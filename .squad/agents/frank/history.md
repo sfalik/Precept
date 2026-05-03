@@ -27,6 +27,15 @@
 
 ## Recent Updates
 
+### 2026-05-03T09:10:00Z — Catalog-Driven Thesis Deviation Audit
+
+Audited all 11 canonical pipeline stage design docs against the catalog-driven thesis. Findings:
+- **2 real deviations** (tooling-surface.md hand-crafted grammar, mcp.md hardcoded firePipeline)
+- **2 flagged open questions** that acknowledge the deviation (GraphState booleans, firePipeline)
+- **1 structural concern** (type-checker switches on ConstructKind for dispatch, which is structural routing not per-member behavior — acceptable)
+- All 11 docs are architecturally sound. The thesis is thoroughly embedded. Deviations are known gaps with explicit open questions, not silent drift.
+- Decision note written to `.squad/decisions/inbox/frank-thesis-deviation-audit.md`.
+
 ### 2026-05-03T05:21:49Z — HandlesCatalog cleanup recorded
 - frank-18 locked the Option F verdict: remove `[HandlesCatalogExhaustively]` / `[HandlesCatalogMember]` from Parser.cs, TypeChecker.cs, and GraphAnalyzer.cs, but retain the attribute type definitions for catalog-side use.
 - frank-19 landed the cleanup: removed all 39 consumer annotations, deleted the two stale reflection enforcement tests, and left the repo building clean with 0 errors and 0 warnings.

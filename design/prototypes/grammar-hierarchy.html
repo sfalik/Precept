@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept — Grammar Hierarchy</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   Design tokens — aligned with brand-spec.html
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:        #0c0c0f;
+  --text:      #f3f4fb;
+  --muted:     #a5adbf;
+  --soft:      #6f778a;
+  --line:      rgba(129, 140, 248, 0.18);
+
+  /* Routing-family accents */
+  --c-header:  #fbbf24;   /* gold    — singular / file-level      */
+  --c-direct:  #6366f1;   /* indigo  — top-level declarations     */
+  --c-state:   #a898f5;   /* purple  — state-scoped constructs    */
+  --c-event:   #30b8e8;   /* cyan    — event-scoped constructs    */
+
+  /* Sub-element accents */
+  --c-action:  #34d399;   /* emerald — action verbs               */
+  --c-outcome: #f87171;   /* rose    — outcome variants           */
+
+  --mono: "Cascadia Code", "Cascadia Cove", Consolas, "SF Mono", monospace;
+}
+
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  background:
+    radial-gradient(ellipse at 10% 0%,   rgba(99,102,241,0.17) 0%, transparent 34%),
+    radial-gradient(ellipse at 88% 6%,   rgba(48,184,232,0.11) 0%, transparent 28%),
+    radial-gradient(ellipse at 50% 105%, rgba(168,152,245,0.09) 0%, transparent 40%),
+    linear-gradient(180deg, #08090d 0%, #0c0c0f 50%, #090a10 100%);
+  min-height: 100vh;
+  padding: 40px 24px 80px;
+}
+
+/* Subtle grid overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.017) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.017) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 70%);
+}
+
+/* ── Page wrapper ── */
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Masthead
+   ══════════════════════════════════════════════════════════════════ */
+.masthead {
+  margin-bottom: 28px;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 6px;
+}
+.masthead h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.masthead .subtitle {
+  font-size: 11px;
+  color: var(--soft);
+  letter-spacing: 0.04em;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Legend bar
+   ══════════════════════════════════════════════════════════════════ */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  margin-bottom: 24px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.07);
+  font-size: 11px;
+  color: var(--muted);
+}
+.legend-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.legend-sep {
+  color: rgba(255,255,255,0.12);
+  margin: 0 6px;
+}
+.legend-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+}
+.chip-a { background: rgba(52,211,153,0.13); border: 1px solid rgba(52,211,153,0.28); color: var(--c-action); }
+.chip-o { background: rgba(248,113,113,0.13); border: 1px solid rgba(248,113,113,0.28); color: var(--c-outcome); }
+.legend-opt { color: var(--soft); font-size: 12px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Family card
+   ══════════════════════════════════════════════════════════════════ */
+.family {
+  margin-bottom: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--family-border, rgba(255,255,255,0.08));
+  overflow: hidden;
+  /* CSS custom properties set via inline style on each .family */
+}
+.family-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: var(--family-tint, rgba(255,255,255,0.03));
+}
+.family-glyph {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--family-color, #fff);
+  box-shadow: 0 0 8px var(--family-color, transparent);
+  flex-shrink: 0;
+}
+.family-name {
+  font-size: 10px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--family-color, var(--muted));
+}
+.family-meta {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--soft);
+  letter-spacing: 0.03em;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Construct table (standard rows)
+   ══════════════════════════════════════════════════════════════════ */
+.constructs {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+.c-row {
+  display: table-row;
+}
+.c-row:not(:last-child) .c-cell {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.c-cell {
+  display: table-cell;
+  padding: 12px 18px;
+  vertical-align: top;
+  line-height: 1.6;
+}
+.c-name {
+  width: 200px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  padding-right: 0;
+}
+.c-name-label {
+  display: block;
+  margin-bottom: 3px;
+}
+.c-syntax {
+  font-size: 13px;
+  color: var(--text);
+}
+.c-example {
+  width: 270px;
+  font-size: 10px;
+  color: var(--soft);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ── Syntax token classes ── */
+.kw    { font-weight: 600; }
+.slot  { font-style: italic; color: var(--muted); }
+.opt   { color: var(--soft); }
+.arrow { color: var(--soft); }
+.ac    { color: var(--c-action);  font-style: italic; }
+.oc    { color: var(--c-outcome); font-style: italic; }
+.no-oc { color: rgba(248,113,113,0.30); font-size: 11px; margin-left: 6px; }
+
+/* Disambiguation badge inline */
+.disambig {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--soft);
+  vertical-align: middle;
+  margin-left: 5px;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TransitionRow — featured / expanded layout
+   ══════════════════════════════════════════════════════════════════ */
+.tr-block {
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding: 14px 18px;
+}
+.tr-header {
+  display: flex;
+  gap: 0;
+  align-items: flex-start;
+}
+.tr-name-col {
+  width: 200px;
+  flex-shrink: 0;
+  padding-right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tr-name-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.owns-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  background: rgba(251,191,36,0.10);
+  border: 1px solid rgba(251,191,36,0.28);
+  color: var(--c-header);
+  white-space: nowrap;
+  align-self: flex-start;
+}
+.tr-syntax-col {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.7;
+  min-width: 0;
+}
+.tr-example-col {
+  width: 270px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--soft);
+  text-align: right;
+  line-height: 1.8;
+  padding-left: 18px;
+}
+
+/* Sub-section grid (actions + outcomes) — offset to align with syntax column */
+.tr-sub {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  margin-left: 200px; /* aligns with tr-syntax-col */
+}
+.sub-label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* Action groups */
+.action-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ag-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ag-label {
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: rgba(52,211,153,0.42);
+  width: 58px;
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+.ag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Chips */
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: var(--mono);
+}
+.chip-action {
+  background: rgba(52,211,153,0.09);
+  border: 1px solid rgba(52,211,153,0.22);
+  color: var(--c-action);
+}
+.chip-outcome {
+  background: rgba(248,113,113,0.09);
+  border: 1px solid rgba(248,113,113,0.22);
+  color: var(--c-outcome);
+}
+
+/* Outcome list */
+.outcome-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.outcome-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.outcome-note {
+  font-size: 11px;
+  color: var(--soft);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.badge-gold {
+  background: rgba(251,191,36,0.10);
+  border: 1px solid rgba(251,191,36,0.28);
+  color: var(--c-header);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Asymmetry callout cards
+   ══════════════════════════════════════════════════════════════════ */
+.asymmetries {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.asym-card {
+  border-radius: 12px;
+  border: 1px solid rgba(251,191,36,0.17);
+  background: rgba(251,191,36,0.026);
+  padding: 18px 18px 16px;
+}
+.asym-n {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(251,191,36,0.26);
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.asym-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-header);
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+.asym-body {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin-bottom: 10px;
+}
+.asym-code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: rgba(255,255,255,0.028);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 7px;
+  padding: 10px 12px;
+  line-height: 1.9;
+}
+/* Highlight helpers used in asym-code */
+.hl-s { color: var(--c-state); }
+.hl-e { color: var(--c-event); }
+.hl-a { color: var(--c-action); }
+.hl-o { color: var(--c-outcome); }
+.hl-dim { color: var(--soft); }
+
+/* ══════════════════════════════════════════════════════════════════
+   Footer
+   ══════════════════════════════════════════════════════════════════ */
+.footer {
+  margin-top: 36px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--soft);
+  letter-spacing: 0.03em;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════════════════════════════════════════════════
+       Masthead
+       ═══════════════════════════════════════════════════════ -->
+  <div class="masthead">
+    <div class="eyebrow">Precept · Grammar Reference</div>
+    <h1>Grammar Hierarchy</h1>
+    <div class="subtitle">12 constructs &nbsp;·&nbsp; 4 routing families &nbsp;·&nbsp; 15 actions &nbsp;·&nbsp; 3 outcomes</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       Legend
+       ═══════════════════════════════════════════════════════ -->
+  <div class="legend">
+    <div class="legend-group">
+      <div class="legend-item"><div class="legend-dot" style="background:#fbbf24; box-shadow:0 0 6px #fbbf24"></div> Header</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#6366f1; box-shadow:0 0 6px #6366f1"></div> Direct</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a898f5; box-shadow:0 0 6px #a898f5"></div> StateScoped</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#30b8e8; box-shadow:0 0 6px #30b8e8"></div> EventScoped</div>
+    </div>
+    <span class="legend-sep">|</span>
+    <div class="legend-item"><span class="legend-chip chip-a">actions</span>&nbsp;appear in 3 constructs</div>
+    <div class="legend-item"><span class="legend-chip chip-o">outcomes</span>&nbsp;only in TransitionRow</div>
+    <span class="legend-sep">|</span>
+    <div class="legend-item"><span class="legend-opt">[ ]</span> = optional slot &nbsp;&nbsp;<span class="legend-opt">|</span> = alternative</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       HEADER FAMILY
+       ═══════════════════════════════════════════════════════ -->
+  <div class="family"
+       style="--family-color:#fbbf24; --family-border:rgba(251,191,36,0.22); --family-tint:rgba(251,191,36,0.055)">
+    <div class="family-header">
+      <div class="family-glyph"></div>
+      <span class="family-name">Header</span>
+      <span class="family-meta">1 construct · file-level · must appear first</span>
+    </div>
+    <div class="constructs">
+      <div class="c-row">
+        <div class="c-cell c-name"><span class="c-name-label">PreceptHeader</span></div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#fbbf24">precept</span>
+          <span class="slot"> Name</span>
+        </div>
+        <div class="c-cell c-example">precept LoanApplication</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       DIRECT FAMILY
+       ═══════════════════════════════════════════════════════ -->
+  <div class="family"
+       style="--family-color:#6366f1; --family-border:rgba(99,102,241,0.28); --family-tint:rgba(99,102,241,0.065)">
+    <div class="family-header">
+      <div class="family-glyph"></div>
+      <span class="family-name">Direct</span>
+      <span class="family-meta">4 constructs · top-level, no state or event scope</span>
+    </div>
+    <div class="constructs">
+
+      <div class="c-row">
+        <div class="c-cell c-name"><span class="c-name-label">FieldDeclaration</span></div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#6366f1">field</span>
+          <span class="slot"> Name+</span>
+          <span class="opt"> as</span>
+          <span class="slot"> Type</span>
+          <span class="opt"> [Modifiers]</span>
+          <span class="opt"> [= Expr]</span>
+        </div>
+        <div class="c-cell c-example">field amount as money nonnegative</div>
+      </div>
+
+      <div class="c-row">
+        <div class="c-cell c-name"><span class="c-name-label">StateDeclaration</span></div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#6366f1">state</span>
+          <span class="slot"> Name+</span>
+          <span class="opt"> [Modifiers]</span>
+        </div>
+        <div class="c-cell c-example">state Draft initial, Submitted, Approved terminal</div>
+      </div>
+
+      <div class="c-row">
+        <div class="c-cell c-name"><span class="c-name-label">EventDeclaration</span></div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#6366f1">event</span>
+          <span class="slot"> Name+</span>
+          <span class="opt"> [(Args)]</span>
+          <span class="opt"> [initial]</span>
+        </div>
+        <div class="c-cell c-example">event Submit(approver as string)</div>
+      </div>
+
+      <div class="c-row">
+        <div class="c-cell c-name"><span class="c-name-label">RuleDeclaration</span></div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#6366f1">rule</span>
+          <span class="slot"> Expr</span>
+          <span class="opt"> [when Guard]</span>
+          <span class="opt"> because</span>
+          <span class="slot"> "msg"</span>
+        </div>
+        <div class="c-cell c-example">rule amount > 0 because "Amount must be positive"</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STATESCOPED FAMILY
+       ═══════════════════════════════════════════════════════ -->
+  <div class="family"
+       style="--family-color:#a898f5; --family-border:rgba(168,152,245,0.28); --family-tint:rgba(168,152,245,0.060)">
+    <div class="family-header">
+      <div class="family-glyph"></div>
+      <span class="family-name">StateScoped</span>
+      <span class="family-meta">5 constructs · keyed to a state declaration</span>
+    </div>
+
+    <!-- ── TransitionRow — featured, owns actions + outcomes ── -->
+    <div class="tr-block">
+      <div class="tr-header">
+        <div class="tr-name-col">
+          <span class="tr-name-label">TransitionRow</span>
+          <span class="owns-badge">★ actions + outcomes</span>
+        </div>
+        <div class="tr-syntax-col">
+          <span class="kw" style="color:#a898f5">from</span>
+          <span class="slot"> State</span>
+          <span class="kw" style="color:#a898f5"> on</span>
+          <span class="slot"> Event</span>
+          <span class="opt"> [when Guard]</span>
+          <br>
+          <span class="arrow" style="padding-left:1em">→</span>
+          <span class="ac"> [Actions…]</span>
+          <span class="arrow"> →</span>
+          <span class="oc"> Outcome</span>
+        </div>
+        <div class="tr-example-col">
+          from Draft on Submit<br>
+          → set reviewer = approver<br>
+          → transition Submitted
+        </div>
+      </div>
+
+      <!-- Sub-sections: Actions + Outcomes -->
+      <div class="tr-sub">
+
+        <!-- Actions -->
+        <div>
+          <div class="sub-label" style="color:rgba(52,211,153,0.58)">
+            Actions — 15 mutation verbs &nbsp;(zero or more, each prefixed →)
+          </div>
+          <div class="action-groups">
+            <div class="ag-row">
+              <div class="ag-label">Scalar</div>
+              <div class="ag-chips">
+                <span class="chip chip-action">set</span>
+              </div>
+            </div>
+            <div class="ag-row">
+              <div class="ag-label">Set</div>
+              <div class="ag-chips">
+                <span class="chip chip-action">add</span>
+                <span class="chip chip-action">remove</span>
+              </div>
+            </div>
+            <div class="ag-row">
+              <div class="ag-label">Queue</div>
+              <div class="ag-chips">
+                <span class="chip chip-action">enqueue</span>
+                <span class="chip chip-action">dequeue</span>
+                <span class="chip chip-action">enqueueBy</span>
+                <span class="chip chip-action">dequeueBy</span>
+              </div>
+            </div>
+            <div class="ag-row">
+              <div class="ag-label">Stack</div>
+              <div class="ag-chips">
+                <span class="chip chip-action">push</span>
+                <span class="chip chip-action">pop</span>
+              </div>
+            </div>
+            <div class="ag-row">
+              <div class="ag-label">List</div>
+              <div class="ag-chips">
+                <span class="chip chip-action">append</span>
+                <span class="chip chip-action">appendBy</span>
+                <span class="chip chip-action">insert</span>
+                <span class="chip chip-action">removeAt</span>
+                <span class="chip chip-action">put</span>
+              </div>
+            </div>
+            <div class="ag-row">
+              <div class="ag-label">Universal</div>
+              <div class="ag-chips">
+                <span class="chip chip-action">clear</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outcomes -->
+        <div>
+          <div class="sub-label" style="color:rgba(248,113,113,0.58)">
+            Outcomes — 3 variants &nbsp;(exactly one, required, terminal)
+          </div>
+          <div class="outcome-list">
+            <div class="outcome-entry">
+              <span class="chip chip-outcome">→ transition</span>
+              <span class="slot" style="font-size:12px">State</span>
+              <span class="outcome-note">move to target state</span>
+            </div>
+            <div class="outcome-entry">
+              <span class="chip chip-outcome">→ no transition</span>
+              <span class="outcome-note">stay in current state</span>
+              <span class="badge badge-gold">2 tokens · 1 outcome</span>
+            </div>
+            <div class="outcome-entry">
+              <span class="chip chip-outcome">→ reject</span>
+              <span class="slot" style="font-size:12px">"msg"</span>
+              <span class="outcome-note">refuse the event</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.tr-sub -->
+    </div><!-- /.tr-block -->
+
+    <!-- ── Remaining StateScoped constructs ── -->
+    <div class="constructs">
+
+      <div class="c-row">
+        <div class="c-cell c-name">
+          <span class="c-name-label">StateEnsure</span>
+          <span class="disambig">ensure</span>
+        </div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#a898f5">in</span>
+          <span class="opt"> | </span>
+          <span class="kw" style="color:#a898f5">to</span>
+          <span class="opt"> | </span>
+          <span class="kw" style="color:#a898f5">from</span>
+          <span class="slot"> State</span>
+          <span class="kw" style="color:#a898f5"> ensure</span>
+          <span class="slot"> Expr</span>
+          <span class="opt"> because</span>
+          <span class="slot"> "msg"</span>
+        </div>
+        <div class="c-cell c-example">in Approved ensure amount > 0 because "…"</div>
+      </div>
+
+      <div class="c-row">
+        <div class="c-cell c-name">
+          <span class="c-name-label">AccessMode</span>
+          <span class="disambig">modify</span>
+        </div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#a898f5">in</span>
+          <span class="slot"> State</span>
+          <span class="kw" style="color:#a898f5"> modify</span>
+          <span class="slot"> Field</span>
+          <span class="slot"> readonly</span>
+          <span class="opt"> | </span>
+          <span class="slot">editable</span>
+          <span class="opt"> [when Guard]</span>
+        </div>
+        <div class="c-cell c-example">in Draft modify Amount editable</div>
+      </div>
+
+      <div class="c-row">
+        <div class="c-cell c-name">
+          <span class="c-name-label">OmitDeclaration</span>
+          <span class="disambig">omit</span>
+        </div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#a898f5">in</span>
+          <span class="slot"> State</span>
+          <span class="kw" style="color:#a898f5"> omit</span>
+          <span class="slot"> Field</span>
+          <span class="opt" style="font-size:11px; margin-left:8px">unconditional — no guard slot</span>
+        </div>
+        <div class="c-cell c-example">in Draft omit InternalNotes</div>
+      </div>
+
+      <div class="c-row">
+        <div class="c-cell c-name">
+          <span class="c-name-label">StateAction</span>
+          <span class="disambig">→</span>
+        </div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#a898f5">to</span>
+          <span class="opt"> | </span>
+          <span class="kw" style="color:#a898f5">from</span>
+          <span class="slot"> State</span>
+          <span class="arrow"> →</span>
+          <span class="ac"> Actions…</span>
+          <span class="no-oc">· no outcome slot</span>
+        </div>
+        <div class="c-cell c-example">to Submitted → set submittedAt = now()</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       EVENTSCOPED FAMILY
+       ═══════════════════════════════════════════════════════ -->
+  <div class="family"
+       style="--family-color:#30b8e8; --family-border:rgba(48,184,232,0.22); --family-tint:rgba(48,184,232,0.050)">
+    <div class="family-header">
+      <div class="family-glyph"></div>
+      <span class="family-name">EventScoped</span>
+      <span class="family-meta">2 constructs · keyed to an event declaration</span>
+    </div>
+    <div class="constructs">
+
+      <div class="c-row">
+        <div class="c-cell c-name">
+          <span class="c-name-label">EventEnsure</span>
+          <span class="disambig">ensure</span>
+        </div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#30b8e8">on</span>
+          <span class="slot"> Event</span>
+          <span class="kw" style="color:#30b8e8"> ensure</span>
+          <span class="slot"> Expr</span>
+          <span class="opt"> because</span>
+          <span class="slot"> "msg"</span>
+        </div>
+        <div class="c-cell c-example">on Submit ensure reviewer != "" because "…"</div>
+      </div>
+
+      <div class="c-row">
+        <div class="c-cell c-name">
+          <span class="c-name-label">EventHandler</span>
+          <span class="disambig">→</span>
+        </div>
+        <div class="c-cell c-syntax">
+          <span class="kw" style="color:#30b8e8">on</span>
+          <span class="slot"> Event</span>
+          <span class="arrow"> →</span>
+          <span class="ac"> Actions…</span>
+          <span class="no-oc">· no outcome slot</span>
+        </div>
+        <div class="c-cell c-example">on UpdateName → set name = newName</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       KEY ASYMMETRIES
+       ═══════════════════════════════════════════════════════ -->
+  <div class="asymmetries">
+
+    <div class="asym-card">
+      <div class="asym-n">①</div>
+      <div class="asym-title">Actions appear in 3 constructs</div>
+      <div class="asym-body">
+        Actions are not exclusive to transitions. Any construct with an action-chain slot carries the same 15 verbs.
+      </div>
+      <div class="asym-code">
+        <span class="hl-s">TransitionRow</span>  <span class="hl-a">→ Actions…</span> <span class="hl-o">→ Outcome</span><br>
+        <span class="hl-s">StateAction</span>     <span class="hl-a">→ Actions…</span><br>
+        <span class="hl-e">EventHandler</span>    <span class="hl-a">→ Actions…</span>
+      </div>
+    </div>
+
+    <div class="asym-card">
+      <div class="asym-n">②</div>
+      <div class="asym-title">Outcomes exist only in TransitionRow</div>
+      <div class="asym-body">
+        StateAction and EventHandler have action chains but no outcome slot — they don't resolve state-machine disposition.
+      </div>
+      <div class="asym-code">
+        <span class="hl-s">TransitionRow</span>  <span class="hl-o">→ Outcome</span>  ✓<br>
+        <span class="hl-s">StateAction</span>     <span class="hl-dim">no outcome</span>   —<br>
+        <span class="hl-e">EventHandler</span>    <span class="hl-dim">no outcome</span>   —
+      </div>
+    </div>
+
+    <div class="asym-card">
+      <div class="asym-n">③</div>
+      <div class="asym-title">no&nbsp;transition is 2&nbsp;tokens · 1&nbsp;outcome</div>
+      <div class="asym-body">
+        Token enumeration can't enumerate outcomes. <code style="color:var(--c-outcome)">no transition</code> composes two tokens into one concept — that composition is domain knowledge, cataloged not hardcoded.
+      </div>
+      <div class="asym-code">
+        <span class="hl-o">→ transition</span> State  <span class="hl-dim">(2 tokens)</span><br>
+        <span class="hl-o">→ no transition</span>      <span class="hl-dim">(2 tokens → 1 outcome)</span><br>
+        <span class="hl-o">→ reject</span> "msg"        <span class="hl-dim">(2 tokens)</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       Footer
+       ═══════════════════════════════════════════════════════ -->
+  <div class="footer">
+    <span>src/Precept/Language/Constructs.cs &nbsp;·&nbsp; ActionKind.cs &nbsp;·&nbsp; Pipeline/SyntaxNodes/OutcomeNode.cs</span>
+    <span>12 constructs &nbsp;·&nbsp; 4 families &nbsp;·&nbsp; 15 actions &nbsp;·&nbsp; 3 outcomes</span>
+  </div>
+
+</div><!-- /.page -->
+</body>
+</html>

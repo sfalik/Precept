@@ -1,5 +1,4 @@
 using Precept.Language;
-using Precept.Pipeline.SyntaxNodes;
 
 namespace Precept.Pipeline;
 
@@ -19,27 +18,9 @@ namespace Precept.Pipeline;
 //
 // See: docs/language/catalog-system.md § GraphAnalyzer-catalog integration pattern
 
-[Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
 public static class GraphAnalyzer
 {
     // TODO Phase 3: implement graph analysis dispatch
     public static StateGraph Analyze(SemanticIndex semantics) => throw new NotImplementedException();
-
-    // TODO Phase 3: implement per-expression-form reachability / constraint analysis
-    [HandlesCatalogMember(ExpressionFormKind.Literal)]
-    [HandlesCatalogMember(ExpressionFormKind.Identifier)]
-    [HandlesCatalogMember(ExpressionFormKind.Grouped)]
-    [HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
-    [HandlesCatalogMember(ExpressionFormKind.UnaryOperation)]
-    [HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
-    [HandlesCatalogMember(ExpressionFormKind.Conditional)]
-    [HandlesCatalogMember(ExpressionFormKind.FunctionCall)]
-    [HandlesCatalogMember(ExpressionFormKind.MethodCall)]
-    [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
-    [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
-    [HandlesCatalogMember(ExpressionFormKind.Quantifier)]
-    [HandlesCatalogMember(ExpressionFormKind.CIFunctionCall)]
-    private static void AnalyzeExpression(Expression expression) =>
-        throw new NotImplementedException("GraphAnalyzer expression handling — Phase 3 implementation");
 }
 

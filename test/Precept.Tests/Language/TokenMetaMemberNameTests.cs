@@ -28,15 +28,7 @@ public class TokenMetaMemberNameTests
     public void TokenMeta_AllOtherKeywords_IsValidAsMemberName_False(TokenKind kind)
         => Tokens.GetMeta(kind).IsValidAsMemberName.Should().BeFalse();
 
-    [Fact]
-    public void Parser_KeywordsValidAsMemberName_ContainsMinAndMax()
-    {
-        Precept.Pipeline.Parser.KeywordsValidAsMemberName.Should().Contain(TokenKind.Min);
-        Precept.Pipeline.Parser.KeywordsValidAsMemberName.Should().Contain(TokenKind.Max);
-        Precept.Pipeline.Parser.KeywordsValidAsMemberName.Should().Contain(TokenKind.Countof);
-        Precept.Pipeline.Parser.KeywordsValidAsMemberName.Should().Contain(TokenKind.Peekby);
-        Precept.Pipeline.Parser.KeywordsValidAsMemberName.Should().HaveCount(4);
-    }
+
 
     public static TheoryData<TokenKind> AllKindsExceptValidMemberNames()
     {

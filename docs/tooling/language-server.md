@@ -219,18 +219,20 @@ Semantic tokens enable rich syntax highlighting beyond what TextMate grammars ca
 
 **Trigger:** `textDocument/semanticTokens/full`
 
-**Artifact:** `Compilation.TokenStream` + `TokenMeta.SemanticTokenType`
+**Artifact:** `Compilation.Tokens` + `TokenMeta.SemanticTokenType`
+
+> **Open Question (unresolved):** Should `Compilation` carry a `Tokens` field for lexical semantic token generation? The precept-builder.md `Compilation` record does not currently include it.
 
 **Mechanics:**
 
-Pass 1 walks the `TokenStream` and emits semantic tokens based on `TokenMeta.SemanticTokenType`. This pass requires only the lexer — it works even when the type checker fails.
+Pass 1 walks the token stream and emits semantic tokens based on `TokenMeta.SemanticTokenType`. This pass requires only the lexer — it works even when the type checker fails.
 
 ```csharp
 SemanticTokens BuildLexicalTokens(Compilation compilation)
 {
     var builder = new SemanticTokensBuilder();
     
-    foreach (var token in compilation.TokenStream)
+    foreach (var token in compilation.Tokens)
     {
         var meta = Tokens.GetMeta(token.Kind);
         if (meta.SemanticTokenType is null) continue;
@@ -240,7 +242,7 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
             character: token.Span.StartColumn,
             length: token.Span.Length,
             tokenType: meta.SemanticTokenType,
-            tokenModifiers: meta.SemanticTokenModifiers ?? "");
+            tokenModifiers: 0);  // TokenMeta.SemanticTokenModifiers TBD
     }
     
     return builder.Build();
@@ -316,6 +318,8 @@ void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
 }
 ```
 
+> **Open Question (unresolved):** `SemanticIndex.References` does not exist in the type-checker.md §7.1 canonical shape. Should the type checker emit reference collections, or should Pass 2 reconstruct reference sites by walking typed declarations and pattern-matching on `TypedFieldRef`, `TypedArgRef`, etc.?
+
 **Graceful Degradation:**
 
 If the type checker fails (compilation has errors), Pass 2 is skipped. The editor still gets Pass 1 lexical tokens — keywords, types, operators, and literals are highlighted correctly. Only identifier classification degrades.
@@ -346,6 +350,8 @@ enum SlotContext
     InExpression,       // Inside guard, compute, ensure expression
     InArgDefault,       // Default value for event argument
 }
+
+> **Open Question (unresolved):** `SlotContext` is defined here and in tooling-surface.md. Which document is the canonical home? Also, this maps `SlotKind` values while tooling-surface.md maps `ConstructSlotKind`. Are these the same enum under different names?
 
 SlotContext GetCursorContext(SyntaxTree tree, Position position)
 {
@@ -408,6 +414,8 @@ IEnumerable<CompletionItem> GetTypeCompletions()
         });
 }
 
+> **Open Question (unresolved):** `TypeMeta.IsUserFacing` and `TypeMeta.SnippetTemplate` are used here but not in the catalog-system.md shape. Should these properties be added to `TypeMeta`?
+
 IEnumerable<CompletionItem> GetActionCompletions(TypeKind? fieldType)
 {
     return Actions.All
@@ -416,13 +424,13 @@ IEnumerable<CompletionItem> GetActionCompletions(TypeKind? fieldType)
         {
             Label = a.Token.Text,
             Kind = CompletionItemKind.Method,
-            Documentation = a.HoverDescription,
-            InsertText = a.SnippetTemplate ?? a.Token.Text,
-            InsertTextFormat = a.SnippetTemplate is not null 
-                ? InsertTextFormat.Snippet 
-                : InsertTextFormat.PlainText
+            Documentation = a.Description,  // ActionMeta has Description, not HoverDescription
+            InsertText = a.Token.Text,
+            InsertTextFormat = InsertTextFormat.PlainText
         });
 }
+
+> **Open Question (unresolved):** `ActionMeta.HoverDescription` and `ActionMeta.SnippetTemplate` are used in the original design but not in the catalog-system.md shape. Should these properties be added to `ActionMeta`?
 
 IEnumerable<CompletionItem> GetStateCompletions(SemanticIndex? index)
 {
@@ -524,13 +532,15 @@ MarkupContent FormatSymbolHover(object symbol) => symbol switch
     TypedArg a => new MarkupContent
     {
         Kind = MarkupKind.Markdown,
-        Value = $"**argument** `{a.Name}` : `{Types.GetMeta(a.ResolvedType).Token.Text}`\n\n" +
-                $"Event: `{a.EventName}`"
+        Value = $"**argument** `{a.Name}` : `{Types.GetMeta(a.ResolvedType).Token.Text}`"
+        // Note: owning event lookup needed separately via ArgReference
     },
     
     _ => new MarkupContent { Kind = MarkupKind.PlainText, Value = "" }
 };
 ```
+
+> **Open Question (unresolved):** `TypedArg` has no `EventName` back-reference. Hover for an event arg needs to look up the owning event from an `ArgReference`. Should `TypedArg` carry an `EventName` field, or should hover look it up separately?
 
 ### 7.5 Go-to-Definition
 
@@ -595,7 +605,9 @@ public sealed record TypedEvent(
 
 ### 7.6 Preview/Inspect (Custom LSP Extension)
 
-**Trigger:** `precept/inspect` (custom method, not standard LSP)
+**Trigger:** `precept/preview` (custom method, not standard LSP)
+
+> **Open Question (unresolved):** This method is named `precept/inspect` here but `precept/preview` in tooling-surface.md §7.4. Which name is canonical? Using `precept/preview` pending resolution.
 
 **Artifact:** `Precept` + inspection runtime (`EventInspection`, `UpdateInspection`)
 
@@ -652,9 +664,9 @@ public sealed record EventInspection(
 public enum Prospect { Certain, Possible, Impossible }
 ```
 
-**Integration with VS Code Extension:**
+> **Open Question (unresolved):** The `EventInspection` shape here differs from evaluator.md. This doc has `BeforeFields`/`AfterFields`; evaluator.md has `EventEnsures`/`ConstraintResult`. Which is canonical? Should this doc reference evaluator.md's shape?
 
-The extension calls `precept/inspect` whenever the user changes preview state, then renders the result in the preview webview. See `docs/tooling/extension.md` for the webview side.
+The extension calls `precept/preview` whenever the user changes preview state, then renders the result in the preview webview. See `docs/tooling/extension.md` for the webview side.
 
 ### 7.7 Document Outline
 
@@ -686,6 +698,8 @@ bool IsOutlineConstruct(ConstructKind kind) => kind switch
     ConstructKind.EditDeclaration => true,
     _ => false
 };
+
+> **Open Question (unresolved):** `IsOutlineConstruct` and `MapSymbolKind` hardcode `ConstructKind` values. By catalog-driven architecture, `ConstructMeta` should carry `IsOutlineNode` and `LspSymbolKind` properties. Should these be added to the catalog?
 
 DocumentSymbol ToDocumentSymbol(ParsedConstruct construct) => new()
 {
@@ -847,7 +861,7 @@ void Update(Compilation compilation)
 
 **Choice:** Store `Compilation` in a `volatile` field and update via `Interlocked.Exchange`. No locks.
 
-**Rationale:** `Compilation` is deeply immutable — once created, it never changes. Concurrent readers all see a complete, consistent snapshot. No lock contention, no deadlock risk, no lock ordering bugs.
+**Rationale:** `Compilation` is deeply immutable — once created, it never changes. Concurrent readers all see a complete, consistent snapshot. No lock contention, no deadlock risk, no lock ordering bugs. Deep immutability is enforced by using `ImmutableArray<>` and sealed record types throughout the compilation artifact graph.
 
 **Alternatives Rejected:**
 - **Reader-writer lock** — adds contention and complexity for no benefit when data is immutable

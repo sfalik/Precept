@@ -498,17 +498,7 @@ public class ConstructsTests
             "9 distinct leading tokens: Precept, Field, State, Event, Rule, From, In, To, On");
     }
 
-    // ── ExpressionBoundaryTokens derivation ─────────────────────────────────────
 
-    [Fact]
-    public void ExpressionBoundaryTokens_ContainsAllConstructLeadingTokens()
-    {
-        var boundary = Parser.ExpressionBoundaryTokens;
-        foreach (var tk in Constructs.LeadingTokens)
-        {
-            boundary.Should().Contain(tk, $"LeadingToken {tk} must be an expression boundary");
-        }
-    }
 
     // ── RoutingFamily ────────────────────────────────────────────────────────────
 

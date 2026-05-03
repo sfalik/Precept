@@ -1,160 +1,659 @@
 # Graph Analyzer
 
-## Status
+> **Status:** Design — implementation pending.
 
-| Property | Value |
-|---|---|
-| Doc maturity | Stub |
-| Implementation state | Diagnostics-only stub |
-| Source | `src/Precept/Pipeline/GraphAnalyzer.cs`, `src/Precept/Pipeline/StateGraph.cs` |
-| Upstream | SemanticIndex (from TypeChecker), catalog metadata |
-| Downstream | ProofEngine, Precept Builder, LS structural diagnostics |
+## 1. Overview
 
----
+The graph analyzer is the fourth pipeline stage, transforming the type checker's `SemanticIndex` into a `StateGraph` containing topology models and structural analysis facts. This stage produces no runtime values — only structural analysis results that inform subsequent proof obligations and diagnostics.
 
-## Overview
+**Pipeline Position:**
 
-The graph analyzer derives lifecycle structure from semantic declarations. It transforms the resolved `SemanticIndex` into a `StateGraph` — a directed edge set plus derived structural facts (reachability, dominance, event coverage, topology violations). Its key design choice: it operates on resolved semantic identities, not syntax, because reachability and dominance require identity, not source position.
+```text
+Source Text → Lexer → Parser → Type Checker → [Graph Analyzer] → Proof Engine → Runtime
+                                   ↓                  ↓
+                            SemanticIndex       StateGraph
+```
 
----
-
-## Responsibilities and Boundaries
-
-**OWNS:** Transition edge set construction, reachability computation, terminal/unreachable state detection, dominance analysis, irreversible back-edge detection, event coverage per state, ProofForwardingFacts production.
-
-**Does NOT OWN:** Semantic resolution (TypeChecker), expression proof obligations (ProofEngine), runtime topology indexes (Precept Builder — builds execution-time indexes from graph facts).
+The graph analyzer operates on fully resolved, well-typed declarations. It constructs the state-transition graph topology, partitions states by reachability, enforces catalog-driven modifier semantics (terminal, required, irreversible), and prepares proof-forwarding facts for downstream stages.
 
 ---
 
-## Right-Sizing
+## 2. Responsibilities and Boundaries
 
-The graph analyzer is sized to structural analysis only. It does not evaluate expressions (that is the proof engine's domain) and does not plan execution (that is the builder's domain). The `StateGraph` artifact is topology + structural facts — nothing more. Modifier semantics (`initial`, `terminal`, `required`, `irreversible`) are resolved by the TypeChecker; the graph analyzer consumes already-resolved modifier facts without re-interpreting them.
+### In Scope
 
----
+| Responsibility | Description |
+|----------------|-------------|
+| **Edge construction** | Build `GraphEdge` entries from `TypedTransitionRow` declarations, resolving any-state wildcards to explicit source states |
+| **Reachability analysis** | Partition states into reachable and unreachable sets via BFS from the initial state |
+| **Modifier enforcement** | Apply catalog-driven structural constraints: terminal states must have no outgoing edges, irreversible states must have no back-edges, required states must dominate some terminal |
+| **Dominance computation** | Compute dominator relationships to verify required-state constraints |
+| **Event coverage analysis** | Determine which events are handled in each state, identifying dead events |
+| **Proof forwarding** | Emit `ProofForwardingFact` entries that guide the proof engine's obligation generation |
+| **Diagnostic emission** | Report `UnreachableState`, `UnhandledEvent`, and structural violations as diagnostics |
 
-## Inputs and Outputs
+### Out of Scope
 
-**Input:**
-- `SemanticIndex` — typed state/event/transition declarations with resolved modifier facts
-- Catalog metadata: Modifiers, Actions, Diagnostics
-
-**Output:**
-- `StateGraph` — adjacency set, predecessor/successor indexes, reachability partition, derived structural facts (`DominanceFact`, `TerminalOutgoingViolation`, `IrreversibleBackEdgeViolation`, `EventCoverageEntry`, `ProofForwardingFact`), diagnostics
-
----
-
-## Four-Phase Analysis
-
-Graph construction then structural analysis in four phases:
-
-1. **Phase 1 — Edge set:** Build directed edge set from `TypedTransitionRow` entries in `SemanticIndex`.
-2. **Phase 2 — Reachability:** Compute reachability from initial state via BFS/DFS. Partition states into reachable / unreachable sets.
-3. **Phase 3 — Structural facts:** Derive dominance, coverage, and violation facts from topology.
-4. **Phase 4 — Proof forwarding:** Forward structural defects as `ProofForwardingFact` entries for the proof engine.
+| Exclusion | Rationale |
+|-----------|-----------|
+| **Expression evaluation** | The graph analyzer operates on topology, not values. Expression semantics belong to the proof engine and runtime evaluator. |
+| **Name resolution** | Names are already resolved by the type checker. The graph analyzer consumes `TypedState`, `TypedEvent`, and `TypedTransitionRow` entries with resolved references. |
+| **Guard analysis** | Guard expressions are opaque to the graph analyzer. The proof engine handles guard satisfiability. |
+| **Action effects** | Actions mutate state data at runtime. The graph analyzer sees only the structural transition topology. |
+| **Runtime execution** | No event firing, no state mutation, no data binding. |
 
 ---
 
-## Structural Analysis Operations
+## 3. Right-Sizing
 
-### Edge Set Construction
+The graph analyzer is intentionally minimal. It produces exactly the structural facts that downstream stages require — no more.
 
-Each `TypedTransitionRow` contributes directed edges. `from → to` rows produce a single edge. `in` rows produce self-edges (state-scoped event declarations with no topology change). `on` rows produce edges from any reachable state to the target state. The edge set is keyed by `(TypedState, TypedEvent)` pairs — semantic identity, not string names.
+**Why not merge into the type checker?**
+The type checker validates declaration-level semantics (name binding, type compatibility, modifier applicability). Graph analysis requires the complete, resolved declaration set to reason about global properties like reachability and dominance. Separating these concerns keeps each stage focused and testable.
 
-### Reachability Computation
+**Why not merge into the proof engine?**
+The proof engine generates and solves proof obligations for runtime correctness. It consumes structural facts (reachability, dominance) as inputs. Bundling topology analysis into proof generation would conflate static graph properties with dynamic proof obligations.
 
-BFS from the initial state. Every state reachable from the initial state via any chain of transitions is in the reachable set. States not reachable from the initial state are in the unreachable set and produce `UnreachableState` diagnostics.
-
-### Dominance Analysis
-
-A state `s` dominates a terminal state `t` if every path from initial to `t` passes through `s`. Required-state modifier mandates this dominance relationship — a `required` state that does not dominate at least one terminal state is a `DominanceFact` violation.
-
-### Event Coverage
-
-For each reachable state, the analyzer computes which events have declared transition rows. States that have no declared rows for an event that is reachable in the lifecycle are represented as `EventCoverageEntry` entries — informational, not necessarily violations.
-
-### Violation Detection
-
-**Canonical source:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). See [spec §3.10](../language/precept-language-spec.md#310-diagnostic-catalog) for the full group reference.
-
-| Violation | Condition |
-|---|---|
-| `TerminalOutgoingViolation` | Terminal state has outgoing transitions |
-| `IrreversibleBackEdgeViolation` | A transition re-enters an irreversible state from a downstream state |
-| `UnreachableState` (diagnostic) | State not reachable from initial state |
-| `DominanceFact` violation | Required state does not dominate any terminal |
+**Bounded complexity:**
+Precept targets small state machines (3–15 states typical, bounded at 50). At this scale, straightforward algorithms (BFS for reachability, iterative dominator computation) suffice. The graph analyzer does not need asymptotically optimal algorithms designed for thousands of nodes.
 
 ---
 
-## Dependencies and Integration Points
+## 4. Inputs and Outputs
 
-- **SemanticIndex** (upstream): typed transition rows, typed state modifier facts, typed event declarations
-- **Catalogs** (upstream): Modifiers (for `initial`, `terminal`, `required`, `irreversible` semantics), Diagnostics
-- **ProofEngine** (downstream): consumes `ProofForwardingFact` entries from structural violations
-- **Precept Builder** (downstream): builds runtime dispatch indexes and reachability index from `StateGraph` topology
-- **LS structural diagnostics** (downstream): surfaces unreachable states and topology violations in the editor
+### Input: `SemanticIndex`
+
+The `SemanticIndex` is the type checker's output — a fully resolved, well-typed representation of the precept definition. The canonical shape is defined in `type-checker.md` §7.1.
+
+**Graph-relevant fields:**
+
+| Field | Purpose |
+|-------|---------|
+| `States` | `ImmutableArray<TypedState>` — state names and modifiers |
+| `TransitionRows` | `ImmutableArray<TypedTransitionRow>` — edge definitions |
+| `StateHooks` | `ImmutableArray<TypedStateHook>` — entry/exit hooks (stub — no downstream consumer yet) |
+
+The graph analyzer reads only the topology-relevant subset of `SemanticIndex`. It does not consume `Fields`, `Rules`, `Ensures`, `AccessModes`, or `EventHandlers` — those belong to the proof engine and runtime builder.
+
+### Output: `StateGraph`
+
+The `StateGraph` encapsulates the topology model, reachability partition, structural analysis facts, proof-forwarding facts, and diagnostics.
+
+```csharp
+public sealed record StateGraph(
+    // Core topology
+    ImmutableArray<GraphState> States,
+    ImmutableArray<GraphEvent> Events,
+    ImmutableArray<GraphEdge> Edges,
+    
+    // Reachability partition
+    ImmutableHashSet<string> ReachableStates,
+    ImmutableHashSet<string> UnreachableStates,
+    
+    // Structural analysis facts
+    ImmutableArray<DominanceFact> Dominance,
+    ImmutableArray<TerminalOutgoingViolation> TerminalViolations,
+    ImmutableArray<IrreversibleBackEdgeViolation> BackEdgeViolations,
+    ImmutableArray<EventCoverageEntry> EventCoverage,
+    
+    // Proof forwarding
+    ImmutableArray<ProofForwardingFact> ProofFacts,
+    
+    // Diagnostics
+    ImmutableArray<Diagnostic> Diagnostics
+);
+```
+
+**Core Topology Types:**
+
+```csharp
+public sealed record GraphState(
+    string Name,
+    bool IsInitial,
+    bool IsTerminal,
+    bool IsRequired,
+    bool IsIrreversible,
+    bool IsReachable
+);
+```
+
+> **Open Question (unresolved):** `GraphState` uses four explicit boolean properties (`IsInitial`, `IsTerminal`, `IsRequired`, `IsIrreversible`) derived from state modifiers. Should `GraphState` instead carry `ImmutableArray<ModifierKind> Modifiers` and derive flags from catalog lookups at construction time? `IsReachable` is computed topology output (not a modifier) and is fine as-is.
+
+```csharp
+
+public sealed record GraphEvent(
+    string Name,
+    bool IsInitial,
+    ImmutableArray<string> HandledInStates  // states where this event has a transition
+);
+
+public sealed record GraphEdge(
+    string FromState,
+    string EventName,
+    string ToState,       // resolved: self-transitions become explicit
+    bool HasGuard,
+    TransitionOutcome Outcome
+);
+```
+
+**Structural Analysis Types:**
+
+```csharp
+public sealed record DominanceFact(
+    string Dominator,
+    string Dominated,
+    int Distance          // path length in dominator tree
+);
+
+public sealed record TerminalOutgoingViolation(
+    string StateName,
+    ImmutableArray<GraphEdge> OutgoingEdges
+);
+
+public sealed record IrreversibleBackEdgeViolation(
+    string StateName,
+    GraphEdge BackEdge
+);
+
+public sealed record EventCoverageEntry(
+    string EventName,
+    ImmutableArray<string> HandlingStates,
+    ImmutableArray<string> NonHandlingReachableStates
+);
+```
+
+**Proof Forwarding Types:**
+
+```csharp
+public abstract record ProofForwardingFact;
+
+public sealed record ReachabilityFact(
+    string StateName,
+    bool IsReachable,
+    ImmutableArray<string>? PathFromInitial  // null if unreachable
+) : ProofForwardingFact;
+
+public sealed record DominancePathFact(
+    string RequiredState,
+    ImmutableArray<string> DominatedTerminals
+) : ProofForwardingFact;
+
+public sealed record EventCoverageFact(
+    string EventName,
+    ImmutableArray<string> UnhandledReachableStates
+) : ProofForwardingFact;
+
+public sealed record TerminalCompletenessFact(
+    bool AllTerminalsReachable,
+    ImmutableArray<string> UnreachableTerminals
+) : ProofForwardingFact;
+```
 
 ---
 
-## Failure Modes and Recovery
+## 5. Architecture
 
-The graph analyzer accumulates all diagnostics without aborting. If no initial state is declared, the edge set is empty and reachability produces an empty reachable set with a diagnostic. Topology violations produce diagnostics and structural fact entries; downstream stages (proof, builder) treat them as signals to suppress derivative work or plant fault backstops.
+### 5.1 Four-Phase Analysis Pipeline
+
+The graph analyzer executes four sequential phases, each building on prior results:
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                         SemanticIndex                                │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Phase 1: Edge Construction                                          │
+│  • Expand any-state wildcards to explicit edges                      │
+│  • Resolve self-transitions to explicit FromState == ToState         │
+│  • Build adjacency structures                                        │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Phase 2: Reachability Analysis                                      │
+│  • BFS from initial state                                            │
+│  • Partition into ReachableStates / UnreachableStates                │
+│  • Emit UnreachableState diagnostics                                 │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Phase 3: Structural Analysis                                        │
+│  • Compute dominator tree (iterative algorithm)                      │
+│  • Check terminal modifier constraints (no outgoing edges)           │
+│  • Check irreversible modifier constraints (no back-edges)           │
+│  • Check required modifier constraints (must dominate terminal)      │
+│  • Compute event coverage per state                                  │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Phase 4: Proof Forwarding                                           │
+│  • Emit ReachabilityFact for each state                              │
+│  • Emit DominancePathFact for required states                        │
+│  • Emit EventCoverageFact for events with gaps                       │
+│  • Emit TerminalCompletenessFact                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                           StateGraph                                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Catalog-Driven Modifier Dispatch
+
+State modifier semantics are defined in the `Modifiers` catalog, not hardcoded in the analyzer. The `StateModifierMeta` record carries the structural constraint flags:
+
+```csharp
+// From src/Precept/Language/Modifier.cs
+public sealed record StateModifierMeta(
+    ModifierKind Kind,
+    TokenMeta Token,
+    string Description,
+    ModifierCategory Category,
+    bool AllowsOutgoing = true,      // terminal: false
+    bool RequiresDominator = false,  // required: true
+    bool PreventsBackEdge = false,   // irreversible: true
+    ModifierKind[]? MutuallyExclusiveWith = null
+) : ModifierMeta(Kind, Token, Description, Category);
+```
+
+**Dispatch pattern:**
+
+```csharp
+foreach (var state in index.States)
+{
+    foreach (var modifierKind in state.Modifiers)
+    {
+        var meta = Modifiers.GetMeta(modifierKind);
+        if (meta is StateModifierMeta stateMeta)
+        {
+            if (!stateMeta.AllowsOutgoing)
+                CheckNoOutgoingEdges(state, edges);
+            
+            if (stateMeta.PreventsBackEdge)
+                CheckNoBackEdges(state, edges, reachabilityOrder);
+            
+            if (stateMeta.RequiresDominator)
+                CheckDominatesTerminal(state, dominatorTree);
+        }
+    }
+}
+```
+
+This pattern ensures new modifier constraints can be added to the catalog without modifying analyzer code.
 
 ---
 
-## Contracts and Guarantees
+## 6. Component Mechanics
 
-- Every state in `SemanticIndex` appears in exactly one of: reachable set, unreachable set.
-- Every `TypedTransitionRow` in `SemanticIndex` contributes at least one edge to the edge set.
-- `ProofForwardingFact` entries are produced for all structural violations that have proof-level implications.
+### 6.1 Edge Construction (Phase 1)
+
+**Input:** `ImmutableArray<TypedTransitionRow>`
+
+**Processing:**
+
+1. **Wildcard expansion:** For rows where `FromState` is null (any-state wildcard), generate one edge per declared state that does not have an explicit transition for that event.
+
+> **Open Question (unresolved):** Should wildcard expansion happen for all declared states (Phase 2 later marks unreachable ones), or only reachable states (requiring Phase 2 to run first)? The current phase order implies all declared states.
+
+2. **Self-transition resolution:** For rows where `TargetState` is null, set `ToState = FromState`.
+
+3. **Adjacency map:** Build `Dictionary<string, List<GraphEdge>>` for O(1) edge lookup by source state.
+
+**Output:** `ImmutableArray<GraphEdge>`, adjacency structures.
+
+### 6.2 Reachability Analysis (Phase 2)
+
+**Algorithm:** Breadth-first search from the initial state.
+
+```text
+Input: adjacency map, initial state name
+Output: (ReachableStates, UnreachableStates, pathMap)
+
+1. Initialize queue with initial state
+2. Initialize visited = { initial }
+3. Initialize pathMap[initial] = []
+4. While queue not empty:
+   a. Dequeue current
+   b. For each edge from current:
+      i.  If edge.ToState not in visited:
+          - Add to visited
+          - Enqueue edge.ToState
+          - pathMap[edge.ToState] = pathMap[current] + [current]
+5. ReachableStates = visited
+6. UnreachableStates = AllStates - visited
+7. Emit Diagnostic(UnreachableState) for each unreachable state
+```
+
+### 6.3 Dominator Computation (Phase 3)
+
+**Algorithm:** Iterative dominator computation (Cooper, Harvey, Kennedy).
+
+At Precept's bounded scale (≤50 states), the simple iterative algorithm is sufficient. Lengauer-Tarjan is unnecessary.
+
+```text
+Input: adjacency map, initial state, ReachableStates
+Output: dominatorTree (immediate dominators), DominanceFact[]
+
+1. dom[initial] = initial
+2. For all other reachable states: dom[s] = undefined
+3. changed = true
+4. While changed:
+   changed = false
+   For each state s in reverse postorder (excluding initial):
+     new_idom = first processed predecessor
+     For each other predecessor p:
+       if dom[p] defined:
+         new_idom = intersect(new_idom, p)
+     if dom[s] ≠ new_idom:
+       dom[s] = new_idom
+       changed = true
+5. Build DominanceFact entries from dom[] tree
+```
+
+**Dominance verification for `required` modifier:**
+
+A required state must dominate at least one terminal state. This ensures every complete execution path passes through the required state.
+
+```text
+For each state with RequiresDominator = true:
+  terminalsReached = { t ∈ Terminals : state dominates t }
+  if terminalsReached is empty:
+    Emit Diagnostic(RequiredStateDoesNotDominateTerminal)
+```
+
+### 6.4 Structural Constraint Checks (Phase 3)
+
+**Terminal constraint (`AllowsOutgoing = false`):**
+
+```text
+For each state where AllowsOutgoing = false:
+  outgoing = edges where FromState = state
+  if outgoing is not empty:
+    Emit TerminalOutgoingViolation(state, outgoing)
+    Emit Diagnostic(TerminalStateHasOutgoingEdges)
+```
+
+**Irreversible constraint (`PreventsBackEdge = true`):**
+
+A back-edge is an edge from a state to an ancestor in the BFS traversal (indicating a cycle that returns to an earlier point).
+
+```text
+For each state where PreventsBackEdge = true:
+  For each edge from state:
+    if edge.ToState is ancestor of state in BFS tree:
+      Emit IrreversibleBackEdgeViolation(state, edge)
+      Emit Diagnostic(IrreversibleStateHasBackEdge)
+```
+
+### 6.5 Event Coverage Analysis (Phase 3)
+
+Determine which events are handled in which states, identifying gaps.
+
+```text
+For each event e:
+  handlingStates = { s : ∃ edge from s on event e }
+  nonHandlingReachable = ReachableStates - handlingStates
+  Emit EventCoverageEntry(e, handlingStates, nonHandlingReachable)
+  
+  if nonHandlingReachable is not empty:
+    Emit Diagnostic(UnhandledEvent, state, event) for each gap
+```
+
+> **Open Question (unresolved):** Should there be a mechanism to suppress `UnhandledEvent` diagnostics for certain events (e.g., an "optional" modifier on events)? Currently no such mechanism exists in the language spec.
+
+### 6.6 Proof Forwarding (Phase 4)
+
+Package analysis results as typed facts for the proof engine:
+
+1. **ReachabilityFact:** For each state, whether it's reachable and the path from initial (if reachable).
+
+2. **DominancePathFact:** For each required state, which terminals it dominates.
+
+3. **EventCoverageFact:** For each event with coverage gaps, which reachable states don't handle it.
+
+4. **TerminalCompletenessFact:** Whether all terminal states are reachable.
 
 ---
 
-## Design Rationale and Decisions
+## 7. Dependencies and Integration Points
 
-TBD — design rationale section to be populated during implementation. Key decisions include: choice of graph algorithm for dominance (see Open Questions), definition of "unreachable" in the presence of `on` anchor rows.
+### Upstream Dependencies
 
----
+| Component | Dependency Type | Data Consumed |
+|-----------|-----------------|---------------|
+| Type Checker | Pipeline predecessor | `SemanticIndex` — resolved states, events, transitions |
+| `Modifiers` catalog | Static metadata | `StateModifierMeta.AllowsOutgoing`, `.RequiresDominator`, `.PreventsBackEdge` |
+| `Diagnostics` | Static metadata | `DiagnosticCode.UnreachableState`, `.UnhandledEvent` |
 
-## Innovation
+### Downstream Consumers
 
-- **Reachability as a first-class design artifact:** Graph analysis produces reachable/unreachable state sets, structural validity facts, and runtime indexes — not just a pass/fail check. These facts flow into proof obligations and runtime precomputation.
-- **Lifecycle soundness at compile time:** Unreachable states, terminal outgoing-edge violations, required-state dominance violations, and irreversible back-edges are caught before any instance exists. No state machine library in this category provides this level of static lifecycle verification.
-- **Structural cycle and dominance detection:** The graph analyzer reasons about structural properties (dominance, predecessor/successor relationships, event coverage per state) that would otherwise require runtime observation to discover.
+| Component | Dependency Type | Data Provided |
+|-----------|-----------------|---------------|
+| Proof Engine | Pipeline successor | `StateGraph` — topology, reachability, dominance, proof facts |
+| Language Server | Tooling | `StateGraph` — for hover info, go-to-definition, diagnostics |
+| MCP Server | Tooling | `StateGraph` — for `precept_compile` tool output |
 
----
+### Catalog Integration
 
-## Open Questions / Implementation Notes
+The graph analyzer reads from two catalogs:
 
-1. `GraphAnalyzer.Analyze` throws `NotImplementedException` — implementation not started beyond stub wiring.
-2. Confirm graph algorithm for dominance computation: standard immediate dominator algorithm, or Lengauer-Tarjan? At Precept's scale (bounded state count), a simple post-dominator DFS is sufficient; Lengauer-Tarjan is not needed.
-3. Confirm `EventCoverageEntry` definition: what does "uncovered" mean exactly — event declared but no row in this state, or event reachable but no row here?
-4. Confirm `ProofForwardingFact` shapes before implementing the proof engine — the proof engine depends on these.
-5. Confirm whether `StateGraph` needs a predecessor index at runtime (Precept Builder uses it) or only at graph-analysis time.
+1. **`Modifiers`** — via `Modifiers.GetMeta(kind)` to retrieve structural constraint flags for state modifiers.
 
----
+2. **`Diagnostics`** — via `Diagnostics.Create(code, span, args)` to emit properly formatted diagnostics.
 
-## Deliberate Exclusions
-
-- **No expression evaluation or proof:** Constraint satisfiability and operation safety are the proof engine's domain.
-- **No execution planning:** Runtime dispatch indexes are built by the Precept Builder from graph facts.
-- **No modifier re-resolution:** Modifier semantics (`initial`, `terminal`, `required`, `irreversible`) are resolved by the TypeChecker; the graph analyzer consumes already-resolved modifier facts.
+The analyzer does not write to catalogs. All catalog interaction is read-only.
 
 ---
 
-## Cross-References
+## 8. Failure Modes and Recovery
 
-| Topic | Document |
-|---|---|
-| Full StateGraph design | `docs/compiler-and-runtime-design.md §7` |
-| SemanticIndex input contract | `docs/compiler/type-checker.md` |
-| ProofForwardingFacts consumer | `docs/compiler/proof-engine.md` |
-| Runtime index builder from StateGraph | `docs/runtime/precept-builder.md` |
+### 8.1 Upstream Failures
+
+**Empty or invalid `SemanticIndex`:**
+
+If the type checker produces no states or no initial state, the graph analyzer cannot proceed meaningfully.
+
+- **Detection:** Check `index.States.IsEmpty` or absence of initial modifier.
+- **Recovery:** Return a minimal `StateGraph` with a diagnostic. Do not throw.
+
+**Missing initial state:**
+
+A precept without an initial state has no entry point for graph traversal.
+
+- **Detection:** `!index.States.Any(s => s.Modifiers.Contains(ModifierKind.Initial))`
+- **Recovery:** Emit `Diagnostic(NoInitialState)`, return empty reachability sets.
+
+### 8.2 Structural Violations
+
+Structural violations (terminal with outgoing edges, irreversible with back-edges, required not dominating terminal) are not failures — they are analysis results. The analyzer:
+
+1. Records the violation in the appropriate collection (`TerminalViolations`, `BackEdgeViolations`).
+2. Emits a diagnostic.
+3. Continues analysis to completion.
+
+The graph analyzer does not short-circuit on violations. All structural facts are computed regardless of individual violations.
+
+### 8.3 Invariants
+
+The graph analyzer maintains these invariants:
+
+1. **Completeness:** Every state in `SemanticIndex.States` appears in either `ReachableStates` or `UnreachableStates`, never both, never neither.
+
+2. **Deterministic output:** Given the same `SemanticIndex`, the `StateGraph` is identical across invocations (order-independent where order doesn't matter semantically).
+
+3. **No exceptions:** The analyzer returns a `StateGraph` for any valid `SemanticIndex`. Structural problems are reported as diagnostics, not exceptions.
 
 ---
 
-## Source Files
+## 9. Contracts and Guarantees
+
+### Preconditions
+
+| Precondition | Enforced By |
+|--------------|-------------|
+| `SemanticIndex` is well-formed (no null collections) | Type checker |
+| State and event names are non-null, non-empty | Type checker |
+| Transition references resolve to declared states/events | Type checker |
+
+### Postconditions
+
+| Postcondition | Verified By |
+|---------------|-------------|
+| `ReachableStates ∪ UnreachableStates = AllStates` | Unit tests |
+| `ReachableStates ∩ UnreachableStates = ∅` | Unit tests |
+| Every `GraphEdge.FromState` and `GraphEdge.ToState` exists in `States` | Unit tests |
+| Diagnostics use only registered `DiagnosticCode` values | Catalog tests |
+
+### Invariants
+
+| Invariant | Description |
+|-----------|-------------|
+| Catalog-driven dispatch | Structural constraint checks are derived from `StateModifierMeta` flags, not hardcoded per-modifier-kind |
+| Deterministic ordering | Output collections use stable ordering (alphabetical by name or declaration order) |
+| No side effects | The analyzer is a pure function: `SemanticIndex → StateGraph` |
+
+---
+
+## 10. Design Rationale and Decisions
+
+### 10.1 Catalog-Driven Modifier Semantics
+
+**Decision:** Structural constraint semantics (AllowsOutgoing, RequiresDominator, PreventsBackEdge) are defined in `StateModifierMeta`, not hardcoded in the analyzer.
+
+**Rationale:** Precept follows a metadata-driven architecture. When a new state modifier is added, its structural semantics are declared in the catalog entry. The analyzer reads these flags and applies generic constraint-checking logic. This:
+
+- Eliminates switch statements on `ModifierKind` for structural checks
+- Ensures new modifiers automatically participate in graph analysis
+- Keeps domain knowledge in the catalog, not scattered in pipeline code
+
+### 10.2 Four-Phase Architecture
+
+**Decision:** Separate edge construction, reachability, structural analysis, and proof forwarding into distinct phases.
+
+**Rationale:** Each phase has clear inputs and outputs. Separation enables:
+
+- Independent testing of each phase
+- Clear data flow (each phase builds on prior results)
+- Easier debugging (inspect intermediate state between phases)
+
+### 10.3 Simple Dominator Algorithm
+
+**Decision:** Use iterative dominator computation, not Lengauer-Tarjan.
+
+**Rationale:** Precept state machines are small (3–15 states typical, bounded at 50). The iterative algorithm is O(n²) in the worst case, but at n ≤ 50, this is trivial. Lengauer-Tarjan's O(n·α(n)) complexity provides no practical benefit and adds implementation complexity.
+
+### 10.4 Proof Forwarding as Typed Facts
+
+**Decision:** Package analysis results as a discriminated union of `ProofForwardingFact` subtypes.
+
+**Rationale:** The proof engine needs structured data, not string diagnostics. Typed facts enable:
+
+- Type-safe pattern matching in the proof engine
+- Clear contracts between stages
+- Self-documenting data flow
+
+### 10.5 Non-Short-Circuiting Analysis
+
+**Decision:** The analyzer completes all phases regardless of violations.
+
+**Rationale:** Reporting all structural issues in a single pass provides a better developer experience than stopping at the first error. The language server and MCP tools can display the complete diagnostic set.
+
+---
+
+## 11. Innovation
+
+### 11.1 Catalog-Derived Constraint Checking
+
+Unlike traditional compilers where modifier semantics are embedded in analysis code, Precept's graph analyzer derives constraint checks from catalog metadata. The `StateModifierMeta` record declares the structural properties; the analyzer reads them and applies generic checks.
+
+This inverts the typical pattern: instead of "the analyzer knows what `terminal` means," the catalog declares "terminal means AllowsOutgoing = false" and the analyzer enforces "states with AllowsOutgoing = false must have no outgoing edges."
+
+### 11.2 Proof Forwarding Pipeline
+
+Graph analysis facts are not consumed directly for diagnostics — they flow forward to the proof engine as structured facts. This separation means:
+
+- The graph analyzer is a pure topology analyzer
+- The proof engine decides which facts warrant obligations
+- Future proof strategies can consume the same facts differently
+
+---
+
+## 12. Open Questions / Implementation Notes
+
+### Implementation Notes
+
+1. **Wildcard expansion ordering:** When expanding any-state wildcards, process states in declaration order to ensure deterministic edge ordering.
+
+2. **Diagnostic source locations:** Structural violations (e.g., terminal with outgoing edges) should report the source location of both the modifier and the violating edge, enabling precise IDE diagnostics.
+
+3. **Incremental analysis:** The current design is whole-graph analysis. Future work may introduce incremental updates for language server responsiveness, but this is not required initially.
+
+### To Be Resolved During Implementation
+
+1. **EventCoverageEntry granularity:** Should coverage track guarded vs. unguarded transitions separately? A guarded transition may not always fire, so event coverage with guards is probabilistic.
+
+2. **Back-edge definition:** The current definition uses BFS ancestor relationship. An alternative is DFS back-edges. Clarify which definition aligns with the `irreversible` modifier's intent.
+
+---
+
+## 13. Deliberate Exclusions
+
+| Exclusion | Rationale |
+|-----------|-----------|
+| **Guard satisfiability analysis** | Guards contain arbitrary expressions. Determining whether a guard can be satisfied requires the proof engine's SMT integration, not graph-level analysis. |
+| **Data-flow analysis** | The graph analyzer operates on control flow (state transitions), not data flow (field values). Field analysis is the proof engine's domain. |
+| **Path enumeration** | Enumerating all paths through the state machine is exponential. The analyzer computes structural properties (reachability, dominance) that summarize path behavior without enumeration. |
+| **Cycle detection beyond irreversible** | General cycle detection is not a requirement. Only the `irreversible` modifier constrains cycles (via back-edge prevention). Other cycles are legal. |
+| **Transition priority/ordering** | When multiple transitions match (e.g., from wildcard and explicit), priority is a runtime concern. The graph analyzer treats all matching transitions as edges. |
+
+---
+
+## 14. Cross-References
+
+### Related Documentation
+
+| Document | Relationship |
+|----------|--------------|
+| [Type Checker](./type-checker.md) | Upstream stage; defines `SemanticIndex` shape |
+| [Proof Engine](./proof-engine.md) | Downstream stage; consumes `StateGraph` and proof facts |
+| [Catalog System](../language/catalog-system.md) | Defines catalog-driven architecture and `ModifierMeta` hierarchy |
+| [Precept Language Spec](../language/precept-language-spec.md) | Defines modifier semantics at the language level |
+| [Compiler and Runtime Design](../compiler-and-runtime-design.md) | Pipeline overview and stage responsibilities |
+
+### Related Catalogs
+
+| Catalog | Usage |
+|---------|-------|
+| `Modifiers` | Source of `StateModifierMeta` structural constraint flags |
+| `Diagnostics` | Source of diagnostic codes and message templates |
+
+---
+
+## 15. Source Files
 
 | File | Purpose |
-|---|---|
-| `src/Precept/Pipeline/GraphAnalyzer.cs` | Graph analyzer implementation — `GraphAnalyzer` static class with `Analyze(SemanticIndex)` entry point |
-| `src/Precept/Pipeline/StateGraph.cs` | `StateGraph` — topology and derived structural facts artifact |
+|------|---------|
+| `src/Precept/Pipeline/GraphAnalyzer.cs` | Main entry point: `GraphAnalyzer.Analyze(SemanticIndex)` |
+| `src/Precept/Pipeline/StateGraph.cs` | Output type definition |
+| `src/Precept/Pipeline/GraphTypes.cs` | Supporting types: `GraphState`, `GraphEvent`, `GraphEdge`, analysis facts |
+| `src/Precept/Language/Modifiers.cs` | Modifiers catalog with `StateModifierMeta` entries |
+| `src/Precept/Language/Modifier.cs` | `ModifierMeta` discriminated union hierarchy |
+| `test/Precept.Tests/Pipeline/GraphAnalyzerTests.cs` | Unit tests |
+
+---
+
+## Appendix: Diagnostic Codes
+
+| Code | Name | Description |
+|------|------|-------------|
+| 80 | `UnreachableState` | A state cannot be reached from the initial state |
+| 81 | `UnhandledEvent` | An event has no transition in one or more reachable states |
+| TBD | `TerminalStateHasOutgoingEdges` | A terminal state has outgoing transitions |
+| TBD | `IrreversibleStateHasBackEdge` | An irreversible state has a transition returning to an ancestor |
+| TBD | `RequiredStateDoesNotDominateTerminal` | A required state does not dominate any terminal state |
+| TBD | `NoInitialState` | No state is marked with the `initial` modifier |

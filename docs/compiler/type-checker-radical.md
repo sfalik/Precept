@@ -7,6 +7,20 @@
 
 ---
 
+## §0. The Grammar of Precept (Summary)
+
+The type checker validates the *typed structure* produced by the parser, so it must understand construct shape. This section summarizes the grammar's fundamental pattern — see `parser-radical.md §0` for the full illustration with examples.
+
+**The shape:** Every Precept construct is a leading keyword followed by a flat sequence of typed slots. No recursive nesting at the construct level. The entire grammar is a table of `Leader → Slot → Slot → ... → [Block]` patterns.
+
+**Slot types** the checker must validate: identifiers (field/state/event names), type references (with qualifiers), expressions (guards, conditions, computed values), modifier keywords (constraint annotations), action chains (state-mutating statements), and outcome blocks (transition/reject). See `parser-radical.md §0.7` for the four-concept relationship (constructs, actions, outcomes, slots) and `§0.8` for the revised architectural ruling: outcomes use a two-level pattern (DU for parsing, catalog for enumeration/metadata), same as Actions.
+
+**Construct families:** Some keywords (`in`, `on`, `from`) introduce multiple construct shapes disambiguated by a secondary token. The parser resolves this; the checker receives a fully-typed node with named slots already extracted.
+
+**Why it matters for the type checker:** Because constructs are flat slot sequences — not recursive trees — the checker can validate each slot position independently. A `Tag("condition", ExprProd())` slot always produces an expression that needs boolean-type checking. A `Tag("type", TypeRefProd())` slot always produces a type reference that needs existence/applicability checking. The checker's job is per-slot validation dispatched by slot type — the same "interpret the shape" principle that drives the parser.
+
+---
+
 ## 1. The Bet
 
 The existing type-checker design is good. The 11-slice plan covers the right surface area. The SemanticIndex shape is correct. The 2-pass architecture is correct. But the *model* underneath is still shaped by how Roslyn works.

@@ -6,7 +6,7 @@
 
 | Property | Value |
 |---|---|
-| Doc maturity | Draft |
+| Doc maturity | Full |
 | Implementation state | Implemented — all 13 catalogs in `src/Precept/`; team review complete (2026-04-25) |
 | Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
 
@@ -29,7 +29,7 @@ Every consumer reads from these catalogs:
 | LS semantic tokens | Token categories |
 | Type checker | Modifier applicability, function signatures, operation legality |
 | AI grounding | All 13 catalogs — complete language knowledge |
-| Reference docs | All 9 language definition catalogs |
+| Reference docs | All 11 language definition catalogs |
 
 No consumer maintains its own parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface. The compiler refuses to build if any member is missing metadata.
 
@@ -224,6 +224,8 @@ var plan = meta switch
 };
 ```
 
+> **Open Question (unresolved):** The `ConstraintMeta` hierarchy shows `StateAnchored` with "three state kinds" comment, but only `StateResident` is shown. The builder uses five subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`). Are `StateEntry` and `StateExit` subtypes of `StateAnchored`? The full hierarchy needs to be documented.
+
 This is **not** an enum in disguise. The DU provides:
 1. **Compile-time exhaustiveness** — a new enum member without a matching subtype is a build error at every pattern-match site
 2. **Type IS the semantic signal** — `meta is StateAnchored` is structurally safer than `meta.Scope == ConstraintScope.State`; no field value can be misassigned
@@ -380,14 +382,9 @@ When adding a new dispatcher over a catalog enum type, choose at the same commit
 
 Do not defer this decision. The enforcement mechanism is chosen at the commit that introduces the dispatch, not retrofitted later.
 
-### Phase 3 Note: TypeChecker and ProofEngine
+### Implementation Dispatchers
 
-When TypeChecker and ProofEngine implement type/constraint dispatch (D8/R4 and beyond), the team must decide at implementation time:
-
-- The TypeChecker catalog guide steers toward **catalog-property-driven dispatch** — reading metadata properties from `TypeMeta` or `ConstraintMeta` rather than switching on `TypeKind` or `ConstraintKind`. If the implementation follows this guidance, there is no per-kind switch and no per-kind handler methods — meaning neither CS8509 nor `[HandlesCatalogExhaustively]` applies. The catalog metadata itself drives behavior generically.
-- If any type/constraint dispatcher deviates from this and introduces a per-kind switch or distributed handlers, the decision rule above applies at that commit.
-
-This decision cannot be made in advance — it depends on the actual dispatch architecture chosen at implementation time.
+Implementation dispatchers (TypeChecker, ProofEngine, Evaluator, etc.) follow the same decision rule: if the dispatch uses a centralized switch expression, CS8509 enforces exhaustiveness automatically; if the dispatch uses distributed handler methods, use `[HandlesCatalogExhaustively]` + `[HandlesCatalogMember]` and PRECEPT0019 enforcement. See the decision rule table above. The catalog metadata itself may drive behavior generically (no per-kind switch) — in that case, neither enforcement mechanism applies because there is no per-kind dispatch to exhaust.
 
 ## Naming Convention
 
@@ -404,7 +401,7 @@ This decision cannot be made in advance — it depends on the actual dispatch ar
 
 ### Language Definition Catalogs
 
-These ten catalogs describe what the Precept language IS.
+These eleven catalogs describe what the Precept language IS.
 
 #### 1. Tokens (✅ Implemented)
 
@@ -416,6 +413,8 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TextMateScope?, SemanticTokenType?, ValidAfter[]?)` |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
+
+> **Open Question (unresolved):** Should `TokenMeta.SemanticTokenModifiers?` be added? Both language-server.md and tooling-surface.md reference it, but it's not in this shape.
 
 **Consumers:** MCP vocabulary, LS semantic tokens, LS completions, lexer keyword lookup, TextMate grammar keyword alternations.
 
@@ -463,7 +462,9 @@ public record TypeMeta(
 );
 ```
 
-The `Token` field holds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
+> **Open Question (unresolved):** Should `TypeMeta.IsUserFacing` and `TypeMeta.SnippetTemplate?` be added? language-server.md uses these for completion filtering.
+
+The `Token` fieldholds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
 
 `DisplayName` is required — every type must have a human-readable name. Single-word types use their keyword (e.g., `"money"`); multi-word types use the human form (e.g., `"zoned date-time"`, `"unit of measure"`). Omitting it is a compile error.
 
@@ -493,7 +494,11 @@ public record TypeAccessor(
     TypeTrait RequiredTraits   = TypeTrait.None,
     ProofRequirement[] ProofRequirements = []
 );
+```
 
+> **Open Question (unresolved):** Is `TypeAccessor` meant to be a DU with subtypes? type-checker.md references `ElementParameterAccessor` as a third subtype. The full hierarchy (`TypeAccessor` base, `FixedReturnAccessor`, `ElementParameterAccessor`) needs to be documented.
+
+```csharp
 public enum QualifierAxis
 {
     None,
@@ -563,6 +568,8 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 | Meta record | `FunctionMeta(Kind, Name, Description, Overloads[], Category, UsageExample?, SnippetTemplate?, HoverDescription?)` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
 | Catalog class | `Functions` — `GetMeta()`, `All` |
 | Output type | None — functions are evaluated inline |
+
+> **Open Question (unresolved):** type-checker.md states `FunctionMeta.HasCIVariant` already exists, but it's not in this shape. Should it be added?
 
 **Members (from `precept-language-spec.md` §3.7):**
 
@@ -961,6 +968,8 @@ State-machine action verbs — the keywords that appear after `->` in transition
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
+> **Open Question (unresolved):** `ActionMeta` is missing properties referenced elsewhere: `ActionSyntaxShape` (type-checker.md), `HoverDescription` and `SnippetTemplate` (language-server.md), `syntaxShape` (mcp.md). Which should be added?
+
 **Members (from `ActionKind.cs`):**
 
 | Action | ApplicableTo (`TypeTarget[]`) | Value | Into | AllowedIn |
@@ -1004,6 +1013,9 @@ Grammar forms / declaration shapes.
 | Kind enum | `ConstructKind` (11 members) |
 | Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], LeadingToken, SnippetTemplate?)` — see full shape below |
 | Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (15-member enum) |
+
+> **Open Question (unresolved):** parser.md claims 17 `ConstructSlotKind` members including `RuleExpressionSlot` and `InitialMarkerSlot`. This inventory shows 15. Which is correct?
+
 | Catalog class | `Constructs` — `GetMeta()`, `All` |
 | Output type | None |
 
@@ -1148,6 +1160,8 @@ Runtime failure modes — every fault the evaluator can produce. Currently 13 me
 | Meta record | `FaultMeta(Code, MessageTemplate)` |
 | Catalog class | `Faults` — `GetMeta()`, `All`, `Create()` |
 | Output type | `Fault(Code, CodeName, Message)` — `CodeName` is the `nameof`-derived stable identity string used for logging and MCP reporting |
+
+> **Open Question (unresolved):** `FaultCode.AmbiguousDispatch` is used in evaluator.md but not in the 13-member list. Should it be added with `[StaticallyPreventable(DiagnosticCode.AmbiguousTransition)]`? See §Candidate Additions below for proposed shape.
 
 **Consumers:** MCP fire/inspect, runtime outcome reporting.
 
@@ -1473,11 +1487,11 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 |-------|--------------|----------------|
 | **Lexer** | Already uses `Tokens.Keywords` for keyword classification | Minimal further impact. Operator scan priority derivable from `Operators.All` sorted by `Token.Text.Length` descending. |
 | **Parser** | Hand-coded vocabulary tables + recursive descent grammar | Vocabulary tables — operator precedence, type keyword mappings, modifier/action recognition sets (~40–50% of language knowledge decisions) — migrate to catalog-derived frozen dictionaries at startup. Grammar productions stay hand-written. Construct slots enable test generation and LS completions. When a new type, modifier, operator, or action is added to a catalog, the parser adapts automatically — no parser edit needed. |
-| **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability/exclusivity → `FieldModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `FieldModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. The type checker's `switch` forests shrink to catalog lookups. |
+| **TypeChecker** | Catalog-driven validation | Full design documented in `docs/compiler/type-checker.md`. Modifier applicability/exclusivity → `FieldModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `FieldModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. |
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Event modifier graph requirements → `EventModifierMeta.RequiredAnalysis`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
-| **ProofEngine** | Hand-coded proof obligations per operator | Significant: `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances — no hardcoded per-kind obligation lists. |
-| **PreceptBuilder** | Hand-coded constraint bucketing | `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. No hardcoded activation-timing switch. Currently implemented in `Precept.From(Compilation)` — no dedicated `PreceptBuilder` class yet. |
-| **Evaluator** | Not yet implemented | **Today:** constraint activation timing → `Constraints.GetMeta(kind)`; modifier boundary validation → `FieldModifierMeta.ApplicableTo`/`HasValue`; accessor metadata → `TypeMeta.Accessors`. **Future (pending executable model design D8/R4):** operation dispatch → `Operations.FindUnary`/`FindCandidates`; function dispatch → `Functions.GetMeta(kind)`; action dispatch → `Actions.GetMeta(kind)`. Do not use `Operations.Resolve()` — that API does not exist. Do not claim catalog-driven execution dispatch until delegate fields exist in catalog metadata. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
+| **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `FieldModifierMeta.ProofDischarges` (pending — see Open Questions) enables catalog-driven modifier-proof strategy. |
+| **PreceptBuilder** | Catalog-driven routing | Full design documented in `docs/runtime/precept-builder.md`. `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. `ActionMeta.SyntaxShape` drives action plan opcode emission. |
+| **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `FieldModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Operation/function/action execution dispatch delegate design is pending. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
 
 Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
 
@@ -1581,20 +1595,197 @@ Subject shape (what the obligation applies to) is encoded in the requirement ins
 
 | Evaluator need | Catalog source | Status |
 |---|---|---|
-| Constraint activation timing | `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype | Available now |
-| Modifier boundary validation | `FieldModifierMeta.ApplicableTo`, `HasValue` | Available now |
-| Accessor signatures | `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits` | Available now |
-| Operation dispatch | `Operations.FindUnary` / `FindCandidates` | Deferred (D8/R4) |
-| Function dispatch | `Functions.GetMeta(kind)` | Deferred (D8/R4) |
-| Action dispatch | `Actions.GetMeta(kind)` | Deferred (D8/R4) |
+| Constraint activation timing | `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype | Available |
+| Modifier boundary validation | `FieldModifierMeta.ApplicableTo`, `HasValue` | Available |
+| Accessor signatures | `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits` | Available |
+| Access mode enforcement | `FieldDescriptor.AccessModes` | Pending (see Open Questions) |
+| Operation dispatch | `Operations.FindUnary` / `FindCandidates` | Delegate design pending |
+| Function dispatch | `Functions.GetMeta(kind)` | Delegate design pending |
+| Action dispatch | `Actions.GetMeta(kind)` | Delegate design pending |
 
-Do not use `Operations.Resolve()` — that API does not exist. Do not claim catalog-driven execution dispatch until delegate fields exist in catalog metadata.
+Execution dispatch delegate design is pending. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written.
+
+---
+
+### PreceptBuilder-catalog integration pattern
+
+The Precept Builder transforms analysis artifacts into the executable runtime model. Its catalog integrations:
+
+| Builder need | Catalog source |
+|---|---|
+| Constraint activation bucket routing | `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype (`Invariant`, `StateAnchored`, `EventPrecondition`) |
+| Constraint anchor family grouping | `ConstraintMeta.StateAnchored` — groups `StateResident`, `StateEntry`, `StateExit` |
+| Action plan shape determination | `ActionMeta.SyntaxShape` — drives `ActionPlan` opcode emission |
+| Modifier lists on descriptors | `Modifiers.GetMeta(kind)` — populates `FieldDescriptor.Modifiers[]` |
+| Construct model contribution | `ConstructMeta.ModelContribution` (pending — see Open Questions) |
+
+**The failure mode:** Hardcoding which ConstraintKind values are "state-scoped" in the builder's routing logic. Use `Constraints.GetMeta(kind)` and pattern-match on `ConstraintMeta` DU subtypes — the subtype IS the routing decision.
+
+---
+
+### LanguageServer-catalog integration pattern
+
+The language server produces editor artifacts from catalog metadata and compiler output. Its catalog integrations:
+
+| LS feature | Catalog source |
+|---|---|
+| Semantic token classification (Pass 1) | `TokenMeta.SemanticTokenType` — maps token kinds to LSP token types |
+| Completion candidates — type position | `Types.All` |
+| Completion candidates — modifier position | `Modifiers.All` filtered by `ApplicableTo(constructKind)` |
+| Completion candidates — action verb position | `Actions.All` |
+| Completion candidates — function position | `Functions.All` |
+| Hover text for keywords | `TokenMeta.HoverDescription` (pending — see Open Questions) |
+| Hover text for types | `TypeMeta.HoverDescription` |
+| Hover text for functions | `FunctionMeta.HoverDescription` |
+| TextMate grammar patterns | `TokenMeta.TextMateScope`, `TokenMeta.Pattern` |
+
+**The failure mode:** Hardcoding completion candidate lists in LS code. The LS derives candidates from catalogs — new language features appear automatically in completions when added to the catalog.
 
 ---
 
 ## Open Questions / Implementation Notes
 
-_TBD — open questions will be captured here as catalog consumers are implemented._
+The following catalog additions have been identified by pipeline stage design documents but are not yet implemented. Each entry specifies what's being added, the proposed shape, which consumer reads it, and implementation steps.
+
+### FieldModifierMeta.ProofDischarges
+
+**Source:** `docs/compiler/proof-engine.md` §7 Strategy 2: Modifier Proof
+
+**Purpose:** Enable the proof engine's modifier-proof strategy to discharge proof obligations based on field modifiers without hardcoding modifier-to-obligation mappings.
+
+**Proposed shape:**
+
+```csharp
+public sealed record ProofDischarge(
+    ProofRequirementKind RequirementKind,
+    OperatorKind? Comparison,    // for Numeric requirements
+    decimal? Threshold           // for Numeric requirements
+);
+
+// Add to FieldModifierMeta:
+ProofDischarge[] ProofDischarges = default!
+```
+
+**Consumer:** ProofEngine reads `fieldMeta.ProofDischarges` during modifier-proof strategy to determine which obligations a modifier discharges (e.g., `positive` discharges `> 0` and `!= 0` requirements).
+
+**Implementation checklist:**
+- [ ] Add `ProofDischarge` record to `src/Precept/Language/Modifier.cs`
+- [ ] Add `ProofDischarges` property to `FieldModifierMeta`
+- [ ] Update `Modifiers.GetMeta()` entries for `positive`, `nonnegative`, `nonzero`, `notempty`
+- [ ] Consider `min`/`max` value-dependent discharge logic
+- [ ] Update MCP vocabulary if exposed to AI tooling
+
+---
+
+### ConstructMeta.ModelContribution (Candidate)
+
+**Source:** `docs/runtime/precept-builder.md` §13 Open Questions
+
+**Purpose:** Make the Precept Builder's assembly loop fully generic by declaring what each construct contributes to the `Precept` model.
+
+**Status:** Candidate — value is marginal for ~12 constructs. Pending owner ruling.
+
+**Proposed shape:**
+
+```csharp
+public enum ModelContribution
+{
+    None,              // No model contribution
+    DeclaresField,     // Adds a FieldDescriptor
+    DeclaresState,     // Adds a StateDescriptor
+    DeclaresEvent,     // Adds an EventDescriptor
+    AddsTransition,    // Adds an ExecutionRow
+    AddsConstraint,    // Adds a ConstraintDescriptor
+    AddsAccessMode,    // Modifies FieldDescriptor access mode
+    AddsStateHook,     // Adds entry/exit actions
+}
+
+// Add to ConstructMeta:
+ModelContribution Contribution
+```
+
+**Consumer:** PreceptBuilder dispatches on `construct.Meta.Contribution` instead of `ConstructKind`.
+
+**Implementation checklist:**
+- [ ] Owner decision on marginal value vs. catalog complexity
+- [ ] If approved: Add `ModelContribution` enum and `ConstructMeta.Contribution` property
+- [ ] If approved: Update `Constructs.GetMeta()` entries
+- [ ] If approved: Refactor builder to dispatch on contribution
+
+---
+
+### FieldDescriptor.AccessModes
+
+**Source:** `docs/runtime/evaluator.md` §7.5 Access Mode Enforcement
+
+**Purpose:** Enable the evaluator to check field access modes without re-deriving from modifiers at runtime.
+
+**Proposed shape:**
+
+```csharp
+public enum AccessMode { Writable = 1, ReadOnly = 2, Omit = 3 }
+
+// Add to FieldDescriptor:
+IReadOnlyDictionary<StateDescriptor?, AccessMode> AccessModes
+```
+
+**Consumer:** Evaluator reads `field.AccessModes[currentState]` during Update operations for O(1) access mode lookup.
+
+**Implementation checklist:**
+- [ ] Add `AccessMode` enum to `src/Precept/Runtime/Descriptors.cs`
+- [ ] Add `AccessModes` property to `FieldDescriptor`
+- [ ] Update Precept Builder to resolve access modes during descriptor pass
+- [ ] Update evaluator's `Update` operation to use `AccessModes`
+
+**Open question:** Dictionary vs. array representation — dictionary is O(1) but has overhead; array is cache-friendly but O(n). For typical 3–10 states, difference is negligible. Recommend dictionary for clarity.
+
+---
+
+### FaultCode.AmbiguousDispatch (Candidate)
+
+**Source:** `docs/runtime/evaluator.md` §13 Open Questions
+
+**Purpose:** Classify the impossible-path failure when multiple transition rows pass guard and constraint evaluation.
+
+**Proposed shape:**
+
+```csharp
+// Add to FaultCode enum:
+[StaticallyPreventable(DiagnosticCode.AmbiguousTransition)]
+AmbiguousDispatch = 14
+
+// Add to Faults.GetMeta():
+FaultCode.AmbiguousDispatch => new(
+    nameof(FaultCode.AmbiguousDispatch),
+    "Multiple transition rows matched for event '{0}' in state '{1}'",
+    RecoveryHint: "Indicates a bug in proof engine exclusivity analysis.")
+```
+
+**Consumer:** Evaluator calls `Fail(FaultCode.AmbiguousDispatch, ...)` when multiple candidates pass.
+
+**Implementation checklist:**
+- [ ] Add `DiagnosticCode.AmbiguousTransition` if not present
+- [ ] Add `FaultCode.AmbiguousDispatch` with `[StaticallyPreventable]` attribute
+- [ ] Add `FaultMeta` entry in `Faults.GetMeta()`
+- [ ] Update evaluator to produce this fault
+
+---
+
+### Catalog documentation strings (HoverDescription / SnippetTemplate)
+
+**Source:** `docs/tooling/language-server.md` §7.3 Completions, §7.4 Hover
+
+**Purpose:** Enable the language server's completion and hover features to show rich documentation without hardcoding text in LS code.
+
+**Current state:** `TypeMeta`, `FunctionMeta`, and `TypeAccessor` already have `HoverDescription` and `UsageExample`/`SnippetTemplate`. The gap is `TokenMeta` and `ModifierMeta` for non-type/non-function keywords.
+
+**Open question:** Standardize `HoverDescription?: string` and `SnippetTemplate?: string` across all meta types that feed LS completions and hover. Consider whether `TokenMeta.HoverDescription` duplicates hover from `Types`/`Modifiers`/`Actions` catalogs that already carry the keyword's documentation.
+
+**Implementation checklist:**
+- [ ] Add `HoverDescription` to `TokenMeta`, `ModifierMeta` (abstract)
+- [ ] Add `SnippetTemplate` to `ModifierMeta`, `ActionMeta` if not present
+- [ ] Update catalog entries with documentation strings (incremental)
+- [ ] Update MCP vocabulary if exposed to AI tooling
 
 ---
 
