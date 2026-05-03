@@ -193,18 +193,23 @@ Every construct is a single-line statement, except where a block body is explici
 keyword [disambig] name  slot*             [block?]
 ```
 
-Concrete anatomy of six representative constructs:
+Concrete anatomy — slot and routing archetypes:
 
-These examples are chosen for coverage, not because six is a magic number. Together they span the grammar's main surface patterns:
+These examples are chosen to cover every distinct slot shape and routing pattern in the construct catalog. Together they span:
 
+- the file-opening header construct (`precept`)
 - a direct declaration with type + modifier slots (`field`, stored form)
 - a direct declaration with a computed-expression slot (`field`, computed form)
 - a list-shaped declaration with construct-specific modifiers (`state`)
 - a direct declaration with a parenthesized argument list (`event`)
-- a family-routed declaration selected by a disambiguation token and carrying a reasoned constraint (`in ... ensure`)
-- the richest routed declaration, combining references, an optional guard, an action chain, and a terminal outcome (`from ... on`)
+- a direct declaration with rule expression and mandatory reason (`rule`)
+- a family-routed declaration with field target and access mode adjective (`in ... modify`)
+- a family-routed declaration with reasoned constraint (`in ... ensure`)
+- a state hook declaration via disambiguation token (`to ... ->` / `from ... ->`)
+- an event-scoped action handler (`on ... ->`)
+- the richest routed declaration with guard, action chain, and terminal outcome (`from ... on`)
 
-That makes this section representative rather than exhaustive: it gives developers a compact map of the slot shapes and routing patterns they need to recognize when extending the catalog or parser, while later sections enumerate every construct family and slot kind.
+`OmitDeclaration` and `EventEnsure` are omitted — their slot shapes are covered by `AccessMode` and `StateEnsure` respectively. See §4 for construct family routing and disambiguation details.
 
 ```
 field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
@@ -269,6 +274,56 @@ from  Draft  on  Submit  when  DocumentsVerified  ->  set ApplicantName = Submit
 [3] EventTarget slot — the event name
 [4] GuardClause slot — optional `when` expression
 [5] ActionChain slot — zero or more `-> action` pairs; terminates with an Outcome
+```
+
+```
+precept  Claim
+   │       │
+  [1]     [2]
+[1] Leading token: `precept`
+[2] IdentifierList slot — the governed entity name
+```
+
+```
+rule  ApprovedAmount >= 0  because  "Approved amount cannot be negative"
+  │            │               ↑                    │
+ [1]          [2]            slot                 [3]
+                             marker
+[1] Leading token: `rule`
+[2] RuleExpression slot — the boolean condition that must hold globally
+[3] BecauseClause slot — the mandatory explanatory reason
+```
+
+```
+in  Draft  modify  ClaimAmount  editable  when  DocumentsVerified
+ │    │       ↑         │           │       ↑            │
+[1]  [2]  disambig.    [3]         [4]    slot         [5]
+            token                             marker
+[1] Leading token: `in`   ← shared with StateEnsure, OmitDeclaration
+[2] StateTarget slot — the anchor state name
+[3] FieldTarget slot — the field affected in that state
+[4] AccessModeKeyword slot — `editable` or `readonly`
+[5] GuardClause slot — optional `when` expression
+```
+
+```
+to  Approved  ->  set ApprovedAmount = ClaimAmount
+ │     │       ↑                │
+[1]   [2]  disambig.           [3]
+            token
+[1] Leading token: `to`   ← shared with StateEnsure
+[2] StateTarget slot — the state whose entry hook is being declared
+[3] ActionChain slot — one or more `-> action` steps; `from` uses the same shape for exit hooks
+```
+
+```
+on  Submit  ->  set ClaimAmount = Submit.Amount
+ │    │       ↑             │
+[1]  [2]  disambig.        [3]
+           token
+[1] Leading token: `on`   ← shared with EventEnsure
+[2] EventTarget slot — the event whose handler is being declared
+[3] ActionChain slot — one or more `-> action` steps for the event-scoped handler
 ```
 
 ---
