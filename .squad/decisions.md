@@ -6,6 +6,106 @@
 
 ---
 
+### 2026-05-03T22:22:27Z: CC#25 runtime baseline is `PreceptValue` plus catalog-owned delegate dispatch
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (7 files; final recommendation and superseded explorations normalized).
+
+**Merged sources:** `frank-cc25-recommendation`, `frank-cc25-neutral-rerun`, `frank-cc25-same-process-reanalysis`, `frank-cc25-boxing-and-dispatch`, `frank-cc25-il-emission-radical`, `frank-cc25-vm-free-analysis`, `frank-cc25-creative-options`.
+
+- Durable runtime choice: production Fire uses Option A + G — a 32-byte `PreceptValue` tagged struct on the evaluation stack and `Version.Slots`, with catalog-owned unary/binary executor arrays indexed by `OperationKind` so the evaluator stays zero-knowledge.
+- The decisive performance variable is representation, not dispatch: replacing boxed `object?` arithmetic with `PreceptValue` removes the projected ~768 MB/s gen-0 pressure at 100k events/sec while leaving delegate-array dispatch in the noise.
+- `System.Linq.Expressions` / compiled-path work stays a designed-in upgrade seam, not a v1 dual-path architecture; v1 ships the interpreter-shaped A+G runtime only.
+- Same-process deployment matters: catalog delegate arrays are JIT-warm and fixed for the process lifetime, so there is no plugin-style indirection penalty that would justify reopening dispatch around slower but more complex alternatives.
+
+---
+
+### 2026-05-03T22:22:27Z: CC#25 TypeBuilder-generated CLR types are rejected for the SaaS runtime baseline
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (3 files; recommendation reversal captured durably).
+
+**Merged sources:** `frank-cc25-typegen-analysis`, `frank-cc25-sourcegen-contrast`, `frank-cc25-saas-runtime`.
+
+- TypeBuilder's warm-path throughput and earlier executor validation are real advantages, but they do not survive the actual product constraints driving CC#25.
+- The blocking constraint is SaaS cold-start and per-definition churn: hundreds of milliseconds of compile work on upload, cache miss, or deployment is incompatible with the save-and-test loop, while A+G stays sub-millisecond to stand up.
+- Inspectability is a product guarantee, not an optional debugger convenience; TypeBuilder would require a second interpreted or tracing-decorator path to recover per-step explanations that A+G already exposes naturally.
+- Durable boundary: do not treat TypeBuilder or build-time codegen as the implicit v2 path unless the deployment model or inspectability requirement changes first.
+
+---
+
+### 2026-05-03T22:22:27Z: CC#25 type-per-lane storage loses to unified `PreceptValue`
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files; revised analysis supersedes the original Option F memo).
+
+**Merged sources:** `frank-cc25-option-f-lanes`, `frank-cc25-option-f-lanes-revised`.
+
+- Option F's split-lane model does not materially reduce the hard cases because 23 of 32 `TypeKind` members still live in the reference lane and the business-domain types remain cross-lane participants.
+- Adding a wider business-value lane only recreates `PreceptValue`'s struct-copy cost without gaining the unified operation surface that makes A+G simple.
+- The NodaTime/date-time correction changes details but not the verdict: the lane split still adds routing complexity for no meaningful reduction in cross-lane operations.
+
+---
+
+### 2026-05-03T22:22:27Z: CC#25 interactive tooling keeps traced tree-walk evaluation while production stays typed-opcode based
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (4 files; parallel follow-up analyses converged on the same split).
+
+**Merged sources:** `frank-cc25-treewalk`, `frank-cc25-spanstack`, `frank-cc25-jsonreader`, `frank-cc25-optionc`.
+
+- Durable dual-consumer model: production Fire/Inspect/Update uses the A+G typed-opcode runtime, while LS/MCP interactive tooling keeps a `TypedExpression` tree-walk path for rich per-node traces and sub-50 ms authoring feedback.
+- JSON-native or span-stack evaluation is rejected as the production stack currency: every serious precedent deserializes to typed values before computation, and parse/format cost swamps any zero-copy story for numeric work.
+- Good ideas harvested from the rejected variants stay additive: explicit TypeKind→CLR mapping metadata and string-stack / JSON-friendly techniques remain valid for the interactive tooling path without reopening the production runtime decision.
+
+---
+
+### 2026-05-03T22:22:27Z: CC#25 extends the Types catalog with owned JSON serialization delegates
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-cc25-catalog-owned-storage`.
+
+- `TypeMeta` gains catalog-owned JSON reader/writer delegates so serialization follows the same metadata-owned behavior pattern as execution dispatch.
+- Collection-field serializers are composed once at build time from structural collection logic plus element-type delegates, keeping runtime streaming, reflection-free, and free of `JsonElement` or `object` fallback paths.
+- Durable architecture rule: persistence behavior belongs on catalog metadata; do not reintroduce per-`TypeKind` consumer switches in serializer code.
+
+---
+
+### 2026-05-03T22:22:27Z: CC#25 changes runtime storage and literal loading, not the compiler pipeline shape
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-cc25-compiler-output-impact`.
+
+- Option A+G is a runtime-layer change: parser, type checker, graph analyzer, proof engine, and plan topology remain structurally unchanged.
+- The only recommended compiler/runtime boundary adjustment is to pre-wrap literals so `LoadLit` carries `PreceptValue` payloads directly instead of constructing them in the evaluator loop.
+- Durable boundary: execution plans keep serializable catalog indices and never embed delegate instances.
+
+---
+
+### 2026-05-03T22:22:27Z: CC#25 Fire-call lifecycle is now quantified as the A+G implementation baseline
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file; reference walkthrough promoted to durable implementation baseline).
+
+**Merged sources:** `frank-cc25-fire-data-flow`.
+
+- The full Fire walkthrough establishes the hot-path memory picture for one event under A+G: peak live slot footprint is ~44-48 `PreceptValue` slots, total stack traffic is ~4,480 bytes per Fire, and the working copy is the donated next-version slot array rather than a throwaway buffer.
+- With slot-array pooling, GC-visible allocation drops to the unavoidable boundary objects (about ~88 bytes in the walkthrough), while scalar evaluation itself stays zero-boxing throughout the pipeline.
+- The walkthrough also locks the next implementation questions to six concrete seams: slot-array ownership transfer, eval-stack allocation strategy, JSON ingress/egress ownership, event-args representation, trace-path data structures, and multi-row working-copy pooling.
+
+---
+
 ### 2026-05-03T14:59:24Z: Per-stage pipeline topology boxes stay ASCII-safe in compiler-and-runtime docs
 
 **By:** Scribe
@@ -1966,3 +2066,4 @@
 
 
 ---
+

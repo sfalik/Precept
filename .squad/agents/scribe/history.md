@@ -15,6 +15,10 @@
 
 ## Recent Updates
 
+### 2026-05-03T22:22:27Z — CC#25 corpus archival pass recorded
+- Pre-check measured `decisions.md` at 61,990 bytes with 19 inbox files; the hard-gate 7-day archive pass ran and found 0 entries older than the cutoff, so no archive move was performed.
+- Merged the 19 CC#25 inbox files into 7 canonical ledger entries, wrote the Frank orchestration log and fire-data-flow session log, summarized Frank back under the 15 KB gate, and cleared the inbox.
+
 ### 2026-05-01T20:10:18Z — HandlesCatalogMember closeout recorded
 - Ran the hard-gate 7-day archive pass because `decisions.md` was 562768 bytes before merge, then merged George-7's rename inbox note, wrote orchestration/session logs, and cleared the processed inbox file.
 - Health report: `decisions.md` 562768B -> 573372B; inbox processed 1; history summarization remained at 0 files.
