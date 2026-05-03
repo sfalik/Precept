@@ -6,6 +6,14 @@
 
 ## Learnings
 
+- Grammar design reference documents for a DSL need to lead with what the grammar is NOT before explaining what it is — this immediately orients the reader who may arrive with assumptions from general-purpose language design. The "not expression-based / not indentation-sensitive / not context-dependent" framing prevents the most common misreadings.
+- The flat-construct / keyword-anchored / named-slot triad is best understood as three mutually reinforcing properties, not three independent features. Each one enables the other two: flatness makes keyword anchoring tractable; keyword anchoring makes named slots necessary; named slots make flatness readable. Framing them together as "the core design choices" is clearer than listing them separately.
+- The linguistic-model section (nouns/verbs/adjectives/prepositions) is the most powerful bridge between the formal grammar description and the business-domain audience claim. Grounding each linguistic role in concrete Precept examples makes the claim testable: readers can verify by reading a `.precept` file aloud.
+- Grammar invariants belong in a dedicated section for language designers — not scattered through the philosophy or the construct descriptions. Collocating all six invariants with their "what breaks if violated" rationale makes the document actionable for the next person proposing a language change.
+- The catalog-as-grammar section should emphasize the architectural inversion explicitly ("the catalog IS the grammar — not a reflection of it") before showing the mechanics. Without the inversion framed clearly, the catalog table reads as documentation rather than as the central design claim.
+- A quick-reference appendix at the end (construct-to-family mapping, slot-kind to expression-type mapping, invariants at a glance) doubles the document's utility for people who already know the material and just need a lookup surface.
+- Target audience framing for a design reference is critical: writing for "people building the language" vs. "people using the language" produces very different tone and emphasis. The document should assume familiarity with compiler concepts (Pratt parser, disambiguation, catalog-driven dispatch) and not explain them from scratch.
+
 - When the type system already disambiguates, surface keywords should stay short, shared, and author-friendly.
 - Design docs should be decision-led and problem-first; tables should stay only where they truly compare alternatives or dimensions.
 - Progressive disclosure beats uniform metadata tables for long technical docs.
@@ -42,6 +50,15 @@
 - Scribe logged Elaine-2's §0.9 Grammar Hierarchy pass: the durable reference stays a plain ASCII table spanning routing families, constructs, action groups, outcome variants, and the ①② asymmetry callouts.
 - Durable presentation rule: when grammar examples are long and asymmetries cut across rows, ASCII reference tables communicate more clearly than Mermaid-style node graphs.
 
-### 2026-05-03T01:07:30Z — Grammar-hierarchy icon revision recorded
-- Scribe merged Elaine's follow-on §0.9 icon note: `◆` is the structural `ConstructFamily` anchor marker, while `[A]` / `[O]` are per-construct slot badges.
-- Durable presentation rule: do not reuse the same visual icon family for grouping rows and annotation badges; distinct semantic roles need distinct visual classes.
+### 2026-05-03T09:55:27Z — Grammar design reference created
+
+- Created `docs/language/precept-grammar.md` as the language design reference for Precept developers and language designers.
+- Document covers: grammar philosophy (flat/keyword-anchored/named-slots), the four-level hierarchy (File → Constructs → Slots → Expressions), the 12 construct kinds, the four routing families and disambiguation protocol, the 15 slot kinds, expression placement constraints, the linguistic model, the six grammar invariants, and the catalog-as-grammar-spec principle.
+- Used ASCII hierarchy trees, annotated construct anatomy diagrams, and slot-sequence tables throughout. Quick-reference appendix added for lookup use cases.
+
+### 2026-05-03T09:59:25Z — Grammar design reference confirmed complete
+
+- Reviewed `docs/language/precept-grammar.md` against full task brief; confirmed all required sections are present and authoritative.
+- Design principles (flat/combinator-friendly, IntelliSense-friendly, AI-authoring-friendly, noun-verb-adjective grammar, consistency as a value) are effectively distributed across §1, §7, §8, and §9 rather than collected in one explicit "Grammar Design Principles" section. The content is complete; future maintainers may wish to consolidate into a dedicated principles section if the document is extended.
+- Decisions inbox (`elaine-grammar-doc.md`) and learnings already captured from prior session; no duplicate entries needed.
+
