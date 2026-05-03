@@ -759,28 +759,3 @@
 
 ---
 
----
-
-### 2026-04-26T15:48:53Z: Analyzer expansion plan and catalog conventions canonicalized
-
-**By:** Scribe
-
-**Status:** Merged, deduplicated, inbox cleared (10 files)
-
-**Merged sources:** `coordinator-analyzer-implementation-plan`, `coordinator-analyzer-queue-priority`, `coordinator-catalog-audit-findings`, `coordinator-catalog-conventions`, `coordinator-post-infra-analyzer-analysis`, `copilot-directive-2026-04-26T-catalog-lexer`, `frank-cross-catalog-invariants`, `george-cross-catalog-api-design`, `soup-nazi-analyzer-test-infra`, `soup-nazi-analyzer-test-plan`.
-
-- The April 26 catalog audit now splits cleanly into **fixed now** vs **follow-up work**. Fixed in-session: `Period` gained `EqualityComparable`; qualifier modeling now reflects the full `in`/`of` system with exclusivity rules; `DisplayName` is required/populated for surfaced types; `UsageExample` is populated for surfaced types. Deferred follow-up: `TokenMeta.ValidAfter`, catalog-driven language-server completions, and the rest of the analyzer sweep.
-
-- Canonical analyzer scope is 53 statically checkable invariants (37 cross-catalog, 16 intra-catalog) across 11 analyzers `PRECEPT0007`–`PRECEPT0017`; `PRECEPT0018` is dropped because Tokens is a leaf and exhaustiveness is already covered by `PRECEPT0007`.
-
-- Shared analyzer infrastructure is now the center of gravity: `CatalogAnalysisHelpers.cs` plus a multi-source `AnalyzerTestHelper` overload. Test stubs stay minimal, avoid Frozen/Immutable BCL dependencies, and identify catalogs by class name rather than file path.
-
-- Constructor parameters are the canonical way to express optional catalog metadata. `init`-only metadata properties on catalog records are now explicitly rejected because they create a second analyzer extraction path.
-
-- Queue/order dedupe: the earlier simple-patterns-first plan is superseded by Shane's later directive to front-load the trait↔operation consistency path because it builds reusable switch-walker and enum-resolution infrastructure for the rest of the analyzer suite.
-
-- Soup Nazi's test-plan bar stands: helper tests plus analyzer suites total about 298 cases, with the accepted blind spot limited to spread elements inside shared static arrays and guarded by declaration-site validation/regression anchors.
-
-- Owner directive stands: lexer token classification must converge on fully catalog-driven behavior; implementation tactics may vary, but the architectural target is no-exceptions catalog authority.
-
----
