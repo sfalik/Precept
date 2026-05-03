@@ -1,6 +1,6 @@
 # Precept Compiler and Runtime Design
 
-> **Status:** Approved working architecture
+> **Status:** Canonical design — catalog-first pipeline
 > **Audience:** compiler, runtime, language-server, MCP, and documentation authors
 
 **How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
@@ -19,13 +19,13 @@ Everything in this document — every pipeline stage, every artifact, every runt
 
 ### Catalog-driven design
 
-Precept keeps its language purposely simple. Rather than embedding domain knowledge in pipeline stage implementations (as traditional compilers do), Precept externalizes the entire language definition as structured metadata in twelve catalogs. Pipeline stages are generic machinery that reads this metadata.
+Precept keeps its language purposely simple. Rather than embedding domain knowledge in pipeline stage implementations (as traditional compilers do), Precept externalizes the entire language definition as structured metadata in thirteen catalogs. Pipeline stages are generic machinery that reads this metadata.
 
 This inverts the traditional compiler model. In general-purpose compilers (Roslyn, GCC, TypeScript), domain knowledge is scattered across pipeline stage implementations — adding a language feature means touching dozens of files. The surveyed DSL-scale systems take a different approach: CEL centralizes its language definition in `Env` declarations, OPA/Rego externalizes rule indexing and type environments in `ast.Compiler`, and CUE's lattice-based evaluation derives behavior from schema declarations. Precept takes this pattern further — adding a language feature means adding an enum member and filling an exhaustive switch. The C# compiler refuses to build if any member lacks metadata, and propagation to every consumer (grammar, completions, hover, MCP, semantic tokens) is automatic.
 
-The twelve catalogs fall into two groups:
+The thirteen catalogs fall into two groups:
 
-**Language definition** — what the language IS: `Tokens` (lexical vocabulary), `Types` (type system families), `Functions` (built-in function library), `Operators` (operator symbols with precedence/associativity/arity), `Operations` (typed operator combinations — which `(op, lhs, rhs)` triples are legal; `BidirectionalLookup` entries declare commutative operations once so `money * decimal` and `decimal * money` resolve to the same entry without duplicate definitions), `Modifiers` (declaration-attached modifiers as a discriminated union with five subtypes), `Actions` (state-machine action verbs), `Constructs` (grammar forms and declaration shapes), `Constraints` (constraint kinds and activation anchor metadata), `ProofRequirements` (proof obligation kinds and qualifier compatibility metadata).
+**Language definition** — what the language IS: `Tokens` (lexical vocabulary), `Types` (type system families), `Functions` (built-in function library), `Operators` (operator symbols with precedence/associativity/arity), `Operations` (typed operator combinations — which `(op, lhs, rhs)` triples are legal; `BidirectionalLookup` entries declare commutative operations once so `money * decimal` and `decimal * money` resolve to the same entry without duplicate definitions), `Modifiers` (declaration-attached modifiers as a discriminated union with five subtypes), `Actions` (state-machine action verbs), `Constructs` (grammar forms and declaration shapes), `ExpressionForms` (expression grammar forms — expression node kinds: literal, identifier, binary op, function call, quantifier, CI function call), `Constraints` (constraint kinds and activation anchor metadata), `ProofRequirements` (proof obligation kinds and qualifier compatibility metadata).
 
 **Failure modes** — how it reports problems: `Diagnostics` (compile-time rules), `Faults` (runtime failure modes). The diagnostic-and-output-design survey confirms that Precept's catalog-based separation of diagnostic rule definition (`DiagnosticCode` in the `Diagnostics` catalog) from diagnostic instance (`Diagnostic` with source location, severity, and message arguments) follows the Roslyn pattern (`DiagnosticDescriptor` / `Diagnostic`) — the most explicit rule-vs-instance separation in the surveyed systems. TypeScript uses a similar `DiagnosticMessage` / `Diagnostic` split. The survey also reveals a severity-level divide: all surveyed DSL-scale systems (CEL, OPA/Rego, CUE, Dhall, Jsonnet, Pkl, Starlark) have error-only diagnostics — no warnings, no hints. Only general-purpose compilers (Roslyn, TypeScript, Rust, Swift) define 4+ severity levels. Precept's `Diagnostics` catalog defines severity levels beyond error, which is an intentional choice above DSL-scale norms, driven by the authoring-surface ambition of the language server and MCP tools.
 
@@ -34,7 +34,7 @@ Their union IS the language specification in machine-readable form. No consumer 
 The architectural principle: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never encode language knowledge in their own logic. See `docs/language/catalog-system.md` for the full catalog system design.
 
 > **Precept Innovations**
-> - **Catalog-as-spec inversion.** Traditional compilers scatter language knowledge across pipeline implementations — adding a feature means touching dozens of files and hoping every consumer gets updated. Precept externalizes the entire language specification as twelve machine-readable catalogs; their union IS the spec. Without this, grammar, completions, hover, and MCP vocabulary would drift independently and require manual synchronization on every language change.
+> - **Catalog-as-spec inversion.** Traditional compilers scatter language knowledge across pipeline implementations — adding a feature means touching dozens of files and hoping every consumer gets updated. Precept externalizes the entire language specification as thirteen machine-readable catalogs; their union IS the spec. Without this, grammar, completions, hover, and MCP vocabulary would drift independently and require manual synchronization on every language change.
 > - **Single-act feature propagation.** Adding a language feature is one enum member with an exhaustive metadata switch. The C# compiler refuses to build if metadata is missing, and propagation to grammar, completions, hover, MCP vocabulary, and semantic tokens is automatic.
 > - **Grammar generation from catalogs.** The TextMate grammar, LS completions, and MCP vocabulary are generated artifacts, not hand-edited — they cannot drift from the language specification because they ARE the specification, projected to different surfaces.
 
@@ -279,9 +279,11 @@ The language server's completion logic uses `TokenMeta.ValidAfter` to filter can
 > - **Catalog-driven token recognition.** `TokenKind` derives from catalog metadata, not a parallel enum. The lexer is a vocabulary consumer — adding a keyword to the `Tokens` catalog automatically makes it lexable, highlightable, and completable.
 > - **No vocabulary ownership at the lexer level.** Traditional lexers own a hardcoded keyword table. Precept's lexer reads its vocabulary from the same metadata that drives every other consumer.
 
+See [`docs/compiler/lexer.md`](./compiler/lexer.md) for the full stage design.
+
 ## 5. Parser
 
-The parser builds the source-structural model of the authored program. Its key design choice: `SyntaxTree` preserves the author's source structure — including recovery shape for broken programs — without resolving names, types, or overloads. Tooling needs source-faithful structure (folding, outline, recovery context) independently of semantic resolution.
+The parser transforms a token stream into a `SyntaxTree` containing `ParsedConstruct` nodes. Its key design choice: a **catalog-driven generic interpreter** — the parser contains no per-construct parsing logic encoded in source code. Instead, construct metadata in the `Constructs` catalog drives a single generic slot-walking engine. There are no per-construct AST node types.
 
 ```mermaid
 flowchart LR
@@ -300,10 +302,10 @@ flowchart LR
     PAR --> OUT
 ```
 
-| **Output** | `SyntaxTree` — `PreceptSyntax Root` with source-faithful declaration/expression nodes, missing-node representation, and span ownership; plus parse-phase diagnostics. |
+| **Output** | `SyntaxTree` — `ImmutableArray<ParsedConstruct> Constructs` (each node: `ConstructMeta Meta`, `ImmutableArray<SlotValue> Slots`, `SourceSpan Span`) plus parse-phase diagnostics |
 |---|---|
-| **Catalog role** | The parser stamps syntax-level identities as soon as syntax alone can know them: construct kind, anchor keyword, action keyword, operator token, literal segment form. |
-| **Consumers** | TypeChecker, LS syntax-facing features (outline, folding, recovery-aware local context) |
+| **Catalog role** | The parser stamps kind identities at parse time: `ConstructKind` via `Meta.Kind`, `ActionKind` into `ActionChainSlot`, `ModifierKind` into `ModifierListSlot`. `TypeKind` is NOT stamped at parse time — `TypeExpressionSlot` carries `SourceSpan`; the type checker resolves type references. |
+| **Consumers** | TypeChecker, LS syntax-facing features (outline, folding, span-based context) |
 
 **How it serves the guarantee:** Structural fidelity means the type checker and downstream stages work from a faithful representation of the author's intent, including malformed programs — authoring tools can diagnose problems precisely because the structure is preserved, not discarded on error.
 
@@ -311,9 +313,9 @@ flowchart LR
 
 The parser guarantees to the type checker:
 
-- Every declaration is structurally well-formed — required slots are filled, or represented as `MissingNode` (never silently absent). The type checker does not re-validate structural completeness.
-- All identifiers in keyword positions have been resolved to catalog-defined keywords. The type checker does not re-resolve keyword identity.
-- `ConstructKind`, `ActionKind`, `OperatorKind`, `TypeKind` (on `TypeRef`), and `ModifierKind` are stamped on every applicable node. The type checker can assume these are present and correct.
+- Every parsed region produces a `ParsedConstruct` node. Missing or invalid slots produce synthesized placeholder `SlotValue` instances — required content is never silently absent. The type checker does not re-validate structural completeness.
+- The `ConstructKind` for each construct is stamped via `Meta.Kind` at parse time. `ActionKind` and `ModifierKind` are resolved and stored in `ActionChainSlot` and `ModifierListSlot` subtypes at parse time.
+- `TypeKind` is NOT stamped at parse time — `TypeExpressionSlot` carries `SourceSpan`; the type checker resolves type references by looking up the span in the `Types` catalog.
 
 What the parser does NOT guarantee: name resolution, type compatibility, overload selection, or semantic legality. The type checker owns all semantic resolution.
 
@@ -321,33 +323,28 @@ What the parser does NOT guarantee: name resolution, type compatibility, overloa
 
 Error recovery is construct-level, not token-level. When the parser encounters a malformed construct, it emits a diagnostic and skips to the next newline-anchored declaration keyword (`field`, `state`, `event`, `rule`, `from`, `in`, `to`, `on`). This is panic-mode recovery with synchronization at declaration boundaries.
 
-Malformed input is represented as `MissingNode` for required slots that could not be parsed and `SkippedTokens` trivia attached to the nearest valid node for tokens that could not be incorporated into any construct. A `MissingNode` carries the expected `ConstructSlot` identity and the span where the parser expected content. The tree always accounts for every character of source text — no input is silently discarded. This adapts the error-tolerant parsing approach pioneered by Roslyn (missing tokens + skipped tokens trivia) to Precept's simpler grammar shape, where recovery granularity is at the declaration level rather than the statement level.
+For slots where expected tokens are absent, the parser synthesizes a placeholder `SlotValue` for the slot kind and continues. The parser always terminates; every syntax error produces a `Diagnostic`; partial constructs are emitted with available slots populated.
 
-### Node inventory
+### Output: `ParsedConstruct` and `SlotValue`
 
-The parser produces one syntax node type per `ConstructKind`, with child nodes corresponding to `ConstructSlot` entries from the `Constructs` catalog. The containment hierarchy:
+The parser produces one output type for all constructs:
 
-```
-PreceptSyntax  (root — owns every declaration)
-├── FieldDeclarationSyntax       field name, type reference, modifiers, default/computed expression
-├── StateBlockSyntax             state name, modifiers
-│   ├── EnsureDeclarationSyntax      state-scoped constraint with because clause
-│   └── AccessDeclarationSyntax      edit/readonly declarations per field
-├── EventDeclarationSyntax       event name, modifiers, arg declarations
-├── TransitionRowSyntax          anchor (from/to/in/on), state/event refs, guard, action chain
-├── RuleDeclarationSyntax        guard (optional), ensure expression, because clause
-├── EnsureDeclarationSyntax      event-scoped constraint with because clause
-├── AccessDeclarationSyntax      edit/readonly declarations per field per state
-│
-├── MissingNode                  required slot that could not be parsed (carries expected ConstructSlot + span)
-└── SkippedTokens                trivia: tokens not incorporated into any construct
+```csharp
+public sealed record ParsedConstruct(
+    ConstructMeta Meta,
+    ImmutableArray<SlotValue> Slots,
+    SourceSpan Span);
 ```
 
-**Recovery shape.** `MissingNode` and `SkippedTokens` are first-class tree citizens, not out-of-band error records. A malformed `field` declaration appears as a `FieldDeclarationSyntax` with `MissingNode` children in unfilled slots and `SkippedTokens` trivia attached to the nearest valid node. The tree always accounts for every character of source text.
+- **Meta** — The `Constructs` catalog entry describing this construct's kind, slots, and routing
+- **Slots** — Parsed values in declaration order matching `Meta.Slots`
+- **Span** — Source location from first to last consumed token
 
-**Expression nodes** (appear only inside declaration slots — guards, action RHS, ensure clauses, computed fields, because clauses):
+There are no per-construct AST node types. The old typed-class hierarchy (`FieldDeclarationSyntax`, `StateBlockSyntax`, `EventDeclarationSyntax`, `TransitionRowSyntax`, etc.) has been deleted. Consumers work with `ParsedConstruct` uniformly, dispatching on `ConstructKind` via `Meta.Kind` when construct-specific handling is needed.
 
-`BinaryExpressionSyntax` · `UnaryExpressionSyntax` · `LiteralExpressionSyntax` · `FieldReferenceSyntax` · `EventArgReferenceSyntax` · `FunctionCallSyntax` · `IfThenElseSyntax` · `MemberAccessSyntax` · `IsSetExpressionSyntax` · `ContainsExpressionSyntax`
+`SlotValue` is a 17-subtype discriminated union, one per `ConstructSlotKind`. Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) currently carry only `SourceSpan` — expression tree design is deferred. See [`docs/compiler/parser.md`](./compiler/parser.md) for the full slot subtype inventory and open questions.
+
+> **Open Question (inherited from parser.md):** Expression-carrying slots hold `SourceSpan` only. The eventual expression parser will be a Pratt parser (operator-precedence) using the `Operators` catalog for precedence/associativity metadata. Three representation options remain under consideration: Roslyn-style per-expression-kind node types; uniform S-expression `(op, args...)`; or span + lazy parse on demand. Design review required before implementation. This blocks expression resolution in the type checker.
 
 ### Catalog-to-grammar mapping
 
@@ -368,9 +365,11 @@ Precept's grammar calls for parser patterns scaled to a flat, keyword-anchored, 
 `set` appears as both an action keyword (`TokenCategory.Action` — e.g., `set Amount to 100`) and a type keyword (`TokenCategory.Type` — e.g., `field Tags as set of string`). The parser disambiguates by position context: after `->` or in action position = action; after `as`/`of` or in type position = type. This disambiguation is a parser responsibility, not a catalog lookup — the catalog correctly classifies `set` under both categories.
 
 > **Precept Innovations**
-> - **Flat, declaration-oriented grammar.** No nesting beyond expression-within-declaration. This makes the grammar trivially parseable, the error recovery model simple and predictable, and the SyntaxTree shape directly useful for tooling without the complexity budget of a general-purpose language parser.
+> - **Flat, declaration-oriented grammar.** No nesting beyond expression-within-declaration. This makes the grammar trivially parseable, the error recovery model simple and predictable, and the `SyntaxTree` shape directly useful for tooling without the complexity budget of a general-purpose language parser.
 > - **Precedence from catalog metadata.** Operator precedence and associativity are not hardcoded — they derive from `Operators.GetMeta()`. Changing precedence is a catalog edit, not a parser rewrite.
-> - **One node type per `ConstructKind`.** The node inventory is catalog-derived — each construct in the `Constructs` catalog maps to exactly one syntax node with slots matching `ConstructSlot` entries. The parser shape IS the grammar shape.
+> - **Catalog-driven generic interpreter.** The parser contains no per-construct parsing logic — it is a generic slot-walking engine driven by `Constructs` catalog metadata. There are no per-construct AST node types: a single `ParsedConstruct(ConstructMeta, ImmutableArray<SlotValue>, SourceSpan)` is the parser's universal output type. Adding a new construct requires only a catalog entry, not parser code changes.
+
+See [`docs/compiler/parser.md`](./compiler/parser.md) for the full stage design including slot subtype inventory, disambiguation protocol, and routing family details.
 
 ## 6. Type Checker
 
@@ -406,7 +405,7 @@ The `SemanticIndex` is not a second tree that mirrors parser structure with type
 
 **Why inventory-shaped.** Graph analysis needs transition rows keyed by state/event identity. Proof needs constraint expressions with resolved types and dependency facts. The Precept Builder needs normalized declaration sets it can transform into descriptor tables. The LS needs symbol tables for hover, go-to-definition, and semantic tokens. None of these consumers want a tree walk over parser nesting — they want declarations indexed by semantic role. The `SemanticIndex` shape reflects this: flat at the declaration level, structured within typed expressions.
 
-**Syntax-node back-pointers.** Semantic entries hold direct references to their originating `SyntaxTree` nodes — a `TypedField` points to its `FieldDeclarationSyntax`; a `TypedExpression` points to the expression syntax node it was resolved from; a `TypedTransitionRow` points to its `TransitionRowSyntax`. The pointer is a direct object reference, not a span lookup or index-based correlation.
+**Syntax-node back-pointers.** Semantic entries hold direct references to their originating `ParsedConstruct` nodes — a `TypedField` points to its source `ParsedConstruct`; a `TypedExpression` points to the `SourceSpan` it was resolved from; a `TypedTransitionRow` points to its source `ParsedConstruct`. The pointer is a direct object reference, not a span lookup or index-based correlation.
 
 This is the right trade for Precept. The LS runs in the same process as the compiler — no serialization boundary, both artifacts on the same heap — so a direct reference is the simplest linking strategy. Precept recompiles the entire file on every change (§9), producing a fresh, immutable `Compilation` each time, so back-pointers never dangle. At Precept's scale (flat grammar, shallow trees, 64KB ceiling), the memory cost of holding both artifacts plus cross-references is negligible. And when an LS feature needs new source-structural context (e.g., the exact span of a guard clause for a diagnostic underline), the back-pointer makes it immediately available without extending the `SemanticIndex` contract.
 
@@ -420,12 +419,12 @@ The semantic inventory is organized by role, not by source position. Each entry 
 SemanticIndex                              ◄ flat inventory, not a tree
 │
 ├── Symbols ─────────────────────────────────────────────────────
-│   TypedField    "Amount"    number   [required]       → FieldDeclarationSyntax
-│   TypedField    "Status"    string   [computed]        → FieldDeclarationSyntax
-│   TypedState    "Draft"     [initial]                  → StateBlockSyntax
-│   TypedState    "Approved"  [terminal]                 → StateBlockSyntax
-│   TypedEvent    "Submit"    args: [Approver]           → EventDeclarationSyntax
-│   TypedArg      "Approver"  string   [required]        → arg syntax
+│   TypedField    "Amount"    number   [required]       → ParsedConstruct (FieldDeclaration)
+│   TypedField    "Status"    string   [computed]        → ParsedConstruct (FieldDeclaration)
+│   TypedState    "Draft"     [initial]                  → ParsedConstruct (StateDeclaration)
+│   TypedState    "Approved"  [terminal]                 → ParsedConstruct (StateDeclaration)
+│   TypedEvent    "Submit"    args: [Approver]           → ParsedConstruct (EventDeclaration)
+│   TypedArg      "Approver"  string   [required]        → slot within ParsedConstruct
 │
 ├── Bindings ────────────────────────────────────────────────────
 │   expr site  "Amount > 0"   →  OperationKind.GreaterThan(number, number)
@@ -452,10 +451,10 @@ SemanticIndex                              ◄ flat inventory, not a tree
 
 | Symbol | Key | Semantic content | → syntax |
 |---|---|---|---|
-| `TypedField` | field name | `TypeKind`, modifiers, default/computed expression | `FieldDeclarationSyntax` |
-| `TypedState` | state name | modifier set (initial, terminal, required, …) | `StateBlockSyntax` |
-| `TypedEvent` | event name | modifier set, arg symbols | `EventDeclarationSyntax` |
-| `TypedArg` | event + arg name | `TypeKind`, optionality, default expression | arg syntax node |
+| `TypedField` | field name | `TypeKind`, modifiers, default/computed expression | `ParsedConstruct` |
+| `TypedState` | state name | modifier set (initial, terminal, required, …) | `ParsedConstruct` |
+| `TypedEvent` | event name | modifier set, arg symbols | `ParsedConstruct` |
+| `TypedArg` | event + arg name | `TypeKind`, optionality, default expression | slot within `ParsedConstruct` |
 
 **Bindings** — every reference site resolved to its target
 
@@ -492,7 +491,7 @@ These rules constrain the `SemanticIndex` shape. They are architectural constrai
 1. **No parser layout inheritance.** `SemanticIndex` must not preserve parser child layout, missing-node shape, or recovery nullability as its primary contract. The semantic inventory is organized by semantic role, not by source structure.
 2. **Semantic LS features must not walk syntax.** Hover, go-to-definition, semantic tokens, and semantic completions must be satisfiable from `SemanticIndex` bindings plus back-pointers to originating syntax nodes. If an LS feature must walk parser structure to answer a semantic question, the `SemanticIndex` is underspecified — fix the inventory, not the LS feature.
 3. **Downstream stages consume semantic inventories.** Graph analysis, proof, and the Precept Builder consume normalized semantic inventories. They must not traverse syntax nodes via back-pointers. If a downstream stage needs source-structural information, the `SemanticIndex` is missing a semantic fact.
-4. **`SyntaxTree` retains sole ownership of source shape.** Recovery, token grouping, exact authored ordering, and malformed-construct shape belong to `SyntaxTree` exclusively. `SemanticIndex` entries hold back-pointers for navigation, not syntax fragments for reconstruction.
+4. **`SyntaxTree` retains sole ownership of source shape.** Recovery, construct ordering, span information, and parse-phase slot layout belong to `SyntaxTree`/`ParsedConstruct` exclusively. `SemanticIndex` entries hold back-pointers for navigation, not syntax fragments for reconstruction.
 
 ### Right-sized type checking: generic resolution passes
 
@@ -523,16 +522,20 @@ The Precept Builder produces the matching executable family: `ExecutableAction`,
 
 | Stage | Kinds assigned |
 |---|---|
-| Parser | `ConstructKind`, `ActionKind`, `OperatorKind`, `TypeKind` on `TypeRef` nodes, `ModifierKind`, `ConstraintKind` |
-| Type checker | `OperationKind`, `FunctionKind`, resolved `TypeAccessor`, resolved result `TypeKind` on typed expressions |
+| Parser | `ConstructKind`, `ActionKind`, `OperatorKind`, `ModifierKind` — stamped into `SlotValue` subtypes at parse time |
+| Type checker | `TypeKind`, `OperationKind`, `FunctionKind`, resolved `TypeAccessor`, resolved result types on typed expressions |
 
 The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `SyntaxTree`; a kind that syntax alone determines does not wait for the type checker.
 
 > **Precept Innovations**
 > - **Catalog-driven resolution passes.** Type checking resolves against catalog metadata (`Operations`, `Functions`, `Types`, `Modifiers`, `Actions`, `Constraints`, `ProofRequirements`) rather than encoding per-construct behavior in checker logic. Adding a new operation or function to the catalog automatically makes it resolvable — no checker code changes required.
 > - **Flat semantic inventory, not annotated syntax.** The `SemanticIndex` is a flat inventory of symbols, bindings, and normalized declarations — not an AST with types bolted on. The shape is driven by what graph analysis, proof, the Precept Builder, and the LS need, not by what the parser produces. The anti-mirroring rules enforce this structurally.
-> - **Syntax-node back-pointers with consumer discipline.** Semantic entries hold direct references to originating syntax nodes — cheap LS navigation without span correlation. But downstream stages (graph, proof, the Precept Builder) consume only the semantic inventories, never the syntax structure behind the pointers. The back-pointer is a navigation convenience, not a structural dependency.
+> - **Syntax-node back-pointers with consumer discipline.** Semantic entries hold direct references to originating `ParsedConstruct` nodes — cheap LS navigation without span correlation. But downstream stages (graph, proof, the Precept Builder) consume only the semantic inventories, never the syntax structure behind the pointers. The back-pointer is a navigation convenience, not a structural dependency.
 > - **Three-shape typed action family.** Actions resolve to exactly one of three semantic shapes (`TypedAction`, `TypedInputAction`, `TypedBindingAction`), enforced by the DU pattern. A flat shape with optional nullable fields is prohibited — the type system prevents invalid action representations.
+
+> **Open Question (inherited from type-checker.md):** Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) currently carry only `SourceSpan`. The expression resolution sub-engine (§7.2 in type-checker.md) is fully designed but cannot be exercised until the parser produces expression trees. Implementation is blocked pending expression tree design.
+
+See [`docs/compiler/type-checker.md`](./compiler/type-checker.md) for the full stage design including `SemanticIndex` record types, 2-pass architecture, and expression resolution strategy.
 
 ## 7. Graph Analyzer
 
@@ -623,6 +626,8 @@ Review  ──Reject───▶ Draft
 > - **Reachability as a first-class design artifact.** Graph analysis produces reachable/unreachable state sets, structural validity facts, and runtime indexes — not just a pass/fail check. These facts flow into proof obligations and runtime precomputation.
 > - **Lifecycle soundness as a compile-time guarantee.** Unreachable states, terminal outgoing-edge violations, required-state dominance violations, and irreversible back-edges are all caught before any instance exists. Without this analysis stage, these defects would surface as runtime surprises — an entity that can never reach a terminal state, a transition that violates an irreversibility promise — with no static signal to the author.
 > - **Structural cycle and dominance detection.** The graph analyzer reasons about structural properties (dominance, predecessor/successor relationships, event coverage per state) that would otherwise require runtime observation to discover.
+
+See [`docs/compiler/graph-analyzer.md`](./compiler/graph-analyzer.md) for the full stage design.
 
 ## 8. Proof Engine
 
@@ -731,6 +736,8 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 > - **`ConstraintInfluenceMap`.** The Precept Builder can produce a precomputed map from constraints to contributing fields (with expression-text excerpts). This makes AI inspection structurally superior — an agent can answer "which field change would satisfy this constraint?" without reverse-engineering expressions. This is a structural differentiator for the MCP surface.
 > - **Structured "why not" explanations.** Constraint violations carry structured explanation depth — the failing expression, evaluated field values, guard context, and failing sub-expression — not just a boolean status. This transforms MCP tools from status reporters to causal reasoning engines.
 > - **Bounded, non-extensible strategy set.** Four strategies only, each a simple predicate function — not a general solver framework. This makes the proof engine predictable, auditable, and implementable without external dependencies.
+
+See [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md) for the full stage design including strategy details and the proof/fault chain.
 
 ## 9. Compilation
 
@@ -942,6 +949,8 @@ The stable runtime contract is descriptor-backed. Current public stubs still exp
 > - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. Without this, the evaluator would need to walk expression trees at runtime and re-resolve operation kinds and field names on every operation. Flat plans make evaluation predictable-time and the execution trace trivially inspectable.
 > - **Dispatch-optimized constraint indexes.** Constraints are grouped by activation anchor into precomputed buckets — the evaluator never scans or filters at dispatch time. Five anchor families, four activation indexes, built once during the Precept Builder stage.
 > - **`ConstraintInfluenceMap` as a built artifact.** The dependency from constraints to contributing fields, with expression-text excerpts, becomes a first-class runtime artifact — enabling AI agents to reason causally about constraint satisfaction.
+
+See [`docs/runtime/precept-builder.md`](../runtime/precept-builder.md) for the full stage design including the six transformation passes.
 
 ## 11. Runtime surface and operations
 
@@ -1156,6 +1165,8 @@ Do NOT add patterns directly to `tmLanguage.json`. Add the language element to t
 > - **Grammar generation, not grammar authoring.** The TextMate grammar is a build output. Syntax highlighting correctness is a property of catalog completeness, not of grammar maintenance. A new keyword highlights correctly the moment its catalog entry is added.
 > - **Zero-drift guarantee.** Because the grammar is generated from the same metadata the parser and type checker consume, it is structurally impossible for syntax highlighting to disagree with actual parse behavior.
 
+See [`docs/compiler/tooling-surface.md`](./compiler/tooling-surface.md) for the full tooling surface design. Note: the grammar generator is currently designed but not yet implemented — the current `precept.tmLanguage.json` is hand-crafted.
+
 ## 14. MCP integration
 
 Precept ships five MCP tools as **primary distribution surfaces** — not integrations bolted on afterward. The MCP server is an AI-first design concern: every architectural decision accounts for AI agent consumers alongside human developers.
@@ -1192,6 +1203,8 @@ The `ConstraintInfluenceMap` (§8 innovation) would make MCP tools causal reason
 > - **Causal reasoning in tool output.** Structured "why not" explanations in fire/update results transform MCP from status reporting to causal reasoning — an AI agent can explain failures without access to source code.
 > - **AI-first, not AI-adapted.** The MCP surface was designed alongside the core API, not retrofitted. Structured outcomes, deterministic shapes, and complete vocabulary exposure are architectural requirements, not afterthoughts.
 
+See [`docs/tooling/mcp.md`](../tooling/mcp.md) for the full MCP design including tool signatures and thin-wrapper discipline.
+
 ## 15. Language-server integration
 
 The language server consumes pipeline artifacts by responsibility — each LS feature reads from exactly the artifact that owns the information it needs, and nothing else. For contributors building LS features, this means: reach for the right artifact first. Using the wrong artifact does not just produce incorrect behavior — it creates coupling to structural concerns the feature should not depend on.
@@ -1202,11 +1215,11 @@ The language server consumes pipeline artifacts by responsibility — each LS fe
 
 **Diagnostics** — reads merged `Compilation.Diagnostics`. Not per-stage polling.
 
-**Semantic tokens for identifiers** — reads `SemanticIndex` symbol/reference bindings; source spans come from back-pointers to originating syntax nodes (see §6). Not token categories alone.
+**Semantic tokens for identifiers** — reads `SemanticIndex` symbol/reference bindings; source spans come from back-pointers to originating `ParsedConstruct` nodes (see §6). Not token categories alone.
 
 **Completions** — reads catalogs for candidate inventory, `SyntaxTree` for local parse context, `SemanticIndex` for scope/binding/expected type. Not `StateGraph` or `ProofLedger`.
 
-**Hover** — reads `SemanticIndex` semantic identity + catalog documentation/signatures; source location from the back-pointer to the originating syntax node. Not raw syntax.
+**Hover** — reads `SemanticIndex` semantic identity + catalog documentation/signatures; source location from the back-pointer to the originating `ParsedConstruct` node. Not raw syntax.
 
 **Go-to-definition** — reads `SemanticIndex` reference binding + declaration-origin back-pointer. Not syntax-tree guessing.
 
@@ -1228,6 +1241,8 @@ Two hard rules: (1) Do not make semantic LS features walk `SyntaxTree` to answer
 | MCP `precept_update` | `Precept` / `Version.Update` |
 | Host application authoring-time validation | `Compilation` |
 | Host application execution | `Precept` + `Version` |
+
+See [`docs/tooling/language-server.md`](../tooling/language-server.md) for the full language server design including in-process compilation model and per-feature artifact routing.
 
 ---
 
