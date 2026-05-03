@@ -20099,4 +20099,286 @@ The following priority areas from the task brief were checked and found clean:
 - **`OutcomeKeywords` and `IsOutcomeAhead()`**: ✅ Correctly derived from `TokenCategory.Outcome`.
 - **`Actions.ClearApplicable`**: ✅ Correctly excludes Log, LogBy, and Lookup per spec §3.8.
 - **`Modifiers.CollectionTypes`**: ✅ Correctly includes all 9 collection types for mincount/maxcount per spec §3.8 table.
-- **Lexer**: ✅ Fully catalog-driven (keywords, operators, punctuation all via Tokens catalog).
+- **Lexer**: ✅ Fully catalog-driven (keywords, operators, punctuation all via Tokens catalog).
+
+# Decision: Parser Rebuild Rejected — Path C (Targeted Improvements) Selected
+
+**By:** Frank (Lead/Architect)  
+**Date:** 2026-05-02T19:00:25.570-04:00  
+**Document:** `docs/working/frank-architecture-decision-parser-rebuild.md`
+
+## Decision
+
+Shane asked: "Should we delete the parser and re-implement as a radical idea?"
+
+**Answer: No.** Path C selected — targeted parser improvements (2-3 days), then build the type checker.
+
+## Rationale
+
+1. The radical rewrite has 3 unsolved design gaps (stashed-guard, split-modifier, variant-action triggers) that would stall it mid-flight.
+2. George's reality-check proved my 80-line sizing claim was off by 2× (honest estimate: 150-200 lines).
+3. The type checker is the priority milestone; only targeted parser changes that directly unblock it are warranted now.
+4. The binding constraint is: uniform action-shape `Statement` nodes MUST land before checker Slice 5. Path C solves this directly.
+
+## Sequencing Locked
+
+- Phase 1 (2-3 days): Derive `StructuralBoundaryTokens`, consolidate action-shape nodes, add `VariantTriggerToken?`, add `TypeParseShape` DU
+- Phase 2: Build type checker Slices 0-11
+- Phase 3 (post-checker, P3): Evaluate Declarative Grammar Machine with empirical evidence from two AST consumers
+
+## Principle
+
+Don't rebuild infrastructure to satisfy architectural aesthetics before building the thing that reveals whether the aesthetics are correct.
+
+# Decision Note: Parser Rebuild Reassessment (AI Velocity Correction)
+
+**Author:** Frank  
+**Date:** 2026-05-02T19:07:59-04:00  
+**Scope:** Parser rebuild vs. incremental improvement sequencing  
+**Amends:** frank-parser-rebuild-decision (same date)
+
+## Decision
+
+Path C (targeted parser improvements → type checker) remains the recommendation. The justification has shifted: time cost is no longer a differentiator (both paths ~2 days with AI velocity). The surviving argument is purely risk-based — Path C avoids the three unsolved design gaps (stashed-guard, split-modifier, variant-action detection) that Path B would require solving simultaneously.
+
+## What Changed
+
+Shane corrected Frank's 1-2 week rebuild estimate by noting the entire parser was originally built from spec in 2 days using AI. Frank's time-cost argument was calibrated to human velocity and was wrong. The recommendation holds on risk grounds alone.
+
+## Key Distinction
+
+- **Time cost**: AI makes this a wash. ~2 days either way. Frank's original estimate was flawed.
+- **Design risk**: Unchanged. Three unsolved design gaps are design problems, not coding problems. AI velocity doesn't help.
+- **Regression risk**: Reduced but real. 2000+ tests still gate correctness. Implicit grammar knowledge in the current parser is at risk in a clean-room rebuild.
+
+## If Path B Is Chosen Anyway
+
+Lock the stashed-guard pattern design before starting. It's the gap that breaks the slot-sequential model most fundamentally and has no plausible workaround without new design work.
+
+# Decision: Slots Field Removed from ConstructMeta (Radical Parser Design)
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-02  
+**Status:** Locked  
+**Scope:** `docs/compiler/parser-radical.md` — radical parser design sketch
+
+## Decision
+
+The `ImmutableArray<ConstructSlot> Slots` field is removed from `ConstructMeta` in the radical parser design. Named captures are derived from the grammar combinator tree at startup via `ExtractNamedCaptures(ParseRule grammar)`.
+
+## Rationale
+
+- **Single representation:** The `Tag("name", rule)` nodes in the `Grammar` combinator tree ARE the named captures. A separate `Slots` field is a parallel representation of the same truth.
+- **No divergence risk:** Two fields encoding the same information can diverge silently. One field cannot.
+- **The concept survives; the field does not.** IDE tooling and documentation consumers call `ExtractNamedCaptures(grammar)` to get the ordered list of named positions — same data, derived from the authoritative source instead of maintained alongside it.
+
+## Extraction Utility
+
+`ExtractNamedCaptures(ParseRule grammar)` walks the combinator tree, collects all `Tag` node names, and returns `ImmutableArray<string>`. Called once per `ConstructMeta` at catalog initialization.
+
+# Decision: Slots as a Separate Catalog Concept — Drop Them
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-02  
+**Status:** DECIDED  
+**In response to:** Shane's challenge on `parser-radical.md` slot retention  
+
+---
+
+## The Question
+
+Should `ImmutableArray<ConstructSlot> Slots` remain as a separate field on `ConstructMeta`, or is the concept vestigial in the radical design?
+
+---
+
+## 1. What "Slots" Are — And the Distinction That Matters
+
+In the **current parser**, `ConstructSlot` records are explicit catalog metadata entries. The parser iterates them via `InvokeSlotParser`, populating a result bag slot by slot. The `Slots` list *is* the grammar — the parser's execution order derives directly from it.
+
+In the **radical design**, `Tag("name", rule)` nodes embedded in the `Grammar` combinator tree are the named captures. When you write `Tag("type", TypeRefProd())`, you have declared a named parse position with a production rule. That IS a slot — inline, executable, self-describing.
+
+These are not the same thing. The current `Slots` field is an explicit parallel list. The radical design's `Tag` nodes are the slot definitions, integrated into the grammar tree itself.
+
+---
+
+## 2. What Slots Were Supposed to Do — And What Actually Uses Them
+
+The design doc retains `Slots` with the justification: *"keep — used for documentation/tooling."* Let's check whether that holds up.
+
+**Consumers examined:**
+
+| Consumer | Needs slot metadata? | Derivable from Grammar tree? |
+|---|---|---|
+| Parser (radical) | Uses `Grammar` only — `Slots` not consulted | N/A — `Slots` already irrelevant |
+| IDE completions/hover | Needs "at this position, I expect X" | Yes — walk `Grammar` tree, read `Tag` node types |
+| Error messages | Needs slot names for "expected X" | Yes — `Tag.Name` is the slot name; readable from tree |
+| MCP `precept_language` | Describes construct grammar | Yes — serialize the `Grammar` tree; `Tag` nodes expose names |
+| Documentation generation | Named positions for human docs | Yes — walk tree, collect `Tag` nodes |
+
+Every consumer that referenced `Slots` for documentation or tooling purposes can be served by **walking the `Grammar` combinator tree and collecting `Tag` nodes**. The result is equivalent: a named list of (name, production type) pairs.
+
+---
+
+## 3. The Parallel Representation Problem
+
+The `Slots` field as a separate catalog concept reintroduces the exact pathology the metadata-driven architecture is built to prevent: **two representations of the same truth that can diverge.**
+
+The `Grammar` tree says what the named parse positions are — via `Tag` nodes.  
+`Slots` says the same thing — via an explicit list.  
+
+These must be kept in sync by hand. There is no compiler enforcement that `Slots` matches the `Tag` nodes in `Grammar`. Someone adds a `Tag("postCondition", ...)` to `EventHandler.Grammar` and forgets to add a corresponding `ConstructSlot` entry. The documentation is now wrong. This is exactly how the current parser accumulated its catalog-vs-code divergences.
+
+In the radical model, there is only one source of truth for what a construct's named positions are: the `Grammar` field. `Slots` is a redundant copy.
+
+---
+
+## 4. The "Slots" Concept Is Not Dead — The Field Is
+
+This is a precise distinction. "Slot" as a **concept** — a named parse position in a construct's grammar — remains entirely valid and useful. The term should survive in documentation, error messages, and developer communication.
+
+What dies is `ImmutableArray<ConstructSlot> Slots` as a **separate catalog field on `ConstructMeta`**. The concept is not dropped; it is *dissolved into the grammar tree*, where it was always more naturally expressed.
+
+If you need a named-capture list for tooling:
+
+```csharp
+// Derivable from any ConstructMeta.Grammar at startup cost O(construct count × grammar depth)
+public static ImmutableArray<(string Name, Type ProductionType)> ExtractNamedCaptures(ParseRule rule)
+{
+    // walk the tree, collect all Tag nodes
+}
+```
+
+Build this once at startup into a `FrozenDictionary<ConstructKind, ImmutableArray<...>>`. Zero ongoing maintenance cost. Automatically correct whenever `Grammar` changes.
+
+---
+
+## 5. What Changes If We Drop `Slots`
+
+**`ConstructMeta` loses one field:**
+```csharp
+// Before:
+public sealed record ConstructMeta(
+    ConstructKind Kind,
+    string DisplayName,
+    TokenKind LeadingToken,
+    ImmutableArray<ConstructSlot> Slots,          // ← remove
+    ImmutableArray<TokenKind>? DisambiguationTokens,
+    ParseRule Grammar
+)
+
+// After:
+public sealed record ConstructMeta(
+    ConstructKind Kind,
+    string DisplayName,
+    TokenKind LeadingToken,
+    ImmutableArray<TokenKind>? DisambiguationTokens,
+    ParseRule Grammar
+)
+```
+
+**Everything that currently reads `Slots` for tooling/documentation** moves to a startup-computed `ExtractNamedCaptures` helper that walks the grammar tree.
+
+**Nothing in the parser changes** — it already doesn't use `Slots` in the radical design.
+
+**Nothing in the type checker changes** — the TC never touched `Slots`.
+
+---
+
+## 6. Verdict
+
+**Drop `ImmutableArray<ConstructSlot> Slots` from `ConstructMeta`.**
+
+The `Slots` field was a vestigial reflex from the current parser, where the slot list was the grammar and the parser iterated it directly. In the radical design, the `Grammar` combinator tree with its `Tag` nodes IS the slot list — in a richer, executable, self-consistent form.
+
+Keeping `Slots` as a separate catalog concept:
+- Creates a parallel representation that can diverge from `Grammar`
+- Adds no information that isn't already in the `Grammar` tree
+- Contradicts the core architectural principle: the catalog is the single source of truth, not two sources that must be kept in sync
+
+The concept of "slot" (a named parse position) survives. The concept is expressed through `Tag` nodes in `Grammar`. A derivation helper can reconstruct the list for any consumer that needs it. That is the correct design.
+
+The design doc's note *"keep — used for documentation/tooling"* was defensive hedging, not a principled justification. It didn't survive examination. The field goes.
+
+---
+
+## Required Change to `parser-radical.md`
+
+§3.1 must be updated:
+
+- Remove `ImmutableArray<ConstructSlot> Slots` from the `ConstructMeta` record shown
+- Remove the comment "keep — used for documentation/tooling"
+- Add a note: "Named parse positions (slots) are expressed via `Tag` nodes in `Grammar`. A `ExtractNamedCaptures(grammar)` helper derives the named-capture list at startup for tooling consumers."
+- The two-sentence clarification "Both say the same thing; `Grammar` is the executable form" must go — it was the tell that we were maintaining parallel truth.
+
+# George Pipeline Review Complete
+
+**Author:** George (Runtime Dev)
+**Date:** 2026-05-02T18:39:02-04:00
+**Subject:** Decision note — pipeline cross-review delivered
+
+---
+
+## Summary
+
+George completed an implementer's peer review of Frank's two catalog-bias analyses (type checker and parser). The review document is at `docs/working/george-catalog-driven-pipeline-review.md`.
+
+---
+
+## Key Findings for Team Decision
+
+### Factual Correction
+
+Frank's parser analysis claims `is set`/`is not set` hardcode precedence in the Pratt loop. This is wrong. `Parser.Expressions.cs:60` reads `Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)!.Precedence` — catalog-driven. The only real hardcodes are `.` (precedence 80, line 48) and `(` (precedence 90, line 82).
+
+### Priority Corrections
+
+Frank's priority table has two significant errors:
+
+1. **Uniform action-shape `Statement` nodes (Frank's P3)** should be **P1**. The checker's Slice 5 must be written against the consolidated AST. Writing against per-kind nodes and refactoring afterward is double work with regression risk.
+
+2. **`ParseFieldDeclaration` unification (Frank's P1)** should be **P2**. The split-modifier pattern (pre-compute modifiers and post-compute modifiers, with a single `SlotModifierList` slot in the catalog) requires new metadata design before this is safe. Doing it prematurely risks silently dropping post-compute modifiers.
+
+3. **`StructuralBoundaryTokens` derivation (Frank's P1)** should be **P0** — it's a drifting hand-maintained set that breaks silently when new slot kinds are added.
+
+### Hidden Gaps Frank Missed
+
+1. **Inline kind-identity checks in shape parsers** — `ParseCollectionValueStatement` (lines 355, 365, 373) and `ParseCollectionIntoStatement` (line 415) do `meta.Kind == ActionKind.X` mid-parse to detect variant actions. Same smell as the throw-arm ceremony Frank identified, but in a different location. Requires `ActionMeta.VariantTriggerToken?` (or equivalent) catalog field.
+
+2. **`ParseOutcomeNode` completely skipped by Frank** — Outcomes are hardcoded at both the parser and checker layers. GAP-062 remains unaddressed by both of Frank's analyses.
+
+3. **`TypeMeta.LiteralRange?` not mentioned by Frank** — This is a Slice 4 blocker for numeric literal range validation. Still missing from `TypeMeta`. Must land before Slice 4.
+
+4. **`ContentValidation DU` not mentioned by Frank** — Also a Slice 4 blocker for typed-constant content checking. Neither analysis proposes a catalog solution.
+
+5. **`BuildNode` preposition-token threading gap** — `ConstructKind.StateEnsure` and `ConstructKind.StateAction` in `BuildNode` (Parser.cs:513–534) receive `default` for preposition tokens parsed before the slot path. Any unified-slot proposal must address how these extra-slot tokens are threaded through.
+
+### Ordering Dependencies (Not in Either Analysis)
+
+These must be tracked explicitly:
+
+| Must-Do-First | Before |
+|---|---|
+| `StructuralBoundaryTokens` derivation | Any new slot kind |
+| Split-modifier metadata design | `ParseFieldDeclaration` unification |
+| Uniform action-shape `Statement` nodes | Checker Slice 5 implementation |
+| `TypeMeta.LiteralRange?` field | Checker Slice 4 implementation |
+| `ActionMeta.TypedActionShape` catalog field | Checker Slice 5 implementation |
+| `ScopeRule` on `ConstructMeta` | Checker Slice 3 implementation |
+| Precomputed operation/function tables | Checker implementation start |
+| `TypeParseShape` DU on `TypeMeta` | Optional before checker Pass 1, beneficial if done first |
+
+### Cross-Review Connections (Frank's Separate Documents Miss These)
+
+- **Action-statement unification is one problem at two stages.** Parser throw-arm ceremony and checker Slice 5 action classification both dissolve if: (a) parser consolidates to one `Statement` per shape, and (b) `ActionMeta.TypedActionShape` is added to catalog.
+- **`TypeParseShape` DU benefits the checker too**, not just the parser. Checker Pass 1 TypeRef resolution becomes catalog-driven dispatch instead of a 5-branch switch if `TypeMeta.TypeParseShape` is in place.
+- **Precomputed-table pattern is shared architecture** — the parser's vocabulary FrozenSets at startup and the checker's proposed operation/function tables at startup are the same design principle. Frank's two documents treat them as separate innovations; they're one pattern applied to two stages.
+
+---
+
+## Recommendation for Shane
+
+The reviews are ready for discussion. Before Frank and George align on a final implementation sequencing plan, two questions need team input:
+
+1. **Split-modifier metadata design** — Does `ConstructMeta` get a `SplitAroundSlot` field? Two `ModifierList` slots? Some other mechanism? This blocks the `ParseFieldDeclaration` unification work.
+
+2. **`ResolutionShape` timing** — Frank marks this P1 (add to ExpressionFormMeta before implementing `Resolve()`). George marks it P3 (implement baseline checker first, add as post-green refactor). Shane should decide whether to design metadata and its consumer simultaneously or sequentially.

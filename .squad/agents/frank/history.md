@@ -21,7 +21,11 @@
 - Iteration 10 audits added two lasting parser rules: variant-action arms inside shape-specific parser methods must throw when unreachable, and every parser-facing catalog should expose an O(1) metadata index keyed to the lookup axis the parser actually uses.
 - GAP-047 is the durable reminder that spec shorthand like "numeric" must stay scoped to primitive numeric lanes when domain types such as money and quantity have qualifier-preserving overloads.
 
-## Recent Updates
+## Recent Updates
+
+### 2026-05-03T00:26:00Z — Grammar primer docs recorded
+- Added §0 "The Grammar of Precept" to docs/compiler/parser-radical.md and a concise cross-reference summary to docs/compiler/type-checker-radical.md.
+- Grounded the primer in samples/trafficlight.precept, samples/insurance-claim.precept, and samples/loan-application.precept; the pass confirmed the flat, keyword-anchored grammar thesis rather than changing the design.
 
 ### 2026-05-03T00:15:16Z — Radical parser slot field removed
 - The radical parser doc now removes `ImmutableArray<ConstructSlot> Slots` from `ConstructMeta`; named parse positions live only as `Tag` nodes inside `Grammar`.
@@ -57,4 +61,4 @@
 
 ### 2026-05-02T22:14:44Z — GAP-047 closed
 - Spec §3.7 now explicitly documents the money/quantity overloads for `min`, `max`, `abs`, `clamp`, and `round(value, places)`, including same-qualifier requirements and qualifier-preserving results.
-- The working gap ledger is fully closed for this audit pass: GAP-047 is Fixed, and the primitive numeric-lane shorthand is now explicitly separated from domain-type overload semantics.
+- The working gap ledger is fully closed for this audit pass: GAP-047 is Fixed, and the primitive numeric-lane shorthand is now explicitly separated from domain-type overload semantics.
