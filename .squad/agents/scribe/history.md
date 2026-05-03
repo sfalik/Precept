@@ -15,6 +15,10 @@
 
 ## Recent Updates
 
+### 2026-05-03T23:00:32Z — ReadJson / WriteJson batch recorded
+- Pre-check measured decisions.md at 68928 bytes with 1 inbox file; the hard-gate archive pass ran on the 7-day window threshold and found 0 entries old enough to move.
+- Merged `frank-readwrite-json-api` into a new CC#25 ledger entry, deleted the processed inbox file, wrote the Frank orchestration log plus the readjson-writejson session log, and confirmed No open PR found for branch 'Precept-V2-Radical'; PR stewardship was a no-op.
+- Health report: decisions.md 68928B -> 70011B; inbox processed = 1; history files summarized = 0.
 ### 2026-05-03T22:22:27Z — CC#25 corpus archival pass recorded
 - Pre-check measured `decisions.md` at 61,990 bytes with 19 inbox files; the hard-gate 7-day archive pass ran and found 0 entries older than the cutoff, so no archive move was performed.
 - Merged the 19 CC#25 inbox files into 7 canonical ledger entries, wrote the Frank orchestration log and fire-data-flow session log, summarized Frank back under the 15 KB gate, and cleared the inbox.

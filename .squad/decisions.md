@@ -6,6 +6,19 @@
 
 ---
 
+### 2026-05-03T23:00:32Z: CC#25 TypeRuntimeMeta JSON flow locks to symmetric `ReadJson`/`WriteJson` API
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-readwrite-json-api`.
+
+- Phase 1 ingress now dispatches through `TypeRuntimeMeta.ReadJson(ref Utf8JsonReader, ref PreceptValue)` and Phase 8 egress through `TypeRuntimeMeta.WriteJson(Utf8JsonWriter, PreceptValue)`, replacing `StoreValue` / `ParseValue` / `FormatValue` on the hot JSON path.
+- Zero-boxing scope is locked precisely: scalar fields read and write the inline value region directly, while string, NodaTime, and collection values stay in the ref region and are written back by reference instead of re-boxed intermediaries.
+- Ownership rules are durable: the call site advances to the value token and handles `null`, collection runtimes own structural array/object loops, and the active `TypeRuntimeMeta` surface is `ReadJson`, `WriteJson`, `ParseString`, `FormatString`, `BinaryExecutors`, and `UnaryExecutors`, with `ExtractValue` / `StoreValue` / `ParseValue` excluded from Fire, Inspect, and Update hot paths.
+
+---
 ### 2026-05-03T22:22:27Z: CC#25 runtime baseline is `PreceptValue` plus catalog-owned delegate dispatch
 
 **By:** Scribe

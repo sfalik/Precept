@@ -8,6 +8,8 @@
 
 ## Learnings
 
+- **ReadJson/WriteJson API design (2026-05-03):** Closed the JSON ingress/egress seam from the Fire-call lifecycle walkthrough. Phase 8 egress: `FormatValue` is replaced by `WriteJson(Utf8JsonWriter, PreceptValue)` — zero boxing for scalars, ref-region types are already-heap references cast and written directly. Phase 1 ingress: `StoreValue`/`ParseValue` replaced by `ReadJson(ref Utf8JsonReader, ref PreceptValue)` — `ref Utf8JsonReader` required because it's a ref struct; `ref PreceptValue` for consistent write-back. Null handling is call-site-only (check `TokenType == Null` before dispatching). Collection runtimes own their structural loop; element-type runtime handles individual elements. Token-advance ownership: call site advances to value token, `ReadJson` calls `GetXxx()`, call site advances at next iteration. `TypeRuntimeMeta` final surface: `ReadJson`, `WriteJson`, `ParseString`, `FormatString`, `BinaryExecutors`, `UnaryExecutors`. `ExtractValue`/`StoreValue`/`ParseValue` eliminated from all hot paths.
+
 - **CC#25 Fire data lifecycle walkthrough (2026-05-03):** Peak live footprint for one Fire under A+G is ~44-48 `PreceptValue` slots, total stack traffic is ~4,480 bytes, the working copy is the donated next-version slot array, and pooled arrays cut GC-visible allocation to the boundary objects. The remaining implementation questions are slot-array ownership transfer, eval-stack allocation strategy, JSON ingress/egress ownership, event-args representation, trace-path data structures, and multi-row working-copy pooling.
 - **CC#25 final runtime recommendation (2026-05-03):** The real performance lever is representation, not dispatch. Replace boxed `object?` hot-path values with a 32-byte `PreceptValue` tagged struct and keep execution semantics on catalog-owned delegate arrays. `System.Linq.Expressions` stays an upgrade seam, not a v1 dual-path commitment.
 - **CC#25 SaaS constraint resolution (2026-05-03):** TypeBuilder/source-generated CLR types only win under a different product shape. In the current SaaS, per-definition cold-start and loss of fine-grained inspectability outweigh warm-path throughput gains.
@@ -20,6 +22,9 @@
 
 ## Recent Updates
 
+### 2026-05-03T23:00:32Z — ReadJson / WriteJson API lock recorded
+- Frank-48 closed the CC#25 JSON ingress/egress seam: ReadJson now owns typed value extraction, WriteJson owns symmetric egress, null handling stays at the call site, and collection runtimes own structural JSON loops.
+- The locked TypeRuntimeMeta surface is ReadJson, WriteJson, ParseString, FormatString, BinaryExecutors, and UnaryExecutors, with ExtractValue and StoreValue / ParseValue kept out of Fire, Inspect, and Update hot paths.
 ### 2026-05-03T22:22:27Z — CC#25 corpus canonicalized
 - Scribe merged 19 CC#25 inbox files into 7 durable ledger entries, deleted the processed inbox notes, and recorded the active runtime baseline as `PreceptValue` + catalog-owned delegate dispatch with TypeBuilder and lane-split alternatives explicitly closed.
 - The Fire-call lifecycle walkthrough is now part of Frank's active context as the quantitative implementation baseline for A+G memory/ownership work.
