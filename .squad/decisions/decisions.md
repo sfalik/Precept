@@ -37602,3 +37602,26 @@ No existing sections were restructured or rewritten. The new section was inserte
 **By:** Frank
 **What:** Created docs/working/structural-gap-register.md — pipeline stage shape/interface gaps, numbered #40+
 **Why:** Shane wants catalog gaps and pipeline output gaps tracked in parallel companion docs
+### 2026-05-03: Cross-cutting coverage audit routed into execution planning
+**By:** Frank
+**What:** Audited 12 out-of-scope catalog-gap items against the corrected cross-cutting definition, confirmed 8 are truly cross-cutting (4 already captured and 4 needing promotion), and found 5 additional missing cross-cutting items across the canonical docs.
+**Why:** Shane needed a coverage check before treating the three-register model as complete.
+**Note:** The audit raised coverage confidence from about 92% to about 97% once the follow-on register updates landed.
+
+### 2026-05-03: Gap registers deprecated in favor of canonical open questions
+**By:** Frank
+**What:** Archived `docs/working/catalog-gap-register.md` and `docs/working/structural-gap-register.md`, migrated their unresolved content into canonical docs as inline Open Questions, added missing gap #55 to `docs/compiler/graph-analyzer.md`, and restructured `docs/working/cross-cutting-decisions.md` into a wave-ordered execution driver with 26 decisions across Waves 0-5 and ownership labels.
+**Why:** The gap registers had become a second source of truth after the canonical docs absorbed the real unresolved questions.
+**Note:** Going forward, cross-cutting sequencing lives in `cross-cutting-decisions.md`; new gaps go directly into the relevant canonical doc instead of separate registers.
+
+### 2026-05-03: Cross-cutting audit recommendations applied
+**By:** Frank
+**What:** Updated `docs/working/cross-cutting-decisions.md` with entries #21-#26, added catalog gaps #41-#43, and reclassified catalog-gap items #10, #14, #19, #26, #28, #29, #32, and #38 with explicit traceability back to the cross-cutting register.
+**Why:** To apply the approved audit recommendations directly in the working registers.
+**Note:** No umbrella evaluator-output decision was added because decisions #22-#24 already provide the needed concrete navigation points.
+
+### 2026-05-03: Gap sequencing changed to wave-ordered execution
+**By:** Frank
+**What:** Reframed the dependency graph so cross-cutting decisions lead the work: Wave 0 centers on CC#1, CC#2, and CC#25; Waves 1-2 lock shape-defining owner decisions; Wave 3 becomes mechanical catalog/structural resolution; Wave 4 handles tooling and minor decisions in parallel; Wave 5 closes doc-sync and stale-item cleanup.
+**Why:** The proposed catalog -> structural -> cross-cutting order would create rework because cross-cutting decisions define the shapes the other registers depend on.
+**Note:** Wave 0 is the critical owner gate, while most downstream gap resolution becomes team-autonomous once those shapes are locked.

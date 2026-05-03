@@ -24,6 +24,8 @@
 - The 2026-05-03 `SyntaxTree` doc sweep confirmed the missed type-name drift in `docs/compiler/type-checker.md` and `docs/compiler/README.md`, and also cleaned stale internal references in `tooling-surface.md`, `language-server.md`, `compiler-and-runtime-design.md`, `precept-builder.md`, `fault-system.md`, and multiple archived design notes. The only remaining `SyntaxTree` mention under `docs/` is the intentional Roslyn reference in `docs/working/Archived/type-checker-research-crossref.md`; `dotnet build` stayed green after the sweep.
 - Grammar anatomy for `StateEnsure` / `EventEnsure` must model `EnsureClause` and `BecauseClause` as separate slots, mirroring `RuleDeclaration`; the `because` reason remains mandatory even though it is no longer described as embedded inside `EnsureClause`.
 
+- Gap register deprecation (2026-05-03): `catalog-gap-register.md` (#1–43) and `structural-gap-register.md` (#44–85) served as discovery artifacts and are now archived under `docs/working/Archived/`. Their content was migrated to canonical pipeline docs as Open Questions, making each stage doc self-contained. Nearly all gaps were already captured inline during canonical doc writing. The only genuinely missing gap was #55 (GraphEvent.IsInitial derivation) — added to graph-analyzer.md. The execution model going forward: `cross-cutting-decisions.md` drives wave-sequenced resolution (Waves 0–2 = Shane decisions, Waves 3–5 = team-autonomous). Separate gap registers are superseded.
+
 ## Recent Updates
 
 ### 2026-05-03T14:28:59Z — ConstructManifest rename shipped
@@ -82,3 +84,13 @@ Audited all 12 out-of-scope items in catalog-gap-register.md against the correct
 - Added cross-cutting decision entries #21–#26 in `docs/working/cross-cutting-decisions.md`, including the new execution-dispatch and stateless-precept decisions plus the four audit promotions.
 - Updated `docs/working/catalog-gap-register.md` with new gaps #41–#43 and reclassified the eight mis-scoped items so the register now points at the correct cross-cutting entries.
 - Deliberately skipped a separate umbrella decision for evaluator-output richness because #22–#24 already provide the concrete navigation points without adding another layer of indirection.
+
+
+## 2026-05-03 — Gap Sequencing Strategy
+
+Produced .squad/decisions/inbox/frank-gap-sequencing.md. Key finding: Shane's catalog→structural→cross-cutting order is backwards — cross-cutting decisions (especially CC#1 Expression Trees, CC#2 SlotValue Shapes, CC#25 Execution Dispatch) are the root of the dependency graph and must resolve first. Recommended 5-wave attack sequence with 12 Shane-required decisions and ~50 team-autonomous resolution items.
+
+### 2026-05-03T16:44:09Z — Gap-register deprecation and wave driver recorded
+- Frank-38 restructured `docs/working/cross-cutting-decisions.md` into the wave-ordered execution driver (Waves 0-5, 26 decisions, ownership labels), archived the two working gap registers, and migrated their unresolved content into canonical docs as inline Open Questions.
+- Durable baseline: separate gap registers are retired; new gaps belong directly in the relevant canonical doc, while sequencing and ownership routing now live in `docs/working/cross-cutting-decisions.md`.
+- Specific closeout: missing gap #55 (`GraphEvent.IsInitial` derivation) was added to `docs/compiler/graph-analyzer.md`, and the deprecation rationale is now captured in the decision ledger.
