@@ -37639,16 +37639,16 @@ No existing sections were restructured or rewritten. The new section was inserte
 - Closed set by design — new expression form requires C# code change.
 
 **Exhaustiveness enforcement:**
-- Sealed class hierarchy = compiler-level exhaustiveness checking
-- Roslyn analyzer test in test suite = build-time verification that all expression-DU switch arms are exhaustive. Adding a subtype without updating all switches = test fails.
+- Sealed DU hierarchy = compiler-level exhaustiveness checking over expression node shapes.
+- Annotation-bridge pattern = `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019, which names the catalog-to-DU exhaustiveness bridge precisely wherever distributed per-form handling still exists.
+- Convention/test-level invariant: `ExpressionFormKind` members and expression DU subtypes remain in 1:1 bijection.
 
 **Why:**
 - ~10 expression forms is a bounded, catalogable set. Strongly typed DU eliminates entire class of runtime errors.
 - Closed set is a feature, not a limitation — expression additions are rare, intentional language changes that SHOULD require global updates.
-- Exhaustiveness enforcement makes the C# compiler a partner in correctness, not just the test suite.
+- Exhaustiveness enforcement makes the C# compiler and annotation-bridge enforcement partners in correctness, not just the test suite.
 - Consistent with catalog-first architecture: expression forms are declared in the catalog; the DU reflects catalog entries in C#.
 
 **Blocks resolved:** Parser expression slots, TC §7.2 Expression Resolution Engine, Proof Engine strategies 3 & 4, Builder compilation.
 
 **Next wave item:** CC#25 (Execution Dispatch Design) and CC#2 (SlotValue Subtype Shapes) — present briefs when Shane is ready.
-
