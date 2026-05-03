@@ -108,7 +108,7 @@ flowchart TD
     subgraph CATALOGS[Catalogs]
         direction LR
         TOK(Tokens):::catalog ~~~ TYP(Types):::catalog ~~~ FUN(Functions):::catalog ~~~ OPR(Operators):::catalog ~~~ OPN(Operations):::catalog ~~~ MOD(Modifiers):::catalog
-        ACT(Actions):::catalog ~~~ CON(Constructs):::catalog ~~~ CST(Constraints):::catalog ~~~ PRQ(ProofReqs):::catalog ~~~ DIA(Diagnostics):::catalog ~~~ FLT(Faults):::catalog
+        ACT(Actions):::catalog ~~~ CON(Constructs):::catalog ~~~ EXP(ExpressionForms):::catalog ~~~ CST(Constraints):::catalog ~~~ PRQ(ProofReqs):::catalog ~~~ DIA(Diagnostics):::catalog ~~~ FLT(Faults):::catalog
     end
 
     CATALOGS -. feeds all stages .-> COMPILE
@@ -349,6 +349,8 @@ There are no per-construct AST node types. The old typed-class hierarchy (`Field
 
 > **Open Question (inherited from parser.md):** Expression-carrying slots hold `SourceSpan` only. The eventual expression parser will be a Pratt parser (operator-precedence) using the `Operators` catalog for precedence/associativity metadata. Three representation options remain under consideration: Roslyn-style per-expression-kind node types; uniform S-expression `(op, args...)`; or span + lazy parse on demand. Design review required before implementation. This blocks expression resolution in the type checker.
 
+> **Open Question (inherited from parser.md):** `parser.md` and `type-checker.md` disagree on the concrete contents of several `SlotValue` subtypes. `ModifierListSlot` carries `ImmutableArray<ModifierKind>` per `parser.md` but `ImmutableArray<TokenKind>` per `type-checker.md`. The same conflict exists for `AccessModeSlot` (`SourceSpan` vs `TokenKind`) and `BecauseClauseSlot` (`string` vs `SourceSpan`). This overview follows `type-checker.md` for `TypeExpressionSlot` (`SourceSpan`, not `TypeMeta`) but follows `parser.md` for `ModifierKind` in `ModifierListSlot` — that inconsistency is intentional (these are unresolved). The §6 "Earliest-knowable kind assignment" table follows the same `parser.md` view for `ModifierKind`. Which shapes are canonical is unresolved; see `parser.md` open questions for full detail.
+
 ### Catalog-to-grammar mapping
 
 Catalog metadata factors into parsing decisions at specific points. The parser uses `Constructs.GetMeta()` to determine legal declaration forms — each `ConstructKind` defines the expected slot sequence via `ConstructSlot` entries, each carrying whether the slot is required or optional and its expected position. The parser validates that slots appear in the declared order with declared optionality. Slot validation is catalog-driven: there is no per-construct parser logic that hardcodes what a `field` declaration requires vs. what a `from` row requires. Add a new required slot to a `ConstructKind` in the catalog, and the parser diagnoses all existing declarations that are missing it. The parser uses `Operators.GetMeta()` for expression parsing — operator precedence and associativity come from catalog metadata, not a hardcoded table. Keyword recognition is inherited from the lexer's catalog-driven `TokenKind` assignments; the parser dispatches on `TokenKind`, not on string comparison.
@@ -528,7 +530,7 @@ The Precept Builder produces the matching executable family: `ExecutableAction`,
 | Parser | `ConstructKind`, `ActionKind`, `OperatorKind`, `ModifierKind` — stamped into `SlotValue` subtypes at parse time |
 | Type checker | `TypeKind`, `OperationKind`, `FunctionKind`, resolved `TypeAccessor`, resolved result types on typed expressions |
 
-The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `SyntaxTree`; a kind that syntax alone determines does not wait for the type checker.
+The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `SyntaxTree`; a kind that syntax alone determines does not wait for the type checker. (See §5 open question on `SlotValue` subtype shapes — the `ModifierKind` entry above follows `parser.md`; `type-checker.md` lists `ImmutableArray<TokenKind>` for `ModifierListSlot`.)
 
 > **Precept Innovations**
 > - **Catalog-driven resolution passes.** Type checking resolves against catalog metadata (`Operations`, `Functions`, `Types`, `Modifiers`, `Actions`, `Constraints`, `ProofRequirements`) rather than encoding per-construct behavior in checker logic. Adding a new operation or function to the catalog automatically makes it resolvable — no checker code changes required.
@@ -1166,7 +1168,7 @@ Do NOT add patterns directly to `tmLanguage.json`. Add the language element to t
 > **Precept Innovations**
 > - **Single source of truth for language surface.** Grammar, completions, hover, semantic tokens, and MCP vocabulary are all derived from the same catalog definitions. Without this, each surface would maintain its own keyword list and drift independently — a grammar that highlights syntax the parser rejects, completions that suggest constructs the type checker doesn't recognize.
 > - **Grammar generation, not grammar authoring.** The TextMate grammar is a build output. Syntax highlighting correctness is a property of catalog completeness, not of grammar maintenance. A new keyword highlights correctly the moment its catalog entry is added.
-> - **Zero-drift guarantee.** Because the grammar is generated from the same metadata the parser and type checker consume, it is structurally impossible for syntax highlighting to disagree with actual parse behavior.
+> - **Zero-drift guarantee (design property).** Because the grammar is generated from the same metadata the parser and type checker consume, it will be structurally impossible for syntax highlighting to disagree with actual parse behavior. This property holds once the grammar generator replaces the current hand-crafted grammar.
 
 See [`docs/compiler/tooling-surface.md`](./compiler/tooling-surface.md) for the full tooling surface design. Note: the grammar generator is currently designed but not yet implemented — the current `precept.tmLanguage.json` is hand-crafted.
 
