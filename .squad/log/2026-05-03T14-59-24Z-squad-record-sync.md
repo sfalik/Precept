@@ -1,0 +1,3 @@
+# Session Log — squad record sync
+
+On 2026-05-03T14:59:24Z UTC, Scribe measured `decisions.md` at 57761 bytes with 3 inbox files, ran the hard archive gate at the 7-day threshold and moved 0 qualifying decision entries to `decisions-archive.md`, merged 3 inbox notes into `decisions.md` with deduplication plus 2 direct spawn-manifest rulings, deleted the processed inbox files, wrote orchestration records for elaine-14 and frank-29 through frank-31, updated Elaine and Frank shared histories, summarized 0 history files, and logged the health report with `decisions.md` at 57761 bytes before and 61990 bytes after.

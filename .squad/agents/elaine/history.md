@@ -96,4 +96,8 @@
 ### 2026-05-03T10:52:58Z — Subgraph wrappers removed from per-stage pipeline diagrams
 
 - Removed `subgraph CATS / end` wrappers and `style CATS` lines from 4 diagrams in `docs/compiler-and-runtime-design.md` (§5 Parser, §6 Type Checker, §7 Graph Analyzer, §8 Proof Engine). §4 Lexer was already wrapper-free.
-- Catalog nodes are now declared inline with unquoted labels — `(Constructs)` not `("Constructs")` — connecting directly to the stage with their own arrows, no enclosing box. Commit `9db529f`.
+- Catalog nodes are now declared inline with unquoted labels — `(Constructs)` not `("Constructs")` — connecting directly to the stage with their own arrows, no enclosing box. Commit `9db529f`.
+
+### 2026-05-03T14:59:24Z — ASCII-safe topology box fix recorded
+- Elaine-14 replaced `▶` with `>` in the fixed-width topology box in `docs/compiler-and-runtime-design.md` §7. Commit `086434a`.
+- Durable diagram rule: box-drawing prose/ASCII layouts should avoid ambiguous-width Unicode arrowheads when column alignment is part of the design contract.
