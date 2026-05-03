@@ -1,3 +1,40 @@
+# Cross-Cutting Decisions Register Review
+
+**From:** Frank (Lead Architect)
+**Date:** 2025-01-21
+**Type:** Analysis Complete
+**Artifact:** `docs/working/cross-cutting-decisions.md`
+
+---
+
+## Summary
+
+Completed comprehensive gap coverage review across all 11 canonical docs.
+Created `docs/working/cross-cutting-decisions.md` documenting:
+
+- **5 Priority 1 decisions** (blocking multiple stages, must resolve first)
+- **7 Priority 2 decisions** (significant cross-stage impact)
+- **8 Priority 3 decisions** (minor coordination needed)
+- **Coverage assessment** with 13 newly-found gaps not in existing registers
+
+## Key Findings
+
+**Expression tree design** is the single most blocking cross-cutting decision — it affects Parser, Type Checker, Proof Engine, Evaluator, and Precept Builder. No expression-related implementation can proceed until this is resolved.
+
+**Gap register coverage: ~90%** — the two existing registers capture most significant gaps. The 13 newly-found gaps are primarily:
+- Literal system implementation questions
+- Evaluator opcode execution details
+- Graph analyzer edge-case semantics
+
+## Decisions Needed
+
+1. **Expression tree structure** — Roslyn-style vs S-expression vs span+lazy-parse
+2. **SlotValue shape authority** — parser.md vs type-checker.md as canonical
+3. **SemanticIndex reference collections** — add to type checker or reconstruct in LS?
+
+## Recommendation
+
+Schedule a design session to resolve Priority 1 decisions before implementation sprints begin. These cannot be resolved stage-by-stage — they require coordinated decision-making.
 # Technical Review: Elaine's `lookup`/`queue` Surface Proposals
 
 **By:** Frank
@@ -33,7 +70,6 @@ The `-key` suffix is not load-bearing anywhere. No pipeline stage, no evaluator 
 ## Proposal 3 — Use `by` at the dequeue-capture site
 
 **Verdict: APPROVED WITH MODIFICATION.**
-
 ### Analysis of filter-condition ambiguity
 
 The concern I raised previously: `dequeue ClaimQueue into CurrentClaim by CurrentSeverity` could be misread as "dequeue the item BY this severity" (a filter/selection condition) rather than "dequeue and capture the severity INTO this field."
@@ -47,7 +83,6 @@ dequeue Identifier (into Identifier (by Identifier)?)?
 There is no conditional-dequeue production. The parser has no `by` + expression continuation that would create a grammatical fork. The `by` keyword in this position is unambiguously a capture binding — the parser cannot misparse it.
 
 Is it a reader-misparse risk? **Mildly.** A business author encountering `dequeue F into X by Y` for the first time might momentarily wonder whether `by Y` means "select by Y" or "capture Y." But this is a first-encounter learning cost, not an ongoing ambiguity. Once learned, the pattern is stable.
-
 ### Weighing the arguments
 
 **Elaine's consistency argument** (spec Principle 5 — keyword-anchored readability): The `by` keyword appears at declaration (`queue of T by P`), at enqueue (`enqueue F Expr by Priority`), and now at dequeue (`dequeue F into X by Y`). The same keyword, the same role (introducing the priority axis), in all three action contexts. An author who writes `enqueue F X by P` one line above will instinctively reach for `by` at dequeue. Encountering `priority` there is a vocabulary seam — two words for one concept within the same type.
@@ -55,7 +90,6 @@ Is it a reader-misparse risk? **Mildly.** A business author encountering `dequeu
 **My filter-reading concern**: Theoretical. No grammar production creates ambiguity. No current or planned Precept feature introduces conditional dequeue. If conditional dequeue were ever needed, it would use `when` (the language's universal guard keyword), not `by`. The `by` keyword is already claimed for priority-axis role connection — overloading it for a future filter condition would itself be the design error.
 
 **Verdict:** Elaine's consistency argument is stronger. Principle 5 says "statement kind is identified by its opening keyword sequence" — and within that, vocabulary consistency across the lifecycle of a single type is the natural corollary. `by` at declaration, `by` at enqueue, `by` at dequeue. The fork was unjustified.
-
 ### The modification
 
 The accessor (`.priority`) and quantifier binding (`.priority`) remain as nouns. This is correct and Elaine explicitly preserves it. `by` is a preposition introducing a role at action sites. `.priority` is a noun naming a property at access sites. Different grammatical roles, same underlying concept. No seam.
@@ -81,7 +115,6 @@ The `containskey` and `removekey` tokens can be removed from the lexer's keyword
 ---
 
 ---
-
 # Decision: README Image Link Fixes
 
 **Date:** 2026-04-07
@@ -115,7 +148,6 @@ The README's narrative around the hero example remains valid: it correctly notes
 ---
 
 ---
-
 # Decision: README Hero DSL PNG Rendering
 
 **Author:** Elaine (UX)
@@ -149,7 +181,6 @@ If the hero snippet changes, re-render with:
 ---
 
 ---
-
 # One-shot: install puppeteer, screenshot, remove
 npm install --no-save puppeteer
 node -e "<screenshot script>"  # see commit for full script
@@ -161,7 +192,6 @@ Future improvement: automate this as a build script or CI step.
 ---
 
 ---
-
 # Steinbrenner Final Point Decision
 
 - Date: 2026-04-05
@@ -182,7 +212,6 @@ Future improvement: automate this as a build script or CI step.
 ---
 
 ---
-
 # Decision: Issue #22 Design Fidelity Directive
 
 **Date:** 2026-04-08
@@ -193,7 +222,6 @@ When implementing issue #22, if anything the team is going to implement strays f
 ---
 
 ---
-
 # Decision: Issue #22 — Data-Only Precepts Design Q&A (12 Decisions)
 
 **Date:** 2026-04-08
@@ -239,7 +267,6 @@ Use `customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`
 ---
 
 ---
-
 # Decision: Slice 7 Test Coverage — Known Gaps (Deferred)
 
 **Date:** 2026-04-08
@@ -256,7 +283,6 @@ These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
 ---
 
 ---
-
 # Decision: combined-design-v2 promoted to canonical location
 
 **Author:** Frank (Lead/Architect)
@@ -280,7 +306,6 @@ The combined-design-v2 doc had accumulated all review feedback, innovations call
 ---
 
 ---
-
 # Decision: Graph topology crosses the lowering boundary as runtime-native shapes
 
 **Author:** Frank (Lead/Architect)
@@ -335,7 +360,6 @@ These don't cross because no runtime operation needs them — the prohibition is
 ---
 
 ---
-
 # Design Evaluation: Per-Field `readonly` Modifier as Access Default Inversion
 
 **Author:** Frank (Lead/Architect & Language Designer)
@@ -346,7 +370,6 @@ These don't cross because no runtime operation needs them — the prohibition is
 ---
 
 ---
-
 # Decision Record: Research Grounding for compiler-and-runtime-design.md
 
 **Author:** Frank (Lead/Architect)
@@ -411,7 +434,6 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 ---
 
 ---
-
 # Doc Audit: `writable` Field Modifier — Findings & Decisions
 
 **Date:** 2025-04-27
@@ -421,7 +443,6 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 ---
 
 ---
-
 # Soup Nazi: writable Test Coverage Review
 
 **Date:** 2025-07-06
@@ -432,7 +453,6 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 ---
 
 ---
-
 # Decision: README hero PNG fallback
 
 - **Context:** GitHub does not render the styled inline HTML contract block in `README.md` as intended.
@@ -459,7 +479,6 @@ Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a l
 ---
 
 ---
-
 # Precept V2 — Exhaustive Parser & Lexer Test Coverage Audit
 
 **Branch:** `spike/Precept-V2`
@@ -489,7 +508,6 @@ Sample file parse coverage: **3 clean / 2 partial / 23 untested** (of 28 total).
 ## Coverage Matrix
 
 Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)** · **Severity** · **Notes**
-
 ### 1 · Precept Header
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -497,7 +515,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `precept Name` header | ✅ | ✅ (missing name) | `ParserTests.cs` | — | Well-covered |
 
 ---
-
 ### 2 · Top-Level Declarations
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -513,7 +530,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `rule BoolExpr when Guard because "msg"` | ✅ | — | `ParserTests` | — | Guard form covered |
 
 ---
-
 ### 3 · In-State Declarations (`in State ...`)
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -525,7 +541,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `in State omit FieldTarget` | ✅ | ✅ | `ParserTests` | — | Well-covered |
 
 ---
-
 ### 4 · To-State Declarations (`to State ...`)
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -536,7 +551,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `to State -> ActionList when Guard` | ✅ | — | `ParserTests` | — | Guard form covered |
 
 ---
-
 ### 5 · From-State Declarations (`from State ...`)
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -547,7 +561,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `from any on Event -> Outcome` | ✅ (no-transition) | — | `ParserTests` (Slice 5.1) | **Medium** | `from any` tested only with `no transition`. No test for `from any -> transition X` or `from any -> reject "msg"`. |
 
 ---
-
 ### 6 · On-Event Declarations (`on Event ...`)
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -557,7 +570,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `on Event -> ActionList` | ✅ | — | `ParserTests` (Slice 4.4) | — | Well-covered |
 
 ---
-
 ### 7 · Transition Rows (`from State on Event ...`)
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -571,7 +583,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `from any on Event -> ...` — all outcomes | Partial | — | `ParserTests` | **Medium** | `no transition` tested; `transition X` and `reject "msg"` with `any` not tested |
 
 ---
-
 ### 8 · Action Statements
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -588,7 +599,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `clear F` | ✅ | — | `ParserTests` (Slice 4.3) | — | Covered |
 
 ---
-
 ### 9 · Expression Atoms
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -607,7 +617,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | Negative literal folding (`-1`, `-3.14`) | ✅ | — | `ExpressionParserTests` | — | Covered |
 
 ---
-
 ### 10 · Expression Operators
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -634,7 +643,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | Non-associative comparison diagnostic | — | ❌ | — | **High** | **GAP-13**: No test for `a == b == c` producing `NonAssociativeComparison` diagnostic. Listed as parse-stage code in `DiagnosticsTests`. |
 
 ---
-
 ### 11 · Expression Forms (Structural)
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -649,7 +657,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | Boundary at `because` | ✅ | — | `ExpressionParserTests` | — | Covered |
 
 ---
-
 ### 12 · Type References
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -667,7 +674,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | Case-insensitive collection `set of ~string` | — | — | — | **Medium** | **GAP-26**: No parser test for `Tilde` before `string` in collection inner-type position. |
 
 ---
-
 ### 13 · Field Modifiers (in `ModifierList`)
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -689,7 +695,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `maxplaces Expr` value-bearing | — | — | — | **Medium** | **GAP-22**: No parse test. Used in `fee-schedule.precept`, `invoice-line-item.precept`. Integration test via `insurance-claim.precept` (partial). |
 
 ---
-
 ### 14 · State Modifiers
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -703,7 +708,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `error` state modifier | — | — | — | **Medium** | **GAP-31**: No parse test. Used in `trafficlight.precept` (integration-tested but no modifier assertion). |
 
 ---
-
 ### 15 · Lexer-Level Constructs
 
 | Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
@@ -722,7 +726,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 | `UnescapedBraceInLiteral` diagnostic | — | ❌ | — | **Low** | **GAP-37**: `DiagnosticsTests` lists this as a parse code. No lexer test for bare `}` inside a literal. |
 
 ---
-
 ### 16 · Parser Diagnostic Coverage
 
 | Diagnostic Code | ✅ Produced by Test? | Test File | Sev | Notes |
@@ -744,7 +747,6 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 ## Top 10 Highest-Priority Gaps
 
 Ordered by: parser correctness > spec contract > sample-file blast radius > implementation cost.
-
 ### Priority 1 — GAP-2: `in/to/from State ensure Condition when Guard` (Parser BUG)
 **Severity:** Critical — parser bug producing false diagnostic on spec-valid syntax
 **Spec:** §2.2 — `ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?`
@@ -754,7 +756,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `Parse_StateEnsure_In_WithConditionAndGuard`, `Parse_StateEnsure_To_WithConditionAndGuard`, `Parse_StateEnsure_From_WithConditionAndGuard`
 
 ---
-
 ### Priority 2 — GAP-1: `TypedConstant` atom in expression parser (Parser BUG)
 **Severity:** Critical — typed constant literals produce parser error/fallthrough in expression context
 **Spec:** §2.1 null-denotation table — `TypedConstant` token → `TypedConstantExpression`
@@ -764,7 +765,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `ParseExpr_TypedConstantLiteral_ProducesTypedConstantExpression`, `ParseExpr_InterpolatedTypedConstant_ProducesInterpolatedTypedConstantExpression`
 
 ---
-
 ### Priority 3 — GAP-3: `is set` / `is not set` postfix expressions
 **Severity:** Critical (known gap)
 **Spec:** §2.1 — postfix at precedence 40, alongside `contains`
@@ -773,7 +773,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `ParseExpr_IsSet_ProducesIsSetExpression`, `ParseExpr_IsNotSet_ProducesNegatedIsSetExpression`
 
 ---
-
 ### Priority 4 — GAP-4: `contains` infix expression
 **Severity:** High
 **Spec:** §2.1 — infix at precedence 40
@@ -781,7 +780,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `ParseExpr_Contains_ProducesContainsExpression`, precedence test vs `and`/`or`
 
 ---
-
 ### Priority 5 — GAP-17: `<`, `<=`, `>=`, `==`, `!=` comparison operators
 **Severity:** High — multiple operators completely untested in expression parser
 **Spec:** §2.1 — all standard comparisons at precedence 30
@@ -789,7 +787,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `[Theory][InlineData("<")][InlineData("<=")][InlineData(">=")][InlineData("==")][InlineData("!=")]` — one theory covering all five missing operators
 
 ---
-
 ### Priority 6 — GAP-10: Interpolated string expression
 **Severity:** High
 **Spec:** §2.5 — `StringStart`/`StringMiddle`/`StringEnd` reassembly loop
@@ -797,7 +794,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `ParseExpr_InterpolatedString_ProducesInterpolatedStringExpression`, test with multiple interpolation segments
 
 ---
-
 ### Priority 7 — GAP-5/6/7/8: `remove`, `enqueue`, `dequeue`, `push`, `pop` action statements
 **Severity:** High (5 related gaps)
 **Spec:** §2.2 action statement grammar
@@ -810,7 +806,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 - `Parse_Action_Pop_WithoutInto`, `Parse_Action_Pop_WithInto`
 
 ---
-
 ### Priority 8 — GAP-12: List literal expression `[a, b, c]`
 **Severity:** High
 **Spec:** §2.1 — `LeftBracket` null-denotation → `ListLiteralExpression`
@@ -818,7 +813,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `ParseExpr_EmptyList`, `ParseExpr_NonEmptyList`, `ParseExpr_NestedList` (if supported)
 
 ---
-
 ### Priority 9 — GAP-15: `~=` and `!~` case-insensitive operators
 **Severity:** High
 **Spec:** §2.1 — comparison operators at precedence 30
@@ -826,7 +820,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 **Tests needed:** `ParseExpr_CaseInsensitiveEquals_ProducesCorrectNode`, `ParseExpr_CaseInsensitiveNotEquals`
 
 ---
-
 ### Priority 10 — GAP-13: `NonAssociativeComparison` diagnostic
 **Severity:** High
 **Spec:** §2.7 — parse-stage error when a second comparison is chained: `a > b > c`
@@ -835,7 +828,6 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 ---
 
 ## Sample File Parse Coverage
-
 ### Well-Tested (clean parse, multiple assertions)
 
 | File | Tests | What's Verified |
@@ -843,14 +835,12 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 | `crosswalk-signal.precept` | 4 | No diagnostics, header, declaration count (5), AccessModeNodes, TransitionRows |
 | `trafficlight.precept` | 4 | No diagnostics, header, declaration count (5), AccessModeNodes, TransitionRows |
 | `hiring-pipeline.precept` | 4 | No diagnostics (WSI), header, declaration count (5), TransitionRows |
-
 ### Partial Coverage (known parse failures, counts only)
 
 | File | Tests | What's Verified | Known Failures |
 |------|------:|----------------|----------------|
 | `insurance-claim.precept` | 1 | Declaration counts only (8 fields verified) | GAP-2 (`in Approved ensure ... when`), GAP-3 (`is set`) |
 | `loan-application.precept` | 1 | Declaration counts only | GAP-2 (`in UnderReview ensure ... when`) |
-
 ### No Parse Coverage (23 files)
 
 The following sample files are never loaded by a test. Each has a note on which features it would exercise:
@@ -884,28 +874,20 @@ The following sample files are never loaded by a test. Each has a note on which 
 ---
 
 ## Recommendations
-
 ### R1 — Fix parser bugs before writing new tests (Priority 1 and 2 first)
 GAP-2 (ensure+guard) and GAP-1 (TypedConstant atom) are parser bugs, not test gaps. Fix the production code first; then the tests become regression anchors. Fixing GAP-2 will immediately unblock the `insurance-claim.precept` and `loan-application.precept` integration tests from partial to full coverage.
-
 ### R2 — Add a sample-file integration theory to `ParserTests.cs`
 Add a `[Theory][InlineData("filename.precept")]` test that loads each sample file, parses it, and asserts `diagnostics.Should().BeEmpty()`. This catches regressions without per-construct knowledge. Once GAP-1 and GAP-2 are fixed, all 28 sample files should pass this test. Use the existing pattern from Slice 5.3 (`Parse_SampleFile_HasNoParseErrors`).
-
 ### R3 — Add `ExpressionParserTests` batch for missing operators
 All five missing comparison operators (GAP-17) and both case-insensitive operators (GAP-15) can be covered with a single `[Theory][InlineData(...)]` test. Similarly for `%` (GAP-16). Combine into `ParseExpr_BinaryOperator_Coverage_Theory` to avoid test sprawl.
-
 ### R4 — Add action statement tests for collection-mutating actions
 `remove`, `enqueue`, `dequeue (into)`, `push`, `pop (into)` are five related gaps (GAP-5/6/7/8). One file — `ActionStatementParserTests.cs` — can cover all six action keywords with positive + negative tests (missing target, missing value, malformed `into` clause).
-
 ### R5 — Add value-bearing modifier tests to `SlotParserTests.cs`
 `default`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces` (GAP-18–22) are all value-bearing modifiers with no dedicated parse tests. A `[Theory]` over the modifier keywords with representative expression forms would cover them efficiently.
-
 ### R6 — Add tests for remaining state modifier keywords
 `required`, `irreversible`, `success`, `warning`, `error` (GAP-31) each need a `ParseStateModifierList_*` test in `SlotParserTests.cs`. These are low-effort: copy the `ParseStateModifierList_Terminal` pattern.
-
 ### R7 — Test `is set`, `contains`, list literals, and interpolated strings together
 GAP-3, GAP-4, GAP-10, GAP-12 are all expression-layer features that can be added to `ExpressionParserTests.cs` without any production code fixes (except GAP-3 and GAP-10 may require parser support). Audit the Pratt parser's `ParseAtom()` and left-denotation table before writing tests — confirm which of these are already wired and just untested vs. which need production changes.
-
 ### R8 — Scope TypeChecker tests as a separate milestone
 All TypeChecker-level validations (§3 of the spec) are blocked by `NotImplementedException`. Do not attempt to write TypeChecker tests until the implementation is underway. Track them separately — they are not a test-writing problem yet.
 
@@ -942,7 +924,6 @@ All TypeChecker-level validations (§3 of the spec) are blocked by `NotImplement
 **Total baseline:** 2107 tests, 0 failing.
 
 ---
-
 # Soup Nazi — Full Test Coverage Review: spike/Precept-V2
 
 **Date:** 2025-07-14

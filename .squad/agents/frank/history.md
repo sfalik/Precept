@@ -66,3 +66,8 @@
 - Frank's latest gap sweep is now the durable squad baseline: 5 gaps were already captured in `catalog-system.md`, and 34 more were identified across the 11 canonical docs.
 - Use `docs/working/catalog-gap-register.md` for the catalog triage view and `docs/working/structural-gap-register.md` for the stage/interface structural blockers that still need owner decisions or design closure.
 - Elaine-17 also reset the visual baseline for catalog-system Level 1: refer to the split topology + consumer-landscape pair instead of the former single 70-edge overview.
+
+### 2026-05-03T16:20:17Z — Structural gap register rename recorded
+- Scribe logged Frank's `frank-register-rename` batch: `docs/working/structural-gap-register.md` is now the durable register name, with the old `pipeline-output-gap-register.md` wording retired.
+- Durable baseline update: the structural register now extends through gaps #85, and `docs/working/catalog-gap-register.md` also absorbed the companion catalog gap from the same sweep.
+- Scribe health pass: pre-check saw 2 inbox files, the merge processed 3 after a late inbox arrival, `decisions.md` was archived under the 7-day gate before merge, and no history file crossed the 15 KB summarization threshold.
