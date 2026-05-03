@@ -1439,7 +1439,7 @@ These are enabled by the catalog system but not part of the initial implementati
 
 1. **Error message enrichment** — diagnostics that cross-reference catalog entries (e.g., "did you mean `MoneyType`?" suggestions from `Types.All`).
 2. **Quick fixes / code actions** — LS code actions derived from catalog metadata (e.g., suggest valid modifiers for a type from `Modifiers.All` filtered by `ApplicableTo`).
-3. **Parser validation** — construct slot arrays as test oracle. Generate exhaustive parser test inputs from slot permutations.
+3. **Parser validation** — Catalog-driven parser conformance generation from construct slot sequences, optional-slot presence matrices, and disambiguation paths.
 4. **Version diffing** — catalog snapshots as changelog. Diff two versions of `All` to produce a human-readable changelog of language surface changes.
 5. **Playground / explorer UI** — all catalog-derived. Browse the language interactively from the catalog data.
 
