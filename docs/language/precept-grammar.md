@@ -67,8 +67,8 @@ state  →  StateDeclaration
 event  →  EventDeclaration
 rule   →  RuleDeclaration
 from   →  TransitionRow | StateEnsure | StateAction   (disambiguated by 2nd keyword: on | ensure | ->)
-in     →  StateEnsure | AccessMode | OmitDeclaration  (disambiguated by 2nd keyword)
-on     →  EventEnsure | EventHandler                  (disambiguated by 2nd keyword)
+in     →  StateEnsure | AccessMode | OmitDeclaration  (disambiguated by 2nd keyword: ensure | modify | omit)
+on     →  EventEnsure | EventHandler                  (disambiguated by 2nd keyword: ensure | ->)
 to     →  StateEnsure | StateAction                   (disambiguated by 2nd keyword: ensure | ->)
 ```
 
@@ -171,7 +171,7 @@ A construct is a complete declaration — a "sentence" in the DSL. There are 12 
 | `RuleDeclaration` | `rule` | Declares a global data constraint |
 | `TransitionRow` | `from` + `on` | Declares one transition in the state machine |
 | `StateEnsure` | `in`/`to`/`from` + `ensure` | Declares a state-scoped constraint |
-| `AccessMode` | `in` + `modify`/`readonly`/`editable` | Declares field editability in a state |
+| `AccessMode` | `in` + `modify` | Declares field editability in a state |
 | `OmitDeclaration` | `in` + `omit` | Declares field omission in a state |
 | `StateAction` | `to`/`from` + `->` | Declares a state entry or exit action hook |
 | `EventEnsure` | `on` + `ensure` | Declares an event precondition |
@@ -292,7 +292,7 @@ Direct       field            none               FieldDeclaration
              event            none               EventDeclaration
              rule             none               RuleDeclaration
 StateScoped  in               peek at next kwd   StateEnsure (ensure)
-                                                 AccessMode  (modify/readonly/editable)
+                                                 AccessMode  (modify)
                                                  OmitDeclaration (omit)
              from             peek at next kwd   TransitionRow (on)
                                                   StateEnsure (ensure)
@@ -335,14 +335,12 @@ Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the constru
 #### The `in` family (StateScoped)
 
 ```
-in  [AnchorState]  ensure  Expr  because  "..."    → StateEnsure
-in  [AnchorState]  modify  Field  [AccessKwd]      → AccessMode
-in  [AnchorState]  readonly  Field                 → AccessMode
-in  [AnchorState]  editable  Field                 → AccessMode
-in  [AnchorState]  omit  Field                     → OmitDeclaration
+in  [AnchorState]  ensure  Expr  because  "..."                    → StateEnsure
+in  [AnchorState]  modify  Field  [readonly|editable]  [when Guard] → AccessMode
+in  [AnchorState]  omit  Field                                     → OmitDeclaration
 ```
 
-The second keyword (`ensure`, `modify`, `readonly`, `editable`, `omit`) is the disambiguation token.
+The second keyword (`ensure`, `modify`, `omit`) is the disambiguation token. `readonly` and `editable` are access-mode adjectives inside the `AccessModeKeyword` slot, not family-level disambiguation tokens.
 
 #### The `on` family (EventScoped)
 
