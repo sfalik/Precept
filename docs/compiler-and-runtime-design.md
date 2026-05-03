@@ -35,7 +35,7 @@ The architectural principle: **if something is domain knowledge, it is metadata;
 
 > **Precept Innovations**
 > - **Catalog-as-spec inversion.** Traditional compilers scatter language knowledge across pipeline implementations — adding a feature means touching dozens of files and hoping every consumer gets updated. Precept externalizes the entire language specification as thirteen machine-readable catalogs; their union IS the spec. Without this, grammar, completions, hover, and MCP vocabulary would drift independently and require manual synchronization on every language change.
-> - **Single-act feature propagation.** Adding a language feature is one enum member with an exhaustive metadata switch. The C# compiler refuses to build if metadata is missing, and propagation to grammar, completions, hover, MCP vocabulary, and semantic tokens is automatic.
+> - **Single-act feature propagation.** Adding a language feature is one catalog entry — a structured metadata record. Discriminated union record shapes enforce that every entry is fully specified at catalog declaration time; the C# compiler refuses to build if any required DU field is absent. No per-feature switch exists in pipeline stages — consumers derive behavior from catalog metadata generically — so propagation to grammar, completions, hover, MCP vocabulary, and semantic tokens is automatic.
 > - **Grammar generation from catalogs.** The TextMate grammar, LS completions, and MCP vocabulary are generated artifacts, not hand-edited — they cannot drift from the language specification because they ARE the specification, projected to different surfaces.
 
 ### Purpose-built
@@ -148,15 +148,18 @@ To see what that call actually does, zoom in on the compiler itself. Notice what
 ```csharp
 // Inside Compiler.Compile
 TokenStream   tokens    = Lexer.Lex(source);
+// SyntaxTree carries ImmutableArray<ParsedConstruct> Constructs — no per-construct AST node types.
+// ParsedConstruct: (ConstructMeta Meta, ImmutableArray<SlotValue> Slots, SourceSpan Span)
+// ⚠ SlotValue subtype field shapes have open mismatches between parser.md and type-checker.md — see parser.md open questions
 SyntaxTree    tree      = Parser.Parse(tokens);
-SemanticIndex semantics = TypeChecker.Check(tree);
+SemanticIndex semantics = TypeChecker.Check(tree);  // accepts SyntaxTree directly
 StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
 ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
 
 ImmutableArray<Diagnostic> diagnostics =
 [
     ..tokens.Diagnostics,
-    ..tree.Diagnostics,
+    ..tree.Diagnostics,      // parse-phase diagnostics on SyntaxTree.Diagnostics
     ..semantics.Diagnostics,
     ..graph.Diagnostics,
     ..proof.Diagnostics,
@@ -164,7 +167,7 @@ ImmutableArray<Diagnostic> diagnostics =
 
 return new Compilation(
     Tokens:      tokens,
-    SyntaxTree:  tree,
+    SyntaxTree:  tree,       // Compilation.SyntaxTree field holds the ParsedConstruct-based tree
     Semantics:   semantics,
     Graph:       graph,
     Proof:       proof,
@@ -175,7 +178,7 @@ return new Compilation(
 
 Every stage starts from two roots. The first root is the `.precept` source text: the program the author wrote. The second root is the catalogs: the language specification that supplies the identities and metadata the compiler must preserve. Those catalogs enter as soon as a stage can know something from them, and later stages carry that catalog-stamped identity forward instead of reconstructing it with hardcoded switches.
 
-The stages produce progressively richer artifacts. Lexing produces a `TokenStream`. Parsing produces a `SyntaxTree`. Type checking produces a `SemanticIndex`. Graph analysis produces a `StateGraph`. Proof analysis produces a `ProofLedger`. `Compilation` is the aggregate over those artifacts plus the merged diagnostic stream and the `HasErrors` summary. It is the compiler's complete output, not a success token.
+The stages produce progressively richer artifacts. Lexing produces a `TokenStream`. Parsing produces a `SyntaxTree` of `ParsedConstruct` nodes — one uniform type per construct carrying `ConstructMeta`, slot values, and a source span, with no per-construct AST node types. Type checking produces a `SemanticIndex`. Graph analysis produces a `StateGraph`. Proof analysis produces a `ProofLedger`. `Compilation` is the aggregate over those artifacts plus the merged diagnostic stream and the `HasErrors` summary. It is the compiler's complete output, not a success token.
 
 `Compilation` is the last compile-time aggregate. Execution starts only when that aggregate is transformed into runtime-native structures.
 
