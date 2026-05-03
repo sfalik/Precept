@@ -138,6 +138,429 @@ The exhaustive switch is the enforcement — the C# compiler refuses to build if
 
 The thirteen catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, expression forms, constraints, proof requirements, compile-time rules, and runtime failure modes. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
 
+---
+
+## Catalog Schema
+
+Three levels of detail. Use the overview map to see the full 13-catalog topology at a glance, the schema anatomy sections to understand the structurally complex catalogs, and the reference tables for complete member inventories.
+
+---
+
+### Level 1 — Catalog Overview Map
+
+Thirteen catalogs in four layers. Pipeline stages (solid arrows) and tooling consumers (dashed arrows) all read from catalog metadata — no parallel copies.
+
+```mermaid
+flowchart TB
+    %% ── Pipeline stages ──────────────────────────────────────────────────────
+    Lexer["Lexer"]
+    Parser["Parser"]
+    TypeChecker["TypeChecker"]
+    GraphAnalyzer["GraphAnalyzer"]
+    ProofEngine["ProofEngine"]
+    Evaluator["Evaluator"]
+
+    %% ── Tooling consumers ────────────────────────────────────────────────────
+    LS["Language Server"]
+    Grammar["TextMate Grammar"]
+    MCP["MCP precept_language"]
+
+    %% ── Catalog layers ───────────────────────────────────────────────────────
+    subgraph Lexical["Lexical foundation"]
+        Tokens["Tokens\n(TokenKind · 138)"]
+    end
+
+    subgraph GrammarSchema["Grammar / structure"]
+        Constructs["Constructs\n(ConstructKind · 12)"]
+        ExpressionForms["ExpressionForms\n(ExpressionFormKind · 13)"]
+        Constraints["Constraints\n(ConstraintKind · 5)"]
+        ConstructSlotKind["ConstructSlotKind\n⟨helper enum — not a catalog⟩"]
+    end
+
+    subgraph Semantic["Semantic / behavior"]
+        Types["Types\n(TypeKind · 32)"]
+        Operators["Operators\n(OperatorKind · 21)"]
+        Operations["Operations\n(OperationKind · 198)"]
+        Functions["Functions\n(FunctionKind · 23)"]
+        Modifiers["Modifiers\n(ModifierKind · 29)"]
+        Actions["Actions\n(ActionKind · 15)"]
+        ProofRequirements["ProofRequirements\n(ProofRequirementKind · 5)"]
+    end
+
+    subgraph Failure["Failure modes"]
+        Diagnostics["Diagnostics\n(DiagnosticCode · 106)"]
+        Faults["Faults\n(FaultCode · 13)"]
+    end
+
+    %% ── Cross-catalog reference edges ────────────────────────────────────────
+    Types           -->|Token| Tokens
+    Operators       -->|"Token(s)"| Tokens
+    Modifiers       -->|Token| Tokens
+    Actions         -->|Token| Tokens
+    Constructs      -->|"LeadingToken / DisambTokens"| Tokens
+    ExpressionForms -->|LeadTokens| Tokens
+
+    Types      -->|ImpliedModifiers| Modifiers
+    Modifiers  -->|ApplicableTo| Types
+    Actions    -->|ApplicableTo| Types
+    Functions  -->|"param + return types"| Types
+    Operations -->|"operand + result types"| Types
+    Operations -->|Op| Operators
+
+    Types      -->|"accessor ProofRequirements"| ProofRequirements
+    Functions  -->|"overload ProofRequirements"| ProofRequirements
+    Operations -->|"operation ProofRequirements"| ProofRequirements
+    Actions    -->|"action ProofRequirements"| ProofRequirements
+
+    Actions    -->|AllowedIn| Constructs
+    Constructs -->|AllowedIn| Constructs
+    Constructs -->|Slots| ConstructSlotKind
+
+    Diagnostics -->|PreventsFault| Faults
+    Faults      -->|StaticallyPreventable| Diagnostics
+
+    %% ── Pipeline stage → catalog edges ──────────────────────────────────────
+    Lexer --> Tokens
+
+    Parser --> Tokens
+    Parser --> Constructs
+    Parser --> ExpressionForms
+    Parser --> Operators
+    Parser --> Actions
+    Parser --> Modifiers
+    Parser --> Types
+
+    TypeChecker --> Types
+    TypeChecker --> Functions
+    TypeChecker --> Operators
+    TypeChecker --> Operations
+    TypeChecker --> Modifiers
+    TypeChecker --> Actions
+    TypeChecker --> Constraints
+    TypeChecker --> ProofRequirements
+    TypeChecker --> Diagnostics
+
+    GraphAnalyzer --> Constructs
+    GraphAnalyzer --> Modifiers
+    GraphAnalyzer --> Constraints
+    GraphAnalyzer --> Diagnostics
+
+    ProofEngine --> ProofRequirements
+    ProofEngine --> Diagnostics
+
+    Evaluator --> Functions
+    Evaluator --> Operations
+    Evaluator --> Actions
+    Evaluator --> Faults
+
+    %% ── Tooling consumer → catalog edges (dashed) ────────────────────────────
+    LS -.-> Tokens
+    LS -.-> Types
+    LS -.-> Functions
+    LS -.-> Modifiers
+    LS -.-> Actions
+    LS -.-> Constructs
+    LS -.-> ExpressionForms
+    LS -.-> Diagnostics
+
+    Grammar -.-> Tokens
+    Grammar -.-> Types
+    Grammar -.-> Constructs
+    Grammar -.-> ExpressionForms
+    Grammar -.-> Operators
+
+    MCP -.-> Tokens
+    MCP -.-> Types
+    MCP -.-> Functions
+    MCP -.-> Operators
+    MCP -.-> Operations
+    MCP -.-> Modifiers
+    MCP -.-> Actions
+    MCP -.-> Constructs
+    MCP -.-> ExpressionForms
+    MCP -.-> Constraints
+    MCP -.-> ProofRequirements
+    MCP -.-> Diagnostics
+    MCP -.-> Faults
+```
+
+**Reading the diagram:**
+
+- **Tokens** is the lexical foundation — six catalogs carry direct `TokenMeta` or `TokenKind` references upward to it.
+- **Types** and **Constructs** are the twin semantic hubs — Types for runtime behavior, Constructs for grammar schema.
+- **Operations** is the typed-legality hub — it ties Operators + Types + ProofRequirements together.
+- **Diagnostics ↔ Faults** is the only bidirectional pair — each points to the other via `PreventsFault` / `[StaticallyPreventable]`.
+- `ConstructSlotKind` is a helper enum embedded in the Constructs schema surface, not a catalog — it appears in the Grammar layer but carries no `GetMeta()` or `All`.
+
+---
+
+### Level 2 — Schema Anatomy
+
+Schema detail for the five structurally complex catalogs.
+
+---
+
+#### Constructs — grammar schema hub
+
+`ConstructMeta` is the grammar schema hub — every declaration shape in the language maps to one entry. The schema hangs off three supporting types.
+
+```
+ConstructMeta
+├── Kind              : ConstructKind                         identity
+├── Name              : string                                human-readable name
+├── Description       : string                                purpose description
+├── UsageExample      : string                                DSL snippet
+├── AllowedIn         : ConstructKind[]                  ◄── self-reference: nesting rules (empty = top-level)
+├── Slots             : IReadOnlyList<ConstructSlot>     ◄── ordered schema of declaration positions
+├── Entries           : ImmutableArray<DisambiguationEntry>   ◄── leading-token routing map
+├── RoutingFamily     : RoutingFamily                         parser dispatch category
+└── SnippetTemplate   : string?                               optional LS completion snippet
+
+ConstructSlot
+├── Kind              : ConstructSlotKind                ◄── 17-member helper enum (see Level 3)
+├── IsRequired        : bool                                  whether slot is mandatory
+└── Description       : string?                               optional hint
+
+DisambiguationEntry
+├── LeadingToken      : TokenKind                        ◄── anchors to Tokens catalog
+├── DisambiguationTokens : ImmutableArray<TokenKind>?         second-token disambiguation set
+└── LeadingTokenSlot  : ConstructSlotKind?                    which slot the leading token occupies
+```
+
+`RoutingFamily` controls parser dispatch:
+
+| Value | Meaning |
+|-------|---------|
+| `Header` | Pre-loop preamble — not through standard dispatch |
+| `Direct` | Unique leading token; routed directly |
+| `StateScoped` | Shares `in`/`to`/`from`; routed via `DisambiguationEntry` |
+| `EventScoped` | Shares `on`; routed via `DisambiguationEntry` |
+
+`Constructs.ByLeadingToken` is the derived index — maps each leading `TokenKind` to all construct entries that begin with it. The parser derives disambiguation from this index, not from hardcoded token sets.
+
+---
+
+#### Modifiers — 5-subtype discriminated union
+
+`ModifierMeta` is a discriminated union with **5 sealed subtypes** — the clearest example of the catalog-system thesis. Previously four bare enums (`StateModifierKind`, `AccessMode`, `EnsureAnchor`, `StateActionAnchor`) are now first-class catalog members.
+
+```mermaid
+classDiagram
+    class ModifierMeta {
+        <<abstract>>
+        Kind : ModifierKind
+        Token : TokenMeta
+        Description : string
+        Category : ModifierCategory
+        MutuallyExclusiveWith : ModifierKind[]
+    }
+    class FieldModifierMeta {
+        ApplicableTo : TypeTarget[]
+        HasValue : bool
+        Subsumes : ModifierKind[]
+        HoverDescription : string?
+        UsageExample : string?
+        SnippetTemplate : string?
+    }
+    class StateModifierMeta {
+        AllowsOutgoing : bool
+        RequiresDominator : bool
+        PreventsBackEdge : bool
+    }
+    class EventModifierMeta {
+        RequiredAnalysis : GraphAnalysisKind
+    }
+    class AccessModifierMeta {
+        IsPresent : bool
+        IsWritable : bool
+    }
+    class AnchorModifierMeta {
+        Scope : AnchorScope
+        Target : AnchorTarget
+    }
+    ModifierMeta <|-- FieldModifierMeta : 15 members
+    ModifierMeta <|-- StateModifierMeta : 7 members
+    ModifierMeta <|-- EventModifierMeta : 1 member
+    ModifierMeta <|-- AccessModifierMeta : 4 members
+    ModifierMeta <|-- AnchorModifierMeta : 3 members
+```
+
+**Subtype member distribution (29 total):**
+
+| Subtype | Count | Representative members |
+|---------|------:|------------------------|
+| `FieldModifierMeta` | 15 | `optional`, `writable`, `nonnegative`, `positive`, `notempty`, `min`, `max`, `ordered` |
+| `StateModifierMeta` | 7 | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` |
+| `EventModifierMeta` | 1 | `initial` (event) |
+| `AccessModifierMeta` | 4 | `modify`, `readonly`, `editable`, `omit` |
+| `AnchorModifierMeta` | 3 | `in`, `to`, `from` |
+
+> The `initial` keyword appears in two subtypes — `InitialState` (`StateModifierMeta`) and `InitialEvent` (`EventModifierMeta`) — same token text, different subtypes, different metadata. `AnchorTarget` disambiguates the three anchor kinds between ensure and state-action contexts.
+
+---
+
+#### Operations — typed-legality hub
+
+`OperationMeta` is a discriminated union with **2 sealed subtypes**. 198 entries cover every legal `(operator, operand type(s)) → result type` combination in the language.
+
+```mermaid
+classDiagram
+    class OperationMeta {
+        <<abstract>>
+        Kind : OperationKind
+        Op : OperatorKind
+        Result : TypeKind
+        Description : string
+    }
+    class UnaryOperationMeta {
+        Operand : ParameterMeta
+    }
+    class BinaryOperationMeta {
+        Lhs : ParameterMeta
+        Rhs : ParameterMeta
+        BidirectionalLookup : bool
+        Match : QualifierMatch
+        ProofRequirements : ProofRequirement[]
+    }
+    class ParameterMeta {
+        Kind : TypeKind
+        Name : string?
+    }
+    OperationMeta <|-- UnaryOperationMeta : 9 unary
+    OperationMeta <|-- BinaryOperationMeta : 189 binary
+    UnaryOperationMeta --> ParameterMeta : Operand
+    BinaryOperationMeta --> ParameterMeta : Lhs
+    BinaryOperationMeta --> ParameterMeta : Rhs
+```
+
+- **`ParameterMeta`** uses object identity — `ParamSubject` holds a direct reference to the `ParameterMeta` instance in the containing operation or overload, enforcing referential integrity across the catalog (see Proof Obligations).
+- **`BidirectionalLookup = true`** registers both `(op, lhs, rhs)` and `(op, rhs, lhs)` in the index so commutative operations use one entry for both orderings.
+- **`QualifierMatch`** handles the two operations whose result type depends on qualifier comparison (`money/money`, `quantity/quantity`): `Same` → ratio result, `Different` → currency-pair or compound-unit result.
+
+---
+
+#### ProofRequirements — catalog meta vs. obligation instances
+
+Two separate type hierarchies: **catalog meta** (static identity, 5 members in `ProofRequirements.All`) and **obligation instances** (per-use payload, carried inside other catalog entries that declare requirements).
+
+**Catalog meta — DU as identity (5 members):**
+
+```mermaid
+classDiagram
+    class ProofRequirementMeta {
+        <<abstract>>
+        Kind : ProofRequirementKind
+        Description : string
+    }
+    class Numeric { }
+    class Presence { }
+    class Dimension { }
+    class Modifier { }
+    class QualifierCompatibility { }
+    ProofRequirementMeta <|-- Numeric
+    ProofRequirementMeta <|-- Presence
+    ProofRequirementMeta <|-- Dimension
+    ProofRequirementMeta <|-- Modifier
+    ProofRequirementMeta <|-- QualifierCompatibility
+```
+
+**Obligation instances — DU with per-kind payloads:**
+
+```mermaid
+classDiagram
+    class ProofRequirement {
+        <<abstract>>
+        Kind : ProofRequirementKind
+        Description : string
+    }
+    class NumericProofRequirement {
+        Subject : ProofSubject
+        Comparison : OperatorKind
+        Threshold : decimal
+    }
+    class PresenceProofRequirement {
+        Subject : ProofSubject
+    }
+    class DimensionProofRequirement {
+        Subject : ProofSubject
+        RequiredDimension : PeriodDimension
+    }
+    class QualifierCompatibilityProofRequirement {
+        LeftSubject : ProofSubject
+        RightSubject : ProofSubject
+        Axis : QualifierAxis
+    }
+    class ModifierRequirement {
+        Subject : ProofSubject
+        Required : ModifierKind
+    }
+    ProofRequirement <|-- NumericProofRequirement
+    ProofRequirement <|-- PresenceProofRequirement
+    ProofRequirement <|-- DimensionProofRequirement
+    ProofRequirement <|-- QualifierCompatibilityProofRequirement
+    ProofRequirement <|-- ModifierRequirement
+```
+
+`QualifierCompatibilityProofRequirement` is the only dual-subject kind — it carries both `LeftSubject` and `RightSubject` independently. Consumers check `meta is ProofRequirementMeta.QualifierCompatibility` to detect dual-subject obligations without a `SubjectArity` field.
+
+Obligation instances are declared **inside other catalog entries** (`BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements`). The `ProofRequirementMeta` catalog describes obligation *kinds* — the instances are the actual declared obligations attached to specific catalog entries.
+
+---
+
+#### Diagnostics and Faults — bidirectional failure-mode pair
+
+The only bidirectional catalog pair. Each catalog points to the other.
+
+```
+DiagnosticMeta                                   FaultMeta
+─────────────────────────────────────────        ─────────────────────────────────────
+Code            : string                         Code            : string
+Stage           : DiagnosticStage                MessageTemplate : string
+Severity        : Severity                       Severity        : FaultSeverity
+MessageTemplate : string                         RecoveryHint    : string?
+Category        : DiagnosticCategory
+RelatedCodes    : DiagnosticCode[]?
+FixHint         : string?
+PreventsFault   : FaultCode?     ──────────►
+                                                 FaultCode enum members decorated with:
+                             ◄─────────────────  [StaticallyPreventable(DiagnosticCode.X)]
+```
+
+**Two enforcement layers close the loop:**
+
+| Mechanism | What it enforces |
+|-----------|-----------------|
+| `DiagnosticMeta.PreventsFault` | Every diagnostic that prevents a runtime fault names which fault |
+| `[StaticallyPreventable(DiagnosticCode.X)]` on `FaultCode` | Every runtime fault names the compile-time rule that should prevent it — **PRECEPT0002** fires if a `FaultCode` member lacks this attribute |
+
+The pair is bidirectional by design: diagnostics are the compile-time face, faults are the runtime face. Every fault that can be statically prevented has a corresponding diagnostic, and every diagnostic that prevents a fault names it. Any gap in the linkage is a build error.
+
+---
+
+### Level 3 — Member Inventories
+
+Complete enum counts and key groupings. See source files for the full member lists.
+
+| Catalog | Enum | Members | Key groupings | Source |
+|---------|------|--------:|---------------|--------|
+| **Tokens** | `TokenKind` | 138 | Keywords (declaration, lifecycle, expression, action, constraint, qualifier, anchor), Operators, Punctuation, Literals, Special | `TokenKind.cs` |
+| **Types** | `TypeKind` | 32 | Scalar (6: `string`, `boolean`, `integer`, `decimal`, `number`, `choice`), Temporal (8), Business-domain (7), Collection (3), Special (2: `error`, `stateref`) | `TypeKind.cs` |
+| **Functions** | `FunctionKind` | 23 | Numeric (12), String (8), Temporal (1), CI variants (2) | `FunctionKind.cs` |
+| **Operators** | `OperatorKind` | 21 | Arithmetic (5: `+`, `-`, `*`, `/`, `%`), Comparison (8), Logical (3), Membership (1), Negation (1), CI (2) | `OperatorKind.cs` |
+| **Operations** | `OperationKind` | 198 | Unary (9), Binary: arithmetic, comparison, logical, business-type (money/quantity/price/exchangerate/period), CI string | `OperationKind.cs` |
+| **Modifiers** | `ModifierKind` | 29 | Field (15), State (7), Event (1), Access (4), Anchor (3) — see DU anatomy above | `ModifierKind.cs` |
+| **Actions** | `ActionKind` | 15 | Scalar (1: `set`), Set collection (3), Queue (4), Stack (3), Universal (1: `clear`), Compound (3: `append`, `insert`, `put`) | `ActionKind.cs` |
+| **Constructs** | `ConstructKind` | 12 | Header (1), Direct declarations (4), State-scoped (5), Event-scoped (2) | `ConstructKind.cs` |
+| **ExpressionForms** | `ExpressionFormKind` | 13 | Atoms (3: literal, identifier, grouped), Composites (5), Invocations (3), Collections (1: list), Quantifier (1) | `ExpressionForms.cs` |
+| **Constraints** | `ConstraintKind` | 5 | Invariant (1), StateAnchored (3: resident/entry/exit), EventPrecondition (1) | `ConstraintKind.cs` |
+| **ProofRequirements** | `ProofRequirementKind` | 5 | Numeric, Presence, Dimension, Modifier, QualifierCompatibility | `ProofRequirementKind.cs` |
+| **Diagnostics** | `DiagnosticCode` | 106 | By stage — Lex (8), Parse (7+), Type (50+), Graph (2+), Proof (3+) | `DiagnosticCode.cs` |
+| **Faults** | `FaultCode` | 13 | Arithmetic (2), Type/field (4), Collection (2), Qualifier (1), Numeric (2), Dispatch (1), Range (1) | `FaultCode.cs` |
+
+> **`ConstructSlotKind`** (17 members — `IdentifierList`, `TypeExpression`, `ModifierList`, `StateEntryList`, `ArgumentList`, `ComputeExpression`, `GuardClause`, `ActionChain`, `Outcome`, `StateTarget`, `EventTarget`, `EnsureClause`, `BecauseClause`, `AccessModeKeyword`, `FieldTarget`, `RuleExpression`, `InitialMarker`) is a helper enum in the Constructs schema surface, not a catalog. Source: `ConstructSlot.cs`.
+
+---
+
 ## Pattern Definition
 
 A catalog has four parts:
