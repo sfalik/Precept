@@ -71,3 +71,8 @@
 
 - Elaine-4's grammar-doc pass is now durably recorded: `docs/language/precept-grammar.md` is the active grammar design reference, with negative-first orientation, the flat/keyword-anchored/named-slot spine, dedicated linguistic-model + invariants sections, and a quick-reference appendix.
 - Elaine-5's duplicate verification adds no new work item; treat the current grammar doc as complete unless a later scope expansion justifies consolidating the distributed design-principles content into a dedicated section.
+
+### 2026-05-03T14:37:24Z — Grammar anatomy expansion recorded
+- Elaine-11 expanded docs/language/precept-grammar.md §3 with five new anatomy examples — PreceptHeader, RuleDeclaration, AccessMode, StateAction, and EventHandler — and reframed the introduction around distinct slot/routing archetypes. Commit 5908878.
+- Frank-27's follow-up review caught and fixed 5 material errors affecting the new anatomy pass and adjacent section facts: missing GuardClause on RuleDeclaration, incorrect BecauseClause separation in StateEnsure, missing InitialMarker on EventDeclaration, conflated ActionChain/Outcome in TransitionRow, and the stale slot-kind count.
+- Durable takeaway: Elaine's coverage expansion stands, but the current canonical text is the reviewed/fixed version after Frank's corrective pass.

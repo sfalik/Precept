@@ -35,3 +35,8 @@
 
 ### 2026-05-03T05:21:49Z — HandlesCatalog cleanup remains recorded
 - The Option F follow-through still stands: consumer-side `[HandlesCatalogExhaustively]` / `[HandlesCatalogMember]` annotations and their reflection tests were removed, while the attribute types themselves remain valid for catalog-side use.
+
+### 2026-05-03T14:37:24Z — Grammar doc accuracy confirmed against catalog
+- Frank-27 completed a full review of docs/language/precept-grammar.md and corrected 9 material errors across slot-bearing examples, slot-kind totals, and invariant references.
+- Durable baseline: the grammar doc now matches catalog reality for StateEntryList, InitialMarker, GuardClause, and the distinct ActionChain + Outcome slot shape in TransitionRow.
+- The active grammar reference should now be treated as accurate on the reviewed slot/routing details unless a later catalog change reopens them.

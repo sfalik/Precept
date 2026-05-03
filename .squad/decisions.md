@@ -1,11 +1,24 @@
-# Squad Decisions
-
----
-
-## ACTIVE DECISIONS — Current Sprint
-
----
-
+# Squad Decisions
+
+---
+
+## ACTIVE DECISIONS — Current Sprint
+
+---
+
+### 2026-05-03T14:37:24Z: Grammar anatomy section stays representative and now covers the missing slot/routing archetypes
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file)
+
+**Merged sources:** `elaine-concrete-anatomy-coverage`.
+
+- `docs/language/precept-grammar.md` §3 stays representative rather than exhaustive; anatomy examples exist to cover distinct slot and routing archetypes, not every construct kind.
+- The selected expansion set is `PreceptHeader`, `RuleDeclaration`, `AccessMode`, `StateAction`, and `EventHandler`; `OmitDeclaration` and `EventEnsure` remain intentionally omitted because their slot shapes are already legible from the chosen set.
+- Durable framing rule: describe §3 as coverage of distinct slot/routing archetypes.
+
+---
 ### 2026-05-03T14:18:15Z: SyntaxTree rename target preference locked to ConstructManifest
 
 **By:** Scribe
@@ -951,3 +964,4 @@
 - Team pattern locked: dual-surface config work is only considered landed when the config artifact and at least one directly related doc land together.
 
 ---
+
