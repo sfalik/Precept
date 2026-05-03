@@ -96,12 +96,19 @@
 ### 2026-05-03T10:52:58Z — Subgraph wrappers removed from per-stage pipeline diagrams
 
 - Removed `subgraph CATS / end` wrappers and `style CATS` lines from 4 diagrams in `docs/compiler-and-runtime-design.md` (§5 Parser, §6 Type Checker, §7 Graph Analyzer, §8 Proof Engine). §4 Lexer was already wrapper-free.
-- Catalog nodes are now declared inline with unquoted labels — `(Constructs)` not `("Constructs")` — connecting directly to the stage with their own arrows, no enclosing box. Commit `9db529f`.
-
+- Catalog nodes are now declared inline with unquoted labels — `(Constructs)` not `("Constructs")` — connecting directly to the stage with their own arrows, no enclosing box. Commit `9db529f`.
+
+
+
 ### 2026-05-03T14:59:24Z — ASCII-safe topology box fix recorded
 - Elaine-14 replaced `▶` with `>` in the fixed-width topology box in `docs/compiler-and-runtime-design.md` §7. Commit `086434a`.
-- Durable diagram rule: box-drawing prose/ASCII layouts should avoid ambiguous-width Unicode arrowheads when column alignment is part of the design contract.
+- Durable diagram rule: box-drawing prose/ASCII layouts should avoid ambiguous-width Unicode arrowheads when column alignment is part of the design contract.
+
 
 ### 2026-05-03T15:37:24Z — LS diagnostic enrichment spec relocated
 - Elaine relocated the LS diagnostic enrichment UX spec from design/system/surfaces/ls-diagnostic-enrichment-ux.md into docs/tooling/language-server.md, landing the content as §7.9 Diagnostic Enrichment and §7.10 Code Actions with the heading hierarchy normalized to the document's existing H3/H4 structure. Commit c5d5e77.
 - Durable doc rule: once a language-server UX spec becomes authoritative tooling guidance, keep it in docs/tooling/language-server.md rather than as a standalone design/system surface file.
+
+### 2026-05-03T16:05:46Z — Catalog diagram and gap-register sync recorded
+- Elaine-17's `catalog-system.md` pass is now the durable diagram baseline: Level 1 is split into two focused diagrams — catalog topology and consumer landscape — instead of one overloaded 70-edge flowchart. Commit `0d0d2a5`.
+- Frank's companion gap work is now part of the shared operating context: `docs/working/catalog-gap-register.md` holds the 39-gap triage set, while `docs/working/pipeline-output-gap-register.md` tracks the 34 pipeline output/interface blockers that still need owner decisions or design closure.
