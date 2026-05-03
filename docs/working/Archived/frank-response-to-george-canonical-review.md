@@ -370,7 +370,7 @@ ImmutableArray<TypedEditDeclaration> EditDeclarations  // initially empty
 
 ### Gate 2: `TypeCheck()` and `TypeCheckExpr()` test helpers
 
-**Design implication:** These helpers belong in the test project infrastructure, not in the canonical design doc. They are test-side convenience wrappers around `TypeChecker.Check()` and `Resolve()` respectively. The design doc specifies the public API (`TypeChecker.Check(SyntaxTree) → SemanticIndex`). Test helpers are an implementation detail of the test project.
+**Design implication:** These helpers belong in the test project infrastructure, not in the canonical design doc. They are test-side convenience wrappers around `TypeChecker.Check()` and `Resolve()` respectively. The design doc specifies the public API (`TypeChecker.Check(ConstructManifest) → SemanticIndex`). Test helpers are an implementation detail of the test project.
 
 **One addition to canonical doc:** Add a note to Pre-Slice 0 that the shape commit ALSO includes test infrastructure helpers:
 

@@ -29,7 +29,7 @@ The central architectural principle: **every editor-facing artifact derives from
 |---|---|---|---|
 | TextMate grammar | Build (extension `npm run` pipeline) | `Tokens`, `Types`, `Operators` catalogs | `precept.tmLanguage.json` |
 | Semantic tokens | LSP request | `TokenStream` + `TokenMeta`, `SemanticIndex` | LSP `SemanticTokens` response |
-| Completions | LSP request | Catalogs + `SyntaxTree` cursor context + `SemanticIndex` | LSP `CompletionItem[]` response |
+| Completions | LSP request | Catalogs + `ConstructManifest` cursor context + `SemanticIndex` | LSP `CompletionItem[]` response |
 | Hover | LSP request | `SemanticIndex` + catalog documentation | LSP `Hover` response |
 
 ### VS Code Extension Integration
@@ -162,7 +162,7 @@ If any of these require manual tooling changes, the design is violated. The sing
 
 | Input | Output |
 |---|---|
-| Cursor position + `SyntaxTree.FindAt(position)` | `SlotContext` identifying expected value kind |
+| Cursor position + `ConstructManifest.FindAt(position)` | `SlotContext` identifying expected value kind |
 | `SlotContext` + catalog query | `CompletionItem[]` filtered by context |
 | `SemanticIndex` (when available) | Declared state/event/field names for references |
 
@@ -711,7 +711,7 @@ string FormatEventHover(TypedEvent evt)
 | `Modifiers.All` | Catalog | `ModifierMeta.Token`, `ApplicableTo`, `HoverDescription` |
 | `Constructs.All` | Catalog | `ConstructMeta.Slots`, `LeadingTokens`, `RoutingFamily` |
 | `TokenStream` | Lexer | Token sequence for Pass 1 semantic tokens |
-| `SyntaxTree` | Parser | Cursor context for completions |
+| `ConstructManifest` | Parser | Cursor context for completions |
 | `SemanticIndex` | TypeChecker | Resolved symbols for Pass 2, identifier completions, hover |
 | `Precept` (runtime) | Builder | Preview/inspect via LS `precept/preview` |
 

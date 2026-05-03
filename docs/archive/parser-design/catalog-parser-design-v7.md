@@ -745,7 +745,7 @@ public void ParseRuleDeclaration_ValidInputs(string input) { ... }
 **Modify:** `src/Precept/Pipeline/Parser.cs` — implement the dispatch loop for unique leading tokens:
 
 ```csharp
-public static SyntaxTree Parse(TokenStream tokens)
+public static ConstructManifest Parse(TokenStream tokens)
 {
     var parser = new ParserState(tokens);
     while (parser.Current().Kind != TokenKind.EndOfSource)
@@ -771,7 +771,7 @@ public static SyntaxTree Parse(TokenStream tokens)
             parser.SyncToNextDeclaration();
         }
     }
-    return parser.BuildSyntaxTree();
+    return parser.BuildConstructManifest();
 }
 ```
 
@@ -1168,7 +1168,7 @@ Seven rounds of design review between Frank (language designer) and George (runt
 | `src/Precept/Language/Constructs.cs` | PR 1 (modify) |
 | `src/Precept/Language/DiagnosticCode.cs` | PR 5 (modify) |
 | `src/Precept/Pipeline/Parser.cs` | PR 2–5 (modify) |
-| `src/Precept/Pipeline/SyntaxTree.cs` | PR 2 (modify) |
+| `src/Precept/Pipeline/ConstructManifest.cs` | PR 2 (modify) |
 | `src/Precept/Pipeline/SyntaxNodes/*.cs` | PR 2 (create ~15 files) |
 | `test/Precept.Tests/ConstructsTests.cs` | PR 1 (modify) |
 | `test/Precept.Tests/SlotOrderingDriftTests.cs` | PR 2 (create) |

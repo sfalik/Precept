@@ -50,7 +50,7 @@ Two top-level products emerge from this pipeline:
 
 **`Compilation`** — the immutable analysis snapshot. Always produced, even from broken input. Authoring surfaces (language server, MCP compile) need the full picture — including syntax errors, unresolved references, and unproven safety obligations — to provide diagnostics, completions, and navigation. This follows the error-tolerant compilation model established by Roslyn (full syntax trees from broken input) and adopted across the surveyed systems: OPA's compiler collects errors without short-circuiting; CEL's `Compile()` returns `Issues` alongside partial ASTs; Dhall's LSP runs the full pipeline and pushes all diagnostics.
 
-**`Precept`** — the executable runtime model. Produced only from error-free compilations via `Precept.From(compilation)`. This is the sealed model that runtime operations execute against. It carries descriptor tables, prebuilt execution plans, and constraint indexes — not syntax trees or proof ledgers.
+**`Precept`** — the executable runtime model. Produced only from error-free compilations via `Precept.From(compilation)`. This is the sealed model that runtime operations execute against. It carries descriptor tables, prebuilt execution plans, and constraint indexes — not construct manifests or proof ledgers.
 
 The relationship is straightforward: analysis builds `Compilation`; the Precept Builder transforms it into `Precept`; runtime operations execute against `Precept`. Authoring tools read `Compilation`. Execution tools read `Precept`.
 
@@ -186,7 +186,7 @@ The stages produce progressively richer artifacts. Lexing produces a `TokenStrea
 Precept     precept     = Precept.From(compilation);        // requires !HasErrors
 ```
 
-`Precept.From()` is the transformation boundary. It takes the knowledge already established by compilation and re-expresses the runtime-relevant parts in executable form. What crosses the boundary is not the compile artifacts themselves, but the information runtime must execute and answer structural questions. What does not cross is equally important: runtime types do not hold references to tokens, syntax trees, parser recovery state, or proof artifacts. The design keeps execution independent from compiler internals while still preserving the results of analysis in shapes the evaluator can use directly.
+`Precept.From()` is the transformation boundary. It takes the knowledge already established by compilation and re-expresses the runtime-relevant parts in executable form. What crosses the boundary is not the compile artifacts themselves, but the information runtime must execute and answer structural questions. What does not cross is equally important: runtime types do not hold references to tokens, construct manifests, parser recovery state, or proof artifacts. The design keeps execution independent from compiler internals while still preserving the results of analysis in shapes the evaluator can use directly.
 
 ### Artifact inventory
 

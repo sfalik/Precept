@@ -7,7 +7,7 @@
 | Doc maturity | Full |
 | Implementation state | Stub — not yet implemented |
 | Source | `src/Precept/Pipeline/TypeChecker.cs`, `src/Precept/Pipeline/SemanticIndex.cs` |
-| Upstream | `SyntaxTree` (from Parser) |
+| Upstream | `ConstructManifest` (from Parser) |
 | Downstream | GraphAnalyzer, ProofEngine, PreceptBuilder, LS semantic features |
 
 ---
@@ -18,14 +18,14 @@ The type checker is a **metadata resolution engine with structural scaffolding**
 
 This reframing has a profound implication: **new language features (operations, functions, types, modifiers, actions) require zero type-checker code changes.** Add the catalog entry → the generic resolution engine handles it automatically. Only genuinely new structural patterns (a new scope rule, a new validation shape) require checker changes.
 
-The type checker transforms `SyntaxTree` into `SemanticIndex` — a flat semantic inventory of resolved symbols, typed expressions, normalized declarations, and dependency facts. The inventory is organized by semantic role, not by source position, because downstream consumers need declarations indexed by role, not by parser nesting.
+The type checker transforms `ConstructManifest` into `SemanticIndex` — a flat semantic inventory of resolved symbols, typed expressions, normalized declarations, and dependency facts. The inventory is organized by semantic role, not by source position, because downstream consumers need declarations indexed by role, not by parser nesting.
 
 ### Input Shape
 
 The parser produces:
 
 ```csharp
-public sealed record SyntaxTree(
+public sealed record ConstructManifest(
     ImmutableArray<ParsedConstruct> Constructs,
     ImmutableArray<Diagnostic> Diagnostics);
 ```
@@ -101,7 +101,7 @@ The checker is NOT a general-purpose compiler component — it's purpose-built f
 
 ### Input
 
-`SyntaxTree` containing `ImmutableArray<ParsedConstruct>` from the parser. The type checker iterates over constructs and dispatches on `ConstructKind`.
+`ConstructManifest` containing `ImmutableArray<ParsedConstruct>` from the parser. The type checker iterates over constructs and dispatches on `ConstructKind`.
 
 ### Output
 
@@ -121,7 +121,7 @@ The checker is NOT a general-purpose compiler component — it's purpose-built f
 The type checker dispatches on `ConstructKind` (an enum), NOT on C# type. There are no per-construct AST node classes — only generic `ParsedConstruct`:
 
 ```csharp
-foreach (var construct in syntaxTree.Constructs)
+foreach (var construct in manifest.Constructs)
 {
     switch (construct.Meta.Kind)
     {
@@ -165,7 +165,7 @@ The slot array layout for each `ConstructKind` is defined by the `ConstructMeta.
 
 ### Pass 1: Registration (Symbol Table Construction)
 
-**Input:** `SyntaxTree.Constructs`
+**Input:** `ConstructManifest.Constructs`
 **Output:** Mutable symbol tables (field, state, event) in `CheckContext`
 
 No expression checking. No diagnostics beyond duplicates and structural errors.
@@ -185,7 +185,7 @@ Dispatches on `ConstructKind`:
 
 ### Pass 2: Checking (Expression Resolution + Normalization + Structural Validation)
 
-**Input:** Symbol tables (from Pass 1) + `SyntaxTree.Constructs`
+**Input:** Symbol tables (from Pass 1) + `ConstructManifest.Constructs`
 **Output:** `SemanticIndex`
 
 Pass 2 has three generic sub-passes.
@@ -832,7 +832,7 @@ Five stable rules. The 5-rule enforcement surface is small enough that checker l
 
 | Component | What it provides |
 |---|---|
-| **Parser** | `SyntaxTree` containing `ImmutableArray<ParsedConstruct>` — the generic construct nodes with typed slots |
+| **Parser** | `ConstructManifest` containing `ImmutableArray<ParsedConstruct>` — the generic construct nodes with typed slots |
 | **Constructs catalog** | `ConstructMeta` with slot layouts — defines what slots each `ConstructKind` has |
 | **Types catalog** | `TypeMeta` with `WidensTo`, `Accessors`, `ImpliedModifiers` |
 | **Operations catalog** | `FindCandidates()`, `FindUnary()` — operator lookup |
@@ -880,7 +880,7 @@ No declaration type is ever skipped due to sub-expression errors.
 
 | Guarantee | Description |
 |---|---|
-| **Total function** | Every `SyntaxTree` produces a `SemanticIndex`, even with errors |
+| **Total function** | Every `ConstructManifest` produces a `SemanticIndex`, even with errors |
 | **Diagnostic completeness** | Every `TypedErrorExpression` has a corresponding `Diagnostic` |
 | **Declaration preservation** | Every parseable declaration appears in the output, even if sub-expressions failed |
 | **No cascading errors** | `ErrorType` propagation prevents duplicate diagnostics for the same failure |
@@ -1052,7 +1052,7 @@ Implementation is blocked pending parser expression tree output. When expression
 |---|---|
 | SemanticIndex governance, anti-mirroring rules, inventory shape | `docs/compiler-and-runtime-design.md §6` |
 | All catalogs the type checker consumes | `docs/language/catalog-system.md` |
-| SyntaxTree input contract | `docs/compiler/parser.md` |
+| ConstructManifest input contract | `docs/compiler/parser.md` |
 | SemanticIndex consumer (graph) | `docs/compiler/graph-analyzer.md` |
 | ParsedConstruct and SlotValue definitions | `src/Precept/Pipeline/ParsedConstruct.cs`, `src/Precept/Pipeline/SlotValue.cs` |
 | ConstructMeta slot layouts | `src/Precept/Language/Constructs.cs` |
@@ -1063,7 +1063,7 @@ Implementation is blocked pending parser expression tree output. When expression
 
 | File | Purpose |
 |---|---|
-| `src/Precept/Pipeline/TypeChecker.cs` | Type checker implementation — `TypeChecker` static class with `Check(SyntaxTree)` entry point |
+| `src/Precept/Pipeline/TypeChecker.cs` | Type checker implementation — `TypeChecker` static class with `Check(ConstructManifest)` entry point |
 | `src/Precept/Pipeline/SemanticIndex.cs` | `SemanticIndex` — flat semantic inventory artifact |
 | `src/Precept/Pipeline/ParsedConstruct.cs` | `ParsedConstruct` — generic input node type with `ConstructMeta` and `SlotValue[]` |
 | `src/Precept/Pipeline/SlotValue.cs` | 17 `SlotValue` subtypes — the typed slot discriminated union |

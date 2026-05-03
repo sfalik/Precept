@@ -194,7 +194,7 @@ It's already built. The current `Lexer.cs` IS a catalog-driven scan engine with 
 
 **What it does in the pipeline:**
 
-The parser transforms a `TokenStream` into structured parse output (currently a `SyntaxTree` of typed AST nodes; in the radical design, `ParsedConstruct[]`). It recognizes construct boundaries, dispatches to per-construct parse methods, extracts slot values, and invokes sub-parsers for expressions, type references, and modifiers.
+The parser transforms a `TokenStream` into structured parse output (currently a `ConstructManifest` of typed AST nodes; in the radical design, `ParsedConstruct[]`). It recognizes construct boundaries, dispatches to per-construct parse methods, extracts slot values, and invokes sub-parsers for expressions, type references, and modifiers.
 
 **What it needs:**
 
@@ -556,7 +556,7 @@ Adding a new construct? Add catalog metadata + grammar rule. The LS picks it up 
 
 **What it does in the pipeline:**
 
-The precept builder takes parse output — whether `SyntaxTree` nodes or `ParsedConstruct[]` — and assembles a `PreceptDefinition`: the typed semantic model that all downstream consumers operate on. It pairs state declarations with transition rows, resolves event references, collects field declarations, builds the constraint model, and produces the coherent domain object that represents a complete precept.
+The precept builder takes parse output — whether `ConstructManifest` nodes or `ParsedConstruct[]` — and assembles a `PreceptDefinition`: the typed semantic model that all downstream consumers operate on. It pairs state declarations with transition rows, resolves event references, collects field declarations, builds the constraint model, and produces the coherent domain object that represents a complete precept.
 
 This is **pure structural assembly**. No evaluation. No validation. No type inference. It reads parsed structure and materializes the domain model. This makes it the most naturally catalog-drivable stage in the entire pipeline.
 

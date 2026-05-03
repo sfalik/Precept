@@ -548,7 +548,7 @@ The existing spec's three "sub-passes" (2a expression resolution, 2b declaration
 
 ```
 Pass 2 (single linear scan):
-  for each declaration in syntaxTree.Declarations:
+  for each declaration in manifest.Declarations:
     using var scope = catalogIndex.ScopeRules.TryGetValue(declaration.Kind, out var sr)
                       ? context.PushScope(sr, declaration) : default;
     match declaration:

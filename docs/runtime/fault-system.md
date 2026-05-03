@@ -294,7 +294,7 @@ This affects how aggressively the evaluator should assert vs. gracefully fault. 
 
 **`FaultException` type** — not yet implemented. Whether faults are thrown as exceptions or returned as structured values is open question Q1. Adding `FaultException` before the evaluator result type is decided would constrain the design.
 
-**`Fault.SourceSpan`** — excluded from the current `Fault` struct. At runtime, there is no source text in scope; the expression being evaluated is an in-memory execution plan, not a syntax tree. If expression context is needed it will be a different field shape (see Q2).
+**`Fault.SourceSpan`** — excluded from the current `Fault` struct. At runtime, there is no source text in scope; the expression being evaluated is an in-memory execution plan, not a construct manifest. If expression context is needed it will be a different field shape (see Q2).
 
 **Non-fatal fault severity** — all faults are currently `FaultSeverity.Fatal`. Informational or warning-level evaluator faults are excluded until a concrete consumer use case emerges. `FaultSeverity` is kept as an enum (not a bool) to leave this open without a breaking change.
 

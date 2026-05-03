@@ -51,7 +51,7 @@ All 6 slices completed in a single pass:
 - Delta:  +26 new tests (12 AstNodeTests, 10 ParserInfrastructureTests, 4 SlotOrderingDriftTests)
 
 ### Design Decisions
-1. **SyntaxTree expanded**: Added `Header` (PreceptHeaderNode?) and `Declarations` (ImmutableArray\<Declaration>) to the existing SyntaxTree record. No existing callers affected.
+1. **ConstructManifest expanded**: Added `Header` (PreceptHeaderNode?) and `Declarations` (ImmutableArray\<Declaration>) to the existing ConstructManifest record. No existing callers affected.
 2. **BuildNode helper extensions**: `AsToken()`, `AsTokenArray()`, etc. are temporary `NotImplementedException` stubs. PR 3 will replace these when slot parsers return concrete types.
 3. **CS8524 wildcard arm**: `InvokeSlotParser` switch uses all 16 named enum members plus `_ => throw` for unnamed values. Adding a new `ConstructSlotKind` member still triggers a build warning/error for the missing named arm.
 4. **InternalsVisibleTo**: Added for `Precept.Tests` so tests can access `internal` members (BuildNode, vocabulary dictionaries).

@@ -41,7 +41,7 @@ Here are the specific facts I found that affect the parser design:
 **From the spec (law):**
 - Transition row grammar: `from StateTarget on Identifier ("when" BoolExpr)? ("->" ActionStatement)* "->" Outcome` — guard is AFTER event target.
 - There is NO explicit grammar rule for `from StateTarget when BoolExpr on Identifier ...` (pre-event guard position) in the spec.
-- `Parser.cs` is a stub: `public static SyntaxTree Parse(TokenStream tokens) => throw new NotImplementedException();` — confirmed zero consumers.
+- `Parser.cs` is a stub: `public static ConstructManifest Parse(TokenStream tokens) => throw new NotImplementedException();` — confirmed zero consumers.
 
 **From catalog-system.md:**
 - 12 catalogs form a closed registry. Constructs catalog covers grammar forms.
@@ -302,7 +302,7 @@ Use reflection to find all `Parse{SlotKindName}` methods on the parser and map t
 **Option C: Test-time construction.**
 Instantiate the parser in test code and extract the dictionary keys. This requires the parser to be constructible in test context, which it should be (vocabulary tables from catalogs, no runtime dependencies).
 
-**I recommend Option C** because the parser is already stateless (it takes `TokenStream` and returns `SyntaxTree`). When the parser is refactored from a static class to an instance class with vocabulary tables injected at construction, the test can instantiate it and read the dictionary directly. Until then, Option A (internal static method) is the pragmatic bridge.
+**I recommend Option C** because the parser is already stateless (it takes `TokenStream` and returns `ConstructManifest`). When the parser is refactored from a static class to an instance class with vocabulary tables injected at construction, the test can instantiate it and read the dictionary directly. Until then, Option A (internal static method) is the pragmatic bridge.
 
 ### The Exhaustiveness Guarantee
 

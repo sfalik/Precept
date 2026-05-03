@@ -7,7 +7,7 @@ Implementation blueprints for each stage of the Precept compiler pipeline. Each 
 The compiler is a linear five-stage pipeline. Read the stage docs in this order:
 
 ```
-Source string → Lexer.Lex → TokenStream → Parser.Parse → SyntaxTree → TypeChecker.Check → SemanticIndex → GraphAnalyzer.Analyze → StateGraph → ProofEngine.Prove → ProofLedger → Compiler.Compile → Compilation
+Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManifest → TypeChecker.Check → SemanticIndex → GraphAnalyzer.Analyze → StateGraph → ProofEngine.Prove → ProofLedger → Compiler.Compile → Compilation
 ```
 
 | Stage | Document | Doc maturity | Impl state |

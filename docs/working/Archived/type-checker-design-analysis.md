@@ -616,14 +616,14 @@ This reframes the architecture: **the type checker is a two-pass metadata resolu
 
 ### Pass 1: Registration (Symbol Table Construction)
 
-**Input:** `SyntaxTree.Declarations`
+**Input:** `ConstructManifest.Declarations`
 **Output:** Mutable symbol tables (field, state, event)
 **No expression checking.** No diagnostics beyond duplicates and structural errors.
 
 The registration pass walks all declarations once:
 
 ```
-for each declaration in syntaxTree.Declarations:
+for each declaration in manifest.Declarations:
     match declaration:
         FieldDeclarationNode → register field names + resolve TypeRef → TypeKind
         StateDeclarationNode → register state names + resolve modifiers
@@ -637,7 +637,7 @@ for each declaration in syntaxTree.Declarations:
 
 ### Pass 2: Checking (Expression Resolution + Normalization)
 
-**Input:** Symbol tables (from Pass 1) + `SyntaxTree.Declarations`
+**Input:** Symbol tables (from Pass 1) + `ConstructManifest.Declarations`
 **Output:** `SemanticIndex`
 
 Pass 2 has **three generic sub-passes** rather than per-construct methods:

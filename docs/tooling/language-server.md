@@ -128,16 +128,16 @@ When `!HasErrors`, the LS also holds a `Precept` (built from `Compilation`) for 
 | Diagnostics | `Compilation.Diagnostics` | All stages (accumulated) |
 | Lexical semantic tokens (Pass 1) | `TokenStream` + `TokenMeta.SemanticTokenType` | Lexer |
 | Identifier semantic tokens (Pass 2) | `SemanticIndex` reference bindings | TypeChecker |
-| Completions | Catalogs + `SyntaxTree` context + `SemanticIndex` | Parser + TypeChecker |
+| Completions | Catalogs + `ConstructManifest` context + `SemanticIndex` | Parser + TypeChecker |
 | Hover | `SemanticIndex` + catalog documentation | TypeChecker + Catalogs |
 | Go-to-definition | `SemanticIndex` reference → `ParsedConstruct Syntax` back-pointer | TypeChecker |
 | Preview/inspect | `Precept` + inspection runtime | Builder + Evaluator |
-| Outline | `SyntaxTree.Constructs` | Parser |
-| Folding | `SyntaxTree.Constructs` (multi-line spans) | Parser |
+| Outline | `ConstructManifest.Constructs` | Parser |
+| Folding | `ConstructManifest.Constructs` (multi-line spans) | Parser |
 
 #### Hard Rules
 
-1. **Semantic LS features must not walk `SyntaxTree` to answer semantic questions** — use `SemanticIndex` + back-pointers only. The type checker owns semantic identity; the LS reads it.
+1. **Semantic LS features must not walk `ConstructManifest` to answer semantic questions** — use `SemanticIndex` + back-pointers only. The type checker owns semantic identity; the LS reads it.
 
 2. **Preview/runtime features must not consume `Compilation` after `Precept` is available** — the runtime snapshot is the source of truth for inspection.
 
@@ -328,7 +328,7 @@ If the type checker fails (compilation has errors), Pass 2 is skipped. The edito
 
 **Trigger:** `textDocument/completion`
 
-**Artifact:** Catalogs + `SyntaxTree` cursor context + `SemanticIndex` (when available)
+**Artifact:** Catalogs + `ConstructManifest` cursor context + `SemanticIndex` (when available)
 
 **Mechanics:**
 
@@ -672,16 +672,16 @@ The extension calls `precept/preview` whenever the user changes preview state, t
 
 **Trigger:** `textDocument/documentSymbol`
 
-**Artifact:** `SyntaxTree.Constructs`
+**Artifact:** `ConstructManifest.Constructs`
 
 **Mechanics:**
 
-Document outline provides hierarchical symbols for the document sidebar. The LS walks `SyntaxTree.Constructs` and maps each to a `DocumentSymbol`.
+Document outline provides hierarchical symbols for the document sidebar. The LS walks `ConstructManifest.Constructs` and maps each to a `DocumentSymbol`.
 
 ```csharp
 DocumentSymbol[] GetDocumentSymbols(Compilation compilation)
 {
-    return compilation.SyntaxTree.Constructs
+    return compilation.ConstructManifest.Constructs
         .Where(c => IsOutlineConstruct(c.Meta.Kind))
         .Select(c => ToDocumentSymbol(c))
         .ToArray();
@@ -726,7 +726,7 @@ SymbolKind MapSymbolKind(ConstructKind kind) => kind switch
 
 **Trigger:** `textDocument/foldingRange`
 
-**Artifact:** `SyntaxTree.Constructs` (multi-line spans)
+**Artifact:** `ConstructManifest.Constructs` (multi-line spans)
 
 **Mechanics:**
 
@@ -735,7 +735,7 @@ Folding enables collapsing of multi-line constructs. The LS identifies construct
 ```csharp
 FoldingRange[] GetFoldingRanges(Compilation compilation)
 {
-    return compilation.SyntaxTree.Constructs
+    return compilation.ConstructManifest.Constructs
         .Where(c => c.Span.EndLine > c.Span.StartLine)  // Multi-line only
         .Select(c => new FoldingRange
         {
@@ -891,7 +891,7 @@ void Update(Compilation compilation)
 
 **Choice:** Each LS feature reads from exactly one designated artifact (see §6 Consumer Artifact Map). Violations are design bugs.
 
-**Rationale:** Clear ownership prevents bugs where features read stale or inappropriate data. If hover walks `SyntaxTree` instead of `SemanticIndex`, it might show wrong types. If preview reads `Compilation` instead of `Precept`, it might show incomplete execution plans.
+**Rationale:** Clear ownership prevents bugs where features read stale or inappropriate data. If hover walks `ConstructManifest` instead of `SemanticIndex`, it might show wrong types. If preview reads `Compilation` instead of `Precept`, it might show incomplete execution plans.
 
 **Alternatives Rejected:**
 - **Ad-hoc artifact access** — leads to subtle bugs and inconsistent behavior
@@ -986,7 +986,7 @@ void Update(Compilation compilation)
 | Immutability + atomic swap model | `docs/compiler-and-runtime-design.md §12` |
 | Compiler pipeline overview | `docs/compiler/` |
 | Lexer and TokenStream | `docs/compiler/lexer.md` |
-| Parser and SyntaxTree | `docs/compiler/parser.md` |
+| Parser and ConstructManifest | `docs/compiler/parser.md` |
 | Type Checker and SemanticIndex | `docs/compiler/type-checker.md` |
 | Evaluator and EventInspection | `docs/runtime/evaluator.md` |
 | Precept Builder | `docs/runtime/precept-builder.md` |

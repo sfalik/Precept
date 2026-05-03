@@ -21,7 +21,7 @@ Before anything else, a fact that changes the framing of every claim below:
 
 **`Parser.cs` (line 87):**
 ```csharp
-public static SyntaxTree Parse(TokenStream tokens) => throw new NotImplementedException();
+public static ConstructManifest Parse(TokenStream tokens) => throw new NotImplementedException();
 ```
 
 That is the entire parser body. The file contains ~80 lines of architectural design comments followed by this one-line stub. There is no disambiguation logic, no slot loop, no pre-parsed injection, no stash variable. Nothing has been implemented.

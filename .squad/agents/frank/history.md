@@ -6,6 +6,8 @@
 
 ## Learnings
 
+- The `tree` variable name sweep (2026-05-03) found stale references in 7 files: `Compiler.cs`, `CompileRunner/Program.cs`, `ConstructsTests.cs`, `compiler-and-runtime-design.md`, `precept-language-spec.md`, `tooling-surface.md`, and `language-server.md`. All Roslyn `SyntaxTree` usages in analyzer tests/code are legitimate and left alone. Archived docs are not updated. The `docs/compiler/type-checker.md` still has many `SyntaxTree` type-name references (not caught by `\btree\b` word boundary) that will need a separate pass.
+
 - `docs/compiler-and-runtime-design.md` is the narrative overview layer over the 11 canonical stage docs; it inherits open questions and cross-references the stage docs rather than silently resolving them.
 - `SemanticIndex` is a flat semantic inventory, not a mirrored tree; any wording that frames it as annotated syntax is architectural drift.
 - Catalog-first propagation means “add a catalog entry and keep consumers generic,” not “add an enum member and fill an exhaustive switch.”
@@ -14,6 +16,8 @@
 - Outcomes need metadata when outcome-level meaning is compositional (`no transition` remains the durable example).
 - The remaining explicit catalog-thesis tooling gaps are still the hand-authored TextMate grammar and the hardcoded MCP `firePipeline` array.
 - Tree-shaped naming for the flat parser artifact remains suspect; Shane's current preference is `ConstructManifest` if the `SyntaxTree` rename moves forward.
+
+- The 2026-05-03 `SyntaxTree` doc sweep confirmed the missed type-name drift in `docs/compiler/type-checker.md` and `docs/compiler/README.md`, and also cleaned stale internal references in `tooling-surface.md`, `language-server.md`, `compiler-and-runtime-design.md`, `precept-builder.md`, `fault-system.md`, and multiple archived design notes. The only remaining `SyntaxTree` mention under `docs/` is the intentional Roslyn reference in `docs/working/Archived/type-checker-research-crossref.md`; `dotnet build` stayed green after the sweep.
 
 ## Recent Updates
 

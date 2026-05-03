@@ -148,11 +148,11 @@ For stateless precepts, the `edit all` / `edit Field1, Field2` declarations need
 
 The current LS recompiles on every change. The type checker adds a new pipeline stage. With Precept's scale constraints (64KB ceiling, flat grammar, ~100 declarations max), the full pipeline should remain fast enough for interactive editing. The lexer + parser + type checker + graph + proof pipeline running in <50ms on a typical precept file means no incremental strategy is needed now.
 
-**But:** If the type checker's expression resolution proves slower than expected on large files with many computed fields and complex guard expressions, the first optimization should be skipping type-checking for declarations whose syntax hasn't changed (checking the AST node identity via reference equality on the `SyntaxTree.Declarations` array). Flag this as a performance escape hatch, not a design change.
+**But:** If the type checker's expression resolution proves slower than expected on large files with many computed fields and complex guard expressions, the first optimization should be skipping type-checking for declarations whose syntax hasn't changed (checking the AST node identity via reference equality on the `ConstructManifest.Declarations` array). Flag this as a performance escape hatch, not a design change.
 
 ### R6: Preview webview — SemanticIndex gives richer data
 
-The state diagram preview currently works from `SyntaxTree` + `StateGraph`. With the `SemanticIndex`, the preview gains:
+The state diagram preview currently works from `ConstructManifest` + `StateGraph`. With the `SemanticIndex`, the preview gains:
 - **Resolved guard types** — can show "boolean" badge on guards that type-check correctly, "error" on those that don't
 - **Typed action summaries** — "set Amount = EventArg.Price * EventArg.Quantity" with type annotations
 - **Constraint anchoring** — `TypedEnsure.AnchorState` / `TypedEnsure.AnchorEvent` lets the preview attach constraint badges to specific states/events in the diagram

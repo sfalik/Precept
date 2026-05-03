@@ -1393,7 +1393,7 @@ Borderline slices: 1.4, 3.1. George should confirm these are manageable or propo
 | `src/Precept/Language/Constructs.cs` | PR 1 (modify) |
 | `src/Precept/Language/DiagnosticCode.cs` | PR 4 (modify — add OmitDoesNotSupportGuard), PR 5 (modify — add PreEventGuardNotAllowed) |
 | `src/Precept/Pipeline/Parser.cs` | PR 2–5 (modify) |
-| `src/Precept/Pipeline/SyntaxTree.cs` | PR 2 (modify) |
+| `src/Precept/Pipeline/ConstructManifest.cs` | PR 2 (modify) |
 | `src/Precept/Pipeline/SyntaxNodes/*.cs` | PR 2 (create ~15 files: 2.1a base types + FieldTargetNode DU, 2.1b declaration nodes including OmitDeclarationNode) |
 | `test/Precept.Tests/ConstructsTests.cs` | PR 1 (modify) |
 | `test/Precept.Tests/SlotOrderingDriftTests.cs` | PR 2 (create) |

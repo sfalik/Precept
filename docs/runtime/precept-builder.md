@@ -61,7 +61,7 @@ The builder executes six sequential transformation passes:
 
 | Exclusion | Rationale |
 |---|---|
-| **Lexing / parsing** | The lexer and parser produce the syntax tree. The builder consumes typed semantic facts, not tokens or parse nodes. |
+| **Lexing / parsing** | The lexer and parser produce the construct manifest. The builder consumes typed semantic facts, not tokens or parse nodes. |
 | **Semantic analysis** | The type checker resolves names, types, and overloads. The builder reads resolved `TypedField`, `TypedState`, `TypedTransitionRow`, etc. |
 | **Graph analysis** | The graph analyzer computes topology, reachability, and dominance. The builder reads the `StateGraph` output. |
 | **Proof discharge** | The proof engine generates and discharges obligations. The builder reads `ProofLedger` results. |

@@ -28,7 +28,7 @@ The answer is catalog-driven. Here's why and how.
 1. **Hand-written recursive descent.** The parser is not generated from a grammar file. It's hand-written C# code that reads catalog metadata.
 2. **Pratt expression parser.** Expression parsing uses a Pratt loop with catalog-derived binding powers. The loop structure is hand-written; the precedence table is catalog-derived.
 3. **Per-construct AST node types.** `FieldDeclarationNode`, `TransitionRowNode`, etc., remain strongly typed records. Downstream consumers pattern-match on them.
-4. **Static pure function entry point.** `Parser.Parse(TokenStream) → SyntaxTree` doesn't change.
+4. **Static pure function entry point.** `Parser.Parse(TokenStream) → ConstructManifest` doesn't change.
 
 ---
 
