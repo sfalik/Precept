@@ -111,4 +111,4 @@
 
 ### 2026-05-03T16:05:46Z — Catalog diagram and gap-register sync recorded
 - Elaine-17's `catalog-system.md` pass is now the durable diagram baseline: Level 1 is split into two focused diagrams — catalog topology and consumer landscape — instead of one overloaded 70-edge flowchart. Commit `0d0d2a5`.
-- Frank's companion gap work is now part of the shared operating context: `docs/working/catalog-gap-register.md` holds the 39-gap triage set, while `docs/working/pipeline-output-gap-register.md` tracks the 34 pipeline output/interface blockers that still need owner decisions or design closure.
+- Frank's companion gap work is now part of the shared operating context: `docs/working/catalog-gap-register.md` holds the catalog triage set, while `docs/working/structural-gap-register.md` tracks the structural blockers that still need owner decisions or design closure.

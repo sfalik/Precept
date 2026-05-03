@@ -321,25 +321,12 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ## Coverage Assessment
 
-### Gaps NOT in Either Register (Newly Found)
+### Coverage-Review Gaps Now Registered
 
-The following gaps were found during this review that are not captured in either the catalog-gap-register.md or pipeline-output-gap-register.md:
+The previously unregistered coverage-review findings are now tracked in the working registers:
 
-| Doc | Location | Description |
-|-----|----------|-------------|
-| literal-system.md | §Open Questions #1 | `ITypedConstantValidator` registration API — exact API surface not settled |
-| literal-system.md | §Open Questions #2 | Interpolated typed constant validation timing — compile-time vs runtime |
-| literal-system.md | §Open Questions #3 | Structural validation fallback definition for `'...'` |
-| tooling-surface.md | line ~144 | Grammar input catalog list may be incomplete — do `Modifiers.All` and `Actions.All` feed grammar via their `Token` references? |
-| evaluator.md | line ~567–568 | InspectFire multiple candidates handling — should inspection return `Fault`? |
-| evaluator.md | line ~568 | `EventEnsures` hardcoded to `[]` in InspectFire — event-level constraints not evaluated |
-| evaluator.md | line ~707 | Four opcode executor implementation questions: LoadArg null handling, BranchFalse 0 as falsy, Return fallthrough, Stack pooling |
-| evaluator.md | line ~805 | `FieldDescriptor.AccessModes` shape — `ImmutableDictionary` vs `ImmutableArray` |
-| evaluator.md | line ~131 | `Version.Slots` — `ImmutableArray` vs `object?[]` with copy-on-write |
-| graph-analyzer.md | line ~300 | Wildcard expansion ordering — all declared states vs reachable states only |
-| graph-analyzer.md | line ~600 | EventCoverageEntry granularity — guarded vs unguarded transitions |
-| graph-analyzer.md | line ~601 | Back-edge definition — BFS ancestor vs DFS back-edges |
-| mcp.md | line ~98 | Initial event with null data — what is passed to `Restore`? |
+- `docs/working/structural-gap-register.md` now captures structural gaps **#74–85** from `evaluator.md`, `graph-analyzer.md`, `mcp.md`, and `literal-system.md`.
+- `docs/working/catalog-gap-register.md` now captures catalog gap **#40** from `tooling-surface.md` covering grammar input catalog coverage.
 
 ### Gaps in Registers That Are Isolated (Single-Doc Only)
 

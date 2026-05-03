@@ -65,6 +65,7 @@ Items marked **Already Captured** are already in catalog-system.md § Open Quest
 | 37 | Complex TextMate Pattern Representation | Medium | Pending Decision | tooling-surface.md | line 1035 | Multi-line/nested scope metadata in catalog |
 | 38 | `SlotContext` vs `SlotKind` Enum Naming | Low | Out of Scope | tooling-surface.md | line 512 | Doc naming inconsistency, not catalog metadata |
 | 39 | Diagnostic Related Locations | Low | Pending Decision | diagnostic-system.md | line 540 | `AdditionalLocations` for multi-span diagnostics |
+| 40 | Grammar input catalog coverage | Medium | Pending Decision | tooling-surface.md | line ~144 | Grammar input catalog list may be incomplete; confirm whether `Modifiers.All` and `Actions.All` feed grammar through `Token` references |
 
 ## Summary by Status
 
@@ -72,9 +73,9 @@ Items marked **Already Captured** are already in catalog-system.md § Open Quest
 |--------|-------|
 | Already Captured | 5 |
 | Resolved in Source | 3 |
-| Pending Decision | 19 |
+| Pending Decision | 20 |
 | Out of Scope | 12 |
-| **Total** | **39** |
+| **Total** | **40** |
 
 ## High-Priority Gaps (Blocking)
 

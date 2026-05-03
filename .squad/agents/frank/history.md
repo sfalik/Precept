@@ -64,5 +64,5 @@
 
 ### 2026-05-03T16:05:46Z — Catalog gap registers recorded
 - Frank's latest gap sweep is now the durable squad baseline: 5 gaps were already captured in `catalog-system.md`, and 34 more were identified across the 11 canonical docs.
-- Use `docs/working/catalog-gap-register.md` for the 39-gap triage view (5 already captured, 3 resolved in source, 19 pending decision, 12 out of scope) and `docs/working/pipeline-output-gap-register.md` for the 34 stage-output/interface gaps that still block implementation sequencing.
+- Use `docs/working/catalog-gap-register.md` for the catalog triage view and `docs/working/structural-gap-register.md` for the stage/interface structural blockers that still need owner decisions or design closure.
 - Elaine-17 also reset the visual baseline for catalog-system Level 1: refer to the split topology + consumer-landscape pair instead of the former single 70-edge overview.

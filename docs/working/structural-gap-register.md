@@ -1,12 +1,12 @@
-# Pipeline Output Gap Register
+# Structural Gap Register
 
 > Companion to `docs/working/catalog-gap-register.md`.
-> Covers gaps in the structural shapes of data flowing between pipeline stages.
+> Covers gaps in the structural shapes of data flowing between pipeline stages and adjacent interfaces.
 > Gaps are promoted from here into the relevant canonical doc once decided.
 
 ## How to Use This Register
 
-A **pipeline output gap** is a place where:
+A **structural gap** is a place where:
 - A stage's output type has a field referenced downstream that doesn't exist
 - Two docs describe the same type with different shapes
 - A type carries `SourceSpan` as a placeholder where a richer structure is needed
@@ -111,12 +111,12 @@ Organized by producing stage. **Numbering continues from catalog-gap-register.md
 | Status | Count |
 |--------|-------|
 | Shape Mismatch | 6 |
-| Missing Field | 13 |
+| Missing Field | 11 |
 | Placeholder | 2 |
 | Missing Variant | 1 |
-| Interface Gap | 10 |
-| Pending Decision | 4 |
-| **Total** | **34** |
+| Interface Gap | 9 |
+| Pending Decision | 17 |
+| **Total** | **46** |
 
 ## High-Priority Gaps (Blocking)
 
@@ -176,3 +176,101 @@ Gaps #47–50 (missing reference collections) block:
 Gaps #56–57 (FaultSiteLink transformation) block:
 1. **Precept Builder** fault backstop pass — cannot plant `FaultSiteDescriptor` without transformation spec
 2. **Evaluator** fault routing — cannot locate fault sites without row/opcode references
+
+## Newly Found Gaps (Frank Coverage Review)
+
+### #74 — InspectFire multiple-candidate handling
+
+**Status:** Pending Decision  
+**Source:** `evaluator.md` line ~567–568  
+**The Gap:** `InspectFire` documents a multiple-candidate branch but does not settle whether inspection should return a `Fault`, mirror runtime dispatch rejection semantics, or surface ambiguity some other way.  
+**Why It Matters:** Inspection and execution need aligned semantics for ambiguous dispatch or tooling will preview a different outcome than runtime fire.  
+**Options:** Return `Faulted(Fault)`; return an inspection-specific ambiguity result; or specify that inspection never faults and instead reports multiple candidates explicitly.
+
+### #75 — `InspectFire` skips event-level ensures
+
+**Status:** Pending Decision  
+**Source:** `evaluator.md` line ~568  
+**The Gap:** `InspectFire` hardcodes `EventEnsures` to `[]`, leaving event-level constraint evaluation unspecified during inspection.  
+**Why It Matters:** Tooling and MCP inspection results can under-report failing ensures compared to actual event execution.  
+**Options:** Evaluate event ensures during inspection; explicitly declare inspection as transition-only; or add a partial-inspection contract that marks event ensures as omitted.
+
+### #76 — Opcode executor behavior details unresolved
+
+**Status:** Pending Decision  
+**Source:** `evaluator.md` line ~707  
+**The Gap:** Four executor semantics are still open: `LoadArg` null handling, whether `BranchFalse` treats `0` as falsy, whether `Return` can fall through, and whether the evaluation stack should be pooled.  
+**Why It Matters:** These choices affect runtime determinism, compiled-plan compatibility, and the exact behavior the builder must target.  
+**Options:** No options listed in the source; owner decision is needed on each executor rule.
+
+### #77 — `FieldDescriptor.AccessModes` structural shape
+
+**Status:** Pending Decision  
+**Source:** `evaluator.md` line ~805  
+**The Gap:** `FieldDescriptor.AccessModes` is not settled between an `ImmutableDictionary` keyed by state and a denser `ImmutableArray`-style representation.  
+**Why It Matters:** This shape affects evaluator lookup cost, builder emission shape, and alignment with the catalog-side `FieldDescriptor.AccessModes` question.  
+**Options:** `ImmutableDictionary<StateId, AccessMode>` for direct lookup, or `ImmutableArray`/indexed storage for denser compiled descriptors.
+
+### #78 — `Version.Slots` storage representation
+
+**Status:** Pending Decision  
+**Source:** `evaluator.md` line ~131  
+**The Gap:** `Version.Slots` is still undecided between immutable-array semantics and an `object?[]` copy-on-write backing store.  
+**Why It Matters:** The choice affects mutation cost, snapshot semantics, and the concrete versioning contract exposed across evaluator internals.  
+**Options:** `ImmutableArray<object?>` for explicit immutability, or `object?[]` with copy-on-write for lower allocation overhead.
+
+### #79 — Wildcard expansion ordering
+
+**Status:** Pending Decision  
+**Source:** `graph-analyzer.md` line ~300  
+**The Gap:** Wildcard transition expansion does not specify whether expansion iterates all declared states or only states already reachable in the graph.  
+**Why It Matters:** Expansion order and reachability scope change graph shape, event coverage results, and the downstream runtime rows the builder will receive.  
+**Options:** Expand against all declared states, or restrict expansion to currently reachable states only.
+
+### #80 — `EventCoverageEntry` granularity
+
+**Status:** Pending Decision  
+**Source:** `graph-analyzer.md` line ~600  
+**The Gap:** The graph analyzer does not settle whether `EventCoverageEntry` distinguishes guarded and unguarded transitions separately or folds them together.  
+**Why It Matters:** Coverage reporting, diagnostics, and later tooling views depend on whether guard-conditioned coverage is preserved as first-class structure.  
+**Options:** Track guarded versus unguarded entries separately, or keep a single coarser event-coverage entry.
+
+### #81 — Back-edge definition
+
+**Status:** Pending Decision  
+**Source:** `graph-analyzer.md` line ~601  
+**The Gap:** The doc leaves "back-edge" undefined between a BFS-ancestor notion and classic DFS back-edge semantics.  
+**Why It Matters:** Cycle detection, irreversibility reasoning, and graph diagnostics can differ materially depending on which graph-theory definition is canonical.  
+**Options:** Define back-edges relative to BFS ancestry, or use standard DFS back-edge classification.
+
+### #82 — Initial event with null data
+
+**Status:** Pending Decision  
+**Source:** `mcp.md` line ~98  
+**The Gap:** The MCP design does not define what gets passed to `Restore` when the initial event is fired with null data.  
+**Why It Matters:** Tool callers need a deterministic initialization contract, and runtime/MCP parity breaks if null bootstrap data is interpreted differently.  
+**Options:** Pass `null`, pass an empty slot/value container, or require callers to provide initial data explicitly.
+
+### #83 — `ITypedConstantValidator` registration API
+
+**Status:** Pending Decision  
+**Source:** `literal-system.md` §Open Questions #1  
+**The Gap:** The literal system leaves the exact registration API surface for `ITypedConstantValidator` unsettled.  
+**Why It Matters:** Consumers cannot implement extension registration or dependency injection wiring until the contract is nailed down.  
+**Options:** No options listed in the source; API shape remains open.
+
+### #84 — Interpolated typed-constant validation timing
+
+**Status:** Pending Decision  
+**Source:** `literal-system.md` §Open Questions #2  
+**The Gap:** The doc does not decide whether interpolated typed constants validate entirely at compile time or defer some validation to runtime.  
+**Why It Matters:** This changes diagnostics timing, what the type checker guarantees, and whether runtime fault paths must remain for typed constants.  
+**Options:** Compile-time validation, runtime validation, or a split model where structural checks compile-time and value checks runtime.
+
+### #85 — Structural validation fallback for `'...'`
+
+**Status:** Pending Decision  
+**Source:** `literal-system.md` §Open Questions #3  
+**The Gap:** Structural validation fallback semantics for `'...'` are not defined.  
+**Why It Matters:** Literal-system consumers need a deterministic rule for how incomplete or deferred structural validation behaves when a fully typed validator is unavailable.  
+**Options:** No options listed in the source; fallback behavior remains open.

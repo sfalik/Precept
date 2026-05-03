@@ -41006,7 +41006,7 @@ No existing sections were restructured or rewritten. The new section was inserte
 
 ### 2026-05-03: Full catalog gap analysis recorded
 **By:** Frank
-**What:** Completed a full sweep across 11 canonical docs, confirming 5 gaps already captured in `catalog-system.md` and identifying 34 additional gaps. The durable handoff is split between `docs/working/catalog-gap-register.md` (39 total gaps across captured/resolved/pending/out-of-scope buckets) and `docs/working/pipeline-output-gap-register.md` (34 pipeline output/interface gaps numbered #40–73).
+**What:** Completed a full sweep across 11 canonical docs, confirming 5 gaps already captured in `catalog-system.md` and identifying 34 additional gaps. The durable handoff is split between `docs/working/catalog-gap-register.md` (39 total gaps across captured/resolved/pending/out-of-scope buckets) and `docs/working/structural-gap-register.md` (34 pipeline output/interface gaps numbered #40–73).
 **Why:** Shane asked for a complete gap inventory plus separate working registers for catalog-thesis drift and stage-output shape blockers.
 **Note:** Highest-priority blockers remain SlotValue shape conflicts, the missing expression-tree design, missing `SemanticIndex` reference collections, and whether `Compilation` needs a `Tokens` surface for tooling. This is the durable summary-only record for the full inbox memo.
 
@@ -41017,5 +41017,5 @@ No existing sections were restructured or rewritten. The new section was inserte
 
 ### 2026-05-03: Pipeline output gap register created
 **By:** Frank
-**What:** Created docs/working/pipeline-output-gap-register.md — pipeline stage shape/interface gaps, numbered #40+
+**What:** Created docs/working/structural-gap-register.md — pipeline stage shape/interface gaps, numbered #40+
 **Why:** Shane wants catalog gaps and pipeline output gaps tracked in parallel companion docs
