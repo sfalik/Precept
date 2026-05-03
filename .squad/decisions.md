@@ -6,8 +6,6 @@
 
 ---
 
----
-
 ### 2026-05-03T01:07:30Z: Outcomes catalog ruling reversed to DU + catalog two-level pattern
 
 **By:** Scribe
@@ -40,7 +38,7 @@
 
 **By:** Scribe
 
-**Status:** Merged, inbox cleared (1 late-arriving file)
+**Status:** Merged, deduplicated, inbox cleared (1 file)
 
 **Merged sources:** `elaine-diagram-icon-revision`.
 
