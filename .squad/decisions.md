@@ -163,60 +163,6 @@
 
 ---
 
-### 2026-05-02T21:58:18Z: GAP-035, GAP-040, and GAP-042 implementation batch recorded
-
-**By:** Scribe
-
-**Status:** Recovered from merged inbox, deduplicated, inbox cleared (1 file)
-
-**Merged sources:** george-gap035-040-042.
-
-- George's implementation batch now durably records the shipped parser/catalog work: TypeMeta.ChoiceLiteralTokens drives ParseChoiceValue, BagAccessors.countof uses ElementParameterAccessor, and the dead variant-action dispatch arms for CollectionValueBy, RemoveAtIndex, and CollectionIntoBy were deleted rather than scaffolded.
-
-- The execution record preserves the test impact that the earlier design-only summaries did not: GAP-035 added choice-literal metadata/parser tests, GAP-040 added accessor-shape regressions, and GAP-042 remained a zero-behavior-change cleanup that stayed green across all 2713 existing tests.
-
-- Durable parser rule: variant-action syntax shapes do not justify unreachable helper methods or dispatch arms; if Actions.ByTokenKind cannot route there, the parser must throw rather than pretend to construct a live statement node.
-
----
-
----
-
-### 2026-05-02T21:58:17Z: GAP-046 implementation completed and consumer follow-through pinned
-
-**By:** Scribe
-
-**Status:** Recovered from merged inbox, deduplicated, inbox cleared (1 file)
-
-**Merged sources:** george-gap046-complete.
-
-- George shipped the GAP-046 implementation exactly on Frank's approved design path: FunctionKind.TildeStartsWith / TildeEndsWith, FunctionMeta.CIVariantOf, CI hover cross-reference text, the §3.7 catalog footnote, and the matching function-test count updates all landed green.
-
-- The implementation record locks the downstream consumer contracts: LS CI completions derive from Functions.All.Where(f => f.CIVariantOf != null), future MCP language output projects a ciVariantOf field from the same metadata, and the eventual checker handler resolves CI calls through Functions.ByName["~" + name].
-
-- Parser Tilde handling, TypeChecker logic, and diagnostics all remain intentionally unchanged in this slice; the implementation is catalog/tooling surface completion, not a new parser or checker behavior change.
-
----
-
----
-
-### 2026-05-02T21:58:16Z: Iteration 10 doc/catalog and catalog/impl audits synchronized
-
-**By:** Scribe
-
-**Status:** Recovered from merged inbox, deduplicated, inbox cleared (2 files; cross-audit merge normalized)
-
-**Merged sources:** frank-iteration10-audit, george-iteration10-audit.
-
-- Frank's doc/catalog pass and George's catalog/impl pass now sit in one durable audit trail: GAP-043/044/045 were fixed inline in docs, GAP-047 remains the open spec-underdocuments-domain-overloads issue, and the earlier GAP-046 catalog gap is now closed by the shipped implementation.
-
-- George's follow-on audit closes two more implementation drifts: ParseCollectionIntoStatement must throw on unreachable DequeueBy, and Modifiers now exposes an O(1) ByFieldToken index so parser modifier dispatch matches the rest of the catalog-driven parser surface.
-
-- The combined carry-forward rule is explicit: parser-facing catalogs need direct metadata indexes, and variant-action dead arms can hide in nested sub-switches just as easily as at top-level dispatch.
-
----
-
----
-
 ### 2026-05-02T20:05:35Z: GAP-040 bag `countof` parameter locked to DU accessor metadata
 
 **By:** Scribe
@@ -417,24 +363,6 @@
 
 ---
 
-### 2026-05-02T19:42:01Z: Collection-types implementation notes through slices 1 to 14 recorded
-
-**By:** Scribe
-
-**Status:** Merged, deduplicated, inbox cleared (2 files; working-state snapshot preserved)
-
-**Merged sources:** `impl-notes-slices-1-7b`, `impl-notes-slices-8-14`.
-
-- The implementation snapshot now durably records tokens 124–138, the `countof` / `peekby` member-name exceptions, `for` reuse as the lookup-access token, `~string` scalar parsing, and the observation that several planned catalog/AST steps were effectively already landed by the time slices were written up.
-
-- The notes also preserve important corrections to stale assumptions: `to` already existed as `TokenKind` 14, slice 8 catalog/AST work had effectively been completed earlier, and parser/action tests must use real transition-row context instead of pseudo snippets.
-
-- Treat these notes as execution-trail context rather than final plan truth; the review-normalized entries above remain the authoritative gate for follow-on work.
-
----
-
----
-
 ### 2026-05-01T20:06:10Z: Catalog-member annotation rename locked; no exhaustiveness gaps found
 
 **By:** Scribe
@@ -448,24 +376,6 @@
 - Historical ledger wording was updated inline so earlier Slice 4, Slice 27, and annotation-bridge records stay readable after the rename without implying the old attribute still exists.
 
 - Frank-9's full sweep of catalog enum types found no currently-unannotated distributed-dispatch gaps: existing consumers already line up with the correct enforcement mode, with CS8509 retained for centralized switches and `[HandlesCatalogExhaustively]` reserved for real distributed handlers.
-
----
-
----
-
-### 2026-05-01T19:50:46Z: Phase 2 acceptance gate fully closed
-
-**By:** Scribe
-
-**Status:** Merged, deduplicated, inbox cleared (1 file)
-
-**Merged sources:** `george-phase2-gate-closed`.
-
-- George's final gate-closure batch is now durably recorded: PRECEPT0023c checks duplicate full token sequences rather than duplicate lead tokens, the diagnostic is promoted to Error, and the `IsSet` / `IsNotSet` false-positive case is locked by regression coverage.
-
-- The remaining docs gate was verification-only: `docs/language/precept-language-spec.md` §2.1 already had precedence `60` for `is set` / `is not set`, so the acceptance checklist closed without another spec edit.
-
-- Phase 2 is now fully closed as team state: all 14 acceptance-gate items are satisfied, `docs/working/parser-gap-fixes-plan.md` marks the gate resolved, and validation stands at 2678 passing tests with 0 failures and 0 warnings.
 
 ---
 
@@ -544,28 +454,6 @@
 - Frank recommends treating this as GitHub-issue/design-review work rather than a hotfix and prefers a full-fidelity catalog representation plus `ExpressionFormKind.PostfixOperation`; George supplied the bounded call-site inventory and the `ByToken` hazard that must be handled in the same commit.
 
 - Carry-forward state: proposal scope and rationale are locked, but the final `OperatorMeta` shape still needs owner sign-off.
-
----
-
----
-
-### 2026-05-01T18:17:13Z: Parser-gap implementation batch synchronized through Slice 13
-
-**By:** Scribe
-
-**Status:** Merged, deduplicated, inbox cleared (10 files; implementation batch normalized)
-
-**Merged sources:** `george-phase2a-complete`, `george-slice1-done`, `george-slice2-done`, `george-slice3-done`, `george-slice4-done`, `george-slice7-done`, `george-slices56-done`, `soup-nazi-slices-8-11-done`, `soup-nazi-slice12-done`, `soup-nazi-slice13-done`.
-
-- George's branch reports now durably capture typed constants and interpolated typed constants, stateless event-handler post-condition `ensure` guards, Pratt support for `is set` / `is not set`, the `ExpressionFormKind` catalog + PRECEPT0019 annotation bridge, list literals, method calls, and the ensure-grammar spec correction.
-
-- George also marked the broader parser-gap Phase 2A branch complete, so the slice reports above should be treated as the current implementation baseline rather than isolated point fixes.
-
-- Soup Nazi's reports add regression coverage for comparison/contains operators, collection mutation actions, interpolated strings, sample-file integration, and reflection-backed expression-form coverage assertions.
-
-- Slice 12 makes the remaining parser debt explicit instead of implicit: 21 sample files parse cleanly, while 7 stay in known-broken sentinels for three gaps still outside the completed slice batch — state/event ensure `when` guards, post-expression field modifiers, and reserved-keyword member names such as `.min` / `.max`.
-
-- Validation stayed green across the slice reports and reached 2424 passing tests after the event-handler ensure-guard addition, while PRECEPT0019 finished green once list literals and method calls were annotated.
 
 ---
 
@@ -686,26 +574,6 @@
 - Frank's philosophy-grounded follow-up endorsed those revisions but flagged a product-identity gap: `docs/philosophy.md` explicitly scopes "prevention, not detection" to invalid entity configurations and does not yet name evaluation-fault prevention with the same explicitness. Recommended wording was recorded for owner review only and was not applied.
 
 - Net result: the spec now clearly states the no-runtime-faults promise, while the philosophy gap is durably recorded as a flag for Shane rather than an auto-applied philosophy change.
-
----
-
----
-
-### 2026-04-29T03:09:18Z: PRECEPT0018 correctness gate closed and test backfill recorded
-
-**By:** Scribe
-
-**Status:** Merged, deduplicated, inbox cleared (3 files)
-
-**Merged sources:** `frank-precept0018-review`, `george-precept0018-implemented`, `george-precept0018-tests-added`.
-
-- Frank's correctness-gate review confirmed the PRECEPT0018 analyzer, `AllowZeroDefaultAttribute`, all three intentional zero-value exemptions, and the 23 enum fixes were correct, then blocked merge only on three missing required regression tests: TP3 (zero-valued member not first), EC4 (`byte` underlying type), and EC5 (`long` underlying type).
-
-- George's implementation record is now preserved as the baseline landing: commit `a7b0bb7` created the analyzer and attribute, applied `[AllowZeroDefault]` to `LexerMode.Normal`, `QualifierMatch.Any`, and `PeriodDimension.Any`, and made all 23 semantic enums 1-based with 225 analyzer tests and 2044 core tests green.
-
-- George's follow-up commit `e7a643d` closed Frank's B1 finding and the two advisory anchors by adding TP7–TP9 and EC6–EC7 in `test/Precept.Analyzers.Tests/Precept0018Tests.cs`; analyzer tests rose to 230 while core tests stayed 2044.
-
-- Net result: PRECEPT0018 is now durably recorded as implemented and correctness-cleared, with no post-review code changes beyond the missing regression tests.
 
 ---
 
