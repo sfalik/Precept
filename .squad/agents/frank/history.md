@@ -71,3 +71,14 @@
 - Scribe logged Frank's `frank-register-rename` batch: `docs/working/structural-gap-register.md` is now the durable register name, with the old `pipeline-output-gap-register.md` wording retired.
 - Durable baseline update: the structural register now extends through gaps #85, and `docs/working/catalog-gap-register.md` also absorbed the companion catalog gap from the same sweep.
 - Scribe health pass: pre-check saw 2 inbox files, the merge processed 3 after a late inbox arrival, `decisions.md` was archived under the 7-day gate before merge, and no history file crossed the 15 KB summarization threshold.
+
+
+## 2026-05-03 — Cross-Cutting Coverage Audit
+
+Audited all 12 out-of-scope items in catalog-gap-register.md against the corrected cross-cutting definition. Found 8/12 are cross-cutting (4 already captured, 4 need promotion: #10, #26, #28, #29). Swept 11+ canonical docs and found 5 additional uncaptured cross-cutting items (TokenMeta.SemanticTokenModifiers, TypeAccessor DU hierarchy, execution dispatch delegates, ActionMeta missing properties, stateless precept semantics). Overall coverage verdict: ~92% → ~97% after recommended fixes. Report delivered to `.squad/decisions/inbox/frank-cross-cutting-audit.md`.
+
+## 2026-05-03 — Audit recommendations applied
+
+- Added cross-cutting decision entries #21–#26 in `docs/working/cross-cutting-decisions.md`, including the new execution-dispatch and stateless-precept decisions plus the four audit promotions.
+- Updated `docs/working/catalog-gap-register.md` with new gaps #41–#43 and reclassified the eight mis-scoped items so the register now points at the correct cross-cutting entries.
+- Deliberately skipped a separate umbrella decision for evaluator-output richness because #22–#24 already provide the concrete navigation points without adding another layer of indirection.

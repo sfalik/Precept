@@ -11,7 +11,7 @@ A **gap** is a place where a design doc references catalog metadata that doesn't
 2. **Decided** — owner has ruled; implementation can proceed
 3. **Promoted** — implemented and documented in `docs/language/catalog-system.md`
 
-Items marked **Already Captured** are already in catalog-system.md § Open Questions. Items marked **Resolved in Source** are implemented but catalog-system.md docs are stale. Items marked **Out of Scope** are API design, naming, or tooling questions — not catalog metadata gaps.
+Items marked **Already Captured** are already in catalog-system.md § Open Questions. Items marked **Resolved in Source** are implemented but catalog-system.md docs are stale. Items marked **Captured in cross-cutting-decisions.md #N** or **Moved to cross-cutting-decisions.md #N** now live in the cross-cutting register for coordinated resolution. Items marked **Out of Scope** remain API design, naming, or tooling questions that are not catalog metadata gaps.
 
 ## Status Key
 
@@ -20,6 +20,8 @@ Items marked **Already Captured** are already in catalog-system.md § Open Quest
 | Already Captured | In catalog-system.md § Open Questions |
 | Resolved in Source | Already implemented — catalog-system.md docs just stale |
 | Pending Decision | Needs owner ruling before catalog addition |
+| Captured in cross-cutting-decisions.md #N | Already tracked as a cross-cutting decision; kept here for traceability |
+| Moved to cross-cutting-decisions.md #N | Re-triaged from this register into the cross-cutting decisions register |
 | Out of Scope | API/naming/tooling — not a catalog metadata gap |
 
 ## Gap Register
@@ -35,37 +37,40 @@ Items marked **Already Captured** are already in catalog-system.md § Open Quest
 | 7 | SlotValue Subtype Shape Conflicts | High | Pending Decision | parser.md | line 58 | 4 slots have conflicting shapes across docs — blocking |
 | 8 | `DisambiguationEntry.Offset` | Low | Pending Decision | parser.md | line 185 | peek(offset) value may vary per construct |
 | 9 | GraphState Modifier Representation | Medium | Pending Decision | graph-analyzer.md | line 120 | `ImmutableArray<ModifierKind>` vs explicit booleans |
-| 10 | Event "Optional" Modifier | Low | Out of Scope | graph-analyzer.md | line 407 | Language surface change, not catalog metadata |
+| 10 | Event "Optional" Modifier | Low | Moved to cross-cutting-decisions.md #21 | graph-analyzer.md | line 407 | Cross-stage language surface + runtime semantics; tracked in cross-cutting register |
 | 11 | `FaultSiteLink.Site` to `FaultSiteDescriptor` Binding | Medium | Pending Decision | proof-engine.md | line 222 | Proof-to-runtime bridge transformation |
 | 12 | `TryLiteralProof` Requirement Coverage | Low | Out of Scope | proof-engine.md | line 409 | Strategy scope question, not catalog metadata |
 | 13 | Strategy 3 vs Strategy 4 Boundary | Medium | Pending Decision | proof-engine.md | line 568 | guard-in-path vs flow-narrowing boundary unclear |
-| 14 | Expression Tree Design Blocking | High | Out of Scope | proof-engine.md | line 976 | Cross-doc tracking gap, not catalog metadata |
+| 14 | Expression Tree Design Blocking | High | Captured in cross-cutting-decisions.md #1 | proof-engine.md | line 976 | Cross-doc tracking gap now traced to cross-cutting register |
 | 15 | `ConstraintFieldRefs.ConstraintIdentity` Type | Medium | Pending Decision | type-checker.md | line 528 | `object` vs typed DU alignment |
 | 16 | `SemanticIndex` Reference-Tracking Collections | High | Pending Decision | type-checker.md | line 562 | Missing `References`, `FieldReferences`, etc. — tooling blocked |
 | 17 | `ActionMeta.SyntaxShape` | Medium | Resolved in Source | type-checker.md | line 767 | Already in `Action.cs` — docs stale |
 | 18 | `FunctionMeta.HasCIVariant` | Low | Resolved in Source | type-checker.md | line 825 | Already in `Function.cs` — docs stale |
-| 19 | `Compilation.Tokens` Field | Medium | Out of Scope | precept-builder.md | line 116 | Core type shape, not catalog metadata |
+| 19 | `Compilation.Tokens` Field | Medium | Captured in cross-cutting-decisions.md #4 | precept-builder.md | line 116 | Core type shape tracked in cross-cutting register |
 | 20 | `ExecutionRow.RejectReason` Field | Medium | Pending Decision | evaluator.md | line 434 | `because` clause storage for reject transitions |
 | 21 | `Faulted(Fault)` as `EventOutcome` Variant | Medium | Pending Decision | evaluator.md | line 885 | Outcome type hierarchy gap |
 | 22 | `ConstraintMeta` DU Subtype Count | Medium | Pending Decision | precept-builder.md | line 608 | 4 vs 5 subtypes — shape mismatch |
 | 23 | `FaultSiteDescriptor` Planting Mechanism | Medium | Pending Decision | precept-builder.md | line 467 | How evaluator locates fault sites in rows |
 | 24 | `ModifierMeta.ModifierCategory` | Low | Resolved in Source | mcp.md | line 280 | Already in `Modifier.cs` — docs stale |
 | 25 | `FirePipeline` Catalog | Low | Out of Scope | mcp.md | line 378 | MCP output design, not catalog metadata |
-| 26 | `SemanticIndex.EnsuresByState` | Low | Out of Scope | mcp.md | line 443 | Convenience index, not catalog metadata |
+| 26 | `SemanticIndex.EnsuresByState` | Low | Moved to cross-cutting-decisions.md #22 | mcp.md | line 443 | Producer/consumer coordination now tracked as cross-cutting |
 | 27 | `precept_inspect` Composite View Exemption | Low | Out of Scope | mcp.md | line 509 | API design, not catalog metadata |
-| 28 | `EventOutcome.mutations` Payload | Low | Out of Scope | mcp.md | line 629 | Runtime-to-MCP interface, not catalog metadata |
-| 29 | Unmatched Guard Trace Enrichment | Low | Out of Scope | mcp.md | line 684 | Diagnostic enrichment, not catalog metadata |
+| 28 | `EventOutcome.mutations` Payload | Low | Moved to cross-cutting-decisions.md #23 | mcp.md | line 629 | Evaluator/MCP outcome-shape decision moved to cross-cutting register |
+| 29 | Unmatched Guard Trace Enrichment | Low | Moved to cross-cutting-decisions.md #24 | mcp.md | line 684 | Evaluator/MCP diagnostic-shape decision moved to cross-cutting register |
 | 30 | `TypeMeta.IsUserFacing` | Low | Pending Decision | language-server.md | line 417 | Completions use but not in catalog shape |
 | 31 | `TypedArg.EventName` Back-Reference | Low | Pending Decision | language-server.md | line 543 | Navigation for hover on event args |
-| 32 | `precept/inspect` vs `precept/preview` Naming | Low | Out of Scope | language-server.md | line 610 | Doc naming sync, not catalog metadata |
+| 32 | `precept/inspect` vs `precept/preview` Naming | Low | Captured in cross-cutting-decisions.md #15 | language-server.md | line 610 | Naming sync tracked in cross-cutting register |
 | 33 | `EventInspection` Shape Disagreement | Medium | Pending Decision | language-server.md | line 667 | Cross-doc shape mismatch |
 | 34 | `ConstructMeta.IsOutlineNode` / `LspSymbolKind` | Medium | Pending Decision | language-server.md | line 702 | Tooling-facing catalog properties for outline |
 | 35 | `TokenMeta.HoverDescription` (broader strategy) | Medium | Pending Decision | language-server.md | line 1356 | Documentation string strategy beyond partial capture |
 | 36 | Grammar Generator Implementation Path | Medium | Out of Scope | tooling-surface.md | line 376 | Implementation tooling, not catalog metadata |
 | 37 | Complex TextMate Pattern Representation | Medium | Pending Decision | tooling-surface.md | line 1035 | Multi-line/nested scope metadata in catalog |
-| 38 | `SlotContext` vs `SlotKind` Enum Naming | Low | Out of Scope | tooling-surface.md | line 512 | Doc naming inconsistency, not catalog metadata |
+| 38 | `SlotContext` vs `SlotKind` Enum Naming | Low | Captured in cross-cutting-decisions.md #14 | tooling-surface.md | line 512 | Naming inconsistency tracked in cross-cutting register |
 | 39 | Diagnostic Related Locations | Low | Pending Decision | diagnostic-system.md | line 540 | `AdditionalLocations` for multi-span diagnostics |
 | 40 | Grammar input catalog coverage | Medium | Pending Decision | tooling-surface.md | line ~144 | Grammar input catalog list may be incomplete; confirm whether `Modifiers.All` and `Actions.All` feed grammar through `Token` references |
+| 41 | `TokenMeta.SemanticTokenModifiers` | Medium | Pending Decision | catalog-system.md | line 819 | Tokens Catalog + LS + tooling need a canonical modifier list for semantic-token emission |
+| 42 | `TypeAccessor` DU hierarchy (`FixedReturnAccessor`, `ElementParameterAccessor`) | Medium | Pending Decision | catalog-system.md | line 901 | Types Catalog shape and type-checker accessor resolution disagree on the documented DU surface |
+| 43 | `ActionMeta` missing properties (`SyntaxShape`, `HoverDescription`, `SnippetTemplate`) | Medium | Pending Decision | catalog-system.md | line 1373 | Aggregate ActionMeta consumer contract is incomplete; `SyntaxShape` exists in source, but docs + remaining LS/MCP-facing metadata are not fully aligned |
 
 ## Summary by Status
 
@@ -73,9 +78,11 @@ Items marked **Already Captured** are already in catalog-system.md § Open Quest
 |--------|-------|
 | Already Captured | 5 |
 | Resolved in Source | 3 |
-| Pending Decision | 20 |
-| Out of Scope | 12 |
-| **Total** | **40** |
+| Pending Decision | 23 |
+| Captured in cross-cutting-decisions.md #N | 4 |
+| Moved to cross-cutting-decisions.md #N | 4 |
+| Out of Scope | 4 |
+| **Total** | **43** |
 
 ## High-Priority Gaps (Blocking)
 
