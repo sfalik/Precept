@@ -39,6 +39,8 @@
 
 - **GAP-065 rule:** `QualifierMatch.Same` enforcement is a real correctness hole. The catalog declares it; the TypeChecker must honor it. File as Slice 1 TypeChecker work, not a deferred item.
 
+- **BecauseClause catalog defect fix (2026-05-03):** `StateEnsure` and `EventEnsure` were missing `SlotBecauseClause` — a catalog defect inconsistent with `RuleDeclaration`. Fix: added `SlotBecauseClause` to both slot arrays; corrected `EnsureClause = 12` comment to `"ensure expression"` only. Parser is still a stub — when implemented, both parse paths must emit a standalone `BecauseClauseSlot` (not embedded in `EnsureClauseSlot`). LS and MCP need no immediate changes; both derive from catalog automatically. 2316 tests pass.
+
 
 
 

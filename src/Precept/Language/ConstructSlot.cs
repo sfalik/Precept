@@ -17,7 +17,7 @@ public enum ConstructSlotKind
     Outcome           =  9, // "-> transition State | -> no transition | -> reject 'reason'"
     StateTarget       = 10, // state name or quantifier (any)
     EventTarget       = 11, // event name (or "initial" marker)
-    EnsureClause      = 12, // "ensure expression because message"
+    EnsureClause      = 12, // "ensure expression"
     BecauseClause     = 13, // "because message"
     AccessModeKeyword = 14, // readonly | editable (B4 access mode adjectives)
     FieldTarget       = 15, // field name or "all"

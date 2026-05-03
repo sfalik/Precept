@@ -105,7 +105,7 @@ public static class Constructs
             "State-scoped constraint that must hold on entry, exit, or while in a state",
             "in Approved ensure amount > 0 because \"Approved amount must be positive\"",
             [ConstructKind.StateDeclaration],
-            [SlotStateTarget, SlotEnsureClause],
+            [SlotStateTarget, SlotEnsureClause, SlotBecauseClause],
             [new(TokenKind.In, [TokenKind.Ensure]), new(TokenKind.To, [TokenKind.Ensure]), new(TokenKind.From, [TokenKind.Ensure])],
             RoutingFamily.StateScoped),
 
@@ -145,7 +145,7 @@ public static class Constructs
             "Event-scoped constraint that must hold when an event fires",
             "on Submit ensure reviewer != \"\" because \"Reviewer required\"",
             [ConstructKind.EventDeclaration],
-            [SlotEventTarget, SlotEnsureClause],
+            [SlotEventTarget, SlotEnsureClause, SlotBecauseClause],
             [new(TokenKind.On, [TokenKind.Ensure])],
             RoutingFamily.EventScoped),
 
