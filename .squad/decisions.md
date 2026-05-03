@@ -12,6 +12,20 @@
 
 ---
 
+### 2026-05-03T01:07:30Z: Routing-family terminology split locked for parser-radical docs
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file)
+
+**Merged sources:** `frank-family-terminology`.
+
+- Frank locked the terminology split in `parser-radical.md`: the four parse-scope buckets are always "routing families", while the shared-leader disambiguation groups are always `ConstructFamily` entries.
+- Durable catalog rule: Header and Direct constructs never belong to a `ConstructFamily` because unique leading keywords need no family-level disambiguation metadata; only `In`, `To`, `From`, and `On` participate in `Families.All` / `FamilyDispatch`.
+- Carry-forward wording rule: avoid the unqualified word "family" in this design area because it ambiguously conflates parse scope with shared-leader disambiguation.
+
+---
+
 ### 2026-05-03T00:51:29Z: Outcomes stay DU-only; no Outcomes catalog is warranted
 
 **By:** Scribe
