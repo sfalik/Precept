@@ -142,7 +142,7 @@ File
 │  │  │  │  EXPRESSION                                              │  │  │  │
 │  │  │  │  • A computed value — appears only in expression-typed   │  │  │  │
 │  │  │  │    slots (ComputeExpression, GuardClause, EnsureClause,  │  │  │  │
-│  │  │  │    RuleExpression, Outcome).                             │  │  │  │
+│  │  │  │    RuleExpression, ActionChain, Outcome).                │  │  │  │
 │  │  │  │  • Never a top-level statement.                          │  │  │  │
 │  │  │  │  • Parsed by Pratt parser; precedence from Operators     │  │  │  │
 │  │  │  │    catalog.                                              │  │  │  │
@@ -202,7 +202,7 @@ These examples are chosen to cover every distinct slot shape and routing pattern
 - a direct declaration with a computed-expression slot (`field`, computed form)
 - a list-shaped declaration with construct-specific modifiers (`state`)
 - a direct declaration with a parenthesized argument list (`event`)
-- a direct declaration with rule expression and mandatory reason (`rule`)
+- a direct declaration with rule expression, optional guard, and mandatory reason (`rule`)
 - a family-routed declaration with field target and access mode adjective (`in ... modify`)
 - a family-routed declaration with reasoned constraint (`in ... ensure`)
 - a state hook declaration via disambiguation token (`to ... ->` / `from ... ->`)
@@ -238,42 +238,44 @@ field  LineTotal  as  number  ->  TaxableAmount + TaxAmount  nonnegative
 ```
 state  Draft  initial
   │      │       │
- [1]    [2]    [3]
+ [1]    [2]─────[2] (continued)
 [1] Leading token: `state`
-[2] StateEntryList slot — one or more state names with optional modifiers
-[3] StateModifier — `initial` marks this as the initial state
+[2] StateEntryList slot — comma-separated (name modifier*) entries; `initial` is a
+    state modifier within this slot, not a separate slot
 ```
 
 ```
 event  Submit  (Amount as number, Note as string optional)
   │       │                     │
- [1]     [2]                  [3]
+ [1]     [2]                  [3]                           [4] (if present)
 [1] Leading token: `event`
 [2] IdentifierList slot — the event name
-[3] ArgumentList slot — the parenthesized typed parameter list
+[3] ArgumentList slot (optional) — the parenthesized typed parameter list
+[4] InitialMarker slot (optional) — `initial` keyword, marks the event as the entry-point event
 ```
 
 ```
 in  Approved  ensure  ApprovedAmount > 0  because  "…"
- │     │        ↑           │                ↑       │
-[1]   [2]   disambig.      [3]            slot      [4]
-            token           marker
+ │     │        ↑           │                       │
+[1]   [2]   disambig.      [3]─────────────────────[3] (continued)
+            token
 [1] Leading token: `in`   ← shared with AccessMode, OmitDeclaration
 [2] StateTarget slot — the anchor state name
-[3] EnsureClause slot — expression condition
-[4] BecauseClause slot — mandatory reason
+[3] EnsureClause slot — contains both the expression condition and the `because` reason
+    (the `because` clause is part of the EnsureClause slot content, not a separate slot)
 ```
 
 ```
-from  Draft  on  Submit  when  DocumentsVerified  ->  set ApplicantName = Submit.Applicant
-  │     │     ↑    │      ↑          │             ↑         │
- [1]   [2]  slot  [3]   slot        [4]          slot       [5]
-            mark       mark                      mark
+from  Draft  on  Submit  when  DocumentsVerified  ->  set ApplicantName = Submit.Applicant  ->  transition Submitted
+  │     │     ↑    │      ↑          │             ↑         │                                  ↑         │
+ [1]   [2]  slot  [3]   slot        [4]          slot       [5]                               slot       [6]
+            mark       mark                      mark                                         mark
 [1] Leading token: `from`
 [2] StateTarget slot — the source state (or `any`)
 [3] EventTarget slot — the event name
 [4] GuardClause slot — optional `when` expression
-[5] ActionChain slot — zero or more `-> action` pairs; terminates with an Outcome
+[5] ActionChain slot — zero or more `-> action` pairs
+[6] Outcome slot — terminal disposition (`-> transition State`, `-> reject "…"`, `-> no transition`)
 ```
 
 ```
@@ -285,13 +287,14 @@ precept  Claim
 ```
 
 ```
-rule  ApprovedAmount >= 0  because  "Approved amount cannot be negative"
-  │            │               ↑                    │
- [1]          [2]            slot                 [3]
-                             marker
+rule  ApprovedAmount >= 0  when  IsActive  because  "Approved amount cannot be negative"
+  │            │             ↑       │        ↑                    │
+ [1]          [2]          slot     [3]     slot                 [4]
+                           marker           marker
 [1] Leading token: `rule`
 [2] RuleExpression slot — the boolean condition that must hold globally
-[3] BecauseClause slot — the mandatory explanatory reason
+[3] GuardClause slot (optional) — `when` expression that scopes when the rule applies
+[4] BecauseClause slot — the mandatory explanatory reason
 ```
 
 ```
@@ -451,14 +454,14 @@ A slot is a named, typed position in a construct's grammar, defined by `Construc
 
 ### Slot kinds
 
-The 15 `ConstructSlotKind` values cover every distinct slot type in the language:
+The 17 `ConstructSlotKind` values cover every distinct slot type in the language:
 
 | Kind | What it holds | Where it appears |
 |------|---------------|-----------------|
-| `IdentifierList` | One or more names (field, state, event) | `field Name`, `state A, B, C`, `event Submit` |
+| `IdentifierList` | One or more names (field, state, event) | `field Name`, `event Submit` |
 | `TypeExpression` | A type reference (type keyword + qualifiers) | `as decimal`, `as set of string` |
 | `ModifierList` | Zero or more modifier keywords (some with values) | `nonnegative maxplaces 2 default 0` |
-| `StateModifierList` | State lifecycle modifiers | `initial`, `terminal success` |
+| `StateEntryList` | Comma-separated (name modifier*) pairs for state declarations | `Draft initial, Submitted, Approved terminal success` |
 | `ArgumentList` | Typed parameter list | `(Amount as number, Note as string optional)` |
 | `ComputeExpression` | Computed field body expression | `-> UnitPrice * Quantity` |
 | `GuardClause` | Optional `when` condition expression | `when DocumentsVerified and CreditScore >= 680` |
@@ -466,12 +469,12 @@ The 15 `ConstructSlotKind` values cover every distinct slot type in the language
 | `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "..."` / `-> no transition` |
 | `StateTarget` | A state name reference | `from Draft`, `to Approved` |
 | `EventTarget` | An event name reference | `on Submit` |
-| `EnsureClause` | Constraint expression | `ensure ApprovedAmount > 0` |
+| `EnsureClause` | Constraint expression with mandatory reason | `ensure ApprovedAmount > 0 because "..."` |
 | `BecauseClause` | Mandatory reason string literal | `because "Approved amount must be positive"` |
 | `AccessModeKeyword` | Access mode for a field | `editable`, `readonly` |
 | `FieldTarget` | A field name reference | `modify DecisionNote` |
-
-> **Note on open question:** `parser.md` lists 17 slot kinds (adding `RuleExpressionSlot` and `InitialMarkerSlot`). The catalog documents 15. Reconciliation is tracked as an open question in the parser documentation.
+| `RuleExpression` | The rule's boolean expression | `rule amount > 0` |
+| `InitialMarker` | Optional `initial` keyword on event declarations | `event Submit initial` |
 
 ### Slot positions in a real construct
 
@@ -515,15 +518,16 @@ No counting positions. No consulting a function signature. **The keyword markers
 
 ### Where expressions appear
 
-Expressions appear **only** in expression-typed slots. The five expression-typed slot kinds are:
+Expressions appear **only** in expression-typed slots. The six expression-typed slot kinds are:
 
 | Slot kind | Where it appears | Example |
 |-----------|-----------------|---------|
 | `ComputeExpression` | Computed field body | `field Subtotal as number -> UnitPrice * Quantity` |
-| `GuardClause` | Transition row guard | `when DocumentsVerified and CreditScore >= 680` |
-| `EnsureClause` | State/event constraint | `ensure ApprovedAmount > 0` |
+| `GuardClause` | Transition row guard, rule scope | `when DocumentsVerified and CreditScore >= 680` |
+| `EnsureClause` | State/event constraint | `ensure ApprovedAmount > 0 because "..."` |
 | `RuleExpression` | Rule body | `rule ExistingDebt <= AnnualIncome * 3` |
-| `Outcome` | Assignment values within action chains | `set ApprovedAmount = min(Approve.Amount, RequestedAmount)` |
+| `ActionChain` | Action assignments | `-> set ApprovedAmount = min(Approve.Amount, RequestedAmount)` |
+| `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "reason"` |
 
 ### Expression as a value, not a statement
 
@@ -654,7 +658,7 @@ These are the rules any future language enhancement MUST respect. They are not s
 
 ### Invariant 4: Expressions appear only in expression-typed slots
 
-**The rule:** An expression (computed value, boolean condition, arithmetic formula) is valid only inside a slot of kind `ComputeExpression`, `GuardClause`, `EnsureClause`, `RuleExpression`, or `Outcome`. Expressions are never standalone top-level constructs.
+**The rule:** An expression (computed value, boolean condition, arithmetic formula) is valid only inside a slot of kind `ComputeExpression`, `GuardClause`, `EnsureClause`, `RuleExpression`, `ActionChain`, or `Outcome`. Expressions are never standalone top-level constructs.
 
 **Why it exists:** Keeping expressions inside slots maintains the flat construct model. It also enforces expression purity — expressions cannot have side effects because they only appear in value-producing positions.
 
@@ -800,7 +804,8 @@ ConstructSlotKind         Expression-typed?
 IdentifierList            no  — names only
 TypeExpression            no  — type keyword + qualifiers
 ModifierList              no  — modifier keywords + values
-StateModifierList         no  — modifier keywords
+StateEntryList            no  — (name modifier*) pairs
+InitialMarker             no  — keyword only
 ArgumentList              no  — name:type pairs
 StateTarget               no  — state name
 EventTarget               no  — event name
