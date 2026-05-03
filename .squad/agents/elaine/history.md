@@ -6,6 +6,13 @@
 
 ## Learnings
 
+- Per-stage pipeline diagrams should use individual catalog nodes (one box per catalog) rather than combined multi-name boxes. This is both more honest (the reader can see exactly which catalogs feed each stage) and more maintainable (adding a catalog to a stage is a single-node addition, not a string edit inside a quoted label).
+- Broken Mermaid is silent: the Type Checker diagram referenced `CAT` without defining it — Mermaid renders the edge into the void. The fix pattern is to verify every node ID referenced in an edge has a corresponding definition line in the same diagram block.
+- Missing edges are also silent: the Parser's `TS>"TokenStream"]` node was defined but had no edge to `PAR`. The diagram looked complete but was structurally wrong. Verification step: confirm every input artifact node has an outbound edge to the stage.
+- Subgraphs with `direction TB` inside a `flowchart LR` parent cleanly group catalog nodes into a vertical stack on the left, keeping the LR flow of artifact → stage → artifact readable without catalog clutter.
+- Edge labels on artifact→stage connections are redundant when the artifact nodes carry descriptive names. Remove them; keep only labels that carry constraint meaning (e.g., `only when !HasErrors`).
+- Ambiguous-width Unicode symbols in ASCII diagrams are a UX footgun: `▶` can render as double-width and push box walls out of alignment. For docs that depend on monospaced layout, prefer plain ASCII arrow tips like `>` over visually nicer but width-unstable glyphs.
+
 - Grammar design reference documents for a DSL need to lead with what the grammar is NOT before explaining what it is — this immediately orients the reader who may arrive with assumptions from general-purpose language design. The "not expression-based / not indentation-sensitive / not context-dependent" framing prevents the most common misreadings.
 - The flat-construct / keyword-anchored / named-slot triad is best understood as three mutually reinforcing properties, not three independent features. Each one enables the other two: flatness makes keyword anchoring tractable; keyword anchoring makes named slots necessary; named slots make flatness readable. Framing them together as "the core design choices" is clearer than listing them separately.
 - The linguistic-model section (nouns/verbs/adjectives/prepositions) is the most powerful bridge between the formal grammar description and the business-domain audience claim. Grounding each linguistic role in concrete Precept examples makes the claim testable: readers can verify by reading a `.precept` file aloud.
@@ -76,3 +83,17 @@
 - Elaine-11 expanded docs/language/precept-grammar.md §3 with five new anatomy examples — PreceptHeader, RuleDeclaration, AccessMode, StateAction, and EventHandler — and reframed the introduction around distinct slot/routing archetypes. Commit 5908878.
 - Frank-27's follow-up review caught and fixed 5 material errors affecting the new anatomy pass and adjacent section facts: missing GuardClause on RuleDeclaration, incorrect BecauseClause separation in StateEnsure, missing InitialMarker on EventDeclaration, conflated ActionChain/Outcome in TransitionRow, and the stale slot-kind count.
 - Durable takeaway: Elaine's coverage expansion stands, but the current canonical text is the reviewed/fixed version after Frank's corrective pass.
+
+### 2026-05-03T10:48:47Z — Per-stage pipeline diagram overhaul
+
+- Fixed all 5 per-stage pipeline diagrams in `docs/compiler-and-runtime-design.md` (Lexer, Parser, Type Checker, Graph Analyzer, Proof Engine).
+- Replaced single combined `CAT(...)` catalog boxes with individual named nodes per catalog. Subgraph `CATS` with `direction TB` used for 3+ catalogs; direct arrows for the Lexer's 2 catalogs.
+- Fixed broken Mermaid in Type Checker (undefined `CAT` referenced in edge; 9 individual catalog nodes now explicitly defined).
+- Fixed missing `TS --> PAR` edge in Parser diagram (TokenStream was defined but never connected to Parser — structural bug).
+- Removed redundant artifact→stage edge labels (`"construct manifest"`, `"semantic declarations"`, `"semantic inventory + graph facts"`). Retained `"only when !HasErrors"` in the Precept Builder.
+- Added `style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63` to all catalog subgraphs. Commit `9df4141`.
+
+### 2026-05-03T10:52:58Z — Subgraph wrappers removed from per-stage pipeline diagrams
+
+- Removed `subgraph CATS / end` wrappers and `style CATS` lines from 4 diagrams in `docs/compiler-and-runtime-design.md` (§5 Parser, §6 Type Checker, §7 Graph Analyzer, §8 Proof Engine). §4 Lexer was already wrapper-free.
+- Catalog nodes are now declared inline with unquoted labels — `(Constructs)` not `("Constructs")` — connecting directly to the stage with their own arrows, no enclosing box. Commit `9db529f`.

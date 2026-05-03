@@ -610,9 +610,9 @@ StateGraph                             ◄ graph + derived facts
 │
 │  ┌─────────── Topology ───────────┐
 │  │                                │
-│  │   Draft ──Submit──▶ Review     │
-│  │   Review ──Approve──▶ Approved │
-│  │   Review ──Reject───▶ Draft    │
+│  │   Draft ──Submit──> Review     │
+│  │   Review ──Approve──> Approved │
+│  │   Review ──Reject───> Draft    │
 │  │                                │
 │  └────────────────────────────────┘
 │
@@ -643,9 +643,9 @@ StateGraph                             ◄ graph + derived facts
 
 Example adjacency (from a three-state lifecycle):
 ```
-Draft   ──Submit──▶  Review
-Review  ──Approve──▶ Approved  (terminal)
-Review  ──Reject───▶ Draft
+Draft   ──Submit──>  Review
+Review  ──Approve──> Approved  (terminal)
+Review  ──Reject───> Draft
 ```
 
 **Derived facts — structural verdicts and proof inputs**
