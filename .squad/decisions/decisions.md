@@ -20382,3 +20382,353 @@ The reviews are ready for discussion. Before Frank and George align on a final i
 1. **Split-modifier metadata design** — Does `ConstructMeta` get a `SplitAroundSlot` field? Two `ModifierList` slots? Some other mechanism? This blocks the `ParseFieldDeclaration` unification work.
 
 2. **`ResolutionShape` timing** — Frank marks this P1 (add to ExpressionFormMeta before implementing `Resolve()`). George marks it P3 (implement baseline checker first, add as post-green refactor). Shane should decide whether to design metadata and its consumer simultaneously or sequentially.
+
+---
+
+# Decision: Delete AST SyntaxNodes and AstNodeTests
+
+**Date:** 2026-05-03  
+**Author:** Frank  
+**Status:** Executed
+
+## Decision
+
+Delete all 38 AST syntax node files under `src/Precept/Pipeline/SyntaxNodes/` (including the `Expressions/` subfolder), delete `test/Precept.Tests/AstNodeTests.cs`, and slim the pipeline to build clean with zero SyntaxNode dependencies.
+
+## Rationale
+
+The current SyntaxNode hierarchy was authored before the catalog-driven radical AST design was locked. Those record types encode per-construct structural assumptions as C# type shapes rather than as catalog metadata — the exact anti-pattern the catalog system exists to prevent. Keeping them would bias the replacement design toward the old shape.
+
+The clean-slate approach mirrors what was already done with the TypeChecker stub: remove the implementation, return an empty result, reimplement correctly once the design is locked.
+
+## What Was Deleted
+
+- `src/Precept/Pipeline/SyntaxNodes/*.cs` — 19 files (SyntaxNode base, Declaration, Statement, Expression, all concrete declaration nodes, FieldTargetNode DU, StateTargetNode, OutcomeNode, TypeRefNode DU, FieldModifierNode)
+- `src/Precept/Pipeline/SyntaxNodes/Expressions/*.cs` — 14 expression node files
+- `test/Precept.Tests/AstNodeTests.cs` — structural contract tests for deleted types
+
+## Compilation Fallout Fixed
+
+| File | Change |
+|------|--------|
+| `src/Precept/Pipeline/SyntaxTree.cs` | Removed `PreceptHeaderNode?` and `ImmutableArray<Declaration>` parameters; now holds only `ImmutableArray<Diagnostic>` |
+| `src/Precept/Pipeline/Parser.cs` | Removed `using Precept.Pipeline.SyntaxNodes`; updated `Parse` to return `new(ImmutableArray<Diagnostic>.Empty)` |
+| `src/Precept/Pipeline/GraphAnalyzer.cs` | Removed `using Precept.Pipeline.SyntaxNodes`; dropped `Expression expression` parameter from stub method |
+
+## Build Result
+
+0 errors, 0 warnings.
+
+---
+
+# Decision: Parser and AST Stubbed
+
+**Author:** Frank  
+**Date:** 2026-05-03  
+**Status:** Executed (owner-directed)
+
+## What Was Done
+
+Deleted the entire Parser implementation and replaced it with a stub that matches the TypeChecker pattern.
+
+### Deleted Files (Implementation)
+
+| File | Size | Content |
+|------|------|---------|
+| `src/Precept/Pipeline/Parser.cs` | ~28KB | Full recursive-descent parser: vocabulary FrozenDictionaries, ParseSession ref struct, top-level dispatch, slot parsers, BuildNode factory |
+| `src/Precept/Pipeline/Parser.Declarations.cs` | Partial | Declaration-level slot parsers (field, state, event, rule, transition, etc.) |
+| `src/Precept/Pipeline/Parser.Expressions.cs` | Partial | Pratt expression parser, all expression form handlers |
+
+### Deleted Test Files
+
+| File | Reason |
+|------|--------|
+| `ExpressionParserTests.cs` | Tested `Parser.ParseSession.ParseExpression` (internal) |
+| `ParserInfrastructureTests.cs` | Tested vocabulary dictionaries and `BuildNode` (internal) |
+| `SlotParserTests.cs` | Tested full pipeline expecting parse output |
+| `ParserTests.cs` | Tested full pipeline expecting parse output |
+| `SampleFileIntegrationTests.cs` | Loaded .precept files expecting zero parse errors |
+
+### Trimmed Tests (Kept File, Removed References)
+
+- `ConstructsTests.cs` — removed `ExpressionBoundaryTokens_ContainsAllConstructLeadingTokens`
+- `TokenMetaMemberNameTests.cs` — removed `Parser_KeywordsValidAsMemberName_ContainsMinAndMax`
+- `ExpressionFormCoverageTests.cs` — removed ParseExpr helper and Group 3 (parse round-trips); kept Groups 1-2 (catalog completeness + annotation reflection)
+
+## Stub Contract
+
+```csharp
+[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
+public static class Parser
+{
+    public static SyntaxTree Parse(TokenStream tokens) =>
+        new(null, ImmutableArray<Declaration>.Empty, ImmutableArray<Diagnostic>.Empty);
+}
+```
+
+- Returns an empty `SyntaxTree` (no header, no declarations, no diagnostics)
+- Carries `[HandlesCatalogExhaustively]` + all 13 `[HandlesCatalogMember]` annotations for PRECEPT0019 compliance
+- Allows full `Compiler.Compile()` pipeline to execute without throwing
+
+## What Was Preserved
+
+- `SyntaxTree.cs` — record type (needed by Compilation and TypeChecker)
+- `SyntaxNodes/` folder — all AST node record declarations (22 files + 16 expression subtypes). These are the type contract for future parser and downstream consumer implementations.
+- `SourceSpan.cs`, `TokenStream.cs` — consumed by Lexer and stub
+
+## Rationale
+
+Owner-directed cleanup. The existing parser was a complete recursive-descent implementation from the incremental-build era. The architecture is moving toward a catalog-driven radical parser design. Stubbing clears the deck for the new implementation without leaving dead code that misleads contributors.
+
+---
+
+# Decision: Per-Consumer Pipeline Implementation Recommendations
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-02T23:17:33-04:00  
+**Source:** `docs/working/catalog-driven-pipeline.md` §6.7
+
+## Locked Decisions
+
+1. **Precept Builder is the proof-of-concept stage.** It has the smallest irreducible kernel (~50 lines of generic extraction + resolution pass) and the most natural catalog-driven architecture. If `ModelContribution` metadata is added to `ConstructMeta`, the builder becomes a generic slot-extraction loop. Start here to validate the catalog-driven consumer thesis end-to-end.
+
+2. **Accessor layer remains YAGNI.** Per Shane's ruling. Even if a consumer need emerges, consider alternatives (source-generated helpers, extension methods on `ParsedConstruct`) before building a full accessor layer.
+
+3. **The Pratt expression engine is irreducible in three consumers.** Parser, type checker, and evaluator all contain a recursive Pratt-style expression handler. This is not catalog-drivable at the structural level. Within the loop, operation semantics (precedence, legality, result types) ARE catalog-driven. The recursive structure is the universal kernel — accept it, don't fight it.
+
+4. **Pipeline order for §3 analysis is: Lexer → Parser → Type Checker → Graph Analyzer → Proof Engine → Language Server → Precept Builder → Evaluator → MCP Tools.** Renumbered as §3.1–§3.9 to remove the §3.0.x upstream/downstream split.
+
+5. **Language Server is green-field catalog-driven from day one.** Zero per-construct LS code. Five generic handlers, each <50 lines, dispatching on catalog metadata and pipeline output. No legacy to accommodate.
+
+---
+
+# Decision: Proof-Discharge Cataloging Depth
+
+**By:** Frank  
+**Date:** 2026-05-03  
+**Source:** `docs/working/catalog-driven-pipeline.md` §7, Decision #3  
+**Status:** LOCKED
+
+## Verdict
+
+**Catalog structural discharge shortcuts; keep guard-expression reasoning algorithmic.**
+
+Obligation *generation* is already fully catalog-driven (operations, functions, and actions declare `ProofRequirement[]`). For obligation *discharge*, the split is:
+
+- **Cataloged (Layer A — structural shortcuts):** Modifier-to-interval implications (`nonzero` discharges `≠ 0`, `positive` discharges `> 0`/`≠ 0`/`≥ 0`), declaration-vacuity checks (non-optional satisfies Presence), modifier-presence checks, identity rules for QualifierCompatibility, and static dimension narrowing. These are finite O(1) lookups with no expression analysis.
+
+- **Algorithmic (Layer B — irreducible reasoning):** Guard-expression interval analysis, transitive numeric implication (`> 5` → `> 0` → `≠ 0`), compound guard coordination, and QualifierCompatibility from guard assertions. These operate over user-written expressions — an unbounded input space no finite table can enumerate.
+
+## Concrete Shape
+
+`DischargeImplication` record added to `FieldModifierMeta`:
+
+```csharp
+public sealed record DischargeImplication(
+    ProofRequirementKind ObligationKind,
+    OperatorKind?        Comparison,
+    decimal?             Threshold
+);
+```
+
+~6 entries total across `nonzero`, `positive`, `nonnegative`, `notempty`.
+
+## The Line
+
+If discharge can be determined by a finite lookup with no expression analysis → catalog.  
+If discharge requires walking or interpreting a guard expression → algorithm.
+
+## Key Tradeoff
+
+Over-cataloging is worse than under-cataloging for Precept. A false discharge in metadata means a runtime fault slips through undetected — violating the prevention guarantee. The algorithmic discharge layer (~60 lines of interval reasoning) must be manually updated when new obligation kinds are added, but obligation kinds change extremely rarely (5 total, all stable) and the algorithm has exhaustive unit tests by design.
+
+---
+
+# Decision: Semantic Constraint Metadata Placement
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-02T23:36:42-04:00  
+**Status:** LOCKED  
+**Source:** `docs/working/catalog-driven-pipeline.md` §7 — Open Decision #2
+
+## Decision
+
+**Enrich `Tag` nodes in the grammar tree with `TypeExpectation?` and `ReferenceKind?` fields. Add a separate `CrossConstructConstraint[]` on `ConstructMeta` for relationship rules that span constructs.**
+
+## Rationale
+
+The `Tag` node IS the slot. It already carries the slot's name and parse rule. Adding semantic expectations to it makes the slot a complete, self-describing contract: parse shape + type expectation + reference semantics in one location. This is the metadata-driven principle applied directly — every consumer reads one artifact for both syntactic and semantic knowledge about a slot.
+
+### Why alternatives were rejected
+
+- **(b) Parallel `SemanticConstraint[]` on `ConstructMeta`:** Creates split-brain between slot identity (grammar tree) and slot semantics (sibling array). Two lookups, risk of desynchronization on rename/refactor. No benefit over putting the data where the slot already lives.
+
+- **(c) Derived at startup from other catalogs:** Fails for the interesting cases. "Guard must be Boolean" has no derivation source — it's construct-specific language-definition knowledge that must be declared explicitly. Only trivial cases (ident slots reference identifiers) could be derived, and even those are more direct as explicit metadata.
+
+### Why the "couples syntax and semantics" objection doesn't apply
+
+The radical parser already rejected the traditional separation. Locked decision #4 in this document states: "ConstructMeta must carry semantic metadata beyond syntax." The grammar tree carries `ExprProd()`, `TypeRefProd()` — these are ALREADY semantic classifications of slot contents. `TypeExpectation.Boolean` is a refinement of the same contract, not a category violation.
+
+### Cross-construct constraints
+
+Per-slot `TypeExpectation` cannot express "target state must exist in declarations" — that's a cross-construct relationship requiring the symbol table. These are modeled as `CrossConstructConstraint[]` on `ConstructMeta`: a declarative (slot → namespace → diagnostic) vocabulary. This is the "hybrid" aspect — most expectations live on `Tag`, cross-construct relationships live as construct-level metadata.
+
+## New Metadata Fields
+
+```csharp
+sealed class Tag(string Name, ParseRule Rule, TypeExpectation? Expected = null, ReferenceKind? Reference = null) : ParseRule;
+enum TypeExpectation { Boolean, Identifier, TypeKind, StringLiteral, NumericLiteral, Any }
+enum ReferenceKind { Declares, References }
+record CrossConstructConstraint(string SlotName, ReferenceNamespace TargetNamespace, string DiagnosticCode);
+```
+
+## Consumer Impact
+
+| Consumer | Benefit |
+|----------|---------|
+| Type checker | Single-pass slot validation: read `Tag.Expected`, validate value type. No per-construct switch arms. |
+| LS completions | Type-filtered expression completions: if `Expected == Boolean`, prioritize boolean-returning identifiers/functions. |
+| LS hover | Rich slot descriptions: "guard: Boolean expression" directly from `Tag` metadata. |
+| MCP `precept_language` | Complete slot contract output — parse shape + semantic expectation in one structure. |
+| Documentation generators | Self-documenting grammar: each slot declares what it means, not just what it parses. |
+
+---
+
+# Decision: Option F AST Stub — Generic ParsedConstruct + SlotValue DU
+
+**Date:** 2026-05-03  
+**Author:** Frank  
+**Status:** Implemented
+
+## Decision
+
+The pipeline's parse output is `ImmutableArray<ParsedConstruct>` where each `ParsedConstruct` carries a `ConstructMeta` reference and an `ImmutableArray<SlotValue>`. `SlotValue` is a discriminated union with one sealed subtype per `ConstructSlotKind` catalog member (17 kinds, 17 subtypes).
+
+## Shape
+
+```csharp
+// ParsedConstruct.cs
+public sealed record ParsedConstruct(
+    ConstructMeta             Meta,
+    ImmutableArray<SlotValue> Slots,
+    SourceSpan                Span
+);
+
+// SlotValue.cs — abstract base + 17 sealed subtypes
+public abstract record SlotValue(ConstructSlotKind Kind, SourceSpan Span);
+
+// Example subtypes:
+public sealed record IdentifierListSlot(ImmutableArray<string> Names, SourceSpan Span)
+    : SlotValue(ConstructSlotKind.IdentifierList, Span);
+public sealed record TypeExpressionSlot(TypeMeta Type, SourceSpan Span)
+    : SlotValue(ConstructSlotKind.TypeExpression, Span);
+// ... 15 more
+```
+
+`SyntaxTree` now: `(ImmutableArray<ParsedConstruct> Constructs, ImmutableArray<Diagnostic> Diagnostics)`.
+
+## Naming Adjustments from Spec
+
+- **`Construct` → `ConstructMeta`**: The actual catalog record type is `ConstructMeta`. No bare `Construct` class exists.
+- **`Language.Type` → `TypeMeta`**: `Precept.Language.Type.cs` contains `TypeMeta`, not a class named `Type`. Used `TypeMeta` in `TypeExpressionSlot` and the `ArgumentListSlot` tuple to avoid collision with `System.Type`.
+
+## Rationale
+
+Option F was chosen over per-construct typed AST nodes (38 files, just deleted) because:
+1. **Catalog-driven**: The slot type DU mirrors `ConstructSlotKind` exactly — the catalog is the shape contract, not 38 hand-written record types.
+2. **No per-construct knowledge in consumers**: Downstream stages (type checker, graph analyzer, proof engine) dispatch on `SlotValue` subtype, not on construct identity.
+3. **Incremental expression design**: Expression-carrying slots (`GuardClauseSlot`, `ComputeExpressionSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) hold only `SourceSpan` for now — no `ExpressionNode` type yet. The DU shape is complete; expression content is deferred.
+
+## Alternatives Rejected
+
+- **38 per-construct record types (old AST)**: Deleted. Encoded construct identity in the type system; consumers required per-construct switch dispatch.
+- **Option E (source-generated per-construct types)**: Deferred — ergonomics argument is valid but YAGNI until generic consumers prove insufficient.
+- **Flat record with nullable fields**: Anti-pattern; inapplicable fields on every slot value. DU subtypes carry exactly the fields their consumers need.
+
+## Files
+
+- Created: `src/Precept/Pipeline/SlotValue.cs`
+- Created: `src/Precept/Pipeline/ParsedConstruct.cs`
+- Updated: `src/Precept/Pipeline/SyntaxTree.cs`
+- Updated: `src/Precept/Pipeline/Parser.cs`
+- Updated: `src/Precept/Pipeline/GraphAnalyzer.cs` (`AnalyzeExpression` now takes `ParsedConstruct construct`)
+
+---
+
+# Decision: Remove `[HandlesCatalogExhaustively]` from Pipeline Consumers
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-03  
+**Status:** Decided  
+**Scope:** `HandlesCatalogExhaustivelyAttribute`, `HandlesCatalogMemberAttribute`, and their usage on pipeline stage classes
+
+---
+
+## Verdict
+
+**Remove** `[HandlesCatalogExhaustively]` and `[HandlesCatalogMember]` annotations from `Parser`, `TypeChecker`, and `GraphAnalyzer`. Retain the attributes themselves — they remain valid on the **catalog layer**, not on consumers.
+
+---
+
+## Reasoning
+
+### The attribute solved a problem that no longer exists
+
+The annotation-bridge pattern was designed for a world where each pipeline consumer had **one method per language form** — a `ParseLiteral()`, `ParseBinaryOperation()`, `CheckLiteral()`, `CheckBinaryOperation()` etc. In that world, exhaustiveness enforcement was critical: "did you remember to write a handler for the new form you just added?"
+
+In the Option F / catalog-driven world, that problem is **structurally eliminated**:
+
+- `ParsedConstruct` is generic. There is no `LiteralNode` vs `BinaryOperationNode` — there's one type carrying `ConstructMeta` + `SlotValue[]`.
+- The type checker doesn't switch on construct kind. It iterates `c.Meta.CheckerConstraints` and evaluates them generically.
+- The graph analyzer doesn't switch on expression form. It reads graph-relevant metadata from `ModifierMeta`, `ConstructMeta`, etc.
+- Adding a new language construct means adding catalog metadata. **No consumer code changes.** There's nothing to be "exhaustive" about in the consumer.
+
+The exhaustiveness guarantee is now **structural** — it's enforced by the catalog's `GetMeta()` switch (which the compiler already enforces via CS8509 on the enum), not by annotations on consumers.
+
+### Where exhaustiveness enforcement IS still valid
+
+The `ExpressionForms.GetMeta()` switch — and every other catalog's `GetMeta()` — must remain exhaustive. The C# compiler already enforces this via CS8509 (non-exhaustive switch expression). That's the correct enforcement mechanism: it's a compile error, not a runtime annotation check.
+
+The `ExpressionFormCoverageTests` Group 1 tests (catalog completeness) remain valid and valuable — they verify that `ExpressionForms.All` contains an entry for every enum member with non-null metadata. **Keep those.**
+
+### What's misleading about the current annotations
+
+The stub annotations on `Parser.ParseExpression()`, `TypeChecker.CheckExpression()`, and `GraphAnalyzer.AnalyzeExpression()` claim these methods handle specific expression forms. They don't. They're empty stubs with 13 `[HandlesCatalogMember(...)]` attributes each that prove nothing except "someone remembered to copy-paste the enum members." In the new design, these methods won't exist at all — there's no `ParseExpression()` that switches on form kind.
+
+The Pratt parser sub-engine for expressions IS per-form, but its dispatch is via precedence/binding-power tables (themselves catalog-driven via `ExpressionFormMeta.Category` and `OperatorMeta.Precedence`), not via annotation-bridge attributes.
+
+---
+
+## Action Items
+
+1. **Remove** `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` from `Parser`, `TypeChecker`, `GraphAnalyzer`
+2. **Remove** all `[HandlesCatalogMember(...)]` annotations and the associated empty stub methods from those three classes
+3. **Remove** `ExpressionFormCoverageTests` Group 2 (the annotation-bridge reflection tests) — `Parser_HasHandlesCatalogExhaustivelyForExpressionFormKind` and `Parser_HandlesCatalogMemberAnnotations_CoverAllExpressionFormKinds`
+4. **Retain** `ExpressionFormCoverageTests` Group 1 (catalog completeness tests) — these verify metadata integrity, which is still critical
+5. **Retain** the attribute types themselves (`HandlesCatalogExhaustivelyAttribute.cs`, `HandlesCatalogMemberAttribute.cs`) — they may still be valid for the expression sub-engine or other future per-member dispatch sites, and PRECEPT0019 analyzer tests reference them
+6. **Retain** `Precept0019Tests.cs` — the analyzer infrastructure is still correct for any future site that genuinely needs per-member dispatch
+
+---
+
+## What Replaces the Safety Guarantee
+
+The old guarantee was: "every ExpressionFormKind member has a handler method in the consumer."
+
+The new guarantees are:
+
+| Layer | Mechanism | What it proves |
+|-------|-----------|----------------|
+| Catalog completeness | `ExpressionForms.All` must have one entry per enum member (xUnit test) | Every form has metadata |
+| `GetMeta()` exhaustiveness | C# CS8509 on the switch expression | The catalog switch covers every member |
+| Consumer correctness | Generic dispatch reads metadata — no per-member arms to miss | Adding a form cannot leave a consumer broken |
+| SlotValue DU exhaustiveness | C# CS8509 on any `SlotValue` pattern match | Slot shape is structurally correct |
+
+This is **stronger** than the annotation bridge. The annotation bridge was a voluntary proof ("I annotated my method"). The new design is a structural proof ("there is no per-member code path to forget").
+
+---
+
+## Summary
+
+The annotation-bridge pattern was a scaffolding technique for a per-node-type consumer architecture. Option F eliminates per-node-type consumers. The scaffolding is not just unnecessary — it's actively misleading, because it implies consumer code must change when the language grows. It must not. That's the entire thesis of catalog-driven design.
+
+Remove from consumers. Retain in the catalog layer. The compiler's own exhaustiveness checking (CS8509) is the correct mechanism for catalog switches.
