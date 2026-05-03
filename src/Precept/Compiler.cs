@@ -10,15 +10,15 @@ public static class Compiler
     public static Compilation Compile(string source)
     {
         TokenStream      tokens    = Lexer.Lex(source);
-        ConstructManifest tree      = Parser.Parse(tokens);
-        SemanticIndex    semantics = TypeChecker.Check(tree);
+        ConstructManifest manifest  = Parser.Parse(tokens);
+        SemanticIndex    semantics = TypeChecker.Check(manifest);
         StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
         ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
 
         ImmutableArray<Diagnostic> diagnostics =
         [
             ..tokens.Diagnostics,
-            ..tree.Diagnostics,
+            ..manifest.Diagnostics,
             ..semantics.Diagnostics,
             ..graph.Diagnostics,
             ..proof.Diagnostics,
@@ -26,7 +26,7 @@ public static class Compiler
 
         return new Compilation(
             Tokens:      tokens,
-            ConstructManifest:  tree,
+            ConstructManifest:  manifest,
             Semantics:   semantics,
             Graph:       graph,
             Proof:       proof,

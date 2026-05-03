@@ -511,9 +511,9 @@ enum SlotContext
 
 > **Open Question (unresolved):** `SlotContext` is defined here and in `language-server.md` §7.3. This maps `ConstructSlotKind` values; language-server.md maps `SlotKind`. Which document is canonical, and are these the same enum under different names?
 
-SlotContext GetCursorContext(SyntaxTree tree, Position position)
+SlotContext GetCursorContext(ConstructManifest manifest, Position position)
 {
-    var construct = tree.FindConstructAt(position);
+    var construct = manifest.FindConstructAt(position);
     if (construct is null) return SlotContext.TopLevel;
     
     var slotIndex = construct.FindSlotAt(position);

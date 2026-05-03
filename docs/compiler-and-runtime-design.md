@@ -151,15 +151,15 @@ TokenStream   tokens    = Lexer.Lex(source);
 // ConstructManifest carries ImmutableArray<ParsedConstruct> Constructs — no per-construct AST node types.
 // ParsedConstruct: (ConstructMeta Meta, ImmutableArray<SlotValue> Slots, SourceSpan Span)
 // ⚠ SlotValue subtype field shapes have open mismatches between parser.md and type-checker.md — see parser.md open questions
-ConstructManifest tree      = Parser.Parse(tokens);
-SemanticIndex semantics = TypeChecker.Check(tree);
+ConstructManifest manifest   = Parser.Parse(tokens);
+SemanticIndex semantics = TypeChecker.Check(manifest);
 StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
 ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
 
 ImmutableArray<Diagnostic> diagnostics =
 [
     ..tokens.Diagnostics,
-    ..tree.Diagnostics,      // parse-phase diagnostics on ConstructManifest.Diagnostics
+    ..manifest.Diagnostics,   // parse-phase diagnostics on ConstructManifest.Diagnostics
     ..semantics.Diagnostics,
     ..graph.Diagnostics,
     ..proof.Diagnostics,
@@ -167,7 +167,7 @@ ImmutableArray<Diagnostic> diagnostics =
 
 return new Compilation(
     Tokens:      tokens,
-    ConstructManifest:  tree,
+    ConstructManifest:  manifest,
     Semantics:   semantics,
     Graph:       graph,
     Proof:       proof,

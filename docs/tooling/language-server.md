@@ -353,10 +353,10 @@ enum SlotContext
 
 > **Open Question (unresolved):** `SlotContext` is defined here and in tooling-surface.md. Which document is the canonical home? Also, this maps `SlotKind` values while tooling-surface.md maps `ConstructSlotKind`. Are these the same enum under different names?
 
-SlotContext GetCursorContext(SyntaxTree tree, Position position)
+SlotContext GetCursorContext(ConstructManifest manifest, Position position)
 {
     // Find the innermost construct containing the cursor
-    var construct = FindConstructAt(tree, position);
+    var construct = FindConstructAt(manifest, position);
     if (construct is null) return SlotContext.TopLevel;
     
     // Find which slot the cursor is in

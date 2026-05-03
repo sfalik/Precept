@@ -521,7 +521,7 @@ public class ConstructsTests
     public void ParseDirectConstruct_CoversAllDirectConstructs(ConstructKind kind, string source)
     {
         var tokens = Precept.Pipeline.Lexer.Lex(source);
-        var tree = Precept.Pipeline.Parser.Parse(tokens);
-        tree.Diagnostics.Should().BeEmpty($"{kind} minimal snippet should parse without errors");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+        manifest.Diagnostics.Should().BeEmpty($"{kind} minimal snippet should parse without errors");
     }
 }

@@ -8,9 +8,9 @@ var source = Console.In.ReadToEnd();
 
 // Only Lexer and Parser are implemented; TypeChecker/GraphAnalyzer/ProofEngine are stubs.
 var tokens = Lexer.Lex(source);
-var tree   = Parser.Parse(tokens);
+var manifest = Parser.Parse(tokens);
 
-var allDiagnostics = tokens.Diagnostics.Concat(tree.Diagnostics).ToArray();
+var allDiagnostics = tokens.Diagnostics.Concat(manifest.Diagnostics).ToArray();
 
 static object SerializeSpan(SourceSpan s) => new
 {
@@ -125,9 +125,9 @@ var result = new
     diagnostics          = allDiagnostics.Select(SerializeDiag).ToArray(),
     syntaxTree = new
     {
-        preceptName      = tree.Header?.Name.Text,
-        declarationCount = tree.Declarations.Length,
-        declarations     = tree.Declarations.Select(SerializeDeclaration).ToArray()
+        preceptName      = manifest.Header?.Name.Text,
+        declarationCount = manifest.Declarations.Length,
+        declarations     = manifest.Declarations.Select(SerializeDeclaration).ToArray()
     }
 };
 

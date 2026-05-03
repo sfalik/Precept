@@ -672,19 +672,19 @@ In all cases the invalid source span still produces a diagnostic with the correc
 
 ## 2. Parser
 
-The parser transforms the flat `TokenStream` into a `SyntaxTree` — an abstract syntax tree representing the semantic structure of the precept definition. The parser is a hand-written recursive descent parser with a Pratt expression parser for operator precedence. It produces an AST (not a CST) — comments and whitespace are consumed silently.
+The parser transforms the flat `TokenStream` into a `ConstructManifest` — a flat ordered list of parsed constructs representing the semantic structure of the precept definition. The parser is a hand-written recursive descent parser with a Pratt expression parser for operator precedence. It produces a flat manifest (not a tree or CST) — comments and whitespace are consumed silently.
 
 ```
-TokenStream  →  Parser.Parse  →  SyntaxTree
+TokenStream  →  Parser.Parse  →  ConstructManifest
 ```
 
 The public surface is a static class `Parser` with a single method:
 
 ```csharp
-public static SyntaxTree Parse(TokenStream tokens)
+public static ConstructManifest Parse(TokenStream tokens)
 ```
 
-The parser always runs to end-of-source. On malformed input it emits diagnostics and inserts `IsMissing` nodes or skips to sync points, ensuring downstream stages receive a structurally coherent tree.
+The parser always runs to end-of-source. On malformed input it emits diagnostics and inserts `IsMissing` nodes or skips to sync points, ensuring downstream stages receive a structurally coherent manifest.
 
 ### 2.1 Expression Precedence
 
@@ -1043,16 +1043,16 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 
 ## 3. Type Checker
 
-The type checker transforms a `SyntaxTree` into a `SemanticIndex` — a flat collection of symbol tables, resolved declarations, and diagnostics. It always produces a result, even on broken input (the pipeline's resilient contract).
+The type checker transforms a `ConstructManifest` into a `SemanticIndex` — a flat collection of symbol tables, resolved declarations, and diagnostics. It always produces a result, even on broken input (the pipeline's resilient contract).
 
 ```
-SyntaxTree  →  TypeChecker.Check  →  SemanticIndex
+ConstructManifest  →  TypeChecker.Check  →  SemanticIndex
 ```
 
 The public surface is a static method:
 
 ```csharp
-public static SemanticIndex Check(SyntaxTree tree)
+public static SemanticIndex Check(ConstructManifest manifest)
 ```
 
 ### 3.1 Processing Model
