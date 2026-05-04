@@ -6,6 +6,22 @@
 
 ---
 
+### 2026-05-04T17:00:09Z: Business value type coverage narrowed: Price stays semantic-only; ExchangeRate, Percentage, and DateRange advance as candidates
+
+**By:** Frank
+
+**Status:** Recommendation recorded from inbox; Shane decision still needed on OQ-7a through OQ-7f.
+
+**Merged source:** `frank-business-types-coverage.md`.
+
+- `Price` is not a new first-class type; it remains a role name on `MoneyValue` fields rather than a distinct structural/runtime type.
+- `ExchangeRate` is recommended as a new first-class value type with `(BaseCurrency, QuoteCurrency, Rate)` shape and a positive-rate invariant lean.
+- `Percentage` and `DateRange` are recommended as additional first-class candidates because they introduce invariant-bearing, runtime-significant semantics that bare decimals and paired dates cannot express safely.
+- The investigation scope should expand from unit types to the broader Precept value-type surface; six open questions remain for Shane on built-in status, invariants, interval semantics, and a future `DateTimeRange` companion.
+
+---
+
+---
 ### 2026-05-04T05:45:56Z: Audit-gap P2 clarifications recorded; compiler/runtime innovation callouts confirmed clean
 
 **By:** Scribe
@@ -666,4 +682,5 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `docs/working/unit-type-system-investigation.md` now carries a dedicated struct-vs-class addendum that re-checks the hot path using the actual proposed `QuantityValue(decimal Amount, Unit Unit)` shape.
 - The hotpath verdict is durable: at 24 bytes, `QuantityValue` stays well below the copy-cost crossover, avoids the projected short-lived Gen0 churn from a sealed-class shape, and exposes no designed boxing hazards on the public API surface.
 - The dual-shape model is explicitly confirmed: `QuantityValue` remains a `readonly record struct` for API-boundary materialization, while `Unit` remains an interned `sealed class` entity and internal slot storage continues to belong to `PreceptValue`.
+
 
