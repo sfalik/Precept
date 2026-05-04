@@ -41,3 +41,5 @@
 
 ### 2026-04-11 — Named rule keyword analysis
 - Recommended avoiding `rule` for passive named predicates because it silently implies enforcement in a prevention-first product.
+### 2026-05-04T15:15:33Z — Philosophy review notes absorbed into v6 lock
+- Steinbrenner's v4 review was approved with notes, and the resulting concerns are now closed in the v5/v6 path: the philosophy copy frames Precept as a developer commitment rather than as direct domain-expert address, while preserving the stronger business-process / prevention guarantee language in the locked docs/philosophy.md bullets.

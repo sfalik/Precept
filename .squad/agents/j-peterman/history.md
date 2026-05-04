@@ -76,3 +76,5 @@
 - Switched from markdown image syntax `![...](...)` to fixed-size HTML `<img src="..." width="600" />` to ensure the contract diagram reads at proper visual scale alongside surrounding page text in GitHub's README view.
 - Brand rationale: The Quick Example section is a teaching artifact, not an archive. The professionally rendered contract image is the hero; the copyable fallback was defensive scaffolding. Removing it simplifies visual hierarchy and directs curious readers toward `samples/` or the language reference for further exploration.
 - Decision written to `.squad/decisions/inbox/j-peterman-readme-contract.md`.
+### 2026-05-04T15:15:33Z — Philosophy review notes absorbed into v6 lock
+- Peterman's v4 review was approved with notes and carried into Elaine's v5/v6 closeout: docs/philosophy.md now keeps the stronger prevention framing while speaking to the developer evaluating adoption, not to the domain expert directly.
