@@ -1,0 +1,2 @@
+Recorded Frank's cross-cutting execution-driver and audit-gap-status batch, ran the hard-gate 7-day archive pass because `decisions.md` was 801946 bytes, checked `decisions.md` for dated entries older than 2026-04-27 and found none to move, then merged 4 inbox files with deduplication, cleared the inbox, refreshed Frank/Scribe history, and closed the pass with health = 801946B -> 808541B on `decisions.md` and 1 summarized history file.
+

@@ -44,3 +44,8 @@
 - Wrote orchestration logs for Frank's paired collection research batch, merged 2 inbox records into canonical decisions, and refreshed durable squad state.
 - That pass also summarized Frank's oversized history, establishing the current summarization pattern.
 
+### 2026-05-04T12:31:31Z — Cross-cutting driver / audit-status closeout recorded
+- Pre-check measured `decisions.md` at 801946 bytes with 4 inbox files; the hard-gate 7-day archive pass ran before merge because the ledger exceeded the threshold.
+- Checked for dated ledger entries older than 2026-04-27 and found none eligible to move, then merged 4 Frank inbox notes into the canonical decision record with deduplication, deleted the processed inbox files, and wrote orchestration logs for frank-78 / frank-79 plus the batch session log.
+- Health report: `decisions.md` 801946B -> 808541B; inbox processed = 4; history files summarized = 1 (`frank/history.md`).
+

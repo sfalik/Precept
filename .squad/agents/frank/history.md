@@ -38,69 +38,26 @@
 
 ## Recent Activity
 
-### 2026-05-04T02:02:54Z — Catalog gap register migration audit
-
-Shane requested migration of `docs/working/catalog-gap-register.md` open questions to canonical docs. Audit confirmed the migration was already completed in commit `2715872` (Frank-66). The register is archived at `docs/working/Archived/catalog-gap-register-migrated.md`.
-
-**Migration summary confirmed:**
-- 23 Pending Decision gaps → placed as `Open Question` blocks across 9 canonical docs (parser.md, graph-analyzer.md, proof-engine.md, type-checker.md, evaluator.md, diagnostic-system.md, language-server.md, tooling-surface.md, catalog-system.md)
-- 5 Already Captured → confirmed in-place in catalog-system.md
-- 3 Resolved in Source → #17, #18, #24 marked resolved; stale open-question bullets removed
-- 4 Out of Scope → API/tooling questions excluded from canonical docs
-- 8 Cross-cutting → tracked in cross-cutting-decisions.md; source attributions added in register
-
-**Pattern observed:** The gap register had a clean triaging model — every entry had a clear status and a destination. The only ambiguity was between "Out of Scope" (not catalog metadata) and "Pending Decision" (catalog metadata needing a ruling). All 4 Out-of-Scope entries were correctly excluded: they were MCP output design, API naming, strategy scope, or grammar implementation tooling — none were catalog metadata questions. The 23 Pending Decision gaps distributed across 9 docs fairly evenly, suggesting the gap register captured real cross-doc knowledge breadth rather than concentrating on a single surface.
-
-Wrote inbox decision entry `frank-catalog-gaps-migrated.md`.
-
-### 2026-05-04T01:44:47Z — P2 doc fixes: four audit gap items
-
-- Added `### Approaches Considered and Rejected` to `evaluator.md` §4 covering two items:
-  - **TypeBuilder rejected** (Item 10): AOT incompatibility, catalog delegates achieve identical O(1) dispatch, TypeBuilder output is opaque.
-  - **Upgrade seam toward compilation** (Item 12): A+G interpreter implements the same contract a compiled path would; pre-indexed dispatch model is the seam.
-- Added `Operations` / `TypeRuntimeMeta.BinaryExecutors` relationship note to `evaluator.md` §7.3 (Item 11): explains that `Operations` aggregates per-type executors from `TypeRuntimeMeta` registrations at startup; evaluator is zero-knowledge about type identity.
-- Audited all 13 Precept Innovations callouts in `compiler-and-runtime-design.md` (Item 14): no stale TypeBuilder, dual-interpreter, or code-gen claims found; tree-walk mentions correctly describe the rejected alternative; no changes needed.
-
-### 2026-05-04T04:36:09Z — Scribe closeout: deep content audit recorded
-
-- Scribe merged `frank-deep-content-audit.md` into `decisions.md`, cleared the decisions inbox, and recorded the batch in the orchestration/session logs.
-- Durable runtime-doc baseline now explicitly covers the `PreceptValue` performance rationale and memory picture, the 7-step Fire lifecycle, slot-index `LOAD_ARG`, `TypeRuntime` executor arrays, and the `bool[]` arg presence mask semantics.
-- The archive hard gate was checked at closeout; `decisions.md` was over the size threshold, but there were no active entries older than 30 days to move.
-
-### 2026-05-04T00:36:09Z — Deep content audit: decisions.md → canonical docs
-
-Shane requested an urgent specificity audit — not a coverage check. The question was not "is PreceptValue mentioned?" but "does the canonical doc describe the struct layout, the tag bits, the union fields, the memory picture, the WHY?"
-
-**Audit found 6 real gaps:**
-1. **PreceptValue struct layout missing** — evaluator.md named the 32-byte size but had zero layout detail: no FieldOffset, no PreceptValueTag, no union field description. Added the `### PreceptValue: Evaluation Currency` subsection to evaluator.md §5 with the GC-pressure rationale (~768 MB/s gen-0 at 100k ev/sec), the performance motivation, and the precise struct layout flagged as an open design question. The specific FieldOffset layout was NOT decided in decisions.md; documenting it as a pending decision is the correct action — not inventing a layout.
-2. **Hot-path memory picture missing** — ~44–48 PreceptValue slots, ~4,480 bytes stack traffic per Fire, ~88 bytes boundary objects — none of it was in evaluator.md. Added as a table in the PreceptValue subsection.
-3. **Full Fire lifecycle missing Load-args step** — Working Copy Management section was 5 steps, missing "Load args from pre-materialized FiredArgs.ArgSlots" and "Recompute computed fields." Rewrote to 7-step lifecycle.
-4. **LOAD_ARG opcode stale as name-based** — opcode table described LOAD_ARG as a name lookup. Decision says it resolves to a slot index at build time. Updated; added open design question about ArgDescriptor.SlotIndex.
-5. **BinaryExecutors/UnaryExecutors missing from TypeRuntime** — decisions.md locked these as part of the active TypeRuntime surface; catalog-system.md's abstract class had none of them. Added both to TypeRuntime with the catalog-delegate dispatch explanation and an open design question on the registration mechanism.
-6. **Presence mask undefined** — runtime-api.md mentioned "presence mask" but never defined it. Added a concrete definition (bool[] same length as arg slot array, true = set, false = absent).
-
-**Three things that were already correct:**
-- IReadOnlyDictionary lane obsolescence: runtime-api.md was correct.
-- JSON-only Restore: runtime-api.md was correct.
-- SlotLayout and construct/field-slot vocabulary: precept-builder.md was correct.
-
-**Stale code fixed:** evaluator.md §7.3 had a pre-CC#25 `object?`-based EvaluatePlan implementation that contradicted the PreceptValue baseline in §7.0. Replaced with the canonical PreceptValue implementation showing catalog-delegate dispatch. §7.1 pseudocode annotated as using `object?[]` for readability.
-
-### 2026-05-04T04:36:09Z — Citation cleanup closeout
-- Frank-68 removed CC# citation artifacts from 8 canonical docs: `evaluator.md`, `precept-builder.md`, `runtime-api.md`, `catalog-system.md`, `compiler-and-runtime-design.md`, `proof-engine.md`, `type-checker.md`, and `parser.md`.
-- `docs/working/` stayed untouched; working-record navigation links remained where they still serve discovery.
-- Durable takeaway: canonical docs should never carry `(CC#...)`, `Resolved (CC#...)`, or similar provenance wrappers.
-
-### 2026-05-04T04:19:13Z — Chunk-4 migration and full decisions audit
-- Frank-66 migrated or triaged all 43 catalog-gap-register entries, archived the working register, and pushed pending questions back into canonical docs with explicit routing for cross-cutting and out-of-scope items.
-- Frank-67 audited the CC#25 / CC#2 decision set across canonical docs, fixed lagging coverage in `evaluator.md`, `result-types.md`, `precept-builder.md`, `compiler-and-runtime-design.md`, and `cross-cutting-decisions.md`, and left only the `TypeRuntime<T>` reconciliation and non-expression `SlotValue` conflicts open.
+### Historical summary through 2026-05-04T03:39:16Z
+- Consolidated the late-April and early-May design corpus: collection-surface research, parser/catalog remediation, annotation-bridge decisions, CC#25 Q1-Q7 rulings, CC#2 acceptance, and the related canonical-doc sync passes across runtime, evaluator, parser, proof, and catalog surfaces.
+- Durable pattern: once a design locked, Frank moved canonical docs to factual architecture, pushed provenance back into squad records, and treated working docs only as temporary coordination scaffolding.
 
 ### 2026-05-04T03:45:15Z — Runtime API doc sync baseline
-- `runtime-api.md` now reflects the two-lane ingress model, `PreceptValue`-based access surfaces, typed builder interfaces, and JSON-only restore semantics.
-- The squad baseline is that dictionary-based convenience ingress is out of scope.
+- `runtime-api.md` now reflects two-lane ingress, `PreceptValue`-based access, typed builders, and JSON-only restore semantics.
+- The durable squad baseline is that dictionary-based convenience ingress is out of scope.
 
-### 2026-05-04 — Cross-cutting execution driver restructured
+### 2026-05-04T04:36:09Z — Citation cleanup closeout
+- Canonical docs had CC#/decision-provenance wrappers removed while `docs/working/` navigation links stayed in place where still useful.
+- Durable takeaway: canonical docs state architecture; squad records carry provenance.
 
-- `docs/working/cross-cutting-decisions.md` now opens with a 5-wave execution driver instead of making readers infer sequence from the raw CC entries.
-- The driver now has four coordination surfaces up front: status summary for CC#1–CC#26, dependency map by canonical doc/stage, wave-by-wave execution checklists, and explicit Wave 3 burn-down order for migrated open questions.
-- The original detailed decision entries were preserved below the driver as retained source material. Use the top of the file to coordinate execution; use the retained entries only when you need the underlying rationale or option framing for a specific CC item.
+### 2026-05-04T04:36:09Z — Deep content audit closeout
+- Scribe recorded the batch that pushed evaluator/runtime docs to the active specificity baseline: `PreceptValue` memory picture, 7-step Fire lifecycle, slot-index `LOAD_ARG`, executor arrays, and the arg presence mask definition.
+- The archive hard gate was checked in that pass; no >30-day active entries were eligible then.
+
+### 2026-05-04T05:45:56Z — Audit gap walkthrough closeout
+- The audit gap report was driven to the current state: resolved doc gaps were documented, stale status markers were corrected, and only genuine open items remained pending owner sign-off or follow-up.
+- Working takeaway: before trusting a gap report rollup, re-verify the canonical docs and then recalculate the status summary.
+
+### 2026-05-04T12:31:31Z — Scribe recorded cross-cutting driver and audit-status batch
+- Scribe logged frank-78 (`e10bcef`) and frank-79 (`2b5df03`), merged their inbox notes into the decision ledger, cleared the decisions inbox, and refreshed Frank's durable history.
+- The working-doc state now reflects the 5-wave cross-cutting execution driver and the corrected audit-gap status markers as the recorded batch baseline.
