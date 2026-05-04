@@ -1,3 +1,46 @@
+# Doc Sync Confirmation — runtime-api.md
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-03T23:45:15-04:00  
+**Status:** Complete
+
+## Summary
+
+`docs/runtime/runtime-api.md` is fully synchronized with all locked CC#25 (Q2/Q5/Q7) and CC#2 decisions. Every `IReadOnlyDictionary<string, object?>` overload has been eliminated. The two-lane ingress design (JSON + typed) is reflected throughout.
+
+## Changes Applied
+
+| Section | What changed |
+|---------|-------------|
+| Status table | Doc maturity updated to reflect CC#25 Q2/Q5/Q7 locked |
+| Overview | `Metadata-First Principle` → `Two-Lane Ingress Principle` |
+| Inputs/Outputs | Updated to reflect two-lane ingress and `JsonElement`-based Restore |
+| `Precept` class block | Two `Create`/`InspectCreate` overloads each (JSON + typed); `Restore(string?, JsonElement)` only |
+| `Version` class block | `PreceptValue` indexer + `Get<T>`; `ArgDescriptor` replaces `ArgInfo`; all commit/inspect methods split into JSON + typed overloads |
+| Create code example | Both lanes shown; dictionary removed |
+| Restore code example | JSON lane only; dictionary removed |
+| Fire code example | Both lanes shown; dictionary removed |
+| Update code example | Both lanes shown; dictionary removed |
+| InspectFire code example | Both lanes shown; dictionary removed |
+| InspectUpdate code example | Both lanes shown; dictionary removed |
+| `FieldAccessInfo` | `CurrentValue` changed from `object?` to `PreceptValue` |
+| `ArgInfo` | Renamed to `ArgDescriptor` |
+| New: Ingress Types | Added `IArgBuilder` and `IFieldBuilder` sections |
+| New: Value Types | Added `PreceptValue`, `TypeRuntime<T>`, `FiredArgs` sections |
+| Design Rationale | Updated to document two-lane rationale; updated decisions tracking |
+| R3 open question | Updated to reference CC#25 Q5 `PreceptValue[]` slot donation |
+| Deliberate Exclusions | Added `IReadOnlyDictionary` exclusion |
+
+## Gaps Discovered
+
+1. **`Version.Get<T>()` was missing from the Version class block.** CC#25 Q7 baseline (per history.md) names it as a primary typed access surface alongside `FiredArgs.Get<T>`. Added it.
+
+2. **`ArgDescriptor` is named but its shape is minimal.** The current `ArgDescriptor(string Name, string Type)` is the same shape as the old `ArgInfo`. D8/R4 will expand it to a full descriptor with slot index and type metadata — the rename is forward-compatible.
+
+3. **`PreceptRuntime.Register<T>` is referenced in the `TypeRuntime<T>` registration pattern but is not yet documented as a type.** It will need its own section when the runtime registration surface is formally specified.
+
+4. **`FiredArgs` placement on `EventOutcome` variants** (`Transitioned.Args`, `Applied.Args`, `Rejected.Args`) is documented here but the `result-types.md` doc may need parallel updates. This was not in scope for this pass — flagging for follow-up.
+
 # CC#2 — SlotValue Subtype Shapes: Locked Decisions
 
 **Accepted by:** Shane Falik  
@@ -322,6 +365,7 @@ Explicit call required. Neither path is automatic.
 
 
 **Note:** "Preserves structural components" distinguishes period from duration negation.
+
 # Decision: HandlesCatalogMember rename propagation complete
 
 
@@ -475,6 +519,7 @@ George completed the mechanical rename from `[HandlesForm]` to `[HandlesCatalogM
 
 
 ---
+
 # Parser Coverage Assertion Against ExpressionFormKind
 
 
@@ -1626,6 +1671,7 @@ public void ParseAtom_Handles_All_Nud_Form_LeadTokens()
 
 
 ---
+
 # Collection Iteration Research — Frank
 
 
@@ -1956,6 +2002,7 @@ The pressure is ordered:
 
 
 ---
+
 # Universal: every element satisfies
 
 
@@ -1981,6 +2028,7 @@ rule Items.all(item, item > 0)
 
 
 ---
+
 # Existential: at least one satisfies
 
 
@@ -2006,6 +2054,7 @@ from Submitted on Approve when Reviewers.any(r, r == Approve.ReviewerName)
 
 
 ---
+
 # Negated universal: no element satisfies
 
 
@@ -2217,6 +2266,7 @@ from UnderReview on Approve when none PendingInterviewers each == ""
 
 
 ---
+
 # Aggregate boolean
 
 
@@ -2238,6 +2288,7 @@ rule Items.all(> 0) because "All items must be positive"
 
 
 ---
+
 # Aggregate numeric
 
 
@@ -2259,6 +2310,7 @@ field Total as decimal -> Items.sum(.amount)
 
 
 ---
+
 # Conditional count
 
 
@@ -2512,6 +2564,7 @@ Rationale:
 
 
 ---
+
 # Collection-Level Constraint Rules Research — Frank
 
 
@@ -3237,6 +3290,7 @@ Rules relating a scalar aggregate of a collection to a threshold or another fiel
 
 
 ---
+
 # Uniqueness — elements must be distinct
 
 
@@ -3258,6 +3312,7 @@ field Approvers as set of string unique
 
 
 ---
+
 # Collection notempty — at least one element required (alias for mincount 1)
 
 
@@ -3279,6 +3334,7 @@ field LineItems as set of number notempty
 
 
 ---
+
 # Cross-collection subset
 
 
@@ -3300,6 +3356,7 @@ field SelectedOptions as set of string subset AvailableOptions
 
 
 ---
+
 # Cross-collection disjoint
 
 
@@ -3414,6 +3471,7 @@ field PrimaryContacts as set of string disjoint BackupContacts
 
 
 ---
+
 # All elements satisfy a predicate
 
 
@@ -3439,6 +3497,7 @@ rule Items.all(item, item > 0)
 
 
 ---
+
 # At least one element satisfies
 
 
@@ -3464,6 +3523,7 @@ rule Reviewers.any(reviewer, reviewer != "")
 
 
 ---
+
 # State-scoped element constraint
 
 
@@ -3489,6 +3549,7 @@ in Review ensure Scores.all(score, score >= 1 and score <= 5)
 
 
 ---
+
 # Guard with quantifier
 
 
@@ -3911,6 +3972,7 @@ For every collection rule that requires runtime checking, the compiler must:
 
 
 ---
+
 # Readability Review: combined-design-v2.md (2026-07-17)
 
 
@@ -4016,6 +4078,7 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 ---
+
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
 
 
@@ -4336,6 +4399,7 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 ---
+
 # Decision: Combined Design v2 Comprehensive Revision Pass
 
 
@@ -4933,6 +4997,7 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 ---
+
 # George — Technical Review: combined-design-v2.md
 
 
@@ -5359,6 +5424,7 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 
 
 ---
+
 # Calculated Field Arrow Direction: `<-` vs `->` Analysis
 
 
@@ -6010,6 +6076,7 @@ Compare the two:
 
 
 ---
+
 # Current (->)
 
 
@@ -6043,6 +6110,7 @@ field Net as number positive -> Subtotal - Tax
 
 
 ---
+
 # Proposed (<-)
 
 
@@ -6520,6 +6588,7 @@ The right-pointing arrow:
 
 
 ---
+
 # Design Session Round 1: Catalog-Driven Parser Full Vision
 
 
@@ -6657,6 +6726,7 @@ See `## For George` section in the design doc. Key areas: `Entries` replacing `L
 
 
 ---
+
 # Decision: Catalog-Driven Parser Design — Round 3 Resolutions
 
 
@@ -7024,6 +7094,7 @@ None. All decisions locked and documented above.
 
 
 ---
+
 # Frank — `writable` Field Modifier Review
 
 
@@ -7437,6 +7508,7 @@ Items 2–4 are doc-only and may land in the same commit as item 1.
 
 
 ---
+
 # Decision Note: Catalog-Driven Parser Design Round 2
 
 
@@ -7854,6 +7926,7 @@ fixes at design time.
 
 
 ---
+
 # Soup Nazi — Writable Coverage Review
 
 
@@ -9114,6 +9187,7 @@ Both fixes are one-liners or near-one-liners. No soup until then.
 
 
 ---
+
 # Decision: Access-mode shorthand grammar and AST split
 
 
@@ -9476,6 +9550,7 @@ v8 approved after fix verification — proceed to Phase 2.
 
 
 ---
+
 # George's Review of catalog-parser-design-v8.md
 
 
@@ -10098,6 +10173,7 @@ v8 is substantially correct — the OmitDeclaration split is clean, the FieldTar
 
 
 ---
+
 # Deep Re-Review: Catalog Extensibility CS8509 Enforcement
 
 
@@ -10517,6 +10593,7 @@ After these fixes, every catalog enum switch in the parser will use the same pat
 
 
 ---
+
 # Enum Deviation Review — `feature/catalog-extensibility`
 
 
@@ -11257,6 +11334,7 @@ The only remaining caveat is the observation under B1: if a developer adds a new
 
 
 ---
+
 # Deviation Review: George's Catalog Extensibility Implementation
 
 
@@ -11500,6 +11578,7 @@ Wait — correction: `_ =>` in a switch expression **does** suppress CS8509 beca
 
 
 ---
+
 # PRECEPT0018 — Semantic Enum Zero-Slot Analyzer
 
 
@@ -12828,6 +12907,7 @@ These are the catalog enums where the first semantic member currently sits at im
 
 
 ---
+
 # Spike Mode Is First-Class
 
 
@@ -12917,6 +12997,7 @@ Spike mode is first-class. It must be activated deliberately, enforced consisten
 
 
 ---
+
 # Zero-Slot Enum Audit — `src/Precept/`
 
 
@@ -13856,6 +13937,7 @@ This policy, if encoded in a Roslyn analyzer or code review checklist, would hav
 
 
 ---
+
 # Decision: ActionSyntaxShape — Explicit 1-Based Integer Values
 
 
@@ -14037,6 +14119,7 @@ Serialized integer values for `ActionSyntaxShape` (if any external system ever p
 
 
 ---
+
 # George → Frank: B1–B7 Fixed — Re-review Requested
 
 
@@ -14278,6 +14361,7 @@ explicit arms for all named members · `#pragma CS8524` to suppress unnamed-inte
 
 
 ---
+
 # Decision: Catalog Extensibility Implementation Complete (PR #138)
 
 
@@ -14454,6 +14538,7 @@ Parser internal only. No grammar, language server, MCP, or sample changes needed
 
 
 ---
+
 # Decision: All Semantic Zero-Slot Enums Use Explicit 1-Based Values
 
 
@@ -14767,6 +14852,7 @@ New enums in `src/Precept/` where all members are semantically meaningful must s
 
 
 ---
+
 # Decision: Map Access Syntax
 
 
@@ -15145,6 +15231,7 @@ CoverageLimits at CheckCoverage.CoverageType
 
 
 ---
+
 # Rule expression
 
 
@@ -15170,6 +15257,7 @@ rule CoverageLimits at CheckCoverage.CoverageType >= 50000
 
 
 ---
+
 # Action body
 
 
@@ -15199,6 +15287,7 @@ from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.Cover
 
 
 ---
+
 # Event guard
 
 
@@ -15265,6 +15354,7 @@ from Active on AdjustCoverage
 
 
 ---
+
 # Advisory: Map Access Keyword — `at` vs `for`
 
 
@@ -15824,6 +15914,7 @@ CoverageLimits at CheckCoverage.CoverageType
 
 
 ---
+
 # Decision: Map Access Keyword — `for` vs `at`
 
 
@@ -16061,6 +16152,7 @@ The only counterargument for `at` is familiarity for developers who know `dict.a
 
 
 ---
+
 # Decision Record: `map` Access Keyword — Working Syntax `for`, Decision Open
 
 
@@ -16344,6 +16436,7 @@ superseded by `each` — `each` is grammatically correct where `all` would be br
 
 
 ---
+
 # Under consideration:
 
 
@@ -16762,6 +16855,7 @@ collision is non-issue parsing. No change to the approved syntax.
 
 
 ---
+
 # Decision: `ordered` as Collection Modifier vs `sortedset` as Named Type
 
 
@@ -16831,6 +16925,7 @@ Shane proposed reusing the existing `ordered` keyword at the collection level:
 
 
 ---
+
 # Instead of:
 
 
@@ -16852,6 +16947,7 @@ field ApprovalLevels as sortedset of string
 
 
 ---
+
 # Shane's proposal:
 
 
@@ -17327,6 +17423,7 @@ The `ordered` modifier has one meaning, one valid application site, and zero amb
 
 
 ---
+
 # Decision: `sorted` as Collection-Level Modifier vs `sortedset` as Named Type
 
 
@@ -17679,6 +17776,7 @@ field Tags as set of string notempty maxcount 10
 
 
 ---
+
 # → still a hash-backed set; notempty and maxcount are constraints on values
 
 
@@ -17696,6 +17794,7 @@ field Tags as set of string notempty maxcount 10
 
 
 ---
+
 # → if you remove those modifiers, you still have the same underlying type
 
 
@@ -17721,6 +17820,7 @@ field Tags as set of string sorted
 
 
 ---
+
 # → tree-backed set; sorted iteration; safe .min/.max
 
 
@@ -17738,6 +17838,7 @@ field Tags as set of string sorted
 
 
 ---
+
 # → if you remove `sorted`, you have a fundamentally different type
 
 
@@ -18127,6 +18228,7 @@ The remaining objections are not merely grammar preferences. They reflect struct
 
 
 ---
+
 # Decision: Priorityqueue Design — Five Open Questions Resolved
 
 
@@ -18574,6 +18676,7 @@ The second `ScalarType` (after `priority`) must be orderable — numeric types, 
 
 
 ---
+
 # Collection Surface Re-evaluation: Three Challenges Answered
 
 
@@ -19330,6 +19433,7 @@ In this taxonomy, there are no "base types" — every type IS its contract. `que
 
 
 ---
+
 # `list of T` — Oversight Acknowledgment and Full Evaluation
 
 
@@ -19911,6 +20015,7 @@ This is not a reject — ring buffer was rejected on philosophy grounds (silent 
 
 
 ---
+
 # Decision: `sortedset of T` — Value Assessment
 
 
@@ -20126,6 +20231,7 @@ field ApprovalLevels as sortedset of choice("team-lead", "director", "vp", "cfo"
 
 
 ---
+
 # .max is always safe
 
 
@@ -20151,6 +20257,7 @@ field ApprovalLevels as set of choice("team-lead", "director", "vp", "cfo") orde
 
 
 ---
+
 # .max is also always safe — identical proof obligation
 
 
@@ -20407,6 +20514,7 @@ If Precept ever adds ordered-iteration constructs, the design review at that tim
 
 
 ---
+
 # ScalarType Extension — Temporal and Business-Domain Inner Types
 
 
@@ -21336,6 +21444,7 @@ PriceQualifier    :=  in '<currency>/<unit>'
 
 
 ---
+
 # `choice(...)` Design Analysis
 
 
@@ -21549,6 +21658,7 @@ from Active on SetPriority
 
 
 ---
+
 # Comparison also valid — identical sequence, same rank
 
 
@@ -21590,6 +21700,7 @@ from Active on SetPriority when SetPriority.Level > Priority
 
 
 ---
+
 # Subset arg — different choice set → still a type error
 
 
@@ -21759,6 +21870,7 @@ The `of` keyword here is the same connector used in `set of T` — it specifies 
 
 
 ---
+
 # String choice (current behavior preserved)
 
 
@@ -21780,6 +21892,7 @@ field Status as choice("draft", "active", "closed") default "draft"
 
 
 ---
+
 # Integer choice — explicit codes
 
 
@@ -21801,6 +21914,7 @@ field ErrorCode as choice of integer(0, 404, 500) default 0
 
 
 ---
+
 # Decimal choice — fixed rate tier
 
 
@@ -21822,6 +21936,7 @@ field TaxRate as choice of decimal(0.0, 0.05, 0.10, 0.20) default 0.0
 
 
 ---
+
 # Event arg with typed choice
 
 
@@ -22795,6 +22910,7 @@ field Priority as choice("Low","Medium","High") default "Low"
 
 
 ---
+
 # Can I do this?
 
 
@@ -23343,6 +23459,7 @@ The thing I want to say plainly: **the current design is incomplete, not wrong.*
 
 
 ---
+
 # What the sealed vocabulary model looks like in practice
 
 
@@ -23372,6 +23489,7 @@ field Notes as string writable
 
 
 ---
+
 # These compile:
 
 
@@ -23401,6 +23519,7 @@ set Priority = EscalationEvent.Target                # Target as choice("High","
 
 
 ---
+
 # These are type errors:
 
 
@@ -23576,6 +23695,7 @@ field Priority as choice("Low", "Medium", "High") default "Low"
 
 
 ---
+
 # Valid — {"Low","Medium"} ⊆ {"Low","Medium","High"}
 
 
@@ -23605,6 +23725,7 @@ from Active on Triage
 
 
 ---
+
 # Valid — {"High"} ⊆ {"Low","Medium","High"}
 
 
@@ -23634,6 +23755,7 @@ from Active on MarkUrgent
 
 
 ---
+
 # TYPE ERROR — "Critical" ∉ {"Low","Medium","High"}
 
 
@@ -23663,6 +23785,7 @@ from Active on Escalate
 
 
 ---
+
 # TYPE ERROR — superset: field may hold "Low" which isn't in arg's set
 
 
@@ -23757,6 +23880,7 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 
 ---
+
 # Declared ranks: Low=1, Medium=2, High=3
 
 
@@ -23826,6 +23950,7 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 
 ---
+
 # Concrete example — assignment valid, ordinal comparison valid
 
 
@@ -23855,6 +23980,7 @@ from Active on Triage when Triage.Level < Priority
 
 
 ---
+
 # Assignment valid, ordinal comparison TypeMismatch (reversed order)
 
 
@@ -23904,6 +24030,7 @@ from Active on InvertedTriage when InvertedTriage.Level < Priority  # TypeMismat
 
 
 ---
+
 # Declaration order = rank order for all types
 
 
@@ -23925,6 +24052,7 @@ field ErrorCode as choice of integer(200, 404, 500) ordered default 200
 
 
 ---
+
 # Ranks: 200=1, 404=2, 500=3 — author listed ascending; natural and declared order agree
 
 
@@ -23950,6 +24078,7 @@ field SeverityCode as choice of integer(500, 404, 200) ordered default 500
 
 
 ---
+
 # Ranks: 500=1, 404=2, 200=3 — deliberately reversed; the author controls this
 
 
@@ -23967,6 +24096,7 @@ field SeverityCode as choice of integer(500, 404, 200) ordered default 500
 
 
 ---
+
 # 500 < 404 < 200 by declared rank
 
 
@@ -24069,6 +24199,7 @@ ChoiceValueExpr   := StringLiteral | IntegerLiteral | DecimalLiteral | NumberLit
 
 
 ---
+
 # String choice — unchanged
 
 
@@ -24090,6 +24221,7 @@ field Status as choice("draft", "active", "closed") default "draft"
 
 
 ---
+
 # Integer choice — HTTP status codes, numeric tiers
 
 
@@ -24111,6 +24243,7 @@ field ErrorCode as choice of integer(200, 404, 500) ordered default 200
 
 
 ---
+
 # Decimal choice — exact rate tiers (base-10 precision required)
 
 
@@ -24132,6 +24265,7 @@ field TaxRate as choice of decimal(0.00, 0.05, 0.10, 0.20) default 0.00
 
 
 ---
+
 # Number choice — threshold picker (IEEE 754 precision acceptable for this domain)
 
 
@@ -24153,6 +24287,7 @@ field AlertThreshold as choice of number(1500, 2500, 5000) default 2500
 
 
 ---
+
 # Boolean choice — full domain declared explicitly
 
 
@@ -24174,6 +24309,7 @@ field IsActive as choice of boolean(true, false) default true
 
 
 ---
+
 # Event arg using typed choice — subset subtype applies
 
 
@@ -24308,6 +24444,7 @@ from Active on SetRate
 
 
 ---
+
 # Lexicographic — "High" < "Low" < "Medium"
 
 
@@ -24325,6 +24462,7 @@ from Active on SetRate
 
 
 ---
+
 # A comparison Priority > "Low" returns true when Priority == "High" — backwards
 
 
@@ -24628,6 +24766,7 @@ This question is independent of the subset subtype model (§2), which governs ch
 
 
 ---
+
 # Decision Record: Choice Field Diagnostic Messages
 
 
@@ -25135,6 +25274,7 @@ field Priority as choice("Low", "Medium", "High") default "Low"
 
 
 ---
+
 # "Critical" is not in {"Low","Medium","High"}
 
 
@@ -25164,6 +25304,7 @@ from Active on Escalate
 
 
 ---
+
 # "Critical" and "Urgent" both outside the field's set
 
 
@@ -25567,6 +25708,7 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 
 ---
+
 # Declared ranks: Low=1, Medium=2, High=3
 
 
@@ -25584,6 +25726,7 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 
 ---
+
 # Rank conflict: in this arg, Medium=1 and Low=2 — inverted from the field
 
 
@@ -25917,6 +26060,7 @@ For `choice of integer` and `choice of decimal` values, no string quotes are use
 
 
 ---
+
 # Design Consultation: `lookup` and `queue by P` Language Surface
 
 
@@ -26410,6 +26554,7 @@ rule each claim in ClaimQueue (claim.value.length > 5)
 
 
 ---
+
 # Design Decision: `priorityqueue` Backing Structure and Tiebreak Guarantee
 
 
@@ -26745,6 +26890,7 @@ The bucket model is the implementation. The spec exposes the contract only.
 
 
 ---
+
 # Design Advisory: `priorityqueue` Syntax Alternatives
 
 
@@ -27250,6 +27396,7 @@ Owner to pick one:
 
 
 ---
+
 # Frank — whitespace-insensitivity docs sync
 
 
@@ -27379,6 +27526,7 @@ This is the enduring design intent of Precept's keyword-led surface:
 
 
 ---
+
 # WSI Implementation Decisions (Slices 2–5)
 
 
@@ -27684,6 +27832,7 @@ This is the enduring design intent of Precept's keyword-led surface:
 
 
 ---
+
 # Owner Decision: choice of T — Explicit Element Type Required
 
 
@@ -27825,6 +27974,7 @@ A new diagnostic is needed: choice(...) without of T → error pointing the auth
 
 
 ---
+
 # WSI Test Coverage: Findings and Coverage Gaps
 
 
@@ -28279,6 +28429,7 @@ The project's canonical regression protocol requires 4 rounds of `precept_compil
 
 
 ---
+
 # Frank gap analysis inbox
 
 
@@ -28432,6 +28583,7 @@ Requested by: Shane
 
 
 ---
+
 # George gap analysis inbox — parser implementation
 
 
@@ -29365,6 +29517,7 @@ Pragmatic sequencing: **GAP-2 immediately** (five lines, zero design risk), **GA
 
 
 ---
+
 # Parser Gap Fixes — Catalog Compliance Audit Decision
 
 
@@ -29510,6 +29663,7 @@ If additional multi-token operators enter the language (beyond `is set`/`is not 
 
 
 ---
+
 # Decision: Catalog Compliance Verdict on Parser Gap Fixes
 
 
@@ -29695,6 +29849,7 @@ An operator must exist in the Operators catalog even if the parser doesn't read 
 
 
 ---
+
 # Decision: Catalog Vision Ordering — Strengthened Wording
 
 
@@ -29816,6 +29971,7 @@ The principle was implicitly present in the document's existing "Completeness Pr
 
 
 ---
+
 # Decision: Expression Form Catalog Placement — Separate vs. Extend Constructs
 
 
@@ -30380,6 +30536,7 @@ The analysis is clear enough that I don't see a remaining open question. If Shan
 
 
 ---
+
 # Decision: Expression Forms Do Not Get a Catalog
 
 
@@ -30565,6 +30722,7 @@ The catalog system's Completeness Principle asks: "If I enumerated every catalog
 
 
 ---
+
 # Decision: Expression Forms Belong in the Catalog (Revised)
 
 
@@ -30958,6 +31116,7 @@ Should expression forms be a separate 13th catalog (`ExpressionForms`) or an ext
 
 
 ---
+
 # Parser vs. Spec: Full Audit — Frank
 
 
@@ -32247,6 +32406,7 @@ Before marking any of these gaps as fixed, the test suite must have:
 
 
 ---
+
 # Decision: Parser Gap Fixes Implementation Plan
 
 
@@ -32425,6 +32585,7 @@ Before marking any of these gaps as fixed, the test suite must have:
 
 
 ---
+
 # George — Architectural Concerns from Parser Gap Plan Review
 
 
@@ -32718,6 +32879,7 @@ _End of George's architectural concerns inbox item._
 
 
 ---
+
 # Decision: Full-Vision Annotation-Bridge Pattern
 
 
@@ -33269,6 +33431,7 @@ These are complementary layers:
 
 
 ---
+
 # Phase 2 Gap Audit
 
 
@@ -33786,6 +33949,7 @@ Gap 1 is the only one that requires a new slice. Gaps 2–4 are addenda to exist
 
 
 ---
+
 # Pre-Implementation Q&A — Phase 2 Blockers
 
 
@@ -34053,6 +34217,7 @@ Full-text search of `docs/language/precept-language-spec.md` for both `OperatorF
 
 
 ---
+
 # Phase 2b Decision Notes — OperatorMeta DU Restructure
 
 
@@ -34306,6 +34471,7 @@ case additions) → **2274 passing, 0 failing**.
 
 
 ---
+
 # Decision Note — Phase 2c Complete (Slices 23–26)
 
 
@@ -34491,6 +34657,7 @@ Phase 2c closes the PRECEPT0019 promotion work. All four slices landed in a sing
 
 
 ---
+
 # Decision Note: Phase 2d Complete — Parser.cs Structural Split
 
 
@@ -34652,6 +34819,7 @@ Phase 2d (Slice 27) is the only slice in this phase. Phase 2d is now complete.
 
 
 ---
+
 # Full Architecture Review — spike/Precept-V2
 
 
@@ -35330,6 +35498,7 @@ This branch is ready to merge to main.
 
 
 ---
+
 # George: G2 + G3 Fix — RS1030 and Phase 3 CatalogEnumNames TODO
 
 
@@ -35584,6 +35753,7 @@ enforcement takes effect immediately.
 **What:** Implement the type checker on the current spike branch. No GitHub issue — skip the formal issue/PR workflow. This is a spike implementation.
 
 **Why:** User request — captured for team memory
+
 # Catalog-Driven Type Checker Design Review
 
 
@@ -36172,6 +36342,7 @@ The recurring theme is: **Precept's type system is closed and small enough to pr
 **What:** Updated `docs/language/precept-language-spec.md` §3.7 to expand `min`, `max`, `abs`, `clamp`, and `round(value, places)` into explicit primitive-numeric, money, and quantity overload rows. Documented same-qualifier requirements, qualifier-preserving results, and clarified that the `round(value, places)` bridge semantics apply only within the primitive numeric lanes.
 
 **Why:** Align the public language spec with the existing `Functions` catalog and close GAP-047 without any code changes.
+
 # Frank — Iteration 11 doc/catalog audit findings
 
 
@@ -36223,6 +36394,7 @@ Date: 2026-05-02
 - Do the intrinsic `notempty` semantics on identity types belong in the public spec as language behavior, or should they be demoted from catalog metadata?
 
 - Do CI string-function rules need richer catalog metadata (e.g. CI-sensitive parameter position), or is out-of-band checker logic the intended design?
+
 # Decision: Parser Catalog-Driven Review Complete
 
 
@@ -36268,6 +36440,7 @@ Completed a full catalog-driven design review of the parser (`src/Precept/Pipeli
 
 
 Review written to: `docs/working/frank-catalog-driven-parser-review.md`
+
 # George's Catalog-Driven Type Checker Review
 
 
@@ -36975,6 +37148,7 @@ The modifier bounds-pair issue (Gap C) is lower-priority but real. The parser pa
 
 
 Frank should decide whether Proposals 1-3 are blocking the slice plan or deferred debt. My read: Proposals 2 and 3 are genuine Slice 4 blockers because they directly cause hardcoded per-TypeKind switches in Slice 4 itself. Proposal 1 is a Slice 5 blocker for the same reason.
+
 # George — Iteration 11 Catalog-Impl Audit Findings
 
 
@@ -37108,6 +37282,7 @@ The following priority areas from the task brief were checked and found clean:
 - **`Modifiers.CollectionTypes`**: ✅ Correctly includes all 9 collection types for mincount/maxcount per spec §3.8 table.
 
 - **Lexer**: ✅ Fully catalog-driven (keywords, operators, punctuation all via Tokens catalog).
+
 # Decision: Parser Rebuild Rejected — Path C (Targeted Improvements) Selected
 
 **By:** Frank (Lead/Architect)  
@@ -37136,6 +37311,7 @@ Shane asked: "Should we delete the parser and re-implement as a radical idea?"
 ## Principle
 
 Don't rebuild infrastructure to satisfy architectural aesthetics before building the thing that reveals whether the aesthetics are correct.
+
 # Decision Note: Parser Rebuild Reassessment (AI Velocity Correction)
 
 **Author:** Frank  
@@ -37160,6 +37336,7 @@ Shane corrected Frank's 1-2 week rebuild estimate by noting the entire parser wa
 ## If Path B Is Chosen Anyway
 
 Lock the stashed-guard pattern design before starting. It's the gap that breaks the slot-sequential model most fundamentally and has no plausible workaround without new design work.
+
 # Decision: Slots Field Removed from ConstructMeta (Radical Parser Design)
 
 **Author:** Frank (Lead/Architect)  
@@ -37180,6 +37357,7 @@ The `ImmutableArray<ConstructSlot> Slots` field is removed from `ConstructMeta` 
 ## Extraction Utility
 
 `ExtractNamedCaptures(ParseRule grammar)` walks the combinator tree, collects all `Tag` node names, and returns `ImmutableArray<string>`. Called once per `ConstructMeta` at catalog initialization.
+
 # Decision: Slots as a Separate Catalog Concept — Drop Them
 
 **Author:** Frank (Lead/Architect)  
@@ -37313,6 +37491,7 @@ The design doc's note *"keep — used for documentation/tooling"* was defensive 
 - Remove the comment "keep — used for documentation/tooling"
 - Add a note: "Named parse positions (slots) are expressed via `Tag` nodes in `Grammar`. A `ExtractNamedCaptures(grammar)` helper derives the named-capture list at startup for tooling consumers."
 - The two-sentence clarification "Both say the same thing; `Grammar` is the executable form" must go — it was the tell that we were maintaining parallel truth.
+
 # George Pipeline Review Complete
 
 **Author:** George (Runtime Dev)
@@ -37382,6 +37561,7 @@ The reviews are ready for discussion. Before Frank and George align on a final i
 2. **`ResolutionShape` timing** — Frank marks this P1 (add to ExpressionFormMeta before implementing `Resolve()`). George marks it P3 (implement baseline checker first, add as post-green refactor). Shane should decide whether to design metadata and its consumer simultaneously or sequentially.
 
 ---
+
 # Decision: Delete AST SyntaxNodes and AstNodeTests
 
 **Date:** 2026-05-03  
@@ -37417,6 +37597,7 @@ The clean-slate approach mirrors what was already done with the TypeChecker stub
 0 errors, 0 warnings.
 
 ---
+
 # Decision: Parser and AST Stubbed
 
 **Author:** Frank  
@@ -37474,6 +37655,7 @@ public static class Parser
 Owner-directed cleanup. The existing parser was a complete recursive-descent implementation from the incremental-build era. The architecture is moving toward a catalog-driven radical parser design. Stubbing clears the deck for the new implementation without leaving dead code that misleads contributors.
 
 ---
+
 # Decision: Per-Consumer Pipeline Implementation Recommendations
 
 **Author:** Frank (Lead/Architect)  
@@ -37493,6 +37675,7 @@ Owner-directed cleanup. The existing parser was a complete recursive-descent imp
 5. **Language Server is green-field catalog-driven from day one.** Zero per-construct LS code. Five generic handlers, each <50 lines, dispatching on catalog metadata and pipeline output. No legacy to accommodate.
 
 ---
+
 # Decision: Proof-Discharge Cataloging Depth
 
 **By:** Frank  
@@ -37534,6 +37717,7 @@ If discharge requires walking or interpreting a guard expression → algorithm.
 Over-cataloging is worse than under-cataloging for Precept. A false discharge in metadata means a runtime fault slips through undetected — violating the prevention guarantee. The algorithmic discharge layer (~60 lines of interval reasoning) must be manually updated when new obligation kinds are added, but obligation kinds change extremely rarely (5 total, all stable) and the algorithm has exhaustive unit tests by design.
 
 ---
+
 # Decision: Semantic Constraint Metadata Placement
 
 **Author:** Frank (Lead/Architect)  
@@ -37580,6 +37764,7 @@ record CrossConstructConstraint(string SlotName, ReferenceNamespace TargetNamesp
 | Documentation generators | Self-documenting grammar: each slot declares what it means, not just what it parses. |
 
 ---
+
 # Decision: Option F AST Stub — Generic ParsedConstruct + SlotValue DU
 
 **Date:** 2026-05-03  
@@ -37640,6 +37825,7 @@ Option F was chosen over per-construct typed AST nodes (38 files, just deleted) 
 - Updated: `src/Precept/Pipeline/GraphAnalyzer.cs` (`AnalyzeExpression` now takes `ParsedConstruct construct`)
 
 ---
+
 # Decision: Remove `[HandlesCatalogExhaustively]` from Pipeline Consumers
 
 **Author:** Frank (Lead/Architect)  
@@ -37716,6 +37902,7 @@ The annotation-bridge pattern was a scaffolding technique for a per-node-type co
 Remove from consumers. Retain in the catalog layer. The compiler's own exhaustiveness checking (CS8509) is the correct mechanism for catalog switches.
 
 ---
+
 # Decision: Remove [HandlesCatalogExhaustively] / [HandlesCatalogMember] from pipeline consumer stubs
 
 **By:** Frank  
@@ -37761,6 +37948,7 @@ Any test that enforces annotation presence via reflection must be removed alongs
 **Supersedes:** Earlier split routing that treated ASCII as Elaine-only work and Mermaid as Frank's default rendering surface.
 
 ---
+
 # Decision: Ensure BecauseClause slot split closed at the catalog layer
 
 **Date:** 2026-05-03
@@ -37778,6 +37966,7 @@ Any test that enforces annotation presence via reflection must be removed alongs
 **Pattern:** When one `ConstructSlotKind` appears in constructs with different optionality, introduce a named `SlotOpt...` sibling instead of mutating the shared required slot instance.
 
 ---
+
 # Decision: StateEntryList owns the full state-entry modifier surface
 
 **Date:** 2026-05-03
@@ -37791,6 +37980,7 @@ Any test that enforces annotation presence via reflection must be removed alongs
 **Why:** The catalog shape, language spec, and grammar examples already agree on `(name state-modifier*)` entries. The grammar anatomy prose should describe the whole modifier family rather than sounding `initial`-only.
 
 ---
+
 # Decision note: catalog schema diagram baseline is 13 catalogs
 
 **Date:** 2026-05-03
@@ -37802,6 +37992,7 @@ Any test that enforces annotation presence via reflection must be removed alongs
 **What:** Any catalog-system schema diagram should model **13 catalogs**, not 12: `ExpressionForms` is the 13th live catalog, and `ConstructSlotKind` is a supporting enum, not a catalog. The full research memo was intentionally not copied into `decisions.md` to avoid ledger bloat; it was summarized here before inbox cleanup.
 
 **Reference:** `frank-catalog-schema-diagram.md` (inbox memo deleted after merge; recoverable from git history if the full inventory/mapping details are needed).
+
 # Frank — Catalog Schema Doc Complete
 
 **Date:** 2026-05-03T11:12:30.425-04:00
@@ -37940,6 +38131,7 @@ No existing sections were restructured or rewritten. The new section was inserte
 **Next wave item:** CC#25 (Execution Dispatch Design) and CC#2 (SlotValue Subtype Shapes) — present briefs when Shane is ready.
 
 ---
+
 # TypeRuntimes Construction — Architecture Decision
 
 **Author:** Frank  
@@ -38054,6 +38246,7 @@ None from Frank. The following are sequencing dependencies that affect when the 
 - Collection-type `TypeRuntimeMeta` entries (Set, Queue, Log, Bag, etc.) depend on element-type parameterization. The `BuildRuntimes()` factory must have access to element-type runtime metadata at construction time — which means collection runtimes are composed after scalar runtimes, within the same initializer.
 
 ---
+
 # `in PreceptValue` / `out PreceptValue` / `ref` asymmetry — CC#25 JSON API
 
 **Date:** 2026-05-04  
@@ -38116,6 +38309,7 @@ void WriteJson(Utf8JsonWriter writer, in PreceptValue slot)
 The previously recorded `ref PreceptValue` on `ReadJson` is superseded by `out PreceptValue`. The `in PreceptValue` addition to `WriteJson` is new. All other `TypeRuntimeMeta` surface decisions recorded in the 2026-05-03 session ledger remain in force.
 
 ---
+
 # Collection types and `in PreceptValue` — does the slot abstraction hold?
 
 **Date:** 2026-05-03  
@@ -38256,6 +38450,7 @@ The linked-list concern is real but is fully resolved by the two-level model:
 The `in PreceptValue slot` decision was never "collections are stored as arrays." It was "every field's logical representation fits in a 32-byte tagged slot." That claim holds. Collection fields hold a heap *reference* in the slot. That reference is passed zero-copy via `in`. What the reference points to is an implementation detail.
 
 ---
+
 # Stack-Only Evaluator — Shane's Directive
 
 **Author:** Frank  
@@ -38451,6 +38646,7 @@ Option A (row-level only) would have provided only pass/fail per row, not per-cl
 - The `GuardTrace` result shape (per-clause outcome record) needs to be specified in the evaluator design doc
 
 ---
+
 # Evaluation: Opcodes in CompilationResult
 
 **Author:** Frank (Lead Architect)
@@ -38569,6 +38765,7 @@ This is already the canonical design per `docs/compiler-and-runtime-design.md` �
 - CC#25 decision: "runtime baseline is `PreceptValue` plus catalog-owned delegate dispatch"
 
 ---
+
 # CC#25: Collections + TypeRuntimeMeta Q&A
 
 **Date:** 2026-05-03  
@@ -39058,4 +39255,3 @@ The prior Q6 answer described enforcement in builder Pass 5. This revision moves
 | User feedback timing | At app startup | While authoring |
 
 The `ExecutionPlan.MaxStackDepth` field remains useful for debug assertions but is no longer the enforcement point.
-

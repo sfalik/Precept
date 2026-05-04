@@ -4,7 +4,7 @@
 
 | Property | Value |
 |---|---|
-| Doc maturity | Design — public surface approved, entity internals (R3) pending |
+| Doc maturity | Design — public surface locked (CC#25 Q2/Q5/Q7 accepted); entity internals (R3) pending |
 | Implementation state | Partial stub (`Precept.cs` and `Version.cs` exist; all operation bodies throw `NotImplementedException`) |
 | Source | `src/Precept/Runtime/Precept.cs`, `src/Precept/Runtime/Version.cs` |
 | Upstream | Compiler pipeline (`Compilation`) |
@@ -23,20 +23,18 @@ The runtime API is the boundary between Precept and host applications. It has fo
 
 The API surface is deliberately small. Two types carry the entire public contract: `Precept` (the executable model, definition-level queries, construction) and `Version` (entity snapshot, instance-level operations and inspection). `Precept` mirrors `Version`'s commit/inspect pattern: `Create` / `InspectCreate` parallel `Fire` / `InspectFire`.
 
-### Metadata-First Principle
+### Two-Lane Ingress Principle
 
-**The runtime API must use typed metadata descriptors from the executable model — not raw strings — for field names, event names, state names, and arg names.** Every identifier that appears in the public API (parameters, return types, structural queries) should be backed by a model-owned descriptor that carries the full compiled metadata: name, type, slot index, access mode, declared constraints, etc.
+**The runtime API accepts two and only two ingress shapes for all mutable operations — no more, no less.**
 
-This principle applies throughout:
-- `Fire` and `Update` accept descriptors (or descriptor-keyed dictionaries), not string-keyed dictionaries.
-- `AvailableEvents` returns event descriptors, not event name strings.
-- `FieldAccess` returns field descriptors, not field info records with string names.
-- `RequiredArgs` returns arg descriptors, not string/type pairs.
-- Inspection types (`FieldSnapshot`, `ConstraintResult`, etc.) reference descriptors, not string identifiers.
+- **JSON lane** (`JsonElement?`) — for wire callers: MCP tools, HTTP APIs, deserialization pipelines. Callers that have a JSON string use `JsonDocument.Parse(str).RootElement` inline. No string-input convenience overloads exist.
+- **Typed lane** (`Action<IArgBuilder>?` for event args; `Action<IFieldBuilder>?` for field patches) — for in-process callers that work with typed CLR values. Zero-boxing via `TypeRuntime<T>`.
 
-The executable model owns these descriptors. They are created during `Precept.From()` and are the canonical identity for every declared element. Callers obtain descriptors from the model and pass them back to operations — no string-based lookup at the API boundary.
+**There are no `IReadOnlyDictionary<string, object?>` overloads anywhere.** That provisional convenience lane is fully obsolete and superseded by these two lanes (CC#25 Q5/Q7).
 
-> **Current state:** The stubs below use `string` placeholders where descriptors will go. These will be replaced with typed descriptors when D8/R4 (executable model contract) is resolved. Every `string` parameter or return type annotated with `// TODO D8/R4: replace with descriptor` is a known provisional placeholder.
+**Restore is JSON-only.** `Restore(string? state, JsonElement fields)` has no typed overload. Restore is a hydration path from persisted storage — storage always provides serialized data, so in-process callers never need a typed Restore lane.
+
+**Typed output via `PreceptValue`.** Field values read back from `Version` (via the indexer or `FieldAccess`) are `PreceptValue`. Convert via `ToClr<T>()` or `ToJson()`. `FiredArgs` carries submitted arg values for egress using the same `Get<T>()` pattern.
 
 ---
 
@@ -58,11 +56,11 @@ The runtime API surface is deliberately minimal: two types (`Precept` and `Versi
 
 **Inputs:**
 - `Compilation` → `Precept.From()` — the compiled artifact; must be error-free
-- `state`, `fields` → `Precept.Restore()` — persisted entity state for validated reconstruction
-- `args` → `Precept.Create()` / `Version.Fire()` — event arguments (keyed by arg name)
-- `fields` → `Version.Update()` — field patch dictionary (all fields applied atomically)
-- `eventName`, `args?` → `Version.InspectFire()` — event name with optional arg refinement
-- `fields?` → `Version.InspectUpdate()` — optional hypothetical field patch
+- `state`, `fields` → `Precept.Restore()` — persisted entity state for validated reconstruction (`JsonElement` only)
+- `args` → `Precept.Create()` / `Version.Fire()` — event arguments; `JsonElement?` (JSON lane) or `Action<IArgBuilder>?` (typed lane)
+- `fields` → `Version.Update()` — field patch; `JsonElement?` (JSON lane) or `Action<IFieldBuilder>?` (typed lane), applied atomically
+- `eventName`, `args?` → `Version.InspectFire()` — event name with optional arg refinement; both lanes
+- `fields?` → `Version.InspectUpdate()` — optional hypothetical field patch; both lanes
 
 **Outputs:**
 - `Precept` — the executable model; returned from `Precept.From()`
@@ -93,12 +91,16 @@ If construction fails despite an error-free compilation result, that is a compil
 
 ```csharp
 // Precepts WITH an initial event — args required
-EventOutcome outcome = precept.Create(new Dictionary<string, object?>
-{
-    ["Amount"] = 500.00m,
-    ["ApplicantName"] = "Jane Doe",
-    ["CreditScore"] = 720
-});
+
+// JSON lane (wire callers: MCP, HTTP APIs, deserialization)
+EventOutcome outcome = precept.Create(
+    JsonDocument.Parse("""{"Amount":500.00,"ApplicantName":"Jane Doe","CreditScore":720}""").RootElement);
+
+// Typed lane (in-process callers)
+EventOutcome outcome = precept.Create(
+    args => args.Set<decimal>("Amount", 500.00m)
+               .Set<string>("ApplicantName", "Jane Doe")
+               .Set<int>("CreditScore", 720));
 
 Version version = outcome switch
 {
@@ -139,12 +141,16 @@ public sealed class Precept
     // Construction
     public static Precept From(Compilation compilation);
 
-    // Entity creation — mirrors Version's commit/inspect pattern
-    public EventOutcome Create(IReadOnlyDictionary<string, object?>? args = null);
-    public EventInspection InspectCreate(IReadOnlyDictionary<string, object?>? args = null);
+    // Entity creation — JSON lane (wire callers)
+    public EventOutcome Create(JsonElement? args = null);
+    public EventInspection InspectCreate(JsonElement? args = null);
 
-    // Entity restoration — validated reconstruction from persisted data
-    public RestoreOutcome Restore(string? state, IReadOnlyDictionary<string, object?> fields);
+    // Entity creation — typed lane (in-process callers)
+    public EventOutcome Create(Action<IArgBuilder>? args = null);
+    public EventInspection InspectCreate(Action<IArgBuilder>? args = null);
+
+    // Entity restoration — JSON only (no typed overload for Restore)
+    public RestoreOutcome Restore(string? state, JsonElement fields);
 
     // Definition-level queries (structural — precomputed from graph analysis)
     public IReadOnlyList<string> States { get; }
@@ -175,12 +181,7 @@ public sealed class Precept
 ```csharp
 RestoreOutcome outcome = precept.Restore(
     state: "Approved",
-    fields: new Dictionary<string, object?>
-    {
-        ["Amount"] = 500.00m,
-        ["ApplicantName"] = "Jane Doe",
-        ["CreditScore"] = 720
-    });
+    fields: JsonDocument.Parse("""{"Amount":500.00,"ApplicantName":"Jane Doe","CreditScore":720}""").RootElement);
 
 Version version = outcome switch
 {
@@ -230,23 +231,32 @@ public sealed record Version
     public string? State { get; }                                    // null for stateless precepts
 
     // Field access
-    public object? this[string fieldName] { get; }                   // throws on omitted field
-    public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }       // omit = absent from list
+    public PreceptValue this[string fieldName] { get; }             // throws on omitted field
+    public T Get<T>(string fieldName);                              // typed access via TypeRuntime<T>
+    public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }      // omit = absent from list
 
     // Structural queries (precomputed — zero evaluation cost)
-    public IReadOnlyList<string> AvailableEvents { get; }            // events with rows in current state
-    public IReadOnlyList<ArgInfo> RequiredArgs(string eventName);    // name + type per arg
+    public IReadOnlyList<string> AvailableEvents { get; }           // events with rows in current state
+    public IReadOnlyList<ArgDescriptor> RequiredArgs(string eventName); // typed arg descriptors per arg
 
     // Applicable constraints (Tier 2 — filtered for current state)
     public IReadOnlyList<ConstraintDescriptor> ApplicableConstraints { get; }
 
-    // Commit — require complete input, return one outcome, produce new Version on success
-    public EventOutcome   Fire(string eventName, IReadOnlyDictionary<string, object?> args);
-    public UpdateOutcome  Update(IReadOnlyDictionary<string, object?> fields);
+    // Commit — JSON lane (wire callers)
+    public EventOutcome  Fire(string eventName, JsonElement? args = null);
+    public UpdateOutcome Update(JsonElement? fields = null);
 
-    // Inspect — input optional, return annotated landscape, no mutation
-    public EventInspection   InspectFire(string eventName, IReadOnlyDictionary<string, object?>? args = null);
-    public UpdateInspection  InspectUpdate(IReadOnlyDictionary<string, object?>? fields = null);
+    // Commit — typed lane (in-process callers)
+    public EventOutcome  Fire(string eventName, Action<IArgBuilder>? args = null);
+    public UpdateOutcome Update(Action<IFieldBuilder>? fields = null);
+
+    // Inspect — JSON lane
+    public EventInspection  InspectFire(string eventName, JsonElement? args = null);
+    public UpdateInspection InspectUpdate(JsonElement? fields = null);
+
+    // Inspect — typed lane
+    public EventInspection  InspectFire(string eventName, Action<IArgBuilder>? args = null);
+    public UpdateInspection InspectUpdate(Action<IFieldBuilder>? fields = null);
 }
 ```
 
@@ -263,19 +273,22 @@ public sealed record Version
 - **Immutable snapshot.** Operations return new `Version` instances. Survey evidence overwhelmingly favors this: XState `MachineSnapshot`, CEL activations, CUE `Value`, Dhall `Val`. At Precept's scale (10–50 fields), snapshot creation is sub-microsecond.
 - **`string? State` for stateless precepts.** Stateless precepts have events, hooks, rules, and fields — but no states. `State` is `null`. This is the degenerate case, not a separate type. XState's pattern (state machines are one `ActorLogic` implementation among several) suggests a unified interface. All `EventOutcome` variants except `Transitioned` are reachable for stateless precepts.
 - **Field indexer throws on omitted fields.** An `omit`ted field is structurally absent — it doesn't exist in the current state. Accessing it is a programming error, not a null. `FieldAccess` lists only non-omitted fields, so callers can enumerate what's accessible.
-- **`Update` takes a dictionary.** Multi-field atomic update. The entire patch is applied to a working copy, constraints evaluated against the post-patch state, and either all fields commit or none do. Single-field convenience can be added later as an overload.
-- **`Fire` takes a dictionary for args.** Event args are named and typed. The dictionary maps arg names to values. `InvalidArgs` is returned (not thrown) when the dictionary doesn't match the event's declared contract.
+- **Two ingress lanes for all commit and inspect operations.** The **JSON lane** (`JsonElement?`) serves wire callers — MCP, HTTP APIs, deserialization pipelines — that already have JSON on hand. The **typed lane** (`Action<IArgBuilder>?` for Fire/Inspect, `Action<IFieldBuilder>?` for Update/Create) serves in-process callers that work with typed values. Both lanes cover all callers. There are no `IReadOnlyDictionary<string, object?>` overloads anywhere. Callers with a JSON string use `JsonDocument.Parse(str).RootElement` inline — no string-input convenience overloads.
+- **Typed Restore is deliberately absent.** `Restore` takes `JsonElement` only — no `Action<IFieldBuilder>` overload. Restore is a hydration path from persisted storage, and storage always returns serialized data. In-process code never constructs a Restore call from scratch; callers use Create or Fire instead.
 - **Instance methods delegate to static evaluator.** `Version.Fire(...)` delegates to `Evaluator.Fire(this.Precept, this, ...)`. The Version is a thin facade over the stateless evaluation function (R1). This keeps entity representation separate from evaluation logic.
 - **Applicable constraints are state-scoped.** `Version.ApplicableConstraints` exposes the subset of `Precept.Constraints` that are active for the entity's current state: global rules (always), `in <CurrentState>` residency ensures, `from <CurrentState>` exit ensures, and event ensures for available events. Precomputed from the executable model's scope index — zero evaluation cost. This is the "what must be true here?" surface.
 
 ### Fire
 
 ```csharp
-EventOutcome outcome = version.Fire("submit", new Dictionary<string, object?>
-{
-    ["approver"] = "Jane",
-    ["timestamp"] = DateTimeOffset.UtcNow
-});
+// JSON lane (wire callers)
+EventOutcome outcome = version.Fire("submit",
+    JsonDocument.Parse("""{"approver":"Jane","timestamp":"2026-05-03T23:45:15Z"}""").RootElement);
+
+// Typed lane (in-process callers)
+EventOutcome outcome = version.Fire("submit",
+    args => args.Set<string>("approver", "Jane")
+               .Set<DateTimeOffset>("timestamp", DateTimeOffset.UtcNow));
 
 Version next = outcome switch
 {
@@ -294,11 +307,14 @@ Fire runs the full event pipeline: arg validation → row matching (first-match 
 ### Update
 
 ```csharp
-UpdateOutcome outcome = version.Update(new Dictionary<string, object?>
-{
-    ["email"] = "jane@example.com",
-    ["phone"] = "555-0100"
-});
+// JSON lane (wire callers)
+UpdateOutcome outcome = version.Update(
+    JsonDocument.Parse("""{"email":"jane@example.com","phone":"555-0100"}""").RootElement);
+
+// Typed lane (in-process callers)
+UpdateOutcome outcome = version.Update(
+    fields => fields.Set<string>("email", "jane@example.com")
+                   .Set<string>("phone", "555-0100"));
 
 Version next = outcome switch
 {
@@ -399,24 +415,111 @@ public sealed record FieldAccessInfo(
     string FieldName,
     FieldAccessMode Mode,       // Readonly or Editable
     string FieldType,
-    object? CurrentValue);
+    PreceptValue CurrentValue);
 
 public enum FieldAccessMode { Readonly, Editable }
 ```
 
 Returned by `Version.FieldAccess`. Lists every non-omitted field in the current state with its access mode and current value. `Omit`ted fields are structurally absent — they don't appear in this list.
 
-#### ArgInfo
+#### ArgDescriptor
 
 ```csharp
-public sealed record ArgInfo(string Name, string Type);
+public sealed record ArgDescriptor(string Name, string Type);
 ```
 
 Returned by `Version.RequiredArgs(eventName)`. Enables the UI to render typed input controls for event arguments.
 
+### Ingress Types
+
+#### IArgBuilder
+
+The fluent builder for event arguments, used in the typed lane for `Fire`, `InspectFire`, `Create`, and `InspectCreate`.
+
+```csharp
+public interface IArgBuilder
+{
+    IArgBuilder Set<T>(string name, T value);
+}
+```
+
+Usage: `args => args.Set<decimal>("Amount", 500m).Set<string>("ApplicantName", "Jane")`
+
+Each `Set<T>` call is resolved through the registered `TypeRuntime<T>` for zero-boxing conversion to `PreceptValue`. The builder internally produces a slot array populated via the presence mask. Unset args remain absent; `InvalidArgs` is returned if required args are missing.
+
+#### IFieldBuilder
+
+The fluent builder for field patches, used in the typed lane for `Update`, `InspectUpdate`, `Create`, and `InspectCreate`.
+
+```csharp
+public interface IFieldBuilder
+{
+    IFieldBuilder Set<T>(string name, T value);
+}
+```
+
+Usage: `fields => fields.Set<string>("ApplicantName", "Jane Doe").Set<decimal>("Amount", 500m)`
+
+Each `Set<T>` call is resolved through the registered `TypeRuntime<T>`. The patch is applied atomically — either all fields commit or none do.
+
+### Value Types
+
+#### PreceptValue
+
+The unified value type at the API boundary. All field and arg values are `PreceptValue` when read back from the runtime.
+
+```csharp
+public abstract class PreceptValue
+{
+    // JSON lane conversions
+    public static PreceptValue FromJson(JsonElement element);
+    public JsonElement ToJson();
+
+    // Typed lane conversions (uses registered TypeRuntime<T>)
+    public static PreceptValue FromClr<T>(T value);
+    public T ToClr<T>();
+}
+```
+
+`PreceptValue` is a sealed class hierarchy. Concrete subtypes correspond to Precept's declared types (integer, decimal, text, boolean, etc.). Callers read field values via the indexer (`version["FieldName"]`) and convert using `ToClr<T>()` or `ToJson()`.
+
+#### TypeRuntime\<T\>
+
+Zero-boxing registration record for mapping between CLR types and `PreceptValue`.
+
+```csharp
+public sealed record TypeRuntime<T>(
+    Func<T, PreceptValue> FromClr,
+    Func<PreceptValue, T> ToClr);
+```
+
+Registration pattern:
+
+```csharp
+PreceptRuntime.Register(new TypeRuntime<decimal>(
+    v  => new DecimalValue(v),
+    pv => ((DecimalValue)pv).Value));
+```
+
+Registrations are process-global. `IArgBuilder.Set<T>` and `IFieldBuilder.Set<T>` resolve through registered `TypeRuntime<T>` entries for zero-allocation conversion. `Version.Get<T>()` and `FiredArgs.Get<T>()` use `ToClr` on the registered runtime.
+
+#### FiredArgs
+
+Event arg egress — appears on `EventOutcome` variants that carry submission context (`Transitioned.Args`, `Applied.Args`, `Rejected.Args`). Allows callers to read back what was submitted as strongly-typed values.
+
+```csharp
+public sealed class FiredArgs
+{
+    public PreceptValue this[string name] { get; }
+    public T Get<T>(string name);
+}
+```
+
+`Get<T>` uses the registered `TypeRuntime<T>.ToClr` for the conversion. The `PreceptValue` indexer returns the raw value for callers that want to inspect or serialize it directly.
+
 ### Correctness Invariant
 
-**Inspection and commit share the same evaluation path.** `InspectFire` runs the same pipeline as `Fire` — same guard evaluation, same action chain, same constraint checking. The only difference is disposition: inspection discards the working copy; commit promotes it on success. This is a structural guarantee, not a convention.
+**Inspection and commit share the same evaluation path.** `InspectFire` runs the same pipeline as `Fire`— same guard evaluation, same action chain, same constraint checking. The only difference is disposition: inspection discards the working copy; commit promotes it on success. This is a structural guarantee, not a convention.
 
 **Survey grounding:** XState's `transition()` / `getNextSnapshot()` pair — same code path, different output. CEL's `ExhaustiveEval` — same `Interpretable` tree, different evaluation mode. K8s dry-run — same controller logic, different commit behavior.
 
@@ -437,11 +540,13 @@ Returned by `Version.RequiredArgs(eventName)`. Enables the UI to render typed in
 // No args — all guards with arg-dependent terms are Possible
 EventInspection landscape = version.InspectFire("submit");
 
-// With partial args — refine toward Certain
-EventInspection refined = version.InspectFire("submit", new Dictionary<string, object?>
-{
-    ["approver"] = "Jane"
-});
+// JSON lane — with partial args — refine toward Certain
+EventInspection refined = version.InspectFire("submit",
+    JsonDocument.Parse("""{"approver":"Jane"}""").RootElement);
+
+// Typed lane — with partial args — refine toward Certain
+EventInspection refined = version.InspectFire("submit",
+    args => args.Set<string>("approver", "Jane"));
 
 // Check the reduced answer
 bool canFire = refined.OverallProspect != Prospect.Impossible;
@@ -457,11 +562,13 @@ Returns the full annotated landscape for an event: every row with `Prospect` (Ce
 // No patch — landscape against current field values
 UpdateInspection current = version.InspectUpdate();
 
-// With field patch — see how changes affect constraints and event prospects
-UpdateInspection preview = version.InspectUpdate(new Dictionary<string, object?>
-{
-    ["amount"] = 150.0m
-});
+// JSON lane — see how changes affect constraints and event prospects
+UpdateInspection preview = version.InspectUpdate(
+    JsonDocument.Parse("""{"amount":150.00}""").RootElement);
+
+// Typed lane — same hypothetical using in-process values
+UpdateInspection preview = version.InspectUpdate(
+    fields => fields.Set<decimal>("amount", 150.0m));
 
 // Check which events become available after the hypothetical edit
 foreach (var evt in preview.Events)
@@ -489,7 +596,9 @@ The three-tier constraint exposure model separates three questions that callers 
 
 Conflating these tiers would require callers to filter and re-scope constraint lists themselves — the three-tier model removes that burden.
 
-**Decisions tracking:** R1 ✅ (stateless evaluator), R2 ✅ (result type taxonomy), R5 ✅ (four-method Version surface); R3 (entity representation internals) open; D8/R4 (executable model contract) open.
+**Two-lane ingress design (CC#25 Q5/Q7).** The JSON lane (`JsonElement?`) and typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) are the complete ingress surface. `IReadOnlyDictionary<string, object?>` convenience overloads were considered provisionally and superseded — they added a third shape without covering a third class of callers. JSON + typed covers all real callers without compromising type safety or allocation characteristics.
+
+**Decisions tracking:** R1 ✅ (stateless evaluator), R2 ✅ (result type taxonomy), R5 ✅ (four-method Version surface), CC#25 Q2/Q5/Q7 ✅ (two-lane ingress, PreceptValue, TypeRuntime<T>, FiredArgs, IArgBuilder, IFieldBuilder); R3 (entity representation internals) open; D8/R4 (executable model contract) open.
 
 ---
 
@@ -497,15 +606,14 @@ Conflating these tiers would require callers to filter and re-scope constraint l
 
 ### R3 — Entity Representation Internals
 
-How is `Version` represented internally? The public API is decided; the internal storage is not.
+How is `Version` represented internally? The public API is decided; the internal storage is not formally closed.
 
 | Option | Trade-off |
 |--------|-----------|
-| Slot array (`object?[]`) | O(1) field access via precomputed indices. Requires executable model to resolve field names → slot indices during construction. |
-| Dictionary (`ImmutableDictionary<string, object?>`) | Simpler construction. O(1) amortized but with hashing overhead. |
-| Hybrid (slot array internal, name-based public API) | Best of both — array performance internally, clean API externally. |
+| Slot array (`PreceptValue[]`) | O(1) field access via precomputed indices. Requires executable model to resolve field names → slot indices during construction. Donated directly as `Version.Slots` on commit (CC#25 Q5 — zero-copy promotion). |
+| Hybrid (slot array internal, name-based public API) | Best of both — array performance internally, clean `PreceptValue` API externally. |
 
-Survey evidence favors slot arrays (CEL activations use positional binding; XState snapshots carry structured context). The hybrid is the likely answer but hasn't been formally decided.
+CC#25 Q5 locked zero-copy promotion (`PreceptValue[]` working copy donated as `Version.Slots` on commit). Slot arrays are the direction; the formal R3 close is pending D8/R4.
 
 ### D8/R4 — Executable Model Contract
 
@@ -521,6 +629,7 @@ How does `CreateInitialVersion` work for stateless precepts? No initial state, n
 
 ## Deliberate Exclusions
 
+- **No `IReadOnlyDictionary<string, object?>` overloads.** Fully obsolete. The two-lane ingress (JSON + typed) covers all callers. No dictionary-based convenience extensions exist or will be added.
 - **No fault type definitions.** `FaultException` and fault site taxonomy are in `fault-system.md`. The runtime API surface only produces structured outcomes — faults are the exceptional escape hatch for impossible-path bugs, not part of the normal outcome model.
 - **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.

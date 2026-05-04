@@ -35,6 +35,7 @@ Created `docs/working/cross-cutting-decisions.md` documenting:
 ## Recommendation
 
 Schedule a design session to resolve Priority 1 decisions before implementation sprints begin. These cannot be resolved stage-by-stage — they require coordinated decision-making.
+
 # Technical Review: Elaine's `lookup`/`queue` Surface Proposals
 
 **By:** Frank
@@ -115,6 +116,7 @@ The `containskey` and `removekey` tokens can be removed from the lexer's keyword
 ---
 
 ---
+
 # Decision: README Image Link Fixes
 
 **Date:** 2026-04-07
@@ -148,6 +150,7 @@ The README's narrative around the hero example remains valid: it correctly notes
 ---
 
 ---
+
 # Decision: README Hero DSL PNG Rendering
 
 **Author:** Elaine (UX)
@@ -181,6 +184,7 @@ If the hero snippet changes, re-render with:
 ---
 
 ---
+
 # One-shot: install puppeteer, screenshot, remove
 npm install --no-save puppeteer
 node -e "<screenshot script>"  # see commit for full script
@@ -192,6 +196,7 @@ Future improvement: automate this as a build script or CI step.
 ---
 
 ---
+
 # Steinbrenner Final Point Decision
 
 - Date: 2026-04-05
@@ -212,6 +217,7 @@ Future improvement: automate this as a build script or CI step.
 ---
 
 ---
+
 # Decision: Issue #22 Design Fidelity Directive
 
 **Date:** 2026-04-08
@@ -222,6 +228,7 @@ When implementing issue #22, if anything the team is going to implement strays f
 ---
 
 ---
+
 # Decision: Issue #22 — Data-Only Precepts Design Q&A (12 Decisions)
 
 **Date:** 2026-04-08
@@ -267,6 +274,7 @@ Use `customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`
 ---
 
 ---
+
 # Decision: Slice 7 Test Coverage — Known Gaps (Deferred)
 
 **Date:** 2026-04-08
@@ -283,6 +291,7 @@ These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
 ---
 
 ---
+
 # Decision: combined-design-v2 promoted to canonical location
 
 **Author:** Frank (Lead/Architect)
@@ -306,6 +315,7 @@ The combined-design-v2 doc had accumulated all review feedback, innovations call
 ---
 
 ---
+
 # Decision: Graph topology crosses the lowering boundary as runtime-native shapes
 
 **Author:** Frank (Lead/Architect)
@@ -360,6 +370,7 @@ These don't cross because no runtime operation needs them — the prohibition is
 ---
 
 ---
+
 # Design Evaluation: Per-Field `readonly` Modifier as Access Default Inversion
 
 **Author:** Frank (Lead/Architect & Language Designer)
@@ -370,6 +381,7 @@ These don't cross because no runtime operation needs them — the prohibition is
 ---
 
 ---
+
 # Decision Record: Research Grounding for compiler-and-runtime-design.md
 
 **Author:** Frank (Lead/Architect)
@@ -434,6 +446,7 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 ---
 
 ---
+
 # Doc Audit: `writable` Field Modifier — Findings & Decisions
 
 **Date:** 2025-04-27
@@ -443,6 +456,7 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 ---
 
 ---
+
 # Soup Nazi: writable Test Coverage Review
 
 **Date:** 2025-07-06
@@ -453,6 +467,7 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 ---
 
 ---
+
 # Decision: README hero PNG fallback
 
 - **Context:** GitHub does not render the styled inline HTML contract block in `README.md` as intended.
@@ -479,6 +494,7 @@ Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a l
 ---
 
 ---
+
 # Precept V2 — Exhaustive Parser & Lexer Test Coverage Audit
 
 **Branch:** `spike/Precept-V2`
@@ -924,6 +940,7 @@ All TypeChecker-level validations (§3 of the spec) are blocked by `NotImplement
 **Total baseline:** 2107 tests, 0 failing.
 
 ---
+
 # Soup Nazi — Full Test Coverage Review: spike/Precept-V2
 
 **Date:** 2025-07-14
