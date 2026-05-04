@@ -93,6 +93,12 @@ The evaluator is a static class with pure functions — aligned with the pipelin
 
 The evaluator has no algorithmic complexity beyond iteration. It does not compute fixpoints, solve constraints, or traverse graphs. Every loop is O(n) over a prebuilt array: opcodes, rows, constraints, actions. The only conditional branching is guard evaluation and constraint checking — both read prebuilt plans.
 
+### Approaches Considered and Rejected
+
+**TypeBuilder rejected:** The team considered using `TypeBuilder` (a dynamic code-generation approach via `System.Reflection.Emit`) to generate per-type evaluation dispatch at startup. This was rejected because: (1) it introduces AOT/trimming incompatibility — `Reflection.Emit` is not available in NativeAOT or trimmed builds; (2) the catalog-owned delegate pattern (`TypeRuntimeMeta.BinaryExecutors[]`) achieves the same O(1) dispatch without codegen; (3) TypeBuilder output is opaque — the catalog approach keeps dispatch wiring visible and inspectable at startup. The catalog pre-wires flat `Func<PreceptValue, PreceptValue, PreceptValue>[]` arrays indexed by `OperationKind` ordinal; this is equivalent in performance to generated code but compatible with all .NET deployment models.
+
+**Upgrade seam toward compilation:** The A+G interpreter is the canonical execution path. The design deliberately leaves a seam for future compiled execution: because all dispatch is pre-indexed (slot arrays, `OperationKind` ordinals, `FiredArgs` slot indexes, prebuilt `ExecutionPlan` opcode arrays), a future compiled path could consume the same `Precept` model without requiring any changes to the evaluator's input types. The upgrade seam is the `Precept` model itself — a compiled executor would read the same `DispatchIndex`, `SlotLayout`, `ConstraintPlanIndex`, and `ExecutionPlan` structures. This was a deliberate design choice: the interpreter is not a dead-end; it is a working implementation of the same contract a compiled path would implement.
+
 ---
 
 ## 5. Inputs and Outputs
@@ -384,44 +390,42 @@ internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slo
 
 `Create` constructs the initial entity instance. Behavior depends on whether the precept declares an initial event:
 
-> **Implementation note:** The pseudocode below uses `object?[]` for readability in showing the slot array operations. The canonical implementation uses `PreceptValue[]` throughout — all slot values are `PreceptValue`, not boxed `object?`. The logic structure is unchanged.
-
 **With initial event:**
 
 ```csharp
-EventOutcome Create(IReadOnlyDictionary<string, object?>? args)
+EventOutcome Create(FiredArgs? args)
 {
     // 1. Build hollow version: default slot values + initial state
-    var hollowSlots = new object?[precept.SlotLayout.FieldCount];
+    var hollowSlots = new PreceptValue[precept.SlotLayout.FieldCount];
     for (int i = 0; i < hollowSlots.Length; i++)
         hollowSlots[i] = EvaluateDefault(precept.Fields[i]);
     
     var hollow = new Version(precept, precept.InitialState, hollowSlots);
     
     // 2. Fire the initial event atomically
-    return Fire(precept, hollow, precept.InitialEvent!, args ?? EmptyArgs);
+    return Fire(precept, hollow, precept.InitialEvent!, args ?? FiredArgs.Empty);
 }
 ```
 
 **Without initial event:**
 
 ```csharp
-EventOutcome Create(IReadOnlyDictionary<string, object?>? args)
+EventOutcome Create()
 {
     // 1. Build version with defaults + initial state
-    var slots = new object?[precept.SlotLayout.FieldCount];
+    var slots = new PreceptValue[precept.SlotLayout.FieldCount];
     for (int i = 0; i < slots.Length; i++)
         slots[i] = EvaluateDefault(precept.Fields[i]);
     
-    // 2. Recompute computed fields
+    // 2. Recompute computed fields (no event args — use FiredArgs.Empty)
     foreach (var slot in precept.SlotLayout.ComputedSlots)
-        slots[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, slots, args);
+        slots[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, slots, FiredArgs.Empty);
     
     // 3. Evaluate constraints: always + in <initial>
     var violations = EvaluateConstraintBuckets(
         precept.ConstraintPlanIndex.Always,
         precept.ConstraintPlanIndex.InState[precept.InitialState!],
-        slots, args);
+        slots, FiredArgs.Empty);
     
     if (violations.Count > 0)
         return new EventConstraintsFailed(violations);  // Should not happen per C100/C101
@@ -437,13 +441,13 @@ EventOutcome Create(IReadOnlyDictionary<string, object?>? args)
 #### Fire(event, args)
 
 ```csharp
-EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, IReadOnlyDictionary<string, object?> args)
+EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, FiredArgs args)
 {
     // 1. Look up dispatch index
     if (!precept.DispatchIndex.Rows.TryGetValue((version.CurrentState, @event), out var rows))
         return new UndefinedEvent();
     
-    var candidates = new List<(ExecutionRow row, object?[] workingCopy)>();
+    var candidates = new List<(ExecutionRow row, PreceptValue[] workingCopy)>();
     var allViolations = new List<ConstraintViolation>();
     
     // 2. Evaluate each row
@@ -454,7 +458,7 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, IRea
             continue;  // Guard failed — skip row
         
         // 2b. Snapshot working copy
-        var workingCopy = (object?[])version.Slots.Clone();
+        var workingCopy = version.Slots.ToArray();
         
         // 2c. Execute actions
         foreach (var action in row.Actions)
@@ -506,34 +510,45 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, IRea
 
 `TransitionOutcome` is the canonical type name (defined in `type-checker.md` §7.1). The evaluator uses this same type at runtime.
 
-> **Open Question (unresolved):** `winningRow.RejectReason` references a field not defined on `ExecutionRow`. The `because` clause from a `reject` transition row needs a storage location. Should `ExecutionRow` gain a `string? RejectReason` field?
+> **Open Question:** `ExecutionRow.RejectReason` storage
+> The fire path still references `winningRow.RejectReason`, but `ExecutionRow` has no field that can carry a lowered `because` message from a reject row. The runtime contract needs one canonical storage location before authored rejection reasons can survive lowering.
+> *Flagged: 2026-05-04*
 > *Source: catalog-gap-register.md #20*
 
 ```csharp
-UpdateOutcome Update(Precept precept, Version version, IReadOnlyDictionary<FieldDescriptor, object?> patch)
+UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
 {
     // 1. Access mode checks
-    foreach (var (field, _) in patch)
+    if (patch != null)
     {
-        var mode = GetAccessMode(field, version.CurrentState);
-        if (mode != AccessMode.Writable)
-            return new AccessDenied(field.Name, mode == AccessMode.ReadOnly ? FieldAccessMode.Read : FieldAccessMode.Omit);
+        for (int i = 0; i < patch.Length; i++)
+        {
+            if (patch[i].IsAbsent) continue;
+            var field = precept.Fields[i];
+            var mode = GetAccessMode(field, version.CurrentState);
+            if (mode != AccessMode.Writable)
+                return new AccessDenied(field.Name, mode == AccessMode.ReadOnly ? FieldAccessMode.Read : FieldAccessMode.Omit);
+        }
     }
     
     // 2. Apply patch to working copy
-    var workingCopy = (object?[])version.Slots.Clone();
-    foreach (var (field, value) in patch)
-        workingCopy[field.SlotIndex] = value;
+    var workingCopy = version.Slots.ToArray();
+    if (patch != null)
+    {
+        for (int i = 0; i < patch.Length; i++)
+            if (!patch[i].IsAbsent)
+                workingCopy[i] = patch[i];  // patch is slot-indexed; IsAbsent means this slot is not being updated
+    }
     
     // 3. Recompute computed fields
     foreach (var slot in precept.SlotLayout.ComputedSlots)
-        workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, EmptyArgs);
+        workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, FiredArgs.Empty);
     
     // 4. Evaluate constraints: always + in <current>
     var violations = EvaluateConstraintBuckets(
         precept.ConstraintPlanIndex.Always,
         precept.ConstraintPlanIndex.InState.GetValueOrDefault(version.CurrentState),
-        workingCopy, EmptyArgs);
+        workingCopy, FiredArgs.Empty);
     
     if (violations.Count > 0)
         return new UpdateConstraintsFailed(violations);
@@ -580,7 +595,7 @@ RestoreOutcome Restore(Precept precept, StateDescriptor? state, IReadOnlyDiction
 Returns `EventInspection` — one `RowInspection` per declared transition row for the current state/event:
 
 ```csharp
-EventInspection InspectFire(Precept precept, Version version, EventDescriptor @event, IReadOnlyDictionary<string, object?>? args)
+EventInspection InspectFire(Precept precept, Version version, EventDescriptor @event, FiredArgs? args)
 {
     if (!precept.DispatchIndex.Rows.TryGetValue((version.CurrentState, @event), out var rows))
         return new EventInspection(@event.Name, Prospect.Impossible, [], []);
@@ -591,8 +606,8 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
     
     foreach (var row in rows)
     {
-        // Evaluate guard
-        var guardResult = row.Guard == null || EvaluateGuard(row.Guard, version.Slots, args ?? EmptyArgs);
+        // Evaluate guard (FiredArgs.Empty if no args provided — no event args means no arg-dependent guards)
+        var guardResult = row.Guard == null || EvaluateGuard(row.Guard, version.Slots, args ?? FiredArgs.Empty);
         
         if (!guardResult)
         {
@@ -603,12 +618,12 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
         }
         
         // Guard passed — simulate execution
-        var workingCopy = (object?[])version.Slots.Clone();
+        var workingCopy = version.Slots.ToArray();
         foreach (var action in row.Actions)
-            ExecuteAction(action, workingCopy, args ?? EmptyArgs);
+            ExecuteAction(action, workingCopy, args ?? FiredArgs.Empty);
         
         foreach (var slot in precept.SlotLayout.ComputedSlots)
-            workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, args ?? EmptyArgs);
+            workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, args ?? FiredArgs.Empty);
         
         var violations = EvaluateFireConstraints(...);
         var constraintResults = BuildConstraintResults(violations, ...);
@@ -641,7 +656,13 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
 }
 ```
 
-> **Open Question (unresolved):** Two unresolved design issues in `InspectFire`: (1) Multiple candidates handling — should inspection return `Fault` like `Fire`? (2) `EventEnsures` is hardcoded to `[]` — event-level constraints (`on<event>` bucket) are not evaluated in inspection. Should they be?
+> **Open Question:** `InspectFire` multiple-candidate handling
+> `InspectFire` documents a multiple-candidate branch but never settles whether inspection should mirror runtime ambiguous-dispatch failure, return an inspection-specific ambiguity result, or report multiple candidates without faulting. Inspection and execution need aligned semantics so preview never promises behavior the runtime will reject.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `InspectFire` event-level ensures
+> `InspectFire` currently hardcodes `EventEnsures` to an empty array, leaving `on<event>` constraints outside the inspection contract. The inspection surface needs an explicit decision on whether event ensures are evaluated, omitted, or reported as intentionally partial.
+> *Flagged: 2026-05-04*
 
 It evaluates every declared row, not just the winning candidate. Each `RowInspection` describes:
 - `GuardMatched`: Did the guard pass?
@@ -654,20 +675,21 @@ It evaluates every declared row, not just the winning candidate. Each `RowInspec
 Returns `UpdateInspection` — access mode results, constraint evaluation, and event-prospect analysis:
 
 ```csharp
-UpdateInspection InspectUpdate(Precept precept, Version version, IReadOnlyDictionary<FieldDescriptor, object?>? patch)
+UpdateInspection InspectUpdate(Precept precept, Version version, PreceptValue[]? patch)
 {
-    var workingCopy = (object?[])version.Slots.Clone();
+    var workingCopy = version.Slots.ToArray();
     
     // Apply patch if provided
     if (patch != null)
     {
-        foreach (var (field, value) in patch)
-            workingCopy[field.SlotIndex] = value;
+        for (int i = 0; i < patch.Length; i++)
+            if (!patch[i].IsAbsent)
+                workingCopy[i] = patch[i];  // patch is slot-indexed; IsAbsent means this slot is not being updated
     }
     
     // Recompute computed fields
     foreach (var slot in precept.SlotLayout.ComputedSlots)
-        workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, EmptyArgs);
+        workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, FiredArgs.Empty);
     
     // Evaluate constraints
     var violations = EvaluateConstraintBuckets(...);
@@ -725,6 +747,8 @@ case BinaryOp(var kind):
 
 The `Operations` catalog pre-wires flat executor arrays at startup — one slot per `OperationKind` ordinal. The evaluator calls the delegate; it never switches on `OperationKind` itself. Same pattern for unary ops via `Operations.UnaryExecutors`.
 
+> **`Operations` and `TypeRuntimeMeta.BinaryExecutors` relationship:** `Operations` is a static registry class that aggregates per-type executor delegates from all registered `TypeRuntimeMeta` instances into flat, `OperationKind`-indexed arrays at startup. When types are registered (via `TypeRuntime<T>.Register()`), their `TypeRuntimeMeta.BinaryExecutors` and `UnaryExecutors` arrays are merged into `Operations.BinaryExecutors` and `Operations.UnaryExecutors` — one slot per `OperationKind` ordinal. The evaluator calls `Operations.BinaryExecutors[(int)kind]` at evaluation time; it has no knowledge of which type registered that delegate. This keeps the evaluator zero-knowledge about type identity while still achieving O(1) dispatch per operation.
+
 **LOAD_ARG and event-arg slots:**
 
 Event arguments are converted to `PreceptValue` at the Fire boundary (before the opcode loop begins), not lazily inside the loop. `IArgBuilder` materializes a `PreceptValue[]` arg slot array for the call; `LOAD_ARG(name)` resolves the arg name to a slot index at build time, so the opcode carries a slot index rather than a string:
@@ -737,7 +761,9 @@ case LoadArg(var argSlotIndex):
 
 This keeps LOAD_ARG O(1) — no dictionary lookup, no string comparison.
 
-> **Open Question (unresolved):** The LOAD_ARG opcode is currently described as `LOAD_ARG(name)` in the opcode table (string key). Locking the opcode to `LOAD_ARG(slotIndex)` (integer index, resolved at build time) is the intended design per the typed-slot baseline, but this requires `ArgDescriptor.SlotIndex` to be defined and populated by the Precept Builder. The `ArgDescriptor` shape needs updating before the evaluator implementation pass.
+> **Open Question:** Opcode executor behavior details
+> Four opcode semantics remain unspecified even though the stack-machine shape is fixed: how `LOAD_ARG` treats absent/null inputs, whether `BRANCH_FALSE` treats numeric zero as falsy or only `false`, whether `RETURN` may legally fall through additional opcodes, and whether the evaluation stack itself should be pooled rather than `stackalloc`-only. Those rules need to be locked before builder-emitted plans and any future compiled path can rely on identical execution semantics.
+> *Flagged: 2026-05-04*
 
 | Opcode | Stack Effect | Description |
 |---|---|---|
@@ -776,7 +802,7 @@ Action dispatch reads `ActionMeta.SyntaxShape` from the Actions catalog. The 9 `
 | `PutKeyValue` | `put` | Pop key + value, upsert into lookup |
 
 ```csharp
-void ExecuteAction(ActionPlan action, object?[] slots, IReadOnlyDictionary<string, object?> args)
+void ExecuteAction(ActionPlan action, PreceptValue[] slots, FiredArgs args)
 {
     // SyntaxShape is resolved at build time and stored in ActionPlan
     switch (action.SyntaxShape)
@@ -835,7 +861,9 @@ The `AccessModes` dictionary on `FieldDescriptor` is the **resolved** per-state 
 
 The evaluator never re-derives this; it reads the pre-resolved descriptor.
 
-> **Open Question (unresolved):** Confirm the shape of `FieldDescriptor.AccessModes`. Current design assumes `ImmutableDictionary<StateDescriptor?, AccessMode>`. Alternative: `ImmutableArray<(StateDescriptor?, AccessMode)>` for smaller field counts.
+> **Open Question:** `FieldDescriptor.AccessModes` structural shape
+> The evaluator assumes a per-state access-mode lookup on `FieldDescriptor`, but the descriptor contract never settles whether that data is dictionary-based or a denser indexed representation. The runtime and builder need one storage shape because lookup cost, descriptor size, and emission strategy all depend on it.
+> *Flagged: 2026-05-04*
 
 ### 7.6 Constraint Evaluation
 
@@ -845,8 +873,8 @@ IReadOnlyList<ConstraintViolation> EvaluateFireConstraints(
     StateDescriptor? currentState,
     EventDescriptor @event,
     StateDescriptor? targetState,
-    object?[] slots,
-    IReadOnlyDictionary<string, object?> args)
+    PreceptValue[] slots,
+    FiredArgs args)
 {
     var violations = new List<ConstraintViolation>();
     
@@ -874,8 +902,8 @@ IReadOnlyList<ConstraintViolation> EvaluateFireConstraints(
 
 void EvaluateConstraint(
     ConstraintDescriptor constraint,
-    object?[] slots,
-    IReadOnlyDictionary<string, object?> args,
+    PreceptValue[] slots,
+    FiredArgs args,
     List<ConstraintViolation> violations)
 {
     var result = EvaluatePlan(constraint.Expression, slots, args);
@@ -897,11 +925,11 @@ public sealed record ConstraintViolation(
     string? BecauseClause,                   // From constraint declaration
     ImmutableArray<FieldSnapshot> RelevantFields,  // Field values at evaluation time
     string? FailingSubexpression,            // Innermost expression that evaluated false
-    object? FailingValue                     // Value that caused failure
+    PreceptValue? FailingValue               // Value at the failure site
 );
 ```
 
-When an opcode hits a fault backstop site (identified by a `FaultSiteDescriptor` planted by the Precept Builder), the evaluator produces a structured `Fault`:
+When an opcode hits a fault backstop site(identified by a `FaultSiteDescriptor` planted by the Precept Builder), the evaluator produces a structured `Fault`:
 
 ```csharp
 internal static Fault Fail(FaultCode code, params object?[] args)
@@ -915,8 +943,9 @@ The `Faults` catalog produces a fully-formed `Fault` with:
 
 Faults are **never thrown** — they are returned as structured outcome variants. This maintains the pattern-matchable, composable outcome model.
 
-> **Open Question (unresolved):** `Fail` returns a `Fault`, but `Fault` is not currently a subtype of `EventOutcome`. Should `Faulted(Fault)` be added as an `EventOutcome` variant?
-> *Source: catalog-gap-register.md #21*
+> **Open Question:** `Faulted(Fault)` as an `EventOutcome` variant
+> The evaluator models impossible-path failures as structured `Fault` values, but the `EventOutcome` DU still has no `Faulted(Fault)` branch. The commit-result contract needs to decide whether faults become first-class outcomes or remain outside the main event-result hierarchy.
+> *Flagged: 2026-05-04*
 
 ---
 
@@ -954,35 +983,78 @@ Faults are **never thrown** — they are returned as structured outcome variants
 
 ### Integration Contract
 
+The public `Version` API is dual-lane: callers supply either a `JsonElement?` (JSON lane) or an `Action<IArgBuilder>?` (CLR lane). Either is materialized into `FiredArgs` before reaching the internal evaluator. The evaluator always sees `FiredArgs` — never a dictionary or raw JSON.
+
 ```csharp
-// Version façade delegates to Evaluator
+// Version façade — dual-lane ingress materializes to FiredArgs before calling Evaluator
 public sealed record Version
 {
-    public EventOutcome Fire(string eventName, IReadOnlyDictionary<string, object?> args)
+    // ── JSON lane ──────────────────────────────────────────────────────────────
+    public EventOutcome Fire(string eventName, JsonElement? args = null)
     {
         var @event = Precept.Events.Single(e => e.Name == eventName);
-        return Evaluator.Fire(Precept, this, @event, args);
+        var firedArgs = args.HasValue
+            ? ArgMaterializer.FromJson(@event, args.Value)  // JsonElement → FiredArgs
+            : FiredArgs.Empty;
+        return Evaluator.Fire(Precept, this, @event, firedArgs);
     }
     
-    public UpdateOutcome Update(IReadOnlyDictionary<string, object?> fields)
+    public UpdateOutcome Update(JsonElement? patch = null)
     {
-        var patch = ResolvePatch(fields);  // name → FieldDescriptor
-        return Evaluator.Update(Precept, this, patch);
+        var resolvedPatch = patch.HasValue
+            ? PatchMaterializer.FromJson(Precept, patch.Value)  // JsonElement → PreceptValue[]
+            : null;
+        return Evaluator.Update(Precept, this, resolvedPatch);
     }
     
-    public EventInspection InspectFire(string eventName, IReadOnlyDictionary<string, object?>? args = null)
+    // ── CLR lane ───────────────────────────────────────────────────────────────
+    public EventOutcome Fire(string eventName, Action<IArgBuilder>? build = null)
     {
         var @event = Precept.Events.Single(e => e.Name == eventName);
-        return Evaluator.InspectFire(Precept, this, @event, args);
+        var firedArgs = build != null
+            ? ArgMaterializer.FromBuilder(@event, build)  // IArgBuilder → FiredArgs
+            : FiredArgs.Empty;
+        return Evaluator.Fire(Precept, this, @event, firedArgs);
     }
     
-    public UpdateInspection InspectUpdate(IReadOnlyDictionary<string, object?>? fields = null)
+    public UpdateOutcome Update(Action<IFieldBuilder>? build = null)
     {
-        var patch = fields != null ? ResolvePatch(fields) : null;
-        return Evaluator.InspectUpdate(Precept, this, patch);
+        var resolvedPatch = build != null
+            ? PatchMaterializer.FromBuilder(Precept, build)  // IFieldBuilder → PreceptValue[]
+            : null;
+        return Evaluator.Update(Precept, this, resolvedPatch);
+    }
+    
+    // ── Inspect (same dual-lane pattern) ──────────────────────────────────────
+    public EventInspection InspectFire(string eventName, JsonElement? args = null)
+    {
+        var @event = Precept.Events.Single(e => e.Name == eventName);
+        var firedArgs = args.HasValue ? ArgMaterializer.FromJson(@event, args.Value) : (FiredArgs?)null;
+        return Evaluator.InspectFire(Precept, this, @event, firedArgs);
+    }
+    
+    public EventInspection InspectFire(string eventName, Action<IArgBuilder>? build = null)
+    {
+        var @event = Precept.Events.Single(e => e.Name == eventName);
+        var firedArgs = build != null ? ArgMaterializer.FromBuilder(@event, build) : (FiredArgs?)null;
+        return Evaluator.InspectFire(Precept, this, @event, firedArgs);
+    }
+    
+    public UpdateInspection InspectUpdate(JsonElement? patch = null)
+    {
+        var resolvedPatch = patch.HasValue ? PatchMaterializer.FromJson(Precept, patch.Value) : null;
+        return Evaluator.InspectUpdate(Precept, this, resolvedPatch);
+    }
+    
+    public UpdateInspection InspectUpdate(Action<IFieldBuilder>? build = null)
+    {
+        var resolvedPatch = build != null ? PatchMaterializer.FromBuilder(Precept, build) : null;
+        return Evaluator.InspectUpdate(Precept, this, resolvedPatch);
     }
 }
 ```
+
+**The boundary is explicit and one-way.** Public callers choose a lane (JSON or CLR typed). Materialization happens at the boundary. The internal evaluator only ever sees `FiredArgs` and `PreceptValue[]` — no dictionaries, no raw JSON, no `object?`.
 
 ---
 
@@ -1211,6 +1283,21 @@ The only exception paths are truly exceptional: out-of-memory, corrupted `Precep
 
 **Alternative rejected:** *Short-circuit on first violation* — rejected because it provides poor user experience and no meaningful performance benefit.
 
+### Decision 8: Single Interpreter with Diagnostic Trace — No Dual-Path
+
+**Decision:** There is one interpreter. The A+G stack-based opcode executor is the single runtime for ALL consumers — production Fire/Inspect/Update AND LS/MCP interactive authoring feedback.
+
+**Rationale:**
+- **Correctness guarantee:** Dual interpreters (one for production, one for tooling) must agree on semantics. When they diverge, tooling lies to the author. That is worse than no tooling.
+- **Simplicity and maintainability:** A single interpreter with trace output is simpler and cheaper to maintain — there is no synchronization burden between two execution paths.
+- **Trivially traceable:** The opcode loop is a flat array with O(1) per step and no recursion. Adding per-opcode trace emission is a small increment, not an architectural change.
+
+**How trace mode works:** When a trace context is attached to an evaluation call, each opcode step emits a diagnostic record: opcode identity, operand values before and after, slot index for LOAD_SLOT/STORE_SLOT, stack depth. The trace record uses the same `PreceptValue` currency — no boxing, no secondary representation.
+
+**Alternative explicitly rejected:** *Separate tree-walk interpreter for LS/MCP* — rejected because two interpreters that must agree is a correctness liability. Tooling that uses a different execution engine than production will eventually diverge and mislead authors.
+
+**Open design question:** The exact trace record shape (struct? class? output channel?), how trace contexts are attached (parameter? ambient?), and how the LS/MCP consumes trace output are NOT yet decided. These are implementation seams, not architectural questions.
+
 ---
 
 ## 12. Innovation
@@ -1286,7 +1373,7 @@ public sealed record ConstraintViolation(
     string? BecauseClause,                   // "because inventory cannot go negative"
     ImmutableArray<FieldSnapshot> RelevantFields,  // What were the field values?
     string? FailingSubexpression,            // "quantity - sold"
-    object? FailingValue                     // "-5"
+    PreceptValue? FailingValue               // Value at the failure site
 );
 ```
 
@@ -1357,9 +1444,12 @@ This enables progressive UIs: show users what actions become available as they f
 
 ### Pending Design Questions
 
-> **Open Question (unresolved):** Should `Version.Slots` be `ImmutableArray<object?>` or `object?[]`? `ImmutableArray` provides snapshot semantics but has allocation overhead for copy-on-write. `object?[]` with explicit cloning may be more efficient but requires discipline.
+> **Open Question:** `Version.Slots` storage representation
+> The runtime baseline now documents `Version.Slots` as `PreceptValue[]`, but the versioning contract still does not settle whether versions own raw arrays with donation/copy-on-write semantics or an immutable wrapper over the same storage. That choice controls snapshot semantics, allocation behavior, and how far zero-copy promotion can go.
+> *Flagged: 2026-05-04*
 
-> **Open Question (unresolved):** Confirm the shape of `FieldDescriptor.AccessModes`. Current design assumes `ImmutableDictionary<StateDescriptor?, AccessMode>`. Alternative: flat array `ImmutableArray<(StateDescriptor?, AccessMode)>` for smaller field counts.
+- See §7.5 for the `FieldDescriptor.AccessModes` open question.
+
 
 > **Open Question (unresolved):** `InspectUpdate` event-prospect evaluation runs `InspectFire` over the hypothetical post-patch state. Should this use a temporary `Version` object, or operate directly on the working copy? Using a `Version` is cleaner but allocates; operating on the working copy requires parameter surgery.
 
@@ -1369,13 +1459,7 @@ This enables progressive UIs: show users what actions become available as they f
 
 ### Implementation Notes
 
-5. **`ConstraintViolation` full shape not yet implemented** — Currently only `ConstraintDescriptor` + `IReadOnlyList<string> FieldNames`. Full shape needs:
-   - Evaluated field values (`FieldSnapshot[]`)
-   - Guard context (if the constraint was guarded)
-   - Failing sub-expression text
-   - Failing value that caused the failure
-   
-   This is the designed contract; implementation is blocked on the evaluator.
+5. **`ConstraintViolation` full shape** — Canonical 5-field shape is now the designed public contract (Shane ruling 2026-05-04). Implementation of `FailingSubexpression` and `FailingValue` population requires evaluator instrumentation (tracking which opcode produced the failing value). `BecauseClause` and `RelevantFields` are structurally simpler — `BecauseClause` comes from `ConstraintDescriptor` metadata; `RelevantFields` is a snapshot of `version.Slots` at evaluation time. Full population is an implementation milestone, not a design question.
 
 6. **Event-prospect evaluation in `InspectUpdate`** — Runs `InspectFire` over all events available in the current state, using the hypothetical post-patch field values. This may be expensive for precepts with many events; consider lazy evaluation.
 

@@ -204,6 +204,10 @@ public enum ProofStrategy
 }
 ```
 
+> **Open Question:** `ProofObligation.Site` structural identity
+> `ProofObligation.Site` currently stores the full `TypedExpression` node, but the runtime-side installation path eventually needs a stable structural reference such as a row, action, or opcode site. The proof contract needs to decide whether obligations carry both views or whether the builder derives structural identity from the typed-expression ownership graph.
+> *Flagged: 2026-05-04*
+
 #### FaultSiteLink
 
 Links unresolved obligations to their runtime fault codes:
@@ -219,8 +223,9 @@ public sealed record FaultSiteLink(
 
 The Precept Builder consumes these to plant `FaultSiteDescriptor` backstops — defense-in-depth runtime checks for operations that could not be proven safe.
 
-> **Open Question (unresolved):** `FaultSiteLink.Site` carries `SourceSpan`, but `FaultSiteDescriptor` needs structural binding (ExecutionRow, opcode offset) for runtime installation. What transformation bridges compile-time site to runtime check?
-> *Source: catalog-gap-register.md #11*
+> **Open Question:** `FaultSiteLink.Site` to `FaultSiteDescriptor` binding
+> `FaultSiteLink.Site` is still only a `SourceSpan`, while runtime backstops ultimately need a structural binding such as an `ExecutionRow`, constraint descriptor, or opcode offset. The proof-to-runtime bridge needs one transformation contract before the builder can plant backstops deterministically.
+> *Flagged: 2026-05-04*
 
 #### ConstraintInfluenceEntry
 
@@ -566,8 +571,9 @@ This strategy handles the case where a guard establishes a *relative* constraint
 2. The guard establishes a simple relational constraint
 3. The proof site references the constrained field
 
-> **Open Question (unresolved):** Strategy 3 vs Strategy 4 differentiation unclear. Is the boundary "Strategy 3 = field-vs-constant, Strategy 4 = field-vs-field"? Needs unambiguous definition.
-> *Source: catalog-gap-register.md #13*
+> **Open Question:** Strategy 3 vs Strategy 4 boundary
+> The proof doc still does not draw a crisp line between guard-in-path and flow-narrowing obligations. That boundary must be explicit so the engine knows which obligations belong to which strategy and new proofs do not shift categories silently.
+> *Flagged: 2026-05-04*
 
 ### Proof/Fault Chain
 

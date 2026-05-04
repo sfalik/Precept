@@ -95,7 +95,9 @@ Each runtime tool (`precept_inspect`, `precept_fire`, `precept_update`):
 5. Calls the appropriate operation (`InspectFire`/`Fire`/`Update`)
 6. Serializes the outcome to JSON
 
-> **Open Question (unresolved):** When `data` is null (initial event with no prior state), what is passed to `Restore`? Does an empty fields dictionary with null non-optional fields silently bypass constraints or fault?
+> **Open Question:** Initial event with null data
+> The MCP flow still does not define what `Restore` receives when an initial event is fired with `data = null`. Tooling and runtime parity need one deterministic bootstrap contract so null startup data is not interpreted differently across surfaces.
+> *Flagged: 2026-05-04*
 
 ---
 
@@ -440,7 +442,9 @@ JSON response to agent
       }
     ],
 
-> **Open Question (unresolved):** Nesting constraints under their anchor state requires re-correlating flat `TypedEnsure` arrays. Should `SemanticIndex.EnsuresByState` be added to avoid reconstruction logic in the MCP layer?
+> **Open Question:** `SemanticIndex.EnsuresByState` index
+> MCP currently has to re-correlate flat `TypedEnsure` arrays just to nest constraints under their anchor state. The compile-time surface needs to decide whether that grouping becomes first-class on `SemanticIndex` or remains a reconstruction step in tooling.
+> *Flagged: 2026-05-04*
 
     "events": [
       {
@@ -506,7 +510,9 @@ JSON response to agent
 
 **Core API:** `Version.InspectFire(event, args)` for each available event; `Version.InspectUpdate(patch)` for field editability
 
-> **Open Question (unresolved):** `precept_inspect` calls N+1 core API operations (once per event + update). This violates the thin-wrapper "one core operation" contract. Should §6 exempt this tool as a composite view, or should a batched `InspectAll` API be added to the core?
+> **Open Question:** `precept_inspect` N+1 API calls
+> `precept_inspect` is currently a composite view that fans out into one inspection call per event plus update inspection, which violates the thin-wrapper story described earlier in the doc. The tooling surface needs to decide whether this tool is explicitly exempt or whether the core runtime gains a batched inspection API.
+> *Flagged: 2026-05-04*
 
 ```json
 {
@@ -626,7 +632,9 @@ JSON response to agent
 }
 ```
 
-> **Open Question (unresolved):** The `mutations` array requires diffing old/new slots in the MCP layer. Should `EventOutcome.Transitioned`/`Applied` carry a `mutations` payload from the evaluator to maintain thin-wrapper compliance?
+> **Open Question:** `EventOutcome.mutations` payload
+> MCP can only populate its `mutations` array by diffing old and new slot values after a fire operation. The evaluator and tooling surface need to decide whether mutation deltas belong in `EventOutcome` itself or remain a post-processing responsibility in the MCP layer.
+> *Flagged: 2026-05-04*
 
 ```json
 {
@@ -681,7 +689,9 @@ JSON response to agent
 }
 ```
 
-> **Open Question (unresolved):** `evaluatedGuards` requires re-inspecting transition rows beyond the single `version.Fire` call. Should `Unmatched` be enriched at the evaluator level to carry evaluated guard traces?
+> **Open Question:** `Unmatched` guard trace enrichment
+> MCP can only produce `evaluatedGuards` by re-inspecting transition rows after `version.Fire` reports `Unmatched`. The runtime contract needs to decide whether guard traces are first-class on `Unmatched` or whether tooling is expected to reconstruct them out of band.
+> *Flagged: 2026-05-04*
 
 ```json
 {

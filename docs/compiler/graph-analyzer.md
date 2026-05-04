@@ -117,7 +117,9 @@ public sealed record GraphState(
 );
 ```
 
-> **Open Question (unresolved):** `GraphState` uses four explicit boolean properties (`IsInitial`, `IsTerminal`, `IsRequired`, `IsIrreversible`) derived from state modifiers. Should `GraphState` instead carry `ImmutableArray<ModifierKind> Modifiers` and derive flags from catalog lookups at construction time? `IsReachable` is computed topology output (not a modifier) and is fine as-is.
+> **Open Question:** `GraphState.Modifiers` representation
+> `GraphState` currently materializes four modifier-derived booleans, but the doc never settles whether the graph should instead carry the original modifier set and derive flags from catalog metadata. `IsReachable` is topological output, so the unresolved part is specifically how modifier facts are represented.
+> *Flagged: 2026-05-04*
 > *Source: catalog-gap-register.md #9*
 
 ```csharp
@@ -299,7 +301,9 @@ This pattern ensures new modifier constraints can be added to the catalog withou
 
 1. **Wildcard expansion:** For rows where `FromState` is null (any-state wildcard), generate one edge per declared state that does not have an explicit transition for that event.
 
-> **Open Question (unresolved):** Should wildcard expansion happen for all declared states (Phase 2 later marks unreachable ones), or only reachable states (requiring Phase 2 to run first)? The current phase order implies all declared states.
+> **Open Question:** Wildcard expansion ordering
+> Wildcard transition expansion does not yet say whether it iterates all declared states or only states already proven reachable. The phase contract needs one rule because expansion scope changes graph shape, event coverage, and the runtime rows the builder will later compile.
+> *Flagged: 2026-05-04*
 
 2. **Self-transition resolution:** For rows where `TargetState` is null, set `ToState = FromState`.
 
@@ -596,11 +600,17 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 
 ### To Be Resolved During Implementation
 
-1. **EventCoverageEntry granularity:** Should coverage track guarded vs. unguarded transitions separately? A guarded transition may not always fire, so event coverage with guards is probabilistic.
+> **Open Question:** `EventCoverageEntry` granularity
+> The graph analyzer does not yet settle whether guarded and unguarded transition coverage stay separate or collapse into one coarser event-coverage entry. That choice affects diagnostics, tooling summaries, and whether guard-conditioned reachability remains visible downstream.
+> *Flagged: 2026-05-04*
 
-2. **Back-edge definition:** The current definition uses BFS ancestor relationship. An alternative is DFS back-edges. Clarify which definition aligns with the `irreversible` modifier's intent.
+> **Open Question:** Back-edge definition
+> The current text mixes a BFS-ancestor notion of back-edge with classic DFS back-edge terminology. The graph contract needs one definition because cycle detection and `irreversible` reasoning change depending on which graph-theory meaning is canonical.
+> *Flagged: 2026-05-04*
 
-3. **GraphEvent.IsInitial derivation:** How is `IsInitial` determined for `GraphEvent`? The property exists on the record but the derivation logic is unspecified — is it set for events that only appear in the initial state's transitions, events explicitly marked, or events that trigger creation?
+> **Open Question:** `GraphEvent.IsInitial` derivation
+> `GraphEvent` exposes `IsInitial`, but the doc never defines whether that flag comes from initial-state reachability, explicit event metadata, or creation-only routing. The analyzer needs one derivation rule before event facts can be treated as structural output.
+> *Flagged: 2026-05-04*
 
 ---
 

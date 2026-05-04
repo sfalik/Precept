@@ -493,9 +493,17 @@ String coercion during interpolation always uses invariant-culture formatting. `
 
 ## Open Questions / Implementation Notes
 
-1. **`ITypedConstantValidator` registration API:** The registration mechanism is defined as a hook in the type checker. The exact API surface (static registration, startup-time registry, per-compilation context) is not yet settled.
-2. **Interpolated typed constant: validation timing:** The spec states content is validated after interpolation substitution. Whether this validation occurs at compile time (with constant-folded expressions) or at runtime (in the evaluator after substitution) needs explicit decision.
-3. **Structural validation fallback:** When no validator is registered for an expected type, "structural validation is accepted." The definition of structural validation for `'...'` — what exactly is checked — is not yet specified.
+> **Open Question:** `ITypedConstantValidator` registration API
+> The literal system defines `ITypedConstantValidator` as the extension hook for typed-constant validation, but the registration surface is still undecided. Consumers need one canonical registration model before domain validators can be wired into compilation predictably.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** Interpolated typed-constant validation timing
+> The doc says typed-constant content is validated after interpolation substitution, but it does not settle whether that happens entirely at compile time, at runtime, or in a split model. That timing decision changes diagnostics behavior and how much the evaluator must still validate after type checking.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** Structural validation fallback for `'...'`
+> The fallback rule for "structural validation is accepted" remains undefined when no validator is registered for the expected type. The literal-system contract needs an explicit minimum-check story so deferred or partially shipped domains behave deterministically.
+> *Flagged: 2026-05-04*
 4. **Percentage domain:** Listed in Future Extensibility as `'10 percent'`. The type name, validator shape, and arithmetic semantics are TBD.
 5. **State reference literals:** The content validation table lists `state ref` as a typed constant kind using plain identifiers (`'Open'`, `'UnderReview'`). The mechanics of state reference validation (which state machine provides the context?) are not yet documented here.
 

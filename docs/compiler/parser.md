@@ -33,7 +33,9 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 
 `SlotValue` is an abstract record with 17 sealed subtypes, one per `ConstructSlotKind`:
 
-> **Open Question (unresolved):** catalog-system.md shows 15 `ConstructSlotKind` members; this doc lists 17 (`RuleExpressionSlot` and `InitialMarkerSlot` are missing from the catalog). Which count is correct?
+> **Open Question:** `SlotValue` subtype inventory
+> parser.md documents 17 `SlotValue` subtypes, while catalog-system.md still lists 15 `ConstructSlotKind` members and omits `RuleExpressionSlot` and `InitialMarkerSlot`. The parser contract needs one canonical inventory before downstream docs and implementation names can stabilize.
+> *Flagged: 2026-05-04*
 > *Source: catalog-gap-register.md #6*
 
 | Subtype | Carries |
@@ -56,7 +58,21 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 | `RuleExpressionSlot` | `ParsedExpression` (typed DU) |
 | `InitialMarkerSlot` | `bool` — presence of `initial` keyword |
 
-> **Open Question (unresolved):** Four slot subtypes contradict type-checker.md: `TypeExpressionSlot` (TypeMeta here vs SourceSpan there), `ModifierListSlot` (ModifierKind here vs TokenKind there), `AccessModeSlot` (SourceSpan here vs TokenKind there), `BecauseClauseSlot` (string here vs SourceSpan there). Which shapes are canonical?
+> **Open Question:** `TypeExpressionSlot` canonical shape
+> parser.md resolves `TypeExpressionSlot` to `TypeMeta`, while type-checker.md still describes the same slot as a `SourceSpan`. The parser and type checker need one contract for when type references become resolved objects.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `ModifierListSlot` canonical shape
+> parser.md stores `ModifierListSlot` as `ImmutableArray<ModifierKind>`, but type-checker.md still describes `ImmutableArray<TokenKind>`. The slot contract must settle whether modifier identity is normalized in the parser or deferred to later stages.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `AccessModeSlot` canonical shape
+> parser.md keeps `AccessModeSlot` as a `SourceSpan`, while type-checker.md describes the same slot as a resolved `TokenKind`. The pipeline needs one answer on whether access modes are parsed as syntax spans or normalized tokens before type checking.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `BecauseClauseSlot` canonical shape
+> parser.md treats `BecauseClauseSlot` as the authored diagnostic string, while type-checker.md still documents a raw `SourceSpan`. The contract needs one canonical representation so downstream diagnostics know whether they receive text or syntax to re-read.
+> *Flagged: 2026-05-04*
 > *Source: catalog-gap-register.md #7 — BLOCKING*
 
 Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
@@ -285,7 +301,9 @@ Error recovery synchronizes on these boundaries.
 | Type Checker | `ConstructManifest` with typed slots |
 | Language Server | Spans for diagnostics, hover, go-to-definition |
 
-> **Open Question (unresolved):** Graph analyzer consumes `SemanticIndex`, not `ConstructManifest`. Should the old "Graph Analyzer" row be removed, or does tooling need a ConstructManifest → graph-analyzer edge?
+> **Open Question:** `ConstructManifest` as a graph-analyzer input
+> The documented dependency table still shows a parser-to-graph edge even though graph-analyzer.md consumes `SemanticIndex`, not `ConstructManifest`. The pipeline overview needs to decide whether that edge is obsolete or whether some tooling path still legitimately reads parser output directly.
+> *Flagged: 2026-05-04*
 
 ---
 

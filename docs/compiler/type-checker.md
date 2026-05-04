@@ -527,7 +527,9 @@ public sealed record ConstraintFieldRefs(
 );
 ```
 
-> **Open Question (unresolved):** `ConstraintFieldRefs.ConstraintIdentity` is typed `object`. The proof-engine.md defines a proper discriminated union for this concept: `abstract record ConstraintIdentity` with sealed subtypes `RuleIdentity` and `EnsureIdentity`. Should `ConstraintFieldRefs.ConstraintIdentity` use the same typed DU that proof-engine.md defines for interoperability?
+> **Open Question:** `ConstraintFieldRefs.ConstraintIdentity` typing
+> `ConstraintFieldRefs.ConstraintIdentity` is still typed as `object`, while proof-engine.md defines a dedicated `ConstraintIdentity` DU with `RuleIdentity` and `EnsureIdentity` variants. The type-checker and proof engine need the same structural identity type if they are going to share constraint-reference data without ad hoc casting.
+> *Flagged: 2026-05-04*
 > *Source: catalog-gap-register.md #15*
 
 #### SemanticIndex Record
@@ -562,7 +564,21 @@ public sealed record SemanticIndex(
 );
 ```
 
-> **Open Question (unresolved):** The `SemanticIndex` record has no reference-tracking collections (`References`, `FieldReferences`, `StateReferences`, `EventReferences`). The language-server.md and tooling-surface.md Pass 2 iterate these collections for semantic tokens. Either `SemanticIndex` needs reference-site tracking arrays (requiring the type checker to record span and binding of every identifier use), or the LS/tooling docs need a different mechanism for Pass 2.
+> **Open Question:** `SemanticIndex.References` collection
+> The canonical `SemanticIndex` shape does not currently expose a general reference-site inventory, but language-server.md still describes Pass 2 semantic tokens as walking `index.References`. The type-checker contract needs to settle whether a heterogeneous references array exists or whether tooling must derive that view from narrower structures.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `SemanticIndex.FieldReferences` collection
+> Language-server Pass 2 and reference navigation both need field-use spans without rewalking every typed declaration. If field references are not first-class on `SemanticIndex`, the type-checker doc must define the exact derivation path tooling is expected to use instead.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `SemanticIndex.StateReferences` collection
+> State-reference semantic tokens currently assume a dedicated `StateReferences` collection on `SemanticIndex`, but that collection is absent from the canonical shape. The contract needs to decide whether state references are emitted directly or reconstructed downstream from typed transition structures.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `SemanticIndex.EventReferences` collection
+> Event-reference highlighting and navigation likewise assume a dedicated `EventReferences` collection that the canonical `SemanticIndex` does not define. The type-checker contract must either promote event references to first-class output or specify the sanctioned reconstruction rule for tooling consumers.
+> *Flagged: 2026-05-04*
 > *Source: catalog-gap-register.md #16 — BLOCKING for LS Pass 2*
 
 ---

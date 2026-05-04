@@ -221,7 +221,9 @@ Semantic tokens enable rich syntax highlighting beyond what TextMate grammars ca
 
 **Artifact:** `Compilation.Tokens` + `TokenMeta.SemanticTokenType`
 
-> **Open Question (unresolved):** Should `Compilation` carry a `Tokens` field for lexical semantic token generation? The precept-builder.md `Compilation` record does not currently include it.
+> **Open Question:** `Compilation.Tokens` for semantic-token Pass 1
+> Lexical semantic tokens need the token stream even when type checking fails, but precept-builder.md's `Compilation` record does not currently carry `Tokens`. The compile output contract needs one sanctioned path for language-server Pass 1 tokenization.
+> *Flagged: 2026-05-04*
 
 **Mechanics:**
 
@@ -351,7 +353,9 @@ enum SlotContext
     InArgDefault,       // Default value for event argument
 }
 
-> **Open Question (unresolved):** `SlotContext` is defined here and in tooling-surface.md. Which document is the canonical home? Also, this maps `SlotKind` values while tooling-surface.md maps `ConstructSlotKind`. Are these the same enum under different names?
+> **Open Question:** `SlotContext` vs `SlotKind` naming
+> language-server.md and tooling-surface.md both define cursor-context mapping, but one speaks in `SlotContext`/`SlotKind` terms while the other maps `ConstructSlotKind`. The tooling surface needs one canonical enum story so completions do not rest on two names for the same structural axis.
+> *Flagged: 2026-05-04*
 
 SlotContext GetCursorContext(ConstructManifest manifest, Position position)
 {
@@ -542,8 +546,9 @@ MarkupContent FormatSymbolHover(object symbol) => symbol switch
 };
 ```
 
-> **Open Question (unresolved):** `TypedArg` has no `EventName` back-reference. Hover for an event arg needs to look up the owning event from an `ArgReference`. Should `TypedArg` carry an `EventName` field, or should hover look it up separately?
-> *Source: catalog-gap-register.md #31*
+> **Open Question:** `TypedArg.EventName` back-reference
+> Hover over an event argument currently needs to recover the owning event indirectly from an `ArgReference`, because `TypedArg` has no back-reference to its declaring event. The semantic model needs to decide whether that ownership is first-class on `TypedArg` or always reconstructed on demand.
+> *Flagged: 2026-05-04*
 
 ### 7.5 Go-to-Definition
 
@@ -610,7 +615,9 @@ public sealed record TypedEvent(
 
 **Trigger:** `precept/preview` (custom method, not standard LSP)
 
-> **Open Question (unresolved):** This method is named `precept/inspect` here but `precept/preview` in tooling-surface.md §7.4. Which name is canonical? Using `precept/preview` pending resolution.
+> **Open Question:** `precept/inspect` vs `precept/preview`
+> language-server.md and tooling-surface.md still disagree on the custom method name for preview inspection. The tooling contract needs one canonical request name before extension code, server handlers, and docs can converge.
+> *Flagged: 2026-05-04*
 
 **Artifact:** `Precept` + inspection runtime (`EventInspection`, `UpdateInspection`)
 
@@ -667,8 +674,9 @@ public sealed record EventInspection(
 public enum Prospect { Certain, Possible, Impossible }
 ```
 
-> **Open Question (unresolved):** The `EventInspection` shape here differs from evaluator.md. This doc has `BeforeFields`/`AfterFields`; evaluator.md has `EventEnsures`/`ConstraintResult`. Which is canonical? Should this doc reference evaluator.md's shape?
-> *Source: catalog-gap-register.md #33*
+> **Open Question:** `EventInspection` canonical shape
+> language-server.md still documents `BeforeFields`/`AfterFields`, while evaluator.md describes `EventEnsures` plus per-row `ConstraintResult` data. The inspection surface needs one canonical shape so preview rendering and evaluator output do not drift.
+> *Flagged: 2026-05-04*
 
 The extension calls `precept/preview` whenever the user changes preview state, then renders the result in the preview webview. See `docs/tooling/extension.md` for the webview side.
 
@@ -703,8 +711,13 @@ bool IsOutlineConstruct(ConstructKind kind) => kind switch
     _ => false
 };
 
-> **Open Question (unresolved):** `IsOutlineConstruct` and `MapSymbolKind` hardcode `ConstructKind` values. By catalog-driven architecture, `ConstructMeta` should carry `IsOutlineNode` and `LspSymbolKind` properties. Should these be added to the catalog?
-> *Source: catalog-gap-register.md #34*
+> **Open Question:** `ConstructMeta.IsOutlineNode`
+> Document outline still hardcodes which constructs appear in the symbol tree instead of reading that decision from catalog metadata. The language-server contract needs to decide whether outline eligibility becomes a first-class `ConstructMeta` property.
+> *Flagged: 2026-05-04*
+
+> **Open Question:** `ConstructMeta.LspSymbolKind`
+> The current outline mapping also hardcodes `ConstructKind` → `SymbolKind` translation in server code. A catalog-first surface would move that choice into `ConstructMeta`, but the canonical shape has not yet been extended to carry it.
+> *Flagged: 2026-05-04*
 
 DocumentSymbol ToDocumentSymbol(ParsedConstruct construct) => new()
 {

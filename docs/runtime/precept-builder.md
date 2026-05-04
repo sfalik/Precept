@@ -113,7 +113,9 @@ public sealed record Compilation(
 }
 ```
 
-> **Open Question (unresolved):** Should `Compilation` carry a `Tokens` field for the language server's lexical semantic token generation? Both language-server.md and tooling-surface.md reference this for Pass 1 tokens.
+> **Open Question:** `Compilation.Tokens` field
+> The builder-facing `Compilation` shape currently omits the token stream even though the language server's lexical semantic-token pass still depends on it. The compile aggregate needs one sanctioned access path for tokens so tooling does not invent a side channel.
+> *Flagged: 2026-05-04*
 
 The builder reads all three analysis artifacts:
 
@@ -288,9 +290,12 @@ public sealed record EventDescriptor(
 public sealed record ArgDescriptor(
     string Name,
     TypeKind Type,
-    bool IsOptional
+    bool IsOptional,
+    int SlotIndex
 );
 ```
+
+Arg slot indexes are assigned during this pass: each arg in an event's arg declaration list receives a sequential `SlotIndex` value in declaration order, starting at 0. This mirrors the field slot assignment invariant: the first declared arg gets index 0, the second gets index 1, and so on. `LOAD_ARG` opcodes carry arg slot indexes, not arg names — the name-to-index mapping is resolved at build time and never consulted at execution time.
 
 **Why descriptors?** Descriptors are the runtime's vocabulary — named, typed, immutable value-objects that carry all the information needed for display, debugging, inspection, and dispatch. They are read-only structural mirrors of the semantic declarations, organized for fast lookup. The slot index is the field's address in the entity's runtime value array.
 
@@ -349,7 +354,7 @@ An `ExecutionPlan` is a flat array of `Opcode` values that the evaluator walks l
 | Opcode | Stack Effect | Description |
 |---|---|---|
 | `LOAD_SLOT(i)` | push | Load field value at slot index `i` |
-| `LOAD_ARG(name)` | push | Load event arg value by name |
+| `LOAD_ARG(argSlotIndex)` | push | Load event arg value by pre-resolved arg slot index |
 | `LOAD_LIT(value)` | push | Push literal value |
 | `STORE_SLOT(i)` | pop | Pop and store to slot index `i` |
 | `BINARY_OP(kind)` | pop 2, push 1 | Binary operation (catalog-driven via `OperationMeta`) |
@@ -375,7 +380,7 @@ public sealed record ExecutionPlan(
 
 public abstract record Opcode;
 public sealed record LoadSlot(int SlotIndex) : Opcode;
-public sealed record LoadArg(string ArgName) : Opcode;
+public sealed record LoadArg(int ArgSlotIndex) : Opcode;  // pre-resolved at build time; name resolution complete before execution
 public sealed record LoadLit(PreceptValue Value) : Opcode;  // literals pre-wrapped at build time
 public sealed record StoreSlot(int SlotIndex) : Opcode;
 public sealed record BinaryOp(OperationKind Kind) : Opcode;
@@ -415,6 +420,10 @@ public sealed record ActionPlan(
 
 public enum TransitionOutcome { Transition, NoTransition, Reject }
 ```
+
+> **Open Question:** `ExecutionRow.RejectReason` storage
+> `TransitionOutcome.Reject` rows can carry an authored `because` message, but `ExecutionRow` currently has nowhere to store that reason after lowering. The builder contract needs one canonical home for reject-row rationale before the evaluator can return authored rejection text without re-reading source.
+> *Flagged: 2026-05-04*
 
 **Catalog-driven compilation:** The expression compiler reads `Operations.GetMeta(kind)`, `Functions.GetMeta(kind)`, and `Types.GetAccessor(type, name)` to emit the correct opcodes. It does not hardcode per-operation behavior — it dispatches on catalog entries.
 
@@ -467,8 +476,9 @@ public sealed record FaultSiteDescriptor(
 );
 ```
 
-> **Open Question (unresolved):** What is the actual planting mechanism for `FaultSiteDescriptor`? Neither `ExecutionRow` nor `ConstraintDescriptor` carries a fault site field, and `Precept.FaultBackstops` is a flat array. How does the evaluator know which opcode or row constitutes a fault site?
-> *Source: catalog-gap-register.md #23*
+> **Open Question:** `FaultSiteDescriptor` planting mechanism
+> The builder says it plants `FaultSiteDescriptor` backstops, but neither `ExecutionRow` nor `ConstraintDescriptor` exposes a placement slot and `Precept.FaultBackstops` is only a flat array. The lowering contract needs one concrete planting mechanism so evaluator fault routing is structural rather than implicit.
+> *Flagged: 2026-05-04*
 
 Fault backstops are defense-in-depth. A correctly-proven program never reaches them at runtime. When reached, they fire the `FaultCode`'s runtime behavior (log + graceful failure) via `Faults.Create(descriptor, context)`.
 
@@ -600,6 +610,14 @@ If `Precept.From` throws:
 - For all `FieldDescriptor f`: `0 <= f.SlotIndex < SlotLayout.FieldCount`
 - `SlotLayout.Fields[i].SlotIndex == i` (slot-order array)
 
+### Arg Slot Invariants
+
+- Arg slot indexes are assigned sequentially in event arg declaration order, starting at 0
+- For all `ArgDescriptor a` on event `e`: `0 <= a.SlotIndex < e.Args.Length`
+- `e.Args[i].SlotIndex == i` (declaration-order array)
+- Arg slot arrays are ephemeral — allocated at the Fire boundary, discarded after the call
+- `LOAD_ARG(i)` opcodes carry `SlotIndex`, never arg names — all name resolution happens at build time
+
 ### Constraint Plan Invariants
 
 - Every `ConstraintDescriptor` appears in exactly one bucket
@@ -609,8 +627,9 @@ If `Precept.From` throws:
 - `ToState` buckets contain only `ConstraintKind.StateEntry` constraints
 - `OnEvent` buckets contain only `ConstraintKind.EventPrecondition` constraints
 
-> **Open Question (unresolved):** The constraint bucket dispatch uses five concrete subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`), but catalog-system.md shows only four subtypes in the `ConstraintMeta` DU hierarchy. Are `StateEntry` and `StateExit` subtypes of `StateAnchored`, or separate top-level subtypes?
-> *Source: catalog-gap-register.md #22*
+> **Open Question:** `ConstraintDescriptor` bucket routing
+> The constraint-plan pass routes constraints into five anchor buckets, but catalog-system.md still documents only four `ConstraintMeta` shapes. The builder and catalog docs need one canonical subtype story so anchor routing is metadata-driven instead of relying on undocumented special cases.
+> *Flagged: 2026-05-04*
 
 ### Stateless Precept Handling
 

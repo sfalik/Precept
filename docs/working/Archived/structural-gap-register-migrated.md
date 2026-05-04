@@ -1,5 +1,10 @@
 # Structural Gap Register
 
+> **Migration completed:** 2026-05-04
+> **Total entries:** 46
+> **Breakdown:** 44 migrated to canonical docs; 2 already resolved by recorded decisions (#45, #53).
+> **Canonical docs updated:** `docs/compiler/parser.md`, `docs/compiler/type-checker.md`, `docs/compiler/graph-analyzer.md`, `docs/compiler/proof-engine.md`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`, `docs/tooling/language-server.md`, `docs/tooling/mcp.md`, `docs/compiler/literal-system.md`.
+
 > Companion to `docs/working/catalog-gap-register.md`.
 > Covers gaps in the structural shapes of data flowing between pipeline stages and adjacent interfaces.
 > Gaps are promoted from here into the relevant canonical doc once decided.
@@ -41,70 +46,70 @@ Organized by producing stage. **Numbering continues from catalog-gap-register.md
 
 | # | Gap | Priority | Status | Source Doc(s) | Notes |
 |---|-----|----------|--------|---------------|-------|
-| 40 | `SlotValue` subtype count mismatch (15 vs 17) | Medium | Shape Mismatch | parser.md line 36, catalog-system.md | `RuleExpressionSlot` and `InitialMarkerSlot` exist in parser.md but not in catalog |
-| 41 | `TypeExpressionSlot` shape conflict | High | Shape Mismatch | parser.md line 51, type-checker.md line 51 | parser.md: `TypeMeta`; type-checker.md: `SourceSpan` |
-| 42 | `ModifierListSlot` shape conflict | High | Shape Mismatch | parser.md line 42, type-checker.md line 52 | parser.md: `ImmutableArray<ModifierKind>`; type-checker.md: `ImmutableArray<TokenKind>` |
-| 43 | `AccessModeSlot` shape conflict | High | Shape Mismatch | parser.md line 53, type-checker.md line 63 | parser.md: `SourceSpan`; type-checker.md: `TokenKind` |
-| 44 | `BecauseClauseSlot` shape conflict | Medium | Shape Mismatch | parser.md line 52, type-checker.md line 62 | parser.md: `string`; type-checker.md: `SourceSpan` |
-| 45 | Expression-carrying slots hold `SourceSpan` only | High | Placeholder | parser.md line 60, type-checker.md line 70 | Blocks type checker and proof engine expression resolution |
-| 46 | `ConstructManifest` missing from graph analyzer inputs | Low | Interface Gap | parser.md line 283 | Does graph analyzer need ConstructManifest → graph edge, or only SemanticIndex? |
+| 40 | `SlotValue` subtype count mismatch (15 vs 17) | Medium | MIGRATED | parser.md line 36, catalog-system.md | Migrated to `docs/compiler/parser.md` §2.2 SlotValue: 17-Subtype Discriminated Union |
+| 41 | `TypeExpressionSlot` shape conflict | High | MIGRATED | parser.md line 51, type-checker.md line 51 | Migrated to `docs/compiler/parser.md` §2.2 SlotValue: 17-Subtype Discriminated Union |
+| 42 | `ModifierListSlot` shape conflict | High | MIGRATED | parser.md line 42, type-checker.md line 52 | Migrated to `docs/compiler/parser.md` §2.2 SlotValue: 17-Subtype Discriminated Union |
+| 43 | `AccessModeSlot` shape conflict | High | MIGRATED | parser.md line 53, type-checker.md line 63 | Migrated to `docs/compiler/parser.md` §2.2 SlotValue: 17-Subtype Discriminated Union |
+| 44 | `BecauseClauseSlot` shape conflict | Medium | MIGRATED | parser.md line 52, type-checker.md line 62 | Migrated to `docs/compiler/parser.md` §2.2 SlotValue: 17-Subtype Discriminated Union |
+| 45 | Expression-carrying slots hold `SourceSpan` only | High | RESOLVED | parser.md line 60, type-checker.md line 70 | Resolved by the 2026-05-04 `ParsedExpression` / `TypedExpression` decision; canonical docs now document typed expression DU output |
+| 46 | `ConstructManifest` missing from graph analyzer inputs | Low | MIGRATED | parser.md line 283 | Migrated to `docs/compiler/parser.md` §7 Dependencies and Integration Points |
 
 ### Type Checker Output
 
 | # | Gap | Priority | Status | Source Doc(s) | Notes |
 |---|-----|----------|--------|---------------|-------|
-| 47 | `SemanticIndex.References` collection missing | High | Missing Field | type-checker.md line 562, language-server.md line 305 | LS Pass 2 needs reference-site arrays for semantic tokens |
-| 48 | `SemanticIndex.FieldReferences` collection missing | High | Missing Field | language-server.md line 305-318 | Needed for field reference semantic tokens |
-| 49 | `SemanticIndex.StateReferences` collection missing | Medium | Missing Field | language-server.md line 305-318 | Needed for state reference semantic tokens |
-| 50 | `SemanticIndex.EventReferences` collection missing | Medium | Missing Field | language-server.md line 305-318 | Needed for event reference semantic tokens |
-| 51 | `ConstraintFieldRefs.ConstraintIdentity` typed as `object` | Medium | Placeholder | type-checker.md line 528, proof-engine.md | proof-engine.md defines `ConstraintIdentity` DU; type-checker should use it |
-| 52 | `TypedArg.EventName` back-reference missing | Low | Missing Field | language-server.md line 543 | Hover for event arg needs owning event lookup |
-| 53 | `TypedExpression` DU incomplete for proof engine | Medium | Pending Decision | type-checker.md, proof-engine.md | Proof engine needs structured expression trees, not spans |
+| 47 | `SemanticIndex.References` collection missing | High | MIGRATED | type-checker.md line 562, language-server.md line 305 | Migrated to `docs/compiler/type-checker.md` §7.1 SemanticIndex |
+| 48 | `SemanticIndex.FieldReferences` collection missing | High | MIGRATED | language-server.md line 305-318 | Migrated to `docs/compiler/type-checker.md` §7.1 SemanticIndex |
+| 49 | `SemanticIndex.StateReferences` collection missing | Medium | MIGRATED | language-server.md line 305-318 | Migrated to `docs/compiler/type-checker.md` §7.1 SemanticIndex |
+| 50 | `SemanticIndex.EventReferences` collection missing | Medium | MIGRATED | language-server.md line 305-318 | Migrated to `docs/compiler/type-checker.md` §7.1 SemanticIndex |
+| 51 | `ConstraintFieldRefs.ConstraintIdentity` typed as `object` | Medium | MIGRATED | type-checker.md line 528, proof-engine.md | Migrated to `docs/compiler/type-checker.md` §7.1 SemanticIndex |
+| 52 | `TypedArg.EventName` back-reference missing | Low | MIGRATED | language-server.md line 543 | Migrated to `docs/tooling/language-server.md` §7.4 Hover |
+| 53 | `TypedExpression` DU incomplete for proof engine | Medium | RESOLVED | type-checker.md, proof-engine.md | Resolved in canonical docs: `docs/compiler/type-checker.md` now defines the closed `TypedExpression` DU and `docs/compiler/proof-engine.md` consumes typed expressions directly |
 
 ### Graph Analyzer Output
 
 | # | Gap | Priority | Status | Source Doc(s) | Notes |
 |---|-----|----------|--------|---------------|-------|
-| 54 | `GraphState.Modifiers` vs explicit booleans | Medium | Pending Decision | graph-analyzer.md line 120 | Should carry `ImmutableArray<ModifierKind>` and derive flags from catalog? |
-| 55 | `GraphEvent.IsInitial` derivation unclear | Low | Interface Gap | graph-analyzer.md line 125 | How is "initial" determined for events? Needs specification |
+| 54 | `GraphState.Modifiers` vs explicit booleans | Medium | MIGRATED | graph-analyzer.md line 120 | Migrated to `docs/compiler/graph-analyzer.md` §2 Output Shape |
+| 55 | `GraphEvent.IsInitial` derivation unclear | Low | MIGRATED | graph-analyzer.md line 125 | Migrated to `docs/compiler/graph-analyzer.md` §12 Open Questions / Implementation Notes |
 
 ### Proof Engine Output
 
 | # | Gap | Priority | Status | Status | Notes |
 |---|-----|----------|--------|--------|-------|
-| 56 | `FaultSiteLink.Site` to `FaultSiteDescriptor` transformation | Medium | Interface Gap | proof-engine.md line 222, precept-builder.md line 467 | No mechanism specified for transforming proof span to runtime site |
-| 57 | `ProofObligation.Site` carries `TypedExpression`, not structural ref | Medium | Pending Decision | proof-engine.md line 188 | Builder needs row/opcode reference, not expression node |
-| 58 | Strategy 3 vs Strategy 4 boundary undefined | Medium | Interface Gap | proof-engine.md line 568 | Affects which obligations go to which strategy |
+| 56 | `FaultSiteLink.Site` to `FaultSiteDescriptor` transformation | Medium | MIGRATED | proof-engine.md line 222, precept-builder.md line 467 | Migrated to `docs/compiler/proof-engine.md` §2 Output Shape |
+| 57 | `ProofObligation.Site` carries `TypedExpression`, not structural ref | Medium | MIGRATED | proof-engine.md line 188 | Migrated to `docs/compiler/proof-engine.md` §2 Output Shape |
+| 58 | Strategy 3 vs Strategy 4 boundary undefined | Medium | MIGRATED | proof-engine.md line 568 | Migrated to `docs/compiler/proof-engine.md` §7 Strategy 4 |
 
 ### Precept Builder Output (Descriptors)
 
 | # | Gap | Priority | Status | Source Doc(s) | Notes |
 |---|-----|----------|--------|---------------|-------|
-| 59 | `ExecutionRow.RejectReason` field missing | Medium | Missing Field | evaluator.md line 434, precept-builder.md | `because` clause storage for reject transitions undefined |
-| 60 | `FaultSiteDescriptor` planting mechanism unspecified | Medium | Interface Gap | precept-builder.md line 467 | How does evaluator locate fault sites in rows? |
-| 61 | `Compilation.Tokens` field missing | Medium | Missing Field | precept-builder.md line 116, language-server.md line 222 | LS needs token stream for Pass 1 semantic tokens |
-| 62 | `ConstraintDescriptor` bucket routing to anchor unclear | Low | Interface Gap | precept-builder.md line 201-205 | Five buckets but only four `ConstraintMeta` subtypes in catalog |
+| 59 | `ExecutionRow.RejectReason` field missing | Medium | MIGRATED | evaluator.md line 434, precept-builder.md | Migrated to `docs/runtime/precept-builder.md` §7 Component Mechanics / ExecutionRow |
+| 60 | `FaultSiteDescriptor` planting mechanism unspecified | Medium | MIGRATED | precept-builder.md line 467 | Migrated to `docs/runtime/precept-builder.md` §7 Component Mechanics / Pass 6 |
+| 61 | `Compilation.Tokens` field missing | Medium | MIGRATED | precept-builder.md line 116, language-server.md line 222 | Migrated to `docs/runtime/precept-builder.md` §2 Inputs and Outputs |
+| 62 | `ConstraintDescriptor` bucket routing to anchor unclear | Low | MIGRATED | precept-builder.md line 201-205 | Migrated to `docs/runtime/precept-builder.md` §7 Component Mechanics / Pass 4 |
 
 ### Evaluator Output
 
 | # | Gap | Priority | Status | Source Doc(s) | Notes |
 |---|-----|----------|--------|---------------|-------|
-| 63 | `Faulted(Fault)` missing from `EventOutcome` DU | Medium | Missing Variant | evaluator.md line 156, line 885 | `Fail` returns `Fault`, but no `Faulted` outcome variant |
-| 64 | `EventInspection` shape mismatch | Medium | Shape Mismatch | language-server.md line 655-663, evaluator.md line 183-189 | LS: `BeforeFields`/`AfterFields`; evaluator: `EventEnsures`/`ConstraintResult` |
-| 65 | `EventOutcome.mutations` payload missing | Low | Missing Field | mcp.md line 629 | MCP diffs old/new slots; should evaluator include mutations? |
-| 66 | `Unmatched` guard trace enrichment | Low | Pending Decision | mcp.md line 684 | Should `Unmatched` carry evaluated guard traces? |
-| 67 | `Version.Slots` array vs `ImmutableArray` | Low | Pending Decision | evaluator.md line 131 | Copy-on-write vs immutable semantics |
+| 63 | `Faulted(Fault)` missing from `EventOutcome` DU | Medium | MIGRATED | evaluator.md line 156, line 885 | Migrated to `docs/runtime/evaluator.md` §7.6 Constraint Evaluation |
+| 64 | `EventInspection` shape mismatch | Medium | MIGRATED | language-server.md line 655-663, evaluator.md line 183-189 | Migrated to `docs/tooling/language-server.md` §7.6 Preview/Inspect |
+| 65 | `EventOutcome.mutations` payload missing | Low | MIGRATED | mcp.md line 629 | Migrated to `docs/tooling/mcp.md` § `precept_fire` |
+| 66 | `Unmatched` guard trace enrichment | Low | MIGRATED | mcp.md line 684 | Migrated to `docs/tooling/mcp.md` § `precept_fire` |
+| 67 | `Version.Slots` array vs `ImmutableArray` | Low | MIGRATED | evaluator.md line 131 | Migrated to `docs/runtime/evaluator.md` §13 Open Questions / Implementation Notes |
 
 ### Compilation / Tooling Interface
 
 | # | Gap | Priority | Status | Source Doc(s) | Notes |
 |---|-----|----------|--------|---------------|-------|
-| 68 | `precept/inspect` vs `precept/preview` naming | Low | Interface Gap | language-server.md line 610, tooling-surface.md | Two names for same custom LSP method |
-| 69 | `SlotContext` vs `SlotKind` enum naming | Low | Interface Gap | language-server.md line 354, tooling-surface.md line 512 | Same enum under different names? |
-| 70 | `ConstructMeta.IsOutlineNode` missing | Medium | Missing Field | language-server.md line 702 | LS hardcodes `IsOutlineConstruct` mapping |
-| 71 | `ConstructMeta.LspSymbolKind` missing | Medium | Missing Field | language-server.md line 712 | LS hardcodes `MapSymbolKind` mapping |
-| 72 | `precept_inspect` N+1 API calls | Low | Interface Gap | mcp.md line 509 | Violates thin-wrapper; needs batched `InspectAll` API? |
-| 73 | `SemanticIndex.EnsuresByState` index missing | Low | Missing Field | mcp.md line 443 | MCP reconstructs nesting; should be pre-indexed |
+| 68 | `precept/inspect` vs `precept/preview` naming | Low | MIGRATED | language-server.md line 610, tooling-surface.md | Migrated to `docs/tooling/language-server.md` §7.6 Preview/Inspect |
+| 69 | `SlotContext` vs `SlotKind` enum naming | Low | MIGRATED | language-server.md line 354, tooling-surface.md line 512 | Migrated to `docs/tooling/language-server.md` §7.3 Catalog-Driven Completions |
+| 70 | `ConstructMeta.IsOutlineNode` missing | Medium | MIGRATED | language-server.md line 702 | Migrated to `docs/tooling/language-server.md` §7.7 Document Outline |
+| 71 | `ConstructMeta.LspSymbolKind` missing | Medium | MIGRATED | language-server.md line 712 | Migrated to `docs/tooling/language-server.md` §7.7 Document Outline |
+| 72 | `precept_inspect` N+1 API calls | Low | MIGRATED | mcp.md line 509 | Migrated to `docs/tooling/mcp.md` § `precept_inspect` |
+| 73 | `SemanticIndex.EnsuresByState` index missing | Low | MIGRATED | mcp.md line 443 | Migrated to `docs/tooling/mcp.md` § `precept_compile` |
 
 ## Summary by Status
 
@@ -181,96 +186,108 @@ Gaps #56–57 (FaultSiteLink transformation) block:
 
 ### #74 — InspectFire multiple-candidate handling
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `evaluator.md` line ~567–568  
 **The Gap:** `InspectFire` documents a multiple-candidate branch but does not settle whether inspection should return a `Fault`, mirror runtime dispatch rejection semantics, or surface ambiguity some other way.  
 **Why It Matters:** Inspection and execution need aligned semantics for ambiguous dispatch or tooling will preview a different outcome than runtime fire.  
 **Options:** Return `Faulted(Fault)`; return an inspection-specific ambiguity result; or specify that inspection never faults and instead reports multiple candidates explicitly.
+**Migration:** `docs/runtime/evaluator.md` §7.2 Inspection Operations
 
 ### #75 — `InspectFire` skips event-level ensures
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `evaluator.md` line ~568  
 **The Gap:** `InspectFire` hardcodes `EventEnsures` to `[]`, leaving event-level constraint evaluation unspecified during inspection.  
 **Why It Matters:** Tooling and MCP inspection results can under-report failing ensures compared to actual event execution.  
 **Options:** Evaluate event ensures during inspection; explicitly declare inspection as transition-only; or add a partial-inspection contract that marks event ensures as omitted.
+**Migration:** `docs/runtime/evaluator.md` §7.2 Inspection Operations
 
 ### #76 — Opcode executor behavior details unresolved
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `evaluator.md` line ~707  
 **The Gap:** Four executor semantics are still open: `LoadArg` null handling, whether `BranchFalse` treats `0` as falsy, whether `Return` can fall through, and whether the evaluation stack should be pooled.  
 **Why It Matters:** These choices affect runtime determinism, compiled-plan compatibility, and the exact behavior the builder must target.  
 **Options:** No options listed in the source; owner decision is needed on each executor rule.
+**Migration:** `docs/runtime/evaluator.md` §7.3 Opcode Execution Engine
 
 ### #77 — `FieldDescriptor.AccessModes` structural shape
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `evaluator.md` line ~805  
 **The Gap:** `FieldDescriptor.AccessModes` is not settled between an `ImmutableDictionary` keyed by state and a denser `ImmutableArray`-style representation.  
 **Why It Matters:** This shape affects evaluator lookup cost, builder emission shape, and alignment with the catalog-side `FieldDescriptor.AccessModes` question.  
 **Options:** `ImmutableDictionary<StateId, AccessMode>` for direct lookup, or `ImmutableArray`/indexed storage for denser compiled descriptors.
+**Migration:** `docs/runtime/evaluator.md` §7.5 Access Mode Enforcement
 
 ### #78 — `Version.Slots` storage representation
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `evaluator.md` line ~131  
 **The Gap:** `Version.Slots` is still undecided between immutable-array semantics and an `object?[]` copy-on-write backing store.  
 **Why It Matters:** The choice affects mutation cost, snapshot semantics, and the concrete versioning contract exposed across evaluator internals.  
 **Options:** `ImmutableArray<object?>` for explicit immutability, or `object?[]` with copy-on-write for lower allocation overhead.
+**Migration:** `docs/runtime/evaluator.md` §13 Open Questions / Implementation Notes
 
 ### #79 — Wildcard expansion ordering
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `graph-analyzer.md` line ~300  
 **The Gap:** Wildcard transition expansion does not specify whether expansion iterates all declared states or only states already reachable in the graph.  
 **Why It Matters:** Expansion order and reachability scope change graph shape, event coverage results, and the downstream runtime rows the builder will receive.  
 **Options:** Expand against all declared states, or restrict expansion to currently reachable states only.
+**Migration:** `docs/compiler/graph-analyzer.md` §6 Wildcard expansion
 
 ### #80 — `EventCoverageEntry` granularity
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `graph-analyzer.md` line ~600  
 **The Gap:** The graph analyzer does not settle whether `EventCoverageEntry` distinguishes guarded and unguarded transitions separately or folds them together.  
 **Why It Matters:** Coverage reporting, diagnostics, and later tooling views depend on whether guard-conditioned coverage is preserved as first-class structure.  
 **Options:** Track guarded versus unguarded entries separately, or keep a single coarser event-coverage entry.
+**Migration:** `docs/compiler/graph-analyzer.md` §12 Open Questions / Implementation Notes
 
 ### #81 — Back-edge definition
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `graph-analyzer.md` line ~601  
 **The Gap:** The doc leaves "back-edge" undefined between a BFS-ancestor notion and classic DFS back-edge semantics.  
 **Why It Matters:** Cycle detection, irreversibility reasoning, and graph diagnostics can differ materially depending on which graph-theory definition is canonical.  
 **Options:** Define back-edges relative to BFS ancestry, or use standard DFS back-edge classification.
+**Migration:** `docs/compiler/graph-analyzer.md` §12 Open Questions / Implementation Notes
 
 ### #82 — Initial event with null data
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `mcp.md` line ~98  
 **The Gap:** The MCP design does not define what gets passed to `Restore` when the initial event is fired with null data.  
 **Why It Matters:** Tool callers need a deterministic initialization contract, and runtime/MCP parity breaks if null bootstrap data is interpreted differently.  
 **Options:** Pass `null`, pass an empty slot/value container, or require callers to provide initial data explicitly.
+**Migration:** `docs/tooling/mcp.md` §5 Internal Flow
 
 ### #83 — `ITypedConstantValidator` registration API
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `literal-system.md` §Open Questions #1  
 **The Gap:** The literal system leaves the exact registration API surface for `ITypedConstantValidator` unsettled.  
 **Why It Matters:** Consumers cannot implement extension registration or dependency injection wiring until the contract is nailed down.  
 **Options:** No options listed in the source; API shape remains open.
+**Migration:** `docs/compiler/literal-system.md` §Open Questions / Implementation Notes
 
 ### #84 — Interpolated typed-constant validation timing
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `literal-system.md` §Open Questions #2  
 **The Gap:** The doc does not decide whether interpolated typed constants validate entirely at compile time or defer some validation to runtime.  
 **Why It Matters:** This changes diagnostics timing, what the type checker guarantees, and whether runtime fault paths must remain for typed constants.  
 **Options:** Compile-time validation, runtime validation, or a split model where structural checks compile-time and value checks runtime.
+**Migration:** `docs/compiler/literal-system.md` §Open Questions / Implementation Notes
 
 ### #85 — Structural validation fallback for `'...'`
 
-**Status:** Pending Decision  
+**Status:** MIGRATED  
 **Source:** `literal-system.md` §Open Questions #3  
 **The Gap:** Structural validation fallback semantics for `'...'` are not defined.  
 **Why It Matters:** Literal-system consumers need a deterministic rule for how incomplete or deferred structural validation behaves when a fully typed validator is unavailable.  
 **Options:** No options listed in the source; fallback behavior remains open.
+**Migration:** `docs/compiler/literal-system.md` §Open Questions / Implementation Notes
