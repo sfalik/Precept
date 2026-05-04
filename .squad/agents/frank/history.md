@@ -23,7 +23,42 @@
 - Canonical record: Option C (Hybrid) accepted; the five locked SlotValue shape decisions now live in decisions.md.
 - Redundant stamped options brief was cleared during inbox dedupe.
 
-### 2026-05-04T03:26:10Z — CC#25 Q7 acceptance revision complete
+### 2026-05-03T23:45:15Z — runtime-api.md updated for CC#25 Q2/Q5/Q7 and CC#2
+
+- Applied all locked CC#25 ingress/egress decisions to `docs/runtime/runtime-api.md` in full.
+- Replaced `Metadata-First Principle` section with `Two-Lane Ingress Principle` — the dictionary design is gone; JSON lane (`JsonElement?`) and typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) are the complete ingress surface.
+- Updated `Precept` class block: two overloads each for `Create`/`InspectCreate` (JSON + typed); `Restore` is JSON-only.
+- Updated `Version` class block: `PreceptValue` indexer + `Get<T>` typed access; `ArgDescriptor` replaces `ArgInfo`; `RequiredArgs` returns `IReadOnlyList<ArgDescriptor>`; all commit and inspect methods split into JSON lane and typed lane overloads; no dictionary overloads.
+- Replaced all code examples (`Create`, `Restore`, `Fire`, `Update`, `InspectFire`, `InspectUpdate`) — every dictionary literal gone, both lanes shown where applicable; Restore shows JSON only.
+- Updated `FieldAccessInfo.CurrentValue` from `object?` to `PreceptValue`.
+- Added new type sections: `IArgBuilder`, `IFieldBuilder` (Ingress Types), `PreceptValue`, `TypeRuntime<T>`, `FiredArgs` (Value Types).
+- Updated Design Rationale and Decisions section to document two-lane design rationale and updated Decisions tracking to include CC#25 closures.
+- Updated R3 open question to reflect CC#25 Q5 zero-copy `PreceptValue[]` slot donation decision.
+- Added `IReadOnlyDictionary` exclusion to Deliberate Exclusions.
+- Status table updated: doc maturity reflects locked CC#25 decisions.
+
 - Frank's Q7 revision pass is fully accepted and merged into the squad ledger.
 - All seven locked decisions are now durable context: From/To naming, no string JSON overloads, typed Restore removed, arg slot arrays with presence mask, zero-boxing `TypeRuntime<T>`, `FiredArgs` typed egress, and fluent typed builders for Fire/Inspect/Create.
 - `IReadOnlyDictionary<string, object?>` convenience/extension methods are obsolete and removed from scope.
+
+### 2026-05-03T23:59:12Z — Fix 1: result-types.md FiredArgs on EventOutcome variants; Fix 2: C# stub signature update
+
+**Files changed:**
+- `docs/runtime/result-types.md` — Added `FiredArgs Args` to `Transitioned`, `Applied`, and `Rejected` record declarations and updated table notes for those three variants. Added `FiredArgs.cs` to the source file list. `UndefinedEvent`, `Unmatched`, `InvalidArgs`, `EventConstraintsFailed` unchanged — they are failure/error paths where no submission context exists.
+- `src/Precept/Runtime/EventOutcome.cs` — Updated `Transitioned`, `Applied`, `Rejected` record signatures to include `FiredArgs Args`. XML summaries updated to reference the property.
+- `src/Precept/Runtime/Precept.cs` — Added `using System.Text.Json;`. Replaced single-overload `Create(IReadOnlyDictionary?)` / `InspectCreate(IReadOnlyDictionary?)` with JSON lane (`JsonElement?`) + typed lane (`Action<IArgBuilder>?`) overload pairs. `Restore` signature updated from `IReadOnlyDictionary<string, object?>` to `JsonElement` (JSON-only hydration path per Q7 locked decision).
+- `src/Precept/Runtime/Version.cs` — Added `using System.Text.Json;`. Indexer return type changed from `object?` to `PreceptValue`. Added `Get<T>(string fieldName)` method. Replaced all four single-overload commit/inspect methods with JSON lane + typed lane pairs: `Fire`×2, `Update`×2, `InspectFire`×2, `InspectUpdate`×2. Removed stale comment about string-keyed args.
+
+**New stub files created:**
+- `src/Precept/Runtime/FiredArgs.cs` — `PreceptValue this[string]` indexer + `Get<T>(string)` (stubs, `NotImplementedException`)
+- `src/Precept/Runtime/PreceptValue.cs` — abstract class with `FromJson`, `FromClr<T>`, `ToClr<T>`, `ToJson` stubs
+- `src/Precept/Runtime/IArgBuilder.cs` — `IArgBuilder Set<T>(string, T)` interface stub
+- `src/Precept/Runtime/IFieldBuilder.cs` — `IFieldBuilder Set<T>(string, T)` interface stub
+
+**Build:** `dotnet build src/Precept/Precept.csproj` → 0 errors, 0 warnings.
+
+### 2026-05-04T04:02:05Z — Chunk 2 closeout recorded
+- Frank-64's runtime/result-types pass is durably logged for the squad record.
+- `docs/runtime/result-types.md`, `src/Precept/Runtime/Precept.cs`, and `src/Precept/Runtime/Version.cs` now reflect the two-lane ingress/value surface captured in the current stub set.
+- New stubs `FiredArgs`, `PreceptValue`, `IArgBuilder`, and `IFieldBuilder` are part of the active runtime API baseline; build status remained clean.
+- Follow-up gaps were preserved in decisions.md: stale `result-types.md` API surface text, stale inputs/outputs table wording, `FieldAccessInfo.CurrentValue`, `FieldSnapshot.Value`, and the missing `TypeRuntime<T>` stub still need owner-directed cleanup.

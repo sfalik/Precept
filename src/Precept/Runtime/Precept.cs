@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Precept.Language;
 using Precept.Pipeline;
 
@@ -49,7 +50,11 @@ public sealed class Precept
     /// The compiler enforces (C100) that precepts with required fields lacking defaults
     /// declare an initial event, and (C101) that the initial event assigns those fields.
     /// </remarks>
-    public EventOutcome Create(IReadOnlyDictionary<string, object?>? args = null)
+    public EventOutcome Create(JsonElement? args = null)
+        => throw new NotImplementedException();
+
+    /// <inheritdoc cref="Create(JsonElement?)"/>
+    public EventOutcome Create(Action<IArgBuilder>? args = null)
         => throw new NotImplementedException();
 
     /// <summary>
@@ -57,7 +62,11 @@ public sealed class Precept
     /// Returns the annotated landscape for the initial event: row matching, constraint
     /// results, field snapshots. If no initial event, returns the default-based landscape.
     /// </summary>
-    public EventInspection InspectCreate(IReadOnlyDictionary<string, object?>? args = null)
+    public EventInspection InspectCreate(JsonElement? args = null)
+        => throw new NotImplementedException();
+
+    /// <inheritdoc cref="InspectCreate(JsonElement?)"/>
+    public EventInspection InspectCreate(Action<IArgBuilder>? args = null)
         => throw new NotImplementedException();
 
     /// <summary>
@@ -71,7 +80,7 @@ public sealed class Precept
     /// → evaluate constraints → return outcome. No event matching, no mutations, no
     /// access mode checks. Future migration logic runs before the validation pipeline.
     /// </remarks>
-    public RestoreOutcome Restore(string? state, IReadOnlyDictionary<string, object?> fields)
+    public RestoreOutcome Restore(string? state, JsonElement fields)
         => throw new NotImplementedException();
 
     // ── Definition-level queries (structural — precomputed) ─────────

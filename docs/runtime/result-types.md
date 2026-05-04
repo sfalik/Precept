@@ -61,9 +61,9 @@ Sealed hierarchy. Callers pattern-match; any unhandled variant produces a compil
 
 ```csharp
 public abstract record EventOutcome;
-public sealed record Transitioned(Version Result) : EventOutcome;
-public sealed record Applied(Version Result) : EventOutcome;
-public sealed record Rejected(string Reason) : EventOutcome;
+public sealed record Transitioned(Version Result, FiredArgs Args) : EventOutcome;
+public sealed record Applied(Version Result, FiredArgs Args) : EventOutcome;
+public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;
 public sealed record InvalidArgs(string Reason) : EventOutcome;
 public sealed record EventConstraintsFailed(IReadOnlyList<ConstraintViolation> Violations) : EventOutcome;
 public sealed record Unmatched() : EventOutcome;
@@ -72,9 +72,9 @@ public sealed record UndefinedEvent() : EventOutcome;
 
 | Variant | Meaning | Pipeline stage | Stateless reachable? |
 |---------|---------|----------------|---------------------|
-| `Transitioned` | State change succeeded, new Version in target state | Stage 10 commit | No (no states) |
-| `Applied` | No-transition row or stateless event succeeded, mutations committed | Stage 10 commit | Yes |
-| `Rejected` | Authored `reject` row matched — business prohibition | Stage 4-5 (reject row) | Yes |
+| `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted | Stage 10 commit | No (no states) |
+| `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted | Stage 10 commit | Yes |
+| `Rejected` | Authored `reject` row matched — business prohibition; `Args` carries what was submitted | Stage 4-5 (reject row) | Yes |
 | `InvalidArgs` | Arg validation failure — wrong type, unknown key | Stage 2 (arg validation) | Yes |
 | `EventConstraintsFailed` | Post-mutation constraints violated (rules, state ensures, event ensures) | Stage 9-10 | Yes |
 | `Unmatched` | All guards failed (including `when` precondition) — no row matched | Stage 4-5 | Yes |
@@ -351,6 +351,8 @@ Guard evaluation under partial args must use Kleene three-value logic. Compariso
 - `FieldSnapshot.cs` — shared primitive
 - `ConstraintResult.cs` — shared primitive
 - `ArgInfo.cs` — shared primitive
+- `FiredArgs.cs` — event arg egress; appears on Transitioned, Applied, Rejected
+- `PreceptValue.cs` — unified value type at the API boundary
 - `Prospect.cs` — enum
 - `ConstraintStatus.cs` — enum
 - `RowEffect.cs` — discriminated union

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Precept.Runtime;
 
 /// <summary>
@@ -26,7 +28,10 @@ public sealed record Version
 
     // ── Field access ────────────────────────────────────────────────
 
-    public object? this[string fieldName]                               // TODO R3: slot array or dictionary
+    public PreceptValue this[string fieldName]                          // TODO R3: slot array or dictionary
+        => throw new NotImplementedException();
+
+    public T Get<T>(string fieldName)
         => throw new NotImplementedException();
 
     public IReadOnlyList<FieldAccessInfo> FieldAccess                   // omit = absent from list
@@ -52,21 +57,34 @@ public sealed record Version
         => throw new NotImplementedException();
 
     // ── Commit ──────────────────────────────────────────────────────
-    // Fire and Update use string-keyed arguments — these remain string-based
-    // until the Evaluator is implemented, as they require descriptor resolution
-    // at dispatch time (R3/R5).
 
-    public EventOutcome Fire(string eventName, IReadOnlyDictionary<string, object?> args)
+    // JSON lane — wire callers that already have JsonElement on hand
+    public EventOutcome Fire(string eventName, JsonElement? args = null)
         => throw new NotImplementedException();
 
-    public UpdateOutcome Update(IReadOnlyDictionary<string, object?> fields)
+    public UpdateOutcome Update(JsonElement? fields = null)
+        => throw new NotImplementedException();
+
+    // Typed lane — in-process callers using fluent builders
+    public EventOutcome Fire(string eventName, Action<IArgBuilder>? args = null)
+        => throw new NotImplementedException();
+
+    public UpdateOutcome Update(Action<IFieldBuilder>? fields = null)
         => throw new NotImplementedException();
 
     // ── Inspect ─────────────────────────────────────────────────────
 
-    public EventInspection InspectFire(string eventName, IReadOnlyDictionary<string, object?>? args = null)
+    // JSON lane
+    public EventInspection InspectFire(string eventName, JsonElement? args = null)
         => throw new NotImplementedException();
 
-    public UpdateInspection InspectUpdate(IReadOnlyDictionary<string, object?>? fields = null)
+    public UpdateInspection InspectUpdate(JsonElement? fields = null)
+        => throw new NotImplementedException();
+
+    // Typed lane
+    public EventInspection InspectFire(string eventName, Action<IArgBuilder>? args = null)
+        => throw new NotImplementedException();
+
+    public UpdateInspection InspectUpdate(Action<IFieldBuilder>? fields = null)
         => throw new NotImplementedException();
 }
