@@ -1,3 +1,95 @@
+# CC#2 — SlotValue Subtype Shapes: Locked Decisions
+
+**Accepted by:** Shane Falik  
+**Accepted at:** 2026-05-03T23:39:16.086-04:00  
+**Decision date:** 2026-05-03T23:39:16.086-04:00  
+**Option selected:** Option C (Hybrid)
+
+## Decision 1 — Parser stamps ParsedExpression
+
+The 5 expression-carrying `SlotValue` subtypes (`GuardClauseSlot`, `ComputeExpressionSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) carry a `ParsedExpression Expression` field, not `SourceSpan`. The parser builds the raw structural tree (operands, operators, grouping, no type resolution) and stamps it into the slot.
+
+### Rationale
+
+This preserves the parser's real work as durable structure instead of reducing it back to text coordinates. It gives downstream consumers a stable parse-time artifact while keeping semantic ownership out of the parser.
+
+### Alternatives rejected
+
+- **`SourceSpan` stubs in expression slots:** rejected because it discards parser output and forces later phases to reconstruct syntax they already had.
+- **Parser produces typed/semantic expressions directly:** rejected because type resolution belongs to the type checker, not the parser.
+
+### Tradeoff accepted
+
+`SlotValue` now carries richer parse-time payloads, so parse objects are heavier than span-only stubs. That cost is accepted to avoid throwing away structural information.
+
+## Decision 2 — TypedExpression is TC output
+
+The type checker reads `ParsedExpression` from the slot, resolves types against the field catalog and state graph, and produces `TypedExpression`. This is stored in `SemanticIndex`, not back into the slot.
+
+### Rationale
+
+This keeps semantic products in the semantic layer. `SemanticIndex` is the correct home for TC-owned facts, while `SlotValue` remains the parser-owned shape captured at parse time.
+
+### Alternatives rejected
+
+- **Overwrite slot payload with `TypedExpression`:** rejected because it collapses the parser/TC boundary and destroys the original syntactic artifact.
+- **Store both parsed and typed forms in the slot:** rejected because it makes slots a cross-phase bag instead of a clean parse-time DU.
+
+### Tradeoff accepted
+
+The system now maintains both parsed and typed representations. That duplication is intentional because the two artifacts answer different questions for different consumers.
+
+## Decision 3 — Single parse pass
+
+No re-parsing from source span. The parser's structural work is never discarded. This is the defining constraint of Option C over Option B.
+
+### Rationale
+
+A single structural parse pass removes avoidable duplicate work and eliminates drift risk between "first parse" and "re-parse later" behavior. The parser becomes the sole producer of syntactic expression trees.
+
+### Alternatives rejected
+
+- **Option B re-parse model:** rejected because it pays parser cost twice and reintroduces correctness risk through duplicated parsing paths.
+- **Hybrid with selective re-parse fallback:** rejected because the fallback still normalizes discarding parser output as an acceptable pattern.
+
+### Tradeoff accepted
+
+Parser output shape becomes more consequential because downstream phases rely on it directly. That tighter coupling is accepted because the parser is supposed to be the authoritative syntactic producer.
+
+## Decision 4 — Two representations, clean boundary
+
+`ParsedExpression` = syntactic structure (parser-owned). `TypedExpression` = semantic content (TC-owned). These are distinct DU hierarchies, consistent with CC#1's two-hierarchy decision.
+
+### Rationale
+
+Syntax and semantics are different kinds of information. Keeping them as separate hierarchies preserves phase ownership, aligns with CC#1, and prevents semantic fields from leaking into parser structures.
+
+### Alternatives rejected
+
+- **Single shared expression hierarchy with optional semantic fields:** rejected because it blurs ownership and produces partially-populated nodes across phases.
+- **Catalog/member switches to emulate phase differences inside one type:** rejected because it hides a real shape distinction instead of modeling it explicitly.
+
+### Tradeoff accepted
+
+There is some mirrored shape across the two hierarchies. That repetition is accepted because the boundary clarity is more valuable than forcing one overloaded tree to do both jobs.
+
+## Decision 5 — SlotValue subtypes are parse-time final
+
+The `SlotValue` DU shape is now complete. All 17 subtypes are stable. Expression-carrying slots no longer hold `SourceSpan` stubs — they carry `ParsedExpression`.
+
+### Rationale
+
+This closes the cross-cutting ambiguity blocking parser and TC work. With the DU stabilized, downstream design can proceed against one canonical parse-time contract instead of competing interpretations.
+
+### Alternatives rejected
+
+- **Leave slot shapes open pending implementation:** rejected because the ambiguity is itself the blocker.
+- **Stabilize only non-expression slots now and revisit expression slots later:** rejected because expression slots are the highest-friction part of the mismatch and must be resolved to unblock implementation.
+
+### Tradeoff accepted
+
+Future changes to slot shapes now carry a higher bar because the DU is declared stable. That rigidity is accepted to end churn and give the pipeline a canonical contract.
+
 # CC#25 Q6 Addendum — Sync-Only API (Async Clarification)
 
 **Status:** Accepted by Shane
@@ -38966,3 +39058,4 @@ The prior Q6 answer described enforcement in builder Pass 5. This revision moves
 | User feedback timing | At app startup | While authoring |
 
 The `ExecutionPlan.MaxStackDepth` field remains useful for debug assertions but is no longer the enforcement point.
+

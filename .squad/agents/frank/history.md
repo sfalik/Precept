@@ -17,7 +17,11 @@
 - Separate durable API surface decisions from rejected convenience lanes; the rejected lane still needs an explicit closeout note.
 - Summarize back to architectural baselines once detailed delivery history crosses the active-context threshold.
 
-## Recent Updates
+
+### 2026-05-04T03:39:16Z — CC#2 acceptance merged
+- Frank-62's CC#2 acceptance is now durable in the squad ledger.
+- Canonical record: Option C (Hybrid) accepted; the five locked SlotValue shape decisions now live in decisions.md.
+- Redundant stamped options brief was cleared during inbox dedupe.
 
 ### 2026-05-04T03:26:10Z — CC#25 Q7 acceptance revision complete
 - Frank's Q7 revision pass is fully accepted and merged into the squad ledger.
