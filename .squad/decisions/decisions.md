@@ -36286,3 +36286,250 @@ Then work wave by wave from the checklists; the retained detailed entries are th
 **What:** `Version.ToJson()` omits unresolved fields and never throws. Direct field reads remain two-lane: `version["fieldName"]` for raw JSON access and `version.Get<T>("fieldName")` for typed access. Both direct read surfaces throw `InvalidOperationException` for absent or unresolved fields; callers use `FieldAccess` to preflight presence.
 
 **Why:** Omitting unresolved fields is the only round-trip-safe representation and avoids conflating unresolved values with JSON `null`. Throwing on direct reads keeps the programmer-error contract consistent with the rest of the public runtime surface.
+
+# API Naming Assessment — Public Runtime Surface
+
+**Date:** 2026-05-04T12:31:05Z  
+**By:** Elaine  
+**Status:** Assessment complete — no spec edits made (read-only per task constraint)
+
+---
+
+## Executive Summary
+
+The public API surface is structurally sound and the type/operation naming is largely good. The value-lane decision (JsonElement / T via Get<T>()) is clean. The core operations (Fire, Update, Create, Inspect*) are well-named. The main problems cluster around three concerns:
+
+1. **One name with a domain-wrong connotation** — `AccessDenied` carries RBAC baggage that actively misleads.
+2. **Three names using Precept-internal vocabulary** — `RowInspection`, `BecauseClause`, and (pre-Frank) `EventConstraintsFailed` / `UpdateConstraintsFailed` are opaque to external developers.
+3. **One success variant that's stylistically inconsistent** — `FieldWriteCommitted` is verbose and breaks the naming register of the other success variants.
+
+---
+
+## Issue 1: `AccessDenied` — RBAC false connotation
+
+**What's wrong:** `AccessDenied(string FieldName, FieldAccessMode ActualMode) : UpdateOutcome` reads as a security/RBAC rejection — as if a user's role or permission was checked and failed. This is not what's happening. This variant fires when a field's *declared access mode* (Readonly vs Editable) prevents direct editing. That is a structural property of the field declaration, not an authorization decision.
+
+The philosophy is explicit that Precept governs entity data through declared rules — not through authorization. Pairing Precept with RBAC vocabulary creates a false model in the developer's mind from the first time they pattern-match on this type.
+
+**Precept vocabulary:** `FieldAccessMode { Readonly, Editable }` — the concept is already cleanly named in the API. The failure case should reflect it.
+
+**Recommendation: `FieldNotEditable`** — precise, structurally accurate, zero security connotation, anchored to the `Editable` concept already in the API.
+
+**On `ActualMode`:** When this variant fires, `ActualMode` will always be `Readonly` (that's the structural precondition). The property is still worth keeping for programmatic consumers who shouldn't hardcode the comparison. Rename the variant; keep the property.
+
+---
+
+## Issue 2: `EventConstraintsFailed` / `UpdateConstraintsFailed` → `ConstraintsFailed`
+
+Frank-96's inbox file (`frank-constraints-failed-naming.md`) documents this rename and additional nesting of all DU variants. **I agree with both decisions.**
+
+**Why the prefix was wrong:** `EventConstraintsFailed` reads as "event-scoped ensures failed." `UpdateConstraintsFailed` reads as "update-scoped rules failed." Both are wrong — Fire and Update run the *full* constraint evaluation, which can surface violations from rules, state ensures, and event ensures depending on what the precept declares. The operation prefix was a false narrowing.
+
+**Why `ConstraintsFailed` is right:** The DU base type (`EventOutcome` vs `UpdateOutcome`) already encodes which operation produced the result. The variant name only needs to describe *what* failed — not *which operation* ran.
+
+**Why nesting all variants is right:** Partial nesting (only `ConstraintsFailed` nested, others top-level) would create inconsistent qualification in switch expressions — some arms would require `EventOutcome.ConstraintsFailed`, others would be bare `Transitioned`. All-nested eliminates that inconsistency.
+
+---
+
+## Issue 3: `RowInspection` — internal vocabulary leak
+
+**What's wrong:** "Row" is Precept-internal vocabulary for a guard/mutation pair in an event handler (a transition row). External developers have no context for what a "row" means here. It reads like a database row, a table row, or a layout row — none of which apply.
+
+**Precept vocabulary:** The philosophy says "the transition that produces an invalid data configuration is rejected." The runtime concept being inspected is a *transition* — one guard branch within an event. Developers familiar with state machines know what a transition is; nobody outside Precept knows what a "row" is.
+
+**Recommendation: `TransitionInspection`** — immediately legible to any developer familiar with state machines. Clean, precise, philosophy-aligned.
+
+**Corollary rename:** `EventInspection.Rows` → `EventInspection.Transitions` — the property name should match the type name.
+
+---
+
+## Issue 4: `BecauseClause` vs `Because` — inconsistency
+
+**What's wrong:** `ConstraintDescriptor.Because` (string) uses the DSL keyword form. `ConstraintViolation.BecauseClause` (string?) uses a different name for the same concept. These two types are tightly paired in every usage — the violation references the constraint — yet they use different names for what is functionally "the reason text."
+
+**Recommendation: Rename `BecauseClause` → `Because` on `ConstraintViolation`** to match `ConstraintDescriptor.Because`. Both types are in the same consumption context; developers should see consistent names.
+
+---
+
+## Issue 5: `InvalidArgs` vs `InvalidInput` — inconsistency
+
+**What's wrong:** 
+- `EventOutcome.InvalidArgs` — used when event/create arguments are malformed
+- `UpdateOutcome.InvalidInput` — used when update field data is malformed
+
+The Update operation takes `fields`, not `args`. `InvalidInput` is a generic name that doesn't reflect the Update operation's own vocabulary. The parallel naming should mirror the parameter types:
+
+**Recommendation: `UpdateOutcome.InvalidInput` → `UpdateOutcome.InvalidFields`**
+
+Resulting parallel:
+- `InvalidArgs` — bad input to Create/Fire (which take `args`)
+- `InvalidFields` — bad input to Update (which takes `fields`)
+
+---
+
+## Issue 6: `FieldWriteCommitted` — verbose and stylistically inconsistent
+
+**What's wrong:** The success variants of `EventOutcome` are named as short, past-tense entity actions: `Transitioned`, `Applied`. The success variant of `UpdateOutcome` is named as a verbose operation noun: `FieldWriteCommitted`. Three words, mixed register, sounds like a database commit log entry.
+
+**Recommendation: `FieldWriteCommitted` → `Updated`**
+
+With nesting: `UpdateOutcome.Updated`. Reads cleanly: `if (outcome is UpdateOutcome.Updated u)`. Matches the naming register of `EventOutcome.Transitioned`.
+
+---
+
+## Minor Observations (not primary recommendations)
+
+**a) `Applied` vs `Transitioned` — distinguish these explicitly in the spec.** Two success variants of `EventOutcome` with identical shapes (`Version Result, FiredArgs Args`) but different semantics. The distinction should be documented: `Transitioned` = lifecycle-stateful entity moved to a new state; `Applied` = stateless entity or event without state change. The names themselves are fine; the distinction just needs clear documentation.
+
+**b) `RequiredArgs(string eventName)` — scope should be explicit.** If this returns required-only args (not optionals), developers have no single method to see all args for an event. If it returns all args (and `IsOptional` distinguishes), the name `RequiredArgs` is misleading. Either add `EventArgs(string eventName)` to surface all args, or document precisely what `RequiredArgs` returns. Optionals are also legitimate metadata callers may need.
+
+**c) `Prospect` enum — functional but unusual.** The values (`Certain`, `Possible`, `Impossible`) are clear. The type name `Prospect` is uncommon in API design but unambiguous. No action needed — just note that documentation should define it explicitly so developers don't have to infer from values.
+
+**d) `ConstraintKind` enum values** (`StateEnsureIn`, `StateEnsureFrom`, `StateEnsureTo`) **— mirror DSL syntax, require DSL literacy.** This is correct for a catalog-driven API: the names match the language constructs they represent. Clarity comes from documentation, not renaming.
+
+**e) `UpdateInspection.Events` property type** (`ImmutableArray<EventInspection>`) — the property is named `Events` but holds inspection objects. Minor: consider `EventInspections` to make the type transparent in the property name. Low priority.
+
+---
+
+## Systemic Patterns
+
+**Pattern 1 — Success variant register mismatch.** `EventOutcome` success variants (`Transitioned`, `Applied`) are short, entity-centric, past tense. `UpdateOutcome` success variant (`FieldWriteCommitted`) is operational, verbose, and reads like a database operation. The fix is `Updated`.
+
+**Pattern 2 — DSL keyword consistency.** Where a property directly reflects a DSL keyword (e.g., `because`), the property name should match the keyword — as `ConstraintDescriptor.Because` already does. `ConstraintViolation.BecauseClause` is the only outlier. Normalize to `Because` everywhere.
+
+**Pattern 3 — Vocabulary at the point of failure.** Two of the issues (`AccessDenied`, `RowInspection`) are cases where the name at a *failure or result point* uses vocabulary that doesn't match the rest of the API surface. At the point where a developer is debugging or handling an outcome, vocabulary precision matters most. These are the highest-UX-impact fixes.
+
+---
+
+## Recommendations Table
+
+| Current Name | Recommended Name | Priority | Rationale |
+|---|---|---|---|
+| `AccessDenied` | `FieldNotEditable` | **High** | RBAC false connotation; structurally wrong domain signal |
+| `EventConstraintsFailed` / `UpdateConstraintsFailed` | `EventOutcome.ConstraintsFailed` / `UpdateOutcome.ConstraintsFailed` | **High** | Frank-96 in-progress; I agree. Operation-scope prefix is false narrowing. |
+| `RowInspection` | `TransitionInspection` | **High** | Internal vocabulary; "transition" is the public-facing concept |
+| `EventInspection.Rows` | `EventInspection.Transitions` | **High** | Corollary of TransitionInspection rename |
+| `ConstraintViolation.BecauseClause` | `ConstraintViolation.Because` | **Medium** | Inconsistent with `ConstraintDescriptor.Because`; same concept, same context |
+| `UpdateOutcome.InvalidInput` | `UpdateOutcome.InvalidFields` | **Medium** | Inconsistent with `InvalidArgs`; Update operates on fields, not args |
+| `FieldWriteCommitted` | `Updated` | **Medium** | Verbose; breaks naming register of `Transitioned`/`Applied` |
+| `RequiredArgs(string)` | Clarify scope or add `EventArgs(string)` companion | **Low** | Ambiguous whether returns required-only or all args |
+
+---
+
+## Decisions This Assessment Does Not Make
+
+- Whether `Applied` (in `EventOutcome`) fires for stateless entities only, for events-without-state-change, or both — this distinction needs spec documentation regardless of naming.
+- Whether `Prospect` should be renamed — functional as-is; preference call only.
+- Whether `ConstraintKind` enum values need simplification — they mirror DSL, so they're correct as-is; documentation solves the clarity need.
+
+# ConstraintsFailed Naming and DU Nesting
+
+**Date:** 2026-05-04T12:27:25Z  
+**By:** Frank  
+**Status:** Decided — spec updated  
+
+---
+
+## What Was Decided
+
+### 1. Rename the constraint-failure variants
+
+- `EventConstraintsFailed` → `EventOutcome.ConstraintsFailed`
+- `UpdateConstraintsFailed` → `UpdateOutcome.ConstraintsFailed`
+
+Spec updated in `docs/working/runtime-api-public-surface-spec.md` §2.1 and §2.2.
+
+### 2. Nest all DU variants inside their abstract record base
+
+Both `EventOutcome` and `UpdateOutcome` now show all variants as nested types within the abstract record body. This was necessary for the rename to be consistent and collision-free, and it is the right long-term shape for these DUs.
+
+---
+
+## Rationale
+
+### Why "ConstraintsFailed" and not the old prefix names
+
+The `Event`/`Update` prefix implied that only one category of constraint can fail per operation:
+- `EventConstraintsFailed` reads as "event-scoped constraints failed" — which a reader could wrongly interpret as "only `ensures` clauses scoped to events failed"
+- `UpdateConstraintsFailed` reads as "update-scoped constraints failed" — which could be read as "only `rule` declarations on edited fields failed"
+
+In reality, `Fire` and `Update` both run the full constraint evaluation, which can surface violations from `rule` declarations, `ensures` scoped to events, and `ensures` scoped to states — depending on what the precept defines. The operation-type prefix is a false narrowing. The correct umbrella is `ConstraintsFailed`. Which operation produced it is already encoded in the DU base (`EventOutcome` vs. `UpdateOutcome`).
+
+### Why nested rather than Option A (single shared type)
+
+Option A (a single `ConstraintsFailed` shared across both DUs) is the most elegant API surface — pattern matching `outcome is ConstraintsFailed cf` works for either operation. But it requires both `EventOutcome` and `UpdateOutcome` to be interfaces rather than abstract records. Converting them to interfaces opens the hierarchy to external implementations, which violates Precept's closed, deterministic contract model. An open DU base would allow third-party code to add variants the runtime never produces, breaking exhaustiveness checks. Closed abstract record hierarchies are non-negotiable.
+
+### Why nested rather than flat top-level with distinct names
+
+Keeping flat top-level types with distinct names (the old approach) simply fails to achieve the requested rename — you'd need something like `FireConstraintsFailed`/`UpdateConstraintsFailed`, which is equally misleading as the old `Event`/`Update` prefixes and doesn't improve the API.
+
+### Why nest ALL variants, not just ConstraintsFailed
+
+Partial nesting — where `ConstraintsFailed` is nested inside `EventOutcome` but `Transitioned`, `Applied`, `Rejected` etc. remain top-level — is inconsistent. In a switch expression on `EventOutcome`, some arms would be `EventOutcome.ConstraintsFailed` and others would be bare `Transitioned`. That inconsistency is a maintenance hazard and a readability problem. All-nested is a well-established C# DU pattern (each variant prefixed with its union name in switch expressions) and should be applied consistently.
+
+---
+
+## Alternatives Rejected
+
+| Alternative | Rejection reason |
+|---|---|
+| Option A — single `ConstraintsFailed : EventOutcome, UpdateOutcome` | Requires interfaces, opens the closed hierarchy — incompatible with Precept's determinism contract |
+| Option B — operation-verb prefix (`FireConstraintsFailed`, `UpdateConstraintsFailed`) | Equally misleading in a different direction; "Fire" and "Update" are operation verbs, not domain scopes — doesn't fix the underlying naming smell |
+| Partial nesting (only `ConstraintsFailed` nested, others top-level) | Creates inconsistent qualification in switch expressions; cognitive overhead for no gain |
+
+---
+
+## Files Updated
+
+- `docs/working/runtime-api-public-surface-spec.md` — §2.1, §2.2 (nested structure + rename), §11 (decisions #11 and #12)
+
+# Elaine Naming Pass — Applied to Runtime API Surface Spec
+
+**Date:** 2026-05-04T12:40:31Z  
+**By:** Frank  
+**Status:** Applied — all five renames complete; §11 updated with decision records #13–17
+
+---
+
+## What Was Applied
+
+All five naming recommendations from Elaine's API naming assessment (`elaine-api-naming-assessment.md`) were applied to `docs/working/runtime-api-public-surface-spec.md`. Frank-96's two renames (`ConstraintsFailed` + full DU nesting, §11 decisions #11 and #12) were already present and were NOT re-applied.
+
+### 1. `AccessDenied` → `FieldNotEditable`
+
+**Sections touched:** §2.2 (`UpdateOutcome` record definition)  
+**Rationale:** `AccessDenied` carried RBAC connotation. This variant fires on a field's declared access mode (`Readonly` vs `Editable`) — a structural fact, not an authorization decision. `FieldNotEditable` is precise and anchored to the existing `FieldAccessMode.Editable` concept.
+
+### 2. `RowInspection` → `TransitionInspection`; `EventInspection.Rows` → `EventInspection.Transitions`
+
+**Sections touched:** §2.3 (record definitions for `EventInspection` and `TransitionInspection`)  
+**Rationale:** "Row" is internal Precept vocabulary with no meaning to external developers. "Transition" is standard state-machine vocabulary, immediately legible. Property rename follows the type rename.
+
+### 3. `ConstraintViolation.BecauseClause` → `ConstraintViolation.Because`
+
+**Sections touched:** §2.7 (`ConstraintViolation` record definition)  
+**Rationale:** `ConstraintDescriptor.Because` already used the DSL keyword form. `BecauseClause` was an outlier. Normalizing to `Because` achieves consistency across the two tightly-paired types.
+
+### 4. `UpdateOutcome.InvalidInput` → `UpdateOutcome.InvalidFields`
+
+**Sections touched:** §2.2 (`UpdateOutcome` record definition)  
+**Rationale:** `Update()` takes a `fields` parameter; the failure variant should reflect that vocabulary. Creates a clean parallel: `InvalidArgs` for Create/Fire (which take args), `InvalidFields` for Update (which takes fields).
+
+### 5. `UpdateOutcome.FieldWriteCommitted` → `UpdateOutcome.Updated`
+
+**Sections touched:** §2.2 (`UpdateOutcome` record definition)  
+**Rationale:** `FieldWriteCommitted` was verbose and broke the naming register of `Transitioned` and `Applied` (short, past-tense, entity-centric). `Updated` matches the register and reads cleanly in switch expressions.
+
+---
+
+## §11 Decision Records Added
+
+Decision records #13–17 were appended to §11 of the spec, one per rename. Each entry documents the old name, new name, brief rationale, and credits Elaine as the analyst who surfaced the issue.
+
+Frank-96's entries (#11 — DU nesting, #12 — ConstraintsFailed rename) were confirmed present before the pass began.
+
+---
+
+## Files Updated
+
+- `docs/working/runtime-api-public-surface-spec.md` — §2.2, §2.3, §2.7, §11 (decisions #13–17 added)
