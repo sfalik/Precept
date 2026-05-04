@@ -1,3 +1,25 @@
+# CC#25 Q6 Addendum — Sync-Only API (Async Clarification)
+
+**Status:** Accepted by Shane
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-03
+
+## Decision
+
+The public Precept API (Fire, Update, Create, Restore, Inspect) is **sync-only**. No FireAsync, UpdateAsync, or equivalent overloads will be provided.
+
+## Rationale
+
+Precept execution is entirely CPU-bound — guard evaluation, action execution, constraint checking, and slot promotion are pure in-memory computation with no I/O. Async/await provides no scalability benefit for CPU-bound work; it only releases threads during I/O waits. On an ASP.NET thread pool thread, calling Fire() keeps the thread actively computing — which is exactly what thread pool threads are for.
+
+The stackalloc PreceptValue[32] operand stack (Q6) is a consequence, not a cause: it is safe precisely *because* execution is synchronous. The causality is: CPU-bound → sync optimal → stackalloc safe.
+
+If async were ever required (e.g., persistence hooks, external validation), that would be a fundamental architecture change — not an additive API surface. That is a different product.
+
+## Documentation Note
+
+Public API docs should state: "Precept execution is CPU-bound. Async wrappers provide no scalability benefit and are not provided."
+
 # CC#25 Q6 — Eval Stack Allocation
 
 **Status:** Proposed — awaiting Shane acceptance
