@@ -38817,3 +38817,152 @@ These arose during this analysis but belong in their own decision cycles:
 **By:** Frank
 **What:** Locked the vocabulary split between parser-time construct slots and runtime field slots. ParsedConstruct.Slots / SlotValue stay compile-time only; runtime execution uses field slot indices in the PreceptValue[] working-copy array, with SlotLayout as the canonical field-name-to-slot-index mapping.
 **Why:** The two concepts share a word but not a lifecycle, representation, or owner. Builder-time slot assignment happens mechanically inside Precept.From() in declaration order, so discussions that cross parser and runtime layers must explicitly distinguish construct slots from field slots.
+
+# CC#25 Q6 Revision — Stack Depth Enforcement (LS Diagnostic)
+
+**Status:** Accepted by Shane
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-03
+**Accepted:** Shane (2026-05-03)
+**Supersedes:** Prior Q6 answer (Pass 5 plan-emission in Precept Builder — rejected: runtime only)
+
+## Revised Decision
+
+Expression stack depth enforcement moves from the Precept Builder (Pass 5, `Precept.From()`) to the **Type Checker** (compiler Pass 3). The type checker computes `TypedExpression.MaxStackDepth` during expression typing and emits `ExpressionTooComplex` as a compile-time diagnostic. This produces a red squiggle in VS Code while editing.
+
+## Pipeline Analysis
+
+### What the LS Runs
+
+The language server calls `Compiler.Compile(source)` on every document change. This runs the full **compiler pipeline**:
+
+| Pass | Stage | Artifact | Runs in LS? |
+|------|-------|----------|-------------|
+| 1 | Lexer | `TokenStream` | ✅ Yes |
+| 2 | Parser | `ConstructManifest` | ✅ Yes |
+| 3 | TypeChecker | `SemanticIndex` | ✅ Yes |
+| 4 | GraphAnalyzer | `StateGraph` | ✅ Yes |
+| 5 | ProofEngine | `ProofLedger` | ✅ Yes |
+
+Diagnostics from all five passes are collected into `Compilation.Diagnostics` and pushed to the editor as red squiggles.
+
+### What the LS Does NOT Run for Diagnostics
+
+`Precept.From(compilation)` — the **Precept Builder** — runs only:
+1. When `!compilation.HasErrors`
+2. To build the `Precept` for preview/inspect operations
+
+This is a **runtime call** (at app startup), not a diagnostic path. A check in the builder's Execution Plan Pass (builder Pass 5) only fails when the application loads — no red squiggle, no feedback while authoring.
+
+### Why the Type Checker
+
+The type checker already walks every expression to produce `TypedExpression`. Adding depth tracking is a natural extension:
+
+1. **Expression walk already happens** — no new traversal required
+2. **Depth is a structural property** — computable without execution planning
+3. **Diagnostic fits existing patterns** — type-checking diagnostics are the natural category for "this expression exceeds allowed complexity"
+
+The depth limit (32) is a fixed ceiling, not data-dependent. It can be enforced during type checking without waiting for opcode emission.
+
+## Implementation
+
+### TypedExpression Record Extension
+
+```csharp
+// In SemanticIndex — already carries typed expressions
+public sealed record TypedExpression(
+    ExpressionFormKind Form,
+    TypeKind ResultType,
+    SourceSpan Span,
+    // ... existing fields ...
+    int MaxStackDepth  // NEW: high-water-mark for this expression tree
+);
+```
+
+### Type Checker Expression Visitor
+
+During expression typing, the type checker computes `MaxStackDepth` recursively:
+
+```csharp
+// Pseudocode — actual implementation in TypeChecker.ExpressionResolver
+int ComputeDepth(TypedExpression expr) => expr.Form switch
+{
+    ExpressionFormKind.Literal => 1,
+    ExpressionFormKind.FieldRef => 1,
+    ExpressionFormKind.ArgRef => 1,
+    ExpressionFormKind.Binary => Math.Max(Left.MaxStackDepth, Right.MaxStackDepth + 1),
+    ExpressionFormKind.Unary => Child.MaxStackDepth,
+    ExpressionFormKind.FunctionCall => args.Max(a => a.MaxStackDepth) + arity - 1,
+    ExpressionFormKind.Ternary => Math.Max(Condition, Math.Max(Then, Else)) + 2,
+    // ... other forms ...
+};
+```
+
+### Diagnostic Emission
+
+```csharp
+const int MaxEvalStackDepth = 32;
+
+if (typedExpr.MaxStackDepth > MaxEvalStackDepth)
+{
+    diagnostics.Add(Diagnostic.Create(
+        DiagnosticCode.ExpressionTooComplex,
+        typedExpr.Span,
+        typedExpr.MaxStackDepth,
+        MaxEvalStackDepth));
+}
+```
+
+### New DiagnosticCode
+
+```csharp
+// In DiagnosticCode.cs — Type section
+ExpressionTooComplex = 107,  // next available ordinal
+```
+
+### DiagnosticMeta Entry
+
+```csharp
+// In Diagnostics catalog
+new DiagnosticMeta(
+    Code: DiagnosticCode.ExpressionTooComplex,
+    Severity: Severity.Error,
+    MessageTemplate: "Expression too complex: stack depth {0} exceeds limit {1}",
+    Category: DiagnosticCategory.Type)
+```
+
+## Builder Pass 5 Adjustment
+
+The Precept Builder's Execution Plan Pass no longer enforces the depth ceiling — it is guaranteed by the type checker. The builder can add a debug assertion:
+
+```csharp
+// Pass 5 — Execution Plan Pass
+Debug.Assert(
+    typedExpr.MaxStackDepth <= MaxEvalStackDepth,
+    "Type checker should have rejected this expression");
+```
+
+## Rationale
+
+1. **LS diagnostic path:** The type checker runs in `Compiler.Compile()`, which the LS calls on every document change. Diagnostics emitted here appear as red squiggles immediately.
+
+2. **No new traversal:** The type checker already visits every expression node to compute types. Depth tracking piggybacks on this walk.
+
+3. **Static property:** Stack depth is determined by expression structure, not by runtime values. It is computable without opcode emission.
+
+4. **Consistent with other type diagnostics:** `TypeMismatch`, `FunctionArityMismatch`, `CircularComputedField` — expression complexity fits the same diagnostic category.
+
+5. **Single enforcement point:** One check in the type checker, not two (one in compiler, one in builder). The builder trusts the compiler's guarantee.
+
+## Migration
+
+The prior Q6 answer described enforcement in builder Pass 5. This revision moves it earlier:
+
+| Aspect | Prior Q6 | Revised Q6 |
+|--------|----------|------------|
+| Enforcement location | Precept Builder Pass 5 | Type Checker (compiler Pass 3) |
+| When it runs | `Precept.From()` at app startup | `Compiler.Compile()` on every edit |
+| Diagnostic surface | None (runtime exception or diagnostic) | LS red squiggle |
+| User feedback timing | At app startup | While authoring |
+
+The `ExecutionPlan.MaxStackDepth` field remains useful for debug assertions but is no longer the enforcement point.

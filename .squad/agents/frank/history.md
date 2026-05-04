@@ -94,3 +94,5 @@
 - Frank's working-copy recommendation is now durably recorded in `decisions.md`: each candidate row forks from the original `Version.Slots`, guards read only immutable source slots, and only the winning row can donate its working copy into the next `Version`.
 - Durable constraint: no shared mutable working copy crosses row boundaries; pooling remains an optimization seam, not a semantic change.
 
+### 2026-05-04T02:14:47Z — Q6 revised stack-depth decision accepted
+- Shane accepted the revised CC#25 Q6 answer: stack-depth enforcement moves into the Type Checker as an LS diagnostic, with the builder reduced to a debug-assert trust boundary.
