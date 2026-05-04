@@ -445,7 +445,7 @@ public interface IArgBuilder
 
 Usage: `args => args.Set<decimal>("Amount", 500m).Set<string>("ApplicantName", "Jane")`
 
-Each `Set<T>` call is resolved through the registered `TypeRuntime<T>` for zero-boxing conversion to `PreceptValue`. The builder internally produces a slot array populated via the presence mask. Unset args remain absent; `InvalidArgs` is returned if required args are missing.
+Each `Set<T>` call is resolved through the registered `TypeRuntime<T>` for zero-boxing conversion to `PreceptValue`. The builder internally produces a `PreceptValue[]` arg slot array populated via the **presence mask** — a `bool[]` of the same length, where `presence[i] == true` means arg slot `i` was explicitly set by the caller and `presence[i] == false` means it was not provided. Unset optional args remain absent (the corresponding `PreceptValue` slot is the absent sentinel); unset required args cause `InvalidArgs` at the Fire boundary before the opcode loop begins. The presence mask and slot array are both built during the `Action<IArgBuilder>` invocation and discarded after the call completes — they are not observable from outside the builder.
 
 #### IFieldBuilder
 

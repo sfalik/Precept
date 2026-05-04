@@ -880,13 +880,21 @@ The `Token` fieldholds a direct reference to the `TokenMeta` instance from the T
 The property uses the abstract base:
 
 ```csharp
-// Abstract base — catalog holds this; carries JSON and string delegates
+// Abstract base — catalog holds this; carries JSON, string, and executor delegates
 public abstract class TypeRuntime
 {
     public abstract PreceptValue ReadJson(ref Utf8JsonReader reader);
     public abstract void WriteJson(Utf8JsonWriter writer, PreceptValue value);
     public abstract PreceptValue ParseString(string text);
     public abstract string FormatString(PreceptValue value);
+    
+    // Catalog-owned executor delegates, indexed by OperationKind ordinal.
+    // The evaluator calls BinaryExecutors[(int)kind] and UnaryExecutors[(int)kind]
+    // rather than switching on OperationKind — making it zero-knowledge about operations.
+    // Slots for operations not applicable to this type carry null; the evaluator must
+    // never call a null slot (the type checker guarantees this statically).
+    public abstract Func<PreceptValue, PreceptValue, PreceptValue>?[] BinaryExecutors { get; }
+    public abstract Func<PreceptValue, PreceptValue>?[] UnaryExecutors { get; }
 }
 
 // Generic sealed subclass — adds zero-boxing CLR lane delegates
@@ -898,6 +906,10 @@ public sealed class TypeRuntime<T> : TypeRuntime
 ```
 
 Registration is process-global via `PreceptRuntime.Register<T>(fromClr, toClr)`. The runtime stores the resulting `TypeRuntime<T>` instance in the corresponding `TypeMeta` entry. Types with no registration default to JSON-lane-only access (`TypeMeta.Runtime == null`).
+
+**Naming context:** The abstract base methods (`ReadJson`, `WriteJson`, `ParseString`, `FormatString`) are the internal hot-path streaming API. These are distinct from the public-facing `PreceptValue` static methods (`PreceptValue.FromJson(JsonElement)` / `PreceptValue.ToJson()`) which are higher-level convenience conversions over `JsonElement`. The internal `TypeRuntime` delegates use `Utf8JsonReader`/`Utf8JsonWriter` for streaming efficiency; the public `PreceptValue` methods wrap `JsonElement`.
+
+> **Open Design Question:** The `TypeRuntime<T>` `BinaryExecutors` and `UnaryExecutors` arrays are flat arrays indexed by `(int)OperationKind`. Two unresolved implementation details remain: (1) How are the executor delegates registered per operation — does each `OperationMeta` carry its delegate, or does the type system assemble the array at startup? (2) What is the lifetime/ownership model — are these `static readonly` arrays on the `Operations` catalog, or instance arrays on each `TypeRuntime`? *These need a design decision before the evaluator implementation pass.*
 
 **Durable architecture rule:** Persistence and typed-lane conversion behavior belongs on catalog metadata — do not reintroduce per-`TypeKind` consumer switches in serializer or ingress code. The catalog entry IS the behavior.
 
@@ -1926,7 +1938,7 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Event modifier graph requirements → `EventModifierMeta.RequiredAnalysis`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
 | **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `FieldModifierMeta.ProofDischarges` (pending — see Open Questions) enables catalog-driven modifier-proof strategy. |
 | **PreceptBuilder** | Catalog-driven routing | Full design documented in `docs/runtime/precept-builder.md`. `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. `ActionMeta.SyntaxShape` drives action plan opcode emission. |
-| **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `FieldModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Operation/function/action execution dispatch delegate design is pending. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
+| **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `FieldModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Binary/unary operation dispatch uses `TypeRuntime.BinaryExecutors` and `TypeRuntime.UnaryExecutors` indexed by `OperationKind` ordinal — the evaluator calls the pre-wired delegate and applies no per-`OperationKind` switch logic. Function and action execution dispatch delegate design is pending. |
 
 Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
 

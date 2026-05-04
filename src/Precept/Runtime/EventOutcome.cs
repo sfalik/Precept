@@ -8,14 +8,14 @@ namespace Precept.Runtime;
 /// </summary>
 public abstract record EventOutcome;
 
-/// <summary>State change succeeded — new Version in target state.</summary>
-public sealed record Transitioned(Version Result) : EventOutcome;
+/// <summary>State change succeeded — new Version in target state. <see cref="Args"/> carries the submitted event args.</summary>
+public sealed record Transitioned(Version Result, FiredArgs Args) : EventOutcome;
 
-/// <summary>No-transition row or stateless event succeeded — mutations committed.</summary>
-public sealed record Applied(Version Result) : EventOutcome;
+/// <summary>No-transition row or stateless event succeeded — mutations committed. <see cref="Args"/> carries the submitted event args.</summary>
+public sealed record Applied(Version Result, FiredArgs Args) : EventOutcome;
 
-/// <summary>Authored <c>reject</c> row matched — business prohibition.</summary>
-public sealed record Rejected(string Reason) : EventOutcome;
+/// <summary>Authored <c>reject</c> row matched — business prohibition. <see cref="Args"/> carries the submitted event args.</summary>
+public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;
 
 /// <summary>Arg validation failure — wrong type, unknown key, missing required arg.</summary>
 public sealed record InvalidArgs(string Reason) : EventOutcome;

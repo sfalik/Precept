@@ -128,6 +128,53 @@ public sealed record Version
 
 The evaluator's inner loop reads from and writes to `Slots` via slot index. It never resolves field names at runtime — all name-to-slot mappings were resolved at build time. `PreceptValue` is the 32-byte tagged value struct shared across the entire evaluation pipeline. On commit success, the working copy `PreceptValue[]` is donated directly as the new `Version.Slots` — no clone (zero-copy promotion). On constraint failure, the array is returned to `ArrayPool<PreceptValue>.Shared`.
 
+### PreceptValue: Evaluation Currency
+
+`PreceptValue` is the unified value representation for every scalar, reference, and absent value at runtime. All field slot reads and writes, all opcode stack pushes and pops, and all event arg representations use `PreceptValue`. There is no `object?` at evaluation time.
+
+**Why 32 bytes?** The target size is architecturally motivated by GC throughput at scale. At 100 000 Fire calls/sec, a boxed-`object?` evaluation currency projects approximately **~768 MB/s of gen-0 pressure** (each boxed value is an 8-byte reference to a 16-24 byte heap object; 40-60 live values per call). Replacing boxing with a 32-byte value struct eliminates this pressure entirely: the working copy array sits in the LOH-exempt gen-0 region and the evaluator's stack frame carries its `Span<PreceptValue>` without any heap traffic. The 32-byte size target accommodates the tag plus the largest union payload (`decimal`, which is 16 bytes) with alignment padding, while keeping the struct copy cost well inside what the JIT inlines in a register-passing calling convention.
+
+**Hot-path memory picture (Fire, one event, Option A+G baseline):**
+
+| Region | Slots | Size |
+|--------|-------|------|
+| Field slots (typical precept) | ~36–44 | 1,152–1,408 bytes |
+| Ephemeral arg slots (per Fire call) | ~4–8 | 128–256 bytes |
+| `stackalloc` opcode stack | 32 fixed | 1,024 bytes |
+| Working copy slot array (rented) | same as field slots | 1,152–1,408 bytes |
+| **Total peak stack traffic per Fire** | **~44–48 slots** | **~4,480 bytes** |
+
+With slot-array pooling via `ArrayPool<PreceptValue>.Shared`, the GC-visible allocation per Fire call drops to the unavoidable boundary objects: the outcome record (`Transitioned` / `Applied`) and `FiredArgs` wrapper, totalling approximately **~88 bytes**. All scalar evaluation is zero-boxing.
+
+**Struct layout — target and open design question:**
+
+The 32-byte size and tagged-value-struct shape are locked. The exact internal field layout (tag type, union field offsets, which types use which union region) is an **open design question pending implementation decision**:
+
+```csharp
+// SHAPE LOCKED — INTERNAL LAYOUT PENDING DECISION
+// The 32-byte, tagged-struct representation is the architectural baseline.
+// Field offsets, tag enum, and union regions are not yet specified at implementation level.
+[StructLayout(LayoutKind.Explicit, Size = 32)]
+internal struct PreceptValue
+{
+    // Byte 0: type discriminant tag (PreceptValueTag enum — members TBD)
+    // Bytes 1–7: padding / reserved
+    // Bytes 8–23: union payload — exact field layout pending:
+    //   - scalar region (long, bool via long, enum ordinal via long, DateOnly)
+    //   - wide scalar region (decimal — 16 bytes — overlaps scalar region)
+    //   - reference region (string, object, null sentinel)
+    //   How decimal, DateOnly, and reference types share the union is the open question.
+    // Bytes 24–31: reserved / padding to 32-byte boundary
+}
+```
+
+> **Open Design Question:** The exact `StructLayout` field offsets need a concrete decision before implementation of the opcode executor. Specifically:
+> 1. What is the `PreceptValueTag` enum shape (byte, int, other)?
+> 2. Does `decimal` (16 bytes) overlay with the reference region, or does the struct use a parallel reference + scalar split?
+> 3. Where does `DateOnly` (4 bytes) sit relative to `long`?
+> 4. What is the absent/null sentinel encoding (tag value vs. zero-value check)?
+> *This decision belongs in `evaluator.md` and must be made before the opcode executor implementation pass.*
+
 ### Input Summary
 
 | Input | Source | Description |
@@ -290,13 +337,15 @@ public static class Evaluator
 
 ### Working Copy Management
 
-The evaluator never mutates the input `Version`. For each candidate row evaluation:
+The evaluator never mutates the input `Version`. The full Fire lifecycle for one event:
 
 1. **Rent:** Rent a `PreceptValue[]` working copy from `ArrayPool<PreceptValue>.Shared`
-2. **Populate:** Copy `Version.Slots` into the rented array
-3. **Mutate:** Execute action plans against the working copy
-4. **Evaluate:** Run constraint plans against the working copy
-5. **Commit or discard:** If constraints pass, donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone); if constraints fail, return the array to `ArrayPool<PreceptValue>.Shared`
+2. **Populate:** Copy `Version.Slots` into the rented array (field slots)
+3. **Load args:** The `FiredArgs` value carries the `PreceptValue[]` arg slot array materialized by `IArgBuilder` at the Fire boundary. Event args are already `PreceptValue` — no per-opcode conversion needed. `LOAD_ARG` reads from this array by pre-resolved slot index.
+4. **Mutate:** Execute action plans against the working copy
+5. **Recompute:** Walk `SlotLayout.ComputedSlots`; re-evaluate each computed field
+6. **Evaluate:** Run constraint plans against the working copy
+7. **Commit or discard:** If constraints pass, donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone); if constraints fail, return the array to `ArrayPool<PreceptValue>.Shared`
 
 This ensures that constraint evaluation sees the post-mutation state, and that failed rows leave no side effects. On success, the working array becomes the committed `Version.Slots` — no extra allocation.
 
@@ -334,6 +383,8 @@ internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slo
 #### Create
 
 `Create` constructs the initial entity instance. Behavior depends on whether the precept declares an initial event:
+
+> **Implementation note:** The pseudocode below uses `object?[]` for readability in showing the slot array operations. The canonical implementation uses `PreceptValue[]` throughout — all slot values are `PreceptValue`, not boxed `object?`. The logic structure is unchanged.
 
 **With initial event:**
 
@@ -640,101 +691,58 @@ UpdateInspection InspectUpdate(Precept precept, Version version, IReadOnlyDictio
 
 ### 7.3 Opcode Execution Engine
 
-The evaluator walks flat `ExecutionPlan` opcode arrays built by the Precept Builder. The execution model is a stack machine:
+The evaluator walks flat `ExecutionPlan` opcode arrays built by the Precept Builder. The execution model is a stack machine.
+
+**Canonical signature (PreceptValue baseline — see §7.0):**
 
 ```csharp
-object? EvaluatePlan(ExecutionPlan plan, object?[] slots, IReadOnlyDictionary<string, object?> args)
+// Canonical implementation: stackalloc PreceptValue[32], indexed top pointer.
+// See §7.0 Evaluation Stack Allocation for the full implementation.
+internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slots, FiredArgs args)
 {
-    var stack = new Stack<object?>();
-    var opcodes = plan.Opcodes;
-    int ip = 0;  // instruction pointer
-    
-    while (ip < opcodes.Length)
-    {
-        var op = opcodes[ip++];
-        
-        switch (op)
-        {
-            case LoadSlot(var i):
-                stack.Push(slots[i]);
-                break;
-                
-            case LoadArg(var name):
-                stack.Push(args.TryGetValue(name, out var v) ? v : null);
-                break;
-                
-            case LoadLit(var value):
-                stack.Push(value);
-                break;
-                
-            case StoreSlot(var i):
-                slots[i] = stack.Pop();
-                break;
-                
-            case BinaryOp(var kind):
-                var right = stack.Pop();
-                var left = stack.Pop();
-                stack.Push(ExecuteBinaryOp(kind, left, right));
-                break;
-                
-            case UnaryOp(var kind):
-                var operand = stack.Pop();
-                stack.Push(ExecuteUnaryOp(kind, operand));
-                break;
-                
-            case CallFunction(var kind, var arity):
-                var funcArgs = new object?[arity];
-                for (int i = arity - 1; i >= 0; i--)
-                    funcArgs[i] = stack.Pop();
-                stack.Push(ExecuteFunction(kind, funcArgs));
-                break;
-                
-            case MemberAccess(var accessor):
-                var target = stack.Pop();
-                stack.Push(ExecuteAccessor(accessor, target));
-                break;
-                
-            case CollectionOp(var kind, var slot):
-                ExecuteCollectionOp(kind, slots, slot, stack);
-                break;
-                
-            case BranchFalse(var offset):
-                if (stack.Pop() is false or null or 0)
-                    ip += offset;
-                break;
-                
-            case BranchTrue(var offset):
-                if (stack.Pop() is true)
-                    ip += offset;
-                break;
-                
-            case Jump(var offset):
-                ip += offset;
-                break;
-                
-            case Dup():
-                stack.Push(stack.Peek());
-                break;
-                
-            case Pop():
-                stack.Pop();
-                break;
-                
-            case Return():
-                return stack.Pop();
-        }
-    }
-    
-    return stack.Count > 0 ? stack.Pop() : null;
+    Span<PreceptValue> stack = stackalloc PreceptValue[plan.MaxStackDepth];
+    int top = 0;
+    foreach (var opcode in plan.Opcodes)
+        Dispatch(opcode, slots, args, stack, ref top);
+    return stack[0];
 }
 ```
 
-> **Open Question (unresolved):** Four implementation detail questions in the opcode executor: (1) `LoadArg` silently returns null for missing keys — should this fault? (2) `BranchFalse` treats `0` as falsy — is this intentional? (3) Fall-through on missing `Return` returns null — should this fault? (4) `Stack<object?>` allocation per plan — should this be pooled?
+**Operator dispatch (catalog-owned, zero-knowledge evaluator):**
+
+Binary and unary operator execution uses catalog-owned executor delegates indexed by `OperationKind`. The evaluator does not switch on `OperationKind` members or apply per-operator logic. It reads the pre-wired delegate:
+
+```csharp
+case BinaryOp(var kind):
+    PreceptValue r = stack[--top];
+    PreceptValue l = stack[--top];
+    // Executor is a catalog-owned Func<PreceptValue, PreceptValue, PreceptValue>,
+    // retrieved from TypeRuntime.BinaryExecutors[(int)kind] at startup.
+    // The evaluator is zero-knowledge about what the operation does.
+    stack[top++] = Operations.BinaryExecutors[(int)kind](l, r);
+    break;
+```
+
+The `Operations` catalog pre-wires flat executor arrays at startup — one slot per `OperationKind` ordinal. The evaluator calls the delegate; it never switches on `OperationKind` itself. Same pattern for unary ops via `Operations.UnaryExecutors`.
+
+**LOAD_ARG and event-arg slots:**
+
+Event arguments are converted to `PreceptValue` at the Fire boundary (before the opcode loop begins), not lazily inside the loop. `IArgBuilder` materializes a `PreceptValue[]` arg slot array for the call; `LOAD_ARG(name)` resolves the arg name to a slot index at build time, so the opcode carries a slot index rather than a string:
+
+```csharp
+case LoadArg(var argSlotIndex):
+    stack[top++] = args[argSlotIndex];  // args is PreceptValue[], pre-filled at Fire boundary
+    break;
+```
+
+This keeps LOAD_ARG O(1) — no dictionary lookup, no string comparison.
+
+> **Open Question (unresolved):** The LOAD_ARG opcode is currently described as `LOAD_ARG(name)` in the opcode table (string key). Locking the opcode to `LOAD_ARG(slotIndex)` (integer index, resolved at build time) is the intended design per the typed-slot baseline, but this requires `ArgDescriptor.SlotIndex` to be defined and populated by the Precept Builder. The `ArgDescriptor` shape needs updating before the evaluator implementation pass.
 
 | Opcode | Stack Effect | Description |
 |---|---|---|
 | `LOAD_SLOT(i)` | push | Load field value at slot index `i` |
-| `LOAD_ARG(name)` | push | Load event arg value by name |
+| `LOAD_ARG(argSlotIndex)` | push | Load event arg value by pre-resolved arg slot index (args converted to `PreceptValue[]` at Fire boundary; no dictionary lookup at execution time) |
 | `LOAD_LIT(value)` | push | Push literal value (boxed) |
 | `STORE_SLOT(i)` | pop | Pop and store to slot index `i` |
 | `BINARY_OP(kind)` | pop 2, push 1 | Binary operation (via `OperationMeta`) |
@@ -1209,30 +1217,31 @@ The only exception paths are truly exceptional: out-of-memory, corrupted `Precep
 
 ### Plan Execution, Not Tree-Walking
 
-Traditional expression evaluators walk recursive ASTs. Precept compiles expressions to flat, cache-friendly slot-addressed opcodes:
+Traditional expression evaluators walk recursive ASTs. Precept compiles expressions to flat, cache-friendly slot-addressed opcodes with a `stackalloc` operand stack and `PreceptValue`-typed currency:
 
 ```csharp
-// Traditional tree-walking
+// Traditional tree-walking — object? everywhere, unbounded recursion, heap boxing
 object? Evaluate(Expr node) => node switch
 {
     BinaryExpr(var l, var op, var r) => ApplyOp(op, Evaluate(l), Evaluate(r)),
     FieldRef(var name) => fields[name],
     Literal(var v) => v,
-    // ... recursive calls, stack depth grows with expression depth
+    // ... recursive calls, stack depth grows with expression depth, boxing on every value
 };
 
-// Precept's flat opcode execution
-var stack = new Stack<object?>();
+// Precept's flat opcode execution — PreceptValue, stackalloc, catalog-delegate dispatch
+Span<PreceptValue> stack = stackalloc PreceptValue[plan.MaxStackDepth];
+int top = 0;
 foreach (var op in plan.Opcodes)
 {
     switch (op)
     {
-        case LoadSlot(var i): stack.Push(slots[i]); break;
-        case BinaryOp(var kind): 
-            var r = stack.Pop(); var l = stack.Pop();
-            stack.Push(Execute(kind, l, r));
+        case LoadSlot(var i): stack[top++] = slots[i]; break;
+        case BinaryOp(var kind):
+            PreceptValue r = stack[--top]; PreceptValue l = stack[--top];
+            stack[top++] = Operations.BinaryExecutors[(int)kind](l, r);  // catalog-owned, zero-knowledge
             break;
-        // ... O(n) iteration, no recursion
+        // ... O(n) iteration, no recursion, no boxing, no heap traffic
     }
 }
 ```
