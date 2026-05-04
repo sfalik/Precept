@@ -331,10 +331,12 @@ Explicit call required. Neither path is automatic.
 **By:** Shane (via Copilot)
 **What:** Out-of-scope items in catalog-gap-register.md do not need to be relocated to other working docs. MCP-specific items (non-cross-cutting) live in the MCP doc. Single-component isolated questions live in their respective canonical docs. No GitHub issues for language proposals at this stage.
 **Why:** User decision — keep gaps close to their domain, avoid unnecessary cross-register movement for non-cross-cutting items.
+
 ### 2026-05-03: Structural gap register — rename + 13 new gaps
 **By:** Frank
 **What:** docs/working/pipeline-output-gap-register.md → docs/working/structural-gap-register.md. Added 12 structural gaps (#74–85) and 1 catalog gap to catalog-gap-register.md.
 **Why:** Scope expansion beyond pipeline-output; "structural" better reflects within-stage design questions. Gaps found during coverage review.
+
 ### 2026-05-01: GAP-7/8/11 spec doc fixes applied
 
 
@@ -348,6 +350,7 @@ Explicit call required. Neither path is automatic.
 
 
 **Why:** Cross-check audit identified these as spec inaccuracies vs. actual implementation.
+
 ### 2026-05-01: GAP-6 resolved — NegatePeriod added to spec §3.6
 
 
@@ -5280,6 +5283,7 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 
 
 ---
+
 ### 2026-04-27: User directive — greenfield parser, no consumer concerns
 
 
@@ -5293,6 +5297,7 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 
 
 **Why:** User correction — George raised a backward-compatibility concern that does not apply to a not-yet-implemented component.
+
 ### 2026-04-27: Design question — calculated field operator
 
 
@@ -36234,3 +36239,50 @@ Then work wave by wave from the checklists; the retained detailed entries are th
 - Destination docs: `docs/compiler/parser.md`, `docs/compiler/type-checker.md`, `docs/compiler/graph-analyzer.md`, `docs/compiler/proof-engine.md`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`, `docs/tooling/language-server.md`, `docs/tooling/mcp.md`, and `docs/compiler/literal-system.md`.
 - Found already resolved by recorded decisions: #45 (expression slots now use `ParsedExpression` / `TypedExpression`) and #53 (the `TypedExpression` DU is already documented as the proof-engine input contract).
 - Archived the working register as `docs/working/Archived/structural-gap-register-migrated.md`; the canonical docs are now the live home for these open questions.
+
+### 2026-05-04: Persistence API naming finalized — ToJson / FromJson
+**By:** Shane (owner decision, recorded by Frank)
+**Sources:** `frank-tojson-fromjson-naming-final.md`, `frank-serialization-naming.md`, `frank-remove-tojson-restore.md`
+
+**What:** The public persistence pair is `Version.ToJson()` and `Precept.FromJson(JsonElement document)`. `Serialize` / `Restore` are removed from the public API surface.
+
+**Why:** This is the most legible, self-describing pair for the public contract. `ToJson()` states the output format directly, `FromJson()` keeps hydration on the schema-bearing `Precept`, and internal `PreceptValue.ToJson()` / type-runtime delegates do not create a public naming collision.
+
+**Tradeoff:** `ToJson()` returns `JsonElement`, not `string`, so XML docs and examples must make the structured-output contract explicit.
+
+### 2026-05-04: Persistence envelope shape locked
+**By:** Frank
+**Sources:** `frank-version-envelope.md`
+
+**What:** `Version.ToJson()` returns a self-describing envelope with `$`-prefixed metadata and field data nested under `fields`.
+
+```json
+{
+  "$precept": "LoanApplication",
+  "$state": "UnderReview",
+  "fields": {
+    "amount": 50000.00,
+    "applicantName": "Jane Doe"
+  }
+}
+```
+
+`Precept.FromJson(JsonElement document)` validates `$precept`, reads `$state`, ignores unknown `$`-prefixed properties for forward compatibility, and reserves `$id`, `$version`, `$timestamp`, `$schemaVersion`, and `$envelopeVersion` for future use.
+
+**Why:** The envelope keeps metadata and domain fields in separate namespaces, prevents collisions with user field names, and leaves room for future persistence metadata without breaking old readers.
+
+### 2026-05-04: FromJson returns Version directly
+**By:** Frank
+**Sources:** `frank-restore-return-type.md`
+
+**What:** `Precept.FromJson(JsonElement document)` returns `Version` directly. Invalid document shape, unknown state, malformed JSON payloads, or `$precept` mismatch are programmer errors and throw `ArgumentException`. Constraint revalidation does not run during hydration; callers can trigger current-schema validation through `Update` afterward if they need it.
+
+**Why:** Hydration from known-good storage is not a business-outcome lane. Returning `Version` directly preserves the `version.ToJson()` → `precept.FromJson(document)` round-trip and avoids forcing schema-migration handling into every read path.
+
+### 2026-05-04: Version read path contracts locked
+**By:** Frank
+**Sources:** `frank-version-tojson.md`, `frank-v1-read-ops.md`
+
+**What:** `Version.ToJson()` omits unresolved fields and never throws. Direct field reads remain two-lane: `version["fieldName"]` for raw JSON access and `version.Get<T>("fieldName")` for typed access. Both direct read surfaces throw `InvalidOperationException` for absent or unresolved fields; callers use `FieldAccess` to preflight presence.
+
+**Why:** Omitting unresolved fields is the only round-trip-safe representation and avoids conflating unresolved values with JSON `null`. Throwing on direct reads keeps the programmer-error contract consistent with the rest of the public runtime surface.

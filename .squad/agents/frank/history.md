@@ -28,3 +28,7 @@
 ### 2026-05-04T15:32:34Z — Unit-type investigation and mini-spec OQ closeout recorded
 - Captured the UCUM-backed quantity-system recommendation set in `docs/working/unit-type-system-investigation.md`, including database-driven metadata, tiered discovery, and the currency-separation rule for `MoneyValue`.
 - Recorded the runtime API mini-spec closeout: `integer` = `long`, `duration` = NodaTime `Duration`, descriptor-driven collection wrapping, and `PreceptList<T> : IReadOnlyList<T>` as the collection projection surface.
+
+### 2026-05-04T16:20:24Z — Persistence API naming lock recorded
+- Naming pass on `docs/working/runtime-api-public-surface-spec.md` finalized the public persistence pair as `Version.ToJson()` / `Precept.FromJson(JsonElement document)`.
+- Scribe merged 7 Frank inbox files into 4 canonical decisions covering the final names, envelope shape, direct `FromJson` return contract, and read-path semantics, then cleared the inbox.

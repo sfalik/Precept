@@ -52,3 +52,7 @@
 ### 2026-05-04T15:32:34Z — Runtime API mini-spec inbox closeout recorded
 - Pre-check measured `decisions.md` at 32088 bytes with 2 inbox files; the hard-gate 30-day archive pass ran and checked `decisions.md` for active entries older than 2026-04-04T15:32:34Z and found none to move.
 - Merged Frank's two runtime API inbox notes into one canonical decision entry, deleted the processed inbox files, wrote the paired orchestration logs plus the session log, and refreshed Frank/Scribe history with no summarization required.
+
+### 2026-05-04T16:20:24Z — ToJson / FromJson naming batch recorded
+- Pre-check measured `decisions.md` at 808541 bytes with 7 inbox files, so the hard-gate 7-day archive pass ran before merge.
+- Archived 0 dated records into `decisions-archive.md`, merged the 7 Frank inbox notes into 4 canonical persistence decisions, wrote the Frank orchestration log plus the session log, and refreshed Frank/Scribe history with no summarization required.
