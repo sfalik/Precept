@@ -118,6 +118,7 @@ public sealed record GraphState(
 ```
 
 > **Open Question (unresolved):** `GraphState` uses four explicit boolean properties (`IsInitial`, `IsTerminal`, `IsRequired`, `IsIrreversible`) derived from state modifiers. Should `GraphState` instead carry `ImmutableArray<ModifierKind> Modifiers` and derive flags from catalog lookups at construction time? `IsReachable` is computed topology output (not a modifier) and is fine as-is.
+> *Source: catalog-gap-register.md #9*
 
 ```csharp
 
@@ -598,6 +599,8 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 1. **EventCoverageEntry granularity:** Should coverage track guarded vs. unguarded transitions separately? A guarded transition may not always fire, so event coverage with guards is probabilistic.
 
 2. **Back-edge definition:** The current definition uses BFS ancestor relationship. An alternative is DFS back-edges. Clarify which definition aligns with the `irreversible` modifier's intent.
+
+3. **GraphEvent.IsInitial derivation:** How is `IsInitial` determined for `GraphEvent`? The property exists on the record but the derivation logic is unspecified — is it set for events that only appear in the initial state's transitions, events explicitly marked, or events that trigger creation?
 
 ---
 

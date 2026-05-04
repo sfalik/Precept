@@ -142,6 +142,7 @@ If any of these require manual tooling changes, the design is violated. The sing
 | `Operators.All` | Operator symbols → patterns in `operators` repository |
 
 > **Open Question (unresolved):** Grammar input catalog list may be incomplete. `catalog-system.md` lists "Constructs → Tokens → Types" but `Constructs.All` is not here. Do `Modifiers.All` and `Actions.All` keywords get highlighting via their `Token` references in `Tokens.All`?
+> *Source: catalog-gap-register.md #40*
 
 **Output:**
 
@@ -1042,6 +1043,7 @@ This document describes the **designed** state. Current implementation differs i
 > 3. Use `Constructs.All` to generate structural patterns with slot-level scopes
 > 
 > Recommendation: Option 3 aligns best with catalog-driven architecture but requires construct-level grammar generation design.
+> *Source: catalog-gap-register.md #37*
 
 ### Implementation Notes
 

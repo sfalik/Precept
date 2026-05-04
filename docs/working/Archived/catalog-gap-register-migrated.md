@@ -113,3 +113,11 @@ The following items are already implemented in source code. Update `docs/languag
 | 17 | `ActionMeta.SyntaxShape` | `src/Precept/Language/Action.cs` | Remove from Open Questions — already has `SyntaxShape` property |
 | 18 | `FunctionMeta.HasCIVariant` | `src/Precept/Language/Function.cs` | Remove from Open Questions — already has `HasCIVariant` and `CIVariantOf` |
 | 24 | `ModifierMeta.ModifierCategory` | `src/Precept/Language/Modifier.cs` | Remove from Open Questions — already has `Category` property of type `ModifierCategory` |
+
+
+---
+
+## Migration Status
+
+> **Migrated: 2026-05-04T00:02:05-04:00 by Frank (Chunk 4)**
+> All 43 entries processed. 23 Pending Decision gaps confirmed in target docs with source attributions added. 3 Resolved-in-Source gaps marked resolved (#17, #18, #24). Gap #39 upgraded from bullet to ⚠ Open Question block. 4 Out-of-Scope entries noted. 8 cross-cutting entries noted. 5 Already-Captured entries confirmed in catalog-system.md. Original content preserved below.

@@ -35,7 +35,10 @@
 - `TypedExpression` — sealed abstract record base + per-kind sealed subtypes with resolved types. Type checker produces these.
 - Expression tree is the strongly-typed layer. The rest of the parser AST (constructs, declarations, statements) stays generic.
 - Closed set by design: new expression form requires C# code change. This is intentional — the DU IS the enforcement boundary.
-- **Exhaustiveness enforcement:** (1) sealed class hierarchy gives compiler-level exhaustiveness checking on switches; (2) a Roslyn analyzer test in the test suite verifies all expression-DU switch arms are exhaustive — any new subtype addition breaks failing tests at compile time, forcing all consumers to be updated.
+- **Exhaustiveness enforcement:**
+  - Sealed class hierarchy → compiler-level (CS8509/CS8524): non-exhaustive `switch` expressions over the DU base type are compile errors
+  - `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 → annotation-bridge: multi-method consumers (Parser, Builder) must annotate each handler method with `[HandlesCatalogMember(ExpressionFormKind.X)]`; PRECEPT0019 fires if any enum member lacks a handler
+  - Convention (enforced by test): each `ExpressionFormKind` member maps 1:1 to a sealed DU subtype in both `ParsedExpression` and `TypedExpression`
 
 **Blocked items now unblocked:** Parser expression slots, TC §7.2, Proof Engine strategies 3 & 4, Builder compilation.
 
@@ -43,33 +46,15 @@
 
 ### CC#2. SlotValue Subtype Shapes
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — Option C (Hybrid), 2026-05-03T23:39:16Z
 
 **Affects:** Parser, Type Checker
 **Gap register refs:** #6, #7, #40, #41, #42, #43, #44
-**The decision:** What are the canonical shapes for `SlotValue` subtypes, and which document is authoritative?
+**Decision:** Parser stamps `ParsedExpression` into expression-carrying slots at parse time. Type checker consumes `ParsedExpression` and produces `TypedExpression` into the `SemanticIndex` — no re-parsing. Single parse pass. Clean syntactic/semantic boundary. SlotValue DU shape stable at 17 subtypes. `ParsedExpression` is unresolved (operator + operands, unresolved names); `TypedExpression` is resolved (identities, inferred types). The Pratt expression parser uses `Operators.GetMeta()` for precedence/associativity — no hardcoded table.
 
-**Why it's cross-cutting:**
-- **Parser** produces `SlotValue` subtypes with specific shapes
-- **Type Checker** consumes them with expected shapes
+**Blocked items now unblocked:** Parser expression slots (now `ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot` all carry `ParsedExpression`), TC §7.2 semantic resolution, Proof Engine strategies 3 & 4, Builder compilation.
 
-Four slot subtypes have conflicting shapes between parser.md and type-checker.md:
-
-| Slot | parser.md says | type-checker.md says |
-|------|----------------|----------------------|
-| `TypeExpressionSlot` | `TypeMeta` | `SourceSpan` |
-| `ModifierListSlot` | `ImmutableArray<ModifierKind>` | `ImmutableArray<TokenKind>` |
-| `AccessModeSlot` | `SourceSpan` | `TokenKind` |
-| `BecauseClauseSlot` | `string` | `SourceSpan` |
-
-Additionally, parser.md lists 17 subtypes while catalog-system.md shows 15 `ConstructSlotKind` members. `RuleExpressionSlot` and `InitialMarkerSlot` are in parser.md but not in the catalog.
-
-**Options / known design space:**
-1. **Parser resolves at parse time** — `TypeMeta`, `ModifierKind` carried in slots (parser.md shapes)
-2. **Parser captures spans, type checker resolves** — `SourceSpan`, `TokenKind` in slots (type-checker.md shapes)
-3. **Hybrid** — Some slots resolved early, expression slots deferred
-
-**Resolution path:** Owner must declare which doc is authoritative. The mismatch prevents both parser and type checker implementation.
+**Remaining open (non-expression slots):** The `ModifierListSlot`, `AccessModeSlot`, and `BecauseClauseSlot` shape conflicts between parser.md and type-checker.md are unresolved. These are non-expression slots and are not blocked by CC#2.
 
 ---
 

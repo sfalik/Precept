@@ -46,12 +46,14 @@ Faults — errors the type checker should have prevented, such as referencing an
 | Direction | Type | Description |
 |-----------|------|-------------|
 | In | `string eventName` | Event to fire |
-| In | `IReadOnlyDictionary<string, object?> args` | Event arguments for `Fire` / `InspectFire` |
-| In | `IReadOnlyDictionary<string, object?> fields` | Field patch for `Update` / `InspectUpdate` |
+| In | `JsonElement? args` / `Action<IArgBuilder>?` | Event arguments — JSON lane or typed lane for `Fire` / `InspectFire` |
+| In | `JsonElement? fields` / `Action<IFieldBuilder>?` | Field patch — JSON lane or typed lane for `Update` / `InspectUpdate` |
 | Out | `EventOutcome` | Sealed committed result of `Version.Fire` |
 | Out | `UpdateOutcome` | Sealed committed result of `Version.Update` |
 | Out | `EventInspection` | Annotated landscape from `Version.InspectFire` |
 | Out | `UpdateInspection` | Annotated landscape from `Version.InspectUpdate` |
+
+See `runtime-api.md` for the full two-lane ingress API surface (`Version.Fire`, `Version.Update`, `Version.InspectFire`, `Version.InspectUpdate`) and their JSON-lane / typed-lane overloads.
 
 ---
 
@@ -207,7 +209,7 @@ public sealed record FieldSnapshot(
     FieldAccessMode Mode,
     string FieldType,
     bool IsResolved,
-    object? Value);
+    PreceptValue? Value);
 
 public sealed record ConstraintResult(
     ConstraintDescriptor Constraint,
@@ -229,31 +231,46 @@ public sealed record ArgInfo(
 
 ## Version API Surface
 
+The `Version` API surface is documented in `runtime-api.md` § Operations — Version Entity Snapshot. That section is authoritative for the `Fire`, `Update`, `InspectFire`, and `InspectUpdate` overloads (both JSON lane and typed lane), the field indexer, `FieldAccess`, `AvailableEvents`, `RequiredArgs`, and `ApplicableConstraints`.
+
+For reference, the two-lane commit and inspect overloads:
+
 ```csharp
 public sealed record Version
 {
     public Precept Precept { get; }
     public string? State { get; }
-    public object? this[string fieldName] { get; }
+    public PreceptValue this[string fieldName] { get; }
+    public T Get<T>(string fieldName);
     public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }
     public IReadOnlyList<string> AvailableEvents { get; }
-    public IReadOnlyList<ArgInfo> RequiredArgs(string eventName);
+    public IReadOnlyList<ArgDescriptor> RequiredArgs(string eventName);
     public IReadOnlyList<ConstraintDescriptor> ApplicableConstraints { get; }
 
-    // Commit
-    EventOutcome    Fire(string eventName, IReadOnlyDictionary<string, object?> args);
-    UpdateOutcome   Update(IReadOnlyDictionary<string, object?> fields);
+    // Commit — JSON lane (wire callers)
+    public EventOutcome  Fire(string eventName, JsonElement? args = null);
+    public UpdateOutcome Update(JsonElement? fields = null);
 
-    // Inspect
-    EventInspection   InspectFire(string eventName, IReadOnlyDictionary<string, object?>? args = null);
-    UpdateInspection  InspectUpdate(IReadOnlyDictionary<string, object?>? fields = null);
+    // Commit — typed lane (in-process callers)
+    public EventOutcome  Fire(string eventName, Action<IArgBuilder>? args = null);
+    public UpdateOutcome Update(Action<IFieldBuilder>? fields = null);
+
+    // Inspect — JSON lane
+    public EventInspection  InspectFire(string eventName, JsonElement? args = null);
+    public UpdateInspection InspectUpdate(JsonElement? fields = null);
+
+    // Inspect — typed lane
+    public EventInspection  InspectFire(string eventName, Action<IArgBuilder>? args = null);
+    public UpdateInspection InspectUpdate(Action<IFieldBuilder>? fields = null);
 }
 
-public sealed record FieldAccessInfo(string FieldName, FieldAccessMode Mode, string FieldType, object? CurrentValue);
-public enum FieldAccessMode { Read, Write }
+public sealed record FieldAccessInfo(string FieldName, FieldAccessMode Mode, string FieldType, PreceptValue CurrentValue);
+public enum FieldAccessMode { Readonly, Editable }
 ```
 
-**Four methods, consistent naming:** Every commit verb (`Fire`, `Update`) has an `Inspect___` counterpart. Fire/Update require complete input and return one committed outcome. InspectFire/InspectUpdate accept optional partial input and return an annotated landscape.
+**Two lanes for commit and inspect:** Every operation has a JSON lane (`JsonElement?`) for wire callers and a typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) for in-process callers. There are no `IReadOnlyDictionary<string, object?>` overloads. **`Restore` is JSON-only** — no typed lane overload; callers use `Create` or `Fire` for in-process construction.
+
+**Four commit/inspect pairs, consistent naming:** Every commit verb (`Fire`, `Update`) has an `Inspect___` counterpart. Fire/Update require complete input and return one committed outcome. InspectFire/InspectUpdate accept optional partial input and return an annotated landscape.
 
 **Why InspectFire/InspectUpdate are separate:** Fire and Update are mutually exclusive commit operations — field patches and event args produce a new Version through fundamentally different pipelines (row matching + transition vs. access-mode check + constraint evaluation). A unified `Inspect(fields?, event?, args?)` would force callers to disentangle which combination was evaluated and would conflate two non-overlapping input/output shapes.
 

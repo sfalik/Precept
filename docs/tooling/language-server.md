@@ -415,6 +415,7 @@ IEnumerable<CompletionItem> GetTypeCompletions()
 }
 
 > **Open Question (unresolved):** `TypeMeta.IsUserFacing` and `TypeMeta.SnippetTemplate` are used here but not in the catalog-system.md shape. Should these properties be added to `TypeMeta`?
+> *Source: catalog-gap-register.md #30*
 
 IEnumerable<CompletionItem> GetActionCompletions(TypeKind? fieldType)
 {
@@ -431,6 +432,7 @@ IEnumerable<CompletionItem> GetActionCompletions(TypeKind? fieldType)
 }
 
 > **Open Question (unresolved):** `ActionMeta.HoverDescription` and `ActionMeta.SnippetTemplate` are used in the original design but not in the catalog-system.md shape. Should these properties be added to `ActionMeta`?
+> *Source: catalog-gap-register.md #43 (partial)*
 
 IEnumerable<CompletionItem> GetStateCompletions(SemanticIndex? index)
 {
@@ -541,6 +543,7 @@ MarkupContent FormatSymbolHover(object symbol) => symbol switch
 ```
 
 > **Open Question (unresolved):** `TypedArg` has no `EventName` back-reference. Hover for an event arg needs to look up the owning event from an `ArgReference`. Should `TypedArg` carry an `EventName` field, or should hover look it up separately?
+> *Source: catalog-gap-register.md #31*
 
 ### 7.5 Go-to-Definition
 
@@ -665,6 +668,7 @@ public enum Prospect { Certain, Possible, Impossible }
 ```
 
 > **Open Question (unresolved):** The `EventInspection` shape here differs from evaluator.md. This doc has `BeforeFields`/`AfterFields`; evaluator.md has `EventEnsures`/`ConstraintResult`. Which is canonical? Should this doc reference evaluator.md's shape?
+> *Source: catalog-gap-register.md #33*
 
 The extension calls `precept/preview` whenever the user changes preview state, then renders the result in the preview webview. See `docs/tooling/extension.md` for the webview side.
 
@@ -700,6 +704,7 @@ bool IsOutlineConstruct(ConstructKind kind) => kind switch
 };
 
 > **Open Question (unresolved):** `IsOutlineConstruct` and `MapSymbolKind` hardcode `ConstructKind` values. By catalog-driven architecture, `ConstructMeta` should carry `IsOutlineNode` and `LspSymbolKind` properties. Should these be added to the catalog?
+> *Source: catalog-gap-register.md #34*
 
 DocumentSymbol ToDocumentSymbol(ParsedConstruct construct) => new()
 {
@@ -1354,6 +1359,7 @@ void Update(Compilation compilation)
 ### Open Questions
 
 > **Open Question 1 (unresolved):** Should catalog entries carry a `Documentation` string for hover/completion tooltips?
+> *Source: catalog-gap-register.md #35 (broader documentation-string strategy)*
 >
 > **Context:** The completions and hover features documented in §7.3 and §7.4 reference `HoverDescription` on catalog entries. Some catalog records (`TypeMeta`, `ActionMeta`, `FunctionMeta`) may not currently have this property.
 >

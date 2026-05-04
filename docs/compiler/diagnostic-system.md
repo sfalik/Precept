@@ -537,7 +537,9 @@ The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarant
 ## Open Questions / Implementation Notes
 
 - **D5 coupling (proof attribution schema):** If proof results require richer structured output (expression trees, interval ranges, witness values), the proof stage may need a way to link diagnostics to proof-model entries. Deferred until proof engine design.
-- **Related locations:** Roslyn's `AdditionalLocations` lets a diagnostic point at multiple source ranges. Precept may need this for "field declared at line X, constraint at line Y" patterns. Deferred until concrete use cases surface.
+> **⚠ Open Question — Diagnostic Related Locations**
+> Roslyn's `AdditionalLocations` lets a diagnostic point at multiple source ranges. Precept may need this for "field declared at line X, constraint at line Y" patterns — multi-span diagnostics are deferred until concrete use cases surface. If adopted, `Diagnostic` needs an `AdditionalLocations: ImmutableArray<SourceSpan>` field and the LSP mapper must emit `relatedInformation` entries.
+> *Source: catalog-gap-register.md*
 - **Drift test: diagnostic emission coverage.** For every `DiagnosticCode` referenced by a `[StaticallyPreventable]`, verify that at least one call to `Diagnostics.Create()` with that code exists somewhere in the pipeline. This confirms the compile-time diagnostic isn't just registered — it's actually emitted.
 
 ---

@@ -369,7 +369,8 @@ An `ExecutionPlan` is a flat array of `Opcode` values that the evaluator walks l
 ```csharp
 public sealed record ExecutionPlan(
     ImmutableArray<Opcode> Opcodes,
-    TypeKind ResultType
+    TypeKind ResultType,
+    int MaxStackDepth           // computed at build time; compiler enforces ≤ 32 (CC#25 Q6)
 );
 
 public abstract record Opcode;
@@ -467,6 +468,7 @@ public sealed record FaultSiteDescriptor(
 ```
 
 > **Open Question (unresolved):** What is the actual planting mechanism for `FaultSiteDescriptor`? Neither `ExecutionRow` nor `ConstraintDescriptor` carries a fault site field, and `Precept.FaultBackstops` is a flat array. How does the evaluator know which opcode or row constitutes a fault site?
+> *Source: catalog-gap-register.md #23*
 
 Fault backstops are defense-in-depth. A correctly-proven program never reaches them at runtime. When reached, they fire the `FaultCode`'s runtime behavior (log + graceful failure) via `Faults.Create(descriptor, context)`.
 
@@ -608,6 +610,7 @@ If `Precept.From` throws:
 - `OnEvent` buckets contain only `ConstraintKind.EventPrecondition` constraints
 
 > **Open Question (unresolved):** The constraint bucket dispatch uses five concrete subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`), but catalog-system.md shows only four subtypes in the `ConstraintMeta` DU hierarchy. Are `StateEntry` and `StateExit` subtypes of `StateAnchored`, or separate top-level subtypes?
+> *Source: catalog-gap-register.md #22*
 
 ### Stateless Precept Handling
 

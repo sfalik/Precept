@@ -6,6 +6,33 @@
 
 ---
 
+### 2026-05-04T04:30:00Z: Full CC#25 / CC#2 decisions audit closed the remaining five canonical doc gaps
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-audit-report.md`.
+
+- Audited CC#25 Q1–Q10, CC#2, and the `PreceptValue` slot-storage follow-through across canonical runtime and compiler docs; confirmed Q1, Q2, Q4, Q7, and Q10 were already covered.
+- Closed the lagging doc gaps in `docs/runtime/evaluator.md`, `docs/runtime/result-types.md`, `docs/runtime/precept-builder.md`, `docs/compiler-and-runtime-design.md`, and `docs/working/cross-cutting-decisions.md`.
+- Durable audit rule: after runtime API updates, re-audit `result-types.md`, `evaluator.md`, and the cross-cutting register together so locked decisions do not leave stale `object?`, dictionary, or pending-status language behind.
+- Open flags stay explicit: `TypeRuntime<T>` documentation reconciliation and the non-expression `SlotValue` shape conflicts still need owner direction.
+
+---
+### 2026-05-04T04:02:05Z: Catalog gap register migration completed and archived
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files).
+
+**Merged sources:** `frank-chunk4-gaps.md`, `frank-chunk4-unplaced-gaps.md`.
+
+- The 43 entries from the catalog gap register are now fully triaged: 23 pending gaps were attributed into canonical Open Question blocks across 9 docs, 3 resolved-in-source gaps were marked closed, 5 already-captured gaps were confirmed in place, and gap #39 was promoted to a first-class open-question block.
+- Cross-cutting routing is durable: 8 entries stay owned by the cross-cutting register, while 4 out-of-scope items remain runtime/MCP/tooling design questions rather than catalog metadata gaps.
+- The working register was retired: `docs/working/catalog-gap-register.md` now lives at `docs/working/Archived/catalog-gap-register-migrated.md`, preserving the original content plus a migration notice.
+
+---
 
 ### 2026-05-04T03:26:10Z: CC#25 Q7 acceptance revision locked
 

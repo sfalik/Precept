@@ -277,7 +277,7 @@ JSON response to agent
     ]
   },
 
-> **Open Question (unresolved):** The modifier grouping keys (`"field"`, `"state"`, `"access"`, `"anchor"`) are hardcoded. Should `ModifierMeta` carry a `ModifierCategory` enum so grouping is catalog-derived?
+> **✅ Resolved in Source — ModifierMeta.ModifierCategory:** `Modifier.cs` already carries a `Category` property of type `ModifierCategory`. The grouping keys here should be derived from that catalog field rather than hardcoded. Update the MCP serialization to read `ModifierMeta.Category` and use its string representation as the grouping key. *(Was: catalog-gap-register.md #24)*
 
   "actions": [
     {
@@ -297,7 +297,7 @@ JSON response to agent
     // ... all actions
   ],
 
-> **Open Question (unresolved):** `"syntaxShape"` field is not in `ActionMeta` catalog shape. Should `ActionMeta.SyntaxShape` be added to the catalog?
+> **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property of type `ActionSyntaxShape`. The MCP output should read this field from the catalog rather than hardcoding it. *(Was: catalog-gap-register.md #17)*
 
   "constructs": [
     {

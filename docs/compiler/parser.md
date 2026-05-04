@@ -34,6 +34,7 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 `SlotValue` is an abstract record with 17 sealed subtypes, one per `ConstructSlotKind`:
 
 > **Open Question (unresolved):** catalog-system.md shows 15 `ConstructSlotKind` members; this doc lists 17 (`RuleExpressionSlot` and `InitialMarkerSlot` are missing from the catalog). Which count is correct?
+> *Source: catalog-gap-register.md #6*
 
 | Subtype | Carries |
 |---------|---------|
@@ -56,6 +57,7 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 | `InitialMarkerSlot` | `bool` — presence of `initial` keyword |
 
 > **Open Question (unresolved):** Four slot subtypes contradict type-checker.md: `TypeExpressionSlot` (TypeMeta here vs SourceSpan there), `ModifierListSlot` (ModifierKind here vs TokenKind there), `AccessModeSlot` (SourceSpan here vs TokenKind there), `BecauseClauseSlot` (string here vs SourceSpan there). Which shapes are canonical?
+> *Source: catalog-gap-register.md #7 — BLOCKING*
 
 Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes (CC#1, resolved 2026-05-03). The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
 
@@ -183,6 +185,7 @@ report ambiguous construct
 The offset and token set come from catalog metadata — the parser contains no hardcoded disambiguation logic.
 
 > **Open Question (unresolved):** The disambiguation `peek(offset)` doesn't specify the offset value. Is it always 1? If it varies per construct, `DisambiguationEntry` needs an `Offset` field in the catalog.
+> *Source: catalog-gap-register.md #8*
 
 ### Slot Walking
 

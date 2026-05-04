@@ -108,7 +108,7 @@ The `Version` type is the evaluator's primary runtime substrate — an entity in
 /// </summary>
 public sealed record Version
 {
-    internal Version(Precept precept, StateDescriptor? currentState, object?[] slots)
+    internal Version(Precept precept, StateDescriptor? currentState, PreceptValue[] slots)
     {
         Precept = precept;
         CurrentState = currentState;
@@ -122,13 +122,11 @@ public sealed record Version
     public StateDescriptor? CurrentState { get; }
     
     /// <summary>Slot-addressed field values. Index via FieldDescriptor.SlotIndex.</summary>
-    internal object?[] Slots { get; }
+    internal PreceptValue[] Slots { get; }
 }
 ```
 
-The evaluator's inner loop reads from and writes to `Slots` via slot index. It never resolves field names at runtime — all name-to-slot mappings were resolved at build time.
-
-> **Open Question (unresolved):** Should `Slots` be `ImmutableArray<object?>` for snapshot semantics, or `object?[]` with copy-on-write for working copies? The former is safer; the latter may be more efficient for large field counts.
+The evaluator's inner loop reads from and writes to `Slots` via slot index. It never resolves field names at runtime — all name-to-slot mappings were resolved at build time. `PreceptValue` is the 32-byte tagged value struct shared across the entire evaluation pipeline (CC#25 Q5/Q7). On commit success, the working copy `PreceptValue[]` is donated directly as the new `Version.Slots` — no clone (zero-copy promotion). On constraint failure, the array is returned to `ArrayPool<PreceptValue>.Shared`.
 
 ### Input Summary
 
@@ -147,13 +145,13 @@ The evaluator's inner loop reads from and writes to `Slots` via slot index. It n
 
 ```csharp
 public abstract record EventOutcome;
-public sealed record Transitioned(Version Result) : EventOutcome;           // State change succeeded
-public sealed record Applied(Version Result) : EventOutcome;                // No-transition row or stateless event succeeded
-public sealed record Rejected(string Reason) : EventOutcome;                // Authored reject row matched
-public sealed record InvalidArgs(string Reason) : EventOutcome;             // Arg validation failure
+public sealed record Transitioned(Version Result, FiredArgs Args) : EventOutcome;  // State change succeeded
+public sealed record Applied(Version Result, FiredArgs Args) : EventOutcome;       // No-transition row or stateless event succeeded
+public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;       // Authored reject row matched
+public sealed record InvalidArgs(string Reason) : EventOutcome;                    // Arg validation failure
 public sealed record EventConstraintsFailed(IReadOnlyList<ConstraintViolation> Violations) : EventOutcome;
-public sealed record Unmatched() : EventOutcome;                            // All guards failed
-public sealed record UndefinedEvent() : EventOutcome;                       // No rows for event in current state
+public sealed record Unmatched() : EventOutcome;                                   // All guards failed
+public sealed record UndefinedEvent() : EventOutcome;                              // No rows for event in current state
 ```
 
 **UpdateOutcome** (returned by `Update`):
@@ -226,13 +224,13 @@ The evaluator is a static class with pure functions — no instance state, no pe
 public static class Evaluator
 {
     // ── Commit Operations ────────────────────────────────────────
-    internal static EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, IReadOnlyDictionary<string, object?> args);
-    internal static UpdateOutcome Update(Precept precept, Version version, IReadOnlyDictionary<FieldDescriptor, object?> patch);
-    internal static RestoreOutcome Restore(Precept precept, StateDescriptor? state, IReadOnlyDictionary<FieldDescriptor, object?> fields);
+    internal static EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, FiredArgs args);
+    internal static UpdateOutcome Update(Precept precept, Version version, PreceptValue[] patch);
+    internal static RestoreOutcome Restore(Precept precept, StateDescriptor? state, PreceptValue[] fields);
     
     // ── Inspection Operations ────────────────────────────────────
-    internal static EventInspection InspectFire(Precept precept, Version version, EventDescriptor @event, IReadOnlyDictionary<string, object?>? args);
-    internal static UpdateInspection InspectUpdate(Precept precept, Version version, IReadOnlyDictionary<FieldDescriptor, object?>? patch);
+    internal static EventInspection InspectFire(Precept precept, Version version, EventDescriptor @event, FiredArgs? args);
+    internal static UpdateInspection InspectUpdate(Precept precept, Version version, PreceptValue[]? patch);
     
     // ── Fault Backstop ───────────────────────────────────────────
     internal static Fault Fail(FaultCode code, params object?[] args);
@@ -294,16 +292,42 @@ public static class Evaluator
 
 The evaluator never mutates the input `Version`. For each candidate row evaluation:
 
-1. **Snapshot:** Clone `Version.Slots` into a working copy array
-2. **Mutate:** Execute action plans against the working copy
-3. **Evaluate:** Run constraint plans against the working copy
-4. **Commit or discard:** If constraints pass, use the working copy for the new `Version`; otherwise discard
+1. **Rent:** Rent a `PreceptValue[]` working copy from `ArrayPool<PreceptValue>.Shared`
+2. **Populate:** Copy `Version.Slots` into the rented array
+3. **Mutate:** Execute action plans against the working copy
+4. **Evaluate:** Run constraint plans against the working copy
+5. **Commit or discard:** If constraints pass, donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone); if constraints fail, return the array to `ArrayPool<PreceptValue>.Shared`
 
-This ensures that constraint evaluation sees the post-mutation state, and that failed rows leave no side effects.
+This ensures that constraint evaluation sees the post-mutation state, and that failed rows leave no side effects. On success, the working array becomes the committed `Version.Slots` — no extra allocation.
 
 ---
 
 ## 7. Component Mechanics
+
+### 7.0 Evaluation Stack Allocation
+
+Each expression evaluation call allocates its operand stack on the thread stack using `stackalloc` — no heap allocation per evaluation (CC#25 Q6):
+
+```csharp
+internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slots, FiredArgs args)
+{
+    Span<PreceptValue> stack = stackalloc PreceptValue[32];
+    int top = 0;
+    foreach (var opcode in plan.Opcodes)
+        Dispatch(opcode, slots, args, stack, ref top);
+    return stack[0];
+}
+```
+
+**`ExecutionPlan.MaxStackDepth`** is computed at build time (Precept Builder Pass 5) and represents the maximum stack depth the plan will ever reach. The compiler enforces that `MaxStackDepth ≤ 32`; if a plan exceeds this, a compile-time diagnostic is emitted and the plan is not emitted. This makes the stack bound statically verifiable — no runtime stack overflow risk.
+
+**Sync-only.** The evaluation API is synchronous. There are no `async`/`await` wrappers around evaluation calls. Expression evaluation must complete synchronously within the caller's thread. This is consistent with the stack-allocated operand model — `stackalloc` spans cannot cross `await` points.
+
+| Constraint | Enforcement | Notes |
+|-----------|------------|-------|
+| `MaxStackDepth ≤ 32` | Compile-time diagnostic | Builder Pass 5 computes depth; TC enforces |
+| No heap allocation | `stackalloc` + `ArrayPool` for working copies | Per-evaluation zero heap |
+| Sync-only API | No `async` wrappers | `stackalloc` cannot cross `await` |
 
 ### 7.1 The Four Operations
 
@@ -432,6 +456,7 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, IRea
 `TransitionOutcome` is the canonical type name (defined in `type-checker.md` §7.1). The evaluator uses this same type at runtime.
 
 > **Open Question (unresolved):** `winningRow.RejectReason` references a field not defined on `ExecutionRow`. The `because` clause from a `reject` transition row needs a storage location. Should `ExecutionRow` gain a `string? RejectReason` field?
+> *Source: catalog-gap-register.md #20*
 
 ```csharp
 UpdateOutcome Update(Precept precept, Version version, IReadOnlyDictionary<FieldDescriptor, object?> patch)
@@ -883,6 +908,7 @@ The `Faults` catalog produces a fully-formed `Fault` with:
 Faults are **never thrown** — they are returned as structured outcome variants. This maintains the pattern-matchable, composable outcome model.
 
 > **Open Question (unresolved):** `Fail` returns a `Fault`, but `Fault` is not currently a subtype of `EventOutcome`. Should `Faulted(Fault)` be added as an `EventOutcome` variant?
+> *Source: catalog-gap-register.md #21*
 
 ---
 

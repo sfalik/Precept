@@ -69,7 +69,7 @@ The parser produces these slot value types:
 
 Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`.
 
-> **CC#1 (resolved 2026-05-03):** The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via sealed hierarchy + Roslyn analyzer test. See `docs/working/cross-cutting-decisions.md` CC#1.
+> **CC#1 (resolved 2026-05-03):** The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers. See `docs/working/cross-cutting-decisions.md` CC#1.
 
 ---
 
@@ -428,7 +428,7 @@ public enum ActionSecondaryRole
 
 #### Typed Expressions (DU)
 
-> **CC#1 (resolved 2026-05-03):** `TypedExpression` is a sealed abstract record DU — the type checker's output for expressions. Its parser-side counterpart is `ParsedExpression` (same closed DU pattern, unresolved types). The set is closed by design: adding a new expression form requires a new catalog entry + new DU subtype + updating all consumer switch arms. Exhaustiveness is enforced by: (1) sealed class hierarchy (compiler-level exhaustiveness checking), (2) Roslyn analyzer test verifying all expression-DU switches are exhaustive at build time.
+> **CC#1 (resolved 2026-05-03):** `TypedExpression` is a sealed abstract record DU — the type checker's output for expressions. Its parser-side counterpart is `ParsedExpression` (same closed DU pattern, unresolved types). The set is closed by design: adding a new expression form requires a new catalog entry + new DU subtype + updating all consumer switch arms. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers.
 
 ```csharp
 public abstract record TypedExpression(
@@ -528,6 +528,7 @@ public sealed record ConstraintFieldRefs(
 ```
 
 > **Open Question (unresolved):** `ConstraintFieldRefs.ConstraintIdentity` is typed `object`. The proof-engine.md defines a proper discriminated union for this concept: `abstract record ConstraintIdentity` with sealed subtypes `RuleIdentity` and `EnsureIdentity`. Should `ConstraintFieldRefs.ConstraintIdentity` use the same typed DU that proof-engine.md defines for interoperability?
+> *Source: catalog-gap-register.md #15*
 
 #### SemanticIndex Record
 
@@ -562,6 +563,7 @@ public sealed record SemanticIndex(
 ```
 
 > **Open Question (unresolved):** The `SemanticIndex` record has no reference-tracking collections (`References`, `FieldReferences`, `StateReferences`, `EventReferences`). The language-server.md and tooling-surface.md Pass 2 iterate these collections for semantic tokens. Either `SemanticIndex` needs reference-site tracking arrays (requiring the type checker to record span and binding of every identifier use), or the LS/tooling docs need a different mechanism for Pass 2.
+> *Source: catalog-gap-register.md #16 — BLOCKING for LS Pass 2*
 
 ---
 
@@ -766,7 +768,7 @@ Every expression node type that won't be implemented in its slice has an explici
 | **Modifiers** | `ApplicableTo`, `MutuallyExclusiveWith`, `Subsumes` | Modifier validation |
 | **Actions** | `ApplicableTo`, `AllowedIn`, `ValueRequired`, `ActionSyntaxShape` | Action resolution and classification |
 
-> **Open Question (unresolved):** `ActionSyntaxShape` is referenced here as a property on `ActionMeta`, but `catalog-system.md` does not include it in the canonical `ActionMeta` shape. Should `ActionSyntaxShape` be added to the catalog?
+> **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property (`ActionSyntaxShape`). Update `catalog-system.md` to include it in the canonical `ActionMeta` shape and remove this as an open question. *(Was: catalog-gap-register.md #17)*
 
 ### Catalog-Driven vs Structural Logic (~70/30 Split)
 
@@ -824,7 +826,7 @@ The mapping from `ActionSyntaxShape` → typed DU shape is a stable 3-arm switch
 
 Five stable rules. The 5-rule enforcement surface is small enough that checker logic is acceptable without catalog metadata for the diagnostic dispatch.
 
-> **Open Question (unresolved):** `FunctionMeta.HasCIVariant` is referenced here but does not appear in the `FunctionMeta` shape in `catalog-system.md`. Should it be added to the catalog, or should CI enforcement remain checker logic?
+> **✅ Resolved in Source — FunctionMeta.HasCIVariant:** `Function.cs` already carries `HasCIVariant` and `CIVariantOf` properties. Update `catalog-system.md` to include them in the canonical `FunctionMeta` shape. *(Was: catalog-gap-register.md #18)*
 
 ---
 

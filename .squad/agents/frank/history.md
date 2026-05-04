@@ -16,6 +16,7 @@
 - When a late acceptance closes provisional design notes, record the supersession explicitly so older exploratory entries do not read as active architecture.
 - Separate durable API surface decisions from rejected convenience lanes; the rejected lane still needs an explicit closeout note.
 - Summarize back to architectural baselines once detailed delivery history crosses the active-context threshold.
+- When migrating a gap register, check target docs first — almost all gaps had already been captured informally in their respective docs. The migration job is source attribution + resolving the "Resolved in Source" closed ones, not wholesale insertion.
 
 
 ### 2026-05-04T03:39:16Z — CC#2 acceptance merged
@@ -72,8 +73,51 @@
 - New stubs `FiredArgs`, `PreceptValue`, `IArgBuilder`, and `IFieldBuilder` are part of the active runtime API baseline; build status remained clean.
 - Follow-up gaps were preserved in decisions.md: stale `result-types.md` API surface text, stale inputs/outputs table wording, `FieldAccessInfo.CurrentValue`, `FieldSnapshot.Value`, and the missing `TypeRuntime<T>` stub still need owner-directed cleanup.
 
-### 2026-05-04T04:13:09Z — Scribe closeout for frank-65
+### 2026-05-04T00:02:05Z — Chunk 4: migrate-catalog-gaps
 
-- Oversized decisions ledger checked at 796301 B; the 7-day archive gate ran and found no entries older than the cutoff, so no archive moves were required.
-- Merged `frank-chunk3-gaps.md` into `decisions.md`, cleared the inbox, and recorded health at `decisions.md` 796301 B -> 801093 B.
-- Durable orchestration/session logs written for the chunk-3 doc sync; history summarization remained unnecessary.
+**Register processed:** `docs/working/Archived/catalog-gap-register.md` (43 entries)
+
+**Outcome:**
+- All 23 "Pending Decision" gaps confirmed in their target docs; `*Source: catalog-gap-register.md #N*` attributions added to all Open Question blocks.
+- Gap #39 (Diagnostic Related Locations) upgraded from a plain bullet to a proper `⚠ Open Question` block in `docs/compiler/diagnostic-system.md`.
+- Gaps #17 (`ActionMeta.SyntaxShape`), #18 (`FunctionMeta.HasCIVariant`), #24 (`ModifierMeta.ModifierCategory`) marked `✅ Resolved in Source` in their respective docs: `mcp.md`, `type-checker.md`, `catalog-system.md`.
+- 5 "Already Captured" gaps confirmed in `catalog-system.md` § Open Questions — no changes needed.
+- 8 "Moved/Captured in cross-cutting" entries noted — tracked via CC# register.
+- 4 "Out of Scope" entries filed in `frank-chunk4-unplaced-gaps.md`.
+- Register archived as `catalog-gap-register-migrated.md` with migration notice appended.
+- Summary inbox: `frank-chunk4-gaps.md`.
+
+**Blocking gaps still open:** #7 (SlotValue subtype shape conflicts) and #16 (SemanticIndex reference-tracking) require owner ruling before dependent implementation can proceed.
+
+
+
+### 2026-05-04T04:30:00Z — Full Decisions Audit (CC#25 Q1–Q10 + CC#2 + PreceptValue slot storage)
+
+**Scope:** Cross-checked every locked decision from the CC#25 and CC#2 series against all canonical runtime and compiler docs. Fixed five PARTIAL/MISSING doc gaps. Audit report at `.squad/decisions/inbox/frank-audit-report.md`.
+
+**Key pattern confirmed:** `result-types.md` and `evaluator.md` were lagging behind `runtime-api.md` by 1–2 passes. Both still showed the old `object?`/`IReadOnlyDictionary` API. The `cross-cutting-decisions.md` CC#2 entry was still 🔴 Pending despite CC#2 having been locked weeks earlier. The `compiler-and-runtime-design.md` §5 still described expression slots as carrying `SourceSpan` only — directly contradicting CC#2 Option C.
+
+**Files changed:**
+- `docs/runtime/result-types.md` — G1: Version API Surface block replaced with two-lane API (JSON + typed lanes), cross-references runtime-api.md as authoritative. G2: I/O table updated from `IReadOnlyDictionary<string, object?>` to JSON lane / typed lane with cross-reference. G3: `FieldAccessInfo.CurrentValue` object? → PreceptValue; `FieldAccessMode { Read, Write }` → `{ Readonly, Editable }`. G4: `FieldSnapshot.Value` object? → PreceptValue?
+- `docs/compiler-and-runtime-design.md` — §5 parser section: "expression-carrying slots currently carry only `SourceSpan`" text replaced with CC#2 locked decision summary. Stale Open Question about three representation options replaced with ✅ Resolved block.
+- `docs/working/cross-cutting-decisions.md` — CC#2 entry: 🔴 Pending Shane decision → ✅ Resolved Option C Hybrid (2026-05-03T23:39:16Z) with decision summary and blocked-items-now-unblocked callout.
+- `docs/runtime/evaluator.md` — Version struct: object?[] → PreceptValue[]; stale Slots open question removed; Evaluator signatures updated; FiredArgs added to Transitioned/Applied/Rejected; Working Copy Management section updated to rent/donate/return zero-copy flow; new §7.0 "Evaluation Stack Allocation" section added (CC#25 Q6: stackalloc PreceptValue[32], MaxStackDepth enforcement, sync-only constraint).
+- `docs/runtime/precept-builder.md` — ExecutionPlan record: added `int MaxStackDepth` field with CC#25 Q6 annotation.
+
+**Decisions confirmed COVERED (no change needed):** CC#25 Q1, Q2, Q4, Q7, Q10. Slot storage with PreceptValue in precept-builder.md and runtime-api.md.
+
+**Decisions fixed:** CC#25 Q3 (CC#2 expression slot text), Q5 (evaluator.md zero-copy), Q6 (evaluator.md §7.0 stackalloc + precept-builder.md MaxStackDepth), Q8 (result-types.md G1–G4 + evaluator.md FiredArgs), CC#2 (cross-cutting-decisions.md status + compiler-and-runtime-design.md §5).
+
+**Open flags raised (require Shane direction):**
+- TypeRuntime<T> shape reconciliation between runtime-api.md (flat sealed record) and catalog-system.md (abstract base + generic subclass hierarchy). Catalog-system.md is authoritative; runtime-api.md needs a cleanup pass when the TypeRuntime.cs stub is built.
+- Non-expression SlotValue shape conflicts (ModifierListSlot, AccessModeSlot, BecauseClauseSlot) remain unresolved — separate from CC#2.
+
+**Durable architectural takeaways:**
+- Always audit result-types.md and evaluator.md together after a runtime API pass — they lag the public-facing runtime-api.md because they document the internal representation separately.
+- FiredArgs belongs on Transitioned, Applied, and Rejected — the three variants that correspond to a row having matched. InvalidArgs, Unmatched, EventConstraintsFailed, and UndefinedEvent are failure/error paths with no submission context.
+- The CC#2 resolution date in the squad ledger should be cross-posted to cross-cutting-decisions.md immediately — that doc is checked first by new contributors and was still showing 🔴 Pending.
+
+
+### 2026-05-04T04:19:13Z — chunk-4 migration + full decisions audit closed
+- Frank-66 is complete: all 43 catalog-gap-register entries were migrated or triaged, the working register was archived, and 23 pending gaps were attributed across 9 canonical docs while cross-cutting and out-of-scope items stayed explicitly routed.
+- Frank-67 is complete: the full CC#25 / CC#2 audit fixed 5 lagging docs (`evaluator.md`, `result-types.md`, `precept-builder.md`, `compiler-and-runtime-design.md`, `cross-cutting-decisions.md`) and preserved the remaining open flags around `TypeRuntime<T>` reconciliation and non-expression `SlotValue` shapes.

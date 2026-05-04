@@ -817,6 +817,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
 > **Open Question (unresolved):** Should `TokenMeta.SemanticTokenModifiers?` be added? Both language-server.md and tooling-surface.md reference it, but it's not in this shape.
+> *Source: catalog-gap-register.md #41*
 
 **Consumers:** MCP vocabulary, LS semantic tokens, LS completions, lexer keyword lookup, TextMate grammar keyword alternations.
 
@@ -866,6 +867,7 @@ public record TypeMeta(
 ```
 
 > **Open Question (unresolved):** Should `TypeMeta.IsUserFacing` and `TypeMeta.SnippetTemplate?` be added? language-server.md uses these for completion filtering.
+> *Source: catalog-gap-register.md #30*
 
 The `Token` fieldholds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
 
@@ -928,6 +930,7 @@ public record TypeAccessor(
 ```
 
 > **Open Question (unresolved):** Is `TypeAccessor` meant to be a DU with subtypes? type-checker.md references `ElementParameterAccessor` as a third subtype. The full hierarchy (`TypeAccessor` base, `FixedReturnAccessor`, `ElementParameterAccessor`) needs to be documented.
+> *Source: catalog-gap-register.md #42*
 
 ```csharp
 public enum QualifierAxis
@@ -1000,7 +1003,7 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 | Catalog class | `Functions` — `GetMeta()`, `All` |
 | Output type | None — functions are evaluated inline |
 
-> **Open Question (unresolved):** type-checker.md states `FunctionMeta.HasCIVariant` already exists, but it's not in this shape. Should it be added?
+> **✅ Resolved in Source — FunctionMeta.HasCIVariant:** `Function.cs` already has `HasCIVariant` and `CIVariantOf` properties. Add them to this `FunctionMeta` shape to close the doc gap. *(Was: catalog-gap-register.md #18)*
 
 **Members (from `precept-language-spec.md` §3.7):**
 
@@ -1400,6 +1403,7 @@ State-machine action verbs — the keywords that appear after `->` in transition
 | Output type | None |
 
 > **Open Question (unresolved):** `ActionMeta` is missing properties referenced elsewhere: `ActionSyntaxShape` (type-checker.md), `HoverDescription` and `SnippetTemplate` (language-server.md), `syntaxShape` (mcp.md). Which should be added?
+> *Source: catalog-gap-register.md #43*
 
 **Members (from `ActionKind.cs`):**
 

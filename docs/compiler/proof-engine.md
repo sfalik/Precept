@@ -220,6 +220,7 @@ public sealed record FaultSiteLink(
 The Precept Builder consumes these to plant `FaultSiteDescriptor` backstops — defense-in-depth runtime checks for operations that could not be proven safe.
 
 > **Open Question (unresolved):** `FaultSiteLink.Site` carries `SourceSpan`, but `FaultSiteDescriptor` needs structural binding (ExecutionRow, opcode offset) for runtime installation. What transformation bridges compile-time site to runtime check?
+> *Source: catalog-gap-register.md #11*
 
 #### ConstraintInfluenceEntry
 
@@ -566,6 +567,7 @@ This strategy handles the case where a guard establishes a *relative* constraint
 3. The proof site references the constrained field
 
 > **Open Question (unresolved):** Strategy 3 vs Strategy 4 differentiation unclear. Is the boundary "Strategy 3 = field-vs-constant, Strategy 4 = field-vs-field"? Needs unambiguous definition.
+> *Source: catalog-gap-register.md #13*
 
 ### Proof/Fault Chain
 
