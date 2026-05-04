@@ -24,6 +24,22 @@
 - Gap-register deprecation (2026-05-03) is final: discovery registers were archived, unresolved gaps moved into canonical docs as Open Questions, and `docs/working/cross-cutting-decisions.md` is now the sequencing/ownership driver.
 - **CC#1 resolved (2026-05-03):** `ParsedExpression` and `TypedExpression` are sealed DUs, the expression tree is the only strongly typed parser output layer, and exhaustiveness relies on sealed-hierarchy switches plus the annotation-bridge pattern for distributed dispatch.
 
+### 2026-05-04T00:43:26Z — TypeRuntime-as-catalog analysis delivered
+- Answered Shane's challenge: "Why not make TypeRuntime a full catalog?" — Answer: TypeRuntime is NOT a 14th catalog (it's not language surface), but it IS catalog-owned metadata.
+- The correct shape: `TypeMeta` gains a `Runtime` property of type `TypeRuntime` (the abstract class with sealed subclasses). The abstract class hierarchy stays as the implementation shape, but it's owned by the catalog entry rather than maintained as a parallel array.
+- Key distinction established: catalog DUs (like `ModifierMeta`) are metadata shapes consumers pattern-match on; implementation class hierarchies (like `TypeRuntime`) are behavioral implementations consumers call via virtual dispatch. TypeRuntime is the latter.
+- Consumer access: `Types.GetMeta(kind).Runtime.WriteJson(...)` or via a derived `TypeRuntime[]` index for hot paths — derived from catalog, never a parallel copy.
+- This aligns with the existing decision: "persistence behavior belongs on catalog metadata."
+
+### 2026-05-04T00:27:39Z — Collections BCL-vs-Custom analysis delivered
+- Revised position: BCL `System.Collections.Immutable` for all nine collection types. Seven direct, two via thin composition wrappers. Zero from-scratch persistent data structures at v1.
+- Key finding: All four motivations for custom types (immutability, JSON round-trip, DSL accessors, persistent semantics for discard) are satisfied equally by BCL immutable types.
+- Sortability solved via per-field `IComparer<PreceptValue>` built during `Precept.From()`, capturing TypeTag and direction modifier. Feed directly into `ImmutableSortedDictionary.Create()`.
+- `PreceptValue` needs `IEquatable<PreceptValue>` + `GetHashCode()` for hash-based collections, but NOT `IComparable<PreceptValue>` (use per-field comparers instead).
+- Risk reduction: from multi-month high-complexity custom data structures to days of thin wrapper work.
+- Surfaced 3 new open questions: `ImmutableQueue` lacks O(1) `.Count` (need cached count wrapper), `~string` case-insensitive equality requires per-field `IEqualityComparer<PreceptValue>`, Bag zero-count cleanup is trivial wrapper logic.
+- The existing `collection-types.md` already documents BCL backing for List (`ImmutableList<T>`) and QueueBy (`SortedDictionary<TPriority, Queue<TElement>>`), confirming the project's established BCL-first approach.
+
 ### 2026-05-04T00:15:36Z — CC#25 Collections + TypeRuntimeMeta Q&A delivered
 - Answered Shane's two questions on collection backing types and TypeRuntimeMeta justification in `frank-collections-and-typemeta.md`.
 - Collections: Precept-owned persistent immutable types (e.g., `ImmutableLog<PreceptValue>`) stored as heap refs in `slot.Ref`. Persistent semantics are non-negotiable for working-copy discard.
@@ -50,4 +66,10 @@
 - Frank-34's research memo is now the durable baseline for schema-diagram work: the live catalog system is 13 catalogs because `ExpressionForms` is in scope, and `ConstructSlotKind` is supporting schema rather than a catalog.
 - User routing directive updated: Elaine owns both Mermaid and ASCII diagram rendering. Frank remains the architectural analyst/decision source for what the diagrams should communicate.
 - The because-clause ledger closeout is also recorded: grammar docs already match the separate `EnsureClause` + `BecauseClause` slot anatomy, and George's optional-slot follow-up closed the last catalog-red defect.
+
+
+### 2026-05-04T00:52:48Z — TypeRuntime design locked
+- CC#25 TypeRuntime architecture is now locked: TypeRuntime is catalog-owned metadata on TypeMeta, exposed as a Runtime property typed as the abstract TypeRuntime class with sealed subclasses.
+- The separate TypeRuntimeMeta DU-through-Types variant is rejected. Keep one type catalog lookup, not parallel GetMeta / GetRuntime switches.
+- Durable guidance: consumers call Types.GetMeta(kind).Runtime...; any indexed runtime table is derived from Types.All, never maintained as an independent source of truth.
 

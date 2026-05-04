@@ -38602,3 +38602,27 @@ These arose during this analysis but belong in their own decision cycles:
 2. **Collection builder pattern:** Do `ImmutableLog`, `PreceptSet`, etc. expose a builder API, or do we construct directly? Builders are better for `ReadJson` (bulk construction without repeated structural sharing overhead).
 
 3. **Element-type parameterization at construction time:** `LogTypeRuntime` needs `_elementRuntime` at construction. Since `BuildRuntimes()` constructs all entries in one pass, scalar runtimes must be built before collection runtimes. This ordering constraint needs explicit documentation in the initializer.
+
+### 2026-05-03: CC#25 TypeRuntime becomes catalog-owned TypeMeta metadata
+**By:** Shane (accepting Frank-54 and Frank-55)
+**What:** TypeRuntime is not a 14th catalog. TypeMeta gains a catalog-owned Runtime property typed as the abstract TypeRuntime class with sealed subclasses. Consumers read Types.GetMeta(kind).Runtime, with any hot-path TypeRuntime[] index derived from catalog entries rather than maintained as a parallel registry.
+**Why:** Runtime behavior is per-type domain knowledge that belongs on the type catalog entry, but it is not independent language surface. This removes the split-record smell created by a separate GetRuntime(TypeKind) switch and keeps Types as the single source of truth.
+**Rejected:** Shane's separate TypeRuntimeMeta DU variant. Consumers use virtual dispatch rather than subtype pattern-matching; a record DU would add parallel maintenance, unused equality semantics, and cross-reference footguns for collection runtimes.
+**Supersedes:** The 2026-05-03 TypeRuntimes Construction decision wherever it treated runtime metadata as a separate parallel catalog table or rejected TypeMeta.Runtime unification.
+
+
+### 2026-05-03: CC#25 collection backing types locked
+**By:** Shane (owner sign-off)
+**What:** set, queue, stack, list, log, bag, and lookup use BCL immutable backings directly; queue of T by P uses ImmutableSortedDictionary<PreceptValue, ImmutableQueue<PreceptValue>> plus cached count; log of T by P stays the intentional custom sorted linked-list design with monotonic-key O(1) append, structural sharing, and cached head/tail pointers.
+**Why:** Precept stays BCL-first where the CLR types already match the DSL semantics, but preserves the original custom log of T by P design where the product intentionally depends on its specialized behavior.
+**Also locked:** Build IComparer<PreceptValue> per sorted field during Precept.From(), and require IEquatable<PreceptValue> plus GetHashCode() for hash-based collections.
+**Supersedes:** Frank's inbox recommendation to simplify log of T by P onto ImmutableSortedDictionary for v1.
+
+
+### 2026-05-03: CC#25 slot terminology split recorded
+**By:** Frank
+**What:** Locked the vocabulary split between parser-time construct slots and runtime field slots. ParsedConstruct.Slots / SlotValue stay compile-time only; runtime execution uses field slot indices in the PreceptValue[] working-copy array, with SlotLayout as the canonical field-name-to-slot-index mapping.
+**Why:** The two concepts share a word but not a lifecycle, representation, or owner. Builder-time slot assignment happens mechanically inside Precept.From() in declaration order, so discussions that cross parser and runtime layers must explicitly distinguish construct slots from field slots.
+
+
+
