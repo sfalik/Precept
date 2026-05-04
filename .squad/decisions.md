@@ -650,3 +650,20 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `quantity` resolves to `QuantityValue(decimal, Unit)` on a UCUM-backed, database-driven unit system with tiered discovery; `money` resolves to `MoneyValue(decimal, string)`, and currency stays separate from the unit system.
 - `duration` maps directly to NodaTime `Duration`, and the CLR type table in `docs/working/runtime-api-public-surface-spec.md` now also includes `Unit` plus the locked `currency` = `string` entry.
 - OQ-5 collection surface adopts the lazy adapter shape: `PreceptList<T> : IReadOnlyList<T>`, projecting from internal `PreceptValue[]` on demand with structural immutability and no read-path allocation.
+
+---
+
+---
+
+### 2026-05-04T16:51:56Z: QuantityValue hotpath evaluation confirms `readonly record struct`
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-struct-vs-class-hotpath.md`.
+
+- `docs/working/unit-type-system-investigation.md` now carries a dedicated struct-vs-class addendum that re-checks the hot path using the actual proposed `QuantityValue(decimal Amount, Unit Unit)` shape.
+- The hotpath verdict is durable: at 24 bytes, `QuantityValue` stays well below the copy-cost crossover, avoids the projected short-lived Gen0 churn from a sealed-class shape, and exposes no designed boxing hazards on the public API surface.
+- The dual-shape model is explicitly confirmed: `QuantityValue` remains a `readonly record struct` for API-boundary materialization, while `Unit` remains an interned `sealed class` entity and internal slot storage continues to belong to `PreceptValue`.
+
