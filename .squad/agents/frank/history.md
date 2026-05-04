@@ -73,3 +73,8 @@
 - The separate TypeRuntimeMeta DU-through-Types variant is rejected. Keep one type catalog lookup, not parallel GetMeta / GetRuntime switches.
 - Durable guidance: consumers call Types.GetMeta(kind).Runtime...; any indexed runtime table is derived from Types.All, never maintained as an independent source of truth.
 
+### 2026-05-04T00:56:54Z — CC#25 slot vocabulary boundary locked
+- Answered CC#25 Q1: parser-time construct slots and runtime field slots are different vocabularies with different owners and lifecycles.
+- Durable boundary: `ParsedConstruct.Slots` / `SlotValue` stay compile-time only; runtime execution uses field slot indices in the `PreceptValue[]` working copy, with `SlotLayout` as the field-name-to-slot-index map built in `Precept.From()`.
+- Shane accepted the answer; when discussion crosses parser and runtime layers, say **construct slots** vs **field slots** explicitly.
+
