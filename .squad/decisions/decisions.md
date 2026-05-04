@@ -37652,3 +37652,953 @@ No existing sections were restructured or rewritten. The new section was inserte
 **Blocks resolved:** Parser expression slots, TC §7.2 Expression Resolution Engine, Proof Engine strategies 3 & 4, Builder compilation.
 
 **Next wave item:** CC#25 (Execution Dispatch Design) and CC#2 (SlotValue Subtype Shapes) — present briefs when Shane is ready.
+
+---
+# TypeRuntimes Construction — Architecture Decision
+
+**Author:** Frank  
+**Date:** 2026-05-03T19:31:15.760-04:00  
+**Status:** Decision — binding  
+**Related:** CC#25 (Option A+G runtime baseline)
+
+---
+
+## Context
+
+CC#25 locked the production runtime to Option A+G: a 32-byte `PreceptValue` tagged struct, catalog-owned unary/binary executor delegate arrays, and `TypeRuntimeMeta` as the per-type behavioral record carrying `ReadJson`, `WriteJson`, `ParseString`, `FormatString`, `BinaryExecutors`, and `UnaryExecutors`. The question is how the companion table `TypeRuntimes` — a `TypeRuntimeMeta[]` indexed by `TypeKind` — gets created, where it lives, and whether the `(int)TypeKind` cast pattern is the right abstraction.
+
+---
+
+## Decisions
+
+### 1. Where `TypeRuntimes` is declared
+
+**Decision: `TypeRuntimes` is declared as a `static readonly` field on the `Types` catalog class.**
+
+Not on `PreceptRuntime` or any runtime host. Not in a separate `RuntimeCatalog` class.
+
+**Why:** `TypeRuntimeMeta` is behavioral metadata for a `TypeKind`. It belongs in the same catalog that owns declarative metadata for each type — `Types`. The `TypeMeta` record already lives there. `TypeRuntimeMeta` is the runtime-behavioral companion to `TypeMeta`; co-locating them in `Types` keeps the catalog the single truth surface for everything that is per-type. A separate `RuntimeCatalog` class would be a second catalog for the same domain, and we do not maintain parallel copies.
+
+**Rejected alternative — on `PreceptRuntime` or `Precept`:** Runtime host objects are per-definition (or per-invocation). `TypeRuntimeMeta` is process-global behavioral metadata keyed to a type family, not to a definition. Hanging it on a per-definition object confuses two scopes: global type behavior and per-definition state. It also prevents sharing across `Precept` instances.
+
+**Rejected alternative — a new `RuntimeCatalog` class:** Splits type-behavioral metadata across two catalog surfaces for no payoff. The only reason to split would be if `TypeRuntimeMeta` introduced circular references that `Types` cannot host — it does not.
+
+---
+
+### 2. How it is built
+
+**Decision: Static initializer (class constructor or `static readonly` field initializer). No lazy init. No constructor injection.**
+
+```csharp
+// In Types.cs
+public static readonly TypeRuntimeMeta[] TypeRuntimes = BuildRuntimes();
+
+private static TypeRuntimeMeta[] BuildRuntimes()
+{
+    var table = new TypeRuntimeMeta[MaxTypeKindOrdinal + 1];
+    table[(int)TypeKind.Integer]  = new(ReadJson: ..., WriteJson: ..., BinaryExecutors: ..., ...);
+    table[(int)TypeKind.Decimal]  = new(...);
+    // ... all 32 members
+    return table;
+}
+```
+
+**Why:** The delegates in `TypeRuntimeMeta` are pure functions capturing no mutable state — they are process-global constants. There is no benefit to deferring their construction. A static initializer runs once, the JIT warms those delegate sites, and every subsequent call to the Fire pipeline hits already-warm function pointers. Lazy init adds a null-check on every hot-path access in exchange for nothing. Constructor injection implies parameterization — these delegates are not configurable and are not injected from outside; they are the behavioral definition of the type system.
+
+**Rejected alternative — lazy init via `Lazy<T>`:** Adds a null-check and indirection on every hot-path access. The only scenario where lazy init pays off is if construction is expensive and the table might never be used — neither is true here. Construction is one delegate allocation per type kind, and the runtime always uses these.
+
+**Rejected alternative — constructor injection:** Implies the delegates could be different for different configurations. They cannot. The executor for `integer + integer` is not configurable. Injection would invent a dependency seam that doesn't correspond to a real variability axis.
+
+---
+
+### 3. When it is constructed relative to the pipeline
+
+**Decision: At CLR class load time (when `Types` is first accessed), which is before the first `Precept.From()` call. This is the correct framing — "process startup" is wrong; "class initialization" is right.**
+
+The single-process constraint does not change this answer — it sharpens it. Because there is no separate build or startup phase, there is no external event to trigger construction. The delegates are behavioral metadata for the type system itself, not for any particular precept definition. They need to exist as soon as the first operation involving a `TypeKind` executes, which means at class initialization time.
+
+The framing "when does it get constructed relative to the pipeline" is slightly misleading: `TypeRuntimes` is not built by the pipeline; it is read by it. The pipeline (lexer → parser → type checker → graph analyzer → proof engine → `Precept.From` → evaluator) reads type-behavioral metadata. The metadata pre-exists the pipeline. It is no different from `Types.GetMeta(TypeKind.Integer)` — that data does not come into existence when `Fire()` is called. It exists when `Types` is loaded.
+
+**Durable framing:** `TypeRuntimes` is catalog metadata, not pipeline output. Catalogs are not constructed by running the pipeline; they define what the pipeline knows. They initialize when the class loads, which in .NET happens on first access, before any user code drives the pipeline.
+
+---
+
+### 4. The `(int)TypeKind` cast smell — and whether `TypeRuntimeMeta[]` is the right shape
+
+**Decision: The cast is acceptable at the catalog boundary. Eliminate it everywhere else. The catalog builds and owns the array; consumers call `Types.GetRuntime(kind)` — a single accessor — and never touch ordinals directly.**
+
+The `(int)TypeKind` cast is not inherently wrong. The smell is when consumers reach past the catalog to do array indexing themselves. The fix is not to eliminate the array — a contiguous int-indexed array is the right data structure for a fixed-cardinality, frequently-accessed dispatch table (see: CEL's type-dispatch tables, LLVM's opcode tables). The fix is to ensure the cast is confined to the catalog:
+
+```csharp
+// In Types.cs — the ONLY place the cast appears:
+public static TypeRuntimeMeta GetRuntime(TypeKind kind) => TypeRuntimes[(int)kind];
+```
+
+Consumers — evaluator, JSON ingress/egress, inspector — call `Types.GetRuntime(field.TypeKind)`. They never index the array directly.
+
+**The deeper question: should `TypeMeta` carry `TypeRuntimeMeta` directly?**
+
+This is worth examining because it eliminates the parallel-lookup pattern entirely. The answer: **not yet, and possibly never.**
+
+- `TypeMeta` is declarative metadata. `TypeRuntimeMeta` is behavioral/executable metadata. The same design principle that separates compile-time descriptors from runtime descriptors (`FieldMeta` vs `FieldDescriptor`) argues for keeping these separate. `TypeMeta` is used by the type checker, language server, MCP vocabulary, and grammar generator — none of which should carry delegate pointers.
+- Embedding delegate fields in `TypeMeta` would mean the grammar generator, language server, and MCP serializer all load delegate instances they never use. That is a contamination of the static/language-description surface with runtime-behavioral content.
+- The cost of `Types.GetRuntime(kind)` is one array-indexed read. That is not worth dissolving the separation.
+
+**The most metadata-driven framing:** `TypeRuntimeMeta` is itself the catalog entry for runtime behavior. The array indexed by `TypeKind` is the runtime-behavior catalog, just as `Types.GetMeta(TypeKind)` is the language-surface catalog. Two parallel tables, same key space, different consumers. This is correct architecture, not a smell.
+
+---
+
+## Summary
+
+| Question | Answer |
+|---|---|
+| Where | `static readonly` field on `Types`, co-located with `TypeMeta` |
+| How | Static initializer — one `BuildRuntimes()` call, never deferred |
+| When | At CLR class load time; "process startup" is the wrong frame — this is catalog initialization |
+| `(int)TypeKind` smell | Acceptable inside the catalog; eliminate everywhere else via `Types.GetRuntime(kind)` |
+| Should `TypeMeta` carry delegates | No — that contaminates declarative metadata with executable metadata |
+
+---
+
+## Open Questions
+
+None from Frank. The following are sequencing dependencies that affect when the implementation PR can open:
+
+- **D8/R4 (executable model contract)** must be resolved before `BuildRuntimes()` can be written — the executor delegate signatures depend on the `PreceptValue` layout and slot-array ownership model, which are part of D8/R4.
+- Collection-type `TypeRuntimeMeta` entries (Set, Queue, Log, Bag, etc.) depend on element-type parameterization. The `BuildRuntimes()` factory must have access to element-type runtime metadata at construction time — which means collection runtimes are composed after scalar runtimes, within the same initializer.
+
+---
+# `in PreceptValue` / `out PreceptValue` / `ref` asymmetry — CC#25 JSON API
+
+**Date:** 2026-05-04  
+**Topic:** Modifier choices on `TypeRuntimeMeta.ReadJson` and `WriteJson`  
+**Status:** Decided
+
+---
+
+## 1. `WriteJson` — use `in PreceptValue`
+
+**Recommendation: yes.**
+
+```csharp
+void WriteJson(Utf8JsonWriter writer, in PreceptValue slot)
+```
+
+`PreceptValue` is 32 bytes. On the x64 Windows ABI, structs larger than 8 bytes that are passed by value are not placed in registers — the caller copies the value to a stack slot and passes a pointer to that copy. So `WriteJson(writer, Slots[i])` by value costs a 32-byte memcopy per call, even though the callee only reads the value.
+
+With `in`, the JIT can forward the managed reference from the `Slots[i]` ldelema directly as the parameter — no copy. The caller already holds the element address; `in` lets it pass that address unchanged.
+
+Semantics also match: `WriteJson` is read-only on the slot. `in` is the correct contract signal — it says "this method does not modify the value" and catches accidental mutation at compile time.
+
+**Tradeoff accepted:** `in` introduces defensive-copy risk if the callee passes `slot` to another method that takes it by value, or if the compiler can't prove the ref is stable. In practice, `WriteJson` implementations will read scalar fields (`slot.Tag`, `slot.I64`, `slot.F64`, `slot.Ref`) directly — no secondary by-value pass-through — so defensive copies do not arise.
+
+---
+
+## 2. `ReadJson` — use `out PreceptValue`, not `ref`
+
+**Recommendation: `out`.**
+
+```csharp
+void ReadJson(ref Utf8JsonReader reader, out PreceptValue slot)
+```
+
+The operation is a pure write to `slot` — it constructs a new value from the JSON token and assigns it. The callee never reads the incoming slot value. `out` is the honest contract: it tells the compiler and every reader that the previous value is irrelevant and will be unconditionally replaced.
+
+`ref` would permit the callee to read the slot before writing, implying a read-modify-write semantic that doesn't exist here. Use the tighter modifier.
+
+**Zero-copy consideration:** There is none — `ref` and `out` compile to identical IL (`byref`). Both pass an 8-byte pointer to the slot location. The choice between them is purely about C# definite-assignment rules and contract clarity, not about generated code.
+
+---
+
+## 3. Why `ref Utf8JsonReader` but not `ref Utf8JsonWriter`?
+
+`Utf8JsonReader` is a **ref struct** — a mutable value type that holds its read cursor, current token position, and buffer state as fields. Calling `reader.Read()` or `reader.GetString()` advances those fields in-place. If the reader were passed by value, the callee would advance its own copy and the caller's cursor would stay frozen — the next call site would re-read the same token. `ref` is required to make every `Read()` and `GetXxx()` advance propagate back to the caller's reader variable.
+
+`Utf8JsonWriter` is a **class** — a reference type. Passing it by value passes the object reference, not the object itself. All callers share the same heap object, so writes accumulate in the shared internal buffer regardless of how the reference is passed. `ref Utf8JsonWriter` would mean "I might replace your local variable with a different writer instance," which is never the intent. Passing it by value is correct.
+
+The asymmetry is a direct consequence of .NET's value-type-vs-reference-type split, not an inconsistency in the API. `ref` on `Utf8JsonReader` is structural necessity; omitting `ref` on `Utf8JsonWriter` is equally structural.
+
+---
+
+## Locked signature surface
+
+```csharp
+void ReadJson(ref Utf8JsonReader reader, out PreceptValue slot)
+void WriteJson(Utf8JsonWriter writer, in PreceptValue slot)
+```
+
+The previously recorded `ref PreceptValue` on `ReadJson` is superseded by `out PreceptValue`. The `in PreceptValue` addition to `WriteJson` is new. All other `TypeRuntimeMeta` surface decisions recorded in the 2026-05-03 session ledger remain in force.
+
+---
+# Collection types and `in PreceptValue` — does the slot abstraction hold?
+
+**Date:** 2026-05-03  
+**Topic:** Whether `in PreceptValue slot` / `out PreceptValue slot` remains valid for all field backing stores — specifically `log` fields backed by `ImmutableLog<T>` (pair-of-stacks)  
+**Status:** Decided  
+**Requested by:** Shane
+
+---
+
+## Background
+
+The locked `TypeRuntimeMeta` signature surface (from `frank-in-preceptvalue.md`) is:
+
+```csharp
+void WriteJson(Utf8JsonWriter writer, in PreceptValue slot)
+void ReadJson(ref Utf8JsonReader reader, out PreceptValue slot)
+```
+
+The `in PreceptValue slot` optimization is grounded in the fact that the primary backing store for field data is a `PreceptValue[] Slots` array indexed by `SlotIndex`. The JIT can forward `ldelema Slots[i]` directly as the `in` parameter — no copy of the 32-byte struct.
+
+Shane's question: does this hold for collection-typed fields, specifically `log of T` which is backed by `ImmutableLog<T>` (an Okasaki pair-of-stacks), not a `PreceptValue[]`?
+
+---
+
+## 1. The outer-slot call site is unaffected by the collection's internal backing store
+
+Yes — `in PreceptValue slot` remains valid for ALL collection-typed fields, including `log`.
+
+The call site is always:
+
+```csharp
+TypeRuntimes[(int)field.TypeKind].WriteJson(writer, in Slots[fieldIndex]);
+```
+
+`Slots[fieldIndex]` is a `PreceptValue` regardless of what `field.TypeKind` is. For a `log of string` field, that `PreceptValue` carries:
+- `Tag` = `TypeKind.Log`
+- `Ref` = the heap reference to `ImmutableLog<PreceptValue>` (or whatever the element representation is)
+- Inline union = unused
+
+The `in` parameter passes the address of `Slots[fieldIndex]` directly — the JIT forwards the `ldelema`, no 32-byte copy. The fact that the collection's internal structure is a pair-of-stacks rather than a contiguous array is **entirely opaque** to the call site. The call site doesn't know or care what `slot.Ref` points to.
+
+The optimization holds in full at the outer-slot level.
+
+---
+
+## 2. Inside the collection runtime: elements are NOT in `Slots[]`
+
+Here is where the nuance lives — and it is a real nuance.
+
+When `LogTypeRuntime.WriteJson` executes, it must serialize every element in the `ImmutableLog<T>`. Those elements are NOT in `Slots[]`. They live inside the internal pair-of-stacks nodes on the heap. You cannot take a managed reference to a linked-list or functional-stack node element the same way you take `ldelema` on a CLR array.
+
+The collection runtime's internal loop looks like:
+
+```csharp
+override void WriteJson(Utf8JsonWriter writer, in PreceptValue slot)
+{
+    var log = (ImmutableLog<PreceptValue>)slot.Ref!;
+    writer.WriteStartArray();
+    foreach (var element in log)                        // element is a copy from the node
+    {
+        _elementMeta.WriteJson(writer, in element);     // in on a stack local
+    }
+    writer.WriteEndArray();
+}
+```
+
+`element` here is a stack-local copy — the enumerator copied it out of the internal node. Passing it `in` still avoids a *second* 32-byte copy on the `WriteJson` call, but the copy from the node into `element` already happened. There is no way around that without redesigning `ImmutableLog<T>` to expose a `ref readonly` enumerator (which the Okasaki pair-of-stacks can do, but that's an implementation quality concern, not an API contract concern).
+
+This is the honest cost picture:
+
+| Context | Copy cost per call |
+|---------|-------------------|
+| Scalar field WriteJson call site | Zero copies (`ldelema` forwarded as `in`) |
+| Collection outer-slot WriteJson call site | Zero copies (same — `ldelema` forwarded as `in`) |
+| Element WriteJson call inside collection runtime | One copy: enumerator → stack local; `in` avoids the second copy |
+
+The element-level cost is O(1) per element and is unavoidable without a ref-capable enumerator on the collection backing type. It is not a defect in the signature — it is an honest consequence of heap-interior elements not being addressable the same way array elements are.
+
+**This does not change the API shape.** It is an implementation quality consideration for `ImmutableLog<T>`'s enumerator design — if we want to recover zero-copy element iteration, we give `ImmutableLog<T>` a `ref readonly` enumerator. That's a future optimization seam, not a blocker.
+
+---
+
+## 3. Does the slot abstraction break for any other field type?
+
+No. Walk through every category:
+
+**Scalars (Boolean, Integer, Decimal, Number, Temporal types, Business-domain types):**  
+Value stored in the inline union of `Slots[i]`. `in PreceptValue slot` → ldelema forwarded. Zero copies. No issue.
+
+**Collections (Set, Queue, Stack, Log, LogBy, Bag, List, QueueBy, Lookup):**  
+Collection reference stored in `slot.Ref`. Outer call site: `in Slots[i]` → ldelema forwarded, zero copies. Element iteration inside collection runtime: one copy per element into stack local, `in` avoids second copy. No shape problem — see §2 above.
+
+**Optional fields (`optional T`):**  
+Null-handling is at the call site (locked in the ReadJson/WriteJson decision: "null handled at call site before dispatch"). When the field is null, `WriteJson` is not called — the call site writes `null` directly. When non-null, `WriteJson` sees a normal `PreceptValue` with a present value. Same shape, no issue.
+
+**Variants (if/when introduced):**  
+A variant field would store a discriminated tag in `PreceptValue.Tag` and the value in the inline union or `Ref` accordingly. The dispatch to the correct runtime is external to the slot — it happens via `TypeRuntimes[(int)tag]`. Same `in PreceptValue slot` shape applies.
+
+**ReadJson / `out PreceptValue slot` for collections:**  
+The collection runtime reads the JSON array structure, builds the heap collection (e.g., `ImmutableLog<PreceptValue>`), and writes the heap reference into `slot.Ref`. The `out` modifier is still correct: the slot is unconditionally constructed from JSON; the incoming slot value is never read. No shape change needed.
+
+---
+
+## 4. Single signature covers everything — no overloads needed
+
+The case for separate overloads would require that different field types need different *call* semantics at the `TypeRuntimeMeta` dispatch boundary. They don't. Every field type lives in `Slots[i]` as a 32-byte `PreceptValue`. The `in` contract is uniform: "I will not modify the slot." The `out` contract is uniform: "I will unconditionally replace the slot."
+
+Introducing overloads — e.g., a `WriteJson(Utf8JsonWriter, CollectionPreceptValue)` specialization — would:
+1. Fracture the dispatch table into type-specific call sites
+2. Force the evaluator to know which fields are collections before dispatching
+3. Defeat the zero-knowledge evaluator design (§ A+G baseline: the evaluator doesn't switch on TypeKind)
+
+The uniform `in PreceptValue slot` IS the abstraction. Collection runtimes are free to cast `slot.Ref` to whatever internal type they need inside `WriteJson`. That's their business — not the call site's.
+
+---
+
+## Decisions
+
+1. **`in PreceptValue slot` on `WriteJson` is valid for all field types** including all nine collection kinds. The outer-slot call site is identical regardless of collection backing store. Confirmed.
+
+2. **The slot abstraction does not break for any field type** (scalars, collections, optionals, variants). Every field lives in `Slots[i]` as a `PreceptValue`. Collection backing store is an implementation detail stored in `slot.Ref` — opaque to the call site.
+
+3. **No separate overloads.** The single `in PreceptValue slot` / `out PreceptValue slot` surface is the correct uniform contract. Splitting by field category would break the zero-knowledge evaluator design.
+
+4. **Per-element copy inside collection runtimes is accepted.** One copy per element (enumerator → stack local) is unavoidable with the Okasaki pair-of-stacks backing for `log`. The `in` modifier on the element-level `WriteJson` call avoids a second copy. This is the correct cost model. A `ref readonly` enumerator on `ImmutableLog<T>` would recover zero-copy element iteration — mark that as an implementation quality seam, not a blocker.
+
+5. **`out PreceptValue slot` on `ReadJson` is valid for collections.** The collection runtime constructs the heap object from JSON and writes the reference into `slot.Ref`. `out` is the correct contract: pure write, no read of incoming value.
+
+---
+
+## Implication for the broader backing-store question
+
+The linked-list concern is real but is fully resolved by the two-level model:
+
+- **Level 1 (slot array):** Uniform `PreceptValue[] Slots` indexed by `SlotIndex`. All fields have a slot. The slot for a collection field is 32 bytes containing a heap reference. `in` / `out` on the slot are always sound.
+- **Level 2 (collection interior):** The backing store (pair-of-stacks, hash set, etc.) is private to the `TypeRuntimeMeta` subclass. The calling convention for element serialization is internal to that class. The outer API contract is not affected.
+
+The `in PreceptValue slot` decision was never "collections are stored as arrays." It was "every field's logical representation fits in a 32-byte tagged slot." That claim holds. Collection fields hold a heap *reference* in the slot. That reference is passed zero-copy via `in`. What the reference points to is an implementation detail.
+
+---
+# Stack-Only Evaluator — Shane's Directive
+
+**Author:** Frank  
+**Date:** 2026-05-03T19:52:15-04:00  
+**Status:** Locked — binding  
+**Directive source:** Shane, verbal — 2026-05-03  
+**Related:** CC#25, `frank-cc25-treewalk` (superseded), `frank-cc25-spanstack`, `frank-cc25-optionc`
+
+---
+
+## Locked Decision
+
+**The dual tree-walker / stack-based evaluator approach is off the table. Stack-only. One interpreter.**
+
+The merged decision from 2026-05-03T22:22:27Z — "CC#25 interactive tooling keeps traced tree-walk evaluation while production stays typed-opcode based" — is **superseded and reversed** by this directive.
+
+### What is locked
+
+| Item | Ruling |
+|---|---|
+| Production Fire/Inspect/Update | A+G stack machine. Unchanged. |
+| LS/MCP interactive tooling evaluation | A+G stack machine. Same evaluator. |
+| `TypedExpression` tree-walk evaluator | **Eliminated.** Not built. |
+| Dual-consumer model (two evaluation paths) | **Eliminated.** One path. |
+| "Designed-in upgrade seam" for tree-walk | Still not applicable — stack machine IS the seam |
+
+### Why
+
+Shane's call, not mine to re-litigate. But the rationale is consistent with everything already locked:
+
+- **Dual paths multiply maintenance surface** for a benefit that was never actually measured. The tree-walker's "natural tracing" advantage was assumed, not proven.
+- **A+G is already inspectable.** `EventInspection`, `RowInspection`, and `ConstraintResult` already provide the diagnostic richness that motivated the tree-walk path. The tree-walker's per-node trace was additive, not foundational.
+- **One interpreter means one truth surface.** The LS/MCP tooling path testing the same compiled plans as production is strictly better than testing a separate interpretive path. Bugs that appear in production but not in the tree-walk path become impossible.
+- **The compilation step is not a cost.** A+G stays sub-millisecond to build and run a precept. The "no compile step" advantage the tree-walker appeared to have was illusory in the same-process, always-warm deployment model.
+
+### Tradeoff accepted
+
+Expression-level trace granularity (per-sub-expression intermediate values in guard failure traces) cannot be produced "for free" by the stack machine the way it was by the tree-walker's recursive call structure. If that level of trace detail is required, it must be explicitly designed into the stack machine's trace mode. This is the primary open question that this directive opens (see §4 below).
+
+---
+
+## Implications for CC#25 Evaluator Design
+
+### 1. What the tree-walker was handling that the stack machine must now absorb
+
+**Expression-level trace data.** The tree-walker's natural call-recursion structure gave every `TypedExpression` node a natural slot: call the evaluator, get a result, optionally emit a trace event. The entire recursive call graph WAS the trace.
+
+A stack machine has no such structure. Guard evaluation, computed field evaluation, and constraint evaluation all reduce to `EvaluatePlan(plan, slots, args) → bool|value`. The intermediate opcode results are transient stack frames — they leave no trace unless the evaluator is explicitly instrumented.
+
+This is the gap. Everything else the tree-walker was supposed to provide (sub-50ms latency, a consumer of `TypedExpression` trees without compilation) was either not real or is solved better by the stack machine.
+
+**The specific trace gaps created by this decision:**
+
+| Evaluation site | What the tree-walker gave | What the stack machine gives without instrumentation |
+|---|---|---|
+| Guard failure | "guard failed because `status != 'open'` evaluated to false — status is `'pending'`" | "guard failed" (boolean false from the plan) |
+| Constraint violation | Per-sub-expression path to the violation | Violation message (already in `ConstraintViolation.Message`) |
+| Computed field | Intermediate sub-expression values | Final computed value |
+| Action expression | Intermediate sub-expression values | Final assigned value |
+
+Rows 2–4 are low concern — `ConstraintViolation.Message` already captures the message, and sub-expression traces for computed fields and actions were never a stated requirement. **Row 1 is the real gap**: guard failure explanation in `InspectFire` responses.
+
+---
+
+### 2. Edge cases and the stack-based answer
+
+#### Guards
+
+**The case where the tree-walker was simpler:** In `InspectFire`, a tree-walker evaluating `amount > threshold and status == 'open'` would naturally produce `[(amount > threshold → false, amount=500, threshold=1000), (status == 'open' → skipped/uneval)]`. This is useful diagnostic output for "why didn't this row fire?".
+
+**The stack-based answer:** The evaluator's `InspectFire` path already returns `RowInspection.Prospect = Impossible` for failed guards. To get sub-expression granularity, the evaluator needs a **trace hook** at guard evaluation time. Two options:
+
+- **Option T1: `IEvaluatorTrace` optional parameter** — `EvaluatePlan` accepts a nullable `IEvaluatorTrace` interface; when non-null, emits `(pc, opcode, pre-stack, result)` events. Callers in production always pass null — zero overhead. Callers in inspect mode pass a trace collector. This is the correct design.
+
+- **Option T2: Source-span keyed opcode annotation** — each opcode carries its `SourceSpan`; the trace reports are keyed by span. This is the right eventual form of the trace data (the LS needs spans to underline things), but T1 and T2 compose: T1 collects the raw trace, T2 describes how it's shaped for the LS consumer.
+
+**Stack answer for CC#24 (Unmatched Guard Trace Enrichment):** The `Unmatched()` outcome needs to carry enough data to explain which guards failed and why. With the tree-walker gone, this data comes from the trace hooks during guard evaluation in the `InspectFire` path. The trace collector accumulates per-row guard evaluation results; the `InspectFire` result carries them in `RowInspection`.
+
+This is answerable and clean. It does not require two evaluators.
+
+#### Computed Fields
+
+No edge case. Computed fields are re-evaluated via `EvaluatePlan(field.ComputedPlan, workingCopy, args)` after every mutation. The tree-walker provided nothing extra here. The stack machine already handles this.
+
+#### Constraint Evaluation
+
+No edge case. `ConstraintViolation` already carries the violation message. `ConstraintResult` (in `RowInspection` and `EventInspection`) already reports satisfied/violated status. The tree-walker would have provided sub-expression breakdowns inside the constraint expression, which was not a stated requirement. If it becomes one, the same T1 trace hook covers it.
+
+#### Event Dispatch
+
+No edge case. Event dispatch is structural: `TransitionDispatchIndex[(state, event)] → ExecutionRow[]`. The tree-walker was never involved here. Nothing changes.
+
+---
+
+### 3. What needs to be revised in the CC#25 design
+
+#### Superseded decision — must be updated
+
+The merged decision "CC#25 interactive tooling keeps traced tree-walk evaluation while production stays typed-opcode based" (2026-05-03T22:22:27Z) carries a "Durable dual-consumer model" statement that is now **false**. When Scribe next processes `decisions.md`, this entry must be amended to reflect the reversal. The new durable statement:
+
+> **Single-evaluator model.** Production Fire/Inspect/Update and LS/MCP interactive tooling both use the A+G stack machine. No tree-walk evaluation path is built. The TypedExpression DU (locked by CC#1) is an intermediate representation consumed by the Precept Builder to compile execution plans; it is not independently evaluated.
+
+#### Evaluator design — trace mode is now a first-class requirement
+
+The evaluator spec (`docs/runtime/evaluator.md`) does not currently describe a trace mode. The removal of the tree-walker makes trace-mode design a concrete evaluator requirement rather than a tooling-layer concern. Specifically:
+
+- The evaluator's inspection operations (`InspectFire`, `InspectUpdate`) must be capable of emitting expression-level trace data — IF the required granularity (see §4 below) calls for it.
+- If granularity is row-level + constraint-level only, the current `EventInspection` / `RowInspection` shape is sufficient and no trace infrastructure is needed.
+- If expression-level guard traces are required, the T1 trace hook design must be specified and added to the evaluator design.
+
+#### Builder dependency for tooling
+
+The tree-walker consumed `TypedExpression` trees directly. With that gone, the LS/MCP tooling path requires:
+
+1. The Builder to compile `TypedExpression` → `ExecutionPlan` (the normal production path)
+2. The evaluator to run those plans
+
+This is already how the `Precept.From()` path works. There is no new design here — the LS and MCP already operate on compiled `Precept` models for `precept_compile`, `precept_fire`, `precept_inspect`, and `precept_update`. The tree-walker path was an IF-path for tooling that never actually diverged from the production path. Its elimination changes nothing about the LS/MCP's dependency on compiled plans.
+
+---
+
+## 4. Open Questions for Shane
+
+These are the only questions this directive opens. Everything else is answerable by the team.
+
+---
+
+### Q1 — Expression-level trace granularity for InspectFire (SHANE DECISION REQUIRED)
+
+**The question:** When `precept_inspect` or `InspectFire` returns a result for a row whose guard failed, how much guard-failure detail is required?
+
+**Option A — Row-level only (current `RowInspection` shape)**  
+`Prospect = Impossible`. No sub-expression breakdown. The caller knows the row didn't fire; they don't know which part of the guard expression caused it.
+
+Sufficient for: production fire/inspect, most tooling consumers.  
+Not sufficient for: "why did this guard fail?" diagnostics in the LS hover or MCP debugging responses.
+
+**Option B — Guard-clause-level trace**  
+`RowInspection` gains a `GuardTrace` field carrying per-guard-clause evaluation results: which clause evaluated, what the inputs were, what the result was.
+
+Sufficient for: LS hover ("this guard failed because `amount` (500) < `threshold` (1000)"), MCP `precept_inspect` diagnostic-quality output.
+
+Requires: T1 trace hook in the evaluator's guard evaluation path, a `GuardTrace` type, and a shape decision for `RowInspection`.
+
+**Impact of the choice:** Option B is the right eventual answer. The question is whether it is a v1 requirement or a post-v1 enhancement. The tree-walker was implicitly providing Option B "for free" — now the cost is explicit.
+
+**My recommendation:** Option B is required if the MCP `precept_inspect` tool is expected to explain guard failures to an AI agent in diagnostic terms. That IS the stated use case (AI-first, structured output). Option A would make `precept_inspect` meaningfully less useful for its primary consumer. I lean B — but this is Shane's call.
+
+---
+
+### Q2 — `TypedExpression` tree: any remaining consumers outside the Builder? (Lightweight clarification — Shane should confirm)
+
+**The question:** With the tree-walker gone, `TypedExpression` trees are produced by the type checker and consumed by the Precept Builder to compile `ExecutionPlan` arrays. Is the `TypedExpression` DU exposed in any public API, or is it strictly an internal compilation intermediate?
+
+**Why it matters:** If `TypedExpression` is strictly internal, it can be an internal type that lives and dies within the compilation pipeline. If it's exposed — e.g., for external tooling, MCP vocabulary, or future plugin extensibility — its shape is part of the public contract.
+
+My read from the existing decisions: `TypedExpression` is an internal compilation intermediate. CC#1 locked it as a sealed DU hierarchy consumed by the Builder, with MCP staying "above raw parse output." But I want Shane's explicit confirmation before we treat it as internal-only in the design documents.
+
+---
+
+*No other open questions. The stack-only ruling is clean, the implications are manageable, and Option T1 (trace hook) is a well-understood pattern that does not require two evaluators. The only genuine decision left is guard trace granularity (Q1).*
+
+**Resolution update (2026-05-03):** Q1 is now locked by the follow-up IEvaluatorTrace guard-trace decision, and Q2 is now closed by the opcodes-in-CompilationResult decision confirming that opcodes stay in Precept.From() while TypedExpression remains available to LS/MCP analysis consumers.
+
+---
+### 2026-05-03: Guard trace granularity — Option B chosen
+
+
+
+**Status:** Locked — accepted by Shane on 2026-05-03.
+
+**What Option B is:**
+- A passive observer interface on the evaluator (not a second evaluator)
+- Approximately 10–20 `if (trace != null) trace.Emit(pc, opcode, preStack, result)` lines added to the evaluator's hot loop
+- Production code passes `trace: null` — zero overhead, zero divergence risk
+- `InspectFire` passes a live `IEvaluatorTrace` implementation that captures per-clause results
+
+**What it provides:**
+- Per-opcode trace: `(pc, opcode, pre-stack, result)` on every instruction
+- Equivalent diagnostic granularity to the eliminated tree-walker — same per-sub-expression visibility via opcode-level capture
+- Guard failure explanation for AI-first `precept_inspect` use case: "guard clause `amount > threshold` evaluated false (amount=50, threshold=100)"
+
+**What it is NOT:**
+- Not a second evaluator — no expression semantics to maintain, no divergence surface
+- Not architectural complexity — it's instrumentation bolted onto the single evaluator
+
+**Why Option A was rejected:**
+Option A (row-level only) would have provided only pass/fail per row, not per-clause. Insufficient for the `precept_inspect` AI-first diagnostic requirement.
+
+**Downstream implications:**
+- `IEvaluatorTrace` interface needs to be defined (approximately 1-2 methods)
+- `InspectFire` path in the runtime needs to instantiate and pass a trace collector
+- The `GuardTrace` result shape (per-clause outcome record) needs to be specified in the evaluator design doc
+
+---
+# Evaluation: Opcodes in CompilationResult
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-03
+**Status:** Locked — accepted by Shane on 2026-05-03
+
+---
+
+**Decision status:** Shane accepted the recommendation on 2026-05-03; this is now the locked architecture.
+
+## Summary
+
+**Recommendation: No. Opcodes should NOT be produced as part of `CompilationResult`.** They belong in the `Precept` executable model, compiled during `Precept.From(compilation)`. This is already the canonical design. No change needed.
+
+---
+
+## Analysis
+
+### 1. Correctness — Does this work?
+
+It *could* work mechanically — `TypedExpression` is available at `Compile()` time, and lowering to opcodes has no dependencies on runtime state. There's no pipeline ordering issue that would prevent it.
+
+However, it conflates two architecturally distinct concerns:
+
+- **`Compilation`** is the analysis snapshot. It exists for authoring surfaces (LS, MCP compile). It is always produced — even from broken input.
+- **`Precept`** (built by `Precept.From()`) is the executable model. It is produced only from error-free compilations.
+
+Opcodes are execution artifacts. Putting them in `Compilation` means generating executable plans from programs with errors — plans that can never run. This wastes work and blurs the severance boundary.
+
+### 2. Performance — Cost/benefit
+
+Three options:
+
+| Strategy | Cost | Benefit |
+|---|---|---|
+| **Compile every Fire/Inspect call** | O(n) per invocation, worst case | None — clearly wrong |
+| **Lazy (JIT on first call)** | One-time cost deferred to first execution | Avoids compiling plans for definitions that are only analyzed, not executed |
+| **Eager in `Precept.From()`** | One-time cost at builder time | Plans ready before first Fire; predictable startup; no lazy-locking complexity |
+
+The canonical design already chose **eager in `Precept.From()`** — and this is correct. The Precept Builder is the single transformation boundary. Compilation time is dominated by parse + type-check + graph + proof. Opcode lowering from `TypedExpression` is linear and fast. Moving it earlier (into `Compilation`) saves nothing — `Precept.From()` runs immediately after a successful compile anyway.
+
+Putting opcodes in `CompilationResult` would mean:
+- Wasted work: LS recompiles on every keystroke → would regenerate opcodes that are never executed.
+- No amortization: `Compilation` is immutable and discarded on next edit. The opcodes die with it.
+
+### 3. API Contract
+
+**Current canonical shape (from compiler-and-runtime-design.md §9):**
+
+```
+Compilation
+├── Tokens: TokenStream
+├── ConstructManifest
+├── Semantics: SemanticIndex (contains TypedExpression trees)
+├── Graph: StateGraph
+├── Proof: ProofLedger
+├── Diagnostics: ImmutableArray<Diagnostic>
+└── HasErrors: bool
+```
+
+`TypedExpression` lives inside `SemanticIndex` — it is consumed by:
+- The **LS** for hover, diagnostics, semantic tokens, go-to-definition
+- The **MCP compile tool** for structural inspection
+- The **Precept Builder** as input to opcode lowering
+
+If we added opcodes to `CompilationResult`, `TypedExpression` would remain — it serves authoring consumers that never execute anything. It does NOT become redundant.
+
+**`TypedExpression` must stay.** Removing it would sever LS and MCP from expression semantics. The opcodes would be an additional, largely useless appendage on an analysis artifact.
+
+### 4. Simplicity
+
+Eager compilation in `Precept.From()` already eliminates lazy-compilation complexity from `Fire()`/`Inspect()`. The canonical design says: "The evaluator becomes a plan executor that does not reason about semantics at runtime because the build step has already resolved all semantic questions into executable plans."
+
+There is no lazy-compilation complexity to remove — the current architecture doesn't have it. `Precept.From()` builds all plans eagerly. `Fire()` and `Inspect()` just walk pre-built plan arrays.
+
+Moving the lowering earlier (into `CompilationResult`) would actually ADD complexity: `Compilation` currently has no concept of "executable artifacts" and would need to either:
+- Carry opcodes that may reference unresolved/errored expressions (broken programs), or
+- Conditionally compile opcodes only when `!HasErrors` — introducing a conditional path into what is currently an unconditional aggregation boundary.
+
+### 5. Alignment with Precept Architecture
+
+The canonical pipeline has a clean severance boundary:
+
+```
+Compilation (analysis) ──── Precept.From() ────► Precept (execution)
+```
+
+This boundary is explicit and non-negotiable in the design doc (§3, §10). The Precept Builder is described as "the transformation from analysis to execution." Opcodes are execution. They belong on the execution side.
+
+The metadata-driven philosophy is preserved: catalog-owned delegate arrays (`BinaryExecutors`, `UnaryExecutors`) are the operation dispatch mechanism. Opcodes reference operation codes that index into these arrays. This is runtime machinery, not analysis.
+
+### 6. Recommendation
+
+**Keep the current architecture unchanged.** Specifically:
+
+- `Compilation` (a.k.a. `CompilationResult`) remains the analysis snapshot: `TokenStream`, `ConstructManifest`, `SemanticIndex` (with `TypedExpression`), `StateGraph`, `ProofLedger`, diagnostics.
+- `Precept.From(compilation)` lowers `TypedExpression` → `ExecutionPlan` (flat opcode arrays) as part of building the executable model.
+- `Precept` carries descriptor tables, dispatch indexes, and execution plans (opcodes).
+- `Fire()`/`Inspect()`/`Update()` consume pre-built plans — no lazy compilation, no tree-walking on the production path.
+
+This is already the canonical design per `docs/compiler-and-runtime-design.md` §10. The question resolves to: **the design is already correct; no change is needed.**
+
+---
+
+## Tradeoffs Acknowledged
+
+- If a host calls `Compile()` and immediately `Precept.From()`, the opcode lowering happens in `From()` regardless. There's no performance difference vs. putting it in `Compile()` — both are eager, single-pass, one-time.
+- The LS tree-walk evaluator (interactive tooling path, per CC#25 decision) continues to walk `TypedExpression` directly for per-node traces. This dual-path is already decided and documented.
+
+---
+
+## Reference
+
+- `docs/compiler-and-runtime-design.md` §3 (pipeline), §9 (Compilation snapshot), §10 (Precept Builder)
+- CC#25 decision: "interactive tooling keeps traced tree-walk evaluation while production stays typed-opcode based"
+- CC#25 decision: "runtime baseline is `PreceptValue` plus catalog-owned delegate dispatch"
+
+---
+# CC#25: Collections + TypeRuntimeMeta Q&A
+
+**Date:** 2026-05-03  
+**Author:** Frank  
+**Status:** Answers delivered  
+**Requested by:** Shane
+
+---
+
+## A. Collections in the PreceptValue Slot Model
+
+### What lives in `slot.Ref` for a collection field?
+
+A `PreceptValue` slot for a collection field stores a **heap reference to an immutable, Precept-owned collection type** in the `Ref` region. Not a BCL `List<T>`. Not `ImmutableList<T>`. A type we own that gives us the exact semantics the DSL requires.
+
+The backing types by TypeKind:
+
+| TypeKind | Backing Type (ref region) | Semantics |
+|----------|--------------------------|-----------|
+| `Set` | `PreceptSet<PreceptValue>` | Unordered, unique elements, equality-comparable |
+| `List` | `PreceptList<PreceptValue>` | Ordered, index-addressable, insertion/removal by position |
+| `Queue` | `PreceptQueue<PreceptValue>` | FIFO, enqueue/dequeue |
+| `Stack` | `PreceptStack<PreceptValue>` | LIFO, push/pop |
+| `Log` | `ImmutableLog<PreceptValue>` | Append-only, insertion-ordered, Okasaki pair-of-stacks |
+| `LogBy` | `ImmutableLogBy<PreceptValue>` | Append-only, ordering-key-ordered, unique keys |
+| `Bag` | `PreceptBag<PreceptValue>` | Unordered multiset, per-element frequency |
+| `QueueBy` | `PreceptPriorityQueue<PreceptValue>` | Priority queue, ordering-key-ordered |
+| `Lookup` | `PreceptLookup<PreceptValue>` | Key-value map, unique keys |
+
+**Why custom types, not BCL?** Three reasons:
+
+1. **Immutability guarantee.** The fire pipeline working-copy model demands that the *previous* version of a collection survives alongside the *next* version (the working copy). If we use `List<T>`, any mutation is visible through both references. We need persistent or copy-on-write collections where mutation produces a new root.
+
+2. **Structural JSON round-trip.** The collection type must produce a deterministic JSON shape and read it back without ambiguity. We own the serialization loop, not the BCL.
+
+3. **DSL-semantic accessors.** `.count`, `.first`, `.last`, `.at(N)`, `.peek`, `.countof(E)` — these map directly to methods on the backing type. If we used BCL types, we'd need an adapter layer to map DSL accessors to BCL members. Owning the type means the accessor calls are direct method calls on the backing reference.
+
+### What does `ImmutableLog<PreceptValue>` hold?
+
+An Okasaki-style persistent deque (pair-of-stacks) where each node holds a `PreceptValue`. Append returns a new `ImmutableLog<PreceptValue>` root; the previous root is unchanged. This is the classic functional persistent data structure: structural sharing means appending is O(1) amortized, and iterating front-to-back is O(n).
+
+The `PreceptValue` inside each node is a full 32-byte tagged slot — same representation as the field-level slots. For scalar element types (e.g., `log of integer`), the value lives inline in the node's `PreceptValue.Value` union. For ref-region element types (e.g., `log of string`), the node's `PreceptValue.Ref` holds the string reference.
+
+### `WriteJson` on a collection slot — what happens?
+
+```csharp
+// The collection-specific TypeRuntimeMeta — e.g., for TypeKind.Log
+void WriteJson(Utf8JsonWriter writer, in PreceptValue slot)
+{
+    var log = (ImmutableLog<PreceptValue>)slot.Ref!;
+    writer.WriteStartArray();
+    foreach (PreceptValue element in log)           // one 32-byte copy per element
+    {
+        _elementRuntime.WriteJson(writer, in element);  // element runtime handles scalar/ref
+    }
+    writer.WriteEndArray();
+}
+```
+
+**Who owns the iteration?** The collection's `TypeRuntimeMeta` owns the structural loop (StartArray/EndArray). The *element's* `TypeRuntimeMeta` owns writing each element's value. This is the two-level model locked in `frank-collection-writejson.md`: outer slot → collection runtime → element runtime.
+
+**For `Lookup` (key-value):** Same pattern, but the structural loop is StartObject, and each iteration writes a property name (the key, formatted via the key-type runtime) plus the value element.
+
+### `ReadJson` on a collection slot — what .NET type gets created?
+
+```csharp
+void ReadJson(ref Utf8JsonReader reader, out PreceptValue slot)
+{
+    // reader is positioned at StartArray (call site validated this)
+    var builder = ImmutableLog<PreceptValue>.CreateBuilder();
+    reader.Read(); // advance past StartArray
+    while (reader.TokenType != JsonTokenType.EndArray)
+    {
+        _elementRuntime.ReadJson(ref reader, out PreceptValue element);
+        builder.Append(element);
+        reader.Read(); // advance to next element or EndArray
+    }
+    slot = PreceptValue.FromRef(TypeKind.Log, builder.Build());
+}
+```
+
+`builder.Build()` returns an `ImmutableLog<PreceptValue>`. That heap reference is stored in `slot.Ref`. The 32-byte slot goes into `Slots[fieldIndex]`. Done.
+
+### Are collections mutable inside the evaluator?
+
+**No. Collections are persistent (structurally immutable).** Every mutation operation (add, remove, append, enqueue, dequeue, push, pop, put, insert, clear) returns a **new collection root**. The old root survives unchanged.
+
+During action evaluation in the fire pipeline:
+1. The evaluator reads the current collection from `WorkingCopy.Slots[fieldIndex].Ref`.
+2. The action opcode (e.g., `OpAppend`) invokes the mutator on the persistent collection, producing a new root.
+3. The new root is written back into `WorkingCopy.Slots[fieldIndex].Ref`.
+
+This is not copy-on-write in the CoW-page-fault sense. It's structural sharing — the functional programming definition. Append on an `ImmutableLog` shares all existing nodes; only the new spine nodes are allocated.
+
+**Why persistent, not mutable-in-place?**
+
+The fire pipeline may need to **discard** a working copy if a guard fails or a constraint is violated. If the collection was mutated in place, rollback requires remembering the old state. With persistent collections, rollback is free: you still have the original reference from `Version.Slots[fieldIndex]`.
+
+### `List<Product>` — composite element types in memory
+
+A `list of product` where `product` is itself a composite entity:
+
+- The `PreceptValue` slot for the list field: `Tag=List`, `Ref=PreceptList<PreceptValue>`.
+- Each element `PreceptValue` in the list: `Tag=<composite marker>`, `Ref=PreceptValue[]` (a nested slot array).
+- Each field of the composite is a slot in that nested array.
+
+In JSON this renders as:
+```json
+"Products": [
+  { "Name": "Widget", "Price": 9.99, "Qty": 3 },
+  { "Name": "Gadget", "Price": 24.50, "Qty": 1 }
+]
+```
+
+The collection runtime iterates elements; each element's `WriteJson` dispatches into the composite's slot array and writes each field in turn. The composite's field metadata drives the property names.
+
+### Collection mutability and the fire pipeline (working copy)
+
+Already addressed above, but to be explicit:
+
+- The working copy is a `PreceptValue[]` cloned from `Version.Slots`.
+- Collection slots in the working copy are initially reference-equal to the version's collection objects.
+- First mutation on a collection field creates a new persistent root and writes it into the working copy slot.
+- If fire succeeds: the working copy becomes the next `Version.Slots`. Old persistent collections are GC'd when no version references them.
+- If fire fails (guard or constraint): the working copy is discarded. The original `Version.Slots` (including its collection references) is untouched.
+
+This is why persistent collections are non-negotiable for the fire pipeline. Mutable collections would require explicit snapshot/restore machinery.
+
+---
+
+## B. TypeRuntimeMeta — Defense or Revision
+
+### What problem does it solve?
+
+The production evaluator is a zero-knowledge stack machine. It doesn't switch on `TypeKind`. It doesn't know what an integer is. It doesn't know how to serialize a `log of string`. It executes opcodes and dispatches through delegate tables.
+
+`TypeRuntimeMeta` is the mechanism that gives the evaluator type-specific behavior *without the evaluator knowing the types exist*. It is the per-type delegate holder that the evaluator, JSON ingress/egress, and inspector dispatch through blindly.
+
+Without it, type-specific behavior scatters across:
+- A switch in the JSON serializer
+- A switch in the JSON deserializer
+- A switch in the string formatter
+- A switch in the string parser
+- Per-type executor registration in N places
+
+That's 5+ switches, each with 32 cases, each maintained in parallel, each a violation of the catalog-first principle. `TypeRuntimeMeta` collapses them to: **one object per type, all behavior co-located.**
+
+### The alternatives — concretely
+
+#### Alternative 1: Static class with switch expressions
+
+```csharp
+public static class TypeRuntime
+{
+    public static void WriteJson(Utf8JsonWriter w, TypeKind kind, in PreceptValue slot) => kind switch
+    {
+        TypeKind.Integer => w.WriteNumberValue(slot.AsInt64()),
+        TypeKind.String  => w.WriteStringValue((string)slot.Ref!),
+        TypeKind.Log     => WriteLog(w, slot),
+        // ... 32 cases
+    };
+}
+```
+
+**Tradeoffs:**
+- ✅ Simpler to read initially
+- ❌ Switch on 32 TypeKind values — exactly the per-member dispatch the catalog-first principle prohibits
+- ❌ Cannot carry state (collection runtimes need element-type references for recursive dispatch)
+- ❌ The switch IS the parallel copy — it embeds per-type behavior outside the catalog
+- ❌ Adding a new TypeKind requires editing 5+ switch expressions across 5+ methods
+- ❌ No way to test a single type's behavior in isolation
+
+**Verdict:** This is the pre-catalog design. It's what we're migrating away from.
+
+#### Alternative 2: Struct of delegates (no virtual dispatch)
+
+```csharp
+public readonly struct TypeRuntimeMeta
+{
+    public readonly WriteJsonDelegate WriteJson;
+    public readonly ReadJsonDelegate ReadJson;
+    public readonly ParseStringDelegate ParseString;
+    public readonly FormatStringDelegate FormatString;
+    // ... operator tables
+}
+```
+
+**Tradeoffs:**
+- ✅ No vtable indirection — direct delegate call
+- ✅ Stored in a flat `TypeRuntimeMeta[]` — cache-friendly sequential access
+- ❌ Delegates are 16 bytes each; a struct holding 6+ delegates is 96+ bytes — too large for value semantics
+- ❌ Collection runtimes need to capture the element-type runtime in a closure. Delegate closures are heap allocations anyway, so you lose the "no heap" benefit.
+- ❌ No way to add methods without changing the struct layout (binary compatibility)
+- ✅ BUT: we don't need binary compatibility. This is internal.
+
+**Verdict:** Viable but offers no real advantage over a sealed class. The delegates still close over state for collections. The "no virtual dispatch" win is marginal — delegate invocation and virtual method invocation are both indirect calls through a function pointer. The JIT devirtualizes neither in this scenario (the call site doesn't know which `TypeRuntimeMeta` instance it has).
+
+#### Alternative 3: Interface + per-type sealed classes
+
+```csharp
+public interface ITypeRuntime
+{
+    void WriteJson(Utf8JsonWriter writer, in PreceptValue slot);
+    void ReadJson(ref Utf8JsonReader reader, out PreceptValue slot);
+    string FormatString(in PreceptValue slot);
+    PreceptValue ParseString(ReadOnlySpan<char> text);
+}
+
+public sealed class IntegerRuntime : ITypeRuntime { ... }
+public sealed class LogRuntime : ITypeRuntime { ... }
+```
+
+**Tradeoffs:**
+- ✅ Clean, familiar, testable in isolation
+- ✅ Each type's behavior is self-contained in one class file
+- ✅ Sealed classes enable devirtualization in some scenarios
+- ❌ Allocates N heap objects (one per type kind) — but these are process-global singletons, so who cares
+- ❌ Interface dispatch on a concrete reference: the JIT can devirtualize if the concrete type is sealed and the call site can prove the type (which `Types.GetRuntime(kind)` cannot)
+- ✅ Same performance as the delegate-struct after JIT — both are indirect calls
+
+**Verdict:** This is essentially `TypeRuntimeMeta` with a different name and shape. An interface with sealed implementors vs. a class with instances — the distinction is cosmetic.
+
+#### Alternative 4: The current design — sealed record/class `TypeRuntimeMeta` with method delegates or virtual methods
+
+This is what was proposed. One instance per TypeKind. Stored in a flat array on `Types`. Consumers call `Types.GetRuntime(kind).WriteJson(...)`.
+
+### My recommendation: Keep the design. Refine the shape.
+
+The current `TypeRuntimeMeta` design is correct. Here's why:
+
+1. **It is the runtime-behavioral catalog.** Just as `TypeMeta` is the declarative catalog entry for each type, `TypeRuntimeMeta` is the behavioral catalog entry. Two tables, same key space, different consumers. This is the metadata-driven architecture working exactly as intended.
+
+2. **It eliminates per-TypeKind switches everywhere.** Every consumer dispatches through the catalog — evaluator, JSON layer, string formatter, inspector. No consumer maintains parallel per-type logic.
+
+3. **It composes.** Collection runtimes hold a reference to their element-type's `TypeRuntimeMeta`, enabling recursive dispatch without the evaluator knowing about it.
+
+4. **It tests in isolation.** You can unit-test `LogRuntime.WriteJson` without standing up the full pipeline.
+
+### What I would change
+
+**Shape refinement:** Make it a sealed abstract class with sealed per-type subclasses, not a record holding delegates.
+
+```csharp
+public abstract class TypeRuntimeMeta
+{
+    public abstract void WriteJson(Utf8JsonWriter writer, in PreceptValue slot);
+    public abstract void ReadJson(ref Utf8JsonReader reader, out PreceptValue slot);
+    public abstract string FormatString(in PreceptValue slot);
+    public abstract PreceptValue ParseString(ReadOnlySpan<char> text);
+    // Operator tables remain as data:
+    public required FrozenDictionary<OperationKind, BinaryExecutor> BinaryExecutors { get; init; }
+    public required FrozenDictionary<OperationKind, UnaryExecutor> UnaryExecutors { get; init; }
+}
+
+internal sealed class IntegerTypeRuntime : TypeRuntimeMeta { ... }
+internal sealed class LogTypeRuntime : TypeRuntimeMeta
+{
+    private readonly TypeRuntimeMeta _elementRuntime;
+    // constructor takes element runtime for recursive dispatch
+}
+```
+
+**Why abstract class with virtual methods over delegates?**
+
+- Delegates close over state via captured variables, which is invisible and fragile. A class with fields makes the captured state (like `_elementRuntime`) explicit and debuggable.
+- Virtual dispatch and delegate dispatch are the same cost at the CPU level (indirect call through function pointer). No performance difference.
+- The class hierarchy is self-documenting. You can navigate to `LogTypeRuntime` and see *all* of that type's runtime behavior in one place.
+- Testing: you can mock or subclass for diagnostic purposes (e.g., a tracing wrapper).
+
+**Why NOT an interface?** Because we also carry data (`BinaryExecutors`, `UnaryExecutors`). An interface with data means default interface methods or a parallel data holder. An abstract class carries both methods and data naturally.
+
+### What would be LOST by simplifying to switches?
+
+- The catalog-first principle. Switches re-embed per-type knowledge in consumers.
+- Composability. Collection→element recursive dispatch disappears; you'd need a closure or a second switch nested inside the collection case.
+- Testability in isolation. Switch expressions are monolithic — you test the entire 32-case switch or nothing.
+- The zero-knowledge evaluator design. If the evaluator's JSON layer has a 32-arm switch, the evaluator now *knows* about types. That's the definition of coupled.
+
+### Is `TypeRuntimeMeta` catalog data or runtime machinery?
+
+**It is catalog data that happens to be executable.** This is not a contradiction. The `BinaryExecutors` table in the current design is already a delegate dictionary — behavioral metadata stored as data. The methods on `TypeRuntimeMeta` are the same concept: per-type behavior declared as a catalog entry, not scattered across consumer switch arms.
+
+The framing from `frank-typeruntimes-construction.md` is correct: *"`TypeRuntimeMeta` is the catalog entry for runtime behavior. The array indexed by TypeKind is the runtime-behavior catalog."* Two catalogs for the same domain — one declarative (TypeMeta), one behavioral (TypeRuntimeMeta) — keyed by the same enum, owned by the same static class. This is proper separation without duplication.
+
+### Better name?
+
+`TypeRuntimeMeta` is acceptable but slightly misleading — "Meta" implies description, but this is execution. Options:
+
+- `TypeRuntime` — simpler, direct, says what it is
+- `TypeRuntimeMeta` — current, emphasizes it's catalog metadata
+- `TypeBehavior` — descriptive but vague
+- `TypeDispatch` — too narrow (implies only dispatch, not data)
+
+**My preference: `TypeRuntime`.** Drop the "Meta" suffix. It IS the runtime for a type. The fact that it lives in a catalog table already communicates the metadata nature — the name doesn't need to repeat it.
+
+### Final position
+
+The design is sound. The only changes I'd make:
+
+1. Rename to `TypeRuntime` (drop "Meta").
+2. Shape as `abstract class` with sealed per-type subclasses, not a flat record of delegates.
+3. Keep operator tables as data properties (`FrozenDictionary<OperationKind, *Executor>`).
+4. Keep `ReadJson`/`WriteJson`/`FormatString`/`ParseString` as abstract methods.
+5. Collection subclasses take their element's `TypeRuntime` as a constructor parameter.
+6. The `Types` catalog owns the array and exposes `Types.GetRuntime(TypeKind)`.
+
+This is not over-engineered. This is the minimum structure that satisfies: zero-knowledge evaluator, catalog-first architecture, composable collection dispatch, isolated testability, and explicit state for collection runtimes. Remove any one of these axes and you need more code elsewhere to compensate.
+
+---
+
+## Open Questions (surfaced, not answered here)
+
+These arose during this analysis but belong in their own decision cycles:
+
+1. **Composite element types:** When a collection holds composite entities (`list of product`), does the element `PreceptValue` hold a nested `PreceptValue[]`? Or a reference to a `CompositeValue` wrapper? The nested-array approach is simplest but means element access requires a second indirection.
+
+2. **Collection builder pattern:** Do `ImmutableLog`, `PreceptSet`, etc. expose a builder API, or do we construct directly? Builders are better for `ReadJson` (bulk construction without repeated structural sharing overhead).
+
+3. **Element-type parameterization at construction time:** `LogTypeRuntime` needs `_elementRuntime` at construction. Since `BuildRuntimes()` constructs all entries in one pass, scalar runtimes must be built before collection runtimes. This ordering constraint needs explicit documentation in the initializer.

@@ -6,7 +6,11 @@
 - CC#25 runtime baseline is now fixed for current planning: production Fire uses Option A + G (`PreceptValue` tagged value storage plus catalog-owned delegate arrays), while LS/MCP interactive tooling keeps traced tree-walk evaluation.
 - TypeBuilder/source-generation paths remain recorded as analyzed alternatives, not the active SaaS architecture, unless deployment or inspectability constraints change.
 
-## Learnings
+- **Q2 resolved (2026-05-03):** Opcodes-in-CompilationResult was evaluated and rejected. The current architecture remains correct: opcodes stay in Precept.From() / the Precept executable model, CompilationResult stays analysis-only, and TypedExpression remains available to LS/MCP consumers. Shane accepted the decision on 2026-05-03.
+
+- **Q1 resolved (2026-05-03):** Option B (`IEvaluatorTrace` hook) chosen for guard trace granularity. Shane confirmed 2026-05-03.
+
+- **Opcodes-in-CompilationResult evaluation (2026-05-03):** Recommended NO — opcodes belong in the `Precept` executable model (built by `Precept.From()`), not in `Compilation`/`CompilationResult`. The canonical design already places opcode lowering in the Precept Builder stage. `Compilation` is the analysis snapshot for authoring surfaces; putting execution plans there conflates analysis with execution, wastes work on LS recompiles, and blurs the severance boundary. No architecture change needed — the current design is correct.
 
 - **ReadJson/WriteJson API design (2026-05-03):** Closed the JSON ingress/egress seam from the Fire-call lifecycle walkthrough. Phase 8 egress: `FormatValue` is replaced by `WriteJson(Utf8JsonWriter, PreceptValue)` — zero boxing for scalars, ref-region types are already-heap references cast and written directly. Phase 1 ingress: `StoreValue`/`ParseValue` replaced by `ReadJson(ref Utf8JsonReader, ref PreceptValue)` — `ref Utf8JsonReader` required because it's a ref struct; `ref PreceptValue` for consistent write-back. Null handling is call-site-only (check `TokenType == Null` before dispatching). Collection runtimes own their structural loop; element-type runtime handles individual elements. Token-advance ownership: call site advances to value token, `ReadJson` calls `GetXxx()`, call site advances at next iteration. `TypeRuntimeMeta` final surface: `ReadJson`, `WriteJson`, `ParseString`, `FormatString`, `BinaryExecutors`, `UnaryExecutors`. `ExtractValue`/`StoreValue`/`ParseValue` eliminated from all hot paths.
 
@@ -20,7 +24,15 @@
 - Gap-register deprecation (2026-05-03) is final: discovery registers were archived, unresolved gaps moved into canonical docs as Open Questions, and `docs/working/cross-cutting-decisions.md` is now the sequencing/ownership driver.
 - **CC#1 resolved (2026-05-03):** `ParsedExpression` and `TypedExpression` are sealed DUs, the expression tree is the only strongly typed parser output layer, and exhaustiveness relies on sealed-hierarchy switches plus the annotation-bridge pattern for distributed dispatch.
 
-## Recent Updates
+### 2026-05-04T00:15:36Z — CC#25 Collections + TypeRuntimeMeta Q&A delivered
+- Answered Shane's two questions on collection backing types and TypeRuntimeMeta justification in `frank-collections-and-typemeta.md`.
+- Collections: Precept-owned persistent immutable types (e.g., `ImmutableLog<PreceptValue>`) stored as heap refs in `slot.Ref`. Persistent semantics are non-negotiable for working-copy discard.
+- TypeRuntimeMeta: design is correct; recommended rename to `TypeRuntime`, shape as abstract class + sealed subclasses. Defended against switch/delegate-struct/interface alternatives. It is behavioral catalog data, not scattered machinery.
+- Surfaced 3 new open questions: composite element representation, builder pattern for ReadJson, element-type parameterization ordering.
+
+### 2026-05-04T00:12:46Z — CC#25 Q2 boundary locked
+- Frank-51's evaluation is now durable context: do not move opcodes into `CompilationResult`; keep lowering inside `Precept.From()` on the executable-model side of the boundary.
+- Shane accepted the recommendation, and the public-analysis boundary stays unchanged: `Compilation` / `CompilationResult` remains an authoring snapshot while `TypedExpression` continues serving LS/MCP consumers.
 
 ### 2026-05-03T23:00:32Z — ReadJson / WriteJson API lock recorded
 - Frank-48 closed the CC#25 JSON ingress/egress seam: ReadJson now owns typed value extraction, WriteJson owns symmetric egress, null handling stays at the call site, and collection runtimes own structural JSON loops.
