@@ -36533,3 +36533,1873 @@ Frank-96's entries (#11 — DU nesting, #12 — ConstraintsFailed rename) were c
 ## Files Updated
 
 - `docs/working/runtime-api-public-surface-spec.md` — §2.2, §2.3, §2.7, §11 (decisions #13–17 added)
+
+# Decision Note: copilot-directive-value-suffix-drop
+
+### 2026-05-04T14:42:41: User directive
+**By:** Shane (via Copilot)
+**What:** Drop the `Value` suffix from all business and temporal CLR type names in the public API. `MoneyValue` → `Money`, `QuantityValue` → `Quantity`, `PriceValue` → `Price`, `ExchangeRateValue` → `ExchangeRate`, `DateRangeValue` → `DateRange`, etc.
+**Why:** User request — captured for team memory
+
+# Decision: Collection CLR API Analysis v2
+
+**By:** Frank  
+**Date:** 2026-05-04T16:14:47.605-04:00  
+**Status:** Recommendation — supersedes prior v1 analysis  
+**Supersedes:** `frank-collection-types-investigation.md` (v1 — flawed reasoning basis)  
+**Source docs cited:** `collection-types.md`, `evaluator.md`, `runtime-api.md`, `compiler-and-runtime-design.md`, `runtime-api-public-surface-spec.md`, `precept-collection-types-investigation.md`
+
+---
+
+## Correction Notice
+
+The v1 analysis reached Option E (JSON-only for collections) partly from observing that "the runtime is entirely stub." Shane correctly identified this as a reasoning error. The runtime being unbuilt is irrelevant — we are designing it. This analysis reasons from what the design documents specify the architecture WILL be.
+
+---
+
+## Q1 — How Will the Runtime Store Collections Internally?
+
+### Answer: Collections are reference-typed immutable data structures held in PreceptValue slots.
+
+**Evidence:**
+
+The evaluator doc (`evaluator.md`, lines 130–174) specifies that `PreceptValue` is a 32-byte tagged struct with a reference region (line 171: `"reference region (string, object, null sentinel)"`). Scalar values occupy the value region; reference types occupy the reference region. Collections are reference types — they are immutable persistent data structures held via the reference slot in `PreceptValue`.
+
+The collection-types doc (`collection-types.md`) specifies these backing types:
+
+| Collection Kind | Backing Type | Source Line | Access Characteristics |
+|---|---|---|---|
+| `set of T` | Immutable set (not explicitly named — inferred from semantics) | — | O(log n) membership |
+| `queue of T` | Immutable FIFO (not explicitly named) | — | O(1) peek/dequeue |
+| `stack of T` | Immutable LIFO (not explicitly named) | — | O(1) peek/pop |
+| `log of T` | Custom `ImmutableLog<T>` — Okasaki pair-of-stacks | line 302 | O(1) append, O(1) .last, amortized O(1) .first, **O(n) .at(index)** |
+| `log of T by P` | Custom immutable sorted linked list | line 373 | O(1) in-order append, O(n) .at(index) |
+| `bag of T` | `ImmutableDictionary<T, int>` | line 922 | O(log n) all ops |
+| `list of T` | `ImmutableList<T>` (.NET AVL tree) | line 996 | O(log n) insert/remove/index |
+| `queue of T by P` | `SortedDictionary<TPriority, Queue<TElement>>` | line 1074 | Sorted by P, FIFO tiebreak |
+| `lookup of K to V` | `ImmutableDictionary<K, V>` | line 1284 | O(log n) all ops |
+
+**Critical finding:** These are NOT flat arrays. They are persistent immutable data structures chosen for their mutation characteristics (structural sharing across snapshots per `evaluator.md` line 356: "zero-copy promotion"). The evaluator works with `PreceptValue[]` slot arrays where each slot holds a single `PreceptValue` — and for collection fields, that single `PreceptValue` holds a reference to the immutable collection object.
+
+The mini-spec (`runtime-api-public-surface-spec.md`, §13.1, line 935) says "Internally, collection fields store `PreceptValue[]` in slots" — but this is **per-slot**, not per-element. The collection IS the reference inside the PreceptValue at one slot position. The `PreceptList<T>` adapter described in §13.4 wraps a `PreceptValue[]` and projects elements — but this assumes the collection's internal elements are accessible as a contiguous `PreceptValue[]`, which is architecturally dishonest for several backing types.
+
+### The PreceptValue[] Adapter Assumption Is Wrong for Non-Array-Backed Collections
+
+The mini-spec §13 (`runtime-api-public-surface-spec.md`, lines 946–958) shows `PreceptList<T>` wrapping `PreceptValue[]` with index access `_slots[index]`. This is valid ONLY if the collection's internal representation is a flat `PreceptValue[]`. But the design docs specify:
+
+- `ImmutableLog<T>` (Okasaki pair-of-stacks): **No contiguous array.** Elements are in two linked-list stacks. Converting to indexable form requires O(n) traversal.
+- `ImmutableDictionary<T, int>` (bag): **No array.** Hash-trie structure. Elements must be enumerated.
+- `SortedDictionary<TPriority, Queue<TElement>>` (queue by): **No array.** Tree of buckets.
+- `ImmutableList<T>` (.NET): AVL tree with O(log n) indexing — not O(1).
+
+**This means the `PreceptList<T>` lazy adapter wrapping `PreceptValue[]` requires an intermediate materialization step for most collection kinds.** The adapter must either:
+1. Materialize elements into a `PreceptValue[]` at construction time (defeating "lazy" and "zero-allocation"), or
+2. Wrap the native collection object directly and project per-access through the native access path (honest lazy, but O(n) for `.at(index)` on logs, O(log n) for lists, O(n) for bag enumeration).
+
+Either way, the "zero-copy" claim in the v1 analysis was premature. The adapter is still the right pattern — but its cost profile depends on which collection kind it wraps.
+
+---
+
+## Q2 — What Does a CLR Caller Actually Want Per Collection Kind?
+
+### The caller profile: AI agents first, .NET integration second.
+
+Per `runtime-api.md` line 3 (downstream: "Host applications, language server, MCP tools") and the custom instructions ("AI agents are the primary consumers"), the caller profile is:
+
+1. **MCP tools / AI agents** — consume JSON output. They never call `Get<T>()` directly. They receive `precept_inspect` / `precept_fire` JSON output and reason over it. Collection data arrives as JSON arrays. **CLR typed collections are invisible to this consumer class.**
+
+2. **Language server** — internal consumer. Uses `PreceptValue` directly (internal API). CLR typed collections are irrelevant.
+
+3. **.NET host integration** — the actual consumer of `Get<T>()`. This is the developer embedding Precept in a .NET application who writes:
+
+```csharp
+IReadOnlyList<string> tags = version.Get<IReadOnlyList<string>>("Tags");
+```
+
+### What .NET integration callers want:
+
+| Need | `Get<IReadOnlyList<T>>()` | `version["Tags"].EnumerateArray()` |
+|---|---|---|
+| Type safety at call site | ✅ Compiler-checked `T` | ❌ Must deserialize each element |
+| Discoverability | ✅ IntelliSense on `T` | ⚠️ Must know JSON structure |
+| LINQ composability | ✅ `.Where()`, `.Select()`, `.Any()` | ✅ But on `JsonElement`, not `T` |
+| Indexing | ✅ `tags[0]` returns `string` | ⚠️ `el[0].GetString()` |
+| AI agent code generation | ✅ Clear type = clear generated code | ⚠️ Requires JSON navigation knowledge |
+
+**The ergonomic benefit is real for .NET integration callers.** `Get<IReadOnlyList<string>>("Tags")` is meaningfully better than `version["Tags"].EnumerateArray().Select(e => e.GetString())`. The gap widens for compound types: `Get<IReadOnlyList<Money>>("Charges")` vs. manually deserializing each JSON element into a `Money` struct.
+
+**However:** The question isn't whether there's benefit — it's whether the benefit justifies the architectural complexity of typed collection adapters for 9 collection kinds with heterogeneous backing types.
+
+---
+
+## Q3 — Copy Cost Analysis
+
+### Per-collection-kind cost of projecting to IReadOnlyList<T>:
+
+The "lazy adapter" (`PreceptList<T>`) as specified in the mini-spec wraps `PreceptValue[]`. But the backing types specified in `collection-types.md` are NOT `PreceptValue[]`. The adapter must bridge this gap.
+
+| Collection Kind | Backing Type | Index Access Cost | Materialization to Array | Honest Lazy Cost |
+|---|---|---|---|---|
+| `set of T` | Immutable hash set | N/A — unordered | O(n) enumerate → array | O(n) per full enum |
+| `queue of T` | Immutable queue | O(n) to reach index | O(n) enumerate → array | O(n) per indexed access |
+| `stack of T` | Immutable stack | O(n) to reach index | O(n) enumerate → array | O(n) per indexed access |
+| `log of T` | `ImmutableLog<T>` (Okasaki) | **O(n)** `.at(index)` per doc line 302 | O(n) enumerate → array | O(n) per indexed access |
+| `log of T by P` | Sorted linked list | **O(n)** `.at(index)` per doc line 373 | O(n) enumerate → array | O(n) per indexed access |
+| `bag of T` | `ImmutableDictionary<T, int>` | N/A — key-count map | O(n) expand counts → array | O(n) per full enum |
+| `list of T` | `ImmutableList<T>` (AVL) | O(log n) | O(n) enumerate → array | O(log n) per index |
+| `queue of T by P` | `SortedDictionary<P, Queue<T>>` | N/A — tree of buckets | O(n) flatten → array | O(n) per full enum |
+| `lookup of K to V` | `ImmutableDictionary<K, V>` | O(log n) by key | N/A — dictionary, not list | N/A — IReadOnlyDictionary |
+
+### Key finding: The ImmutableLog<T> indexed access problem
+
+The Okasaki pair-of-stacks structure (`collection-types.md`, line 302) is designed for O(1) append, O(1) `.last`, amortized O(1) `.first`. Indexed access `.at(index)` is **O(n)**. This is architecturally intentional — audit logs are append/read-latest structures, not random-access arrays.
+
+Wrapping this in `IReadOnlyList<T>` exposes an indexer (`list[i]`) that callers will reasonably assume is O(1) — because that's the contract `IReadOnlyList<T>` implicitly promises. But the backing structure makes it O(n). A caller iterating via `for (int i = 0; i < log.Count; i++) log[i]` pays O(n²).
+
+**This is a leaky abstraction.** The `IReadOnlyList<T>` interface doesn't formally guarantee O(1) indexing — `ImmutableList<T>` itself implements it with O(log n) — but the overwhelmingly common expectation is near-constant-time indexed access. The Okasaki structure violates this expectation with O(n).
+
+**Mitigation options:**
+1. **Eager materialization on first access** — enumerate to `T[]` once, cache, return O(1) indexing forever. Cost: O(n) + O(n) memory once. Honest and predictable.
+2. **Leave O(n) and document it** — callers who need indexed access use `.ToArray()`. Unsatisfying.
+3. **Dedicated `IReadOnlyLog<T>` without indexer** — only exposes `.First`, `.Last`, `.Count`, `IEnumerable<T>`. Loses `IReadOnlyList<T>` universality.
+
+The practical answer is option 1: the adapter materializes on first access. At Precept's scale (10–50 field collections, typically ≤100 elements per collection), this is sub-microsecond and irrelevant. The "zero-copy" claim was optimistic, but the ACTUAL cost is trivial.
+
+---
+
+## Q4 — JSON-Only Honest Assessment
+
+**If we eliminate CLR typed collection API entirely:**
+
+- `Get<T>()` works for scalars only.
+- Collections are accessed via `version["Tags"]` → `JsonElement` (JSON array), then caller navigates with `EnumerateArray()`.
+
+### Who loses what:
+
+| Consumer | Impact |
+|---|---|
+| **MCP / AI agents** | **Zero impact.** They already consume JSON. The MCP tools serialize to JSON before the agent sees anything. |
+| **Language server** | **Zero impact.** Internal consumer, uses `PreceptValue` directly. |
+| **.NET host integration** | **Material loss.** Code goes from `version.Get<IReadOnlyList<string>>("Tags")` to `version["Tags"].EnumerateArray().Select(e => e.GetString()).ToList()`. Every collection read becomes 3–5 lines of JSON navigation instead of one typed call. |
+| **AI-generated .NET code** | **Degraded quality.** AI generating integration code has a harder time with JSON navigation than typed APIs. More code to generate = more errors. |
+
+### The material loss is real but bounded:
+
+1. **.NET integration callers exist but are secondary.** The primary consumer path is MCP → JSON. The typed lane exists for direct .NET embedding — a real scenario but not the dominant one.
+2. **The complexity eliminated is non-trivial.** Nine collection kinds × heterogeneous backing types × lazy adapter with materialization × `TypeRuntime<T>` collection-aware projection. That's meaningful internal complexity.
+3. **JSON is already there.** Every collection value is already serializable to JSON (via `TypeRuntimeMeta.WriteJson`). The `version["fieldName"]` indexer returns `JsonElement`. The infrastructure exists regardless of whether CLR typed collections ship.
+
+### But:
+
+The two-lane ingress principle (`runtime-api.md`, lines 26–31) explicitly established that the public API speaks TWO value languages: `JsonElement` (raw lane) and `T` via `Get<T>()` (typed lane). Eliminating `Get<T>()` for collections breaks this symmetry. Scalar fields work with `Get<T>()`. Collection fields don't. Callers must mentally context-switch: "scalars use `Get<T>()`, collections use the indexer." This is an API design wart.
+
+The counter-argument: the JSON indexer IS a value-reading lane. The asymmetry is between "typed" and "raw," not between "nothing" and "something." Collections still have a read path — it's just always JSON.
+
+---
+
+## Q5 — Recommendation
+
+### **Option B: IReadOnlyList<T> for most, with honest materialization semantics.**
+
+Option B from the question list — `IReadOnlyList<T>` for all single-type collections, `IReadOnlyList<KeyedElement<T,P>>` for keyed collections, `IReadOnlyDictionary<K,V>` for lookup. The adapter materializes elements on first access (eager-on-first-read, not truly lazy per-index).
+
+This is the recommendation already locked in the mini-spec (`runtime-api-public-surface-spec.md`, §13.5, line 1041: "Resolved. Option A (lazy adapter) is locked") and the collection investigation (`precept-collection-types-investigation.md`, §4.1, line 104: "Locked decision: `IReadOnlyList<T>` for all single-type collections"). My v1 analysis that recommended JSON-only was wrong to override a locked decision based on implementation-absence reasoning.
+
+### Refinement from this analysis — the adapter is not truly "zero-copy lazy per-index"
+
+The v1 analysis and the mini-spec both describe the adapter as wrapping `PreceptValue[]` with per-index projection. This v2 analysis identifies that description as architecturally incomplete for non-array-backed collections. The honest implementation:
+
+**The adapter materializes to an internal `T[]` on first access.** This is:
+- O(n) once, where n is the collection element count.
+- At Precept's scale (typically ≤100 elements), this is sub-microsecond.
+- After materialization, indexing is O(1). `foreach` is O(n). LINQ works naturally.
+- The `ImmutableLog<T>` O(n) `.at(index)` problem disappears — the materialized array provides O(1).
+
+**This is Option A (lazy adapter) from the mini-spec, with the honesty correction that "lazy" means "lazy at the Version level" (constructed on first field read), not "lazy at the element level" (per-index projection from the backing structure).** For backing types that ARE flat arrays of `PreceptValue` (if any collection kind stores elements that way), per-index projection works. For the Okasaki log, the sorted linked list, the bag dictionary, and the priority queue tree — materialization on first access is the honest path.
+
+### Why not D (JSON-only):
+
+1. **Breaks two-lane symmetry.** The runtime-api.md (lines 26–31) establishes `JsonElement` + `Get<T>()` as the two output lanes. Eliminating `Get<T>()` for collections creates an asymmetry the design explicitly avoided.
+2. **.NET integration ergonomics matter.** `Get<IReadOnlyList<Money>>("Charges")` is categorically better than JSON navigation for a .NET embedding caller.
+3. **The complexity is bounded.** The adapter is ~30 lines per type (mini-spec §13.4, line 1029). Three adapter classes total. The nine collection kinds share the same adapter (§13.6).
+4. **Cost is irrelevant at scale.** Sub-microsecond materialization for typical collection sizes.
+
+### Why not A (Full CLR with IReadOnlyList for everything including log):
+
+Option A is what B is — the question framing implies B adds a dedicated `IReadOnlyLog<T>`. I reject the dedicated type. The materialized-on-first-read `IReadOnlyList<T>` adapter handles the Okasaki structure correctly. Adding `IReadOnlyLog<T>` adds public API surface for marginal benefit — the access pattern difference (O(n) `.at()` vs O(1) after materialization) is invisible to the caller behind the standard interface.
+
+### Why not C (Arrays only):
+
+Arrays are mutable. `T[]` can be downcast from `IReadOnlyList<T>` and mutated. `ReadOnlyCollection<T>` wrapping adds an allocation to solve a problem the adapter already solves. No benefit over the adapter pattern.
+
+### Why not E (Hybrid — scalars typed, collections JSON):
+
+Same as D. Breaks two-lane symmetry. Adds cognitive load.
+
+### Tradeoff accepted:
+
+The materialization cost — O(n) per collection field on first read per Version — is the accepted tradeoff. At Precept's scale (10–50 fields, ≤100 elements per collection), this is negligible. If a precept has a 10,000-element log (unusual but possible), the first `Get<IReadOnlyList<string>>("AuditTrail")` materializes 10,000 strings from `ImmutableLog<T>`. This is ~0.1ms. Acceptable.
+
+The more significant tradeoff: the adapter must bridge between the collection's native backing type and a flat indexable representation. The mini-spec's `PreceptList<T>` wrapping `PreceptValue[]` is correct for the INTERFACE but needs an implementation that extracts elements from the native collection object — not from a hypothetical `PreceptValue[]` that doesn't exist for most collection kinds. This is an implementation detail, not an API change.
+
+### Summary of what stays locked vs. what changes:
+
+| Item | Status |
+|---|---|
+| `IReadOnlyList<T>` for 6 single-type collections | **Stays locked** |
+| `IReadOnlyList<KeyedElement<T,P>>` for keyed collections | **Stays locked** |
+| `IReadOnlyDictionary<K,V>` for lookup | **Stays locked** |
+| `PreceptList<T>` adapter pattern | **Stays locked** — but implementation note updated |
+| "Zero-copy per-index projection" claim | **Corrected** — honest model is materialize-on-first-read |
+| JSON-only for collections (v1 recommendation) | **Withdrawn** — reasoning basis was flawed |
+
+---
+
+## Mini-Spec Impact
+
+The mini-spec §13.4 should add an implementation note:
+
+> **Materialization strategy:** For collection kinds backed by non-array structures (`ImmutableLog<T>`, `ImmutableDictionary<T, int>`, sorted linked list, `SortedDictionary<P, Queue<T>>`), the adapter materializes elements into an internal `T[]` on first index access. This is O(n) once per Version per field read. For collection kinds with efficient indexing (`ImmutableList<T>` — O(log n)), per-access projection through the native structure is acceptable. The adapter implementation chooses the appropriate strategy per collection kind based on the backing type's access characteristics.
+
+No public API changes. No new types. No signature changes. The correction is internal implementation guidance only.
+
+# Decision Record: Collection CoW Protocol for Multi-Mutation Events
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-04  
+**Status:** Analysis  
+**Scope:** How the evaluator handles multiple mutations to the same collection slot within one event execution
+
+---
+
+## The Problem
+
+There is nothing in the language to stop you from mutating a collection more than once in an event handler:
+
+```precept
+on OrderPlaced:
+    add item1 to items
+    add item2 to items
+    add item3 to items
+    set status = "active"
+```
+
+With naive per-mutation CoW (each `add` clones the backing array, produces a new one, writes it to the slot), we get:
+- Action 1: clone 0-element array → append → write 1-element array
+- Action 2: clone 1-element array → append → write 2-element array
+- Action 3: clone 2-element array → append → write 3-element array
+
+Three allocations. Two immediately discarded. At small sizes this is noise. At scale (200-entry log being appended to 5 times in one event = 5 allocations × 200 elements = 1000 elements copied, 4 arrays discarded) it compounds.
+
+**The question is not "does this matter for v1?"** — it may or may not. The question is: **does the evaluator's existing architecture already solve this, or do we need a protocol?**
+
+---
+
+## Question 1: Does the Evaluator Already Have a Working-Copy Model?
+
+**YES.** The evaluator absolutely has a working-copy model — but it operates at the **slot array level**, not at the **collection backing array level.**
+
+From `evaluator.md` §6 Working Copy Management:
+
+```
+1. Rent: Rent a PreceptValue[] working copy from ArrayPool<PreceptValue>.Shared
+2. Populate: Copy Version.Slots into the rented array (field slots)
+3. Load args: FiredArgs carries the PreceptValue[] arg slot array
+4. Mutate: Execute action plans against the working copy
+5. Recompute: Walk SlotLayout.ComputedSlots; re-evaluate each computed field
+6. Evaluate: Run constraint plans against the working copy
+7. Commit or discard: If constraints pass, donate the working copy directly as new Version.Slots (zero-copy promotion); if constraints fail, return the array to ArrayPool
+```
+
+**What this means for collections:**
+
+A collection field occupies one slot in the `PreceptValue[]` working copy. That slot holds a `PreceptValue` struct with a reference tag pointing to the collection's backing `PreceptValue[]`. After step 2 (Populate), `workingCopy[slot]` and `version.Slots[slot]` both reference the **SAME backing array** — they're aliased.
+
+The working-copy model gives you **mutation isolation at the slot level** (you can overwrite slot references freely). But collection backing arrays are **values referenced FROM slots** — the slot is mutable, the thing it points to is shared with the committed version.
+
+**Critical architectural observation:** After the FIRST mutation to a collection slot within event execution, the new backing array that gets written to the slot is **UNSHARED.** No committed `Version` references it. It exists only in the working copy. Subsequent mutations to that same slot are operating on a private array.
+
+**This is the key insight.** The evaluator's architecture already creates the conditions for in-place mutation after first clone. It just doesn't exploit them yet.
+
+---
+
+## Question 2: Viable Approaches — Evaluated
+
+### Option A: Per-Mutation CoW (Naive)
+
+**Mechanism:** Each `CollectionActions.AddToSet(backing, count, element)` call allocates a new array. Pure function. Simple.
+
+**Cost model:** N mutations to a slot with K elements = N allocations, total ~N×K element copies, N-1 intermediate arrays discarded.
+
+**Verdict:** Correct but wasteful. The simplicity is attractive but the waste is architecturally unnecessary given the evaluator already creates the conditions for something better.
+
+### Option B: Deferred CoW — Pre-Clone All Collection Slots
+
+**Mechanism:** At the start of event execution, clone ALL collection backing arrays into working copies before any action executes.
+
+**Problem:** Clones collections that are never mutated. If the event has 5 collection fields but only touches 1, you clone 5 arrays for no reason. This is worse than Option A in the common case.
+
+**Verdict: Rejected.** Speculative cloning is wasteful. Clone on demand.
+
+### Option C: First-Mutation-Triggers-Clone (Slot-Level CoW)
+
+**Mechanism:**
+1. On first mutation to a collection slot: detect that backing is still shared (aliased with committed version), clone it into a working array, write working array reference to slot.
+2. On subsequent mutations to the same slot: detect that backing is already private (not aliased), mutate in place — no clone.
+3. On commit: the working array IS the new version's backing (zero-copy promotion, same as the slot array itself).
+
+**Detection mechanism:** After step 2 (Populate), `workingCopy[slot].CollectionRef` and `version.Slots[slot].CollectionRef` point to the same object. After first mutation, they diverge. The evaluator can detect this with `ReferenceEquals(current, original)`.
+
+**Cost model:** N mutations to a slot with K elements = 1 allocation of size K+N (or pooled), 1 copy of K elements, N-1 in-place mutations. Total: 1 allocation, K+N-1 element operations. Versus Option A's N allocations and N×K copies.
+
+**Verdict: This is the correct answer.** It falls naturally out of the evaluator's existing architecture. It requires no protocol bolt-on — just the evaluator being smart about what's already private.
+
+### Option D: Batch Action Analysis at Build Time
+
+**Mechanism:** The Precept Builder detects when multiple actions target the same collection slot within one event row. Batches them: `BatchAdd(slot, [item1, item2, item3])`.
+
+**Problem:** Complicates the Builder. Doesn't generalize to conditional actions (guard-dependent mutations). Requires a new action plan shape. The Builder's job is to encode actions, not optimize them.
+
+**Enhancement opportunity within Option C:** The Builder CAN annotate each row with the maximum number of additions to each collection slot (static analysis of the action plan array). This gives the evaluator a hint for pre-sizing the working array. But this is an optimization on top of Option C, not a replacement.
+
+**Verdict: Rejected as primary mechanism.** Useful as a sizing hint for Option C.
+
+### Option E: Pre-Execution Slot Snapshot with Dirty Tracking
+
+**Mechanism:** Before executing actions, snapshot all slot references. Use a bitmask to track which slots have been mutated. First mutation triggers clone; subsequent mutations go in-place.
+
+**This is just Option C with explicit dirty tracking.** The evaluator already has the "original" snapshot available (it's `version.Slots`), so the bitmask is unnecessary — the `ReferenceEquals` check against the original is sufficient and doesn't require auxiliary state.
+
+**Verdict: Option C subsumes this.** No separate bitmask needed.
+
+---
+
+## Question 3: What the Evaluator Design Doc Actually Specifies
+
+The evaluator doc specifies the working-copy model at the slot-array level in complete detail. It does NOT explicitly address collection backing arrays. The relevant pseudocode:
+
+```csharp
+// 2c. Execute actions
+foreach (var action in row.Actions)
+    ExecuteAction(action, workingCopy, args);
+```
+
+`ExecuteAction` is unspecified at the level of "what happens when you mutate a collection slot." The doc says action plans execute against the working copy. The doc does NOT say whether collection backing arrays are cloned per-mutation or treated as first-clone-then-in-place.
+
+**This is the gap.** The evaluator doc specifies slot-level CoW (clone the slot array, mutate freely, donate on commit) but is silent on the nested CoW question for collection backing arrays within those slots.
+
+**The answer should be: collection backing arrays follow the SAME protocol as the slot array itself.** Clone once (on first mutation), mutate in place during execution, donate on commit. The protocol is fractal — it applies at both levels.
+
+---
+
+## Question 4: Impact on CollectionActions Static Helper Design
+
+### The frank-109 Contract: "Pure Functions: Array In, Array Out"
+
+This was correct for the naive per-mutation model. It assumed each call would produce a fresh array. Under Option C, CollectionActions needs to support **in-place mutation** because after first clone, subsequent mutations should NOT allocate.
+
+### Two Options for the API Shape
+
+**Option C-1: Dual-mode helpers (pure + in-place)**
+
+```csharp
+internal static class CollectionActions
+{
+    // Pure mode: allocates new array (used by evaluator on first mutation when it handles the clone itself)
+    public static PreceptValue[] AddToSet(PreceptValue[] backing, int count, PreceptValue element)
+    { /* clone, insert, return new array */ }
+    
+    // In-place mode: mutates provided array (used on subsequent mutations)
+    public static int AddToSetInPlace(PreceptValue[] backing, int count, PreceptValue element)
+    { /* insert in place, return new count */ }
+}
+```
+
+**Problem:** Two variants of every method. Maintenance burden. The pure variants are only used on first-mutation which the evaluator could handle differently anyway.
+
+**Option C-2: CollectionActions ALWAYS mutates in place. Evaluator owns the clone.**
+
+```csharp
+internal static class CollectionActions
+{
+    /// <summary>
+    /// Inserts element into set backing array in place. Caller guarantees the array
+    /// is a mutable working copy with sufficient capacity.
+    /// Returns the new logical count (unchanged if element was duplicate).
+    /// </summary>
+    public static int AddToSet(Span<PreceptValue> backing, int count, PreceptValue element)
+    { /* binary search, uniqueness check, insert with shift IN PLACE */ return newCount; }
+    
+    public static int Enqueue(Span<PreceptValue> backing, int count, PreceptValue element)
+    { /* write at position count */ return count + 1; }
+    
+    public static int Push(Span<PreceptValue> backing, int count, PreceptValue element)
+    { /* write at position count */ return count + 1; }
+    
+    public static int AppendToLog(Span<PreceptValue> backing, int count, PreceptValue element)
+    { /* write at position count */ return count + 1; }
+    
+    // Pair kinds (stride 2):
+    public static int PutLookup(Span<PreceptValue> backing, int count, PreceptValue key, PreceptValue value)
+    { /* binary search on keys at stride-2, upsert IN PLACE */ return newCount; }
+}
+```
+
+**The evaluator's protocol:**
+
+```csharp
+void ExecuteCollectionAdd(ActionPlan action, PreceptValue[] workingCopy, PreceptValue[] originalSlots, FiredArgs args)
+{
+    ref var slot = ref workingCopy[action.TargetSlot];
+    var backing = slot.GetCollectionBacking();
+    var count = slot.GetCollectionCount();
+    
+    // CoW gate: is this backing still aliased with the committed version?
+    if (ReferenceEquals(backing, originalSlots[action.TargetSlot].GetCollectionBacking()))
+    {
+        // First mutation to this slot — clone into a working array
+        var capacity = count + action.CollectionGrowthHint; // Builder-provided hint
+        var workingArray = ArrayPool<PreceptValue>.Shared.Rent(capacity);
+        backing.AsSpan(0, count).CopyTo(workingArray);
+        backing = workingArray;
+    }
+    else if (count >= backing.Length)
+    {
+        // Subsequent mutation but working array is full — resize
+        var newArray = ArrayPool<PreceptValue>.Shared.Rent(backing.Length * 2);
+        backing.AsSpan(0, count).CopyTo(newArray);
+        ArrayPool<PreceptValue>.Shared.Return(backing);
+        backing = newArray;
+    }
+    
+    // Mutate in place — backing is guaranteed private
+    var element = EvaluatePlan(action.Value!, workingCopy, args);
+    var newCount = CollectionActions.AddToSet(backing.AsSpan(), count, element);
+    
+    // Write updated reference + count back to slot
+    slot = PreceptValue.Collection(backing, newCount);
+}
+```
+
+---
+
+## Recommendation: Option C-2
+
+**CollectionActions always operates in-place on mutable working arrays. The evaluator owns the CoW boundary.**
+
+### Protocol Summary
+
+| Step | Actor | Action |
+|------|-------|--------|
+| First mutation to collection slot | Evaluator | Detects alias via `ReferenceEquals`. Rents working array from pool. Copies existing elements. |
+| All mutations (including first) | CollectionActions | Mutates in-place. Returns new count. Never allocates. |
+| Subsequent mutations to same slot | Evaluator | Detects backing is already private (not aliased). Passes directly to CollectionActions. |
+| Commit (success) | Evaluator | Working array in slot IS the new version's backing. Zero-copy promotion. Array donated to Version. |
+| Discard (constraint failure) | Evaluator | Returns all working collection arrays to pool. |
+| Resize (capacity exceeded) | Evaluator | Rents larger array from pool. Copies. Returns old array to pool. |
+
+### Cost Model
+
+| Scenario | Option A (naive) | Option C-2 (this) |
+|----------|-----------------|-------------------|
+| 3 adds to empty set | 3 allocs, 0+1+2 copies = 3 | 1 alloc (capacity 3+), 0 copies from CoW, 3 in-place writes |
+| 5 appends to 200-entry log | 5 allocs, 200+201+202+203+204 = 1010 copies | 1 alloc (capacity 205), 200 copies, 5 in-place writes |
+| 1 add to set (common case) | 1 alloc, K copies | 1 alloc, K copies (identical — no overhead) |
+
+**For the single-mutation case (the common case), Option C-2 has IDENTICAL cost to Option A.** There is no overhead for the optimization — the `ReferenceEquals` check is a single pointer comparison.
+
+### What This Changes from frank-109
+
+The frank-109 statement was: "Pure functions: array in, array out."
+
+**Refined to:** "In-place functions: mutable span in, updated count out. Evaluator provides the mutable working array and owns the pool lifecycle."
+
+This is not a contradiction — it's a refinement. The spirit of frank-109 was:
+1. ✅ No wrapper types (preserved)
+2. ✅ Evaluator owns pool lifecycle (preserved — strengthened)
+3. ✅ Static helper class (preserved)
+4. ⚠️ "Array in, array out" → "Span in, count out" (refined — better)
+
+The "array in, array out" formulation implied per-call allocation. That was never the architectural intent — it was a simplification that didn't account for multi-mutation events. The architectural intent was: **CollectionActions has no state, no lifecycle, no ownership.** That holds perfectly under C-2.
+
+### ArrayPool Lifecycle — Unambiguous
+
+| Array Type | Who Rents | Who Returns | When |
+|-----------|-----------|-------------|------|
+| Committed version backing | Nobody (donated from previous Fire) | Nobody (GC'd when Version is GC'd) | N/A |
+| Working collection array | Evaluator (on first mutation to slot) | Evaluator (on constraint failure) OR donated to Version (on commit success) | End of row evaluation |
+| Resized collection array | Evaluator (on capacity exceeded) | Old array: Evaluator immediately. New array: same lifecycle as working. | Resize point / end of row |
+
+**There is no ambiguity.** The evaluator is the only actor that touches the pool. CollectionActions never rents, never returns. Clean.
+
+### Builder Enhancement (Optional, Not Required)
+
+The Precept Builder can statically analyze each `ExecutionRow.Actions` array and compute a per-slot growth hint:
+
+```csharp
+// In ExecutionRow (or ActionPlan metadata):
+internal int CollectionGrowthHint; // max number of add operations targeting this slot in this row
+```
+
+This lets the evaluator rent the right-sized array on first mutation without guessing. If 3 adds target slot 7, rent `currentCount + 3`. No resize needed. This is a performance optimization that can ship later — the protocol works without it (just uses a default growth factor).
+
+---
+
+## Rollback Semantics
+
+**What if constraint evaluation fails after collection mutations?**
+
+From `evaluator.md`: "if constraints fail, return the array to `ArrayPool<PreceptValue>.Shared`". This refers to the slot array. The collection working arrays follow the same protocol:
+
+1. Each row evaluation gets its own working copy (§Implementation Note 7: "Each candidate row evaluation must have its own working copy.")
+2. If a row's constraints fail, ALL pool-rented arrays from that row's execution are returned.
+3. The evaluator must track which collection slots were mutated (to know which backing arrays to return). The `ReferenceEquals` check against `originalSlots` already gives this — any slot where the backing differs from the original has a rented array.
+
+**Cleanup on row failure:**
+
+```csharp
+// After constraint failure for a row:
+for (int i = 0; i < workingCopy.Length; i++)
+{
+    if (workingCopy[i].IsCollection &&
+        !ReferenceEquals(workingCopy[i].GetCollectionBacking(), originalSlots[i].GetCollectionBacking()))
+    {
+        ArrayPool<PreceptValue>.Shared.Return(workingCopy[i].GetCollectionBacking());
+    }
+}
+ArrayPool<PreceptValue>.Shared.Return(workingCopy); // return slot array too
+```
+
+---
+
+## What About `remove` Operations?
+
+Removes shrink the collection. Under Option C-2:
+- First remove from a shared backing: clone to working array (same as add), then shift elements left in place. Count decreases.
+- The working array retains its original capacity (it's rented, might be larger than needed). This is fine — the donated array in the committed version may have slack space. The `count` field in the `PreceptValue` tracks logical length.
+- No special handling needed. Same protocol.
+
+---
+
+## What About Inspection Mode?
+
+Inspection runs the same plans as commit (evaluator.md §10). The working copy protocol is identical — inspection needs mutation isolation too (to show hypothetical results). The only difference is disposition: inspection reports the result without committing.
+
+For inspection, working arrays are ALWAYS returned to the pool at the end (nothing is donated to a Version). The cleanup is simpler:
+
+```csharp
+// Inspection cleanup — always return everything:
+ReturnCollectionWorkingArrays(workingCopy, originalSlots);
+ArrayPool<PreceptValue>.Shared.Return(workingCopy);
+```
+
+---
+
+## Summary of Decisions
+
+1. **The evaluator's existing working-copy model creates the conditions for efficient multi-mutation but doesn't explicitly address it.** This decision fills the gap.
+
+2. **Option C-2 wins:** CollectionActions operates in-place on evaluator-provided mutable Spans. The evaluator owns the CoW boundary (first-mutation clone) and pool lifecycle (rent/return/donate).
+
+3. **frank-109 is refined, not broken.** "Array in, array out" becomes "Span in, count out." The architectural principles (no wrappers, no ownership in helpers, evaluator owns lifecycle) are preserved and strengthened.
+
+4. **Single-mutation case has zero overhead.** The `ReferenceEquals` check is a pointer comparison — unmeasurable.
+
+5. **Multi-mutation case goes from O(N×K) copies to O(K) copies + O(N) in-place writes.** For append-heavy events on large collections, this is the difference between "copies the world N times" and "copies the world once."
+
+6. **ArrayPool lifecycle is unambiguous.** One actor (evaluator) rents and returns. No provenance confusion.
+
+---
+
+## Tradeoff Accepted
+
+- **Evaluator action dispatch is slightly more complex** — it must check `ReferenceEquals` before each collection mutation and handle the first-mutation clone. This adds ~5 lines per collection action dispatch path. Accepted because the alternative (N unnecessary allocations) is worse.
+
+- **CollectionActions methods can no longer be tested with truly immutable inputs** — they mutate their Span argument. Accepted because: (a) the methods are still pure in the sense that their behavior depends only on inputs, not on external state; (b) test assertions on the mutated Span are straightforward; (c) the mutation is the correct semantic — we're testing "does this method correctly transform the collection."
+
+- **Collection slot `PreceptValue` must carry a count** alongside the array reference. This was already implied by the pooling model (rented arrays are larger than logical content). The count is not optional — it's part of the collection representation regardless of CoW protocol.
+
+---
+
+## Open Questions for Implementation
+
+1. **Where does `count` live in `PreceptValue`?** If the collection reference is stored in the reference region of the 32-byte struct, is there room for an int32 count alongside it? Or does count live inside the backing array (sentinel/header element)? This is a PreceptValue layout question — adjacent but separate.
+
+2. **Should the evaluator pass `version.Slots` (original) into `ExecuteAction` for the `ReferenceEquals` check?** Currently the Fire pseudocode passes only `workingCopy` and `args`. The original slot array needs to be accessible during action execution. Options: (a) pass as additional parameter; (b) store on the evaluator's stack frame as a local; (c) use a `Span<PreceptValue>` field in a `ref struct ExecutionContext`.
+
+3. **Builder growth hints — when to implement?** The protocol works with a default growth factor (`count + 4` or `count * 2`). Builder annotations are a refinement for later. Don't block implementation on this.
+
+# Decision Record: Collection Types Investigation Doc — Consolidated Patch
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-04  
+**Status:** Applied  
+**Scope:** Patching `docs/working/precept-collection-types-investigation.md` to reflect all locked architectural decisions
+
+---
+
+## What Changed
+
+The canonical collection types investigation doc was extended from a public-API-only document (§1–§10) to a **complete design reference** covering both external API and internal runtime architecture (§1–§15).
+
+### Sections Added
+
+| Section | Content | Source Decision |
+|---------|---------|----------------|
+| §11 — Internal Representation | `PreceptValue[]` for all 9 kinds, stride-1/stride-2 layout, pair ergonomics, obsoleted backing types | frank-106, frank-108 |
+| §12 — Scalability & Lazy-Load | Size safety zones, `log` as only unbounded kind, `ICollectionBacking` future seam | frank-107 |
+| §13 — Collection Action Architecture | `CollectionActions` static helpers, no wrapper types, evaluator owns lifecycle | frank-109 |
+| §14 — CoW Protocol | Option C-2 multi-mutation protocol, span-in/count-out, ReferenceEquals detection, rollback semantics | frank-110 |
+| §15 — CLR Public API Direction | Two-lane symmetry, adapter materialization correction, `IReadOnlyLog<T>` open item | frank-105 |
+
+### Sections Updated
+
+- **Header:** Renamed to "Design Investigation", added decision record references, updated status.
+- **§1 — Scope:** Expanded to cover all sections including internal runtime.
+- **§8 — Lookup internal impl:** Updated from stale "Dictionary<PreceptValue, PreceptValue>" to stride-2 `PreceptValue[]` backing.
+
+### Preserved (no changes)
+
+- §2–§7, §9–§10: Public API investigation content remains intact.
+- Open questions OQ-C1, OQ-C2, OQ-C3: Still marked as awaiting Shane confirmation.
+
+---
+
+## Decisions Consolidated
+
+All 6 decision records (frank-105 through frank-110) are now accurately reflected in one canonical document. The inbox files remain as provenance/rationale records.
+
+# Decision Record: Multi-Dimensional vs Stride-2 for Pair Collections
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-04  
+**Status:** Analysis  
+**Scope:** Internal representation for pair-kind collections (lookup, bag, log by P, queue by P)
+
+---
+
+## The Question
+
+Should pair-kind collections use a stride-2 flat `PreceptValue[]`, or would a multi-dimensional array (`PreceptValue[,]`), jagged array (`PreceptValue[][]`), or struct tuple array (`(PreceptValue, PreceptValue)[]`) be superior?
+
+---
+
+## Prior Decisions (Locked)
+
+- **frank-106:** All 9 collection kinds use `PreceptValue[]` internally. Pair kinds use stride-2 layout.
+- **frank-107:** `PreceptValue[]` is the right v1 choice. Safe up to ~1,000 pair entries. Lazy-load seam preserved via evaluator slot indirection.
+
+This analysis does NOT re-litigate `PreceptValue[]` for single-value kinds. It evaluates whether a different type is warranted for the 4 pair-kind collections specifically.
+
+---
+
+## The Four Alternatives
+
+### Option 1: Stride-2 Flat Array — `PreceptValue[]`
+
+Layout: `[k₀, v₀, k₁, v₁, k₂, v₂, ...]`  
+Access: `array[i * 2]` = key, `array[i * 2 + 1]` = value  
+Logical count: `array.Length / 2`
+
+### Option 2: 2D Rectangular Array — `PreceptValue[,]`
+
+Layout: `array[i, 0]` = key, `array[i, 1]` = value  
+Logical count: `array.GetLength(0)`
+
+### Option 3: Jagged Array — `PreceptValue[][]`
+
+Layout: `array[i][0]` = key, `array[i][1]` = value  
+Each inner array has exactly 2 elements.
+
+### Option 4: Struct Tuple Array — `(PreceptValue Key, PreceptValue Value)[]`
+
+Layout: `array[i].Key`, `array[i].Value`  
+Element type: `ValueTuple<PreceptValue, PreceptValue>` (64 bytes per element)
+
+---
+
+## Criterion-by-Criterion Evaluation
+
+### a. Memory Layout
+
+| Option | Bytes per entry | Heap objects | Cache behavior | GC pressure |
+|--------|----------------|--------------|----------------|-------------|
+| **Stride-2 flat** | 64 (2 × 32B, contiguous) | 1 array | Excellent — sequential scan hits L1 perfectly. Key and value are adjacent in memory. | Minimal — one allocation. |
+| **2D rectangular** | 64 + CLR overhead | 1 array (CLR stores as flat internally) | Good — CLR lays out `[N, 2]` as contiguous `N*2` block with row-major ordering. Essentially same physical layout as stride-2. | Minimal — one allocation. But: multidimensional array access has bounds-check overhead on BOTH dimensions per access. |
+| **Jagged** | 64 + 40B overhead per inner array (24B header + 16B padding/length) | `N + 1` arrays (outer + N inner) | Terrible — each `array[i]` is a pointer chase to a separately-allocated 2-element array scattered across the heap. No spatial locality between entries. | Catastrophic — N+1 heap objects for N entries. For 500 entries: 501 GC-tracked objects. |
+| **Struct tuple** | 64 (ValueTuple<PV,PV> is 64 bytes, laid out contiguously) | 1 array | Excellent — identical physical layout to stride-2. `(PV, PV)` is 64 bytes stored inline. Sequential scan is perfect. | Minimal — one allocation. |
+
+**Winner: Tie between stride-2 and struct tuple.** Both produce identical physical memory layout — 64 contiguous bytes per entry in a single allocation. The 2D array is functionally equivalent in layout but carries per-access overhead from double bounds-checking (the JIT rarely eliminates the inner dimension check). Jagged is catastrophically wrong.
+
+### b. Access Ergonomics for Action Logic
+
+The evaluator's action execution is the primary consumer. Let's see what `AddToCollection`, `RemoveFromCollection`, and binary-search insertion look like for each:
+
+**Stride-2:**
+```csharp
+// Find key in sorted lookup
+int FindKey(PreceptValue[] arr, int count, PreceptValue key)
+{
+    int lo = 0, hi = count - 1;
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) >> 1;
+        int cmp = Compare(arr[mid * 2], key);  // key at even index
+        if (cmp == 0) return mid;
+        if (cmp < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    return ~lo;
+}
+
+// Read pair
+var key = arr[i * 2];
+var val = arr[i * 2 + 1];
+
+// Insert at position (after Array.Copy shift)
+arr[pos * 2] = newKey;
+arr[pos * 2 + 1] = newValue;
+```
+
+**2D rectangular:**
+```csharp
+int FindKey(PreceptValue[,] arr, int count, PreceptValue key)
+{
+    int lo = 0, hi = count - 1;
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) >> 1;
+        int cmp = Compare(arr[mid, 0], key);
+        if (cmp == 0) return mid;
+        if (cmp < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    return ~lo;
+}
+
+var key = arr[i, 0];
+var val = arr[i, 1];
+```
+
+**Struct tuple:**
+```csharp
+int FindKey((PreceptValue Key, PreceptValue Value)[] arr, int count, PreceptValue key)
+{
+    int lo = 0, hi = count - 1;
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) >> 1;
+        int cmp = Compare(arr[mid].Key, key);
+        if (cmp == 0) return mid;
+        if (cmp < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    return ~lo;
+}
+
+var key = arr[i].Key;
+var val = arr[i].Value;
+```
+
+**Ergonomics verdict:**
+- Struct tuple wins readability: `.Key` / `.Value` is self-documenting.
+- 2D array is slightly cleaner than stride-2: `[i, 0]` vs `[i * 2]`.
+- Stride-2 is the least readable but perfectly serviceable — the `* 2` pattern is mechanical and predictable.
+
+**However:** The ergonomics difference is marginal. We're talking about 4 methods in the evaluator's action execution code — not a public API surface. Internal ergonomics at this scale don't justify a type boundary change.
+
+### c. Copy-on-Write Cost
+
+Every mutation produces a new array. The CoW clone is `Array.Copy` + write:
+
+| Option | Clone mechanism | Cost |
+|--------|----------------|------|
+| **Stride-2 flat** | `Array.Copy(src, dest, length)` — single memcpy of `N * 64` bytes | Optimal. One call. Span-compatible. |
+| **2D rectangular** | `Array.Copy` works on multidimensional arrays but treats them as flat. `Buffer.BlockCopy` does NOT work (only primitive types). Must use `Array.Copy(src, dest, src.Length)` treating it as flat. Resizing requires `new PreceptValue[newCount, 2]` + copy. | Slightly worse — can't use `ArrayPool` (see below). Allocation on every mutation. |
+| **Jagged** | Must clone outer array + clone each inner array (or share inner arrays if immutable). With immutable inner arrays, clone is just outer array copy + new inner array for the changed entry. | Complex. Multiple allocations. Not a single memcpy. |
+| **Struct tuple** | `Array.Copy(src, dest, length)` — single memcpy of `N * 64` bytes | Optimal. Identical cost to stride-2. Span-compatible. |
+
+**Winner: Stride-2 and struct tuple tie.** Both are a single `Array.Copy` call. 2D arrays can't use `ArrayPool`. Jagged is worst.
+
+### d. Uniformity with Single-Value Kinds
+
+Single-value collections are `PreceptValue[]`. If pair collections use a different type:
+
+| Option | Type boundary cost |
+|--------|-------------------|
+| **Stride-2 flat** | **Zero.** Same type everywhere. Action logic uses the same `PreceptValue[]` working surface. The `PreceptValue` tag variant holds one reference type regardless of collection kind. Slot read/write is uniform. |
+| **2D rectangular** | **Moderate.** `PreceptValue[,]` is a different CLR type than `PreceptValue[]`. The collection reference in `PreceptValue` must accommodate both. Action logic must dispatch: "is this a 1D or 2D array?" This bifurcates collection handling. |
+| **Jagged** | **Severe.** `PreceptValue[][]` is yet another CLR type. Same dispatch problem, worse allocation profile. |
+| **Struct tuple** | **Moderate.** `(PreceptValue, PreceptValue)[]` is a different CLR type (`ValueTuple<PreceptValue, PreceptValue>[]`). The collection reference must accommodate both. Action logic dispatches on collection kind. |
+
+**This is the decisive criterion.** The evaluator's architecture is built on `PreceptValue` as the universal currency. A collection slot's reference region points to a `PreceptValue[]`. If pair collections use a different type, the reference region must become polymorphic (hold either `PreceptValue[]` or `(PreceptValue, PreceptValue)[]` or `PreceptValue[,]`), or use a common base type (only `Array` or `object` — both require casting on every access).
+
+With stride-2, the slot is always `PreceptValue[]`. The evaluator reads it once, hands it to kind-specific action logic, gets a `PreceptValue[]` back. No type dispatch at the slot layer. The stride is a layout convention within the same type — invisible to everything above action execution.
+
+### e. ArrayPool<T> Compatibility
+
+| Option | ArrayPool compatibility |
+|--------|------------------------|
+| **Stride-2 flat** | `ArrayPool<PreceptValue>.Shared.Rent(count * 2)` — trivially compatible. This is what the evaluator already uses for slot arrays. One pool for all collection operations regardless of kind. |
+| **2D rectangular** | **Incompatible.** `ArrayPool<T>` does not support multidimensional arrays. `ArrayPool<PreceptValue[,]>` does not exist. Every mutation allocates a new `PreceptValue[N, 2]` via `new`. No pooling. |
+| **Jagged** | Outer array: `ArrayPool<PreceptValue[]>.Shared.Rent(N)`. Inner arrays: would need `ArrayPool<PreceptValue>.Shared.Rent(2)` — returning 2-element arrays to a pool is absurd overhead. Effectively unpoolable. |
+| **Struct tuple** | `ArrayPool<ValueTuple<PreceptValue, PreceptValue>>.Shared.Rent(count)` — technically works, but this is a separate pool from the `PreceptValue[]` pool. Two pools means two rental surfaces, two return paths, two pool lifetimes in the evaluator's working-copy management. |
+
+**Winner: Stride-2 flat — decisively.** One pool. One rental surface. Same `ArrayPool<PreceptValue>.Shared` that the evaluator already uses for the slot array working copy. Zero additional infrastructure. The struct tuple technically works but doubles the pool surface for no gain.
+
+### f. Future Migration Cost (ICollectionBacking)
+
+Per frank-107, the future lazy-load path introduces `ICollectionBacking` behind the reference:
+
+```csharp
+internal interface ICollectionBacking
+{
+    PreceptValue[] Materialize();
+    int Count { get; }
+    PreceptValue ElementAt(int index);
+}
+```
+
+| Option | Migration to ICollectionBacking |
+|--------|-------------------------------|
+| **Stride-2 flat** | Trivial. `PreceptValue[]` wraps into an `ArrayBacking` one-liner. The interface's `Materialize()` returns the array as-is. `ElementAt(index)` indexes directly. Pair logic reads `ElementAt(i*2)` and `ElementAt(i*2+1)`. |
+| **2D rectangular** | Awkward. `ICollectionBacking` exposes `PreceptValue[]` (flat) via `Materialize()`. A 2D backing must flatten on materialize, or the interface changes to accommodate 2D. Either way, friction. |
+| **Jagged** | Worst. The interface would need to expose pair semantics explicitly, or jagged backing flattens on materialize. The inner arrays are wasted. |
+| **Struct tuple** | Moderate. `Materialize()` returns `PreceptValue[]` — the tuple array must be unpacked into flat form. Or the interface gains a second method for pair access. Either way, the tuple type doesn't naturally compose with `ICollectionBacking`. |
+
+**Winner: Stride-2 flat.** It's already the natural currency of `ICollectionBacking`. No conversion, no flattening, no secondary interfaces.
+
+---
+
+## Consolidated Scorecard
+
+| Criterion | Stride-2 Flat | 2D Rectangular | Jagged | Struct Tuple |
+|-----------|:---:|:---:|:---:|:---:|
+| Memory layout | ★★★ | ★★½ | ★ | ★★★ |
+| Access ergonomics | ★★ | ★★½ | ★★½ | ★★★ |
+| Copy-on-write cost | ★★★ | ★★ | ★ | ★★★ |
+| Uniformity | ★★★ | ★½ | ★ | ★★ |
+| ArrayPool compatibility | ★★★ | ☆ | ☆ | ★★ |
+| Future migration | ★★★ | ★½ | ★ | ★★ |
+| **Total** | **17/18** | **10/18** | **5.5/18** | **15/18** |
+
+---
+
+## Verdict
+
+### Recommendation: Stride-2 Flat `PreceptValue[]`
+
+The stride-2 flat array wins on 4 of 6 criteria (ties on memory layout), loses only on access ergonomics — and that loss is marginal (`.Key` vs `[i*2]` in 4 internal methods).
+
+The deciding factors are:
+
+1. **Uniformity is non-negotiable.** The evaluator's entire architecture is `PreceptValue` in, `PreceptValue` out. Collections are `PreceptValue[]` behind a slot reference. Introducing a second type fractures this — it adds a dispatch boundary where none exists today. The stride-2 convention is invisible above the action execution layer. A different CLR type is visible to every consumer of the collection reference.
+
+2. **ArrayPool compatibility is non-negotiable.** The evaluator rents and returns `PreceptValue[]` from one pool. Stride-2 uses this pool directly. Every alternative requires either a second pool or abandons pooling entirely. Abandoning pooling for pair collections means GC allocation on every mutation of every lookup/bag/log-by-P/queue-by-P field. That's unacceptable.
+
+3. **The ergonomics cost is contained.** The `* 2` indexing pattern lives in exactly 4 kind-specific action methods: lookup put/remove, bag add/remove, log-by-P append, queue-by-P enqueue/dequeue. These methods are 10–20 lines each. The ergonomics cost is a single multiplication in a binary search loop and a pair of indexed reads/writes. This is not a public API; it's internal machinery. Clarity is achieved via local helper methods or a `ref` accessor:
+
+```csharp
+// Contained ergonomics pattern — used inside action methods only
+static ref PreceptValue Key(PreceptValue[] arr, int logicalIndex) => ref arr[logicalIndex * 2];
+static ref PreceptValue Val(PreceptValue[] arr, int logicalIndex) => ref arr[logicalIndex * 2 + 1];
+```
+
+This gives the readability of `.Key`/`.Value` without changing the backing type.
+
+### Does This Change Single-Value Kinds?
+
+**No.** Single-value kinds were never in question. They're `PreceptValue[]` with stride 1. This analysis confirms that pair kinds are also `PreceptValue[]` with stride 2. Same type, different convention.
+
+### Should Single-Value and Pair Kinds Use Different Backing Types?
+
+**No.** Uniformity wins. The architectural cost of type bifurcation (polymorphic references, dual pools, dispatch at the slot layer, interface changes for future `ICollectionBacking`) vastly exceeds the ergonomics benefit of named fields.
+
+The struct tuple is the only alternative with competitive performance characteristics. But it fails on uniformity and pool compatibility — both of which are structural costs that permeate the evaluator's working-copy lifecycle, not isolated implementation details.
+
+---
+
+## Tradeoff Accepted
+
+- **Stride-2 indexing is less readable than `.Key`/`.Value`.** Accepted because: (a) it's contained to 4 internal methods, (b) `ref` helper accessors mitigate it, (c) the uniformity and pool benefits are architectural wins that compound across the entire evaluation pipeline.
+
+## Alternatives Rejected
+
+| Alternative | Reason for rejection |
+|-------------|---------------------|
+| `PreceptValue[,]` | No ArrayPool support. Double bounds-check overhead. Breaks type uniformity. No compensating advantage. |
+| `PreceptValue[][]` | N+1 heap allocations per collection. Catastrophic GC pressure. No spatial locality. No pooling. Dead on arrival. |
+| `(PreceptValue, PreceptValue)[]` | Competitive on perf, but introduces a second CLR type, a second pool, and a dispatch boundary at the slot layer. The ergonomics win doesn't justify the architectural cost for 4 internal methods. |
+
+---
+
+## Final Position
+
+The frank-106 decision stands unmodified. All 9 collection kinds use `PreceptValue[]`:
+- Single-value kinds: stride 1
+- Pair kinds: stride 2
+- The stride is a kind-specific layout convention, not a type boundary
+- Helper ref-accessors (`Key(arr, i)`, `Val(arr, i)`) provide ergonomic parity without type pollution
+
+# Decision Record: Collection Scalability and Lazy-Load Extensibility
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-04  
+**Status:** Analysis  
+**Scope:** Forward-looking extensibility assessment of `PreceptValue[]` as internal collection representation
+
+---
+
+## Q1: Lazy-Load Extensibility
+
+### Short answer
+
+`PreceptValue[]` does NOT lock us in. It's the correct v1 choice, and it leaves an upgrade seam that requires zero evaluator changes to exploit later.
+
+### The extensibility argument
+
+The evaluator never sees `PreceptValue[]` directly as "the collection." It sees a `PreceptValue` in a slot — a 32-byte tagged struct whose reference region points to the element storage. The evaluator's contract is:
+
+1. Read a collection reference from a slot.
+2. Hand it to kind-specific action logic.
+3. Receive a new collection reference back.
+4. Write it to the slot.
+
+This is already an **indirection boundary.** The evaluator doesn't index into the array itself — action execution logic does. That action logic is the only consumer of the raw `PreceptValue[]`.
+
+### What would change for lazy iteration
+
+If Precept v2+ needs lazy/streaming collection semantics (e.g., a log backed by an external append store, or a set fed by a query cursor), the change surface is:
+
+| Layer | Change required |
+|-------|----------------|
+| `PreceptValue` tag | Add a tag variant (or repurpose the existing collection reference) to hold a **lazy collection handle** — an `IPreceptCollectionSource` or equivalent |
+| Collection action logic | Already kind-specific methods. They'd gain an overload path: "if backing is lazy, materialize the needed window" |
+| Accessors (`.count`, `.peek`, `.min`) | These already go through kind-specific accessor evaluation. Lazy versions would call the source. |
+| Evaluator opcode loop | **No change.** It reads/writes `PreceptValue` slots. It doesn't know what's behind the reference. |
+| Version snapshot semantics | Lazy collections would need a **materialization-on-commit** rule: before the version is frozen, any lazy collection that was mutated during the event must resolve to a concrete `PreceptValue[]`. This preserves the immutability guarantee. |
+
+### Is `PreceptValue[]` a dead end or extension point?
+
+**Extension point.** The concrete type behind the collection slot's reference region is a private implementation detail. Today it's `PreceptValue[]`. Tomorrow it could be:
+
+- `PreceptValue[]` (materialized, as today)
+- A `LazyCollectionHandle` that wraps a cursor/stream and materializes on first write or on commit
+- A `SharedCollectionSegment` that uses structural sharing for large append-only logs
+
+None of these require changing the evaluator's opcode loop, the slot addressing model, or the `PreceptValue` struct size (32 bytes). They all live behind the reference region's pointer.
+
+### Could `IPreceptCollection` be introduced later?
+
+Yes — but it's **not needed now** and would be premature abstraction. The correct future pattern is:
+
+```csharp
+// v1: reference region points to PreceptValue[]
+// v2: reference region points to ICollectionBacking
+internal interface ICollectionBacking
+{
+    PreceptValue[] Materialize();        // force full array (for commit)
+    int Count { get; }                   // cheap for both lazy and eager
+    PreceptValue ElementAt(int index);   // lazy window access
+}
+
+// PreceptValue[] trivially implements this (or is wrapped by a one-line struct)
+```
+
+This interface can be introduced **without breaking any evaluator code** because the evaluator never touches the backing directly — only action execution logic does. Action logic is already factored per-kind. Adding an interface there is a local refactor, not a systemic change.
+
+### v1 decision that preserves optionality
+
+**Ship `PreceptValue[]` as the concrete backing. Do not introduce an interface or abstraction layer now.**
+
+The optionality is already preserved by the evaluator's architecture:
+- The evaluator is slot-blind (reads/writes `PreceptValue` — doesn't know what's inside)
+- Action logic is kind-specific (already factored for per-kind overloads)
+- The reference region is a pointer (can point to anything without changing the struct layout)
+
+Adding an interface now would be a premature abstraction tax on every collection operation for a use case that may never materialize. The architecture already has the seam. Don't pay for the seam until you use it.
+
+### Verdict
+
+`PreceptValue[]` is the right permanent answer for v1, and it's not a dead end. The upgrade path to lazy/streaming collections is:
+1. Introduce `ICollectionBacking` behind the reference
+2. Modify kind-specific action methods to dispatch on backing type
+3. Add materialize-on-commit semantics
+
+None of this touches the evaluator, the opcode loop, the slot model, or the public API. The seam exists. Don't cut it open prematurely.
+
+---
+
+## Q2: Size Thresholds
+
+### PreceptValue size baseline
+
+`PreceptValue` = 32 bytes (locked architectural decision).
+
+For pair collections (stride-2): each logical entry = 64 bytes.
+
+### Copy-on-write cost model
+
+Every mutation produces a new `PreceptValue[]`:
+- Allocation: `ArrayPool<PreceptValue>.Shared.Rent(n)` — near-zero for pool hits
+- Copy: `Array.Copy` of `n * 32` bytes — one memcpy
+- At 1,000 elements (single-value): 32 KB copied per mutation
+- At 1,000 entries (pair): 64 KB copied per mutation
+
+Modern hardware memcpy throughput: ~20 GB/s. So 32 KB = ~1.6 μs. 320 KB = ~16 μs.
+
+### Per-Kind Threshold Table
+
+| Kind | Typical | Large | Pathological | COW Pain Threshold | Why that threshold | Mitigation |
+|------|---------|-------|--------------|--------------------|--------------------|------------|
+| **set of T** | 3–15 | 50 | 200 | ~500 elements (16 KB) | Sets are mutated frequently (add/remove per event). High mutation frequency × array size = cumulative cost. But 500 is already unrealistic for a business-domain set. | `maxcount` constraint. If >200 is needed, it's a design smell — use a lookup or external store. |
+| **queue of T** | 5–30 | 100 | 500 | ~1,000 elements (32 KB) | Queue mutations are O(1) in concept (enqueue=append, dequeue=shift). Dequeue is the expensive one — creates a new array shifted by 1. But queues drain: they don't grow unbounded if events fire. | `maxcount` constraint. Priority queue (`queue by P`) is the better model for large queues. |
+| **stack of T** | 3–10 | 30 | 100 | ~500 elements (16 KB) | Push=append (cheap), pop=truncate (new array minus 1). Stack depth >100 is pathological in any business domain. | `maxcount` constraint. Stacks model nesting depth — 100 levels of nesting is absurd. |
+| **log of T** | 5–50 | 200 | **10,000+** | ~2,000 elements (64 KB) | **This is the dangerous one.** Logs are append-only, never pruned. An entity with a long lifecycle accumulates entries. Each append copies the entire log. At 10K entries, that's 320 KB per event. | **`maxcount` is mandatory guidance for logs.** Without it, logs grow without bound. At 2K entries, recommend archival pattern (snapshot + external store). The DSL should encourage `maxcount` on logs via a lint/warning. |
+| **log of T by P** | 5–50 | 200 | **10,000+** | ~1,000 entries (64 KB, stride-2) | Same append-only growth risk as `log of T`, plus sorted insertion (binary search + shift). Each entry is 64 bytes. At 1K entries the insertion shift becomes noticeable. | Same as `log of T`: `maxcount` mandatory. Sorted insertion adds an additional O(n) shift cost beyond the copy. |
+| **bag of T** | 3–20 | 50 | 200 | ~500 entries (32 KB, stride-2) | Bags are add/remove with count tracking. Real-world bags (shopping carts, inventory categories) are small. Frequency counters with >200 distinct elements should be external. | `maxcount` constraint. Domain smell if >50 distinct elements. |
+| **list of T** | 3–15 | 50 | 200 | ~500 elements (16 KB) | Lists support `insert at N` — this is an O(n) splice even with the flat array. At 500 elements, insertion at position 0 shifts 16 KB. But lists model ordered steps (approval chains) — 200 is absurd. | `maxcount` constraint. Lists >50 are a design smell. |
+| **queue of T by P** | 5–30 | 100 | 500 | ~500 entries (32 KB, stride-2) | Priority queues have sorted insertion (binary search + shift on enqueue) plus dequeue from front. Both operations are O(n) on the flat array. At 500 entries the sorted insertion matters. | `maxcount` constraint. Large priority queues (>500) should be external systems, not Precept fields. |
+| **lookup of K to V** | 5–30 | 100 | 500 | ~500 entries (32 KB, stride-2) | Lookups have put (insert/replace) and remove. Put on a sorted-key array is binary search + shift. Remove is shift. At 500 entries, the shift cost is 32 KB. | `maxcount` constraint. Lookups >100 entries are config tables that belong in external stores. |
+
+### The Dangerous Kinds (Unbounded Growth Risk)
+
+**`log of T` and `log of T by P`** are the only kinds with structurally unbounded growth. Every other kind has natural drainage (queue/stack dequeue/pop), replacement semantics (set add/remove, lookup put), or explicit user intent to bound (list, bag).
+
+Logs are append-only by design. A Precept modeling a loan lifecycle might accumulate 50–200 audit entries over its lifetime. A Precept modeling a long-lived case (insurance claim, legal matter) could accumulate 2,000+ entries over years.
+
+### Memory Cost Summary
+
+| Element Count | Single-value (32B each) | Pair (64B each) | COW per-mutation cost |
+|---------------|------------------------|-----------------|----------------------|
+| 10 | 320 B | 640 B | Negligible |
+| 50 | 1.6 KB | 3.2 KB | Negligible |
+| 100 | 3.2 KB | 6.4 KB | Negligible |
+| 500 | 16 KB | 32 KB | ~0.8 μs / ~1.6 μs |
+| 1,000 | 32 KB | 64 KB | ~1.6 μs / ~3.2 μs |
+| 5,000 | 160 KB | 320 KB | ~8 μs / ~16 μs |
+| 10,000 | 320 KB | 640 KB | ~16 μs / ~32 μs |
+
+### When Should the Team Worry?
+
+| Threshold | Response |
+|-----------|----------|
+| **<100 elements** | Don't think about it. This is noise. |
+| **100–500 elements** | Fine. Well within acceptable bounds. No action needed. |
+| **500–2,000 elements** | Acceptable but notable. `maxcount` should be documented as best practice. Lint warning if a log has no `maxcount`. |
+| **2,000–5,000 elements** | Yellow zone. The per-event copy cost is 64–160 KB. Not catastrophic, but starting to dominate the evaluator's memory budget (vs. the ~4.5 KB baseline for slot copies). |
+| **5,000–10,000 elements** | Orange zone. 160–320 KB per mutation. At high event throughput (100+ events/sec on the same entity), this becomes GC pressure. But: what entity receives 100 events/sec AND has a 10K-element log? |
+| **>10,000 elements** | Red zone. Design smell. This entity needs archival, snapshotting, or external log storage. `maxcount` should enforce a ceiling. |
+
+### Recommended Mitigations (If Thresholds Are Breached)
+
+1. **`maxcount` enforcement** — The language already supports `maxcount N` constraints on collections. For logs, this should be strongly recommended (perhaps a configurable lint warning for logs without `maxcount`).
+
+2. **Log rotation pattern** — A DSL-level pattern where a log at capacity triggers a "rotate" event that archives the tail and resets. This keeps the hot array bounded while preserving history externally.
+
+3. **Future: Structural sharing for append-only kinds** — If logs routinely hit 5K+ elements AND the team decides this is a legitimate use case (not a design smell), a future optimization could use a chunked append-only structure (array of arrays, tail-append new chunk) instead of copying the entire log. This would be invisible to the evaluator — it's behind the collection reference.
+
+4. **Future: Lazy backing for external sources** — Per Q1 analysis, the architecture already has the seam. If a log needs to be backed by an external append store, introduce `ICollectionBacking` and materialize only on accessor calls.
+
+---
+
+## Summary
+
+| Question | Answer |
+|----------|--------|
+| Does `PreceptValue[]` lock us in for lazy loading? | **No.** The evaluator's slot indirection already provides the extensibility seam. |
+| Is there a v1 decision to preserve optionality? | **Ship `PreceptValue[]` with no abstraction layer.** The seam exists architecturally. Don't cut it open prematurely. |
+| At what size does COW become problematic? | **~2,000 elements for single-value kinds, ~1,000 entries for pair kinds.** Below this: don't think about it. Above this: `maxcount` or archival. |
+| Which kinds are dangerous? | **`log of T` and `log of T by P`** — append-only, never pruned. All other kinds have natural drainage or bounded semantics. |
+| What's the mitigation? | **`maxcount` as mandatory best practice for logs.** Lint warning if omitted. Archival patterns for long-lived entities. Structural sharing or lazy backing deferred to vFuture if needed. |
+
+# Decision: Collection Types Public API Surface
+
+**By:** Frank  
+**Date:** 2026-05-04T14:00:14.809-04:00  
+**Status:** Recommendation — awaiting Shane confirmation on OQ-C1/C2/C3  
+**Source:** `docs/working/precept-collection-types-investigation.md`
+
+## Locked Recommendations
+
+1. **Single-type collections** (`set`, `queue`, `stack`, `bag`, `list`, `log`) → `IReadOnlyList<TElement>`. One CLR type for all six. No per-kind differentiation at the CLR level.
+
+2. **Keyed collections** (`log of T by P`, `queue of T by P`) → `IReadOnlyList<KeyedElement<TValue, TKey>>`. New public struct `KeyedElement<TValue, TKey>` (readonly record struct with `.Value` and `.Key` fields).
+
+3. **Lookup (map)** (`lookup of K to V`) → `IReadOnlyDictionary<TKey, TValue>`. Standard BCL dictionary interface.
+
+4. **No nested collections.** Grammar enforces scalar element types only — no `list of list of T`.
+
+5. **Collections are never null.** Empty collection = `Count == 0`. No null elements. No nullable return from `Get<T>()` for collection fields.
+
+6. **Internal adapter pattern confirmed.** `PreceptList<T> : IReadOnlyList<T>` and `PreceptLookup<K, V> : IReadOnlyDictionary<K, V>` — both internal, lazy-projecting, zero-allocation on access.
+
+## Open for Shane
+
+- **OQ-C1:** Bag as `IReadOnlyList<T>` (duplicates appear) vs frequency-aware surface?
+- **OQ-C2:** `KeyedElement` naming confirmed?
+- **OQ-C3:** Direction modifier lives on `FieldDescriptor` only (not CLR type)?
+
+## Mini-spec Impact
+
+§3.4 table: expand from 1 collection row to 3 rows (single-type, keyed, lookup).
+§13: add `KeyedElement<,>` and `PreceptLookup<K,V>` definitions.
+§4.2: add descriptor-build-time wrapping logic for the three collection shapes.
+
+# Decision Record: Custom Collection Wrapper Types
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-04  
+**Status:** Analysis  
+**Scope:** Whether to build wrapper types encapsulating PreceptValue[] + kind semantics
+
+---
+
+## The Question
+
+Should the evaluator's collection mutation logic live in dedicated wrapper classes (`PreceptSet`, `PreceptPriorityQueue`, etc.) that own the `PreceptValue[]` backing and expose immutable-return-pattern methods? Or should it remain as static helper methods (free functions) called directly by the evaluator's action dispatch?
+
+---
+
+## Verdict: Option A — Static Helper Methods, No Wrapper Types
+
+**Do not build wrapper types.** Collection mutation logic lives as static methods in a companion class (e.g., `CollectionActions`), called directly by the evaluator's action dispatch. No class instances, no lifecycle ownership, no type boundary between the evaluator and the backing array.
+
+---
+
+## Dimension-by-Dimension Analysis
+
+### a. Separation of Concerns
+
+Frank-106 already settled this conclusively:
+
+> "Collection KIND semantics are language semantics — they belong in the evaluator (the language executor), not in the data structure. The data structure is dumb storage. The evaluator is the intelligence."
+
+This is not an accident — it's a direct consequence of the evaluator's design identity. From `evaluator.md`:
+
+> "The evaluator is to execution what the parser is to syntax — it mechanically applies prebuilt structures without semantic interpretation."
+
+The "semantic interpretation" for collections IS the mutation logic — uniqueness enforcement, ordering maintenance, append-only invariants. This logic is encoded into the action plans at build time and executed by the evaluator. Moving it into wrapper types would split the evaluator's execution responsibility across two locations: the evaluator for scalar mutations, and wrapper types for collection mutations. That's not separation of concerns — it's fragmentation of a single concern.
+
+**Verdict: Option A wins.** The evaluator owns all mutation execution. Static helpers are organizational convenience within that single responsibility.
+
+### b. Consistency with Catalog-Driven Architecture
+
+Collection kind semantics ARE specified in catalog metadata. The Precept Builder reads this metadata and builds `ActionPlan` structures that encode which operation to perform. At execution time, the evaluator dispatches to `AddToCollection(collection, element, action.Kind)`.
+
+The question is: does `action.Kind` dispatch to a wrapper type's method, or to a static helper?
+
+Answer: **Static helper.** The catalog tells the builder which action to wire. The builder produces a plan that identifies the target slot and the operation. The evaluator reads the plan and calls the operation. Adding a wrapper type between the plan and the array is a gratuitous intermediate — the evaluator already knows the kind (it's in the `ActionPlan`), and the array is already in the slot. There's nothing for a wrapper to discover, resolve, or dispatch that the evaluator doesn't already know.
+
+Wrapper types would be **behavioral clones of catalog-specified semantics hardcoded into C# classes** — exactly the kind of domain knowledge leaking into parallel implementation that the catalog architecture prohibits. The catalog says "set enforces uniqueness." The evaluator's static helper implements that. A `PreceptSet` class also implements that — but now you have two representations of the same language rule.
+
+### c. The Immutability Contract
+
+Option B's pattern: `var newSet = oldSet.Add(element)` — returning a new instance.
+
+This is idiomatic C# for immutable collections (`ImmutableList<T>.Add()` returns a new list). But Precept's model is fundamentally different from `System.Collections.Immutable`:
+
+1. **No structural sharing.** `ImmutableList<T>` returns new instances cheaply because it shares tree nodes. Precept copies the whole array. The new instance would just wrap a freshly-copied `PreceptValue[]`. The wrapper adds nothing — it's an envelope around a new array.
+
+2. **The evaluator's natural currency is `PreceptValue[]` in a slot.** The evaluator reads `slots[action.TargetSlot]` → gets a `PreceptValue` holding a reference to a `PreceptValue[]`. After mutation, it writes the new `PreceptValue[]` reference back to the slot. If wrapper types exist, the evaluator must: extract backing → construct wrapper → call method → extract new backing → write to slot. That's wrap-call-unwrap overhead for every collection mutation. The static helper just takes the array and returns a new array.
+
+3. **Class allocation pressure.** If `PreceptSet` is a `class`, every mutation allocates a new heap object that lives for one statement — it's constructed, its backing is extracted, and it's immediately eligible for GC. If it's a `struct`, it copies the array reference (fine) but then you can't use interfaces on it without boxing, which kills the `ICollectionBacking` migration path.
+
+**Verdict: Option A wins.** The natural shape is `static PreceptValue[] AddToSet(PreceptValue[] backing, PreceptValue element)` — pure function, no allocation, no wrapper lifecycle.
+
+### d. ArrayPool Compatibility
+
+This is the kill shot for Option B.
+
+The evaluator's CoW protocol for collection arrays:
+1. Rent a new `PreceptValue[]` from `ArrayPool<PreceptValue>.Shared.Rent(newSize)`
+2. Copy existing elements into it
+3. Apply the mutation (insert/remove/append)
+4. Write the new array reference into the slot
+5. The old array is returned to the pool (if it was rented) or abandoned (if it was the initial committed array)
+
+**Who owns the pool lifecycle?** The evaluator does — it knows when an array transitions from "working copy" to "committed version" and when it can be returned. This lifecycle awareness is part of the evaluator's fire/commit protocol.
+
+If wrapper types own the backing:
+- **Construction**: Must they rent from the pool? Or accept a pre-rented array?
+- **Method return**: `new PreceptSet(newBacking)` — who rented `newBacking`? The wrapper? The caller?
+- **Destruction**: When the old wrapper is abandoned after mutation, does it return its backing to the pool? What if the backing was donated from the slot (committed version — NOT rented, must NOT be returned)?
+
+This creates a **dual-lifecycle nightmare.** Some `PreceptValue[]` arrays are pool-rented working copies; others are committed version arrays that were promoted (donated) and must never be returned. The evaluator knows which is which (working-copy management is its core protocol). A wrapper type does NOT know — it just holds a reference. It cannot safely return the array to the pool without knowing the array's provenance.
+
+Solutions:
+- Add a `bool isRented` flag to the wrapper → now it's not a simple wrapper, it's lifecycle machinery
+- Never let wrappers manage the pool → then what does the wrapper own? Just a reference and some methods. That's a static helper with extra steps.
+
+**Verdict: Option A wins decisively.** Pool lifecycle stays in the evaluator where provenance is tracked. Static helpers operate on arrays without owning them.
+
+### e. Evaluator Complexity
+
+Current shape (from `evaluator.md`):
+
+```csharp
+case ActionSyntaxShape.CollectionValue:
+    var element = EvaluatePlan(action.Value!, slots, args);
+    var collection = slots[action.TargetSlot];
+    AddToCollection(collection, element, action.Kind);
+    break;
+```
+
+With Option B wrappers:
+
+```csharp
+case ActionSyntaxShape.CollectionValue:
+    var element = EvaluatePlan(action.Value!, slots, args);
+    var backing = slots[action.TargetSlot].GetCollectionBacking();
+    var wrapper = WrapCollection(backing, action.Kind); // factory dispatch
+    var newWrapper = wrapper.Add(element);              // polymorphic call
+    slots[action.TargetSlot] = PreceptValue.Collection(newWrapper.Backing);
+    break;
+```
+
+This is MORE complex. It adds:
+- A factory method to construct the right wrapper type from kind
+- A polymorphic call (virtual dispatch or interface) where a static dispatch sufficed
+- An extraction step to get the backing back out
+- Two additional local variables
+
+The static helper version:
+
+```csharp
+case ActionSyntaxShape.CollectionValue:
+    var element = EvaluatePlan(action.Value!, slots, args);
+    ref var slot = ref slots[action.TargetSlot];
+    slot = CollectionActions.Add(slot, element, action.Kind);
+    break;
+```
+
+**Verdict: Option A wins.** Fewer lines, no wrapper construction/extraction, no polymorphic dispatch. The evaluator stays minimal.
+
+### f. Testability
+
+Can static helpers be tested independently? **Yes, trivially.**
+
+```csharp
+[Fact]
+public void AddToSet_EnforcesUniqueness()
+{
+    var backing = new PreceptValue[] { PV(1), PV(3), PV(5) };
+    var result = CollectionActions.AddToSet(backing, PV(3));
+    result.Should().BeEquivalentTo(backing); // no change — already present
+}
+
+[Fact]
+public void EnqueueByPriority_MaintainsSortOrder()
+{
+    var backing = new PreceptValue[] { PV("a"), PV(1), PV("b"), PV(3) }; // stride-2
+    var result = CollectionActions.EnqueueByPriority(backing, PV("c"), PV(2));
+    // result should be: [a,1, c,2, b,3]
+}
+```
+
+Static pure functions are the **most testable shape possible.** They have no state, no construction, no lifecycle. Input array → output array. Every invariant (uniqueness, ordering, append-only, key integrity) is testable in isolation without constructing any wrapper instance, evaluator, or execution context.
+
+Wrapper types offer no testability advantage. They offer the same tests with extra construction boilerplate.
+
+**Verdict: Tie, but Option A has marginally less ceremony.**
+
+### g. Stride-2 Ergonomics
+
+Frank-108's `ref` helper pattern:
+
+```csharp
+static ref PreceptValue Key(PreceptValue[] arr, int i) => ref arr[i * 2];
+static ref PreceptValue Val(PreceptValue[] arr, int i) => ref arr[i * 2 + 1];
+```
+
+With a wrapper type:
+
+```csharp
+public PreceptValue Key(int i) => _backing[i * 2];
+public PreceptValue Val(int i) => _backing[i * 2 + 1];
+```
+
+The difference: `Key(arr, i)` vs `wrapper.Key(i)`. One parameter saved. The internal implementation is identical. The `ref` return (allowing in-place write) actually works BETTER with the static pattern because the wrapper would need `ref` returns on an instance method — possible but unusual.
+
+**Verdict: Marginal.** Not enough to justify a type boundary. The static `ref` helpers are already the right solution.
+
+### h. Future ICollectionBacking Migration
+
+Frank-107's upgrade path:
+
+```csharp
+internal interface ICollectionBacking
+{
+    PreceptValue[] Materialize();
+    int Count { get; }
+    PreceptValue ElementAt(int index);
+}
+```
+
+With Option A (static helpers on `PreceptValue[]`):
+- Migration: action methods gain an overload path: `if (backing is ICollectionBacking lazy) { /* materialize or window */ } else { /* direct array access */ }`
+- Or: `PreceptValue[]` is wrapped in a trivial `ArrayBacking : ICollectionBacking`. Action methods take `ICollectionBacking` instead of raw arrays.
+- Change surface: the static helper signatures. Clean, local refactor.
+
+With Option B (wrapper types):
+- Migration: wrapper types become intermediate types that sit between the evaluator and `ICollectionBacking`. The evaluator constructs a wrapper, the wrapper holds `ICollectionBacking` instead of `PreceptValue[]`. But now the wrapper is just forwarding to the interface — it's a passthrough layer. Why have both `PreceptSet` and `ICollectionBacking`? Either the wrapper IS the backing (then it's the interface implementation, not a wrapper), or it WRAPS the backing (gratuitous indirection).
+- Wrapper types would need to be refactored into or eliminated in favor of `ICollectionBacking` — they become technical debt the moment the interface arrives.
+
+**Verdict: Option A wins.** Static helpers migrate cleanly to `ICollectionBacking` parameter types with no intermediate types to eliminate.
+
+---
+
+## Consolidated Scorecard
+
+| Dimension | Option A (Static Helpers) | Option B (Wrapper Classes) | Option C (Ref Struct Views) |
+|-----------|:---:|:---:|:---:|
+| Separation of concerns | ★★★ | ★★ | ★★½ |
+| Catalog consistency | ★★★ | ★½ | ★★½ |
+| Immutability fit | ★★★ | ★★ | ★★½ |
+| ArrayPool compatibility | ★★★ | ★ | ★★½ |
+| Evaluator complexity | ★★★ | ★½ | ★★ |
+| Testability | ★★★ | ★★★ | ★★ |
+| Stride-2 ergonomics | ★★½ | ★★★ | ★★★ |
+| ICollectionBacking migration | ★★★ | ★½ | ★★ |
+| **Total** | **23.5/24** | **15.5/24** | **19/24** |
+
+---
+
+## The Correct Shape
+
+```csharp
+/// <summary>
+/// Pure static helpers for collection mutation. Each method takes the current
+/// backing array + arguments, returns a new backing array (CoW). The evaluator
+/// owns the array lifecycle (pool rent/return). These methods own the kind semantics.
+/// </summary>
+internal static class CollectionActions
+{
+    // === Single-value kinds (stride 1) ===
+    
+    public static PreceptValue[] AddToSet(PreceptValue[] backing, int count, PreceptValue element)
+    { /* binary search, uniqueness check, insert with shift, new array */ }
+    
+    public static PreceptValue[] RemoveFromSet(PreceptValue[] backing, int count, PreceptValue element)
+    { /* binary search, remove with shift, new array */ }
+    
+    public static PreceptValue[] Enqueue(PreceptValue[] backing, int count, PreceptValue element)
+    { /* append to end, new array */ }
+    
+    public static PreceptValue[] Dequeue(PreceptValue[] backing, int count)
+    { /* remove from front, shift, new array */ }
+    
+    public static PreceptValue[] Push(PreceptValue[] backing, int count, PreceptValue element)
+    { /* append to end, new array */ }
+    
+    public static PreceptValue[] Pop(PreceptValue[] backing, int count)
+    { /* truncate last, new array */ }
+    
+    public static PreceptValue[] AppendToLog(PreceptValue[] backing, int count, PreceptValue element)
+    { /* append, new array */ }
+    
+    public static PreceptValue[] InsertAt(PreceptValue[] backing, int count, int index, PreceptValue element)
+    { /* splice at index, new array */ }
+    
+    // === Pair kinds (stride 2) ===
+    
+    public static PreceptValue[] PutLookup(PreceptValue[] backing, int count, PreceptValue key, PreceptValue value)
+    { /* binary search on keys at stride-2, upsert, new array */ }
+    
+    public static PreceptValue[] RemoveLookup(PreceptValue[] backing, int count, PreceptValue key)
+    { /* binary search, remove pair, shift, new array */ }
+    
+    public static PreceptValue[] AddToBag(PreceptValue[] backing, int count, PreceptValue element)
+    { /* find element, increment count or insert new pair, new array */ }
+    
+    public static PreceptValue[] EnqueueByPriority(PreceptValue[] backing, int count, PreceptValue element, PreceptValue priority)
+    { /* sorted insertion by priority, stable tiebreak, stride-2, new array */ }
+    
+    // === Stride-2 ergonomic helpers (from frank-108) ===
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static ref PreceptValue Key(PreceptValue[] arr, int logicalIndex) => ref arr[logicalIndex * 2];
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static ref PreceptValue Val(PreceptValue[] arr, int logicalIndex) => ref arr[logicalIndex * 2 + 1];
+}
+```
+
+The evaluator's dispatch stays minimal:
+
+```csharp
+case ActionSyntaxShape.CollectionValue:
+    var element = EvaluatePlan(action.Value!, slots, args);
+    slots[action.TargetSlot] = ApplyCollectionAdd(slots[action.TargetSlot], element, action.CollectionKind);
+    break;
+```
+
+Where `ApplyCollectionAdd` is a thin kind-switch that delegates to the appropriate `CollectionActions` method. This switch is the **only** place collection kind dispatches at runtime — and it reads from the `ActionPlan.CollectionKind` field that was resolved at build time.
+
+---
+
+## Option C Assessment (Ref Struct Views)
+
+Option C (`ref struct PreceptSetView`) provides stride-2 ergonomics without lifecycle concerns. But:
+
+1. It solves a problem already solved by `ref` helper accessors (`Key(arr, i)`, `Val(arr, i)`).
+2. `ref struct` cannot be stored in fields, returned from async methods, or captured in lambdas — limiting utility if action logic ever needs to pass context around.
+3. It's a zero-cost abstraction that provides zero benefit beyond what static helpers already provide.
+
+**Rejected:** Not wrong, but unnecessary. The `ref` helpers give the same ergonomics at lower conceptual cost (no type to understand, no scoping rules to remember).
+
+---
+
+## Alternatives Rejected
+
+| Alternative | Reason for Rejection |
+|-------------|---------------------|
+| **Option B: Wrapper classes per kind** | Fragments evaluator's execution responsibility. Creates pool lifecycle ambiguity. Adds wrap/unwrap overhead to every collection mutation. Becomes technical debt when `ICollectionBacking` arrives. Duplicates catalog-specified semantics in C# class hierarchies. |
+| **Option C: Ref struct views** | Solves a problem already solved by static `ref` helpers. Adds a type to the mental model for zero incremental benefit. |
+| **Hybrid: Wrapper for pair kinds only** | Still has the pool lifecycle problem. Still adds wrap/unwrap. The stride-2 ergonomics benefit is already captured by `Key()`/`Val()` helpers. |
+| **Interface-based dispatch (`ICollectionMutator`)** | Premature abstraction. Introduces virtual dispatch where static dispatch suffices. Correct migration path (per frank-107) is to introduce `ICollectionBacking` at the DATA layer, not at the LOGIC layer. |
+
+---
+
+## Tradeoff Accepted
+
+- **Collection kind logic is "scattered" across static methods** — there's no single type you can look at to understand "what is a PreceptSet." Accepted because: (a) the canonical description of each kind is in `collection-types.md` and catalog metadata — that IS the single source; (b) the static methods are organized in one class (`CollectionActions`) so they're locatable; (c) the evaluator's identity as a plan executor means logic locality is method-level, not type-level.
+
+- **No polymorphic dispatch** — you can't write generic code that says `collection.Add(element)` regardless of kind. Accepted because: the evaluator already knows the kind from the `ActionPlan`. There is no scenario where collection mutation is invoked without knowing the kind. Polymorphism would serve nobody.
+
+---
+
+## Precedent
+
+This decision is consistent with how the evaluator handles ALL execution:
+- Scalar assignment: static opcode execution, no `PreceptField` wrapper
+- Guard evaluation: static plan walking, no `PreceptGuard` wrapper
+- Constraint checking: static bucket iteration, no `PreceptConstraint` wrapper
+- Computed field recomputation: static plan execution, no `PreceptComputed` wrapper
+
+Collection mutation is not special. It follows the same pattern: prebuilt plan → static execution logic → slot write. Adding wrapper types for collections but not for scalars/guards/constraints would be an inconsistency.
+
+---
+
+## Final Position
+
+**Option A: Static helper methods in a companion `CollectionActions` class.**
+
+- No wrapper types. No wrapper lifecycle. No polymorphic dispatch.
+- Pure functions: array in, array out. The evaluator owns pool lifecycle.
+- Stride-2 ergonomics via `ref` helpers (`Key(arr, i)`, `Val(arr, i)`).
+- Independently testable as pure functions with zero ceremony.
+- Clean migration path to `ICollectionBacking` when/if needed — change the parameter types, nothing else.
+
+# Decision Record: Internal Collection Representation
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-04  
+**Status:** Recommendation  
+**Scope:** Internal runtime representation of collection field values — NOT the public API
+
+---
+
+## The Question
+
+Should the internal runtime representation of all collection fields be `PreceptValue[]` — a flat immutable array that is replaced wholesale on every mutation?
+
+---
+
+## Answer: Yes, with one structural caveat
+
+**`PreceptValue[]` is the correct internal representation for all nine collection kinds.** The specialized backing types specified in `collection-types.md` (Okasaki log, `ImmutableDictionary<T,int>`, `ImmutableList<T>`, `SortedDictionary<P, Queue<T>>`, etc.) are design-doc commitments that predate the runtime's actual architecture. They were never implemented, and they don't survive contact with the slot model.
+
+The caveat: **`lookup of K to V` and `queue of T by P` store pairs, not single values.** But this doesn't require a different container type — it requires a layout convention within the same `PreceptValue[]`. More on this below.
+
+---
+
+## Analysis
+
+### 1. The Immutability Model
+
+From `evaluator.md`:
+
+```csharp
+public sealed record Version
+{
+    internal PreceptValue[] Slots { get; }
+}
+```
+
+Every operation (Fire, Update, Restore) follows the same lifecycle:
+1. **Rent** a `PreceptValue[]` working copy from ArrayPool
+2. **Copy** `Version.Slots` into it
+3. **Mutate** the working copy via action execution
+4. **Commit** the working copy directly as the new `Version.Slots` (zero-copy promotion)
+
+The Version is immutable. The working copy is the mutation surface. On success, it IS the new version's slot array — donated, not cloned. The entire evaluation pipeline speaks `PreceptValue[]` as its currency.
+
+**Critical observation:** The evaluator already treats `Version.Slots` as a flat `PreceptValue[]`. A collection field occupies a slot. The question is: what does a collection slot contain?
+
+### 2. What a Collection Slot Contains
+
+Today, a scalar field slot contains a single `PreceptValue` (32-byte tagged struct). A collection field slot must contain a reference to the collection's elements. The natural representation:
+
+**A collection slot's `PreceptValue` holds a reference to a `PreceptValue[]` array.**
+
+This means `PreceptValue` needs a tag variant for "collection reference" — a reference-typed payload pointing to the element array. The element array itself is immutable post-commit (it's part of the frozen version). Mutation during action execution produces a new array that replaces the slot value.
+
+### 3. Per-Collection-Kind Assessment
+
+| Kind | Fits `PreceptValue[]`? | Layout | Notes |
+|------|----------------------|--------|-------|
+| `set of T` | ✅ Clean | Flat array of `T` values, maintained in sorted order (for `.min`/`.max`) or unsorted with dedup at write time | Evaluator enforces uniqueness on `add` |
+| `queue of T` | ✅ Clean | Flat array, index 0 = front | `enqueue` → append; `dequeue` → new array without [0] |
+| `stack of T` | ✅ Clean | Flat array, last index = top | `push` → append; `pop` → new array without last |
+| `log of T` | ✅ Clean | Flat array, append-only | Only grows. Never shrinks. Trivial. |
+| `log of T by P` | ✅ With pairs | Array of `(P, T)` pairs maintained in P-order | Two `PreceptValue` per entry. Sorted insertion. |
+| `bag of T` | ✅ With counts | Array of `(T, count)` pairs | Two `PreceptValue` per entry: element + integer count. Evaluator enforces count semantics. |
+| `list of T` | ✅ Clean | Flat array, positional | `insert at N` → new array with element spliced in |
+| `queue of T by P` | ✅ With pairs | Array of `(T, P, insertionOrder)` maintained in P-order with stable tiebreak | Could be `(T, P)` pairs sorted by P then insertion position. Or `(P, T)` pairs where stability is positional. |
+| `lookup of K to V` | ✅ With pairs | Array of `(K, V)` pairs | Two `PreceptValue` per entry. Evaluator maintains key uniqueness. |
+
+**No collection kind requires a fundamentally different container.** Every kind reduces to `PreceptValue[]` with varying:
+- Element stride (1 for single-value kinds, 2 for pair kinds, potentially 3 for `queue of T by P` if insertion order must be explicit)
+- Invariants enforced at write time (uniqueness, ordering, append-only)
+
+### 4. What Specialized Backing Structures Were Supposed to Buy
+
+| Specified backing | Supposed advantage | Actual value in this model |
+|---|---|---|
+| `ImmutableLog<T>` (Okasaki pair-of-stacks) | O(1) append with structural sharing across snapshots | **Zero.** We copy the whole slot array on every event. Structural sharing between versions doesn't happen — each version owns its own `PreceptValue[]`. |
+| `ImmutableDictionary<T, int>` (bag) | O(log n) add/remove with structural sharing | **Zero.** Same reason. We're copying the whole thing. |
+| `ImmutableList<T>` (list) | O(log n) insert/remove with structural sharing | **Zero.** We copy the working array. An O(n) splice on a 50-element array is ~50 * 32 bytes = 1.6 KB of memcpy. Irrelevant. |
+| `SortedDictionary<P, Queue<T>>` (queue by P) | O(log n) enqueue with bucket structure | **Zero.** The bucket structure is more complex to snapshot. A sorted flat array with binary search for insertion point is simpler and the data volume is tiny. |
+| `ImmutableDictionary<K, V>` (lookup) | O(log n) put/remove with structural sharing | **Zero.** Same as above. |
+
+**The original motivation was structural sharing between snapshots.** But structural sharing only matters if you're retaining multiple versions simultaneously and want them to share internal nodes. Precept's model is: produce a new version, hand it back to the caller. The caller holds one version. The old version is GC'd. There is no version tree, no branching history, no multi-version cache that would benefit from shared tails.
+
+### 5. Structural Sharing Cost Analysis
+
+**Is copying a 50-element `PreceptValue[]` on every event acceptable?**
+
+Yes. Overwhelmingly.
+
+- Typical collection size in business domains: 1–50 elements (tags, queue entries, audit entries per entity)
+- `PreceptValue` is 32 bytes
+- 50 elements = 1,600 bytes copied per collection mutation
+- The evaluator already copies the ENTIRE slot array (all fields) at step 2b: `var workingCopy = version.Slots.ToArray()`
+- A precept with 40 fields = 40 * 32 = 1,280 bytes copied regardless
+- Collection element arrays are additional, but at Precept's scale (business entity lifecycle, not high-frequency trading), copying 1.6 KB is noise
+
+**Pathological case:** An audit log with 10,000 entries. That's 320 KB per append. This is the only scenario where structural sharing would matter. But:
+1. Audit logs of this size should trigger a maxcount constraint or archival pattern
+2. Even 320 KB is a single memcpy — sub-millisecond on modern hardware
+3. The evaluator's total memory budget per Fire is ~4.5 KB for typical precepts. A 10K-element log dominates regardless of representation.
+
+**Verdict:** At Precept's operational scale (entity lifecycle events, not streaming pipelines), array copying is acceptable for any realistic collection size. If a collection grows to pathological size, that's a domain modelling problem, not a runtime representation problem.
+
+### 6. Where Complexity Lives
+
+With `PreceptValue[]` as the internal representation:
+
+| Concern | Lives in | Not in |
+|---------|----------|--------|
+| Uniqueness (set, lookup keys, log-by-P keys) | Evaluator action execution | The array type |
+| Ordering (set min/max, log-by-P, queue-by-P) | Evaluator action execution + accessor evaluation | The array type |
+| Append-only (log) | Evaluator action execution (only emits append opcode) | The array type |
+| Count tracking (bag) | Evaluator action execution | The array type |
+| FIFO/LIFO semantics | Evaluator action execution (which end to add/remove) | The array type |
+| Stable tiebreak (queue-by-P) | Evaluator insertion logic | The array type |
+
+**This is the correct separation.** Collection KIND semantics are language semantics — they belong in the evaluator (the language executor), not in the data structure. The data structure is dumb storage. The evaluator is the intelligence.
+
+This is consistent with the evaluator's design identity: "mechanically applies prebuilt structures without semantic interpretation" — except here the semantic interpretation IS the collection mutation logic, which is encoded in the action plans at build time.
+
+### 7. Implementation Shape
+
+```csharp
+// PreceptValue gains a collection tag variant:
+// Tag: Collection
+// Payload: reference to PreceptValue[] (the element array)
+// The element array is frozen once committed to a Version.
+
+// Single-value collections (set, queue, stack, log, list):
+// Element array: [v₀, v₁, v₂, ...] — each element is one PreceptValue
+
+// Pair collections (lookup, bag, log-by-P, queue-by-P):
+// Element array: [k₀, v₀, k₁, v₁, ...] — stride of 2
+// OR: a separate interleaved/stride scheme TBD at implementation time
+
+// The evaluator's action execution for collection mutations:
+// 1. Read current collection array from slot
+// 2. Produce new array with the mutation applied (kind-specific logic)
+// 3. Write new array reference back to slot
+// 4. On commit, the slot value (pointing to new array) goes with the version
+```
+
+---
+
+## Recommendation
+
+**Use `PreceptValue[]` as the universal internal representation for all collection kinds.**
+
+### Rationale
+
+1. **Consistency with the slot model.** The evaluator already operates on `PreceptValue[]` slot arrays. Collections are slots. Making their content the same type eliminates a type boundary.
+
+2. **Simplicity.** One container type, one allocation pattern, one pooling strategy. No `ImmutableLog<T>`, no `ImmutableDictionary<K,V>`, no Okasaki queues. The evaluation pipeline stays unified.
+
+3. **Structural sharing is worthless here.** Precept's versioning model is replace-the-whole-thing. There's no multi-version tree where shared tails save memory. Each version is independently held.
+
+4. **Collection semantics belong in the evaluator.** The evaluator already owns all mutation logic via prebuilt action plans. Adding "produce new array" to its repertoire is natural. Pushing semantics into specialized data structures splits the intelligence across two locations.
+
+5. **Performance is not a concern at Precept's scale.** Business entity collections are small. Copying them is free relative to the evaluator's existing per-Fire cost.
+
+### Tradeoff Accepted
+
+- **O(n) mutation cost for all operations** — no O(log n) structural trees. Accepted because N is small (business-domain collections) and the constant factor of memcpy is tiny.
+- **No structural sharing between versions** — each version owns its arrays independently. Accepted because Precept doesn't maintain version trees.
+- **Pathological audit logs (10K+ entries) pay linear copy cost.** Accepted because this is a domain modelling smell; `maxcount` constraints exist for a reason.
+
+### What This Obsoletes
+
+The following design-doc backing type specifications are now obsolete as implementation guidance (they may remain as conceptual documentation of the semantics each kind provides):
+
+- `ImmutableLog<T>` (Okasaki pair-of-stacks)
+- `ImmutableDictionary<T, int>` (bag backing)
+- `ImmutableList<T>` (list backing)
+- `SortedDictionary<TPriority, Queue<TElement>>` (queue-by-P backing)
+- `ImmutableDictionary<K, V>` (lookup backing)
+- Custom immutable sorted linked list (log-by-P backing)
+
+All replaced by: `PreceptValue[]` with evaluator-enforced invariants.
+
+---
+
+## Open Question for Next Decision
+
+How does `PreceptValue` (32-byte struct) represent a collection reference? Options:
+
+1. **Reference payload variant.** The union's reference region holds a `PreceptValue[]` (or a wrapper struct that includes stride/length metadata).
+2. **Boxed array.** The reference slot points to a heap-allocated array. This is the natural .NET representation — `PreceptValue[]` is already a reference type.
+
+This is a `PreceptValue` layout decision — adjacent to but separate from this collection representation decision.
+
+# Decision: Value Types Investigation Doc — Canonical Alignment Patches
+
+**By:** Frank (Lead Architect)  
+**Date:** 2026-05-04T14:00:14.809-04:00  
+**Status:** Applied  
+**Scope:** `docs/working/precept-value-types-investigation.md`
+
+---
+
+## Context
+
+The investigation doc (`precept-value-types-investigation.md`) was written before the canonical `docs/language/business-domain-types.md` reached its current state. A review identified 5 factual conflicts and 4 coverage gaps. This decision records the 9 patches applied to bring the investigation into alignment.
+
+## Patches Applied
+
+| # | Section | Change | Canonical Source |
+|---|---------|--------|-----------------|
+| 1 | §7.1 Price | RETRACTED "not a type" claim → `PriceValue` is a canonical 3-field struct | `business-domain-types.md` §Runtime engine changes |
+| 2 | §7.3 Percentage | Downgraded to "future candidate — deferred" | `business-domain-types.md` §Explicit Exclusions |
+| 3 | §7.2 ExchangeRate | Renamed properties: `BaseCurrency`/`QuoteCurrency`/`Rate` → `From`/`To`/`Amount` | `business-domain-types.md` §exchangerate accessors |
+| 4 | §7.2 ExchangeRate | Removed OQ-7b; replaced with locked D16 Corollary 2 implicit `positive` | `business-domain-types.md` D16 Corollary 2 |
+| 5 | §7.4 DateRange | `LocalDate?` → `DateOnly?`; renamed to `DateRangeValue` | `runtime-api-public-surface-spec.md` §3.4 CLR mapping |
+| 6 | §5, §6 | `quantity(kg)` → `quantity in 'kg'`; `quantity(mass)` → `quantity of 'mass'` | `business-domain-types.md` §Summary |
+| 7 | §7.6 Summary table | Added `price`, `currency`, `unitofmeasure`, `dimension` rows; marked `percentage` deferred | Canonical type list |
+| 8 | H1 title | Renamed to "Precept Value Types — CLR Mapping Investigation" | §7.7 recommendation |
+| 9 | New subsection | Added D12 decimal backing mandate citation as §7 preamble | `business-domain-types.md` D12 |
+
+## Governing Principle
+
+Canonical design docs (`docs/language/`) are the source of truth. Working docs (`docs/working/`) are investigations that must not contradict locked decisions. When they do, the working doc is patched — the canonical doc is never weakened to match an investigation.
+
+## Remaining Open Questions (reduced set)
+
+- OQ-7a: Should `exchangerate` be a built-in DSL field type? (Frank leans yes)
+- OQ-7e: DateRange inclusive vs exclusive end convention
+- OQ-7f: Whether `DateTimeRange` (Instant-bounded) is needed
+- Percentage: deferred to its own investigation
+
+# Frank Decision Record — Mini-spec unit row + OQ-7 open questions
+
+- **Date:** 2026-05-04T13:46:41.209-04:00
+- **Requested by:** Shane
+- **Scope:** `docs/working/runtime-api-public-surface-spec.md`
+
+## What I changed
+
+- Updated the `Unit` row in the CLR type mapping table to state the actual C# shape: `sealed class`.
+- Added the missing rationale directly in the row: `Unit` stays a reference type because the catalog interns units, so repeated `UnitCatalog.Get("kg")` calls return the same instance and reference equality is a valid fast path.
+- Added a new `OQ-7` section immediately after the resolved OQ-3 block, clearly marked **Open, awaiting Shane's decisions**, covering `ExchangeRate`, `Percentage`, `DateRange`, doc-scope rename, and candidate-list completeness.
+
+## Why
+
+- The mini-spec needed to stop implying `Unit` was just an abstract conceptual value and instead state the actual public CLR contract and the identity/interning rationale that justifies it.
+- The business value type assessment already surfaced unresolved design questions; the mini-spec now carries them explicitly so the open decision set is visible in the same contract document rather than stranded in investigation notes.
+
+# Decision: Mini-spec aligned to collection types investigation
+
+**By:** Frank  
+**Date:** 2026-05-04T14:39:39.310-04:00  
+**Status:** Locked  
+**Source:** `docs/working/precept-collection-types-investigation.md` → `docs/working/runtime-api-public-surface-spec.md`
+
+---
+
+## What Changed
+
+The runtime API public surface spec now fully reflects the collection types investigation. Prior state had a single placeholder row ("Collections (List<T>, etc.)") — now expanded to the complete 3-shape mapping.
+
+## Locked Decisions
+
+1. **Three CLR shapes for 9 collection types:**
+   - Single-type (`set`, `queue`, `stack`, `bag`, `list`, `log`) → `IReadOnlyList<TElement>`
+   - Keyed (`log by`, `queue by`) → `IReadOnlyList<KeyedElement<TValue, TKey>>`
+   - Map (`lookup`) → `IReadOnlyDictionary<TKey, TValue>`
+
+2. **One new public type:** `KeyedElement<TValue, TKey>` — `readonly record struct(TValue Value, TKey Key)` in `Precept.Runtime` namespace.
+
+3. **Two internal adapters:** `PreceptList<T>` and `PreceptLookup<TKey, TValue>` — callers never see these types.
+
+4. **Collection null/empty semantics:** Collections are never null at CLR level; empty = `Count == 0`; `optional` modifier does not apply to collections.
+
+5. **`PreceptValue` leakage prohibition** explicitly documented in §6 internals table — the collection type mapping exists specifically to prevent leakage through generic type parameters.
+
+6. **Descriptor-build three-case logic** documented in §4.2 — Builder handles single-type, keyed, and lookup differently.
+
+7. **OQ-5 resolved** — Option A (lazy adapter) locked per §13. Three remaining sub-questions (OQ-C1 bag frequency, OQ-C2 KeyedElement naming, OQ-C3 direction modifier) forwarded to Shane.
+
+## Sections Patched
+
+- §3.4 — CLR type table rows + call-site examples + null/empty semantics + KeyedElement definition
+- §4.2 — Descriptor-build three-case documentation
+- §6 — Internals table (PreceptList, PreceptLookup, strengthened PreceptValue row)
+- §12 — OQ-5 resolved entry
+- §13 — Header, §13.5 closure, §13.6 adapter inventory, §13.7 remaining OQs
+- Status line — updated to reflect OQ-5 resolution
+
+# Decision: Drop `Value` Suffix from Business and Temporal CLR Type Names
+
+**Date:** 2026-05-04T14:42:41.234-04:00
+**Owner:** Frank (Lead/Architect & Language Designer)
+**Directed by:** Shane
+**Status:** LOCKED
+
+---
+
+## Decision
+
+All business and temporal CLR type names in the Precept public API drop the `Value` suffix. The names are:
+
+| Old name          | New name       |
+|-------------------|----------------|
+| `MoneyValue`      | `Money`        |
+| `QuantityValue`   | `Quantity`     |
+| `PriceValue`      | `Price`        |
+| `ExchangeRateValue` | `ExchangeRate` |
+| `DateRangeValue`  | `DateRange`    |
+
+`CurrencyValue` and `DimensionValue` were not present in the working docs at time of rename.
+
+---
+
+## Rationale
+
+The `Value` suffix is redundant noise. All of these types are values by construction — they are `readonly record struct` types whose entire identity is their data. The suffix adds length without adding meaning:
+
+- `Money` is unambiguous. `MoneyValue` says "a value that is money" — the `Value` adds nothing.
+- `Quantity` already implies a measured amount. `QuantityValue` is tautological.
+- `Price`, `ExchangeRate`, `DateRange` — same logic applies.
+
+The suffix was a convention carried forward from early drafts when the naming registered these as "business value types" (a category label). The category label is not the CLR name. Leaking the category into the type name degrades API ergonomics and IDE autocomplete signals.
+
+---
+
+## Constraints Preserved
+
+- `PreceptValue` is untouched. This is a distinct internal type — the slot-storage shape for the evaluator's internal representation. Its name is correct and independent of this decision.
+- `KeyedElement<TValue, TKey>` generic parameter `TValue` is untouched. It is a generic parameter naming convention, not a reference to any of these types.
+- Camelcase local variable names (e.g., `quantityValue`) are untouched. Only PascalCase CLR type names were renamed.
+- Prose uses of "value" (e.g., "a monetary value", "this value type") are untouched.
+
+---
+
+## Application
+
+Applied to all three working docs:
+
+| File | Replacements |
+|------|-------------|
+| `docs/working/runtime-api-public-surface-spec.md` | 8 |
+| `docs/working/precept-value-types-investigation.md` | 88 |
+| `docs/working/precept-collection-types-investigation.md` | 9 |
+| **Total** | **105** |
+
+Post-application scan confirmed: no `MoneyValue`, `QuantityValue`, `PriceValue`, `ExchangeRateValue`, or `DateRangeValue` remain in any of the three files. `PreceptValue` occurrence counts unchanged (48, 7, 20 respectively).
+
+# Decision: Value Types Investigation Doc — Final Patch Pass
+
+**By:** Frank (Lead Architect)  
+**Date:** 2026-05-04T18:23:21-04:00  
+**Status:** Applied  
+**Scope:** `docs/working/precept-value-types-investigation.md`
+
+---
+
+## Context
+
+Shane requested a comprehensive patch of the value-types investigation doc against all locked decisions in the inbox. This is the second patch pass (first was `frank-investigation-doc-patched.md`).
+
+## What Changed
+
+| # | Location | Change |
+|---|----------|--------|
+| 1 | §7.2 ExchangeRate, line 721 | Added interning clarification to 32-byte size claim: "reference sizes on x64; the `string` fields hold interned ISO 4217 references, not per-instance heap allocations" (review finding #2) |
+
+## What Was Already Correct (No Action Needed)
+
+- **Value suffix drop:** Zero remaining `MoneyValue`/`QuantityValue`/`PriceValue`/`ExchangeRateValue`/`DateRangeValue` occurrences — confirmed via grep. The prior pass (88 replacements) was clean.
+- **OQ-7 resolution:** Already reflected — OQ-7a (exchangerate as built-in), OQ-7e (inclusive vs exclusive end), OQ-7f (DateTimeRange) all present in the doc.
+- **Review findings #1, #3, #4, #5:** All addressed in the prior 9-patch pass (From/To naming, DateOnly?, Price retraction, coverage rows).
+- **D12 decimal mandate:** Already present as §7 preamble.
+- **`PreceptValue` NOT renamed:** Confirmed untouched (not a business type).
+
+## Remaining Open Questions (unchanged)
+
+- OQ-7a: Should `exchangerate` be a built-in DSL field type?
+- OQ-7e: DateRange inclusive vs exclusive end convention
+- OQ-7f: Whether `DateTimeRange` (Instant-bounded) is needed
+- Percentage: deferred to its own investigation
+
+# Value Types Investigation — Canonical Review Findings
+
+**By:** Frank  
+**Date:** 2026-05-04T13:55:39.461-04:00  
+**Subject:** `docs/working/precept-value-types-investigation.md` accuracy vs canonical docs
+
+## Summary
+
+The investigation doc is structurally sound and internally consistent. Its core recommendations (UCUM foundation, database-backed catalog, `QuantityValue` as `readonly record struct`, `Unit` as `sealed class`, currency separation) are all confirmed correct by the canonical design docs. However, it has **five naming conflicts** with the canonical `business-domain-types.md` design, **significant coverage gaps** (missing 5 of 7 business-domain types as DSL-level treatment), and several stale assumptions about types the canonical docs have since fully specified. The doc needs targeted patches, not major revision.
+
+## Key Conflicts
+
+1. **ExchangeRate accessor naming:** Investigation uses `BaseCurrency`/`QuoteCurrency` properties. Canonical doc uses `.from`/`.to` accessors (confirmed in business-domain-types.md line 828-829). The CLR struct should follow the canonical DSL surface.
+
+2. **ExchangeRate size claim:** Investigation says 32 bytes (`string + string + decimal` = 8 + 8 + 16). But strings are ISO 4217 3-letter codes — the canonical design uses `string`, not a fixed-width type. Claim is technically correct for reference size on x64, but should note these are interned references, not heap strings per instance.
+
+3. **DateRange uses `LocalDate?` (NodaTime):** Investigation proposes `LocalDate?` fields. The canonical temporal design maps `date` → `DateOnly` at the CLR boundary (mini-spec §3.4). If `DateRange` is a public API type, it should use `DateOnly?`, not `LocalDate?`.
+
+4. **Price ruled out as a type:** Investigation §7.1 rejects `Price` entirely. Canonical `business-domain-types.md` defines `price` as a **first-class named type** with a full operator table, accessors, constraints, and DSL keyword. This is a direct conflict — the canonical design DOES have `price`.
+
+5. **Percentage outside canonical scope:** Investigation proposes `Percentage` as a new first-class type. Canonical `business-domain-types.md` explicitly lists "Percentage type" under **Explicit Exclusions / Out of Scope** (line 1724): "Whether `percent` is a type or syntactic sugar for `number / 100` is a separate investigation."
+
+## Key Gaps
+
+- The investigation does not cover `price`, `currency`, `unitofmeasure`, or `dimension` as DSL types with their full operator tables and accessors — these are fully specified in the canonical doc.
+- No mention of the `in`/`of` qualification system, discrete equality narrowing, or compound type dimensional cancellation — all canonical.
+- No treatment of `decimal` backing mandate (D12) across all seven types.
+
+## Recommended Actions (Priority Order)
+
+1. **Retract `Price` rejection** — §7.1 is wrong. `price` is a canonical named type. Revise to acknowledge the canonical decision.
+2. **Flag `Percentage` as out-of-canonical-scope** — §7.3's proposal conflicts with the exclusions list. It should be reframed as a future investigation, not a confirmed candidate.
+3. **Rename `BaseCurrency`/`QuoteCurrency` → `From`/`To`** on the `ExchangeRate` struct to match canonical accessor naming.
+4. **Fix `DateRange` to use `DateOnly?`** not `LocalDate?` for the public CLR surface.
+5. **Add coverage note** acknowledging the 5 types the investigation doesn't treat in depth (`price`, `currency`, `unitofmeasure`, `dimension`, `period` extensions).
