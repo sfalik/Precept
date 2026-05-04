@@ -1,5 +1,144 @@
 # Cross-Cutting Decisions — Execution Driver
 
+> This document is the coordination artifact for all multi-stage decisions.
+> It drives Wave 1–5 execution. Wave 0 (Shane's foundational decisions) is complete.
+
+## Status Summary
+
+| CC# | Decision | Current status | Blocks |
+|---|---|---|---|
+| CC#1 | Expression Tree Design | [Decided] | Parser, Type Checker, Proof Engine, Precept Builder, Evaluator |
+| CC#2 | SlotValue Subtype Shapes | [Decided] | Parser, Type Checker |
+| CC#3 | SemanticIndex Reference-Tracking Collections | [Open Question — canonical doc: `docs/compiler/type-checker.md §7.1 SemanticIndex`] | Language Server semantic tokens, tooling surface reference routing |
+| CC#4 | `Compilation.Tokens` Field | [Open Question — canonical doc: `docs/runtime/precept-builder.md §2 Inputs and Outputs`] | Builder-facing compilation contract, lexical token tooling |
+| CC#5 | `FieldModifierMeta.ProofDischarges` | [Open Question — canonical doc: `docs/language/catalog-system.md §FieldModifierMeta.ProofDischarges`] | Proof Engine Strategy 2 |
+| CC#6 | FaultSiteLink to FaultSiteDescriptor Transformation | [Open Question — canonical doc: `docs/compiler/proof-engine.md §2 Output Shape`] | Proof-to-runtime backstop planting |
+| CC#7 | ConstraintMeta DU Subtype Count | [Open Question — canonical doc: `docs/runtime/precept-builder.md §Constraint bucket routing / Open Questions`] | Builder constraint routing, catalog-system alignment |
+| CC#8 | EventInspection Shape | [Open Question — canonical doc: `docs/tooling/language-server.md §7.6 Preview/Inspect`] | Evaluator inspection contract, LS preview, MCP DTO shape |
+| CC#9 | `ConstraintFieldRefs.ConstraintIdentity` Type | [Blocked by: CC#7] | Type Checker and Proof Engine constraint identity alignment |
+| CC#10 | GraphState Modifier Representation | [Open Question — canonical doc: `docs/compiler/graph-analyzer.md §GraphState shape`] | Graph output shape, modifier-derived facts |
+| CC#11 | `ExecutionRow.RejectReason` Field | [Open Question — canonical doc: `docs/runtime/precept-builder.md §7 Component Mechanics / ExecutionRow`] | Reject-row lowering, evaluator rejection outcomes |
+| CC#12 | `Faulted(Fault)` as EventOutcome Variant | [Blocked by: CC#8] | Evaluator outcome DU, MCP fire result serialization |
+| CC#13 | `FaultCode.AmbiguousDispatch` | [Open Question — canonical doc: `docs/runtime/evaluator.md §7 Fire dispatch`] | Evaluator impossible-path faulting, diagnostics linkage |
+| CC#14 | SlotContext vs SlotKind Enum Naming | [Open Question — canonical doc: `docs/tooling/language-server.md §7.3 Completions`] | LS/tooling completion context contract |
+| CC#15 | `precept/inspect` vs `precept/preview` Naming | [Open Question — canonical doc: `docs/tooling/language-server.md §7.6 Preview/Inspect`] | LS custom method name, tooling preview routing |
+| CC#16 | `TypeMeta.IsUserFacing` for Completions | [Open Question — canonical doc: `docs/language/catalog-system.md §TypeMeta`] | Completion filtering |
+| CC#17 | `TypedArg.EventName` Back-Reference | [Open Question — canonical doc: `docs/tooling/language-server.md §7.5 Go To Definition`] | Arg hover/navigation |
+| CC#18 | ConstructMeta Outline Properties | [Open Question — canonical doc: `docs/tooling/language-server.md §7.7 Document Outline`] | Document symbols / outline |
+| CC#19 | `TokenMeta.HoverDescription` Strategy | [Open Question — canonical doc: `docs/language/catalog-system.md §Catalog documentation strings`] | Hover/completion documentation |
+| CC#20 | Diagnostic Related Locations | [Open Question — canonical doc: `docs/compiler/diagnostic-system.md §Open Questions / Implementation Notes`] | Multi-span diagnostics, LSP relatedInformation |
+| CC#21 | Event `optional` Modifier | [Open Question — canonical doc: `docs/compiler/graph-analyzer.md §Event coverage open questions`] | Parser, Type Checker, Graph Analyzer, Evaluator, grammar, completions, hover, MCP |
+| CC#22 | `SemanticIndex.EnsuresByState` | [Blocked by: CC#3] | LS/MCP ensure navigation and indexing |
+| CC#23 | `EventOutcome.mutations` Payload | [Open Question — canonical doc: `docs/tooling/mcp.md §precept_fire`] | Evaluator outcome contract, MCP fire payload |
+| CC#24 | Unmatched Guard Trace Enrichment | [Open Question — canonical doc: `docs/tooling/mcp.md §precept_fire`] | Evaluator unmatched contract, MCP diagnostics |
+| CC#25 | Execution Dispatch Delegate Design | [Decided] | Evaluator, runtime value model, builder plan lowering, catalog runtime metadata |
+| CC#26 | Stateless Precepts `CreateInitialVersion` Semantics | [Open Question — canonical doc: `docs/runtime/runtime-api.md §Stateless Precepts — CreateInitialVersion`] | Runtime API, Evaluator, Graph Analyzer |
+
+## Dependency Map
+
+| Canonical doc / stage | Blocking CC decisions | Why this matters |
+|---|---|---|
+| `docs/compiler/parser.md` | CC#1, CC#2, CC#21 | Expression nodes, slot shapes, and any event-surface modifier semantics must be fixed before parser text can stabilize. |
+| `docs/compiler/type-checker.md` | CC#1, CC#2, CC#3, CC#7, CC#9, CC#22 | SemanticIndex shape and constraint identity are the type-checker contracts other stages read. |
+| `docs/compiler/proof-engine.md` | CC#1, CC#5, CC#6, CC#9 | Proof discharge and proof-to-runtime fault-site identity define what residue crosses downstream. |
+| `docs/compiler/graph-analyzer.md` | CC#10, CC#21, CC#26 | Graph facts depend on modifier representation, optional-event semantics, and stateless creation rules. |
+| `docs/runtime/precept-builder.md` | CC#4, CC#6, CC#7, CC#11, CC#25 | The compile-to-runtime boundary owns compilation aggregate shape, fault-site planting, constraint routing, reject-row lowering, and execution-plan dispatch. |
+| `docs/runtime/evaluator.md` | CC#8, CC#11, CC#12, CC#13, CC#23, CC#24, CC#25, CC#26 | Runtime result shapes, impossible-path faults, mutation reporting, trace richness, and stateless creation semantics converge here. |
+| `docs/runtime/runtime-api.md` | CC#25, CC#26 | Public API wording must match the locked runtime baseline and stateless initialization contract. |
+| `docs/tooling/language-server.md` | CC#3, CC#8, CC#14, CC#15, CC#17, CC#18, CC#19, CC#22 | LS contracts mirror the semantic index, preview method naming, outline metadata, and hover/documentation metadata. |
+| `docs/tooling/mcp.md` | CC#8, CC#12, CC#22, CC#23, CC#24 | MCP DTOs are thin wrappers; they cannot drift from evaluator and SemanticIndex contracts. |
+| `docs/language/catalog-system.md` | CC#5, CC#7, CC#16, CC#19, CC#21, CC#25 | Catalog metadata is the machine-readable language spec; these decisions decide which metadata must exist. |
+| `docs/compiler/diagnostic-system.md` | CC#13, CC#20 | Impossible-path fault linkage and related locations must stay aligned between diagnostics and runtime fault codes. |
+
+## Wave 0 — Foundational Decisions ✅ COMPLETE
+
+### Execution Checklist
+
+- [x] [Shane] Lock CC#1 Expression Tree Design. [Blocks: `docs/compiler/parser.md`, `docs/compiler/type-checker.md`, `docs/compiler/proof-engine.md`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`]
+- [x] [Shane] Lock CC#2 SlotValue subtype ownership and expression-slot contract. [Blocks: `docs/compiler/parser.md`, `docs/compiler/type-checker.md`]
+- [x] [Shane] Lock CC#25 execution dispatch/runtime value architecture. [Blocks: `docs/runtime/evaluator.md`, `docs/runtime/precept-builder.md`, `docs/runtime/runtime-api.md`, `docs/language/catalog-system.md`]
+
+### Outcome
+
+Wave 0 is closed. Wave 1 now owns the remaining cross-stage shape decisions; Waves 2–5 should treat CC#1, CC#2, and CC#25 as fixed architecture, not open design space.
+
+## Wave 1 — Cross-Stage Structural Decisions
+
+### Execution Checklist
+
+- [ ] [Shane] Resolve CC#3 `SemanticIndex` reference-collection contract. [Blocks: `docs/compiler/type-checker.md §7.1`, `docs/tooling/language-server.md §7.3`, `docs/compiler/tooling-surface.md`]
+- [ ] [Shane] Resolve CC#4 `Compilation.Tokens` access path. [Blocks: `docs/runtime/precept-builder.md §2`, lexical semantic-token flow]
+- [ ] [Shane] Resolve CC#6 proof-to-runtime `FaultSiteLink` lowering. [Blocks: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, evaluator fault routing]
+- [ ] [Shane] Resolve CC#7 `ConstraintMeta` DU hierarchy. [Blocks: builder constraint buckets, catalog-system constraint metadata]
+- [ ] [Shane] Resolve CC#8 canonical `EventInspection` shape. [Blocks: evaluator inspection contract, LS preview, MCP DTOs]
+- [ ] [Team] Apply the CC#7 ruling to CC#9 `ConstraintFieldRefs.ConstraintIdentity`. [Blocked by: CC#7] [Blocks: type-checker/proof-engine shared identity data]
+- [ ] [Team] Add canonical storage for reject-row `because` text (CC#11). [Blocked by: none] [Blocks: `docs/runtime/precept-builder.md §ExecutionRow`, `docs/runtime/evaluator.md` rejection outcomes]
+- [ ] [Team] Apply the CC#8 ruling to CC#12 `Faulted(Fault)` outcome handling. [Blocked by: CC#8] [Blocks: evaluator/MCP outcome parity]
+- [ ] [Shane] Resolve CC#23 `EventOutcome.mutations` ownership. [Blocks: evaluator result contract, `docs/tooling/mcp.md §precept_fire`]
+- [ ] [Shane] Resolve CC#24 unmatched-guard trace richness. [Blocks: evaluator unmatched contract, `docs/tooling/mcp.md §precept_fire`]
+
+### Exit Criteria
+
+Wave 1 is done when the cross-stage shape questions stop living only in this driver and each affected canonical doc can state a single contract without cross-doc disagreement.
+
+## Wave 2 — Stage-Local Resolutions
+
+### Execution Checklist
+
+- [ ] [Team] Close CC#5 `FieldModifierMeta.ProofDischarges` using the already-drafted catalog shape. [Blocks: `docs/language/catalog-system.md`, proof-engine Strategy 2]
+- [ ] [Team] Close CC#10 `GraphState` modifier representation. [Blocks: `docs/compiler/graph-analyzer.md` graph output shape]
+- [ ] [Team] Add CC#13 `FaultCode.AmbiguousDispatch` plus linked diagnostic metadata. [Blocks: evaluator impossible-path faulting, diagnostics linkage]
+- [ ] [Team] Unify CC#14 `SlotContext` vs `SlotKind` naming. [Blocks: LS/tooling completion context docs]
+- [ ] [Team] Lock CC#15 `precept/inspect` vs `precept/preview` naming and apply it everywhere. [Blocks: LS preview command, tooling surface docs]
+- [ ] [Team] Decide whether CC#16 `TypeMeta.IsUserFacing` becomes first-class catalog metadata. [Blocks: completion filtering docs]
+- [ ] [Team] Close CC#17 `TypedArg.EventName` back-reference routing. [Blocks: arg hover/navigation docs]
+- [ ] [Team] Close CC#18 outline metadata on `ConstructMeta`. [Blocks: document-symbol / outline docs]
+- [ ] [Team] Standardize CC#19 hover/snippet documentation metadata strategy. [Blocks: catalog-system hover/completion docs]
+- [ ] [Team] Decide CC#20 diagnostic related-location support. [Blocks: `docs/compiler/diagnostic-system.md`, LS `relatedInformation` mapping]
+- [ ] [Shane] Lock CC#21 end-to-end semantics for the event `optional` modifier. [Blocks: parser, type checker, graph analyzer, evaluator, grammar, completions, hover, MCP]
+- [ ] [Team] Apply the CC#3 ruling to CC#22 `SemanticIndex.EnsuresByState`. [Blocked by: CC#3] [Blocks: LS/MCP ensure navigation]
+- [ ] [Shane] Lock CC#26 stateless `CreateInitialVersion` semantics. [Blocks: `docs/runtime/runtime-api.md`, evaluator, graph analyzer]
+
+### Exit Criteria
+
+Wave 2 is done when the remaining single-stage or lightly coupled questions become mechanical documentation and implementation work instead of architecture debates.
+
+## Wave 3 — Open Question Resolution
+
+### Execution Checklist
+
+- [ ] [Team] Use `docs/working/Archived/structural-gap-register-migrated.md` as a routing index only; burn down each migrated structural open question in its owning canonical doc. [Blocked by: Waves 1–2]
+- [ ] [Team] Use `docs/working/Archived/catalog-gap-register-migrated.md` as a routing index only; burn down each migrated catalog open question in `docs/language/catalog-system.md` and dependent docs. [Blocked by: Waves 1–2]
+- [ ] [Team] Sweep `docs/compiler/type-checker.md`, `docs/compiler/proof-engine.md`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`, `docs/tooling/language-server.md`, `docs/tooling/mcp.md`, `docs/language/catalog-system.md`, `docs/compiler/graph-analyzer.md`, and `docs/compiler/diagnostic-system.md` so the canonical docs become the only live trackers. [Blocked by: Waves 1–2]
+- [ ] [Shane] Review any item that remains a real product choice after the team closes the mechanical migrations. [Blocked by: Team sweep]
+
+### Canonical-Doc Burn-Down Order
+
+1. `docs/compiler/type-checker.md` — CC#3, CC#9, CC#22
+2. `docs/compiler/proof-engine.md` + `docs/runtime/precept-builder.md` — CC#6, CC#7, CC#11
+3. `docs/runtime/evaluator.md` + `docs/tooling/language-server.md` + `docs/tooling/mcp.md` — CC#8, CC#12, CC#23, CC#24
+4. `docs/language/catalog-system.md` + `docs/compiler/graph-analyzer.md` + `docs/compiler/diagnostic-system.md` — CC#5, CC#10, CC#13, CC#16–CC#21, CC#26
+
+## Wave 4 — Doc Finalization
+
+### Execution Checklist
+
+- [ ] [Team] Run a final consistency pass across compiler, runtime, tooling, and catalog docs after Wave 3 closes. [Blocked by: Wave 3]
+- [ ] [Team] Replace stale `pending`, `provisional`, and cross-doc disagreement language for any CC decision already locked. [Blocked by: Wave 3]
+- [ ] [Team] Update `docs/compiler/README.md` and any navigation tables so canonical docs are the first and only destination. [Blocked by: Wave 3]
+- [ ] [Shane] Sign off any owner-only open question that still prevents a doc from reaching Full status. [Blocked by: Team final pass]
+
+## Wave 5 — Archive
+
+### Execution Checklist
+
+- [ ] [Team] Delete `docs/working/` only after Wave 4 confirms the canonical docs carry all live open questions and decision outcomes. [Blocked by: Wave 4]
+- [ ] [Team] Remove superseded `docs/compiler/parser-radical.md` and `docs/compiler/type-checker-radical.md` once their content is fully absorbed or explicitly retired. [Blocked by: Wave 4]
+- [ ] [Team] Clean README and doc links that still point at retired working artifacts. [Blocked by: Wave 4]
+- [ ] [Team] Verify no unresolved decision exists only in an archived working file before cleanup closes. [Blocked by: Wave 4]
+
+## Detailed Decision Entries (Retained Source Material)
+
 > Primary execution driver for gap resolution. Organized by dependency wave per Frank's gap-sequencing analysis (2026-05-03).
 > Cross-cutting decisions gate everything — resolve waves 0–2 before any catalog/structural gap resolution.
 
@@ -60,24 +199,24 @@
 
 ### CC#25. Execution Dispatch Delegate Design
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — Option A+G (typed-opcode interpreter + catalog-owned delegate dispatch), 2026-05-03/04.
 
 **Affects:** Evaluator, Operations Catalog, Functions Catalog, Actions Catalog
 **Gap register refs:** Audit item C
-**The decision:** What catalog-defined execution delegate contract should drive operation, function, and action dispatch at runtime?
 
-**Why it's cross-cutting:**
-- **Evaluator** — needs a canonical invocation contract for expression execution and action application.
-- **Operations Catalog** — must declare how unary/binary operator implementations are surfaced to the evaluator.
-- **Functions Catalog** — must declare callable signatures, argument binding, and execution delegates.
-- **Actions Catalog** — must declare how action payloads are executed without evaluator-owned per-action switches.
+**Resolution:**
+- `PreceptValue` is a 32-byte tagged struct (`[StructLayout(LayoutKind.Explicit, Size = 32)]`) — the internal evaluation currency on the A+G opcode stack.
+- Catalog-owned executor arrays: `BinaryExecutors` and `UnaryExecutors` live on `TypeRuntimeMeta`, indexed by `OperationKind`. The evaluator dispatches via `TypeRuntimeMeta.BinaryExecutors[(int)kind](l, r)` — no per-operation switches in the evaluator.
+- `LOAD_ARG` carries pre-resolved `ArgSlotIndex` (not arg name string). All name resolution happens at build time in Pass 1.
+- `IArgBuilder` materializes `PreceptValue[]` arg slot array + `bool[]` presence mask at the Fire boundary. Required-arg faults happen before the opcode loop.
+- `TypeRuntime<T>` naming is final: `FromClr` / `ToClr` / `FromJson` / `ToJson`.
+- `TypeRuntimeMeta` active surface: `ReadJson` / `WriteJson` / `ParseString` / `FormatString` / `BinaryExecutors` / `UnaryExecutors`. `ExtractValue`, `StoreValue`, `ParseValue` excluded from hot paths.
+- Single interpreter with diagnostic trace — no dual-path. The A+G opcode executor serves production Fire/Inspect/Update AND LS/MCP authoring feedback. Trace mode emits per-step diagnostic records; no separate tree-walk interpreter.
+- `System.Linq.Expressions` compilation is a designed-in future seam — not a v1 dual-path. TypeBuilder rejected for SaaS (cold-start incompatibility + inspectability guarantee).
 
-**Options / known design space:**
-1. **Per-catalog delegate properties** — each catalog family exposes its own strongly typed execution delegate shape.
-2. **Shared invocation descriptor** — catalogs expose a common execution-contract DU or descriptor that the evaluator interprets generically.
-3. **Evaluator adapter layer** — catalogs stay descriptive only and the evaluator owns the dispatch mapping (least aligned with the catalog-first architecture).
+**Blocked items now unblocked:** Evaluator opcode dispatch, TypeRuntime registration, builder execution plan compilation, IArgBuilder/IFieldBuilder implementation.
 
-**Resolution path:** Lock the dispatch contract before evaluator execution work proceeds further; this is the highest-priority uncaptured catalog-system decision from the audit.
+**Canonical docs:** `docs/runtime/evaluator.md` (§5 PreceptValue, §7 opcode dispatch, §11 Decision 8), `docs/runtime/runtime-api.md` (§Value Types), `docs/runtime/precept-builder.md` (§Pass 5, §Arg Slot Invariants).
 
 ---
 

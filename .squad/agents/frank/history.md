@@ -97,3 +97,9 @@ Shane requested an urgent specificity audit — not a coverage check. The questi
 ### 2026-05-04T03:45:15Z — Runtime API doc sync baseline
 - `runtime-api.md` now reflects the two-lane ingress model, `PreceptValue`-based access surfaces, typed builder interfaces, and JSON-only restore semantics.
 - The squad baseline is that dictionary-based convenience ingress is out of scope.
+
+### 2026-05-04 — Cross-cutting execution driver restructured
+
+- `docs/working/cross-cutting-decisions.md` now opens with a 5-wave execution driver instead of making readers infer sequence from the raw CC entries.
+- The driver now has four coordination surfaces up front: status summary for CC#1–CC#26, dependency map by canonical doc/stage, wave-by-wave execution checklists, and explicit Wave 3 burn-down order for migrated open questions.
+- The original detailed decision entries were preserved below the driver as retained source material. Use the top of the file to coordinate execution; use the retained entries only when you need the underlying rationale or option framing for a specific CC item.
