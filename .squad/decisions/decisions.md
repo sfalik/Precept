@@ -36074,3 +36074,55 @@ consumer code references it explicitly.
 - `Transitioned`, `Applied`, `Rejected` correctly carry `FiredArgs Args`; the other four variants correctly do not.
 - `Restore` is JSON-only (`JsonElement fields`) — no typed overload. Correct per Q7.
 - Both `Precept` and `Version` have `using System.Text.Json;`. Build passes 0 errors / 0 warnings.
+
+# Frank — Chunk 3 Gap Notes
+**Date:** 2026-05-04T00:02:05.132-04:00  
+**Task:** cc25-doc-impact-pass (Chunk 3)
+
+---
+
+## Target 1: docs/runtime/precept-builder.md
+
+**Applied:**
+- Q1 (SlotLayout vocabulary): Changed `object?[]` → `PreceptValue[]` in the Pass 2 description of the evaluator register file. Added explicit vocabulary callout box distinguishing **construct slots** (`ParsedConstruct.Slots` / `SlotValue` — compile-time only) from **field slots** (`SlotLayout` + `PreceptValue[]` — runtime only).
+- Q1: Changed `LoadLit(object? Value)` → `LoadLit(PreceptValue Value)` in the opcode DU — consistent with CC#25 compiler-output-impact decision (pre-wrap literals so `LoadLit` carries `PreceptValue` payloads directly).
+- Q1: Updated the flat evaluator stack machine example (`Stack<object?>` → `Stack<PreceptValue>`, typed variable declarations).
+
+**Q10 scope note — TypeMeta.Runtime NOT added here:**  
+`TypeMeta` is not documented in `precept-builder.md`. The builder references the Types catalog only through `Types.GetAccessor(type, name)` for `MEMBER_ACCESS` opcode emission — it does not document `TypeMeta` shape. Forcing `TypeMeta.Runtime` into this doc would be wrong scope placement. Q10 changes belong in `catalog-system.md` (done below).
+
+**No two-lane API examples in this doc:**  
+`precept-builder.md` covers the builder's internal transformation passes — it has no public API surface of its own. The one existing `Dictionary<string, object?>` mention (Decision 4, §11) is explaining why slot-indexed internal storage was chosen over name-keyed internal storage — it is NOT a public API reference and must not be changed.
+
+---
+
+## Target 2: docs/language/catalog-system.md
+
+**Applied:**
+- Q10 (TypeMeta.Runtime): Added `TypeRuntime? Runtime = null` to the `TypeMeta` record. Added a new `##### TypeRuntime — typed-lane registration` subsection documenting:
+  - Abstract base `TypeRuntime` with `ReadJson` / `WriteJson` / `ParseString` / `FormatString` delegates (catalog-owned JSON and string I/O)
+  - Generic sealed subclass `TypeRuntime<T>` adding `FromClr(T)` → `PreceptValue` and `ToClr(T)` ← `PreceptValue` for zero-boxing typed-lane ingress/egress
+  - Registration pattern: `PreceptRuntime.Register<T>(fromClr, toClr)` — process-global, stored in the TypeMeta entry
+  - `IArgBuilder.Set<T>` / `IFieldBuilder.Set<T>` resolve through the registered `TypeRuntime<T>` for zero-allocation conversion
+  - Durable architecture rule: persistence and typed-lane conversion behavior belongs on catalog metadata — no per-`TypeKind` consumer switches
+
+**Open question raised: TypeRuntime stub file**  
+The `src/Precept/Runtime/PreceptValue.cs` stub (created in Chunk 2) is at the public API boundary. A corresponding `TypeRuntime.cs` stub for the abstract base + generic subclass does not yet exist. Owner should direct whether this stub is created now or deferred to implementation. The catalog-system.md doc is now ahead of the implementation on this shape.
+
+**Open question raised: TypeRuntime<T> in runtime-api.md vs. catalog-system.md**  
+`runtime-api.md` shows `TypeRuntime<T>` as a flat `sealed record` with just `FromClr`/`ToClr`. `catalog-system.md` now documents it as a class hierarchy with additional JSON/string delegates (from CC#25 TypeRuntimeMeta JSON flow decision). These two representations need to be reconciled in a single pass when the TypeRuntime stub is built. The catalog-system.md version is the authoritative catalog-owned shape; runtime-api.md should defer to it.
+
+---
+
+## Target 3: README.md
+
+**No changes made.**  
+README.md contains no `IReadOnlyDictionary<string, object?>` examples, no `new Dictionary<string, object?> { ... }` call patterns, and no `.Fire("EventName", new Dictionary...)` style calls. The only code example in the README is a simplified illustrative snippet using fictional simplified API names (`PreceptParser.Parse`, `PreceptCompiler.Compile`, `eng.CreateInstance`, `eng.Fire`) — this is a high-level orientation block, not the real runtime API. It does not show dictionary ingress. No changes required.
+
+---
+
+## Cross-cutting notes
+
+- The `TypeMeta.Runtime` property is described in catalog-system.md as `TypeRuntime? Runtime` (abstract base) rather than `TypeRuntime<T>? Runtime` (generic). This is correct for a non-generic record — the catalog holds the abstract base, and the concrete generic registration is stored polymorphically. The doc makes this clear in the subsection text.
+- The Q10 CC#25 decision ("CC#25 extends the Types catalog with owned JSON serialization delegates") is the grounding for the `TypeRuntime` catalog-owned behavior pattern. The durable architecture rule is captured verbatim in the new subsection.
+

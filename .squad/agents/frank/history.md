@@ -57,8 +57,23 @@
 
 **Build:** `dotnet build src/Precept/Precept.csproj` → 0 errors, 0 warnings.
 
-### 2026-05-04T04:02:05Z — Chunk 2 closeout recorded
+### 2026-05-04T00:02:05Z — Chunk 3: cc25-doc-impact-pass
+
+**Three targets assessed; two updated:**
+
+- `docs/runtime/precept-builder.md` — Applied CC#25 Q1 (SlotLayout vocabulary): changed `object?[]` → `PreceptValue[]` for the evaluator register file description; added explicit construct-slots vs field-slots vocabulary callout; changed `LoadLit(object? Value)` → `LoadLit(PreceptValue Value)` per CC#25 compiler-output-impact (literals pre-wrapped at build time); updated evaluator stack machine example to `Stack<PreceptValue>` with typed variable declarations. Q10 (TypeMeta.Runtime) was NOT added here — correct scope is catalog-system.md.
+- `docs/language/catalog-system.md` — Applied CC#25 Q10 (TypeMeta.Runtime): added `TypeRuntime? Runtime = null` to the `TypeMeta` record; added new `##### TypeRuntime — typed-lane registration` subsection documenting the abstract base + generic `TypeRuntime<T>` hierarchy, `ReadJson`/`WriteJson`/`ParseString`/`FormatString` catalog delegates, `FromClr`/`ToClr` typed-lane delegates, and the `PreceptRuntime.Register<T>` registration pattern; captured durable architecture rule (persistence/typed-lane behavior belongs on catalog metadata — no per-`TypeKind` switches).
+- `README.md` — No changes. README uses a simplified illustrative API snippet (not the real runtime surface) and contains no dictionary ingress examples.
+
+**Gaps recorded to inbox:** `frank-chunk3-gaps.md` — TypeRuntime stub file not yet created; `runtime-api.md` TypeRuntime<T> shape vs. catalog-system.md need reconciliation when stub lands; TypeMeta.Runtime scoping rationale.
+
 - Frank-64's runtime/result-types pass is durably logged for the squad record.
 - `docs/runtime/result-types.md`, `src/Precept/Runtime/Precept.cs`, and `src/Precept/Runtime/Version.cs` now reflect the two-lane ingress/value surface captured in the current stub set.
 - New stubs `FiredArgs`, `PreceptValue`, `IArgBuilder`, and `IFieldBuilder` are part of the active runtime API baseline; build status remained clean.
 - Follow-up gaps were preserved in decisions.md: stale `result-types.md` API surface text, stale inputs/outputs table wording, `FieldAccessInfo.CurrentValue`, `FieldSnapshot.Value`, and the missing `TypeRuntime<T>` stub still need owner-directed cleanup.
+
+### 2026-05-04T04:13:09Z — Scribe closeout for frank-65
+
+- Oversized decisions ledger checked at 796301 B; the 7-day archive gate ran and found no entries older than the cutoff, so no archive moves were required.
+- Merged `frank-chunk3-gaps.md` into `decisions.md`, cleared the inbox, and recorded health at `decisions.md` 796301 B -> 801093 B.
+- Durable orchestration/session logs written for the chunk-3 doc sync; history summarization remained unnecessary.

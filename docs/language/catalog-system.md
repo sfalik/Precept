@@ -860,7 +860,8 @@ public record TypeMeta(
     ModifierKind[]?              ImpliedModifiers = null,
     IReadOnlyList<TypeAccessor>? Accessors        = null,
     string?                      HoverDescription = null,
-    string?                      UsageExample     = null
+    string?                      UsageExample     = null,
+    TypeRuntime?                 Runtime          = null   // optional zero-boxing typed-lane registration (CC#25 Q10)
 );
 ```
 
@@ -869,6 +870,34 @@ public record TypeMeta(
 The `Token` fieldholds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
 
 `DisplayName` is required — every type must have a human-readable name. Single-word types use their keyword (e.g., `"money"`); multi-word types use the human form (e.g., `"zoned date-time"`, `"unit of measure"`). Omitting it is a compile error.
+
+##### TypeRuntime — typed-lane registration
+
+`TypeMeta.Runtime` carries the optional **typed-lane registration** for the type. When a caller supplies `Action<IArgBuilder>?` or `Action<IFieldBuilder>?`, the runtime resolves the registered `TypeRuntime<T>` for each named arg or field, calling `FromClr(value)` to convert the CLR value to `PreceptValue` with zero boxing. `Version.Get<T>()` and `FiredArgs.Get<T>()` call the registered `ToClr` on the reverse path.
+
+The property uses the abstract base:
+
+```csharp
+// Abstract base — catalog holds this; carries JSON and string delegates
+public abstract class TypeRuntime
+{
+    public abstract PreceptValue ReadJson(ref Utf8JsonReader reader);
+    public abstract void WriteJson(Utf8JsonWriter writer, PreceptValue value);
+    public abstract PreceptValue ParseString(string text);
+    public abstract string FormatString(PreceptValue value);
+}
+
+// Generic sealed subclass — adds zero-boxing CLR lane delegates
+public sealed class TypeRuntime<T> : TypeRuntime
+{
+    public Func<T, PreceptValue> FromClr { get; }
+    public Func<PreceptValue, T> ToClr   { get; }
+}
+```
+
+Registration is process-global via `PreceptRuntime.Register<T>(fromClr, toClr)`. The runtime stores the resulting `TypeRuntime<T>` instance in the corresponding `TypeMeta` entry. Types with no registration default to JSON-lane-only access (`TypeMeta.Runtime == null`).
+
+**Durable architecture rule (CC#25):** Persistence and typed-lane conversion behavior belongs on catalog metadata — do not reintroduce per-`TypeKind` consumer switches in serializer or ingress code. The catalog entry IS the behavior.
 
 ##### TypeTrait flags enum
 

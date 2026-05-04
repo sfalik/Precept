@@ -306,7 +306,9 @@ public sealed record SlotLayout(
 );
 ```
 
-The slot layout is the evaluator's register file specification. Every entity instance (`Version`) is a `object?[]` array of size `FieldCount`. The evaluator uses slot indexes, never field names, during execution.
+The slot layout is the evaluator's register file specification. Every entity instance (`Version`) is a `PreceptValue[]` slot array of size `FieldCount`. The evaluator uses slot indexes, never field names, during execution.
+
+> **Vocabulary (CC#25 Q1):** These are **field slots** — runtime storage positions in the `PreceptValue[]` working-copy array, owned by `SlotLayout`, built during `Precept.From()`. They are distinct from **construct slots** (`ParsedConstruct.Slots` / `SlotValue`), which are compile-time parse positions owned by the Constructs catalog. The two concepts do not share lifecycle, representation, or owner. When discussion crosses layers, use these terms explicitly.
 
 **Computed slots:** Fields with `IsComputed == true` are collected into the `ComputedSlots` array. After every state transition, the evaluator walks this array and recalculates each computed field's value before constraint evaluation.
 
@@ -373,7 +375,7 @@ public sealed record ExecutionPlan(
 public abstract record Opcode;
 public sealed record LoadSlot(int SlotIndex) : Opcode;
 public sealed record LoadArg(string ArgName) : Opcode;
-public sealed record LoadLit(object? Value) : Opcode;
+public sealed record LoadLit(PreceptValue Value) : Opcode;  // literals pre-wrapped at build time (CC#25)
 public sealed record StoreSlot(int SlotIndex) : Opcode;
 public sealed record BinaryOp(OperationKind Kind) : Opcode;
 public sealed record UnaryOp(OperationKind Kind) : Opcode;
@@ -703,15 +705,15 @@ The evaluator never scans or filters — it reads the pre-built bucket for its c
 Expressions are precomputed into flat, cache-friendly slot-addressed opcodes. The evaluator is a simple stack machine:
 
 ```csharp
-var stack = new Stack<object?>();
+var stack = new Stack<PreceptValue>();
 foreach (var op in plan.Opcodes)
 {
     switch (op)
     {
         case LoadSlot(var i): stack.Push(slots[i]); break;
-        case LoadLit(var v): stack.Push(v); break;
+        case LoadLit(var v): stack.Push(v); break;         // v is already PreceptValue
         case BinaryOp(var kind): 
-            var r = stack.Pop(); var l = stack.Pop();
+            PreceptValue r = stack.Pop(); PreceptValue l = stack.Pop();
             stack.Push(Execute(kind, l, r));
             break;
         case Return: return stack.Pop();
