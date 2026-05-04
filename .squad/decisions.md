@@ -6,6 +6,88 @@
 
 ---
 
+
+### 2026-05-04T05:45:56Z: Audit-gap P2 clarifications recorded; compiler/runtime innovation callouts confirmed clean
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-p2-doc-fixes.md`.
+
+- `docs/runtime/evaluator.md` §4 now records both the `TypeBuilder` rejection rationale and the stable compiled-path upgrade seam against the existing A+G execution contract.
+- `docs/runtime/evaluator.md` §7.3 now clarifies that per-type `TypeRuntimeMeta.BinaryExecutors` / `UnaryExecutors` are registered into flat `Operations` arrays, preserving zero-knowledge O(1) dispatch inside the evaluator.
+- `docs/compiler-and-runtime-design.md` required no edit for Item 14; all `Precept Innovations` callouts already match the single-interpreter, catalog-dispatch architecture.
+
+---
+
+### 2026-05-04T05:45:56Z: Decision ledger summary created as a non-canonical navigation aid
+
+**By:** Scribe
+
+**Status:** Recorded from inbox note.
+
+**Merged source:** `frank-decisions-summary.md`.
+
+- `docs/working/decisions-summary.md` was added as a scanning aid over `.squad/decisions.md`.
+- The durable source of truth remains `.squad/decisions.md`; the summary is reference-only and does not supersede the ledger.
+
+---
+
+### 2026-05-04T05:44:10Z: `ConstraintViolation` public contract promoted to the 5-field rich shape
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-constraint-violation-promoted.md`.
+
+- Shane's 2026-05-04 ruling promotes the 5-field `ConstraintViolation` shape from `docs/runtime/evaluator.md` §7.6 to the public runtime contract; the earlier 2-field minimal shape is superseded.
+- `FailingValue` is `PreceptValue?`, not `object?`; CLR callers convert through `TypeRuntime<T>.ToClr` rather than through evaluator-owned boxing.
+- `docs/runtime/runtime-api.md` now documents the public 5-field shape, and the evaluator docs frame the remaining work as implementation follow-through rather than as an unresolved contract question.
+
+---
+
+### 2026-05-04T05:31:45Z: Evaluator pseudocode and §8 integration contract aligned to `FiredArgs` / `PreceptValue` lanes
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-evaluator-pseudocode-fix.md`.
+
+- `docs/runtime/evaluator.md` pseudocode now uses the actual CC#25 internal types throughout: `FiredArgs`, `PreceptValue[]`, `PreceptValue[]? patch`, and `version.Slots.ToArray()`.
+- Update patch application and access-mode checks are slot-indexed, `FiredArgs.Empty` replaces the stale standalone `EmptyArgs`, and the old `object?[]` readability caveat is removed.
+- §8 now documents the durable dual-lane public contract: both JSON ingress and CLR-builder ingress materialize `FiredArgs`, and the evaluator never consumes raw dictionaries or raw JSON.
+
+---
+
+### 2026-05-04T01:45:56Z: ConstructManifest name confirmed as the working-doc parser artifact label
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-construct-manifest-rename.md`.
+
+- The working docs now use `ConstructManifest` consistently for the parser output artifact, matching the already-correct pipeline diagram and earlier canonical rename decisions.
+- Scope remains documentation only; any source-code rename is a separate implementation task.
+
+---
+
+### 2026-05-04T01:08:14Z: Dual-interpreter model rejected; trace stays inside the single A+G interpreter
+
+**By:** Shane (via Copilot)
+
+**Status:** Recorded from inbox correction merge.
+
+**Merged source:** `frank-trace-correction.md`.
+
+- Rejected: a production A+G runtime paired with a separate LS/MCP tree-walk interpreter.
+- Adopted instead: one stack-based opcode interpreter serves every consumer, with optional per-step trace emission for tooling and diagnostics.
+- Trace record shape and LS/MCP consumption remain open implementation seams, but the architecture no longer permits a second semantic engine.
+
+---
 ### 2026-05-04T04:36:09Z: Deep content audit filled seven specificity gaps in canonical docs
 
 **By:** Scribe
@@ -199,13 +281,15 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 **By:** Scribe
 
-**Status:** Merged, deduplicated, inbox cleared (4 files; parallel follow-up analyses converged on the same split).
+**⚠️ SUPERSEDED — 2026-05-04.** This entry recorded an exploration, not the adopted design. The dual-consumer model was explicitly rejected by Shane. See the 2026-05-04 correction entries below. The correct durable decision is: **single interpreter with diagnostic trace** — one A+G stack-based opcode executor serves ALL consumers. See `evaluator.md` §11 Decision 8.
+
+**Status (original):** Merged, deduplicated, inbox cleared (4 files; parallel follow-up analyses converged on the same split).
 
 **Merged sources:** `frank-cc25-treewalk`, `frank-cc25-spanstack`, `frank-cc25-jsonreader`, `frank-cc25-optionc`.
 
-- Durable dual-consumer model: production Fire/Inspect/Update uses the A+G typed-opcode runtime, while LS/MCP interactive tooling keeps a `TypedExpression` tree-walk path for rich per-node traces and sub-50 ms authoring feedback.
+- ~~Durable dual-consumer model: production Fire/Inspect/Update uses the A+G typed-opcode runtime, while LS/MCP interactive tooling keeps a `TypedExpression` tree-walk path for rich per-node traces and sub-50 ms authoring feedback.~~ **REJECTED — see correction.**
 - JSON-native or span-stack evaluation is rejected as the production stack currency: every serious precedent deserializes to typed values before computation, and parse/format cost swamps any zero-copy story for numeric work.
-- Good ideas harvested from the rejected variants stay additive: explicit TypeKind→CLR mapping metadata and string-stack / JSON-friendly techniques remain valid for the interactive tooling path without reopening the production runtime decision.
+- Good ideas harvested from the rejected variants stay additive: explicit TypeKind→CLR mapping metadata and string-stack / JSON-friendly techniques remain valid **only as inspiration, not as a separate interpreter path**.
 
 ---
 

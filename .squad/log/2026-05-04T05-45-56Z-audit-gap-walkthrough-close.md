@@ -1,0 +1,3 @@
+# Session Log — audit gap walkthrough close
+
+On 2026-05-04T05:45:56Z UTC, Scribe measured `.squad/decisions.md` at 77038 bytes with 6 inbox files, ran the hard archive gate and found no active entries older than 7 days to move, confirmed no `history.md` file reached the 15 KB summarization gate, merged all 6 inbox notes into the durable ledger with deduplication, cleared the inbox, wrote orchestration records for frank-73 through frank-76, and closed the audit-gap walkthrough: all P0/P1/P2 items from `audit-gap-report.md` are resolved and the canonical docs are now accurate; `.squad/decisions.md` finished at 81044 bytes and histories summarized = none.
