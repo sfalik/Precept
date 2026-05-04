@@ -34,6 +34,7 @@
 - §8 Integration Contract must show both public ingress lanes (JSON `JsonElement?` and CLR `Action<IArgBuilder>?`) materializing to `FiredArgs` before reaching `Evaluator.*`. A single-lane example that shows only a dictionary bridge is doubly wrong: wrong type and wrong architecture.
 - When a gap register is fully migrated, the archived file should carry a migration header that records: date, total entries, breakdown by status, and which canonical docs received blocks. This makes the archive a reference rather than a dead dump.
 - The 43-entry gap register distributed 23 Pending Decision gaps across 9 canonical docs — a healthy spread indicating the gaps were real cross-doc knowledge breadth, not concentrated defects in a single surface. Out-of-Scope was the clearest call: MCP output design, API naming, and grammar tooling implementation are not catalog metadata questions by definition.
+- Audit-gap reports can go stale within hours when canonical docs move fast; before trusting a non-✅ status marker or summary total, re-verify the underlying canonical doc and then recalculate the rollup.
 
 ## Recent Activity
 
