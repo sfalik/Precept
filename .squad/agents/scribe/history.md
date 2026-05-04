@@ -49,3 +49,6 @@
 - Checked for dated ledger entries older than 2026-04-27 and found none eligible to move, then merged 4 Frank inbox notes into the canonical decision record with deduplication, deleted the processed inbox files, and wrote orchestration logs for frank-78 / frank-79 plus the batch session log.
 - Health report: `decisions.md` 801946B -> 808541B; inbox processed = 4; history files summarized = 1 (`frank/history.md`).
 
+### 2026-05-04T15:32:34Z — Runtime API mini-spec inbox closeout recorded
+- Pre-check measured `decisions.md` at 32088 bytes with 2 inbox files; the hard-gate 30-day archive pass ran and checked `decisions.md` for active entries older than 2026-04-04T15:32:34Z and found none to move.
+- Merged Frank's two runtime API inbox notes into one canonical decision entry, deleted the processed inbox files, wrote the paired orchestration logs plus the session log, and refreshed Frank/Scribe history with no summarization required.

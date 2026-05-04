@@ -24,3 +24,7 @@
 
 ### 2026-05-04T15:15:33Z — Philosophy review notes landed in the locked v6 copy
 - Frank's v4 philosophy review was approved with notes and is now durably reflected in the locked v6 text path: prevention is framed as structural impossibility, Precept's own nouns replace stray implementation jargon, and the final document addresses developers as adopters/builders rather than speaking directly to domain experts.
+
+### 2026-05-04T15:32:34Z — Unit-type investigation and mini-spec OQ closeout recorded
+- Captured the UCUM-backed quantity-system recommendation set in `docs/working/unit-type-system-investigation.md`, including database-driven metadata, tiered discovery, and the currency-separation rule for `MoneyValue`.
+- Recorded the runtime API mini-spec closeout: `integer` = `long`, `duration` = NodaTime `Duration`, descriptor-driven collection wrapping, and `PreceptList<T> : IReadOnlyList<T>` as the collection projection surface.

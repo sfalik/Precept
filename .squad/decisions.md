@@ -20,6 +20,8 @@
 
 ---
 
+---
+
 ### 2026-05-04T05:45:56Z: Decision ledger summary created as a non-canonical navigation aid
 
 **By:** Scribe
@@ -30,6 +32,8 @@
 
 - `docs/working/decisions-summary.md` was added as a scanning aid over `.squad/decisions.md`.
 - The durable source of truth remains `.squad/decisions.md`; the summary is reference-only and does not supersede the ledger.
+
+---
 
 ---
 
@@ -47,6 +51,8 @@
 
 ---
 
+---
+
 ### 2026-05-04T05:31:45Z: Evaluator pseudocode and §8 integration contract aligned to `FiredArgs` / `PreceptValue` lanes
 
 **By:** Scribe
@@ -58,6 +64,8 @@
 - `docs/runtime/evaluator.md` pseudocode now uses the actual CC#25 internal types throughout: `FiredArgs`, `PreceptValue[]`, `PreceptValue[]? patch`, and `version.Slots.ToArray()`.
 - Update patch application and access-mode checks are slot-indexed, `FiredArgs.Empty` replaces the stale standalone `EmptyArgs`, and the old `object?[]` readability caveat is removed.
 - §8 now documents the durable dual-lane public contract: both JSON ingress and CLR-builder ingress materialize `FiredArgs`, and the evaluator never consumes raw dictionaries or raw JSON.
+
+---
 
 ---
 
@@ -74,6 +82,8 @@
 
 ---
 
+---
+
 ### 2026-05-04T01:08:14Z: Dual-interpreter model rejected; trace stays inside the single A+G interpreter
 
 **By:** Shane (via Copilot)
@@ -85,6 +95,8 @@
 - Rejected: a production A+G runtime paired with a separate LS/MCP tree-walk interpreter.
 - Adopted instead: one stack-based opcode interpreter serves every consumer, with optional per-step trace emission for tooling and diagnostics.
 - Trace record shape and LS/MCP consumption remain open implementation seams, but the architecture no longer permits a second semantic engine.
+
+---
 
 ---
 
@@ -104,6 +116,8 @@
 
 ---
 
+---
+
 ### 2026-05-04T04:30:00Z: Full CC#25 / CC#2 decisions audit closed the remaining five canonical doc gaps
 
 **By:** Scribe
@@ -119,6 +133,8 @@
 
 ---
 
+---
+
 ### 2026-05-04T04:02:05Z: Catalog gap register migration completed and archived
 
 **By:** Scribe
@@ -130,6 +146,8 @@
 - The 43 entries from the catalog gap register are now fully triaged: 23 pending gaps were attributed into canonical Open Question blocks across 9 docs, 3 resolved-in-source gaps were marked closed, 5 already-captured gaps were confirmed in place, and gap #39 was promoted to a first-class open-question block.
 - Cross-cutting routing is durable: 8 entries stay owned by the cross-cutting register, while 4 out-of-scope items remain runtime/MCP/tooling design questions rather than catalog metadata gaps.
 - The working register was retired: `docs/working/catalog-gap-register.md` now lives at `docs/working/Archived/catalog-gap-register-migrated.md`, preserving the original content plus a migration notice.
+
+---
 
 ---
 
@@ -150,6 +168,8 @@
 
 ---
 
+---
+
 ### 2026-05-04T03:26:10Z: CC#25 Q7 dictionary convenience lane closed
 
 **By:** Shane (via Copilot)
@@ -160,6 +180,8 @@
 
 - `IReadOnlyDictionary<string, object?>` convenience overloads and extension methods are fully obsolete. They are not part of the main API, not a test-only helper lane, and not a future convenience surface.
 - Wire-format callers use `JsonElement`; in-process typed callers use the fluent builders. No third ingress lane remains.
+
+---
 
 ---
 
@@ -193,6 +215,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-04T00:56:54Z: CC#25 construct-slot vs field-slot vocabulary boundary locked
 
 **By:** Scribe
@@ -204,6 +228,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Locked the vocabulary split between parser-time construct slots and runtime field slots: `ParsedConstruct.Slots` / `SlotValue` stay compile-time only.
 - Runtime execution uses field slot indices in the `PreceptValue[]` working-copy array, with `SlotLayout` as the canonical field-name-to-slot-index mapping built during `Precept.From()`.
 - Durable wording rule: when discussion crosses parser and runtime layers, explicitly say **construct slots** vs **field slots** because the two concepts do not share lifecycle, representation, or owner.
+
+---
 
 ---
 
@@ -221,6 +247,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T23:00:32Z: CC#25 TypeRuntimeMeta JSON flow locks to symmetric `ReadJson`/`WriteJson` API
 
 **By:** Scribe
@@ -232,6 +260,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Phase 1 ingress now dispatches through `TypeRuntimeMeta.ReadJson(ref Utf8JsonReader, ref PreceptValue)` and Phase 8 egress through `TypeRuntimeMeta.WriteJson(Utf8JsonWriter, PreceptValue)`, replacing `StoreValue` / `ParseValue` / `FormatValue` on the hot JSON path.
 - Zero-boxing scope is locked precisely: scalar fields read and write the inline value region directly, while string, NodaTime, and collection values stay in the ref region and are written back by reference instead of re-boxed intermediaries.
 - Ownership rules are durable: the call site advances to the value token and handles `null`, collection runtimes own structural array/object loops, and the active `TypeRuntimeMeta` surface is `ReadJson`, `WriteJson`, `ParseString`, `FormatString`, `BinaryExecutors`, and `UnaryExecutors`, with `ExtractValue` / `StoreValue` / `ParseValue` excluded from Fire, Inspect, and Update hot paths.
+
+---
 
 ---
 
@@ -250,6 +280,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T22:22:27Z: CC#25 TypeBuilder-generated CLR types are rejected for the SaaS runtime baseline
 
 **By:** Scribe
@@ -265,6 +297,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T22:22:27Z: CC#25 type-per-lane storage loses to unified `PreceptValue`
 
 **By:** Scribe
@@ -276,6 +310,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Option F's split-lane model does not materially reduce the hard cases because 23 of 32 `TypeKind` members still live in the reference lane and the business-domain types remain cross-lane participants.
 - Adding a wider business-value lane only recreates `PreceptValue`'s struct-copy cost without gaining the unified operation surface that makes A+G simple.
 - The NodaTime/date-time correction changes details but not the verdict: the lane split still adds routing complexity for no meaningful reduction in cross-lane operations.
+
+---
 
 ---
 
@@ -295,6 +331,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T22:22:27Z: CC#25 extends the Types catalog with owned JSON serialization delegates
 
 **By:** Scribe
@@ -306,6 +344,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `TypeMeta` gains catalog-owned JSON reader/writer delegates so serialization follows the same metadata-owned behavior pattern as execution dispatch.
 - Collection-field serializers are composed once at build time from structural collection logic plus element-type delegates, keeping runtime streaming, reflection-free, and free of `JsonElement` or `object` fallback paths.
 - Durable architecture rule: persistence behavior belongs on catalog metadata; do not reintroduce per-`TypeKind` consumer switches in serializer code.
+
+---
 
 ---
 
@@ -323,6 +363,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T22:22:27Z: CC#25 Fire-call lifecycle is now quantified as the A+G implementation baseline
 
 **By:** Scribe
@@ -337,6 +379,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T14:59:24Z: Per-stage pipeline topology boxes stay ASCII-safe in compiler-and-runtime docs
 
 **By:** Scribe
@@ -348,6 +392,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `docs/compiler-and-runtime-design.md` §7 now uses plain ASCII `>` instead of `▶` inside the fixed-width topology box so monospace alignment stays stable across renderers.
 - Durable diagram rule: when box geometry depends on character columns, prefer ASCII arrowheads over ambiguous-width Unicode glyphs even if the Unicode form looks nicer in rich editors.
 
+
+---
 
 ---
 
@@ -366,6 +412,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T14:59:24Z: EnsureClause reason text stays in its own BecauseClause slot
 
 **By:** Scribe
@@ -378,6 +426,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `StateEnsure` and `EventEnsure` treating `because` as anything other than a dedicated slot is a catalog defect to correct, not an accepted alternate model.
 - Durable modeling rule: when ensure syntax carries explanatory reason text, that reason is represented by its own named slot.
 
+
+---
 
 ---
 
@@ -396,6 +446,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T14:37:24Z: Grammar anatomy section stays representative and now covers the missing slot/routing archetypes
 
 **By:** Scribe
@@ -410,6 +462,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+
+---
 
 ---
 
@@ -437,6 +491,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T14:18:15Z: Compiler overview confirmation notes deduplicated into existing sync decisions
 
 
@@ -458,6 +514,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+
+---
 
 ---
 
@@ -485,6 +543,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T14:02:40Z: Catalog-driven thesis deviations remain explicit tooling gaps only
 
 
@@ -506,6 +566,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+
+---
 
 ---
 
@@ -533,6 +595,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-03T14:02:40Z: Catalog-first wording corrected in compiler-and-runtime-design.md
 
 
@@ -557,6 +621,8 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 
 ---
 
+---
+
 ### 2026-05-04T15:15:33Z: Philosophy v6 locked with prevention framing and developer-commitment POV
 
 **By:** Scribe
@@ -569,3 +635,18 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Reviewer convergence locked two durable copy rules for `docs/philosophy.md`: use Precept's real nouns (`compiled precept`, `runtime`, `definition`) instead of implementation jargon like `engine`, and address developers as adopters/builders while keeping domain-user pain as the beneficiary frame.
 - docs/philosophy.md is now locked at v6: the Prevention, not detection bullet states the structural no-window guarantee in business-logic and business-process terms, and Compile-time structural checking now explicitly names dead-end states, unsatisfiable guard combinations, and workflow-topology proof.
 - Review status is durably recorded: Frank, Steinbrenner, and Peterman all approved Elaine v4 with notes, Elaine-24 performed the final POV shift in v6, and Elaine-25 applied the locked two-bullet edit to docs/philosophy.md.
+
+---
+
+### 2026-05-04T15:32:34Z: Runtime API public-surface mini-spec OQs 1-5 resolved; UCUM quantity and lazy collection surfaces selected
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files).
+
+**Merged sources:** `frank-mini-spec-oq-update.md`, `frank-unit-type-investigation.md`.
+
+- `integer` is canonically `long`; `TypeMeta.ClrType` stays scalar-only; descriptors wrap collection values as `IReadOnlyList<T>` rather than encoding list-ness into scalar type metadata.
+- `quantity` resolves to `QuantityValue(decimal, Unit)` on a UCUM-backed, database-driven unit system with tiered discovery; `money` resolves to `MoneyValue(decimal, string)`, and currency stays separate from the unit system.
+- `duration` maps directly to NodaTime `Duration`, and the CLR type table in `docs/working/runtime-api-public-surface-spec.md` now also includes `Unit` plus the locked `currency` = `string` entry.
+- OQ-5 collection surface adopts the lazy adapter shape: `PreceptList<T> : IReadOnlyList<T>`, projecting from internal `PreceptValue[]` on demand with structural immutability and no read-path allocation.
