@@ -7,6 +7,36 @@
 ---
 
 
+### 2026-05-03: CC#25 Q2 — Event Args + JSON-First Public API (LOCKED)
+
+**By:** Scribe
+
+**Status:** Recorded from spawn manifest plus inbox merge closeout.
+
+**Merged sources:** `frank-57` (already durable in ledger), `frank-json-first-api.md`, `frank-59` (inline manifest result).
+
+**Decision:** Q2 is resolved. Event args ARE converted to PreceptValue inside the evaluator — the asymmetry between fields and args is lifecycle/ownership, not type representation. LOAD_ARG opcode loads event args into the evaluator's PreceptValue[] register file.
+
+**Public API amendment (JSON-first):** The public API switches to JsonElement as the primary type for all data/args parameters.
+
+Primary signatures:
+```csharp
+EventOutcome  Fire(string eventName, JsonElement? args = null)       // on Version
+UpdateOutcome Update(JsonElement fields)
+EventOutcome  Create(JsonElement? args = null)                       // on Precept
+RestoreOutcome Restore(string? state, JsonElement fields)
+```
+
+Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to convenience extension methods for tests/in-process callers only.
+
+**Rationale:** ~90% of real callers (ASP.NET Core, minimal APIs, Azure Functions) receive JsonElement directly from the framework. The dictionary API forced double-parse on every wire-format caller. JsonElement flows straight from HTTP request body to Fire() with zero intermediate allocations. Parse errors carry position info from the original payload. The dictionary API loses that provenance.
+
+**Doc impact:** runtime-api.md will be updated in the implementation PR that ships this change (not now — docs track what exists in the runtime).
+
+**Accepted by:** Shane Falik
+
+---
+
 ### 2026-05-04T00:56:54Z: CC#25 construct-slot vs field-slot vocabulary boundary locked
 
 **By:** Scribe

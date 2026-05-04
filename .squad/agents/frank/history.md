@@ -78,3 +78,9 @@
 - Durable boundary: `ParsedConstruct.Slots` / `SlotValue` stay compile-time only; runtime execution uses field slot indices in the `PreceptValue[]` working copy, with `SlotLayout` as the field-name-to-slot-index map built in `Precept.From()`.
 - Shane accepted the answer; when discussion crosses parser and runtime layers, say **construct slots** vs **field slots** explicitly.
 
+### 2026-05-03T21:12:30-04:00 — CC#25 Q2 locked; JSON-first API accepted
+- Q2 is now fully locked: event args become `PreceptValue` inside the evaluator, and `LOAD_ARG` loads them into the evaluator's `PreceptValue[]` register file. The args-vs-fields asymmetry is lifecycle/ownership only.
+- Public API primary ingress is now `JsonElement` for commit/update/create/restore data and args.
+- `IReadOnlyDictionary<string, object?>` overloads are demoted to convenience extension methods for tests and in-process callers.
+- `docs/runtime/runtime-api.md` stays unchanged until the implementation PR ships the runtime surface.
+
