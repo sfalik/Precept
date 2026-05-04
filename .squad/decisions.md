@@ -7,6 +7,36 @@
 ---
 
 
+### 2026-05-04T03:26:10Z: CC#25 Q7 acceptance revision locked
+
+**By:** Scribe
+
+**Status:** Recorded from the full Q7 acceptance inbox merge.
+
+**Merged sources:** `frank-cc25-q7-typed-api.md`, `frank-cc25-q7-accepted.md`, `frank-cc25-q7-challenges.md`, `copilot-cc25-q7-ingress-egress.md`, `copilot-directive-20260503-231016.md`, `copilot-directive-20260503-231158-no-string-json-overloads.md`.
+
+- Q7 is now fully accepted. `Version.Get<T>(string)` is the primary typed field API, raw indexers return `PreceptValue`, and `Transitioned` / `Applied` carry `FiredArgs` with the same `Get<T>` + `PreceptValue` indexer pattern for event-arg egress.
+- `TypeRuntime` naming is final: `FromJson` / `ToJson` / `FromClr` / `ToClr`. `TypeRuntime<T>` is the zero-boxing CLR ingress/egress path, and typed `Get<T>` / `Set<T>` dispatch through those delegates.
+- Typed ingress is fluent and AOT-safe: `Fire()` / `Inspect()` use `Action<IArgBuilder>`, `Create()` uses `Action<IFieldBuilder>`, and `IArgBuilder` now materializes `PreceptValue[]` plus a presence mask rather than an arg dictionary.
+- JSON boundaries stay `JsonElement`-only. No string convenience overloads exist anywhere on the JSON API surface, and typed `Restore` is removed so restore remains round-trip-faithful hydration from Precept's own serialized egress.
+- The JSON ingress/egress boundary remains outside the evaluator: public API / `Version` conversion owns JSON parsing and lazy `ToJson()` egress, while the evaluator only sees typed `PreceptValue` data.
+- This supersedes the earlier provisional note that `IReadOnlyDictionary<string, object?>` would survive as a convenience extension lane.
+
+---
+
+### 2026-05-04T03:26:10Z: CC#25 Q7 dictionary convenience lane closed
+
+**By:** Shane (via Copilot)
+
+**Status:** Recorded from inbox closeout.
+
+**Merged source:** `copilot-cc25-q7-dict-extension-obsolete.md`.
+
+- `IReadOnlyDictionary<string, object?>` convenience overloads and extension methods are fully obsolete. They are not part of the main API, not a test-only helper lane, and not a future convenience surface.
+- Wire-format callers use `JsonElement`; in-process typed callers use the fluent builders. No third ingress lane remains.
+
+---
+
 ### 2026-05-03: CC#25 Q2 — Event Args + JSON-First Public API (LOCKED)
 
 **By:** Scribe
