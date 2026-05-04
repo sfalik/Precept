@@ -1,3 +1,159 @@
+# CC#25 Q6 — Eval Stack Allocation
+
+**Status:** Proposed — awaiting Shane acceptance
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-03
+
+## Decision
+
+Fixed `stackalloc PreceptValue[32]` per evaluation call. `ExecutionPlan` records `MaxStackDepth` at compile time; Pass 5 rejects any expression exceeding the ceiling with a compiler diagnostic. No pool, no async escape hazard, no runtime depth checks.
+
+## Detail
+
+The expression evaluator uses a stack machine to execute `ExecutionPlan.Opcodes`. Each `Execute*` entry point allocates its operand stack as:
+
+```csharp
+Span<PreceptValue> stack = stackalloc PreceptValue[MaxEvalStackDepth]; // 32
+int sp = 0; // stack pointer
+```
+
+**Ceiling of 32 slots:**
+- Precept expressions are structural (not Turing-complete) — no recursion, no unbounded loops, no function calls that could nest arbitrarily
+- Real-world guards and computed fields rarely exceed depth 5–8 (e.g., `a > b && c < d && e == f` peaks at depth 2)
+- 32 slots accommodates pathological but legal expressions with room to spare
+- At 16–24 bytes per `PreceptValue`, 32 slots = 512–768 bytes — well under the ~1KB `stackalloc` safety threshold
+
+**Compile-time enforcement:**
+
+```csharp
+sealed record ExecutionPlan(
+    ImmutableArray<Opcode> Opcodes,
+    TypeKind ResultType,
+    int MaxStackDepth);  // computed during opcode emission
+```
+
+Pass 5 emits `Opcode` sequences and tracks high-water-mark depth. If any expression's `MaxStackDepth > 32`, emit `PRECEPT0XXX: Expression too complex (stack depth N exceeds limit 32)`. This is a compiler diagnostic, not a runtime fault — the evaluator never sees illegal plans.
+
+**No runtime depth checks:**
+Because the ceiling is enforced at compile time, the evaluator does not bounds-check the stack pointer. The `stackalloc` buffer is guaranteed sufficient.
+
+## Integration Points
+
+### ExecutionPlan
+
+`ExecutionPlan.MaxStackDepth` is computed during opcode emission in Pass 5. The field enables:
+1. Compile-time ceiling enforcement (reject if > 32)
+2. Debug assertions during development (`Debug.Assert(plan.MaxStackDepth <= MaxEvalStackDepth)`)
+3. Future profiling/metrics if needed
+
+The evaluator ignores `MaxStackDepth` at runtime — it always allocates the fixed ceiling.
+
+### Fire() call context
+
+`Fire()` is synchronous (locked in Q2). The `stackalloc` buffer lives on the thread's stack and never escapes:
+- Guard evaluation → stack allocated → evaluation completes → stack unwound
+- Action evaluation → same
+- Constraint evaluation → same
+- Computed field evaluation → same
+
+No async/await in the evaluation path means no risk of `stackalloc` escaping to the heap or crossing suspension points.
+
+### Execute* entry points
+
+All four entry points follow the same pattern:
+
+```csharp
+internal static bool ExecuteGuard(ExecutionPlan plan, ReadOnlySpan<PreceptValue> slots)
+{
+    Span<PreceptValue> stack = stackalloc PreceptValue[MaxEvalStackDepth];
+    int sp = 0;
+    
+    foreach (var op in plan.Opcodes.AsSpan())
+    {
+        // dispatch op, manipulate stack/sp
+    }
+    
+    Debug.Assert(sp == 1);
+    return stack[0].IsTrue;
+}
+
+internal static PreceptValue ExecuteAction(ExecutionPlan plan, ReadOnlySpan<PreceptValue> slots)
+{
+    // identical pattern, returns stack[0]
+}
+
+internal static bool ExecuteConstraint(ExecutionPlan plan, ReadOnlySpan<PreceptValue> slots)
+{
+    // identical pattern, returns stack[0].IsTrue
+}
+
+internal static PreceptValue ExecuteComputed(ExecutionPlan plan, ReadOnlySpan<PreceptValue> slots)
+{
+    // identical pattern, returns stack[0]
+}
+```
+
+The `slots` parameter is a read-only view of the field slot array (either `Version.Slots` for reads or the working copy for in-progress mutations). Opcodes like `LoadSlot(int index)` push from `slots`; the operand `stack` is purely for intermediate computation.
+
+## Rationale
+
+**Why stackalloc over ArrayPool:**
+- Zero allocation, zero GC pressure, zero pool coordination overhead
+- The expression evaluator is the hottest path in the runtime — it executes for every guard, every action value, every constraint, every computed field recalculation
+- Pool rent/return adds branch overhead and potential contention; `stackalloc` is a single stack-pointer bump
+
+**Why fixed ceiling over per-plan sizing:**
+- Simplicity: one constant, no per-call decision
+- The ceiling cost (512–768 bytes) is trivial on any thread stack
+- Avoids conditional pool fallback logic (`stackalloc` if small, pool if large)
+
+**Why compile-time enforcement:**
+- Precept's design philosophy: prevent invalid states at design time
+- If an expression is too complex, that's an authoring error — fail during `Precept.From()`, not during `Fire()`
+- Eliminates runtime bounds-checking overhead entirely
+
+**Why depth 32:**
+- Empirically covers all reasonable expressions with 4× headroom
+- Keeps stack allocation under 1KB
+- Round power of 2 for mental model simplicity
+
+### 2026-05-03: CC#25 Q5 — Slot Ownership Transfer (Zero-Copy Promotion)
+**Locked:** 2026-05-03 | **Accepted by:** Shane
+
+**Decision:** Zero-copy promotion. The working copy (`PreceptValue[]`) is donated directly as `Version.Slots` — no second clone at commit time.
+
+**`Version` type:**
+```csharp
+sealed record Version(PreceptDefinition Precept, string State, PreceptValue[] Slots)
+{
+    internal PreceptValue[] Slots { get; } = Slots;
+}
+```
+- `Slots` is `PreceptValue[]` (not `object?[]`)
+- `internal` visibility — callers cannot alias the array
+- Get-only property — assigned once at construction, never replaced
+
+**Commit path (donate):**
+```csharp
+var newVersion = new Version(precept, newState, workingCopy);
+// Evaluator holds no further reference to workingCopy — donate complete
+```
+"Donate" is behavioral, not an API call. No `ArrayPool.Return()` is called. The array exits pool management permanently and is now owned by `Version`.
+
+**Reject path:**
+```csharp
+ArrayPool<PreceptValue>.Shared.Return(workingCopy, clearArray: true);
+```
+Explicit call required. Neither path is automatic.
+
+**Memory safety:**
+- No `IDisposable` or finalizers needed — `PreceptValue[]` is fully managed
+- No memory leak: GC collects `Version` and its `Slots` array together when `Version` is released
+- If `PreceptValue` is a struct: contiguous block of value-typed data, even more GC-efficient
+- The only "leak" scenario is application code holding stale `Version` references indefinitely — standard GC responsibility, not a runtime design issue
+
+**Aliasing safety:** Evaluator drops its reference to `workingCopy` after the constructor call. `Slots` is `internal` — no external callers can alias it.
+
 ### 2026-05-03: CC#25 Q3 — execution plan origin confirmed
 **By:** Frank
 **Date:** 2026-05-03
