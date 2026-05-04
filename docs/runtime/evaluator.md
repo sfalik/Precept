@@ -126,7 +126,7 @@ public sealed record Version
 }
 ```
 
-The evaluator's inner loop reads from and writes to `Slots` via slot index. It never resolves field names at runtime — all name-to-slot mappings were resolved at build time. `PreceptValue` is the 32-byte tagged value struct shared across the entire evaluation pipeline (CC#25 Q5/Q7). On commit success, the working copy `PreceptValue[]` is donated directly as the new `Version.Slots` — no clone (zero-copy promotion). On constraint failure, the array is returned to `ArrayPool<PreceptValue>.Shared`.
+The evaluator's inner loop reads from and writes to `Slots` via slot index. It never resolves field names at runtime — all name-to-slot mappings were resolved at build time. `PreceptValue` is the 32-byte tagged value struct shared across the entire evaluation pipeline. On commit success, the working copy `PreceptValue[]` is donated directly as the new `Version.Slots` — no clone (zero-copy promotion). On constraint failure, the array is returned to `ArrayPool<PreceptValue>.Shared`.
 
 ### Input Summary
 
@@ -306,7 +306,7 @@ This ensures that constraint evaluation sees the post-mutation state, and that f
 
 ### 7.0 Evaluation Stack Allocation
 
-Each expression evaluation call allocates its operand stack on the thread stack using `stackalloc` — no heap allocation per evaluation (CC#25 Q6):
+Each expression evaluation call allocates its operand stack on the thread stack using `stackalloc` — no heap allocation per evaluation:
 
 ```csharp
 internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slots, FiredArgs args)

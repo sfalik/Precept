@@ -69,7 +69,7 @@ The parser produces these slot value types:
 
 Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`.
 
-> **CC#1 (resolved 2026-05-03):** The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers. See `docs/working/cross-cutting-decisions.md` CC#1.
+The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers. See `docs/working/cross-cutting-decisions.md` CC#1.
 
 ---
 
@@ -192,7 +192,7 @@ Pass 2 has three generic sub-passes.
 
 #### Sub-pass 2a: Expression Resolution Engine
 
-**Unblocked** (CC#1 resolved 2026-05-03). Expression-carrying slots now carry `ParsedExpression` — the expression resolution engine can proceed.
+**Unblocked.** Expression-carrying slots now carry `ParsedExpression` — the expression resolution engine can proceed.
 
 The core of the checker will be a single recursive function (~250–350 lines) that resolves any `ParsedExpression` node to a `TypedExpression`. The function dispatches on expression form and delegates to catalog lookups for operator semantics, function signatures, and type accessors.
 
@@ -428,7 +428,7 @@ public enum ActionSecondaryRole
 
 #### Typed Expressions (DU)
 
-> **CC#1 (resolved 2026-05-03):** `TypedExpression` is a sealed abstract record DU — the type checker's output for expressions. Its parser-side counterpart is `ParsedExpression` (same closed DU pattern, unresolved types). The set is closed by design: adding a new expression form requires a new catalog entry + new DU subtype + updating all consumer switch arms. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers.
+`TypedExpression` is a sealed abstract record DU — the type checker's output for expressions. Its parser-side counterpart is `ParsedExpression` (same closed DU pattern, unresolved types). The set is closed by design: adding a new expression form requires a new catalog entry + new DU subtype + updating all consumer switch arms. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers.
 
 ```csharp
 public abstract record TypedExpression(
@@ -603,7 +603,7 @@ Scope is managed by setting `CurrentEventArgs` when entering a transition row, e
 
 ### 7.3 Expression Resolution (UNBLOCKED)
 
-> **CC#1 resolved 2026-05-03.** Parser now produces `ParsedExpression` DU nodes. The design below is complete and ready for implementation.
+Parser now produces `ParsedExpression` DU nodes. The design below is complete and ready for implementation.
 
 #### The Core Resolve Function
 
@@ -947,7 +947,7 @@ The type checker dispatches on `ConstructKind` enum values via exhaustive switch
 
 ### Implementation Plan (UNBLOCKED)
 
-Implementation unblocked by CC#1 (2026-05-03). Parser now produces `ParsedExpression` DU nodes. The following slices can proceed:
+Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The following slices can proceed:
 
 **Pre-Slice 0: Shape Commit (unblocks everything)**
 - All `TypedField`, `TypedState`, `TypedEvent`, `TypedArg` record definitions

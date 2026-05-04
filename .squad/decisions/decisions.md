@@ -36126,3 +36126,10 @@ README.md contains no `IReadOnlyDictionary<string, object?>` examples, no `new D
 - The `TypeMeta.Runtime` property is described in catalog-system.md as `TypeRuntime? Runtime` (abstract base) rather than `TypeRuntime<T>? Runtime` (generic). This is correct for a non-generic record — the catalog holds the abstract base, and the concrete generic registration is stored polymorphically. The doc makes this clear in the subsection text.
 - The Q10 CC#25 decision ("CC#25 extends the Types catalog with owned JSON serialization delegates") is the grounding for the `TypeRuntime` catalog-owned behavior pattern. The durable architecture rule is captured verbatim in the new subsection.
 
+### 2026-05-04: Canonical docs strip CC# citation artifacts
+**What:** Removed CC# provenance callouts and related citation artifacts from 8 canonical docs under `docs/` while leaving `docs/working/` untouched. Cleaned `evaluator.md`, `precept-builder.md`, `runtime-api.md`, `catalog-system.md`, `compiler-and-runtime-design.md`, `proof-engine.md`, `type-checker.md`, and `parser.md` so the canonical set states current architecture and behavior without embedding decision-thread markers.
+
+**Why:** Canonical docs are the durable statement of what Precept is. Decision provenance belongs in the squad ledger and working records, not in the product-facing canonical set.
+
+**Notes:** Navigation links into working decision records were retained where they serve discovery rather than provenance stamping. Inbox source: `frank-citation-cleanup.md`.
+

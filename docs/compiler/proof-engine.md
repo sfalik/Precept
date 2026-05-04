@@ -973,7 +973,7 @@ The proof engine produces a `ConstraintInfluenceMap` that enables AI agents to r
 
 5. **Initial-state satisfiability blocked** — this check requires resolved initial field values and initial-state constraint expressions. Implementation is blocked pending the type checker's expression resolution engine being fully operational (see `docs/compiler/type-checker.md` § Blocking Dependency: Expression Trees).
 
-6. **~~Expression tree parsing blocked~~** — **RESOLVED (CC#1, 2026-05-03).** Guard-in-path (Strategy 3) and flow-narrowing (Strategy 4) are now unblocked. Parser produces `ParsedExpression` DU nodes for `GuardClauseSlot`; the type checker resolves these into `TypedExpression` for proof engine consumption. See `docs/working/cross-cutting-decisions.md` CC#1.
+6. **~~Expression tree parsing blocked~~** — **RESOLVED.** Guard-in-path (Strategy 3) and flow-narrowing (Strategy 4) are now unblocked. Parser produces `ParsedExpression` DU nodes for `GuardClauseSlot`; the type checker resolves these into `TypedExpression` for proof engine consumption. See `docs/working/cross-cutting-decisions.md` CC#1.
 
 > **Open Question (unresolved):** Item 5 still shares expression tree blocking dependency with type-checker.md — the type checker's expression resolution engine must be implemented before initial-state satisfiability can run.
 

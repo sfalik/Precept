@@ -4,7 +4,7 @@
 
 **Stage:** Design Complete  
 **Implementation:** Stub — `Parser.Parse` returns empty arrays  
-**Blocking:** ~~Expression tree design~~ — resolved by CC#1 (2026-05-03). Expression slots now carry `ParsedExpression`.
+**Blocking:** ~~Expression tree design~~ — resolved. Expression slots now carry `ParsedExpression`.
 
 ---
 
@@ -43,23 +43,23 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 | `ModifierListSlot` | `ImmutableArray<ModifierKind>` |
 | `StateEntryListSlot` | `ImmutableArray<(string Name, ImmutableArray<ModifierKind> Modifiers)>` |
 | `ArgumentListSlot` | `ImmutableArray<(string Name, TypeMeta Type)>` |
-| `ComputeExpressionSlot` | `ParsedExpression` (CC#1 resolved — typed DU) |
-| `GuardClauseSlot` | `ParsedExpression` (CC#1 resolved — typed DU) |
+| `ComputeExpressionSlot` | `ParsedExpression` (typed DU) |
+| `GuardClauseSlot` | `ParsedExpression` (typed DU) |
 | `ActionChainSlot` | `ImmutableArray<ActionKind>` |
-| `OutcomeSlot` | `ParsedExpression` (CC#1 resolved — typed DU) |
+| `OutcomeSlot` | `ParsedExpression` (typed DU) |
 | `StateTargetSlot` | `string?` — target state name |
 | `EventTargetSlot` | `string?` — target event name |
-| `EnsureClauseSlot` | `ParsedExpression` (CC#1 resolved — typed DU) |
+| `EnsureClauseSlot` | `ParsedExpression` (typed DU) |
 | `BecauseClauseSlot` | `string` — diagnostic message |
 | `AccessModeSlot` | `SourceSpan` — access mode span |
 | `FieldTargetSlot` | `string?` — target field name |
-| `RuleExpressionSlot` | `ParsedExpression` (CC#1 resolved — typed DU) |
+| `RuleExpressionSlot` | `ParsedExpression` (typed DU) |
 | `InitialMarkerSlot` | `bool` — presence of `initial` keyword |
 
 > **Open Question (unresolved):** Four slot subtypes contradict type-checker.md: `TypeExpressionSlot` (TypeMeta here vs SourceSpan there), `ModifierListSlot` (ModifierKind here vs TokenKind there), `AccessModeSlot` (SourceSpan here vs TokenKind there), `BecauseClauseSlot` (string here vs SourceSpan there). Which shapes are canonical?
 > *Source: catalog-gap-register.md #7 — BLOCKING*
 
-Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes (CC#1, resolved 2026-05-03). The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
+Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
 
 ---
 
@@ -227,7 +227,7 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 
 Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with ~10 sealed subtypes (one per expression form). The expression parser is a Pratt parser (operator-precedence) using `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
 
-> **CC#1 (resolved 2026-05-03):** `ParsedExpression` is a closed, strongly-typed DU. Adding a new expression form requires a C# code change (new subtype + update all consumer switches). Exhaustiveness is enforced by sealed hierarchy + Roslyn analyzer test. See `docs/working/cross-cutting-decisions.md` CC#1.
+`ParsedExpression` is a closed, strongly-typed DU. Adding a new expression form requires a C# code change (new subtype + update all consumer switches). Exhaustiveness is enforced by sealed hierarchy + Roslyn analyzer test. See `docs/working/cross-cutting-decisions.md` CC#1.
 
 ---
 
@@ -375,7 +375,7 @@ When multiple constructs match and disambiguation fails:
 
 ### Expression Tree Design (RESOLVED)
 
-**Decision (CC#1, 2026-05-03):** Expression-carrying slots carry `ParsedExpression` — a sealed abstract record DU with per-form sealed subtypes.
+**Decision:** Expression-carrying slots carry `ParsedExpression` — a sealed abstract record DU with per-form sealed subtypes.
 
 **Design:**
 - `ParsedExpression` = sealed abstract record base + ~10 sealed subtypes (one per expression form declared in the `ExpressionForms` catalog)
@@ -406,9 +406,9 @@ Traditional ASTs have per-node-type properties (`FieldDeclaration.Name`, `EventD
 
 ## Open Questions / Implementation Notes
 
-### ~~Expression Tree Design~~ (RESOLVED — CC#1)
+### ~~Expression Tree Design~~ (RESOLVED)
 
-Expression tree design resolved 2026-05-03. Expression-carrying slots carry `ParsedExpression` (sealed DU, ~10 subtypes). See § Expression Tree Design (RESOLVED) above and `docs/working/cross-cutting-decisions.md` CC#1.
+Expression tree design resolved. Expression-carrying slots carry `ParsedExpression` (sealed DU, ~10 subtypes). See § Expression Tree Design (RESOLVED) above and `docs/working/cross-cutting-decisions.md` CC#1.
 
 ### Error Recovery Granularity
 

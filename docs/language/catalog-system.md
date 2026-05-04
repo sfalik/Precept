@@ -862,7 +862,7 @@ public record TypeMeta(
     IReadOnlyList<TypeAccessor>? Accessors        = null,
     string?                      HoverDescription = null,
     string?                      UsageExample     = null,
-    TypeRuntime?                 Runtime          = null   // optional zero-boxing typed-lane registration (CC#25 Q10)
+    TypeRuntime?                 Runtime          = null   // optional zero-boxing typed-lane registration
 );
 ```
 
@@ -899,7 +899,7 @@ public sealed class TypeRuntime<T> : TypeRuntime
 
 Registration is process-global via `PreceptRuntime.Register<T>(fromClr, toClr)`. The runtime stores the resulting `TypeRuntime<T>` instance in the corresponding `TypeMeta` entry. Types with no registration default to JSON-lane-only access (`TypeMeta.Runtime == null`).
 
-**Durable architecture rule (CC#25):** Persistence and typed-lane conversion behavior belongs on catalog metadata — do not reintroduce per-`TypeKind` consumer switches in serializer or ingress code. The catalog entry IS the behavior.
+**Durable architecture rule:** Persistence and typed-lane conversion behavior belongs on catalog metadata — do not reintroduce per-`TypeKind` consumer switches in serializer or ingress code. The catalog entry IS the behavior.
 
 ##### TypeTrait flags enum
 

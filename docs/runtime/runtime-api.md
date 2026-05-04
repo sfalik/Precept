@@ -4,7 +4,7 @@
 
 | Property | Value |
 |---|---|
-| Doc maturity | Design — public surface locked (CC#25 Q2/Q5/Q7 accepted); entity internals (R3) pending |
+| Doc maturity | Design — public surface locked; entity internals (R3) pending |
 | Implementation state | Partial stub (`Precept.cs` and `Version.cs` exist; all operation bodies throw `NotImplementedException`) |
 | Source | `src/Precept/Runtime/Precept.cs`, `src/Precept/Runtime/Version.cs` |
 | Upstream | Compiler pipeline (`Compilation`) |
@@ -30,7 +30,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 - **JSON lane** (`JsonElement?`) — for wire callers: MCP tools, HTTP APIs, deserialization pipelines. Callers that have a JSON string use `JsonDocument.Parse(str).RootElement` inline. No string-input convenience overloads exist.
 - **Typed lane** (`Action<IArgBuilder>?` for event args; `Action<IFieldBuilder>?` for field patches) — for in-process callers that work with typed CLR values. Zero-boxing via `TypeRuntime<T>`.
 
-**There are no `IReadOnlyDictionary<string, object?>` overloads anywhere.** That provisional convenience lane is fully obsolete and superseded by these two lanes (CC#25 Q5/Q7).
+**There are no `IReadOnlyDictionary<string, object?>` overloads anywhere.** That provisional convenience lane is fully obsolete and superseded by these two lanes.
 
 **Restore is JSON-only.** `Restore(string? state, JsonElement fields)` has no typed overload. Restore is a hydration path from persisted storage — storage always provides serialized data, so in-process callers never need a typed Restore lane.
 
@@ -596,9 +596,7 @@ The three-tier constraint exposure model separates three questions that callers 
 
 Conflating these tiers would require callers to filter and re-scope constraint lists themselves — the three-tier model removes that burden.
 
-**Two-lane ingress design (CC#25 Q5/Q7).** The JSON lane (`JsonElement?`) and typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) are the complete ingress surface. `IReadOnlyDictionary<string, object?>` convenience overloads were considered provisionally and superseded — they added a third shape without covering a third class of callers. JSON + typed covers all real callers without compromising type safety or allocation characteristics.
-
-**Decisions tracking:** R1 ✅ (stateless evaluator), R2 ✅ (result type taxonomy), R5 ✅ (four-method Version surface), CC#25 Q2/Q5/Q7 ✅ (two-lane ingress, PreceptValue, TypeRuntime<T>, FiredArgs, IArgBuilder, IFieldBuilder); R3 (entity representation internals) open; D8/R4 (executable model contract) open.
+**Two-lane ingress design.** The JSON lane (`JsonElement?`) and typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) are the complete ingress surface. `IReadOnlyDictionary<string, object?>` convenience overloads were considered provisionally and superseded — they added a third shape without covering a third class of callers. JSON + typed covers all real callers without compromising type safety or allocation characteristics.
 
 ---
 
@@ -610,10 +608,10 @@ How is `Version` represented internally? The public API is decided; the internal
 
 | Option | Trade-off |
 |--------|-----------|
-| Slot array (`PreceptValue[]`) | O(1) field access via precomputed indices. Requires executable model to resolve field names → slot indices during construction. Donated directly as `Version.Slots` on commit (CC#25 Q5 — zero-copy promotion). |
+| Slot array (`PreceptValue[]`) | O(1) field access via precomputed indices. Requires executable model to resolve field names → slot indices during construction. Donated directly as `Version.Slots` on commit (zero-copy promotion). |
 | Hybrid (slot array internal, name-based public API) | Best of both — array performance internally, clean `PreceptValue` API externally. |
 
-CC#25 Q5 locked zero-copy promotion (`PreceptValue[]` working copy donated as `Version.Slots` on commit). Slot arrays are the direction; the formal R3 close is pending D8/R4.
+Zero-copy promotion is locked (`PreceptValue[]` working copy donated as `Version.Slots` on commit). Slot arrays are the direction; the formal R3 close is pending D8/R4.
 
 ### D8/R4 — Executable Model Contract
 

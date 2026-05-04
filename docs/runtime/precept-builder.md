@@ -308,7 +308,7 @@ public sealed record SlotLayout(
 
 The slot layout is the evaluator's register file specification. Every entity instance (`Version`) is a `PreceptValue[]` slot array of size `FieldCount`. The evaluator uses slot indexes, never field names, during execution.
 
-> **Vocabulary (CC#25 Q1):** These are **field slots** — runtime storage positions in the `PreceptValue[]` working-copy array, owned by `SlotLayout`, built during `Precept.From()`. They are distinct from **construct slots** (`ParsedConstruct.Slots` / `SlotValue`), which are compile-time parse positions owned by the Constructs catalog. The two concepts do not share lifecycle, representation, or owner. When discussion crosses layers, use these terms explicitly.
+> **Vocabulary:** These are **field slots** — runtime storage positions in the `PreceptValue[]` working-copy array, owned by `SlotLayout`, built during `Precept.From()`. They are distinct from **construct slots** (`ParsedConstruct.Slots` / `SlotValue`), which are compile-time parse positions owned by the Constructs catalog. The two concepts do not share lifecycle, representation, or owner. When discussion crosses layers, use these terms explicitly.
 
 **Computed slots:** Fields with `IsComputed == true` are collected into the `ComputedSlots` array. After every state transition, the evaluator walks this array and recalculates each computed field's value before constraint evaluation.
 
@@ -370,13 +370,13 @@ An `ExecutionPlan` is a flat array of `Opcode` values that the evaluator walks l
 public sealed record ExecutionPlan(
     ImmutableArray<Opcode> Opcodes,
     TypeKind ResultType,
-    int MaxStackDepth           // computed at build time; compiler enforces ≤ 32 (CC#25 Q6)
+    int MaxStackDepth           // computed at build time; compiler enforces ≤ 32
 );
 
 public abstract record Opcode;
 public sealed record LoadSlot(int SlotIndex) : Opcode;
 public sealed record LoadArg(string ArgName) : Opcode;
-public sealed record LoadLit(PreceptValue Value) : Opcode;  // literals pre-wrapped at build time (CC#25)
+public sealed record LoadLit(PreceptValue Value) : Opcode;  // literals pre-wrapped at build time
 public sealed record StoreSlot(int SlotIndex) : Opcode;
 public sealed record BinaryOp(OperationKind Kind) : Opcode;
 public sealed record UnaryOp(OperationKind Kind) : Opcode;
