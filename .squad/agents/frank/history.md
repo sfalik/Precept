@@ -84,3 +84,13 @@
 - `IReadOnlyDictionary<string, object?>` overloads are demoted to convenience extension methods for tests and in-process callers.
 - `docs/runtime/runtime-api.md` stays unchanged until the implementation PR ships the runtime surface.
 
+- **Q3 resolved (2026-05-03):** "Where do execution plans come from?" — confirmed existing architecture answers all 6 sub-questions. `ExecutionPlan` is a named type (opcode array + ResultType), compiled eagerly in Pass 5 of `Precept.From()`, embedded in owning structures (ExecutionRow.Guard, ActionPlan.Value, ConstraintDescriptor.Expression, FieldDescriptor.ComputedPlan), shared across Versions via the Precept reference, accessed by structural traversal not name-based lookup. No design change required.
+
+### 2026-05-04T01:18:00Z — Q3 ledger merge recorded
+- Frank-53's CC#25 Q3 recommendation is now merged into `decisions.md`; the durable runtime baseline remains unchanged because the existing architecture already answered the execution-plan origin questions.
+- Durable statement: `ExecutionPlan` stays the eager Pass 5 compiled form owned by the immutable `Precept` model and reached structurally from guards, action values, constraints, and computed fields.
+
+### 2026-05-04T01:18:00Z — Q4 ledger merge recorded
+- Frank's working-copy recommendation is now durably recorded in `decisions.md`: each candidate row forks from the original `Version.Slots`, guards read only immutable source slots, and only the winning row can donate its working copy into the next `Version`.
+- Durable constraint: no shared mutable working copy crosses row boundaries; pooling remains an optimization seam, not a semantic change.
+

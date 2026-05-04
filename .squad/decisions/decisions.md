@@ -1,3 +1,19 @@
+### 2026-05-03: CC#25 Q3 — execution plan origin confirmed
+**By:** Frank
+**Date:** 2026-05-03
+
+**What:** Confirmed the existing architecture already answers all six execution-plan origin questions. `ExecutionPlan` remains the named opcode-array-plus-result-type artifact compiled eagerly in Pass 5 of `Precept.From()`, embedded directly at each expression site (`ExecutionRow.Guard`, `ActionPlan.Value`, `ConstraintDescriptor.Expression`, `FieldDescriptor.ComputedPlan`), shared across `Version` instances through `Version.Precept`, and accessed by structural traversal rather than lookup-by-name.
+
+**Why:** The current design already defines execution-plan identity, ownership, compile timing, sharing, and evaluator access patterns, so no architecture change is required.
+
+### 2026-05-03: CC#25 Q4 — working copies fork per row
+**By:** Frank
+**Date:** 2026-05-03
+
+**What:** Confirmed that each candidate row evaluates against its own isolated `PreceptValue[]` working copy cloned from the original `Version.Slots` once the row passes its guard. Guards always read the immutable original slots, Fire commits at most one donated working copy into the next `Version`, and a failing candidate leaves no mutations behind.
+
+**Why:** Shared row mutation would make row order a user-visible semantic dependency. Forked working copies preserve determinism, immutability, and rollback-free discard semantics while keeping pooling and other allocation optimizations as future seams rather than new architectural work.
+
 ### 2026-05-03: Out-of-scope item routing rule
 **By:** Shane (via Copilot)
 **What:** Out-of-scope items in catalog-gap-register.md do not need to be relocated to other working docs. MCP-specific items (non-cross-cutting) live in the MCP doc. Single-component isolated questions live in their respective canonical docs. No GitHub issues for language proposals at this stage.
@@ -38623,6 +38639,3 @@ These arose during this analysis but belong in their own decision cycles:
 **By:** Frank
 **What:** Locked the vocabulary split between parser-time construct slots and runtime field slots. ParsedConstruct.Slots / SlotValue stay compile-time only; runtime execution uses field slot indices in the PreceptValue[] working-copy array, with SlotLayout as the canonical field-name-to-slot-index mapping.
 **Why:** The two concepts share a word but not a lifecycle, representation, or owner. Builder-time slot assignment happens mechanically inside Precept.From() in declaration order, so discussions that cross parser and runtime layers must explicitly distinguish construct slots from field slots.
-
-
-
