@@ -6,13 +6,13 @@
 
 **Why:** The current design already defines execution-plan identity, ownership, compile timing, sharing, and evaluator access patterns, so no architecture change is required.
 
-### 2026-05-03: CC#25 Q4 — working copies fork per row
-**By:** Frank
+### 2026-05-03: CC#25 Q4 — one working copy per Fire() call (corrected)
+**By:** Frank (revised after Shane's challenge)
 **Date:** 2026-05-03
 
-**What:** Confirmed that each candidate row evaluates against its own isolated `PreceptValue[]` working copy cloned from the original `Version.Slots` once the row passes its guard. Guards always read the immutable original slots, Fire commits at most one donated working copy into the next `Version`, and a failing candidate leaves no mutations behind.
+**What:** One working copy per `Fire()` call — not per row. The proof engine's exclusivity analysis guarantees that at most one guard passes per (state, event) pair. Therefore only one row ever executes, and exactly one `PreceptValue[]` is cloned from `Version.Slots` (lazily, after the unique matching guard passes). Guards always read the immutable original `Version.Slots`. If constraints fail, the working copy is discarded and the event returns `EventConstraintsFailed` — there is no backtracking to another row. On commit, the working copy is donated as the new `Version.Slots` (zero-copy promotion).
 
-**Why:** Shared row mutation would make row order a user-visible semantic dependency. Forked working copies preserve determinism, immutability, and rollback-free discard semantics while keeping pooling and other allocation optimizations as future seams rather than new architectural work.
+**Why:** The original "fork per row" framing was defensively over-engineered for a scenario the proof engine makes structurally impossible. The working copy isolates the *current Version* from mutation until commit — not rows from each other, because row isolation is never needed. Pooling implication: one rented `ArrayPool<PreceptValue>` array per Fire call — rent on guard-pass, donate on commit or return-to-pool on constraint failure.
 
 ### 2026-05-03: Out-of-scope item routing rule
 **By:** Shane (via Copilot)
