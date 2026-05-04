@@ -38403,3 +38403,279 @@ The investigation doc is structurally sound and internally consistent. Its core 
 3. **Rename `BaseCurrency`/`QuoteCurrency` → `From`/`To`** on the `ExchangeRate` struct to match canonical accessor naming.
 4. **Fix `DateRange` to use `DateOnly?`** not `LocalDate?` for the public CLR surface.
 5. **Add coverage note** acknowledging the 5 types the investigation doesn't treat in depth (`price`, `currency`, `unitofmeasure`, `dimension`, `period` extensions).
+
+# CLR Collection Surface: `ImmutableArray<T>` vs `IReadOnlyList<T>`
+
+**By:** Frank  
+**Date:** 2026-05-06  
+**Status:** Decision — ready for Shane review  
+**Subject:** Should `Get<T>()` for collection fields return `ImmutableArray<T>` instead of `IReadOnlyList<T>`?
+
+---
+
+## 1. Recommendation
+
+**Hybrid. Not a hedge — architecturally distinct deployments of each type.**
+
+| Surface | Type | Decision |
+|---|---|---|
+| Field collection reads (`Get<T>()`) — 6 single-type kinds | `IReadOnlyList<T>` | **Keep** |
+| Field collection reads (`Get<T>()`) — `log by`, `queue by` | `IReadOnlyList<KeyedElement<TValue, TKey>>` | **Keep** |
+| Field collection reads (`Get<T>()`) — `lookup` | `IReadOnlyDictionary<TKey, TValue>` | **Keep** |
+| Result type arrays (`Violations`, `Transitions`, `EventEnsures`, `PostFields`, etc.) | `ImmutableArray<T>` | **Already there — keep** |
+
+`ImmutableArray<T>` is the right type for fixed-size, fully-materialized metadata arrays on outcome records. It is the wrong type for projecting from `PreceptValue[]` internal storage. These are two different things. The asymmetry is correct.
+
+**Do not change the field collection surface.**
+
+---
+
+## 2. Allocation Model
+
+### Why `ImmutableArray<T>` cannot be used as a lazy adapter
+
+`ImmutableArray<T>` is a struct wrapping a `T[]`. To hand one to a caller, you need a `T[]`. You cannot alias a `PreceptValue[]` into an `ImmutableArray<T>` — they're different types. That means to return `ImmutableArray<string>` for a `set of string` field, you must project the entire `PreceptValue[]` into a new `string[]`. This is O(n) materialization per `Get<T>()` call.
+
+The lazy adapter (`PreceptList<T> : IReadOnlyList<T>`) wraps the `PreceptValue[]` directly. `Get<T>()` is O(1) — it just constructs the thin wrapper. Individual element access is O(1) per element (one projection per `[i]` call). The wrapper itself is a small heap-allocated object, but the backing `PreceptValue[]` is already on the heap as the committed slot backing.
+
+### "But CoW makes caching natural"
+
+True. Unmodified slots carry forward the **same** `PreceptValue[]` reference across versions. If you cache the materialized `T[]` by the `PreceptValue[]` reference (a `ConditionalWeakTable<PreceptValue[], object>`), then versions that don't touch a slot share the cached `T[]`. The cross-version cache works.
+
+Evaluation: this is real, and it's a legitimate reason to reconsider. But it doesn't change the verdict.
+
+The lazy adapter is always at least as efficient as cached `ImmutableArray<T>` and strictly better for partial iteration:
+
+| Scenario | Lazy adapter | `ImmutableArray<T>` + cache |
+|---|---|---|
+| `Get<>()` then access `[0]` only | O(1) wrap + O(1) element | O(n) materialize (first hit) |
+| `Get<>()` then full enumeration | O(1) wrap + O(n) projection | O(n) materialize + O(1) cache hit per subsequent call |
+| Same field, second `Get<>()`, same Version | O(1) wrap (same backing) | O(1) if cached |
+| Same field, next Version (slot unmodified, same `PreceptValue[]`) | O(1) wrap (same backing) | O(1) if ConditionalWeakTable hit |
+
+The only scenario where `ImmutableArray<T>` wins is repeated `Get<>()` on the **same field in the same Version** after the first call. That is an uncommon usage pattern — callers typically call `Get<>()` once and hold the result. The lazy adapter handles this identically: both are O(1) wraps of the same `PreceptValue[]`.
+
+### Caching strategy verdict
+
+No caching strategy for `ImmutableArray<T>` improves on the lazy adapter. The ConditionalWeakTable approach works but adds implementation complexity (secondary dictionary for type dispatch per key, weak reference overhead) for zero benefit at Precept's scale (business entity collections, typically ≤100 elements). Ship the lazy adapter. The CoW backing is the structural sharing mechanism — the public API doesn't need to replicate it.
+
+### Where `ImmutableArray<T>` IS correct
+
+Result type arrays (`Violations`, `Transitions`, `FieldSnapshots`, `EventEnsures`, `PostFields`, `RelevantFields`) are already materialized from CLR objects at construction time. There is no `PreceptValue[]` intermediary — these are `ConstraintViolation[]`, `TransitionInspection[]`, etc. assembled at outcome-construction time. Wrapping them in `ImmutableArray<T>` costs nothing extra. The materialization would happen anyway. `ImmutableArray<T>` here is free immutability signal. That's the correct deployment.
+
+This distinction — "already materialized from CLR objects" vs. "backed by `PreceptValue[]`" — is the architectural boundary that determines which type is right.
+
+---
+
+## 3. Pair Collections
+
+`IReadOnlyList<KeyedElement<TValue, TKey>>` via `PreceptList<KeyedElement<T,P>>` — **confirmed, no change**.
+
+The stride-2 backing (`even indices = element, odd indices = key/priority`) maps cleanly to the adapter:
+
+```csharp
+internal sealed class PreceptPairList<TValue, TKey> : IReadOnlyList<KeyedElement<TValue, TKey>>
+{
+    public KeyedElement<TValue, TKey> this[int index]
+        => new(projectValue(_slots[index * 2]), projectKey(_slots[index * 2 + 1]));
+    public int Count => _slots.Length / 2;
+}
+```
+
+`KeyedElement<TValue, TKey>` is a `readonly record struct` — a value type. Every index access creates one on the stack. No heap allocation per element. This is optimal.
+
+Under `ImmutableArray<KeyedElement<TValue, TKey>>`, you'd allocate a `KeyedElement<TValue, TKey>[]` upfront — same struct creation, but all at once even for partial access. No improvement.
+
+`IReadOnlyList<KeyedElement<TValue, TKey>>` with the lazy adapter is correct. Pair collections are confirmed.
+
+---
+
+## 4. Lookup
+
+**`IReadOnlyDictionary<TKey, TValue>` — keep. `ImmutableDictionary<K,V>` — rejected.**
+
+Rationale:
+
+`ImmutableDictionary<K,V>` is a balanced tree (AVL or red-black). Lookup is O(log n). The internal `PreceptValue[]` stride-2 backing is an unordered flat array — materializing it into a tree costs O(n log n). Every key lookup thereafter is O(log n).
+
+`IReadOnlyDictionary<K,V>` backed by `PreceptLookup<K,V>` (internal adapter that builds a `Dictionary<K,V>` on first key access) gives O(n) construction and O(1) lookup. Same semantics, better performance, simpler construction.
+
+Immutability is not a differentiator here. `PreceptLookup<K,V>` wraps committed `PreceptValue[]` that the runtime never mutates after commit. The underlying data is immutable — `ImmutableDictionary` doesn't add safety, it adds O(log n) penalty.
+
+For a type whose entire identity is key-value lookup, O(log n) lookup is the wrong tradeoff. `IReadOnlyDictionary<K,V>` keeps the right semantics. `ImmutableDictionary<K,V>` would make Precept lookup semantically inferior to an ordinary .NET `Dictionary<K,V>` for no benefit.
+
+`IReadOnlyDictionary<TKey, TValue>` confirmed.
+
+---
+
+## 5. OQ-C1 / OQ-C2 / OQ-C3 Resolution
+
+**None of these are resolved by the `ImmutableArray` question. All three remain live.**
+
+| OQ | Question | Affected by `ImmutableArray`? | Status |
+|---|---|---|---|
+| **OQ-C1** | `bag of T`: `IReadOnlyList<T>` with duplicates vs. frequency-aware surface (`IReadOnlyDictionary<T, long>`) | ❌ No. The frequency question is about bag semantics — whether element counts are surfaced explicitly. The wrapper type is orthogonal. | **Open — awaiting Shane** |
+| **OQ-C2** | `KeyedElement<TValue, TKey>` — confirm or rename (`OrderedEntry`, `KeyedItem`) | ❌ No. The struct name doesn't depend on whether it's in an `IReadOnlyList<>` or `ImmutableArray<>`. | **Open — awaiting Shane** |
+| **OQ-C3** | `ascending`/`descending` direction modifier — lives on `FieldDescriptor.SortDirection` only, not on CLR type | ❌ No. Whether direction is on the descriptor or the CLR type wrapper doesn't depend on the wrapper type itself. | **Open — awaiting Shane** |
+
+Frank's standing leans on all three (from prior investigation):
+- **OQ-C1**: Keep `IReadOnlyList<T>` with duplicates. LINQ `GroupBy` for frequency. Consistent surface.
+- **OQ-C2**: Keep `KeyedElement<TValue, TKey>`. Precise and neutral.
+- **OQ-C3**: Direction on `FieldDescriptor.SortDirection` only. CLR type is always `IReadOnlyList<KeyedElement<T, P>>` regardless.
+
+None require Shane's input to unblock implementation — they're naming and surface refinements. But Shane should confirm before the API is published.
+
+---
+
+## 6. Immutability Signal: Does `ImmutableArray<T>` Communicate the Contract Better?
+
+Yes. `ImmutableArray<T>` is structurally immutable at the type level. `IReadOnlyList<T>` is an interface — it prevents writes through the interface but doesn't prove the backing collection can't be mutated.
+
+This is a real advantage. But it doesn't change the verdict, for two reasons:
+
+**First**, the contract that matters for Precept is not "this array can't be mutated by someone holding a reference" — it's "this Version is an immutable snapshot." That contract is enforced by the runtime's CoW model, not by the type of the returned collection. `PreceptList<T>` wraps committed `PreceptValue[]` that the runtime never touches after commit. The collection is effectively immutable regardless of the interface type. Adding `ImmutableArray<T>` would be a redundant signal on top of an already-enforced invariant.
+
+**Second**, callers who care about this distinction understand Precept's model from the docs. Callers who don't understand Precept's model aren't protected by `ImmutableArray<T>` either — they need the docs. The type-level signal doesn't substitute for the runtime guarantee.
+
+The immutability signal is a genuine point in `ImmutableArray<T>`'s favor. It just doesn't outweigh the allocation cost and adapter complexity for field collection reads.
+
+---
+
+## 7. BCL Dependency Concern
+
+Not a concern. `System.Collections.Immutable` is already a dependency — it appears on `EventOutcome.ConstraintsFailed.Violations`, `EventInspection.Transitions`, `ConstraintViolation.RelevantFields`, and others. Any caller using Precept's public API already carries this package. Adding it to field collection reads would not introduce a new dependency.
+
+This was one of the original rejection reasons for `ImmutableArray<T>` in the collection investigation (§4.1). That rejection was written before the result types adopted `ImmutableArray<T>`. The BCL dependency argument is now moot. But the allocation argument holds.
+
+---
+
+## 8. Caller Ergonomics
+
+`ImmutableArray<string>` vs `IReadOnlyList<string>` — which reads better?
+
+```csharp
+// Current (IReadOnlyList<T>)
+IReadOnlyList<string> tags = version.Get<IReadOnlyList<string>>("Tags");
+string first = tags[0];
+
+// Proposed (ImmutableArray<T>)
+ImmutableArray<string> tags = version.Get<ImmutableArray<string>>("Tags");
+string first = tags[0];
+```
+
+`ImmutableArray<T>` reads slightly better as a type name — shorter, more direct. But the `Get<T>()` call is longer and more awkward because `ImmutableArray<string>` is a heavier type argument than `IReadOnlyList<string>` for most developers' muscle memory.
+
+More importantly: the result types already use `ImmutableArray<T>` for small fixed arrays. If field collection reads also used `ImmutableArray<T>`, the entire public surface would be consistent — `ImmutableArray<T>` everywhere a sequence appears. This is a coherence argument worth acknowledging.
+
+But it's not sufficient to override the allocation concern. The right split is: `ImmutableArray<T>` for fully-materialized fixed-size metadata arrays; `IReadOnlyList<T>` for projections from internal storage. Callers who encounter both will understand the distinction once they read the docs. Forcing `ImmutableArray<T>` everywhere for surface consistency would be the wrong tradeoff.
+
+---
+
+## 9. Design Coherence
+
+Precept versions are structurally immutable. Does `ImmutableArray<T>` reinforce this better than `IReadOnlyList<T>`?
+
+Marginally. But the stronger statement of Precept's immutability model is not in the CLR type returned by `Get<T>()` — it's in the architecture: CoW protocol, committed `PreceptValue[]` never mutated, `Version` is a record. A caller who understands why Precept is immutable doesn't need the type to signal it. A caller who doesn't understand it isn't meaningfully protected by the struct type.
+
+The design identity argument applies to the _result types_ more than the collection reads. When a constraint check fails, `Violations` being `ImmutableArray<ConstraintViolation>` is the right signal — the set of violations is final, there's no question. For field collection reads, the "immutable" quality is a property of the Version as a whole, not specifically of the collection value returned.
+
+---
+
+## 10. Tradeoffs Accepted
+
+By holding `IReadOnlyList<T>` for field collection reads:
+
+- **Accepting:** The CLR type doesn't advertise structural immutability. A caller could downcast (they'd get `InvalidCastException` attempting to cast `PreceptList<T>` to `List<T>` — the runtime rejects it. But the interface doesn't prevent the attempt.)
+- **Accepting:** Surface inconsistency between result type arrays (which use `ImmutableArray<T>`) and field collection reads (which use `IReadOnlyList<T>`). This is architecturally justified but requires a clear doc note explaining the distinction.
+- **Accepting:** Not getting the ergonomic win of a uniform `ImmutableArray<T>` surface.
+
+By rejecting `ImmutableArray<T>` for field collection reads:
+
+- **Avoiding:** O(n) materialization on every `Get<T>()` call unless cached.
+- **Avoiding:** Implementation complexity of cross-version caching (ConditionalWeakTable keyed by `PreceptValue[]` reference + type).
+- **Avoiding:** Allocating a new `T[]` for every unique `(Version, fieldName)` pair even when the caller only accesses one element.
+
+The tradeoffs are clear. Hold the lazy adapter.
+
+---
+
+## Summary
+
+| Question | Answer |
+|---|---|
+| Should `Get<T>()` return `ImmutableArray<T>` for field collection reads? | **No.** Allocation cost is real. Lazy adapter is strictly better for partial iteration and equivalent for full enumeration. |
+| Should result type arrays stay as `ImmutableArray<T>`? | **Yes.** Already materialized from CLR objects. Free immutability signal. Correct deployment. |
+| Should `lookup` use `ImmutableDictionary<K,V>`? | **No.** O(log n) lookup for hash-semantics type. `IReadOnlyDictionary<K,V>` backed by internal `Dictionary<K,V>` gives O(1). |
+| Are OQ-C1, OQ-C2, OQ-C3 closed by this decision? | **No.** All three remain live — they're orthogonal to the wrapper type choice. |
+| Is the BCL dependency a concern? | **No.** `System.Collections.Immutable` is already on the surface via result types. |
+| Does `ImmutableArray<T>` reinforce Precept's design identity for field reads? | **Marginally yes, not sufficiently yes.** The model's immutability is enforced by CoW, not advertised by the return type. |
+
+**Path forward:** No changes to the collection surface spec. OQ-C1, OQ-C2, OQ-C3 go to Shane for confirmation as originally planned.
+
+# OQ-C3: Direction Storage for Pair Collections — LOCKED
+
+**By:** Frank  
+**Date:** 2026-05-04  
+**Status:** Decision — locked by Shane  
+**Subject:** How does the evaluator store `queue by` / `log by` pair collections — always-ascending with adapter flips, or declared direction?
+
+---
+
+## Decision
+
+**Store in declared direction.**
+
+The evaluator stores pair collections (`queue by`, `log by`) in the **declared direction** (ascending or descending as declared in the DSL). Direction is "compiled in" at write time. All read surfaces are direction-naive.
+
+---
+
+## Mechanics
+
+- `CollectionActions.Enqueue` and `CollectionActions.LogByAppend` take direction as a parameter and insert each element into the correct sorted position based on declared direction.
+- `arr[0]` is always "front" in the declared order. Callers who want the front of a `queue by T ascending` get the smallest key at index 0; callers with `queue by T descending` get the largest key at index 0.
+- `Peek`, `Dequeue`, and log iteration are **direction-naive** — they operate on index 0 and forward iteration without needing a direction parameter.
+- `PreceptPairList<TValue, TKey>` does **not** flip index math — it returns `arr[0]` as index 0 directly.
+- The JSON serializer iterates the array forward — no inversion logic needed.
+- `FieldDescriptor.SortDirection` remains as **informational metadata only** — it is not consulted at read time by any runtime surface.
+
+---
+
+## Rationale
+
+One place owns direction: insertion (`Enqueue` / `LogByAppend`). All reads — CLR adapter, JSON serializer, evaluator peek/dequeue — are direction-naive. This minimizes the surface area of direction-awareness and prevents hidden bugs from forgetting to flip in one of multiple owning locations.
+
+---
+
+## Alternative Rejected
+
+**Option A: Always store ascending internally; flip index math in `PreceptPairList` CLR adapter.**
+
+Rejected because:
+1. The JSON serializer also needed a flip to present the collection in declared order — direction ownership was split across two independent places (`PreceptPairList` and the JSON serializer).
+2. Two callsites needing the same direction knowledge is a design smell. The declared-direction model eliminates this entirely.
+3. No performance benefit — insertion cost is identical; the flip cost is just moved from write-time (one operation) to read-time (every access).
+
+---
+
+## Companion Decisions Also Locked
+
+| OQ | Decision |
+|---|---|
+| OQ-C1 | `bag of T` exposed as `IReadOnlyList<T>` with duplicates. LINQ `GroupBy` for frequency. No special bag-frequency CLR type. |
+| OQ-C2 | `KeyedElement<TValue, TKey>` confirmed as the named pair struct. `readonly record struct KeyedElement<TValue, TKey>(TValue Value, TKey Key)`. |
+
+---
+
+## Affected Components
+
+| Component | Impact |
+|---|---|
+| `CollectionActions` | `Enqueue` and `LogByAppend` take `SortDirection` parameter; insert in declared-direction sorted position. |
+| `PreceptPairList<TValue, TKey>` | No direction flip — returns `arr[0]` as index 0. Direction-naive. |
+| JSON serializer | Iterates backing array forward — no inversion. Direction-naive. |
+| `FieldDescriptor.SortDirection` | Informational metadata only. Not consulted by any read surface. |
+| Evaluator `Peek` / `Dequeue` | Direction-naive. Index 0 is always "front" in declared order. |
+
+---
+
+*Source documents patched: `docs/working/precept-collection-types-investigation.md` §9; `docs/working/runtime-api-public-surface-spec.md` §13.7.*
