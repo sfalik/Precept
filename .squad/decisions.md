@@ -6,6 +6,23 @@
 
 ---
 
+### 2026-05-05T15:32:50Z: Value-types investigation reconciled to authoritative docs; `DateRange` deferred and `date` stays `NodaTime.LocalDate`
+
+**By:** Frank
+
+**Status:** Merged, inbox cleared (1 file).
+
+**Merged sources:** `frank-value-types-reconciliation.md`.
+
+- `docs/working/precept-value-types-investigation.md` now aligns with `docs/language/temporal-type-system.md` and `docs/language/business-domain-types.md` across §§1–§14.
+- §7.4 `DateRange` is no longer treated as a confirmed type: the temporal type system explicitly defers date-interval / daterange support, so the investigation now records it as deferred rather than adopted.
+- The backing type for `date` is confirmed as `NodaTime.LocalDate`, and the earlier `DateOnly` / dual-public-surface claim was removed because the locked temporal design exposes NodaTime directly.
+- All remaining sections were verified as consistent; the only follow-up tensions left for Shane are the DX-layer well-known-constants surface and the authoritative `currency` accessor doc lag.
+
+---
+
+---
+
 ### 2026-05-04T17:00:09Z: Business value type coverage narrowed: Price stays semantic-only; ExchangeRate, Percentage, and DateRange advance as candidates
 
 **By:** Frank
@@ -22,6 +39,7 @@
 ---
 
 ---
+
 ### 2026-05-04T05:45:56Z: Audit-gap P2 clarifications recorded; compiler/runtime innovation callouts confirmed clean
 
 **By:** Scribe
@@ -1145,5 +1163,3 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Source: `docs/working/precept-collection-types-investigation.md` §§8, 11–14. The investigation doc conclusions are now captured in evaluator.md; the investigation doc may be archived.
 
 ---
-
-

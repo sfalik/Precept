@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+### 2026-05-05T15:32:50Z — Value-types reconciliation batch recorded
+
+- Pre-check measured `decisions.md` at 62325 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran before merge and found 0 eligible entries older than 2026-04-28T15:32:50Z.
+- Merged Frank's authoritative-doc reconciliation inbox note into the canonical ledger, deleted the processed inbox file, wrote the Frank orchestration/session logs, and refreshed Frank/Scribe history.
+- Health report: `decisions.md` 62325B -> 63360B; history files summarized = 0.
+
 ### 2026-05-05T15:20:17Z — Value-types integration batch recorded
 
 - Pre-check: decisions.md measured 825968 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran before merge.
