@@ -74,11 +74,12 @@ sealed record EventDescriptor(
     IReadOnlyList<ArgDescriptor> Args,
     int SourceLine);
 
-// Arg descriptor — carries type and optionality for validation
+// Arg descriptor — carries type, optionality, and arg slot index for evaluator access
 sealed record ArgDescriptor(
     string Name,
     TypeKind Type,
     bool IsOptional,
+    int SlotIndex,
     string? DefaultExpression,
     int SourceLine);
 

@@ -384,12 +384,22 @@ Appears in `EventInspection.EventEnsures`, `RowInspection.Constraints`, and `Upd
 ```csharp
 public sealed record ConstraintViolation(
     ConstraintDescriptor Constraint,
-    IReadOnlyList<string> FieldNames);
+    string? BecauseClause,                        // From the constraint's because clause
+    ImmutableArray<FieldSnapshot> RelevantFields,  // Field values at evaluation time
+    string? FailingSubexpression,                  // Innermost expression that evaluated false
+    PreceptValue? FailingValue                     // Value at the failure site
+);
 ```
+
+- `Constraint` — the descriptor of the rule that was violated
+- `BecauseClause` — the `because "..."` text from the constraint declaration, if present
+- `RelevantFields` — snapshots of field values at the time of evaluation (for diagnostic context)
+- `FailingSubexpression` — the innermost subexpression text that evaluated to false
+- `FailingValue` — the `PreceptValue` at the failure site (e.g., the computed value that violated the bound)
 
 Appears in `EventConstraintsFailed.Violations` and `UpdateConstraintsFailed.Violations`. Only produced for constraints that are definitively violated (not unresolvable — commit operations have complete data).
 
-> **Provisional (G1/G9):** Same as ConstraintResult — `FieldNames` will evolve into a typed target list under D8/R4.
+> **Provisional (Shane ruling 2026-05-04):** Shape promoted from minimal 2-field form to the canonical 5-field design. Field population (especially `FailingSubexpression` and `FailingValue`) depends on evaluator instrumentation; all fields nullable/defaultable for fields not yet wired. `FieldNames` dropped — superseded by typed `ImmutableArray<FieldSnapshot>`.
 
 #### Tier 2 Scope Rules
 
@@ -425,7 +435,7 @@ Returned by `Version.FieldAccess`. Lists every non-omitted field in the current 
 #### ArgDescriptor
 
 ```csharp
-public sealed record ArgDescriptor(string Name, string Type);
+public sealed record ArgDescriptor(string Name, string Type, bool IsOptional, int SlotIndex);
 ```
 
 Returned by `Version.RequiredArgs(eventName)`. Enables the UI to render typed input controls for event arguments.
@@ -466,46 +476,66 @@ Each `Set<T>` call is resolved through the registered `TypeRuntime<T>`. The patc
 
 #### PreceptValue
 
-The unified value type at the API boundary. All field and arg values are `PreceptValue` when read back from the runtime.
+The evaluation currency for the runtime. `PreceptValue` is a **32-byte tagged struct** — not a class hierarchy. All field and arg values are `PreceptValue` when read back from the runtime.
 
 ```csharp
-public abstract class PreceptValue
+[StructLayout(LayoutKind.Explicit, Size = 32)]
+public struct PreceptValue
 {
-    // JSON lane conversions
-    public static PreceptValue FromJson(JsonElement element);
-    public JsonElement ToJson();
-
-    // Typed lane conversions (uses registered TypeRuntime<T>)
-    public static PreceptValue FromClr<T>(T value);
-    public T ToClr<T>();
+    // Opaque tagged union. Callers do not construct PreceptValue directly.
+    // Obtain values from Version["FieldName"], FiredArgs["ArgName"], or
+    // via IArgBuilder.Set<T> / IFieldBuilder.Set<T> (which go through TypeRuntime<T>).
+    // Convert using TypeRuntime<T>.ToClr / TypeRuntimeMeta.WriteJson.
 }
 ```
 
-`PreceptValue` is a sealed class hierarchy. Concrete subtypes correspond to Precept's declared types (integer, decimal, text, boolean, etc.). Callers read field values via the indexer (`version["FieldName"]`) and convert using `ToClr<T>()` or `ToJson()`.
+`PreceptValue` carries no instance methods for conversion. Conversion is owned by the catalog's `TypeRuntime<T>` and `TypeRuntimeMeta` registrations — not by the value itself.
 
 #### TypeRuntime\<T\>
 
-Zero-boxing registration record for mapping between CLR types and `PreceptValue`.
+Zero-boxing registration record for mapping between CLR types and `PreceptValue`. Naming is final: `FromClr` / `ToClr` / `FromJson` / `ToJson`.
 
 ```csharp
 public sealed record TypeRuntime<T>(
-    Func<T, PreceptValue> FromClr,
-    Func<PreceptValue, T> ToClr);
+    Func<T, PreceptValue>       FromClr,
+    Func<PreceptValue, T>       ToClr,
+    Func<JsonElement, PreceptValue> FromJson,
+    Func<PreceptValue, JsonElement> ToJson);
 ```
 
 Registration pattern:
 
 ```csharp
 PreceptRuntime.Register(new TypeRuntime<decimal>(
-    v  => new DecimalValue(v),
-    pv => ((DecimalValue)pv).Value));
+    FromClr:  v  => PreceptValue.FromScalar(v),
+    ToClr:    pv => pv.AsDecimal(),
+    FromJson: el => PreceptValue.FromScalar(el.GetDecimal()),
+    ToJson:   pv => JsonSerializer.SerializeToElement(pv.AsDecimal())));
 ```
 
 Registrations are process-global. `IArgBuilder.Set<T>` and `IFieldBuilder.Set<T>` resolve through registered `TypeRuntime<T>` entries for zero-allocation conversion. `Version.Get<T>()` and `FiredArgs.Get<T>()` use `ToClr` on the registered runtime.
 
+#### TypeRuntimeMeta
+
+Catalog-owned metadata record that holds the hot-path serialization delegates for each Precept type. Every `TypeMeta` entry in the Types catalog carries a `TypeRuntimeMeta` instance.
+
+```csharp
+public sealed record TypeRuntimeMeta(
+    ReadJsonDelegate         ReadJson,          // ref Utf8JsonReader, ref PreceptValue — Phase 1 ingress
+    WriteJsonDelegate        WriteJson,         // Utf8JsonWriter, PreceptValue — Phase 8 egress
+    ParseStringDelegate      ParseString,       // string → PreceptValue (LS/authoring path)
+    FormatStringDelegate     FormatString,      // PreceptValue → string (LS/authoring path)
+    BinaryExecutorDelegate[] BinaryExecutors,   // indexed by OperationKind — builder embeds delegates in opcodes at compile time
+    UnaryExecutorDelegate[]  UnaryExecutors);   // indexed by OperationKind — builder embeds delegates in opcodes at compile time
+```
+
+Active surface for Fire/Inspect/Update hot paths: `ReadJson`, `WriteJson`. `BinaryExecutors` and `UnaryExecutors` are consumed at build time — the builder embeds executor delegates directly in `BinaryOp`/`UnaryOp` opcodes; the evaluator never indexes these arrays at evaluation time. `ParseString` and `FormatString` are used by the language server and authoring tools. `ExtractValue`, `StoreValue`, and `ParseValue` are excluded from hot paths.
+
+Ownership rules (locked per CC#25): the call site advances to the value token and handles `null`; collection runtimes own structural array/object loops; scalar fields read and write the inline value region directly without boxing intermediaries.
+
 #### FiredArgs
 
-Event arg egress — appears on `EventOutcome` variants that carry submission context (`Transitioned.Args`, `Applied.Args`, `Rejected.Args`). Allows callers to read back what was submitted as strongly-typed values.
+Event arg egress — appears on `EventOutcome` variants that carry submission context (`Transitioned.Args`, `Applied.Args`, `Rejected.Args`). Allows callers to read back what was submitted as strongly-typed values. `Rejected` carries `FiredArgs` so callers can log or display what was submitted alongside the rejection reason — the submitted args are part of the rejection context, not discarded because the row matched.
 
 ```csharp
 public sealed class FiredArgs

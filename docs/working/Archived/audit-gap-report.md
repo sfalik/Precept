@@ -125,7 +125,7 @@ Add a note: *"Arg slot indexes are assigned in Pass 1 (Descriptor Pass) in decla
 
 **Status:** ✅ Fixed
 
-**Update (2026-05-04):** Fixed. `evaluator.md` §4 now records the TypeBuilder rejection rationale, including AOT/trimming, cold-start, and inspectability concerns.
+**Update (2026-05-04, revised):** Fixed with full rationale. `evaluator.md` §4 now records all three blocking constraints from decisions.md: SaaS cold-start incompatibility, inspectability as a product guarantee (not debugger convenience), and same-process JIT-warm delegates making the warm-path advantage irrelevant. Prior AOT/trimming framing (not in decisions.md) removed.
 
 **What's in decisions.md:** Entry 2026-05-03T22:22:27Z: *"The blocking constraint is SaaS cold-start and per-definition churn: hundreds of milliseconds of compile work on upload, cache miss, or deployment is incompatible with the save-and-test loop. Inspectability is a product guarantee, not an optional debugger convenience; TypeBuilder would require a second interpreted or tracing-decorator path."* `decisions-summary.md` captures a 2-sentence version.
 
@@ -139,7 +139,9 @@ Add a note: *"Arg slot indexes are assigned in Pass 1 (Descriptor Pass) in decla
 
 ### CC#25 type-per-lane storage (Option F) — rejected
 
-**Status:** ❌ Not in canonical docs
+**Status:** ✅ Fixed
+
+**Update (2026-05-04):** Fixed. `evaluator.md` §5 PreceptValue now includes a "Rejected alternative" block covering the split-lane analysis: 23 of 32 TypeKind members in reference lane, business-domain types cross-lane, NodaTime re-analysis changed details but not verdict.
 
 **What's in decisions.md:** *"Option F's split-lane model does not materially reduce the hard cases because 23 of 32 TypeKind members still live in the reference lane."*
 
@@ -342,9 +344,9 @@ These are completely different. `evaluator.md` has a rich shape (5 fields, inclu
 
 ### `FiredArgs` on `Rejected` outcome
 
-**Status:** ⚠️ Partially captured
+**Status:** ✅ Fixed
 
-**What's in decisions.md:** *"Transitioned / Applied carry `FiredArgs` with the same `Get<T>` + `PreceptValue` indexer pattern for event-arg egress."* Decisions mention `Transitioned` and `Applied` explicitly. `Rejected` is not mentioned.
+**Update (2026-05-04):** Fixed. Added rationale sentence to `runtime-api.md` §FiredArgs: Rejected carries FiredArgs so callers can log or display submitted args alongside the rejection reason.
 
 **What's in canonical docs:** `evaluator.md` §5 shows `Rejected(string Reason, FiredArgs Args)` — FiredArgs on Rejected. `runtime-api.md` §FiredArgs says: *"appears on `EventOutcome` variants that carry submission context (`Transitioned.Args`, `Applied.Args`, `Rejected.Args`)."* — FiredArgs IS on Rejected.
 
@@ -374,9 +376,9 @@ These are completely different. `evaluator.md` has a rich shape (5 fields, inclu
 
 ### Precept Builder — six-pass transformation order
 
-**Status:** ⚠️ Partially captured
+**Status:** ✅ Fixed
 
-**What's in decisions.md:** No explicit decision on pass ordering, but the builder design is settled as six passes (descriptor, slot layout, dispatch index, constraint plan, execution plan, fault backstop).
+**Update (2026-05-04):** Fixed. Renumbered passes in `precept-builder.md` so execution order matches pass numbers: old Pass 5 (Execution Plan) → Pass 4; old Pass 4 (Constraint Plan) → Pass 5. Execution order is now 1 → 2/3 → 4 → 5 → 6. Dependency note updated accordingly. All 8 references updated (diagram, dependency table, section headers, inline comment).
 
 **What's in canonical docs:** `precept-builder.md` §6 shows the six-pass diagram. The diagram correctly shows Passes 1→2 (parallel with 3)→5→4→6. However, the diagram labels "Pass 5 (Execution Plan Pass)" above "Pass 4 (Constraint Plan Pass)" in the flow diagram, noting "Pass 5 runs before Pass 4." This is potentially confusing — the pass numbers don't reflect execution order. The dependency table at the bottom correctly shows the order.
 
@@ -501,25 +503,21 @@ execution plan compilation, IArgBuilder/IFieldBuilder implementation.
 
 ### GAP-040 — `bag.countof` uses `ElementParameterAccessor` DU subtype
 
-**Status:** ⚠️ Partially captured
+**Status:** ✅ Fixed
 
 **What's in decisions.md:** *"GAP-040 is locked to the metadata-driven path: `bag.countof(...)` must stop pretending its parameter is `integer` and instead use a dedicated `ElementParameterAccessor` DU subtype whose parameter resolves to the bag element type."*
 
-**What's in canonical docs:** `decisions-summary.md` captures the decision. Whether `catalog-system.md` or the Types/Functions catalog reference tables have been updated to reflect `ElementParameterAccessor` was not verifiable from the portions I read.
-
-**Gap:** Cannot verify catalog-level update without reading the full Types catalog reference tables. Marked as partially captured — needs verification that the Types accessor catalog entry for `countof` now reflects `ElementParameterAccessor` shape.
+**What's in canonical docs:** `catalog-system.md` §TypeAccessor DU now documents the full three-type hierarchy: `TypeAccessor` base (inner-type return), `FixedReturnAccessor` (fixed return), and `ElementParameterAccessor` (parameter resolves to bag element type). The stale "Open Question" callout and missing code fence were also corrected. `decisions-summary.md` captures the decision.
 
 ---
 
 ### GAP-046 — CI function kinds as dedicated catalog entries
 
-**Status:** ⚠️ Partially captured
+**Status:** ✅ Fixed
 
 **What's in decisions.md:** *"`FunctionKind.TildeStartsWith` / `FunctionKind.TildeEndsWith` plus `FunctionMeta.CIVariantOf` are added so CI functions exist as real function metadata."* Open downstream concern: calling `~startsWith`/`~endsWith` with non-`~string` first argument still needs a future diagnostic decision.
 
-**What's in canonical docs:** `decisions-summary.md` captures the decision. The open downstream checker concern is noted. Whether the Functions catalog in `catalog-system.md` or `precept-language-spec.md` has been updated was not verifiable.
-
-**Gap:** Same as GAP-040 — needs verification against the actual Functions catalog reference tables.
+**What's in canonical docs:** `catalog-system.md` §FunctionMeta now includes `HasCIVariant: bool` and `CIVariantOf: FunctionKind?`. The stale ✅ callout pointing to the missing fields has been removed. `decisions-summary.md` captures the decision and the open downstream checker concern.
 
 ---
 

@@ -1,10 +1,12 @@
+> **ARCHIVED** — 2026-05-05. Investigation complete. Decisions locked. See `docs/working/runtime-api-public-surface-spec.md` for the normative surface specification and `.squad/decisions.md` for the ruling history.
+
 # Precept Collection Types — Design Investigation
 
 **By:** Frank  
 **Date:** 2026-05-04  
 **Status:** Investigation complete — all architectural decisions locked  
 **Depends on:** `runtime-api-public-surface-spec.md` (§13, OQ-2, OQ-5), `precept-value-types-investigation.md`  
-**Decision records:** frank-105 (CLR API), frank-106 (internal representation), frank-107 (scalability), frank-108 (pair layout), frank-109 (action architecture), frank-110 (CoW protocol)
+**Decision records:** frank-105 (CLR API), frank-106 (internal representation), frank-107 (scalability), frank-108 (pair layout), frank-109 (action architecture), frank-110 (CoW protocol), frank-immutable-array (CLR surface — ImmutableArray<T> rejected), frank-oq-c3-direction-resolved (2026-05-04, OQ-C1/C2/C3 locked)
 
 ---
 
@@ -105,7 +107,7 @@ These all have the same shape: a collection of elements of type `T`.
 | E | `ReadOnlyCollection<T>` | ✅ Known | ✅ No mutation | ✅ Full | ✅ Clear | O(n) per access | Rejected — requires materialization |
 | F | Custom `PreceptSet<T>` etc. | ❌ Unknown | ✅ By design | ✅ Full | ❌ Opaque | Zero | Rejected — adds surface area |
 
-**Locked decision: `IReadOnlyList<T>` for all single-type collections.**
+**Locked decision: `IReadOnlyList<T>` for all single-type collections.** (frank-immutable-array: `ImmutableArray<T>` reconsidered and rejected)
 
 Rationale:
 - Consistent with the existing OQ-2 resolution
@@ -113,6 +115,12 @@ Rationale:
 - Familiar to every C# developer and every AI agent
 - Indexing, LINQ, `foreach` — all work naturally
 - No collection-kind-specific CLR types — reduces API surface to minimum
+
+**Why not `ImmutableArray<T>`?** (frank-immutable-array, full evaluation on file)
+
+`ImmutableArray<T>` requires materializing a `T[]` from `PreceptValue[]` — O(n) upfront, even if the caller only accesses one element. The lazy `PreceptList<T>` adapter is O(1) at the `Get<T>()` call site and O(1) per element on access. The CoW model's structural sharing (unmodified slots reference the same `PreceptValue[]` across versions) makes cross-version caching of a materialized `T[]` theoretically clean, but the lazy adapter is still never worse than the cached `ImmutableArray<T>` approach and is strictly better for partial iteration.
+
+**Architectural split** (locked): `ImmutableArray<T>` IS correct for result type arrays (`Violations`, `Transitions`, `EventEnsures`, `PostFields`, etc.) because those are assembled from fully-materialized CLR objects at outcome-construction time — there is no `PreceptValue[]` intermediary. The boundary is: "already materialized from CLR objects" → `ImmutableArray<T>`; "backed by `PreceptValue[]` internal storage" → `IReadOnlyList<T>`.
 
 ### 4.2 Why not differentiate by collection kind?
 
@@ -228,7 +236,7 @@ bool hasHome = limits.ContainsKey("home");
 One new public type is required:
 
 ```csharp
-namespace Precept.Runtime;
+namespace Precept.Types;
 
 /// <summary>
 /// An element paired with its ordering/priority key, as stored in keyed collections
@@ -355,32 +363,41 @@ In the DSL grammar, both `K` and `V` in `lookup of K to V` are `ScalarType`. Thi
 
 ## §9 — Open Questions
 
-### OQ-C1: Bag element count exposure
+### OQ-C1: Bag element count exposure — **LOCKED**
 
 A `bag of T` tracks element frequency (`.countof(E)` accessor in DSL). The current recommendation maps `bag` to `IReadOnlyList<T>` where duplicates appear multiple times. Alternative: should the bag expose a dedicated surface like `IReadOnlyList<(T Element, long Count)>` or `IReadOnlyDictionary<T, long>`?
 
-**Lean:** Keep `IReadOnlyList<T>` with duplicates. Rationale: consistent with other collections; the `.countof(E)` accessor is a DSL expression concern (available in constraints/rules), not a public API read concern. If callers need frequency, they can use LINQ `GroupBy`. The DSL prevents the bag from growing unbounded through constraints.
+**OQ-C1 LOCKED:** `IReadOnlyList<T>` with duplicate elements for bags. LINQ `GroupBy` for frequency counts. No special bag-frequency CLR type.
 
-**Decision needed from Shane:** Confirm `IReadOnlyList<T>` for bags, or prefer a frequency-aware surface.
+Rationale: consistent with other single-type collections; the `.countof(E)` accessor is a DSL expression concern (available in constraints/rules), not a public API read concern. Callers who need frequency use LINQ `GroupBy`. No separate CLR type introduced.
 
-### OQ-C2: `KeyedElement` naming
+### OQ-C2: `KeyedElement` naming — **LOCKED**
 
 The `KeyedElement<TValue, TKey>` struct is a new public type. Alternative names considered:
 - `OrderedEntry<TValue, TKey>` — emphasizes ordering
 - `KeyedItem<TValue, TKey>` — slightly different connotation
 - `CollectionEntry<TValue, TKey>` — too generic
 
-**Lean:** `KeyedElement` is precise and neutral. The `Key` field serves both as an ordering key (for `queue by`, `log by`) and conceptually as a secondary value that the DSL associates with each element.
+**OQ-C2 LOCKED:** `KeyedElement<TValue, TKey>` confirmed as the named pair struct. `readonly record struct KeyedElement<TValue, TKey>(TValue Value, TKey Key)`.
 
-**Decision needed from Shane:** Confirm `KeyedElement<TValue, TKey>` or rename.
+Rationale: precise and neutral; `Key` serves both as an ordering key (for `queue by`, `log by`) and conceptually as the secondary value the DSL associates with each element. Alternatives rejected: `OrderedEntry` over-emphasizes ordering (lookups have no ordering), `KeyedItem` has weaker connotation, `CollectionEntry` too generic.
 
-### OQ-C3: Direction modifier exposure
+### OQ-C3: Direction modifier exposure — **LOCKED**
 
 `queue of T by P ascending` vs `queue of T by P descending` — the ordering direction is part of the type declaration. Should `FieldDescriptor` carry an `IsDescending` flag or similar?
 
-**Lean:** Yes — on `FieldDescriptor`, not on the CLR type. The CLR type is always `IReadOnlyList<KeyedElement<T, P>>` regardless of direction. The direction affects internal ordering (what `.peek` returns, what index 0 is) but not the type shape. A `SortDirection` property on the descriptor is sufficient for callers who need to know.
+**OQ-C3 LOCKED: Store in declared direction.**
 
-**Decision needed from Shane:** Confirm direction lives on descriptor only.
+- The evaluator stores pair collections (`queue by`, `log by`) in the **declared direction** (ascending or descending as declared in the DSL).
+- `CollectionActions` insertion/sort operations (`Enqueue`, `LogByAppend`) take direction as a parameter and insert in the correct sorted position based on declared direction.
+- `arr[0]` is always "front" in the declared order — `Peek`, `Dequeue`, and log iteration are direction-naive (no direction parameter needed).
+- `PreceptPairList<TValue, TKey>` does NOT flip index math — it returns `arr[0]` as index 0 directly.
+- The JSON serializer iterates the array forward — no inversion needed.
+- `FieldDescriptor.SortDirection` stays as informational metadata only (not consulted by reads).
+
+**Rationale:** Direction is "compiled in" at write time by `Enqueue`/`LogByAppend`. One place owns direction (insertion), not three (insertion + CLR adapter + JSON serializer). All read surfaces are direction-naive: CLR adapter, JSON, evaluator peek/dequeue.
+
+**Alternative rejected:** Option A — always store ascending internally, flip index math in CLR adapter. Rejected because the JSON serializer also needed a flip, adding complexity in two independent places. The declared-direction model eliminates that split ownership.
 
 ---
 
@@ -673,10 +690,10 @@ The adapter (`PreceptList<T> : IReadOnlyList<T>`) materializes to an internal `T
 
 The "zero-copy per-index projection" claim from earlier analysis is corrected: **"lazy" means lazy at the Version level** (adapter constructed on first field read), not lazy at the element level.
 
-### `log` — potential dedicated interface (still open)
+### `log` — CLR mapping settled
 
-`log` may warrant a dedicated `IReadOnlyLog<T>` that omits the indexer and exposes only `.First`, `.Last`, `.Count`, `IEnumerable<T>`. This remains open — current default is `IReadOnlyList<T>` with materialization.
+`log` maps to `IReadOnlyList<TElement>`, consistent with §5's locked mapping table. No dedicated interface is needed.
 
 ---
 
-*End of investigation. All architectural decisions are locked. Open questions (OQ-C1, OQ-C2, OQ-C3) remain for Shane confirmation.*
+*End of investigation. All architectural decisions are locked. OQ-C1, OQ-C2, and OQ-C3 are resolved and locked (2026-05-04). See `frank-oq-c3-direction-resolved.md` for decision record.*

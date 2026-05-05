@@ -889,10 +889,10 @@ public abstract class TypeRuntime
     public abstract string FormatString(PreceptValue value);
     
     // Catalog-owned executor delegates, indexed by OperationKind ordinal.
-    // The evaluator calls BinaryExecutors[(int)kind] and UnaryExecutors[(int)kind]
-    // rather than switching on OperationKind — making it zero-knowledge about operations.
-    // Slots for operations not applicable to this type carry null; the evaluator must
-    // never call a null slot (the type checker guarantees this statically).
+    // The builder fetches these at compile time and embeds the delegate directly in each
+    // BinaryOp / UnaryOp opcode. The evaluator calls opcode.Executor(l, r) — it never
+    // indexes these arrays at evaluation time. Slots for inapplicable operations carry null;
+    // the type checker guarantees no null-slot delegate is ever embedded in an opcode.
     public abstract Func<PreceptValue, PreceptValue, PreceptValue>?[] BinaryExecutors { get; }
     public abstract Func<PreceptValue, PreceptValue>?[] UnaryExecutors { get; }
 }
@@ -909,7 +909,7 @@ Registration is process-global via `PreceptRuntime.Register<T>(fromClr, toClr)`.
 
 **Naming context:** The abstract base methods (`ReadJson`, `WriteJson`, `ParseString`, `FormatString`) are the internal hot-path streaming API. These are distinct from the public-facing `PreceptValue` static methods (`PreceptValue.FromJson(JsonElement)` / `PreceptValue.ToJson()`) which are higher-level convenience conversions over `JsonElement`. The internal `TypeRuntime` delegates use `Utf8JsonReader`/`Utf8JsonWriter` for streaming efficiency; the public `PreceptValue` methods wrap `JsonElement`.
 
-> **Open Design Question:** The `TypeRuntime<T>` `BinaryExecutors` and `UnaryExecutors` arrays are flat arrays indexed by `(int)OperationKind`. Two unresolved implementation details remain: (1) How are the executor delegates registered per operation — does each `OperationMeta` carry its delegate, or does the type system assemble the array at startup? (2) What is the lifetime/ownership model — are these `static readonly` arrays on the `Operations` catalog, or instance arrays on each `TypeRuntime`? *These need a design decision before the evaluator implementation pass.*
+> **Resolved (CC#25):** The `BinaryExecutors` and `UnaryExecutors` arrays are `static readonly` instance properties on each `TypeRuntime<T>` — allocated once at type initialization, immortal. The builder fetches the appropriate delegate at compile time and embeds it directly in the `BinaryOp`/`UnaryOp` opcode. There is no global aggregation class. The evaluator calls the opcode's embedded delegate — it never indexes these arrays at evaluation time.
 
 **Durable architecture rule:** Persistence and typed-lane conversion behavior belongs on catalog metadata — do not reintroduce per-`TypeKind` consumer switches in serializer or ingress code. The catalog entry IS the behavior.
 
@@ -941,8 +941,7 @@ public record TypeAccessor(
 );
 ```
 
-> **Open Question (unresolved):** Is `TypeAccessor` meant to be a DU with subtypes? type-checker.md references `ElementParameterAccessor` as a third subtype. The full hierarchy (`TypeAccessor` base, `FixedReturnAccessor`, `ElementParameterAccessor`) needs to be documented.
-> *Source: catalog-gap-register.md #42*
+`TypeAccessor` is a discriminated union: the base record plus two sealed subtypes — `FixedReturnAccessor` and `ElementParameterAccessor`. Both are defined after `QualifierShape` below.
 
 ```csharp
 public enum QualifierAxis
@@ -982,6 +981,7 @@ Shared shapes in the Types catalog:
 | `QS_CurrencyAndDimension` | `In(Currency)`, `Of(Dimension)` | false | `price` |
 | `QS_ExchangeRate` | `In(FromCurrency)`, `To(ToCurrency)` | n/a | `exchangerate` |
 
+```csharp
 public sealed record FixedReturnAccessor(
     string    Name,
     TypeKind  Returns,
@@ -991,10 +991,18 @@ public sealed record FixedReturnAccessor(
     ProofRequirement[] ProofRequirements = [],
     QualifierAxis ReturnsQualifier = QualifierAxis.None
 ) : TypeAccessor(Name, Description, ParameterType, RequiredTraits, ProofRequirements);
+
+public sealed record ElementParameterAccessor(
+    string    Name,
+    string    Description,
+    TypeTrait RequiredTraits    = TypeTrait.None,
+    ProofRequirement[]? ProofRequirements = null
+) : TypeAccessor(Name, Description, null, RequiredTraits, ProofRequirements);
 ```
 
-- `TypeAccessor` base = inner-type return (`.peek`, `.min`, `.max`). Absence of `Returns` is the declaration.
-- `FixedReturnAccessor` = fixed return (`.count`, `.currency`, `.amount`, `.inZone(tz)`).
+- `TypeAccessor` base = inner-type return (`.peek`, `.min`, `.max`). No `Returns` field — absence of a subtype is the declaration.
+- `FixedReturnAccessor` = fixed return type (`.count`, `.currency`, `.amount`, `.inZone(tz)`). `Returns` declares the exact `TypeKind`.
+- `ElementParameterAccessor` = parameter resolves to the bag's element type (`bag.countof(x)`). No fixed `ParameterType` — the type checker resolves the parameter type against the owning field's element type at the call site. Always returns `integer`.
 - `RequiredTraits` on base — checked against the collection's inner type for inner-type accessors, and against the owner type for fixed-return accessors.
 - `ReturnsQualifier != None` means the accessor returns the qualifier value itself on the named axis — the result type carries the same qualifier as the owner field's qualifier on that axis. Examples: `.currency` on `money` → `ReturnsQualifier: QualifierAxis.Currency`; `.amount` on `money` → `ReturnsQualifier: QualifierAxis.None`. LS hover uses this to display "returns the currency of this field."
 
@@ -1014,8 +1022,6 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 | Meta record | `FunctionMeta(Kind, Name, Description, Overloads[], Category, UsageExample?, SnippetTemplate?, HoverDescription?)` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
 | Catalog class | `Functions` — `GetMeta()`, `All` |
 | Output type | None — functions are evaluated inline |
-
-> **✅ Resolved in Source — FunctionMeta.HasCIVariant:** `Function.cs` already has `HasCIVariant` and `CIVariantOf` properties. Add them to this `FunctionMeta` shape to close the doc gap. *(Was: catalog-gap-register.md #18)*
 
 **Members (from `precept-language-spec.md` §3.7):**
 
@@ -1051,7 +1057,9 @@ public sealed record FunctionMeta(
     FunctionCategory                Category,
     string?                         UsageExample     = null,
     string?                         SnippetTemplate  = null,
-    string?                         HoverDescription = null
+    string?                         HoverDescription = null,
+    bool                            HasCIVariant     = false,
+    FunctionKind?                   CIVariantOf      = null
 );
 ```
 
@@ -1871,7 +1879,7 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | **Parser vocabulary** | Operators + Types + Modifiers + Actions + Constructs | Frozen dictionaries derived from catalogs at startup: `Operators.All` → precedence table; `Types.All` → type keyword mapping; `Modifiers.All` → recognition sets; `Actions.All` → action keywords. No hand-maintained vocabulary tables. |
 | **Plan router / Precept Builder** | Constraints | `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket (`always`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`). `ConstraintMeta.StateAnchored` groups all state-scoped kinds without per-member checks. |
 | **Proof engine** | ProofRequirements | `ProofRequirements.GetMeta(kind)` dispatches proof obligation instances by kind. `ProofRequirementMeta.QualifierCompatibility` identifies dual-subject obligations without per-kind conditionals. |
-| **Evaluator dispatch** | Functions + Operations + Constraints | Evaluator dispatches by operation kind and function kind. `Constraints.GetMeta()` drives constraint activation timing — no hardcoded per-kind activation logic. Execution delegate design deferred pending working copy API design. |
+| **Evaluator dispatch** | Functions + Operations + Constraints | Binary/unary dispatch: builder embeds `static readonly` executor delegates (from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`) directly in `BinaryOp`/`UnaryOp` opcodes at compile time; evaluator calls `opcode.Executor(l, r)` — no lookup, no switch. `Constraints.GetMeta()` drives constraint activation timing — no hardcoded per-kind activation logic. Function execution dispatch delegate design is pending. |
 | **Runtime boundary validation** | Modifiers | `FieldModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
 | **Reference documentation** | All 11 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
 | **AI grounding** | All 13 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
@@ -1938,7 +1946,7 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Event modifier graph requirements → `EventModifierMeta.RequiredAnalysis`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
 | **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `FieldModifierMeta.ProofDischarges` (pending — see Open Questions) enables catalog-driven modifier-proof strategy. |
 | **PreceptBuilder** | Catalog-driven routing | Full design documented in `docs/runtime/precept-builder.md`. `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. `ActionMeta.SyntaxShape` drives action plan opcode emission. |
-| **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `FieldModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Binary/unary operation dispatch uses `TypeRuntime.BinaryExecutors` and `TypeRuntime.UnaryExecutors` indexed by `OperationKind` ordinal — the evaluator calls the pre-wired delegate and applies no per-`OperationKind` switch logic. Function and action execution dispatch delegate design is pending. |
+| **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `FieldModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Binary/unary operation dispatch: executor delegates are embedded in `BinaryOp`/`UnaryOp` opcodes at build time (fetched from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`); evaluator calls `opcode.Executor(l, r)` — no per-`OperationKind` switch, no catalog lookup at evaluation time. Function and action execution dispatch delegate design is pending. |
 
 Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
 

@@ -192,7 +192,7 @@ The builder executes six sequential passes, each producing artifacts consumed by
                                    │
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Pass 5: Execution Plan Pass (runs before Pass 4)                    │
+│  Pass 4: Execution Plan Pass                                         │
 │  • Compile TypedExpression trees → flat ExecutionPlan opcode arrays  │
 │  • Compile TypedAction chains → ActionPlan arrays                    │
 │  • Build ExecutionRow from TypedTransitionRow                        │
@@ -200,7 +200,7 @@ The builder executes six sequential passes, each producing artifacts consumed by
                                    │
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Pass 4: Constraint Plan Pass (runs after Pass 5)                    │
+│  Pass 5: Constraint Plan Pass                                        │
 │  • Build ConstraintDescriptor with compiled ExecutionPlan            │
 │  • Route into anchor buckets: always, in<S>, from<S>, to<S>, on<E>   │
 │  • Build ConstraintPlanIndex                                         │
@@ -227,13 +227,13 @@ The builder executes six sequential passes, each producing artifacts consumed by
 | Pass 1 (Descriptor) | `SemanticIndex` | Descriptor tables, slot index assignments |
 | Pass 2 (Slot Layout) | Pass 1 | `SlotLayout` |
 | Pass 3 (Dispatch Index) | Pass 1, `StateGraph` | `TransitionDispatchIndex`, `ReachabilityIndex` |
-| Pass 5 (Execution Plan) | Pass 1 (slot indexes) | `ExecutionPlan`, `ActionPlan`, `ExecutionRow` |
-| Pass 4 (Constraint Plan) | Pass 5 (compiled expressions) | `ConstraintPlanIndex` |
-| Pass 6 (Fault Backstop) | Pass 4, `ProofLedger` | `FaultSiteDescriptor[]`, `ConstraintInfluenceMap` |
+| Pass 4 (Execution Plan) | Pass 1 (slot indexes) | `ExecutionPlan`, `ActionPlan`, `ExecutionRow` |
+| Pass 5 (Constraint Plan) | Pass 4 (compiled expressions) | `ConstraintPlanIndex` |
+| Pass 6 (Fault Backstop) | Pass 5, `ProofLedger` | `FaultSiteDescriptor[]`, `ConstraintInfluenceMap` |
 
-**Valid execution order:** 1 → 2 (parallel with 3) → 5 → 4 → 6 → assemble `Precept`
+**Valid execution order:** 1 → 2 (parallel with 3) → 4 → 5 → 6 → assemble `Precept`
 
-Note: Pass 5 runs before Pass 4 because `ConstraintDescriptor` requires a compiled `ExecutionPlan` for its expression. The pass numbers reflect logical grouping, not execution order.
+Note: Pass 5 (Constraint Plan) depends on Pass 4 (Execution Plan) because `ConstraintDescriptor` requires a compiled `ExecutionPlan` for its expression — pass numbers now reflect execution order.
 
 ---
 
@@ -343,7 +343,7 @@ public sealed record ReachabilityIndex(
 );
 ```
 
-### Pass 5 — Execution Plan Pass
+### Pass 4 — Execution Plan Pass
 
 Compile typed action chains and typed guard/constraint expressions from the `SemanticIndex` into flat opcode arrays.
 
@@ -383,8 +383,8 @@ public sealed record LoadSlot(int SlotIndex) : Opcode;
 public sealed record LoadArg(int ArgSlotIndex) : Opcode;  // pre-resolved at build time; name resolution complete before execution
 public sealed record LoadLit(PreceptValue Value) : Opcode;  // literals pre-wrapped at build time
 public sealed record StoreSlot(int SlotIndex) : Opcode;
-public sealed record BinaryOp(OperationKind Kind) : Opcode;
-public sealed record UnaryOp(OperationKind Kind) : Opcode;
+public sealed record BinaryOp(OperationKind Kind, Func<PreceptValue, PreceptValue, PreceptValue> Executor) : Opcode;
+public sealed record UnaryOp(OperationKind Kind, Func<PreceptValue, PreceptValue> Executor) : Opcode;
 public sealed record CallFunction(FunctionKind Kind, int Arity) : Opcode;
 public sealed record MemberAccess(TypeAccessor Accessor) : Opcode;
 public sealed record CollectionOp(ActionKind Kind, int SlotIndex) : Opcode;
@@ -425,9 +425,9 @@ public enum TransitionOutcome { Transition, NoTransition, Reject }
 > `TransitionOutcome.Reject` rows can carry an authored `because` message, but `ExecutionRow` currently has nowhere to store that reason after lowering. The builder contract needs one canonical home for reject-row rationale before the evaluator can return authored rejection text without re-reading source.
 > *Flagged: 2026-05-04*
 
-**Catalog-driven compilation:** The expression compiler reads `Operations.GetMeta(kind)`, `Functions.GetMeta(kind)`, and `Types.GetAccessor(type, name)` to emit the correct opcodes. It does not hardcode per-operation behavior — it dispatches on catalog entries.
+**Catalog-driven compilation:** The expression compiler reads `Operations.GetMeta(kind)`, `Functions.GetMeta(kind)`, and `Types.GetAccessor(type, name)` to emit the correct opcodes. It does not hardcode per-operation behavior — it dispatches on catalog entries. When emitting `BinaryOp` or `UnaryOp`, the builder resolves the `OperationMeta`, fetches the executor delegate from the corresponding `TypeRuntimeMeta.BinaryExecutors[localIndex]` (or `UnaryExecutors`), and embeds it directly in the opcode record. The evaluator never indexes `TypeRuntimeMeta` arrays — the delegate is already embedded.
 
-### Pass 4 — Constraint Plan Pass
+### Pass 5 — Constraint Plan Pass
 
 Sort constraint descriptors into activation-anchor buckets:
 
@@ -444,7 +444,7 @@ public sealed record ConstraintDescriptor(
     ConstraintKind Kind,
     StateDescriptor? StateAnchor,      // null for global constraints
     EventDescriptor? EventAnchor,      // null for non-event constraints
-    ExecutionPlan Expression,          // compiled expression (from Pass 5)
+    ExecutionPlan Expression,          // compiled expression (from Pass 4)
     string? BecauseClause,
     SourceSpan Source
 );
@@ -734,9 +734,9 @@ foreach (var op in plan.Opcodes)
     {
         case LoadSlot(var i): stack.Push(slots[i]); break;
         case LoadLit(var v): stack.Push(v); break;         // v is already PreceptValue
-        case BinaryOp(var kind): 
+        case BinaryOp(var kind, var executor): 
             PreceptValue r = stack.Pop(); PreceptValue l = stack.Pop();
-            stack.Push(Execute(kind, l, r));
+            stack.Push(executor(l, r));
             break;
         case Return: return stack.Pop();
     }

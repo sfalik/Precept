@@ -206,7 +206,7 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 
 **Resolution:**
 - `PreceptValue` is a 32-byte tagged struct (`[StructLayout(LayoutKind.Explicit, Size = 32)]`) — the internal evaluation currency on the A+G opcode stack.
-- Catalog-owned executor arrays: `BinaryExecutors` and `UnaryExecutors` live on `TypeRuntimeMeta`, indexed by `OperationKind`. The evaluator dispatches via `TypeRuntimeMeta.BinaryExecutors[(int)kind](l, r)` — no per-operation switches in the evaluator.
+- Catalog-owned executor arrays: `BinaryExecutors` and `UnaryExecutors` live on `TypeRuntimeMeta`, indexed by `OperationKind` ordinal. The builder fetches the delegate at compile time and embeds it directly in the `BinaryOp`/`UnaryOp` opcode record (`Func<PreceptValue, PreceptValue, PreceptValue> Executor` field). The evaluator calls `opcode.Executor(l, r)` — no global aggregation, no catalog lookup at evaluation time. `Kind` is preserved on the opcode for diagnostics and trace mode.
 - `LOAD_ARG` carries pre-resolved `ArgSlotIndex` (not arg name string). All name resolution happens at build time in Pass 1.
 - `IArgBuilder` materializes `PreceptValue[]` arg slot array + `bool[]` presence mask at the Fire boundary. Required-arg faults happen before the opcode loop.
 - `TypeRuntime<T>` naming is final: `FromClr` / `ToClr` / `FromJson` / `ToJson`.

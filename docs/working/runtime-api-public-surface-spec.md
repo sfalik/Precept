@@ -2,7 +2,7 @@
 
 **By:** Frank  
 **Date:** 2026-05-04 (updated)  
-**Status:** Draft — OQ-1 through OQ-4 resolved; OQ-5 (collections) pending owner decision  
+**Status:** Draft — OQ-1 through OQ-5 resolved; OQ-C1/C2/C3 resolved and locked (2026-05-04)  
 **Purpose:** Authoritative specification for the redesigned public API surface. Drives `docs/runtime/runtime-api.md` updates after approval.
 
 ---
@@ -20,6 +20,12 @@
 2. The type system is closed. There is no public registration surface.
 3. The public API speaks two value languages: `JsonElement` (raw lane) and `T` via `Get<T>()` (typed lane).
 4. Discovery of valid `T` is metadata, not machinery.
+
+**Why Axiom 1 is non-negotiable:**
+- **Brittleness** — `PreceptValue` evolves with the evaluator (new subtypes, restructured slot model). Exposing it makes internal refactoring a breaking API change. The internal and external surfaces have different stability requirements.
+- **AI agent hostility** — An AI agent calling `precept_inspect` or `precept_compile` cannot reason about opaque internal types. `IReadOnlyList<string>` is immediately actionable; `IReadOnlyList<PreceptValue>` requires the agent to discover what `PreceptValue` is, enumerate subtypes, and figure out how to cast — a multi-step recovery chain that degrades accuracy.
+- **Contract** — Generic type parameters are the hardest leakage vector to detect: `IReadOnlyList<PreceptValue>` satisfies `IReadOnlyList<T>` at the call site but exposes the internal type inside the generic. The collection type mapping exists specifically to close this gap.
+- **Dual-shape model** — `PreceptValue` is the internal slot-storage shape; CLR types are the external materialization shape. Collections are the vectorized case of this rule — not an exception to it.
 
 ---
 
@@ -457,12 +463,61 @@ Does NOT swallow type errors — a mismatched `T` still throws `InvalidOperation
 | `instant` | `DateTimeOffset` | |
 | `duration` | `Duration` (NodaTime) | Same pattern as all other temporal types — direct NodaTime usage, no wrapper (OQ-4 resolved) |
 | `choice` | `string` | The selected variant name |
-| `money` | `MoneyValue` | `readonly record struct(decimal Amount, string Currency)` — Currency is ISO 4217 string. NOT a unit. (OQ-3d, OQ-3e resolved) |
+| `money` | `Money` | `readonly record struct(decimal Amount, string Currency)` — Currency is ISO 4217 string. NOT a unit. (OQ-3d, OQ-3e resolved) |
 | `currency` | `string` | ISO 4217 code |
-| `quantity` | `QuantityValue` | `readonly record struct(decimal Amount, Unit Unit)` — Unit identity is UCUM code (OQ-3a, OQ-3e resolved) |
-| `Unit` | `Unit` | UCUM-identified unit value. Database-backed, no static members (OQ-3c resolved) |
+| `quantity` | `Quantity` | `readonly record struct(decimal Amount, Unit Unit)` — Unit identity is UCUM code (OQ-3a, OQ-3e resolved) |
+| `Unit` | `Unit` | `sealed class` — UCUM-identified unit value. Database-backed, no static members. `sealed class` (not struct) because units are interned: `UnitCatalog.Get("kg")` returns the same instance every time, enabling reference equality as a fast path. (OQ-3c resolved) |
 | `stateref` | `string` | The state name |
-| Collections (`List<T>`, etc.) | `IReadOnlyList<TElement>` | Element type is the scalar CLR projection. `TypeMeta.ClrType` is scalar only; wrapping applied at descriptor-build time (OQ-2 resolved) |
+| `set of T`, `queue of T`, `stack of T`, `bag of T`, `list of T`, `log of T` | `IReadOnlyList<TElement>` | `TElement` is the scalar CLR projection of `T`. All six single-type collections share the same CLR surface. `TypeMeta.ClrType` is scalar only; wrapping applied at descriptor-build time (OQ-2 resolved). See `docs/working/precept-collection-types-investigation.md`. |
+| `log of T by P`, `queue of T by P` | `IReadOnlyList<KeyedElement<TValue, TKey>>` | `TValue` is CLR projection of `T`; `TKey` is CLR projection of `P`. `KeyedElement<TValue, TKey>` is `readonly record struct(TValue Value, TKey Key)`. |
+| `lookup of K to V` | `IReadOnlyDictionary<TKey, TValue>` | `TKey` is CLR projection of `K`; `TValue` is CLR projection of `V`. Standard .NET dictionary interface — `ContainsKey`, `TryGetValue`, indexer `[key]`, `Keys`, `Values`. |
+
+**Collection `Get<T>()` call-site examples:**
+
+```csharp
+// set of string
+IReadOnlyList<string> tags = version.Get<IReadOnlyList<string>>("Tags");
+
+// list of integer
+IReadOnlyList<long> scores = version.Get<IReadOnlyList<long>>("Scores");
+
+// log of string by instant (keyed collection)
+IReadOnlyList<KeyedElement<string, DateTimeOffset>> log =
+    version.Get<IReadOnlyList<KeyedElement<string, DateTimeOffset>>>("AuditLog");
+string entry = log[0].Value;
+DateTimeOffset when = log[0].Key;
+
+// queue of string by integer (priority queue)
+IReadOnlyList<KeyedElement<string, long>> pq =
+    version.Get<IReadOnlyList<KeyedElement<string, long>>>("ClaimQueue");
+
+// lookup of string to decimal (map)
+IReadOnlyDictionary<string, decimal> limits =
+    version.Get<IReadOnlyDictionary<string, decimal>>("CoverageLimits");
+decimal auto = limits["auto"];
+bool hasHome = limits.ContainsKey("home");
+```
+
+**Collection null/empty semantics:**
+- Collections are **never null** at the CLR level. `Get<IReadOnlyList<string>>("Tags")` always returns a non-null instance.
+- Empty collections have `Count == 0`. Missing/unset fields return an empty collection, not null.
+- The `optional` modifier does not apply to collection fields — they are always present (possibly empty).
+- Collection elements are never null — Precept has no `null` value.
+- Dictionary values are never null; missing keys throw `KeyNotFoundException` per standard .NET dictionary semantics.
+
+**`KeyedElement<TValue, TKey>` — new public type:**
+
+```csharp
+namespace Precept.Types;
+
+/// <summary>
+/// An element paired with its ordering/priority key, as stored in keyed collections
+/// (log of T by P, queue of T by P).
+/// </summary>
+public readonly record struct KeyedElement<TValue, TKey>(TValue Value, TKey Key);
+```
+
+This is the only custom collection type added. All other mappings use standard BCL interfaces.
 
 This is the **complete, closed set.** No external types can be added. The internal `TypeRuntime<T>` table is populated at static initialization for every entry in this table and sealed.
 
@@ -508,6 +563,12 @@ Type clrType = field.ClrType;  // e.g., typeof(decimal) or typeof(IReadOnlyList<
 ArgDescriptor arg = version.RequiredArgs("submit")[0];
 Type clrType = arg.ClrType;  // e.g., typeof(string)
 ```
+
+**Collection descriptor-build cases:** For collection-typed fields, `FieldDescriptor.ClrType` encodes the full constructed generic type. The Builder handles three cases:
+
+1. **Single-type collection** → `typeof(IReadOnlyList<>).MakeGenericType(elementClrType)`
+2. **Keyed collection** → `typeof(IReadOnlyList<>).MakeGenericType(typeof(KeyedElement<,>).MakeGenericType(elementClrType, keyClrType))`
+3. **Lookup** → `typeof(IReadOnlyDictionary<,>).MakeGenericType(keyClrType, valueClrType)`
 
 No secondary lookup needed. The Precept Builder resolves this once during `Precept.From()`.
 
@@ -610,7 +671,7 @@ Both lanes cover exactly the same operations:
 
 | Type/Surface | Visibility | Reason |
 |---|---|---|
-| `PreceptValue` | `internal` | Evaluation currency; representation must be freely changeable |
+| `PreceptValue` | `internal` | Evaluation currency; representation must be freely changeable. **`PreceptValue` MUST NOT appear in any public method signature, return type, property type, or generic constraint.** The collection type mapping exists specifically to prevent this leakage through generic type parameters. |
 | `TypeRuntime<T>` | `internal` | Full internal conversion record (CLR ↔ PreceptValue ↔ JSON) |
 | `TypeRuntimeMeta` | `internal` | Catalog-owned hot-path delegates (ReadJson, WriteJson, executors) |
 | `TypeMapping<T>` | **Does not exist** | Registration surface eliminated — type system is closed |
@@ -621,6 +682,8 @@ Both lanes cover exactly the same operations:
 | Presence mask (`bool[]`) | `internal` | Builder internals |
 | `FiredArgs` internal slot storage | `internal` | External view is `JsonElement` / `Get<T>()` only |
 | `BinaryExecutorDelegate` / `UnaryExecutorDelegate` | `internal` | Evaluator dispatch delegates |
+| `PreceptList<T>` | `internal` | Lazy adapter — callers see only `IReadOnlyList<T>` |
+| `PreceptLookup<TKey, TValue>` | `internal` | Lazy adapter — callers see only `IReadOnlyDictionary<TKey, TValue>` |
 
 ---
 
@@ -831,21 +894,47 @@ Resolved across 7 sub-questions:
 | **OQ-3a** | UCUM codes are canonical unit identity |
 | **OQ-3b** | Full UCUM grammar accepted; discovery is tiered — Tier 1 (~150 atoms) surfaced proactively, full grammar always valid |
 | **OQ-3c** | Pure database-backed — unit metadata is an embedded resource; NO static `Units.X` members in the library |
-| **OQ-3d** | Currency is separate from the unit system. `MoneyValue.Currency` is `string` (ISO 4217). Not a unit. |
-| **OQ-3e** | `QuantityValue` = `readonly record struct(decimal Amount, Unit Unit)`; `MoneyValue` = `readonly record struct(decimal Amount, string Currency)` |
+| **OQ-3d** | Currency is separate from the unit system. `Money.Currency` is `string` (ISO 4217). Not a unit. |
+| **OQ-3e** | `Quantity` = `readonly record struct(decimal Amount, Unit Unit)`; `Money` = `readonly record struct(decimal Amount, string Currency)` |
 | **OQ-3f** | DSL constraint granularity follows `docs/language/business-domain-types.md` — three levels: `quantity` (any), `quantity of 'length'` (dimension-constrained), `quantity in 'kg'` (unit-constrained). CLR mapping: `QuantityFieldDescriptor` carries `Unit? ConstrainedUnit` and `Dimension? ConstrainedDimension`. |
 | **OQ-3g** | UCUM data shipped as embedded resource in Precept NuGet package; updated with library releases |
 
-**Rationale:** See `docs/working/unit-type-system-investigation.md` for the full analysis. UCUM provides machine-parseable, interoperable unit identity. Database-backed architecture aligns with Precept's catalog-driven design. Separating money from units avoids dimensional confusion (currency is not a physical quantity).
+**Rationale:** See `docs/working/precept-value-types-investigation.md` for the full analysis. UCUM provides machine-parseable, interoperable unit identity. Database-backed architecture aligns with Precept's catalog-driven design. Separating money from units avoids dimensional confusion (currency is not a physical quantity).
+
+### ~~OQ-7~~: Business value types coverage ✅ RESOLVED (cross-referenced from existing docs)
+
+All sub-questions resolved by cross-reference to `docs/language/business-domain-types.md` and `docs/language/temporal-type-system.md`:
+
+| Sub-Q | Resolution |
+|-------|-----------|
+| ~~**OQ-7a**~~ | **Resolved.** `Rate` is `decimal`. D12 locks `decimal` for all seven business-domain types — no `double` in the business chain. |
+| ~~**OQ-7b**~~ | **Resolved.** Temporal validity stays at field/rules layer. The `exchangerate` type carries no validity timestamp — the doc explicitly notes ordering has "no meaning outside their time context," confirming that context belongs to the field. |
+| ~~**OQ-7c**~~ | **Deferred — separate investigation.** Business-domain-types.md Exclusions section explicitly states: "Whether `percent` is a type or syntactic sugar for `number / 100` is a separate investigation." Out of scope for this spec. |
+| ~~**OQ-7d**~~ | **Resolved — not a new type.** `DateRange` is defined in `docs/language/temporal-type-system.md`. No new CLR type needed. |
+| ~~**OQ-7e**~~ | **Resolved — renamed.** `docs/working/precept-value-types-investigation.md` |
+| ~~**OQ-7f**~~ | **Resolved.** Type list is complete per both design docs. `Percentage` is a deferred separate investigation, not a gap. |
 
 ### ~~OQ-4~~: `duration` CLR type ✅ RESOLVED
 
 **Decision:** NodaTime `Duration` directly. No wrapper. Same pattern as all other temporal types.  
 **Rationale:** NodaTime is already an accepted dependency for temporal types. `Duration` handles ISO 8601 duration semantics correctly (unlike `TimeSpan` which conflates elapsed time with calendar periods). Consistency with other temporal types (all NodaTime) outweighs the zero-dependency argument.
 
+### ~~OQ-5~~: Collection CLR type shapes ✅ RESOLVED
+
+**Decision:** Three CLR shapes for 9 collection types. Option A (lazy adapter) locked.  
+**Source:** `docs/working/precept-collection-types-investigation.md`
+
+| Shape | DSL Types | CLR Public Type |
+|---|---|---|
+| Single-type | `set`, `queue`, `stack`, `bag`, `list`, `log` | `IReadOnlyList<TElement>` |
+| Keyed | `log by`, `queue by` | `IReadOnlyList<KeyedElement<TValue, TKey>>` |
+| Map | `lookup` | `IReadOnlyDictionary<TKey, TValue>` |
+
+One new public type: `KeyedElement<TValue, TKey>` (`readonly record struct`). Two internal adapters: `PreceptList<T>`, `PreceptLookup<K, V>`. Remaining sub-questions (OQ-C1, OQ-C2, OQ-C3) documented in §13.7.
+
 ---
 
-## §13 Collection Surface Design (OQ-5)
+## §13 Collection Surface Design (~~OQ-5~~ ✅ RESOLVED)
 
 ### 13.1 The Problem
 
@@ -858,9 +947,9 @@ Neither can expose `PreceptValue` to callers. The design question is: what's the
 
 ### 13.2 Options
 
-#### Option A — Lazy Adapter Wrapper
+#### Option A — Eager-on-First-Read Adapter
 
-An internal `PreceptList<T> : IReadOnlyList<T>` wraps the internal `PreceptValue[]` and projects via the CLR↔PreceptValue mapping on each index access.
+An internal `PreceptList<T> : IReadOnlyList<T>` materializes a `T[]` from the internal `PreceptValue[]` **on first access** (eager-on-first-read), then serves all subsequent reads from the materialized array.
 
 ```csharp
 // Internal — callers only see IReadOnlyList<T>
@@ -868,21 +957,32 @@ internal sealed class PreceptList<T> : IReadOnlyList<T>
 {
     private readonly PreceptValue[] _slots;
     private readonly Func<PreceptValue, T> _project;
+    private T[]? _materialized;
 
-    public T this[int index] => _project(_slots[index]);
+    public T this[int index] => Materialized[index];
     public int Count => _slots.Length;
-    // IEnumerable<T> implementation via yield
+
+    private T[] Materialized => _materialized ??= Materialize();
+    private T[] Materialize()
+    {
+        var result = new T[_slots.Length];
+        for (int i = 0; i < _slots.Length; i++)
+            result[i] = _project(_slots[i]);
+        return result;
+    }
+    // IEnumerable<T> implementation via materialized array
 }
 ```
 
 **Pros:**
-- Zero allocation on access — the wrapper is created once at field construction
-- Consistent with how scalar fields work (project from PreceptValue on access)
-- Immutable by construction — no `T[]` reference escapes
+- Projection cost paid once — O(n) on first read, O(1) indexing thereafter
+- At Precept's scale (typically ≤100 elements), materialization is sub-microsecond
+- Immutable by construction — no `T[]` reference escapes; materialized snapshot is stable
+- Lazy at the Version level (adapter constructed on first field read), not element-level
 
 **Cons:**
-- Projection cost on every index access (trivial for scalars, non-trivial for compound types like `QuantityValue`)
-- `PreceptValue[]` mutation internally would be visible through the wrapper (requires care in the runtime)
+- O(n) allocation on first access (trivial at typical collection sizes)
+- Materialized `T[]` retained for adapter lifetime — minor memory cost
 - LINQ `.ToList()` by callers still allocates — but that's their choice
 
 #### Option B — Materialized Copy
@@ -930,34 +1030,54 @@ internal object CollectionSlot; // boxed T[] — cast at access time
 
 ### 13.3 Evaluation Against Constraints
 
-| Constraint | Option A (Lazy) | Option B (Materialized) | Option C (Typed Storage) |
+| Constraint | Option A (Eager-on-First-Read) | Option B (Per-Access Materialization) | Option C (Typed Storage) |
 |---|---|---|---|
 | PreceptValue not in public API | ✅ Hidden behind `IReadOnlyList<T>` | ✅ Fully projected | ✅ Never created for collections |
-| Thin implementation | ✅ ~30 lines | ⚠️ Thin but needs caching or per-access allocation | ❌ Requires evaluator refactoring |
-| Consistent with scalar access | ✅ Same pattern — project from PreceptValue on read | ⚠️ Different timing — project eagerly | ❌ Breaks uniformity |
-| Immutability | ✅ Structurally immutable | ⚠️ Requires wrapping (not bare array) | ✅ `ReadOnlyCollection<T>` wrapping |
+| Thin implementation | ✅ ~40 lines | ⚠️ Thin but needs per-access allocation or separate caching | ❌ Requires evaluator refactoring |
+| Consistent with scalar access | ✅ Same internal PreceptValue storage — materialization is the projection step | ⚠️ Different timing — project on every access | ❌ Breaks uniformity |
+| Immutability | ✅ Structurally immutable — materialized snapshot is stable | ⚠️ Requires wrapping (not bare array) | ✅ `ReadOnlyCollection<T>` wrapping |
 
-### 13.4 Frank's Recommendation: Option A — Lazy Adapter
+### 13.4 Frank's Recommendation: Option A — Eager-on-First-Read Adapter
 
 **Option A is the clear winner.** Rationale:
 
-1. **Consistency:** Scalar fields project from `PreceptValue` on `Get<T>()` access. Collection fields projecting from `PreceptValue[]` on index access is the same pattern, just vectorized. One mental model for "how values leave the runtime."
+1. **Consistency:** Scalar fields project from `PreceptValue` on `Get<T>()` access. Collection fields materialize from `PreceptValue[]` to `T[]` on first access — same internal storage, same projection direction, one-time cost.
 
-2. **Thinness:** `PreceptList<T>` is approximately 30 lines of straightforward code. No cache invalidation, no evaluator changes, no slot-model refactoring.
+2. **Thinness:** `PreceptList<T>` is approximately 40 lines of straightforward code. No per-access allocation, no evaluator changes, no slot-model refactoring.
 
-3. **Zero allocation on access:** The wrapper is allocated once when the field is first read (or at `Version` construction). Subsequent index accesses are pure projection — no GC pressure.
+3. **O(n) once, O(1) thereafter:** The adapter materializes the full `T[]` on first read. At Precept's scale (typically ≤100 elements), this is sub-microsecond. All subsequent index accesses hit the materialized array directly — no projection, no GC pressure.
 
-4. **Immutability:** `IReadOnlyList<T>` has no mutation methods. The internal `PreceptValue[]` is owned by the runtime and never exposed. Callers cannot mutate.
+4. **Immutability:** `IReadOnlyList<T>` has no mutation methods. The internal `PreceptValue[]` is owned by the runtime and never exposed. The materialized `T[]` is a stable snapshot. Callers cannot mutate.
 
-5. **No evaluator changes:** The evaluator continues to work uniformly with `PreceptValue[]` slots for all fields (scalar and collection). Collection fields simply have their slot hold an array of `PreceptValue` rather than a single `PreceptValue`. The public-facing wrapper handles projection transparently.
+5. **No evaluator changes:** The evaluator continues to work uniformly with `PreceptValue[]` slots for all fields (scalar and collection). Collection fields simply have their slot hold an array of `PreceptValue` rather than a single `PreceptValue`. The adapter handles materialization transparently.
 
-6. **Compound type friendliness:** For `QuantityValue` or `MoneyValue` elements, projection on access means no pre-materialization of complex structs that may never be accessed by index. LINQ consumers who `.ToList()` pay projection once — same cost as Option B but opt-in rather than mandatory.
+6. **Compound type friendliness:** For `Quantity` or `Money` elements, eager materialization pays the projection cost once on first read rather than on every index access. Callers who access multiple elements (iteration, LINQ) pay the same total cost as per-index projection but with better cache locality.
 
-### 13.5 Shane's Remaining Decision
+### 13.5 ~~Shane's Remaining Decision~~ ✅ RESOLVED
 
-**None required.** Option A is unambiguously superior against all four constraints. No tradeoff requires an owner call — the lazy adapter is thinner, more consistent, and has better performance characteristics than either alternative.
+**Resolved.** Option A (eager-on-first-read adapter) is locked. The full investigation (`docs/working/precept-collection-types-investigation.md`) confirmed eager-on-first-read `T[]` materialization (§15 correction), the three CLR shapes, the `KeyedElement<TValue, TKey>` public type, and the `PreceptLookup<K, V>` internal adapter. No owner call required.
 
-If Shane wants to override: the only defensible alternative is Option B with caching (simpler mental model at cost of cache management). Option C should be rejected — it breaks evaluator uniformity for marginal gain.
+### 13.6 Internal Adapter Inventory (Locked)
+
+| Internal Type | Public Surface | Covers |
+|---|---|---|
+| `PreceptList<T> : IReadOnlyList<T>` | `IReadOnlyList<TElement>` | `set`, `queue`, `stack`, `bag`, `list`, `log` |
+| `PreceptList<KeyedElement<T, P>> : IReadOnlyList<KeyedElement<T, P>>` | `IReadOnlyList<KeyedElement<TValue, TKey>>` | `log by`, `queue by` |
+| `PreceptLookup<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>` | `IReadOnlyDictionary<TKey, TValue>` | `lookup` |
+
+All three adapters wrap internal `PreceptValue` storage and materialize to typed arrays/dictionaries on first access (eager-on-first-read). Callers never see the adapter type names — they interact through the standard BCL interfaces only.
+
+### 13.7 Remaining Decisions — All Locked (2026-05-04)
+
+| OQ | Decision | Status |
+|---|---|---|
+| **OQ-C1** | `bag of T`: `IReadOnlyList<T>` with duplicates. LINQ `GroupBy` for frequency. No special bag-frequency CLR type. | ✅ LOCKED |
+| **OQ-C2** | `KeyedElement<TValue, TKey>` confirmed. `readonly record struct KeyedElement<TValue, TKey>(TValue Value, TKey Key)`. | ✅ LOCKED |
+| **OQ-C3** | Store in **declared direction**. `Enqueue`/`LogByAppend` take direction param and insert in correct sorted position. `arr[0]` is always "front" in declared order. `Peek`, `Dequeue`, log iteration are direction-naive. `PreceptPairList<TValue, TKey>` returns `arr[0]` as index 0 — no adapter flip. JSON serializer iterates forward — no inversion. `FieldDescriptor.SortDirection` is informational metadata only. | ✅ LOCKED |
+
+**OQ-C3 rationale:** Direction is "compiled in" at write time by `Enqueue`/`LogByAppend`. One place owns direction (insertion); all reads are direction-naive. Alternative (always store ascending, flip in CLR adapter) rejected — JSON serializer also needed a flip, splitting ownership across two places.
+
+Source: `docs/working/precept-collection-types-investigation.md` §9. Decision record: `frank-oq-c3-direction-resolved.md`.
 
 ---
 
