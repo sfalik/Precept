@@ -14817,3 +14817,280 @@ Rejected because:
 **By:** Shane (via Copilot)
 **What:** Do not run the decisions.md archive step (moving old entries to decisions-archive.md) while a working-doc review and closeout session is in progress. Archival is only permitted after all working docs under review have been fully walked through and closed out.
 **Why:** User request — captured for team memory
+
+
+# Catalog-Delegate Evaluation — Should Executor Logic Live on `OperationMeta` Entries?
+
+**By:** Frank (Lead Architect)
+**Date:** 2026-05-04T21:10:06.730-04:00
+**Status:** Recommendation recorded — Shane makes the final call
+**Trigger:** Shane's question: "instead of separate computation modules, why not put the computation logic directly in the catalog delegates themselves?"
+
+---
+
+## 1. What I Read Before Forming an Opinion
+
+Before answering, I read the actual code:
+
+- **`src/Precept/Language/Operations.cs`** (1158 lines) — The fully implemented catalog. `OperationMeta` is a pure data record with no delegate fields. `GetMeta` is an exhaustive switch returning `new UnaryOperationMeta(...)` / `new BinaryOperationMeta(...)` instances. 150+ entries covering every legal typed operation. No computation logic anywhere in the file.
+- **`src/Precept/Language/Operation.cs`** — The record hierarchy: `abstract record OperationMeta` → `sealed record UnaryOperationMeta` / `sealed record BinaryOperationMeta`. Fields: `Kind`, `Op`, `Lhs/Rhs`, `Result`, `Description`, `ProofRequirements`. No delegate fields.
+- **`src/Precept/Language/Function.cs`** — `FunctionMeta` similarly carries no delegates. Type checker-facing catalog records throughout the codebase are pure metadata.
+- **`src/Precept/Runtime/PreceptValue.cs`** — Stub. `FromJson`, `FromClr<T>`, `ToClr<T>`, `ToJson`. Public API boundary as planned.
+- **`src/Precept/Runtime/TypeRuntime.cs`** — Does **not exist yet**. It is a designed-but-unimplemented structure.
+- **`.squad/decisions/inbox/frank-evaluator-vs-clr-computation.md`** — The prior decision from this session. It already resolved the open design question from the catalog-system doc: *"The type system assembles the array at startup. `OperationMeta` records remain pure metadata. Executor delegates live on `TypeRuntime`, not on `OperationMeta`."*
+
+The codebase is unambiguous: zero existing catalog records carry delegates anywhere. The pattern is uniform and it was established deliberately.u
+
+---
+
+## 2. What Shane Is Actually Proposing
+
+Shane's proposal has two overlapping interpretations. I need to address both:
+
+**Interpretation 1 — Delegate field on `OperationMeta`, pointing to named static methods:**
+
+```csharp
+// OperationMeta gains an Executor field:
+public sealed record BinaryOperationMeta(
+    OperationKind Kind,
+    ...
+    Func<PreceptValue, PreceptValue, PreceptValue>? Executor = null) // ← new
+    : OperationMeta(Kind, Op, Result, Description);
+
+// Populated in Operations.GetMeta:
+OperationKind.MoneyPlusMoney => new BinaryOperationMeta(
+    kind, OperatorKind.Plus, PMoney, PMoney, TypeKind.Money,
+    "Money + money → money (same currency required)",
+    Executor: MoneyOperations.Add),  // ← delegate on catalog entry
+```
+
+**Interpretation 2 — Logic inlined directly in delegates on catalog entries (Shane's "directly in the catalog delegates themselves" phrasing):**
+
+```csharp
+OperationKind.MoneyPlusMoney => new BinaryOperationMeta(
+    kind, OperatorKind.Plus, PMoney, PMoney, TypeKind.Money,
+    "Money + money → money (same currency required)",
+    Executor: (left, right) => {
+        var l = left.AsMoney();
+        var r = right.AsMoney();
+        if (l.Currency != r.Currency) throw PreceptFault.QualifierMismatch(...);
+        return PreceptValue.From(new Money(l.Amount + r.Amount, l.Currency));
+    }),
+```
+
+Both interpretations put execution machinery on language specification records. The second interpretation additionally embeds computation logic inside the 1158-line `Operations.cs` catalog file.
+
+---
+
+## 3. Architectural Soundness Assessment (A)
+
+### The Core Violation
+
+The catalog-driven architecture has one axiom that matters here, stated plainly in `docs/language/catalog-system.md` § Architectural Identity:
+
+> "Pipeline stages are generic machinery that reads [catalog metadata]."
+
+If the catalog carries executor delegates, it has stopped being metadata that pipeline stages read — it has become a pipeline stage itself. This is not a minor stylistic quibble. It inverts the architectural relationship.
+
+The `OperationMeta` record has a well-defined consumer set:
+
+| Consumer | What it reads | Needs executors? |
+|---|---|---|
+| Type checker | `Lhs.Kind`, `Rhs.Kind`, `Result`, `ProofRequirements` | ❌ |
+| Language server | `Description`, `Op`, operand types | ❌ |
+| MCP `precept_language` tool | All metadata fields | ❌ |
+| Doc generator | All metadata fields | ❌ |
+| Evaluator dispatch | `Kind` (to index into executor array) | ✅ — but only needs `Kind` |
+
+The evaluator does not need to read the full `OperationMeta` record to get its executor — it only needs the `OperationKind` ordinal. Under Option B, the flow is:
+
+1. Type checker resolves `OperationKind` at compile time
+2. Evaluator looks up `BinaryExecutors[(int)kind]` at execution time — O(1) array index
+
+Adding an `Executor` field to `OperationMeta` means the type checker, language server, MCP server, and doc generator all have to carry a `Func<...>?` field in every record they process, serving exactly zero of their use cases. That is leakage of execution machinery into language specification records.
+
+### The Same-Key Argument — Why It Doesn't Resolve the Question
+
+Shane's framing: "both are keyed dispatch tables — the question is whether the key is an array index or a catalog field."
+
+This is accurate as far as it goes. Both approaches DO produce the same runtime behavior: given an `OperationKind`, get a delegate and call it. But "same key" does not mean "same design." The question is whether that delegate belongs on the record that describes the language, or on the structure that governs execution. Those are different things with different consumers and different change rates.
+
+Consider: if we add a new type to the language, the catalog change (new `OperationKind` enum value, new `OperationMeta` entries in the switch) is a language specification change. The executor registration (new entries in `TypeRuntime.BinaryExecutors`) is a runtime machinery change. Under the catalog-delegate approach, both changes happen in the same record. The catalog entry now tracks two concerns: "this operation is legal" AND "here is how to compute it." A future developer modifying the executor doesn't need to touch the language specification — and shouldn't.
+
+---
+
+## 4. Concrete Tradeoffs (B)
+
+### Testability
+
+**Option B (TypeRuntime array + executor modules):**
+```csharp
+[Fact]
+public void MoneyAdd_SameCurrency_ReturnsSum()
+{
+    var result = MoneyOperations.Add(
+        PreceptValue.From(new Money(100m, usd)),
+        PreceptValue.From(new Money(50m, usd)));
+    result.AsMoney().Should().Be(new Money(150m, usd));
+}
+```
+`MoneyOperations.Add` is a named, stable, directly-callable static method. Test file is `MoneyOperationsTests.cs`. No catalog, no pipeline, no dispatch infrastructure needed.
+
+**Catalog-delegate (interpretation 1 — named methods on records):**
+```csharp
+Operations.GetMeta(OperationKind.MoneyPlusMoney).Executor!(left, right)
+```
+Testable but requires catalog initialization and adds ceremony. The underlying method (`MoneyOperations.Add`) is still directly callable if it exists — the delegate is just a pointer to it. If the modules exist, this interpretation changes only the lookup path, not the testability story.
+
+**Catalog-delegate (interpretation 2 — inline lambdas on records):**
+The logic is anonymous. No named test target. You must invoke it via the catalog entry. If the lambda has a bug, the test failure points at a line number in the `GetMeta` switch — not a method name. Debugging experience is significantly worse.
+
+### Readability
+
+`Operations.cs` is currently 1158 lines. Under interpretation 2 (inline logic), adding even 3 lines of executor code per entry across 150+ operations produces a 1600–2000 line file where language metadata and execution behavior are woven together. The catalog currently has a clear single responsibility: "every legal typed operation in the language, with its types, proof requirements, and documentation." That clarity is worth preserving.
+
+Under interpretation 1 (named method delegates), the file grows by one field name per entry — a minor increase. But the record now carries execution machinery whether or not it needs to, and `Operations.cs` implicitly depends on `Precept.Runtime.Operations` (the module assembly) instead of being self-contained.
+
+### Extensibility
+
+Adding a new business type (e.g., `DateRange` with its own arithmetic):
+
+**Option B:** Add `OperationKind` values, `OperationMeta` entries to `Operations.cs`, a new `DateRangeOperations` static class in `src/Precept/Runtime/Operations/`, and registration calls in `TypeRuntime`.
+
+**Catalog-delegate:** Add `OperationKind` values and `OperationMeta` entries to `Operations.cs` with inline delegates or delegate fields. All in one place — which is the appeal. But it concentrates all changes in the catalog file, which already touches too many concerns.
+
+Both approaches scale the same way. The difference is whether the logic for the new type is localized in its own module or embedded in the catalog.
+
+### Startup Cost
+
+Negligible in both cases. Array initialization (`new Func<...>?[N]` + N assignments) vs. delegate fields on catalog records (stored in the same records that `Operations.All` already materializes). Both are one-time O(N) setup at process start.
+
+---
+
+## 5. Public API Surface Impact (C)
+
+Shane's premise — "only the thin CLR wrappers for `Get<T>()` and arg builder support are public" — is **correct and unaffected by either approach.**
+
+The catalog-delegate vs. TypeRuntime-array choice is entirely internal. `OperationMeta` records are not part of the public API surface; neither is `TypeRuntime`. `PreceptValue`, `Money`, `Quantity`, `Price`, `ExchangeRate`, `Currency`, `UnitOfMeasureCode`, `DimensionCode` — these are the public surface. Neither approach affects them.
+
+The executor modules (`MoneyOperations`, etc.) are already planned as `internal` (OQ-EC-1 from the prior decision recommended `internal initially`). Whether those modules are separate classes or inline lambdas on catalog entries has zero public API impact either way.
+
+Shane's public-API premise is sound. It does not, however, resolve the internal architecture question.
+
+---
+
+## 6. Recommendation (D)
+
+**Maintain Option B as designed. `OperationMeta` stays pure. `TypeRuntime.BinaryExecutors` is the execution registry. Executor logic lives in named static modules.**
+
+The reasoning is exact:
+
+1. **`OperationMeta` serves the language specification layer.** Type checker, language server, MCP server, and doc generator consume it. None of them execute operations. Adding execution delegates to these records creates coupling between concerns that have no mutual dependency. The catalog defines what's legal; the executor array defines how to compute. Different consumers, different change rates, different concerns.
+
+2. **Named executor modules are better test targets.** `MoneyOperations.Add` is directly callable, independently testable, debuggable by name. Anonymous inline delegates in the `GetMeta` switch are not. For a codebase with ~2,000 tests, the testing story matters.
+
+3. **Initialization order is cleaner.** `Operations` initializes with pure metadata and no dependencies. `TypeRuntime` registers executors at startup, pulling in `UnitCatalog`, `CurrencyCatalog`, and other runtime dependencies on a controlled timeline. Embedding delegates on catalog records that need catalog references creates a circular initialization concern — the `Operations` catalog would now depend on `UnitCatalog`, which may not be initialized yet.
+
+4. **`Operations.cs` should not become a god class.** 1158 lines of language specification is already a large file. It serves one purpose clearly. Adding executor logic — even as method group references — begins pulling it toward "the file that knows everything about operations." That file doesn't have an ownership boundary; executor modules do.
+
+5. **The catalog-driven principle is precise about the boundary.** Catalogs are metadata sources. Pipeline stages read them. When a catalog entry carries execution behavior, it has become a pipeline stage. That inversion makes future architectural reasoning — "does this belong in the catalog or in the pipeline?" — harder to apply consistently.
+
+### What Shane's instinct gets right
+
+Shane is right that the current design has an apparent seam: the catalog knows everything about an operation *except* how to compute it. That seam exists deliberately — the catalog's job stops at "what the language permits." The executor's job starts at "how to compute the result." The seam IS the architecture.
+
+If the seam feels like friction, the correct response is to make the executor registration visible and co-located — not by embedding delegates on records, but by ensuring the registration module (`OperationRegistration` or its equivalent in `TypeRuntime`) is easy to navigate. Each `TypeRuntime` subclass registers its executors in one place, keyed by `OperationKind`. Any developer asking "where does `MoneyPlusMoney` get computed?" has one obvious place to look: `MoneyTypeRuntime.Initialize()` or equivalent.
+
+### The hybrid not worth recommending
+
+A possible middle position: a static `Executors` property on the `Operations` class (not on `OperationMeta` records), serving as the executor registry alongside the metadata. This would look like:
+
+```csharp
+// On Operations (not on OperationMeta):
+public static Func<PreceptValue, PreceptValue, PreceptValue>?[] BinaryExecutors { get; }
+    = new Func<...>?[Enum.GetValues<OperationKind>().Length];
+```
+
+This keeps `OperationMeta` clean while consolidating dispatch into the `Operations` namespace. But it moves `TypeRuntime`'s job into `Operations`, creating an assembly dependency that goes the wrong direction: `Language.Operations` would now hold runtime execution delegates alongside language specification metadata. That's the same separation-of-concerns violation, just with a different class name attached. Not recommended.
+
+---
+
+## 7. Three-Line Summary for Shane
+
+The catalog's job is to describe what the language allows. The executor's job is to compute the result. These are different concerns with different consumers — putting execution delegates on language specification records violates the catalog-driven principle that pipeline stages read from catalogs, not the other way around. Option B (TypeRuntime array + executor modules) is the correct architecture. The "fewer files" appeal is false economy — it trades focused, testable, single-responsibility modules for a god-class catalog that owns both language specification and execution behavior.
+
+**Recommendation: No change. `OperationMeta` stays pure. TypeRuntime array approach stands.**
+
+
+### 2026-05-05T11:20:17Z: Value-types investigation synced with 31 inbox files
+
+**By:** Frank
+
+**Status:** Complete — investigation doc updated with all applicable inbox content.
+
+---
+
+## Captured (Directly Applicable — 20 files)
+
+| Inbox File | Content Integrated | Target Section |
+|---|---|---|
+| `frank-evaluator-vs-clr-computation.md` | LOCKED verdict: CLR types are pure data records; computation in executor modules only | New §9 |
+| `frank-computation-locality.md` | Superseded Option A analysis (historical note) | §9.2 |
+| `frank-operator-overloads.md` | Operator overload structural problems (historical) | New §14 |
+| `frank-cc25-registration-mechanism.md` | TypeRuntimeMeta instance arrays, runtime-layer aggregation | New §10.2 |
+| `frank-catalog-delegate-eval.md` | OperationMeta carries NO executor delegates | §10.1 |
+| `frank-operations-registry-verdict.md` | Embedded delegates in opcodes, global array eliminated | §10.3 |
+| `frank-operations-registry-analysis.md` | Superseded analysis (referenced in §10.3) | §10.3 |
+| `frank-delegate-heap-verdict.md` | `static readonly Func<>` not `unsafe delegate*` | §10.4 |
+| `frank-registry-record-struct-verdict.md` | `record struct` opcodes not pursued | §10.5 |
+| `frank-type-library-assembly.md` | `Precept.Types` separate assembly, dependency graph | New §11 |
+| `frank-identity-types-uom-dimension.md` | `UnitOfMeasure` and `MeasureDimension` proxy struct designs | New §12 |
+| `frank-type-rename-no-code-suffix.md` | Naming: `UnitOfMeasure` (not `UnitOfMeasureCode`), `MeasureDimension` (not `DimensionCode`) | §12.4 |
+| `frank-uom-dimension-currency-consistency.md` | Dual-shape justification — why Currency is sealed class but UoM/Dimension are structs | §12.1 |
+| `copilot-directive-2026-05-04T20-37-12.md` | Shane directive: `Code` suffix disliked | §12.4 |
+| `copilot-directive-2026-05-04T20-59-49.md` | Shane directive: `MeasureDimension` naming locked | §12.4 |
+| `frank-surface-spec-preceptvalue-rationale.md` | PreceptValue Axiom 1 rationale (4 reasons) | New §13 |
+| `frank-raw-lane-json-ruling.md` | Raw lane = JsonElement, PreceptValue internal-only | §13.1 |
+| `copilot-directive-2026-05-05T00-11-43.md` | PreceptValue never leaks public API (Shane directive) | §13.1 |
+| `frank-doc-closure-verdict.md` | Nine stale sections identified, ten OQs blocking archival | Status header updated |
+| `frank-business-types-coverage.md` | Already captured in §7 during original writing | §7 (confirmed current) |
+
+## Captured (Partially Applicable — 2 files)
+
+| Inbox File | Content Extracted | Target Section |
+|---|---|---|
+| `frank-evaluator-collection-internals.md` | Universal `PreceptValue[]` backing confirms §13.2 dual-shape model | §13.2 (context reference) |
+| `copilot-directive-2026-05-04T23-59-06.md` | `IReadOnlyLog<T>` stale — log maps to `IReadOnlyList<TElement>` | Not integrated (collection concern, not value-type) |
+
+## Skipped (Not Applicable — 9 files)
+
+| Inbox File | Reason Skipped |
+|---|---|
+| `frank-collection-doc-analysis.md` | Pure collection surface spec audit |
+| `frank-collection-finalization.md` | Collection investigation archival process |
+| `frank-collection-types-stale-fixes.md` | Collection doc namespace/type fixes |
+| `frank-surface-spec-13-2-fix.md` | Collection adapter eager-on-first-read semantics |
+| `copilot-directive-clr-collections-keep-v1.md` | CLR collection projections stay in v1 |
+| `copilot-cc25-q7-dict-extension-obsolete.md` | Dictionary convenience lane closure |
+| `copilot-directive-2026-05-04T21-13-31.md` | Superseded HOLD process directive |
+| `frank-decisions-summary.md` | Navigation aid creation (squad process) |
+| `frank-trace-correction.md` | Interpreter model (not value types) |
+
+---
+
+## Remaining Gaps (Open Questions Blocking Archival)
+
+The investigation doc is functionally complete for its investigative purpose. The following open questions remain blocked on Shane:
+
+1. **OQ-3b** — UCUM scope (full grammar + tiered discovery vs. hard subset)
+2. **OQ-3f** — DSL constraint granularity for quantity fields (3 levels vs. 2 vs. 1)
+3. **OQ-CUR-1** — Include `symbol` supplement in CurrencyCatalog?
+4. **OQ-CUR-3** — `Get<Currency>()` vs. `Get<string>()` for currency-typed fields
+5. **OQ-CUR-4** — Shipping mechanism (embedded resource vs. separate package)
+6. **OQ-7a** — Is `exchangerate` a built-in DSL field type?
+7. **OQ-7e** — DateRange inclusive vs. exclusive end
+8. **OQ-7f** — Parallel `DateTimeRange` for Instant-bounded intervals
+9. **OQ-DISP-1** — Runtime-layer aggregation class final name
+10. **Precept.Types assembly** — Shane confirmation needed on the separate-package decision
+
+The doc can be archived with these OQs explicitly marked open. Their resolution does not require further investigation — each is a Shane-decides binary/ternary choice.

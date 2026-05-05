@@ -10,9 +10,15 @@
 - Working docs drift quickly during heavy deliberation; canonical docs and squad records must be synchronized as soon as a decision locks.
 - Investigation docs may be archived once their outcomes are captured in canonical docs, proposals, or the squad decision ledger.
 
-## Recent Updates
-
-### 2026-05-05T05:19:25Z — Collection types investigation fully archived
+## Recent Updates
+
+### 2026-05-05T15:20:17Z — Value-types investigation ledger sync recorded
+
+- Scribe merged Frank's value-types sync and catalog-delegate evaluation inbox notes into `.squad/decisions/decisions.md`.
+- The canonical record now reflects the §§9–§14 investigation integration plus the `OperationMeta`/executor separation verdict.
+- Processed inbox files were cleared after deduplication and ledger merge.
+
+### 2026-05-05T05:19:25Z — Collection types investigation fully archived
 
 - Full walkthrough of `docs/working/precept-collection-types-investigation.md` is complete and the document is now archived under `docs/working/Archived/`.
 - `docs/runtime/evaluator.md` now carries the OQ-C3 direction-model closure in §7.4.1 §C: `EnqueueByPriority` takes `SortDirection`, and the new "Direction model (OQ-C3)" subsection makes declared-direction storage explicit.
@@ -20,7 +26,7 @@
 
 ### Historical summary through 2026-05-05
 
-- 2026-05-04 locked the execution architecture baseline: `TypeRuntime` owns per-type behavior, the runtime aggregation registry owns flat dispatch, and the evaluator never regains type-specific knowledge.
-- Collection API direction stabilized around CLR-friendly adapters (`PreceptList<T>`, `PreceptLookup<TKey, TValue>`, `KeyedElement<TValue, TKey>`) with evaluator-owned CoW and declared-direction pair storage.
-- Currency, unit, and dimension work converged on catalog-backed identity types with strict provenance notes and API-boundary-specific shapes.
-- Use `.squad/decisions.md` for full per-decision provenance; keep `history.md` focused on durable operating context plus the newest closures.
+- 2026-05-04 locked the execution architecture baseline: `TypeRuntime` owns per-type behavior, the runtime aggregation registry owns flat dispatch, and the evaluator never regains type-specific knowledge.
+- Collection API direction stabilized around CLR-friendly adapters (`PreceptList<T>`, `PreceptLookup<TKey, TValue>`, `KeyedElement<TValue, TKey>`) with evaluator-owned CoW and declared-direction pair storage.
+- Currency, unit, and dimension work converged on catalog-backed identity types with strict provenance notes and API-boundary-specific shapes.
+- Use `.squad/decisions.md` for full per-decision provenance; keep `history.md` focused on durable operating context plus the newest closures.

@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+### 2026-05-05T15:20:17Z — Value-types integration batch recorded
+
+- Pre-check: decisions.md measured 825968 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran before merge.
+- Archived 0 dated decision entries, merged 2 inbox files into the canonical ledger, deleted the processed inbox files, and wrote the Frank orchestration/session logs.
+- Health report: decisions.md 825968B → 845747B; history files summarized = 0.
+
 ### 2026-05-03T23:00:32Z — ReadJson / WriteJson batch recorded
 - Pre-check measured decisions.md at 68928 bytes with 1 inbox file; the hard-gate archive pass ran on the 7-day window threshold and found 0 entries old enough to move.
 - Merged `frank-readwrite-json-api` into a new CC#25 ledger entry, deleted the processed inbox file, wrote the Frank orchestration log plus the readjson-writejson session log, and confirmed No open PR found for branch 'Precept-V2-Radical'; PR stewardship was a no-op.
