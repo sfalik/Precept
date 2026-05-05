@@ -683,4 +683,467 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The hotpath verdict is durable: at 24 bytes, `QuantityValue` stays well below the copy-cost crossover, avoids the projected short-lived Gen0 churn from a sealed-class shape, and exposes no designed boxing hazards on the public API surface.
 - The dual-shape model is explicitly confirmed: `QuantityValue` remains a `readonly record struct` for API-boundary materialization, while `Unit` remains an interned `sealed class` entity and internal slot storage continues to belong to `PreceptValue`.
 
+---
+
+---
+
+### 2026-05-04T23:22Z: `UnitOfMeasureCode` and `DimensionCode` CLR identity-type designs
+
+**By:** Frank
+
+**Status:** Recommendation recorded — awaiting Shane decisions on final naming.
+
+**Merged source:** `frank-identity-types-uom-dimension.md`.
+
+- `UnitOfMeasureCode` is a `readonly record struct` (not `Unit` sealed class) — the API proxy carrying only the validated UCUM code string. `Unit` is the evaluator-internal enriched catalog entity; `UnitOfMeasureCode` is the lightweight field value at the public boundary.
+- `DimensionCode` is likewise a `readonly record struct` carrying only the dimension name string. Same dual-shape rationale: `Dimension` (7-exponent SI vector) is the evaluator-internal type; `DimensionCode` is the identity code.
+- Both types include a curated set of `static readonly` well-known members (~25–30 Tier 1 units for `UnitOfMeasureCode`; 12–15 named dimensions for `DimensionCode`) for DX convenience.
+- Both implement `Parse`, `TryParse`, and structural equality. `UnitOfMeasureCode` supports entity-scoped unit lookup via a `PreceptDefinition context` overload.
+- The governing principle: expose the catalog entity at the API boundary only when all its properties are consumer-facing; use a proxy struct when the entity carries evaluator-internal metadata (tiers, conversion factors, SI exponent vectors).
+
+---
+
+---
+
+### 2026-05-04T23:31Z: API boundary consistency — `Currency` vs. `UnitOfMeasure`/`MeasureDimension` shapes justified
+
+**By:** Frank
+
+**Status:** Recommendation recorded.
+
+**Merged source:** `frank-uom-dimension-currency-consistency.md`.
+
+- The apparent asymmetry (Currency = sealed class, UnitOfMeasureCode/DimensionCode = readonly record structs) is real and architecturally justified, not inconsistent.
+- `Currency`: every property (AlphaCode, Name, Symbol, MinorUnit, NumericCode) is consumer-facing → expose the catalog entity directly as the API type.
+- `Unit`: carries evaluator-internal fields (Tier, DimensionVector, conversion factors) → API boundary needs a lean proxy struct (`UnitOfMeasureCode`) that strips internal concerns.
+- `Dimension` (SI exponent vector): dimensional analysis machinery → `DimensionCode` proxy is the API boundary type.
+- Governing principle: *expose the catalog entity at the API boundary only when all its properties are consumer-facing; use a proxy struct otherwise.*
+
+---
+
+---
+
+### 2026-05-04T23:44Z: `Precept.Types` — separate type library assembly decision
+
+**By:** Frank
+
+**Status:** Recommendation recorded — Shane confirmation needed.
+
+**Merged source:** `frank-type-library-assembly.md`.
+
+- A standalone `Precept.Types` assembly is required. Consumers who want `Money`, `Currency`, `UnitOfMeasure`, etc. in their DTO layer must not pull in the full Precept compiler pipeline.
+- Dependency graph: `Precept.Types` has no Precept dependencies; `Precept` (evaluator) references `Precept.Types`; consumers may reference either.
+- `Precept.Types` contents: `Currency`, `CurrencyCatalog`, `UnitOfMeasureCode`, `DimensionCode`, `Money`, `Price`, `ExchangeRate`, `Quantity`, `KeyedElement<TValue, TKey>`, `IUnitConversionSource`, embedded ISO 4217 resource.
+- `Precept` (evaluator assembly) retains: `Unit` (sealed class with Tier + DimensionVector + ConversionFactors), `UnitCatalog`, `DimensionCatalog`, all pipeline stages, embedded UCUM resource.
+- The NodaTime analogy taken seriously implies a separate package, not just separate files.
+
+---
+
+---
+
+### 2026-05-04T23:58Z: Computation locality — Option A analysis (superseded by frank-evaluator-vs-clr-computation)
+
+**By:** Frank
+
+**Status:** Analysis only — superseded. Final verdict in `frank-evaluator-vs-clr-computation.md` (Option B).
+
+**Merged source:** `frank-computation-locality.md`.
+
+- Proposed Option A: arithmetic on the types. `Money`, `Price`, `ExchangeRate`, `Quantity` carry their own computation methods. `IUnitConversionSource` injected for `Quantity.ConvertTo()`.
+- `RoundToMinorUnit()` illustrates why computation fits on types: `Currency.MinorUnit` is already in `Precept.Types` — no evaluator needed.
+- Computation boundary: same-unit/same-currency operations are fully self-contained on types; D8 auto-conversion requires catalog injection via `IUnitConversionSource`.
+- **This analysis was superseded.** The evaluator-only computation model (Option B) was accepted. CLR types are now pure data records; computation lives in named executor modules registered on `TypeRuntimeMeta`.
+
+---
+
+---
+
+### 2026-05-05T00:14Z: Operator overload surface analysis for business-domain types
+
+**By:** Frank
+
+**Status:** Analysis recorded — informs Option B design (evaluator-only computation).
+
+**Merged source:** `frank-operator-overloads.md`.
+
+- Three structural problems with naïve C# operator overloads: (1) operators cannot take extra parameters (`IUnitConversionSource` needed for D8); (2) same operand types, different return types (`Money / Money` → `decimal` or `ExchangeRate`); (3) commutative cross-type operators require declaration on both types.
+- Per-type operator surfaces analyzed: `Money` (additive, scaling, ratio, comparisons, named `DeriveRate`/`DivideBy`); `ExchangeRate` (currency conversion `operator*`, scaling, named `Apply`/`Invert`); `Price` (dimensional cancellation `operator*`, scaling, additive); `Quantity` (same-unit operators, D8 as named method with source injection, compound division).
+- `Quantity.operator+(Quantity, Quantity)` requires same unit; D8 auto-conversion is a named method (`AddSameDimension(other, source)`) — cannot be an `operator+` because of the required injection parameter.
+- `Money / Money` → operator returns `decimal` (ratio, same currency); `ExchangeRate` derivation is a named method (`DeriveRate`) because C# cannot return two types from one operator signature.
+- **This analysis was superseded by Option B.** Under the evaluator-only model, CLR types carry no operators; all arithmetic is in named executor modules. Operator overloads on `Precept.Types` types were explicitly not adopted.
+
+---
+
+---
+
+### 2026-05-05T00:32Z: LOCKED — Evaluator-only computation (Option B); CLR types are pure data records
+
+**By:** Frank
+
+**Status:** Accepted. Supersedes frank-computation-locality and frank-operator-overloads.
+
+**Merged source:** `frank-evaluator-vs-clr-computation.md`.
+
+- **CLR types (`Money`, `Price`, `ExchangeRate`, `Quantity`) are pure data records.** No operators, no arithmetic methods, no validation logic. `ToString()`, `Parse()`, construction only.
+- **Computation lives in named executor modules** (`MoneyOperations`, `QuantityOperations`, `PriceOperations`, `ExchangeRateOperations`) as `internal static` classes in `src/Precept/Runtime/Operations/`. Each method corresponds to one `OperationKind`.
+- **Why not Option A:** creates structural duplication of domain rules — same-currency, same-unit, D15 boundary, D16 exception table — enforced in both CLR type operators AND the evaluator pipeline. Seven rules with two enforcement points; must stay manually in sync.
+- **Under Option B:** type checker reads `ProofRequirements` from `OperationMeta` (compile time); executor module method is the single runtime enforcement point. No third copy. Catalog-driven.
+- **D8 auto-conversion:** lives in `QuantityOperations.Add()` — has full access to `UnitCatalog`. One path. Under Option A it required two paths (same-unit operator + named method with source).
+- **Evaluator:** three-line indexer — resolve operation, index into `TypeRuntimeMeta.BinaryExecutors`, call. Zero domain logic.
+- **The NodaTime analogy was wrong for this decision:** NodaTime carries computation because it has no runtime. Precept has a runtime. The analogy justifies the separate assembly; it does not require computation on the types.
+- Open items: OQ-DISP-1 (Runtime-layer aggregation class name), OQ-DISP-2 (update evaluator.md dispatch code to use qualified name), OQ-DISP-3 (update catalog-system.md open question).
+
+---
+
+---
+
+### 2026-05-05T00:37Z: User directive — `Code` suffix on CLR identity type names disliked
+
+**By:** Shane (via Copilot)
+
+**Status:** Directive recorded.
+
+**Merged source:** `copilot-directive-2026-05-04T20-37-12.md`.
+
+- `UnitOfMeasureCode` and `DimensionCode` should not carry a `Code` suffix. User preference captured for team memory and naming decisions.
+
+---
+
+---
+
+### 2026-05-05T00:39Z: Rename recommendations — `Code` suffix removal analysis
+
+**By:** Frank
+
+**Status:** Recommendation recorded — Shane decision needed to finalize.
+
+**Merged source:** `frank-type-rename-no-code-suffix.md`.
+
+- `UnitOfMeasureCode` → `UnitOfMeasure`: **Approved.** No direct CLR naming conflict. Distinguishes the lightweight API proxy from the evaluator-internal `Unit` entity without stealing the shorter name.
+- `DimensionCode` → `Dimension`: **Rejected.** Conflict with the existing `ProofRequirementMeta.Dimension` type in live source, and conceptual collision with the planned algebraic `Dimension` SI-exponent type.
+- If `Code` suffix must go on `DimensionCode`: use `MeasureDimension` — distinct from the algebraic `Dimension`, domain-readable, pairs well with `UnitOfMeasure`.
+- `CurrencyCode` is not relevant here; the accepted direction already uses `Currency` (sealed class).
+
+---
+
+---
+
+### 2026-05-05T01:00Z: User directive — `DimensionCode` property named `MeasureDimension`
+
+**By:** Shane (via Copilot)
+
+**Status:** Directive recorded. Locks naming for the `dimension` field CLR type.
+
+**Merged source:** `copilot-directive-2026-05-04T20-59-49.md`.
+
+- The `DimensionCode` property on the `Quantity` CLR type (and the type itself) shall be named `MeasureDimension`, not `DimensionCode` or `Dimension`.
+- Rationale: `Dimension` is already a first-class Precept language type (`TypeKind.Dimension`, keyword `dimension`). Using it as a property name creates a scope collision. `MeasureDimension` is distinct, unambiguous, and future-proof against a planned algebraic `Dimension` type for dimensional analysis.
+
+---
+
+---
+
+### 2026-05-05T01:13Z: User directive — HOLD on inbox merge until CLR type design finalized (SUPERSEDED)
+
+**By:** Shane (via Copilot)
+
+**Status:** Superseded. Lift signaled by current spawn manifest.
+
+**Merged source:** `copilot-directive-2026-05-04T21-13-31.md`.
+
+- Directive recorded: Scribe must not merge inbox into decisions.md while CLR business-domain type design is in active deliberation.
+- This hold has been lifted by the current batch spawn manifest, which explicitly instructs the inbox merge. Recording the hold for historical completeness.
+
+---
+
+---
+
+### 2026-05-05T01:15Z: Executor delegates do not belong on `OperationMeta` records
+
+**By:** Frank
+
+**Status:** Accepted — settles one of two options for CC#25 registration mechanism.
+
+**Merged source:** `frank-catalog-delegate-eval.md`.
+
+- `OperationMeta` records serve the type checker, language server, MCP server, and doc generator — none of which execute operations. Adding `Func<…>?` executor fields pollutes language specification records with execution machinery.
+- The catalog-driven architecture axiom: *pipeline stages read catalogs; catalogs do not become pipeline stages.* Putting executors on `OperationMeta` inverts this relationship.
+- `Operations.cs` (1158 lines) has zero delegate fields anywhere — this is a deliberate, uniform pattern.
+- Option A (catalog-delegate) in both forms — delegate field on `OperationMeta` pointing to named methods, or inline lambdas in the `GetMeta` switch — is dead on arrival.
+- Named executor modules (`MoneyOperations`, `QuantityOperations`, etc.) in `src/Precept/Runtime/Operations/` are independently testable, named, and debuggable without catalog infrastructure.
+
+---
+
+---
+
+### 2026-05-05T01:27Z: LOCKED — CC#25 registration mechanism: `TypeRuntimeMeta` instance arrays; Runtime-layer `OperationRegistry` aggregation
+
+**By:** Frank
+
+**Status:** Accepted. Closes the open design question in catalog-system.md.
+
+**Merged source:** `frank-cc25-registration-mechanism.md`.
+
+- **`OperationMeta` is pure metadata, always.** No delegate fields, no executor references.
+- **Executor modules** (`MoneyOperations`, `QuantityOperations`, etc.) are `internal static` classes in `src/Precept/Runtime/Operations/`. Methods have stable names and correspond 1:1 to `OperationKind` values.
+- **`TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`** are instance arrays, the **authority**. Each `TypeRuntime<T>` concrete implementation populates its arrays from the executor module's static methods at type initialization.
+- **Runtime-layer aggregation registry** (name TBD — `OperationRegistry` is placeholder; must be in `Precept.Runtime` namespace, NOT `Precept.Language`) aggregates delegates from all registered `TypeRuntimeMeta` instances into flat `OperationKind`-indexed arrays at startup. This is the evaluator's dispatch table — a derived read-only view; `TypeRuntimeMeta` arrays are the source of truth.
+- The `Operations.BinaryExecutors[(int)kind]` in evaluator.md §7 refers to this Runtime-layer class, NOT `Language.Operations`. Doc correction required: use fully-qualified name to eliminate ambiguity.
+- **"The catalog entry IS the behavior"** principle applies to the `TypeMeta.Runtime` entry (the `TypeRuntime` instance), not to individual `OperationMeta` entries.
+- Open items: OQ-DISP-1 (final class name — Shane decides), OQ-DISP-2 (evaluator.md doc correction), OQ-DISP-3 (catalog-system.md open question struck).
+
+---
+
+---
+
+### 2026-05-05T02:15Z: Operations registry analysis — global flat array defense and rebuttal (superseded by verdict)
+
+**By:** Frank
+
+**Status:** Analysis only — superseded by frank-operations-registry-verdict.md.
+
+**Merged source:** `frank-operations-registry-analysis.md`.
+
+- Prior analysis defended global `Operations.BinaryExecutors[]` flat array on four pillars: contiguous memory, cache-friendly, separation of data and behavior, O(1) indexed access.
+- Shane dismantled all four. This file records the defense; the subsequent verdict records the reversal.
+
+---
+
+---
+
+### 2026-05-05T02:45Z: LOCKED — Global `Operations.BinaryExecutors[]` eliminated; delegates embedded in opcodes
+
+**By:** Frank
+
+**Status:** Accepted. Supersedes frank-operations-registry-analysis.md.
+
+**Merged source:** `frank-operations-registry-verdict.md`.
+
+- **The fatal flaw:** opcodes are `sealed record` (reference types). The memory-layout argument ("flat value-type array, cache-friendly") was factually wrong. The evaluator already chases a heap pointer to reach every opcode. Adding a `Func<>` field adds one pointer-width field to an object already dereferenced — marginal cost is zero.
+- **Embedded delegates win:** deref opcode → fetch delegate → call (2 steps). Global array: deref opcode → extract Kind → index static array → fetch delegate → call (4 steps). Embedded path has one fewer indirection.
+- **Verdict:** `BinaryOp` gains an `Executor: Func<PreceptValue, PreceptValue, PreceptValue>` field. `UnaryOp` gains `Executor: Func<PreceptValue, PreceptValue>`. Builder fetches from `TypeRuntimeMeta.BinaryExecutors[(int)kind]` at build time; evaluator calls `opcode.Executor(l, r)` directly.
+- **`Language.Operations` catalog unchanged** — holds `OperationMeta` (language spec), never executors.
+- **`TypeRuntimeMeta` remains the source of truth** for executor delegates.
+- **Global aggregation array eliminated** — not yet implemented in source, so no removal needed.
+
+---
+
+---
+
+### 2026-05-05T03:03Z: `record struct` opcodes do not change the embedded-delegate verdict
+
+**By:** Frank
+
+**Status:** Accepted — closes follow-up question on value-type opcodes.
+
+**Merged source:** `frank-registry-record-struct-verdict.md`.
+
+- If opcodes were `record struct`, Scenario A (global array + compact structs) would have 4× higher cache density per cache line. This is theoretically correct but practically irrelevant: Precept evaluates 5–50 opcodes per dispatch; the entire working set fits in L1 cache regardless.
+- `record struct` transition is premature optimization. Do not pursue until profiling demands it.
+- The prior verdict's conclusion (embedded delegates, eliminate global registry) holds for the deeper architectural reason: simplicity — one fewer indirection, one fewer global mutable structure, one fewer initialization ceremony, self-contained evaluator. These benefits are independent of value-type vs. reference-type.
+
+---
+
+---
+
+### 2026-05-05T03:07Z: `static readonly Func<>` delegates — not `unsafe delegate*` — for opcode executor storage
+
+**By:** Frank
+
+**Status:** Accepted.
+
+**Merged source:** `frank-delegate-heap-verdict.md`.
+
+- **Verdict:** use `static readonly Func<PreceptValue, PreceptValue, PreceptValue>` delegates. Do not use `unsafe delegate*`.
+- All executor methods are static — no closures, no instance state. Both `delegate*` and `static readonly Func<>` are technically applicable.
+- `unsafe delegate*` costs: propagates `unsafe` through `BinaryOp`, `ExecutionPlan`, and into user-facing APIs; cannot be stored in `object`, used as generic type arguments, or used with expression trees; saves ~150ns per event at business-operation cadence — unmeasurable.
+- `static readonly Func<>` costs: ~48 bytes per delegate on x64; ~100 operations × 48 bytes = ~4.8 KB total, allocated once at type initialization, immortal for process lifetime. Zero per-eval allocation. Zero GC pressure.
+- JIT devirtualizes and inlines static delegate calls in hot paths — the most optimizable delegate pattern.
+
+---
+
+---
+
+### 2026-05-05T03:45Z: Doc closure status for collection and value-types investigation docs
+
+**By:** Frank
+
+**Status:** Recorded — action items for Frank and Shane.
+
+**Merged source:** `frank-doc-closure-verdict.md`.
+
+- **`precept-collection-types-investigation.md`:** Ready to archive after two minor corrections: (1) `KeyedElement` namespace declaration → `Precept.Types`; (2) raw lane return type → `JsonElement`. Then archive to `docs/working/Archived/`. No Shane input needed.
+- **`precept-value-types-investigation.md`:** Needs updates before archive. Nine stale sections resolvable by Frank now (CLR shapes use `UnitOfMeasure`, `MeasureDimension`, `Currency` structs/class; computation locality settled; operator overloads superseded; `Precept.Types` assembly). Ten open questions block full archival — blocked on Shane for: OQ-3b, OQ-3f, OQ-CUR-1, OQ-CUR-3, OQ-CUR-4, OQ-7a, OQ-7e, OQ-7f, OQ-CL-1–5, OQ-DISP-1. The doc's investigation purpose is fulfilled; archival with explicitly-marked open OQs is viable.
+- **`runtime-api.md`:** Current. No changes needed. Optional: add `Money` registration example alongside `decimal` example.
+
+---
+
+---
+
+### 2026-05-05T03:59Z: User directive — `IReadOnlyLog<T>` dedicated interface is stale/superseded
+
+**By:** Shane (via Copilot)
+
+**Status:** Directive recorded.
+
+**Merged source:** `copilot-directive-2026-05-04T23-59-06.md`.
+
+- `IReadOnlyLog<T>` dedicated interface from the collection types investigation §15 is stale. It was a speculative brainstorm option, never selected, never assigned an OQ number, never pursued. Treat as STALE/SUPERSEDED, not OPEN.
+- `log` maps to `IReadOnlyList<TElement>`, consistent with §5's locked mapping table.
+
+---
+
+---
+
+### 2026-05-05T04:05Z: Collection types investigation — stale fixes applied
+
+**By:** Frank
+
+**Status:** Applied.
+
+**Merged source:** `frank-collection-types-stale-fixes.md`.
+
+- **Fix 1 — §5 namespace:** `namespace Precept.Runtime` → `namespace Precept.Types` for `KeyedElement<TValue, TKey>` declaration. Authority: `frank-type-library-assembly.md`.
+- **Fix 3a — §15 raw lane return type:** `version["fieldName"]` return type changed from `JsonElement` to `PreceptValue`. *(Note: this was subsequently overruled by Shane's raw lane = JsonElement directive — see entry below. The investigation doc will need a further correction.)*
+- **Fix 3b — §15 `IReadOnlyLog<T>` removal:** Speculative option removed; replaced with settled decision text (`log` → `IReadOnlyList<TElement>`).
+- Post-edit grep confirmed zero remaining `IReadOnlyLog`, `JsonElement`, or `Precept.Runtime` references in the document.
+
+---
+
+---
+
+### 2026-05-05T04:11Z: User directive — Raw lane = JSON lane; `PreceptValue` never leaks public API
+
+**By:** Shane (via Copilot)
+
+**Status:** Directive recorded. Resolves B2 conflict between surface spec and CC#25 Q7.
+
+**Merged source:** `copilot-directive-2026-05-05T00-11-43.md`.
+
+- The raw lane is the JSON lane. Raw lane public indexer (`version["fieldName"]`) returns `JsonElement`, not `PreceptValue`.
+- `PreceptValue` is a strictly internal type and must NEVER appear in any public method signature, return type, property type, or generic constraint.
+- This overrides any prior inbox reference to `PreceptValue` as the raw lane return type (including the stale Fix 3a applied to the collection types investigation).
+
+---
+
+---
+
+### 2026-05-05T04:12Z: Raw lane = JsonElement — Frank's restatement (duplicate of Shane directive)
+
+**By:** Frank
+
+**Status:** Recorded — duplicate of copilot-directive-2026-05-05T00-11-43.md. No additional content.
+
+**Merged source:** `frank-raw-lane-json-ruling.md`.
+
+- Restatement of Shane's ruling: raw lane indexer returns `JsonElement`; `PreceptValue` is internal only.
+
+---
+
+---
+
+### 2026-05-05T04:25Z: User directive — CLR typed collection projections stay in v1 (overrules frank-138 deferral)
+
+**By:** Shane (via Copilot)
+
+**Status:** Directive recorded. Owner overrule of frank-138 deferral recommendation.
+
+**Merged source:** `copilot-directive-clr-collections-keep-v1.md`.
+
+- `IReadOnlyList<T>`, `IReadOnlyDictionary<K,V>`, `KeyedElement<TValue,TKey>`, `PreceptList<T>`, `PreceptLookup<K,V>` stay in v1 public surface.
+- §10 prescribed surface spec changes in collection types investigation doc remain valid and were already applied.
+- `FieldDescriptor.ClrType` for collection fields must use constructed generics.
+
+---
+
+---
+
+### 2026-05-05T04:27Z: Collection types investigation finalized and archived
+
+**By:** Frank
+
+**Status:** Complete — investigation doc closed.
+
+**Merged source:** `frank-collection-finalization.md`.
+
+- `docs/working/precept-collection-types-investigation.md` finalized with archive header. All decisions locked, no stale references found after corrections.
+- Shane's CLR collections ruling overruled frank-138 deferral. Investigation was already written with CLR collections as the default design — no text edits needed beyond the archive header.
+- All three §10 prescribed surface spec changes were already applied to `runtime-api-public-surface-spec.md` (§3.4 three-row CLR expansion, §13 KeyedElement + PreceptLookup + FieldDescriptor note, §4.2 two-type collection ClrType encoding note).
+- File ready for coordinator to move to `docs/working/Archived/`.
+
+---
+
+---
+
+### 2026-05-05T04:32Z: Collection types investigation — section-by-section surface spec coverage audit
+
+**By:** Frank
+
+**Status:** Analysis complete — all prescriptions confirmed applied.
+
+**Merged source:** `frank-collection-doc-analysis.md`.
+
+- All §§1–10 prescriptions from the collection types investigation are confirmed applied to `docs/working/runtime-api-public-surface-spec.md`.
+- §§11–14 (internal representation, scalability, action architecture, CoW protocol) have no surface-spec prescriptions — marked N/A. They should eventually migrate to `docs/runtime/evaluator.md` as implementation guidance (Wave 3/4).
+- §3 `PreceptValue` leakage conflict noted: canonical `docs/runtime/runtime-api.md` still shows `PreceptValue` in several public signatures. These are stale given the raw lane = JsonElement ruling. Stale locations: `Version` indexer (line 234), `FieldAccessInfo.CurrentValue` (line 428), `ConstraintViolation.FailingValue` (line 390), `FiredArgs` indexer (line 543), overview paragraph (line 37).
+
+---
+
+---
+
+### 2026-05-05T04:37Z: Surface spec §13.2–13.6 corrected to eager-on-first-read adapter semantics
+
+**By:** Frank
+
+**Status:** Applied.
+
+**Merged source:** `frank-surface-spec-13-2-fix.md`.
+
+- `docs/working/runtime-api-public-surface-spec.md` §13.2–13.6 corrected: `PreceptList<T>` and `PreceptLookup<K,V>` are eager-on-first-read (full `T[]` materialization on first access), not per-index lazy projection.
+- Old framing: `this[int index]` invokes projection function on every access — zero allocation, per-access cost.
+- New framing: on first access materialize full `T[]` from backing `PreceptValue[]`; serve all subsequent reads from materialized array. O(n) once, O(1) thereafter. "Lazy" applies only at the Version level (adapter constructed on first field read), not at the element level.
+- Sections touched: §13.2 Option A, §13.3 evaluation table, §13.4 recommendation, §13.5 resolved note, §13.6 adapter inventory.
+
+---
+
+---
+
+### 2026-05-05T04:45Z: `PreceptValue` Axiom 1 rationale added to surface spec
+
+**By:** Frank
+
+**Status:** Applied.
+
+**Merged source:** `frank-surface-spec-preceptvalue-rationale.md`.
+
+- Added "Why Axiom 1 is non-negotiable" rationale block to `docs/working/runtime-api-public-surface-spec.md`, immediately after the axioms block and before §1.
+- Four reasons sourced from collection types investigation §3: (1) Brittleness — evaluator-internal types have different stability requirements than public surface; (2) AI agent hostility — opaque internal types degrade agent accuracy; (3) Contract — generic type parameters are the hardest leakage vector; (4) Dual-shape model — collections are the vectorized case of the same internal/external shape rule.
+- Axiom 1 governs every collection return type decision and any future surface extension; the rationale must be inline so future engineers encounter it before deciding to violate it.
+
+---
+
+---
+
+### 2026-05-05T05:12Z: Collection internal implementation disseminated to `docs/runtime/evaluator.md`
+
+**By:** Frank
+
+**Status:** Documentation dissemination complete. evaluator.md is now the authoritative reference for collection internals.
+
+**Merged source:** `frank-evaluator-collection-internals.md`.
+
+- `docs/runtime/evaluator.md` **§7.4.1 Collection Internals** added (5 subsections):
+  - **§A — Universal `PreceptValue[]` backing:** all 9 collection kinds; stride table; `ref` helper accessors; 5 rationale points; obsolete backing types list (Okasaki logs, `ImmutableDictionary`, `SortedDictionary`, etc. are explicitly off-limits).
+  - **§B — CLR Adapter Types:** `PreceptList<T>` and `PreceptLookup<TKey, TValue>` lazy-at-Version-level, eager-on-first-read behavior; semantics.
+  - **§C — `CollectionActions` Static Class:** full class shape; "Span in, count out" convention; why-not-wrappers table.
+  - **§D — Copy-on-Write Protocol:** `ReferenceEquals` alias check; 5-step protocol table; cost model; `ArrayPool` lifecycle table; rollback snippet.
+  - **§E — Scalability Guidance:** size zones table; `log` as the only structurally unbounded kind; `ICollectionBacking` deferred seam.
+- `docs/runtime/evaluator.md` **§11 Design Rationale — Decisions 9–11** added:
+  - Decision 9: Universal `PreceptValue[]` backing for all 9 collection kinds.
+  - Decision 10: `CollectionActions` as a stateless static helper class.
+  - Decision 11: Evaluator-owned copy-on-write for multi-mutation events.
+- Source: `docs/working/precept-collection-types-investigation.md` §§8, 11–14. The investigation doc conclusions are now captured in evaluator.md; the investigation doc may be archived.
+
+---
+
 
