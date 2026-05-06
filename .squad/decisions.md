@@ -74,9 +74,9 @@
 
 **By:** Scribe
 
-**Status:** Merged, deduplicated, inbox cleared (6 files).
+**Status:** Merged, deduplicated, inbox cleared (7 files).
 
-**Merged sources:** `copilot-directive-rule-failure-descriptions.md`, `elaine-33-corrections.md`, `elaine-oq1-closed.md`, `elaine-oq3-closed.md`, `elaine-oq5-closed.md`, `elaine-oq6-closed.md`.
+**Merged sources:** `copilot-directive-rule-failure-descriptions.md`, `elaine-33-corrections.md`, `elaine-oq1-closed.md`, `elaine-oq3-closed.md`, `elaine-oq5-closed.md`, `elaine-oq6-closed.md`, `frank-guard-summary-added.md`.
 
 - OQ-1 is durably closed: user-facing surfaces normalize certain-reject outcomes to **Blocked**, per the semantic visual-system spec.
 - OQ-3 is durably closed in V1: collection event args (`set of T`, `list of T`) use pill/tag input rather than a deferred follow-up control.
@@ -84,6 +84,22 @@
 - OQ-6 is durably closed in V1: event cards use the event name as the sole label, with no authored description, generated transition-summary copy, or hover help text beyond that name.
 - Rule-failure descriptions are a universal runtime contract: every rule-failure surface must provide a human-readable reason, not just guard summaries or constraint failures already carrying `because`.
 - Elaine-33's API accuracy pass is folded forward: `InspectUpdate` references `ConstraintResult`, fire-outcome prose uses `EventOutcome.ConstraintsFailed`, `TransitionInspection` references align to the `RowEffect` DU, and `datetime` remains a valid Precept type.
+
+---
+
+### 2026-05-06T23:51:33Z: Event-interaction UXR closes OQ-8 and OQ-9; document is now complete
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files).
+
+**Merged sources:** `elaine-oq8-closed.md`, `elaine-oq9-closed.md`.
+
+- OQ-8 is durably closed: the Data Form supports both commit modes, with per-field blur commit for fields outside multi-field constraints and buffered Save/Cancel for fields participating in multi-field constraints.
+- The commit mode is derived from `FieldAccessInfo` constraint metadata; the UI does not introduce manual per-field configuration.
+- OQ-9 is durably closed: the Event Timeline reflects only the current committed state, and fire actions remain disabled while buffered edits are pending.
+- The preview surface does not make a hypothetical inspect/fire call against uncommitted edits; the user must save or discard before interacting with event firing.
+- With OQ-6 already closed in the prior merged entry, all event-interaction UXR open questions are now resolved and `docs/working/elaine-ux-requirements-event-interaction.md` is complete.
 
 ---
 

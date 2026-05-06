@@ -2,7 +2,7 @@
 
 **Author:** Elaine (UX Designer)
 **Date:** 2026-05-06
-**Status:** Draft — pending Shane's calls on OQ-8, OQ-9 (OQ-1, OQ-2, OQ-3, OQ-4, OQ-5, OQ-6, OQ-7, OQ-10 closed)
+**Status:** Complete — all open questions resolved
 **Revision:** Elaine-32 (2026-05-06) — ArgErrorKind removal: aligned arg error display to field edit pattern (string Reason only); removed ArgErrorKind from UXR-9 and §5.3; removed UXR-24.
 **Informs:** VS Code extension implementation, CC#12, CC#23, CC#24
 
@@ -1497,17 +1497,15 @@ If the user opens the arg form for `Approve`, types values, then clicks away to 
 
 ---
 
-**OQ-8: Should the Data Form use buffered commit or per-field immediate commit?**
+**OQ-8: Buffered vs. per-field commit for Data Form?** *(✅ Closed — support both)*
 
 As documented in §6.4, the recommendation is buffered atomic commit. But per-field immediate commit (Tab-out or Enter commits a single field) is more ergonomic for simple cases and is appropriate when there are no cross-field constraints.
 
-**The question:** Should the commit mode be determined by the presence of cross-field constraints (smart/adaptive), or should there be a single consistent pattern? Smart mode is better UX but requires the UI to detect whether a field has cross-field rule involvement at author time — this may be possible from the `ConstraintDescriptor.RelevantFields` if the UI can precompute it. Single consistent pattern is simpler to reason about.
-
-**My lean:** Per-field commit for `writable` fields on stateless precepts (no events, simple maintenance UX). Buffered commit for state-scoped editable fields and any field participating in a multi-field constraint. Shane needs to call whether the runtime makes this distinction queryable.
+**Ruling:** The Data Form supports both commit modes. The runtime's constraint metadata determines which mode applies per field. Fields with no multi-field constraints commit per-field (on blur). Fields involved in multi-field constraints use buffered commit with explicit Save/Cancel. The UI derives the mode from `FieldAccessInfo` constraint metadata — no manual configuration required.
 
 ---
 
-**OQ-9: Should uncommitted pending field edits be reflected in the Event Timeline preview?**
+**OQ-9: Should uncommitted field edits be reflected in the Event Timeline preview?** *(✅ Closed — fire disabled while edits pending)*
 
 §6.5d specifies that `InspectUpdate(pendingPatch)` drives the Event Timeline while edits are pending. This means the event cards reflect a hypothetical state that has not been committed. The user sees "Approve will unlock after saving."
 
@@ -1516,6 +1514,8 @@ As documented in §6.4, the recommendation is buffered atomic commit. But per-fi
 **The question:** Is the live Event Timeline preview (updated while edits are pending) worth the complexity and potential confusion? Or should the event actions region only update after a successful `Update()` call?
 
 **My lean:** Yes, show the live preview — this is the product's inspectability promise. The constraint is that fire buttons are disabled while there are uncommitted edits. This is clear and not confusing. But Shane should confirm this is the right UX direction before we spec the animation details.
+
+**Ruling:** The Event Timeline always reflects the current committed state. Fire buttons are disabled while field edits are buffered (pending Save or Cancel). The user must commit or discard edits before interacting with the Event Timeline. No hypothetical InspectUpdate call is made for uncommitted edits.
 
 ---
 
@@ -1527,7 +1527,7 @@ As documented in §6.4, the recommendation is buffered atomic commit. But per-fi
 
 ---
 
-*Document complete. Ready for Shane's calls on OQ-8, OQ-9. OQ-1, OQ-2, OQ-3, OQ-4, OQ-5, OQ-6, OQ-7, OQ-10 closed above.*
+*Document complete. All open questions are resolved. OQ-1, OQ-2, OQ-3, OQ-4, OQ-5, OQ-6, OQ-7, OQ-8, OQ-9, and OQ-10 are closed above.*
 
 ---
 
