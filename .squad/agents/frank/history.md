@@ -22,6 +22,14 @@
 
 ## Recent Updates
 
+### 2026-05-06 - Wave 1 cross-cutting decisions facilitation started
+
+- Wave 0 complete (CC#1, CC#2, CC#25 locked). Opened Wave 1 facilitation with Shane.
+- Wave 1 sequencing: CC#7 first (unblocks CC#9), then CC#8 (unblocks CC#12), then CC#3/CC#4/CC#6/CC#23/CC#24, then CC#11 (team-autonomous).
+- CC#7 presented: `ConstraintMeta` DU hierarchy — flat 5 vs hierarchical with `StateAnchored` intermediate. Recommendation: Option B (Hierarchical) — already specified in catalog-system.md §Constraints, `StateAnchored` encodes real semantic grouping even though builder routing requires all 5 concrete leaves. The §DU-as-identity example (3-way switch) is incomplete and will need correction on lock.
+- Facilitation notes in `.squad/decisions/inbox/frank-wave1-start.md`.
+- Waiting for Shane's ruling on CC#7.
+
 ### 2026-05-05 - Severity audit of 41 canonical doc gaps
 
 - Cross-referenced all six canonical runtime/language docs against `docs/working/runtime-api-public-surface-spec.md` §§1–10 (post frank-152) and the 17 locked §11 design decisions.
