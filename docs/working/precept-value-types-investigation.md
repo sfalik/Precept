@@ -2,88 +2,11 @@
 
 **By:** Frank (Lead Architect)  
 **Date:** 2026-05-04 (last synced 2026-05-05)  
-**Status:** Investigation — core verdicts locked; open questions remain for Shane  
+**Status:** Investigation — all verdicts locked.  
 **Context:** OQ-3 resolution (compound CLR types) from `runtime-api-public-surface-spec.md`
 
 ---
 
-## 1. UCUM Overview
-
-### What Is UCUM?
-
-The **Unified Code for Units of Measure** (UCUM) is a machine-readable coding system for unambiguous representation of measurement units in electronic data exchange. It is not a measurement system itself — it is a *code system* that assigns unique, parseable string codes to units from multiple measurement systems.
-
-### Domain Coverage
-
-| Domain | Examples |
-|--------|----------|
-| SI base units | `m`, `kg`, `s`, `A`, `K`, `mol`, `cd` |
-| SI derived | `N` (newton), `Pa` (pascal), `J` (joule), `W` (watt) |
-| SI prefixes | `k` (kilo), `m` (milli), `u` (micro), `n` (nano) |
-| US/Imperial customary | `[ft_i]` (foot), `[lb_av]` (pound avoirdupois), `[gal_us]` (US gallon) |
-| Clinical/laboratory | `[IU]` (international unit), `[pH]`, `mg/dL` |
-| Dimensionless | `%`, `[ppth]` (parts per thousand) |
-| Arbitrary combinations | Any unit expression via UCUM grammar: `kg.m/s2`, `mol/L` |
-
-UCUM covers approximately **2,600+ predefined unit atoms** plus an infinite set of derived expressions formed by its compositional grammar (multiplication `.`, division `/`, exponentiation, prefix application).
-
-### Is It the Right Foundation?
-
-**Yes.** UCUM is the right *code foundation* for Precept because:
-
-1. **Machine-parseable grammar** — UCUM codes are not opaque strings; they have a formal grammar that enables dimensional analysis and conversion derivation.
-2. **Interoperability standard** — adopted by HL7/FHIR, LOINC, ISO 11240, CDISC. Any Precept deployment interfacing with healthcare, logistics, or scientific systems will encounter UCUM codes.
-3. **Living standard** — maintained by Regenstrief Institute. Current version: v2.1. Updates are infrequent (years between revisions), meaning the code set is stable.
-4. **Complete coverage** — SI, customary, clinical, and combinatorial. No business domain Precept targets lacks UCUM coverage.
-
-### Comparison to Other Standards
-
-| Standard | Role | Machine-Readable? | Compositional Grammar? | Precept Fit |
-|----------|------|-------------------|----------------------|-------------|
-| **UCUM** | Unit coding system | Yes — formal grammar | Yes — arbitrary expressions | ✅ Foundation |
-| **SI (BIPM)** | Defines the 7 base units + derived | No — human prose | No | Covered by UCUM |
-| **ISO 80000** | Notation/presentation rules | No — document standard | No | Orthogonal (display layer) |
-| **Domain-specific** (e.g., UNECE Rec.20) | Trade/logistics unit codes | Yes — flat code list | No — no composition | Subset of UCUM |
-
-**Conclusion:** UCUM is the foundation. SI and ISO 80000 inform what UCUM encodes; they are not alternatives.
-
----
-
-## 2. .NET Ecosystem Survey
-
-### Existing Libraries
-
-| Library | Units | Standard | Type Design | Active? |
-|---------|-------|----------|-------------|---------|
-| **UnitsNet** | ~1,500 units across 100+ quantity types | Own taxonomy (loosely SI-aligned) | One struct per quantity type (`Length`, `Mass`, etc.) with enum-per-unit | Yes |
-| **QuantityTypes** | ~200 units | SI-focused | Generic `Quantity<T>` | Dormant |
-| **UnitConversion** | Small | Custom | Flat converters | Dormant |
-| **Gu.Units** | ~50 quantity types | SI | Source-generated structs | Low activity |
-
-No .NET library implements UCUM. No .NET library provides a database-driven unit system.
-
-### Why UnitsNet Is Inadequate for Precept
-
-UnitsNet is the closest candidate. Here's why it doesn't fit:
-
-| Gap | Problem for Precept |
-|-----|-------------------|
-| **Closed code-generation model** | Units are code-generated into separate C# types at build time. Adding a unit requires regenerating the library. Not extensible at runtime. |
-| **No UCUM codes** | Units use internal enum identifiers (`LengthUnit.Meter`), not standardized codes. No UCUM-interop without a mapping layer. |
-| **One type per quantity dimension** | `Length`, `Mass`, `Volume` are all separate types. A generic `Quantity` that holds "any quantity with its unit" doesn't exist cleanly. |
-| **No compositional grammar** | Can't express arbitrary compound units (`kg.m/s2`) — only predefined ones. |
-| **No database/catalog architecture** | All knowledge is compiled into static C# code. No updateability story. |
-| **Conversion is internal** | Conversion factors are internal constants, not inspectable metadata. |
-
-### The NodaTime Analogy
-
-`System.DateTime` failed because it conflated instant, local date, local time, and zoned time into one type with no explicit calendar or timezone model. NodaTime built a correct type system from scratch.
-
-`UnitsNet` fails similarly: it conflates the *code system*, the *unit identity*, the *dimensional model*, and the *conversion engine* into a single monolithic code-generated structure with no standard identity layer and no separation of concerns.
-
-**Conclusion: Precept must build its own unit type system.** No existing .NET library provides UCUM-based identity, database-driven metadata, catalog-driven architecture, or the generic `Quantity` shape Precept needs. The investment is justified for the same structural reasons NodaTime was justified.
-
----
 
 ## 3. UCUM Scope Decision — Full vs. Subset
 
@@ -244,8 +167,9 @@ The unit database is a catalog entry — shipped as embedded resource, loadable 
 
 ```csharp
 /// A unit of measure identified by its UCUM code.
+/// Evaluator-internal type — not part of the public API. Consumers receive `UnitOfMeasure` at the API boundary.
 /// Value-semantics, immutable, interned from the unit database.
-public sealed class Unit : IEquatable<Unit>
+internal sealed class Unit : IEquatable<Unit>
 {
     public string Code { get; }           // UCUM code: "kg", "m/s2", "[lb_av]"
     public string Name { get; }           // Human name: "kilogram", "meter per second squared"
@@ -257,9 +181,10 @@ public sealed class Unit : IEquatable<Unit>
     public override int GetHashCode() => Code.GetHashCode();
 }
 
-/// Dimensional category for dimensional analysis.
+/// Dimensional category for dimensional analysis — evaluator-internal.
+/// Public API proxy is `MeasureDimension` (see §12).
 /// A product of base dimension exponents.
-public readonly record struct Dimension(
+internal readonly record struct Dimension(
     int Length,       // m
     int Mass,         // kg
     int Time,         // s
@@ -276,7 +201,7 @@ public readonly record struct Dimension(
     public bool IsCompatibleWith(Dimension other) => this == other;
 }
 
-public enum UnitTier { Common, Extended, Full, Derived }
+internal enum UnitTier { Common, Extended, Full, Derived }
 ```
 
 ### Why `sealed class` Not `struct` or `record struct`
@@ -286,11 +211,14 @@ public enum UnitTier { Common, Extended, Full, Derived }
 - **Extensible metadata** — future fields (symbol, print format, conversion factor to base) don't break binary layout.
 - **Not `record`** — records imply structural equality with all fields. Unit equality is strictly by `Code`. Using `class` with explicit `IEquatable<Unit>` makes the contract clear.
 
+> **API boundary note:** `Unit`, `Dimension`, and `UnitTier` are evaluator-internal types. They live in the `Precept` assembly and are never exposed at the public API surface. At the API boundary, consumers receive `UnitOfMeasure` (a `readonly record struct` carrying the validated UCUM code string) and `MeasureDimension` (a `readonly record struct` carrying the dimension name). The evaluator resolves `UnitOfMeasure.Code` → `Unit` via `UnitCatalog.Get(code)` internally. See §12 for the full dual-shape API boundary design.
+
 ### Quantity
 
 ```csharp
 /// A measured quantity: an amount with its unit.
-public readonly record struct Quantity(decimal Amount, Unit Unit)
+/// Lives in Precept.Types; uses UnitOfMeasure (the public proxy) not the evaluator-internal Unit.
+public readonly record struct Quantity(decimal Amount, UnitOfMeasure Unit)
 {
     // Display
     public override string ToString() => $"{Amount} {Unit.Code}";
@@ -299,24 +227,24 @@ public readonly record struct Quantity(decimal Amount, Unit Unit)
 
 - `record struct` — value semantics, cheap to copy, stack-allocable.
 - `decimal` for Amount — matches Precept's `decimal` type semantics (exact representation, no floating-point surprise).
-- `Unit` is the reference to the interned unit instance.
+- `UnitOfMeasure` carries the validated UCUM code string. The evaluator resolves it to the internal `Unit` catalog entity via `UnitCatalog.Get(code)` when dimensional analysis or conversion metadata is needed.
 
 ### Money — Separate from Unit System
 
 ```csharp
 /// A monetary amount with its currency.
-public readonly record struct Money(decimal Amount, string Currency)
+public readonly record struct Money(decimal Amount, Currency Currency)
 {
-    // Currency is ISO 4217 code: "USD", "EUR", "GBP"
-    public override string ToString() => $"{Amount} {Currency}";
+    // Currency wraps an ISO 4217 code: "USD", "EUR", "GBP"
+    public override string ToString() => $"{Amount} {Currency.Code}";
 }
 ```
 
-**Currency stays as `string`, NOT part of the unit system.** Reasoning:
+**`Currency` is a first-class CLR type (§8), NOT part of the unit system.** Reasoning:
 
 1. UCUM does not define currencies. Currency is not a unit of measure — it's a medium of exchange with no dimensional analysis.
 2. ISO 4217 is the correct standard for currency codes. It's a flat code list, not a compositional grammar.
-3. Precept already decided `currency` fields are `string` (ISO 4217). `Money.Currency` is consistent.
+3. `Currency` is a `sealed class` backed by `CurrencyCatalog` (§8) — structurally parallel to `Unit`, but architecturally separate.
 4. Conversion between currencies is fundamentally different from unit conversion — it requires temporal exchange rates, not fixed factors.
 
 ### Unit Database / Provider
@@ -359,78 +287,27 @@ The `UnitCatalog` is a runtime catalog — it follows the same pattern as `Token
 // On TypeMeta / FieldDescriptor level:
 public sealed record QuantityFieldDescriptor(
     string FieldName,
-    Unit? ConstrainedUnit,    // null = any unit allowed
-    Dimension? ConstrainedDimension);  // null = any dimension
+    UnitOfMeasure? ConstrainedUnit,       // null = any unit; non-null = `quantity in 'kg'` form
+    MeasureDimension? ConstrainedDimension); // null = any dimension; non-null = `quantity of 'mass'` form
 ```
 
-In the DSL, a field declaration like `quantity in 'kg'` constrains to a specific unit; `quantity of 'mass'` constrains to a dimension; bare `quantity` allows any unit.
+In the DSL, a field declaration like `quantity in 'kg'` constrains to a specific unit; `quantity of 'mass'` constrains to a dimension; bare `quantity` allows any unit. See §6 for the full constraint-level rationale.
 
 ---
 
-## 6. Shane's Open Questions for Resolution
+## 6. Quantity Field Constraint Levels
 
-### OQ-3a: UCUM as Foundation Standard
+Quantity field declarations support three constraint levels:
 
-**Shane decides:** Confirm UCUM as the unit identity standard for Precept's unit system.
+- **`quantity`** — accepts any valid quantity value with any unit.
+- **`quantity of 'mass'`** — constrains to a specific dimension; any unit within that dimension is valid (e.g., `kg`, `g`, `lb`). The type checker rejects assignments from incompatible dimensions at compile time.
+- **`quantity in 'kg'`** — constrains to an exact unit. The runtime rejects quantity values with a different unit at the event-arg input boundary and at `set` time.
 
-- **Option A (recommended):** Yes — UCUM codes are the canonical unit identity. Full grammar support, tiered discovery.
-- **Option B:** No — define a Precept-proprietary code system. (Frank advises against: reinventing a solved problem with interop cost.)
+These three levels map directly onto `QuantityFieldDescriptor` (§5 — Public API Discovery Surface): `ConstrainedUnit` is non-null for the unit-constrained form; `ConstrainedDimension` is non-null for the dimension-constrained form; both null for bare `quantity`.
 
-### OQ-3b: Scope — Full Grammar + Tiered Discovery
+The three-level model is structurally correct for Precept. `quantity in 'kg'` communicates the invariant at declaration time — the type checker verifies compatible operations at compile time and the runtime enforces the unit boundary at data ingress. `quantity of 'mass'` serves the case where any mass-compatible unit is acceptable (a logistics field might accept `kg` or `lb`), which cannot be expressed with unit-only constraints. Bare `quantity` is valid for genuinely open measurement fields — sensor readings, generic integration points, fields whose unit is supplied at runtime.
 
-**Shane decides:** Accept the tiered model (all UCUM valid, discovery curated) vs. hard subset (reject unknown codes).
-
-- **Option A (recommended):** Hybrid — full UCUM grammar accepted, Tier 1 (~150 atoms) surfaced proactively. No code is ever "invalid" if it's grammatically correct UCUM.
-- **Option B:** Hard subset — only Tier 1 units are valid. External codes outside the subset are rejected. Simpler but creates interop friction.
-- **Option C:** Everything equal — all 2,600 atoms surfaced with equal weight in tooling. Noisy but zero curation cost.
-
-### OQ-3c: Database-Backed Architecture
-
-**Shane decides:** Confirm database-backed (NodaTime-style data file) vs. code-backed (static members) vs. hybrid.
-
-- **Option A (recommended):** Pure database — unit metadata is an embedded data resource, updateable independently. No static `Units.X` in the library.
-- **Option B:** Hybrid — database + well-known static convenience members for Tier 1.
-- **Option C:** Code-backed — all units as static fields. (Frank advises against: violates catalog-driven architecture.)
-
-### OQ-3d: Currency Separation
-
-**Shane decides:** Confirm that `Money.Currency` remains `string` (ISO 4217) and is NOT part of the unit type system.
-
-- **Option A (recommended):** Yes — currency is separate. `Money` is its own type with `string Currency`. No unit system involvement.
-- **Option B:** Unify — currency becomes a unit in the unit system with `Dimension.Currency`. (Frank advises against: currencies aren't units, conversion is temporal.)
-
-### OQ-3e: Quantity Shape
-
-**Shane decides:** Confirm `Quantity` as `readonly record struct { decimal Amount, Unit Unit }`.
-
-- **Option A (recommended):** As proposed — `record struct`, `decimal` amount, reference to interned `Unit`.
-- **Option B:** `Amount` as `double` instead of `decimal`. (Frank advises against: Precept uses `decimal` semantics throughout; floating-point would be inconsistent.)
-
-### OQ-3f: DSL Constraint Granularity for Quantity Fields
-
-**Shane decides:** What constraint levels does the DSL expose for quantity fields?
-
-- **Option A:** Three levels: `quantity` (any), `quantity of 'mass'` (dimension-constrained), `quantity in 'kg'` (unit-constrained).
-- **Option B:** Two levels: `quantity` (any) and `quantity in 'kg'` (unit-constrained only). Dimension constraints derived from unit.
-- **Option C:** One level: `quantity` only. Constraint enforcement is via rules/guards, not field declaration.
-
-This is a language surface decision that affects the type checker and DSL grammar. Frank leans toward Option A for maximum expressiveness, but it's a language design call.
-
-### OQ-3g: Unit Catalog Shipping Mechanism
-
-**Shane decides:** How is the UCUM data shipped?
-
-- **Option A (recommended):** Embedded resource in the Precept NuGet package. Updated with library releases. Sufficient given UCUM's multi-year revision cadence.
-- **Option B:** Separate NuGet package (like `NodaTime.Tzdb`). Allows data updates without library updates. More complex packaging.
-- **Option C:** External file loaded at runtime. Maximum flexibility but operational complexity for consumers.
-
-Given UCUM updates every ~5 years (vs. tzdb's multiple times per year), Option A is pragmatic. If update cadence increases, promote to Option B later.
-
----
-
-## Summary
-
-Precept should build its own unit type system using UCUM as the identity foundation — the same pattern NodaTime used with IANA tzdb. The architecture is database-backed, catalog-driven, with a compositional grammar parser for derived expressions. Currency remains separate. The investment is justified because no existing .NET library provides the right combination of standard identity, metadata architecture, and generic quantity representation.
+`quantity of 'mass'` is not redundant with `quantity in 'kg'`: dimension constraints allow dimension-compatible substitution; unit constraints hard-lock to a single unit. Collapsing to two levels pushes dimension-level invariants into guards, discarding a structurally enforceable constraint. Collapsing to one level abandons structural enforcement entirely.
 
 ---
 
@@ -449,7 +326,7 @@ There are two distinct types in the unit system design, and they require differe
 | Type | Current design | Holds |
 |------|---------------|-------|
 | `Unit` | `sealed class` | UCUM code, name, dimension, tier — the *identity* of a unit |
-| `Quantity` | `readonly record struct(decimal Amount, Unit Unit)` | A measured amount + its unit — the *value* of a quantity field |
+| `Quantity` | `readonly record struct(decimal Amount, UnitOfMeasure Unit)` | A measured amount + its unit — the *value* of a quantity field |
 
 Shane's question targets `Quantity`. The `Unit` sealed class is **not in question** — its sealed-class shape is correct for different reasons (interning, nullable-by-reference, extensible metadata) and is addressed at the end of this section.
 
@@ -475,52 +352,7 @@ Quantity layout (64-bit process):
 
 ---
 
-### 2. Allocation and GC Pressure
-
-#### Expression evaluation hotpath
-
-The Precept evaluator runs inside every `Fire`, `Update`, and `Create` call. It evaluates constraint expressions, guard conditions, and computed field formulas. For a precept with quantity fields, the evaluator processes nodes like:
-
-```
-weight / volume > threshold_density
-total_cost = unit_price * quantity_kg
-shipment_mass > min_kg AND shipment_mass < max_kg
-```
-
-Each arithmetic or comparison operation on quantities produces an intermediate `Quantity`. These are **the shortest-lived objects in the entire runtime** — typically consumed by the next AST node, never surviving past the expression evaluation frame.
-
-| Shape | Intermediate per expression | GC implication |
-|-------|---------------------------|----------------|
-| `sealed class` | 1 heap allocation per intermediate | Escapes to heap; collected in Gen0 sweep |
-| `readonly record struct` | 0 heap allocations for temporaries | Stack-resident; reclaimed at frame exit |
-
-For a `Fire` call evaluating 6 rules across 3 quantity fields, the class approach may produce 20–40 short-lived heap objects per call. In high-throughput scenarios (bulk validation, batch processing), this becomes measurable Gen0 pressure. With struct: **zero allocations for intermediate values.**
-
-#### Stored values vs. scratch values
-
-There is a critical distinction:
-
-- **Scratch** — intermediate results during expression evaluation. Extremely short-lived. Struct dominates.
-- **Stored** — the value sitting in a `Version` field slot. Long-lived. But the stored representation is `PreceptValue` (the internal sealed class hierarchy), not `Quantity`. The `Quantity` struct is only **materialized at the API boundary** via `Get<Quantity>()`.
-
-The design already achieves a natural dual-shape without engineering it artificially:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Internal runtime                   │  Public API boundary       │
-│                                     │                            │
-│  PreceptValue (sealed class)        │  Quantity             │
-│  ← lives in slot arrays             │  ← materialized on Get<T>  │
-│  ← GC-tracked, reference-shared     │  ← struct, returned by val │
-│  ← correct for long-lived storage   │  ← no allocation on read   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-The `Quantity` struct is the right shape for the boundary type. The `PreceptValue` class is the right shape for the storage type. There is no tension — they serve different phases.
-
----
-
-### 3. Boxing Hazards
+### 2. Boxing Hazards
 
 Boxing occurs when a struct is stored as `object`, passed through an interface, or placed in a non-generic collection. The audit:
 
@@ -610,8 +442,8 @@ The current proposal in §5 already makes the right call. This evaluation exists
 | Shape | Type | Use | Lifetime |
 |-------|------|-----|----------|
 | `readonly record struct` | `Quantity` | API boundary, expression scratch (future typed path) | Transient |
-| `sealed class` (subtype) | Internal `PreceptValue` | Runtime slot storage | Entity lifetime |
-| `sealed class` | `Unit` | Unit identity, interned from catalog | Catalog lifetime |
+| 32-byte tagged struct | `PreceptValue` | Runtime slot storage | Opaque tagged union; no per-value heap allocation |
+| `sealed class` (internal) | `Unit` | Evaluator-internal unit identity, interned from `UnitCatalog`; public API proxy is `UnitOfMeasure` (see §12) | Catalog lifetime |
 
 If the evaluator later gains an optimization path that operates on `Quantity` structs directly on a typed computation stack (bypassing `PreceptValue` for short-lived arithmetic), the struct design enables that path without any breaking change.
 
@@ -654,21 +486,19 @@ This mandate is cross-cutting — it applies to `Money`, `Quantity`, `Price`, an
 
 ### 7.1 Price — First-Class Canonical Named Type
 
-> **RETRACTION:** An earlier version of this section incorrectly claimed "Price is NOT a Separate Type" and stated it was structurally identical to `Money`. This contradicts the canonical design in `docs/language/business-domain-types.md`. The correction follows.
-
 **`price` IS a first-class canonical named type** defined in `docs/language/business-domain-types.md` (§ Runtime engine changes, § Operator tables). It is structurally distinct from `Money`.
 
 **CLR shape:**
 ```csharp
-public readonly record struct Price(decimal Amount, string Currency, string Unit)
+public readonly record struct Price(decimal Amount, Currency Currency, UnitOfMeasure Unit)
 ```
 
 **Three-field backing:**
 - `decimal Amount` — magnitude (the numeric value)
-- `string Currency` — numerator currency (ISO 4217, e.g. `"USD"`)
-- `string Unit` — denominator unit (UCUM, e.g. `"kg"`, `"each"`)
+- `Currency Currency` — numerator currency (ISO 4217, e.g. `"USD"`)
+- `UnitOfMeasure Unit` — denominator unit (UCUM, e.g. `"kg"`, `"each"`)
 
-**Structural distinction from `Money`:** `Money` is `(decimal Amount, string Currency)` — two fields. `Price` has a third field: the denominator unit. A price is inherently a compound type — currency *per* unit. `'24.50 USD/kg'` cannot be represented by `Money` without losing the denominator.
+**Structural distinction from `Money`:** `Money` is `(decimal Amount, Currency Currency)` — two fields. `Price` has a third field: the denominator unit. A price is inherently a compound type — currency *per* unit. `'24.50 USD/kg'` cannot be represented by `Money` without losing the denominator.
 
 **Key operator — dimensional cancellation:**
 - `price × quantity → money` (denominator unit cancels: `'24.50 USD/kg' × '3 kg' → '73.50 USD'`)
@@ -689,8 +519,8 @@ public readonly record struct Price(decimal Amount, string Currency, string Unit
 /// Convention: 1 From = Amount × To
 public readonly record struct ExchangeRate(
     decimal Amount,      // e.g., 0.92 means 1 From = 0.92 To
-    string From,         // ISO 4217 source currency: "USD"
-    string To)           // ISO 4217 target currency: "EUR"
+    Currency From,       // ISO 4217 source currency: "USD"
+    Currency To)         // ISO 4217 target currency: "EUR"
 {
     public override string ToString() => $"{Amount} {From}/{To}";
 }
@@ -718,144 +548,9 @@ public readonly record struct ExchangeRate(
 
 - **Temporal validity is NOT on the type.** An exchange rate value is "the rate at the point in time it was captured." The *timestamp* of when the rate was valid is a separate field on the entity — `rate_as_of: datetime` alongside `exchange_rate: ExchangeRate`. The value type is timeless; the entity tracks when.
 - **Inverse derivation:** `ExchangeRate(0.92m, "USD", "EUR")` implies `ExchangeRate(1/0.92m, "EUR", "USD")`. Whether Precept provides a `.Invert()` method is an API convenience question, not a type design question.
-- **32 bytes:** `decimal + string + string` = 16 + 8 + 8 = 32 bytes (reference sizes on x64; the `string` fields hold interned ISO 4217 references, not per-instance heap allocations). Still well under the copy-cost crossover. `readonly record struct` is correct.
+- **32 bytes:** `decimal + Currency + Currency` = 16 + 8 + 8 = 32 bytes (reference sizes on x64; `Currency` instances are interned from `CurrencyCatalog`, not per-instance heap allocations). Still well under the copy-cost crossover. `readonly record struct` is correct.
 - **Currency pair identity:** Two rates are "for the same pair" if `From` and `To` match. The `record struct` auto-generated equality handles this correctly.
 
-**Open questions for Shane:**
-
-- OQ-7a: Should the DSL expose `exchangerate` as a built-in field type (like `money` and `quantity`), or is this a domain-specific composite that users declare as individual fields? Frank leans toward built-in — the structural shape is universal enough.
-
----
-
-### 7.3 Percentage — Future Candidate (Deferred)
-
-> **Status:** Deferred pending separate investigation. `docs/language/business-domain-types.md` § Explicit Exclusions explicitly states: *"Whether `percent` is a type or syntactic sugar for `number / 100` is a separate investigation."*
-
-**Previously proposed shape:**
-```csharp
-/// A dimensionless ratio expressed as parts per hundred.
-public readonly record struct Percentage(decimal Value)
-{
-    /// The decimal multiplier (e.g., 25% → 0.25)
-    public decimal AsMultiplier => Value / 100m;
-    
-    public override string ToString() => $"{Value}%";
-}
-```
-
-**Why it was considered:**
-
-1. **Behavioral distinction:** The perennial "is 25% stored as `25` or `0.25`?" problem. Every system that stores percentages as bare decimals invites a class of bugs where someone divides by 100 twice or not at all. A dedicated type with explicit `.Value` (the human-readable number, e.g. 25) and `.AsMultiplier` (the computation form, 0.25) eliminates this class of error by making the representation unambiguous.
-
-2. **Structural distinction (invariant):** A percentage has a natural domain. While unconstrained percentages exist (> 100% is valid for growth rates), the *representation convention* is always parts-per-hundred. The type makes this convention structural.
-
-3. **Evaluator interaction:** `money * percentage` is a common expression pattern (tax calculation, discount application, interest). The evaluator can recognise `Money × Percentage → Money` as `Amount * Percentage.AsMultiplier` without users hand-writing the division.
-
-**Why deferred:** The canonical design doc has explicitly excluded `percent` from the seven business-domain types. The question of whether it becomes a type, syntactic sugar, or a UCUM `%` dimensionless unit requires its own investigation separate from the main business-domain type system. This investigation should not pre-commit a recommendation that the canonical doc has explicitly left open.
-
-**Questions for future investigation:**
-
-- Should `Percentage` allow negative values (e.g., `-5%` for a discount)?
-- Should `Percentage` participate in the unit system as UCUM's `%` dimensionless unit, or remain structurally separate (like `Money` is separate from quantity)?
-- Is `percent` a type or syntactic sugar for `decimal / 100`?
-
----
-
-### 7.4 DateRange — YES, a Separate Type
-
-**Proposed shape:**
-```csharp
-/// An inclusive range between two dates (or open-ended).
-public readonly record struct DateRange(
-    DateOnly? Start,   // null = unbounded start
-    DateOnly? End)     // null = unbounded end
-{
-    public bool Contains(DateOnly date) =>
-        (Start is null || date >= Start) && (End is null || date <= End);
-    
-    public override string ToString() => $"[{Start?.ToString() ?? "∞"}, {End?.ToString() ?? "∞"}]";
-}
-```
-
-> **CLR type note:** The public API surface uses `DateOnly` (per `docs/working/runtime-api-public-surface-spec.md` §3.4 which maps `date` → `DateOnly`). The internal runtime uses NodaTime `LocalDate`; the dual-shape boundary materializes `DateOnly` for consumers.
-
-**Why this earns its own type:**
-
-1. **Structural distinction:** Two dates forming a bounded interval. This is not "a date" — it's a *range*. Different shape, different fields.
-2. **Behavioral distinction:** The fundamental operation is *containment* — "is this date within the range?" This is used pervasively in guards and constraints (effective dates, eligibility windows, validity periods).
-3. **Invariant enforcement:** `Start <= End` (when both are non-null) is a type-level invariant that bare date fields cannot express without guards.
-
-**Design note:** Public API uses `DateOnly`; internal runtime uses NodaTime `LocalDate`. The dual-shape model materializes `DateOnly` at the API boundary, consistent with the CLR type mapping in `runtime-api-public-surface-spec.md`.
-
-**Open questions for Shane:**
-
-- OQ-7e: Inclusive vs. exclusive end? Convention varies by domain. Frank recommends inclusive-inclusive (`[start, end]`) as the default with a separate `DateInterval` (exclusive end) only if demanded.
-- OQ-7f: Should there be a parallel `DateTimeRange` for `Instant`-bounded intervals? Frank leans yes for completeness, but it can wait for demand.
-
----
-
-### 7.5 Candidates Considered and REJECTED
-
-These do NOT earn first-class types. Rationale for each:
-
-#### Ratio (generic)
-
-**Would be:** `readonly record struct Ratio(decimal Numerator, decimal Denominator)`
-
-**Rejected because:** A ratio is just a decimal value. The separate numerator/denominator representation only matters if you need to preserve the original fraction for display (e.g., "3/4" instead of "0.75"). That's a formatting concern, not a type-system concern. The evaluator operates on computed values. If a domain needs a displayed fraction, that's a string field alongside the computed decimal.
-
-#### Range\<T\> (generic bounded interval)
-
-**Would be:** `readonly record struct Range<T>(T Lower, T Upper) where T : IComparable<T>`
-
-**Rejected for now because:** Generic range is an attractive abstraction but introduces generic type parameters into the Precept value-type surface. The evaluator dispatches on concrete types, not open generics. `DateRange` is the one range type with enough business ubiquity to ship. If `QuantityRange` or `MoneyRange` demand emerges, they can be added as concrete types — not as generic specializations.
-
-#### Weight / Volume / Length (domain-specific quantity subtypes)
-
-**Would be:** `readonly record struct Weight(decimal Amount, Unit Unit)` where `Unit.Dimension == Mass`
-
-**Rejected because:** This is already handled by `Quantity` with a dimension constraint. The DSL declaration `quantity of 'mass'` constrains to the mass dimension — no need for a separate CLR type per dimension. The type system is `Quantity`; the constraint system narrows it.
-
-#### Duration
-
-**Already covered:** The earlier decision locked `duration` → NodaTime `Duration`. No new type needed.
-
-#### Address / Email / PhoneNumber (formatted string types)
-
-**Rejected because:** These are validation patterns on `string`, not structural value types. Precept's constraint system (`validate` declarations) handles format validation. Minting a CLR type for every validated string format violates the principle that Precept's type surface is finite and structural.
-
-#### CompoundMoney (multi-currency basket)
-
-**Would be:** A collection of `Money` entries summing a position across currencies.
-
-**Rejected because:** This is a *collection*, not a value type. It's `PreceptList<Money>` — handled by the collection system, not the scalar type system.
-
----
-
-### 7.6 Summary Table
-
-| Candidate | Verdict | CLR Type | Shape | Rationale |
-|-----------|---------|----------|-------|-----------|
-| **Price** | ✅ Canonical named type | `Price` | `readonly record struct(decimal Amount, string Currency, string Unit)` | Three-field backing; `price × quantity → money` dimensional cancellation. Defined in `business-domain-types.md`. |
-| **ExchangeRate** | ✅ Canonical named type | `ExchangeRate` | `readonly record struct(decimal Amount, string From, string To)` | Structural + behavioral distinction. Three fields, non-monetary arithmetic. Implicit `positive` (D16 Corollary 2). |
-| **Percentage** | ⏳ Deferred | — | — | Separate investigation per `business-domain-types.md` § Explicit Exclusions. Not confirmed as a type. |
-| **DateRange** | ✅ New type | `DateRange` | `readonly record struct(DateOnly? Start, DateOnly? End)` | Structural (interval), behavioral (containment), invariant-enforced. |
-| **currency** | DSL type | `string` | CLR backing is `string` (ISO 4217) | Not a new struct — string-backed identity type in the DSL. |
-| **unitofmeasure** | DSL type | `string` | CLR backing is `string` (UCUM code) | Not a new struct — string-backed identity type in the DSL. |
-| **dimension** | DSL type | `string` | CLR backing is `string` (dimension name) | Not a new struct — string-backed identity type in the DSL. |
-| **Ratio** | ❌ Rejected | — | — | A decimal. Fraction display is formatting, not type structure. |
-| **Range\<T\>** | ❌ Rejected | — | — | Generic dispatch incompatible with evaluator. Concrete types only. |
-| **Weight/Volume/etc.** | ❌ Rejected | — | — | Handled by `Quantity` + dimension constraint. |
-| **Address/Email/etc.** | ❌ Rejected | — | — | Validation patterns on `string`, not structural types. |
-| **CompoundMoney** | ❌ Rejected | — | — | Collection concern (`PreceptList<Money>`), not scalar type. |
-
----
-
-### 7.7 Doc Scoping Note
-
-This document is currently titled "Unit Type System Investigation." With the addition of `ExchangeRate`, `Percentage`, and `DateRange` — none of which are unit-system types — the scope has outgrown the title.
-
-**Recommendation:** Rename to **"Precept Value Types — Investigation and Design"** once Shane decides on the candidates above. The unit system (UCUM, `Quantity`, `Unit`) is one section; the broader value-type surface (`Money`, `ExchangeRate`, `Percentage`, `DateRange`) is another. Both belong in the same document because they share the same design principles (struct vs. class, dual-shape model, catalog-driven metadata), but the title should reflect the actual scope.
 
 ---
 
@@ -879,12 +574,7 @@ The prior draft proposed `readonly record struct CurrencyCode` with well-known s
 
 **Tradeoff accepted:** `CurrencyCatalog.Default.Get("USD")` is more verbose than `CurrencyCode.USD`. This is the same ergonomic tradeoff accepted for `UnitCatalog` — and accepted for the same reasons.
 
-**Open questions (not yet resolved by Shane):**
-- **OQ-CUR-1:** Include curated `symbol` supplement? Frank recommends Option A (include). Shane has not responded. → **Open.**
-- **OQ-CUR-4:** Embedded resource vs. separate data package? Frank recommends Option A (embedded, v1). Shane has not responded. → **Open.**
-
-**Presumed agreed given the locked design:**
-- **OQ-CUR-2:** Upgrade `Money.Currency`, `Price.Currency`, `ExchangeRate.From`/`.To` from `string` to `Currency`. No breaking change (types not shipped). Structural consistency. Presumed agreed.
+All open questions (OQ-CUR-1, OQ-CUR-2, OQ-CUR-3, OQ-CUR-4) are resolved — see §8.10.
 
 ---
 
@@ -922,7 +612,7 @@ The standard covers approximately **180 active codes** plus a small set of speci
 - Is fully enumerable as a flat list
 - Has a simpler validation model: dictionary lookup only, no grammar parser
 
-**Amendment cadence:** ISO 4217 amendments are published several times per year as countries rename currencies or join/leave currency unions. Actual code *additions* are rare — they happen only when a country adopts a new currency, which is a multi-year event. Most amendments are country-name corrections. This is more frequent than UCUM (years between revisions) but the functional impact of being one amendment behind is negligible. The shipping mechanism is flagged as OQ-CUR-4.
+**Amendment cadence:** ISO 4217 amendments are published several times per year as countries rename currencies or join/leave currency unions. Actual code *additions* are rare — they happen only when a country adopts a new currency, which is a multi-year event. Most amendments are country-name corrections. This is more frequent than UCUM (years between revisions) but the functional impact of being one amendment behind is negligible. ISO 4217 data ships as an embedded resource in the `CurrencyCatalog` assembly — no separate data package at v1; promote if amendment drift creates meaningful operational friction.
 
 ---
 
@@ -936,7 +626,7 @@ public sealed class Currency : IEquatable<Currency>
     public string AlphaCode   { get; }   // ISO 4217 alphabetic: "USD", "EUR", "JPY"
     public int    NumericCode { get; }   // ISO 4217 numeric: 840, 978, 392
     public string Name        { get; }   // Official name: "US Dollar", "Euro", "Yen"
-    public string Symbol      { get; }   // Display symbol: "$", "€", "¥" (curated supplement — OQ-CUR-1)
+    public string Symbol      { get; }   // Display symbol: "$", "€", "¥" (curated supplement; disambiguated where shared, e.g., "US$" for USD)
     public int    MinorUnit   { get; }   // Decimal places: 2 (USD), 0 (JPY), 3 (KWD)
 
     // Equality by alphabetic code
@@ -1053,7 +743,7 @@ TypeKind.Currency => new(
     Accessors:
     [
         new FixedReturnAccessor("name",        TypeKind.String,  "Official ISO 4217 currency name (e.g., 'US Dollar')"),
-        new FixedReturnAccessor("symbol",       TypeKind.String,  "Display symbol (e.g., '$', '€') — curated supplement, not in ISO 4217 spec (OQ-CUR-1)"),
+        new FixedReturnAccessor("symbol",       TypeKind.String,  "Display symbol (e.g., '$', '€') — from curated supplement; disambiguated where symbol is shared across currencies (e.g., 'US$' for USD)"),
         new FixedReturnAccessor("minorUnit",    TypeKind.Integer, "Decimal places per ISO 4217 minor unit (2 for USD, 0 for JPY, 3 for KWD)"),
         new FixedReturnAccessor("numericCode",  TypeKind.Integer, "ISO 4217 numeric code (840 for USD, 978 for EUR)"),
     ],
@@ -1130,29 +820,29 @@ This is a small but architecturally significant cleanup: it removes the only pla
 
 Introducing `Currency` as a structured CLR type raises a ripple question: should `Money`, `Price`, and `ExchangeRate` change their currency fields from `string` to `Currency`?
 
-**Current:**
+**Before OQ-CUR-2 upgrade:**
 ```csharp
 public readonly record struct Money(decimal Amount, string Currency)
 public readonly record struct Price(decimal Amount, string Currency, string Unit)
 public readonly record struct ExchangeRate(decimal Amount, string From, string To)
 ```
 
-**Upgraded:**
+**After OQ-CUR-2 upgrade (✅ Applied):**
 ```csharp
 public readonly record struct Money(decimal Amount, Currency Currency)
-public readonly record struct Price(decimal Amount, Currency Currency, string Unit)
+public readonly record struct Price(decimal Amount, Currency Currency, UnitOfMeasure Unit)
 public readonly record struct ExchangeRate(decimal Amount, Currency From, Currency To)
 ```
 
 Size impact on x64: `string` (8 bytes managed reference) and `Currency` (8 bytes managed reference) have the same slot size. No change to struct size.
 
-**Frank's recommendation: upgrade.** Reasons:
+**Rationale for upgrade:**
 1. **No breaking-change cost** — none of these CLR types are shipped yet
-2. **Structural consistency** — the catalog model says `money.currency` returns `TypeKind.Currency`; the CLR type should match
+2. **Structural consistency** — the catalog model says `money.currency` returns `TypeKind.Currency`; the CLR type matches
 3. **Direct `.MinorUnit` access** — `Money.Currency.MinorUnit` eliminates a re-lookup for D10 enforcement in the evaluator
 4. **Interning benefit** — the `Currency` references in `Money`, `Price`, and `ExchangeRate` instances all point to the same ~180 interned objects; no per-instance metadata duplication
 
-This is flagged as **OQ-CUR-2** for Shane's decision.
+**OQ-CUR-2: ✅ Locked — upgrade applied.**
 
 ---
 
@@ -1182,47 +872,27 @@ Both currency and unit use the same catalog-driven pattern:
 
 ---
 
-### 8.10 Open Questions
+### 8.10 Currency API Surface Decisions
 
-**OQ-CUR-1: Include `symbol`?** — ⏳ **Open** (Shane has not responded)
+`symbol` is included in `Currency`. The "not in ISO 4217" objection is a purity argument, not a practical one. Every business display of monetary amounts needs the currency symbol; requiring callers to maintain a parallel symbol map defeats the catalog-driven architecture's purpose. Symbols that are ambiguous across currencies use a disambiguated form in the curated supplement (e.g., `US$` for USD rather than bare `$`, which is shared by USD/CAD/AUD/NZD/HKD). The field is sourced from the curated supplement accompanying the ISO 4217 standard — not from the standard itself — and this is noted in the field comment.
 
-`symbol` (e.g., `$`, `€`, `¥`) is **not part of the ISO 4217 specification**. It is colloquially associated but the standard does not define symbols. Multiple currencies share the dollar sign (`$`): USD, CAD, AUD, NZD, HKD, etc.
+`Money.Currency`, `Price.Currency`, and `ExchangeRate.From`/`.To` use the `Currency` CLR type. None of these CLR types are shipped; the upgrade carries no breaking-change cost. Structural consistency with the catalog-backed `sealed class Currency` design is mandatory.
 
-- **Option A (recommended by Frank):** Include `symbol` as a curated supplement maintained in the same embedded resource as the ISO 4217 data. Use the unambiguous symbol where one exists (e.g., `€` for EUR, `£` for GBP), and the alpha code as the fallback where the symbol is ambiguous (e.g., `US$` for USD to distinguish from `CA$`, `A$`). Frank leans toward inclusion: every invoice renderer needs it; requiring an out-of-band lookup is a catalog-architecture violation.
-- **Option B:** Exclude `symbol` entirely — expose only the four ISO-4217-defined fields. Simpler, but forces consumers to maintain a parallel metadata structure.
+Both `Get<Currency>()` and `Get<string>()` are supported for `currency`-typed fields. `Get<Currency>()` returns the full catalog-backed `Currency` object with all accessors (`.name`, `.symbol`, `.minorUnit`, `.numericCode`). `Get<string>()` returns the alpha code string for consumers that only need the code — serialization, logging, code-only comparison. The `TypeRuntime<Currency>` adapter handles both via the standard typed-lane dispatch.
 
-**OQ-CUR-2: Upgrade `Money.Currency`, `Price.Currency`, `ExchangeRate.From`/`.To` from `string` to `Currency`?** — ✅ **Presumed agreed** (no breaking-change cost; structural consistency with locked design)
-
-Frank recommends upgrading (§8.8). Given that the `sealed class Currency` design is locked and none of these CLR types are shipped, OQ-CUR-2 is treated as agreed pending explicit override from Shane.
-
-- **Option A (agreed):** All three upgraded — `Money(decimal Amount, Currency Currency)`, etc. Structural consistency, no breaking change, direct `.MinorUnit` access.
-- **Option B:** Keep `string` — `currency` fields return `Currency` from `Get<Currency>()`, but the composite type fields (`Money.Currency`, etc.) stay `string`.
-
-**OQ-CUR-3: `Get<Currency>()` vs. `Get<string>()` for `currency`-typed fields?** — ⏳ **Open**
-
-When `Get<T>()` is called on a `currency`-typed field with `T = Currency`, the runtime returns the `Currency` object from the catalog. Should `Get<string>()` also be supported as a fallback returning the alpha code?
-
-- **Option A (recommended by Frank):** Both work. `Get<Currency>()` is the primary typed API. `Get<string>()` returns the alpha code string for consumers who only need the code. The `TypeRuntime<Currency>` for `currency` resolves via `CurrencyCatalog.Default.Get(alphaCode)`.
-- **Option B:** Only `Get<Currency>()`. `Get<string>()` on a `currency` field is a type mismatch at call time.
-
-**OQ-CUR-4: Shipping mechanism — embedded resource vs. separate package?** — ⏳ **Open** (Shane has not responded)
-
-ISO 4217 amendments are more frequent than UCUM revisions, though actual code changes are rare.
-
-- **Option A (recommended by Frank for v1):** Embedded resource in the Precept NuGet package. Code additions happen only when countries change currencies (multi-year cadence). Name corrections don't affect runtime behavior. If amendment drift creates real friction, promote to Option B.
-- **Option B:** Separate `Precept.Currencies` data package (analogous to `NodaTime.Tzdb`). Data updates without library releases. More packaging complexity, justified only if amendment frequency creates meaningful drift.
+ISO 4217 data is embedded as a compiled resource in the assembly hosting `CurrencyCatalog`. ~180 rows, loaded once at startup. Amendment cadence is primarily country name corrections; actual code additions happen only when a country adopts a new currency (multi-year event). A separate data package is not justified at v1; promote if amendment drift creates meaningful operational friction.
 
 ---
 
 ### 8.11 Summary
 
-**Status: ✅ Locked** — Shane selected frank-114 on 2026-05-04. OQ-CUR-1 and OQ-CUR-4 remain open pending Shane's input.
+**Status: ✅ Locked** — Shane selected frank-114 on 2026-05-04. All open questions resolved — see §8.10.
 
 | Design Point | Decision | Status | Rationale |
 |---|---|---|---|
 | CLR type name | `Currency` | ✅ Locked | Parallel to `Unit` — same naming convention |
 | CLR shape | `sealed class` | ✅ Locked | Interning, extensible metadata, catalog lifetime — identical to `Unit` reasoning |
-| Fields | `AlphaCode`, `NumericCode`, `Name`, `Symbol`*, `MinorUnit` | ✅ Locked (Symbol pending OQ-CUR-1) | ISO 4217 defined + curated `Symbol` supplement |
+| Fields | `AlphaCode`, `NumericCode`, `Name`, `Symbol`, `MinorUnit` | ✅ Locked | ISO 4217 defined + curated `Symbol` supplement (see §8.10) |
 | Catalog | `CurrencyCatalog` | ✅ Locked | Embedded resource, `FrozenDictionary` backing, analogous to `UnitCatalog` |
 | Tiers | None | ✅ Locked | ~180 codes, flat list — no tiering needed (unlike UCUM) |
 | Grammar parser | None | ✅ Locked | ISO 4217 is flat — no compositional grammar |
@@ -1230,9 +900,10 @@ ISO 4217 amendments are more frequent than UCUM revisions, though actual code ch
 | DSL declaration | Unchanged — `field X as currency` | ✅ Locked | Identity types don't support `in`/`of` |
 | New accessors | `.name`, `.symbol`, `.minorUnit`, `.numericCode` | ✅ Locked | Derived from catalog at evaluation time; zero storage cost |
 | Serialization | Unchanged — `"USD"` (alpha code string) | ✅ Locked | Value is the code; metadata is always derived |
-| `Money.Currency` type | Upgrade to `Currency` (OQ-CUR-2) | ✅ Presumed agreed | Structural consistency; direct `.MinorUnit` access; no breaking change |
-| `symbol` inclusion | OQ-CUR-1 — Frank recommends Option A | ⏳ Open | Shane has not responded |
-| Shipping mechanism | OQ-CUR-4 — Frank recommends Option A (embedded) | ⏳ Open | Shane has not responded |
+| `Money.Currency` type | Upgrade to `Currency` (OQ-CUR-2) | ✅ Locked | Structural consistency; direct `.MinorUnit` access; no breaking change |
+| `symbol` inclusion | Included — curated supplement with disambiguation | ✅ Locked | See §8.10 |
+| `Get<T>()` currency lanes | Both `Get<Currency>()` and `Get<string>()` supported | ✅ Locked | See §8.10 |
+| Shipping mechanism | Embedded resource in `CurrencyCatalog` assembly | ✅ Locked | See §8.10 |
 
 ---
 
@@ -1284,14 +955,6 @@ Evaluator    → calls executor module method (single runtime enforcement point)
 - **Type checker:** validates operations are legal by reading `OperationMeta` from the `Language.Operations` catalog. Same-currency, same-unit, and D15/D16 checks are compile-time proof requirements.
 - **Evaluator:** three-line dispatch — resolve operation, index into `TypeRuntimeMeta.BinaryExecutors`, call delegate. Zero domain logic in the evaluator.
 - **Executor module:** the SINGLE runtime enforcement point for domain rules. D8 auto-conversion lives in `QuantityOperations.Add()` with full access to `UnitCatalog`. One path, not two.
-
-### 9.4 The NodaTime Analogy Correction
-
-The NodaTime analogy (§4) justified building a separate type system. It was wrongly extended to mean "types carry computation like NodaTime types do." The distinction: NodaTime carries computation because it has no runtime — its types ARE the runtime. Precept has a runtime. The analogy justifies the separate assembly; it does not require computation on the types.
-
-### 9.5 Implications for CLR Type Definitions
-
-All value type CLR shapes in this document (§5 `Quantity`, §7.1 `Price`, §7.2 `ExchangeRate`, §8.3 `Currency`) are confirmed as pure data records. They expose their fields, equality, construction, and formatting — nothing else. Any arithmetic example in this document (e.g., `price × quantity → money`) describes evaluator behavior, not CLR operator overloads.
 
 ---
 
@@ -1350,38 +1013,13 @@ If opcodes were `record struct`, cache density would improve 4×. This is theore
 
 ---
 
-## 11. Type Library Assembly — `Precept.Types` (Recommended)
+## 11. Namespace Organization — `Precept.Types`
 
 **By:** Frank (Lead Architect)  
-**Date:** 2026-05-04  
-**Status:** Recommendation recorded — Shane confirmation needed.
+**Date:** 2026-05-04 (updated 2026-05-05)  
+**Status:** Decided.
 
-### 11.1 The Problem
-
-Consumers who want `Money`, `Currency`, `UnitOfMeasure`, etc. in their DTO layer must not pull in the full Precept compiler pipeline. The NodaTime analogy taken seriously implies a separate package, not just separate files.
-
-### 11.2 Dependency Graph
-
-```
-Precept.Types (no Precept dependencies)
-     ↑
-Precept (evaluator assembly — references Precept.Types)
-     ↑
-Consumer code (may reference either)
-```
-
-### 11.3 Assembly Contents
-
-| Assembly | Contents |
-|----------|----------|
-| **`Precept.Types`** | `Currency`, `CurrencyCatalog`, `UnitOfMeasure`, `MeasureDimension`, `Money`, `Price`, `ExchangeRate`, `Quantity`, `KeyedElement<TValue, TKey>`, `IUnitConversionSource`, embedded ISO 4217 resource |
-| **`Precept`** (evaluator) | `Unit` (sealed class with Tier + DimensionVector + ConversionFactors), `UnitCatalog`, `DimensionCatalog`, all pipeline stages, embedded UCUM resource |
-
-### 11.4 Why the Split
-
-- `Precept.Types` has zero Precept dependencies — it's a pure type library.
-- Consumer DTOs and domain models can reference `Money`, `Quantity`, etc. without pulling in the lexer, parser, type checker, graph analyzer, or evaluator.
-- The evaluator references `Precept.Types` and adds the enriched catalog entities (`Unit`, `UnitCatalog`) that carry evaluator-internal metadata (tiers, conversion factors, SI exponent vectors).
+`Money`, `Quantity`, `Currency`, `UnitOfMeasure`, `MeasureDimension`, `UnitCatalog`, `CurrencyCatalog`, `Price`, and `ExchangeRate` live in the `Precept.Types` namespace within the existing `Precept` assembly. No separate NuGet package or assembly split is introduced.
 
 ---
 
@@ -1479,7 +1117,7 @@ The dual-shape model established in §Addendum (struct vs. class evaluation) is 
 
 | Layer | Type | Shape | Purpose |
 |-------|------|-------|---------|
-| Internal runtime slots | `PreceptValue` subtype hierarchy | `sealed class` | GC-tracked, reference-shared, correct for long-lived storage |
+| Internal runtime slots | `PreceptValue` | 32-byte tagged struct | Opaque tagged union; all field and arg values at runtime |
 | Public API boundary | `Money`, `Quantity`, `Price`, etc. | `readonly record struct` | Materialized on `Get<T>()`, no allocation on read |
 | Raw lane | `JsonElement` | CLR struct | Wire-format access, no Precept types needed |
 
@@ -1494,28 +1132,3 @@ Four reasons (sourced from collection types investigation §3):
 2. **AI agent hostility** — opaque internal types degrade agent accuracy when reasoning about APIs
 3. **Contract** — generic type parameters are the hardest leakage vector to contain
 4. **Dual-shape model** — collections are the vectorized case of the same internal/external shape rule that governs scalar value types
-
----
-
-## 14. Operator Overload Analysis (Superseded — Historical Record)
-
-**By:** Frank (Lead Architect)  
-**Date:** 2026-05-04  
-**Status:** ❌ **Superseded** by §9 (Evaluator-Only Computation). Retained for historical context only.
-
-### 14.1 Summary of Analysis
-
-Before the evaluator-only model was locked, Option A explored C# operator overloads on the CLR types. The analysis identified three structural problems with naïve operator overloads:
-
-1. **Injection parameter problem:** operators cannot take extra parameters. D8 auto-conversion requires `IUnitConversionSource` — impossible to pass via `operator+`.
-2. **Return-type ambiguity:** `Money / Money` → `decimal` (ratio) vs. `Money / Quantity` → `Price`. Same operand types, different return types — C# cannot express this.
-3. **Commutative cross-type operators:** `Price * Quantity` and `Quantity * Price` must both work. Declaring the operator on both types creates coupling.
-
-### 14.2 Per-Type Surfaces Analyzed (Now Moot)
-
-- **Money:** additive (`+`, `-`), scaling (`* decimal`, `/ decimal`), ratio (`Money / Money` → `decimal`), comparisons, named `DeriveRate`/`DivideBy`
-- **ExchangeRate:** currency conversion (`operator*`), scaling, named `Apply`/`Invert`
-- **Price:** dimensional cancellation (`price * quantity → money`), scaling, additive
-- **Quantity:** same-unit operators, D8 as named method, compound division
-
-**All of this is now historical.** Under the locked evaluator-only model (§9), CLR types carry NO operators. Computation lives in named executor modules. This section exists to document WHY operators were rejected, not to prescribe them.

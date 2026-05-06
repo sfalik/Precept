@@ -207,7 +207,7 @@ ISO 4217 defines ~180 active 3-letter currency codes (USD, EUR, JPY, GBP, etc.) 
 
 ### UCUM — Units of measure
 
-The Unified Code for Units of Measure (UCUM) provides a formal grammar for unit expressions including compound units with multiplication (`.`), division (`/`), exponents, and parentheses. It supports equality testing (canonical reduction) and commensurability testing (same dimension). Precept uses a UCUM subset covering common business units — no external library dependency (D13).
+The Unified Code for Units of Measure (UCUM) provides a formal grammar for unit expressions including compound units with multiplication (`.`), division (`/`), exponents, and parentheses. It supports equality testing (canonical reduction) and commensurability testing (same dimension). Precept accepts the full UCUM grammar — any valid UCUM expression is structurally acceptable — and uses a tiered discovery model to control what is surfaced to authors: Tier 1 (~150 atoms) in autocomplete, documentation, and builder APIs; Tier 2 (~500 atoms) valid and recognized but not surfaced proactively; Tier 3 (full ~2,600 atoms) accepted for interop. No external library dependency (D13).
 
 Time units are excluded from UCUM's domain in Precept — they belong to NodaTime's temporal types (dead end #6 in the research doc). NodaTime's vocabulary (`hours`, `minutes`, `days`) replaces UCUM's (`h`, `min`, `d`) everywhere, including inside compound type denominators.
 
@@ -337,7 +337,7 @@ Both rules require **commensurable** operands (same UCUM dimension). `'5 kg' + '
 
 **What it makes explicit:** This is a monetary amount in a single currency — not a bare decimal, not a decimal+string pair. The currency is part of the value's identity. Arithmetic respects dimensional rules: you can't add USD to EUR.
 
-**Backing type:** `decimal` magnitude + ISO 4217 currency code
+**CLR shape:** `Amount` (`decimal`) + `Currency` (`Currency`, interned from `CurrencyCatalog`)
 
 **Declaration:**
 
@@ -406,7 +406,7 @@ field Budget as money in 'EUR' optional
 
 **What it makes explicit:** This is an ISO 4217 currency code — not a string that happens to look like a currency. It identifies a currency but carries no magnitude.
 
-**Backing type:** `string` (validated against ISO 4217 at compile time for literals, at fire/update boundary for runtime values)
+**CLR shape:** `sealed class Currency` with fields `AlphaCode` (`string`), `NumericCode` (`int`), `Name` (`string`), `MinorUnit` (`int`), and `Symbol` (`string`). Instances are interned from `CurrencyCatalog` (a singleton `FrozenDictionary`-backed ISO 4217 catalog). `Symbol` is sourced from the curated supplement (not part of the ISO 4217 standard itself); where ISO 4217 alpha codes share a display symbol (e.g., `$` shared by USD, CAD, AUD), the supplement provides a disambiguated form (`US$` for USD). Equality by alpha code; `ToString()` returns alpha code. Validated against `CurrencyCatalog.Default` at compile time for literals and at the fire/update boundary for runtime values.
 
 **Declaration:**
 
@@ -426,7 +426,14 @@ field InvoiceCurrency as currency optional
 | `currency + currency` | Currency codes are identifiers, not numbers. Use `money` for monetary amounts. |
 | `currency < currency` | Currency codes have no natural ordering. |
 
-**Accessors:** None.
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.name` | `string` | Official ISO 4217 currency name (e.g., `"US Dollar"`, `"Euro"`) |
+| `.minorUnit` | `integer` | Decimal places per ISO 4217 minor unit (`2` for USD, `0` for JPY, `3` for KWD) |
+| `.numericCode` | `integer` | ISO 4217 numeric code (`840` for USD, `978` for EUR) |
+| `.symbol` | `string` | Display symbol (e.g., `"$"`, `"€"`) — from the curated supplement; disambiguated form used where ISO 4217 alpha codes share a symbol |
 
 **Constraints:** `optional`, `default '...'`.
 
@@ -445,7 +452,7 @@ field InvoiceCurrency as currency optional
 
 **What it makes explicit:** This is a numeric value with a unit of measure — not a bare number. The unit is part of the value's identity. `'5 kg'` and `'5 lbs'` are different quantities, even though both have magnitude 5.
 
-**Backing type:** `decimal` magnitude + unit identifier (UCUM or entity-scoped)
+**CLR shape:** `Amount` (`decimal`) + `Unit` (`UnitOfMeasure`, validated UCUM code interned from `UnitCatalog`)
 
 **Declaration:**
 
@@ -522,7 +529,7 @@ field Measurement as quantity             # open — unit comes from event data
 
 **What it makes explicit:** This is a unit identifier — not a string that happens to name a unit. It identifies a unit but carries no magnitude.
 
-**Backing type:** `string` (validated against UCUM registry or entity-scoped units)
+**CLR shape:** `readonly record struct UnitOfMeasure(string Code)` — the validated UCUM unit code. A lightweight API proxy; the evaluator resolves `Code` to the internal `Unit` entity via `UnitCatalog` for dimensional analysis and conversion.
 
 **Runtime validation:** Allowlist-only. Values must match a known UCUM unit atom (excluding temporal units, which belong to the `period` type family) or an entity-scoped unit declared within the precept. Structural characters (`/`, `*`, `^`, `.`) are rejected in atomic unit positions — they are syntactic operators in compound unit expressions and must not appear in `unitofmeasure` values, preventing injection into compound unit parsing.
 
@@ -554,7 +561,7 @@ field SelectedUnit as unitofmeasure optional
 | Scope | Source of truth | Examples | Validation timing |
 |---|---|---|---|
 | **Language-level** | NodaTime | `days`, `hours`, `months` | Compile-time — closed set |
-| **Standard registry** | ISO 4217, UCUM subset | `USD`, `EUR`, `kg`, `lbs` | Compile-time — large but closed set |
+| **Standard registry** | ISO 4217, UCUM (full grammar + tiered discovery) | `USD`, `EUR`, `kg`, `lbs` | Compile-time — Tier 1/2 atoms plus grammar-valid derived expressions |
 | **Entity-scoped** | `units` block in precept definition | `each`, `case`, `six-pack` | Compile-time within the precept |
 
 **Constraints:** `optional`, `default '...'`.
@@ -573,7 +580,7 @@ field SelectedUnit as unitofmeasure optional
 
 **What it makes explicit:** This is a measurement category identifier — not a string. It classifies the family a measurement belongs to: physical dimensions (UCUM: `'mass'`, `'length'`, `'volume'`) or temporal dimensions (`'date'`, `'time'`, `'datetime'`). The registry is partitioned by parent type — the type checker knows which partition to validate against.
 
-**Backing type:** `string` (validated against the dimension registry — UCUM partition for `quantity`/`unitofmeasure`, temporal partition for `period`)
+**CLR shape:** `readonly record struct MeasureDimension(string Name)` — the validated dimension category name. A lightweight API proxy; the UCUM and temporal partitions govern which names are valid (UCUM partition for `quantity`/`unitofmeasure`, temporal partition for `period`).
 
 **Declaration:**
 
@@ -663,7 +670,7 @@ rule Input.dimension == Output.dimension
 
 **What it makes explicit:** This is a currency-per-unit ratio — not a bare decimal. It carries both a currency numerator and a unit denominator. The key operation: `price * quantity → money` (dimensional cancellation).
 
-**Backing type:** `decimal` magnitude + `string` numerator currency + `string` denominator unit
+**CLR shape:** `Amount` (`decimal`) + `Currency` (`Currency`, interned from `CurrencyCatalog`) + `Unit` (`UnitOfMeasure`, interned from `UnitCatalog`)
 
 **Declaration:**
 
@@ -778,7 +785,7 @@ The field type declaration is the author's statement of business intent. `instan
 
 **What it makes explicit:** This is a currency-per-currency ratio — not a bare number. It enables explicit, governed currency conversion. The compiler verifies that currency pairs match during conversion.
 
-**Backing type:** `decimal` magnitude + `string` numerator currency + `string` denominator currency
+**CLR shape:** `Rate` (`decimal`) + `From` (`Currency`, interned from `CurrencyCatalog`) + `To` (`Currency`, interned from `CurrencyCatalog`)
 
 **Declaration:**
 
@@ -1501,11 +1508,11 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 
 ### D5. UCUM as the standard registry for physical units
 
-- **What:** Physical unit names inside `'...'` are validated against a UCUM subset.
+- **What:** Physical unit names inside `'...'` are validated against the full UCUM grammar. Any valid UCUM expression is structurally accepted. Discovery is tiered: Tier 1 (~150 atoms) surfaced in completions and documentation, Tier 2 (~500 atoms) valid and recognized but not surfaced proactively, Tier 3 (full ~2,600 atoms) valid for interop.
 - **Why:** UCUM provides formal grammar for unit expressions with compound support, equality testing, and commensurability testing.
 - **Alternatives rejected:** (A) Custom registry — reinventing the wheel. (B) QUDT — too heavy. (C) UN/CEFACT Rec 20 — no algebraic grammar.
 - **Precedent:** NodaTime uses IANA TZDB. ISO 4217 for currencies. UCUM for units (HL7/FHIR, scientific computing).
-- **Tradeoff accepted:** Precept uses a practical subset, not the full UCUM specification.
+- **Tradeoff accepted:** Tier 1 discovery list (~150 atoms) requires curation. The full grammar means any well-formed UCUM expression is accepted — authors using esoteric atoms get no completions but no errors either.
 
 ### D6. Entity-scoped conversion factors are typed compound quantities, not bare integers
 
@@ -1578,9 +1585,9 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 
 ### D13. Self-contained registries — no external library dependency for currency or units
 
-- **What:** Precept embeds ISO 4217 as a static currency table and a UCUM subset as a static unit registry. No NMoneys, no UnitsNet.
+- **What:** Precept embeds ISO 4217 as a static currency table (`CurrencyCatalog`) and a tiered UCUM unit registry with a full grammar parser (`UnitCatalog`). No NMoneys, no UnitsNet.
 - **Why:** What Precept needs is data, not logic. ISO 4217 is ~180 rows. UCUM validation is a grammar + registry. Neither requires the complexity that justified NodaTime.
-- **Alternatives rejected:** (A) NMoneys — adds dependency for a 180-row lookup; `double`-era APIs. (B) UnitsNet — uses `double` (incompatible with D12). (C) Full UCUM parser — overkill for v1.
+- **Alternatives rejected:** (A) NMoneys — adds dependency for a 180-row lookup; `double`-era APIs. (B) UnitsNet — uses `double` (incompatible with D12). (C) External full UCUM parser library — unnecessary; Precept implements its own grammar natively.
 - **Precedent:** NodaTime itself embeds TZDB data as a static resource. Same principle: own the data, not the library.
 - **Tradeoff accepted:** Precept owns registry updates. ISO 4217 changes ~1-2 times/year. UCUM core units are stable.
 

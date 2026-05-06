@@ -34,7 +34,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 **Restore is JSON-only.** `Restore(string? state, JsonElement fields)` has no typed overload. Restore is a hydration path from persisted storage — storage always provides serialized data, so in-process callers never need a typed Restore lane.
 
-**Typed output via `PreceptValue`.** Field values read back from `Version` (via the indexer or `FieldAccess`) are `PreceptValue`. Convert via `ToClr<T>()` or `ToJson()`. `FiredArgs` carries submitted arg values for egress using the same `Get<T>()` pattern.
+**Dual-lane output.** The raw-lane indexer (`version["fieldName"]`) returns `JsonElement` — no Precept type dependency required. The typed lane uses `Get<T>()`, which materializes a CLR value via the registered `TypeRuntime<T>.ToClr`. `FiredArgs` carries submitted arg values for egress using the same `Get<T>()` pattern.
 
 ---
 
@@ -231,7 +231,7 @@ public sealed record Version
     public string? State { get; }                                    // null for stateless precepts
 
     // Field access
-    public PreceptValue this[string fieldName] { get; }             // throws on omitted field
+    public JsonElement this[string fieldName] { get; }              // throws on omitted field
     public T Get<T>(string fieldName);                              // typed access via TypeRuntime<T>
     public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }      // omit = absent from list
 
@@ -540,12 +540,14 @@ Event arg egress — appears on `EventOutcome` variants that carry submission co
 ```csharp
 public sealed class FiredArgs
 {
-    public PreceptValue this[string name] { get; }
+    public JsonElement this[string name] { get; }
     public T Get<T>(string name);
 }
 ```
 
-`Get<T>` uses the registered `TypeRuntime<T>.ToClr` for the conversion. The `PreceptValue` indexer returns the raw value for callers that want to inspect or serialize it directly.
+`Get<T>` uses the registered `TypeRuntime<T>.ToClr` for the conversion. The `JsonElement` indexer returns the raw value for callers that want to inspect or serialize it directly.
+
+`Get<string>()` is a universal overload that works for every type Precept supports — analogous to `.ToString()` in .NET. This includes all primitive and scalar types (`int`, `decimal`, `bool`, `string`, `DateTime`, and their Precept-mapped counterparts), all business-domain value types, and any other type registered with the runtime. No separate registered runtime entry is required; `string` is always a valid target. The canonical form for business-domain value types: `Quantity` → UCUM literal (e.g., `"5 kg"`); `Money` → ISO 4217 amount string (e.g., `"100.00 USD"`); `Price` → ratio string (e.g., `"2.50 USD/each"`); `ExchangeRate` → ratio string (e.g., `"1.08 USD/EUR"`); `Currency` → alpha code (e.g., `"USD"`). This applies equally on `Version.Get<string>()` and `FiredArgs.Get<string>()`.
 
 ### Correctness Invariant
 
