@@ -24,8 +24,8 @@ Faults (evaluator-level errors the type checker should have prevented) throw `Fa
 
 **OWNS**
 - The sealed result type hierarchies for commit operations: `EventOutcome` (7 variants) and `UpdateOutcome` (4 variants)
-- The inspection type family: `EventInspection`, `UpdateInspection`, `RowInspection`
-- Shared primitives: `FieldSnapshot`, `ConstraintResult`, `ArgInfo`
+- The inspection type family: `EventInspection`, `UpdateInspection`, `TransitionInspection`
+- Shared primitives: `FieldSnapshot`, `ConstraintResult`
 - The `Prospect` and `ConstraintStatus` enums and their propagation rules
 - The `Version` API surface (`Fire`, `Update`, `InspectFire`, `InspectUpdate`)
 
@@ -62,14 +62,16 @@ See `runtime-api.md` for the full two-lane ingress API surface (`Version.Fire`, 
 Sealed hierarchy. Callers pattern-match; any unhandled variant produces a compiler warning.
 
 ```csharp
-public abstract record EventOutcome;
-public sealed record Transitioned(Version Result, FiredArgs Args) : EventOutcome;
-public sealed record Applied(Version Result, FiredArgs Args) : EventOutcome;
-public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;
-public sealed record InvalidArgs(string Reason) : EventOutcome;
-public sealed record EventConstraintsFailed(IReadOnlyList<ConstraintViolation> Violations) : EventOutcome;
-public sealed record Unmatched() : EventOutcome;
-public sealed record UndefinedEvent() : EventOutcome;
+public abstract record EventOutcome
+{
+    public sealed record Transitioned(Version Result, FiredArgs Args) : EventOutcome;
+    public sealed record Applied(Version Result, FiredArgs Args) : EventOutcome;
+    public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;
+    public sealed record InvalidArgs(string Reason) : EventOutcome;
+    public sealed record ConstraintsFailed(ImmutableArray<ConstraintViolation> Violations) : EventOutcome;
+    public sealed record Unmatched() : EventOutcome;
+    public sealed record UndefinedEvent() : EventOutcome;
+}
 ```
 
 | Variant | Meaning | Pipeline stage | Stateless reachable? |
@@ -78,32 +80,34 @@ public sealed record UndefinedEvent() : EventOutcome;
 | `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted | Stage 10 commit | Yes |
 | `Rejected` | Authored `reject` row matched — business prohibition; `Args` carries what was submitted | Stage 4-5 (reject row) | Yes |
 | `InvalidArgs` | Arg validation failure — wrong type, unknown key | Stage 2 (arg validation) | Yes |
-| `EventConstraintsFailed` | Post-mutation constraints violated (rules, state ensures, event ensures) | Stage 9-10 | Yes |
+| `ConstraintsFailed` | Post-mutation constraints violated (rules, state ensures, event ensures) | Stage 9-10 | Yes |
 | `Unmatched` | All guards failed (including `when` precondition) — no row matched | Stage 4-5 | Yes |
 | `UndefinedEvent` | No transition rows or hooks for this event in current state | Stage 1 | Yes |
 
-**`Rejected` vs `InvalidArgs`:** `Rejected` is a business decision authored in the precept (`-> reject "reason"`). `InvalidArgs` is a caller error — the args don't match the event's declared contract. Parallel with UpdateOutcome's `InvalidInput`. DDD's "business rejection vs. invalid input" distinction.
+**`Rejected` vs `InvalidArgs`:** `Rejected` is a business decision authored in the precept (`-> reject "reason"`). `InvalidArgs` is a caller error — the args don't match the event's declared contract. Parallel with `UpdateOutcome.InvalidFields`. DDD's "business rejection vs. invalid input" distinction.
 
-**`EventConstraintsFailed` scope:** Covers ALL post-fire constraints: global rules, state ensures (`in`/`to`/`from`), AND event ensures. The `Event` prefix disambiguates from `UpdateConstraintsFailed`, not scope-limits to event-level constraints.
+**`EventOutcome.ConstraintsFailed` scope:** Covers ALL post-fire constraints: global rules, state ensures (`in`/`to`/`from`), AND event ensures. The containing DU (`EventOutcome`) identifies which operation produced the failure; no operation-type prefix is needed on the variant itself.
 
 ---
 
 ## UpdateOutcome
 
 ```csharp
-public abstract record UpdateOutcome;
-public sealed record FieldWriteCommitted(Version Result) : UpdateOutcome;
-public sealed record UpdateConstraintsFailed(IReadOnlyList<ConstraintViolation> Violations) : UpdateOutcome;
-public sealed record AccessDenied(string FieldName, FieldAccessMode ActualMode) : UpdateOutcome;
-public sealed record InvalidInput(string Reason) : UpdateOutcome;
+public abstract record UpdateOutcome
+{
+    public sealed record Updated(Version Result) : UpdateOutcome;
+    public sealed record ConstraintsFailed(ImmutableArray<ConstraintViolation> Violations) : UpdateOutcome;
+    public sealed record FieldNotEditable(string FieldName, FieldAccessMode ActualMode) : UpdateOutcome;
+    public sealed record InvalidFields(string Reason) : UpdateOutcome;
+}
 ```
 
 | Variant | Meaning | Pipeline stage |
 |---------|---------|----------------|
-| `FieldWriteCommitted` | Patch applied, constraints passed, new Version committed | Commit |
-| `UpdateConstraintsFailed` | Patch applied to working copy but constraints violated | Rule/ensure evaluation |
-| `AccessDenied` | Field is not `write`-accessible in current state | Access mode check |
-| `InvalidInput` | Type mismatch or structurally invalid patch | Type check |
+| `Updated` | Patch applied, constraints passed, new Version committed | Commit |
+| `ConstraintsFailed` | Patch applied to working copy but constraints violated | Rule/ensure evaluation |
+| `FieldNotEditable` | Field's declared access mode (`Readonly`) prevents direct editing in current state | Access mode check |
+| `InvalidFields` | Type mismatch or structurally invalid patch | Type check |
 
 ---
 
@@ -149,15 +153,16 @@ Where "Unknown" = the expression references an arg not yet provided.
 
 ```csharp
 public sealed record EventInspection(
-    string EventName,
     Prospect OverallProspect,
-    IReadOnlyList<ConstraintResult> EventEnsures,
-    IReadOnlyList<RowInspection> Rows);
+    ImmutableArray<TransitionInspection> Transitions,
+    ImmutableArray<ConstraintResult> EventEnsures,
+    ImmutableArray<FieldSnapshot> FieldSnapshots);
 ```
 
-- `OverallProspect` — reduced from Rows: if any row is `Certain` or `Possible`, the event is enabled.
-- `Rows` — empty list = undefined event (no rows/hooks for this event in current state).
-- `EventEnsures` — arg-scoped ensures, individually annotated.
+- `OverallProspect` — reduced from Transitions: if any transition is `Certain` or `Possible`, the event is enabled.
+- `Transitions` — empty list = undefined event (no rows/hooks for this event in current state).
+- `EventEnsures` — event-scoped ensures, individually annotated.
+- `FieldSnapshots` — current field values at the time of inspection.
 
 Returned by `Version.InspectFire(eventName, args?)`. Also nested inside `UpdateInspection.Events`.
 
@@ -165,10 +170,9 @@ Returned by `Version.InspectFire(eventName, args?)`. Also nested inside `UpdateI
 
 ```csharp
 public sealed record UpdateInspection(
-    IReadOnlyList<FieldSnapshot> Fields,
-    IReadOnlyList<ConstraintResult> Constraints,
-    IReadOnlyList<EventInspection> Events,
-    Version? HypotheticalResult);
+    ImmutableArray<FieldSnapshot> Fields,
+    ImmutableArray<ConstraintResult> Constraints,
+    ImmutableArray<EventInspection> Events);
 ```
 
 - `Fields` — ALL non-omitted fields with post-patch values and recomputed derived fields.
@@ -178,28 +182,18 @@ public sealed record UpdateInspection(
 
 Returned by `Version.InspectUpdate(fields?)`. When called with no patch, returns the landscape against current field values.
 
-### RowInspection
+### TransitionInspection
 
 ```csharp
-public sealed record RowInspection(
+public sealed record TransitionInspection(
     Prospect Prospect,
-    RowEffect Effect,
-    IReadOnlyList<FieldSnapshot> ResultingFields,
-    IReadOnlyList<ConstraintResult> Constraints,
-    Version? HypotheticalResult);
+    string? TargetState,
+    ImmutableArray<ConstraintResult> Constraints,
+    ImmutableArray<FieldSnapshot> PostFields);
 ```
 
-- `ResultingFields` — ALL non-omitted fields in the TARGET state, post-mutation + recomputation. Fields whose access mode changes upon transition reflect the target state's mode.
-- `HypotheticalResult` — non-null only when `Prospect == Certain` and the full pipeline resolves successfully.
-
-### Row Effects
-
-```csharp
-public abstract record RowEffect;
-public sealed record TransitionTo(string TargetState) : RowEffect;
-public sealed record NoTransition() : RowEffect;
-public sealed record Rejection(string Reason) : RowEffect;
-```
+- `PostFields` — ALL non-omitted fields in the target state, post-mutation + recomputation. Fields whose access mode changes upon transition reflect the target state's mode.
+- `TargetState` — the state this transition would enter; `null` for no-transition rows.
 
 ### Shared Primitives
 
@@ -209,19 +203,18 @@ public sealed record FieldSnapshot(
     FieldAccessMode Mode,
     string FieldType,
     bool IsResolved,
-    PreceptValue? Value);
+    JsonElement? Value,
+    Type ClrType);
 
 public sealed record ConstraintResult(
     ConstraintDescriptor Constraint,
     IReadOnlyList<string> FieldNames,
     ConstraintStatus Status);
-
-public sealed record ArgInfo(
-    string Name,
-    string Type);
 ```
 
-**`FieldSnapshot.IsResolved`:** `false` when the post-mutation value could not be computed because a required arg dependency is missing. `Value` is meaningless when `IsResolved = false`. Prevents ambiguity between genuinely-null optional fields (`IsResolved = true, Value = null`) and stuck assignments.
+**`FieldSnapshot.IsResolved`:** `false` when the post-mutation value could not be computed because a required arg dependency is missing. `Value` is `null` when `IsResolved == false` (unresolved computed field or structurally absent). Prevents ambiguity between genuinely-null optional fields (`IsResolved = true, Value` is a JSON null) and stuck assignments.
+
+**`FieldSnapshot.ClrType`:** The valid CLR type for `Get<T>()` on this field, precomputed from `FieldDescriptor.ClrType`. Carries the full constructed generic type for collection fields (e.g., `typeof(IReadOnlyList<long>)` for `list of integer`).
 
 **`ConstraintResult.Constraint`:** References the `ConstraintDescriptor` that was evaluated — callers can access kind, scope, anchor, guard, and `because` rationale through the descriptor. This is Tier 3 of the three-tier constraint exposure model (see `runtime-api.md` § Constraint Exposure Model).
 
@@ -240,10 +233,10 @@ public sealed record Version
 {
     public Precept Precept { get; }
     public string? State { get; }
-    public PreceptValue this[string fieldName] { get; }
+    public JsonElement this[string fieldName] { get; }
     public T Get<T>(string fieldName);
     public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }
-    public IReadOnlyList<string> AvailableEvents { get; }
+    public IReadOnlyList<EventDescriptor> AvailableEvents { get; }
     public IReadOnlyList<ArgDescriptor> RequiredArgs(string eventName);
     public IReadOnlyList<ConstraintDescriptor> ApplicableConstraints { get; }
 
@@ -262,13 +255,16 @@ public sealed record Version
     // Inspect — typed lane
     public EventInspection  InspectFire(string eventName, Action<IArgBuilder>? args = null);
     public UpdateInspection InspectUpdate(Action<IFieldBuilder>? fields = null);
+
+    // Persistence
+    public JsonElement ToJson();
 }
 
-public sealed record FieldAccessInfo(string FieldName, FieldAccessMode Mode, string FieldType, PreceptValue CurrentValue);
+public sealed record FieldAccessInfo(FieldDescriptor Field, FieldAccessMode Mode, JsonElement CurrentValue);
 public enum FieldAccessMode { Readonly, Editable }
 ```
 
-**Two lanes for commit and inspect:** Every operation has a JSON lane (`JsonElement?`) for wire callers and a typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) for in-process callers. There are no `IReadOnlyDictionary<string, object?>` overloads. **`Restore` is JSON-only** — no typed lane overload; callers use `Create` or `Fire` for in-process construction.
+**Two lanes for commit and inspect:** Every operation has a JSON lane (`JsonElement?`) for wire callers and a typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) for in-process callers. There are no `IReadOnlyDictionary<string, object?>` overloads. **`FromJson` is JSON-only** — no typed overload; restoration is a hydration path from persisted storage.
 
 **Four commit/inspect pairs, consistent naming:** Every commit verb (`Fire`, `Update`) has an `Inspect___` counterpart. Fire/Update require complete input and return one committed outcome. InspectFire/InspectUpdate accept optional partial input and return an annotated landscape.
 
@@ -360,17 +356,14 @@ Guard evaluation under partial args must use Kleene three-value logic. Compariso
 
 `src/Precept/Runtime/` — stub; not yet implemented. Expected types:
 
-- `EventOutcome.cs` — sealed record hierarchy
-- `UpdateOutcome.cs` — sealed record hierarchy
+- `EventOutcome.cs` — sealed record hierarchy (with nested variants)
+- `UpdateOutcome.cs` — sealed record hierarchy (with nested variants)
 - `EventInspection.cs` — inspection result type
 - `UpdateInspection.cs` — inspection result type
-- `RowInspection.cs` — row-level inspection
+- `TransitionInspection.cs` — transition-level inspection (replaces `RowInspection.cs`)
 - `FieldSnapshot.cs` — shared primitive
 - `ConstraintResult.cs` — shared primitive
-- `ArgInfo.cs` — shared primitive
 - `FiredArgs.cs` — event arg egress; appears on Transitioned, Applied, Rejected
-- `PreceptValue.cs` — unified value type at the API boundary
 - `Prospect.cs` — enum
 - `ConstraintStatus.cs` — enum
-- `RowEffect.cs` — discriminated union
 - `Version.cs` — runtime Version record

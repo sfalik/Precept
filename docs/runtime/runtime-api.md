@@ -17,7 +17,7 @@
 The runtime API is the boundary between Precept and host applications. It has four concerns:
 
 1. **Construction** — compile source → build executable model → create initial entity via `Create` / `InspectCreate`
-2. **Restoration** — reconstitute an entity from persisted data via `Restore` (validated, not trusted)
+2. **Restoration** — reconstitute an entity from persisted data via `FromJson` (hydration from storage, not validated business input)
 3. **Operations** — commit changes via `Fire` and `Update`
 4. **Inspection** — progressive evaluation via `InspectFire` and `InspectUpdate`
 
@@ -32,7 +32,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 **There are no `IReadOnlyDictionary<string, object?>` overloads anywhere.** That provisional convenience lane is fully obsolete and superseded by these two lanes.
 
-**Restore is JSON-only.** `Restore(string? state, JsonElement fields)` has no typed overload. Restore is a hydration path from persisted storage — storage always provides serialized data, so in-process callers never need a typed Restore lane.
+**Restoration is JSON-only.** `FromJson(JsonElement document)` has no typed overload. Restoration is a hydration path from persisted storage — storage always provides serialized data. Invalid inputs (mismatched precept name, malformed JSON, unknown fields) are programmer errors and throw `ArgumentException`.
 
 **Dual-lane output.** The raw-lane indexer (`version["fieldName"]`) returns `JsonElement` — no Precept type dependency required. The typed lane uses `Get<T>()`, which materializes a CLR value via the registered `TypeRuntime<T>.ToClr`. `FiredArgs` carries submitted arg values for egress using the same `Get<T>()` pattern.
 
@@ -40,15 +40,15 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 ## Responsibilities and Boundaries
 
-**OWNS:** Public API surface (`Precept` and `Version`); executable model lifecycle (construction from `Compilation`, validation); entity construction (`Create`, `InspectCreate`); entity restoration (`Restore`); operation dispatch (`Fire`, `Update`); inspection surface (`InspectFire`, `InspectUpdate`); definition-level structural queries (`States`, `Fields`, `Events`, `Constraints`); constraint exposure model (all three tiers); field access surface (`FieldAccess`, `AvailableEvents`, `RequiredArgs`, `ApplicableConstraints`).
+**OWNS:** Public API surface (`Precept` and `Version`); executable model lifecycle (construction from `Compilation`, validation); entity construction (`Create`, `InspectCreate`); entity restoration (`FromJson`); operation dispatch (`Fire`, `Update`); inspection surface (`InspectFire`, `InspectUpdate`); definition-level structural queries (`States`, `Fields`, `Events`, `Constraints`); constraint exposure model (all three tiers); field access surface (`FieldAccess`, `AvailableEvents`, `RequiredArgs`, `ApplicableConstraints`).
 
-**Does NOT OWN:** Compilation (owned by the compiler pipeline); evaluation logic (owned by the `Evaluator`); executable model internals / dispatch table layouts (pending D8/R4); result type definitions (`EventOutcome.cs`, `UpdateOutcome.cs`, `RestoreOutcome.cs`); descriptor type definitions (`Descriptors.cs`); fault system (`FaultException` and fault site taxonomy).
+**Does NOT OWN:** Compilation (owned by the compiler pipeline); evaluation logic (owned by the `Evaluator`); executable model internals / dispatch table layouts (pending D8/R4); result type definitions (`EventOutcome.cs`, `UpdateOutcome.cs`); descriptor type definitions (`Descriptors.cs`); fault system (`FaultException` and fault site taxonomy).
 
 ---
 
 ## Right-Sizing
 
-The runtime API surface is deliberately minimal: two types (`Precept` and `Version`), four commit operations (`Create`, `Restore`, `Fire`, `Update`), and parallel inspection variants (`InspectCreate`, `InspectFire`, `InspectUpdate`). Definition-level queries are precomputed structural reads — zero evaluation cost. The boundary between `Precept` and `Version` is clean: `Precept` carries everything definition-scoped; `Version` carries everything instance-scoped. Internal evaluation complexity lives entirely in the `Evaluator` behind `Version`'s thin facade.
+The runtime API surface is deliberately minimal: two types (`Precept` and `Version`), four operations (`Create`, `FromJson`, `Fire`, `Update`), and parallel inspection variants (`InspectCreate`, `InspectFire`, `InspectUpdate`). Definition-level queries are precomputed structural reads — zero evaluation cost. The boundary between `Precept` and `Version` is clean: `Precept` carries everything definition-scoped; `Version` carries everything instance-scoped. Internal evaluation complexity lives entirely in the `Evaluator` behind `Version`'s thin facade.
 
 ---
 
@@ -56,7 +56,7 @@ The runtime API surface is deliberately minimal: two types (`Precept` and `Versi
 
 **Inputs:**
 - `Compilation` → `Precept.From()` — the compiled artifact; must be error-free
-- `state`, `fields` → `Precept.Restore()` — persisted entity state for validated reconstruction (`JsonElement` only)
+- `document` → `Precept.FromJson()` — full persistence envelope for entity hydration (`JsonElement` only)
 - `args` → `Precept.Create()` / `Version.Fire()` — event arguments; `JsonElement?` (JSON lane) or `Action<IArgBuilder>?` (typed lane)
 - `fields` → `Version.Update()` — field patch; `JsonElement?` (JSON lane) or `Action<IFieldBuilder>?` (typed lane), applied atomically
 - `eventName`, `args?` → `Version.InspectFire()` — event name with optional arg refinement; both lanes
@@ -64,8 +64,8 @@ The runtime API surface is deliberately minimal: two types (`Precept` and `Versi
 
 **Outputs:**
 - `Precept` — the executable model; returned from `Precept.From()`
+- `Version` — the hydrated entity snapshot; returned from `Precept.FromJson()`
 - `EventOutcome` (7 variants) — returned from `Create`, `Fire`; see `result-types.md`
-- `RestoreOutcome` (3 variants) — returned from `Restore`; see `result-types.md`
 - `UpdateOutcome` (4 variants) — returned from `Update`; see `result-types.md`
 - `EventInspection` — returned from `InspectCreate`, `InspectFire`; full annotated landscape
 - `UpdateInspection` — returned from `InspectUpdate`; annotated landscape with event prospects
@@ -104,13 +104,13 @@ EventOutcome outcome = precept.Create(
 
 Version version = outcome switch
 {
-    Transitioned t            => t.Result,     // initial event transitioned to another state
-    Applied a                 => a.Result,     // stayed in initial state
-    Rejected r                => throw new BusinessException(r.Reason),
-    InvalidArgs e             => throw new ArgumentException(e.Reason),
-    EventConstraintsFailed f  => HandleViolations(f.Violations),
-    Unmatched                 => HandleNoMatch(),
-    UndefinedEvent            => throw new InvalidOperationException(),  // compiler prevents this
+    EventOutcome.Transitioned t           => t.Result,     // initial event transitioned to another state
+    EventOutcome.Applied a                => a.Result,     // stayed in initial state
+    EventOutcome.Rejected r               => throw new BusinessException(r.Reason),
+    EventOutcome.InvalidArgs e            => throw new ArgumentException(e.Reason),
+    EventOutcome.ConstraintsFailed f      => HandleViolations(f.Violations),
+    EventOutcome.Unmatched                => HandleNoMatch(),
+    EventOutcome.UndefinedEvent           => throw new InvalidOperationException(),  // compiler prevents this
 };
 
 // Precepts WITHOUT an initial event — all fields have defaults
@@ -149,13 +149,13 @@ public sealed class Precept
     public EventOutcome Create(Action<IArgBuilder>? args = null);
     public EventInspection InspectCreate(Action<IArgBuilder>? args = null);
 
-    // Entity restoration — JSON only (no typed overload for Restore)
-    public RestoreOutcome Restore(string? state, JsonElement fields);
+    // Entity restoration — JSON only (no typed overload for FromJson)
+    public Version FromJson(JsonElement document);
 
     // Definition-level queries (structural — precomputed from graph analysis)
     public IReadOnlyList<string> States { get; }
-    public IReadOnlyList<string> Fields { get; }
-    public IReadOnlyList<string> Events { get; }
+    public IReadOnlyList<FieldDescriptor> Fields { get; }
+    public IReadOnlyList<EventDescriptor> Events { get; }
     public string? InitialState { get; }
     public string? InitialEvent { get; }             // null = no initial event, args optional
     public bool IsStateless { get; }
@@ -179,41 +179,32 @@ public sealed class Precept
 ## Restoration
 
 ```csharp
-RestoreOutcome outcome = precept.Restore(
-    state: "Approved",
-    fields: JsonDocument.Parse("""{"Amount":500.00,"ApplicantName":"Jane Doe","CreditScore":720}""").RootElement);
+// Hydration from persisted storage — returns Version directly
+Version version = precept.FromJson(document);
 
-Version version = outcome switch
-{
-    Restored r                    => r.Result,
-    RestoreConstraintsFailed f    => HandleMigrationNeeded(f.Violations),
-    RestoreInvalidInput e         => HandleSchemaMismatch(e.Reason),
-};
+// Persistence — produce the storage envelope
+JsonElement document = version.ToJson();
 ```
 
-`Restore` is validated reconstruction from persisted data. It is a distinct pipeline entry — not Fire-without-event, not Update-without-access-checks.
+`FromJson` is hydration from persisted storage. It is not a validated business operation — it is the inverse of `ToJson()`, forming a round-trip contract. No constraint validation occurs.
 
-**Pipeline stages:**
+**Document envelope:** The input must be a JSON object containing:
+- `$precept` (string, required) — must match `precept.Name` exactly (case-sensitive)
+- `fields` (object, required) — field values keyed by field name
+- `$state` (string, optional) — the state name; absent or `null` for stateless precepts
 
-| Stage | Fire | Update | Restore |
-|-------|------|--------|---------|
-| Row matching / guards | ✅ | — | — |
-| Apply mutations / patches | ✅ | ✅ | ✅ (all fields from storage) |
-| Set state | via `transition` | — | from caller |
-| Access mode checks | N/A | ✅ | — (bypassed) |
-| Recompute computed fields | ✅ | ✅ | ✅ |
-| Evaluate constraints | ✅ | ✅ | ✅ |
+Unknown `$`-prefixed properties (e.g., `$version`, `$timestamp`) are silently ignored — this enables forward-compatible storage schemas.
 
-Access modes are bypassed because persisted fields were written when the entity was in prior states — a field that is `readonly` in `Approved` was `editable` when the entity was in `Draft`. Restore accepts all stored fields regardless of the restored state's access declarations.
+**Throws `ArgumentException` on programmer errors:**
+- `$precept` does not match the precept name
+- `$state` names an unknown state
+- Required fields are missing or have invalid types
 
-**Return type:** `RestoreOutcome` — three variants:
-- `Restored(Version)` — data valid, constraints passed.
-- `RestoreConstraintsFailed(Violations)` — constraints violated against current definition.
-- `RestoreInvalidInput(Reason)` — structural mismatch (undefined state, unknown fields, type mismatch).
+**Why no constraint validation:** Restoration is not a business transaction. Data was committed when it satisfied the rules in effect at that time. The definition may have evolved since — constraint validation on restore would block all existing data on every schema change, making evolution impossible. Callers who need to validate restored state should call `version.InspectFire` or `version.InspectUpdate` after restoration.
 
-**Why validated, not trusted:** Restoring an entity in an invalid state is not allowed. The data must satisfy the current definition's constraints. If the definition changed since the data was stored, the correct response is migration (future design), not silent acceptance of invalid data.
+**Access modes are bypassed.** Fields that are `readonly` in the restored state were `editable` when previously written. `FromJson` accepts all stored fields regardless of the current state's access declarations.
 
-**Future:** Migration logic will run before the validation pipeline — transforming persisted data to conform to the current definition before constraints are evaluated.
+**Round-trip contract:** `precept.FromJson(version.ToJson())` must produce a semantically identical `Version` (same state, same field values). The runtime guarantees this for documents it produced — callers must not modify the envelope between `ToJson()` and `FromJson()`.
 
 ---
 
@@ -236,7 +227,7 @@ public sealed record Version
     public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }      // omit = absent from list
 
     // Structural queries (precomputed — zero evaluation cost)
-    public IReadOnlyList<string> AvailableEvents { get; }           // events with rows in current state
+    public IReadOnlyList<EventDescriptor> AvailableEvents { get; }           // events with rows in current state
     public IReadOnlyList<ArgDescriptor> RequiredArgs(string eventName); // typed arg descriptors per arg
 
     // Applicable constraints (Tier 2 — filtered for current state)
@@ -292,13 +283,13 @@ EventOutcome outcome = version.Fire("submit",
 
 Version next = outcome switch
 {
-    Transitioned t => t.Result,     // state changed
-    Applied a      => a.Result,     // stateless or no-transition success
-    Rejected r     => throw new BusinessException(r.Reason),
-    InvalidArgs e  => throw new ArgumentException(e.Reason),
-    EventConstraintsFailed f => HandleViolations(f.Violations),
-    Unmatched      => HandleNoMatch(),
-    UndefinedEvent => HandleUnknownEvent(),
+    EventOutcome.Transitioned t           => t.Result,
+    EventOutcome.Applied a                => a.Result,
+    EventOutcome.Rejected r               => throw new BusinessException(r.Reason),
+    EventOutcome.InvalidArgs e            => throw new ArgumentException(e.Reason),
+    EventOutcome.ConstraintsFailed f      => HandleViolations(f.Violations),
+    EventOutcome.Unmatched                => HandleNoMatch(),
+    EventOutcome.UndefinedEvent           => HandleUnknownEvent(),
 };
 ```
 
@@ -318,10 +309,10 @@ UpdateOutcome outcome = version.Update(
 
 Version next = outcome switch
 {
-    FieldWriteCommitted c       => c.Result,
-    UpdateConstraintsFailed f   => HandleViolations(f.Violations),
-    AccessDenied d              => HandleDenied(d.FieldName, d.ActualMode),
-    InvalidInput e              => throw new ArgumentException(e.Reason),
+    UpdateOutcome.Updated c             => c.Result,
+    UpdateOutcome.ConstraintsFailed f   => HandleViolations(f.Violations),
+    UpdateOutcome.FieldNotEditable d    => HandleDenied(d.FieldName, d.ActualMode),
+    UpdateOutcome.InvalidFields e       => throw new ArgumentException(e.Reason),
 };
 ```
 
@@ -375,7 +366,7 @@ public sealed record ConstraintResult(
     ConstraintStatus Status);
 ```
 
-Appears in `EventInspection.EventEnsures`, `RowInspection.Constraints`, and `UpdateInspection.Constraints`. References the descriptor and carries evaluation status: `Satisfied`, `Violated`, or `Unresolvable`.
+Appears in `EventInspection.EventEnsures`, `TransitionInspection.Constraints`, and `UpdateInspection.Constraints`. References the descriptor and carries evaluation status: `Satisfied`, `Violated`, or `Unresolvable`.
 
 > **Provisional (G1/G9):** `FieldNames` is a flat string list. The prototype carries a typed target hierarchy (field, event-arg, event, state, definition) for rich UI attribution. When metadata descriptors (D8/R4) are defined, this will become a typed target list that distinguishes WHERE a violation lands.
 
@@ -384,20 +375,20 @@ Appears in `EventInspection.EventEnsures`, `RowInspection.Constraints`, and `Upd
 ```csharp
 public sealed record ConstraintViolation(
     ConstraintDescriptor Constraint,
-    string? BecauseClause,                        // From the constraint's because clause
-    ImmutableArray<FieldSnapshot> RelevantFields,  // Field values at evaluation time
-    string? FailingSubexpression,                  // Innermost expression that evaluated false
-    PreceptValue? FailingValue                     // Value at the failure site
+    string? Because,                              // From the constraint's because clause
+    ImmutableArray<FieldSnapshot> RelevantFields, // Field values at evaluation time
+    string? FailingSubexpression,                 // Innermost expression that evaluated false
+    JsonElement? FailingValue                     // Value at the failure site
 );
 ```
 
 - `Constraint` — the descriptor of the rule that was violated
-- `BecauseClause` — the `because "..."` text from the constraint declaration, if present
+- `Because` — the `because "..."` text from the constraint declaration, if present
 - `RelevantFields` — snapshots of field values at the time of evaluation (for diagnostic context)
 - `FailingSubexpression` — the innermost subexpression text that evaluated to false
-- `FailingValue` — the `PreceptValue` at the failure site (e.g., the computed value that violated the bound)
+- `FailingValue` — the `JsonElement` at the failure site (e.g., the computed value that violated the bound)
 
-Appears in `EventConstraintsFailed.Violations` and `UpdateConstraintsFailed.Violations`. Only produced for constraints that are definitively violated (not unresolvable — commit operations have complete data).
+Appears in `EventOutcome.ConstraintsFailed.Violations` and `UpdateOutcome.ConstraintsFailed.Violations`. Only produced for constraints that are definitively violated (not unresolvable — commit operations have complete data).
 
 > **Provisional (Shane ruling 2026-05-04):** Shape promoted from minimal 2-field form to the canonical 5-field design. Field population (especially `FailingSubexpression` and `FailingValue`) depends on evaluator instrumentation; all fields nullable/defaultable for fields not yet wired. `FieldNames` dropped — superseded by typed `ImmutableArray<FieldSnapshot>`.
 
@@ -412,7 +403,7 @@ Appears in `EventConstraintsFailed.Violations` and `UpdateConstraintsFailed.Viol
 | State S | `from S ensure` (exit truth — will be checked on transition out) |
 | State S | `on E ensure` for every event E with rows in state S |
 
-`to <State> ensure` constraints are NOT included in `ApplicableConstraints` for the target state — they are transitional, only surfacing in Tier 3 during inspect/fire when the target state is known from row matching. They appear in `RowInspection.Constraints` for rows that transition into that state. This is the correct boundary: Tier 2 is "what must hold in my current state"; Tier 3 is "what was actually evaluated for this specific operation" (which includes to-ensures once a target is resolved).
+`to <State> ensure` constraints are NOT included in `ApplicableConstraints` for the target state — they are transitional, only surfacing in Tier 3 during inspect/fire when the target state is known from row matching. They appear in `TransitionInspection.Constraints` for rows that transition into that state. This is the correct boundary: Tier 2 is "what must hold in my current state"; Tier 3 is "what was actually evaluated for this specific operation" (which includes to-ensures once a target is resolved).
 
 For stateless precepts, `ApplicableConstraints` includes all global rules and all event ensures.
 
@@ -422,10 +413,9 @@ For stateless precepts, `ApplicableConstraints` includes all global rules and al
 
 ```csharp
 public sealed record FieldAccessInfo(
-    string FieldName,
+    FieldDescriptor Field,
     FieldAccessMode Mode,       // Readonly or Editable
-    string FieldType,
-    PreceptValue CurrentValue);
+    JsonElement CurrentValue);
 
 public enum FieldAccessMode { Readonly, Editable }
 ```
@@ -540,12 +530,18 @@ Event arg egress — appears on `EventOutcome` variants that carry submission co
 ```csharp
 public sealed class FiredArgs
 {
+    public static FiredArgs Empty { get; }         // canonical empty instance for no-arg events
     public JsonElement this[string name] { get; }
     public T Get<T>(string name);
+    public bool TryGet<T>(string name, out T value); // returns false when optional arg was not provided
 }
 ```
 
 `Get<T>` uses the registered `TypeRuntime<T>.ToClr` for the conversion. The `JsonElement` indexer returns the raw value for callers that want to inspect or serialize it directly.
+
+`TryGet<T>` is available on `FiredArgs` only (not on `Version`). It returns `false` when an optional arg was not provided by the caller — it does NOT swallow type errors. Mismatched `T` still throws `InvalidOperationException`. Fields are either resolved or omitted; `TryGet` is only meaningful for optional args that may or may not have been included.
+
+`FiredArgs.Empty` is the canonical instance for events with no arguments.
 
 `Get<string>()` is a universal overload that works for every type Precept supports — analogous to `.ToString()` in .NET. This includes all primitive and scalar types (`int`, `decimal`, `bool`, `string`, `DateTime`, and their Precept-mapped counterparts), all business-domain value types, and any other type registered with the runtime. No separate registered runtime entry is required; `string` is always a valid target. The canonical form for business-domain value types: `Quantity` → UCUM literal (e.g., `"5 kg"`); `Money` → ISO 4217 amount string (e.g., `"100.00 USD"`); `Price` → ratio string (e.g., `"2.50 USD/each"`); `ExchangeRate` → ratio string (e.g., `"1.08 USD/EUR"`); `Currency` → alpha code (e.g., `"USD"`). This applies equally on `Version.Get<string>()` and `FiredArgs.Get<string>()`.
 
@@ -615,6 +611,97 @@ Returns all non-omitted fields with post-patch values, constraint results, and f
 
 ---
 
+## Typed Lane
+
+The typed lane — `Version.Get<T>(string fieldName)` and `FiredArgs.Get<T>(string name)` — provides strongly-typed field and arg access without boxing. It is the preferred access path for in-process callers.
+
+### Get\<T\>() Mechanics
+
+```csharp
+// Version field access
+decimal amount = version.Get<decimal>("Amount");
+string state = version.Get<string>("Status");   // universal overload — works for every type
+
+// FiredArgs access on outcome variants
+EventOutcome.Transitioned t = ...;
+string reviewer = t.Args.Get<string>("Reviewer");
+bool wasApproved = t.Args.Get<bool>("Approved");
+
+// Optional arg with TryGet (FiredArgs only)
+if (t.Args.TryGet<string>("Comment", out var comment))
+    Console.WriteLine($"Reviewer comment: {comment}");
+```
+
+Resolution uses the registered `TypeRuntime<T>` for the field's type — zero boxing for primitives. `Get<string>()` is a universal overload that works for every Precept-supported type; it formats to the canonical string representation.
+
+`TryGet<T>` is available on `FiredArgs` only. It returns `false` when an optional arg was not provided. It does NOT swallow type errors — mismatched `T` still throws.
+
+### Valid CLR Types
+
+`T` must be a type from this closed set:
+
+| Precept type | Valid `T` |
+|---|---|
+| `integer` | `long` |
+| `decimal` | `decimal` |
+| `number` | `double` |
+| `string`, `text` | `string` |
+| `boolean` | `bool` |
+| `date` | `DateOnly` |
+| `time` | `TimeOnly` |
+| `instant` | `DateTimeOffset` |
+| `duration` | `Duration` (NodaTime) |
+| `choice` | `string` |
+| `money` | `Money` |
+| `currency` | `Currency` |
+| `quantity` | `Quantity` |
+| `unitofmeasure` | `UnitOfMeasure` |
+| `dimension` | `MeasureDimension` |
+| `price` | `Price` |
+| `exchangerate` | `ExchangeRate` |
+| `stateref` | `string` |
+| `list of T` (single-type collection) | `IReadOnlyList<TElement>` |
+| `list of T keyed by K` (keyed collection) | `IReadOnlyList<KeyedElement<TValue, TKey>>` |
+| `map K to T` (lookup collection) | `IReadOnlyDictionary<TKey, TValue>` |
+
+**`Get<string>()`** is universally valid for every type. No separate registration required.
+
+**`KeyedElement<TValue, TKey>`** is a public `readonly record struct` in `namespace Precept.Types`:
+
+```csharp
+namespace Precept.Types;
+public readonly record struct KeyedElement<TValue, TKey>(TKey Key, TValue Value);
+```
+
+**Throws on invalid `T`:** Requesting a `T` not in the valid set for the field's declared type throws `InvalidOperationException` with a descriptive message identifying the field name, declared type, and requested `T`. The runtime uses `FieldDescriptor.ClrType` and `ArgDescriptor.ClrType` (precomputed at Precept Builder time) to validate at the call boundary.
+
+---
+
+## CLR Type Discovery
+
+To discover the valid `T` for `Get<T>()` without calling the method, inspect `ClrType` on the descriptor:
+
+```csharp
+// From the Precept definition
+foreach (FieldDescriptor fd in precept.Fields)
+    Console.WriteLine($"{fd.Name}: {fd.ClrType.Name}");
+
+// From a specific arg
+IReadOnlyList<ArgDescriptor> args = version.RequiredArgs("Submit");
+foreach (ArgDescriptor ad in args)
+    Console.WriteLine($"{ad.Name}: {ad.ClrType.Name}");
+```
+
+`FieldDescriptor.ClrType` and `ArgDescriptor.ClrType` are `System.Type` instances computed at Precept Builder time. For collection-typed fields, `ClrType` is the full constructed generic type (e.g., `typeof(IReadOnlyList<long>)` for `list of integer`).
+
+| Discovery surface | What it tells you |
+|---|---|
+| `FieldDescriptor.ClrType` | Valid `T` for `version.Get<T>(fieldName)` |
+| `ArgDescriptor.ClrType` | Valid `T` for `firedArgs.Get<T>(argName)` |
+| `FieldSnapshot.ClrType` | Valid `T` when iterating inspection results |
+
+---
+
 ## Design Rationale and Decisions
 
 The two-type surface (`Precept` + `Version`) is the foundational architectural decision. `Precept` is a definition-level artifact — immutable, shareable, one-per-definition. `Version` is an instance-level snapshot — immutable, one-per-operation-result. This clean split maps naturally to how host applications manage entity lifecycle: load a precept once, restore or create entity instances as needed, treat every operation result as a new snapshot.
@@ -661,10 +748,10 @@ How does `CreateInitialVersion` work for stateless precepts? No initial state, n
 
 - **No `IReadOnlyDictionary<string, object?>` overloads.** Fully obsolete. The two-lane ingress (JSON + typed) covers all callers. No dictionary-based convenience extensions exist or will be added.
 - **No fault type definitions.** `FaultException` and fault site taxonomy are in `fault-system.md`. The runtime API surface only produces structured outcomes — faults are the exceptional escape hatch for impossible-path bugs, not part of the normal outcome model.
-- **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
+- **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.
 - **No build-time analysis.** Graph analysis, type checking, and compilation are owned by the compiler pipeline. `Precept.From()` accepts only an error-free `Compilation` — it does not re-analyze.
-- **No migration logic.** Future work. `Restore` validates against the current definition; if the definition changed since data was stored, migration is the caller's responsibility until the migration pipeline is designed.
+- **No migration logic.** Future work. `FromJson` bypasses constraint validation; if the definition changed since data was stored, migration is the caller's responsibility until the migration pipeline is designed.
 
 ---
 
@@ -673,7 +760,7 @@ How does `CreateInitialVersion` work for stateless precepts? No initial state, n
 | Topic | Document |
 |---|---|
 | Compiler and runtime architectural decisions (R1–R5, D8) | `docs/compiler-and-runtime-design.md` |
-| Full result type taxonomy (`EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, inspection types) | `docs/runtime/result-types.md` |
+| Full result type taxonomy (`EventOutcome`, `UpdateOutcome`, inspection types) | `docs/runtime/result-types.md` |
 | Fault system and `FaultException` taxonomy | `docs/runtime/fault-system.md` |
 | Evaluator — plan execution and pipeline mechanics | `docs/runtime/evaluator.md` |
 | Descriptor types used in outcomes and inspections | `docs/runtime/descriptor-types.md` |
@@ -685,5 +772,5 @@ How does `CreateInitialVersion` work for stateless precepts? No initial state, n
 
 | File | Purpose |
 |---|---|
-| `src/Precept/Runtime/Precept.cs` | Executable model — `Precept.From()`, `Create`, `InspectCreate`, `Restore`, definition-level queries |
+| `src/Precept/Runtime/Precept.cs` | Executable model — `Precept.From()`, `Create`, `InspectCreate`, `FromJson`, definition-level queries |
 | `src/Precept/Runtime/Version.cs` | Entity snapshot — `Fire`, `Update`, `InspectFire`, `InspectUpdate`, field access, structural queries |

@@ -8,7 +8,7 @@
 | Implementation state | Stub — error guard implemented; transformation logic not implemented; `Precept.From` throws `NotImplementedException` after `HasErrors` check |
 | Source | `src/Precept/Runtime/Precept.cs` (`Precept.From` factory), `src/Precept/Runtime/PreceptBuilder.cs` (builder implementation — planned) |
 | Upstream | `Compilation` (when `!HasErrors`) — carries `SemanticIndex`, `StateGraph`, `ProofLedger` |
-| Downstream | All runtime operations (Create, Fire, Update, Restore, Inspect), LS preview, MCP runtime tools |
+| Downstream | All runtime operations (Create, Fire, Update, Inspect), LS preview, MCP runtime tools |
 
 ---
 
@@ -113,9 +113,7 @@ public sealed record Compilation(
 }
 ```
 
-> **Open Question:** `Compilation.Tokens` field
-> The builder-facing `Compilation` shape currently omits the token stream even though the language server's lexical semantic-token pass still depends on it. The compile aggregate needs one sanctioned access path for tokens so tooling does not invent a side channel.
-> *Flagged: 2026-05-04*
+**`Compilation.Tokens` field:** The builder-facing `Compilation` shape currently omits the token stream, though the language server's lexical semantic-token pass depends on it. The compile aggregate needs one sanctioned access path for tokens so tooling does not invent a side channel. This is a pending implementation decision.
 
 The builder reads all three analysis artifacts:
 
@@ -248,7 +246,7 @@ Build descriptor tables from `SemanticIndex` typed declarations:
 The input `TypedField` shape is defined canonically in `type-checker.md` §7.1. Key fields for the builder:
 
 ```csharp
-// Output: FieldDescriptor with assigned SlotIndex
+// Output: FieldDescriptor with assigned SlotIndex and ClrType
 public sealed record FieldDescriptor(
     string Name,
     TypeKind Type,
@@ -256,11 +254,14 @@ public sealed record FieldDescriptor(
     ImmutableArray<ModifierKind> Modifiers,
     bool IsComputed,
     bool IsOptional,
-    SourceSpan Source
+    SourceSpan Source,
+    Type ClrType                                // resolved at build time; IReadOnlyList<T> for collection-typed fields
 );
 ```
 
-> **Open Question (unresolved):** `FieldDescriptor` needs an `AccessModes` property (per evaluator.md §7.5). What is the exact shape? `ImmutableDictionary<StateDescriptor?, AccessMode>` or `ImmutableArray<(StateDescriptor?, AccessMode)>`? Which pass builds it?
+`ClrType` is resolved from `TypeMeta.ClrType` (the base element type) plus collection wrapping for collection-typed fields. This is the valid `T` for `version.Get<T>(fieldName)`. For `list of integer`, `ClrType` is `typeof(IReadOnlyList<long>)`.
+
+**`AccessModes` property:** `FieldDescriptor` needs an `AccessModes` property for per-state access-mode lookup (per evaluator.md §7.5). The exact shape (`ImmutableDictionary<StateDescriptor?, AccessMode>` vs. `ImmutableArray<(StateDescriptor?, AccessMode)>`) is a pending implementation decision.
 
 Slot indexes are assigned during this pass: fields receive sequential `SlotIndex` values in declaration order, starting at 0. Computed fields get slots too — their values are recalculated by the evaluator on each transition.
 
@@ -291,7 +292,8 @@ public sealed record ArgDescriptor(
     string Name,
     TypeKind Type,
     bool IsOptional,
-    int SlotIndex
+    int SlotIndex,
+    Type ClrType                                // resolved at build time — valid T for FiredArgs.Get<T>()
 );
 ```
 
@@ -421,9 +423,7 @@ public sealed record ActionPlan(
 public enum TransitionOutcome { Transition, NoTransition, Reject }
 ```
 
-> **Open Question:** `ExecutionRow.RejectReason` storage
-> `TransitionOutcome.Reject` rows can carry an authored `because` message, but `ExecutionRow` currently has nowhere to store that reason after lowering. The builder contract needs one canonical home for reject-row rationale before the evaluator can return authored rejection text without re-reading source.
-> *Flagged: 2026-05-04*
+**`ExecutionRow.RejectReason` storage:** `TransitionOutcome.Reject` rows carry an authored `because` message. `ExecutionRow` needs a canonical home for reject-row rationale so the evaluator can return authored rejection text without re-reading source. This is a pending implementation decision.
 
 **Catalog-driven compilation:** The expression compiler reads `Operations.GetMeta(kind)`, `Functions.GetMeta(kind)`, and `Types.GetAccessor(type, name)` to emit the correct opcodes. It does not hardcode per-operation behavior — it dispatches on catalog entries. When emitting `BinaryOp` or `UnaryOp`, the builder resolves the `OperationMeta`, fetches the executor delegate from the corresponding `TypeRuntimeMeta.BinaryExecutors[localIndex]` (or `UnaryExecutors`), and embeds it directly in the opcode record. The evaluator never indexes `TypeRuntimeMeta` arrays — the delegate is already embedded.
 
@@ -445,7 +445,7 @@ public sealed record ConstraintDescriptor(
     StateDescriptor? StateAnchor,      // null for global constraints
     EventDescriptor? EventAnchor,      // null for non-event constraints
     ExecutionPlan Expression,          // compiled expression (from Pass 4)
-    string? BecauseClause,
+    string? Because,
     SourceSpan Source
 );
 ```
@@ -476,9 +476,7 @@ public sealed record FaultSiteDescriptor(
 );
 ```
 
-> **Open Question:** `FaultSiteDescriptor` planting mechanism
-> The builder says it plants `FaultSiteDescriptor` backstops, but neither `ExecutionRow` nor `ConstraintDescriptor` exposes a placement slot and `Precept.FaultBackstops` is only a flat array. The lowering contract needs one concrete planting mechanism so evaluator fault routing is structural rather than implicit.
-> *Flagged: 2026-05-04*
+**`FaultSiteDescriptor` planting mechanism:** The builder plants `FaultSiteDescriptor` backstops, but the exact planting mechanism (placement slot on `ExecutionRow`, on `ConstraintDescriptor`, or in `Precept.FaultBackstops` flat array) is a pending implementation decision. The evaluator fault routing must be structural rather than implicit.
 
 Fault backstops are defense-in-depth. A correctly-proven program never reaches them at runtime. When reached, they fire the `FaultCode`'s runtime behavior (log + graceful failure) via `Faults.Create(descriptor, context)`.
 
@@ -627,9 +625,7 @@ If `Precept.From` throws:
 - `ToState` buckets contain only `ConstraintKind.StateEntry` constraints
 - `OnEvent` buckets contain only `ConstraintKind.EventPrecondition` constraints
 
-> **Open Question:** `ConstraintDescriptor` bucket routing
-> The constraint-plan pass routes constraints into five anchor buckets, but catalog-system.md still documents only four `ConstraintMeta` shapes. The builder and catalog docs need one canonical subtype story so anchor routing is metadata-driven instead of relying on undocumented special cases.
-> *Flagged: 2026-05-04*
+**Constraint bucket routing:** The constraint-plan pass routes constraints into five anchor buckets driven by `ConstraintMeta` DU subtypes. The catalog system documents the five constraint meta shapes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) and the builder pattern-matches on them for routing. If catalog-system.md and the builder routing ever diverge, the catalog is the source of truth.
 
 ### Stateless Precept Handling
 
@@ -764,7 +760,7 @@ This enables causal reasoning about constraint satisfaction without re-analyzing
 
 ---
 
-## 13. Open Questions / Implementation Notes
+## 13. Implementation Notes
 
 ### Implementation Status
 
@@ -778,7 +774,7 @@ This enables causal reasoning about constraint satisfaction without re-analyzing
 
 ### Resolved Questions
 
-5. **Slot layout algorithm:** Field declaration order → slot index. Computed fields get slots. This is resolved — declaration order provides predictable, debuggable slot assignment.
+5. **Slot layout algorithm:** Field declaration order → slot index. Computed fields get slots. Declaration order provides predictable, debuggable slot assignment.
 
 6. **ConstraintInfluenceMap ownership:** Built by the Precept Builder from `ProofLedger.ConstraintInfluenceEntries`. The proof engine computes the raw edges; the builder reshapes them into the query index.
 
@@ -786,11 +782,11 @@ This enables causal reasoning about constraint satisfaction without re-analyzing
 
 ### Pending Design Decisions
 
-> **Open Question (unresolved):** Should the builder expose `ModelContribution` metadata on `ConstructMeta` to make the assembly loop fully generic? Currently implicit — the builder "knows" that `FieldDeclaration` adds a field and `TransitionRow` adds a transition. This knowledge is trivially catalogable, but the value is marginal for ~12 constructs.
+8. **`ModelContribution` metadata on `ConstructMeta`:** Should the builder expose this to make the assembly loop fully generic? Currently implicit — the builder "knows" that `FieldDeclaration` adds a field and `TransitionRow` adds a transition. This knowledge is trivially catalogable, but the value is marginal for ~12 constructs.
 
-> **Open Question (unresolved):** Expression compilation currently targets a stack-based VM. Should register-based allocation be considered for performance-critical paths? Stack machines are simpler but register allocation can reduce push/pop overhead.
+9. **Register-based vs. stack-based expression compilation:** Stack machines are simpler but register allocation can reduce push/pop overhead for performance-critical paths. Stack VM is the current choice; register allocation is a future optimization if profiling demands it.
 
-> **Open Question (unresolved):** The `ExecutionPlan` opcode array uses discriminated union subtypes (`LoadSlot`, `BinaryOp`, etc.). Should this be a flat struct array with an enum discriminator for better cache locality? The DU is cleaner but has object allocation overhead.
+10. **Opcode array shape:** The `ExecutionPlan` opcode array uses discriminated union subtypes (`LoadSlot`, `BinaryOp`, etc.). A flat struct array with an enum discriminator would improve cache locality. The DU is cleaner but has object allocation overhead per opcode. Decision pending profiling evidence.
 
 ---
 

@@ -59,7 +59,8 @@ sealed record FieldDescriptor(
     IReadOnlyList<ModifierKind> Modifiers,
     string? DefaultExpression,
     bool IsComputed,
-    int SourceLine);
+    int SourceLine,
+    Type ClrType);       // resolved at Precept Builder time; IReadOnlyList<T> for collection-typed fields
 
 // State descriptor — carries modifier set for dispatch decisions
 sealed record StateDescriptor(
@@ -81,7 +82,8 @@ sealed record ArgDescriptor(
     bool IsOptional,
     int SlotIndex,
     string? DefaultExpression,
-    int SourceLine);
+    int SourceLine,
+    Type ClrType);       // resolved at Precept Builder time
 
 // FaultSiteDescriptor — planted by builder, read by evaluator backstops
 sealed record FaultSiteDescriptor(
@@ -90,7 +92,7 @@ sealed record FaultSiteDescriptor(
     int SourceLine);
 ```
 
-`ConstraintDescriptor` exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy (TODO G1/G9) will replace it when the constraint evaluation attribution model is implemented.
+`ConstraintDescriptor` exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy will replace it when the constraint evaluation attribution model is implemented.
 
 ### API Surfaces Using Descriptors
 
@@ -102,7 +104,7 @@ All structural query surfaces now return typed descriptors:
 - `Precept.InitialState` → `StateDescriptor?`
 - `Precept.InitialEvent` → `EventDescriptor?`
 - `Version.AvailableEvents` → `IReadOnlyList<EventDescriptor>`
-- `Version.RequiredArgs(EventDescriptor)` → `IReadOnlyList<ArgDescriptor>`
+- `Version.RequiredArgs(string eventName)` → `IReadOnlyList<ArgDescriptor>`
 - `SharedTypes.FieldAccessInfo` → `FieldDescriptor Field` (replaces string name + type)
 
 String-keyed `Fire`, `Update`, `InspectFire`, `InspectUpdate` remain string-keyed until the Evaluator is implemented (R3/R5 work).
@@ -153,14 +155,11 @@ Descriptors are the "no string aliasing" principle applied at the runtime API bo
 
 ---
 
-## Open Questions / Implementation Notes
+## Notes
 
-1. `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` do NOT yet exist as types — only `ConstraintDescriptor` is defined.
-2. Create `src/Precept/Runtime/Descriptors.cs` with all 5 missing sealed records.
-3. Update `Precept.cs`: `States` → `IReadOnlyList<StateDescriptor>`, `Fields` → `IReadOnlyList<FieldDescriptor>`, `Events` → `IReadOnlyList<EventDescriptor>`, `InitialState` → `StateDescriptor?`, `InitialEvent` → `EventDescriptor?`.
-4. Update `Version.cs`: `AvailableEvents` → `IReadOnlyList<EventDescriptor>`, `RequiredArgs(EventDescriptor)` → `IReadOnlyList<ArgDescriptor>`.
-5. Update `SharedTypes.cs`: `FieldAccessInfo` — replace `string FieldName` + `string FieldType` with `FieldDescriptor Field`; remove `ArgInfo` (replaced by `ArgDescriptor`).
-6. Update MCP DTOs in `tools/Precept.Mcp/Tools/` once descriptors are defined.
+`ClrType` on `FieldDescriptor` and `ArgDescriptor` is `System.Type` — the CLR projection valid for `Get<T>()` / `Set<T>()`. For collection-typed fields, `FieldDescriptor.ClrType` encodes the full constructed generic type (e.g., `typeof(IReadOnlyList<long>)` for `list of integer`). Resolved at Precept Builder time from `TypeMeta.ClrType` plus collection wrapping. See `runtime-api.md` § Typed Lane for the complete valid-`T` table.
+
+`ConstraintDescriptor` exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy will replace it when the constraint evaluation attribution model is implemented.
 
 ---
 
