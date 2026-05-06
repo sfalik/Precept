@@ -29,3 +29,23 @@
 
 - Earlier detailed history was archived to `history-archive.md` during the CC#8 closeout so `history.md` stays under the 15 KB gate.
 - Use the archive for the full philosophy-wording trail, earlier visual-system passes, and pre-closeout event-interaction deliberation detail.
+
+## Elaine-33 — API accuracy pass
+[2026-05-06]
+Task: Applied 4 accuracy fixes from Frank/George review: ConstraintResult (inspection path), EventOutcome type name verification, RowEffect DU shape (TransitionInspection), datetime→correct type.
+
+## Elaine-34 — OQ-1 closed
+[2026-05-06]
+Task: Closed OQ-1; visual system spec answer = certain-reject → Blocked.
+
+## Elaine-35 — OQ-3 closed
+[2026-05-06]
+Task: Closed OQ-3; tag input for collection args (`set of T`, `list of T`) is in V1 scope.
+
+## Elaine-36 — OQ-5 closed
+[2026-05-06]
+Task: OQ-5 closed; runtime provides GuardSummary on TransitionInspection.
+
+## Elaine-37 — OQ-6 closed
+[2026-05-06]
+Task: OQ-6 closed; V1 event name only, V2 language annotation deferred.

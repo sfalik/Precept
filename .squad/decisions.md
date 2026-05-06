@@ -70,6 +70,23 @@
 
 ---
 
+### 2026-05-06T23:45:58Z: Event-interaction UXR closes OQ-1, OQ-3, and OQ-5; rule-failure descriptions are universal
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (6 files).
+
+**Merged sources:** `copilot-directive-rule-failure-descriptions.md`, `elaine-33-corrections.md`, `elaine-oq1-closed.md`, `elaine-oq3-closed.md`, `elaine-oq5-closed.md`, `elaine-oq6-closed.md`.
+
+- OQ-1 is durably closed: user-facing surfaces normalize certain-reject outcomes to **Blocked**, per the semantic visual-system spec.
+- OQ-3 is durably closed in V1: collection event args (`set of T`, `list of T`) use pill/tag input rather than a deferred follow-up control.
+- OQ-5 is durably closed on the runtime contract: `TransitionInspection` provides `GuardSummary: string?`, and the UI renders that summary directly instead of parsing DSL source or inventing a fallback.
+- OQ-6 is durably closed in V1: event cards use the event name as the sole label, with no authored description, generated transition-summary copy, or hover help text beyond that name.
+- Rule-failure descriptions are a universal runtime contract: every rule-failure surface must provide a human-readable reason, not just guard summaries or constraint failures already carrying `because`.
+- Elaine-33's API accuracy pass is folded forward: `InspectUpdate` references `ConstraintResult`, fire-outcome prose uses `EventOutcome.ConstraintsFailed`, `TransitionInspection` references align to the `RowEffect` DU, and `datetime` remains a valid Precept type.
+
+---
+
 ### 2026-05-06: Wave 1 cross-cutting facilitation started with CC#7 first
 
 **By:** Frank
