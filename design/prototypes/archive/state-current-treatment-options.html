@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept - State Current Treatment Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --panel-2: #0d1014;
+  --panel-3: #11151b;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure: #6366F1;
+  --state: #A898F5;
+  --event: #30B8E8;
+  --valid: #34D399;
+  --warn: #FDE047;
+  --mono: "Geist Mono","Cascadia Code",Consolas,monospace;
+  --sans: "Geist","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(99,102,241,0.10), transparent 28%),
+    radial-gradient(circle at top right, rgba(168,152,245,0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), transparent 22%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+a { color: inherit; }
+
+.page {
+  width: min(1380px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 40px 0 96px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.hero {
+  display: grid;
+  gap: 28px;
+  padding: 32px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+}
+
+.hero-head {
+  display: grid;
+  gap: 16px;
+  max-width: 84ch;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(34px, 6vw, 72px);
+  line-height: 0.94;
+  letter-spacing: -0.03em;
+}
+
+.hero p,
+.hero li,
+.option-note,
+.spec-note,
+.summary-card p {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--muted);
+}
+
+.hero-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+.summary-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  background: var(--panel);
+}
+
+.summary-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.summary-value {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.comparison-stack {
+  margin-top: 28px;
+  display: grid;
+  gap: 40px;
+}
+
+.comparison-section {
+  display: grid;
+  gap: 20px;
+}
+
+.comparison-section + .comparison-section {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.comparison-head {
+  display: grid;
+  gap: 10px;
+  max-width: 76ch;
+}
+
+.comparison-heading {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+
+.comparison-copy {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--muted);
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.option-card {
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  min-width: 0;
+}
+
+.option-head {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.option-kicker-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.option-kicker,
+.option-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.option-kicker { color: var(--soft); }
+
+.option-status { color: var(--text); }
+
+.option-status--recommended {
+  border-color: rgba(52,211,153,0.35);
+  color: var(--valid);
+}
+
+.option-status--live {
+  border-color: rgba(99,102,241,0.30);
+  color: var(--structure);
+}
+
+.option-status--experimental {
+  border-color: rgba(253,224,71,0.26);
+  color: var(--warn);
+}
+
+.option-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+}
+
+.option-copy {
+  max-width: 44ch;
+}
+
+.spec-list {
+  display: grid;
+  gap: 14px;
+}
+
+.spec-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.spec-label {
+  padding-top: 6px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.specimen {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.state-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.flow-arrow {
+  color: rgba(48,184,232,0.78);
+  font-size: 12px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+
+.state-chip {
+  --chip-text: var(--state);
+  --chip-border: rgba(168,152,245,0.32);
+  --chip-bg: rgba(168,152,245,0.04);
+  --chip-shadow: none;
+  --chip-outline: none;
+  --chip-dot-bg: var(--structure);
+  --chip-dot-ring: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: var(--chip-outline, 1px solid transparent);
+  box-shadow: var(--chip-shadow, none);
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.state-chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px var(--chip-border-style, solid) var(--chip-border);
+  pointer-events: none;
+}
+
+.state-chip__dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--chip-dot-bg);
+  box-shadow: var(--chip-dot-ring);
+}
+
+.state-chip--terminal {
+  --chip-shadow: inset 0 0 0 1px rgba(168,152,245,0.14);
+}
+
+.state-chip--terminal::before {
+  border-width: 2px;
+}
+
+.state-chip--current-baseline {
+  --chip-border: rgba(168,152,245,0.46);
+  --chip-bg: rgba(168,152,245,0.10);
+}
+
+.state-chip--current-strong {
+  --chip-border: rgba(168,152,245,0.72);
+  --chip-bg: linear-gradient(180deg, rgba(168,152,245,0.28), rgba(168,152,245,0.18));
+  --chip-shadow: inset 0 0 0 1px rgba(168,152,245,0.16), 0 0 0 1px rgba(168,152,245,0.10);
+}
+
+.state-chip--current-invert {
+  --chip-text: #08090b;
+  --chip-border: rgba(168,152,245,0.92);
+  --chip-bg: #A898F5;
+  --chip-dot-bg: #08090b;
+}
+
+.state-chip--current-halo {
+  --chip-border: rgba(168,152,245,0.42);
+  --chip-bg: rgba(168,152,245,0.06);
+  --chip-shadow: 0 0 0 3px rgba(168,152,245,0.20), 0 0 0 7px rgba(168,152,245,0.05);
+}
+
+.state-chip--unreachable-initial {
+  --chip-text: rgba(168,152,245,0.76);
+  --chip-border-style: dashed;
+  --chip-border: rgba(168,152,245,0.34);
+  --chip-bg: rgba(168,152,245,0.02);
+}
+
+.state-chip--unreachable-current-hatch {
+  --chip-text: rgba(168,152,245,0.76);
+  --chip-border: rgba(168,152,245,0.22);
+  --chip-bg:
+    repeating-linear-gradient(135deg, rgba(168,152,245,0.11) 0 1px, transparent 1px 6px),
+    rgba(168,152,245,0.025);
+}
+
+.state-chip--unreachable-current-dotted {
+  --chip-text: rgba(168,152,245,0.76);
+  --chip-border-style: dotted;
+  --chip-border: rgba(168,152,245,0.34);
+  --chip-bg: rgba(168,152,245,0.02);
+}
+
+.state-chip--unreachable-initial-hatch-dim {
+  --chip-text: rgba(168,152,245,0.54);
+  --chip-border: rgba(168,152,245,0.16);
+  --chip-bg:
+    repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
+    rgba(168,152,245,0.012);
+}
+
+.state-chip--unreachable-current-dashed-dim {
+  --chip-text: rgba(168,152,245,0.54);
+  --chip-border-style: dashed;
+  --chip-border: rgba(168,152,245,0.22);
+  --chip-bg: rgba(168,152,245,0.012);
+}
+
+.flow-base .state-chip,
+.flow-current .state-chip,
+.flow-stack .state-chip,
+.flow-terminal .state-chip {
+  max-width: 100%;
+}
+
+.spec-note {
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+.note-cell {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--panel);
+}
+
+.note-label {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.note-cell--strengths .note-label { color: var(--valid); }
+.note-cell--risks .note-label { color: var(--warn); }
+
+.footnote {
+  margin-top: 24px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+}
+
+.footnote p {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+@media (max-width: 1120px) {
+  .hero-summary,
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    width: min(100vw - 24px, 1380px);
+    padding-top: 20px;
+  }
+
+  .hero,
+  .option-card {
+    padding: 18px;
+  }
+
+  .spec-row,
+  .notes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .spec-label {
+    padding-top: 0;
+  }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero-head">
+      <div class="eyebrow">Design prototype · state current treatment</div>
+      <h1 id="page-title">Comparing current-state emphasis and unreachable-state splits.</h1>
+      <p>This page extends the temporary state-treatment study without changing the canonical semantic visual system. Every option keeps the same violet family, chip anatomy, chrome, and type posture as the live artifact. The variables are only how currentness is expressed and how the two unreachable-state modifiers split apart.</p>
+    </div>
+    <div class="hero-summary" aria-label="Recommendation summary">
+      <article class="summary-card">
+        <div class="summary-label">Current Recommendation</div>
+        <div class="summary-value">Stronger fill over outline</div>
+        <p>It reads faster than the live treatment, still behaves like a state chip rather than a selected UI control, and survives stacking with initial or terminal without creating a second semantic color.</p>
+      </article>
+      <article class="summary-card">
+        <div class="summary-label">Unreachable Recommendation</div>
+        <div class="summary-value">Hatch + dashed split</div>
+        <p>Dim both unreachable states more aggressively than the base chip, then use a subtle interior hatch for states unreachable from the initial path and reserve the dashed perimeter for states unreachable only from the current snapshot.</p>
+      </article>
+      <article class="summary-card">
+        <div class="summary-label">Alternative Split</div>
+        <div class="summary-value">Dashed + dotted outline</div>
+        <p>It is cheaper to implement because both cues stay on the perimeter, but the two unreachable cases start to blur together faster than the recommended interior-versus-edge split.</p>
+      </article>
+    </div>
+  </section>
+
+  <div class="comparison-stack">
+    <section class="comparison-section" aria-labelledby="current-options-title">
+      <header class="comparison-head">
+        <div class="eyebrow">Modifier study · current</div>
+        <h2 class="comparison-heading" id="current-options-title">Current-state options</h2>
+        <p class="comparison-copy">These are the existing current-state options already under review. The recommendation remains the denser fill step because it strengthens currentness without turning the state chip into a generic selected control.</p>
+      </header>
+
+      <div class="comparison-grid" aria-label="Current treatment options comparison">
+        <article class="option-card">
+      <header class="option-head">
+        <div class="option-kicker-row">
+          <span class="option-kicker">Option 01</span>
+          <span class="option-status option-status--live">Baseline / live artifact</span>
+        </div>
+        <h2 class="option-title">Current light fill</h2>
+        <p class="option-copy option-note">This is the treatment in the canonical semantic visual system now: same violet text and outline, plus a modest active fill. It is quiet and coherent, but it does not pull forward quickly when several state chips sit together.</p>
+      </header>
+
+      <div class="spec-list">
+        <div class="spec-row">
+          <div class="spec-label">Base state</div>
+          <div class="specimen flow-base">
+            <div class="state-flow"><span class="state-chip">Review</span></div>
+            <p class="spec-note">Unmodified state chip for comparison.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current</div>
+          <div class="specimen flow-current">
+            <div class="state-flow"><span class="state-chip state-chip--current-baseline">Review</span></div>
+            <p class="spec-note">Low-contrast fill shows current without changing the semantic family.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Initial + current</div>
+          <div class="specimen flow-stack">
+            <div class="state-flow"><span class="state-chip state-chip--current-baseline"><span class="state-chip__dot"></span>Open</span></div>
+            <p class="spec-note">Dot and current fill coexist cleanly, but the current cue still stays fairly quiet.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current + terminal</div>
+          <div class="specimen flow-terminal">
+            <div class="state-flow"><span class="state-chip state-chip--terminal state-chip--current-baseline">Closed</span></div>
+            <p class="spec-note">Terminal outline remains legible; currentness is present but not emphatic.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-grid">
+        <div class="note-cell note-cell--strengths">
+          <div class="note-label">Strengths</div>
+          <p class="option-note">Most faithful to the existing system. No semantic drift. Stacks with other modifiers without surprise.</p>
+        </div>
+        <div class="note-cell note-cell--risks">
+          <div class="note-label">Risks</div>
+          <p class="option-note">Current can disappear in a busy path because the fill difference is only modestly stronger than the base chip.</p>
+        </div>
+      </div>
+        </article>
+
+        <article class="option-card">
+      <header class="option-head">
+        <div class="option-kicker-row">
+          <span class="option-kicker">Option 02</span>
+          <span class="option-status option-status--recommended">Recommended</span>
+        </div>
+        <h2 class="option-title">Stronger fill over outline</h2>
+        <p class="option-copy option-note">Keep the baseline chip anatomy, but let currentness land with a denser violet fill and a slightly firmer edge. This makes the active node read first while still looking like a state, not a selection widget.</p>
+      </header>
+
+      <div class="spec-list">
+        <div class="spec-row">
+          <div class="spec-label">Base state</div>
+          <div class="specimen flow-base">
+            <div class="state-flow"><span class="state-chip">Review</span></div>
+            <p class="spec-note">Base state remains identical to the canonical chip.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current</div>
+          <div class="specimen flow-current">
+            <div class="state-flow"><span class="state-chip state-chip--current-strong">Review</span></div>
+            <p class="spec-note">The larger fill step gives current a faster read without breaking the violet lane.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Initial + current</div>
+          <div class="specimen flow-stack">
+            <div class="state-flow"><span class="state-chip state-chip--current-strong"><span class="state-chip__dot"></span>Open</span></div>
+            <p class="spec-note">The initial dot still leads the label, while the stronger fill keeps the live node visually ahead.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current + terminal</div>
+          <div class="specimen flow-terminal">
+            <div class="state-flow"><span class="state-chip state-chip--terminal state-chip--current-strong">Closed</span></div>
+            <p class="spec-note">Terminal weight and current fill remain separable, which is the main reason this direction is viable.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-grid">
+        <div class="note-cell note-cell--strengths">
+          <div class="note-label">Strengths</div>
+          <p class="option-note">Best balance of speed, semantic discipline, and modifier stacking. Reads stronger in diagrams and in compact modifier matrices.</p>
+        </div>
+        <div class="note-cell note-cell--risks">
+          <div class="note-label">Risks</div>
+          <p class="option-note">If pushed further, it could start competing with runtime verdict fills. The fill step needs to stay clearly within the state family.</p>
+        </div>
+      </div>
+        </article>
+
+        <article class="option-card">
+      <header class="option-head">
+        <div class="option-kicker-row">
+          <span class="option-kicker">Option 03</span>
+          <span class="option-status option-status--experimental">High-contrast experiment</span>
+        </div>
+        <h2 class="option-title">Full inversion</h2>
+        <p class="option-copy option-note">Make current a solid violet mass with near-background text. This maximizes immediate contrast, but it also shifts the chip toward the language of selected controls or active tabs.</p>
+      </header>
+
+      <div class="spec-list">
+        <div class="spec-row">
+          <div class="spec-label">Base state</div>
+          <div class="specimen flow-base">
+            <div class="state-flow"><span class="state-chip">Review</span></div>
+            <p class="spec-note">Base state stays unchanged to expose the contrast jump.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current</div>
+          <div class="specimen flow-current">
+            <div class="state-flow"><span class="state-chip state-chip--current-invert">Review</span></div>
+            <p class="spec-note">Fastest read at a glance. The chip becomes nearly impossible to miss.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Initial + current</div>
+          <div class="specimen flow-stack">
+            <div class="state-flow"><span class="state-chip state-chip--current-invert"><span class="state-chip__dot"></span>Open</span></div>
+            <p class="spec-note">The initial dot still works, but the solid fill dominates the stack and leaves less room for secondary signals.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current + terminal</div>
+          <div class="specimen flow-terminal">
+            <div class="state-flow"><span class="state-chip state-chip--terminal state-chip--current-invert">Closed</span></div>
+            <p class="spec-note">Terminal remains technically visible, but the inversion turns current into the whole story.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-grid">
+        <div class="note-cell note-cell--strengths">
+          <div class="note-label">Strengths</div>
+          <p class="option-note">Unambiguous emphasis. Useful if the product needs an intentionally loud active-state marker in sparse flows.</p>
+        </div>
+        <div class="note-cell note-cell--risks">
+          <div class="note-label">Risks</div>
+          <p class="option-note">Feels closer to UI selection than semantic state. Stacked modifiers flatten because the fill takes over the whole node.</p>
+        </div>
+      </div>
+        </article>
+
+        <article class="option-card">
+      <header class="option-head">
+        <div class="option-kicker-row">
+          <span class="option-kicker">Option 04</span>
+          <span class="option-status option-status--experimental">Spatial experiment</span>
+        </div>
+        <h2 class="option-title">Outer ring / halo</h2>
+        <p class="option-copy option-note">Leave the chip mostly intact and place currentness around it as a glow-like ring. This preserves the interior state treatment, but it asks the surrounding layout to donate space to the modifier.</p>
+      </header>
+
+      <div class="spec-list">
+        <div class="spec-row">
+          <div class="spec-label">Base state</div>
+          <div class="specimen flow-base">
+            <div class="state-flow"><span class="state-chip">Review</span></div>
+            <p class="spec-note">Base state remains the canonical chip with no outer effect.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current</div>
+          <div class="specimen flow-current">
+            <div class="state-flow"><span class="state-chip state-chip--current-halo">Review</span></div>
+            <p class="spec-note">Current is called out from outside the chip instead of by deepening the interior fill.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Initial + current</div>
+          <div class="specimen flow-stack">
+            <div class="state-flow"><span class="state-chip state-chip--current-halo"><span class="state-chip__dot"></span>Open</span></div>
+            <p class="spec-note">The stack stays semantically legible, but the halo begins to enlarge the node footprint.</p>
+          </div>
+        </div>
+
+        <div class="spec-row">
+          <div class="spec-label">Current + terminal</div>
+          <div class="specimen flow-terminal">
+            <div class="state-flow"><span class="state-chip state-chip--terminal state-chip--current-halo">Closed</span></div>
+            <p class="spec-note">Outer emphasis and terminal outline can coexist, but the treatment becomes visually busy faster than the fill-based alternatives.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-grid">
+        <div class="note-cell note-cell--strengths">
+          <div class="note-label">Strengths</div>
+          <p class="option-note">Preserves the interior chip almost entirely. The modifier reads as an overlay rather than a changed state object.</p>
+        </div>
+        <div class="note-cell note-cell--risks">
+          <div class="note-label">Risks</div>
+          <p class="option-note">Consumes more space, can muddy edge alignment, and is the most likely to cause clutter in dense diagrams or stacked tables.</p>
+        </div>
+      </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="comparison-section" aria-labelledby="unreachable-options-title">
+      <header class="comparison-head">
+        <div class="eyebrow">Modifier study · unreachable</div>
+        <h2 class="comparison-heading" id="unreachable-options-title">Unreachable-state options</h2>
+        <p class="comparison-copy">The goal here is not to make unreachable states louder. It is to keep both modifiers ghosted first, then distinguish whether the disconnect is absolute from the entry path or relative to the current snapshot.</p>
+      </header>
+
+      <div class="comparison-grid" aria-label="Unreachable treatment options comparison">
+        <article class="option-card">
+          <header class="option-head">
+            <div class="option-kicker-row">
+              <span class="option-kicker">Option 05</span>
+              <span class="option-status option-status--recommended">Recommended split</span>
+            </div>
+            <h2 class="option-title">Interior hatch for initial, dashed outline for current</h2>
+            <p class="option-copy option-note">Keep both unreachable cases dimmed first, then separate them by where the secondary cue lives. The entry-path failure takes a quiet interior hatch so the whole chip reads like a muted dead branch. The current-snapshot failure stays just as ghosted, but moves the distinction to a dashed perimeter so it reads as a from-here condition at the edge.</p>
+          </header>
+
+          <div class="spec-list">
+            <div class="spec-row">
+              <div class="spec-label">Base state</div>
+              <div class="specimen flow-base">
+                <div class="state-flow"><span class="state-chip">Archived</span></div>
+                <p class="spec-note">Reference chip with no unreachable modifier applied.</p>
+              </div>
+            </div>
+
+            <div class="spec-row">
+              <div class="spec-label">notReachableFromInitial</div>
+              <div class="specimen flow-current">
+                <div class="state-flow"><span class="state-chip state-chip--unreachable-initial-hatch-dim">Archived</span></div>
+                <p class="spec-note">The stronger dim and interior hatch make the state read unreachable first, with the hatch acting as the secondary cue for entry-path disconnect.</p>
+              </div>
+            </div>
+
+            <div class="spec-row">
+              <div class="spec-label">notReachableFromCurrent</div>
+              <div class="specimen flow-stack">
+                <div class="state-flow"><span class="state-chip state-chip--unreachable-current-dashed-dim">Archived</span></div>
+                <p class="spec-note">The stronger dim still establishes unreachability first, while the dashed edge keeps the from-current distinction on the perimeter.</p>
+              </div>
+            </div>
+
+            <div class="spec-row">
+              <div class="spec-label">Live snapshot</div>
+              <div class="specimen flow-terminal">
+                <div class="state-flow"><span class="state-chip state-chip--current-strong">Review</span><span class="flow-arrow">from here</span><span class="state-chip state-chip--unreachable-current-dashed-dim">Archived</span></div>
+                <p class="spec-note">The live node stays vivid while the unreachable target drops back hard, leaving the dashed edge to carry the from-current distinction.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="notes-grid">
+            <div class="note-cell note-cell--strengths">
+              <div class="note-label">Strengths</div>
+              <p class="option-note">The stronger dimming makes both states read unavailable before any secondary cue is parsed. The swapped mapping also tests whether the from-current case is clearer when its distinction stays on the boundary nearest the route context.</p>
+            </div>
+            <div class="note-cell note-cell--risks">
+              <div class="note-label">Risks</div>
+              <p class="option-note">This mapping is less immediately intuitive than the original edge-for-initial split, so the dimming and hatch density have to stay disciplined. At very small sizes, the interior cue may still need a simplified fallback.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="option-card">
+          <header class="option-head">
+            <div class="option-kicker-row">
+              <span class="option-kicker">Option 06</span>
+              <span class="option-status option-status--experimental">Alternative split</span>
+            </div>
+            <h2 class="option-title">Dashed outline for initial, dotted outline for current</h2>
+            <p class="option-copy option-note">This keeps both differences on the perimeter. It is the cheapest extension of the existing chip language because no interior treatment is required, but it also makes the two unreachable cases more similar than the recommended split.</p>
+          </header>
+
+          <div class="spec-list">
+            <div class="spec-row">
+              <div class="spec-label">Base state</div>
+              <div class="specimen flow-base">
+                <div class="state-flow"><span class="state-chip">Archived</span></div>
+                <p class="spec-note">Same untouched base chip for direct comparison.</p>
+              </div>
+            </div>
+
+            <div class="spec-row">
+              <div class="spec-label">notReachableFromInitial</div>
+              <div class="specimen flow-current">
+                <div class="state-flow"><span class="state-chip state-chip--unreachable-initial">Archived</span></div>
+                <p class="spec-note">Dashed perimeter still carries the entry-path disconnect well.</p>
+              </div>
+            </div>
+
+            <div class="spec-row">
+              <div class="spec-label">notReachableFromCurrent</div>
+              <div class="specimen flow-stack">
+                <div class="state-flow"><span class="state-chip state-chip--unreachable-current-dotted">Archived</span></div>
+                <p class="spec-note">Dotted outline distinguishes the current-relative case, but only at the edge.</p>
+              </div>
+            </div>
+
+            <div class="spec-row">
+              <div class="spec-label">Live snapshot</div>
+              <div class="specimen flow-terminal">
+                <div class="state-flow"><span class="state-chip state-chip--current-strong">Review</span><span class="flow-arrow">from here</span><span class="state-chip state-chip--unreachable-current-dotted">Archived</span></div>
+                <p class="spec-note">The read is implementation-light, but the two unreachable styles begin to collapse into one family of outline changes.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="notes-grid">
+            <div class="note-cell note-cell--strengths">
+              <div class="note-label">Strengths</div>
+              <p class="option-note">Low implementation cost and easy to explain. The split remains technically visible without adding texture inside the chip body.</p>
+            </div>
+            <div class="note-cell note-cell--risks">
+              <div class="note-label">Risks</div>
+              <p class="option-note">Because both cues live on the outline, the difference weakens in dense flows, low zoom, and any context where border rhythm is already doing other work.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <div class="footnote">
+    <p>Evaluation frame: Precept already uses shape, weight, and typography to layer meaning. Current should therefore read as a live-state modifier, not as a second category. Unreachable cues should stay ghosted first, then differentiate whether the disconnect is authored from the entry path or only true of the present snapshot.</p>
+  </div>
+</main>
+</body>
+</html>

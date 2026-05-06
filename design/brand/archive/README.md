@@ -9,7 +9,7 @@ The current split outputs are being derived from that archived combined spec rat
 Current canonical sources:
 
 - Brand identity meaning lives in `design/brand/brand-spec.html`.
-- Reusable visual-system guidance lives in `design/system/foundations/semantic-visual-system.html`.
+- Reusable visual-system guidance lives in `design/system/semantic-visual-system.html`.
 
 Ownership boundary:
 

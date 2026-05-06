@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline–Form Unification — 4 Variants</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+/* ── SVS TOKENS ───────────────────────────── */
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --panel-2: #0d1014;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure: #6366F1;
+  --state: #A898F5;
+  --event: #30B8E8;
+  --valid: #34D399;
+  --violated: #F87171;
+  --rule: #FBBF24;
+  --mono: "Geist Mono","Cascadia Code",Consolas,monospace;
+  --sans: "Geist","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+  padding: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── PAGE LAYOUT ──────────────────────────── */
+.page {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.page-title {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.page-subtitle {
+  font-size: 11px;
+  color: var(--soft);
+  margin-top: 6px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+/* ── VARIANT WRAPPER ──────────────────────── */
+.variant {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.variant-label {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+}
+
+.variant-letter {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--event);
+}
+
+.variant-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.variant-desc {
+  font-size: 11px;
+  color: var(--soft);
+  margin-left: auto;
+}
+
+/* ── SHARED COMPONENT STYLES ──────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-top: none;
+  background: var(--panel);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.header-name {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.header-id {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(168,152,245,0.24);
+  background: rgba(168,152,245,0.08);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--state);
+  white-space: nowrap;
+}
+
+.state-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--state);
+}
+
+/* ── GRID  ────────────────────────────────── */
+.body-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-top: none;
+}
+
+/* ── HISTORY COLUMN ───────────────────────── */
+.history {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-head-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.history-head-count {
+  font-size: 10px;
+  color: var(--soft);
+}
+
+.history-table {
+  position: relative;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 0;
+  height: 30px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-row:last-child { border-bottom: none; }
+.history-row--current { background: var(--panel-2); }
+
+.row-rail { position: relative; height: 30px; flex-shrink: 0; }
+
+.row-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.row-entry { color: var(--event); flex-shrink: 0; }
+.row-entry--edit { color: var(--muted); }
+.row-entry--state { color: var(--state); font-weight: 500; }
+.row-arrow { color: var(--soft); }
+.row-target { color: var(--state); }
+.row-detail { color: var(--soft); overflow: hidden; text-overflow: ellipsis; }
+
+.history-row--past .row-entry { opacity: 0.7; }
+.history-row--past .row-detail { color: var(--soft); }
+.history-row--future .row-entry { color: var(--soft); }
+.history-row--future .row-detail { color: var(--soft); }
+.history-row--future-ok .row-entry { color: var(--valid); }
+.history-row--future-blocked .row-entry { color: var(--violated); }
+
+.graph-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  overflow: visible;
+}
+
+/* ── FORM SIDE ────────────────────────────── */
+.detail {
+  background: var(--panel);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.fields-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fields-head-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.fields-head-meta {
+  font-size: 10px;
+  color: var(--soft);
+}
+
+.card-fields {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 9px;
+}
+
+.f-row {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.f-label { font-size: 12px; color: var(--soft); }
+.f-label--constrained { font-style: italic; }
+.f-label--required { color: var(--rule); }
+.f-label--required::after { content: " *"; font-size: 10px; }
+.f-val { color: var(--text); }
+.f-val--yes { color: var(--valid); }
+.f-val--yes::before { content: "\2713  "; font-size: 11px; opacity: 0.8; }
+.f-val--open { color: var(--valid); }
+.f-val--open::before { content: "\25CF  "; font-size: 9px; opacity: 0.7; }
+
+.f-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 5px 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+}
+
+.f-input:focus { border-color: rgba(48,184,232,0.45); }
+.f-input::placeholder { color: var(--soft); }
+
+/* ── BUTTONS & VERDICTS ───────────────────── */
+.card-actions {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.action-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-bar-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.verdict-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.act-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  line-height: 1.3;
+}
+
+.act-btn--go {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+}
+
+.act-btn--go:hover {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+
+.act-btn--off {
+  border-color: rgba(255,255,255,0.11);
+  background: transparent;
+  color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.verdict-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  padding-left: 2px;
+  line-height: 1.3;
+}
+
+.verdict-line--go { color: var(--state); }
+.verdict-line--go .v-arrow { color: var(--soft); font-size: 10px; }
+.verdict-line--blocked { color: var(--violated); opacity: 0.75; }
+.verdict-line--blocked .v-icon { font-size: 10px; flex-shrink: 0; opacity: 0.7; }
+
+.form-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  line-height: 1.3;
+}
+
+.form-btn--save {
+  background: rgba(52,211,153,0.12);
+  border-color: rgba(52,211,153,0.32);
+  color: var(--valid);
+}
+
+.form-btn--save:hover {
+  background: rgba(52,211,153,0.20);
+  border-color: rgba(52,211,153,0.50);
+}
+
+.form-btn--cancel {
+  border-color: rgba(255,255,255,0.10);
+  color: var(--soft);
+}
+
+.form-btn--cancel:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.18);
+}
+
+/* ── FOOTER ───────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-top: none;
+  background: var(--panel);
+  font-size: 10px;
+  color: var(--soft);
+}
+
+/* ════════════════════════════════════════════
+   VARIANT A — Timeline IS the action surface
+   Future rows are clickable; no action bar on form
+   ════════════════════════════════════════════ */
+
+.va-future-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 0;
+  height: 44px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.va-future-row:last-child { border-bottom: none; }
+
+.va-future-row:hover {
+  background: var(--panel-2);
+}
+
+.va-future-row--blocked {
+  cursor: not-allowed;
+}
+
+.va-future-row--blocked:hover {
+  background: transparent;
+}
+
+.va-future-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+  min-width: 0;
+}
+
+.va-event-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.va-event-name--go {
+  color: var(--event);
+  font-weight: 500;
+}
+
+.va-event-name--off {
+  color: var(--soft);
+  opacity: 0.55;
+}
+
+.va-verdict {
+  font-family: var(--mono);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.va-verdict--go {
+  color: var(--state);
+}
+
+.va-verdict--blocked {
+  color: var(--violated);
+  opacity: 0.7;
+}
+
+/* Form-only actions (just Save/Cancel, no events) */
+.va-form-actions {
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ════════════════════════════════════════════
+   VARIANT C — Buttons grow the timeline
+   Ghost rows at the bottom of the timeline
+   ════════════════════════════════════════════ */
+
+.vc-ghost-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 0;
+  height: 44px;
+  border-bottom: 1px dashed var(--line-strong);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.vc-ghost-row:last-child { border-bottom: none; }
+
+.vc-ghost-row:hover {
+  background: rgba(48,184,232,0.04);
+}
+
+.vc-ghost-row--blocked {
+  cursor: not-allowed;
+}
+
+.vc-ghost-row--blocked:hover {
+  background: transparent;
+}
+
+.vc-ghost-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+}
+
+.vc-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 14px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px dashed transparent;
+  background: none;
+  line-height: 1.3;
+}
+
+.vc-ghost-btn--go {
+  border-color: rgba(48,184,232,0.30);
+  background: rgba(48,184,232,0.06);
+  color: var(--event);
+  cursor: pointer;
+}
+
+.vc-ghost-btn--go:hover {
+  background: rgba(48,184,232,0.14);
+  border-style: solid;
+  border-color: rgba(48,184,232,0.50);
+}
+
+.vc-ghost-btn--off {
+  border-color: rgba(255,255,255,0.08);
+  color: var(--soft);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vc-ghost-verdict {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.vc-ghost-verdict--go {
+  color: var(--state);
+}
+
+.vc-ghost-verdict--blocked {
+  color: var(--violated);
+  opacity: 0.7;
+}
+
+.vc-pending-label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  opacity: 0.5;
+  padding: 6px 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+/* ════════════════════════════════════════════
+   VARIANT D — Cross-highlighting on hover
+   Both views exist; hover links them
+   ════════════════════════════════════════════ */
+
+.vd-highlight-pickup .vd-row-pickup,
+.vd-highlight-pickup .vd-btn-pickup {
+  background: rgba(48,184,232,0.08);
+}
+
+.vd-highlight-expire .vd-row-expire,
+.vd-highlight-expire .vd-btn-expire {
+  background: rgba(248,113,113,0.06);
+}
+
+.vd-row-pickup,
+.vd-row-expire,
+.vd-btn-pickup,
+.vd-btn-expire {
+  transition: background 0.18s ease;
+}
+
+/* Pulsing dot when cross-highlighted */
+@keyframes vd-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.vd-highlight-pickup .vd-link-dot-pickup,
+.vd-highlight-expire .vd-link-dot-expire {
+  animation: vd-pulse 0.8s ease-in-out infinite;
+}
+
+.vd-link-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+
+.vd-link-dot--go { background: var(--event); }
+.vd-link-dot--blocked { background: var(--violated); }
+
+.vd-highlight-pickup .vd-link-dot-pickup,
+.vd-highlight-expire .vd-link-dot-expire {
+  opacity: 1;
+}
+
+/* ════════════════════════════════════════════
+   VARIANT E — Verdict lines in timeline
+   Timeline carries explanation; form has bare triggers
+   ════════════════════════════════════════════ */
+
+.ve-future-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 0;
+  height: 40px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ve-future-row:last-child { border-bottom: none; }
+
+.ve-future-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 10px;
+  min-width: 0;
+}
+
+.ve-event-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ve-verdict-detail {
+  font-family: var(--mono);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ve-verdict-detail--go { color: var(--state); }
+.ve-verdict-detail--go .v-arrow { color: var(--soft); font-size: 9px; }
+.ve-verdict-detail--blocked { color: var(--violated); opacity: 0.7; }
+
+/* Bare trigger buttons (no verdict lines) */
+.ve-action-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ve-bare-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  line-height: 1.3;
+}
+
+.ve-bare-btn--go {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+}
+
+.ve-bare-btn--go:hover {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+
+.ve-bare-btn--off {
+  border-color: rgba(255,255,255,0.11);
+  background: transparent;
+  color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ════════════════════════════════════════════
+   VARIANT F/G — Timeline on the RIGHT
+   Form is primary (left), timeline is context (right)
+   ════════════════════════════════════════════ */
+
+.body-grid--right-timeline {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+}
+
+.body-grid--right-timeline .history {
+  border-right: none;
+  border-left: 1px solid var(--line);
+  order: 2;
+}
+
+.body-grid--right-timeline .detail {
+  order: 1;
+}
+
+/* Variant G: action rows in right-side timeline */
+.vg-future-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 0;
+  height: 44px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vg-future-row:last-child { border-bottom: none; }
+
+.vg-future-row:hover {
+  background: var(--panel-2);
+}
+
+.vg-future-row--blocked {
+  cursor: not-allowed;
+}
+
+.vg-future-row--blocked:hover {
+  background: transparent;
+}
+
+.vg-future-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+  min-width: 0;
+}
+
+.vg-event-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.vg-event-name--go {
+  color: var(--event);
+  font-weight: 500;
+}
+
+.vg-event-name--off {
+  color: var(--soft);
+  opacity: 0.55;
+}
+
+.vg-verdict {
+  font-family: var(--mono);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.vg-verdict--go { color: var(--state); }
+.vg-verdict--blocked { color: var(--violated); opacity: 0.7; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <h1 class="page-title">Timeline–Form Unification
+      <span class="page-subtitle">Resolving the disconnect between future timeline forks and action buttons</span>
+    </h1>
+  </div>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  VARIANT A — Timeline IS the Action Surface                ║
+     ║  Future rows are clickable. Action bar removed from form.  ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+
+<div class="variant" id="variant-a">
+  <div class="variant-label">
+    <span class="variant-letter">A</span>
+    <span class="variant-name">Timeline IS the action surface</span>
+    <span class="variant-desc">Future rows contain buttons · no duplicate action bar</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-eyebrow">Precept</span>
+      <span class="header-name">VisitorBadgePickup</span>
+      <span class="header-id">#VBP-2847</span>
+    </div>
+    <div class="state-pill">
+      <span class="state-pill-dot" aria-hidden="true"></span>
+      ReadyForPickup
+    </div>
+  </header>
+
+  <div class="body-grid">
+    <section class="history" aria-label="Lifecycle history">
+      <div class="history-head">
+        <span class="history-head-label">Timeline</span>
+        <span class="history-head-count">4 steps · 3 states visited</span>
+      </div>
+      <div class="history-table">
+        <!-- SVG: 5 past/current rows × 30px = 150, then 2 action rows × 44px = 88 → total 238 -->
+        <svg class="graph-svg" viewBox="0 0 48 238" preserveAspectRatio="xMinYMin meet"
+             style="height:238px" role="img" aria-label="Git-graph timeline rail">
+          <!-- Trunk: initial through current -->
+          <line x1="14" y1="15" x2="14" y2="135" stroke="var(--state)" stroke-width="2" />
+          <!-- Fork: current → PickUp (row center at 150 + 22 = 172) -->
+          <line x1="14" y1="135" x2="14" y2="172" stroke="var(--valid)" stroke-width="2" stroke-dasharray="4 3" />
+          <!-- Fork: current → Expire (row center at 150 + 44 + 22 = 216) -->
+          <path d="M 14 135 C 14 155, 30 165, 30 178" fill="none" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <line x1="30" y1="178" x2="30" y2="216" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <!-- Nodes -->
+          <circle cx="14" cy="15" r="5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="45" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="75" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="135" r="5.5" fill="var(--state)" stroke="none" />
+          <circle cx="14" cy="172" r="4.5" fill="var(--panel)" stroke="var(--valid)" stroke-width="1.5" />
+          <circle cx="30" cy="216" r="4.5" fill="var(--panel)" stroke="var(--violated)" stroke-width="1.5" />
+        </svg>
+
+        <!-- Past rows (30px each) -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">Requested</span>
+            <span class="row-detail">initial</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">ApproveRequest</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Approved</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PrintBadge</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">ReadyForPickup</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--edit">edit OutcomeNote</span>
+          </div>
+        </div>
+        <div class="history-row history-row--current">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">ReadyForPickup</span>
+            <span class="row-detail">4 steps</span>
+          </div>
+        </div>
+
+        <!-- ▸ Future: clickable action rows (44px each) -->
+        <div class="va-future-row" role="button" tabindex="0" aria-label="Fire Pick Up event">
+          <div class="row-rail"></div>
+          <div class="va-future-content">
+            <div class="va-event-line">
+              <span class="va-event-name--go">Pick Up</span>
+            </div>
+            <div class="va-verdict va-verdict--go">
+              <span style="color:var(--soft);font-size:9px">→</span>
+              <span>PickedUp</span>
+            </div>
+          </div>
+        </div>
+        <div class="va-future-row va-future-row--blocked" aria-label="Expire event is blocked">
+          <div class="row-rail"></div>
+          <div class="va-future-content">
+            <div class="va-event-line">
+              <span class="va-event-name--off">Expire</span>
+            </div>
+            <div class="va-verdict va-verdict--blocked">
+              <span style="font-size:9px">⊘</span>
+              <span>Pickup window must be closed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: form only — no event buttons -->
+    <section class="detail" aria-label="Record context">
+      <div>
+        <div class="fields-head">
+          <span class="fields-head-label">Fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 5 fields</span>
+        </div>
+        <div class="card-fields">
+          <div class="f-row"><span class="f-label">Visitor name</span><span class="f-val">Ada Reyes</span></div>
+          <div class="f-row"><span class="f-label f-label--constrained">Host confirmed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Badge printed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Pickup window</span><span class="f-val f-val--open">Open</span></div>
+          <div class="f-row"><span class="f-label f-label--required">Outcome note</span><input class="f-input" type="text" placeholder="Enter outcome note…"></div>
+        </div>
+      </div>
+      <!-- Only Save/Cancel — event actions live in timeline -->
+      <div class="va-form-actions">
+        <button class="form-btn form-btn--save" type="button">Save</button>
+        <button class="form-btn form-btn--cancel" type="button">Cancel</button>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span>A — Timeline is the action surface</span>
+    <span>Future rows are clickable · action bar removed from form</span>
+  </footer>
+</div>
+
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  VARIANT C — Buttons Grow the Timeline                     ║
+     ║  Ghost rows at timeline bottom = pending next steps        ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+
+<div class="variant" id="variant-c">
+  <div class="variant-label">
+    <span class="variant-letter">C</span>
+    <span class="variant-name">Buttons grow the timeline</span>
+    <span class="variant-desc">Dashed ghost rows = the next entry that will be written</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-eyebrow">Precept</span>
+      <span class="header-name">VisitorBadgePickup</span>
+      <span class="header-id">#VBP-2847</span>
+    </div>
+    <div class="state-pill">
+      <span class="state-pill-dot" aria-hidden="true"></span>
+      ReadyForPickup
+    </div>
+  </header>
+
+  <div class="body-grid">
+    <section class="history" aria-label="Lifecycle history">
+      <div class="history-head">
+        <span class="history-head-label">Timeline</span>
+        <span class="history-head-count">4 steps · 3 states visited</span>
+      </div>
+      <div class="history-table">
+        <!-- SVG: 5 rows × 30px = 150, pending label ~22px, ghost rows 2 × 44 = 88 → total ~260 -->
+        <svg class="graph-svg" viewBox="0 0 48 260" preserveAspectRatio="xMinYMin meet"
+             style="height:260px" role="img" aria-label="Git-graph timeline rail">
+          <!-- Trunk: initial through current -->
+          <line x1="14" y1="15" x2="14" y2="135" stroke="var(--state)" stroke-width="2" />
+          <!-- Ghost fork: current → PickUp ghost (center ~194) -->
+          <line x1="14" y1="135" x2="14" y2="194" stroke="var(--valid)" stroke-width="1.5" stroke-dasharray="3 4" opacity="0.5" />
+          <!-- Ghost fork: current → Expire ghost (center ~238) -->
+          <path d="M 14 135 C 14 160, 30 170, 30 188" fill="none" stroke="var(--violated)" stroke-width="1.5" stroke-dasharray="3 4" opacity="0.4" />
+          <line x1="30" y1="188" x2="30" y2="238" stroke="var(--violated)" stroke-width="1.5" stroke-dasharray="3 4" opacity="0.4" />
+          <!-- Nodes -->
+          <circle cx="14" cy="15" r="5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="45" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="75" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="135" r="5.5" fill="var(--state)" stroke="none" />
+          <!-- Ghost nodes (ring only, translucent) -->
+          <circle cx="14" cy="194" r="4" fill="none" stroke="var(--valid)" stroke-width="1" stroke-dasharray="2 2" opacity="0.5" />
+          <circle cx="30" cy="238" r="4" fill="none" stroke="var(--violated)" stroke-width="1" stroke-dasharray="2 2" opacity="0.4" />
+        </svg>
+
+        <!-- Past rows -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">Requested</span>
+            <span class="row-detail">initial</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">ApproveRequest</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Approved</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PrintBadge</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">ReadyForPickup</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--edit">edit OutcomeNote</span>
+          </div>
+        </div>
+        <div class="history-row history-row--current">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">ReadyForPickup</span>
+            <span class="row-detail">4 steps</span>
+          </div>
+        </div>
+
+        <!-- ▸ Ghost rows: dashed future actions as pending timeline entries -->
+        <div class="vc-pending-label">next</div>
+
+        <div class="vc-ghost-row" role="button" tabindex="0" aria-label="Fire Pick Up event">
+          <div class="row-rail"></div>
+          <div class="vc-ghost-content">
+            <button class="vc-ghost-btn vc-ghost-btn--go" type="button">Pick Up</button>
+            <span class="vc-ghost-verdict vc-ghost-verdict--go">→ PickedUp</span>
+          </div>
+        </div>
+        <div class="vc-ghost-row vc-ghost-row--blocked" aria-label="Expire event is blocked">
+          <div class="row-rail"></div>
+          <div class="vc-ghost-content">
+            <button class="vc-ghost-btn vc-ghost-btn--off" type="button" disabled>Expire</button>
+            <span class="vc-ghost-verdict vc-ghost-verdict--blocked">⊘ window must be closed</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: form only — events in ghost rows -->
+    <section class="detail" aria-label="Record context">
+      <div>
+        <div class="fields-head">
+          <span class="fields-head-label">Fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 5 fields</span>
+        </div>
+        <div class="card-fields">
+          <div class="f-row"><span class="f-label">Visitor name</span><span class="f-val">Ada Reyes</span></div>
+          <div class="f-row"><span class="f-label f-label--constrained">Host confirmed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Badge printed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Pickup window</span><span class="f-val f-val--open">Open</span></div>
+          <div class="f-row"><span class="f-label f-label--required">Outcome note</span><input class="f-input" type="text" placeholder="Enter outcome note…"></div>
+        </div>
+      </div>
+      <div class="va-form-actions">
+        <button class="form-btn form-btn--save" type="button">Save</button>
+        <button class="form-btn form-btn--cancel" type="button">Cancel</button>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span>C — Buttons grow the timeline</span>
+    <span>Ghost rows with dashed borders · buttons as pending entries</span>
+  </footer>
+</div>
+
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  VARIANT D — Cross-Highlighting on Hover                   ║
+     ║  Both views exist; hover one → the other lights up         ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+
+<div class="variant" id="variant-d">
+  <div class="variant-label">
+    <span class="variant-letter">D</span>
+    <span class="variant-name">Cross-highlighting on hover</span>
+    <span class="variant-desc">Hover timeline fork ⇄ button pulses · shows connection</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-eyebrow">Precept</span>
+      <span class="header-name">VisitorBadgePickup</span>
+      <span class="header-id">#VBP-2847</span>
+    </div>
+    <div class="state-pill">
+      <span class="state-pill-dot" aria-hidden="true"></span>
+      ReadyForPickup
+    </div>
+  </header>
+
+  <div class="body-grid" id="vd-grid">
+    <section class="history" aria-label="Lifecycle history">
+      <div class="history-head">
+        <span class="history-head-label">Timeline</span>
+        <span class="history-head-count">4 steps · 3 states visited</span>
+      </div>
+      <div class="history-table">
+        <svg class="graph-svg" viewBox="0 0 48 210" preserveAspectRatio="xMinYMin meet"
+             style="height:210px" role="img" aria-label="Git-graph timeline rail">
+          <line x1="14" y1="15" x2="14" y2="135" stroke="var(--state)" stroke-width="2" />
+          <line x1="14" y1="135" x2="14" y2="165" stroke="var(--valid)" stroke-width="2" stroke-dasharray="4 3" />
+          <path d="M 14 135 C 14 150, 30 155, 30 165" fill="none" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <line x1="30" y1="165" x2="30" y2="195" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <circle cx="14" cy="15" r="5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="45" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="75" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="135" r="5.5" fill="var(--state)" stroke="none" />
+          <circle cx="14" cy="165" r="4.5" fill="var(--panel)" stroke="var(--valid)" stroke-width="1.5" />
+          <circle cx="30" cy="195" r="4.5" fill="var(--panel)" stroke="var(--violated)" stroke-width="1.5" />
+        </svg>
+
+        <!-- Past rows -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">Requested</span>
+            <span class="row-detail">initial</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">ApproveRequest</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Approved</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PrintBadge</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">ReadyForPickup</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--edit">edit OutcomeNote</span>
+          </div>
+        </div>
+        <div class="history-row history-row--current">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">ReadyForPickup</span>
+            <span class="row-detail">4 steps</span>
+          </div>
+        </div>
+
+        <!-- Future: linked to buttons -->
+        <div class="history-row history-row--future history-row--future-ok vd-row-pickup"
+             data-vd-link="pickup">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PickUp</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">PickedUp</span>
+            <span class="vd-link-dot vd-link-dot--go vd-link-dot-pickup" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="history-row history-row--future history-row--future-blocked vd-row-expire"
+             data-vd-link="expire">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">Expire</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Expired</span>
+            <span class="row-detail">blocked</span>
+            <span class="vd-link-dot vd-link-dot--blocked vd-link-dot-expire" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: full form + action bar (both live here) -->
+    <section class="detail" aria-label="Record context and actions">
+      <div>
+        <div class="fields-head">
+          <span class="fields-head-label">Fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 5 fields</span>
+        </div>
+        <div class="card-fields">
+          <div class="f-row"><span class="f-label">Visitor name</span><span class="f-val">Ada Reyes</span></div>
+          <div class="f-row"><span class="f-label f-label--constrained">Host confirmed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Badge printed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Pickup window</span><span class="f-val f-val--open">Open</span></div>
+          <div class="f-row"><span class="f-label f-label--required">Outcome note</span><input class="f-input" type="text" placeholder="Enter outcome note…"></div>
+        </div>
+      </div>
+      <div class="card-actions">
+        <div class="action-bar">
+          <div class="action-bar-left">
+            <button class="form-btn form-btn--save" type="button">Save</button>
+            <button class="form-btn form-btn--cancel" type="button">Cancel</button>
+          </div>
+          <div class="action-bar-right">
+            <div class="verdict-item vd-btn-pickup" data-vd-link="pickup">
+              <button class="act-btn act-btn--go" type="button">
+                <span class="vd-link-dot vd-link-dot--go vd-link-dot-pickup" aria-hidden="true"></span>
+                Pick Up
+              </button>
+              <div class="verdict-line verdict-line--go">
+                <span class="v-arrow">→</span>
+                <span>PickedUp</span>
+              </div>
+            </div>
+            <div class="verdict-item vd-btn-expire" data-vd-link="expire">
+              <button class="act-btn act-btn--off" type="button" disabled>
+                <span class="vd-link-dot vd-link-dot--blocked vd-link-dot-expire" aria-hidden="true"></span>
+                Expire
+              </button>
+              <div class="verdict-line verdict-line--blocked">
+                <span class="v-icon">⊘</span>
+                <span>Pickup window must be closed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span>D — Cross-highlighting on hover</span>
+    <span>Hover timeline row ↔ button highlights · pulsing link dot</span>
+  </footer>
+</div>
+
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  VARIANT E — Verdict Lines Move to Timeline                ║
+     ║  Timeline carries explanation; buttons are bare triggers   ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+
+<div class="variant" id="variant-e">
+  <div class="variant-label">
+    <span class="variant-letter">E</span>
+    <span class="variant-name">Verdict lines move to timeline</span>
+    <span class="variant-desc">Timeline has the "why" · buttons are just triggers</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-eyebrow">Precept</span>
+      <span class="header-name">VisitorBadgePickup</span>
+      <span class="header-id">#VBP-2847</span>
+    </div>
+    <div class="state-pill">
+      <span class="state-pill-dot" aria-hidden="true"></span>
+      ReadyForPickup
+    </div>
+  </header>
+
+  <div class="body-grid">
+    <section class="history" aria-label="Lifecycle history">
+      <div class="history-head">
+        <span class="history-head-label">Timeline</span>
+        <span class="history-head-count">4 steps · 3 states visited</span>
+      </div>
+      <div class="history-table">
+        <!-- SVG: 5×30 past + 2×40 future = 230 -->
+        <svg class="graph-svg" viewBox="0 0 48 230" preserveAspectRatio="xMinYMin meet"
+             style="height:230px" role="img" aria-label="Git-graph timeline rail">
+          <line x1="14" y1="15" x2="14" y2="135" stroke="var(--state)" stroke-width="2" />
+          <!-- Fork: current → PickUp (center at 150 + 20 = 170) -->
+          <line x1="14" y1="135" x2="14" y2="170" stroke="var(--valid)" stroke-width="2" stroke-dasharray="4 3" />
+          <!-- Fork: current → Expire (center at 150 + 40 + 20 = 210) -->
+          <path d="M 14 135 C 14 155, 30 162, 30 175" fill="none" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <line x1="30" y1="175" x2="30" y2="210" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <!-- Nodes -->
+          <circle cx="14" cy="15" r="5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="45" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="75" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="135" r="5.5" fill="var(--state)" stroke="none" />
+          <circle cx="14" cy="170" r="4.5" fill="var(--panel)" stroke="var(--valid)" stroke-width="1.5" />
+          <circle cx="30" cy="210" r="4.5" fill="var(--panel)" stroke="var(--violated)" stroke-width="1.5" />
+        </svg>
+
+        <!-- Past rows -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">Requested</span>
+            <span class="row-detail">initial</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">ApproveRequest</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Approved</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PrintBadge</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">ReadyForPickup</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--edit">edit OutcomeNote</span>
+          </div>
+        </div>
+        <div class="history-row history-row--current">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">ReadyForPickup</span>
+            <span class="row-detail">4 steps</span>
+          </div>
+        </div>
+
+        <!-- ▸ Future: expanded rows with verdict detail -->
+        <div class="ve-future-row">
+          <div class="row-rail"></div>
+          <div class="ve-future-content">
+            <div class="ve-event-line">
+              <span style="color:var(--valid);font-weight:500">PickUp</span>
+            </div>
+            <div class="ve-verdict-detail ve-verdict-detail--go">
+              <span class="v-arrow">→</span>
+              <span>PickedUp</span>
+              <span style="color:var(--soft);margin-left:4px">· badge printed, window open</span>
+            </div>
+          </div>
+        </div>
+        <div class="ve-future-row">
+          <div class="row-rail"></div>
+          <div class="ve-future-content">
+            <div class="ve-event-line">
+              <span style="color:var(--violated);opacity:0.6">Expire</span>
+              <span style="color:var(--soft);font-size:10px;opacity:0.5">blocked</span>
+            </div>
+            <div class="ve-verdict-detail ve-verdict-detail--blocked">
+              <span style="font-size:9px">⊘</span>
+              <span>Pickup window must be closed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: form + bare trigger buttons (no verdict lines) -->
+    <section class="detail" aria-label="Record context and actions">
+      <div>
+        <div class="fields-head">
+          <span class="fields-head-label">Fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 5 fields</span>
+        </div>
+        <div class="card-fields">
+          <div class="f-row"><span class="f-label">Visitor name</span><span class="f-val">Ada Reyes</span></div>
+          <div class="f-row"><span class="f-label f-label--constrained">Host confirmed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Badge printed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Pickup window</span><span class="f-val f-val--open">Open</span></div>
+          <div class="f-row"><span class="f-label f-label--required">Outcome note</span><input class="f-input" type="text" placeholder="Enter outcome note…"></div>
+        </div>
+      </div>
+      <div class="card-actions">
+        <div class="action-bar">
+          <div class="action-bar-left">
+            <button class="form-btn form-btn--save" type="button">Save</button>
+            <button class="form-btn form-btn--cancel" type="button">Cancel</button>
+          </div>
+          <div class="ve-action-bar-right">
+            <button class="ve-bare-btn ve-bare-btn--go" type="button">Pick Up</button>
+            <button class="ve-bare-btn ve-bare-btn--off" type="button" disabled>Expire</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span>E — Verdict lines move to timeline</span>
+    <span>Timeline carries reasoning · buttons are bare triggers</span>
+  </footer>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  VARIANT F — Timeline Right (with original action bar)     ║
+     ║  Form is primary left column; timeline is context right    ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+
+<div class="variant" id="variant-f">
+  <div class="variant-label">
+    <span class="variant-letter">F</span>
+    <span class="variant-name">Form-first · timeline right (with buttons)</span>
+    <span class="variant-desc">Form + full action bar left · timeline as context right</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-eyebrow">Precept</span>
+      <span class="header-name">VisitorBadgePickup</span>
+      <span class="header-id">#VBP-2847</span>
+    </div>
+    <div class="state-pill">
+      <span class="state-pill-dot" aria-hidden="true"></span>
+      ReadyForPickup
+    </div>
+  </header>
+
+  <div class="body-grid body-grid--right-timeline">
+    <!-- LEFT: form + full action bar (primary surface) -->
+    <section class="detail" aria-label="Record context and actions">
+      <div>
+        <div class="fields-head">
+          <span class="fields-head-label">Fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 5 fields</span>
+        </div>
+        <div class="card-fields">
+          <div class="f-row"><span class="f-label">Visitor name</span><span class="f-val">Ada Reyes</span></div>
+          <div class="f-row"><span class="f-label f-label--constrained">Host confirmed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Badge printed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Pickup window</span><span class="f-val f-val--open">Open</span></div>
+          <div class="f-row"><span class="f-label f-label--required">Outcome note</span><input class="f-input" type="text" placeholder="Enter outcome note…"></div>
+        </div>
+      </div>
+      <div class="card-actions">
+        <div class="action-bar">
+          <div class="action-bar-left">
+            <button class="form-btn form-btn--save" type="button">Save</button>
+            <button class="form-btn form-btn--cancel" type="button">Cancel</button>
+          </div>
+          <div class="action-bar-right">
+            <div class="verdict-item">
+              <button class="act-btn act-btn--go" type="button">Pick Up</button>
+              <div class="verdict-line verdict-line--go">
+                <span class="v-arrow">→</span>
+                <span>PickedUp</span>
+              </div>
+            </div>
+            <div class="verdict-item">
+              <button class="act-btn act-btn--off" type="button" disabled>Expire</button>
+              <div class="verdict-line verdict-line--blocked">
+                <span class="v-icon">⊘</span>
+                <span>Pickup window must be closed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: timeline as supporting context -->
+    <section class="history" aria-label="Lifecycle history">
+      <div class="history-head">
+        <span class="history-head-label">Timeline</span>
+        <span class="history-head-count">4 steps · 3 states visited</span>
+      </div>
+      <div class="history-table">
+        <svg class="graph-svg" viewBox="0 0 48 210" preserveAspectRatio="xMinYMin meet"
+             style="height:210px" role="img" aria-label="Git-graph timeline rail">
+          <line x1="14" y1="15" x2="14" y2="135" stroke="var(--state)" stroke-width="2" />
+          <line x1="14" y1="135" x2="14" y2="165" stroke="var(--valid)" stroke-width="2" stroke-dasharray="4 3" />
+          <path d="M 14 135 C 14 150, 30 155, 30 165" fill="none" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <line x1="30" y1="165" x2="30" y2="195" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <circle cx="14" cy="15" r="5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="45" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="75" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="135" r="5.5" fill="var(--state)" stroke="none" />
+          <circle cx="14" cy="165" r="4.5" fill="var(--panel)" stroke="var(--valid)" stroke-width="1.5" />
+          <circle cx="30" cy="195" r="4.5" fill="var(--panel)" stroke="var(--violated)" stroke-width="1.5" />
+        </svg>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">Requested</span>
+            <span class="row-detail">initial</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">ApproveRequest</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Approved</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PrintBadge</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">ReadyForPickup</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--edit">edit OutcomeNote</span>
+          </div>
+        </div>
+        <div class="history-row history-row--current">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">ReadyForPickup</span>
+            <span class="row-detail">4 steps</span>
+          </div>
+        </div>
+        <div class="history-row history-row--future history-row--future-ok">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PickUp</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">PickedUp</span>
+          </div>
+        </div>
+        <div class="history-row history-row--future history-row--future-blocked">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">Expire</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Expired</span>
+            <span class="row-detail">blocked</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span>F — Form-first, timeline right</span>
+    <span>Form is primary · timeline is supporting context · buttons still on form</span>
+  </footer>
+</div>
+
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  VARIANT G — Form-first + Timeline-IS-actions (right)      ║
+     ║  Combines the flip with variant A: actions live in         ║
+     ║  timeline on the right, form has only Save/Cancel          ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+
+<div class="variant" id="variant-g">
+  <div class="variant-label">
+    <span class="variant-letter">G</span>
+    <span class="variant-name">Form-first · timeline-as-actions right</span>
+    <span class="variant-desc">Form left (Save/Cancel only) · clickable future rows right</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-eyebrow">Precept</span>
+      <span class="header-name">VisitorBadgePickup</span>
+      <span class="header-id">#VBP-2847</span>
+    </div>
+    <div class="state-pill">
+      <span class="state-pill-dot" aria-hidden="true"></span>
+      ReadyForPickup
+    </div>
+  </header>
+
+  <div class="body-grid body-grid--right-timeline">
+    <!-- LEFT: form only — no event buttons -->
+    <section class="detail" aria-label="Record context">
+      <div>
+        <div class="fields-head">
+          <span class="fields-head-label">Fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 5 fields</span>
+        </div>
+        <div class="card-fields">
+          <div class="f-row"><span class="f-label">Visitor name</span><span class="f-val">Ada Reyes</span></div>
+          <div class="f-row"><span class="f-label f-label--constrained">Host confirmed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Badge printed</span><span class="f-val f-val--yes">Yes</span></div>
+          <div class="f-row"><span class="f-label">Pickup window</span><span class="f-val f-val--open">Open</span></div>
+          <div class="f-row"><span class="f-label f-label--required">Outcome note</span><input class="f-input" type="text" placeholder="Enter outcome note…"></div>
+        </div>
+      </div>
+      <div class="va-form-actions">
+        <button class="form-btn form-btn--save" type="button">Save</button>
+        <button class="form-btn form-btn--cancel" type="button">Cancel</button>
+      </div>
+    </section>
+
+    <!-- RIGHT: timeline with clickable future rows -->
+    <section class="history" aria-label="Lifecycle history and actions">
+      <div class="history-head">
+        <span class="history-head-label">Timeline</span>
+        <span class="history-head-count">4 steps · 3 states visited</span>
+      </div>
+      <div class="history-table">
+        <!-- SVG: 5 past/current rows × 30px = 150, then 2 action rows × 44px = 88 → total 238 -->
+        <svg class="graph-svg" viewBox="0 0 48 238" preserveAspectRatio="xMinYMin meet"
+             style="height:238px" role="img" aria-label="Git-graph timeline rail">
+          <line x1="14" y1="15" x2="14" y2="135" stroke="var(--state)" stroke-width="2" />
+          <line x1="14" y1="135" x2="14" y2="172" stroke="var(--valid)" stroke-width="2" stroke-dasharray="4 3" />
+          <path d="M 14 135 C 14 155, 30 165, 30 178" fill="none" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <line x1="30" y1="178" x2="30" y2="216" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <circle cx="14" cy="15" r="5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="45" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="75" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="135" r="5.5" fill="var(--state)" stroke="none" />
+          <circle cx="14" cy="172" r="4.5" fill="var(--panel)" stroke="var(--valid)" stroke-width="1.5" />
+          <circle cx="30" cy="216" r="4.5" fill="var(--panel)" stroke="var(--violated)" stroke-width="1.5" />
+        </svg>
+
+        <!-- Past rows -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">Requested</span>
+            <span class="row-detail">initial</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">ApproveRequest</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Approved</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PrintBadge</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">ReadyForPickup</span>
+          </div>
+        </div>
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--edit">edit OutcomeNote</span>
+          </div>
+        </div>
+        <div class="history-row history-row--current">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">ReadyForPickup</span>
+            <span class="row-detail">4 steps</span>
+          </div>
+        </div>
+
+        <!-- Clickable future rows (44px each) -->
+        <div class="vg-future-row" role="button" tabindex="0" aria-label="Fire Pick Up event">
+          <div class="row-rail"></div>
+          <div class="vg-future-content">
+            <div class="vg-event-line">
+              <span class="vg-event-name--go">Pick Up</span>
+            </div>
+            <div class="vg-verdict vg-verdict--go">
+              <span style="color:var(--soft);font-size:9px">→</span>
+              <span>PickedUp</span>
+            </div>
+          </div>
+        </div>
+        <div class="vg-future-row vg-future-row--blocked" aria-label="Expire event is blocked">
+          <div class="row-rail"></div>
+          <div class="vg-future-content">
+            <div class="vg-event-line">
+              <span class="vg-event-name--off">Expire</span>
+            </div>
+            <div class="vg-verdict vg-verdict--blocked">
+              <span style="font-size:9px">⊘</span>
+              <span>Pickup window must be closed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span>G — Form-first + timeline-as-actions right</span>
+    <span>Form is primary · timeline holds both history and clickable futures</span>
+  </footer>
+</div>
+
+
+</div><!-- /.page -->
+
+<!-- ── Cross-highlighting JS for Variant D ── -->
+<script>
+(function() {
+  const grid = document.getElementById('vd-grid');
+  if (!grid) return;
+
+  const links = grid.querySelectorAll('[data-vd-link]');
+
+  links.forEach(el => {
+    const key = el.dataset.vdLink;
+    el.addEventListener('mouseenter', () => {
+      grid.classList.add('vd-highlight-' + key);
+    });
+    el.addEventListener('mouseleave', () => {
+      grid.classList.remove('vd-highlight-' + key);
+    });
+  });
+})();
+</script>
+</body>
+</html>

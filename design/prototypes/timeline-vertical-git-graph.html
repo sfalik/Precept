@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline Vertical Git Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #040506;
+    --panel: #090b0e;
+    --panel-2: #0d1117;
+    --panel-3: #11161d;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --text: #eef2f6;
+    --muted: #a7afbb;
+    --soft: #687281;
+    --state: #a898f5;
+    --event: #30b8e8;
+    --ok: #34d399;
+    --blocked: #fb7185;
+    --mono: "Geist Mono", "Cascadia Code", Consolas, monospace;
+    --sans: "Geist", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    padding: 28px;
+  }
+
+  .frame {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+  }
+
+  .surface {
+    background: linear-gradient(180deg, rgba(9, 11, 14, 0.98), rgba(6, 8, 11, 0.98));
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: 0 22px 64px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+  }
+
+  .surface-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px 18px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  .head-copy {
+    min-width: 0;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--soft);
+    margin-bottom: 7px;
+  }
+
+  .title {
+    font-family: var(--sans);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  .subtitle {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .head-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-content: flex-start;
+    gap: 8px;
+    min-width: 260px;
+  }
+
+  .meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .meta-chip strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .meta-chip--state {
+    color: var(--state);
+    border-color: rgba(168, 152, 245, 0.24);
+    background: rgba(168, 152, 245, 0.08);
+  }
+
+  .scene-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    min-width: 980px;
+    height: auto;
+  }
+
+  .surface-foot {
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--line);
+    color: var(--soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 860px) {
+    body {
+      padding: 16px;
+    }
+
+    .surface-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .head-meta {
+      justify-content: flex-start;
+      min-width: 0;
+    }
+  }
+</style>
+</head>
+<body>
+  <main class="frame">
+    <section class="surface">
+      <header class="surface-head">
+        <div class="head-copy">
+          <div class="eyebrow">Preview Surface Study</div>
+          <div class="title">VisitorBadgePickup <span style="color: var(--muted); font-family: var(--mono); font-size: 18px; font-weight: 500;">#VBP-2847</span></div>
+          <div class="subtitle">Vertical git-graph timeline with a single SVG scene. Topology stays on the left rail; state names, event pills, and guard explanations get full reading width on the right.</div>
+        </div>
+        <div class="head-meta" aria-label="Record summary">
+          <div class="meta-chip"><strong>Record</strong> Ada Reyes</div>
+          <div class="meta-chip meta-chip--state"><strong>Current</strong> ReadyForPickup</div>
+          <div class="meta-chip"><strong>Future Branches</strong> 2</div>
+        </div>
+      </header>
+
+      <div class="scene-scroll">
+        <svg viewBox="0 0 1000 760" role="img" aria-labelledby="graph-title graph-desc">
+          <title id="graph-title">Vertical git-graph inspired preview timeline for VisitorBadgePickup</title>
+          <desc id="graph-desc">A vertical timeline showing Requested, Approved, and ReadyForPickup on the main lane. From ReadyForPickup the graph branches to PickedUp, which is available, and Expired, which is blocked until PickupWindowOpen becomes false.</desc>
+
+          <defs>
+            <filter id="violetGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#a898f5" flood-opacity="0.35" />
+            </filter>
+            <filter id="emeraldGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#34d399" flood-opacity="0.28" />
+            </filter>
+            <filter id="roseGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#fb7185" flood-opacity="0.2" />
+            </filter>
+            <linearGradient id="railFade" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(168,152,245,0.22)" />
+              <stop offset="100%" stop-color="rgba(168,152,245,0.52)" />
+            </linearGradient>
+          </defs>
+
+          <style>
+            .label-kicker {
+              fill: var(--soft);
+              font-family: var(--mono);
+              font-size: 10px;
+              letter-spacing: 0.14em;
+              text-transform: uppercase;
+            }
+            .label-small {
+              fill: var(--soft);
+              font-family: var(--sans);
+              font-size: 12.5px;
+              font-weight: 500;
+            }
+            .state-name {
+              fill: var(--text);
+              font-family: var(--mono);
+              font-size: 24px;
+              font-weight: 600;
+              letter-spacing: -0.03em;
+            }
+            .state-name-current {
+              fill: #f4f1ff;
+              font-family: var(--mono);
+              font-size: 28px;
+              font-weight: 700;
+              letter-spacing: -0.04em;
+            }
+            .support-copy {
+              fill: var(--muted);
+              font-family: var(--sans);
+              font-size: 14px;
+              font-weight: 500;
+            }
+            .copy-strong {
+              fill: var(--text);
+            }
+            .copy-ok {
+              fill: var(--ok);
+            }
+            .copy-blocked {
+              fill: var(--blocked);
+            }
+            .card {
+              fill: var(--panel-2);
+              stroke: rgba(255, 255, 255, 0.07);
+              stroke-width: 1;
+            }
+            .card-current {
+              fill: var(--panel-3);
+              stroke: rgba(168, 152, 245, 0.18);
+              stroke-width: 1.2;
+            }
+            .column-divider {
+              stroke: rgba(255, 255, 255, 0.05);
+              stroke-width: 1;
+            }
+            .rail {
+              fill: none;
+              stroke: #6e66bf;
+              stroke-opacity: 0.82;
+              stroke-width: 3;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+            }
+            .rail-ghost {
+              fill: none;
+              stroke: rgba(168, 152, 245, 0.18);
+              stroke-width: 1.5;
+              stroke-linecap: round;
+              stroke-dasharray: 2 10;
+            }
+            .rail-branch-available {
+              fill: none;
+              stroke: rgba(52, 211, 153, 0.65);
+              stroke-width: 1.4;
+              stroke-linecap: round;
+              stroke-dasharray: 0 9;
+            }
+            .rail-branch-blocked {
+              fill: none;
+              stroke: rgba(251, 113, 133, 0.58);
+              stroke-width: 1.4;
+              stroke-linecap: round;
+              stroke-dasharray: 0 9;
+            }
+            .node-past {
+              fill: #0a0d12;
+              stroke: rgba(168, 152, 245, 0.62);
+              stroke-width: 2;
+            }
+            .node-past-core {
+              fill: rgba(168, 152, 245, 0.9);
+            }
+            .node-current-shell {
+              fill: rgba(168, 152, 245, 0.1);
+              stroke: rgba(168, 152, 245, 0.32);
+              stroke-width: 1;
+            }
+            .node-current {
+              fill: rgba(168, 152, 245, 0.96);
+            }
+            .node-split {
+              fill: #0b0e13;
+              stroke: rgba(168, 152, 245, 0.44);
+              stroke-width: 1.5;
+            }
+            .node-target {
+              fill: #0b0e13;
+              stroke: rgba(168, 152, 245, 0.72);
+              stroke-width: 2;
+            }
+            .node-target-inner {
+              fill: none;
+              stroke: rgba(168, 152, 245, 0.66);
+              stroke-width: 1.5;
+            }
+            .node-target-blocked {
+              fill: #0b0e13;
+              stroke: rgba(251, 113, 133, 0.68);
+              stroke-width: 2;
+            }
+            .node-target-blocked-inner {
+              fill: none;
+              stroke: rgba(251, 113, 133, 0.56);
+              stroke-width: 1.5;
+              stroke-dasharray: 2.5 2.5;
+            }
+            .pill-event {
+              fill: rgba(48, 184, 232, 0.09);
+              stroke: rgba(48, 184, 232, 0.38);
+              stroke-width: 1;
+            }
+            .pill-event-text {
+              fill: var(--event);
+              font-family: var(--mono);
+              font-size: 12px;
+              font-weight: 600;
+            }
+            .pill-status-ok {
+              fill: rgba(52, 211, 153, 0.1);
+              stroke: rgba(52, 211, 153, 0.28);
+              stroke-width: 1;
+            }
+            .pill-status-blocked {
+              fill: rgba(251, 113, 133, 0.1);
+              stroke: rgba(251, 113, 133, 0.28);
+              stroke-width: 1;
+            }
+            .pill-status-text {
+              fill: var(--text);
+              font-family: var(--mono);
+              font-size: 11px;
+              font-weight: 600;
+              letter-spacing: 0.02em;
+            }
+            .pill-role {
+              fill: rgba(255, 255, 255, 0.03);
+              stroke: rgba(255, 255, 255, 0.08);
+              stroke-width: 1;
+            }
+            .pill-role-current {
+              fill: rgba(168, 152, 245, 0.08);
+              stroke: rgba(168, 152, 245, 0.24);
+              stroke-width: 1;
+            }
+            .pill-role-text {
+              fill: var(--muted);
+              font-family: var(--mono);
+              font-size: 11px;
+              font-weight: 600;
+            }
+          </style>
+
+          <text x="44" y="42" class="label-kicker">Graph Rail</text>
+          <text x="220" y="42" class="label-kicker">State And Transition Detail</text>
+          <line x1="196" y1="20" x2="196" y2="706" class="column-divider" />
+
+          <rect x="220" y="74" width="712" height="88" rx="18" class="card" />
+          <rect x="220" y="200" width="712" height="88" rx="18" class="card" />
+          <rect x="220" y="326" width="712" height="112" rx="18" class="card-current" />
+          <rect x="220" y="474" width="712" height="96" rx="18" class="card" />
+          <rect x="220" y="590" width="712" height="96" rx="18" class="card" />
+
+          <path d="M 118 92 V 434" class="rail" />
+          <path d="M 118 434 C 118 470 170 472 170 520 V 548" class="rail" />
+          <path d="M 118 434 C 118 512 70 548 70 636 V 664" class="rail" />
+          <path d="M 170 548 V 570" class="rail-ghost" />
+          <path d="M 70 664 V 690" class="rail-ghost" />
+          <path d="M 126 444 C 126 468 178 470 178 520" class="rail-branch-available" />
+          <path d="M 110 444 C 110 518 62 552 62 636" class="rail-branch-blocked" />
+
+          <circle cx="118" cy="118" r="9" class="node-past" />
+          <circle cx="118" cy="118" r="3.5" class="node-past-core" />
+
+          <circle cx="118" cy="244" r="9" class="node-past" />
+          <circle cx="118" cy="244" r="3.5" class="node-past-core" />
+
+          <circle cx="118" cy="382" r="22" class="node-current-shell" filter="url(#violetGlow)" />
+          <circle cx="118" cy="382" r="14" class="node-current" />
+
+          <circle cx="118" cy="434" r="6" class="node-split" />
+          <circle cx="118" cy="434" r="2.3" class="node-past-core" />
+
+          <g filter="url(#emeraldGlow)">
+            <circle cx="170" cy="520" r="12" class="node-target" />
+            <circle cx="170" cy="520" r="6.8" class="node-target-inner" />
+          </g>
+
+          <g filter="url(#roseGlow)">
+            <circle cx="70" cy="636" r="12" class="node-target-blocked" />
+            <circle cx="70" cy="636" r="6.8" class="node-target-blocked-inner" />
+          </g>
+
+          <g>
+            <rect x="250" y="95" width="64" height="24" rx="12" class="pill-role" />
+            <text x="282" y="111" text-anchor="middle" class="pill-role-text">origin</text>
+            <text x="250" y="140" class="state-name">Requested</text>
+            <rect x="250" y="154" width="118" height="24" rx="12" class="pill-event" />
+            <text x="309" y="170" text-anchor="middle" class="pill-event-text">CreateRequest</text>
+            <text x="384" y="171" class="support-copy">Initial capture landed on the main lane and opened review.</text>
+          </g>
+
+          <g>
+            <rect x="250" y="221" width="72" height="24" rx="12" class="pill-role" />
+            <text x="286" y="237" text-anchor="middle" class="pill-role-text">visited</text>
+            <text x="250" y="266" class="state-name">Approved</text>
+            <rect x="250" y="280" width="84" height="24" rx="12" class="pill-event" />
+            <text x="292" y="296" text-anchor="middle" class="pill-event-text">Approve</text>
+            <text x="350" y="297" class="support-copy">Review passed cleanly and stayed on the authoritative trunk.</text>
+          </g>
+
+          <g>
+            <rect x="250" y="348" width="78" height="24" rx="12" class="pill-role-current" />
+            <text x="289" y="364" text-anchor="middle" class="pill-role-text">current</text>
+            <text x="250" y="398" class="state-name-current">ReadyForPickup</text>
+            <rect x="250" y="414" width="120" height="24" rx="12" class="pill-event" />
+            <text x="310" y="430" text-anchor="middle" class="pill-event-text">PreparePickup</text>
+            <text x="389" y="431" class="support-copy">Badge is printed. <tspan class="copy-strong">PickupWindowOpen = true</tspan>, so the branch point can explain both futures without squeezing the copy.</text>
+          </g>
+
+          <g>
+            <rect x="250" y="495" width="92" height="24" rx="12" class="pill-role" />
+            <text x="296" y="511" text-anchor="middle" class="pill-role-text">future lane</text>
+            <text x="250" y="536" class="state-name">PickedUp</text>
+            <rect x="250" y="550" width="78" height="24" rx="12" class="pill-event" />
+            <text x="289" y="566" text-anchor="middle" class="pill-event-text">PickUp</text>
+            <rect x="340" y="550" width="96" height="24" rx="12" class="pill-status-ok" />
+            <text x="388" y="566" text-anchor="middle" class="pill-status-text">available</text>
+            <text x="454" y="567" class="support-copy copy-ok">Open pickup window keeps this terminal branch live right now.</text>
+          </g>
+
+          <g>
+            <rect x="250" y="611" width="92" height="24" rx="12" class="pill-role" />
+            <text x="296" y="627" text-anchor="middle" class="pill-role-text">future lane</text>
+            <text x="250" y="652" class="state-name">Expired</text>
+            <rect x="250" y="666" width="78" height="24" rx="12" class="pill-event" />
+            <text x="289" y="682" text-anchor="middle" class="pill-event-text">Expire</text>
+            <rect x="340" y="666" width="84" height="24" rx="12" class="pill-status-blocked" />
+            <text x="382" y="682" text-anchor="middle" class="pill-status-text">blocked</text>
+            <text x="442" y="683" class="support-copy copy-blocked">Held back until <tspan class="copy-strong">PickupWindowOpen = false</tspan> closes the active pickup path.</text>
+          </g>
+
+          <text x="52" y="82" class="label-kicker">past</text>
+          <text x="40" y="474" class="label-kicker">split</text>
+          <text x="30" y="702" class="label-kicker">future</text>
+        </svg>
+      </div>
+
+      <div class="surface-foot">Vertical graph study: left rail preserves source-control-style topology; right-hand rows preserve full event and guard language.</div>
+    </section>
+  </main>
+</body>
+</html>

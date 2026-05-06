@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Button UX Exploration v4 — Precept</title>
+<style>
+/* ─ Custom Properties ─────────────────────────────────────────────────── */
+:root {
+  --panel:    #090b0e;
+  --panel-2:  #0d1014;
+  --panel-3:  #111518;
+  --event:    #30B8E8;
+  --state:    #A898F5;
+  --data:     #B0BEC5;
+  --violated: #F87171;
+  --warn:     #FDE047;
+  --ok:       #34D399;
+  --line:     rgba(255,255,255,0.08);
+  --line-2:   rgba(255,255,255,0.04);
+  --soft:     #687281;
+  --muted:    #a7afbb;
+  --text:     #d4dae3;
+  --mono:     "Geist Mono","Cascadia Code","Fira Code",monospace;
+  --sans:     "Geist","Segoe UI Variable Text",system-ui,sans-serif;
+}
+
+/* ─ Reset ────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 48px 24px 96px;
+}
+a { color: inherit; text-decoration: none; }
+
+/* ─ Page ─────────────────────────────────────────────────────────────── */
+.page { max-width: 960px; margin: 0 auto; }
+
+.page-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 52px;
+}
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.page-title {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--event);
+  margin-bottom: 12px;
+}
+.page-lead {
+  font-size: 13.5px;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.75;
+}
+.page-lead strong { color: var(--text); font-weight: 500; }
+
+/* ─ Design constraints callout ────────────────────────────────────────── */
+.constraints-box {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 20px 24px;
+  margin-bottom: 52px;
+}
+.constraints-box h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 14px;
+}
+.constraints-box ol {
+  list-style: none;
+  counter-reset: cb;
+  display: grid;
+  gap: 7px;
+  padding: 0;
+}
+.constraints-box li {
+  counter-increment: cb;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  display: flex;
+  gap: 10px;
+}
+.constraints-box li::before {
+  content: counter(cb) ".";
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--soft);
+  min-width: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.constraints-box li strong { color: var(--text); font-weight: 500; }
+
+/* ─ Section label ────────────────────────────────────────────────────── */
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 18px;
+}
+
+/* ─ Divider ──────────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--line); margin: 56px 0; }
+
+/* ─ Variant section ──────────────────────────────────────────────────── */
+.variant { margin-bottom: 72px; }
+.var-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.var-letter {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.var-name {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text);
+}
+.var-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.var-chip--evolution {
+  background: rgba(48,184,232,0.08);
+  border: 1px solid rgba(48,184,232,0.28);
+  color: var(--event);
+}
+.var-chip--rec {
+  background: rgba(168,152,245,0.10);
+  border: 1px solid rgba(168,152,245,0.28);
+  color: var(--state);
+}
+.var-chip--synthesis {
+  background: rgba(52,211,153,0.08);
+  border: 1px solid rgba(52,211,153,0.25);
+  color: var(--ok);
+}
+
+.var-idea {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 28px;
+  max-width: 700px;
+}
+.var-annotation {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--soft);
+  font-style: italic;
+  padding-left: 14px;
+  border-left: 2px solid rgba(255,255,255,0.05);
+  max-width: 620px;
+  line-height: 1.65;
+}
+.var-annotation strong { color: var(--muted); font-weight: 500; }
+
+/* ─ Form Card (shared base) ──────────────────────────────────────────── */
+.form-stage {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 4px;
+}
+.form-card {
+  background: var(--panel-2);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 7px;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.40);
+  position: relative;
+}
+
+/* Card header */
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line);
+  gap: 16px;
+}
+.card-meta { min-width: 0; flex: 1; }
+.card-type {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 3px;
+}
+.card-ref {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.card-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+/* State badge */
+.sbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  line-height: 1.25;
+  flex-shrink: 0;
+  height: fit-content;
+}
+.sbadge--current {
+  border: 1.5px solid rgba(168,152,245,0.55);
+  background: rgba(168,152,245,0.12);
+  color: var(--state);
+}
+
+/* Card fields */
+.card-fields {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 9px;
+}
+.f-row {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+.f-label { font-size: 12px; color: var(--soft); }
+.f-label--constrained { font-style: italic; }
+.f-label--required { color: var(--warn); }
+.f-label--required::after { content: " *"; font-size: 10px; }
+.f-val { color: var(--text); }
+.f-val--yes { color: var(--ok); }
+.f-val--yes::before { content: "✓ "; font-size: 11px; opacity: 0.8; }
+.f-val--open { color: var(--ok); }
+.f-val--open::before { content: "● "; font-size: 9px; opacity: 0.7; }
+
+/* Editable field input */
+.f-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 3px;
+  padding: 5px 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.f-input:focus { border-color: rgba(48,184,232,0.45); }
+.f-input::placeholder { color: var(--soft); }
+
+/* Form buttons (Save/Cancel) */
+.form-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  transition: background 0.12s, border-color 0.12s;
+  line-height: 1.3;
+}
+.form-btn--save {
+  background: rgba(52,211,153,0.12);
+  border-color: rgba(52,211,153,0.32);
+  color: var(--ok);
+}
+.form-btn--save:hover {
+  background: rgba(52,211,153,0.20);
+  border-color: rgba(52,211,153,0.50);
+}
+.form-btn--cancel {
+  border-color: rgba(255,255,255,0.10);
+  color: var(--soft);
+}
+.form-btn--cancel:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.18);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SEMANTIC STATE MODIFIERS (shared across all variants)
+   Visual language for state node badges in transition lanes.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.state-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+/* current — solid border, bright state colour */
+.state-node--current {
+  border: 1.5px solid rgba(168,152,245,0.55);
+  background: rgba(168,152,245,0.12);
+  color: var(--state);
+}
+
+/* terminal — double border effect via box-shadow */
+.state-node--terminal {
+  border: 1px solid rgba(168,152,245,0.30);
+  box-shadow: 0 0 0 2px var(--panel-2), 0 0 0 3px rgba(168,152,245,0.20);
+  background: rgba(168,152,245,0.06);
+  color: var(--state);
+}
+
+/* terminal + blocked — rose double border */
+.state-node--terminal-blocked {
+  border: 1px solid rgba(248,113,113,0.25);
+  box-shadow: 0 0 0 2px var(--panel-2), 0 0 0 3px rgba(248,113,113,0.15);
+  background: rgba(248,113,113,0.04);
+  color: var(--violated);
+  opacity: 0.65;
+}
+
+/* initial — filled dot marker before the name */
+.state-node--initial::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--state);
+  flex-shrink: 0;
+}
+
+/* unreachable — dimmed/muted */
+.state-node--unreachable {
+  border: 1px solid rgba(255,255,255,0.06);
+  background: transparent;
+  color: var(--soft);
+  opacity: 0.45;
+}
+
+/* constrained — italic */
+.state-node--constrained {
+  border: 1px solid rgba(168,152,245,0.20);
+  background: rgba(168,152,245,0.04);
+  color: var(--state);
+  font-style: italic;
+}
+
+/* Terminal marker: ◎ ring after the state name */
+.terminal-mark {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-left: 1px;
+}
+.terminal-mark--active { color: var(--state); }
+.terminal-mark--blocked { color: var(--violated); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SHARED LANE/ARROW ELEMENTS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.lane-arrow-seg {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 28px;
+  flex-shrink: 0;
+}
+.lane-arrow-seg::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  right: 3px;
+  height: 1px;
+}
+.lane-arrow-seg::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-top: 1px solid;
+  border-right: 1px solid;
+  transform: translateY(-50%) rotate(45deg);
+}
+.lane-arrow-seg--active::before { background: rgba(48,184,232,0.40); }
+.lane-arrow-seg--active::after { border-color: rgba(48,184,232,0.45); }
+.lane-arrow-seg--blocked::before { background: rgba(248,113,113,0.20); }
+.lane-arrow-seg--blocked::after { border-color: rgba(248,113,113,0.22); }
+.lane-arrow-seg--muted::before { background: rgba(255,255,255,0.08); }
+.lane-arrow-seg--muted::after { border-color: rgba(255,255,255,0.10); }
+
+/* Event button inside lanes */
+.lane-evt {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  border: 1px solid transparent;
+  background: none;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  line-height: 1.3;
+}
+.lane-evt--active {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+}
+.lane-evt--active:hover {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+.lane-evt--blocked {
+  border-color: rgba(255,255,255,0.11);
+  color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Block reason line */
+.block-reason {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--violated);
+  opacity: 0.70;
+  line-height: 1.35;
+}
+.block-reason .br-icon { font-size: 10px; flex-shrink: 0; }
+
+/* Verdict line */
+.verdict-text {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+.verdict-text--ready {
+  color: var(--ok);
+  opacity: 0.7;
+}
+.verdict-text--blocked {
+  color: var(--violated);
+  opacity: 0.70;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT K1 — Diverging Lanes
+   Current state shown ONCE at left, two lanes diverge rightward.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-k1 .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-k1 .action-layout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.card-k1 .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+/* Diverging structure: origin on left, two lanes splitting right */
+.diverge-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.diverge-origin {
+  flex-shrink: 0;
+  z-index: 2;
+}
+.diverge-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diverge-lane {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.diverge-lane-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.diverge-lane-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Active lane brightens on hover */
+.diverge-lane--active:hover .lane-arrow-seg--active::before { background: rgba(48,184,232,0.60); }
+.diverge-lane--active:hover .lane-arrow-seg--active::after { border-color: rgba(48,184,232,0.65); }
+.diverge-lane--active:hover .state-node--terminal {
+  border-color: rgba(168,152,245,0.50);
+  background: rgba(168,152,245,0.10);
+}
+
+/* Blocked lane rose-tint on hover */
+.diverge-lane--blocked:hover .lane-evt--blocked {
+  border-color: rgba(248,113,113,0.22);
+  color: var(--violated);
+  opacity: 0.60;
+}
+.diverge-lane--blocked:hover .block-reason { opacity: 1; }
+.diverge-lane--blocked:hover .lane-arrow-seg--muted::before { background: rgba(248,113,113,0.18); }
+.diverge-lane--blocked:hover .lane-arrow-seg--muted::after { border-color: rgba(248,113,113,0.20); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT K2 — Target-Only Cards
+   Drop the current state. Each event is a card: event name → target.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-k2 .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-k2 .action-layout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.card-k2 .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+}
+.card-k2 .action-bar-right {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.tcard {
+  display: flex;
+  flex-direction: column;
+  border-radius: 5px;
+  padding: 12px 16px 11px;
+  min-width: 175px;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+.tcard--active {
+  border: 1px solid rgba(48,184,232,0.30);
+  background: rgba(48,184,232,0.04);
+  cursor: pointer;
+}
+.tcard--active:hover {
+  border-color: rgba(48,184,232,0.55);
+  background: rgba(48,184,232,0.08);
+  box-shadow: 0 2px 12px rgba(48,184,232,0.08);
+}
+.tcard--blocked {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.70;
+}
+.tcard--blocked:hover {
+  border-color: rgba(248,113,113,0.20);
+  opacity: 0.85;
+}
+
+.tcard-name {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.tcard--active .tcard-name { color: var(--event); }
+.tcard--blocked .tcard-name { color: var(--soft); }
+
+.tcard-flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.tcard-arrow {
+  font-size: 10px;
+  color: var(--soft);
+}
+.tcard-reason {
+  font-size: 10.5px;
+  color: var(--violated);
+  opacity: 0.80;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+.tcard-reason .tr-icon { font-size: 10px; margin-right: 3px; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT K3 — Stacked Transitions
+   Vertical stack: each row is [Event] → [TargetState] + guard status.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-k3 .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-k3 .action-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card-k3 .action-bar-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transition-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.trow {
+  display: grid;
+  grid-template-columns: auto 28px auto 1fr;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 0;
+  transition: background 0.12s;
+}
+.trow + .trow {
+  border-top: 1px solid var(--line);
+}
+.trow--active {
+  background: rgba(48,184,232,0.02);
+}
+.trow--active:hover {
+  background: rgba(48,184,232,0.06);
+}
+.trow--blocked {
+  background: transparent;
+}
+.trow--blocked:hover {
+  background: rgba(248,113,113,0.02);
+}
+
+.trow-event {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 13px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  line-height: 1.3;
+}
+.trow--active .trow-event {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+}
+.trow--active:hover .trow-event {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+.trow--blocked .trow-event {
+  border-color: rgba(255,255,255,0.08);
+  color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.60;
+}
+.trow--blocked:hover .trow-event {
+  border-color: rgba(248,113,113,0.18);
+  color: var(--violated);
+  opacity: 0.65;
+}
+
+.trow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 28px;
+}
+.trow-arrow::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  right: 4px;
+  height: 1px;
+}
+.trow-arrow::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 4px;
+  height: 4px;
+  border-top: 1px solid;
+  border-right: 1px solid;
+  transform: translateY(-50%) rotate(45deg);
+}
+.trow--active .trow-arrow::before { background: rgba(48,184,232,0.35); }
+.trow--active .trow-arrow::after { border-color: rgba(48,184,232,0.40); }
+.trow--blocked .trow-arrow::before { background: rgba(255,255,255,0.08); }
+.trow--blocked .trow-arrow::after { border-color: rgba(255,255,255,0.10); }
+.trow--blocked:hover .trow-arrow::before { background: rgba(248,113,113,0.18); }
+.trow--blocked:hover .trow-arrow::after { border-color: rgba(248,113,113,0.20); }
+
+.trow-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 4px;
+  min-width: 0;
+}
+.trow-reason {
+  font-size: 10.5px;
+  color: var(--violated);
+  opacity: 0.70;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trow-reason .tri-icon { font-size: 10px; margin-right: 3px; }
+
+.trow--blocked:hover .trow-reason { opacity: 1; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT K4 — Action Lane with Verdict
+   Horizontal lanes with always-visible verdict strip underneath.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-k4 .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-k4 .action-layout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.card-k4 .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+}
+.card-k4 .action-bar-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vlane-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vlane-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.vlane-verdict {
+  padding-left: 2px;
+}
+.vlane-verdict-text {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+.vlane-verdict-text--ready {
+  color: var(--ok);
+  opacity: 0.65;
+}
+.vlane-verdict-text--blocked {
+  color: var(--violated);
+  opacity: 0.70;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.vlane-verdict-text--blocked .vv-icon { font-size: 10px; flex-shrink: 0; }
+
+/* K4 hover: active lane brightens */
+.vlane-group--active:hover .lane-arrow-seg--active::before { background: rgba(48,184,232,0.60); }
+.vlane-group--active:hover .lane-arrow-seg--active::after { border-color: rgba(48,184,232,0.65); }
+.vlane-group--active:hover .state-node--terminal {
+  border-color: rgba(168,152,245,0.50);
+  background: rgba(168,152,245,0.10);
+}
+.vlane-group--active:hover .vlane-verdict-text--ready { opacity: 0.9; }
+
+/* K4 hover: blocked lane rose-tint */
+.vlane-group--blocked:hover .lane-evt--blocked {
+  border-color: rgba(248,113,113,0.22);
+  color: var(--violated);
+  opacity: 0.60;
+}
+.vlane-group--blocked:hover .vlane-verdict-text--blocked { opacity: 1; }
+.vlane-group--blocked:hover .lane-arrow-seg--muted::before { background: rgba(248,113,113,0.18); }
+.vlane-group--blocked:hover .lane-arrow-seg--muted::after { border-color: rgba(248,113,113,0.20); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT K5 — Synthesis: Transition Manifest
+   Best ideas from K1–K4 combined into the shippable version.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-k5 .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-k5 .action-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-k5 .action-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Manifest: each transition is a self-contained row */
+.manifest {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.mrow {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 0;
+  transition: background 0.12s;
+}
+.mrow + .mrow {
+  border-top: 1px solid var(--line);
+}
+
+.mrow-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.mrow-lane {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.mrow-verdict {
+  padding-left: 2px;
+  padding-top: 4px;
+}
+
+/* Active row */
+.mrow--active {
+  background: rgba(48,184,232,0.02);
+}
+.mrow--active:hover {
+  background: rgba(48,184,232,0.06);
+}
+.mrow--active:hover .lane-arrow-seg--active::before { background: rgba(48,184,232,0.60); }
+.mrow--active:hover .lane-arrow-seg--active::after { border-color: rgba(48,184,232,0.65); }
+.mrow--active:hover .state-node--terminal {
+  border-color: rgba(168,152,245,0.50);
+  background: rgba(168,152,245,0.10);
+}
+.mrow--active:hover .verdict-text--ready { opacity: 0.9; }
+
+/* Blocked row */
+.mrow--blocked {
+  background: transparent;
+}
+.mrow--blocked:hover {
+  background: rgba(248,113,113,0.02);
+}
+.mrow--blocked:hover .lane-evt--blocked {
+  border-color: rgba(248,113,113,0.22);
+  color: var(--violated);
+  opacity: 0.60;
+}
+.mrow--blocked:hover .verdict-text--blocked { opacity: 1; }
+.mrow--blocked:hover .state-node--terminal-blocked {
+  opacity: 0.80;
+  border-color: rgba(248,113,113,0.35);
+}
+.mrow--blocked:hover .lane-arrow-seg--muted::before { background: rgba(248,113,113,0.18); }
+.mrow--blocked:hover .lane-arrow-seg--muted::after { border-color: rgba(248,113,113,0.20); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RECOMMENDATION SECTION
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.rec-section {
+  background: var(--panel-2);
+  border: 1px solid rgba(168,152,245,0.20);
+  border-radius: 6px;
+  padding: 28px 28px 24px;
+  margin-top: 56px;
+}
+.rec-section h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--state);
+  margin-bottom: 14px;
+}
+.rec-section p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 10px;
+}
+.rec-section p strong { color: var(--text); font-weight: 500; }
+.rec-section p:last-child { margin-bottom: 0; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Page Header ───────────────────────────────────────────────── -->
+  <header class="page-header">
+    <div class="page-eyebrow">Design Prototypes · Event Button UX · v4 · 2026-04-12</div>
+    <h1 class="page-title">Transition Lane Refinements — K-Series Variants</h1>
+    <p class="page-lead">
+      Five new variants evolving from <strong>Variant K (Transition Lane)</strong>, addressing Shane's feedback:
+      no repeated current state, all information visible at rest, target states always shown with
+      <strong>semantic modifiers</strong> (terminal, initial, current), and no hover required for critical info.
+      Mock data: <strong>VisitorBadgePickup</strong> at <strong>ReadyForPickup</strong>.
+    </p>
+  </header>
+
+  <!-- ── Design Constraints ────────────────────────────────────────── -->
+  <div class="constraints-box">
+    <h3>Shane's Constraints for v4</h3>
+    <ol>
+      <li><strong>No hover required</strong> — all information (target state, blocked reason) visible at rest. Hover can enhance but never gate.</li>
+      <li><strong>Don't repeat the current state</strong> — both events originate from ReadyForPickup; showing it twice is redundant.</li>
+      <li><strong>Always show the target state</strong> — even for disabled events. The user sees where each event WOULD go.</li>
+      <li><strong>Semantic modifiers on target states</strong> — terminal (double border), initial (filled dot), current (bright solid border), unreachable (dimmed), constrained (italic).</li>
+    </ol>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT K1 — Diverging Lanes
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant K1</span>
+      <span class="var-name">Diverging Lanes</span>
+      <span class="var-chip var-chip--evolution">K evolution</span>
+    </div>
+    <p class="var-idea">
+      Current state shown <strong>once</strong> at the left origin, two lanes diverge rightward to their targets.
+      The active lane is bright with event‑colour arrows; the blocked lane is muted with the reason inline.
+      Both target states carry semantic modifier badges — PickedUp and Expired show double‑border terminal markers.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-k1">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--current">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions">
+          <div class="action-layout">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="diverge-group">
+              <!-- Shared origin -->
+              <div class="diverge-origin">
+                <span class="state-node state-node--current">ReadyForPickup</span>
+              </div>
+              <!-- Two diverging lanes -->
+              <div class="diverge-lanes">
+                <!-- Active lane: → PickUp → PickedUp (terminal) -->
+                <div class="diverge-lane diverge-lane--active">
+                  <div class="diverge-lane-body">
+                    <div class="diverge-lane-row">
+                      <span class="lane-arrow-seg lane-arrow-seg--active"></span>
+                      <button class="lane-evt lane-evt--active">Pick Up</button>
+                      <span class="lane-arrow-seg lane-arrow-seg--active"></span>
+                      <span class="state-node state-node--terminal">PickedUp <span class="terminal-mark terminal-mark--active">◎</span></span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Blocked lane: → Expire → Expired (terminal, muted) -->
+                <div class="diverge-lane diverge-lane--blocked">
+                  <div class="diverge-lane-body">
+                    <div class="diverge-lane-row">
+                      <span class="lane-arrow-seg lane-arrow-seg--muted"></span>
+                      <button class="lane-evt lane-evt--blocked" disabled>Expire</button>
+                      <span class="lane-arrow-seg lane-arrow-seg--muted"></span>
+                      <span class="state-node state-node--terminal-blocked">Expired <span class="terminal-mark terminal-mark--blocked">◎</span></span>
+                    </div>
+                    <div class="block-reason" style="padding-left: 30px; margin-top: 3px;">
+                      <span class="br-icon">⊘</span>
+                      <span>Pickup window must be closed before expiry</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      Shared origin eliminates repetition; the diverging shape communicates "branching path" at a glance — the strongest structural metaphor for variant K's diagram concept.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT K2 — Target-Only Cards
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant K2</span>
+      <span class="var-name">Target-Only Cards</span>
+      <span class="var-chip var-chip--evolution">K evolution</span>
+    </div>
+    <p class="var-idea">
+      Drop the current state entirely — it's already in the header badge. Each event is a card showing:
+      event name → target state (with semantic modifier). Active cards are clickable surfaces.
+      Blocked cards show the block reason as a subtitle. The "lane" is implied by the arrow inside the card,
+      not a full diagram.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-k2">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--current">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions: Target-only cards -->
+        <div class="card-actions">
+          <div class="action-layout">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="action-bar-right">
+              <!-- Active event card -->
+              <div class="tcard tcard--active" role="button" tabindex="0">
+                <div class="tcard-name">Pick Up</div>
+                <div class="tcard-flow">
+                  <span class="tcard-arrow">→</span>
+                  <span class="state-node state-node--terminal">PickedUp <span class="terminal-mark terminal-mark--active">◎</span></span>
+                </div>
+              </div>
+              <!-- Blocked event card -->
+              <div class="tcard tcard--blocked" role="button" aria-disabled="true">
+                <div class="tcard-name">Expire</div>
+                <div class="tcard-flow">
+                  <span class="tcard-arrow">→</span>
+                  <span class="state-node state-node--terminal-blocked">Expired <span class="terminal-mark terminal-mark--blocked">◎</span></span>
+                </div>
+                <div class="tcard-reason"><span class="tr-icon">⊘</span>Pickup window must be closed before expiry</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      The most compact variant — origin state is in the header badge, each card is just event → target. Best for narrow panels where horizontal space is constrained.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT K3 — Stacked Transitions
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant K3</span>
+      <span class="var-name">Stacked Transitions</span>
+      <span class="var-chip var-chip--evolution">K evolution</span>
+    </div>
+    <p class="var-idea">
+      Vertical stack instead of horizontal. Each row is one transition: <code>[Event] → [TargetState]</code>
+      with inline guard status. Reads top to bottom like a changelog — compact vertical layout for narrow panels.
+      Blocked rows show the reason inline. Target state nodes carry semantic modifiers.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-k3">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--current">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions: Stacked transition rows -->
+        <div class="card-actions">
+          <div class="action-layout">
+            <div class="action-bar-top">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="transition-stack">
+              <!-- Active transition row -->
+              <div class="trow trow--active">
+                <button class="trow-event">Pick Up</button>
+                <span class="trow-arrow"></span>
+                <span class="state-node state-node--terminal">PickedUp <span class="terminal-mark terminal-mark--active">◎</span></span>
+                <span class="trow-info"></span>
+              </div>
+              <!-- Blocked transition row -->
+              <div class="trow trow--blocked">
+                <button class="trow-event" disabled>Expire</button>
+                <span class="trow-arrow"></span>
+                <span class="state-node state-node--terminal-blocked">Expired <span class="terminal-mark terminal-mark--blocked">◎</span></span>
+                <span class="trow-info">
+                  <span class="trow-reason"><span class="tri-icon">⊘</span>Pickup window must be closed</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      The table-like structure reads naturally top to bottom, scales well for 3+ events, and keeps the footprint narrow — ideal for VS Code's sidebar panel width.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT K4 — Action Lane with Verdict
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant K4</span>
+      <span class="var-name">Action Lane with Verdict</span>
+      <span class="var-chip var-chip--evolution">K evolution</span>
+    </div>
+    <p class="var-idea">
+      Horizontal lanes (like K) but without repeating the origin. Each lane flows:
+      <code>[EventButton] → [TargetState]</code> with a verdict strip underneath — always visible, no hover.
+      Active: "Ready — fire to complete pickup". Blocked: "⊘ pickup window must be closed before expiry".
+      Target state badges carry semantic modifiers.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-k4">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--current">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions: Lanes with verdict strips -->
+        <div class="card-actions">
+          <div class="action-layout">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="action-bar-right">
+              <!-- Active lane + verdict -->
+              <div class="vlane-group vlane-group--active">
+                <div class="vlane-row">
+                  <button class="lane-evt lane-evt--active">Pick Up</button>
+                  <span class="lane-arrow-seg lane-arrow-seg--active"></span>
+                  <span class="state-node state-node--terminal">PickedUp <span class="terminal-mark terminal-mark--active">◎</span></span>
+                </div>
+                <div class="vlane-verdict">
+                  <span class="vlane-verdict-text vlane-verdict-text--ready">✓ Ready — fire to complete pickup</span>
+                </div>
+              </div>
+              <!-- Blocked lane + verdict -->
+              <div class="vlane-group vlane-group--blocked">
+                <div class="vlane-row">
+                  <button class="lane-evt lane-evt--blocked" disabled>Expire</button>
+                  <span class="lane-arrow-seg lane-arrow-seg--muted"></span>
+                  <span class="state-node state-node--terminal-blocked">Expired <span class="terminal-mark terminal-mark--blocked">◎</span></span>
+                </div>
+                <div class="vlane-verdict">
+                  <span class="vlane-verdict-text vlane-verdict-text--blocked">
+                    <span class="vv-icon">⊘</span>
+                    Pickup window must be closed before expiry
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      Preserves the horizontal lane readability of K while adding a persistent verdict that makes every transition self-documenting without interaction.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT K5 — Synthesis: Transition Manifest
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant K5</span>
+      <span class="var-name">Transition Manifest</span>
+      <span class="var-chip var-chip--synthesis">Synthesis</span>
+      <span class="var-chip var-chip--rec">Recommended</span>
+    </div>
+    <p class="var-idea">
+      The shippable version. Takes K3's vertical stack structure (narrow-panel friendly),
+      K4's embedded verdict strips (no hover required), K1's semantic state modifiers
+      (terminal ◎ markers), and K2's "origin lives in the header" principle (no repetition).
+      Each transition is a self-contained row: <code>[Event] → [Target◎] + verdict</code>.
+      The manifest reads as a complete decision surface — every answer the user needs
+      is visible before any interaction.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-k5">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--current">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions: Transition Manifest -->
+        <div class="card-actions">
+          <div class="action-layout">
+            <div class="action-top">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="manifest">
+              <!-- Active transition -->
+              <div class="mrow mrow--active">
+                <div class="mrow-body">
+                  <div class="mrow-lane">
+                    <button class="lane-evt lane-evt--active">Pick Up</button>
+                    <span class="lane-arrow-seg lane-arrow-seg--active"></span>
+                    <span class="state-node state-node--terminal">PickedUp <span class="terminal-mark terminal-mark--active">◎</span></span>
+                  </div>
+                  <div class="mrow-verdict">
+                    <span class="verdict-text verdict-text--ready">✓ Ready — fire to complete pickup</span>
+                  </div>
+                </div>
+              </div>
+              <!-- Blocked transition -->
+              <div class="mrow mrow--blocked">
+                <div class="mrow-body">
+                  <div class="mrow-lane">
+                    <button class="lane-evt lane-evt--blocked" disabled>Expire</button>
+                    <span class="lane-arrow-seg lane-arrow-seg--muted"></span>
+                    <span class="state-node state-node--terminal-blocked">Expired <span class="terminal-mark terminal-mark--blocked">◎</span></span>
+                  </div>
+                  <div class="mrow-verdict">
+                    <span class="verdict-text verdict-text--blocked">⊘ Pickup window must be closed before expiry</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      The manifest is a vertical decision surface that satisfies all four of Shane's constraints: no origin repetition, all targets visible at rest, semantic modifiers on every state node, and verdicts always visible without hover.
+    </p>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       RECOMMENDATION
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="rec-section">
+    <h3>Recommendation</h3>
+    <p>
+      <strong>Ship Variant K5 (Transition Manifest)</strong> as the transition lane pattern.
+    </p>
+    <p>
+      K5 is the only variant that satisfies all four of Shane's constraints simultaneously:
+      (1) no hover required — verdicts are always visible,
+      (2) no repeated current state — origin lives in the header badge,
+      (3) target states always shown — even the blocked Expired state is visible at rest,
+      (4) semantic modifiers on targets — both PickedUp and Expired carry the terminal ◎ marker with double-border treatment.
+    </p>
+    <p>
+      The vertical manifest structure (from K3) fits the VS Code sidebar's narrow panel width far better than K1's horizontal diverging lanes or K4's horizontal layout. The embedded verdict (from K4) makes each row self-documenting. And the "origin in the header" principle (from K2) eliminates redundancy without losing context.
+    </p>
+    <p>
+      <strong>Second choice: K3 (Stacked Transitions)</strong> — same vertical structure but without the verdict strips. Use K3 when vertical space is at a premium and the block reason alone is sufficient (no "Ready" confirmation needed for active events).
+    </p>
+    <p>
+      <strong>Best for wide panels: K1 (Diverging Lanes)</strong> — the shared-origin branching diagram is the most visually expressive, but requires ~500px of horizontal space. Reserve K1 for floating inspector windows or wide preview panels.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

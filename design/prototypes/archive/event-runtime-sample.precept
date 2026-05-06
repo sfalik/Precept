@@ -1,0 +1,56 @@
+precept MaintenanceWorkOrder
+
+field Location as string nullable
+field AssignedTechnician as string nullable
+field Urgent as boolean default false
+field PartsApproved as boolean default false
+field CancellationReason as string nullable
+
+state Draft initial
+state Open
+state Scheduled
+state InProgress
+state Cancelled
+
+in Scheduled assert AssignedTechnician != null 
+	because "Scheduled work must have an assigned technician"
+
+event Submit with WorkLocation as string, IsUrgent as boolean default false
+on Submit assert WorkLocation != "" 
+	because "A location is required"
+
+event Assign with Technician as string
+on Assign assert Technician != "" 
+	because "A technician is required"
+
+event ApproveParts
+event StartWork
+
+event Cancel with Reason as string
+on Cancel assert Reason != "" 
+	because "A cancellation reason is required"
+
+from Draft on Submit 
+	-> set Location = Submit.WorkLocation 
+	-> set Urgent = Submit.IsUrgent 
+	-> transition Open
+
+from Open on Assign 
+	-> set AssignedTechnician = Assign.Technician 
+	-> transition Scheduled
+from Open on Cancel 
+	-> set CancellationReason = Cancel.Reason 
+	-> transition Cancelled
+
+from Scheduled on ApproveParts 
+	-> set PartsApproved = true 
+	-> no transition
+from Scheduled on StartWork when PartsApproved 
+	-> transition InProgress
+from Scheduled on StartWork when Urgent == false 
+	-> transition InProgress
+from Scheduled on StartWork 
+	-> reject "Urgent work must have parts approved before it starts"
+from Scheduled on Cancel 
+	-> set CancellationReason = Cancel.Reason 
+	-> transition Cancelled
