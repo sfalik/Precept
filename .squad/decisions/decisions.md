@@ -15,8 +15,10 @@
 | Status table | Doc maturity updated to reflect CC#25 Q2/Q5/Q7 locked |
 | Overview | `Metadata-First Principle` → `Two-Lane Ingress Principle` |
 | Inputs/Outputs | Updated to reflect two-lane ingress and `JsonElement`-based Restore |
-| `Precept` class block | Two `Create`/`InspectCreate` overloads each (JSON + typed); `Restore(string?, JsonElement)` only |
-| `Version` class block | `PreceptValue` indexer + `Get<T>`; `ArgDescriptor` replaces `ArgInfo`; all commit/inspect methods split into JSON + typed overloads |
+| `Precept` class block | Two `Create`/`InspectCreate` overloads each (JSON + typed); `Restore(string?, JsonElement)` only |
+> **SUPERSEDED:** see 2026-05-05 decision — `Precept.FromJson(JsonElement)` replaces `Restore(string?, JsonElement)` and returns `Version` directly.
+| `Version` class block | `PreceptValue` indexer + `Get<T>`; `ArgDescriptor` replaces `ArgInfo`; all commit/inspect methods split into JSON + typed overloads |
+> **SUPERSEDED:** see 2026-05-05 decision — the raw lane indexer returns `JsonElement`, not `PreceptValue`; typed access remains `Get<T>()`.
 | Create code example | Both lanes shown; dictionary removed |
 | Restore code example | JSON lane only; dictionary removed |
 | Fire code example | Both lanes shown; dictionary removed |
@@ -15094,3 +15096,810 @@ The investigation doc is functionally complete for its investigative purpose. Th
 10. **Precept.Types assembly** — Shane confirmation needed on the separate-package decision
 
 The doc can be archived with these OQs explicitly marked open. Their resolution does not require further investigation — each is a Shane-decides binary/ternary choice.
+
+### 2026-05-05T19:56: User directive
+**By:** Shane (via Copilot)
+**What:** `docs/language/business-domain-types.md` and `docs/runtime/evaluator.md` are canonical docs. Keep them clean from conversation artifacts, decision records, working notes, rationale scaffolding, and anything that reads like a working doc or design discussion. These files contain only the authoritative specification — no "as discussed," no "OQ-" open-question markers, no "locked by frank-114" provenance notes, no "per the investigation" references. Pure specification language only.
+**Why:** User requirement — captured for team memory so all agents respect this boundary when editing canonical docs.
+
+### 2026-05-05T20:38: Shane sign-off on all OQs
+
+**By:** Shane (via Copilot)
+**What:**
+- OQ-3f: Already in canonical doc — confirmed closed. Verify and leave as-is.
+- OQ-CUR-1: Yes, include `symbol` on `Currency`. Add it back to `business-domain-types.md`.
+- OQ-CUR-3: `Get<string>()` should work for **every** value type (Quantity, Money, Price, ExchangeRate, Currency) — not just Currency. This is a universal typed-lane rule.
+- OQ-CUR-4: Embed ISO 4217 as resource. Confirmed.
+- §11: No separate `Precept.Types` assembly. Just a new `Precept.Types` namespace within the existing assembly.
+**Why:** Shane explicit sign-off — captured for team memory and canonical doc promotion.
+
+# Shane Sign-offs Applied — 2026-05-05
+
+- **OQ-CUR-1:** Added `Symbol` (string) to `Currency` sealed class description in `docs/language/business-domain-types.md`; added `.symbol` accessor row to the currency accessors table with supplement-source note.
+- **OQ-CUR-3 (generalized):** Added universal `Get<string>()` rule to `docs/runtime/runtime-api.md` — all registered value types support it; canonical string forms documented for `Quantity`, `Money`, `Price`, `ExchangeRate`, and `Currency`.
+- **§11 (assembly split → namespace):** Rewrote section 11 of `docs/working/precept-value-types-investigation.md` — no separate `Precept.Types` assembly; types live in the `Precept.Types` namespace within the existing `Precept` assembly; removed assembly-split framing and "Pending Shane sign-off" marker.
+
+# OQ Resolutions — Frank — 2026-05-05
+
+Resolved during full cleanup pass on `docs/working/precept-value-types-investigation.md`.
+
+---
+
+## OQ-3f — DSL Constraint Granularity for Quantity Fields
+
+**Decision:** Three constraint levels: `quantity` (any unit), `quantity of '<dimension>'` (any unit within the dimension), `quantity in '<unit>'` (exact unit hard-lock).
+
+**Rationale:** Precept exists to make invalid configurations structurally impossible. The three-level model is the minimum necessary to cover real business needs cleanly. `quantity in 'kg'` catches unit mismatches at the declaration boundary — the type checker validates compatible operations at compile time, the runtime enforces at data ingress. `quantity of 'mass'` is not redundant with `quantity in 'kg'`: the former allows dimension-compatible substitution (logistics fields accepting kg *or* lb); the latter hard-locks to one unit. Collapsing to two levels forces dimension-level invariants into guards; collapsing to one level abandons structural enforcement entirely.
+
+---
+
+## OQ-CUR-1 — Include `Symbol` in `Currency`
+
+**Decision:** Include `symbol` as a curated supplement field on `Currency`.
+
+**Rationale:** The "not in ISO 4217" objection is a purity argument, not a practical one. Every business display of monetary amounts requires the currency symbol. Forcing callers to maintain a parallel symbol map is exactly the structural duplication the catalog-driven architecture prevents. Symbols ambiguous across currencies (e.g., `$` shared by USD/CAD/AUD) are handled with a disambiguated form in the curated supplement (`US$` for USD). The source of the supplement is noted in the field comment.
+
+---
+
+## OQ-CUR-3 — `Get<Currency>()` vs. `Get<string>()` for currency fields
+
+**Decision:** Both `Get<Currency>()` and `Get<string>()` are supported. `Get<Currency>()` is the primary typed API and returns the full catalog-backed object. `Get<string>()` returns the alpha code string for serialization and code-only consumers. The `TypeRuntime<Currency>` adapter handles both via the standard typed-lane dispatch.
+
+**Rationale:** Denying `Get<string>()` creates friction for the most common non-display use case (serialization, logging, comparisons). The dual-lane pattern is consistent with how the typed/raw lanes coexist on `Version` itself.
+
+---
+
+## OQ-CUR-4 — ISO 4217 Shipping Mechanism
+
+**Decision:** Embedded resource in the assembly hosting `CurrencyCatalog`. Not a separate data package at v1.
+
+**Rationale:** ISO 4217 is ~180 rows. Amendment cadence is mostly country name corrections; actual code additions happen only when a country adopts a new currency (multi-year event). The operational impact of being one amendment behind is negligible. The complexity and deployment friction of a separate data package is not justified at v1. Promote if amendment drift creates real friction.
+
+---
+
+## §11 — `Precept.Types` Assembly Split
+
+**Decision:** Recommend. **Pending Shane sign-off.**
+
+**Rationale:** Consumers who build domain models and DTOs using `Money`, `Quantity`, `Currency`, etc. should not take a dependency on the Precept compiler pipeline. The split follows the standard .NET pattern (cf. `Microsoft.Extensions.Logging.Abstractions`). The dependency graph is clean: `Precept.Types` → nothing; `Precept` → `Precept.Types`. The only downside is one additional NuGet package in the distribution — Shane needs to confirm the packaging overhead is acceptable before this locks.
+
+---
+
+## Reconciliation — §5 and §12
+
+**Action taken (not a decision per se):** Corrected §5 to mark `Unit`, `Dimension`, and `UnitTier` as `internal`, updated `Quantity` to use `UnitOfMeasure` (the public proxy type), updated `QuantityFieldDescriptor` to use `UnitOfMeasure?` and `MeasureDimension?`, added API boundary note cross-referencing §12. Also corrected `Price` CLR shape in §7.1 to use `Currency Currency` and `UnitOfMeasure Unit` (not `string` fields). §8.8 updated to match final shapes.
+
+# Decision Record — Canonical Doc Fixes (2026-05-05)
+
+**By:** Frank (Lead Architect)  
+**Date:** 2026-05-05T19:56:32-04:00  
+**Requested by:** Shane  
+**Status:** ✅ Executed
+
+---
+
+## Summary
+
+Four live conflicts between `docs/working/precept-value-types-investigation.md` and the canonical docs were identified and corrected. All edits are surgical — no unrelated content was touched.
+
+---
+
+## Fix 1 — `docs/runtime/runtime-api.md`: Wrong public indexer return type
+
+**Error:** `Version` and `FiredArgs` both showed `public PreceptValue this[string ...] { get; }` in the public API surface documentation. `PreceptValue` is an `internal struct` and must never appear in any public signature (§13 axiom, locked Shane directive).
+
+**Correction:**
+- `Version` indexer changed from `PreceptValue` to `JsonElement`
+- `FiredArgs` indexer changed from `PreceptValue` to `JsonElement`
+- Adjacent prose "The `PreceptValue` indexer returns the raw value..." updated to `JsonElement`
+- Overview bullet "Typed output via `PreceptValue`. Field values...are `PreceptValue`" replaced with accurate dual-lane description (raw lane = `JsonElement`, typed lane = `Get<T>()`)
+
+**Authority:** `docs/working/precept-value-types-investigation.md` §13.1 — The Ruling.
+
+---
+
+## Fix 2 — `docs/language/business-domain-types.md`: "UCUM subset" description
+
+**Error:** Multiple locations in the doc described UCUM support as "a UCUM subset covering common business units." This contradicts OQ-3b (resolved), which locked the design as full UCUM grammar accepted with tiered discovery.
+
+**Corrections made:**
+- §UCUM intro (line ~210): Replaced subset claim with accurate tiered model description (full grammar accepted; Tier 1 ~150 atoms surfaced; Tier 2 ~500 recognized; Tier 3 full ~2,600 for interop)
+- `unitofmeasure` registry scopes table: "ISO 4217, UCUM subset" → "ISO 4217, UCUM (full grammar + tiered discovery)"
+- D5 "What": Updated from "validated against a UCUM subset" to full grammar + tiered tiers
+- D5 "Tradeoff accepted": Updated from "Precept uses a practical subset" to actual tradeoff (Tier 1 list curation)
+- D13 "What": Updated "UCUM subset as a static unit registry" to "tiered UCUM unit registry with a full grammar parser (`UnitCatalog`)"
+- D13 "Alternatives rejected": Item (C) "Full UCUM parser — overkill for v1" updated to "External full UCUM parser library — unnecessary; Precept implements its own grammar natively" (the full grammar was accepted, not rejected)
+
+**Authority:** `docs/working/precept-value-types-investigation.md` §3 (OQ-3b resolved, Option A locked).
+
+---
+
+## Fix 3 — `docs/language/business-domain-types.md`: `currency` backing type wrong
+
+**Error:** The `currency` type section stated `**Backing type:** \`string\` (validated against ISO 4217...)`. The locked design (frank-114, 2026-05-04) is `sealed class Currency` backed by `CurrencyCatalog`.
+
+**Correction:** Backing type updated to:
+> `sealed class Currency` backed by `CurrencyCatalog` (a singleton `FrozenDictionary`-backed ISO 4217 catalog). `Currency` carries: `AlphaCode` (string), `NumericCode` (int), `Name` (string), `MinorUnit` (int), and `Symbol` (string, pending OQ-CUR-1). Equality by alpha code; `ToString()` returns alpha code.
+
+**Authority:** `docs/working/precept-value-types-investigation.md` §8.3 and §8.4. Decision record: `.squad/decisions/accepted/frank-currency-type-design.md`.
+
+---
+
+## Fix 4 — `docs/language/business-domain-types.md`: `currency` accessors were "None"
+
+**Error:** The `currency` accessor section said `**Accessors:** None.` The locked design (§8.5–8.6) adds four DSL accessors: `.name`, `.symbol`, `.minorUnit`, `.numericCode`.
+
+**Correction:** Replaced "None" with accessor table:
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.name` | `string` | Official ISO 4217 currency name |
+| `.symbol` | `string` | Display symbol — curated supplement, pending OQ-CUR-1 |
+| `.minorUnit` | `integer` | Decimal places per ISO 4217 minor unit |
+| `.numericCode` | `integer` | ISO 4217 numeric code |
+
+**Authority:** `docs/working/precept-value-types-investigation.md` §8.5 and §8.6.
+
+---
+
+## Open Questions Preserved
+
+- **OQ-CUR-1:** `.symbol` inclusion is still pending Shane's response. Both the backing type description and the `.symbol` accessor row carry a "(pending OQ-CUR-1)" note.
+- **OQ-CUR-4:** Embedded resource vs. separate data package — not addressed by these fixes, not relevant to doc correctness.
+
+# Audit Summary — `precept-value-types-investigation.md`
+
+**Date:** 2026-05-07  
+**Audit task:** frank-151  
+**Document audited:** `docs/working/precept-value-types-investigation.md`  
+**Canonical sources checked:** `docs/language/business-domain-types.md`, `docs/runtime/runtime-api.md`, `docs/runtime/evaluator.md`
+
+---
+
+## Corrections Applied (6 total)
+
+### Fix 1 — §7.1: Money CLR shape (stale pre-OQ-CUR-2)
+- **Before:** `Money` is `(decimal Amount, string Currency)` — two fields
+- **After:** `Money` is `(decimal Amount, Currency Currency)` — two fields
+- **Source:** OQ-CUR-2 locked; `business-domain-types.md` defines `Currency` as `sealed class`
+
+### Fix 2 — §7.2: ExchangeRate size-note field types (stale pre-OQ-CUR-2)
+- **Before:** `decimal + string + string` / "the `string` fields hold interned ISO 4217 references"
+- **After:** `decimal + Currency + Currency` / "`Currency` instances are interned from `CurrencyCatalog`"
+- **Source:** OQ-CUR-2 upgrade; ExchangeRate fields are `Currency From, Currency To`
+
+### Fix 3 — §8.2: Stale OQ-CUR-4 forward reference
+- **Before:** "The shipping mechanism is flagged as OQ-CUR-4."
+- **After:** "ISO 4217 data ships as an embedded resource in the `CurrencyCatalog` assembly — no separate data package at v1; promote if amendment drift creates meaningful operational friction."
+- **Source:** OQ-CUR-4 resolved in §8.10; embedded resource decision was locked
+
+### Fix 4a — §Addendum shape table: PreceptValue struct vs class
+- **Before:** `sealed class (subtype) | Internal PreceptValue | Runtime slot storage | Entity lifetime`
+- **After:** `32-byte tagged struct | PreceptValue | Runtime slot storage | Opaque tagged union; no per-value heap allocation`
+- **Source:** `runtime-api.md` — "PreceptValue is a **32-byte tagged struct** — not a class hierarchy"
+
+### Fix 4b — §13.2 shape table: PreceptValue struct vs class
+- **Before:** `PreceptValue subtype hierarchy | sealed class | GC-tracked, reference-shared, correct for long-lived storage`
+- **After:** `PreceptValue | 32-byte tagged struct | Opaque tagged union; all field and arg values at runtime`
+- **Source:** Same as 4a
+
+### Fix 5 — §8.8 / §8.11: OQ-CUR-2 status "Presumed agreed" → "Locked"
+- **§8.8 footer before:** `OQ-CUR-2: ✅ Presumed agreed — upgrade applied.`
+- **§8.8 footer after:** `OQ-CUR-2: ✅ Locked — upgrade applied.`
+- **§8.11 table before:** `✅ Presumed agreed`
+- **§8.11 table after:** `✅ Locked`
+- **Source:** §8.10 states the decision definitively with no qualification; all other decisions in the table use `✅ Locked`
+
+---
+
+## Items Confirmed Correct (no change)
+
+- §11 namespace: `Precept.Types` within `Precept` assembly — ✓ (fixed in frank-149)
+- Quantity CLR shape `Quantity(decimal Amount, UnitOfMeasure Unit)` — ✓
+- Price CLR shape `Price(decimal Amount, Currency Currency, UnitOfMeasure Unit)` — ✓
+- ExchangeRate CLR shape `ExchangeRate(decimal Amount, Currency From, Currency To)` — ✓
+- Currency shape `sealed class Currency` with five properties including `Symbol` — ✓
+- Accessor tables (`.value`/`.unit`/`.amount`/`.currency`/`.from`/`.to`) — ✓
+- Constraint levels for quantity (three levels: bare, `of`, `in`) — ✓
+- Raw lane returns `JsonElement` — ✓
+- `Get<string>()` universal rule — ✓
+- `UnitCatalog` / `CurrencyCatalog` names — ✓
+- DSL syntax examples — ✓
+- `ConstraintViolation.FailingValue` boxing table entry: left as `JsonElement?` per §13 axiom (PreceptValue is internal-only; `runtime-api.md` marks the `PreceptValue?` shape as Provisional)
+
+---
+
+## Notable Issues
+
+1. **PreceptValue struct/class confusion was the most significant class of error.** The investigation doc was written when a class-hierarchy design was under consideration. After the struct decision locked in `runtime-api.md`, two tables retained the stale class framing.
+
+2. **The stale OQ-CUR-4 forward reference in §8.2** created a false impression that shipping was unresolved — it was fully resolved before §8.10 was written.
+
+3. **OQ-CUR-2 "Presumed agreed" vs "Locked"** was a consistency gap: §8.10 describes the upgrade in the same definitive tone as all other locked decisions, but §8.8/§8.11 retained the hedged qualifier.
+
+4. **Canonical doc internal inconsistency (out of scope, noted):** `business-domain-types.md` `price` and `exchangerate` "Backing type" lines still say `string` — stale from pre-OQ-CUR-2. The investigation doc's CLR shapes for those types are already correct. This gap in the canonical doc was not addressed here (out of scope for this task).
+
+# Inbox Completeness Audit — Runtime API Public Surface Spec
+
+**By:** Frank (Lead/Architect)  
+**Date:** 2026-05-05  
+**Requested by:** Shane  
+**Status:** Findings report — action required
+
+---
+
+## Scope
+
+Mini-spec audited: `docs/working/runtime-api-public-surface-spec.md`
+
+Inbox files checked:
+- `.squad/decisions/inbox/frank-shane-signoffs-applied.md`
+- `.squad/decisions/inbox/frank-oq-resolutions-2026-05-05.md`
+- `.squad/decisions/inbox/frank-canonical-doc-fixes-2026-05-05.md`
+- `.squad/decisions/inbox/frank-151-audit-summary.md`
+- `.squad/decisions/inbox/copilot-directive-20260505-2038.md`
+- `.squad/decisions/inbox/copilot-directive-20260505-1956.md`
+- `.squad/decisions.md`
+
+---
+
+## Executive Finding
+
+**The six inbox files from 2026-05-05 are entirely about the value-types investigation (OQ-CUR-*, OQ-3f, §11 namespace, canonical doc fixes to `business-domain-types.md`). None of them capture any of the 17 locked design decisions in `runtime-api-public-surface-spec.md` §11, the OQ-1 through OQ-5 resolutions specific to the runtime API, or the renamed types and DU nesting decisions.**
+
+The scribe session that produced these inbox files targeted the wrong document. The mini-spec's decisions are unrecorded.
+
+---
+
+## CONFIRMED: Captured in inbox or decisions.md
+
+The following items from the mini-spec are sufficiently covered elsewhere:
+
+1. **Axiom 1 — PreceptValue → `internal struct`** — Captured via `frank-canonical-doc-fixes-2026-05-05.md` Fix 1 (indexer type fix), `frank-oq-resolutions-2026-05-05.md` §Reconciliation note, and `decisions.md` across multiple CC#25 entries (deep content audit, value-types investigation). The principle is distributed but present.
+
+2. **OQ-CUR-1 — `Currency.Symbol` included** — Captured in `frank-oq-resolutions-2026-05-05.md`, `frank-shane-signoffs-applied.md`, `copilot-directive-20260505-2038.md`. Full with rationale.
+
+3. **OQ-CUR-3 — `Get<string>()` universal rule** — Captured in `frank-oq-resolutions-2026-05-05.md`, `frank-shane-signoffs-applied.md`, `copilot-directive-20260505-2038.md`.
+
+4. **OQ-CUR-4 — ISO 4217 as embedded resource** — Captured in `frank-oq-resolutions-2026-05-05.md`, `copilot-directive-20260505-2038.md`.
+
+5. **§11 Namespace — `Precept.Types` within `Precept` assembly** — Captured in `frank-oq-resolutions-2026-05-05.md`, `frank-shane-signoffs-applied.md`, `copilot-directive-20260505-2038.md`.
+
+6. **OQ-3f — Quantity constraint granularity (3 levels)** — Captured in `frank-oq-resolutions-2026-05-05.md` with full rationale.
+
+7. **OQ-C3 — Collection direction model (store in declared direction)** — Captured in `decisions.md` (2026-05-05T05:19:25Z collection archive entry) and evaluator.md §7.4.1 C.
+
+8. **Canonical doc directive — no working-doc artifacts in canonical docs** — Captured in `copilot-directive-20260505-1956.md`.
+
+9. **`ConstraintViolation` 5-field shape (structural shape only)** — Captured in `decisions.md` (2026-05-04T05:44:10Z entry). **However:** see AMBIGUOUS section — the `FailingValue` type was `PreceptValue?` in that entry and the spec changes it to `JsonElement?`. The shape is confirmed; the field type is stale.
+
+---
+
+## GAPS: Not captured anywhere
+
+These are locked decisions in the mini-spec with **no corresponding record in any inbox file or `decisions.md`**:
+
+---
+
+### GAP-1 — Decision #9: `FromJson` replaces `Restore`; `RestoreOutcome` eliminated
+**Where in spec:** §1.4, §2.2, §11#9  
+**What:** `Precept.FromJson(JsonElement)` returns `Version` directly. `RestoreOutcome` DU is eliminated. Invalid inputs throw `ArgumentException` (programmer error, not business outcome). No typed overload. No constraint validation on restore.  
+**Why it matters:** `decisions.md` 2026-05-03 CC#25 Q2 still shows `RestoreOutcome Restore(string? state, JsonElement fields)` as a primary signature. That entry is now stale and actively misleading. Without a superseding record, any implementer reading decisions.md will implement the old shape.
+
+---
+
+### GAP-2 — Decision #10: Public API method naming `ToJson()`/`FromJson()`
+**Where in spec:** §1.4, §1.10, §11#10  
+**What:** Owner (Shane, 2026-05-04) locked the persistence API names as `ToJson()` and `FromJson()`. Alternatives rejected: `Serialize`/`Restore`, `Snapshot`/`Restore`, `ToDocument`/`FromDocument`. `ToJson()` returns `JsonElement` (not `string`) — intentional and documented. `FromJson` is on `Precept`; `ToJson` is on `Version`.  
+**Why it matters:** `decisions.md` CC#25 Q7 records `TypeRuntime.FromJson`/`ToJson` as internal naming. The PUBLIC API naming decision is not captured separately. Future readers will conflate internal naming with public API naming.
+
+---
+
+### GAP-3 — Decision #11: All DU variants nested inside abstract record base
+**Where in spec:** §2.1, §2.2, §11#11  
+**What:** `EventOutcome.Transitioned`, `EventOutcome.ConstraintsFailed`, `UpdateOutcome.Updated`, `UpdateOutcome.ConstraintsFailed`, etc. All variants are nested. No top-level `ConstraintsFailed` type. Partial nesting rejected. Open hierarchy (interface-based) rejected — Precept requires closed hierarchies.  
+**Why it matters:** Without this record, a scribe generating boilerplate code would produce top-level variant names, which collide and pollute the namespace.
+
+---
+
+### GAP-4 — Decision #12: `EventConstraintsFailed` → `EventOutcome.ConstraintsFailed`; `UpdateConstraintsFailed` → `UpdateOutcome.ConstraintsFailed`
+**Where in spec:** §2.1, §2.2, §11#12  
+**What:** The prefix (`Event`/`Update`) was misleading — both constraints-failed variants can fire from any combination of `rule`, `ensures`, and `state` constructs. The containing DU is the disambiguator. Attributed to: flagged by Elaine (API naming assessment, 2026-05-04).  
+**Why it matters:** The old names still appear in `decisions.md` (CC#25 Q7 entry, 2026-05-03) which mentions `Transitioned`/`Applied` but does not record these renames. Implementation against old names breaks the public contract.
+
+---
+
+### GAP-5 — Decision #13: `UpdateOutcome.AccessDenied` → `UpdateOutcome.FieldNotEditable`
+**Where in spec:** §2.2, §11#13  
+**What:** `AccessDenied` carried RBAC/security connotation. The variant fires on `FieldAccessMode.Readonly` violations — a structural declaration property, not an authorization decision. `FieldNotEditable` is anchored to the `Editable` concept in `FieldAccessMode`. Attributed to Elaine.  
+**Why it matters:** `AccessDenied` is the name in the current codebase. Without a captured decision, this rename will be skipped.
+
+---
+
+### GAP-6 — Decision #14: `RowInspection` → `TransitionInspection`; `EventInspection.Rows` → `EventInspection.Transitions`
+**Where in spec:** §2.3, §11#14  
+**What:** "Row" is Precept-internal vocabulary (guard/mutation pair). External developers read it as a database row. `TransitionInspection` is state-machine vocabulary — immediately legible. `Transitions` property follows. Attributed to Elaine.  
+**Why it matters:** The old name is in the codebase. Without a decision record, any rename is just cosmetics with no authoritative backing.
+
+---
+
+### GAP-7 — Decision #15: `ConstraintViolation.BecauseClause` → `ConstraintViolation.Because`
+**Where in spec:** §2.7, §11#15  
+**What:** `ConstraintDescriptor.Because` uses the DSL keyword form. `ConstraintViolation.BecauseClause` used a different name for the same concept. Normalized to `Because` on both types. Attributed to Elaine.  
+**Why it matters:** The inconsistency between `ConstraintDescriptor.Because` and `ConstraintViolation.BecauseClause` (different names, same concept) is a design smell that causes confusion and is currently not recorded as a resolved decision.
+
+---
+
+### GAP-8 — Decision #16: `UpdateOutcome.InvalidInput` → `UpdateOutcome.InvalidFields`
+**Where in spec:** §2.2, §11#16  
+**What:** `Update()` takes a `fields` parameter. `InvalidInput` was generic. `InvalidFields` parallels `InvalidArgs` (Create/Fire) — one vocabulary for each operation's input noun. Attributed to Elaine.  
+**Why it matters:** The parallel naming rule (`InvalidArgs` for arg-taking ops, `InvalidFields` for Update) is the architectural rationale and must be recorded.
+
+---
+
+### GAP-9 — Decision #17: `UpdateOutcome.FieldWriteCommitted` → `UpdateOutcome.Updated`
+**Where in spec:** §2.2, §11#17  
+**What:** `FieldWriteCommitted` was verbose and register-inconsistent with `Transitioned`/`Applied`. `Updated` is concise, past-tense, entity-centric. Attributed to Elaine.  
+**Why it matters:** Without capture, the verbose name persists. `Updated` is the intended public contract.
+
+---
+
+### GAP-10 — Decision #2: `Precept.Fields` → `IReadOnlyList<FieldDescriptor>`
+**Where in spec:** §8, §11#2  
+**What:** `Fields` was `IReadOnlyList<string>`. The new return type is `IReadOnlyList<FieldDescriptor>`, giving callers typed descriptors with `ClrType` immediately — no secondary lookup. The string list was a placeholder.  
+**Why it matters:** This is a breaking API change. Not recorded anywhere. An implementer updating `Precept` class from `decisions.md` alone would use the old signature.
+
+---
+
+### GAP-11 — Decision #3: `Precept.Events` → `IReadOnlyList<EventDescriptor>`
+**Where in spec:** §8, §11#3  
+**What:** Same reasoning as Fields — typed descriptors replace the string list.  
+**Why it matters:** Same — breaking change, not recorded.
+
+---
+
+### GAP-12 — Decision #4: `Version.AvailableEvents` → `IReadOnlyList<EventDescriptor>`
+**Where in spec:** §9, §11#4  
+**What:** Consistent with `Precept.Events`. Returns enriched descriptors with `ClrType` rather than bare names.  
+**Why it matters:** Breaking change, not recorded.
+
+---
+
+### GAP-13 — Decision #1: `TryGet<T>()` on `FiredArgs` only (not `Version`)
+**Where in spec:** §3.3, §11#1  
+**What:** Version fields are always either resolved or absent (programming error on absent). There is no "maybe present" semantic for fields. Optional args have genuine presence/absence semantics. `TryGet<T>()` therefore lives only on `FiredArgs`.  
+**Why it matters:** Without this record, implementers may add `TryGet<T>()` to `Version`, which muddies the "fields are always resolved" contract.
+
+---
+
+### GAP-14 — Decision #5: `FieldSnapshot` includes `ClrType`
+**Where in spec:** §2.4, §11#5  
+**What:** `FieldSnapshot.ClrType : Type` — precomputed from `FieldDescriptor.ClrType`. Inspection results carry discovery metadata so consumers don't cross-reference the definition separately.  
+**Why it matters:** This is a new property on a positional record — a breaking change. Not recorded.
+
+---
+
+### GAP-15 — Decision #7: No `Get<T>()` on `FieldSnapshot` or `FieldAccessInfo`
+**Where in spec:** §3.1, §11#7  
+**What:** These are passive diagnostic records, not active accessors. Typed access lives on `Version` (which holds internal slots). `FieldSnapshot.Value` is `JsonElement?`.  
+**Why it matters:** Without this boundary, tooling code will add convenience `Get<T>()` to FieldSnapshot, which requires it to hold slot references — coupling it to evaluator internals.
+
+---
+
+### GAP-16 — Decision #6: `FiredArgs` indexer throws `KeyNotFoundException` for absent optional args
+**Where in spec:** §2.6, §11#6  
+**What:** Consistent with dictionary semantics. `TryGet<T>()` is the presence-aware path for optional args.  
+**Why it matters:** Distinguishes the throw semantics from a "null return" design — needs to be recorded so implementation is unambiguous.
+
+---
+
+### GAP-17 — Decision #8: `Version.ToJson()` omits unresolved fields from `fields`
+**Where in spec:** §1.10, §11#8  
+**What:** Unresolved fields are omitted (not emitted as null). Consistent with `FromJson` round-trip semantics — absence means "not provided." Returning null would be ambiguous with legitimate nullable fields.  
+**Why it matters:** This is a behavioral contract decision with implications for round-trip fidelity and schema evolution handling.
+
+---
+
+### GAP-18 — OQ-1: `integer` → `long`; no `Get<int>()` convenience overload
+**Where in spec:** §12 OQ-1  
+**What:** `long` is the canonical CLR projection. Callers who need `int` cast explicitly. Eliminates overflow-check surface.  
+**Why it matters:** Not in any inbox file or decisions.md. The implementation choice is not documented.
+
+---
+
+### GAP-19 — OQ-2: `TypeMeta.ClrType` scalar-only; collection wrapping at descriptor build time
+**Where in spec:** §12 OQ-2  
+**What:** `TypeMeta.ClrType` returns the scalar type only. `FieldDescriptor`/`ArgDescriptor` apply `IReadOnlyList<T>` / `IReadOnlyDictionary<K,V>` wrapping at `Precept.From()` build time. No combinatorial explosion in the catalog.  
+**Why it matters:** Drives the contract for `TypeMeta.ClrType`. Not recorded. Implementers may put collection-shaped types directly on `TypeMeta`.
+
+---
+
+### GAP-20 — OQ-4: `duration` → `NodaTime.Duration` directly
+**Where in spec:** §12 OQ-4, §3.4  
+**What:** NodaTime `Duration` directly, no wrapper. Consistent with all other temporal types (all NodaTime). `TimeSpan` conflates elapsed time with calendar periods.  
+**Why it matters:** Not in inbox files. History.md has the NodaTime alignment directive but not this specific resolution.
+
+---
+
+### GAP-21 — OQ-C1: `bag of T` → `IReadOnlyList<T>` with duplicates; no special bag CLR type
+**Where in spec:** §13.7  
+**What:** LINQ `GroupBy` for frequency. No special frequency-map type. Locked 2026-05-04.  
+**Why it matters:** Not in inbox files. The 2026-05-05 collection archive entry in decisions.md calls out OQ-C3 but not OQ-C1 or OQ-C2 explicitly.
+
+---
+
+### GAP-22 — OQ-C2: `KeyedElement<TValue, TKey>` — confirmed shape
+**Where in spec:** §13.7, §3.4  
+**What:** `readonly record struct KeyedElement<TValue, TKey>(TValue Value, TKey Key)`. Namespace: `Precept.Types`. This is the only custom collection type added.  
+**Why it matters:** Not explicitly in inbox files. History.md mentions it, but that is not a formal decision record.
+
+---
+
+### GAP-23 — `TypeMeta.ClrType` as a new field on the existing record
+**Where in spec:** §4.1  
+**What:** `TypeMeta` gains a `Type ClrType` property — the scalar CLR projection. This is a breaking change to the positional record for callers using `with` construction.  
+**Why it matters:** Not in any inbox file or decisions.md as a specific change.
+
+---
+
+### GAP-24 — `ConstraintViolation.FailingValue` type: `PreceptValue?` → `JsonElement?`
+**Where in spec:** §2.7, §5.1, §7.1  
+**What:** The spec changes `FailingValue` from `PreceptValue?` (the 2026-05-04 locked decision in decisions.md) to `JsonElement?`. The canonical-doc-fixes inbox file fixed the VERSION and FIREDARGS indexers but not this property type.  
+**Why it matters:** `decisions.md` still records `FailingValue is PreceptValue?`. This is a **direct conflict** between the spec and decisions.md. Any implementation guided by decisions.md will use the wrong type here.
+
+---
+
+### GAP-25 — §6 Visibility: Registration surface eliminated (`TypeMapping<T>`, `PreceptRuntime.Register<T>()`)
+**Where in spec:** §6  
+**What:** `TypeMapping<T>` does not exist. `PreceptRuntime.Register<T>()` does not exist. The type system is closed. No registration entry point.  
+**Why it matters:** The CC#25 Q7 entry in decisions.md mentions "registration surface eliminated" conceptually but doesn't explicitly call out the method/type removals as a formal API contract decision.
+
+---
+
+### GAP-26 — §6 Visibility: `PreceptList<T>` and `PreceptLookup<TKey, TValue>` are internal
+**Where in spec:** §6  
+**What:** Callers only ever see `IReadOnlyList<T>` and `IReadOnlyDictionary<TKey, TValue>`. The adapter type names are internal and invisible to callers.  
+**Why it matters:** Not recorded. If adapter types are accidentally made public, they leak internal names.
+
+---
+
+### GAP-27 — §5 Consistency Audit: No `object?` anywhere on public surface
+**Where in spec:** §5.1  
+**What:** `FieldSnapshot.Value` was `object?` in the source. Now `JsonElement?`. No `object?` anywhere on the public surface.  
+**Why it matters:** The `frank-canonical-doc-fixes-2026-05-05.md` Fix 1 updated the Version/FiredArgs indexers but §7.1 of the spec explicitly lists `FieldSnapshot.Value: object? → JsonElement?` as a breaking change. This specific change is not in any inbox file.
+
+---
+
+## AMBIGUOUS: Partially captured or unclear
+
+### AMBIGUOUS-1 — `ConstraintViolation.BecauseClause` naming convention
+The 2026-05-03 `decisions.md` entry "EnsureClause reason text stays in its own `BecauseClause` slot" uses the name `BecauseClause` approvingly — it's about parser slot naming, not the public API record property name. Decision #15 in the spec renames `ConstraintViolation.BecauseClause` to `ConstraintViolation.Because`. These are two different surfaces. The decisions.md entry is about the parser/catalog; the spec rename is about the public API record. This is not a contradiction, but it is confusing — a scribe could read the decisions.md entry as protecting the `BecauseClause` name everywhere.
+
+**Status:** The spec decision is NOT captured for the public API surface. GAP-7 stands.
+
+---
+
+### AMBIGUOUS-2 — Decision #10 public API naming and decisions.md CC#25 Q7 internal naming
+`decisions.md` CC#25 Q7 (2026-05-03) records `TypeRuntime` naming as `FromJson`/`ToJson`/`FromClr`/`ToClr` — for the internal type. The spec's Decision #10 is about the PUBLIC method names `Version.ToJson()` and `Precept.FromJson()`. These overlap by name but refer to different surfaces. The public naming decision is attributed to Shane 2026-05-04 but has no capture record of its own.
+
+**Status:** Ambiguous capture. Should be recorded cleanly as a public API decision.
+
+---
+
+### AMBIGUOUS-3 — Spec §3.4 CLR type table: stale rows for `currency`, `money`, `quantity`
+The spec's §3.4 table contains entries that conflict with locked decisions from the value types investigation:
+- `currency → string` (ISO 4217 code) — but OQ-CUR-2 locked `sealed class Currency` as the CLR type
+- `money → Money(decimal Amount, string Currency)` — uses `string Currency`, but the locked Money CLR shape uses `Currency Currency`
+- `quantity → Quantity(decimal Amount, Unit Unit)` — uses `Unit Unit`, but the locked shape uses `UnitOfMeasure Unit` (the public proxy struct)
+- `Unit → sealed class` — this row exists, but `Unit` is an internal type per §6 of the same spec; `UnitOfMeasure` is the public proxy
+
+**Status:** The spec itself is internally inconsistent here. These stale rows pre-date OQ-CUR-2 resolution and the UnitOfMeasure proxy decision. No inbox file has corrected the spec's §3.4 table. This is a spec bug, not just an inbox gap.
+
+---
+
+### AMBIGUOUS-4 — OQ-5 collection Option A — partially in decisions.md
+`decisions.md` 2026-05-05T05:19:25Z: "Collection types investigation fully archived" — records OQ-C3 and confirms adapter design. OQ-C1 and OQ-C2 are not called out by name. The three CLR shapes and the collection-adapter inventory ARE confirmed at a high level, but the specific per-OQ resolution statements are missing.
+
+**Status:** OQ-5 (Option A locked) is mostly captured. OQ-C1 and OQ-C2 are not explicitly recorded (GAP-21, GAP-22 above).
+
+---
+
+### AMBIGUOUS-5 — OQ-3d and OQ-3e: Money/Quantity struct shapes
+The spec §12 lists OQ-3d (`Money.Currency is string, not a unit`) and OQ-3e (`Quantity(decimal Amount, Unit Unit)`) as resolved. But OQ-3e uses `Unit Unit` in the table — which conflicts with the locked `UnitOfMeasure Unit` proxy shape. These were captured in the value-types investigation but are now stale in the spec table.
+
+**Status:** Partially captured but the spec's own table is stale. See AMBIGUOUS-3.
+
+---
+
+## Spec Bugs Found During Audit (Not Inbox Gaps)
+
+These are errors IN the spec itself that should be corrected before the spec drives `runtime-api.md` updates:
+
+| Location | Current (wrong) | Correct |
+|----------|----------------|---------|
+| §3.4 CLR table `currency` row | `string` (ISO 4217 code) | `Currency` (sealed class from CurrencyCatalog) |
+| §3.4 CLR table `money` row | `Money(decimal Amount, string Currency)` | `Money(decimal Amount, Currency Currency)` |
+| §3.4 CLR table `quantity` row | `Quantity(decimal Amount, Unit Unit)` | `Quantity(decimal Amount, UnitOfMeasure Unit)` |
+| §3.4 CLR table `Unit` row | `Unit` listed as a distinct type | `Unit` is internal; remove from public CLR table. `UnitOfMeasure` is the public proxy |
+| §3.2 pseudocode error message | Lists `DateOnly`, `TimeOnly`, `DateTimeOffset` as valid `T` | These may be correct for date/time/instant but `DateOnly`/`TimeOnly` are BCL types, not NodaTime — verify alignment with temporal-type-system.md |
+
+---
+
+## Decisions.md Stale Entries That Conflict With the Spec
+
+| decisions.md Entry | Stale Content | Correct Per Spec |
+|---|---|---|
+| 2026-05-03 CC#25 Q2 | Primary signatures include `RestoreOutcome Restore(string? state, JsonElement fields)` | Eliminated: `FromJson(JsonElement)` returns `Version` directly |
+| 2026-05-04 ConstraintViolation 5-field shape | `FailingValue is PreceptValue?` | `FailingValue is JsonElement?` |
+| 2026-05-03 CC#25 Q7 | Raw indexers return `PreceptValue` | Raw indexers return `JsonElement` (this was later corrected in canonical-doc-fixes but decisions.md entry was not superseded) |
+
+---
+
+## Recommendation
+
+**The scribe captured the wrong body of work.** The inbox session landed decisions from the value-types investigation (OQ-CUR-*, OQ-3f, §11 namespace) — useful, but not from the mini-spec that was supposed to be the target.
+
+Actions required:
+
+1. **Create a new inbox drop** capturing all 17 §11 decisions (GAP-1 through GAP-17) with rationale. Group by category: result type renames (#12–17), API surface changes (#2–4, #10), behavioral contracts (#1, #5–9), DU structure (#11).
+
+2. **Supersede the stale decisions.md entries**: CC#25 Q2 `RestoreOutcome Restore()` and CC#25 Q7 `PreceptValue indexer` entries need explicit supersession notes pointing to the mini-spec as the authoritative newer decision.
+
+3. **Fix `ConstraintViolation.FailingValue` conflict**: decisions.md says `PreceptValue?`; spec says `JsonElement?`. The spec is authoritative. Add a supersession record.
+
+4. **Fix the spec's §3.4 CLR table** (AMBIGUOUS-3 / Spec Bugs): correct `currency`, `money`, `quantity`, and `Unit` rows before the spec drives `runtime-api.md` updates. Stale rows in the approved spec will produce wrong implementation.
+
+5. **Capture OQ-1, OQ-2, OQ-4, OQ-C1, OQ-C2** as formal inbox records (GAP-18, GAP-19, GAP-20, GAP-21, GAP-22).
+
+6. **Merge captured decisions into decisions.md** via the normal scribe flow.
+
+---
+
+*Total gaps identified: 27 (including 5 in the "ambiguous" category and 5 spec bugs).*  
+*Total confirmed captured: 8 items (all from the value-types investigation session, not the runtime API spec).*
+
+# Runtime API Public Surface Spec — Locked Decisions
+**By:** Frank (Lead/Architect)
+**Date:** 2026-05-05
+**Source:** docs/working/runtime-api-public-surface-spec.md §11, §12
+**Status:** All decisions locked, approved by Shane
+
+---
+
+## API Surface Changes (Breaking)
+
+### Decision #2 — `Precept.Fields` return type enriched
+**Decided:** `Precept.Fields` return type changes from `IReadOnlyList<string>` to `IReadOnlyList<FieldDescriptor>`.
+**Rationale:** Exposing typed descriptors with `ClrType` eliminates the need for a secondary lookup. The string list was a placeholder that forced callers to cross-reference the definition separately.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+### Decision #3 — `Precept.Events` return type enriched
+**Decided:** `Precept.Events` return type changes from `IReadOnlyList<string>` to `IReadOnlyList<EventDescriptor>`.
+**Rationale:** Same reasoning as Decision #2 — typed descriptors carry richer metadata (arg names, types, access modes). Consistent with the principle that discovery metadata travels with the descriptor.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+### Decision #4 — `Version.AvailableEvents` return type enriched
+**Decided:** `Version.AvailableEvents` return type changes from `IReadOnlyList<string>` to `IReadOnlyList<EventDescriptor>`.
+**Rationale:** Consistent with `Precept.Events` — both surfaces return event metadata, both should return the same descriptor type.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+### Decision #10 — Persistence API naming locked: `ToJson()` / `FromJson()`
+**Decided:** The persistence pair is named `Version.ToJson()` and `Precept.FromJson()`. `ToJson()` returns `JsonElement` (not `string`). Owner decision locked 2026-05-05.
+**Rationale:** Most expressive and self-describing pair for the public API. `PreceptValue.ToJson()` and `TypeRuntime` delegates (`FromJson`/`ToJson`) are internal — no public API collision. `ToJson()` returning `JsonElement` rather than `string` is intentional: callers who need a string call `JsonSerializer.Serialize()` themselves. Tradeoff accepted: `ToJson()` returning `JsonElement` rather than `string` may mildly surprise developers — mitigated by clear XML docs on the method.
+**Attribution:** Shane (owner decision, 2026-05-05). Alternatives rejected: `Serialize`/`Restore` (slightly off-register for instance methods in .NET), `Snapshot`/`Restore` (domain language but less immediately obvious to new consumers), `ToDocument`/`FromDocument` (less immediately legible).
+**Supersedes:** None.
+
+---
+
+## Restoration Pipeline Redesign
+
+### Decision #9 — `FromJson` returns `Version` directly; `RestoreOutcome` DU eliminated
+**Decided:** `Restore(string? state, JsonElement fields) → RestoreOutcome` is ELIMINATED. Replaced by `Precept.FromJson(JsonElement document) → Version`. Invalid inputs (unknown state, malformed JSON, unknown fields) throw `ArgumentException` (programmer error). No typed overload. No constraint validation on restore. `RestoreOutcome` discriminated union is eliminated entirely.
+**Rationale:** `FromJson` is hydration from storage — data was valid when saved, so restoration is not a failable business operation. Constraints fire only on `Fire`/`Update`. Schema evolution is the caller's responsibility via migration or post-restore `Update`. Eliminating `RestoreOutcome` removes a DU that carried no discriminating information beyond "it failed" for a case that is always a programming error.
+**Attribution:** Spec analysis; Shane approval.
+**Supersedes:** ⚠️ decisions.md entry 2026-05-03 CC#25 Q2, which listed `RestoreOutcome Restore(string? state, JsonElement fields)` as a primary signature. That entry is superseded. The `RestoreOutcome` DU no longer exists; the restore path is `Precept.FromJson(JsonElement) → Version`.
+
+---
+
+### Decision #8 — `Version.ToJson()` omits unresolved fields
+**Decided:** `Version.ToJson()` omits unresolved fields from the `fields` object entirely (does not emit them as `null`). Absence means "not provided."
+**Rationale:** Consistent with `FromJson` round-trip semantics — `precept.FromJson(version.ToJson())` is valid and idempotent. Returning `null` for unresolved fields would introduce ambiguity with legitimately null nullable fields. Absence is unambiguous.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+## DU Structure
+
+### Decision #11 — All DU variants nested inside their abstract record base
+**Decided:** ALL DU variants MUST be nested inside their abstract record base. `EventOutcome.Transitioned`, `EventOutcome.ConstraintsFailed`, `UpdateOutcome.Updated`, `UpdateOutcome.ConstraintsFailed`, etc. No top-level variant types. No partial nesting.
+**Rationale:** Nesting all variants inside the abstract record body resolves the `ConstraintsFailed` name collision without namespace pollution, and creates a uniform, discoverable API surface. In a switch expression on `EventOutcome`, every arm reads `EventOutcome.Variant` — the DU base name is consistent visible context. Partial nesting (mixing nesting levels in the same DU) was rejected: inconsistent and adds cognitive load. Open hierarchy (interface-based) rejected — Precept requires closed hierarchies; the catalog-driven design is deterministic and external implementations of result types are meaningless.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+## Result Type Renames (Attributed to Elaine, 2026-05-05)
+
+### Decision #12 — `EventConstraintsFailed` and `UpdateConstraintsFailed` renamed
+**Decided:** `EventConstraintsFailed` → `EventOutcome.ConstraintsFailed`; `UpdateConstraintsFailed` → `UpdateOutcome.ConstraintsFailed`.
+**Rationale:** The `Event`/`Update` prefix was a domain-scope qualifier that misled callers into believing only event-scoped constructs can fail through `Fire`, or only field-level `rule` declarations through `Update`. Constraint failures surface from any combination of `rule` declarations, `ensures` scoped to events, and `ensures` scoped to states — across both operations. The containing DU (`EventOutcome` vs. `UpdateOutcome`) already identifies which operation produced the result; no operation-type prefix is needed on the variant itself.
+**Attribution:** Elaine (API naming assessment, 2026-05-05).
+**Supersedes:** None.
+
+---
+
+### Decision #13 — `UpdateOutcome.AccessDenied` renamed to `UpdateOutcome.FieldNotEditable`
+**Decided:** `UpdateOutcome.AccessDenied` → `UpdateOutcome.FieldNotEditable`.
+**Rationale:** `AccessDenied` carried a security/RBAC connotation that actively misled callers. This variant fires when a field's *declared access mode* (`Readonly` vs `Editable`) prevents direct editing — a structural property of the field declaration, not an authorization decision. `FieldNotEditable` is precise, structurally accurate, and anchored to the `Editable` concept already present in `FieldAccessMode`.
+**Attribution:** Elaine (API naming assessment, 2026-05-05).
+**Supersedes:** None.
+
+---
+
+### Decision #14 — `RowInspection` → `TransitionInspection`; `EventInspection.Rows` → `EventInspection.Transitions`
+**Decided:** `RowInspection` renamed to `TransitionInspection`; `EventInspection.Rows` renamed to `EventInspection.Transitions`.
+**Rationale:** "Row" is Precept-internal vocabulary for a guard/mutation pair in an event handler. External developers read it as a database row, table row, or layout row — none of which apply. The concept being inspected is a *transition* — one guard branch within an event — which is immediately legible to any developer familiar with state machines. `TransitionInspection` is philosophy-aligned and vocabulary-consistent.
+**Attribution:** Elaine (API naming assessment, 2026-05-05).
+**Supersedes:** None.
+
+---
+
+### Decision #15 — `ConstraintViolation.BecauseClause` → `ConstraintViolation.Because`
+**Decided:** The public API record property `ConstraintViolation.BecauseClause` is renamed to `ConstraintViolation.Because`.
+**Rationale:** `ConstraintDescriptor.Because` already uses the DSL keyword form. `ConstraintViolation.BecauseClause` used a different name for functionally the same concept — the reason text. These two types are tightly paired in every usage context; inconsistent names for the same concept add unnecessary cognitive load. Normalized to `Because` on both types.
+**Attribution:** Elaine (API naming assessment, 2026-05-05).
+**Supersedes:** None. ⚠️ NOTE: decisions.md has a 2026-05-03 entry using `BecauseClause` for the parser/catalog slot (`BecauseClause = 13`) — that is a DIFFERENT surface (the internal parser slot naming, not a public API record property). This Decision #15 rename applies only to `ConstraintViolation.Because` on the public API. The parser slot name is unchanged.
+
+---
+
+### Decision #16 — `UpdateOutcome.InvalidInput` → `UpdateOutcome.InvalidFields`
+**Decided:** `UpdateOutcome.InvalidInput` renamed to `UpdateOutcome.InvalidFields`.
+**Rationale:** `Update()` takes a `fields` parameter, not `args`. `InvalidInput` was generic and didn't reflect the Update operation's own vocabulary. The rename creates a clean parallel: `InvalidArgs` for operations that take args (Create, Fire); `InvalidFields` for Update, which takes fields.
+**Attribution:** Elaine (API naming assessment, 2026-05-05).
+**Supersedes:** None.
+
+---
+
+### Decision #17 — `UpdateOutcome.FieldWriteCommitted` → `UpdateOutcome.Updated`
+**Decided:** `UpdateOutcome.FieldWriteCommitted` renamed to `UpdateOutcome.Updated`.
+**Rationale:** `FieldWriteCommitted` was a three-word verbose log-entry-style name that broke the naming register of the other success variants (`Transitioned`, `Applied` — short, past-tense, entity-centric). `Updated` is concise, consistent with the register, and reads cleanly in switch expressions: `outcome is UpdateOutcome.Updated u`.
+**Attribution:** Elaine (API naming assessment, 2026-05-05).
+**Supersedes:** None.
+
+---
+
+## Behavioral Contracts
+
+### Decision #1 — `TryGet<T>()` exists only on `FiredArgs`
+**Decided:** `TryGet<T>()` exists ONLY on `FiredArgs`, not on `Version`. `Version.Get<T>()` throws on absent fields (programming error). `TryGet<T>()` handles presence/absence for optional args — it does NOT swallow type errors.
+**Rationale:** Fields are either resolved or absent; there is no "maybe present" semantic for fields. Optional args have genuine presence/absence semantics that warrant the Try pattern. Putting `TryGet` on `Version` would suggest fields can legitimately be absent at runtime, which is not the contract.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+### Decision #5 — `FieldSnapshot` gains `ClrType : Type`
+**Decided:** `FieldSnapshot` gains `ClrType : Type` — precomputed from `FieldDescriptor.ClrType`.
+**Rationale:** Inspection results should carry discovery metadata so consumers don't need a cross-reference to the definition separately. `FieldSnapshot` appears in `EventInspection.Transitions` and must be self-describing for AI agent and tooling consumers.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+### Decision #6 — `FiredArgs` indexer throws `KeyNotFoundException` for absent optional args
+**Decided:** The `FiredArgs` indexer throws `KeyNotFoundException` for absent optional args — consistent with dictionary semantics. `TryGet<T>()` is the presence-aware path.
+**Rationale:** Consistent with .NET dictionary contract. Callers who want safe access use `TryGet<T>()`. Callers who index directly accept the throw contract, which is the expected behavior for a known-present arg access.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+### Decision #7 — No `Get<T>()` on `FieldSnapshot` or `FieldAccessInfo`
+**Decided:** `FieldSnapshot` and `FieldAccessInfo` do not expose `Get<T>()`. Typed access lives on `Version` only.
+**Rationale:** `FieldSnapshot` and `FieldAccessInfo` are passive diagnostic records, not active accessors. Adding `Get<T>()` to `FieldSnapshot` would require it to hold slot references — coupling it to evaluator internals. The passive/active separation is architectural.
+**Attribution:** Spec analysis.
+**Supersedes:** None.
+
+---
+
+## Type System Contracts
+
+### Decision — `ConstraintViolation.FailingValue` type is `JsonElement?`
+**Decided:** `ConstraintViolation.FailingValue` has type `JsonElement?`, not `PreceptValue?`.
+**Rationale:** Axiom 1 — `PreceptValue` MUST NOT appear in any public method signature, return type, property type, or generic constraint. `JsonElement?` is the correct Axiom 1-compliant surface for a nullable value carrier. No `object?` anywhere on the public surface.
+**Attribution:** Spec (Axiom 1); Shane directive 2026-05-05 (raw lane = JSON lane; `PreceptValue` never leaks public API).
+**Supersedes:** ⚠️ decisions.md entry 2026-05-04 `ConstraintViolation` shape which recorded `FailingValue is PreceptValue?`. That entry is superseded. The authoritative shape is `JsonElement?`.
+
+---
+
+### Decision — Raw indexers (`Version`/`FiredArgs`) return `JsonElement`
+**Decided:** The raw lane indexer on both `Version` (e.g., `version["fieldName"]`) and `FiredArgs` returns `JsonElement`, NOT `PreceptValue`.
+**Rationale:** Axiom 1 — `PreceptValue` is strictly internal. The raw lane IS the JSON lane. `JsonElement` flows straight from HTTP request body to Fire() with zero intermediate allocations and carries original parse-position provenance.
+**Attribution:** Shane directive 2026-05-05 (copilot-directive-2026-05-05T00-11-43.md). Reconfirmed by Frank (frank-raw-lane-json-ruling.md).
+**Supersedes:** ⚠️ decisions.md entry 2026-05-03 CC#25 Q7 which recorded `PreceptValue` return for raw indexers. That entry is superseded. Raw lane = JSON lane = `JsonElement`.
+
+---
+
+## OQ Resolutions (§12)
+
+### OQ-1 — `integer` CLR projection is `long`
+**Decided:** `integer` maps to `long`. No `Get<int>()` convenience overload. Callers who need `int` cast explicitly.
+**Rationale:** Eliminates the overflow-check surface. A single canonical type avoids the "which integer accessor do I use?" ambiguity. Callers who need `int` write `(int)version.Get<long>("field")` and accept the truncation risk explicitly.
+**Attribution:** Spec analysis (OQ-1 resolution).
+**Supersedes:** None.
+
+---
+
+### OQ-2 — `TypeMeta.ClrType` returns scalar type only
+**Decided:** `TypeMeta.ClrType` returns the scalar CLR type only (NOT collection-wrapped). `FieldDescriptor`/`ArgDescriptor` apply `IReadOnlyList<T>` / `IReadOnlyDictionary<K,V>` wrapping at `Precept.From()` build time.
+**Rationale:** Keeps `TypeMeta` entries 1:1 with Precept scalar types. No combinatorial explosion of generic instantiations in the type catalog. The Builder has full type-parameter context from the DSL declaration and produces the final `Type` (e.g., `typeof(IReadOnlyList<long>)`) on the descriptor.
+**Attribution:** Spec analysis (OQ-2 resolution).
+**Supersedes:** None.
+
+---
+
+### OQ-4 — `duration` CLR projection: `NodaTime.Duration` directly
+**Decided:** `duration` maps to `NodaTime.Duration` directly. No wrapper. No `TimeSpan`.
+**Rationale:** NodaTime is already an accepted dependency for temporal types. `Duration` handles ISO 8601 duration semantics correctly; `TimeSpan` conflates elapsed time with calendar periods. Consistency with all other temporal types (all NodaTime) outweighs the zero-dependency argument.
+**Attribution:** Spec analysis (OQ-4 resolution).
+**Supersedes:** None.
+
+---
+
+### OQ-C1 — `bag<T>` CLR projection: `IReadOnlyList<T>` with duplicates preserved
+**Decided:** `bag<T>` maps to `IReadOnlyList<T>` with duplicates preserved. No special frequency-map CLR type. Callers use LINQ `GroupBy` for frequency analysis. Locked 2026-05-05.
+**Rationale:** Bag semantics do not require a special CLR surface — frequency analysis is a consumer concern, not a storage contract. `IReadOnlyList<T>` is consistent with all other single-type collections.
+**Attribution:** Spec analysis (OQ-C1 resolution).
+**Supersedes:** None.
+
+---
+
+### OQ-C2 — `KeyedElement<TValue, TKey>` confirmed shape and namespace
+**Decided:** `KeyedElement<TValue, TKey>` is `readonly record struct KeyedElement<TValue, TKey>(TValue Value, TKey Key)`. Namespace: `Precept.Types`. This is the only custom collection type added to the API surface.
+**Rationale:** `readonly record struct` provides structural equality, deconstruction, and `with`-expression support without heap allocation. Namespace `Precept.Types` groups it with the other business-domain CLR types. Single public collection type keeps the surface minimal.
+**Attribution:** Spec analysis (OQ-C2 resolution).
+**Supersedes:** None.
+
+---
+
+## Visibility / Internal Surface
+
+### TypeMeta gains `ClrType : Type`
+**Decided:** `TypeMeta` gains `Type ClrType` property — the scalar CLR projection of the Precept type. Breaking change to the positional record for callers using `with` construction.
+**Rationale:** Enables discovery of valid `T` values for `Get<T>()` without separate lookup. Metadata is the mechanism.
+**Attribution:** Spec analysis (Axiom 4 — "Discovery of valid `T` is metadata, not machinery").
+**Supersedes:** None.
+
+---
+
+### Registration surface eliminated
+**Decided:** `TypeMapping<T>` does not exist. `PreceptRuntime.Register<T>()` does not exist. The type system is closed. No public registration entry point.
+**Rationale:** The type system must be closed and catalog-driven. An open registration surface breaks the closed-catalog guarantee and the determinism that Precept is built on.
+**Attribution:** `frank-registration-surface-rethink.md` (governing decision).
+**Supersedes:** None.
+
+---
+
+### `PreceptList<T>` and `PreceptLookup<TKey, TValue>` are internal
+**Decided:** The collection adapter types `PreceptList<T>` and `PreceptLookup<TKey, TValue>` are `internal`. Callers only ever see `IReadOnlyList<T>` and `IReadOnlyDictionary<TKey, TValue>`.
+**Rationale:** Axiom 1 — internal adapter details must not leak to public callers. The collection type mapping exists specifically to prevent `PreceptValue[]` and internal adapter types from leaking through generic type parameters.
+**Attribution:** Spec analysis; collection types investigation.
+**Supersedes:** None.
+
+---
+
+### `FieldSnapshot.Value` type is `JsonElement?`
+**Decided:** `FieldSnapshot.Value` type changes from `object?` to `JsonElement?`.
+**Rationale:** Axiom 1 compliance — no `object?` anywhere on the public surface. `JsonElement?` is the correct Axiom 1-compliant surface for a nullable value carrier on a passive diagnostic record.
+**Attribution:** Spec (Axiom 1).
+**Supersedes:** None.

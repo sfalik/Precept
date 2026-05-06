@@ -463,10 +463,13 @@ Does NOT swallow type errors — a mismatched `T` still throws `InvalidOperation
 | `instant` | `DateTimeOffset` | |
 | `duration` | `Duration` (NodaTime) | Same pattern as all other temporal types — direct NodaTime usage, no wrapper (OQ-4 resolved) |
 | `choice` | `string` | The selected variant name |
-| `money` | `Money` | `readonly record struct(decimal Amount, string Currency)` — Currency is ISO 4217 string. NOT a unit. (OQ-3d, OQ-3e resolved) |
-| `currency` | `string` | ISO 4217 code |
-| `quantity` | `Quantity` | `readonly record struct(decimal Amount, Unit Unit)` — Unit identity is UCUM code (OQ-3a, OQ-3e resolved) |
-| `Unit` | `Unit` | `sealed class` — UCUM-identified unit value. Database-backed, no static members. `sealed class` (not struct) because units are interned: `UnitCatalog.Get("kg")` returns the same instance every time, enabling reference equality as a fast path. (OQ-3c resolved) |
+| `money` | `Money` | `readonly record struct(decimal Amount, Currency Currency)` — `Currency` is a sealed class interned from `CurrencyCatalog`, not an ISO 4217 string. (OQ-3d/OQ-3e superseded — see BDT.md) |
+| `currency` | `Currency` | Sealed class interned from `CurrencyCatalog`. Fields: `AlphaCode` (`string`), `NumericCode` (`int`), `Name` (`string`), `MinorUnit` (`int`), `Symbol` (`string`). Equality by alpha code. |
+| `quantity` | `Quantity` | `readonly record struct(decimal Amount, UnitOfMeasure Unit)` — `UnitOfMeasure` is the public proxy struct; the internal `Unit` class never appears on the public surface. (OQ-3a, OQ-3e superseded — see BDT.md) |
+| `unitofmeasure` | `UnitOfMeasure` | `readonly record struct UnitOfMeasure(string Code)` — validated UCUM unit code. Lightweight API proxy; evaluator resolves `Code` to internal `Unit` entity via `UnitCatalog`. |
+| `dimension` | `MeasureDimension` | `readonly record struct MeasureDimension(string Name)` — validated dimension category name. Lightweight API proxy. |
+| `price` | `Price` | `Amount` (`decimal`) + `Currency` (`Currency`, interned from `CurrencyCatalog`) + `Unit` (`UnitOfMeasure`, interned from `UnitCatalog`) |
+| `exchangerate` | `ExchangeRate` | `Rate` (`decimal`) + `From` (`Currency`, interned from `CurrencyCatalog`) + `To` (`Currency`, interned from `CurrencyCatalog`) |
 | `stateref` | `string` | The state name |
 | `set of T`, `queue of T`, `stack of T`, `bag of T`, `list of T`, `log of T` | `IReadOnlyList<TElement>` | `TElement` is the scalar CLR projection of `T`. All six single-type collections share the same CLR surface. `TypeMeta.ClrType` is scalar only; wrapping applied at descriptor-build time (OQ-2 resolved). See `docs/working/precept-collection-types-investigation.md`. |
 | `log of T by P`, `queue of T by P` | `IReadOnlyList<KeyedElement<TValue, TKey>>` | `TValue` is CLR projection of `T`; `TKey` is CLR projection of `P`. `KeyedElement<TValue, TKey>` is `readonly record struct(TValue Value, TKey Key)`. |
@@ -894,8 +897,8 @@ Resolved across 7 sub-questions:
 | **OQ-3a** | UCUM codes are canonical unit identity |
 | **OQ-3b** | Full UCUM grammar accepted; discovery is tiered — Tier 1 (~150 atoms) surfaced proactively, full grammar always valid |
 | **OQ-3c** | Pure database-backed — unit metadata is an embedded resource; NO static `Units.X` members in the library |
-| **OQ-3d** | Currency is separate from the unit system. `Money.Currency` is `string` (ISO 4217). Not a unit. |
-| **OQ-3e** | `Quantity` = `readonly record struct(decimal Amount, Unit Unit)`; `Money` = `readonly record struct(decimal Amount, string Currency)` |
+| **OQ-3d** | Currency is separate from the unit system. `Money.Currency` is `Currency` (sealed class interned from `CurrencyCatalog`). Not a unit. ~~`string` (ISO 4217)~~ — superseded by BDT.md. |
+| **OQ-3e** | `Quantity` = `readonly record struct(decimal Amount, UnitOfMeasure Unit)`; `Money` = `readonly record struct(decimal Amount, Currency Currency)`. `UnitOfMeasure` is the public proxy struct (not internal `Unit`); `Currency` is the sealed class. Superseded — see BDT.md. |
 | **OQ-3f** | DSL constraint granularity follows `docs/language/business-domain-types.md` — three levels: `quantity` (any), `quantity of 'length'` (dimension-constrained), `quantity in 'kg'` (unit-constrained). CLR mapping: `QuantityFieldDescriptor` carries `Unit? ConstrainedUnit` and `Dimension? ConstrainedDimension`. |
 | **OQ-3g** | UCUM data shipped as embedded resource in Precept NuGet package; updated with library releases |
 
