@@ -13,11 +13,11 @@
 | CC#4 | `Compilation.Tokens` Field | [Open Question — canonical doc: `docs/runtime/precept-builder.md §2 Inputs and Outputs`] | Builder-facing compilation contract, lexical token tooling |
 | CC#5 | `FieldModifierMeta.ProofDischarges` | [Open Question — canonical doc: `docs/language/catalog-system.md §FieldModifierMeta.ProofDischarges`] | Proof Engine Strategy 2 |
 | CC#6 | FaultSiteLink to FaultSiteDescriptor Transformation | [Open Question — canonical doc: `docs/compiler/proof-engine.md §2 Output Shape`] | Proof-to-runtime backstop planting |
-| CC#7 | ConstraintMeta DU Subtype Count | [Open Question — canonical doc: `docs/runtime/precept-builder.md §Constraint bucket routing / Open Questions`] | Builder constraint routing, catalog-system alignment |
+| CC#7 | ConstraintMeta DU Subtype Count | ✅ Resolved — Option B (hierarchical, StateAnchored grouping node). Approved 2026-05-06. | Builder constraint routing, catalog-system alignment |
 | CC#8 | EventInspection Shape | [Open Question — canonical doc: `docs/tooling/language-server.md §7.6 Preview/Inspect`] | Evaluator inspection contract, LS preview, MCP DTO shape |
-| CC#9 | `ConstraintFieldRefs.ConstraintIdentity` Type | [Blocked by: CC#7] | Type Checker and Proof Engine constraint identity alignment |
+| CC#9 | `ConstraintFieldRefs.ConstraintIdentity` Type | ✅ Resolved — uses proof-engine ConstraintIdentity DU. Resolved 2026-05-06. | Type Checker and Proof Engine constraint identity alignment |
 | CC#10 | GraphState Modifier Representation | [Open Question — canonical doc: `docs/compiler/graph-analyzer.md §GraphState shape`] | Graph output shape, modifier-derived facts |
-| CC#11 | `ExecutionRow.RejectReason` Field | [Open Question — canonical doc: `docs/runtime/precept-builder.md §7 Component Mechanics / ExecutionRow`] | Reject-row lowering, evaluator rejection outcomes |
+| CC#11 | `ExecutionRow.RejectReason` Field | ✅ Resolved — string? RejectReason added to TypedTransitionRow and ExecutionRow. Resolved 2026-05-06. | Reject-row lowering, evaluator rejection outcomes |
 | CC#12 | `Faulted(Fault)` as EventOutcome Variant | [Blocked by: CC#8] | Evaluator outcome DU, MCP fire result serialization |
 | CC#13 | `FaultCode.AmbiguousDispatch` | [Open Question — canonical doc: `docs/runtime/evaluator.md §7 Fire dispatch`] | Evaluator impossible-path faulting, diagnostics linkage |
 | CC#14 | SlotContext vs SlotKind Enum Naming | [Open Question — canonical doc: `docs/tooling/language-server.md §7.3 Completions`] | LS/tooling completion context contract |
@@ -69,10 +69,10 @@ Wave 0 is closed. Wave 1 now owns the remaining cross-stage shape decisions; Wav
 - [ ] [Shane] Resolve CC#3 `SemanticIndex` reference-collection contract. [Blocks: `docs/compiler/type-checker.md §7.1`, `docs/tooling/language-server.md §7.3`, `docs/compiler/tooling-surface.md`]
 - [ ] [Shane] Resolve CC#4 `Compilation.Tokens` access path. [Blocks: `docs/runtime/precept-builder.md §2`, lexical semantic-token flow]
 - [ ] [Shane] Resolve CC#6 proof-to-runtime `FaultSiteLink` lowering. [Blocks: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, evaluator fault routing]
-- [ ] [Shane] Resolve CC#7 `ConstraintMeta` DU hierarchy. [Blocks: builder constraint buckets, catalog-system constraint metadata]
+- [x] [Shane] Resolve CC#7 `ConstraintMeta` DU hierarchy. [Blocks: builder constraint buckets, catalog-system constraint metadata]
 - [ ] [Shane] Resolve CC#8 canonical `EventInspection` shape. [Blocks: evaluator inspection contract, LS preview, MCP DTOs]
-- [ ] [Team] Apply the CC#7 ruling to CC#9 `ConstraintFieldRefs.ConstraintIdentity`. [Blocked by: CC#7] [Blocks: type-checker/proof-engine shared identity data]
-- [ ] [Team] Add canonical storage for reject-row `because` text (CC#11). [Blocked by: none] [Blocks: `docs/runtime/precept-builder.md §ExecutionRow`, `docs/runtime/evaluator.md` rejection outcomes]
+- [x] [Team] Apply the CC#7 ruling to CC#9 `ConstraintFieldRefs.ConstraintIdentity`. [Blocked by: CC#7] [Blocks: type-checker/proof-engine shared identity data]
+- [x] [Team] Add canonical storage for reject-row `because` text (CC#11). [Blocked by: none] [Blocks: `docs/runtime/precept-builder.md §ExecutionRow`, `docs/runtime/evaluator.md` rejection outcomes]
 - [ ] [Team] Apply the CC#8 ruling to CC#12 `Faulted(Fault)` outcome handling. [Blocked by: CC#8] [Blocks: evaluator/MCP outcome parity]
 - [ ] [Shane] Resolve CC#23 `EventOutcome.mutations` ownership. [Blocks: evaluator result contract, `docs/tooling/mcp.md §precept_fire`]
 - [ ] [Shane] Resolve CC#24 unmatched-guard trace richness. [Blocks: evaluator unmatched contract, `docs/tooling/mcp.md §precept_fire`]
@@ -296,7 +296,7 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 
 ### CC#7. ConstraintMeta DU Subtype Count
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — Option B (hierarchical, StateAnchored grouping node). Approved 2026-05-06.
 
 **Affects:** Type Checker, Precept Builder
 **Gap register refs:** #22, #62
@@ -308,13 +308,31 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 
 **Current discrepancy:** Precept-builder.md's bucket dispatch switch uses 5 subtypes. Are `StateEntry` and `StateExit` separate top-level subtypes, or subtypes of `StateAnchored`?
 
+**Ruling — Option B (hierarchical with StateAnchored grouping node):**
+
+```csharp
+public abstract record ConstraintMeta(...)
+{
+    public sealed record Invariant()         : ConstraintMeta(...);
+    public abstract record StateAnchored()   : ConstraintMeta(...);
+        public sealed record StateResident() : StateAnchored(...);
+        public sealed record StateEntry()    : StateAnchored(...);
+        public sealed record StateExit()     : StateAnchored(...);
+    public sealed record EventPrecondition() : ConstraintMeta(...);
+}
+```
+
+- Builder routing: 5-way switch on concrete types — correct for execution bucket dispatch.
+- Type checker and proof engine use `meta is ConstraintMeta.StateAnchored` for grouping checks — correct for "is this state-scoped?" questions.
+- The catalog already specifies this shape; this ruling locks it as canonical.
+
 **Resolution path:** Catalog-system.md must specify the exact DU hierarchy.
 
 ---
 
 ### CC#9. ConstraintFieldRefs.ConstraintIdentity Type
 
-**Status:** 🔵 Pending team resolution (follows from CC#7)
+**Status:** ✅ Resolved — ConstraintFieldRefs.ConstraintIdentity uses the proof-engine ConstraintIdentity DU. Resolved 2026-05-06.
 
 **Affects:** Type Checker, Proof Engine
 **Gap register refs:** #15, #51
@@ -323,6 +341,18 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 **Why it's cross-cutting:**
 - **Type Checker** — Produces `ConstraintFieldRefs` with identity field typed as `object`
 - **Proof Engine** — Defines a proper `ConstraintIdentity` DU with `RuleIdentity` and `EnsureIdentity` subtypes
+
+**Ruling:** Use the proof-engine `ConstraintIdentity` DU:
+
+```csharp
+public abstract record ConstraintIdentity
+{
+    public sealed record RuleIdentity(string StateName, string RuleName) : ConstraintIdentity;
+    public sealed record EnsureIdentity(string EventName, string FieldName) : ConstraintIdentity;
+}
+```
+
+`object` is indefensible now that the DU is locked by CC#7. The DU provides type safety and exhaustive matching; `object` would require downstream casts with no compile-time exhaustiveness guarantee. The proof-engine already defines the correct shape — align `ConstraintFieldRefs.ConstraintIdentity` to it.
 
 **Resolution path:** Align on the proof-engine.md DU shape for type safety.
 
@@ -354,7 +384,7 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ### CC#11. ExecutionRow.RejectReason Field
 
-**Status:** 🔵 Pending team resolution (obvious add — no design ambiguity)
+**Status:** ✅ Resolved — string? RejectReason added to TypedTransitionRow and ExecutionRow. Resolved 2026-05-06.
 
 **Affects:** Type Checker, Precept Builder, Evaluator
 **Gap register refs:** #20, #59
@@ -365,7 +395,7 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 - **Precept Builder** — Transforms to `ExecutionRow` (needs field)
 - **Evaluator** — Returns `Rejected(reason)` outcome (reads field)
 
-**Current gap:** Evaluator.md references `winningRow.RejectReason` but no such field is defined on `ExecutionRow`.
+**Ruling:** Add `string? RejectReason` to both `TypedTransitionRow` and `ExecutionRow`. No design ambiguity — the evaluator already references `winningRow.RejectReason`; the field simply wasn't declared. `null` for non-reject rows; populated from the `because` clause text for reject rows.
 
 **Resolution path:** Add `string? RejectReason` to both `TypedTransitionRow` and `ExecutionRow`.
 
