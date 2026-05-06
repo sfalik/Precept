@@ -22,6 +22,18 @@
 
 ## Recent Updates
 
+### 2026-05-05 - Severity audit of 41 canonical doc gaps
+
+- Cross-referenced all six canonical runtime/language docs against `docs/working/runtime-api-public-surface-spec.md` §§1–10 (post frank-152) and the 17 locked §11 design decisions.
+- Result: **22 MAJOR, 12 MINOR, 13 RESOLVED** across 41+ atomic findings (F-001–F-029, some slots multi-gap).
+- `runtime-api.md` is the highest-urgency target: 10 MAJOR gaps including the missing `FromJson` migration, stale `Fields`/`Events`/`AvailableEvents` return types, absent Typed Lane and CLR Discovery sections, and four wrong variant names from decisions #12–#17.
+- `result-types.md` is second: 7 MAJOR gaps — all DU variants shown top-level (not nested), three Axiom 1 `PreceptValue` leaks, and all four UpdateOutcome/EventOutcome renames unapplied.
+- `descriptor-types.md`: 2 MAJOR (both `ClrType` additions missing on `FieldDescriptor` and `ArgDescriptor`); small doc, fast fix.
+- `evaluator.md`: 2 MAJOR (stale variant names in §5 output definitions, `RestoreOutcome` still defined); 2 MINOR (OQ blocks, `BecauseClause` rename).
+- `precept-builder.md`: 1 MAJOR (Pass 1 descriptors missing `ClrType`); OQ blocks and naming are MINOR.
+- `business-domain-types.md`: All 5 findings resolved — doc was correct, frank-152 fixed the spec to match.
+- Full structured report delivered to `.squad/decisions/inbox/frank-severity-audit-2026-05-05.md`.
+
 ### 2026-05-05 - Mini-spec remediation closed out
 
 - Fixed the runtime API mini-spec's stale CLR table and OQ references, then produced `frank-minispec-decisions-2026-05-05.md` so Scribe could merge a complete ledger record for the runtime API surface.
@@ -37,6 +49,13 @@
 - Public persistence naming is `Version.ToJson()` / `Precept.FromJson(JsonElement)`.
 - `FromJson` returns `Version` directly; restore is not a business-outcome DU.
 - Raw public value lanes use JSON (`JsonElement`), never `PreceptValue`.
+
+### 2026-05-05 - Canonical runtime doc completion pass
+
+- Completed the five-doc canonical runtime documentation completion pass across `docs/runtime/result-types.md`, `docs/runtime/descriptor-types.md`, `docs/runtime/runtime-api.md`, `docs/runtime/evaluator.md`, and `docs/runtime/precept-builder.md`.
+- Applied all 34 severity-audit findings assigned to the pass, including locked decisions #9-#17.
+- Archived the mini-spec into `docs/working/archive/` after the canonical sync landed.
+- Commit: `01bfbd0`.
 
 ### Historical summary through 2026-05-05
 
