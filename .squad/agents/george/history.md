@@ -140,3 +140,11 @@
 - The ensure-slot follow-up is now the durable baseline: `StateEnsure` and `EventEnsure` use `SlotOptBecauseClause`, `RuleDeclaration` stays required, and the 2 catalog-red tests are now green inside the 2340-pass run.
 - Team-wide correction to retain: catalog schema diagrams must count 13 catalogs including `ExpressionForms`; `ConstructSlotKind` is supporting schema, not a 14th catalog.
 - User routing directive: Elaine owns both ASCII and Mermaid diagram authoring; Frank supplies architectural analysis and diagram content decisions, not final rendering ownership.
+
+---
+
+### 2026-05-06T23:11:15Z — Runtime review findings absorbed into CC#8 closeout
+- George-2's runtime review correctly flagged the phantom zero-arg `Possible` state and the proposal-vs-source inspection-shape drift.
+- Same-day Shane rulings and the CC#8 resolution absorbed the design blockers: zero-arg `Possible` is removed, `RowEffect` is the durable row-shape choice, and proposal-only inspection members stay explicitly gated behind CC#8 follow-through.
+- Keep George's durable warning active: when UX specs design against a proposal rather than shipped source, label the dependency explicitly so implementers do not treat draft shapes as already-shipped runtime contracts.
+

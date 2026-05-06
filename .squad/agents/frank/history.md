@@ -22,6 +22,19 @@
 
 ## Recent Updates
 
+## Frank-158 — CC#8 proposal update
+[2026-05-06]
+Task: Applied Shane's OQ-2 and OQ-3 resolutions to event-inspection-proposal.md. Updated CC#8 status in cross-cutting-decisions.md to resolved. CC#12 unblocked.
+
+---
+
+## Frank-157 — CC#8 fit assessment
+2026-05-07
+Task: Assessed whether event-inspection-proposal.md satisfies UX requirements in elaine-ux-requirements-event-interaction.md. Produced CC#8 resolution recommendation.
+Verdict: Proposal satisfies the large majority of requirements correctly. Two blocking gaps identified: (1) `ArgErrorKind` absent from `ArgError` — proposal's OQ-2 defers it but UXR-24 makes it Must Have; (2) OQ-3 (`TransitionKind` enum vs `RowEffect` DU) must be closed before CC#8 can resolve — source already uses the DU, Elaine already recommended it, close as DU. One critical source divergence: source `Inspection.cs` lacks `DeclaredArgs`, `ArgErrors`, `CurrentFields` and uses different names (`Rows`, `RowInspection`, `ResultingFields`) — source is a prototype, proposal is the intended canonical, source must be reconciled post-approval. Three mandatory amendments specified; resolution path defined. Output: `.squad/decisions/inbox/frank-cc8-fit-assessment.md`.
+
+---
+
 ### 2026-05-06 - Wave 1 cross-cutting decisions facilitation started
 
 - Wave 0 complete (CC#1, CC#2, CC#25 locked). Opened Wave 1 facilitation with Shane.
@@ -71,3 +84,13 @@
 - Collection API design converged on CLR-friendly adapters and declared-direction storage while keeping internal storage on `PreceptValue[]`.
 - Currency, unit, and dimension work converged on catalog-backed identity types with clear public/internal shape boundaries.
 - Use `.squad/decisions/decisions.md` for full per-decision provenance; keep `history.md` focused on durable operating context and the newest closures.
+
+---
+
+## 2026-05-06 — CC#8 closeout + Wave 1 handoff
+
+- Frank-156's UX accuracy review fed directly into the same-day Elaine correction pass; the dead zero-arg `Possible` state and the undefined-event rendering error are now durably closed.
+- Frank-157-1's fit assessment became the acceptance bar for CC#8: once OQ-2 and OQ-3 were closed, the proposal was fit to adopt.
+- Frank-158-1 applied those closures in `event-inspection-proposal.md`, resolved CC#8 in the cross-cutting register, and unblocked CC#12.
+- Wave 1 facilitation is live with CC#7 first; keep the hierarchical `ConstraintMeta.StateAnchored` recommendation attached to that handoff until Shane rules.
+
