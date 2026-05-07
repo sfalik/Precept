@@ -33,9 +33,7 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 
 `SlotValue` is an abstract record with 17 sealed subtypes, one per `ConstructSlotKind`:
 
-> **Open Question:** `SlotValue` subtype inventory
-> parser.md documents 17 `SlotValue` subtypes, while catalog-system.md still lists 15 `ConstructSlotKind` members and omits `RuleExpressionSlot` and `InitialMarkerSlot`. The parser contract needs one canonical inventory before downstream docs and implementation names can stabilize.
-> *Flagged: 2026-05-04*
+> **Decision (2026-05-06):** `SlotValue` subtype inventory is **17** — the `ConstructSlotKind` enum in code (`src/Precept/Language/ConstructSlot.cs`) is authoritative. All 17 members are declared, including `RuleExpression` (16) and `InitialMarker` (17). catalog-system.md was corrected in Wave 4 to reflect this count. No discrepancy remains.
 
 | Subtype | Carries |
 |---------|---------|
@@ -52,26 +50,18 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 | `EventTargetSlot` | `string?` — target event name |
 | `EnsureClauseSlot` | `ParsedExpression` (typed DU) |
 | `BecauseClauseSlot` | `string` — diagnostic message |
-| `AccessModeSlot` | `SourceSpan` — access mode span |
+| `AccessModeSlot` | `TokenKind` — resolved access mode token |
 | `FieldTargetSlot` | `string?` — target field name |
 | `RuleExpressionSlot` | `ParsedExpression` (typed DU) |
 | `InitialMarkerSlot` | `bool` — presence of `initial` keyword |
 
-> **Open Question:** `TypeExpressionSlot` canonical shape
-> parser.md resolves `TypeExpressionSlot` to `TypeMeta`, while type-checker.md still describes the same slot as a `SourceSpan`. The parser and type checker need one contract for when type references become resolved objects.
-> *Flagged: 2026-05-04*
+> **Decision (2026-05-06):** `TypeExpressionSlot` carries `TypeMeta Type` — the parser resolves the type reference via the `Types` catalog at parse time. The type checker receives an already-resolved `TypeMeta` object (not a span to re-resolve). Rationale: type keywords are a small closed set defined in the `Types` catalog; the parser already consults this catalog for vocabulary recognition, so resolution is trivial and eliminates a re-lookup. The `SourceSpan` on the base record remains available for diagnostics. The type-checker.md table is stale and must be updated to match.
 
-> **Open Question:** `ModifierListSlot` canonical shape
-> parser.md stores `ModifierListSlot` as `ImmutableArray<ModifierKind>`, but type-checker.md still describes `ImmutableArray<TokenKind>`. The slot contract must settle whether modifier identity is normalized in the parser or deferred to later stages.
-> *Flagged: 2026-05-04*
+> **Decision (2026-05-06):** `ModifierListSlot` carries `ImmutableArray<ModifierKind> Modifiers` — the parser normalizes modifier tokens to their semantic `ModifierKind` identity via the `Modifiers` catalog. Rationale: the parser already consults the `Modifiers` catalog for vocabulary recognition; lifting `TokenKind` → `ModifierKind` in the same pass is zero-cost and gives downstream consumers a semantically typed value rather than a raw token to switch on. The type-checker.md table's `ImmutableArray<TokenKind>` is stale.
 
-> **Open Question:** `AccessModeSlot` canonical shape
-> parser.md keeps `AccessModeSlot` as a `SourceSpan`, while type-checker.md describes the same slot as a resolved `TokenKind`. The pipeline needs one answer on whether access modes are parsed as syntax spans or normalized tokens before type checking.
-> *Flagged: 2026-05-04*
+> **Decision (2026-05-06):** `AccessModeSlot` carries `TokenKind AccessMode` — the parser resolves the access mode keyword to its `TokenKind` at parse time. Rationale: access modes are a two-member closed set (`readonly`/`editable`). The parser already identifies which token it consumed; forcing the TC to re-read a span to recover this information is wasteful and violates the principle of resolving closed-vocabulary tokens at their recognition site. **Code update required:** `SlotValue.cs` must add a `TokenKind AccessMode` property to `AccessModeSlot` (currently carries only the base `SourceSpan`).
 
-> **Open Question:** `BecauseClauseSlot` canonical shape
-> parser.md treats `BecauseClauseSlot` as the authored diagnostic string, while type-checker.md still documents a raw `SourceSpan`. The contract needs one canonical representation so downstream diagnostics know whether they receive text or syntax to re-read.
-> *Flagged: 2026-05-04*
+> **Decision (2026-05-06):** `BecauseClauseSlot` carries `string Message` — the parser extracts the string literal content at parse time. Rationale: the `because` clause is syntactically a string literal; the parser already validates the token kind and has the lexeme. Downstream consumers (constraint diagnostics, MCP output, LS hover) all need the text, never the raw span. Deferring extraction would require every consumer to re-read source. The type-checker.md table is stale.
 
 Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
 
@@ -191,14 +181,21 @@ When multiple constructs share a leading token:
 candidates := constructs with this leading token
 for each candidate:
     disambiguationTokens := candidate.Meta.Entries.DisambiguationTokens
-    if peek(offset) in disambiguationTokens:
+    if peek(2) in disambiguationTokens:
         return parseConstruct(candidate)
 report ambiguous construct
 ```
 
 The offset and token set come from catalog metadata — the parser contains no hardcoded disambiguation logic.
 
-> **Open Question (unresolved):** The disambiguation `peek(offset)` doesn't specify the offset value. Is it always 1? If it varies per construct, `DisambiguationEntry` needs an `Offset` field in the catalog.
+> **Decision (2026-05-06): Disambiguation offset is structurally invariant at 2.** All `StateScoped` and `EventScoped` constructs follow the grammar pattern `[leading-token @ offset 0] [anchor-name @ offset 1] [disambiguation-token @ offset 2]`. The parser peeks at `peek(2)` to read the disambiguation token and matches it against `DisambiguationEntry.DisambiguationTokens`. No `Offset` field is needed on `DisambiguationEntry` because:
+>
+> 1. Every StateScoped construct's first slot is `StateTarget` (a single identifier).
+> 2. Every EventScoped construct's first slot is `EventTarget` (a single identifier).
+> 3. The anchor name is always exactly one token after the leading keyword.
+> 4. Therefore the disambiguation token is always at position 2 in the lookahead window.
+>
+> Evidence: `Constructs.cs` construct entries confirm the slot pattern — `TransitionRow`(`from <state> on ...`), `StateEnsure`(`in <state> ensure ...`), `AccessMode`(`in <state> modify ...`), `OmitDeclaration`(`in <state> omit ...`), `StateAction`(`to <state> -> ...`), `EventEnsure`(`on <event> ensure ...`), `EventHandler`(`on <event> -> ...`). All follow offset-2 invariant.
 
 ### Slot Walking
 
