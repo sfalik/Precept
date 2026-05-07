@@ -114,3 +114,20 @@
 
 
 
+### 2026-05-07T09:04:34Z — Parser coverage audit flagged critical gaps
+
+- Parser-focused run is green at 459 passed, 0 failed, 0 skipped across the 6 files under `test/Precept.Tests/Parser/`.
+
+- The strongest gap cluster is type-checker-facing parser surface: full `TypeRef` syntax, collection/lookup/choice shapes, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), rich event args, and stateless handler trailing `ensure` all lack meaningful parser coverage.
+
+- Action parsing is especially under-anchored: parser tests prove `ActionChain` slot presence, but not action kind/operand detail for the collection mutation surface.
+
+- Catalog drift protection is strong and distributed (`TokensTests`, `OperatorsTests`, `ActionsTests`, `ConstructsTests`, `ExpressionForm*`, `SlotOrderingDriftTests`), but parser diagnostic-code coverage is near-zero — many tests still stop at `NotBeEmpty()` or `Stage == Parse`.
+
+- Durable lesson: a green parser suite can still be checker-hostile when it does not pin the actual AST payloads and diagnostic identities that later stages consume.
+
+### 2026-05-07T15:18:42Z — NameBinder suite complete
+
+- Added `test/Precept.Tests/NameBinder/NameBinderTests.cs` with 40 tests spanning 9 behavioral groups for declarations, duplicates, references, shadowing, forward references, and manifest integration.
+- Branch validation closed green at 2929 total passing tests.
+- Frank's companion doc-sync batch eliminated stale NameBinder references, so the implementation and its regression anchors are now durably documented together.

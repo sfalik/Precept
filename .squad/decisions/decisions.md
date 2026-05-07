@@ -10512,8 +10512,6 @@ Frank-96's entries (#11 — DU nesting, #12 — ConstraintsFailed rename) were c
 
 # Decision Note: copilot-directive-value-suffix-drop
 
-
-
 ### 2026-05-04T14:42:41: User directive
 
 **By:** Shane (via Copilot)
@@ -14980,7 +14978,6 @@ The catalog's job is to describe what the language allows. The executor's job is
 
 **Recommendation: No change. `OperationMeta` stays pure. TypeRuntime array approach stands.**
 
-
 ### 2026-05-05T11:20:17Z: Value-types investigation synced with 31 inbox files
 
 **By:** Frank
@@ -16961,3 +16958,2263 @@ Stateless subsection added after the construction algorithm. Key text:
 | Graph analyzer exemptions | `docs/compiler/graph-analyzer.md §8.1` |
 | Language spec coverage | `docs/language/precept-language-spec.md §3A.5` |
 | Cross-cutting ruling | `docs/working/cross-cutting-decisions.md §CC#26` |
+
+### 2026-05-07T09:47: Q1 Decision — NameBinder Pipeline Stage
+**By:** Shane
+**What:** Separate NameBinder stage between Parser and TypeChecker, producing SymbolTable. Included in remediation plan.
+**Why:** Clean separation of concerns. LS gets declaration-level data (completions, hover, go-to-def) without requiring full type inference. Better diagnostic UX — naming errors before type cascade. Natural cache boundary.
+**Stage design:** NameBinder.Bind(manifest) → SymbolTable (declarations, name indexes, resolved references, diagnostics). TypeChecker receives both ConstructManifest + SymbolTable.
+**Hard rule:** SymbolTable carries declarations and references only. No typed expressions, no resolved operations — those stay in SemanticIndex.
+
+### 2026-05-07T09:43: Q2 Decision — ParsedAction DU Granularity
+**By:** Shane
+**What:** Option C — shape-based subtypes (~9) each carrying an ActionKind field
+**Why:** Structural grouping (type checker dispatches on shape) + verb identity (diagnostics/tooling reads Kind). Avoids redundant subtypes of identical shape that Option B would require for collection-mutate actions.
+**Alternatives rejected:** Option A (loses verb identity entirely), Option B (structural redundancy — 5 identical-shape subtypes for collection-mutate actions)
+
+### 2026-05-07T09:47: Q3 Decision — Parser Scope: Structure Only
+**By:** Shane
+**What:** Parser validates structure only — it does NOT validate that referenced names exist.
+**Why:** Clean pipeline separation. Parser = syntactic validity. NameBinder = naming validity. Parser produces StateTargetSlot("whatever-typed") and moves on. NameBinder emits UndeclaredState/Field/Event diagnostics.
+**Consequence:** No parser-level name lookup, no mid-parse declaration inventories. Simpler, faster, better error recovery.
+
+### 2026-05-07T09:48: Q4 Decision — Interpolation Parsing
+**By:** Shane
+**What:** Parse interpolation fully now — produce InterpolatedStringExpression tree in the current remediation batch.
+**Why:** ParserState already in scope, lexer infrastructure ready. Deferring requires re-parsing the raw string later (awkward). TypeChecker gets a proper tree to validate hole types.
+**Output shape:** InterpolatedStringExpression(segments: [LiteralSegment("Hello "), HoleSegment(ParsedExpression(field-ref "name"))])
+
+# Frank — NameBinder Documentation Sync Findings
+
+**Date:** 2026-05-07
+**Context:** Exhaustive documentation sync after NameBinder implementation
+
+## Implementation Matches Design
+
+The NameBinder implementation aligns with the design sketch from the 2026-05-07 session. No surprises:
+
+- **Entry point:** `NameBinder.Bind(ConstructManifest) → SymbolTable` — matches design.
+- **Two-pass architecture:** Pass 1 collects declarations, Pass 2 resolves references — matches design.
+- **TypeChecker signature:** `Check(ConstructManifest, SymbolTable)` — matches design.
+- **Compilation record:** Includes `SymbolTable Symbols` field — matches design.
+- **Diagnostic codes:** All 8 reserved codes implemented (`DuplicateFieldName`, `DuplicateStateName`, `DuplicateEventName`, `UndeclaredField`, `UndeclaredState`, `UndeclaredEvent`, `UndeclaredArg`, `BindingShadowsField`) — matches Q8.
+- **Q6 (BindingShadowsField):** Hard error on quantifier binding shadowing field — implemented as designed.
+- **Q7 (Forward-reference detection):** Owned by NameBinder via `DeclarationOrder` on `DeclaredField` — implemented as designed.
+
+## Observations
+
+1. **BuildDictionaries() is a no-op.** The method exists as a structural pass-boundary placeholder but does nothing — dictionaries are populated during Pass 1 collection. Noted in the doc but not a concern.
+
+2. **SymbolResolution has 6 subtypes, not 5.** The design sketch mentioned FieldTarget, StateTarget, EventTarget, ArgTarget, UnresolvedTarget. The implementation adds `BindingTarget(string)` for quantifier binding variables. This is a natural extension, not a design deviation.
+
+3. **Parser impl state is "Implemented", not "Stub".** The compiler README had Parser listed as "Stub" — corrected to "Implemented" since Parser Slices 1–4 are complete per parser.md.
+
+## No Architectural Decisions Required
+
+No new decisions needed. All findings are documentation corrections to match implemented reality.
+
+# NameBinder Stage Architecture Spec
+
+**Date:** 2026-05-07T10:25:00Z  
+**Author:** Frank (Lead/Architect)  
+**Status:** Formal spec — extends prior sketch (`frank-symboltable-stage-design.md`)  
+**Context:** Locked decision Q1 (see `.squad/decisions/inbox/coordinator-q1-namebinder.md`). This document is the implementation-ready API surface specification.
+
+---
+
+## 1. Pipeline Contract
+
+### Position
+
+```
+Lexer → Parser → NameBinder → TypeChecker → GraphAnalyzer → ProofEngine → PreceptBuilder
+```
+
+### Input
+
+```csharp
+ConstructManifest manifest  // Output of Parser.Parse()
+```
+
+The `ConstructManifest` contains:
+- `ImmutableArray<ParsedConstruct> Constructs` — parsed constructs with slots
+- `ImmutableArray<Diagnostic> Diagnostics` — parser diagnostics
+
+### Output
+
+```csharp
+SymbolTable symbols  // New type produced by NameBinder.Bind()
+```
+
+### Compilation Record Update
+
+```csharp
+public sealed record Compilation(
+    TokenStream          Tokens,
+    ConstructManifest    Manifest,
+    SymbolTable          Symbols,         // ← NEW
+    SemanticIndex        Semantics,
+    StateGraph           Graph,
+    ProofLedger          Proof,
+    ImmutableArray<Diagnostic> Diagnostics,
+    bool                 HasErrors);
+```
+
+### Pipeline Call Site
+
+```csharp
+// Inside Compiler.Compile
+TokenStream        tokens   = Lexer.Lex(source);
+ConstructManifest  manifest = Parser.Parse(tokens);
+SymbolTable        symbols  = NameBinder.Bind(manifest);           // ← NEW
+SemanticIndex      semantics = TypeChecker.Check(manifest, symbols); // ← UPDATED
+StateGraph         graph    = GraphAnalyzer.Analyze(semantics);
+ProofLedger        proof    = ProofEngine.Prove(semantics, graph);
+
+ImmutableArray<Diagnostic> diagnostics =
+[
+    ..tokens.Diagnostics,
+    ..manifest.Diagnostics,
+    ..symbols.Diagnostics,      // ← NEW
+    ..semantics.Diagnostics,
+    ..graph.Diagnostics,
+    ..proof.Diagnostics,
+];
+```
+
+---
+
+## 2. `SymbolTable` Record Definition
+
+```csharp
+namespace Precept.Pipeline;
+
+/// <summary>
+/// Name-binding stage output: all declared symbols and resolved references.
+/// Produced from ConstructManifest by walking ParsedConstruct nodes.
+/// </summary>
+/// <remarks>
+/// <para><b>Hard boundary:</b> SymbolTable contains declarations and references ONLY.
+/// No typed expressions, no inferred types, no resolved operations.
+/// Those belong in SemanticIndex.</para>
+/// </remarks>
+public sealed record SymbolTable(
+    // ── Declarations ──────────────────────────────────────────────
+    ImmutableArray<DeclaredField>  Fields,
+    ImmutableArray<DeclaredState>  States,
+    ImmutableArray<DeclaredEvent>  Events,
+    
+    // ── O(1) Name Lookup Dictionaries ─────────────────────────────
+    ImmutableDictionary<string, DeclaredField> FieldsByName,
+    ImmutableDictionary<string, DeclaredState> StatesByName,
+    ImmutableDictionary<string, DeclaredEvent> EventsByName,
+    
+    // ── Reference Sites ───────────────────────────────────────────
+    ImmutableArray<SymbolReference> References,
+    
+    // ── Stage Diagnostics ─────────────────────────────────────────
+    ImmutableArray<Diagnostic> Diagnostics
+);
+```
+
+### Declaration Records
+
+```csharp
+/// <summary>
+/// A field declaration discovered during name binding.
+/// Carries identity + type (parser-resolved via Types catalog).
+/// </summary>
+public sealed record DeclaredField(
+    string                       Name,
+    TypeMeta                     Type,           // Parser-stamped; already resolved
+    ImmutableArray<ModifierKind> Modifiers,      // Parser-resolved modifiers
+    bool                         IsComputed,     // Has ComputeExpression slot
+    ParsedConstruct              Syntax,         // Back-pointer for go-to-definition
+    SourceSpan                   NameSpan        // Span of the field name token
+);
+
+/// <summary>
+/// A state declaration discovered during name binding.
+/// </summary>
+public sealed record DeclaredState(
+    string                       Name,
+    ImmutableArray<ModifierKind> Modifiers,      // initial, terminal, required, etc.
+    ParsedConstruct              Syntax,
+    SourceSpan                   NameSpan
+);
+
+/// <summary>
+/// An event declaration discovered during name binding.
+/// </summary>
+public sealed record DeclaredEvent(
+    string                       Name,
+    ImmutableArray<DeclaredArg>  Args,
+    bool                         IsInitial,      // Has InitialMarker slot with true
+    ParsedConstruct              Syntax,
+    SourceSpan                   NameSpan
+);
+
+/// <summary>
+/// An event argument discovered during name binding.
+/// </summary>
+public sealed record DeclaredArg(
+    string     Name,
+    TypeMeta   Type,
+    string     EventName,    // Back-reference for scoping
+    SourceSpan NameSpan
+);
+```
+
+### Symbol Reference Records
+
+```csharp
+/// <summary>
+/// A reference site: an identifier in source that resolved to a declared symbol
+/// (or failed to resolve → UnresolvedTarget + diagnostic).
+/// </summary>
+public sealed record SymbolReference(
+    SourceSpan       Site,     // Where the reference appears in source
+    string           Name,     // The identifier text
+    SymbolResolution Resolution
+);
+
+/// <summary>
+/// Discriminated union for reference resolution results.
+/// </summary>
+public abstract record SymbolResolution;
+
+/// <summary>Reference resolved to a field declaration.</summary>
+public sealed record FieldTarget(DeclaredField Field) : SymbolResolution;
+
+/// <summary>Reference resolved to a state declaration.</summary>
+public sealed record StateTarget(DeclaredState State) : SymbolResolution;
+
+/// <summary>Reference resolved to an event declaration.</summary>
+public sealed record EventTarget(DeclaredEvent Event) : SymbolResolution;
+
+/// <summary>Reference resolved to an event argument (scoped to enclosing event context).</summary>
+public sealed record ArgTarget(DeclaredArg Arg) : SymbolResolution;
+
+/// <summary>Reference could not be resolved — diagnostic emitted.</summary>
+public sealed record UnresolvedTarget(string AttemptedName, SymbolCategory ExpectedCategory) : SymbolResolution;
+
+/// <summary>What kind of symbol was expected at a reference site.</summary>
+public enum SymbolCategory { Field, State, Event, Any }
+```
+
+---
+
+## 3. `NameBinder.Bind` Algorithm
+
+```csharp
+public static class NameBinder
+{
+    public static SymbolTable Bind(ConstructManifest manifest)
+    {
+        var binder = new BinderState();
+        
+        // Pass 1: Collect declarations
+        foreach (var construct in manifest.Constructs)
+        {
+            binder.CollectDeclarations(construct);
+        }
+        
+        // Build lookup dictionaries after Pass 1
+        binder.BuildDictionaries();
+        
+        // Pass 2: Resolve references
+        foreach (var construct in manifest.Constructs)
+        {
+            binder.ResolveReferences(construct);
+        }
+        
+        return binder.ToSymbolTable();
+    }
+}
+```
+
+### Pass 1: Declaration Collection
+
+Walk all constructs; extract declared names based on construct kind:
+
+| Construct Kind | Extracts |
+|----------------|----------|
+| `FieldDeclaration` | Field names from `IdentifierListSlot[0]`, type from `TypeExpressionSlot[1]`, modifiers from `ModifierListSlot[2]` |
+| `StateDeclaration` | State names + modifiers from `StateEntryListSlot[0]` |
+| `EventDeclaration` | Event name from `IdentifierListSlot[0]`, args from `ArgumentListSlot[1]`, initial marker from `InitialMarkerSlot[2]` |
+
+**Duplicate detection:** If a name is already declared in its category, emit diagnostic and skip the duplicate.
+
+### Pass 2: Reference Resolution
+
+Walk all constructs; for each reference site, resolve against the dictionaries:
+
+| Slot Type | Contains | Resolution Scope |
+|-----------|----------|------------------|
+| `StateTargetSlot` | State name | `StatesByName` |
+| `EventTargetSlot` | Event name | `EventsByName` |
+| `FieldTargetSlot` | Field name | `FieldsByName` |
+| Expression identifiers | Field, arg, or quantifier binding | See below |
+
+**Expression identifier scoping:**
+
+1. **In event context** (transition row, event handler, event ensure): Check `Args` of the enclosing event first, then `FieldsByName`.
+2. **In global context** (rule, field compute expression): Check `FieldsByName` only.
+3. **In quantifier body**: Check quantifier binding first, then event args, then fields.
+
+The "enclosing event context" is derived from the construct kind and the `EventTargetSlot` value.
+
+### Diagnostics Emitted
+
+| Diagnostic Code | When |
+|-----------------|------|
+| `DuplicateFieldName` | Field name already declared |
+| `DuplicateStateName` | State name already declared |
+| `DuplicateEventName` | Event name already declared |
+| `UndeclaredField` | Field reference not found |
+| `UndeclaredState` | State reference not found |
+| `UndeclaredEvent` | Event reference not found |
+| `UndeclaredArg` | Arg reference not found in event scope |
+
+These diagnostic codes should be added to the `Diagnostics` catalog if not present.
+
+---
+
+## 4. TypeChecker Input Contract
+
+### Signature Change
+
+```csharp
+// Before
+public static SemanticIndex Check(ConstructManifest manifest);
+
+// After
+public static SemanticIndex Check(ConstructManifest manifest, SymbolTable symbols);
+```
+
+### What TypeChecker Receives
+
+| Artifact | Purpose |
+|----------|---------|
+| `ConstructManifest` | Expression ASTs (`ParsedExpression`), action chains, outcome forms, structural slot data |
+| `SymbolTable` | Pre-resolved declarations and references |
+
+### What TypeChecker No Longer Does
+
+- ❌ Discover declarations (NameBinder did it)
+- ❌ Build name→symbol dictionaries (already built)
+- ❌ Emit `UndeclaredField/State/Event` diagnostics (NameBinder owns them)
+- ❌ Emit `Duplicate*Name` diagnostics (NameBinder owns them)
+- ❌ Name lookup at reference sites (already resolved → `SymbolReference.Resolution`)
+
+### What TypeChecker Still Owns
+
+- ✅ Type inference on expressions (`ParsedExpression` → `TypedExpression`)
+- ✅ Operation resolution (`OperationKind` from `Operations` catalog)
+- ✅ Function overload resolution
+- ✅ Type compatibility checks (`TypeMismatch`, `QualifierMismatch`)
+- ✅ Action semantic validation (type-check action operands)
+- ✅ Modifier combination legality
+- ✅ Normalized declaration building (transition rows, rules, ensures)
+- ✅ Dependency fact extraction (computed field deps, constraint refs)
+- ✅ Producing `SemanticIndex` with typed expressions and bindings
+
+### Merged Artifact Option
+
+**Recommendation: Keep artifacts separate.**
+
+The TypeChecker receives `(ConstructManifest, SymbolTable)` as two parameters, not a merged `SemanticManifest`. Rationale:
+- The TypeChecker needs to walk `ParsedExpression` nodes, which are in `ConstructManifest.Constructs`.
+- Merging would require copying expression ASTs into a new structure — wasteful.
+- Two parameters is explicit about what each stage produces.
+
+If a merged view is ever needed for debugging or MCP, it can be a projection:
+```csharp
+public sealed record SemanticManifest(ConstructManifest Manifest, SymbolTable Symbols);
+```
+
+But this is not required for the pipeline.
+
+---
+
+## 5. Hard Boundaries
+
+**What SymbolTable contains:**
+- Declaration identity (name, type, modifiers, span, syntax back-pointer)
+- Reference sites with resolution results
+- Naming diagnostics
+
+**What SymbolTable does NOT contain:**
+- Typed expressions (TypeChecker output)
+- Resolved operations (TypeChecker output)
+- Normalized transition rows/rules/ensures (TypeChecker output)
+- Type inference results (TypeChecker output)
+- Graph topology (GraphAnalyzer output)
+- Proof obligations (ProofEngine output)
+
+**Test:** If a consumer asks "what type does this expression evaluate to?" the answer is not in SymbolTable — it's in SemanticIndex. SymbolTable only answers "what does this identifier resolve to?"
+
+---
+
+## 6. Language Server Consumption
+
+### By Feature
+
+| LS Feature | SymbolTable Data Used |
+|------------|----------------------|
+| **Completions (state target)** | `States` array — all declared state names |
+| **Completions (event target)** | `Events` array — all declared event names |
+| **Completions (field target)** | `Fields` array — all declared field names |
+| **Completions (expression)** | `Fields` + scoped `Event.Args` |
+| **Hover (identifier)** | `SymbolReference.Resolution` → declaration record → type, modifiers |
+| **Go-to-definition** | `SymbolReference.Site` (cursor) → `Resolution.*.Syntax.Span` (declaration) |
+| **Semantic tokens (Pass 2)** | `SymbolReference.Resolution` → classify identifier as field/state/event/arg |
+| **"Did you mean?"** | `FieldsByName.Keys`, `StatesByName.Keys`, `EventsByName.Keys` for fuzzy matching |
+| **Outline** | `ParsedConstruct` from manifest (no symbols needed) |
+| **Diagnostics** | `SymbolTable.Diagnostics` for naming errors |
+
+### Partial Results Benefit
+
+If the TypeChecker fails (type error), the LS still has `SymbolTable` available. This means:
+- Completions work (field/state/event names)
+- Go-to-definition works (for successfully resolved references)
+- Hover shows declaration info (name, type, modifiers)
+- Semantic tokens classify identifiers
+
+Only expression-level features (hover on operation result type) degrade.
+
+---
+
+## Appendix: Estimated Complexity
+
+| Metric | Estimate |
+|--------|----------|
+| **LOC (NameBinder)** | 150–200 |
+| **LOC (SymbolTable + records)** | 100–120 |
+| **Catalog dependencies** | None (reads `ConstructManifest` only) |
+| **Pass count** | 2 (collect, resolve) |
+| **Algorithmic complexity** | O(n) constructs, O(1) dictionary lookups |
+
+The NameBinder is mechanically simple:
+- No type inference
+- No expression walking (identifiers are visited, not evaluated)
+- No catalog metadata resolution (types already stamped by parser)
+- Flat scoping (global + event args, no nested scopes)
+
+---
+
+## Open Questions for Coordinator/Shane
+
+1. **Diagnostic code allocation:** Need to reserve codes for `DuplicateFieldName`, `DuplicateStateName`, `DuplicateEventName`, `UndeclaredField`, `UndeclaredState`, `UndeclaredEvent`, `UndeclaredArg`. What range?
+
+2. **Quantifier binding scope:** When resolving identifiers inside quantifier predicates, the binding variable shadows fields. Is shadowing allowed, or should duplicate names emit a warning?
+
+3. **Forward references in field compute expressions:** Currently the TypeChecker handles forward-reference gating via `FieldScopeMode`. Should this check move to NameBinder (detect reference to later-declared field) or stay in TypeChecker (which knows declaration order)?
+
+---
+
+**Recommendation:** Implement as specified. The NameBinder is a clean, small stage that improves diagnostic UX, LS resilience, and TypeChecker simplicity. No design risks.
+
+# Outcomes Catalog Design
+
+**Date:** 2026-05-07T10:15:00Z  
+**Author:** Frank (Lead/Architect)  
+**Status:** Design for review  
+**Context:** `Parser.Expressions.cs` lines ~544–598 contain a hardcoded 3-arm switch on `TokenKind` to parse outcomes. This is the only place in the parser that bypasses the catalog-driven architecture. This document specifies the `OutcomesCatalog` replacement.
+
+---
+
+## 1. `OutcomeMeta` Record Definition
+
+```csharp
+/// <summary>
+/// Metadata record for a single outcome form in the Outcomes catalog.
+/// Mirrors the pattern established by ActionMeta and ModifierMeta:
+/// - Each member has a leading token for dispatch
+/// - Each member has an argument shape (none, required identifier, required string literal)
+/// - Each member maps to exactly one ParsedOutcome subtype
+/// </summary>
+/// <param name="Kind">The enum member this record describes.</param>
+/// <param name="LeadingToken">The TokenKind that identifies this outcome form after the arrow.</param>
+/// <param name="ArgumentKind">What the outcome expects after its leading token.</param>
+/// <param name="ParsedSubtype">The ParsedOutcome subtype this form produces.</param>
+/// <param name="Description">Human-readable description for tooling (hover, MCP).</param>
+/// <param name="Example">Example syntax fragment for documentation.</param>
+public sealed record OutcomeMeta(
+    OutcomeKind       Kind,
+    TokenKind         LeadingToken,
+    OutcomeArgumentKind ArgumentKind,
+    Type              ParsedSubtype,
+    string            Description,
+    string            Example);
+
+/// <summary>
+/// Classification of outcome forms.
+/// </summary>
+public enum OutcomeKind
+{
+    Transition   = 1,   // -> transition StateName
+    NoTransition = 2,   // -> no transition
+    Reject       = 3,   // -> reject "reason"
+}
+
+/// <summary>
+/// What argument shape the outcome expects after its leading token.
+/// </summary>
+public enum OutcomeArgumentKind
+{
+    /// <summary>No argument — the outcome is complete after the leading token(s).</summary>
+    None = 0,
+
+    /// <summary>Required identifier (state name) following the leading token.</summary>
+    RequiredIdentifier = 1,
+
+    /// <summary>Required string literal (reject reason) following the leading token.</summary>
+    RequiredStringLiteral = 2,
+
+    /// <summary>Compound form — secondary token required before argument (e.g., `no transition`).</summary>
+    SecondaryToken = 3,
+}
+```
+
+### Rationale
+
+The shape mirrors existing catalog patterns:
+
+- **`ActionMeta`**: `(Kind, Token, Description, ApplicableTo, SyntaxShape, ...)` — `SyntaxShape` plays the same role as `ArgumentKind`
+- **`ModifierMeta`**: DU with subtypes, each carrying token and semantic metadata
+- **`ConstructMeta`**: `(Kind, Slots, Entries, RoutingFamily, ...)` — `Entries` drives disambiguation
+
+`OutcomeMeta` is simpler than `ActionMeta` because outcomes have exactly 3 forms and no type-compatibility matrix. The key insight: outcomes are a **closed 3-member vocabulary resolved at parse time** (as stated in `ParsedOutcome.cs` line 6). The catalog must capture:
+
+1. **Dispatch identity**: `LeadingToken` (what token follows `->` to identify this outcome)
+2. **Argument shape**: `ArgumentKind` (what the parser expects after the leading token)
+3. **Output mapping**: `ParsedSubtype` (which DU member the parser emits)
+
+The `Type ParsedSubtype` field is the explicit link to the `ParsedOutcome` DU. This enables generic tooling to enumerate outcome forms and their payload shapes without hardcoded knowledge.
+
+---
+
+## 2. `OutcomesCatalog` Class Skeleton
+
+```csharp
+using System.Collections.Frozen;
+using Precept.Pipeline;
+
+namespace Precept.Language;
+
+/// <summary>
+/// Catalog of outcome forms — the three ways a transition row can conclude.
+/// Source of truth for parser dispatch, LS completions, hover, and MCP vocabulary.
+/// </summary>
+public static class Outcomes
+{
+    // ════════════════════════════════════════════════════════════════════════════
+    //  GetMeta — exhaustive switch
+    // ════════════════════════════════════════════════════════════════════════════
+
+    public static OutcomeMeta GetMeta(OutcomeKind kind) => kind switch
+    {
+        OutcomeKind.Transition => new(
+            kind,
+            TokenKind.Transition,
+            OutcomeArgumentKind.RequiredIdentifier,
+            typeof(TransitionOutcome),
+            "Transition to a named target state",
+            "-> transition Approved"),
+
+        OutcomeKind.NoTransition => new(
+            kind,
+            TokenKind.No,
+            OutcomeArgumentKind.SecondaryToken,  // expects `transition` after `no`
+            typeof(NoTransitionOutcome),
+            "Explicitly remain in the current state with no transition",
+            "-> no transition"),
+
+        OutcomeKind.Reject => new(
+            kind,
+            TokenKind.Reject,
+            OutcomeArgumentKind.RequiredStringLiteral,
+            typeof(RejectOutcome),
+            "Reject the event with an explanation message",
+            "-> reject \"Approval requires verified documents\""),
+
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
+            $"Unknown OutcomeKind: {kind}"),
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  All — every OutcomeMeta in declaration order
+    // ════════════════════════════════════════════════════════════════════════════
+
+    public static IReadOnlyList<OutcomeMeta> All { get; } =
+        Enum.GetValues<OutcomeKind>().Select(GetMeta).ToArray();
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Derived indexes
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// O(1) lookup from leading token to outcome metadata.
+    /// Used by parser to dispatch after consuming the arrow.
+    /// </summary>
+    public static FrozenDictionary<TokenKind, OutcomeMeta> ByLeadingToken { get; } =
+        All.ToFrozenDictionary(m => m.LeadingToken);
+
+    /// <summary>
+    /// The set of all tokens that can follow the outcome arrow.
+    /// Used for vocabulary recognition and error recovery.
+    /// </summary>
+    public static FrozenSet<TokenKind> LeadingTokens { get; } =
+        All.Select(m => m.LeadingToken).ToFrozenSet();
+
+    /// <summary>
+    /// Secondary token required for NoTransition form.
+    /// This is a structural constant — no catalog derivation needed
+    /// because only one form has a secondary token.
+    /// </summary>
+    public static TokenKind NoTransitionSecondaryToken => TokenKind.Transition;
+}
+```
+
+### Catalog Entry Summary
+
+| OutcomeKind | LeadingToken | ArgumentKind | Produces |
+|-------------|--------------|--------------|----------|
+| `Transition` | `TokenKind.Transition` | `RequiredIdentifier` | `TransitionOutcome(stateName)` |
+| `NoTransition` | `TokenKind.No` | `SecondaryToken` | `NoTransitionOutcome()` |
+| `Reject` | `TokenKind.Reject` | `RequiredStringLiteral` | `RejectOutcome(reason)` |
+
+---
+
+## 3. Refactored `ParseOutcome` Pseudocode
+
+Current code (hardcoded switch):
+```csharp
+switch (outcomeToken.Kind)
+{
+    case TokenKind.Transition: // hardcoded
+        ...
+    case TokenKind.No:         // hardcoded
+        ...
+    case TokenKind.Reject:     // hardcoded
+        ...
+    default:
+        // malformed
+}
+```
+
+Refactored (catalog-driven):
+```csharp
+private SlotValue ParseOutcome(ConstructSlot slot)
+{
+    if (Peek().Kind != TokenKind.Arrow)
+        return MakeSentinel(slot);
+
+    var arrowToken = Advance();  // consume '->'
+    var outcomeToken = Peek();
+
+    // Catalog-driven dispatch
+    if (!Outcomes.ByLeadingToken.TryGetValue(outcomeToken.Kind, out var meta))
+    {
+        // Unrecognized token after arrow — malformed
+        return new OutcomeSlot(new MalformedOutcome(arrowToken.Span), arrowToken.Span);
+    }
+
+    Advance();  // consume leading token
+
+    // Dispatch on argument shape
+    ParsedOutcome outcome = meta.ArgumentKind switch
+    {
+        OutcomeArgumentKind.RequiredIdentifier => ParseIdentifierArgument(meta, arrowToken),
+        OutcomeArgumentKind.RequiredStringLiteral => ParseStringLiteralArgument(meta, arrowToken),
+        OutcomeArgumentKind.SecondaryToken => ParseSecondaryTokenForm(meta, arrowToken),
+        OutcomeArgumentKind.None => CreateNoArgOutcome(meta, arrowToken),
+        _ => new MalformedOutcome(arrowToken.Span),
+    };
+
+    return new OutcomeSlot(outcome, outcome.Span);
+}
+
+private ParsedOutcome ParseIdentifierArgument(OutcomeMeta meta, Token arrowToken)
+{
+    // Expects: identifier (state name)
+    var token = Peek();
+    if (token.Kind == TokenKind.Identifier)
+    {
+        Advance();
+        var span = SourceSpan.Covering(arrowToken.Span, token.Span);
+        return new TransitionOutcome(token.Text, span);
+    }
+    // Missing state name — malformed
+    return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, token.Span));
+}
+
+private ParsedOutcome ParseStringLiteralArgument(OutcomeMeta meta, Token arrowToken)
+{
+    // Expects: string literal (reason)
+    var token = Peek();
+    if (token.Kind == TokenKind.StringLiteral)
+    {
+        Advance();
+        var span = SourceSpan.Covering(arrowToken.Span, token.Span);
+        return new RejectOutcome(token.Text, span);
+    }
+    // Missing reason — malformed
+    return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, token.Span));
+}
+
+private ParsedOutcome ParseSecondaryTokenForm(OutcomeMeta meta, Token arrowToken)
+{
+    // Expects: secondary token (e.g., `transition` after `no`)
+    var token = Peek();
+    if (token.Kind == Outcomes.NoTransitionSecondaryToken)
+    {
+        Advance();
+        var span = SourceSpan.Covering(arrowToken.Span, token.Span);
+        return new NoTransitionOutcome(span);
+    }
+    // `no` without `transition` — malformed
+    return new MalformedOutcome(arrowToken.Span);
+}
+
+private ParsedOutcome CreateNoArgOutcome(OutcomeMeta meta, Token arrowToken)
+{
+    // Placeholder for future no-argument outcome forms
+    return new MalformedOutcome(arrowToken.Span);
+}
+```
+
+### Key Changes
+
+1. **Dispatch via catalog**: `Outcomes.ByLeadingToken[token.Kind]` replaces the hardcoded switch.
+2. **Argument shape drives sub-parser**: `ArgumentKind` selects which argument-parsing helper to invoke.
+3. **No per-member knowledge in parser**: The parser doesn't know what `Transition` or `Reject` mean — it knows argument shapes.
+4. **Exhaustiveness by enum switch**: The `ArgumentKind` switch is exhaustive (CS8509 enforced).
+
+---
+
+## 4. Exhaustiveness Enforcement
+
+### Pattern: Same as existing catalogs
+
+The `OutcomeKind` enum and `OutcomeMeta.GetMeta(OutcomeKind kind)` exhaustive switch ensure:
+- Every `OutcomeKind` member has metadata (compiler error CS8509 if missing)
+- The `All` property enumerates every member
+- `ByLeadingToken` covers every member
+
+### Parser-Side Enforcement
+
+The parser dispatches on `OutcomeArgumentKind`, not `OutcomeKind`. This is correct because:
+- The parser doesn't care *which* outcome it is — only *what shape* the argument takes
+- Adding a new `OutcomeKind` with an existing `ArgumentKind` requires no parser changes
+- Adding a new `ArgumentKind` requires adding a case to the parser's `ArgumentKind` switch
+
+To detect the latter (adding a new `ArgumentKind` without a handler):
+1. The `ArgumentKind` switch in `ParseOutcome` is exhaustive (default arm throws or uses CS8509)
+2. Unit tests in `ParserOutcomeTests.cs` cover all 3 outcome forms
+
+### Annotation Option (Optional Enhancement)
+
+If stricter enforcement is desired:
+```csharp
+[HandlesCatalogExhaustively(typeof(OutcomeKind))]
+private SlotValue ParseOutcome(ConstructSlot slot) { ... }
+```
+
+But this is unnecessary because the catalog itself provides the exhaustiveness guarantee at compile time, and the parser's dispatch is on `ArgumentKind` (a secondary axis), not `OutcomeKind`.
+
+---
+
+## 5. Impact on `ParsedOutcome` DU
+
+**No changes required.**
+
+The current `ParsedOutcome` DU in `ParsedOutcome.cs` is correctly shaped:
+
+```csharp
+public abstract record ParsedOutcome(SourceSpan Span);
+public sealed record TransitionOutcome(string StateName, SourceSpan Span) : ParsedOutcome(Span);
+public sealed record NoTransitionOutcome(SourceSpan Span) : ParsedOutcome(Span);
+public sealed record RejectOutcome(string Reason, SourceSpan Span) : ParsedOutcome(Span);
+public sealed record MalformedOutcome(SourceSpan Span) : ParsedOutcome(Span);
+```
+
+Each subtype carries exactly the data its consumers need:
+- `TransitionOutcome`: target state name
+- `NoTransitionOutcome`: no additional data (span only)
+- `RejectOutcome`: reason string
+- `MalformedOutcome`: error recovery sentinel
+
+The catalog maps `OutcomeKind` → `ParsedSubtype` via the `Type` field, which tooling can use for reflection-based enumeration. The DU itself is orthogonal to the catalog — the catalog describes the grammar, the DU describes the parsed output.
+
+---
+
+## 6. `catalog-system.md` Update Needed
+
+Add the following to `docs/language/catalog-system.md`:
+
+1. **Catalog Overview Map (§ Level 1)**: Add `Outcomes (3)` to the **② Grammar / structure** layer alongside `Constructs`, `ExpressionForms`, and `Constraints`.
+
+2. **Completeness Principle (§ Catalog inventory)**: Update the catalog count from 13 to 14, or note that Outcomes is a sub-catalog logically grouped with grammar/structure.
+
+3. **New section: Outcomes Catalog Schema**: Document the `OutcomeMeta` record shape, the 3 entries, and the `ArgumentKind` discriminator.
+
+4. **Consumer landscape diagram**: Add entry:
+   | Consumer | What it reads |
+   |----------|---------------|
+   | Parser (outcome dispatch) | `Outcomes.ByLeadingToken`, `OutcomeMeta.ArgumentKind` |
+   | LS completions (outcome context) | `Outcomes.All` for outcome form suggestions |
+   | LS hover (outcome token) | `OutcomeMeta.Description`, `OutcomeMeta.Example` |
+   | MCP `precept_language` | `Outcomes.All` for grammar vocabulary |
+
+5. **Cross-catalog derivation**: Note that `Outcomes` depends on `Tokens` (like all grammar catalogs) but has no other catalog dependencies.
+
+---
+
+## Appendix: Comparison with Existing Catalogs
+
+| Aspect | Actions | Modifiers | Outcomes |
+|--------|---------|-----------|----------|
+| Member count | 15 | 29 (DU) | 3 |
+| Dispatch key | `TokenKind` | `TokenKind` | `TokenKind` |
+| Output | `ActionKind` | `ModifierKind` | `ParsedOutcome` subtype |
+| Argument shape axis | `ActionSyntaxShape` | per-subtype DU | `OutcomeArgumentKind` |
+| Type compatibility | `ApplicableTo[]` | `ApplicableTo` per subtype | N/A (no types) |
+| Proof requirements | Yes (some actions) | Yes (some modifiers) | No |
+
+Outcomes is the simplest catalog in the grammar layer — 3 members, no type compatibility, no proof requirements. The only complexity is the `no transition` compound form, handled via `SecondaryToken` argument kind.
+
+---
+
+**Recommendation:** Implement exactly as specified. The catalog is small, the refactoring is mechanical, and the result eliminates the last hardcoded grammar knowledge in the parser.
+
+# Parser Architecture Review — Frank (Lead/Architect)
+
+**Date:** 2026-05-07T09:04:34Z  
+**Requested by:** Shane  
+**Scope:** `src/Precept/Pipeline/Parser.cs`, `Parser.Expressions.cs`, related pipeline types  
+**Lens:** Catalog compliance, design doc consistency, type-checker readiness, architecture patterns
+
+---
+
+## 1. Catalog Compliance
+
+Audited against `docs/contributing/catalog-driven-checklist.md` — all 9 submission items + reviewer red flags.
+
+### ✅ PASS — Construct Dispatch (Checklist Items 5, 6)
+
+- `Parser.cs:140` — main loop uses `ConstructsCatalog.ByLeadingToken` for routing. No hardcoded leading token sets.
+- `Parser.cs:154` — disambiguation uses `DisambiguationEntry.DisambiguationTokens` from catalog metadata via `candidates` iteration.
+- `Parser.cs:196` — `SkipToConstructBoundary()` uses `ConstructsCatalog.LeadingTokens`. Catalog-derived.
+- `Parser.cs:688` — `IsAtConstructBoundary()` uses `ConstructsCatalog.LeadingTokens`. Catalog-derived.
+
+### ✅ PASS — Slot Walking (Checklist Item 4)
+
+- `Parser.cs:211` — iterates `meta.Slots` in order. Generic machinery, no per-construct behavior.
+- `Parser.cs:279-301` — `ParseSlotValue` dispatches on `ConstructSlotKind`. This is DU subtype dispatch (the slot kind IS the metadata shape), not enum-identity switching. Correct by the checklist's own distinction.
+
+### ✅ PASS — Vocabulary Sets (Checklist Items 2, 6, 7, 8)
+
+- `Parser.cs:18-20` — `StateModifierTokens` derived from `Modifiers.All.OfType<StateModifierMeta>()`.
+- `Parser.cs:22-23` — `FieldModifierTokens` derived from `Modifiers.ByFieldToken.Keys`.
+- `Parser.cs:25-29` — `ExpressionStartTokens` derived from `ExpressionForms.All`.
+- `Parser.Expressions.cs:293` — `IsMemberNameToken()` delegates to `Tokens.GetMeta(kind).IsValidAsMemberName`. Catalog-driven.
+- `Parser.cs:649` — action chain uses `Actions.ByTokenKind`. Catalog-derived.
+- `Parser.cs:383` — type resolution uses `Types.ByToken`. Catalog-derived.
+
+### ✅ PASS — Operator Precedence (Checklist Item 6)
+
+- `Parser.Expressions.cs:128` — unary precedence from `Operators.ByToken[(opToken.Kind, Arity.Unary)]`.
+- `Parser.Expressions.cs:164` — binary operator lookup via `Operators.ByToken.TryGetValue((kind, Arity.Binary), ...)`.
+- `Parser.Expressions.cs:157` — multi-token `is set` / `is not set` via `Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)`. Catalog-derived.
+
+### ⚠️ OBSERVATION — Dot Binding Power (Lines 143-145, Parser.Expressions.cs)
+
+```csharp
+if (kind == TokenKind.Dot)
+    return (80, 81);
+```
+
+Dot is hardcoded at `(80, 81)`. However, **this is NOT a catalog violation.** Dot is NOT in the `Operators` catalog — it's modeled in `ExpressionForms` as a left-denotation composite form, not as an operator. `ExpressionFormMeta` does not carry a `Precedence` field. The Pratt parser needs binding power for led dispatch, but the current catalog design intentionally separates "operators" (binary/unary/postfix with precedence) from "structural forms" (member access, method call) which have fixed grammar roles.
+
+**Verdict:** Acceptable. If dot's binding power ever needed to vary, the catalog would need a new field. Currently it's grammar geometry (always highest), analogous to the disambiguation offset being a structural invariant.
+
+### ⚠️ OBSERVATION — `IsTrivia` Inline Check (Parser.cs:119-120)
+
+```csharp
+private static bool IsTrivia(TokenKind kind) =>
+    kind == TokenKind.NewLine || kind == TokenKind.Comment;
+```
+
+Two-member inline check. The `Tokens` catalog carries `TokenCategory` but does not expose an `IsTrivia` field or a `Trivia` category. This is a grammar-geometry fact (what the parser strips) rather than per-member domain knowledge that varies. **No violation** — but flagged for awareness.
+
+### ✅ PASS — No Default Arms Suppressing Exhaustiveness
+
+- `Parser.cs:300` — `ParseSlotValue` has `_ => MakeSentinel(slot)` but this is the catch-all for unknown future `ConstructSlotKind` additions. It throws in `MakeSentinel` (line 323). Acceptable as a defensive guard — not silencing known cases.
+- `Parser.cs:49` — `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on `ParserState`. Enforcement attribute present.
+- All expression handlers carry `[HandlesCatalogMember(...)]` annotations — full coverage of all 13 `ExpressionFormKind` members verified.
+
+### ❌ FAIL — Outcome Parsing Not Catalog-Driven (Parser.Expressions.cs:544-598)
+
+The `ParseOutcome` method uses a hardcoded `switch` on `outcomeToken.Kind`:
+
+```csharp
+switch (outcomeToken.Kind)
+{
+    case TokenKind.Transition: ...
+    case TokenKind.No: ...
+    case TokenKind.Reject: ...
+    default: ...
+}
+```
+
+The history file references `Outcomes.ByToken` catalog and `OutcomeSyntaxShape` — but **no such catalog exists in the codebase.** Outcomes are a 3-member closed vocabulary. The parser applies per-member behavior (different token sequences per outcome kind) via hardcoded switch.
+
+**Assessment:** This is a borderline case. Outcomes are a 3-member closed set with distinct syntax shapes. The history note "ParseOutcome correctly uses `Outcomes.ByToken` catalog lookup" is factually incorrect — this catalog does not exist. The implementation IS a raw enum-identity switch applying per-member behavior.
+
+**However:** Outcomes are NOT a `*Kind` enum in the pipeline. They're a parse-time DU (`ParsedOutcome`) with 4 subtypes. The construct catalog models outcomes at the slot level (`ConstructSlotKind.Outcome`) — it doesn't decompose outcome forms. Adding a 4th outcome form (unlikely) would require code changes regardless.
+
+**Verdict:** Low-severity. Document the gap. If outcomes ever grow beyond 3 forms, create an `Outcomes` catalog. Currently the set is genuinely tiny and stable.
+
+---
+
+## 2. Design Doc Consistency
+
+### ❌ INCONSISTENCY — `OutcomeSlot` Type (parser.md:48, type-checker.md:58 vs. Code)
+
+**Docs claim:** `OutcomeSlot` carries `ParsedExpression (typed DU)`.  
+**Code reality:** `OutcomeSlot` carries `ParsedOutcome` — a SEPARATE 4-member DU (`TransitionOutcome`, `NoTransitionOutcome`, `RejectOutcome`, `MalformedOutcome`).
+
+This is documented in `ParsedOutcome.cs:7`: "Outcomes are a closed 3-member vocabulary resolved at parse time — they are NOT expressions and do not participate in expression resolution."
+
+Both `parser.md:48` and `parser.md:66` (and the equivalent lines in `type-checker.md:58,70`) incorrectly include `OutcomeSlot` in the "expression-carrying slots" list.
+
+**Impact:** Medium. Type checker implementors reading the doc will expect `ParsedExpression` in outcome slots and be surprised by `ParsedOutcome`. Must fix both docs.
+
+### ❌ INCONSISTENCY — parser.md:223 (Slot Sub-Parser Table)
+
+`ComputeExpression` is described as `Parse '->' expression`. Code uses `<-` (BackArrow):
+
+```csharp
+// Parser.Expressions.cs:482
+if (Peek().Kind != TokenKind.BackArrow)
+    return MakeSentinel(slot);
+```
+
+The table says `->` but the code correctly uses `<-` per the backArrow decision (history: 2026-05-07T08:40:33Z).
+
+### ⚠️ MINOR — parser.md:469 says "Parser entry point (currently stub)"
+
+The parser is fully implemented (Slices 1-4 complete per the same doc's header). The source files table is stale.
+
+### ⚠️ MINOR — type-checker.md:93 says "Expression forms | 17"
+
+Code has 13 `ExpressionFormKind` members. The doc says 17 — likely confused with the 17 `ConstructSlotKind` members.
+
+### ✅ CONSISTENT — Disambiguation Protocol
+
+`parser.md:180-198` describes the `peek(2)` protocol. Code at `Parser.cs:154` implements exactly this. Catalog-driven. No deviation.
+
+### ✅ CONSISTENT — RoutingFamily Handling
+
+`parser.md:165-173` describes Header/Direct/StateScoped/EventScoped families. Code at `Parser.cs:147-149,176-180` correctly routes based on `meta.RoutingFamily`.
+
+### ✅ CONSISTENT — Slot Invariants
+
+`parser.md:340-342` documents variable-length slot arrays and "locate by Kind, not index." Code at `Parser.cs:214-215` implements this: absent optional slots are omitted.
+
+---
+
+## 3. Type-Checker Readiness
+
+### Current State
+
+`TypeChecker.cs` is a stub — returns empty `SemanticIndex`. The full type-checker design is documented but unimplemented.
+
+### What Parser Output Gives the Type Checker
+
+**Strengths — the parser output contract is type-checker-friendly:**
+
+1. **Closed-vocabulary tokens pre-resolved.** Types (`TypeMeta`), modifiers (`ModifierKind`), access modes (`TokenKind`), actions (`ActionKind`) are all resolved at parse time. The type checker receives semantic identities, not spans to re-parse.
+
+2. **Expressions are structured.** `ParsedExpression` is a 13-subtype DU with operator tokens, arity, and structural nesting. The type checker can pattern-match exhaustively.
+
+3. **Generic shape.** `ParsedConstruct(Meta, Slots, Span)` means the type checker can iterate uniformly. No per-construct class hierarchy to navigate.
+
+4. **SlotValue DU is tight.** 17 subtypes with no nullable-field pollution. Pattern matching is clean.
+
+### Things the Type Checker Must Handle
+
+1. **`MakeSentinel` values.** When parsing fails, sentinel slots have `SourceSpan.Missing` spans and placeholder data (e.g., `LiteralExpression(True, "true", Missing)` in expression sentinels, `Types.All.First()` in type sentinels). The type checker must:
+   - Detect sentinels via `Span == SourceSpan.Missing`
+   - NOT validate sentinel content (it's synthetic)
+   - Propagate error-type to prevent cascading diagnostics
+
+2. **`ParsedOutcome` is separate from `ParsedExpression`.** The type checker needs TWO expression-resolution paths — one for `ParsedExpression` (5 expression slots) and one for `ParsedOutcome` (1 outcome slot: validate state names exist, validate reasons are non-empty, etc.).
+
+3. **`CIFunctionCallExpression` TODO (ParsedExpression.cs:61).** The TODO says: "Revisit whether the parser should stamp resolved FunctionKind here once the CI-variant lookup decision lands." Currently carries only `string FunctionName`. The type checker will need to resolve `~startsWith` / `~endsWith` to their `FunctionKind` entries.
+
+4. **Action operands not parsed.** `ActionChainSlot` carries only `ImmutableArray<ActionKind>` — the tokens between action keywords and the next arrow/boundary are skipped (Parser.cs:669-672). The type checker has NO operand data for actions. This is a **known design gap** — action operands (e.g., `set field = expr`) need a richer slot or a sub-expression parse. Currently, full action parsing is deferred to the evaluator path.
+
+5. **Slot-by-Kind lookup.** The parser docs say "find slots by Kind, not by index." But `ParsedConstruct.Slots` is an `ImmutableArray<SlotValue>` with no helper method. The type checker will need to write LINQ queries or build local dictionaries. Consider adding:
+   ```csharp
+   public T? GetSlot<T>(ConstructSlotKind kind) where T : SlotValue =>
+       Slots.OfType<T>().FirstOrDefault(s => s.Kind == kind);
+   ```
+
+### Things That Make Type-Checking Easier
+
+1. **No re-resolution needed** for types, modifiers, access modes — parser already did it.
+2. **Expression DU exhaustiveness** is compiler-enforced — no missing arms possible.
+3. **`ConstructMeta`** is attached to each construct — the type checker can read slot metadata (required/optional, description) without re-querying the catalog.
+4. **Diagnostic infrastructure** is shared — `Diagnostics.Create()` with `DiagnosticCode` and `SourceSpan`.
+
+---
+
+## 4. Architecture Verdict
+
+### **APPROVED — No Blockers**
+
+The parser is architecturally sound. It genuinely implements the catalog-driven philosophy documented in the spec. The main dispatch loop, slot walking, vocabulary recognition, operator precedence, and disambiguation are all derived from catalog metadata. The `[HandlesCatalogExhaustively]` and `[HandlesCatalogMember]` enforcement attributes provide compile-time guarantees.
+
+### Findings Summary
+
+| # | Severity | Finding | Location |
+|---|----------|---------|----------|
+| 1 | **Low** | Outcome parsing uses hardcoded switch, no `Outcomes` catalog exists | Parser.Expressions.cs:544-598 |
+| 2 | **Medium** | `parser.md` and `type-checker.md` incorrectly claim `OutcomeSlot` carries `ParsedExpression` | parser.md:48,66; type-checker.md:58,70 |
+| 3 | **Low** | `parser.md:223` says `ComputeExpression` uses `->`, code uses `<-` | parser.md:223 |
+| 4 | **Low** | `type-checker.md:93` says 17 expression forms, actual count is 13 | type-checker.md:93 |
+| 5 | **Low** | `parser.md:469` says "currently stub" — parser is fully implemented | parser.md:469 |
+| 6 | **Info** | Dot binding power hardcoded — acceptable (not an operator in catalog) | Parser.Expressions.cs:144-145 |
+| 7 | **Info** | `IsTrivia` inline check — acceptable (grammar geometry) | Parser.cs:119-120 |
+| 8 | **Medium** | Action operands not parsed — type checker will have no operand data | Parser.cs:669-672 |
+| 9 | **Info** | `CIFunctionCallExpression` TODO — type checker will resolve function identity | ParsedExpression.cs:61 |
+| 10 | **Low** | History references `Outcomes.ByToken` which doesn't exist — stale knowledge | .squad/agents/frank/history.md:74 |
+
+### Required Remediation Before Type Checker
+
+1. **Fix doc inconsistency #2** — Update `parser.md` and `type-checker.md` to correctly describe `OutcomeSlot` as carrying `ParsedOutcome`, not `ParsedExpression`. Remove `OutcomeSlot` from the "expression-carrying slots" lists.
+
+2. **Fix doc inconsistency #3** — Update `parser.md:223` ComputeExpression description from `->` to `<-`.
+
+3. **Design decision needed for #8** — Action operands. The type checker needs action operand expressions to validate field references and type compatibility in `set field = expr`. Either:
+   - (A) Extend the parser to produce `ParsedExpression` operands within action chains, OR
+   - (B) Defer full action validation to a later pipeline stage with its own re-parse
+   
+   This is the single most significant gap between parser output and type-checker needs.
+
+### Things That Are Excellent
+
+- The generic `ParsedConstruct` + slot-array architecture eliminates N×M complexity
+- Catalog-driven dispatch means adding a construct requires zero parser code changes (only catalog metadata)
+- Expression DU with enforcement attributes is airtight
+- Error recovery (construct-boundary synchronization) is consistent throughout
+- The scoped-construct protocol (anchor + disambiguation + remaining slots) is clean and uniform
+- `ExpressionStartTokens` derived from `ExpressionForms.All` ensures nud dispatch stays in sync with catalog additions
+
+---
+
+*Reviewed by Frank — Lead/Architect*
+
+# Creative Parser Architecture Opportunities — Frank (Lead/Architect)
+
+**Date:** 2026-05-07T09:15:09Z  
+**Requested by:** Shane  
+**Scope:** Parser system, pipeline contracts, catalog extensibility, type-checker interface  
+**Lens:** Creative architecture — elegance, composability, forward-looking extensibility
+
+---
+
+## Creative Opportunities
+
+### 1. Action Operand Parsing via Catalog-Driven Sub-Expression Grammar
+
+**What:** Replace the "skip operands until boundary" loop (Parser.cs:669-672) with catalog-driven action operand parsing, using `ActionSyntaxShape` metadata to govern sub-expression grammar per action verb.
+
+**Why it's worth doing:** The `ActionSyntaxShape` enum already knows the exact token structure for each action (`AssignValue`, `CollectionValue`, `CollectionInto`, `PutKeyValue`, etc.). The parser throws this information away and blindly advances. This means the type checker would need to re-lex raw spans — violating the principle that closed-vocabulary structure is resolved at parse time. More critically, `ActionSyntaxShape` is a 9-member catalog-ready discriminator: each shape describes exactly which operand slots exist (field target, value expression, key expression, `into` target, `at` index, `by` key). That's structured data the parser can produce.
+
+**Concrete sketch:**
+```csharp
+// New SlotValue or nested parse output:
+public sealed record ParsedAction(
+    ActionKind Kind,
+    string? FieldTarget,        // always present — the field being mutated
+    ParsedExpression? Value,    // set/add/enqueue/push/append/put value
+    ParsedExpression? Key,      // put key, enqueue-by/append-by ordering key
+    ParsedExpression? Index,    // insert-at/remove-at position
+    string? IntoTarget,         // dequeue/pop capture field
+    SourceSpan Span);
+
+// ActionChainSlot becomes:
+public sealed record ActionChainSlot(ImmutableArray<ParsedAction> Actions, SourceSpan Span)
+    : SlotValue(ConstructSlotKind.ActionChain, Span);
+```
+The parser reads `ActionMeta.SyntaxShape` and dispatches to a per-shape sub-parser — exactly analogous to how `ParseSlotValue` dispatches on `ConstructSlotKind`. No per-action-kind code: the 9 `ActionSyntaxShape` values are the discriminator, and each shape's consumption rule is mechanical (field, `=`, expr for `AssignValue`; field, expr for `CollectionValue`; field, `into`, field for `CollectionInto`; etc.).
+
+**Effort:** M (medium). The sub-parsers themselves are trivial — most are "consume field identifier, optionally consume `=`/`at`/`into`/`by`, parse expression." The hard part is updating `ActionChainSlot` consumers (currently minimal since the type checker doesn't exist yet).
+
+**When:** **Before type checker.** This is the single highest-impact action. Doing it after would require the type checker to re-parse raw spans — a layering violation that becomes debt immediately.
+
+---
+
+### 2. Termination Predicate Catalog — Slot Termination as Metadata
+
+**What:** The expression parser uses `Func<bool> terminates` passed ad hoc per call site. Each slot sub-parser constructs its own lambda combining `when`, `because`, `->`, `IsAtConstructBoundary()`, etc. Extract this into catalog metadata: a `TerminationSet` on each `ConstructSlot` that carries which tokens terminate expression parsing in that slot's context.
+
+**Why it's worth doing:** Currently 6 slot sub-parsers (RuleExpression, GuardClause, ComputeExpression, EnsureClause, and the 2 via ActionChain) each build a custom termination lambda. The lambdas follow a pattern: "stop at {specific keywords for my slot} OR `IsAtConstructBoundary()`". If `ConstructSlot` carried `TerminationTokens: TokenKind[]?`, the expression entry point could build the predicate generically:
+
+```csharp
+Func<bool> terminates = () =>
+    (slot.TerminationTokens?.Contains(Peek().Kind) ?? false) || IsAtConstructBoundary();
+```
+
+This eliminates per-slot-parser custom lambdas, makes them declarative, and — critically — means a new construct with expression slots doesn't need any parser code at all. The catalog alone is sufficient.
+
+**Concrete sketch:** Add to `ConstructSlot`:
+```csharp
+public sealed record ConstructSlot(
+    ConstructSlotKind Kind,
+    bool              IsRequired = true,
+    string?           Description = null,
+    TokenKind[]?      TerminationTokens = null);  // NEW
+```
+Existing slot definitions become:
+```csharp
+private static readonly ConstructSlot SlotGuardClause = new(
+    ConstructSlotKind.GuardClause, IsRequired: false,
+    Description: "when expression",
+    TerminationTokens: [TokenKind.Because, TokenKind.Arrow]);
+```
+
+**Effort:** S (small). Mechanical refactor. No new concepts — just elevating existing inline knowledge to metadata.
+
+**When:** Before type checker. Makes the slot machinery fully data-driven, which simplifies testing and makes new-construct addition zero-code.
+
+---
+
+### 3. ParseResult<T> Monad for Sentinel Propagation
+
+**What:** Introduce `ParseResult<T>` as a discriminated wrapper: `Success(T value)` | `Error(SourceSpan span, DiagnosticCode code)`. Replace the convention "check `Span == SourceSpan.Missing` to detect sentinels" with a structural type that makes error propagation explicit.
+
+**Why it's worth doing:** The current sentinel detection pattern is:
+1. Parse returns a `SlotValue` with `Span == SourceSpan.Missing`
+2. Downstream checks `Span` to decide whether the slot was "really" parsed
+3. The type checker must do the same span check to avoid cascading diagnostics
+
+This is stringly-typed in spirit: sentinel detection relies on a magic value in one field. A `ParseResult<T>` makes the success/failure distinction structural:
+
+```csharp
+public abstract record ParseResult<T>;
+public sealed record ParseSuccess<T>(T Value) : ParseResult<T>;
+public sealed record ParseError<T>(SourceSpan Span, DiagnosticCode Code) : ParseResult<T>;
+```
+
+The type checker then pattern-matches on `ParseResult` subtypes — if `ParseError`, it propagates error-type without inspecting the payload. If `ParseSuccess`, it processes normally.
+
+**Why I'm NOT recommending this for v1:** The current pattern works. It's convention-based but consistent, and `SourceSpan.Missing` is a well-known sentinel across the system. The monad adds API surface to every parse helper, increases generic nesting, and its primary benefit (preventing cascade diagnostics) can be achieved with a simpler type-checker-internal approach:
+
+```csharp
+// Type checker helper — simpler than full monadic propagation
+static bool IsSentinel(SlotValue slot) => slot.Span == SourceSpan.Missing;
+```
+
+**Verdict:** Track for v2 refactoring if sentinel-related bugs emerge. Don't introduce before the type checker.
+
+**Effort:** M. Touches every slot sub-parser return path.
+
+**When:** After type checker (retrospective: only if sentinel bugs motivate it).
+
+---
+
+### 4. Intermediate Representation: `SymbolTable` Between Parser and Type Checker
+
+**What:** Introduce a dedicated `SymbolTable` phase (or "Name Binding" pass) that resolves all identifiers to declared symbols before full type checking begins.
+
+**Why it's worth doing:** The current pipeline is `Parser → TypeChecker → GraphAnalyzer`. The type checker will need to:
+1. Discover all declared names (fields, states, events)
+2. Build a symbol table mapping names to declarations
+3. Resolve references (field names in expressions, state names in transitions, event names in handlers)
+4. THEN do type inference on expressions
+
+Steps 1-3 are pure name resolution. They don't need type information. Separating them produces a cleaner type checker (it receives pre-resolved references, not raw strings) and enables:
+- **Better diagnostics:** "undeclared field `ammount` — did you mean `amount`?" emits during name resolution, before type checking clutters the output
+- **Scope-aware completions:** The LS gets a `SymbolTable` earlier in the pipeline (before full type checking) for faster autocomplete
+- **Incremental compilation:** Name resolution can be cached per-construct; type checking is cheaper if symbols are pre-resolved
+
+**Concrete sketch:**
+```csharp
+// New pipeline stage output:
+public sealed record SymbolTable(
+    ImmutableDictionary<string, FieldSymbol>  Fields,
+    ImmutableDictionary<string, StateSymbol>  States,
+    ImmutableDictionary<string, EventSymbol>  Events,
+    ImmutableArray<ResolvedReference>         References,
+    ImmutableArray<Diagnostic>                Diagnostics);
+
+// Pipeline becomes:
+TokenStream → ConstructManifest → SymbolTable → SemanticIndex → StateGraph → ProofLedger
+```
+
+The type checker then receives `(ConstructManifest, SymbolTable)` and can assume all identifiers are either resolved or already diagnosed.
+
+**Effort:** M. The name resolution logic is straightforward (single pass over constructs, collect declarations, resolve references). The pipeline re-plumbing is mechanical.
+
+**When:** Before type checker implementation. This shapes the type checker's INPUT contract. If done after, the type checker would mix name resolution with type inference and need later extraction.
+
+---
+
+### 5. `ExpressionFormMeta.BindingPower` — Unifying the Pratt Dispatch
+
+**What:** Add a `BindingPower: (int Left, int Right)?` field to `ExpressionFormMeta` for left-denotation forms. Move the dot binding power `(80, 81)` and `is set` binding power into the catalog.
+
+**Why it's worth doing:** Currently `GetLedBindingPower` has three dispatch paths:
+1. `Dot` → hardcoded `(80, 81)`
+2. `Is` → derived from `Operators.ByTokenSequence` + custom peek logic
+3. All others → `Operators.ByToken`
+
+The first is not in any catalog. The second is split across `Operators` and `ExpressionForms`. If `ExpressionFormMeta` carried `BindingPower` for led forms, the dispatch becomes:
+
+```csharp
+private (int, int) GetLedBindingPower(TokenKind kind)
+{
+    // Led forms first (member access, postfix)
+    foreach (var form in ExpressionForms.LedForms)
+        if (form.LeadTokens.Contains(kind))
+            return form.BindingPower!.Value;
+    
+    // Binary operators
+    if (Operators.ByToken.TryGetValue((kind, Arity.Binary), out var op))
+        return (op.Precedence, op.RightBp);
+    
+    return (-1, -1);
+}
+```
+
+**What it unlocks:** Adding a new led-position form (e.g., a pipe operator, a subscript operator) would require only catalog metadata — no parser code changes. The entire Pratt loop becomes fully catalog-driven.
+
+**Concrete catalog change:**
+```csharp
+public sealed record ExpressionFormMeta(
+    ExpressionFormKind        Kind,
+    ExpressionCategory        Category,
+    bool                      IsLeftDenotation,
+    IReadOnlyList<TokenKind>  LeadTokens,
+    string                    HoverDocs,
+    (int Left, int Right)?    BindingPower = null);  // NEW — only meaningful for led forms
+```
+
+`MemberAccess` gets `BindingPower: (80, 81)`, `PostfixOperation` gets `BindingPower: (postfixPrecedence, int.MaxValue)`.
+
+**Effort:** S (small). Two metadata additions + simplify `GetLedBindingPower`.
+
+**When:** Before type checker (it's a small, clean catalog extension that reduces parser hardcoding).
+
+---
+
+### 6. `InterpolatedStringExpression` — Proper Interpolation Tree
+
+**What:** Replace the flat `LiteralExpression(TokenKind.StringStart, ...)` representation of interpolated strings with a proper tree node that carries resolved segments:
+
+```csharp
+public sealed record InterpolatedStringExpression(
+    ImmutableArray<InterpolationSegment> Segments,
+    SourceSpan Span)
+    : ParsedExpression(ExpressionFormKind.InterpolatedString, Span);
+
+public abstract record InterpolationSegment;
+public sealed record TextSegment(string Text, SourceSpan Span) : InterpolationSegment;
+public sealed record ExpressionSegment(ParsedExpression Expression, SourceSpan Span) : InterpolationSegment;
+```
+
+**Why it's worth doing:** Currently `ParseInterpolatedString()` (Parser.Expressions.cs:378-395) just blindly advances through interpolation tokens and produces a single `LiteralExpression`. The type checker needs to:
+- Validate that interpolation holes contain well-typed expressions
+- Verify string-coercibility of interpolated values
+- Produce hover/go-to-definition for names inside interpolation holes
+
+With a flat literal, the type checker would have to re-parse the token stream AGAIN. That violates "parse once, consume many." The structured form gives the type checker everything it needs in one pass.
+
+**Effort:** M. New `ExpressionFormKind.InterpolatedString` member + new DU types + parser rework of `ParseInterpolatedString` to actually recurse into holes.
+
+**When:** Before type checker. The type checker needs this data; providing it as a flat literal forces re-parsing.
+
+---
+
+### 7. Diagnostic `RelatedSpans` — Multi-Location Error Context
+
+**What:** Add `ImmutableArray<SourceSpan> RelatedSpans` to the `Diagnostic` record (or a separate `RelatedInformation` array matching LSP's model).
+
+**Why it's worth doing:** The current diagnostic carries a single `SourceSpan`. But many diagnostics are inherently multi-location:
+- "Undeclared field `ammount`" → related span: the declaration site of `amount` (for "did you mean")
+- "Duplicate state name `Draft`" → related span: the first declaration of `Draft`
+- "Type mismatch in `set amount = reviewer`" → related: declaration of `amount` (money), declaration of `reviewer` (string)
+
+The language server's LSP integration supports `relatedInformation` on diagnostics. If the pipeline produces multi-span diagnostics, the LS can surface them natively. Currently it has to re-derive related locations at display time.
+
+**Concrete sketch:**
+```csharp
+public readonly record struct Diagnostic(
+    Severity        Severity,
+    DiagnosticStage Stage,
+    string          Code,
+    string          Message,
+    SourceSpan      Span,
+    ImmutableArray<string> Args = default,
+    ImmutableArray<RelatedSpan> RelatedSpans = default  // NEW
+);
+
+public readonly record struct RelatedSpan(SourceSpan Span, string Message);
+```
+
+**Effort:** S (the record change is trivial; the effort is in producing related spans from the type checker — but that's incremental: each diagnostic chooses whether to attach related info).
+
+**When:** Before type checker (the type checker is the first stage that produces multi-location diagnostics at scale; designing the capacity in now means it uses it from day one).
+
+---
+
+### 8. `GetSlot<T>` + Fluent Interface on ParsedConstruct
+
+**What:** Add typed slot accessors to `ParsedConstruct`:
+
+```csharp
+public sealed record ParsedConstruct(ConstructMeta Meta, ImmutableArray<SlotValue> Slots, SourceSpan Span)
+{
+    public T? GetSlot<T>() where T : SlotValue =>
+        Slots.OfType<T>().FirstOrDefault();
+
+    public T GetRequiredSlot<T>() where T : SlotValue =>
+        Slots.OfType<T>().First();
+
+    public bool HasSlot<T>() where T : SlotValue =>
+        Slots.OfType<T>().Any();
+        
+    public IEnumerable<T> GetSlots<T>() where T : SlotValue =>
+        Slots.OfType<T>();
+}
+```
+
+**Why it's worth doing:** Without this, the type checker writes LINQ queries on every construct access:
+```csharp
+var typeSlot = construct.Slots.OfType<TypeExpressionSlot>().FirstOrDefault();
+var nameSlot = construct.Slots.OfType<IdentifierListSlot>().First();
+```
+
+With `GetSlot<T>`, this becomes:
+```csharp
+var typeSlot = construct.GetSlot<TypeExpressionSlot>();
+var nameSlot = construct.GetRequiredSlot<IdentifierListSlot>();
+```
+
+Cleaner, less error-prone, and — critically — amenable to caching: `GetSlot<T>` could build a lazy type→slot index internally if performance matters later.
+
+**Effort:** S (trivial extension methods or instance methods on the record).
+
+**When:** Before type checker (it's the type checker's primary API for reading constructs).
+
+---
+
+### 9. `ConstructManifest` Index by Kind — O(1) Construct Lookup
+
+**What:** Add prebuilt indexes to `ConstructManifest`:
+
+```csharp
+public sealed record class ConstructManifest(
+    ImmutableArray<ParsedConstruct> Constructs,
+    ImmutableArray<Diagnostic>      Diagnostics)
+{
+    public IReadOnlyList<ParsedConstruct> ByKind(ConstructKind kind) => _kindIndex[kind];
+    
+    private readonly ILookup<ConstructKind, ParsedConstruct> _kindIndex =
+        Constructs.ToLookup(c => c.Meta.Kind);
+}
+```
+
+**Why it's worth doing:** The type checker, graph analyzer, and proof engine all need to "get all TransitionRows" or "get all FieldDeclarations" or "get all StateEnsures." Without an index, every consumer does `manifest.Constructs.Where(c => c.Meta.Kind == ConstructKind.X)`. With the index, it's O(1) lookup into pre-grouped results.
+
+**Effort:** S.
+
+**When:** Before type checker (the type checker is the first consumer that does per-kind iteration at scale).
+
+---
+
+### 10. Structural Guarantee: `ParsedConstruct` Carries Its Own Validity Flag
+
+**What:** Add `bool IsComplete` to `ParsedConstruct` — set to `true` only if ALL required slots were successfully parsed (no sentinels with `SourceSpan.Missing`). The type checker can skip incomplete constructs entirely rather than inspecting each slot.
+
+**Why it's worth doing:** Currently the type checker must check each slot for sentinel-ness individually. If 3 out of 5 required slots are sentinels, the construct is garbage — the type checker should skip it and not emit cascading diagnostics. A top-level `IsComplete` flag makes this a single-branch gate:
+
+```csharp
+foreach (var construct in manifest.Constructs)
+{
+    if (!construct.IsComplete) continue; // parser already emitted the error
+    // ... full type checking ...
+}
+```
+
+This is a structural invariant the PARSER can compute at no additional cost (it already knows which slots it sentinel-ed).
+
+**Effort:** S.
+
+**When:** Before type checker.
+
+---
+
+### 11. Outcomes as a Catalog Entry — The Full Shape
+
+**What:** Create an `Outcomes` catalog parallel to `Actions`, `Operators`, and `Types`:
+
+```csharp
+public enum OutcomeKind { Transition = 1, NoTransition = 2, Reject = 3 }
+
+public sealed record OutcomeMeta(
+    OutcomeKind    Kind,
+    TokenKind      LeadingToken,       // TokenKind.Transition, TokenKind.No, TokenKind.Reject
+    TokenKind[]?   FollowTokens,       // null for transition (just state name), [Transition] for no, null for reject (string)
+    OutcomeSlotShape Payload,          // what follows: StateName, Nothing, ReasonString
+    string         Description,
+    string         HoverDocs);
+
+public enum OutcomeSlotShape { StateName = 1, Nothing = 2, ReasonString = 3 }
+```
+
+**Why it's worth doing beyond "not hardcoded":**
+- **Grammar generator:** Can emit outcome keyword highlighting from catalog metadata instead of hand-authored tmLanguage rules
+- **LS completions:** After `->`, offer outcome forms from the catalog (currently hardcoded in completion provider)
+- **MCP vocabulary:** `precept_language` can expose outcome forms alongside actions, operators, types — currently outcomes are invisible to the vocabulary tool
+- **Parser:** `ParseOutcome` becomes catalog-driven — iterate `Outcomes.All`, match leading token, consume follow-tokens, produce `ParsedOutcome` subtype by `OutcomeSlotShape`
+
+**Effort:** S (3-member catalog, mechanical).
+
+**When:** Before type checker (minor, but completes the catalog-driven story and unblocks the grammar generator/LS from hardcoding outcome knowledge).
+
+---
+
+### 12. Second Pratt Pass for Action Operands — Not Needed
+
+**What I considered:** A "re-entrant" second expression parse pass that re-scans raw action spans to produce expressions. This is what some compilers do for macro bodies.
+
+**Why I'm rejecting it:** The catalog already knows action syntax shapes (Opportunity #1 above). There's no reason to defer and re-parse when the information is available at first-parse time. A second pass adds complexity (span re-alignment, diagnostic attribution) without enabling anything #1 doesn't already enable.
+
+**Verdict:** Redundant. Opportunity #1 subsumes this. Noted for completeness.
+
+---
+
+### 13. `ParsedConstruct.Provenance` — Pipeline Stage Tagging
+
+**What:** Let each stage annotate constructs with its own metadata:
+
+```csharp
+public sealed record ParsedConstruct(
+    ConstructMeta             Meta,
+    ImmutableArray<SlotValue> Slots,
+    SourceSpan                Span,
+    ImmutableDictionary<string, object>? Annotations = null  // stage-contributed metadata
+);
+```
+
+**Why it could matter:** Graph analyzer might want to tag constructs with reachability info. Proof engine might annotate with proof status. Language server might want to decorate with hover metadata. Currently each stage produces a separate output type, which is correct — but for tooling (MCP "parse and inspect"), having a unified annotated-construct view is useful.
+
+**Why I'm NOT recommending this now:** The current pipeline design (each stage produces its own output record) is cleaner and more type-safe. Annotations are a bag of untyped objects — they fight against the catalog-driven philosophy. If tooling needs a unified view, it's better to build a `PreceptInspector` service that joins pipeline stage outputs by construct identity.
+
+**Effort:** S but wrong.
+
+**When:** Don't. Note for future tooling exploration only.
+
+---
+
+### 14. Structurally Typed Action Chain — The DU Approach
+
+**What:** Instead of `ImmutableArray<ParsedAction>` (Opportunity #1's flat record), model action chains as a DU parallel to how outcomes use `ParsedOutcome`:
+
+```csharp
+public abstract record ParsedAction(ActionKind Kind, SourceSpan Span);
+
+public sealed record AssignAction(string Field, ParsedExpression Value, SourceSpan Span)
+    : ParsedAction(ActionKind.Set, Span);
+
+public sealed record CollectionMutateAction(ActionKind Kind, string Field, ParsedExpression Value, SourceSpan Span)
+    : ParsedAction(Kind, Span);
+
+public sealed record CollectionDrainAction(ActionKind Kind, string Field, string? IntoField, SourceSpan Span)
+    : ParsedAction(Kind, Span);
+
+public sealed record ClearAction(string Field, SourceSpan Span)
+    : ParsedAction(ActionKind.Clear, Span);
+
+// etc. — one subtype per ActionSyntaxShape
+```
+
+**Why the DU is better than a flat record:** The flat `ParsedAction` from Opportunity #1 has nullable fields that are inapplicable depending on shape. `AssignAction` never has `IntoTarget`; `ClearAction` never has `Value`. The DU makes each shape carry exactly its fields — matching Precept's own catalog-driven DU philosophy (see `ParsedOutcome`, `ParsedExpression`, `SlotValue`).
+
+**Effort:** M (9 subtypes mirroring `ActionSyntaxShape` members; each is 1-3 fields).
+
+**When:** Before type checker. This IS the type checker's input for action validation.
+
+---
+
+---
+
+## Recommended Before-Type-Checker Actions
+
+Priority-ordered — these are the items where doing them AFTER would be harder or would require rework:
+
+| Priority | Opportunity | Reason |
+|----------|-------------|--------|
+| **P0** | #1 + #14: Action operand parsing (DU approach) | Type checker literally cannot validate actions without this. Doing it after means re-parsing spans — a layering violation. |
+| **P1** | #6: `InterpolatedStringExpression` tree | Type checker needs resolved interpolation holes. Flat literal forces re-parse. |
+| **P2** | #4: `SymbolTable` (name binding stage) | Shapes the type checker's input contract. Mixing name resolution into the type checker creates debt. |
+| **P3** | #8: `GetSlot<T>` + #9: `ByKind` index + #10: `IsComplete` flag | Type checker ergonomics. Small effort, high leverage. Do as a batch. |
+| **P4** | #5: `ExpressionFormMeta.BindingPower` | Small cleanup that completes the "fully catalog-driven Pratt loop" story. |
+| **P5** | #2: Termination predicate catalog | Eliminates per-slot parser code; makes new constructs zero-code. |
+| **P6** | #7: Diagnostic `RelatedSpans` | Type checker will want to emit multi-location diagnostics from day one. |
+| **P7** | #11: `Outcomes` catalog | Completeness. Low effort. Unblocks grammar generator / MCP vocabulary for outcomes. |
+
+---
+
+## Design Questions for Shane
+
+### Q1: SymbolTable as a Separate Pipeline Stage — or Inline in Type Checker?
+
+Opportunity #4 proposes a dedicated `SymbolTable` stage between parser and type checker. The alternative is to build the symbol table as the first phase INSIDE `TypeChecker.Check()` — same logic, but no new pipeline stage boundary.
+
+**Trade-off:**
+- Separate stage: cleaner contracts, independently testable, LS can use just the symbol table for completions without running full type checking
+- Inline: simpler pipeline, one fewer allocation, symbol table is an implementation detail not an architectural boundary
+
+**My lean:** Separate stage. The LS use case alone justifies it — completions need resolved symbols but NOT full type inference. But this is a pipeline architecture decision you should own.
+
+### Q2: Action Chain DU Granularity — Per ActionSyntaxShape or Per ActionKind?
+
+Opportunity #14 proposes one DU subtype per `ActionSyntaxShape` (9 shapes → 9 subtypes). But `ActionSyntaxShape` groups multiple `ActionKind` values (e.g., `CollectionValue` covers `add`, `remove`, `enqueue`, `push`, `append`). The alternative:
+
+- **(A) Per-shape (9 subtypes):** Minimal surface. Type checker pattern-matches on structural shapes.
+- **(B) Per-kind (15 subtypes):** Maximum specificity. Each action is its own node. More boilerplate but trivially exhaustive.
+- **(C) Hybrid:** One base per shape, but carry `ActionKind` for dispatch. (This is effectively what Opportunity #14 shows.)
+
+**My lean:** (C). The DU subtype gives you structural typing (each shape's fields are exact); the carried `ActionKind` gives you per-action dispatch when needed. But if you have a preference for (A) or (B), say so.
+
+### Q3: Should the Parser Validate Action Operand Types or Only Produce Syntax Trees?
+
+When parsing `-> set amount = "hello"`, the parser can structurally produce `AssignAction("amount", LiteralExpression(StringLiteral, "hello"))`. But should it also verify that `amount` is a declared field? Or is that ONLY the type checker's job?
+
+**My position:** Parser produces syntax trees. It does NOT validate references. The parser's contract is structural correctness — is the token sequence grammatically valid? The type checker's contract is semantic correctness — do the references resolve, are the types compatible?
+
+But I raise this because the `SymbolTable` question (#Q1) interacts: if symbol resolution is a separate stage, there's a clean three-way split (parser: structure, name-binder: references, type-checker: types). If it's inline, the temptation to do validation in the parser grows.
+
+### Q4: Interpolated String Fidelity — Full Expression Parsing or Deferred?
+
+Opportunity #6 proposes full recursive expression parsing inside interpolation holes. The alternative: the parser produces an `InterpolatedStringExpression` with `TextSegment` and `UnparsedSegment(TokenKind[] rawTokens)` — deferring hole parsing to the type checker.
+
+**Trade-off:**
+- Full parsing now: one pass, complete tree, type checker gets structured expressions
+- Deferred: simpler parser change now, but the type checker needs to re-enter the expression parser (awkward — parser is a `static class` with `ParserState` machinery)
+
+**My lean:** Full parsing now. The `ParserState` is already in scope when processing interpolation tokens. The recursive call to `ParseExpression(0, terminates)` is trivial to insert. Deferring buys nothing and creates complexity later.
+
+---
+
+*Reviewed by Frank — Lead/Architect*
+
+# Slot Invariant Clarification — Absent Optional Slots
+
+**Date:** 2026-05-07T10:20:00Z  
+**Author:** Frank (Lead/Architect)  
+**Status:** Design note for review  
+**Context:** Ambiguity in parser contract for absent optional slots — sentinel vs. omit.
+
+---
+
+## 1. Actual Current Behavior
+
+Examined `src/Precept/Pipeline/Parser.cs` lines 305–319 (`MakeSentinel` method):
+
+```csharp
+private static SlotValue MakeSentinel(ConstructSlot slot) => slot.Kind switch
+{
+    ConstructSlotKind.IdentifierList    => new IdentifierListSlot(ImmutableArray<string>.Empty, SourceSpan.Missing),
+    ConstructSlotKind.TypeExpression    => new TypeExpressionSlot(TypeMeta.Error, SourceSpan.Missing),
+    ConstructSlotKind.ModifierList      => new ModifierListSlot(ImmutableArray<ModifierKind>.Empty, SourceSpan.Missing),
+    ConstructSlotKind.StateEntryList    => new StateEntryListSlot(ImmutableArray<(string, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
+    ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<(string, TypeMeta)>.Empty, SourceSpan.Missing),
+    ConstructSlotKind.BecauseClause     => new BecauseClauseSlot("", SourceSpan.Missing),
+    ConstructSlotKind.GuardClause       => new GuardClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
+    ConstructSlotKind.RuleExpression    => new RuleExpressionSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
+    ConstructSlotKind.ComputeExpression => new ComputeExpressionSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
+    ConstructSlotKind.EnsureClause      => new EnsureClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
+    ConstructSlotKind.ActionChain       => new ActionChainSlot(ImmutableArray<ActionKind>.Empty, SourceSpan.Missing),
+    ConstructSlotKind.Outcome           => new OutcomeSlot(new MalformedOutcome(SourceSpan.Missing), SourceSpan.Missing),
+    // ... remaining cases
+};
+```
+
+And slot parsing (`ParseConstruct`, lines ~270–300):
+```csharp
+foreach (var slot in meta.Slots)
+{
+    var value = slot.IsRequired || ShouldAttemptOptionalSlot(slot)
+        ? ParseSlot(slot)
+        : MakeSentinel(slot);
+    slots.Add(value);
+}
+```
+
+**The actual behavior is Option X: Sentinel slots.**
+
+When an optional slot is absent, the parser produces a **sentinel `SlotValue`** with:
+- `SourceSpan.Missing` (a static sentinel span)
+- A semantically neutral payload (empty array, empty string, `true` literal, `MalformedOutcome`, etc.)
+
+The slot array **always has the same length as `ConstructMeta.Slots`** — slots are never omitted.
+
+---
+
+## 2. Authoritative Rule
+
+**Sentinel slots, never omit.**
+
+When an optional slot's syntax is absent in source, the parser produces a sentinel `SlotValue` at that slot position. The `ParsedConstruct.Slots` array has a 1:1 correspondence with `ConstructMeta.Slots` by index.
+
+**Invariants:**
+1. `construct.Slots.Length == construct.Meta.Slots.Length` — always
+2. `construct.Slots[i]` corresponds to `construct.Meta.Slots[i]` — by position
+3. Absent optionals have `Span == SourceSpan.Missing` — detectable via `span.IsMissing`
+4. Sentinel payloads are semantically neutral — empty arrays, empty strings, `true` literals, error markers
+
+---
+
+## 3. Rationale
+
+### Type Checker Ergonomics
+
+With sentinel slots:
+```csharp
+// Type checker can always access slot by index
+var guardSlot = (GuardClauseSlot)construct.Slots[2];
+var hasGuard = !guardSlot.Span.IsMissing;
+```
+
+Without sentinel slots (omit):
+```csharp
+// Type checker must search by kind
+var guardSlot = construct.Slots.OfType<GuardClauseSlot>().FirstOrDefault();
+var hasGuard = guardSlot != null;
+```
+
+The index-based approach is:
+- **Faster**: O(1) vs O(n) search
+- **Safer**: Compile-time index correctness via slot order in `ConstructMeta.Slots`
+- **Explicit**: Absence is a positive value (`SourceSpan.Missing`), not a negative (null/missing element)
+
+### Language Server Consumers
+
+The LS uses slots for:
+- **Hover**: Which slot is the cursor in? Index arithmetic works only if slots have stable positions.
+- **Completions**: What's expected at position N? Requires knowing that position N maps to slot N.
+- **Diagnostics**: "Expected 'when' clause" → can point to the sentinel slot's missing span.
+
+With omitted slots, the LS would need to reconstruct the mapping between source positions and semantic slots — the exact work the parser already did.
+
+### MCP Consumers
+
+`precept_compile` returns slot data. A stable slot array (always N elements) is easier to serialize and document than a variable-length array with optional keys.
+
+---
+
+## 4. Updates Required
+
+### Parser (Already Correct)
+
+The parser already implements sentinel slots. No changes needed.
+
+### Spec Doc: `docs/compiler/parser.md`
+
+Line ~95 (approximate, in the Slot Walking section) says:
+> "Absent optional slots produce sentinel slot values."
+
+This is correct. **No change needed** — the doc matches implementation.
+
+### Spec Doc: `docs/compiler/type-checker.md`
+
+Line ~148 (approximate, in the slot access section):
+```csharp
+var guardSlot = construct.Slots[2] as GuardClauseSlot
+```
+
+This pattern assumes sentinel slots. The doc should explicitly state the invariant. Add a note:
+
+> **Slot Access Invariant:** `construct.Slots[i]` always exists and corresponds to `construct.Meta.Slots[i]`. Absent optional slots are sentinel values with `Span.IsMissing == true`. Consumers should never search for slots by type — use index-based access.
+
+### `SlotValue.cs` — Add `SourceSpan.Missing` Documentation
+
+The `SourceSpan.Missing` sentinel should be documented:
+```csharp
+/// <summary>
+/// Sentinel span indicating the slot's syntax was absent in source.
+/// Consumers check <c>span.IsMissing</c> to detect absent optionals.
+/// </summary>
+public static readonly SourceSpan Missing = new(0, 0, SourceLocation.Unknown);
+```
+
+If `SourceSpan.Missing` doesn't exist or `IsMissing` property doesn't exist, add them.
+
+---
+
+## 5. Slots That Violate the Rule
+
+**None found.**
+
+All 17 slot kinds have sentinel factories in `MakeSentinel`. Every slot kind handled:
+
+| Slot Kind | Sentinel Payload |
+|-----------|------------------|
+| `IdentifierList` | `Empty` array |
+| `TypeExpression` | `TypeMeta.Error` |
+| `ModifierList` | `Empty` array |
+| `StateEntryList` | `Empty` array |
+| `ArgumentList` | `Empty` array |
+| `ComputeExpression` | `true` literal |
+| `GuardClause` | `true` literal |
+| `ActionChain` | `Empty` array |
+| `Outcome` | `MalformedOutcome` |
+| `StateTarget` | `null` name |
+| `EventTarget` | `null` name |
+| `EnsureClause` | `true` literal |
+| `BecauseClause` | `""` empty string |
+| `AccessModeKeyword` | (check implementation) |
+| `FieldTarget` | `null` name |
+| `RuleExpression` | `true` literal |
+| `InitialMarker` | `false` |
+
+**Note:** I did not see `AccessModeKeyword` in the `MakeSentinel` switch. Need to verify it's covered.
+
+Checking `Parser.cs`:
+```csharp
+ConstructSlotKind.AccessModeKeyword => new AccessModeSlot(TokenKind.Readonly, SourceSpan.Missing),
+```
+
+This is present and correct (defaults to `readonly` as the conservative access mode).
+
+---
+
+## Summary
+
+| Question | Answer |
+|----------|--------|
+| Current behavior | Sentinel slots (Option X) |
+| Authoritative rule | Sentinel slots — never omit |
+| Rationale | Index-based access, explicit absence, stable array length |
+| Parser changes | None — already correct |
+| Doc changes | Add invariant note to `type-checker.md` |
+| Violating slots | None |
+
+# SymbolTable Pipeline Stage — Design Sketch
+
+**Date:** 2026-05-07T09:36:17Z  
+**Author:** Frank (Lead/Architect)  
+**Requested by:** Shane  
+**Status:** Design sketch for review — not committed  
+**Context:** Pre-type-checker remediation on `Precept-V2-Radical`. Shane approved a separate SymbolTable stage between Parser and TypeChecker. This sketch answers: what's the shape, what does the LS consume, and what does the TC receive?
+
+---
+
+## 1. What the LS Actually Consumes (By Feature)
+
+Exhaustive read of `docs/tooling/language-server.md` §7 yields:
+
+| LS Feature | What It Needs From Resolved Symbols | Current Artifact |
+|---|---|---|
+| **Completions (state target)** | All declared state names + modifiers | `SemanticIndex.States` |
+| **Completions (event target)** | All declared event names | `SemanticIndex.Events` |
+| **Completions (field target / expression)** | All declared field names + types | `SemanticIndex.Fields` |
+| **Completions (expression)** | Field names, arg names (scoped to current event context) | `SemanticIndex` |
+| **Hover (identifier)** | Symbol identity: name, type, modifiers, computed flag, args, event back-ref | `SemanticIndex` typed symbols |
+| **Go-to-definition** | Reference site → declaration `ParsedConstruct` back-pointer | `SemanticIndex` + back-pointers |
+| **Semantic tokens Pass 2** | Identifier classification: field/state/event/arg at each reference site | `SemanticIndex` reference bindings |
+| **"Did you mean?"** | `UserFields`, `UserStates`, `UserEvents` name sets for fuzzy matching | `SemanticIndex` symbol tables |
+| **Outline** | Construct-level (uses `ConstructManifest` only — no symbols needed) | Parser |
+| **Folding** | Construct-level spans (no symbols needed) | Parser |
+| **Diagnostics** | Accumulated from all stages | `Compilation.Diagnostics` |
+
+**Key insight:** The LS needs **declared symbol identity** (name, type, modifiers) and **reference resolution** (what does this identifier resolve to, and where is its declaration?). It does NOT need typed expressions, resolved operations, or normalized declaration inventories for most features. Those are type-checker concerns.
+
+A SymbolTable stage can satisfy completions, hover, go-to-definition, semantic tokens, and "did you mean?" for the **declaration-level** case — even when the full type checker has errors or hasn't run yet.
+
+---
+
+## 2. Proposed SymbolTable Stage Output
+
+### Pipeline Position
+
+```
+TokenStream → ConstructManifest → SymbolTable → SemanticIndex → StateGraph → ProofLedger
+```
+
+### C# Surface Sketch
+
+```csharp
+/// <summary>
+/// Name-binding stage output: all declared symbols and resolved references.
+/// Produced from ConstructManifest by walking ParsedConstruct nodes and
+/// collecting declarations + resolving identifier references to declarations.
+/// </summary>
+public sealed record class SymbolTable(
+    // ── Declarations ──────────────────────────────────────────
+    ImmutableArray<DeclaredField>  Fields,
+    ImmutableArray<DeclaredState>  States,
+    ImmutableArray<DeclaredEvent>  Events,
+    
+    // ── Indexes (prebuilt for O(1) lookup) ────────────────────
+    ImmutableDictionary<string, DeclaredField> FieldsByName,
+    ImmutableDictionary<string, DeclaredState> StatesByName,
+    ImmutableDictionary<string, DeclaredEvent> EventsByName,
+    
+    // ── Reference Sites ───────────────────────────────────────
+    ImmutableArray<SymbolReference> References,
+    
+    // ── Stage diagnostics ─────────────────────────────────────
+    ImmutableArray<Diagnostic> Diagnostics
+);
+```
+
+### Symbol Records
+
+```csharp
+/// <summary>
+/// A field declaration discovered during name binding.
+/// Carries identity + type (already resolved by parser via Types catalog)
+/// but NOT typed expressions or semantic operations.
+/// </summary>
+public sealed record DeclaredField(
+    string       Name,
+    TypeMeta     Type,            // parser-stamped; already resolved
+    ImmutableArray<ModifierKind> Modifiers,
+    bool         IsComputed,      // has ComputeExpression slot
+    ParsedConstruct Syntax        // back-pointer for go-to-definition
+);
+
+/// <summary>
+/// A state declaration discovered during name binding.
+/// </summary>
+public sealed record DeclaredState(
+    string       Name,
+    ImmutableArray<ModifierKind> Modifiers,  // initial, terminal, required, etc.
+    ParsedConstruct Syntax
+);
+
+/// <summary>
+/// An event declaration discovered during name binding.
+/// </summary>
+public sealed record DeclaredEvent(
+    string       Name,
+    ImmutableArray<DeclaredArg> Args,
+    bool         IsInitial,       // has InitialMarker slot
+    ParsedConstruct Syntax
+);
+
+/// <summary>
+/// An event argument discovered during name binding.
+/// </summary>
+public sealed record DeclaredArg(
+    string    Name,
+    TypeMeta  Type,
+    string    EventName,         // back-reference (CC#17)
+    SourceSpan Span
+);
+```
+
+### Reference Resolution
+
+```csharp
+/// <summary>
+/// A resolved reference site: an identifier in the source that
+/// resolved to a declared symbol (or failed to resolve → diagnostic).
+/// </summary>
+public sealed record SymbolReference(
+    SourceSpan    Site,           // where the reference appears
+    SymbolTarget  Target          // what it resolved to
+);
+
+/// <summary>DU for reference targets.</summary>
+public abstract record SymbolTarget;
+public sealed record FieldTarget(DeclaredField Field) : SymbolTarget;
+public sealed record StateTarget(DeclaredState State) : SymbolTarget;
+public sealed record EventTarget(DeclaredEvent Event) : SymbolTarget;
+public sealed record ArgTarget(DeclaredArg Arg) : SymbolTarget;
+public sealed record UnresolvedTarget(string Name) : SymbolTarget;
+```
+
+### What The Stage Does (Mechanics)
+
+Single pass over `ConstructManifest.Constructs`:
+
+1. **Collect declarations:** Walk all constructs; extract declared names from `IdentifierListSlot`, `StateEntryListSlot`, `ArgumentListSlot` per construct kind. Build `Fields`, `States`, `Events` arrays + dictionary indexes.
+2. **Resolve references:** Walk all constructs a second time (or same pass, second phase); for each `StateTargetSlot`, `EventTargetSlot`, `FieldTargetSlot`, and identifier tokens in expressions, resolve against the declaration dictionaries.
+3. **Emit diagnostics:** `UndeclaredField`, `UndeclaredState`, `UndeclaredEvent`, `DuplicateFieldName`, `DuplicateStateName`, `DuplicateEventName`. These are naming diagnostics — produced here, not in the type checker.
+
+---
+
+## 3. What the TypeChecker Receives
+
+```csharp
+// Updated pipeline call:
+SymbolTable   symbols   = NameBinder.Bind(manifest);
+SemanticIndex semantics = TypeChecker.Check(manifest, symbols);
+```
+
+The type checker receives **both** `ConstructManifest` and `SymbolTable`:
+
+- **`ConstructManifest`** — because the TC needs expression ASTs (`ParsedExpression` in slots), action chains, outcome forms, and structural slot data that the SymbolTable does not replicate.
+- **`SymbolTable`** — because all identifiers are pre-resolved. The TC never does name lookup. It consumes `DeclaredField.Type` to know field types, `DeclaredEvent.Args` to know arg types, `SymbolReference.Target` to know what each identifier resolves to.
+
+### What the TC no longer does:
+
+- ❌ Discover declarations (the SymbolTable did it)
+- ❌ Build name→symbol dictionaries (already built)
+- ❌ Emit `UndeclaredField/State/Event` diagnostics (SymbolTable owns them)
+- ❌ Emit `Duplicate*Name` diagnostics (SymbolTable owns them)
+
+### What the TC still owns:
+
+- ✅ Type inference on expressions (resolve `ParsedExpression` → `TypedExpression`)
+- ✅ Operation resolution (`OperationKind` from `Operations` catalog)
+- ✅ Function overload resolution
+- ✅ Type compatibility checks (`TypeMismatch`, `QualifierMismatch`)
+- ✅ Action semantic validation (type-check action operands)
+- ✅ Modifier combination legality
+- ✅ Normalized declaration building (transition rows, rules, ensures, access declarations)
+- ✅ Dependency fact extraction (computed field deps, constraint refs)
+- ✅ Producing the full `SemanticIndex` with typed expressions, bindings, and normalized inventories
+
+The TC's job becomes: **given pre-resolved names and types, perform semantic analysis.** It doesn't search for what things are — it's told.
+
+---
+
+## 4. Additional Benefits
+
+| Benefit | Explanation |
+|---|---|
+| **Faster LS completions** | Name completions (field/state/event targets) work from `SymbolTable` alone — no full TC pass needed. If the TC fails on a type error, completions still work. |
+| **Better error isolation** | Naming errors (typos, undeclared, duplicates) are reported at the symbol stage before type errors. Users see "field `ammount` not declared" before "type mismatch in expression using `ammount`". Cascade suppression is structural. |
+| **MCP `precept_compile` partial results** | MCP can return symbol-level structure even when type checking fails — field/state/event declarations are always available. |
+| **Incremental compilation (future)** | If a change only adds/removes a declaration, symbol table can be updated without re-running TC. The SymbolTable is a natural cache boundary. |
+| **Type checker simplification** | TC receives pre-resolved references. No dictionary building, no name lookup, no naming diagnostics. The TC becomes a pure semantic analysis stage — easier to implement, test, and reason about. |
+| **Cleaner diagnostic ownership** | Each stage owns exactly its category: Parser = structural, SymbolTable = naming, TypeChecker = semantic, Graph = structural lifecycle, Proof = safety obligations. |
+| **"Did you mean?" enrichment** | The LS "did you mean?" fuzzy matching (`§7.9`) needs `UserFields`, `UserStates`, `UserEvents` name sets. These come directly from `SymbolTable` — no TC dependency. |
+
+---
+
+## 5. Risks & Tradeoffs
+
+| Risk | Severity | Mitigation |
+|---|---|---|
+| **Added pipeline stage = added complexity** | Low | The stage is mechanically simple (name collection + dictionary lookup). No type inference, no expression walking, no catalog resolution beyond what the parser already stamped. Estimated ≤ 200 LOC. |
+| **Two-artifact input to TC** | Low | Already planned: the canonical design (`compiler-and-runtime-design.md` §6) shows `TypeChecker.Check(manifest)`. Adding a second parameter `symbols` is a clean signature extension. Both artifacts are on `Compilation`. |
+| **SymbolTable vs SemanticIndex boundary clarity** | Medium | Developers must understand: SymbolTable = names and declarations; SemanticIndex = typed semantics. The names overlap with the canonical design's "Symbols" section of SemanticIndex. Rule: if it needs type inference, it's SemanticIndex; if it's pure name resolution, it's SymbolTable. |
+| **SemanticIndex fields partially redundant** | Low | SemanticIndex's `TypedField`/`TypedState`/`TypedEvent` become enriched versions of SymbolTable declarations (adding typed expressions, resolved operations). The Typed* records reference `DeclaredField` (or carry the same identity) — not a separate symbol table. |
+| **Expression identifiers need scope** | Medium | Field references in expressions are straightforward (global scope). Arg references require knowing which event context the expression lives in. The SymbolTable must thread event scope through transition rows. Solvable — the `ConstructManifest` context already carries this (the enclosing event handler's `EventTargetSlot`). |
+
+---
+
+## 6. Frank's Recommendation
+
+**Do it. No hedging.**
+
+The SymbolTable stage is clean, small, and structurally correct. It follows the principle that each pipeline stage owns exactly one category of resolution — lexical, structural, naming, semantic, lifecycle, safety. Right now "naming" is conflated with "semantic" inside the type checker design, which means the TC must both discover what exists and validate what it means. That's two concerns in one stage.
+
+Splitting them gives us:
+- A type checker that starts from a resolved world (simpler to implement)
+- LS features that degrade gracefully (completions work even with type errors)
+- Better diagnostic UX (naming errors before type errors)
+- A natural cache boundary for future incremental work
+
+The implementation is straightforward: one pass to collect, one pass to resolve, emit diagnostics for failures. The risk profile is near-zero — the stage cannot produce incorrect results because name resolution in Precept is trivial (flat namespace, no scoping beyond event args, no overloading at the name level).
+
+**Recommended name:** `NameBinder` for the stage class, `SymbolTable` for the output record. This follows the pattern: `Lexer` → `TokenStream`, `Parser` → `ConstructManifest`, `NameBinder` → `SymbolTable`, `TypeChecker` → `SemanticIndex`.
+
+**One hard rule:** The SymbolTable carries declarations and references. It does NOT carry typed expressions, resolved operations, or normalized declaration inventories. Those are the type checker's output. If anyone proposes putting expression type resolution into the SymbolTable, that's a layering violation — reject it.
+
+---
+
+## Appendix: Updated Pipeline Sketch
+
+```csharp
+// Inside Compiler.Compile
+TokenStream        tokens   = Lexer.Lex(source);
+ConstructManifest  manifest = Parser.Parse(tokens);
+SymbolTable        symbols  = NameBinder.Bind(manifest);
+SemanticIndex      semantics = TypeChecker.Check(manifest, symbols);
+StateGraph         graph    = GraphAnalyzer.Analyze(semantics);
+ProofLedger        proof    = ProofEngine.Prove(semantics, graph);
+
+ImmutableArray<Diagnostic> diagnostics =
+[
+    ..tokens.Diagnostics,
+    ..manifest.Diagnostics,
+    ..symbols.Diagnostics,      // NEW — naming diagnostics
+    ..semantics.Diagnostics,
+    ..graph.Diagnostics,
+    ..proof.Diagnostics,
+];
+
+return new Compilation(
+    Tokens:           tokens,
+    ConstructManifest: manifest,
+    Symbols:          symbols,           // NEW
+    Semantics:        semantics,
+    Graph:            graph,
+    Proof:            proof,
+    Diagnostics:      diagnostics,
+    HasErrors:        diagnostics.Any(d => d.Severity == Severity.Error)
+);
+```
+
+The `Compilation` record gains a `SymbolTable Symbols` field. LS features that only need name-level data read `Compilation.Symbols` directly.
+
+# George Parser Implementation Review
+
+Date: 2026-05-07T09:04:34Z  
+Requested by: Shane
+
+## Lexer/Parser Conflicts
+
+- **Blocking** — `src\Precept\Pipeline\Parser.Expressions.cs:378-413`
+  - The lexer does real work to segment interpolated literals (`src\Precept\Pipeline\Lexer.cs:334-474`, `500-625`), but the parser throws that structure away. `ParseInterpolatedString()` / `ParseInterpolatedTypedConstant()` just advance until `StringEnd` / `TypedConstantEnd` and return a plain `LiteralExpression`.
+  - That is the parser fighting the lexer: the lexer produces hole boundaries so the parser can reassemble and parse `{expr}` segments, and the parser ignores them.
+  - The spec is explicit that interpolation holes must be parsed and later type-checked (`docs\language\precept-language-spec.md:991-998`, `1366-1372`).
+  - **Recommended resolution:** add dedicated interpolated-literal nodes that preserve text segments plus parsed hole expressions.
+
+- **Notable (intentional, keep it)** — `src\Precept\Pipeline\Parser.cs:380-381`, `507-509`
+  - `Set` -> `SetType` is the **only** true token-kind remap I found. It matches the documented contract in `src\Precept\Language\TokenKind.cs:102-106` and `src\Precept\Language\Types.cs:648-651`.
+  - I did **not** find a second remap of the same class.
+  - **Recommended resolution:** none; this is the right lexer/parser split.
+
+- **Minor** — `src\Precept\Pipeline\Parser.Expressions.cs:147-160`, `325-354`
+  - `is set` / `is not set` is recognized by duplicating the same sequence probe in both `GetLedBindingPower()` and `ParsePostfixIs()`.
+  - This is not a lexer conflict, but it is parser-local duplication around a multi-token operator.
+  - **Recommended resolution:** centralize the sequence probe in one helper or a catalog-driven led dispatcher.
+
+- **Notable** — `src\Precept\Pipeline\Parser.cs:153-176`
+  - Outside interpolation, lookahead is disciplined: construct routing tops out at `Peek(2)`, and I found no `Peek(3+)` cases in the parser files.
+  - The remaining lookahead (`Peek(2)` for scoped-construct routing and `Peek(2)` for `is not set`) looks structural, not like the parser undoing bad lexer decisions.
+  - **Recommended resolution:** none.
+
+## Catalog Gaps
+
+- **Blocking** — `src\Precept\Pipeline\Parser.cs:366-392`
+  - `ParseTypeExpression()` only consumes `as` plus one type token. It does not read the cataloged type shape beyond `Types.ByToken`.
+  - That bypasses type metadata already present in the catalogs: collection inner types / `by` / `to` grammar (`docs\language\precept-language-spec.md:948-965`) and qualifier shape in `src\Precept\Language\Type.cs:55-67`.
+  - Sample syntax already depends on this richer shape: `samples\customer-profile.precept:14`, `samples\it-helpdesk-ticket.precept:13`.
+  - **Recommended resolution:** replace bare `TypeExpressionSlot(TypeMeta, ...)` with a parsed type-reference DU that derives its branches from catalog metadata and preserves nested type structure.
+
+- **Blocking** — `src\Precept\Pipeline\Parser.cs:412-418`
+  - Valued field modifiers are not parsed from metadata shape; the parser hardcodes a tiny token whitelist and then discards the value token entirely.
+  - That bypasses the real modifier contract in `src\Precept\Language\Modifiers.cs:88-133` and contradicts the spec's `default value expression` surface (`docs\language\precept-language-spec.md:1173`).
+  - **Recommended resolution:** extend modifier metadata with value syntax and store parsed modifier applications, not just `ModifierKind`.
+
+- **Blocking** — `src\Precept\Pipeline\Parser.cs:643-683`, `src\Precept\Language\Action.cs:29-50`, `src\Precept\Language\Actions.cs:219-221`
+  - The action parser uses `Actions.ByTokenKind` only as a primary-token check, ignores `ActionSyntaxShape`, skips operands as raw trivia, and never disambiguates secondary forms such as `append ... by ...`, `remove ... at ...`, `put K = V`, or `dequeue ... by ...`.
+  - The catalog already knows that actions have different syntax shapes; the parser is bypassing that metadata.
+  - **Recommended resolution:** introduce a parsed action DU keyed by `ActionMeta.SyntaxShape` and preserve field/value/into/by pieces with spans.
+
+- **Notable** — `src\Precept\Pipeline\Parser.cs:244-258`, `src\Precept\Language\DisambiguationEntry.cs:11-14`
+  - `DisambiguationEntry.LeadingTokenSlot` exists, but `ParseScopedConstruct()` does not use it. Instead it hardcodes the `Arrow` exemption with a comment.
+  - That is exactly the kind of parser-local language knowledge the catalog should own.
+  - **Recommended resolution:** drive disambiguation-token consumption from `LeadingTokenSlot` (or equivalent metadata), not `peek.Kind != TokenKind.Arrow`.
+
+- **Notable** — `src\Precept\Pipeline\Parser.cs:445-450`, `477-485`
+  - State-modifier mapping is still a linear scan over `Modifiers.All`, even though the parser's lookup axis is token -> state modifier.
+  - `Modifiers.ByFieldToken` exists (`src\Precept\Language\Modifiers.cs:234-249`); there is no equivalent state-modifier index.
+  - **Recommended resolution:** add `Modifiers.ByStateToken` (or a unified modifier-token index by subtype).
+
+- **Minor** — `src\Precept\Pipeline\Parser.cs:615-624`, `src\Precept\Language\Tokens.cs:508-513`
+  - Access-mode parsing hardcodes `readonly || editable` even though the token catalog already exposes `Tokens.AccessModeKeywords`.
+  - **Recommended resolution:** derive the accepted set from `Tokens.AccessModeKeywords` and map through `AccessModifierMeta`, not raw token checks.
+
+- **Minor** — `src\Precept\Pipeline\Parser.Expressions.cs:141-158`
+  - Binding power is mostly catalog-driven, but dot access still has hardcoded `80/81`, and postfix `is set` still injects a hardcoded `int.MaxValue` right binding power.
+  - **Recommended resolution:** move non-binary led precedence metadata into a cataloged source instead of hardcoding it in `GetLedBindingPower()`.
+
+## Type Checker Blockers
+
+### Must address before checker work
+
+- **Type checker is still a stub** — `src\Precept\Pipeline\TypeChecker.cs:6-16`
+  - Current behavior is just `new SemanticIndex(empty, empty, empty, empty)`.
+
+- **Parsed type payload is too lossy** — `src\Precept\Pipeline\SlotValue.cs:22-24`, `src\Precept\Pipeline\Parser.cs:366-392`
+  - `TypeExpressionSlot` only carries a `TypeMeta`. It loses collection inner types, `choice` domains, `by`/`to` clauses, qualifiers, and `~string` type-reference shape.
+  - That makes type-checking sample syntax impossible (`samples\customer-profile.precept:14`, `samples\it-helpdesk-ticket.precept:13`).
+
+- **Modifier payload is too lossy** — `src\Precept\Pipeline\SlotValue.cs:26-28`, `src\Precept\Pipeline\Parser.cs:403-418`
+  - The checker will need modifier values (`default`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`), but the parser only keeps `ModifierKind[]`.
+
+- **Action payload is too lossy** — `src\Precept\Pipeline\SlotValue.cs:46-48`, `src\Precept\Pipeline\Parser.cs:643-683`, `docs\language\precept-language-spec.md:1512-1523`
+  - `ActionChainSlot` stores only `ActionKind[]`. No target field, no value expression, no `into`, no `by`, no `at`, no key/value split, no secondary action-form disambiguation.
+  - This is a hard blocker for action type checking and proof-obligation checking.
+
+- **Interpolated literals lose hole expressions** — `src\Precept\Pipeline\Parser.Expressions.cs:378-413`, `docs\language\precept-language-spec.md:991-998`, `1366-1372`
+  - The checker cannot type-check `{expr}` holes because the parser never preserves them.
+
+- **Declaration/argument slots lose precise sites and structure**
+  - `IdentifierListSlot` stores only names (`src\Precept\Pipeline\SlotValue.cs:18-20`; parser fill at `src\Precept\Pipeline\Parser.cs:328-361`).
+  - `StateEntryListSlot` stores `(string Name, ModifierKind[])` without per-name/per-modifier spans (`src\Precept\Pipeline\SlotValue.cs:30-32`; parser fill at `src\Precept\Pipeline\Parser.cs:435-474`).
+  - `ArgumentListSlot` stores `(string Name, TypeMeta)` without name/type spans and with the same lossy type payload (`src\Precept\Pipeline\SlotValue.cs:34-36`; parser fill at `src\Precept\Pipeline\Parser.cs:490-535`).
+  - `SemanticIndex` is span-oriented (`src\Precept\Pipeline\SemanticIndex.cs:6-15`); the parser is not currently preserving enough declaration-site detail to populate it well.
+
+- **Parser silently manufactures valid-looking placeholders for invalid syntax**
+  - Empty `when` becomes `true` with no diagnostic: `src\Precept\Pipeline\Parser.Expressions.cs:463-468`.
+  - Empty `ensure` becomes `true` with no diagnostic: `src\Precept\Pipeline\Parser.Expressions.cs:522-525`.
+  - Invalid outcomes return `MalformedOutcome` but emit no parse diagnostic: `src\Precept\Pipeline\Parser.Expressions.cs:536-597`.
+  - Required transition outcomes can disappear into sentinels even though `TransitionRow` requires `Outcome`: `src\Precept\Pipeline\Parser.Expressions.cs:538-539`, `src\Precept\Pipeline\Parser.cs:304-318`, `src\Precept\Language\Constructs.cs:96-104`.
+  - Required action chains can disappear when arrow is not followed by an action keyword even though `StateAction` / `EventHandler` require `ActionChain`: `src\Precept\Pipeline\Parser.cs:645-650`, `src\Precept\Language\Constructs.cs:137-165`.
+  - This pushes syntax debt downstream into the checker, which is the wrong boundary.
+
+- **Optional-slot invariant drift needs an explicit decision** — `src\Precept\Pipeline\Parser.cs:208-215`, `.squad\decisions.md:95`
+  - The recorded baseline still says absent optionals produce sentinel slots; the live parser now omits them.
+  - Checker work can proceed either way, but only if the invariant is made explicit first. Right now the contract is drifting.
+
+### Nice to have, not a first-stop blocker
+
+- **`ParsedOutcome` is directionally correct but still coarse** — `src\Precept\Pipeline\ParsedOutcome.cs:10-27`, `src\Precept\Pipeline\Parser.Expressions.cs:549-585`
+  - `TransitionOutcome` keeps the target state name but not the target identifier span; `RejectOutcome` keeps the reason text but not the string-literal site.
+  - Good enough for coarse semantics, weak for precise references/diagnostics.
+
+- **`ComputeExpressionSlot` is structurally fine** — `src\Precept\Pipeline\SlotValue.cs:38-40`, `src\Precept\Pipeline\Parser.Expressions.cs:480-502`
+  - I do **not** see a dedicated `ComputeExpressionSlot` blocker beyond the broader expression/type payload problems above.
+
+- **CI function resolution is still deferred** — `src\Precept\Pipeline\ParsedExpression.cs:60-63`
+  - The TODO about stamping resolved `FunctionKind` is real, but the node kind plus function name is enough to start checker work.
+
+## Implementation Verdict
+
+**BLOCKING**
+
+Priority order:
+
+1. **Replace the skeletal type payload** — the current parser cannot represent real Precept type syntax.
+2. **Replace `ActionChainSlot(ActionKind[])` with parsed action nodes** — checker work on actions is impossible otherwise.
+3. **Fix interpolated-literal parsing** — the parser is currently discarding lexer structure the checker needs.
+4. **Stop silent placeholder acceptance** — invalid guard/ensure/action/outcome tails must become parse diagnostics or explicit invalid nodes, not fake `true` / silent sentinels.
+5. **Restore or explicitly redefine the slot-array invariant** before the checker starts relying on it.
+6. **Clean up catalog bypasses** — `LeadingTokenSlot`, state/access modifier lookup, and hardcoded led precedence are all fixable, but they come after the payload blockers.
+
+# Soup Nazi — Parser Coverage Review
+
+**Date:** 2026-05-07T09:04:34Z  
+**Requested by:** Shane  
+**Scope:** `test/Precept.Tests/Parser/`, parser-adjacent drift anchors, `docs/language/precept-language-spec.md`
+
+## Inventory
+
+Parser test files in `test/Precept.Tests/Parser/`:
+
+- `ParserBackArrowTests.cs` — 11 test methods. Covers computed-field `<-`, `->` regression boundaries, two negative `<-` cases, and one exact span anchor.
+- `ParserDirectConstructTests.cs` — 53 test methods. Covers direct constructs (`precept`, `field`, `state`, `event`, `rule`), catalog slot order, basic happy paths, multi-construct ordering, and very shallow recovery checks.
+- `ParserExpressionTests.cs` — 81 test methods. Covers the 13 current `ExpressionFormKind` forms, precedence/associativity happy paths, slot plumbing, and almost no negative diagnostics.
+- `ParserIntegrationTests.cs` — 11 test methods. Parses all 28 sample files, checks required-slot presence and broad span bounds, and adds a few no-crash smoke tests.
+- `ParserOutcomeTests.cs` — 11 test methods. Covers all `ParsedOutcome` DU happy paths, malformed fallback shape, and exact outcome span bounds.
+- `ParserScopedConstructTests.cs` — 76 test methods. Covers scoped/event-scoped constructs, routing/disambiguation, happy-path slot presence/order, and limited guard/action coverage.
+
+Parser-focused run result: **459 passed, 0 failed, 0 skipped** (`dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~Parser"`).
+
+Parser-adjacent coverage outside that folder worth noting:
+
+- `EnsureBecauseClauseSlotTests.cs` — good extra coverage for the split `BecauseClause` slot on `StateEnsure`/`EventEnsure`.
+- `TokensTests.cs`, `OperatorsTests.cs`, `ActionsTests.cs`, `ConstructsTests.cs`, `ExpressionFormCatalogTests.cs`, `ExpressionFormCoverageTests.cs`, `SlotOrderingDriftTests.cs` — distributed catalog drift protection.
+
+## Coverage Map
+
+| Construct / feature | Test file(s) | Coverage level |
+| --- | --- | --- |
+| Precept header | `ParserDirectConstructTests` | Partial |
+| Field declaration (basic shape) | `ParserDirectConstructTests`, `ParserBackArrowTests` | Partial |
+| Type references (full spec surface: scalar families, collections, choice, qualifiers) | none beyond bare `number` / `string` / `date` examples | **Missing** |
+| Field modifiers | `ParserDirectConstructTests`, `ParserBackArrowTests` | Partial |
+| State declaration | `ParserDirectConstructTests` | Partial |
+| Event declaration | `ParserDirectConstructTests` | Partial |
+| Rule declaration / invariant form | `ParserDirectConstructTests`, `ParserExpressionTests` | Partial |
+| Transition rows | `ParserScopedConstructTests`, `ParserOutcomeTests`, `ParserBackArrowTests` | Partial |
+| Outcomes (`transition`, `no transition`, `reject`, malformed DU) | `ParserOutcomeTests` | Partial |
+| State ensure | `ParserScopedConstructTests`, `ParserExpressionTests`, `EnsureBecauseClauseSlotTests*` | Partial |
+| Event ensure | `ParserScopedConstructTests`, `EnsureBecauseClauseSlotTests*` | Partial |
+| State action | `ParserScopedConstructTests` | Partial |
+| Event handler / stateless hook | `ParserScopedConstructTests`, `ParserBackArrowTests` | Partial |
+| Access mode (`modify ... readonly|editable`) | `ParserScopedConstructTests` | Partial |
+| Omit declaration | `ParserScopedConstructTests` | Partial |
+| Expression forms / precedence | `ParserExpressionTests` | Partial |
+| Interpolation reassembly | none | **Missing** |
+| Parser error recovery / diagnostics | `ParserDirectConstructTests`, `ParserOutcomeTests`, `ParserIntegrationTests` | Partial |
+| Span correctness | `ParserDirectConstructTests`, `ParserScopedConstructTests`, `ParserOutcomeTests`, `ParserBackArrowTests`, `ParserIntegrationTests` | Partial |
+| Sample-corpus integration (28 files) | `ParserIntegrationTests` | Partial |
+
+\* outside `test/Precept.Tests/Parser/`, but parser-relevant.
+
+### Current surface by requested area
+
+- **All field types:** not covered. Parser tests only exercise `number`, `string`, and `date`; they do **not** cover `integer`, `decimal`, `boolean`, `~string`, temporal/business types, or collection/choice/qualified forms.
+- **Collection types:** `set`, `queue`, `stack`, `bag`, `list`, `log`, `lookup`, `by`, `ascending`, `descending` are untested in parser suite.
+- **Nullable/default:** `optional` and `default` are untested in parser suite.
+- **Field modifiers:** only `nonnegative` and computed `<-` have any parser coverage. `writable`, `ordered`, `positive`, `nonzero`, `notempty`, `min*`, `max*`, `maxplaces` are untested.
+- **Construct types:** current parser folder covers the 12 current construct kinds, but often only as slot-presence smoke tests. `assert` blocks are not current parser constructs. `write` blocks are not current v3 syntax. “Invariants” currently map to `rule` declarations.
+- **Outcome types / `ParsedOutcome` DU:** positive coverage exists for all three real outcomes plus `MalformedOutcome`, but there is no diagnostic-code coverage around malformed outcomes.
+- **Computed field `<-` syntax:** dedicated coverage exists and is good.
+- **Action chains with `->`:** regression coverage exists, but only for separator/presence, not action detail.
+- **`from any` routing expansion:** missing.
+- **Event args (required, nullable):** only a single required `string` arg is covered. Nullable args, multi-arg lists, modifiers, `~string`, collection args, and defaults are missing.
+- **All collection mutation operators:** missing in parser suite. The suite only exercises `set`, and even there it only checks that an `ActionChain` slot exists.
+- **Guards with complex expressions:** one simple `x > 0 and y` case exists. Nested/chained guards with parentheses, quantifiers, method calls, conditionals, postfix, or member access are missing.
+- **Span correctness:** broad non-missing/in-bounds coverage exists; exact token-anchored span checks are sparse.
+
+## Priority Gaps
+
+1. **Type reference surface is almost entirely uncovered.** No parser tests force collection types, choice types, qualifiers (`in` / `of` / `to`), `~string`, or the larger scalar catalog. This is the biggest blocker for type-checker work because checker slices will lean on parsed type shape immediately.
+2. **Action-chain coverage is nowhere near checker-ready.** `TransitionRow_WithActions_ActionChainSlot_IsPresent`, `StateAction_HappyPath_ActionChainSlot_IsPresent`, and `EventHandler_WithAction_ActionChainSlot_IsPresent` stop at slot presence. There are no parser assertions for `add`, `remove`, `remove at`, `enqueue`, `enqueue by`, `dequeue`, `dequeue into/by`, `push`, `pop`, `clear`, `append`, `append by`, `insert`, or `put` syntax.
+3. **Parser diagnostics are effectively unanchored.** I found no parser test asserting a specific parse diagnostic code. The suite does not pin `ExpectedToken`, `UnexpectedKeyword`, `NonAssociativeComparison`, `InvalidCallTarget`, `OmitDoesNotSupportGuard`, `EventHandlerDoesNotSupportGuard`, `PreEventGuardNotAllowed`, `ExpectedOutcome`, `EmptyChoice`, `ChoiceMissingElementType`, or `ChoiceElementTypeMismatch`.
+4. **State/field wildcard and shorthand forms are uncovered.** No parser tests for `from any`, `in any`, `to any`, `modify all`, `omit all`, multi-name field declarations, or multi-name event declarations. Samples already use `from any`; the parser suite does not.
+5. **Event argument parsing is shallow.** Current tests only prove the parser can retain one argument name. They do not prove argument type capture, multiple arguments, nullable args, modifier-bearing args, or invalid arg forms.
+6. **Stateless event-hook trailing `ensure` is missing.** Spec surface allows `on Event -> ... ensure BoolExpr`; parser tests only cover arrow-prefixed actions.
+7. **Expression negatives are thin.** The expression suite is strong on happy-path AST shape, weak on malformed-but-close syntax, non-associative chains, invalid call targets, unexpected keywords, quantifier syntax errors, and interpolation recovery.
+8. **Interpolation reassembly has zero parser tests.** No interpolated string or interpolated typed-constant parser cases despite explicit parser-spec sections.
+9. **Span checks are uneven.** Exact span anchoring is good for outcomes and `<-`, but most constructs/slots only get `NotBe(SourceSpan.Missing)` or “within bounds” assertions.
+
+## Test Quality Findings
+
+- **`ParserIntegrationTests.SampleFile_ParsesWithoutException_AndReturnsManifest`** — too weak. `NotBeNull` + “construct count > 0” is a smoke test, not a parser correctness test.
+- **`ParserIntegrationTests.MalformedInput_ProducesManifestWithoutException`** — vacuous. It proves “no crash,” but not recovery quality, recovery location, or diagnostic identity.
+- **`ParserIntegrationTests.EmptyInput_ReturnsManifestWithoutException` / `WhitespaceOnlyInput_ReturnsManifestWithoutException`** — vacuous always-green guards.
+- **`ParserDirectConstructTests.FieldDeclaration_HappyPath_Slots0And1_AreIdentifierAndType`** — only checks slot kinds; it never checks the parsed type payload. A broken type parser can still pass.
+- **`ParserDirectConstructTests.EventDeclaration_WithArguments_ArgumentListSlot_ContainsParameterName`** — only checks arg name, not arg count, type, modifier/nullability state, or span.
+- **`ParserScopedConstructTests.TransitionRow_WithActions_ActionChainSlot_IsPresent`** — only proves slot presence. It does not prove the chain actually parsed the intended action kind(s).
+- **`ParserScopedConstructTests.StateAction_HappyPath_ActionChainSlot_IsPresent`** — same problem: presence-only assertion.
+- **`ParserScopedConstructTests.EventHandler_WithAction_ActionChainSlot_IsPresent`** — same problem: presence-only assertion.
+- **`ParserBackArrowTests.BackArrow_UsedAsActionChainSeparator_ProducesParseError`** and **`ComputedField_BackArrow_WithoutExpression_ProducesParseError`** — better than nothing, but they assert only `DiagnosticStage.Parse`; they do not pin the expected code or source location.
+- **`ParserOutcomeTests.TransitionOutcome_MissingStateName_IsMalformed`**, **`NoTransitionOutcome_MissingTransitionKeyword_IsMalformed`**, **`RejectOutcome_MissingReason_IsMalformed`** — good DU-shape checks, but still no diagnostic-code assertion.
+- **`ParserExpressionTests.Postfix_IsNotFollowedBySet_DoesNotLoopInfinitely_IsStoppedByLedCheck`** — important regression, but low-signal assertion (`manifest.Should().NotBeNull`) should be paired with a shape/diagnostic assertion.
+
+### Theory dataset audit
+
+- **No skipped parser tests found.** Good. Rules are rules.
+- **`ParserExpressionTests.ExpressionSource_LexesWithoutErrors`** has breadth, but it is almost entirely positive data and does not pair the same surface with negative parse cases.
+- **`ParserDirectConstructTests.DirectConstruct_LexesWithoutErrors`** is minimal relative to spec surface; it misses multi-name shorthand, richer modifiers, collection/choice types, and richer arg lists.
+- **`ParserScopedConstructTests.ScopedConstruct_LexesWithoutErrors`** misses `from any`, `modify all`, `omit all`, non-`set` actions, and trailing event-hook `ensure`.
+
+## Catalog Drift Coverage
+
+There is **no single `CatalogDriftTests.cs`**. Drift coverage is distributed.
+
+| Catalog | Current status | Immediate-fail on raw enum drift? |
+| --- | --- | --- |
+| `TokenKind` | **Strong** in `TokensTests`. Exhaustive `Enum.GetValues<TokenKind>()` coverage plus `Tokens.All` count == enum length. No hardcoded absolute token total, but a missing catalog entry will fail immediately. | **Yes** |
+| `ExpressionFormKind` | **Strong** in `ExpressionFormCatalogTests`, `ExpressionFormCoverageTests`, and parser-side `ParserExpressionTests` (`13` hard count + enum iteration). Parser suite does **not** itself verify `[HandlesCatalogExhaustively]`; that check lives in analyzer tests. | **Yes** for catalog drift; **partial** for consumer-annotation drift |
+| `ActionKind` | **Strong** in `ActionsTests`. Exhaustive enum iteration plus hard count (`15`). | **Yes** |
+| `ConstructKind` | **Strong** in `ConstructsTests` plus `SlotOrderingDriftTests`. Exhaustive enum iteration plus hard count (`12`) and slot-shape anchors. | **Yes** |
+| `OperatorKind` | **Strong** in `OperatorsTests`. Exhaustive enum iteration plus hard counts (`21` total, `19` single-token, `2` multi-token). | **Yes** |
+
+Bottom line: **catalog membership drift is well-guarded; parser-surface behavior drift is not.** Adding a brand-new enum member without updating the catalog will trip tests fast. What can still slip is “catalog updated, parser behavior/tests not meaningfully expanded.”
+
+## Verdict
+
+# **CRITICAL GAPS**
+
+The parser suite is green, but it is **not** comprehensive enough to support type-checker development safely. The biggest holes are the full type-reference surface, full action syntax surface, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), event-arg richness, interpolation, and specific parser diagnostic-code assertions. Right now, too many tests stop at “a slot exists” or “the parser did not crash.” That is not enough. No soup for unanchored parser behavior.

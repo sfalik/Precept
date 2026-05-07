@@ -28,6 +28,14 @@
 
 - SlotValue shape principle: closed-vocabulary tokens (types, modifiers, access modes) are resolved by the parser at recognition time — never deferred as spans. String literals (`because` clause) are extracted at parse time. Only expressions (open-ended, precedence-sensitive) are deferred as `ParsedExpression`.
 
+- SymbolTable stage design principle: name binding is a separate concern from type inference. The SymbolTable collects declarations (field/state/event/arg) and resolves identifier references — pure name resolution requiring no type information. The type checker then receives pre-resolved names and performs semantic analysis. This follows the pipeline principle that each stage owns exactly one category of resolution.
+
+- LS artifact consumption is layered: lexical features → TokenStream; syntax features → ConstructManifest; name-level features (completions for field/state/event targets, "did you mean?", identifier semantic tokens) → SymbolTable; semantic features (hover with type info, typed expression tokens, operation resolution) → SemanticIndex. The SymbolTable gives the LS useful data even when the TC has errors.
+
+- Current `SemanticIndex.cs` stub is minimal (FieldReferences, StateReferences, EventReferences + diagnostics). The canonical design (`compiler-and-runtime-design.md` §6) specifies a much richer inventory: Symbols, Bindings, Normalized Declarations, Typed Expressions, Dependency Facts. The stub needs major expansion during TC implementation.
+
+- `language-server.md` is fully designed with complete per-feature mechanics (§7.1–7.10), cursor context determination via `SlotContext`, catalog-driven completions, two-pass semantic tokens, "did you mean?" fuzzy matching with Levenshtein ≤3. It reads `SemanticIndex` properties like `FieldsByName`, `StatesByName`, `EventsByName`, `UserFields`, `UserStates`, `UserEvents` that don't yet exist on the stub.
+
 - Disambiguation offset for StateScoped/EventScoped constructs is structurally invariant at 2: `peek(2)` always hits the disambiguation token because the anchor name is always a single identifier at position 1.
 
 - `AccessModeSlot` in `SlotValue.cs` needs a code fix: must carry `TokenKind AccessMode` (currently stores only base `SourceSpan`).
@@ -52,151 +60,16 @@
 
 - Graph structural diagnostic codes (82-85) precede proof engine codes (86+) by pipeline stage order.
 
-
-
 ## Recent Updates
 
+### Historical summary through 2026-05-07T09:36:17Z — Parser and NameBinder design baseline
 
+- Closed the parser-prerequisite and computed-field waves: `<-` is the computed-field delimiter, parser exhaustiveness stays scoped to expression handlers, and the parser remains catalog-driven without new architectural blockers.
+- Completed the independent and creative parser reviews, surfacing one medium-priority follow-up (action operand structure) plus ergonomics ideas, while keeping the current parser/type-checker boundary intact.
+- Produced the SymbolTable/NameBinder stage sketch that formalized the new pipeline slot between Parser and TypeChecker and established the declaration/reference-only contract for `SymbolTable`.
 
-### 2026-05-07T05:09:00Z — Independent parser audit: catalog vs. implementation
+### 2026-05-07T15:18:42Z — NameBinder implementation closed
 
-
-
-- Audited all 12 constructs in `Constructs.cs` against `Parser.cs` slot dispatch.
-
-- **Result: All constructs verified. No discrepancies found.**
-
-- Parser is catalog-driven by construction: `ParseSlots` iterates `meta.Slots` in order, guaranteeing slot count, order, and kind alignment structurally.
-
-- The known concern (EventHandler slots) confirmed correct: catalog declares `[EventTarget, ActionChain]` (2 slots) and parser produces exactly that. The erroneous coordinator spec `[EventTarget, ActionChain, Outcome]` was never implemented.
-
-- `ParseOutcome` correctly uses `Outcomes.ByToken` catalog lookup and dispatches by `OutcomeSyntaxShape`.
-
-- `EventTarget` mid-construct handling (TransitionRow) is correct: parser conditionally consumes `on` only if present, which handles both the leading-token-already-consumed case and the mid-construct case.
-
-- Test coverage gap: `RuleDeclaration` has no parser test in either test file.
-
-
-
----
-
-
-
-### 2026-05-07T04:02:01Z — Parser prerequisite decisions approved
-
-
-
-- Shane approved Frank's B2 + B3 parser-prerequisite decisions and Scribe merged the paired inbox notes into one canonical ledger entry.
-
-- Durable parser rule: keep `peek(2)` as the scoped-construct disambiguation invariant because anchor names are single-token grammar productions and the offset never varies by construct kind.
-
-- George is unblocked on `ParsedExpression.cs`; the remaining paired code fix is `AccessModeSlot(TokenKind AccessMode, SourceSpan Span)` in `SlotValue.cs`.
-
-
-
----
-
-
-
-### 2026-05-06 — Disambiguation offset: structural invariant confirmed
-
-
-
-- Assessed whether `peek(2)` in the disambiguation protocol should be a `DisambiguationEntry` catalog field. Verdict: KEEP as structural invariant.
-
-- Key reasoning: the offset does not vary by construct kind — it is universally 2 for all StateScoped/EventScoped entries. A field with a single constant value for all members is not metadata; it is grammar geometry.
-
-- Confirmed `StateTarget` (Identifier | Any) and `EventTarget` (Identifier) are formally single-token productions in the grammar spec. This is a language-level guarantee, not an unstated assumption.
-
-- The catalog-driven principle governs per-member domain knowledge that varies by kind. The disambiguation offset is applied uniformly before any member is identified — it is machinery topology, not a per-construct fact.
-
-- Decision written to `.squad/decisions/inbox/frank-disambiguation-catalog.md`.
-
-
-
----
-
-
-
-### 2026-05-06 — Wave 5: Archive & Cleanup
-
-
-
-- Deleted `docs/working/` entirely (67 files): cross-cutting-decisions.md, both migrated gap registers, all Archived and inbox working artifacts.
-
-- Deleted `docs/compiler/parser-radical.md` and `docs/compiler/type-checker-radical.md` (radical proposals superseded by canonical stage docs).
-
-- Pre-deletion scan confirmed zero genuine unresolved items in working docs. All open questions not covered by CC decisions already live in canonical docs.
-
-- Fixed broken cross-references in 8 canonical docs: README.md (superseded section removed), parser.md (6 refs), proof-engine.md (5 refs), type-checker.md (4 refs), tooling-surface.md (2 refs), catalog-system.md (ActionMeta OQ converted to settled note + 1 ref), precept-grammar.md (parser-radical.md ref), mcp.md (2 refs).
-
-- `catalog-system.md` ActionMeta "Open Question (unresolved)" converted to "✅ Settled (Wave 4 Gap 6)" — Description is canonical, SyntaxShape is internal, SnippetTemplate is deferred.
-
-- Build validation: 3 pre-existing SemanticIndex.cs errors, 0 new. Baseline unchanged.
-
-- Commit: `421605afc9ec32ff0c28468b5927656bc725441c`
-
-
-
----
-
-
-
-### 2026-05-07 — Wave 4: Final consistency pass + 6 genuine gap triage
-
-
-
-- All 6 Wave 3 follow-up gaps resolved as team-autonomous; no owner-required items.
-
-- **Gap 1 (TokenMeta.SemanticTokenModifiers #41):** No field added. All Precept tokens carry zero modifier bits — LSP modifier flags have no analog in Precept's token taxonomy. `language-server.md` code comment updated; `catalog-system.md` OQ closed.
-
-- **Gap 2 (EventCoverageEntry granularity):** Event-level granularity confirmed. Guard-split is the proof engine's domain. `graph-analyzer.md` OQ closed.
-
-- **Gap 3 (back-edge definition):** BFS-ancestor is canonical; DFS not used. `graph-analyzer.md` OQ closed.
-
-- **Gap 4 (GraphEvent.IsInitial):** Derived structurally from edges originating from the initial-state vertex. `graph-analyzer.md` OQ closed.
-
-- **Gap 5 (TBD diagnostic codes):** Assigned 82=TerminalStateHasOutgoingEdges, 83=IrreversibleStateHasBackEdge, 84=RequiredStateDoesNotDominateTerminal, 85=NoInitialState; proof codes start at 86. `graph-analyzer.md` appendix updated; `proof-engine.md` source-file note corrected.
-
-- **Gap 6 (ActionMeta LS/MCP alignment #43):** Description surfaces in LS hover and MCP; SyntaxShape is internal; SnippetTemplate is a deferred milestone. Pattern settled. `language-server.md` OQ converted to settled note.
-
-- Terminology sweep: 6 `precept/preview` occurrences corrected to `precept/inspect` in `tooling-surface.md`; no other mismatches found (OrphanedEvent, FieldChange, MutationRecord, SlotKind-as-cursor all clean).
-
-- `ConstructSlotKind` count fixed: 15 → 17 in `catalog-system.md §Constructs`; stale OQ about parser.md discrepancy removed (canonical count is 17).
-
-- `docs/compiler/README.md` updated: superseded-doc section added for parser-radical.md and type-checker-radical.md.
-
-- `docs/working/cross-cutting-decisions.md`: Wave 3 marked ✅ COMPLETE; Wave 4 marked ✅ COMPLETE with full outcome block.
-
-- Validation unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
-
-
-
----
-
-
-
-### Historical summary through 2026-05-05
-
-
-
-- 2026-05-04 established the execution/runtime baseline: catalogs describe legality, `TypeRuntime` plus runtime registries own computation, and the evaluator remains type-agnostic.
-
-- Collection API design converged on CLR-friendly adapters and declared-direction storage while keeping internal storage on `PreceptValue[]`.
-
-- Currency, unit, and dimension work converged on catalog-backed identity types with clear public/internal shape boundaries.
-
-- Use `.squad/decisions.md` for full per-decision provenance; keep `history.md` focused on durable operating context and the newest closures.
-
-
-
-### 2026-05-07T08:40:33Z — BackArrow decision and parser exhaustiveness closeout
-
-- Frank's backarrow analysis and plan are now the durable basis for computed fields: `<-` is adopted, `=` is rejected because it collides with `set X = expr`, and `->` stays reserved for outcomes and action chains.
-
-- The PRECEPT0019 follow-through also locked the narrow parser scope: `ExpressionFormKind` exhaustiveness belongs on `ParserState` and its expression handlers, not as a broader parser-wide attribute sweep.
-
-- George's two commits (`266ee5a`, `5212c9d`) and Soup-Nazi's test pass closed the batch at 2810/2810 green.
-
-
-
+- Frank-11 completed the exhaustive NameBinder doc sync, created `docs/compiler/name-binder.md`, and updated 18 documentation files with zero stale references remaining.
+- Soup-Nazi-2 added `test/Precept.Tests/NameBinder/NameBinderTests.cs` with 40 tests across 9 groups, closing the batch with 2929 total passing tests.
+- No new architectural decisions were required; the remaining durable record now lives in the canonical docs, the decision ledger, and the orchestration/session logs.
