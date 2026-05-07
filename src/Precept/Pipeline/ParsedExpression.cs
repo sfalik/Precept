@@ -61,3 +61,30 @@ public sealed record QuantifierExpression(TokenKind QuantifierToken, string Bind
 // TODO: Revisit whether the parser should stamp resolved FunctionKind here once the CI-variant lookup decision lands.
 public sealed record CIFunctionCallExpression(string FunctionName, ImmutableArray<ParsedExpression> Arguments, SourceSpan Span)
     : ParsedExpression(ExpressionFormKind.CIFunctionCall, Span);
+
+/// <summary>
+/// Missing expression sentinel — used when expression parsing fails or an expression is expected but absent.
+/// Emitted when a guard or ensure clause keyword is present but no expression follows.
+/// </summary>
+public sealed record MissingExpression(SourceSpan Span)
+    : ParsedExpression(ExpressionFormKind.Literal, Span);
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Interpolated string support
+// ════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Abstract base of the interpolation segment discriminated union.
+/// Interpolated strings contain a sequence of text segments and hole segments.
+/// </summary>
+public abstract record InterpolationSegment(SourceSpan Span);
+
+/// <summary>A literal text portion of an interpolated string.</summary>
+public sealed record TextSegment(string Text, SourceSpan Span) : InterpolationSegment(Span);
+
+/// <summary>An embedded expression hole within an interpolated string.</summary>
+public sealed record HoleSegment(ParsedExpression Expression, SourceSpan Span) : InterpolationSegment(Span);
+
+/// <summary>An interpolated string with embedded expressions: "Hello {name}!".</summary>
+public sealed record InterpolatedStringExpression(ImmutableArray<InterpolationSegment> Segments, SourceSpan Span)
+    : ParsedExpression(ExpressionFormKind.InterpolatedString, Span);
