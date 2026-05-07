@@ -300,14 +300,14 @@ public sealed record TypedTransitionRow(
     string? TargetState,
     TypedExpression? Guard,
     ImmutableArray<TypedAction> Actions,
-    TypedOutcomeKind Outcome,
+    TransitionRowOutcome Outcome,
     string? RejectReason,
     QualifierBinding? ResultQualifier,
     ParsedConstruct Syntax
 );
 
 /// <summary>Outcome of a transition row.</summary>
-public enum TypedOutcomeKind { Transition = 1, NoTransition = 2, Reject = 3 }
+public enum TransitionRowOutcome { Transition = 1, NoTransition = 2, Reject = 3 }
 
 /// <summary>A normalized rule (invariant constraint) declaration.</summary>
 public sealed record TypedRule(
