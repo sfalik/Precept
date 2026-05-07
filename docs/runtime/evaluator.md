@@ -185,14 +185,28 @@ internal struct PreceptValue
 ```csharp
 public abstract record EventOutcome
 {
-    public sealed record Transitioned(Version Result, FiredArgs Args) : EventOutcome;  // State change succeeded
-    public sealed record Applied(Version Result, FiredArgs Args) : EventOutcome;       // No-transition row or stateless event succeeded
+    // CC#23: Mutations attached directly to success variants — evaluator diffs working copy against original slots
+    public sealed record Transitioned(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;  // State change succeeded
+    public sealed record Applied(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;       // No-transition row or stateless event succeeded
     public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;       // Authored reject row matched
     public sealed record InvalidArgs(string Reason) : EventOutcome;                    // Arg validation failure
     public sealed record ConstraintsFailed(ImmutableArray<ConstraintViolation> Violations) : EventOutcome;
-    public sealed record Unmatched() : EventOutcome;                                   // All guards failed
+    // CC#24: EvaluatedRows carries per-candidate TransitionInspection for tooling debug trace
+    public sealed record Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows) : EventOutcome;
     public sealed record UndefinedEvent() : EventOutcome;                              // No rows for event in current state
+    public sealed record Faulted(Fault Fault) : EventOutcome;                          // CC#12: impossible-path failure surfaced as structured outcome
 }
+```
+
+**`FieldMutation` record** (used by `Transitioned` and `Applied`):
+
+```csharp
+// CC#23: field-level diff computed by evaluator during action execution
+public sealed record FieldMutation(
+    string FieldName,
+    JsonElement? Before,    // slot value serialized to JSON before action execution
+    JsonElement? After      // slot value serialized to JSON after action execution
+);
 ```
 
 **UpdateOutcome** (returned by `Update`):
@@ -429,6 +443,43 @@ EventOutcome Create()
 
 **Compiler guarantees:** The compiler enforces that precepts with required fields lacking defaults declare an initial event, and that the initial event assigns those fields. Therefore, `Create` without an initial event cannot produce `Rejected` for well-proven programs.
 
+**Stateless precepts (no states declared):**
+
+For stateless precepts, `Create` omits the initial-state assignment and all state-entry evaluations:
+
+```csharp
+EventOutcome Create()  // stateless precept — no initial event
+{
+    // 1. Build version with defaults (no initial state — State = null)
+    var slots = new PreceptValue[precept.SlotLayout.FieldCount];
+    for (int i = 0; i < slots.Length; i++)
+        slots[i] = EvaluateDefault(precept.Fields[i]);
+
+    // 2. Recompute computed fields
+    foreach (var slot in precept.SlotLayout.ComputedSlots)
+        slots[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, slots, FiredArgs.Empty);
+
+    // 3. Evaluate global constraints only (no in-state bucket — null state has none)
+    var violations = EvaluateConstraintBuckets(
+        precept.ConstraintPlanIndex.Always,
+        slots, FiredArgs.Empty);
+
+    if (violations.Count > 0)
+        return new EventOutcome.ConstraintsFailed(violations);
+
+    return new EventOutcome.Applied(new Version(precept, state: null, slots));
+}
+```
+
+With an initial event on a stateless precept, the Fire pipeline runs normally — the hollow version is built with `State = null` and passed into `Fire`. State-entry semantics are absent because `to <State> ensure` and `in <State> ensure` require a named state; with `State = null` those constraint buckets are structurally empty.
+
+**CC#26 locked semantics (2026-05-06):**
+- State-set step omitted — `Version.State = null`, no initial state to assign
+- `to <State> ensure` — not evaluated (no state entered)
+- `in <State> ensure` — not evaluated (no residency state)
+- Omit-on-entry clearing — not applied (no state to enter)
+- Arg ensures, field constraints, global rules, computed fields, working copy protocol — all run normally
+
 #### Fire(event, args)
 
 ```csharp
@@ -478,19 +529,22 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
     {
         if (allViolations.Count > 0)
             return new EventOutcome.ConstraintsFailed(allViolations);
-        return new EventOutcome.Unmatched();
+        // CC#24: attach per-candidate trace so callers can explain why no row matched
+        return new EventOutcome.Unmatched(evaluatedRowTraces.ToImmutableArray());
     }
     
     if (candidates.Count > 1)
-        return Fail(FaultCode.AmbiguousDispatch);  // Impossible in proven program
+        return Fail(FaultCode.AmbiguousDispatch);  // Impossible in proven program — proof engine emits DiagnosticCode.AmbiguousDispatch (CC#13)
     
     var (winningRow, finalSlots) = candidates[0];
     var newState = winningRow.TargetState ?? version.CurrentState;
+    // CC#23: compute field-level diff against pre-mutation slots before constructing outcome
+    var mutations = BuildMutations(version.Slots, finalSlots, precept.Fields);
     
     return winningRow.Outcome switch
     {
-        TransitionOutcome.Transition   => new EventOutcome.Transitioned(new Version(precept, newState, finalSlots), firedArgs),
-        TransitionOutcome.NoTransition => new EventOutcome.Applied(new Version(precept, version.CurrentState, finalSlots), firedArgs),
+        TransitionOutcome.Transition   => new EventOutcome.Transitioned(new Version(precept, newState, finalSlots), firedArgs, mutations),
+        TransitionOutcome.NoTransition => new EventOutcome.Applied(new Version(precept, version.CurrentState, finalSlots), firedArgs, mutations),
         TransitionOutcome.Reject       => new EventOutcome.Rejected(winningRow.RejectReason ?? "Rejected", firedArgs),
         _                              => throw new InvalidOperationException()
     };
@@ -499,7 +553,7 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
 
 `TransitionOutcome` is the canonical type name (defined in `type-checker.md` §7.1). The evaluator uses this same type at runtime.
 
-`ExecutionRow.RejectReason` carries the lowered `because` message from an authored reject row. The runtime contract needs one canonical storage location before authored rejection reasons can survive lowering.
+`ExecutionRow.RejectReason` carries the lowered `because` message from an authored reject row. The field is `string? RejectReason` on `ExecutionRow` — resolved by CC#11 and mirrored in `TypedTransitionRow`. The lowered message is stored at build time by the Precept Builder and read by the evaluator at runtime with no further resolution needed.
 
 ```csharp
 UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
@@ -1203,7 +1257,7 @@ The `Faults` catalog produces a fully-formed `Fault` with:
 
 Faults are **never thrown** — they are returned as structured outcome variants. This maintains the pattern-matchable, composable outcome model.
 
-**`Faulted` outcome:** Impossible-path failures are modeled as structured `Fault` values raised via `Faults.Create`. Whether `EventOutcome` gains a `Faulted(Fault)` variant or faults remain out-of-band exceptions is a pending commit-result contract decision.
+**`Faulted` outcome (CC#12):** Impossible-path failures are modeled as structured `Fault` values raised via `Faults.Create` and surfaced as `EventOutcome.Faulted(Fault fault)` — the 8th `EventOutcome` variant. The evaluator's `Fail()` path now returns a `Faulted` outcome rather than an unhandled exception. MCP `precept_fire` serializes this as `{ "outcome": "Faulted", "fault": { "code": ..., "codeName": ..., "message": ... } }`.
 
 ---
 
@@ -1383,13 +1437,14 @@ All in-domain failures produce structured outcome variants — never exceptions:
 
 | Failure | Outcome | Description |
 |---|---|---|
-| All guards failed | `EventOutcome.Unmatched()` | No transition row matched; event was not valid for current state |
+| All guards failed | `EventOutcome.Unmatched(evaluatedRows)` | No transition row matched; per-candidate guard trace attached (CC#24) |
 | Constraint violations | `EventOutcome.ConstraintsFailed(violations)` | Rows matched, but constraint(s) failed post-mutation |
 | Field not editable | `UpdateOutcome.FieldNotEditable(field, mode)` | Update attempted on readonly/omit field |
 | Undefined event | `EventOutcome.UndefinedEvent()` | No rows declared for event in current state |
 | Authored rejection | `EventOutcome.Rejected(reason)` | A `reject` row was the winning candidate |
 | Invalid args | `EventOutcome.InvalidArgs(reason)` | Arg validation failed (wrong type, missing required) |
 | Invalid fields | `UpdateOutcome.InvalidFields(reason)` | Patch validation failed (type mismatch, unknown field) |
+| Impossible-path fault | `EventOutcome.Faulted(fault)` | Defense-in-depth backstop; only fires when upstream pipeline has a bug (CC#12) |
 
 These are **not errors** — they are expected business outcomes. Callers pattern-match on the outcome type to determine the appropriate response.
 
@@ -1408,7 +1463,7 @@ Impossible-path failures indicate bugs in upstream stages (compiler/builder) or 
 | Function arity mismatch | `FunctionArityMismatch` | Static signature checking |
 | Collection empty on access | `CollectionEmptyOnAccess` | Guard `when F.count > 0` |
 | Collection empty on mutation | `CollectionEmptyOnMutation` | Guard `when F.count > 0` |
-| Ambiguous dispatch | (not yet in FaultCode) | Proof engine exclusivity analysis |
+| Ambiguous dispatch | `AmbiguousDispatch` | Proof engine exclusivity analysis (`DiagnosticCode.AmbiguousDispatch`, CC#13) |
 
 Every `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compiler diagnostic that should have caught it:
 
@@ -1834,7 +1889,7 @@ This enables progressive UIs: show users what actions become available as they f
 
 6. **`FieldDescriptor.AccessModes` structural shape** — Per-state access-mode lookup storage shape (dictionary vs. indexed) affects lookup cost and descriptor size. Pending implementation decision for the builder/descriptor pass.
 
-7. **`AmbiguousDispatch` FaultCode** — This impossible-path failure (multiple candidates in first-match) needs a fault code with `[StaticallyPreventable]` linking to the proof engine's exclusivity analysis.
+7. **`AmbiguousDispatch` FaultCode (CC#13)** — `FaultCode.AmbiguousDispatch` confirmed with `[StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]`. The evaluator call site `Fail(FaultCode.AmbiguousDispatch)` at the `candidates.Count > 1` branch is the correct runtime backstop; the proof engine's exclusivity analysis prevents this from firing on a cleanly-proven program.
 
 ### Resolved Design Questions
 
@@ -1942,6 +1997,8 @@ This matrix summarizes which constraint buckets and access-mode checks apply to 
 | `InspectUpdate` | yes (reported) | no | same as `Update`, plus event-prospect over hypothetical state |
 | `Create` with initial event | no | yes (initial event) | same as `Fire` for the initial event |
 | `Create` without initial event | no | no | `always`, `in <initial state>` |
+| `Create` (stateless, with initial event) | no | yes (initial event) | same as `Fire` — no state-entry buckets (`to`, `in`) |
+| `Create` (stateless, without initial event) | no | no | `always` only — no `in <state>` bucket exists |
 | `Restore` | no (bypassed) | no | `always`, `in <current>` — computed fields recomputed first |
 
 **Key rules:**

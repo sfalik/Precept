@@ -276,11 +276,9 @@ public static class Diagnostics
 
         // ── Graph ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UnreachableState               => new(nameof(DiagnosticCode.UnreachableState),               DiagnosticStage.Graph, Severity.Warning, "State '{0}' is unreachable from initial state '{1}'",                                                                                  DiagnosticCategory.Structure,
-            RelatedCodes: [DiagnosticCode.UnhandledEvent],
             FixHint: "Add a transition to this state, or remove it if it is no longer needed"),
-        DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "No transition handles event '{0}' in state '{1}' — firing it will always be rejected",                                                 DiagnosticCategory.Structure,
-            RelatedCodes: [DiagnosticCode.UnreachableState],
-            FixHint: "Add a transition that handles this event in this state, or remove the event"),
+        DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "Event '{0}' has no transition rows in any state — it can never be fired successfully",                                       DiagnosticCategory.Structure,
+            FixHint: "Add at least one transition row that handles this event, or remove the event declaration"),
 
         // ── Proof ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UnsatisfiableGuard             => new(nameof(DiagnosticCode.UnsatisfiableGuard),             DiagnosticStage.Proof, Severity.Warning, "The condition '{0}' on event '{1}' can never be true when {2} — this transition will never fire",                                      DiagnosticCategory.Proof,

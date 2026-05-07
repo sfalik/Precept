@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+### 2026-05-07T03:00:00Z — Wave 3 Round 2 sweep recorded
+
+- Pre-check measured `decisions.md` at 75117 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T03:00:00Z.
+- Merged `frank-wave3-round2.md` into the active ledger, preserved the six discovered follow-up gaps in the canonical record, deleted the processed inbox file, wrote the Frank orchestration/session logs, and refreshed Frank/Scribe history.
+- Health report: `decisions.md` 75117B -> 77092B; inbox processed = 1; history files summarized = 0.
+
 ### 2026-05-07T02:20:00Z — Wave 3 Round 1 sweep recorded
 
 - Pre-check measured `decisions.md` at 73849 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T02:20:00Z.

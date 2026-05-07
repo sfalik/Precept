@@ -221,9 +221,7 @@ Semantic tokens enable rich syntax highlighting beyond what TextMate grammars ca
 
 **Artifact:** `Compilation.Tokens` + `TokenMeta.SemanticTokenType`
 
-> **Open Question:** `Compilation.Tokens` for semantic-token Pass 1
-> Lexical semantic tokens need the token stream even when type checking fails, but precept-builder.md's `Compilation` record does not currently carry `Tokens`. The compile output contract needs one sanctioned path for language-server Pass 1 tokenization.
-> *Flagged: 2026-05-04*
+`Compilation.Tokens` carries the `TokenStream` from the lexer pass — added to the `Compilation` record (CC#4). Lexical semantic tokens have no semantic-index dependency and work even when type checking fails.
 
 **Mechanics:**
 
@@ -244,7 +242,7 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
             character: token.Span.StartColumn,
             length: token.Span.Length,
             tokenType: meta.SemanticTokenType,
-            tokenModifiers: 0);  // TokenMeta.SemanticTokenModifiers TBD
+            tokenModifiers: 0);  // TokenMeta.SemanticTokenModifiers pending catalog addition (catalog-gap #41)
     }
     
     return builder.Build();
@@ -320,7 +318,7 @@ void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
 }
 ```
 
-> **Open Question (unresolved):** `SemanticIndex.References` does not exist in the type-checker.md §7.1 canonical shape. Should the type checker emit reference collections, or should Pass 2 reconstruct reference sites by walking typed declarations and pattern-matching on `TypedFieldRef`, `TypedArgRef`, etc.?
+**Pass 2 reference reconstruction:** `SemanticIndex` does not carry pre-built reference-site collections. Pass 2 reconstructs reference sites by walking the typed declaration tree and pattern-matching on `TypedFieldRef`, `TypedArgRef`, `TypedStateRef`, and `TypedEventRef` nodes. This keeps the type checker focused on declaration-level semantics; tooling-specific reference accumulation is a Pass 2 implementation concern. `SemanticIndex.EnsuresByState` (`FrozenDictionary<string, ImmutableArray<TypedEnsure>>`) is the exception — it was added as a first-class grouping because multiple consumers re-derive the same correlation independently (CC#22).
 
 **Graceful Degradation:**
 
@@ -353,9 +351,9 @@ enum SlotContext
     InArgDefault,       // Default value for event argument
 }
 
-> **Open Question:** `SlotContext` vs `SlotKind` naming
-> language-server.md and tooling-surface.md both define cursor-context mapping, but one speaks in `SlotContext`/`SlotKind` terms while the other maps `ConstructSlotKind`. The tooling surface needs one canonical enum story so completions do not rest on two names for the same structural axis.
-> *Flagged: 2026-05-04*
+> **✅ Resolved (CC#14) — SlotContext vs ConstructSlotKind naming**
+> `SlotContext` is the canonical cursor-context enum name. The mapping switch uses `ConstructSlotKind` members (the catalog type name for construct schema slots) in the switch arms, not a `SlotKind` alias. Two distinct concepts: `SlotContext` = where is the cursor (completion routing); `ConstructSlotKind` = what schema slot is this (catalog). The mapping function maps `ConstructSlotKind` → `SlotContext`.
+> *Resolved: 2026-05-06 — CC#14*
 
 SlotContext GetCursorContext(ConstructManifest manifest, Position position)
 {
@@ -367,17 +365,17 @@ SlotContext GetCursorContext(ConstructManifest manifest, Position position)
     var slotIndex = FindSlotAt(construct, position);
     if (slotIndex < 0) return SlotContext.AfterKeyword;
     
-    // Map slot kind to context
+    // Map ConstructSlotKind (catalog schema slot) → SlotContext (cursor completion context)
     return construct.Meta.Slots[slotIndex].Kind switch
     {
-        SlotKind.TypeExpression => SlotContext.InTypePosition,
-        SlotKind.ModifierList => SlotContext.InModifierPosition,
-        SlotKind.StateTarget => SlotContext.InStateTarget,
-        SlotKind.EventTarget => SlotContext.InEventTarget,
-        SlotKind.FieldTarget => SlotContext.InFieldTarget,
-        SlotKind.ActionChain => SlotContext.InActionVerb,
-        SlotKind.GuardClause or SlotKind.ComputeExpression 
-            or SlotKind.EnsureClause => SlotContext.InExpression,
+        ConstructSlotKind.TypeExpression => SlotContext.InTypePosition,
+        ConstructSlotKind.ModifierList => SlotContext.InModifierPosition,
+        ConstructSlotKind.StateTarget => SlotContext.InStateTarget,
+        ConstructSlotKind.EventTarget => SlotContext.InEventTarget,
+        ConstructSlotKind.FieldTarget => SlotContext.InFieldTarget,
+        ConstructSlotKind.ActionChain => SlotContext.InActionVerb,
+        ConstructSlotKind.GuardClause or ConstructSlotKind.ComputeExpression
+            or ConstructSlotKind.EnsureClause => SlotContext.InExpression,
         _ => SlotContext.AfterKeyword
     };
 }
@@ -405,21 +403,18 @@ IEnumerable<CompletionItem> GetCompletions(SlotContext context, SemanticIndex? i
 IEnumerable<CompletionItem> GetTypeCompletions()
 {
     return Types.All
-        .Where(t => t.IsUserFacing)  // Filter internal types
+        .Where(t => t.IsUserFacing)  // CC#16: IsUserFacing = true by default; Error and StateRef = false
         .Select(t => new CompletionItem
         {
             Label = t.Token.Text,
             Kind = CompletionItemKind.TypeParameter,
             Documentation = t.HoverDescription,
-            InsertText = t.SnippetTemplate ?? t.Token.Text,
+            InsertText = t.SnippetTemplate ?? t.Token.Text,  // SnippetTemplate: future catalog addition; falls back to token text
             InsertTextFormat = t.SnippetTemplate is not null 
                 ? InsertTextFormat.Snippet 
                 : InsertTextFormat.PlainText
         });
 }
-
-> **Open Question (unresolved):** `TypeMeta.IsUserFacing` and `TypeMeta.SnippetTemplate` are used here but not in the catalog-system.md shape. Should these properties be added to `TypeMeta`?
-> *Source: catalog-gap-register.md #30*
 
 IEnumerable<CompletionItem> GetActionCompletions(TypeKind? fieldType)
 {
@@ -429,14 +424,14 @@ IEnumerable<CompletionItem> GetActionCompletions(TypeKind? fieldType)
         {
             Label = a.Token.Text,
             Kind = CompletionItemKind.Method,
-            Documentation = a.Description,  // ActionMeta has Description, not HoverDescription
+            Documentation = a.Description,  // ActionMeta.Description serves the hover description role
             InsertText = a.Token.Text,
             InsertTextFormat = InsertTextFormat.PlainText
         });
 }
 
-> **Open Question (unresolved):** `ActionMeta.HoverDescription` and `ActionMeta.SnippetTemplate` are used in the original design but not in the catalog-system.md shape. Should these properties be added to `ActionMeta`?
-> *Source: catalog-gap-register.md #43 (partial)*
+// ActionMeta.SnippetTemplate and HoverDescription are future catalog additions (catalog-gap #43);
+// the Description field is sufficient for current completion tooltips.
 
 IEnumerable<CompletionItem> GetStateCompletions(SemanticIndex? index)
 {
@@ -538,17 +533,17 @@ MarkupContent FormatSymbolHover(object symbol) => symbol switch
     TypedArg a => new MarkupContent
     {
         Kind = MarkupKind.Markdown,
-        Value = $"**argument** `{a.Name}` : `{Types.GetMeta(a.ResolvedType).Token.Text}`"
-        // Note: owning event lookup needed separately via ArgReference
+        Value = $"**argument** `{a.Name}` : `{Types.GetMeta(a.ResolvedType).Token.Text}` on event `{a.EventName}`"
+        // a.EventName is a first-class back-reference on TypedArg — see CC#17
     },
     
     _ => new MarkupContent { Kind = MarkupKind.PlainText, Value = "" }
 };
 ```
 
-> **Open Question:** `TypedArg.EventName` back-reference
-> Hover over an event argument currently needs to recover the owning event indirectly from an `ArgReference`, because `TypedArg` has no back-reference to its declaring event. The semantic model needs to decide whether that ownership is first-class on `TypedArg` or always reconstructed on demand.
-> *Flagged: 2026-05-04*
+> **✅ Resolved (CC#17) — TypedArg.EventName back-reference**
+> `TypedArg.EventName` is already present as a first-class field in the canonical `type-checker.md §7.1` shape. The hover code above accesses `a.EventName` directly. No reconstruction via `ArgReference` traversal needed.
+> *Resolved: 2026-05-06 — CC#17*
 
 ### 7.5 Go-to-Definition
 
@@ -613,11 +608,11 @@ public sealed record TypedEvent(
 
 ### 7.6 Preview/Inspect (Custom LSP Extension)
 
-**Trigger:** `precept/preview` (custom method, not standard LSP)
+**Trigger:** `precept/inspect` (custom method, not standard LSP)
 
-> **Open Question:** `precept/inspect` vs `precept/preview`
-> language-server.md and tooling-surface.md still disagree on the custom method name for preview inspection. The tooling contract needs one canonical request name before extension code, server handlers, and docs can converge.
-> *Flagged: 2026-05-04*
+> **✅ Resolved (CC#15) — precept/inspect is canonical**
+> `precept/inspect` aligns with the MCP tool name `precept_inspect`. The trigger line `precept/preview` has been corrected here. All extension handlers and docs use `precept/inspect`.
+> *Resolved: 2026-05-06 — CC#15*
 
 **Artifact:** `Precept` + inspection runtime (`EventInspection`, `UpdateInspection`)
 
@@ -668,7 +663,7 @@ InspectResult? HandleInspect(InspectParams p)
 - `version.InspectFire(eventName, args?)` — single-event inspection with optional args
 - `version.InspectUpdate(null)` — full landscape; `UpdateInspection.Events` contains a complete `EventInspection` for every event in the current state
 
-The extension calls `precept/preview` whenever the user changes preview state, then renders the result in the preview webview. See `docs/tooling/extension.md` for the webview side.
+The extension calls `precept/inspect` whenever the user changes preview state, then renders the result in the preview webview. See `docs/tooling/extension.md` for the webview side.
 
 ### 7.7 Document Outline
 
@@ -678,55 +673,27 @@ The extension calls `precept/preview` whenever the user changes preview state, t
 
 **Mechanics:**
 
-Document outline provides hierarchical symbols for the document sidebar. The LS walks `ConstructManifest.Constructs` and maps each to a `DocumentSymbol`.
+Document outline provides hierarchical symbols for the document sidebar. The LS walks `ConstructManifest.Constructs` and maps each to a `DocumentSymbol` using `ConstructMeta.IsOutlineNode` and `ConstructMeta.LspSymbolKind` — no hardcoded `ConstructKind` switches.
 
 ```csharp
 DocumentSymbol[] GetDocumentSymbols(Compilation compilation)
 {
     return compilation.ConstructManifest.Constructs
-        .Where(c => IsOutlineConstruct(c.Meta.Kind))
+        .Where(c => c.Meta.IsOutlineNode)    // CC#18: catalog-driven, no ConstructKind switch
         .Select(c => ToDocumentSymbol(c))
         .ToArray();
 }
 
-bool IsOutlineConstruct(ConstructKind kind) => kind switch
-{
-    ConstructKind.PreceptDeclaration => true,
-    ConstructKind.FieldDeclaration => true,
-    ConstructKind.StateDeclaration => true,
-    ConstructKind.EventDeclaration => true,
-    ConstructKind.TransitionRow => true,
-    ConstructKind.RuleDeclaration => true,
-    ConstructKind.EditDeclaration => true,
-    _ => false
-};
-
-> **Open Question:** `ConstructMeta.IsOutlineNode`
-> Document outline still hardcodes which constructs appear in the symbol tree instead of reading that decision from catalog metadata. The language-server contract needs to decide whether outline eligibility becomes a first-class `ConstructMeta` property.
-> *Flagged: 2026-05-04*
-
-> **Open Question:** `ConstructMeta.LspSymbolKind`
-> The current outline mapping also hardcodes `ConstructKind` → `SymbolKind` translation in server code. A catalog-first surface would move that choice into `ConstructMeta`, but the canonical shape has not yet been extended to carry it.
-> *Flagged: 2026-05-04*
+> **✅ Resolved (CC#18) — ConstructMeta.IsOutlineNode and LspSymbolKind**
+> Outline eligibility and LSP symbol kind are first-class `ConstructMeta` fields. `IsOutlineNode = false` by default; outline constructs set `IsOutlineNode = true` and `LspSymbolKind = "Class"` etc. This matches the `TokenMeta.SemanticTokenType` pattern — the LS reads catalog metadata rather than maintaining a per-`ConstructKind` switch. Adding a new outline-able construct only requires updating its catalog entry.
+> *Resolved: 2026-05-06 — CC#18*
 
 DocumentSymbol ToDocumentSymbol(ParsedConstruct construct) => new()
 {
     Name = ExtractName(construct),
-    Kind = MapSymbolKind(construct.Meta.Kind),
+    Kind = Enum.Parse<SymbolKind>(construct.Meta.LspSymbolKind ?? "Null"),  // catalog-driven
     Range = ToLspRange(construct.Span),
     SelectionRange = ToLspRange(ExtractNameSpan(construct))
-};
-
-SymbolKind MapSymbolKind(ConstructKind kind) => kind switch
-{
-    ConstructKind.PreceptDeclaration => SymbolKind.Class,
-    ConstructKind.FieldDeclaration => SymbolKind.Property,
-    ConstructKind.StateDeclaration => SymbolKind.Enum,
-    ConstructKind.EventDeclaration => SymbolKind.Function,
-    ConstructKind.TransitionRow => SymbolKind.Event,
-    ConstructKind.RuleDeclaration => SymbolKind.Constant,
-    ConstructKind.EditDeclaration => SymbolKind.Interface,
-    _ => SymbolKind.Null
 };
 ```
 
@@ -1361,33 +1328,12 @@ void Update(Compilation compilation)
 
 ### Open Questions
 
-> **Open Question 1 (unresolved):** Should catalog entries carry a `Documentation` string for hover/completion tooltips?
-> *Source: catalog-gap-register.md #35 (broader documentation-string strategy)*
->
-> **Context:** The completions and hover features documented in §7.3 and §7.4 reference `HoverDescription` on catalog entries. Some catalog records (`TypeMeta`, `ActionMeta`, `FunctionMeta`) may not currently have this property.
->
-> **Candidates for `HoverDescription` / `Documentation` addition:**
-> - `ModifierMeta` subtypes (`FieldModifierMeta`, `StateModifierMeta`, `EventModifierMeta`, `ArgModifierMeta`)
-> - `ActionMeta`
-> - `TypeMeta`
-> - `OperationMeta`
-> - `FunctionMeta`
->
-> **Trade-off:** Adding documentation strings to catalogs is ~2 hours of work but enables rich tooltips. Without them, hover shows only the keyword text.
->
-> **Recommendation:** Add `HoverDescription` to all user-facing catalog entries. The investment is low and UX benefit is high.
+> **Documentation strings across catalog entries (CC#19 closed `TokenMeta`; broader expansion pending):**
+> `TokenMeta.HoverDescription` is confirmed (CC#19). `FieldModifierMeta.HoverDescription`, `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, and `OperatorMeta.HoverDescription` already exist. `ActionMeta.SnippetTemplate` and remaining modifier subtypes are incremental catalog additions (catalog-gap #43). The pattern is settled; completion is an implementation milestone, not a design question.
 
-> **Open Question 2 (unresolved):** Should the LS support workspace/symbol for cross-file symbol search?
->
-> **Context:** Single-file precepts don't need cross-file search. But if precepts ever support imports or multi-file definitions, workspace/symbol becomes relevant.
->
-> **Recommendation:** Defer. Precepts are single-file by design. Revisit only if the language surface expands to multi-file.
+> **Workspace/symbol (`workspace/symbol`):** Deferred. Precepts are single-file by design. Revisit only if the language surface expands to multi-file.
 
-> **Open Question 3 (unresolved):** Should the LS support rename refactoring (`textDocument/rename`)?
->
-> **Context:** Rename requires identifying all references to a symbol, which `SemanticIndex` provides. Implementation is straightforward.
->
-> **Recommendation:** Implement after core features. Rename is high-value for usability but not blocking.
+> **Rename refactoring (`textDocument/rename`):** Implement after core features. `SemanticIndex` provides all reference sites needed; implementation is straightforward once Pass 2 reconstruction is in place.
 
 ### Implementation Notes
 

@@ -567,7 +567,11 @@ public sealed record TokenMeta(
     TokenKind                      Kind,
     string?                        Text,
     IReadOnlyList<TokenCategory>   Categories,
-    string                         Description
+    string                         Description,
+    string?                        TextMateScope      = null,
+    string?                        SemanticTokenType  = null,
+    IReadOnlyList<TokenKind>?      ValidAfter         = null,
+    string?                        HoverDescription   = null   // CC#19: user-facing hover text for this token; null = no hover
 );
 ```
 
@@ -611,10 +615,12 @@ public sealed record StateModifierMeta(..., bool AllowsOutgoing, ...) : Modifier
 ```csharp
 public abstract record ConstraintMeta(ConstraintKind Kind, string Description)
 {
-    public sealed record Invariant()        : ConstraintMeta(...);
+    public sealed record Invariant()     : ConstraintMeta(...);
     public abstract record StateAnchored(ConstraintKind Kind, string Description) : ConstraintMeta(Kind, Description);
-    public sealed record StateResident()    : StateAnchored(...);
-    // ...
+    public sealed record StateResident() : StateAnchored(...);  // in <State> ensure
+    public sealed record StateEntry()    : StateAnchored(...);  // to <State> ensure
+    public sealed record StateExit()     : StateAnchored(...);  // from <State> ensure (three subtypes under StateAnchored)
+    public sealed record EventPrecondition() : ConstraintMeta(...);
 }
 
 // Consumer: type IS the signal — no field check needed
@@ -626,7 +632,7 @@ var plan = meta switch
 };
 ```
 
-> **Open Question (unresolved):** The `ConstraintMeta` hierarchy shows `StateAnchored` with "three state kinds" comment, but only `StateResident` is shown. The builder uses five subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`). Are `StateEntry` and `StateExit` subtypes of `StateAnchored`? The full hierarchy needs to be documented.
+The full five-subtype hierarchy: `Invariant`, `StateResident`, `StateEntry`, `StateExit`, and `EventPrecondition`. `StateResident`, `StateEntry`, and `StateExit` are all subtypes of the `StateAnchored` abstract intermediate. Canonical shape locked in `precept-builder.md` §Pass 4 (CC#7).
 
 This is **not** an enum in disguise. The DU provides:
 1. **Compile-time exhaustiveness** — a new enum member without a matching subtype is a build error at every pattern-match site
@@ -812,7 +818,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Part | Type |
 |------|------|
 | Kind enum | `TokenKind` |
-| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TextMateScope?, SemanticTokenType?, ValidAfter[]?)` |
+| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TextMateScope?, SemanticTokenType?, ValidAfter[]?, HoverDescription?)` |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
@@ -862,12 +868,13 @@ public record TypeMeta(
     IReadOnlyList<TypeAccessor>? Accessors        = null,
     string?                      HoverDescription = null,
     string?                      UsageExample     = null,
-    TypeRuntime?                 Runtime          = null   // optional zero-boxing typed-lane registration
+    TypeRuntime?                 Runtime          = null,   // optional zero-boxing typed-lane registration
+    bool                         IsUserFacing     = true    // CC#16: false for Error and StateRef; used by LS completions and MCP vocabulary filtering
 );
 ```
 
-> **Open Question (unresolved):** Should `TypeMeta.IsUserFacing` and `TypeMeta.SnippetTemplate?` be added? language-server.md uses these for completion filtering.
-> *Source: catalog-gap-register.md #30*
+> **✅ Resolved (CC#16):** `IsUserFacing` is a first-class catalog field — domain knowledge about whether a type appears in user-facing completion lists. Default `true`. `Error` and `StateRef` are `false`. Derived filtering from `Token == null` is insufficient because `StateRef` has no token but is meaningfully distinct from `Error`.
+> *Resolved: 2026-05-06 — CC#16*
 
 The `Token` fieldholds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
 
@@ -1289,8 +1296,22 @@ public sealed record FieldModifierMeta(
     string?          HoverDescription  = null,
     string?          UsageExample      = null,
     string?          SnippetTemplate   = null,
-    ModifierKind[]?  MutuallyExclusiveWith = null
+    ModifierKind[]?  MutuallyExclusiveWith = null,
+    ProofDischarge[] ProofDischarges   = []   // CC#5: proof Strategy 2 discharge table for this modifier
 ) : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
+
+/// <summary>
+/// Describes how a field modifier discharges a numeric proof obligation.
+/// The proof engine reads ProofDischarges from FieldModifierMeta; no per-modifier switch in the engine.
+/// </summary>
+/// <param name="RequirementKind">The kind of proof requirement this entry satisfies.</param>
+/// <param name="Comparison">The comparison operator (non-null for Numeric requirements).</param>
+/// <param name="Threshold">The numeric threshold (non-null for Numeric requirements).</param>
+public sealed record ProofDischarge(
+    ProofRequirementKind RequirementKind,
+    OperatorKind?        Comparison,
+    decimal?             Threshold
+);
 
 // ── State modifiers (7) ─────────────────────────────────
 public sealed record StateModifierMeta(
@@ -1491,7 +1512,9 @@ public sealed record ConstructMeta(
     ConstructKind[]              AllowedIn,           // empty = valid at precept body level (top-level)
     IReadOnlyList<ConstructSlot> Slots,
     TokenKind                    LeadingToken,
-    string?                      SnippetTemplate = null
+    string?                      SnippetTemplate = null,
+    bool                         IsOutlineNode   = false,  // CC#18: true if this construct appears in textDocument/documentSymbol
+    string?                      LspSymbolKind   = null    // CC#18: LSP SymbolKind value name (e.g. "Class", "Property"); non-null when IsOutlineNode = true
 );
 
 public sealed record ConstructSlot(
@@ -1616,7 +1639,8 @@ Runtime failure modes — every fault the evaluator can produce. Currently 13 me
 | Catalog class | `Faults` — `GetMeta()`, `All`, `Create()` |
 | Output type | `Fault(Code, CodeName, Message)` — `CodeName` is the `nameof`-derived stable identity string used for logging and MCP reporting |
 
-> **Open Question (unresolved):** `FaultCode.AmbiguousDispatch` is used in evaluator.md but not in the 13-member list. Should it be added with `[StaticallyPreventable(DiagnosticCode.AmbiguousTransition)]`? See §Candidate Additions below for proposed shape.
+> **✅ Resolved (CC#13):** `FaultCode.AmbiguousDispatch` is confirmed. Added to both `FaultCode` enum and `DiagnosticCode` enum with the full `[StaticallyPreventable]` chain. See `docs/compiler/diagnostic-system.md`. The `DiagnosticCode` reference is `AmbiguousDispatch` (not `AmbiguousTransition`). Updated FaultCode member count is 11.
+> *Resolved: 2026-05-06 — CC#13*
 
 **Consumers:** MCP fire/inspect, runtime outcome reporting.
 
@@ -1944,7 +1968,7 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 | **Parser** | Hand-coded vocabulary tables + recursive descent grammar | Vocabulary tables — operator precedence, type keyword mappings, modifier/action recognition sets (~40–50% of language knowledge decisions) — migrate to catalog-derived frozen dictionaries at startup. Grammar productions stay hand-written. Construct slots enable test generation and LS completions. When a new type, modifier, operator, or action is added to a catalog, the parser adapts automatically — no parser edit needed. |
 | **TypeChecker** | Catalog-driven validation | Full design documented in `docs/compiler/type-checker.md`. Modifier applicability/exclusivity → `FieldModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `FieldModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. |
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Event modifier graph requirements → `EventModifierMeta.RequiredAnalysis`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
-| **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `FieldModifierMeta.ProofDischarges` (pending — see Open Questions) enables catalog-driven modifier-proof strategy. |
+| **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `FieldModifierMeta.ProofDischarges` enables catalog-driven modifier-proof strategy (CC#5 resolved). |
 | **PreceptBuilder** | Catalog-driven routing | Full design documented in `docs/runtime/precept-builder.md`. `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. `ActionMeta.SyntaxShape` drives action plan opcode emission. |
 | **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `FieldModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Binary/unary operation dispatch: executor delegates are embedded in `BinaryOp`/`UnaryOp` opcodes at build time (fetched from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`); evaluator calls `opcode.Executor(l, r)` — no per-`OperationKind` switch, no catalog lookup at evaluation time. Function and action execution dispatch delegate design is pending. |
 
@@ -2089,7 +2113,7 @@ The language server produces editor artifacts from catalog metadata and compiler
 | Completion candidates — modifier position | `Modifiers.All` filtered by `ApplicableTo(constructKind)` |
 | Completion candidates — action verb position | `Actions.All` |
 | Completion candidates — function position | `Functions.All` |
-| Hover text for keywords | `TokenMeta.HoverDescription` (pending — see Open Questions) |
+| Hover text for keywords | `TokenMeta.HoverDescription` |
 | Hover text for types | `TypeMeta.HoverDescription` |
 | Hover text for functions | `FunctionMeta.HoverDescription` |
 | TextMate grammar patterns | `TokenMeta.TextMateScope`, `TokenMeta.Pattern` |
@@ -2106,28 +2130,14 @@ The following catalog additions have been identified by pipeline stage design do
 
 **Source:** `docs/compiler/proof-engine.md` §7 Strategy 2: Modifier Proof
 
-**Purpose:** Enable the proof engine's modifier-proof strategy to discharge proof obligations based on field modifiers without hardcoding modifier-to-obligation mappings.
+**Status:** ✅ Resolved (CC#5, 2026-05-06)
 
-**Proposed shape:**
-
-```csharp
-public sealed record ProofDischarge(
-    ProofRequirementKind RequirementKind,
-    OperatorKind? Comparison,    // for Numeric requirements
-    decimal? Threshold           // for Numeric requirements
-);
-
-// Add to FieldModifierMeta:
-ProofDischarge[] ProofDischarges = default!
-```
-
-**Consumer:** ProofEngine reads `fieldMeta.ProofDischarges` during modifier-proof strategy to determine which obligations a modifier discharges (e.g., `positive` discharges `> 0` and `!= 0` requirements).
+`ProofDischarge[] ProofDischarges = []` added to `FieldModifierMeta` and `ProofDischarge` record defined in this file. The discharge table is locked — see the `FieldModifierMeta` shape definition above and the CC#5 ruling in `docs/working/cross-cutting-decisions.md §CC#5`.
 
 **Implementation checklist:**
-- [ ] Add `ProofDischarge` record to `src/Precept/Language/Modifier.cs`
-- [ ] Add `ProofDischarges` property to `FieldModifierMeta`
-- [ ] Update `Modifiers.GetMeta()` entries for `positive`, `nonnegative`, `nonzero`, `notempty`
-- [ ] Consider `min`/`max` value-dependent discharge logic
+- [x] Add `ProofDischarge` record to `src/Precept/Language/Modifier.cs`
+- [x] Add `ProofDischarges` property to `FieldModifierMeta` (canonical shape above)
+- [ ] Update `Modifiers.GetMeta()` entries with discharge tables per modifier
 - [ ] Update MCP vocabulary if exposed to AI tooling
 
 ---
@@ -2196,33 +2206,20 @@ IReadOnlyDictionary<StateDescriptor?, AccessMode> AccessModes
 
 ---
 
-### FaultCode.AmbiguousDispatch (Candidate)
+### FaultCode.AmbiguousDispatch
 
-**Source:** `docs/runtime/evaluator.md` §13 Open Questions
+**Source:** `docs/runtime/evaluator.md` §7 Fire dispatch
 
-**Purpose:** Classify the impossible-path failure when multiple transition rows pass guard and constraint evaluation.
+**Status:** ✅ Resolved (CC#13, 2026-05-06)
 
-**Proposed shape:**
-
-```csharp
-// Add to FaultCode enum:
-[StaticallyPreventable(DiagnosticCode.AmbiguousTransition)]
-AmbiguousDispatch = 14
-
-// Add to Faults.GetMeta():
-FaultCode.AmbiguousDispatch => new(
-    nameof(FaultCode.AmbiguousDispatch),
-    "Multiple transition rows matched for event '{0}' in state '{1}'",
-    RecoveryHint: "Indicates a bug in proof engine exclusivity analysis.")
-```
-
-**Consumer:** Evaluator calls `Fail(FaultCode.AmbiguousDispatch, ...)` when multiple candidates pass.
+`FaultCode.AmbiguousDispatch` added with `[StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]`. `DiagnosticCode.AmbiguousDispatch` added (Proof stage, Error severity). Full shape in `docs/compiler/diagnostic-system.md`. The linked `DiagnosticCode` is `AmbiguousDispatch`, not `AmbiguousTransition`.
 
 **Implementation checklist:**
-- [ ] Add `DiagnosticCode.AmbiguousTransition` if not present
-- [ ] Add `FaultCode.AmbiguousDispatch` with `[StaticallyPreventable]` attribute
-- [ ] Add `FaultMeta` entry in `Faults.GetMeta()`
-- [ ] Update evaluator to produce this fault
+- [x] `DiagnosticCode.AmbiguousDispatch` added to `DiagnosticCode` enum
+- [x] `Diagnostics.GetMeta()` switch arm added
+- [x] `FaultCode.AmbiguousDispatch` added with `[StaticallyPreventable]`
+- [x] `Faults.GetMeta()` switch arm added
+- [ ] Evaluator call site `Fail(FaultCode.AmbiguousDispatch)` confirmed in implementation
 
 ---
 
@@ -2230,16 +2227,15 @@ FaultCode.AmbiguousDispatch => new(
 
 **Source:** `docs/tooling/language-server.md` §7.3 Completions, §7.4 Hover
 
-**Purpose:** Enable the language server's completion and hover features to show rich documentation without hardcoding text in LS code.
+**Status:** ✅ Partially resolved — CC#19 closed `TokenMeta.HoverDescription` (2026-05-06)
 
-**Current state:** `TypeMeta`, `FunctionMeta`, and `TypeAccessor` already have `HoverDescription` and `UsageExample`/`SnippetTemplate`. The gap is `TokenMeta` and `ModifierMeta` for non-type/non-function keywords.
-
-**Open question:** Standardize `HoverDescription?: string` and `SnippetTemplate?: string` across all meta types that feed LS completions and hover. Consider whether `TokenMeta.HoverDescription` duplicates hover from `Types`/`Modifiers`/`Actions` catalogs that already carry the keyword's documentation.
+`string? HoverDescription` added to `TokenMeta` as a first-class catalog field (see `TokenMeta` shape definition above). `FieldModifierMeta.HoverDescription` already existed. `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, `OperatorMeta.HoverDescription` already existed. The field is consistent across all meta types that feed LS completions and hover.
 
 **Implementation checklist:**
-- [ ] Add `HoverDescription` to `TokenMeta`, `ModifierMeta` (abstract)
-- [ ] Add `SnippetTemplate` to `ModifierMeta`, `ActionMeta` if not present
-- [ ] Update catalog entries with documentation strings (incremental)
+- [x] `TokenMeta.HoverDescription` added (CC#19)
+- [x] `FieldModifierMeta.HoverDescription` exists
+- [x] `TypeMeta.HoverDescription` exists
+- [ ] Update catalog entries with documentation strings (incremental — implementation task)
 - [ ] Update MCP vocabulary if exposed to AI tooling
 
 ---

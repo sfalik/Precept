@@ -117,10 +117,9 @@ public sealed record GraphState(
 );
 ```
 
-> **Open Question:** `GraphState.Modifiers` representation
-> `GraphState` currently materializes four modifier-derived booleans, but the doc never settles whether the graph should instead carry the original modifier set and derive flags from catalog metadata. `IsReachable` is topological output, so the unresolved part is specifically how modifier facts are represented.
-> *Flagged: 2026-05-04*
-> *Source: catalog-gap-register.md #9*
+> **✅ Resolved (CC#10) — GraphState modifier representation**
+> Flat boolean flags are correct. `GraphState` is a structural analysis *output* — a record of derived conclusions, not a source model. The booleans are the analyzer's answers to structural questions derived catalog-driven from `StateModifierMeta` fields at construction time (see §5.2). `IsReachable` is topological, not modifier-derived — confirming this is a "derived facts record". `SemanticIndex.TypedState.Modifiers` already carries the raw modifier list for consumers that need it; duplicating it on `GraphState` would be redundant. Shape is final.
+> *Resolved: 2026-05-06 — CC#10*
 
 ```csharp
 
@@ -299,11 +298,7 @@ This pattern ensures new modifier constraints can be added to the catalog withou
 
 **Processing:**
 
-1. **Wildcard expansion:** For rows where `FromState` is null (any-state wildcard), generate one edge per declared state that does not have an explicit transition for that event.
-
-> **Open Question:** Wildcard expansion ordering
-> Wildcard transition expansion does not yet say whether it iterates all declared states or only states already proven reachable. The phase contract needs one rule because expansion scope changes graph shape, event coverage, and the runtime rows the builder will later compile.
-> *Flagged: 2026-05-04*
+1. **Wildcard expansion:** For rows where `FromState` is null (any-state wildcard), generate one edge per declared state that does not have an explicit transition for that event. States are processed in declaration order for deterministic edge ordering — see §12 Implementation Note 1.
 
 2. **Self-transition resolution:** For rows where `TargetState` is null, set `ToState = FromState`.
 
@@ -397,19 +392,23 @@ For each state where PreventsBackEdge = true:
 
 ### 6.5 Event Coverage Analysis (Phase 3)
 
-Determine which events are handled in which states, identifying gaps.
+Compute event coverage per state. The `EventCoverageEntry` feeds proof forwarding for dead guard sharpening — it is always computed regardless of diagnostic emission.
 
 ```text
 For each event e:
-  handlingStates = { s : ∃ edge from s on event e }
+  handlingStates = { s : ∃ transition row from s on event e }
   nonHandlingReachable = ReachableStates - handlingStates
   Emit EventCoverageEntry(e, handlingStates, nonHandlingReachable)
-  
-  if nonHandlingReachable is not empty:
-    Emit Diagnostic(UnhandledEvent, state, event) for each gap
+
+  if handlingStates is empty:
+    Emit Diagnostic(UnhandledEvent, event)
 ```
 
-> **Open Question (unresolved):** Should there be a mechanism to suppress `UnhandledEvent` diagnostics for certain events (e.g., an "optional" modifier on events)? Currently no such mechanism exists in the language spec.
+**Diagnostic rules:**
+- **Partial coverage** (some states handle, some don't) — valid, intentional authoring. No diagnostic emitted. (CC#21 ruling: violates §0.6 principle 2 to flag this.)
+- **Zero coverage** (no state handles the event anywhere) — provably dead declaration. Emit `UnhandledEvent` (Warning).
+
+> **Closed (CC#21):** The `optional` event modifier question is moot — with the old `UnhandledEvent` (partial-coverage) removed, there is nothing to suppress.
 
 ### 6.6 Proof Forwarding (Phase 4)
 
@@ -466,11 +465,22 @@ If the type checker produces no states or no initial state, the graph analyzer c
 - **Detection:** Check `index.States.IsEmpty` or absence of initial modifier.
 - **Recovery:** Return a minimal `StateGraph` with a diagnostic. Do not throw.
 
-**Missing initial state:**
+**Stateless precept (no states declared) — CC#26:**
 
-A precept without an initial state has no entry point for graph traversal.
+A stateless precept declares no `state` blocks. This is a valid, complete configuration — not an error. The graph analyzer is **exempt from state-machine checks** for stateless precepts:
 
-- **Detection:** `!index.States.Any(s => s.Modifiers.Contains(ModifierKind.Initial))`
+- **Initial-state reachability check:** Exempt. There is no initial state — `BFS from initial state` does not apply.
+- **Unreachable-state check:** Exempt. There are no states to classify as reachable or unreachable.
+- **Dead-end-state check:** Exempt. Dead-end analysis requires a state machine topology.
+- **Terminal-state completeness check:** Exempt. No terminal states exist to validate.
+
+**Detection:** `index.States.IsEmpty` — when the `SemanticIndex` has no states, the precept is stateless. The graph analyzer returns an empty-topology `StateGraph` with no diagnostics from topology checks. Event coverage analysis still runs if events are declared.
+
+**Missing initial state (stateful precept, malformed):**
+
+A stateful precept without an initial state has no entry point for graph traversal. This differs from a stateless precept — the author declared states but omitted the `initial` modifier.
+
+- **Detection:** `index.States.Any()` is true, but `!index.States.Any(s => s.Modifiers.Contains(ModifierKind.Initial))`
 - **Recovery:** Emit `Diagnostic(NoInitialState)`, return empty reachability sets.
 
 ### 8.2 Structural Violations
@@ -665,7 +675,7 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 | Code | Name | Description |
 |------|------|-------------|
 | 80 | `UnreachableState` | A state cannot be reached from the initial state |
-| 81 | `UnhandledEvent` | An event has no transition in one or more reachable states |
+| 81 | `UnhandledEvent` | An event declared in the precept has zero transition rows in any state — it can never be fired successfully |
 | TBD | `TerminalStateHasOutgoingEdges` | A terminal state has outgoing transitions |
 | TBD | `IrreversibleStateHasBackEdge` | An irreversible state has a transition returning to an ancestor |
 | TBD | `RequiredStateDoesNotDominateTerminal` | A required state does not dominate any terminal state |

@@ -95,9 +95,7 @@ Each runtime tool (`precept_inspect`, `precept_fire`, `precept_update`):
 5. Calls the appropriate operation (`InspectFire`/`Fire`/`Update`)
 6. Serializes the outcome to JSON
 
-> **Open Question:** Initial event with null data
-> The MCP flow still does not define what `Restore` receives when an initial event is fired with `data = null`. Tooling and runtime parity need one deterministic bootstrap contract so null startup data is not interpreted differently across surfaces.
-> *Flagged: 2026-05-04*
+**Bootstrap contract for null data:** When `data = null`, `Restore` builds a `Version` with all fields at their default values and `State = null` (stateless precept) or the initial state (stateful precept). For stateless precepts this is the complete entity — no initial-event required. For stateful precepts with required fields, the initial-event path fires separately via `Fire`; `Restore(state, null)` is valid only when all required fields have defaults.
 
 ---
 
@@ -377,9 +375,7 @@ JSON response to agent
 }
 ```
 
-> **Open Question (unresolved):** The `firePipeline` array is a hardcoded list that does not match evaluator.md's actual execution model. Should a `FirePipeline` catalog be created, or should this output be removed until it can be derived from evaluator metadata?
-
-**Catalog derivation:** The MCP tool reads `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, etc. No parallel vocabulary is maintained — the tool iterates catalog metadata directly (except for `firePipeline`, noted above).
+**Catalog derivation:** The MCP tool reads `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, etc. No parallel vocabulary is maintained — the tool iterates catalog metadata directly. The `firePipeline` array is a static implementation note and is out of scope for catalog modeling (catalog-gap #25).
 
 ---
 
@@ -442,9 +438,7 @@ JSON response to agent
       }
     ],
 
-> **Open Question:** `SemanticIndex.EnsuresByState` index
-> MCP currently has to re-correlate flat `TypedEnsure` arrays just to nest constraints under their anchor state. The compile-time surface needs to decide whether that grouping becomes first-class on `SemanticIndex` or remains a reconstruction step in tooling.
-> *Flagged: 2026-05-04*
+`SemanticIndex.EnsuresByState` is a first-class grouping on `SemanticIndex`: `FrozenDictionary<string, ImmutableArray<TypedEnsure>>` — resolved by CC#22. MCP nests constraints under their anchor state by reading this pre-grouped index directly, eliminating the re-correlation step.
 
     "events": [
       {
@@ -644,14 +638,12 @@ public object HandleInspect(InspectArgs args)
     "ApprovedAt": "2024-01-15T10:30:00Z"
   },
   "mutations": [
-    { "field": "ApprovedAt", "action": "set", "value": "2024-01-15T10:30:00Z" }
+    { "field": "ApprovedAt", "before": null, "after": "2024-01-15T10:30:00Z" }
   ]
 }
 ```
 
-> **Open Question:** `EventOutcome.mutations` payload
-> MCP can only populate its `mutations` array by diffing old and new slot values after a fire operation. The evaluator and tooling surface need to decide whether mutation deltas belong in `EventOutcome` itself or remain a post-processing responsibility in the MCP layer.
-> *Flagged: 2026-05-04*
+`mutations` is `ImmutableArray<FieldMutation>` attached directly to `Transitioned` and `Applied` outcome variants by the evaluator (CC#23). Each `FieldMutation` carries `FieldName`, `Before` (JsonElement?), and `After` (JsonElement?) — a field-level diff computed against the pre-mutation slot values at zero extra cost during action execution.
 
 ```json
 {
@@ -696,19 +688,18 @@ public object HandleInspect(InspectArgs args)
   "outcome": "Unmatched",
   "event": "Approve",
   "currentState": "Pending",
-  "evaluatedGuards": [
+  "evaluatedRows": [
     {
+      "fromStates": ["Pending"],
       "guard": "Amount <= 100000",
-      "result": false,
+      "guardResult": "Impossible",
       "fieldValues": { "Amount": 150000 }
     }
   ]
 }
 ```
 
-> **Open Question:** `Unmatched` guard trace enrichment
-> MCP can only produce `evaluatedGuards` by re-inspecting transition rows after `version.Fire` reports `Unmatched`. The runtime contract needs to decide whether guard traces are first-class on `Unmatched` or whether tooling is expected to reconstruct them out of band.
-> *Flagged: 2026-05-04*
+`evaluatedRows` is `ImmutableArray<TransitionInspection>` carried directly on `EventOutcome.Unmatched` (CC#24). The evaluator retains per-candidate guard evaluation results on the commit path — the same `TransitionInspection` type used by `precept_inspect`. MCP serializes `EvaluatedRows` using the same DTO as inspect transition rows.
 
 ```json
 {

@@ -75,7 +75,8 @@ public readonly record struct Diagnostic(
     DiagnosticStage Stage,
     string          Code,       // "UndeclaredField" — derived from enum member name
     string          Message,    // pre-formatted, final English string
-    SourceSpan      Span
+    SourceSpan      Span,
+    ImmutableArray<SourceSpan> RelatedLocations = default  // CC#20: additional spans for multi-span diagnostics; empty by default
 );
 ```
 
@@ -179,6 +180,7 @@ public enum DiagnosticCode
     UnsatisfiableGuard,
     DivisionByZero,
     SqrtOfNegative,
+    AmbiguousDispatch,   // CC#13: guard expressions provably ambiguous for same (state, event) pair
 }
 ```
 
@@ -245,10 +247,11 @@ public static class Diagnostics
         DiagnosticCode.UnguardedCollectionMutation     => new(nameof(DiagnosticCode.UnguardedCollectionMutation),     DiagnosticStage.Type,  Severity.Error,   "'{0}' may be empty — guard with `if {0}.count > 0` before `{1}`"),
 
         DiagnosticCode.UnreachableState               => new(nameof(DiagnosticCode.UnreachableState),               DiagnosticStage.Graph, Severity.Warning, "State '{0}' is unreachable from initial state '{1}'"),
-        DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "No transition handles event '{0}' in state '{1}'"),
+        DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "Event '{0}' has no transition rows in any state — it can never be fired successfully"),
         DiagnosticCode.UnsatisfiableGuard             => new(nameof(DiagnosticCode.UnsatisfiableGuard),             DiagnosticStage.Proof, Severity.Warning, "Guard '{0}' on event '{1}' is provably unsatisfiable when {2}"),
         DiagnosticCode.DivisionByZero                 => new(nameof(DiagnosticCode.DivisionByZero),                 DiagnosticStage.Proof, Severity.Error,   "Division by zero: '{0}' can be zero when {1}"),
         DiagnosticCode.SqrtOfNegative                 => new(nameof(DiagnosticCode.SqrtOfNegative),                 DiagnosticStage.Proof, Severity.Error,   "sqrt() operand '{0}' can be negative when {1}"),
+        DiagnosticCode.AmbiguousDispatch              => new(nameof(DiagnosticCode.AmbiguousDispatch),              DiagnosticStage.Proof, Severity.Error,   "Guard expressions are provably ambiguous — multiple rows can simultaneously match in state '{0}' on event '{1}'"),
     };
 
     public static Diagnostic Create(
@@ -349,6 +352,9 @@ public enum FaultCode
 
     [StaticallyPreventable(DiagnosticCode.UnguardedCollectionMutation)]
     EmptyCollectionMutation,
+
+    [StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]
+    AmbiguousDispatch,   // CC#13: evaluator backstop when proof could not eliminate ambiguous rows
 }
 ```
 
@@ -374,6 +380,7 @@ public static class Faults
         FaultCode.FunctionArgConstraintViolation => new(nameof(FaultCode.FunctionArgConstraintViolation), "Function argument violates constraint"),
         FaultCode.EmptyCollectionAccess          => new(nameof(FaultCode.EmptyCollectionAccess),          "Accessor called on empty collection"),
         FaultCode.EmptyCollectionMutation        => new(nameof(FaultCode.EmptyCollectionMutation),        "Dequeue/pop called on empty collection"),
+        FaultCode.AmbiguousDispatch              => new(nameof(FaultCode.AmbiguousDispatch),              "Multiple transition rows match simultaneously — guard expressions are ambiguous"),
     };
 }
 ```
@@ -537,9 +544,9 @@ The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarant
 ## Open Questions / Implementation Notes
 
 - **D5 coupling (proof attribution schema):** If proof results require richer structured output (expression trees, interval ranges, witness values), the proof stage may need a way to link diagnostics to proof-model entries. Deferred until proof engine design.
-> **⚠ Open Question — Diagnostic Related Locations**
-> Roslyn's `AdditionalLocations` lets a diagnostic point at multiple source ranges. Precept may need this for "field declared at line X, constraint at line Y" patterns — multi-span diagnostics are deferred until concrete use cases surface. If adopted, `Diagnostic` needs an `AdditionalLocations: ImmutableArray<SourceSpan>` field and the LSP mapper must emit `relatedInformation` entries.
-> *Source: catalog-gap-register.md*
+> **✅ Resolved (CC#20) — Diagnostic Related Locations**
+> `ImmutableArray<SourceSpan> RelatedLocations = default` has been added to `Diagnostic`. Default empty — all existing diagnostics and their construction sites are unaffected. The LS mapper emits LSP `relatedInformation` entries when `RelatedLocations.Length > 0`, using the parent diagnostic's `Message` as each span's message. No per-span message field needed at Precept's scale.
+> *Resolved: 2026-05-06 — CC#20*
 - **Drift test: diagnostic emission coverage.** For every `DiagnosticCode` referenced by a `[StaticallyPreventable]`, verify that at least one call to `Diagnostics.Create()` with that code exists somewhere in the pipeline. This confirms the compile-time diagnostic isn't just registered — it's actually emitted.
 
 ---

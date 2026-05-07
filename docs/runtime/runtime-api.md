@@ -740,7 +740,32 @@ The Version surface is specified. What the executable model provides (dispatch t
 
 ### Stateless Precepts — CreateInitialVersion
 
-How does `CreateInitialVersion` work for stateless precepts? No initial state, no state entry actions, no omit-on-entry clearing. Fields get defaults, computed fields are evaluated, rules are checked. The `Version.State` is `null`.
+**Locked by CC#26 (2026-05-06) — Option 1: Null-state initial version.**
+
+For stateless precepts (no `state` declarations), `CreateInitialVersion` returns a `Version` with `State = null`. This is the contract — not an error, not a degenerate edge case, the honest representation of "no state machine."
+
+**Pipeline steps:**
+
+| Step | Stateful precept | Stateless precept |
+|------|-----------------|-------------------|
+| Build hollow version | Defaults applied, `State = InitialState` | Defaults applied, `State = null` |
+| Fire initial event (if declared) | Full Fire pipeline | Full Fire pipeline — identical |
+| State-set assignment | `Version.State` ← initial state name | Omitted — no state to assign |
+| `to <State> ensure` entry guards | Evaluated against initial state | Skipped — no state to enter |
+| `in <State> ensure` residency checks | Evaluated against initial state | Skipped — no state to enter |
+| Omit-on-entry clearing | Applied for initial state | Skipped — no state to enter |
+| Arg ensures (`on <Event> ensure`) | Evaluated if initial event declared | Evaluated if initial event declared |
+| Field constraints and global rules | Always evaluated | Always evaluated |
+| Computed field recomputation | Always performed | Always performed |
+| Working copy promotion/discard | Standard protocol | Standard protocol |
+
+**Contract:**
+- `Version.State` is `null` for stateless precepts in all outcomes that include a version (`Applied`, `Transitioned`).
+- `CreateInitialVersion` returns `EventOutcome.Applied(version)` where `version.State == null` when construction succeeds.
+- `EventOutcome.Transitioned` is never produced during stateless construction — there are no transitions.
+- The `Rejected` and `ConstraintsFailed` outcomes remain possible; stateless construction does not suppress business-rule failures.
+
+**Compiler guarantee:** The compiler enforces `RequiredFieldsNeedInitialEvent` / `InitialEventMissingAssignments` for stateless precepts exactly as for stateful precepts — same rules, same diagnostics. Stateless is not a weaker contract.
 
 ---
 

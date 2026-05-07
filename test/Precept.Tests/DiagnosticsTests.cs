@@ -251,7 +251,7 @@ public class DiagnosticsTests
         DiagnosticCode.UnhandledEvent,
     };
 
-    public static TheoryData<DiagnosticCode> ProofCodes => new()
+    public static TheoryData<DiagnosticCode> ProofCodes=> new()
     {
         DiagnosticCode.UnsatisfiableGuard,
         DiagnosticCode.DivisionByZero,

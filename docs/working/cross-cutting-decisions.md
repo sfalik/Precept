@@ -11,43 +11,43 @@
 | CC#2 | SlotValue Subtype Shapes | [Decided] | Parser, Type Checker |
 | CC#3 | SemanticIndex Reference-Tracking Collections | ✅ Resolved — Option A: typed reference arrays (`FieldReferences`, `StateReferences`, `EventReferences`) added to `SemanticIndex`. No general heterogeneous `References` array. Canonical: `docs/compiler/type-checker.md §7.1`. | Language Server semantic tokens, tooling surface reference routing |
 | CC#4 | `Compilation.Tokens` Field | ✅ Resolved — already present in code stub as `TokenStream Tokens` (first field). `TokenStream` wraps `ImmutableArray<Token>` + lex-level diagnostics. No doc change needed; canonical: `src/Precept/Pipeline/Compilation.cs`. | Builder-facing compilation contract, lexical token tooling |
-| CC#5 | `FieldModifierMeta.ProofDischarges` | [Open Question — canonical doc: `docs/language/catalog-system.md §FieldModifierMeta.ProofDischarges`] | Proof Engine Strategy 2 |
+| CC#5 | `FieldModifierMeta.ProofDischarges` | ✅ Resolved — `ProofDischarge[]` added to `FieldModifierMeta`; each entry carries `ProofRequirementKind`, optional `OperatorKind? Comparison`, and `decimal? Threshold`, enabling catalog-driven Strategy 2 modifier proof discharge. Canonical: `docs/language/catalog-system.md §FieldModifierMeta`. | Proof Engine Strategy 2 |
 | CC#6 | FaultSiteLink to FaultSiteDescriptor Transformation | ✅ Resolved — Option A: nullable `FaultSiteAnnotation?` on each opcode. Builder stamps annotation at compile time from unresolved `FaultSiteLink`s. `null` = proven safe (structural absence = elision). Canonical: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`. | Proof-to-runtime backstop planting |
 | CC#7 | ConstraintMeta DU Subtype Count | ✅ Resolved — Option B (hierarchical, StateAnchored grouping node). Approved 2026-05-06. | Builder constraint routing, catalog-system alignment |
 | CC#8 | EventInspection Shape | ✅ Resolved — EventInspection shape adopted; OQ-2 (ArgError = string Reason only) and OQ-3 (RowEffect DU) closed. OQ-4 (EventEnsures timing) pending. Canonical: `result-types.md` + `evaluator.md`. Approved 2026-05-06. | Evaluator inspection contract, LS preview, MCP DTO shape |
 | CC#9 | `ConstraintFieldRefs.ConstraintIdentity` Type | ✅ Resolved — uses proof-engine ConstraintIdentity DU. Resolved 2026-05-06. | Type Checker and Proof Engine constraint identity alignment |
-| CC#10 | GraphState Modifier Representation | [Open Question — canonical doc: `docs/compiler/graph-analyzer.md §GraphState shape`] | Graph output shape, modifier-derived facts |
+| CC#10 | GraphState Modifier Representation | ✅ Resolved — Flat boolean flags (`IsInitial`, `IsTerminal`, `IsRequired`, `IsIrreversible`, `IsReachable`) retained. Graph analyzer derives them catalog-driven from `StateModifierMeta` fields at construction time. `GraphState` carries derived structural conclusions, not the raw modifier list (which remains on `TypedState.Modifiers` in `SemanticIndex`). Canonical: `docs/compiler/graph-analyzer.md §4`. | Graph output shape, modifier-derived facts |
 | CC#11 | `ExecutionRow.RejectReason` Field | ✅ Resolved — string? RejectReason added to TypedTransitionRow and ExecutionRow. Resolved 2026-05-06. | Reject-row lowering, evaluator rejection outcomes |
 | CC#12 | `Faulted(Fault)` as EventOutcome Variant | ✅ Resolved — `Faulted(Fault)` added as 8th variant. Canonical: `result-types.md`. | Evaluator outcome DU, MCP fire result serialization |
-| CC#13 | `FaultCode.AmbiguousDispatch` | [Open Question — canonical doc: `docs/runtime/evaluator.md §7 Fire dispatch`] | Evaluator impossible-path faulting, diagnostics linkage |
-| CC#14 | SlotContext vs SlotKind Enum Naming | [Open Question — canonical doc: `docs/tooling/language-server.md §7.3 Completions`] | LS/tooling completion context contract |
-| CC#15 | `precept/inspect` vs `precept/preview` Naming | [Open Question — canonical doc: `docs/tooling/language-server.md §7.6 Preview/Inspect`] | LS custom method name, tooling preview routing |
-| CC#16 | `TypeMeta.IsUserFacing` for Completions | [Open Question — canonical doc: `docs/language/catalog-system.md §TypeMeta`] | Completion filtering |
-| CC#17 | `TypedArg.EventName` Back-Reference | [Open Question — canonical doc: `docs/tooling/language-server.md §7.5 Go To Definition`] | Arg hover/navigation |
-| CC#18 | ConstructMeta Outline Properties | [Open Question — canonical doc: `docs/tooling/language-server.md §7.7 Document Outline`] | Document symbols / outline |
-| CC#19 | `TokenMeta.HoverDescription` Strategy | [Open Question — canonical doc: `docs/language/catalog-system.md §Catalog documentation strings`] | Hover/completion documentation |
-| CC#20 | Diagnostic Related Locations | [Open Question — canonical doc: `docs/compiler/diagnostic-system.md §Open Questions / Implementation Notes`] | Multi-span diagnostics, LSP relatedInformation |
-| CC#21 | Event `optional` Modifier | [Open Question — canonical doc: `docs/compiler/graph-analyzer.md §Event coverage open questions`] | Parser, Type Checker, Graph Analyzer, Evaluator, grammar, completions, hover, MCP |
-| CC#22 | `SemanticIndex.EnsuresByState` | [Blocked by: CC#3] | LS/MCP ensure navigation and indexing |
+| CC#13 | `FaultCode.AmbiguousDispatch` | ✅ Resolved — `FaultCode.AmbiguousDispatch` confirmed with `[StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]`. `DiagnosticCode.AmbiguousDispatch` added (Proof stage, Error severity). Evaluator fires it on the impossible-path multi-candidate backstop (`candidates.Count > 1`). Canonical: `docs/runtime/evaluator.md §7.1`, `docs/compiler/diagnostic-system.md`. | Evaluator impossible-path faulting, diagnostics linkage |
+| CC#14 | SlotContext vs SlotKind Enum Naming | ✅ Resolved — `SlotContext` is the canonical cursor-context enum name. The mapping switch uses `ConstructSlotKind` members (catalog type name), not a `SlotKind` alias. Two distinct concepts: `SlotContext` = where is the cursor; `ConstructSlotKind` = what schema slot is this. Canonical: `docs/tooling/language-server.md §7.3`. | LS/tooling completion context contract |
+| CC#15 | `precept/inspect` vs `precept/preview` Naming | ✅ Resolved — `precept/inspect` is canonical. Aligns with MCP tool name `precept_inspect` — "inspect" names the operation semantically, "preview" was a UX alias. Canonical: `docs/tooling/language-server.md §7.6`. | LS custom method name, tooling preview routing |
+| CC#16 | `TypeMeta.IsUserFacing` for Completions | ✅ Resolved — `bool IsUserFacing = true` added to `TypeMeta` as first-class catalog field. Default `true` (most types). `Error` and `StateRef` have `IsUserFacing = false`. Derived filtering is insufficient — the distinction is domain knowledge about each type. Canonical: `docs/language/catalog-system.md §TypeMeta`. | Completion filtering |
+| CC#17 | `TypedArg.EventName` Back-Reference | ✅ Resolved — `TypedArg.EventName` back-reference already exists in the canonical `type-checker.md §7.1` shape. LS hover accesses `a.EventName` directly. No additional field needed. Canonical: `docs/compiler/type-checker.md §7.1`. | Arg hover/navigation |
+| CC#18 | ConstructMeta Outline Properties | ✅ Resolved — `bool IsOutlineNode = false` and `string? LspSymbolKind = null` added to `ConstructMeta`. Matches `TokenMeta.SemanticTokenType` pattern. LS reads these instead of hardcoding `ConstructKind` switches. Canonical: `docs/language/catalog-system.md §ConstructMeta`, `docs/tooling/language-server.md §7.7`. | Document symbols / outline |
+| CC#19 | `TokenMeta.HoverDescription` Strategy | ✅ Resolved — Option A: `string? HoverDescription` added to `TokenMeta` as first-class catalog field. Matches existing pattern on `FieldModifierMeta`, `FunctionMeta`, `OperatorMeta`. Hover descriptions are domain knowledge about language elements — they belong in the catalog. Canonical: `docs/language/catalog-system.md §Tokens`. | Hover/completion documentation |
+| CC#20 | Diagnostic Related Locations | ✅ Resolved — `ImmutableArray<SourceSpan> RelatedLocations = default` added to `Diagnostic`. Default empty — existing diagnostics unaffected. LS mapper emits LSP `relatedInformation` entries when non-empty. Canonical: `docs/compiler/diagnostic-system.md`. | Multi-span diagnostics, LSP relatedInformation |
+| CC#21 | Event `optional` Modifier | ✅ Resolved — old `UnhandledEvent` removed (violates §0.6 principle 2); `UnhandledEvent` recycled with tighter definition: zero handlers in ANY state = provably dead. `optional` modifier moot. | Graph Analyzer, Diagnostics |
+| CC#22 | `SemanticIndex.EnsuresByState` | ✅ Resolved — `FrozenDictionary<string, ImmutableArray<TypedEnsure>> EnsuresByState` added to `SemanticIndex`. Follows CC#3 primary-array + secondary-index pattern. `SemanticIndex.Ensures` remains the primary ordered array; `EnsuresByState` is the derived O(1) lookup for LS/MCP ensure navigation. Canonical: `docs/compiler/type-checker.md §7.1`. | LS/MCP ensure navigation and indexing |
 | CC#23 | `EventOutcome.mutations` Payload | ✅ Resolved — Option A: `ImmutableArray<FieldMutation> Mutations` attached to `Transitioned` and `Applied`. Canonical: `result-types.md`. | Evaluator outcome contract, MCP fire payload |
 | CC#24 | Unmatched Guard Trace Enrichment | ✅ Resolved — Option A: `Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows)` — same type as inspect path. Canonical: `result-types.md`. | Evaluator unmatched contract, MCP diagnostics |
 | CC#25 | Execution Dispatch Delegate Design | [Decided] | Evaluator, runtime value model, builder plan lowering, catalog runtime metadata |
-| CC#26 | Stateless Precepts `CreateInitialVersion` Semantics | [Open Question — canonical doc: `docs/runtime/runtime-api.md §Stateless Precepts — CreateInitialVersion`] | Runtime API, Evaluator, Graph Analyzer |
+| CC#26 | Stateless Precepts `CreateInitialVersion` Semantics | ✅ Resolved 2026-05-06 — Option 1: null-state initial version. `Version.State = null`, state-entry semantics skipped, all other construction machinery runs normally. Graph analyzer exempt from initial-state/dead-end/unreachable-state checks for stateless precepts. Canonical: `docs/runtime/runtime-api.md §Stateless Precepts`. | Runtime API, Evaluator, Graph Analyzer |
 
 ## Dependency Map
 
 | Canonical doc / stage | Blocking CC decisions | Why this matters |
 |---|---|---|
-| `docs/compiler/parser.md` | CC#1, CC#2, CC#21 | Expression nodes, slot shapes, and any event-surface modifier semantics must be fixed before parser text can stabilize. |
+| `docs/compiler/parser.md` | CC#1, CC#2 | Expression nodes and slot shapes must be fixed before parser text can stabilize. |
 | `docs/compiler/type-checker.md` | CC#1, CC#2, CC#3, CC#7, CC#9, CC#22 | SemanticIndex shape and constraint identity are the type-checker contracts other stages read. |
 | `docs/compiler/proof-engine.md` | CC#1, CC#5, CC#6, CC#9 | Proof discharge and proof-to-runtime fault-site identity define what residue crosses downstream. |
-| `docs/compiler/graph-analyzer.md` | CC#10, CC#21, CC#26 | Graph facts depend on modifier representation, optional-event semantics, and stateless creation rules. |
+| `docs/compiler/graph-analyzer.md` | CC#10, CC#26 | Graph facts depend on modifier representation and stateless creation rules. |
 | `docs/runtime/precept-builder.md` | CC#4, CC#6, CC#7, CC#11, CC#25 | The compile-to-runtime boundary owns compilation aggregate shape, fault-site planting, constraint routing, reject-row lowering, and execution-plan dispatch. |
 | `docs/runtime/evaluator.md` | CC#8, CC#11, CC#12, CC#13, CC#23, CC#24, CC#25, CC#26 | Runtime result shapes, impossible-path faults, mutation reporting, trace richness, and stateless creation semantics converge here. |
 | `docs/runtime/runtime-api.md` | CC#25, CC#26 | Public API wording must match the locked runtime baseline and stateless initialization contract. |
 | `docs/tooling/language-server.md` | CC#3, CC#8, CC#14, CC#15, CC#17, CC#18, CC#19, CC#22 | LS contracts mirror the semantic index, preview method naming, outline metadata, and hover/documentation metadata. |
 | `docs/tooling/mcp.md` | CC#8, CC#12, CC#22, CC#23, CC#24 | MCP DTOs are thin wrappers; they cannot drift from evaluator and SemanticIndex contracts. |
-| `docs/language/catalog-system.md` | CC#5, CC#7, CC#16, CC#19, CC#21, CC#25 | Catalog metadata is the machine-readable language spec; these decisions decide which metadata must exist. |
+| `docs/language/catalog-system.md` | CC#5, CC#7, CC#16, CC#19, CC#25 | Catalog metadata is the machine-readable language spec; these decisions decide which metadata must exist. |
 | `docs/compiler/diagnostic-system.md` | CC#13, CC#20 | Impossible-path fault linkage and related locations must stay aligned between diagnostics and runtime fault codes. |
 
 ## Wave 0 — Foundational Decisions ✅ COMPLETE
@@ -66,16 +66,16 @@ Wave 0 is closed. Wave 1 now owns the remaining cross-stage shape decisions; Wav
 
 ### Execution Checklist
 
-- [ ] [Shane] Resolve CC#3 `SemanticIndex` reference-collection contract. [Blocks: `docs/compiler/type-checker.md §7.1`, `docs/tooling/language-server.md §7.3`, `docs/compiler/tooling-surface.md`]
-- [ ] [Shane] Resolve CC#4 `Compilation.Tokens` access path. [Blocks: `docs/runtime/precept-builder.md §2`, lexical semantic-token flow]
-- [ ] [Shane] Resolve CC#6 proof-to-runtime `FaultSiteLink` lowering. [Blocks: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, evaluator fault routing]
+- [x] [Shane] Resolve CC#3 `SemanticIndex` reference-collection contract. [Blocks: `docs/compiler/type-checker.md §7.1`, `docs/tooling/language-server.md §7.3`, `docs/compiler/tooling-surface.md`]
+- [x] [Shane] Resolve CC#4 `Compilation.Tokens` access path. [Blocks: `docs/runtime/precept-builder.md §2`, lexical semantic-token flow]
+- [x] [Shane] Resolve CC#6 proof-to-runtime `FaultSiteLink` lowering. [Blocks: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, evaluator fault routing]
 - [x] [Shane] Resolve CC#7 `ConstraintMeta` DU hierarchy. [Blocks: builder constraint buckets, catalog-system constraint metadata]
 - [x] [Shane] Resolve CC#8 canonical `EventInspection` shape. [Blocks: evaluator inspection contract, LS preview, MCP DTOs]
 - [x] [Team] Apply the CC#7 ruling to CC#9 `ConstraintFieldRefs.ConstraintIdentity`. [Blocked by: CC#7] [Blocks: type-checker/proof-engine shared identity data]
 - [x] [Team] Add canonical storage for reject-row `because` text (CC#11). [Blocked by: none] [Blocks: `docs/runtime/precept-builder.md §ExecutionRow`, `docs/runtime/evaluator.md` rejection outcomes]
-- [ ] [Team] Apply the CC#8 ruling to CC#12 `Faulted(Fault)` outcome handling. [Blocks: evaluator/MCP outcome parity]
-- [ ] [Shane] Resolve CC#23 `EventOutcome.mutations` ownership. [Blocks: evaluator result contract, `docs/tooling/mcp.md §precept_fire`]
-- [ ] [Shane] Resolve CC#24 unmatched-guard trace richness. [Blocks: evaluator unmatched contract, `docs/tooling/mcp.md §precept_fire`]
+- [x] [Team] Apply the CC#8 ruling to CC#12 `Faulted(Fault)` outcome handling. [Blocks: evaluator/MCP outcome parity]
+- [x] [Shane] Resolve CC#23 `EventOutcome.mutations` ownership. [Blocks: evaluator result contract, `docs/tooling/mcp.md §precept_fire`]
+- [x] [Shane] Resolve CC#24 unmatched-guard trace richness. [Blocks: evaluator unmatched contract, `docs/tooling/mcp.md §precept_fire`]
 
 ### Exit Criteria
 
@@ -85,19 +85,19 @@ Wave 1 is done when the cross-stage shape questions stop living only in this dri
 
 ### Execution Checklist
 
-- [ ] [Team] Close CC#5 `FieldModifierMeta.ProofDischarges` using the already-drafted catalog shape. [Blocks: `docs/language/catalog-system.md`, proof-engine Strategy 2]
-- [ ] [Team] Close CC#10 `GraphState` modifier representation. [Blocks: `docs/compiler/graph-analyzer.md` graph output shape]
-- [ ] [Team] Add CC#13 `FaultCode.AmbiguousDispatch` plus linked diagnostic metadata. [Blocks: evaluator impossible-path faulting, diagnostics linkage]
-- [ ] [Team] Unify CC#14 `SlotContext` vs `SlotKind` naming. [Blocks: LS/tooling completion context docs]
-- [ ] [Team] Lock CC#15 `precept/inspect` vs `precept/preview` naming and apply it everywhere. [Blocks: LS preview command, tooling surface docs]
-- [ ] [Team] Decide whether CC#16 `TypeMeta.IsUserFacing` becomes first-class catalog metadata. [Blocks: completion filtering docs]
-- [ ] [Team] Close CC#17 `TypedArg.EventName` back-reference routing. [Blocks: arg hover/navigation docs]
-- [ ] [Team] Close CC#18 outline metadata on `ConstructMeta`. [Blocks: document-symbol / outline docs]
-- [ ] [Team] Standardize CC#19 hover/snippet documentation metadata strategy. [Blocks: catalog-system hover/completion docs]
-- [ ] [Team] Decide CC#20 diagnostic related-location support. [Blocks: `docs/compiler/diagnostic-system.md`, LS `relatedInformation` mapping]
-- [ ] [Shane] Lock CC#21 end-to-end semantics for the event `optional` modifier. [Blocks: parser, type checker, graph analyzer, evaluator, grammar, completions, hover, MCP]
-- [ ] [Team] Apply the CC#3 ruling to CC#22 `SemanticIndex.EnsuresByState`. [Blocked by: CC#3] [Blocks: LS/MCP ensure navigation]
-- [ ] [Shane] Lock CC#26 stateless `CreateInitialVersion` semantics. [Blocks: `docs/runtime/runtime-api.md`, evaluator, graph analyzer]
+- [x] [Team] Close CC#5 `FieldModifierMeta.ProofDischarges` using the already-drafted catalog shape. [Blocks: `docs/language/catalog-system.md`, proof-engine Strategy 2]
+- [x] [Team] Close CC#10 `GraphState` modifier representation. [Blocks: `docs/compiler/graph-analyzer.md` graph output shape]
+- [x] [Team] Add CC#13 `FaultCode.AmbiguousDispatch` plus linked diagnostic metadata. [Blocks: evaluator impossible-path faulting, diagnostics linkage]
+- [x] [Team] Unify CC#14 `SlotContext` vs `SlotKind` naming. [Blocks: LS/tooling completion context docs]
+- [x] [Team] Lock CC#15 `precept/inspect` vs `precept/preview` naming and apply it everywhere. [Blocks: LS preview command, tooling surface docs]
+- [x] [Team] Decide whether CC#16 `TypeMeta.IsUserFacing` becomes first-class catalog metadata. [Blocks: completion filtering docs]
+- [x] [Team] Close CC#17 `TypedArg.EventName` back-reference routing. [Blocks: arg hover/navigation docs]
+- [x] [Team] Close CC#18 outline metadata on `ConstructMeta`. [Blocks: document-symbol / outline docs]
+- [x] [Team] Standardize CC#19 hover/snippet documentation metadata strategy. [Blocks: catalog-system hover/completion docs]
+- [x] [Team] Decide CC#20 diagnostic related-location support. [Blocks: `docs/compiler/diagnostic-system.md`, LS `relatedInformation` mapping]
+- [x] [Shane] Lock CC#21 end-to-end semantics for the event `optional` modifier. ✅ Resolved 2026-05-06: old `UnhandledEvent` removed, `UnhandledEvent` recycled (tighter: zero handlers in ANY state), `optional` moot. Name approved by Shane 2026-05-06.
+- [x] [Team] Apply the CC#3 ruling to CC#22 `SemanticIndex.EnsuresByState`. [Blocked by: CC#3] [Blocks: LS/MCP ensure navigation]
+- [x] [Shane] Lock CC#26 stateless `CreateInitialVersion` semantics. ✅ Resolved 2026-05-06: Option 1 — null-state initial version. `Version.State = null`, state-entry semantics skipped, all other construction machinery runs normally. Graph analyzer exempt from initial-state/dead-end/unreachable-state checks for stateless precepts.
 
 ### Exit Criteria
 
@@ -507,189 +507,282 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ### CC#5. FieldModifierMeta.ProofDischarges
 
-**Status:** 🔵 Pending team resolution (already designed — implement when ready)
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Proof Engine, Modifiers Catalog
 **Gap register refs:** #1
-**The decision:** Add `ProofDischarges` property to `FieldModifierMeta` to enable catalog-driven proof Strategy 2 (Modifier Proof).
 
-**Why it's cross-cutting:**
-- **Modifiers Catalog** — Needs new `ProofDischarge[]` property on `FieldModifierMeta`
-- **Proof Engine** — Strategy 2 reads this property to discharge obligations
+**Ruling:**
 
-This is already captured in catalog-system.md § Open Questions with a proposed shape, but implementation is pending.
+Add `ProofDischarge[] ProofDischarges` to `FieldModifierMeta`. The field is defaulted to `[]` for modifiers with no discharge implications.
 
-**Proposed shape (from proof-engine.md):**
 ```csharp
 public sealed record ProofDischarge(
     ProofRequirementKind RequirementKind,
-    OperatorKind? Comparison,
-    decimal? Threshold
+    OperatorKind? Comparison,   // non-null for Numeric requirements
+    decimal? Threshold          // non-null for Numeric requirements
 );
 ```
 
+Discharge table (locked):
+
 | Modifier | ProofDischarges |
 |----------|-----------------|
-| `positive` | `[Numeric(>, 0), Numeric(!=, 0)]` |
+| `positive` | `[Numeric(>, 0), Numeric(!=, 0)]` — strictly positive implies nonzero |
 | `nonnegative` | `[Numeric(>=, 0)]` |
 | `nonzero` | `[Numeric(!=, 0)]` |
-| `notempty` | `[Numeric(>, 0)]` for collection count |
+| `notempty` | `[Numeric(count, >, 0)]` — collection count is positive |
+| `min(N)` | `[Numeric(>=, N)]` |
+| `max(N)` | `[Numeric(<=, N)]` |
+| all others | `[]` |
 
-**Resolution path:** Already designed, awaiting implementation decision.
+The proof engine Strategy 2 walks the field's `Modifiers` array, calls `Modifiers.GetMeta(kind)`, casts to `FieldModifierMeta`, and checks `ProofDischarges` against the `NumericProofRequirement` being discharged. No per-modifier switch in the proof engine — the discharge mapping lives entirely in catalog metadata.
+
+**Rationale:** The draft shape was already captured in `proof-engine.md §Strategy 2`. This decision locks the catalog shape and discharge table so Strategy 2 is implementable. "Modifier discharges obligation" is domain knowledge — it belongs in the modifier's metadata, not in engine code.
+
+**Canonical:** `docs/language/catalog-system.md §FieldModifierMeta`, `docs/compiler/proof-engine.md §Strategy 2`.
 
 ---
 
 ### CC#10. GraphState Modifier Representation
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Graph Analyzer, Modifiers Catalog
 **Gap register refs:** #9, #54
-**The decision:** Should `GraphState` carry explicit boolean flags (`IsInitial`, `IsTerminal`, `IsRequired`, `IsIrreversible`) or `ImmutableArray<ModifierKind> Modifiers` with catalog-derived flags?
 
-**Why it's cross-cutting:**
-- **Graph Analyzer** — Uses `GraphState` with modifier-derived properties
-- **Modifiers Catalog** — Contains `StateModifierMeta` with structural constraint flags
+**Ruling:** Retain flat boolean flags (`IsInitial`, `IsTerminal`, `IsRequired`, `IsIrreversible`, `IsReachable`) on `GraphState`. Do **not** add a redundant `ImmutableArray<ModifierKind> Modifiers` field.
 
-**Options / known design space:**
-1. **Explicit booleans** — Current design, easy to consume
-2. **Modifier array + derivation** — Catalog-driven, easier to extend
+**Rationale:**
 
-**Resolution path:** Decide whether catalog-driven architecture applies to `GraphState` modifier representation.
+`GraphState` is a structural analysis *output* — a record of derived conclusions, not a source model. The booleans are the graph analyzer's answers to structural questions: "is this state initial?", "is it terminal?", etc. These are correct as derived boolean conclusions.
+
+- The graph analyzer's §5.2 already shows catalog-driven modifier derivation *inside* the analyzer — it reads `StateModifierMeta.IsInitial`, `IsTerminal`, etc. from the catalog to populate the booleans. This is exactly the right architecture.
+- `IsReachable` is purely topological (computed from graph traversal), not modifier-derived at all — confirming `GraphState` is a "derived facts record", not a modifier passthrough.
+- `SemanticIndex.TypedState.Modifiers` already carries the raw `ImmutableArray<ModifierKind>` for consumers that need the modifier list. Duplicating it on `GraphState` would be redundant and coupling.
+
+The open question in `graph-analyzer.md §4` is closed. The flat boolean shape is canonical.
+
+**Canonical:** `docs/compiler/graph-analyzer.md §4`.
 
 ---
 
 ### CC#13. FaultCode.AmbiguousDispatch
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Evaluator, Faults Catalog, Diagnostics Catalog
 **Gap register refs:** #4
-**The decision:** Add `FaultCode.AmbiguousDispatch` with corresponding `DiagnosticCode` and `[StaticallyPreventable]` attribute.
 
-**Current gap:** Evaluator.md references `Fail(FaultCode.AmbiguousDispatch)` but the fault code doesn't exist.
+**Ruling:**
+
+Confirm `FaultCode.AmbiguousDispatch` with the full `[StaticallyPreventable]` linkage chain:
+
+- **`DiagnosticCode.AmbiguousDispatch`** — Stage: `Proof`, Severity: `Error`, message template: `"Guard expressions are provably ambiguous — multiple rows can simultaneously match in state '{0}' on event '{1}'"`.
+- **`FaultCode.AmbiguousDispatch`** — `[StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]`. The evaluator fires this fault on the impossible-path backstop: `if (candidates.Count > 1) return Fail(FaultCode.AmbiguousDispatch)`.
+
+The evaluator's `§7.1 Fire` already references `FaultCode.AmbiguousDispatch` — this closes the gap by making the fault code and its diagnostic counterpart fully specified.
+
+The proof engine emits `DiagnosticCode.AmbiguousDispatch` when two guard expressions in the same `(state, event)` pair are simultaneously satisfiable.
+
+**Rationale:** The proof engine statically prevents this by analyzing guard satisfiability. The runtime backstop exists as the last-resort defense for proofs that could not run (e.g., dynamic types). Both sides of the chain must name the same fault concept — this ruling supplies the formal definitions.
+
+**Canonical:** `docs/compiler/diagnostic-system.md`, `docs/runtime/evaluator.md §7.1`.
 
 ---
 
 ### CC#14. SlotContext vs SlotKind Enum Naming
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Language Server, Tooling Surface
 **Gap register refs:** #38, #69
-**The decision:** Is `SlotContext` (language-server.md) the same as `SlotKind` (tooling-surface.md)? Which is canonical?
+
+**Ruling:** `SlotContext` is the canonical name for the cursor-context enum. `SlotKind` is not a real type and must not be used.
+
+The mapping function `GetCursorContext()` in `language-server.md §7.3` maps `ConstructSlotKind` (the catalog type name for a construct's slot schema) → `SlotContext` (what kind of completion context the cursor is in). The two names represent two different concepts:
+
+- `ConstructSlotKind` — where in a construct schema this slot appears (e.g., `TypeExpression`, `FieldName`). Lives in the catalog. Read-only during parsing.
+- `SlotContext` — what the cursor is currently positioned inside, for completion routing. Lives in the LS. Produced by `GetCursorContext()`.
+
+Any reference to `SlotKind.X` in `language-server.md §7.3` should read `ConstructSlotKind.X` in the switch arms.
+
+**Canonical:** `docs/tooling/language-server.md §7.3`.
 
 ---
 
 ### CC#15. precept/inspect vs precept/preview Naming
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Language Server, Tooling Surface
 **Gap register refs:** #32, #68
-**The decision:** What is the canonical name for the custom LSP preview method?
+
+**Ruling:** `precept/inspect` is the canonical custom LSP method name. `precept/preview` was a UX alias that must be removed.
+
+Rationale: `precept/inspect` aligns with the MCP tool `precept_inspect`. The semantics are "inspect the precept's current state and event outcomes" — this is inspection, not preview. The §4 overview table already uses `precept/inspect`; the §7.6 trigger line was inconsistently left as `precept/preview`. That inconsistency is closed by this ruling.
+
+**Canonical:** `docs/tooling/language-server.md §7.6`.
 
 ---
 
 ### CC#16. TypeMeta.IsUserFacing for Completions
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Language Server, Types Catalog
 **Gap register refs:** #30
-**The decision:** Add `IsUserFacing` property to `TypeMeta` for filtering completion suggestions.
+
+**Ruling:** Add `bool IsUserFacing = true` to `TypeMeta` as a first-class catalog field. Default is `true`. `Error` and `StateRef` have `IsUserFacing = false`.
+
+**Rationale:** Whether a type appears in user-facing completion lists is domain knowledge about each type — it cannot be reliably derived from `Token == null` (`StateRef` has no token but is meaningfully different from `Error`; both should be non-user-facing for different reasons). Multiple consumers (LS completions, MCP vocabulary output) need this filter. Following the catalog-driven architecture principle: if the behavior varies per type member and the reason is "the language says so," the behavior belongs in the catalog.
+
+**Alternatives rejected:**
+- *Derive from `Token == null`*: Incorrect — `StateRef` has no token in the typical sense but is not an error type.
+- *Let each consumer hardcode exceptions*: Each consumer maintains parallel per-member knowledge that belongs in the catalog.
+
+**Canonical:** `docs/language/catalog-system.md §TypeMeta`.
 
 ---
 
 ### CC#17. TypedArg.EventName Back-Reference
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Type Checker, Language Server
 **Gap register refs:** #31, #52
-**The decision:** Should `TypedArg` carry an `EventName` back-reference for hover lookup?
+
+**Ruling:** `TypedArg.EventName` already exists as a first-class field in the canonical `type-checker.md §7.1` shape:
+
+```csharp
+public sealed record TypedArg(
+    string Name,
+    string EventName,   // back-reference to the owning event
+    TypeKind ResolvedType,
+    ...
+);
+```
+
+The LS hover at `§7.4` accesses `a.EventName` directly. No additional reconstruction via `ArgReference` traversal is needed. No new field addition is required — the field already exists.
+
+The open question in `language-server.md §7.4` is closed: the back-reference routing is resolved by the existing `TypedArg.EventName` field.
+
+**Canonical:** `docs/compiler/type-checker.md §7.1`, `docs/tooling/language-server.md §7.4`.
 
 ---
 
 ### CC#18. ConstructMeta Outline Properties
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Language Server, Constructs Catalog
 **Gap register refs:** #34, #70, #71
-**The decision:** Add `IsOutlineNode` and `LspSymbolKind` properties to `ConstructMeta` for catalog-driven document outline.
+
+**Ruling:** Add `bool IsOutlineNode = false` and `string? LspSymbolKind = null` to `ConstructMeta`.
+
+`LspSymbolKind` is a string constant matching the LSP `SymbolKind` value names (e.g., `"Class"`, `"Property"`, `"Enum"`, `"Function"`) — same pattern as `TokenMeta.SemanticTokenType`.
+
+The LS `textDocument/documentSymbol` handler reads `ConstructMeta.IsOutlineNode` and `ConstructMeta.LspSymbolKind` from the catalog instead of maintaining a hardcoded `ConstructKind` switch. Adding a new outline-able construct only requires updating the catalog entry.
+
+**Rationale:** "Is this construct an outline node?" and "what LSP symbol kind does it map to?" are domain knowledge about each construct — they vary per member for language-structural reasons. The hardcoded `IsOutlineConstruct()` and `MapSymbolKind()` switch functions in the LS are exactly the per-member dispatch that the catalog-driven architecture prohibits. Follows the `TokenMeta.SemanticTokenType` precedent.
+
+**Alternatives rejected:**
+- *Keep hardcoded switches*: Violates the catalog-driven principle; requires LS changes for every new construct.
+- *Single `string? LspOutlineKind` field only*: `IsOutlineNode` is a distinct boolean for constructs that are outline nodes but have no LSP symbol kind — the separation is clean.
+
+**Canonical:** `docs/language/catalog-system.md §ConstructMeta`, `docs/tooling/language-server.md §7.7`.
 
 ---
 
 ### CC#19. TokenMeta.HoverDescription Strategy
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Language Server, Tooling Surface, Tokens Catalog
 **Gap register refs:** #5, #35
-**The decision:** Comprehensive strategy for documentation strings in `TokenMeta` beyond partial capture.
+
+**Ruling:** Option A — add `string? HoverDescription` to `TokenMeta` as a first-class catalog field.
+
+**Rationale:** `FieldModifierMeta`, `FunctionMeta`, and `OperatorMeta` all already carry a `string? HoverDescription` field. The inconsistency is that `TokenMeta` (keywords, type names, modifiers) lacks one. Hover descriptions for keywords and operators are domain knowledge about those language elements — they belong in the catalog, exactly as they do for modifiers, functions, and operators.
+
+**Alternatives rejected:**
+- *Derive from C# XML doc comments*: Couples tooling metadata to source structure. Doc comments exist for developer-facing API documentation, not for user-facing hover text.
+- *Separate "documentation catalog"*: A 14th catalog serving only one consumer with one field type is architectural overhead. The pattern already exists on the type — add the field.
+- *Let LS hardcode per-token hover strings*: Per-member string knowledge that the catalog should own.
+
+**Canonical:** `docs/language/catalog-system.md §Tokens`.
 
 ---
 
 ### CC#20. Diagnostic Related Locations
 
-**Status:** 🔵 Pending team resolution
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Diagnostic System, Language Server
 **Gap register refs:** #39
-**The decision:** Add `AdditionalLocations` to `Diagnostic` for multi-span diagnostics (e.g., "field declared at line X, constraint at line Y").
+
+**Ruling:** Add `ImmutableArray<SourceSpan> RelatedLocations = default` to the `Diagnostic` `readonly record struct`.
+
+- `default` means `ImmutableArray<SourceSpan>.Empty` — existing diagnostics (and their construction sites) are unaffected.
+- The LS mapper emits LSP `relatedInformation` entries when `RelatedLocations.Length > 0`, using the parent diagnostic's `Message` as each span's message (the relationship is implied by context, not repeated per-span).
+- No per-span message field is added — Precept's diagnostic scale doesn't warrant it.
+
+**Rationale:** Multi-span diagnostics are real (e.g., "field declared at line 12, constraint referencing it at line 31"). Without `RelatedLocations`, the LS can only show a single span per diagnostic. The Roslyn model uses `DiagnosticDescriptor.AdditionalLocations` for the same purpose; the concept is established.
+
+The `readonly record struct` can gain a field with a default without breaking existing construction — C# `with` expression compatibility is maintained. All existing `new Diagnostic(...)` call sites continue to compile.
+
+**Canonical:** `docs/compiler/diagnostic-system.md`.
 
 ---
 
 ### CC#21. Event "optional" Modifier
 
-**Status:** 🔴 Pending Shane decision (non-blocking for core pipeline)
+**Status:** ✅ Resolved (2026-05-06)
 
-**Affects:** Parser, Type Checker, Graph Analyzer, Evaluator, Grammar, Completions, Hover, MCP
+**Affects:** Graph Analyzer, Diagnostics
 **Gap register refs:** #10
-**The decision:** What are the end-to-end semantics of an `optional` modifier on events?
 
-**Why it's cross-cutting:**
-- **Parser** — must recognize `optional` in event modifier position.
-- **Type Checker** — must validate modifier legality and produce the correct typed metadata.
-- **Graph Analyzer** — must decide whether `optional` suppresses `UnhandledEvent`-style diagnostics or changes reachability expectations.
-- **Evaluator** — must define runtime behavior when an optional event has no applicable transition.
-- **Grammar / Completions / Hover / MCP** — must surface the new keyword, documentation, and vocabulary consistently.
+**Ruling:**
 
-**Options / known design space:**
-1. **Compile-time optionality only** — affects diagnostics and tooling surface, but runtime dispatch semantics stay unchanged.
-2. **Full runtime optionality** — missing handlers become a benign outcome with explicit evaluator/tooling semantics.
-3. **Documentation-only marker** — allowed on the language surface but carries no behavioral meaning beyond author intent.
+1. **Remove the old `UnhandledEvent` diagnostic entirely.** A partial event-handler matrix (event handled in some states but not others) is valid, intentional authoring — not broken. Flagging it violates §0.6 principle 2 ("only flag proven violations"). The check is removed from the graph analyzer; the diagnostic code is removed from the catalog.
 
-**Resolution path:** Owner must lock whether `optional` is purely descriptive, diagnostic-affecting, or runtime-affecting before any stage implements it.
+2. **Add `UnhandledEvent` diagnostic (recycled name, tighter definition, Warning).** An event declared with zero transition rows handling it in *any* state is a provably dead declaration. Emit `DiagnosticCode.UnhandledEvent` (Warning, Structure category). Algorithm: if `handlingStates` is empty for an event → emit diagnostic.
+
+   **Name note:** The name `UnhandledEvent` was chosen by Elaine and approved by Shane. It names the structural cause (no handlers exist) rather than implying parentage ("orphan"). It also distinguishes cleanly from `EventNeverSucceeds` — the event isn't merely blocked in some execution path; it has *no* handler rows anywhere and therefore cannot fire successfully under any condition. The old `UnhandledEvent` meant "event not handled in some states" (partial coverage). The new `UnhandledEvent` means "event not handled in ANY state" — a strictly narrower, provably-broken case. Ordinal 81 is retained for stability.
+
+3. **`optional` event modifier: moot.** With the old broad `UnhandledEvent` gone, there is nothing to suppress — no modifier needed.
+
+**Rationale:** The distinction is partial coverage (intentional — author's prerogative) vs. zero coverage (provably dead — definitively broken). Only the latter warrants a diagnostic.
 
 ---
 
 ### CC#22. `SemanticIndex.EnsuresByState`
 
-**Status:** 🔵 Pending team resolution (follows from CC#3)
+**Status:** ✅ Resolved (2026-05-06)
 
 **Affects:** Type Checker, Language Server, MCP
 **Gap register refs:** #26, #73
-**The decision:** Should `SemanticIndex` expose an `EnsuresByState` index, and if so what canonical shape should it use?
 
-**Why it's cross-cutting:**
-- **Type Checker** — would own construction of the index during semantic binding.
-- **Language Server** — can consume the index directly for ensure-aware navigation and tooling features.
-- **MCP** — can serialize or query the index instead of reconstructing state/ensure relationships ad hoc.
+**Ruling:** Option 1 — add `FrozenDictionary<string, ImmutableArray<TypedEnsure>> EnsuresByState` to `SemanticIndex`, following the CC#3 primary-array + secondary-index pattern.
 
-**Options / known design space:**
-1. **Add canonical index to `SemanticIndex`** — one producer, many consumers.
-2. **Keep `SemanticIndex` minimal** — LS and MCP each derive the view from existing arrays.
-3. **Hybrid** — core emits a lazily computed or optional derived index used only by tooling consumers.
+- `SemanticIndex.Ensures` remains the primary ordered array.
+- `EnsuresByState` is the derived secondary index, built at `SemanticIndex` construction time.
+- Only state-anchored ensures (Kind ∈ `{StateResident, StateEntry, StateExit}` where `AnchorState != null`) appear as values. Event-anchored ensures and invariants are NOT included.
+- The key is the state name string.
 
-**Resolution path:** Decide whether this is a first-class semantic artifact or a consumer-side convenience view before LS and MCP implement duplicate derivations.
+**Rationale:** The type checker already walks all ensures during `SemanticIndex` construction — building the index there is zero additional work at call time. LS ensure navigation and MCP inspection need "what ensures exist for state X?" without O(n) scan of the primary array. One producer, many consumers. Follows CC#3: the dual-index approach (primary ordered + secondary keyed) is the resolved contract for `SemanticIndex` secondary lookups.
+
+**Alternatives rejected:**
+- *Keep SemanticIndex minimal; let consumers derive*: Two consumers (LS + MCP) would implement duplicate derivations, which the CC#3 ruling explicitly prevents.
+- *Lazy/optional computed index*: Adds surface complexity for marginal benefit — the type checker owns the data and should populate both.
+
+**Canonical:** `docs/compiler/type-checker.md §7.1`.
 
 ---
 
 ### CC#26. Stateless Precepts `CreateInitialVersion` Semantics
 
-**Status:** 🔴 Pending Shane decision (non-blocking for core pipeline)
+**Status:** ✅ Resolved 2026-05-06 — Option 1: Null-state initial version
 
 **Affects:** Runtime API, Evaluator, Graph Analyzer
 **Gap register refs:** Audit item E
@@ -705,7 +798,28 @@ public sealed record ProofDischarge(
 2. **Synthetic pseudo-state** — represent stateless initialization through an internal sentinel state.
 3. **Disallow API path** — require a separate creation path for stateless precepts instead of `CreateInitialVersion`.
 
-**Resolution path:** Lock the stateless creation contract before runtime API, evaluator, and analyzer behavior diverge.
+---
+
+**Ruling — Option 1 locked by Shane (2026-05-06):**
+
+`CreateInitialVersion` for stateless precepts (no states declared) returns a `Version` with `State = null`. No separate API path, no hidden sentinel state.
+
+**Per-component behavior:**
+
+- **Runtime API:** `Version.State` is `null` for stateless precepts. This is the honest representation of "no state machine" — not an error, not a sentinel, the natural degenerate case. `CreateInitialVersion` returns this version when construction succeeds.
+- **Evaluator:** The state-set step (building the hollow version with an initial state) is omitted. State-entry semantics do not fire because there is no state to enter: no `to <InitialState> ensure` guards, no `in <InitialState> ensure` residency checks, no omit-on-entry clearing. All other construction machinery runs normally — the initial event fires if declared, arg ensures are evaluated, field constraints are checked, global rules (`always`) are evaluated, computed fields are recomputed, and the working copy promotion/discard protocol applies. Construction succeeds if the initial event succeeds.
+- **Graph Analyzer:** Stateless precepts are exempt from initial-state reachability checks, dead-end-state checks, and unreachable-state checks. These checks require a state machine to operate on. A precept with no states declared has no topology to validate.
+
+**Rationale:**
+- The spec (§0.2) defines stateless configuration as "current field values alone" — `null` state is the honest representation of this. Anything else adds hidden behavior inconsistent with the metadata-driven, no-implicit-behavior principle.
+- Option 2 (synthetic sentinel state) would introduce a state that the author never declared, violating the principle that pipeline stages are generic machinery reading catalog metadata — not machinery that invents undeclared structure.
+- Option 3 (separate API path) adds public API surface with no language justification — the spec already handles parameterless construction when no initial event is declared, and the null-state contract extends this cleanly.
+
+**Canonical doc locations:**
+- Full contract: `docs/runtime/runtime-api.md §Stateless Precepts — CreateInitialVersion`
+- Evaluator behavior: `docs/runtime/evaluator.md §Create`
+- Graph analyzer exemptions: `docs/compiler/graph-analyzer.md §8.1`
+- Language spec: `docs/language/precept-language-spec.md §3A.5`
 
 ---
 

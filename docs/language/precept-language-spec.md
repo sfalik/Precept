@@ -1794,6 +1794,18 @@ No special "construction constraint" form is needed. `to <InitialState> ensure` 
 
 **Design rationale:** Construction goes through the full event pipeline because entities must satisfy their constraints from the moment they exist. A parameterless construction path cannot enforce business invariants at intake. By modeling construction as an event, the language reuses all existing machinery — guards can discriminate construction routing, ensures validate args, `reject` can refuse intake, and the caller uses the same pattern matching they use for every event.
 
+#### Stateless Precepts (no states declared)
+
+For precepts that declare no states, `Version.State` is `null` in the constructed version. The construction algorithm adapts as follows:
+
+- **Step 1 (initial state set) is omitted.** There is no initial state to assign. The hollow version is built with `State = null`.
+- **State-entry semantics do not fire.** `to <State> ensure` guards and `in <State> ensure` residency checks require a named state to evaluate against. Because no state is entered, they are structurally absent — not evaluated, not skipped conditionally, simply not applicable.
+- **All other steps apply unchanged.** If an initial event is declared, it fires through the standard pipeline (arg ensures, mutations, field constraints, global rules). If no initial event is declared, defaults and computed fields are set and global rules are checked. The construction succeeds if these pass; `Version.State` is `null` in the returned version.
+
+This is the natural extension of §3A.5 to precepts without a state machine. Null state is the honest representation of "current field values alone" (§0.2) — no sentinel, no hidden machinery, no separate API path.
+
+> **Compiler:** The graph analyzer is exempt from initial-state reachability checks, dead-end-state checks, and unreachable-state checks for stateless precepts. These checks require a state machine topology to operate on. See CC#26.
+
 ### 3A.6 Inspection as a First-Class Operation
 
 Inspection is not a reporting layer — it is a fundamental language operation. It has the same depth as event execution: guard evaluation, exit actions, mutations, entry actions, computed field recomputation, and constraint evaluation — all executed on a working copy without committing.

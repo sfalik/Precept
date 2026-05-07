@@ -20,6 +20,15 @@
 
 ## Recent Updates
 
+### 2026-05-07 — Wave 3 Round 2: canonical doc sweep recorded
+
+- Closed 20 Wave 3 Round 2 markers across `evaluator.md`, `language-server.md`, `mcp.md`, `catalog-system.md`, and `graph-analyzer.md`; `diagnostic-system.md` CC#13 / CC#20 were re-verified complete with no doc edits.
+- `evaluator.md` locked the `EventOutcome` DU follow-through: `Faulted(Fault)`, `Mutations` on `Transitioned` / `Applied`, enriched `Unmatched(EvaluatedRows)`, `RejectReason` closure, `AmbiguousDispatch`, and fire pseudocode alignment.
+- `language-server.md` confirmed `Compilation.Tokens`, `SemanticIndex.References`, `TypeMeta.IsUserFacing`, and `ActionMeta.Description` as the hover source, while converting §13 open questions into decided notes.
+- `mcp.md` closed null-data bootstrap, `firePipeline` scope, `EnsuresByState`, mutations payload, and unmatched guard-trace shape; `catalog-system.md` and `graph-analyzer.md` closed the `ConstraintMeta` hierarchy and wildcard ordering markers.
+- Six genuine follow-up gaps were preserved for owner attention: `TokenMeta.SemanticTokenModifiers` (#41), `EventCoverageEntry` granularity, back-edge definition, `GraphEvent.IsInitial` derivation, TBD structural diagnostic codes, and `ActionMeta` LS/MCP alignment (#43).
+- Validation remains unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
+
 ### 2026-05-07 — Wave 3 Round 1: canonical doc sweep recorded
 
 - Closed 13 Wave 3 Round 1 markers across `docs/compiler/type-checker.md`, `docs/compiler/proof-engine.md`, and `docs/runtime/precept-builder.md`.
@@ -27,6 +36,24 @@
 - `proof-engine.md`: catalog-gap #12 and #13 are closed, CC#1 / CC#5 follow-through notes are complete, and the stale initial-state OQ block is gone.
 - `precept-builder.md`: CC#4 `Compilation.Tokens`, CC#11 `ExecutionRow.RejectReason`, and CC#7 `ConstraintMeta.StateAnchored` hierarchy documentation are now canonical.
 - Validation remains unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
+
+### 2026-05-06 — Wave 3 Round 2: canonical doc sweep
+
+Swept six docs to close remaining open question markers by propagating locked CC decisions.
+
+**evaluator.md:** `EventOutcome` DU updated with three changes: (1) `ImmutableArray<FieldMutation> Mutations` added to `Transitioned` and `Applied` variants (CC#23); (2) `Unmatched()` → `Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows)` (CC#24); (3) `Faulted(Fault Fault)` added as 8th variant (CC#12, catalog gap #21). `FieldMutation` record defined: `(string FieldName, JsonElement? Before, JsonElement? After)`. Stale pending note for `RejectReason` replaced with factual closure (CC#11). `FaultCode` table updated — `AmbiguousDispatch` confirmed with `[StaticallyPreventable]` (CC#13). Implementation Note 7 closed. In-domain failures table gained `Faulted` row. Fire pseudocode updated with mutations and new Unmatched signature.
+
+**language-server.md:** `Compilation.Tokens` OQ closed (CC#4). `SemanticIndex.References` OQ closed — Pass 2 reconstructs reference sites by walking typed declarations; `EnsuresByState` is the one first-class grouping (CC#22). `TypeMeta.IsUserFacing` OQ closed (CC#16). `ActionMeta.HoverDescription` OQ closed — `Description` field sufficient; `SnippetTemplate` is future catalog addition. §13 Open Questions 1–3 converted from unresolved to decided notes.
+
+**mcp.md:** Null-data bootstrap OQ closed. `firePipeline` OQ closed as out-of-scope (catalog-gap #25). `SemanticIndex.EnsuresByState` OQ closed (CC#22). Mutations payload OQ closed (CC#23) — JSON example updated to `before`/`after` shape. Unmatched guard trace OQ closed (CC#24) — `evaluatedGuards` → `evaluatedRows` with `TransitionInspection` shape.
+
+**catalog-system.md:** `ConstraintMeta` hierarchy OQ closed — full five-subtype hierarchy documented (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`; three state kinds subtypes of `StateAnchored`). CC#5, CC#13, CC#16, CC#19 verified complete.
+
+**graph-analyzer.md:** Wildcard expansion ordering OQ closed — declaration order confirmed; note moved inline to §6.1. CC#10, CC#21, CC#26 verified complete.
+
+**diagnostic-system.md:** CC#13 and CC#20 verified complete — no changes needed.
+
+Pattern: When a pending note in prose contradicts an already-resolved code block in the same section, remove the note. When an OQ has a recommendation already (workspace/symbol, rename), convert to a decided note rather than leaving "(unresolved)".
 
 ### 2026-05-06 — Wave 2 cross-cutting decisions fully closed
 

@@ -5,6 +5,23 @@
 ## ACTIVE DECISIONS — Current Sprint
 
 ---
+### 2026-05-07T03:00:00Z: Wave 3 Round 2 canonical doc sweep recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file); Frank reported 3 pre-existing `SemanticIndex.cs` errors only.
+
+**Merged source:** `frank-wave3-round2.md`.
+
+- Closed 20 Wave 3 Round 2 markers across `docs/runtime/evaluator.md`, `docs/tooling/language-server.md`, `docs/tooling/mcp.md`, `docs/language/catalog-system.md`, and `docs/compiler/graph-analyzer.md`; `docs/compiler/diagnostic-system.md` CC#13 / CC#20 were verified complete with no doc edits needed.
+- `evaluator.md` closed 7 items by finalizing the `EventOutcome` DU (`Faulted`, `Mutations`, enriched `Unmatched`), confirming `RejectReason`, locking `AmbiguousDispatch`, and updating the fire pseudocode plus the in-domain failures table.
+- `language-server.md` closed 6 items by confirming `Compilation.Tokens`, `SemanticIndex.References`, `TypeMeta.IsUserFacing`, and `ActionMeta.Description` as the hover source, and by converting §13 open questions into decided notes.
+- `mcp.md` closed 5 items by documenting null-data bootstrap, keeping `firePipeline` out of catalog scope, confirming `EnsuresByState`, carrying the mutations payload, and aligning unmatched output to `evaluatedRows` / `TransitionInspection`.
+- `catalog-system.md` closed the `ConstraintMeta` five-subtype hierarchy marker, and `graph-analyzer.md` closed wildcard expansion ordering by locking declaration order inline.
+- Preserved 6 follow-up gaps for owner attention in the canonical record: `TokenMeta.SemanticTokenModifiers` (#41), `EventCoverageEntry` granularity, back-edge definition, `GraphEvent.IsInitial` derivation, TBD structural diagnostic codes, and `ActionMeta` LS/MCP property alignment (#43).
+- Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
+
+---
 ### 2026-05-07T02:20:00Z: Wave 3 Round 1 canonical doc sweep recorded
 
 **By:** Scribe
