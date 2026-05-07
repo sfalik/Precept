@@ -59,6 +59,8 @@
 - Back-edges in the graph analyzer are BFS-ancestor edges, not DFS back-edges. BFS ancestor is canonical because reachability and irreversibility use the same traversal order.
 
 - Graph structural diagnostic codes (82-85) precede proof engine codes (86+) by pipeline stage order.
+- `docs/language/catalog-system.md` now records `ActionMeta.SyntaxShape` (`ActionSyntaxShape`) as a real Actions-catalog field and documents that parser, TypeChecker, and PreceptBuilder read it for action-shape dispatch.
+- `docs/language/catalog-system.md` now records `FunctionMeta.HasCIVariant` and `FunctionMeta.CIVariantOf` as Functions-catalog fields used by the TypeChecker to resolve CI-qualified function calls.
 
 ## Recent Updates
 
