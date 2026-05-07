@@ -3,7 +3,8 @@
   "noHaiku": true,
   "agentModelOverrides": {
     "elaine": "claude-opus-4.6",
-    "frank": "claude-opus-4.6",
-    "uncle-leo": "gpt-5.4"
+    "uncle-leo": "gpt-5.4",
+    "george": "claude-opus-4.6",
+    "frank": "claude-opus-4.6"
   }
 }

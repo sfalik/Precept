@@ -28,6 +28,18 @@
 
 ## Recent Updates
 
+### 2026-05-07T05:09:00Z — Independent parser audit: catalog vs. implementation
+
+- Audited all 12 constructs in `Constructs.cs` against `Parser.cs` slot dispatch.
+- **Result: All constructs verified. No discrepancies found.**
+- Parser is catalog-driven by construction: `ParseSlots` iterates `meta.Slots` in order, guaranteeing slot count, order, and kind alignment structurally.
+- The known concern (EventHandler slots) confirmed correct: catalog declares `[EventTarget, ActionChain]` (2 slots) and parser produces exactly that. The erroneous coordinator spec `[EventTarget, ActionChain, Outcome]` was never implemented.
+- `ParseOutcome` correctly uses `Outcomes.ByToken` catalog lookup and dispatches by `OutcomeSyntaxShape`.
+- `EventTarget` mid-construct handling (TransitionRow) is correct: parser conditionally consumes `on` only if present, which handles both the leading-token-already-consumed case and the mid-construct case.
+- Test coverage gap: `RuleDeclaration` has no parser test in either test file.
+
+---
+
 ### 2026-05-07T04:02:01Z — Parser prerequisite decisions approved
 
 - Shane approved Frank's B2 + B3 parser-prerequisite decisions and Scribe merged the paired inbox notes into one canonical ledger entry.

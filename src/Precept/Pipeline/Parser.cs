@@ -179,13 +179,14 @@ public static class Parser
             var startSpan = startToken.Span;
             var slots = new List<SlotValue>();
 
+            // Build slot array: include all required slots and present optional slots.
+            // Absent optional slots (sentinel Span == SourceSpan.Missing) are omitted.
+            // Downstream consumers find slots by Kind, not by catalog index position.
             foreach (var slot in meta.Slots)
             {
                 var value = ParseSlotValue(slot, meta);
-                // Absent optional slot: sentinel with Missing span → omit from array
-                if (!slot.IsRequired && value.Span == SourceSpan.Missing)
-                    continue;
-                slots.Add(value);
+                if (slot.IsRequired || value.Span != SourceSpan.Missing)
+                    slots.Add(value);
             }
 
             var endSpan = _position > 0 && !IsTrivia(_tokens[_position - 1].Kind)
@@ -488,11 +489,8 @@ public static class Parser
             if (Peek().Kind == TokenKind.StringLiteral)
             {
                 var strToken = Advance();
-                // Strip surrounding quotes from lexeme
-                var message = strToken.Text.Length >= 2
-                    ? strToken.Text[1..^1]
-                    : strToken.Text;
-                return new BecauseClauseSlot(message,
+                // Lexer emits string content without surrounding quotes
+                return new BecauseClauseSlot(strToken.Text,
                     SourceSpan.Covering(becauseToken.Span, strToken.Span));
             }
 

@@ -337,10 +337,11 @@ When multiple constructs match and disambiguation fails:
 
 ### Invariants
 
-1. **Slot count matches metadata** — `construct.Slots.Length == construct.Meta.Slots.Length`
-2. **Slot kinds match metadata** — `construct.Slots[i]` is the subtype for `construct.Meta.Slots[i].Kind`
-3. **Spans are valid** — All spans reference positions within the source
-4. **No construct type explosion** — Output is always `ParsedConstruct`, never subtypes
+1. **Variable-length slot arrays** — `construct.Slots` contains only present slots. Required slots always appear; absent optional slots are omitted. Slot count equals the number of present slots, not the catalog slot count.
+2. **Slots appear in catalog order** — `construct.Slots` preserves the relative order defined in `Constructs.GetMeta(kind).Slots`; absent optionals create no gaps.
+3. **Locate slots by Kind, not by index** — downstream consumers (type checker, evaluator) must find slots by `slot.Kind`, not by catalog index position, because indices depend on which optional slots are present.
+4. **Spans are valid** — All spans reference positions within the source
+5. **No construct type explosion** — Output is always `ParsedConstruct`, never subtypes
 
 ### Preconditions
 

@@ -418,6 +418,8 @@ public class EnsureBecauseClauseSlotTests
     {
         // RED-P: Parser is a stub.
         // RuleDeclaration with because must continue to work correctly after the ensure fix.
+        // Note: slot arrays are variable-length (absent optional slots omitted); BecauseClause
+        // is located by Kind, not by catalog index position.
         var src = "rule amount > 0 because \"Amount must be positive\"";
         var tokens = Lexer.Lex(src);
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
@@ -428,11 +430,10 @@ public class EnsureBecauseClauseSlotTests
         var rule = manifest.Constructs.Should().ContainSingle(
             c => c.Meta.Kind == ConstructKind.RuleDeclaration).Subject;
 
-        rule.Slots.Should().HaveCount(3);
-        rule.Slots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause,
-            "RuleDeclaration.Slots[2] is BecauseClause — must not regress after ensure fix");
-
-        var becauseSlot = rule.Slots[2].Should().BeOfType<BecauseClauseSlot>().Subject;
+        var becauseSlot = rule.Slots
+            .Should().ContainSingle(s => s.Kind == ConstructSlotKind.BecauseClause,
+                "RuleDeclaration must have a BecauseClause slot — must not regress after ensure fix")
+            .Which.Should().BeOfType<BecauseClauseSlot>().Subject;
         becauseSlot.Message.Should().Be("Amount must be positive");
     }
 

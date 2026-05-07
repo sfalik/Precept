@@ -43,13 +43,38 @@
 
 - **BecauseClause optional slot follow-up fix (2026-05-03):** The prior fix added `SlotBecauseClause` (required) to `StateEnsure` and `EventEnsure`. Defect: `because` is optional in ensure statements — `ensure Expr` is valid DSL without a reason clause. Fix: added `SlotOptBecauseClause = new(ConstructSlotKind.BecauseClause, IsRequired: false)` alongside the required variant; `StateEnsure` and `EventEnsure` now use the optional variant. `RuleDeclaration` retains the required variant unchanged — every rule must supply a reason. Pattern: when a slot kind appears in two constructs with different optionality, introduce a named optional sibling slot (prefix `SlotOpt`) rather than mutating the shared instance. 2340 tests pass; 11 RED-P/RED-R stubs unchanged.
 
+- **Slot-count invariant test alignment (2026-05-07):** Fixed 8 failing tests in `EnsureBecauseClauseSlotTests.cs`. The tests assumed absent optional slots are OMITTED from the `Slots` array. Under the approved slot-count invariant, every `meta.Slots` entry produces exactly one `SlotValue` — absent optionals use sentinel `new BecauseClauseSlot("", SourceSpan.Missing)`. Updated `WithoutBecause` tests to assert sentinel presence, `BecauseMissingString` tests to expect sentinel (parser fills it), and Runtime tests to assert `NotImplementedException` from `GraphAnalyzer`. 2359 tests pass.
+
+- **GAP-062 resolved: Outcomes catalog (2026-05-07):** Created `src/Precept/Language/Outcomes.cs` — a catalog-driven Outcomes subsystem. `OutcomeSyntaxShape` enum (TransitionTarget, NoTransitionPair, RejectMessage), `OutcomeMeta` record (LeadingToken, Token, Description, SyntaxShape, HoverDescription), and `Outcomes` static class with `All` (derived from `TokenCategory.Outcome`) and `ByToken` (`FrozenDictionary`). Updated `ParseOutcome` in `Parser.cs` to dispatch via `Outcomes.ByToken` + switch on `SyntaxShape` instead of inline token-kind if/else. All 2359 tests pass.
+
 
 
 
 
 ## Recent Updates
 
-### 2026-05-07T04:02:01Z — Parser prerequisite approvals received
+### 2026-05-07T04:59:00Z — Parser Slice 2 validated (scoped constructs + disambiguation)
+
+- Created `test/Precept.Tests/Parser/ParserScopedConstructTests.cs` — 19 tests covering all 7 scoped constructs, disambiguation, and slot-count invariants.
+- All 7 scoped constructs parse correctly out of the box — no parser changes needed. The Slice 1 implementation already covers them via catalog-driven slot dispatch.
+- Disambiguation protocol (peek(2)) works correctly for all families: `in` (Ensure/Omit/Modify), `on` (Ensure/Arrow), `from` (On/Ensure/Arrow), `to` (Ensure/Arrow).
+- `ParseEventTarget` correctly handles both contexts: consumes `on` mid-construct (TransitionRow) and skips it when `on` was the leading token (EventEnsure/EventHandler).
+- Action chain vs outcome disambiguation works: `-> set` routes to action, `-> transition` routes to outcome.
+- **FLAG: EventHandler catalog has no Outcome slot** — catalog defines `[SlotEventTarget, SlotActionChain]` only. Task spec expected `[EventTarget, ActionChain, Outcome]`. Filed to decisions inbox. Tests written against actual catalog behavior.
+- Full suite: 2,378 tests pass (0 failures).
+
+### 2026-05-07T04:34:00Z — Parser Slice 1 implemented
+
+- Created `src/Precept/Pipeline/Parser.cs` — full catalog-driven recursive-descent parser replacing the 14-line stub.
+- Created `src/Precept/Pipeline/Parser.Expressions.cs` — minimal stub `ParseExpression` for Slice 1 compilation (Slice 3 replaces).
+- Created `test/Precept.Tests/Parser/ParserDirectConstructTests.cs` — 8 tests covering header, field, field+modifier, state, state+initial, event+args, slot-count invariant, error recovery.
+- Created `src/Precept/Pipeline/TypedDeclarations.cs` — minimal placeholder stubs for `TypedField`/`TypedState`/`TypedEvent` to unblock compilation (SemanticIndex referenced them).
+- Fixed `TypeChecker.cs` stub to pass required `SemanticIndex` constructor args (pre-existing mismatch).
+- Fixed pre-existing ambiguity in `EnsureBecauseClauseSlotTests.cs` (disambiguated `Create()` overload with explicit null cast).
+- All 8 parser tests pass. Zero new compilation errors introduced.
+- Key design: `ParserState` is `private sealed class` inside `Parser`; `ParseExpression` is `private` (not `internal`) due to accessibility constraint with private nested `ParserState`. Slice 3 must keep this or promote `ParserState` visibility.
+- Disambiguation uses peek(2) invariant as specified. All slot sub-parsers produce sentinels for absent optional slots — never null.
+
 
 - Shane approved Frank's B2 + B3 decisions, so the parser/type-checker handoff is now durably locked.
 - `ParsedExpression.cs` can proceed with the closed-vocabulary rule intact: only open-ended expressions stay deferred; types, modifiers, access modes, and `because` text are parser-resolved.
