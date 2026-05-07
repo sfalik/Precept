@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using Precept.Language;
+
 namespace Precept.Pipeline;
 
 // CATALOG-DRIVEN IMPLEMENTATION GUIDE
@@ -19,5 +22,6 @@ namespace Precept.Pipeline;
 
 public static class ProofEngine
 {
-    public static ProofLedger Prove(SemanticIndex semantics, StateGraph graph) => throw new NotImplementedException();
+    public static ProofLedger Prove(SemanticIndex semantics, StateGraph graph) =>
+        new(ImmutableArray<Diagnostic>.Empty);
 }

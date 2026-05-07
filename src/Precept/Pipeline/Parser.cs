@@ -132,26 +132,45 @@ public static class Parser
                 var current = Peek();
                 if (ConstructsCatalog.ByLeadingToken.TryGetValue(current.Kind, out var candidates))
                 {
-                    // Find the first Direct or Header candidate (Slice 1 scope)
-                    ConstructMeta? selected = null;
-                    foreach (var (kind, _) in candidates)
+                    if (candidates.Length == 1)
                     {
-                        var meta = ConstructsCatalog.GetMeta(kind);
+                        // Unambiguous — single candidate
+                        var meta = ConstructsCatalog.GetMeta(candidates[0].Kind);
                         if (meta.RoutingFamily == RoutingFamily.Direct)
-                        {
-                            selected = meta;
-                            break;
-                        }
-                    }
-
-                    if (selected != null)
-                    {
-                        ParseConstruct(selected);
+                            ParseConstruct(meta);
+                        else
+                            ParseScopedConstruct(meta);
                     }
                     else
                     {
-                        // StateScoped/EventScoped — not implemented in Slice 1, skip to boundary
-                        SkipToConstructBoundary();
+                        // B3 disambiguation: peek(2) is the disambiguation token
+                        var disambToken = Peek(2).Kind;
+                        ConstructKind? resolved = null;
+
+                        foreach (var (kind, entry) in candidates)
+                        {
+                            if (entry.DisambiguationTokens is { } tokens
+                                && tokens.Contains(disambToken))
+                            {
+                                resolved = kind;
+                                break;
+                            }
+                        }
+
+                        if (resolved == null)
+                        {
+                            // Disambiguation failure — emit diagnostic, select first candidate
+                            _diagnostics.Add(DiagnosticsCatalog.Create(
+                                DiagnosticCode.ExpectedToken, Peek(2).Span,
+                                "disambiguation keyword", Peek(2).Text));
+                            resolved = candidates[0].Kind;
+                        }
+
+                        var selectedMeta = ConstructsCatalog.GetMeta(resolved.Value);
+                        if (selectedMeta.RoutingFamily == RoutingFamily.Direct)
+                            ParseConstruct(selectedMeta);
+                        else
+                            ParseScopedConstruct(selectedMeta);
                     }
                 }
                 else
@@ -184,6 +203,57 @@ public static class Parser
             // Downstream consumers find slots by Kind, not by catalog index position.
             foreach (var slot in meta.Slots)
             {
+                var value = ParseSlotValue(slot, meta);
+                if (slot.IsRequired || value.Span != SourceSpan.Missing)
+                    slots.Add(value);
+            }
+
+            var endSpan = _position > 0 && !IsTrivia(_tokens[_position - 1].Kind)
+                ? _tokens[_position - 1].Span
+                : startSpan;
+            var span = SourceSpan.Covering(startSpan, endSpan);
+
+            _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span));
+        }
+
+        // ── Scoped construct parsing ────────────────────────────────────────────
+        // Protocol: consume leading keyword, parse anchor slot (Slots[0]),
+        // consume disambiguation keyword (no slot), walk remaining Slots[1..].
+
+        private void ParseScopedConstruct(ConstructMeta meta)
+        {
+            var startToken = Advance(); // consume leading keyword
+            var startSpan = startToken.Span;
+            var slots = new List<SlotValue>();
+
+            // Slots[0] = anchor (StateTarget or EventTarget)
+            if (meta.Slots.Count > 0)
+            {
+                var anchorValue = ParseSlotValue(meta.Slots[0], meta);
+                if (meta.Slots[0].IsRequired || anchorValue.Span != SourceSpan.Missing)
+                    slots.Add(anchorValue);
+            }
+
+            // Consume disambiguation keyword (not a slot) — but only if it won't
+            // be consumed by the next slot's sub-parser. Arrow serves as both
+            // disambiguation token AND ActionChain entry trigger, so we leave it.
+            var peek = Peek();
+            var isDisambToken = false;
+            foreach (var entry in meta.Entries)
+            {
+                if (entry.DisambiguationTokens is { } dTokens && dTokens.Contains(peek.Kind))
+                {
+                    isDisambToken = true;
+                    break;
+                }
+            }
+            if (isDisambToken && peek.Kind != TokenKind.Arrow)
+                Advance(); // consume disambiguation keyword — maps to no slot
+
+            // Walk remaining slots (Slots[1..])
+            for (int i = 1; i < meta.Slots.Count; i++)
+            {
+                var slot = meta.Slots[i];
                 var value = ParseSlotValue(slot, meta);
                 if (slot.IsRequired || value.Span != SourceSpan.Missing)
                     slots.Add(value);
@@ -627,19 +697,31 @@ public static class Parser
 
         private SlotValue ParseEnsureClausePlaceholder(ConstructSlot slot)
         {
-            if (Peek().Kind != TokenKind.Ensure)
+            SourceSpan startRef;
+
+            if (Peek().Kind == TokenKind.Ensure)
+            {
+                // Direct parse path — consume the ensure keyword
+                startRef = Advance().Span;
+            }
+            else if (slot.IsRequired)
+            {
+                // Required slot but ensure already consumed as disambiguation keyword —
+                // parse expression tokens directly
+                startRef = Peek().Span;
+            }
+            else
+            {
                 return MakeSentinel(slot);
+            }
 
-            var ensureToken = Advance();
-            var startSpan = Peek().Span;
-            var lastSpan = ensureToken.Span;
-
+            var lastSpan = startRef;
             while (!IsAtEnd && Peek().Kind != TokenKind.Because && !IsAtConstructBoundary())
             {
                 lastSpan = Advance().Span;
             }
 
-            var span = SourceSpan.Covering(ensureToken.Span, lastSpan);
+            var span = SourceSpan.Covering(startRef, lastSpan);
             var placeholder = new LiteralExpression(TokenKind.True, "true", span);
             return new EnsureClauseSlot(placeholder, span);
         }
@@ -649,12 +731,20 @@ public static class Parser
             if (Peek().Kind != TokenKind.Arrow)
                 return MakeSentinel(slot);
 
+            // Peek ahead: only enter action chain if token after arrow is an action keyword
+            if (!Actions.ByTokenKind.ContainsKey(Peek(1).Kind))
+                return MakeSentinel(slot);
+
             var actions = new List<ActionKind>();
             var startSpan = Peek().Span;
             var lastSpan = startSpan;
 
             while (Peek().Kind == TokenKind.Arrow && !IsAtEnd)
             {
+                // Before consuming arrow, verify next token is an action keyword
+                if (!Actions.ByTokenKind.ContainsKey(Peek(1).Kind))
+                    break;
+
                 Advance(); // consume '->'
                 var actionToken = Peek();
                 if (Actions.ByTokenKind.TryGetValue(actionToken.Kind, out var actionMeta))

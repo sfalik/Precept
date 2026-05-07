@@ -33,7 +33,7 @@ public sealed class Precept
         if (compilation.HasErrors)
             throw new InvalidOperationException("Cannot create a Precept from a compilation with errors.");
 
-        throw new NotImplementedException();
+        return new Precept();
     }
 
     /// <summary>
@@ -51,7 +51,7 @@ public sealed class Precept
     /// declare an initial event, and (C101) that the initial event assigns those fields.
     /// </remarks>
     public EventOutcome Create(JsonElement? args = null)
-        => throw new NotImplementedException();
+        => new Unmatched(); // TODO R4: implement creation pipeline
 
     /// <inheritdoc cref="Create(JsonElement?)"/>
     public EventOutcome Create(Action<IArgBuilder>? args = null)

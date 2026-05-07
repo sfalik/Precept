@@ -43,7 +43,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
     {
         var src = "precept TestWritable\nfield Amount as money writable";
         var act = () => Compiler.Compile(src);
-        act.Should().Throw<NotImplementedException>();
+        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
     }
 
     // ── Case 2: field Amount as money (no writable) ─────────────────────────
@@ -75,7 +75,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
     {
         var src = "precept TestReadOnly\nfield Amount as money";
         var act = () => Compiler.Compile(src);
-        act.Should().Throw<NotImplementedException>();
+        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
     }
 
     // ── Case 3: in Draft modify Amount editable (new access mode vocab B4) ───
@@ -111,7 +111,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             "from Draft on Approve -> transition Approved\n" +
             "event Approve";
         var act = () => Compiler.Compile(src);
-        act.Should().Throw<NotImplementedException>();
+        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
     }
 
     // ── Case 4: in Draft modify Amount readonly (read-only access mode) ──────
@@ -153,7 +153,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             "event Approve";
 
         var act = () => Compiler.Compile(src);
-        act.Should().Throw<NotImplementedException>();
+        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
     }
 
     // ── Case 5: in Draft omit Amount (structural exclusion) ──────────────────
@@ -194,6 +194,6 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             "event Approve";
 
         var act = () => Compiler.Compile(src);
-        act.Should().Throw<NotImplementedException>();
+        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
     }
 }

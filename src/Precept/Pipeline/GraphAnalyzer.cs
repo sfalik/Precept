@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -21,6 +22,7 @@ namespace Precept.Pipeline;
 public static class GraphAnalyzer
 {
     // TODO Phase 3: implement graph analysis dispatch
-    public static StateGraph Analyze(SemanticIndex semantics) => throw new NotImplementedException();
+    public static StateGraph Analyze(SemanticIndex semantics) =>
+        new(ImmutableArray<Diagnostic>.Empty);
 }
 
