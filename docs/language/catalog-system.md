@@ -1033,7 +1033,7 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 | Part | Type |
 |------|------|
 | Kind enum | `FunctionKind` (21 members) |
-| Meta record | `FunctionMeta(Kind, Name, Description, Overloads[], Category, UsageExample?, SnippetTemplate?, HoverDescription?)` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
+| Meta record | `FunctionMeta(Kind, Name, Description, Overloads[], Category, UsageExample?, SnippetTemplate?, HoverDescription?, HasCIVariant, CIVariantOf)` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
 | Catalog class | `Functions` — `GetMeta()`, `All` |
 | Output type | None — functions are evaluated inline |
 
@@ -1047,7 +1047,7 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 
 (`Round` and `RoundPlaces` are listed separately because they are distinct overloads with different return types: `round(value) → integer` vs `round(value, places) → decimal`.)
 
-**Consumers:** MCP vocabulary, LS completions (function names in expression context), LS hover (function documentation), type checker (overload resolution and argument validation), evaluator (runtime dispatch).
+**Consumers:** MCP vocabulary, LS completions (function names in expression context), LS hover (function documentation), type checker (overload resolution, CI-qualified variant resolution, and argument validation), evaluator (runtime dispatch).
 
 **Rationale:** The function catalog serves the most consumers of any planned catalog. The evaluation delegate eliminates a parallel copy in the evaluator — the evaluator dispatches through the catalog rather than maintaining its own function switch.
 
@@ -1079,7 +1079,7 @@ public sealed record FunctionMeta(
 
 Parameters are declared as named statics so `ParamSubject` can reference them by object identity — see Proof Obligations.
 
-Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions. `FunctionCategory` groups functions by semantic domain (`Numeric`, `String`, `Temporal`) for completions and MCP vocabulary presentation.
+Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions. `FunctionCategory` groups functions by semantic domain (`Numeric`, `String`, `Temporal`) for completions and MCP vocabulary presentation. `HasCIVariant` marks the canonical case-sensitive function that has a CI-qualified partner, and `CIVariantOf` points from the CI-qualified function back to its canonical base. The type checker reads these fields when resolving CI-qualified function calls such as `~startsWith(...)`.
 
 ##### Business-type overloads and QualifierMatch
 
@@ -1446,11 +1446,11 @@ State-machine action verbs — the keywords that appear after `->` in transition
 | Part | Type |
 |------|------|
 | Kind enum | `ActionKind` (8 members) |
-| Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], ValueRequired bool, IntoSupported bool, ProofRequirements[], AllowedIn ConstructKind[])` — `Token` is a `TokenMeta` object reference; see full shape below |
+| Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], SyntaxShape ActionSyntaxShape, ValueRequired bool, IntoSupported bool, ProofRequirements[], AllowedIn ConstructKind[])` — `Token` is a `TokenMeta` object reference; see full shape below |
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
-> **✅ Settled (Wave 4 Gap 6):** `ActionMeta.Description` is the canonical hover/MCP documentation field and is present in the `ActionMeta` shape above. `SyntaxShape` (`ActionSyntaxShape`) is internal to `Action.cs` — not a catalog record field. `SnippetTemplate` is a deferred implementation milestone.
+> **✅ Settled (Wave 4 Gap 6):** `ActionMeta.Description` is the canonical hover/MCP documentation field and is present in the `ActionMeta` shape above. `SyntaxShape` (`ActionSyntaxShape`) is a first-class `ActionMeta` field that encodes the action's operand grammar shape. `SnippetTemplate` is a deferred implementation milestone.
 
 **Members (from `ActionKind.cs`):**
 
@@ -1475,6 +1475,7 @@ public sealed record ActionMeta(
     TokenMeta          Token,             // object reference to Tokens catalog entry
     string             Description,
     TypeTarget[]       ApplicableTo      = [],
+    ActionSyntaxShape  SyntaxShape,
     bool               ValueRequired     = false,
     bool               IntoSupported     = false,
     ProofRequirement[] ProofRequirements = [],
@@ -1482,9 +1483,9 @@ public sealed record ActionMeta(
 );
 ```
 
-Consumers access the action keyword text via `action.Token.Text`. Execution delegates on ActionMeta are deferred until the evaluator's working copy API is designed — the delegate signature depends on how mutation is represented.
+Consumers access the action keyword text via `action.Token.Text`. `ActionMeta.SyntaxShape` encodes the action's operand form (`= expr`, bare value, `into`, `by`, `at`, key/value, or field-only). The parser reads it to choose the correct parsed-action form, the type checker reads it to dispatch the corresponding `TypedAction` subtype, and PreceptBuilder reads it to choose the emitted action-plan opcode. Execution delegates on ActionMeta are deferred until the evaluator's working copy API is designed — the delegate signature depends on how mutation is represented.
 
-**Consumers:** MCP vocabulary, LS completions (action verbs after `->` in event bodies), LS hover, parser validation, type checker (target type compatibility per `precept-language-spec.md` §3.8).
+**Consumers:** MCP vocabulary, LS completions (action verbs after `->` in event bodies), LS hover, parser validation, type checker (target type compatibility and `TypedAction` dispatch per `precept-language-spec.md` §3.8), PreceptBuilder (action-plan shape selection).
 
 #### 8. Constructs (✅ Implemented)
 
@@ -2002,7 +2003,7 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 |-------|--------------|----------------|
 | **Lexer** | Already uses `Tokens.Keywords` for keyword classification | Minimal further impact. Operator scan priority derivable from `Operators.All` sorted by `Token.Text.Length` descending. |
 | **Parser** | Hand-coded vocabulary tables + recursive descent grammar | Vocabulary tables — operator precedence, type keyword mappings, modifier/action recognition sets (~40–50% of language knowledge decisions) — migrate to catalog-derived frozen dictionaries at startup. Grammar productions stay hand-written. Construct slots enable test generation and LS completions. When a new type, modifier, operator, or action is added to a catalog, the parser adapts automatically — no parser edit needed. |
-| **TypeChecker** | Catalog-driven validation | Full design documented in `docs/compiler/type-checker.md`. Modifier applicability/exclusivity → `FieldModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `FieldModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. |
+| **TypeChecker** | Catalog-driven validation | Full design documented in `docs/compiler/type-checker.md`. Modifier applicability/exclusivity → `FieldModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `FieldModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`, `FunctionMeta.HasCIVariant`, `FunctionMeta.CIVariantOf`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. |
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Event modifier graph requirements → `EventModifierMeta.RequiredAnalysis`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
 | **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `FieldModifierMeta.ProofDischarges` enables catalog-driven modifier-proof strategy (CC#5 resolved). |
 | **PreceptBuilder** | Catalog-driven routing | Full design documented in `docs/runtime/precept-builder.md`. `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. `ActionMeta.SyntaxShape` drives action plan opcode emission. |
@@ -2060,7 +2061,7 @@ Before writing any `switch` on modifier, type, function, operator, or action ide
 | Modifier subsumption | `FieldModifierMeta.Subsumes` |
 | Access-mode semantics | `AccessModifierMeta.IsPresent`, `IsWritable` |
 | Anchor scope and target | `AnchorModifierMeta.Scope`, `Target` |
-| Function name resolution | `Functions.FindByName(name)` → `FunctionMeta.Overloads` → `FunctionOverload.Match` |
+| Function name resolution | `Functions.FindByName(name)` → `FunctionMeta.Overloads` → `FunctionOverload.Match`; CI-qualified lookup additionally uses `FunctionMeta.HasCIVariant` / `CIVariantOf` |
 | Operator resolution | `Operations.FindUnary(op, operandType)` / `Operations.FindCandidates(op, lhs, rhs)` |
 | Type widening compatibility | `TypeMeta.WidensTo` |
 | Type traits (orderable, equality, choice-element) | `TypeMeta.Traits` |
