@@ -10,5 +10,8 @@ namespace Precept.Pipeline;
 internal static class TypeChecker
 {
     internal static SemanticIndex Check(ConstructManifest manifest) =>
-        new(ImmutableArray<Diagnostic>.Empty);
+        new(ImmutableArray<Diagnostic>.Empty,
+            ImmutableArray<FieldReference>.Empty,
+            ImmutableArray<StateReference>.Empty,
+            ImmutableArray<EventReference>.Empty);
 }

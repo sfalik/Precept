@@ -316,7 +316,7 @@ flowchart LR
 
 | **Output** | `ConstructManifest` — `ImmutableArray<ParsedConstruct> Constructs` (each node: `ConstructMeta Meta`, `ImmutableArray<SlotValue> Slots`, `SourceSpan Span`) plus parse-phase diagnostics |
 |---|---|
-| **Catalog role** | The parser stamps kind identities at parse time: `ConstructKind` via `Meta.Kind`, `ActionKind` into `ActionChainSlot`, `ModifierKind` into `ModifierListSlot`. `TypeKind` is NOT stamped at parse time — `TypeExpressionSlot` carries `SourceSpan`; the type checker resolves type references. |
+| **Catalog role** | The parser stamps kind identities at parse time: `ConstructKind` via `Meta.Kind`, `ActionKind` into `ActionChainSlot`, `ModifierKind` into `ModifierListSlot`. `TypeKind` IS stamped at parse time — `TypeExpressionSlot` carries `TypeMeta`; the parser resolves type references via the `Types` catalog (Decision 2026-05-06 in parser.md). |
 | **Consumers** | TypeChecker, LS syntax-facing features (outline, folding, span-based context) |
 
 **How it serves the guarantee:** Structural fidelity means the type checker and downstream stages work from a faithful representation of the author's intent, including malformed programs — authoring tools can diagnose problems precisely because the structure is preserved, not discarded on error.
@@ -327,7 +327,7 @@ The parser guarantees to the type checker:
 
 - Every parsed region produces a `ParsedConstruct` node. Missing or invalid slots produce synthesized placeholder `SlotValue` instances — required content is never silently absent. The type checker does not re-validate structural completeness.
 - The `ConstructKind` for each construct is stamped via `Meta.Kind` at parse time. `ActionKind` and `ModifierKind` are resolved and stored in `ActionChainSlot` and `ModifierListSlot` subtypes at parse time.
-- `TypeKind` is NOT stamped at parse time — `TypeExpressionSlot` carries `SourceSpan`; the type checker resolves type references by looking up the span in the `Types` catalog.
+- `TypeKind` IS stamped at parse time — `TypeExpressionSlot` carries `TypeMeta`; the parser resolves type references via the `Types` catalog at parse time (Decision 2026-05-06 in parser.md). The type checker receives an already-resolved `TypeMeta` object.
 
 What the parser does NOT guarantee: name resolution, type compatibility, overload selection, or semantic legality. The type checker owns all semantic resolution.
 

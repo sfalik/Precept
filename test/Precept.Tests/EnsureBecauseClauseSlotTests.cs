@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Text.Json;
 using FluentAssertions;
 using Precept.Language;
 using Precept.Pipeline;
@@ -505,7 +506,7 @@ public class EnsureBecauseClauseSlotTests
         compilation.HasErrors.Should().BeFalse("valid DSL must compile without errors");
 
         var precept = Precept.Runtime.Precept.From(compilation);
-        var version = precept.Create();
+        var version = precept.Create(args: (JsonElement?)null);
 
         version.Should().NotBeNull("create must return a version");
     }
@@ -526,7 +527,7 @@ public class EnsureBecauseClauseSlotTests
         compilation.HasErrors.Should().BeFalse("valid DSL must compile without errors");
 
         var precept = Precept.Runtime.Precept.From(compilation);
-        var version = precept.Create();
+        var version = precept.Create(args: (JsonElement?)null);
 
         version.Should().NotBeNull("create must return a version");
     }
@@ -549,7 +550,7 @@ public class EnsureBecauseClauseSlotTests
         compilation.HasErrors.Should().BeFalse("StateEnsure without because is valid DSL");
 
         var precept = Precept.Runtime.Precept.From(compilation);
-        var version = precept.Create();
+        var version = precept.Create(args: (JsonElement?)null);
 
         version.Should().NotBeNull("runtime must handle absent optional BecauseClause without crashing");
     }
@@ -570,7 +571,7 @@ public class EnsureBecauseClauseSlotTests
         compilation.HasErrors.Should().BeFalse("EventEnsure without because is valid DSL");
 
         var precept = Precept.Runtime.Precept.From(compilation);
-        var version = precept.Create();
+        var version = precept.Create(args: (JsonElement?)null);
 
         version.Should().NotBeNull("runtime must handle absent optional BecauseClause without crashing");
     }
