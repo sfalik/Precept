@@ -36,6 +36,11 @@
 
 
 
+### 2026-05-07T23:22:15Z — R0 blocker resolved for TypeChecker Slice 0
+
+- George-12 renamed `TypedOutcomeKind` to `TransitionRowOutcome` in `SemanticIndex.cs` (`350f386`), closing Frank's only R0 blocker while preserving the 2974-test branch baseline.
+- Slice 0's durable shape record now spans the initial shape commits `5260065` / `abf2532` plus the naming fix, so Slice 1 symbol-population work can proceed on the naming-correct baseline.
+
 ### 2026-05-07T08:42:03-04:00 — Bare `<-` parse defect fixed; `ExpressionFormKind` exhaustiveness enforced
 
 - `ParseComputeExpression` now validates the token after `BackArrow` against a catalog-derived expression-start set; bare `<-` emits `ExpectedToken("expression")` and recovers structurally instead of synthesizing a fake compute expression.
@@ -89,6 +94,20 @@
 - Shipped parser metadata P4/P5: `ExpressionFormMeta.BindingPower` now owns member-access precedence and `ConstructSlot.TerminationTokens` now owns expression-slot boundary metadata.
 - Shipped diagnostic payload P3: `Diagnostic.RelatedSpans` landed as an init-only additive extension backed by a `readonly record struct RelatedSpan`.
 - Batch validation for the shipped George work closed green inside the 2949-test branch baseline; keep parser/checker follow-through catalog-derived and constructor-stable.
+
+
+
+### 2026-05-07T18:51:59Z — Pre-Slice 0: TypeChecker shape committed
+
+- All TypedXxx records, TypedExpression DU (14 subtypes), QualifierBinding DU, ActionSecondaryRole enum, TypedAction 3-shape DU, SemanticIndex full layout, CheckContext, and TypeCheckerTestHelpers committed.
+- `TransitionOutcome` enum renamed to `TypedOutcomeKind` to avoid collision with `ParsedOutcome.TransitionOutcome` record.
+- TypedDeclarations.cs stubs replaced with tombstone; all types migrated to SemanticIndex.cs.
+- 2974/2974 tests passing after shape commit.
+- TypedExpression subtypes created: TypedFieldRef, TypedArgRef, TypedLiteral, TypedBinaryOp, TypedUnaryOp, TypedFunctionCall, TypedMemberAccess, TypedConditional, TypedQuantifier, TypedInterpolatedString, TypedTypedConstant, TypedListLiteral, TypedPostfixOp, TypedErrorExpression.
+- SemanticIndex primary arrays: Fields, States, Events, TransitionRows, Rules, Ensures, AccessModes, StateHooks, EventHandlers, EditDeclarations, ComputedDeps, ConstraintRefs, FieldReferences, StateReferences, EventReferences, Diagnostics.
+- SemanticIndex secondary FrozenDictionary indexes: FieldsByName, StatesByName, EventsByName, EnsuresByState.
+- CheckContext key fields: Fields/States/Events lists + lookups, CurrentEventArgs, CurrentFieldIndex, FieldScopeMode, QuantifierBindings stack, all declaration accumulators, Diagnostics list.
+- Commits: 5260065 (shape), abf2532 (test helpers).
 
 ### 2026-05-07T18:51:59Z — H1 housekeeping: committed outstanding working-tree changes
 

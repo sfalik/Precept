@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+### 2026-05-07T23:22:15Z — R0 B1 resolution recorded
+
+- Pre-check measured `decisions.md` at 94420 bytes with 3 inbox files, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T23:22:15Z.
+- Deduplicated `george-s0-shape.md`, `frank-r0-review.md`, and `george-r0-b1-fixed.md` into one canonical ledger entry, then merged the late-arriving `soup-nazi-slice-1-tests.md` note during the same pass, cleared 4 processed inbox files total, and wrote orchestration logs for `frank-13` / `george-12` plus the `r0-b1-resolved` session log.
+- Health report: `decisions.md` 94420B -> 96305B; inbox processed = 4; history files summarized = 0.
+
 ### 2026-05-07T04:02:01Z — Parser prerequisite decisions recorded
 
 - Pre-check measured `decisions.md` at 80481 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran first and found 0 active dated entries eligible to move.

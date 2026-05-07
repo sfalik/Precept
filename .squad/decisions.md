@@ -12,6 +12,34 @@
 
 ---
 
+### 2026-05-07T23:22:15Z: TypeChecker Slice 1 test inventory recorded ahead of symbol population
+
+**By:** Scribe
+
+**Status:** Merged from inbox while implementation was still running.
+
+**Merged source:** `soup-nazi-slice-1-tests.md`.
+
+- Soup-Nazi wrote `test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs` with 55 Slice 1 tests covering type-kind resolution, collection element types, optional/modifier preservation, implied modifiers, state/event population, initial-state diagnostics, and name-index population.
+- At inbox-write time only 2 tests passed and 53 failed because George's Slice 1 symbol-population implementation had not landed yet and `SemanticIndex` was still effectively empty.
+- Durable gate: treat the test matrix as ready for R1 once George's Slice 1 commit arrives; `LogBy` / `QueueBy` key-type coverage remains explicitly deferred beyond this batch.
+
+---
+
+### 2026-05-07T23:22:15Z: TypeChecker Slice 0 R0 closed after `TransitionRowOutcome` rename
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (3 files -> 1 canonical entry).
+
+**Merged sources:** `george-s0-shape.md`, `frank-r0-review.md`, `george-r0-b1-fixed.md`.
+
+- George committed the TypeChecker Slice 0 semantic shape in `5260065` plus `abf2532`: `SemanticIndex` full layout, `CheckContext` accumulators/lookups, the 14-node `TypedExpression` DU, `QualifierBinding`, `ConstraintIdentity`, `TypedAction`, and TypeChecker test-helper wiring.
+- Frank's R0 review found one blocker only: `TypedOutcomeKind` solved the `TransitionOutcome` name collision but violated enum naming conventions; the correct disambiguation is `TransitionRowOutcome`.
+- George resolved B1 in `350f386` by renaming `TypedOutcomeKind` to `TransitionRowOutcome` in `SemanticIndex.cs`; all other D# decisions remained compliant and the 2974-test branch baseline stayed intact.
+
+---
+
 ### 2026-05-08: Parser remediation design decisions Q5–Q8 locked (OutcomesCatalog, NameBinder, quantifier scoping, forward references)
 
 **By:** Coordinator (Shane decisions)

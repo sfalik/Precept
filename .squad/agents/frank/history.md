@@ -24,6 +24,18 @@
 
 ## Learnings
 
+### 2026-05-07: R0 Review — TypeChecker Shape (S0)
+
+- **Verdict: BLOCKED on B1.** One naming violation: `TypedOutcomeKind` must be `TransitionRowOutcome`. The spec name `TransitionOutcome` is unavailable — it's already a `sealed record` in `Precept.Pipeline` (the `ParsedOutcome` DU subtype). George's `TypedOutcomeKind` solves the collision but applies the `Typed` prefix to an enum, violating established convention (`ActionSecondaryRole`, `FieldScopeMode` — no Typed prefix). `TransitionRowOutcome` is the correct redirect.
+
+- **Everything else in S0 is clean.** D4 (ImmutableArray primary / FrozenDictionary secondary), D5 (SecondaryRole invariant documented), D9 (QualifierBinding DU with correct subtypes), D10 (FromState null-doc), D24 (TypedEditDeclaration placeholder), D26 (SemanticIndex debug-assert XML doc) — all compliant. CheckContext is pure accumulator state, TypeChecker stubs throw NotImplementedException, test helpers wire the full pipeline.
+
+- **TypedOutcomeKind naming pattern to watch:** When spec names collide with existing types in the same namespace, implementors will reach for prefix/suffix disambiguation. `Typed` prefix on enums is wrong. Always check whether the spec name is available first; if blocked, use a compound noun (`TransitionRowOutcome`) rather than a prefix convention.
+
+- **S0 shape quality is high.** 14 TypedExpression subtypes (13 spec + TypedPostfixOp for IsSet/IsNotSet), QualifierBinding DU correct, ConstraintIdentity DU correctly shared, segment types for TypedInterpolatedString correct, SemanticIndex.Empty factory present, CheckContext fully mirrors the spec shape including quantifier binding stack.
+
+
+
 
 
 - SlotValue shape principle: closed-vocabulary tokens (types, modifiers, access modes) are resolved by the parser at recognition time — never deferred as spans. String literals (`because` clause) are extracted at parse time. Only expressions (open-ended, precedence-sensitive) are deferred as `ParsedExpression`.
@@ -63,6 +75,11 @@
 - `docs/language/catalog-system.md` now records `FunctionMeta.HasCIVariant` and `FunctionMeta.CIVariantOf` as Functions-catalog fields used by the TypeChecker to resolve CI-qualified function calls.
 
 ## Recent Updates
+
+### 2026-05-07T23:22:15Z — R0 TypeChecker shape review closed
+
+- Frank-13's R0 review found one blocker only: `TypedOutcomeKind` had to become `TransitionRowOutcome` because `TransitionOutcome` is already occupied by the parsed-outcome DU and enum `Typed` prefixes are non-canonical.
+- All other Slice 0 D# decisions were compliant, and George-12 resolved the blocker in `350f386`; the durable record now lives in `decisions.md` plus the paired orchestration/session logs.
 
 ### Historical summary through 2026-05-07T09:36:17Z — Parser and NameBinder design baseline
 
