@@ -146,3 +146,6 @@
 - Added dedicated parser coverage for `ParsedTypeReference`, interpolated-string segments, collection mutation action payloads, wildcard routing forms, and richer event argument lists.
 - The current parser surface matters more than remembered DSL sketches: collection actions parse as `verb target value`, plain quoted strings stay `LiteralExpression`, and bare `queue` currently resolves through `TypeKind.QueueBy` metadata.
 - Recovery assertions should pin actual parser sentinels, not imagined ones: empty guards use `MissingExpression`, while incomplete binary operands currently recover with the parser's placeholder literal plus `ExpectedToken`.
+
+
+### 2026-05-07T21:07:33Z — Scribe merged coverage-gap inbox  - Scribe merged `.squad/decisions/inbox/soup-nazi-coverage-gaps-addressed.md` into `.squad/decisions/decisions.md` and cleared the inbox copy.
