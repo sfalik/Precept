@@ -54,7 +54,7 @@ Inspection and commit paths execute the **same prebuilt plans** — the only dif
 | **Computed field recomputation** | After mutations and before constraint evaluation: walk `SlotLayout.ComputedSlots` and re-evaluate |
 | **Structured outcome production** | Produce `EventOutcome`, `UpdateOutcome` discriminated unions — never throw for in-domain failures |
 | **Inspection production** | Produce `EventInspection`, `UpdateInspection` with full row-by-row and constraint-by-constraint detail |
-| **Fault backstop routing** | At impossible-path sites: call `Faults.Create(descriptor, context)` with the planted `FaultSiteDescriptor` |
+| **Fault backstop routing** | At impossible-path sites: check `opcode.FaultSite` (CC#6 `FaultSiteAnnotation?`); null = no check; non-null → `Faults.Create(annotation, context)` |
 
 ### Out of Scope
 
@@ -748,10 +748,18 @@ internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slo
     Span<PreceptValue> stack = stackalloc PreceptValue[plan.MaxStackDepth];
     int top = 0;
     foreach (var opcode in plan.Opcodes)
+    {
         Dispatch(opcode, slots, args, stack, ref top);
+
+        // CC#6: Defense-in-depth fault backstop — zero overhead when FaultSite is null (proven safe)
+        if (opcode.FaultSite is { } annotation && IsFaultCondition(stack, top, opcode))
+            return Fail(annotation.Code, annotation.PreventedBy, annotation.Site);
+    }
     return stack[0];
 }
 ```
+
+**Two-layer defense model (CC#6):** The first line of defense is the compile gate — the type checker and proof engine emit diagnostics for unresolved obligations, preventing the `Precept` object from being built unless the author fixes them. The second line is the runtime backstop — `FaultSiteAnnotation` on opcodes compiled from unresolved sites (force-builds, catalog evolution, or compiler bugs). For a cleanly-compiled precept, every `opcode.FaultSite` is `null`, and the null check is the only runtime cost — effectively zero overhead. See `proof-engine.md §2` for the structural elision model and `precept-builder.md §Pass 4` for the planting contract.
 
 **Operator dispatch (opcode-embedded, zero-knowledge evaluator):**
 
@@ -1181,7 +1189,7 @@ public sealed record ConstraintViolation(
 );
 ```
 
-When an opcode hits a fault backstop site(identified by a `FaultSiteDescriptor` planted by the Precept Builder), the evaluator produces a structured `Fault`:
+When an opcode hits a fault backstop site (identified by a non-null `FaultSiteAnnotation` on the opcode, stamped by the Precept Builder per CC#6), the evaluator produces a structured `Fault`:
 
 ```csharp
 internal static Fault Fail(FaultCode code, params object?[] args)
@@ -1218,7 +1226,7 @@ Faults are **never thrown** — they are returned as structured outcome variants
 | `ExecutionRow` | Guard plan, action plans, target state, outcome kind |
 | `ExecutionPlan` | Flat opcode array for expressions |
 | `ActionPlan` | Action kind, target slot, value plan, into slot |
-| `FaultSiteDescriptor` | Fault code + preventing diagnostic code + source location |
+| `FaultSiteAnnotation` | Nullable annotation on opcode: fault code + preventing diagnostic code + source location (CC#6). Null = proven safe. |
 | `ConstraintDescriptor` | Constraint kind, anchors, expression plan, because clause |
 | `FieldDescriptor` | Slot index, type, modifiers, access modes, computed plan |
 
@@ -1834,7 +1842,7 @@ This enables progressive UIs: show users what actions become available as they f
 
 9. **Inspection–commit plan sharing** — Confirmed: same plans, same execution. Disposition (report vs. enforce) is the only difference.
 
-10. **Fault backstop threading** — Every backstop site must carry a resolved `FaultSiteDescriptor` from the `Precept` model. The evaluator calls `Faults.Create(code, args)`, not a raw throw.
+10. **Fault backstop threading (CC#6)** — Every backstop site carries a non-null `FaultSiteAnnotation` on the opcode, stamped by the builder from `ProofLedger.FaultSiteLinks`. The evaluator checks `opcode.FaultSite` after dispatch; null = proven safe, no check. Non-null triggers `Faults.Create(code, args)`, not a raw throw. For cleanly-compiled precepts, all annotations are null — zero overhead.
 
 11. **`ConstraintViolation` full shape** — Canonical 5-field shape is the designed public contract. Implementation of `FailingSubexpression` and `FailingValue` population requires evaluator instrumentation (tracking which opcode produced the failing value). `Because` comes from `ConstraintDescriptor` metadata; `RelevantFields` is a snapshot of `version.Slots` at evaluation time. Full population is an implementation milestone, not a design question.
 

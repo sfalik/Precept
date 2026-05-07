@@ -204,9 +204,8 @@ public enum ProofStrategy
 }
 ```
 
-> **Open Question:** `ProofObligation.Site` structural identity
-> `ProofObligation.Site` currently stores the full `TypedExpression` node, but the runtime-side installation path eventually needs a stable structural reference such as a row, action, or opcode site. The proof contract needs to decide whether obligations carry both views or whether the builder derives structural identity from the typed-expression ownership graph.
-> *Flagged: 2026-05-04*
+> **Resolved (CC#6):** `ProofObligation.Site` structural identity
+> The builder resolves structural binding during Pass 4 (expression compilation). When the builder visits a `TypedExpression` to emit an opcode, it matches against `ProofLedger.FaultSiteLinks` by `ProofObligation.Site` identity. The structural binding is the opcode itself — a nullable `FaultSiteAnnotation?` is stamped directly on the emitted opcode. No separate structural reference or opcode-offset lookup is needed; the annotation lives on the opcode, not on a side table. See `precept-builder.md §Pass 4` for the planting contract.
 
 #### FaultSiteLink
 
@@ -221,11 +220,24 @@ public sealed record FaultSiteLink(
 );
 ```
 
-The Precept Builder consumes these to plant `FaultSiteDescriptor` backstops — defense-in-depth runtime checks for operations that could not be proven safe.
+The Precept Builder consumes these to plant `FaultSiteAnnotation` backstops — defense-in-depth runtime checks for operations that could not be proven safe.
 
-> **Open Question:** `FaultSiteLink.Site` to `FaultSiteDescriptor` binding
-> `FaultSiteLink.Site` is still only a `SourceSpan`, while runtime backstops ultimately need a structural binding such as an `ExecutionRow`, constraint descriptor, or opcode offset. The proof-to-runtime bridge needs one transformation contract before the builder can plant backstops deterministically.
-> *Flagged: 2026-05-04*
+> **Resolved (CC#6):** `FaultSiteLink.Site` to runtime binding
+> The builder resolves `FaultSiteLink` to a structural binding during Pass 4 (expression compilation). When the builder compiles a `TypedExpression` into an opcode, it matches `ProofObligation.Site` (the `TypedExpression`) against the expression being compiled. If a matching `FaultSiteLink` exists, the builder stamps a `FaultSiteAnnotation` on the opcode. The `FaultSiteLink.Site` (`SourceSpan`) is carried forward in the annotation for diagnostics/logging; the structural binding is the opcode itself.
+>
+> **Canonical annotation shape:**
+>
+> ```csharp
+> public sealed record FaultSiteAnnotation(
+>     FaultCode Code,           // Runtime fault to fire if reached
+>     DiagnosticCode PreventedBy, // Authoring-time diagnostic that would prevent this
+>     SourceSpan Site           // Source location for diagnostics/logging
+> );
+> // On each Opcode — null = proven safe
+> FaultSiteAnnotation? FaultSite
+> ```
+>
+> **Structural elision model:** Proved obligations produce no `FaultSiteLink` → no annotation → zero evaluator overhead. This matches the SPARK Ada model (strip proven checks) realized through Precept's gate architecture. See `precept-builder.md §Pass 4` for the planting contract and `evaluator.md §7.3` for the consumption contract.
 
 #### ConstraintInfluenceEntry
 
@@ -837,15 +849,15 @@ If the `SemanticIndex` contains `TypedErrorExpression` nodes (from type checker 
 
 ### Decision 2: ProofLedger Does NOT Cross Compile-Runtime Boundary
 
-**Decision:** The `ProofLedger` is a compile-time artifact. Only `FaultSiteDescriptor` records (planted by the Precept Builder) cross into runtime.
+**Decision:** The `ProofLedger` is a compile-time artifact. Only `FaultSiteAnnotation` records (stamped on opcodes by the Precept Builder per CC#6) cross into runtime.
 
 **Rationale:**
 - **Separation of concerns:** Proof is analysis; runtime is execution. The runtime model should contain only what's needed for execution.
 - **Memory efficiency:** Runtime instances don't carry proof baggage. A deployed precept includes only field descriptors, transition tables, and backstops.
-- **Defense-in-depth:** `FaultSiteDescriptor` backstops are defense-in-depth — they should never fire if proof is correct. They exist for belt-and-suspenders safety, not as a proof continuation mechanism.
+- **Defense-in-depth:** `FaultSiteAnnotation` backstops are defense-in-depth — they should never fire if proof is correct. They exist for belt-and-suspenders safety, not as a proof continuation mechanism.
 
 **What crosses:**
-- `FaultSiteDescriptor` — location + fault code + prevention diagnostic code
+- `FaultSiteAnnotation` — nullable annotation on each opcode: fault code + preventing diagnostic code + source location (CC#6)
 - Constraint execution plans (from evaluator, not proof engine)
 
 **What does not cross:**
@@ -1011,7 +1023,7 @@ If an obligation cannot be discharged by the four strategies, the author adds a 
 
 ### No Runtime Obligation Checking
 
-The `ProofLedger` does NOT cross the compile-runtime boundary. Only `FaultSiteDescriptor` records (planted by the Precept Builder) cross into runtime.
+The `ProofLedger` does NOT cross the compile-runtime boundary. Only `FaultSiteAnnotation` records (stamped on opcodes by the Precept Builder per CC#6) cross into runtime.
 
 **Why not pass obligations to runtime?**
 - Runtime instances would carry proof baggage that's never used in execution

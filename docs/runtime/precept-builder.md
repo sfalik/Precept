@@ -37,7 +37,7 @@ The builder executes six sequential transformation passes:
 3. **Dispatch index pass** — build `TransitionDispatchIndex` and `ReachabilityIndex` from topology
 4. **Constraint plan pass** — sort constraints into activation-anchor buckets
 5. **Execution plan pass** — compile typed expressions and actions into flat opcode arrays
-6. **Fault backstop pass** — plant `FaultSiteDescriptor` entries from proof ledger links
+6. **Fault backstop pass** — materialize `Precept.FaultBackstops` from per-opcode `FaultSiteAnnotation` entries; build `ConstraintInfluenceMap`
 
 ---
 
@@ -54,7 +54,7 @@ The builder executes six sequential transformation passes:
 | **Reachability index building** | Build `ReachabilityIndex` from `StateGraph` — pre-computed state reachability sets |
 | **Constraint plan organization** | Sort `ConstraintDescriptor` entries into activation-anchor buckets (`always`, `in`, `from`, `to`, `on`) |
 | **Execution plan compilation** | Compile typed expressions and action chains into flat slot-addressed opcode arrays |
-| **Fault backstop planting** | Read `ProofLedger.FaultSiteLinks` and plant `FaultSiteDescriptor` entries at each site |
+| **Fault backstop planting** | During Pass 4 expression compilation: stamp `FaultSiteAnnotation?` on opcodes from unresolved proof obligations (CC#6). Pass 6 materializes `Precept.FaultBackstops` and builds `ConstraintInfluenceMap`. |
 | **Constraint influence map construction** | Reshape `ProofLedger.ConstraintInfluenceEntries` into query-efficient `ConstraintInfluenceMap` |
 
 ### Out of Scope
@@ -207,8 +207,8 @@ The builder executes six sequential passes, each producing artifacts consumed by
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Pass 6: Fault Backstop Pass                                         │
-│  • Read FaultSiteLinks from ProofLedger                              │
-│  • Plant FaultSiteDescriptor at each site                            │
+│  • Materialize Precept.FaultBackstops from per-opcode annotations     │
+│  • Plant FaultSiteDescriptor tooling array from FaultSiteAnnotation   │
 │  • Build ConstraintInfluenceMap from ConstraintInfluenceEntries      │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
@@ -227,7 +227,7 @@ The builder executes six sequential passes, each producing artifacts consumed by
 | Pass 3 (Dispatch Index) | Pass 1, `StateGraph` | `TransitionDispatchIndex`, `ReachabilityIndex` |
 | Pass 4 (Execution Plan) | Pass 1 (slot indexes) | `ExecutionPlan`, `ActionPlan`, `ExecutionRow` |
 | Pass 5 (Constraint Plan) | Pass 4 (compiled expressions) | `ConstraintPlanIndex` |
-| Pass 6 (Fault Backstop) | Pass 5, `ProofLedger` | `FaultSiteDescriptor[]`, `ConstraintInfluenceMap` |
+| Pass 6 (Fault Backstop) | Pass 4 (opcode annotations), `ProofLedger` | `FaultSiteDescriptor[]` (tooling), `ConstraintInfluenceMap` |
 
 **Valid execution order:** 1 → 2 (parallel with 3) → 4 → 5 → 6 → assemble `Precept`
 
@@ -349,6 +349,35 @@ public sealed record ReachabilityIndex(
 
 Compile typed action chains and typed guard/constraint expressions from the `SemanticIndex` into flat opcode arrays.
 
+**Fault backstop planting (CC#6):** During expression compilation, the builder stamps `FaultSiteAnnotation` on opcodes compiled from expressions with unresolved proof obligations. For each `TypedExpression` being compiled, the builder checks whether `ProofLedger.FaultSiteLinks` contains a link whose `Obligation.Site` matches the expression. If found, the resulting opcode carries a non-null `FaultSite`; if not found, `FaultSite` is null (proven safe — structural absence). This is the canonical planting contract; see `proof-engine.md §2` for the output shape and `evaluator.md §7.3` for the consumption contract.
+
+```csharp
+/// Annotation on an opcode for a defense-in-depth fault backstop.
+/// Present ONLY for Unresolved proof obligations. Null = proven safe.
+public sealed record FaultSiteAnnotation(
+    FaultCode Code,           // Runtime fault to fire if reached
+    DiagnosticCode PreventedBy, // Authoring-time diagnostic that would prevent this
+    SourceSpan Site           // Source location for diagnostics/logging
+);
+```
+
+**Planting pseudocode:**
+
+```csharp
+Opcode CompileExpression(TypedExpression expr, ProofLedger ledger)
+{
+    var opcode = EmitOpcode(expr);
+
+    // Match by TypedExpression identity — the proof obligation's Site
+    var link = ledger.FaultSiteLinks
+        .FirstOrDefault(l => l.Obligation.Site == expr);
+
+    return link is not null
+        ? opcode with { FaultSite = new FaultSiteAnnotation(link.FaultCode, link.DiagnosticCode, link.Site) }
+        : opcode;  // FaultSite = null — proven safe
+}
+```
+
 **Opcode Inventory:**
 
 An `ExecutionPlan` is a flat array of `Opcode` values that the evaluator walks left to right. Opcodes operate on a stack (push/pop) and reference fields by slot index.
@@ -380,7 +409,11 @@ public sealed record ExecutionPlan(
     int MaxStackDepth           // computed at build time; compiler enforces ≤ 32
 );
 
-public abstract record Opcode;
+public abstract record Opcode
+{
+    /// Nullable fault-site annotation (CC#6). Null = proven safe; non-null = unresolved obligation backstop.
+    public FaultSiteAnnotation? FaultSite { get; init; }
+}
 public sealed record LoadSlot(int SlotIndex) : Opcode;
 public sealed record LoadArg(int ArgSlotIndex) : Opcode;  // pre-resolved at build time; name resolution complete before execution
 public sealed record LoadLit(PreceptValue Value) : Opcode;  // literals pre-wrapped at build time
@@ -466,7 +499,9 @@ var bucket = Constraints.GetMeta(constraint.Kind) switch
 
 ### Pass 6 — Fault Backstop Pass
 
-For each `FaultSiteLink` in `ProofLedger.FaultSiteLinks`, plant a `FaultSiteDescriptor` in the relevant `ExecutionRow` or `ConstraintDescriptor` at the site identified by the link.
+**Note (CC#6):** Expression-site fault backstops are now planted during Pass 4 as `FaultSiteAnnotation?` on each opcode (see above). Pass 6 retains ownership of the `ConstraintInfluenceMap` construction and any residual fault-site bookkeeping.
+
+The `Precept.FaultBackstops` flat array is a **derived/tooling artifact** — it materializes all non-null `FaultSiteAnnotation` entries across all execution plans for diagnostic enumeration ("what backstops does this precept carry?"). It is NOT the execution-path contract; the evaluator reads `op.FaultSite` inline during dispatch.
 
 ```csharp
 public sealed record FaultSiteDescriptor(
@@ -476,7 +511,7 @@ public sealed record FaultSiteDescriptor(
 );
 ```
 
-**`FaultSiteDescriptor` planting mechanism:** The builder plants `FaultSiteDescriptor` backstops, but the exact planting mechanism (placement slot on `ExecutionRow`, on `ConstraintDescriptor`, or in `Precept.FaultBackstops` flat array) is a pending implementation decision. The evaluator fault routing must be structural rather than implicit.
+**`FaultSiteDescriptor` and `FaultSiteAnnotation` relationship:** `FaultSiteDescriptor` is the materialized tooling/query shape derived from the per-opcode `FaultSiteAnnotation` annotations. Both carry the same three fields. `FaultSiteDescriptor` exists on `Precept.FaultBackstops` for inspection; `FaultSiteAnnotation` lives on opcodes for execution routing.
 
 Fault backstops are defense-in-depth. A correctly-proven program never reaches them at runtime. When reached, they fire the `FaultCode`'s runtime behavior (log + graceful failure) via `Faults.Create(descriptor, context)`.
 
@@ -599,7 +634,7 @@ If `Precept.From` throws:
 - Every `EventDescriptor` has a unique `Name` within the precept
 - Every `TransitionDispatchIndex` entry corresponds to a `TypedTransitionRow` in `SemanticIndex`
 - Every `ConstraintDescriptor` in `ConstraintPlanIndex` corresponds to a `TypedRule` or `TypedEnsure` in `SemanticIndex`
-- Every `FaultSiteDescriptor` has a `FaultCode` with a `[StaticallyPreventable(DiagnosticCode)]` attribute
+- Every `FaultSiteAnnotation` (on opcodes) and `FaultSiteDescriptor` (on `Precept.FaultBackstops`) has a `FaultCode` with a `[StaticallyPreventable(DiagnosticCode)]` attribute
 
 ### Slot Index Invariants
 
