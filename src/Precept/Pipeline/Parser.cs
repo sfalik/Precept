@@ -23,6 +23,12 @@ public static partial class Parser
     private static readonly FrozenSet<TokenKind> FieldModifierTokens =
         Modifiers.ByFieldToken.Keys.ToFrozenSet();
 
+    private static readonly FrozenSet<TokenKind> ExpressionStartTokens =
+        ExpressionForms.All
+            .Where(form => !form.IsLeftDenotation)
+            .SelectMany(form => form.LeadTokens)
+            .ToFrozenSet();
+
     // ═══════════════════════════════════════════════════════════════════════════════
     //  Public API
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -40,6 +46,7 @@ public static partial class Parser
     //  ParserState — private mutable cursor over the token array
     // ═══════════════════════════════════════════════════════════════════════════════
 
+    [global::Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
     private sealed partial class ParserState
     {
         private readonly ImmutableArray<Token> _tokens;

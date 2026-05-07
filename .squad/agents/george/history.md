@@ -184,3 +184,9 @@
 - `ParsedExpression` currently has 13 sealed subtypes, one per `ExpressionFormKind`, with parser-owned structural payloads only; semantic resolution remains a `TypedExpression` responsibility.
 - Durable implementation choices to retain: postfix presence checks are represented by one `PostfixOperationExpression` with `bool IsNegated`, and CI function calls stay name-based until the `ByCIVariantOf` vs parser-stamped `FunctionKind` decision is implemented.
 
+### 2026-05-07T08:42:03-04:00 — Bare `<-` parse defect fixed; `ExpressionFormKind` exhaustiveness enforced
+- `ParseComputeExpression` now validates the token after `BackArrow` against a catalog-derived `ExpressionStartTokens` set built from `ExpressionForms.All`; bare `<-` now emits `ExpectedToken("expression", ...)` and recovers to the next construct boundary instead of synthesizing a fake compute expression.
+- Added `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` to `ParserState` and method-level `[HandlesCatalogMember]` coverage across the Pratt parser handlers so new expression-form enum members cannot land without PRECEPT0019 catching missing parser coverage.
+- Sanity check passed: removing the `Quantifier` annotation produced `PRECEPT0019` on `ParserState`; restoring it returned the project to green.
+- Validation: `dotnet build src\Precept\Precept.csproj --no-restore --nologo` and `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` both passed; suite result = 2810/2810 green.
+

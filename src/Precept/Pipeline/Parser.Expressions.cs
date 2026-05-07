@@ -44,8 +44,7 @@ public static partial class Parser
                 case TokenKind.True:
                 case TokenKind.False:
                 case TokenKind.TypedConstant:
-                    Advance();
-                    return new LiteralExpression(token.Kind, token.Text, token.Span);
+                    return ParseLiteral();
 
                 // ── Interpolated strings ────────────────────────────────
                 case TokenKind.StringStart:
@@ -68,25 +67,8 @@ public static partial class Parser
 
                 // ── Prefix unary: not ───────────────────────────────────
                 case TokenKind.Not:
-                {
-                    var opToken = Advance();
-                    var meta = Operators.ByToken[(TokenKind.Not, Arity.Unary)];
-                    var operand = ParseExpression(meta.Precedence, terminates);
-                    return new UnaryOperationExpression(
-                        TokenKind.Not, operand,
-                        SourceSpan.Covering(opToken.Span, operand.Span));
-                }
-
-                // ── Prefix unary: minus (negate) ────────────────────────
                 case TokenKind.Minus:
-                {
-                    var opToken = Advance();
-                    var meta = Operators.ByToken[(TokenKind.Minus, Arity.Unary)];
-                    var operand = ParseExpression(meta.Precedence, terminates);
-                    return new UnaryOperationExpression(
-                        TokenKind.Minus, operand,
-                        SourceSpan.Covering(opToken.Span, operand.Span));
-                }
+                    return ParseUnaryOperation(terminates);
 
                 // ── Conditional: if ... then ... else ... ───────────────
                 case TokenKind.If:
@@ -130,6 +112,24 @@ public static partial class Parser
                 default:
                     return ParseBinaryInfix(left, terminates);
             }
+        }
+
+        [HandlesCatalogMember(ExpressionFormKind.Literal)]
+        private ParsedExpression ParseLiteral()
+        {
+            var token = Advance();
+            return new LiteralExpression(token.Kind, token.Text, token.Span);
+        }
+
+        [HandlesCatalogMember(ExpressionFormKind.UnaryOperation)]
+        private ParsedExpression ParseUnaryOperation(Func<bool> terminates)
+        {
+            var opToken = Advance();
+            var meta = Operators.ByToken[(opToken.Kind, Arity.Unary)];
+            var operand = ParseExpression(meta.Precedence, terminates);
+            return new UnaryOperationExpression(
+                opToken.Kind, operand,
+                SourceSpan.Covering(opToken.Span, operand.Span));
         }
 
         // ── Binding power query for led position ────────────────────────────────
@@ -181,6 +181,8 @@ public static partial class Parser
         //  Expression form sub-parsers
         // ═══════════════════════════════════════════════════════════════════════════════
 
+        [HandlesCatalogMember(ExpressionFormKind.Identifier)]
+        [HandlesCatalogMember(ExpressionFormKind.FunctionCall)]
         private ParsedExpression ParseIdentifierOrFunctionCall(Func<bool> terminates)
         {
             var idToken = Advance();
@@ -199,6 +201,7 @@ public static partial class Parser
             return new IdentifierExpression(idToken.Text, idToken.Span);
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.Grouped)]
         private ParsedExpression ParseGrouped(Func<bool> terminates)
         {
             var openParen = Advance(); // consume '('
@@ -208,6 +211,7 @@ public static partial class Parser
                 inner, SourceSpan.Covering(openParen.Span, closeParen.Span));
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
         private ParsedExpression ParseListLiteral(Func<bool> terminates)
         {
             var openBracket = Advance(); // consume '['
@@ -232,6 +236,7 @@ public static partial class Parser
                 SourceSpan.Covering(openBracket.Span, closeBracket.Span));
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.Conditional)]
         private ParsedExpression ParseConditional(Func<bool> terminates)
         {
             var ifToken = Advance(); // consume 'if'
@@ -247,6 +252,7 @@ public static partial class Parser
                 SourceSpan.Covering(ifToken.Span, elseBranch.Span));
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.Quantifier)]
         private ParsedExpression ParseQuantifier(Func<bool> terminates)
         {
             var quantToken = Advance(); // consume each/any/no
@@ -263,6 +269,7 @@ public static partial class Parser
                 SourceSpan.Covering(quantToken.Span, closeParen.Span));
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.CIFunctionCall)]
         private ParsedExpression ParseCIFunctionCall(Func<bool> terminates)
         {
             var tildeToken = Advance(); // consume '~'
@@ -275,6 +282,8 @@ public static partial class Parser
                 SourceSpan.Covering(tildeToken.Span, closeParen.Span));
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
+        [HandlesCatalogMember(ExpressionFormKind.MethodCall)]
         private ParsedExpression ParseMemberAccessOrMethodCall(ParsedExpression left, Func<bool> terminates)
         {
             Advance(); // consume '.'
@@ -313,6 +322,7 @@ public static partial class Parser
             return meta.IsValidAsMemberName;
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
         private ParsedExpression ParsePostfixIs(ParsedExpression left)
         {
             // Peek ahead: is set / is not set
@@ -344,6 +354,7 @@ public static partial class Parser
             return left;
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
         private ParsedExpression ParseBinaryInfix(ParsedExpression left, Func<bool> terminates)
         {
             var opToken = Peek();
@@ -363,6 +374,7 @@ public static partial class Parser
 
         // ── Interpolated string handling ────────────────────────────────────────
 
+        [HandlesCatalogMember(ExpressionFormKind.Literal)]
         private ParsedExpression ParseInterpolatedString()
         {
             var startToken = Advance(); // consume StringStart
@@ -382,6 +394,7 @@ public static partial class Parser
                 SourceSpan.Covering(startToken.Span, lastSpan));
         }
 
+        [HandlesCatalogMember(ExpressionFormKind.Literal)]
         private ParsedExpression ParseInterpolatedTypedConstant()
         {
             var startToken = Advance(); // consume TypedConstantStart
@@ -470,11 +483,17 @@ public static partial class Parser
                 return MakeSentinel(slot);
 
             var arrowToken = Advance(); // consume '<-'
+            var nextToken = Peek();
 
-            if (IsAtEnd || IsAtConstructBoundary())
+            if (!ExpressionStartTokens.Contains(nextToken.Kind))
             {
-                var emptyExpr = new LiteralExpression(TokenKind.True, "true", arrowToken.Span);
-                return new ComputeExpressionSlot(emptyExpr, arrowToken.Span);
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.ExpectedToken, nextToken.Span, "expression", nextToken.Text));
+
+                while (!IsAtEnd && !IsAtConstructBoundary())
+                    Advance();
+
+                return MakeSentinel(slot);
             }
 
             var expr = ParseExpression(0, () => IsAtConstructBoundary());
