@@ -559,27 +559,27 @@ public sealed record SemanticIndex(
     ImmutableArray<ComputedFieldDep> ComputedDeps,
     ImmutableArray<ConstraintFieldRefs> ConstraintRefs,
 
+    // Reference sites — recorded at resolution time for LS semantic tokens and navigation
+    ImmutableArray<FieldReference> FieldReferences,
+    ImmutableArray<StateReference> StateReferences,
+    ImmutableArray<EventReference> EventReferences,
+
     // Diagnostics
     ImmutableArray<Diagnostic> Diagnostics
 );
 ```
 
-> **Open Question:** `SemanticIndex.References` collection
-> The canonical `SemanticIndex` shape does not currently expose a general reference-site inventory, but language-server.md still describes Pass 2 semantic tokens as walking `index.References`. The type-checker contract needs to settle whether a heterogeneous references array exists or whether tooling must derive that view from narrower structures.
-> *Flagged: 2026-05-04*
+> **Resolved (CC#3):** `SemanticIndex` reference collections — Option A adopted. Three typed per-category arrays (`FieldReferences`, `StateReferences`, `EventReferences`) are added. The type checker records every reference site (span + resolved binding) at resolution time. No general heterogeneous `References` array — per-type arrays are sufficient for LS Pass 2 and navigation. Reference types: `FieldReference(TypedField Field, SourceSpan Site)`, `StateReference(TypedState State, SourceSpan Site)`, `EventReference(TypedEvent Event, SourceSpan Site)`.
+> *Closed: 2026-05-06. CC#3 resolved.*
 
-> **Open Question:** `SemanticIndex.FieldReferences` collection
-> Language-server Pass 2 and reference navigation both need field-use spans without rewalking every typed declaration. If field references are not first-class on `SemanticIndex`, the type-checker doc must define the exact derivation path tooling is expected to use instead.
-> *Flagged: 2026-05-04*
+> **Resolved (CC#3):** `SemanticIndex.FieldReferences` — first-class output. See ruling above.
+> *Closed: 2026-05-06. CC#3 resolved.*
 
-> **Open Question:** `SemanticIndex.StateReferences` collection
-> State-reference semantic tokens currently assume a dedicated `StateReferences` collection on `SemanticIndex`, but that collection is absent from the canonical shape. The contract needs to decide whether state references are emitted directly or reconstructed downstream from typed transition structures.
-> *Flagged: 2026-05-04*
+> **Resolved (CC#3):** `SemanticIndex.StateReferences` — first-class output. See ruling above.
+> *Closed: 2026-05-06. CC#3 resolved.*
 
-> **Open Question:** `SemanticIndex.EventReferences` collection
-> Event-reference highlighting and navigation likewise assume a dedicated `EventReferences` collection that the canonical `SemanticIndex` does not define. The type-checker contract must either promote event references to first-class output or specify the sanctioned reconstruction rule for tooling consumers.
-> *Flagged: 2026-05-04*
-> *Source: catalog-gap-register.md #16 — BLOCKING for LS Pass 2*
+> **Resolved (CC#3):** `SemanticIndex.EventReferences` — first-class output. See ruling above.
+> *Closed: 2026-05-06. CC#3 resolved.*
 
 ---
 

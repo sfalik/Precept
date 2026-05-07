@@ -9,10 +9,10 @@
 |---|---|---|---|
 | CC#1 | Expression Tree Design | [Decided] | Parser, Type Checker, Proof Engine, Precept Builder, Evaluator |
 | CC#2 | SlotValue Subtype Shapes | [Decided] | Parser, Type Checker |
-| CC#3 | SemanticIndex Reference-Tracking Collections | [Open Question — canonical doc: `docs/compiler/type-checker.md §7.1 SemanticIndex`] | Language Server semantic tokens, tooling surface reference routing |
-| CC#4 | `Compilation.Tokens` Field | [Open Question — canonical doc: `docs/runtime/precept-builder.md §2 Inputs and Outputs`] | Builder-facing compilation contract, lexical token tooling |
+| CC#3 | SemanticIndex Reference-Tracking Collections | ✅ Resolved — Option A: typed reference arrays (`FieldReferences`, `StateReferences`, `EventReferences`) added to `SemanticIndex`. No general heterogeneous `References` array. Canonical: `docs/compiler/type-checker.md §7.1`. | Language Server semantic tokens, tooling surface reference routing |
+| CC#4 | `Compilation.Tokens` Field | ✅ Resolved — already present in code stub as `TokenStream Tokens` (first field). `TokenStream` wraps `ImmutableArray<Token>` + lex-level diagnostics. No doc change needed; canonical: `src/Precept/Pipeline/Compilation.cs`. | Builder-facing compilation contract, lexical token tooling |
 | CC#5 | `FieldModifierMeta.ProofDischarges` | [Open Question — canonical doc: `docs/language/catalog-system.md §FieldModifierMeta.ProofDischarges`] | Proof Engine Strategy 2 |
-| CC#6 | FaultSiteLink to FaultSiteDescriptor Transformation | [Open Question — canonical doc: `docs/compiler/proof-engine.md §2 Output Shape`] | Proof-to-runtime backstop planting |
+| CC#6 | FaultSiteLink to FaultSiteDescriptor Transformation | ✅ Resolved — Option A: nullable `FaultSiteAnnotation?` on each opcode. Builder stamps annotation at compile time from unresolved `FaultSiteLink`s. `null` = proven safe (structural absence = elision). Canonical: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`. | Proof-to-runtime backstop planting |
 | CC#7 | ConstraintMeta DU Subtype Count | ✅ Resolved — Option B (hierarchical, StateAnchored grouping node). Approved 2026-05-06. | Builder constraint routing, catalog-system alignment |
 | CC#8 | EventInspection Shape | ✅ Resolved — EventInspection shape adopted; OQ-2 (ArgError = string Reason only) and OQ-3 (RowEffect DU) closed. OQ-4 (EventEnsures timing) pending. Canonical: `result-types.md` + `evaluator.md`. Approved 2026-05-06. | Evaluator inspection contract, LS preview, MCP DTO shape |
 | CC#9 | `ConstraintFieldRefs.ConstraintIdentity` Type | ✅ Resolved — uses proof-engine ConstraintIdentity DU. Resolved 2026-05-06. | Type Checker and Proof Engine constraint identity alignment |
@@ -228,7 +228,7 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 
 ### CC#3. SemanticIndex Reference-Tracking Collections
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — Option A: typed reference arrays on `SemanticIndex`. Canonical: `docs/compiler/type-checker.md §7.1`.
 
 **Affects:** Type Checker, Language Server, Tooling Surface
 **Gap register refs:** #16, #47, #48, #49, #50
@@ -239,10 +239,20 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 - **Language Server** — Pass 2 semantic tokens needs reference-site arrays to classify identifier tokens
 - **Tooling Surface** — Also references these collections for semantic token Pass 2
 
-**Options / known design space:**
-1. **Add reference arrays to SemanticIndex** — Type checker records all reference sites
-2. **LS/tooling reconstructs references** — Walk typed declarations, pattern-match on `TypedFieldRef`, `TypedArgRef`, etc.
-3. **Hybrid approach** — Core references in SemanticIndex, derived references reconstructed
+**Ruling:** Option A — typed per-category arrays added to `SemanticIndex`. The type checker is already resolving every identifier; recording the span + binding at that point is zero extra work. Reconstructing from typed declarations at the LS layer would duplicate work done at resolution time. No general heterogeneous `References` array — the per-type arrays are sufficient and avoid a DU or `object`-typed collection.
+
+```csharp
+public sealed record FieldReference(TypedField Field, SourceSpan Site);
+public sealed record StateReference(TypedState State, SourceSpan Site);
+public sealed record EventReference(TypedEvent Event, SourceSpan Site);
+```
+
+Added to `SemanticIndex` as:
+```csharp
+ImmutableArray<FieldReference> FieldReferences,
+ImmutableArray<StateReference> StateReferences,
+ImmutableArray<EventReference> EventReferences,
+```
 
 **Resolution path:** The type-checker.md §7.1 canonical `SemanticIndex` shape has no reference collections, but language-server.md explicitly expects them.
 
@@ -250,7 +260,7 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 
 ### CC#4. Compilation.Tokens Field
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — already present in code stub as `TokenStream Tokens`. No decision needed.
 
 **Affects:** Precept Builder, Language Server, Tooling Surface
 **Gap register refs:** #61
@@ -261,10 +271,7 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 - **Tooling Surface** — References `Compilation.Tokens` for lexical tokens
 - **Precept Builder** — The `Compilation` record in precept-builder.md doesn't include `Tokens`
 
-**Options / known design space:**
-1. **Add `ImmutableArray<Token> Tokens` to `Compilation`** — Direct access
-2. **Separate token stream access path** — LS re-lexes or retrieves from lexer cache
-3. **Compilation variant** — `FullCompilation` with tokens for tooling, `SlimCompilation` for runtime
+**Ruling:** The code stub (`src/Precept/Pipeline/Compilation.cs`) already carries `TokenStream Tokens` as its first field. `TokenStream` wraps `ImmutableArray<Token> Tokens` plus `ImmutableArray<Diagnostic> Diagnostics` (lex-level diagnostics). The doc gap (precept-builder.md not mentioning Tokens) is a documentation lag, not a design gap. The canonical truth is in the code stub.
 
 **Resolution path:** The precept-builder.md `Compilation` record shape is the canonical definition; it needs explicit decision on whether to add `Tokens`.
 
@@ -272,7 +279,7 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 
 ### CC#6. FaultSiteLink to FaultSiteDescriptor Transformation
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — Option A: nullable `FaultSiteAnnotation?` on each opcode. Canonical: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`.
 
 **Affects:** Proof Engine, Precept Builder, Evaluator
 **Gap register refs:** #11, #23, #56, #57, #60
@@ -285,10 +292,27 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 
 **Current gap:** Neither `ExecutionRow` nor `ConstraintDescriptor` carries a fault site field. `Precept.FaultBackstops` is a flat array with no mechanism to associate backstops with specific opcodes.
 
-**Options / known design space:**
-1. **Opcode annotation** — Each opcode carries optional fault site reference
-2. **Span-to-opcode map** — Precept Builder builds span→opcode index, evaluator looks up
-3. **Inline fault checks** — Compiler injects guard opcodes at fault sites
+**Ruling:** Option A — nullable `FaultSiteAnnotation?` field on each opcode.
+
+Key design insight (confirmed by proof-engine.md §2): `FaultSiteLink` is produced *only* for `Unresolved` obligations. Unresolved proof is a hard compilation error — the author must fix the source before a `Precept` can be built. Therefore the runtime backstop is defense-in-depth against:
+- Force-build / tooling-mode builds with errors present
+- Catalog evolution (new `ProofRequirement` added to an existing `FaultCode` after a precept was compiled)
+- Compiler bugs that produce a `Precept` with an undetected hazard
+
+Elision is structural absence: proved obligations produce no `FaultSiteLink`, no annotation is planted, and the evaluator performs zero backstop check. This is the SPARK Ada model (strip proven checks) realized through Precept's gate architecture — no skip flag needed.
+
+```csharp
+public sealed record FaultSiteAnnotation(
+    FaultCode Code,           // Runtime fault to fire if reached
+    DiagnosticCode PreventedBy, // Authoring-time diagnostic that would prevent this
+    SourceSpan Site           // Source location for diagnostics/logging
+);
+
+// On each opcode — null = proven safe (structural absence = elision)
+FaultSiteAnnotation? FaultSite
+```
+
+Builder matches `ProofObligation.Site` (TypedExpression) against the expression being compiled and stamps the annotation on the resulting opcode. Evaluator checks `op.FaultSite` after each dispatch; `null` = no check.
 
 **Resolution path:** The transformation mechanism is unspecified across all three stages.
 
