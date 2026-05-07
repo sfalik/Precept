@@ -22,6 +22,22 @@
 - Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
 
 ---
+### 2026-05-07T02:24:36Z: Wave 5 archive and cleanup recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file); Frank reported 3 pre-existing `SemanticIndex.cs` errors only.
+
+**Merged source:** `frank-wave5-complete.md`.
+
+- Retired `docs/working/` entirely (67 files) after a pre-deletion scan confirmed every surviving open question already lived in canonical docs; no rescued items were needed.
+- Deleted the superseded radical proposals `docs/compiler/parser-radical.md` and `docs/compiler/type-checker-radical.md` because their design content had been absorbed into the canonical stage docs.
+- Repaired broken references across 8 canonical docs: `docs/compiler/README.md`, `docs/compiler/parser.md`, `docs/compiler/proof-engine.md`, `docs/compiler/type-checker.md`, `docs/compiler/tooling-surface.md`, `docs/language/catalog-system.md`, `docs/language/precept-grammar.md`, and `docs/tooling/mcp.md`.
+- `docs/language/catalog-system.md` now records the ActionMeta question as settled inline: `Description` is canonical, `SyntaxShape` stays internal, and `SnippetTemplate` remains deferred.
+- Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
+- Frank's cleanup landed in commit `421605a`.
+
+---
 ### 2026-05-07T02:20:00Z: Wave 3 Round 1 canonical doc sweep recorded
 
 **By:** Scribe

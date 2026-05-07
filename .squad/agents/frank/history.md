@@ -23,6 +23,16 @@
 
 ## Recent Updates
 
+### 2026-05-06 — Wave 5: Archive & Cleanup
+
+- Deleted `docs/working/` entirely (67 files): cross-cutting-decisions.md, both migrated gap registers, all Archived and inbox working artifacts.
+- Deleted `docs/compiler/parser-radical.md` and `docs/compiler/type-checker-radical.md` (radical proposals superseded by canonical stage docs).
+- Pre-deletion scan confirmed zero genuine unresolved items in working docs. All open questions not covered by CC decisions already live in canonical docs.
+- Fixed broken cross-references in 8 canonical docs: README.md (superseded section removed), parser.md (6 refs), proof-engine.md (5 refs), type-checker.md (4 refs), tooling-surface.md (2 refs), catalog-system.md (ActionMeta OQ converted to settled note + 1 ref), precept-grammar.md (parser-radical.md ref), mcp.md (2 refs).
+- `catalog-system.md` ActionMeta "Open Question (unresolved)" converted to "✅ Settled (Wave 4 Gap 6)" — Description is canonical, SyntaxShape is internal, SnippetTemplate is deferred.
+- Build validation: 3 pre-existing SemanticIndex.cs errors, 0 new. Baseline unchanged.
+- Commit: `421605afc9ec32ff0c28468b5927656bc725441c`
+
 ### 2026-05-07 — Wave 4: Final consistency pass + 6 genuine gap triage
 
 - All 6 Wave 3 follow-up gaps resolved as team-autonomous; no owner-required items.
