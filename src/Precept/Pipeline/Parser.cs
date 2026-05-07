@@ -305,7 +305,7 @@ public static partial class Parser
             ConstructSlotKind.TypeExpression    => new TypeExpressionSlot(new MissingTypeReference(SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ModifierList      => new ModifierListSlot(ImmutableArray<ParsedModifier>.Empty, SourceSpan.Missing),
             ConstructSlotKind.StateEntryList    => new StateEntryListSlot(ImmutableArray<(string, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
-            ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<(string, TypeMeta)>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<(string, TypeMeta, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
             ConstructSlotKind.InitialMarker     => new InitialMarkerSlot(false, SourceSpan.Missing),
             ConstructSlotKind.BecauseClause     => new BecauseClauseSlot("", SourceSpan.Missing),
             ConstructSlotKind.GuardClause       => new GuardClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
@@ -678,7 +678,7 @@ public static partial class Parser
                 return MakeSentinel(slot);
 
             var startToken = Advance(); // consume '('
-            var args = new List<(string Name, TypeMeta Type)>();
+            var args = new List<(string Name, TypeMeta Type, ImmutableArray<ModifierKind> Modifiers)>();
 
             while (Peek().Kind != TokenKind.RightParen && !IsAtEnd
                    && !ConstructsCatalog.LeadingTokens.Contains(Peek().Kind))
@@ -694,7 +694,16 @@ public static partial class Parser
                     if (Types.ByToken.TryGetValue(lookupKind, out var typeMeta))
                     {
                         Advance();
-                        args.Add((nameToken.Text, typeMeta));
+
+                        // Consume any trailing field modifiers (e.g. optional, notempty)
+                        var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
+                        while (Modifiers.ByFieldToken.TryGetValue(Peek().Kind, out var modMeta))
+                        {
+                            modifiers.Add(modMeta.Kind);
+                            Advance();
+                        }
+
+                        args.Add((nameToken.Text, typeMeta, modifiers.ToImmutable()));
                     }
                     else
                     {

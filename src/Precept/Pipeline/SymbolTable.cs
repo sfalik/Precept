@@ -89,6 +89,7 @@ public sealed record DeclaredArg(
     string Name,
     TypeMeta Type,
     string EventName,
+    ImmutableArray<ModifierKind> Modifiers,
     SourceSpan NameSpan
 );
 

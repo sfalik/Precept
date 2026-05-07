@@ -169,9 +169,9 @@ internal static class TypeChecker
                     EventName: arg.EventName,
                     ResolvedType: arg.Type.Kind,
                     ElementType: null, // event arg element types deferred until arg type parsing is richer
-                    Modifiers: ImmutableArray<ModifierKind>.Empty,
+                    Modifiers: arg.Modifiers,
                     DefaultExpression: null, // Slice 2+
-                    IsOptional: false,
+                    IsOptional: arg.Modifiers.Contains(ModifierKind.Optional),
                     Span: arg.NameSpan))
                 .ToImmutableArray();
 

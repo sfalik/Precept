@@ -35,8 +35,8 @@ public class TypeReferenceTests
         var typeSlot = field.GetRequiredSlot<TypeExpressionSlot>(ConstructSlotKind.TypeExpression);
 
         var typeRef = typeSlot.TypeRef.Should().BeOfType<CollectionTypeReference>().Subject;
-        typeRef.CollectionType.Kind.Should().Be(TypeKind.QueueBy,
-            "QueueType currently resolves through the catalog to the queue-by family metadata");
+        typeRef.CollectionType.Kind.Should().Be(TypeKind.Queue,
+            "QueueType resolves to Queue; QueueBy only when 'by' clause is present");
         typeRef.KeyType.Should().BeNull();
         typeRef.ElementType.Should().BeOfType<SimpleTypeReference>()
             .Which.Type.Kind.Should().Be(TypeKind.Number);

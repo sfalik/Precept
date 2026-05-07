@@ -91,14 +91,14 @@ public class ParserCoverageGapTests
     public void TypeExpression_QueueOfNumber_ProducesCollectionTypeReference()
     {
         // Asserts queue collection type parsing
-        // Note: 'queue of <type>' maps to QueueBy, the default queue variant
+        // 'queue of <type>' maps to Queue; 'queue of <type> by <key>' maps to QueueBy
         var field = ParseSingleField("field pending as queue of number");
         var typeSlot = field.Slots.OfType<TypeExpressionSlot>().Single();
 
         typeSlot.TypeRef.Should().BeOfType<CollectionTypeReference>();
         var collectionRef = (CollectionTypeReference)typeSlot.TypeRef;
-        collectionRef.CollectionType.Kind.Should().Be(TypeKind.QueueBy,
-            "outer type must be QueueBy for 'queue of number'");
+        collectionRef.CollectionType.Kind.Should().Be(TypeKind.Queue,
+            "outer type must be Queue for 'queue of number'");
     }
 
     [Fact]

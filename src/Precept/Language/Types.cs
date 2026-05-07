@@ -642,7 +642,7 @@ public static class Types
         foreach (var meta in All)
         {
             if (meta.Token is not null)
-                dict[meta.Token.Kind] = meta;
+                dict.TryAdd(meta.Token.Kind, meta);
         }
 
         // The lexer emits TokenKind.Set; the parser reinterprets as SetType in type position.
