@@ -20,13 +20,33 @@
 
 ## Recent Updates
 
+### 2026-05-07 — Wave 3 Round 1: canonical doc sweep recorded
+
+- Closed 13 Wave 3 Round 1 markers across `docs/compiler/type-checker.md`, `docs/compiler/proof-engine.md`, and `docs/runtime/precept-builder.md`.
+- `type-checker.md`: CC#9 `ConstraintIdentity` DU, CC#11 `RejectReason`, and the stale CC#1-era expression-tree note are now closed.
+- `proof-engine.md`: catalog-gap #12 and #13 are closed, CC#1 / CC#5 follow-through notes are complete, and the stale initial-state OQ block is gone.
+- `precept-builder.md`: CC#4 `Compilation.Tokens`, CC#11 `ExecutionRow.RejectReason`, and CC#7 `ConstraintMeta.StateAnchored` hierarchy documentation are now canonical.
+- Validation remains unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
+
 ### 2026-05-06 — Wave 2 cross-cutting decisions fully closed
 
 - Closed all 11 Wave 2 team-autonomous items: CC#5, CC#10, CC#13, CC#14, CC#15, CC#16, CC#17, CC#18, CC#19, CC#20, and CC#22.
 - Corrected stale Wave 1 checkbox drift for CC#3, CC#4, CC#6, CC#12, CC#23, and CC#24, plus the CC#26 status row, where the status table was already authoritative.
 - Propagated the locked rulings through `cross-cutting-decisions.md`, `catalog-system.md`, `graph-analyzer.md`, `evaluator.md`, `diagnostic-system.md`, `language-server.md`, `type-checker.md`, and `proof-engine.md` with a clean build reported.
 
-### 2026-05-06 — CC#8 closeout + Wave 1 handoff
+### 2026-05-06 — Wave 3 Round 1: canonical doc sweep
+
+Swept three docs to close all open question markers by propagating the locked CC decisions.
+
+**type-checker.md:** `ConstraintFieldRefs.ConstraintIdentity` changed from `object` to `ConstraintIdentity` DU (CC#9). `string? RejectReason` added to `TypedTransitionRow` (CC#11). Stale §14 "No expression tree parsing" bullet removed (contradicted CC#1 resolution already in the doc).
+
+**proof-engine.md:** Five OQ blocks closed — `TryLiteralProof` scope (intentional, Strategy 1 = numeric only); Strategy 3 vs Strategy 4 boundary (explicitly specified — direct subject guard vs. relational guard); initial-state satisfiability blocking note corrected (CC#1 resolved design, remaining dependency = TC implementation); corresponding stale OQ block replaced with implementation note; `FieldModifierMeta.ProofDischarges` stale OQ removed (CC#5 canonical in catalog-system.md).
+
+**precept-builder.md:** `TokenStream Tokens` added to `Compilation` code block (CC#4). `string? RejectReason` added to `ExecutionRow` code block (CC#11). `ConstraintMeta` DU hierarchy with `StateAnchored` abstract intermediate node documented after 5-way routing switch (CC#7).
+
+Pattern: When a doc has a code block and a prose "pending" note about the same field, fix both in one edit — the code block and the prose must be consistent. When an OQ block is stale relative to an earlier resolved note in the same doc, remove it — don't leave contradictory annotations.
+
+### 2026-05-06 — Wave 2 cross-cutting decisions: all 11 closed
 
 - Frank-156's UX accuracy review fed directly into the same-day Elaine correction pass; the dead zero-arg `Possible` state and the undefined-event rendering error are durably closed.
 - Frank-157-1's fit assessment became the acceptance bar for CC#8: once OQ-2 and OQ-3 closed, the proposal was fit to adopt.

@@ -424,7 +424,7 @@ bool TryLiteralProof(ProofObligation obligation)
         return false;
 ```
 
-> **Open Question (unresolved):** `TryLiteralProof` only handles `NumericProofRequirement`. Is this intentional (Strategy 1 = numeric interval proofs only), or should it handle `PresenceProofRequirement` etc.?
+> **Intentional scope:** `TryLiteralProof` covers `NumericProofRequirement` only. `PresenceProofRequirement` obligations (null/empty checks) are discharged by Strategy 2 (field modifiers, e.g. `notempty`) or Strategy 3 (guard-in-path, e.g. `when count(x) > 0`). Literal values never statically establish presence — routing `PresenceProofRequirement` to literal proof would be incorrect. The bounded scope is deliberate. *(catalog-gap-register.md #12 — Out of Scope)*
 
 ```csharp
     var subject = ResolveSubject(numeric.Subject, obligation.Site);
@@ -502,7 +502,9 @@ public sealed record ProofDischarge(
 );
 ```
 
-> **Open Question (unresolved):** `docs/working/catalog-updates.md` is a dangling reference. `FieldModifierMeta.ProofDischarges` must be added to catalog-system.md for Strategy 2 to be implementable.
+> **✅ Resolved (CC#5) — FieldModifierMeta.ProofDischarges is now canonical**
+> `ProofDischarge[]` has been added to `FieldModifierMeta` in `catalog-system.md`. The `ProofDischarge` record is also defined there. The catalog update that was pending in `docs/working/catalog-updates.md` is superseded by the canonical shape in `catalog-system.md §FieldModifierMeta`. Strategy 2 can now be implemented by reading `modifier.ProofDischarges` from the catalog — no per-modifier switch in the engine.
+> *Resolved: 2026-05-06 — CC#5*
 
 #### Strategy 3: Guard-in-Path Proof
 
@@ -583,9 +585,11 @@ This strategy handles the case where a guard establishes a *relative* constraint
 2. The guard establishes a simple relational constraint
 3. The proof site references the constrained field
 
-> **Open Question:** Strategy 3 vs Strategy 4 boundary
-> The proof doc still does not draw a crisp line between guard-in-path and flow-narrowing obligations. That boundary must be explicit so the engine knows which obligations belong to which strategy and new proofs do not shift categories silently.
-> *Flagged: 2026-05-04*
+> **Strategy 3 vs Strategy 4 boundary (resolved):**
+> - **Strategy 3 (guard-in-path):** The `when <guard>` clause protects all actions in the row. The guard must directly constrain the proof subject — the field (or collection) being checked for the required property appears as the operand in the guard comparison (e.g., `when Divisor != 0` discharges a `divisor != 0` proof obligation for `A / Divisor`). Strategy 3 applies when the subject is a *named field or arg* and the guard is a *simple comparison or presence check* on that subject.
+> - **Strategy 4 (flow-narrowing):** The guard establishes a *relational invariant between two or more fields* (e.g., `when Quantity > ReorderPoint` establishes `Quantity > ReorderPoint`). Strategy 4 discharges obligations where the proof site involves an expression over both constrained fields and the established relation implies the obligation (e.g., `ReorderPoint - Quantity` is safe because the guard proves `Quantity > ReorderPoint`, so the result is negative, avoiding a specific overflow/underflow concern). Strategy 4 applies only when the guard is a *binary comparison between two non-literal operands* and the obligation is an arithmetic result-range obligation on an expression involving those operands.
+> - **Key discriminator:** If the guard directly names the proof subject (`when X > 0` for an obligation about `X`), use Strategy 3. If the guard names two fields in relation (`when A > B`) and the obligation is about an expression using both, use Strategy 4. Strategy 4 does not fire for simple per-field presence or range checks — those are Strategy 3.
+> *(catalog-gap-register.md #13 — implementation boundary, no CC required)*
 
 ### Proof/Fault Chain
 
@@ -989,17 +993,15 @@ The proof engine produces a `ConstraintInfluenceMap` that enables AI agents to r
 
 ### Blocking Dependencies
 
-5. **Initial-state satisfiability blocked** — this check requires resolved initial field values and initial-state constraint expressions. Implementation is blocked pending the type checker's expression resolution engine being fully operational (see `docs/compiler/type-checker.md` § Blocking Dependency: Expression Trees).
+5. **Initial-state satisfiability blocked on implementation** — this check requires the type checker's expression resolution engine to be operational. The expression tree design is resolved (CC#1); what remains is the type checker implementation itself. Once the type checker's `Resolve()` pass is implemented, initial-state satisfiability can proceed without design changes.
 
 6. **~~Expression tree parsing blocked~~** — **RESOLVED.** Guard-in-path (Strategy 3) and flow-narrowing (Strategy 4) are now unblocked. Parser produces `ParsedExpression` DU nodes for `GuardClauseSlot`; the type checker resolves these into `TypedExpression` for proof engine consumption. See `docs/working/cross-cutting-decisions.md` CC#1.
 
-> **Open Question (unresolved):** Item 5 still shares expression tree blocking dependency with type-checker.md — the type checker's expression resolution engine must be implemented before initial-state satisfiability can run.
+> **Implementation note:** Item 5 above is an implementation dependency, not a design gap — the expression resolution engine must be built before initial-state satisfiability can run. No open design questions remain; CC#1 closed the expression tree design.
 
 ### Catalog Metadata Needed
 
-7. **`FieldModifierMeta.ProofDischarges`** — new metadata property needed for modifier-proof strategy. Design is complete (see §7); implementation requires updating `src/Precept/Language/Modifier.cs` and `Modifiers.cs`.
-
-> **Open Question (unresolved):** `FieldModifierMeta.ProofDischarges` is designed here but not in catalog-system.md. Catalog-first requires adding it there before implementation.
+7. **`FieldModifierMeta.ProofDischarges`** — ✅ resolved (CC#5). `ProofDischarge[]` is in `catalog-system.md §FieldModifierMeta`. Strategy 2 implementation reads `modifier.ProofDischarges` — no per-modifier switch. See §7 Strategy 2 for the catalog-driven dispatch pattern.
 
 ### Future Considerations
 

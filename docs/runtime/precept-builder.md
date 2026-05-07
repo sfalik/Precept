@@ -103,6 +103,7 @@ The builder has no algorithmic complexity beyond iteration and indexing. It does
 
 ```csharp
 public sealed record Compilation(
+    TokenStream Tokens,         // lexical token stream — language server semantic-token pass reads this (CC#4)
     SemanticIndex SemanticIndex,
     StateGraph StateGraph,
     ProofLedger ProofLedger,
@@ -112,8 +113,6 @@ public sealed record Compilation(
     public bool HasErrors => Diagnostics.Any(d => d.Severity == Severity.Error);
 }
 ```
-
-**`Compilation.Tokens` field:** The builder-facing `Compilation` shape currently omits the token stream, though the language server's lexical semantic-token pass depends on it. The compile aggregate needs one sanctioned access path for tokens so tooling does not invent a side channel. This is a pending implementation decision.
 
 The builder reads all three analysis artifacts:
 
@@ -443,6 +442,7 @@ public sealed record ExecutionRow(
     ImmutableArray<ActionPlan> Actions,
     TransitionOutcome Outcome,
     StateDescriptor? TargetState,       // null if outcome doesn't specify target
+    string? RejectReason,               // non-null iff Outcome == Reject; authored "because" text (CC#11)
     SourceSpan Source
 );
 
@@ -456,7 +456,7 @@ public sealed record ActionPlan(
 public enum TransitionOutcome { Transition, NoTransition, Reject }
 ```
 
-**`ExecutionRow.RejectReason` storage:** `TransitionOutcome.Reject` rows carry an authored `because` message. `ExecutionRow` needs a canonical home for reject-row rationale so the evaluator can return authored rejection text without re-reading source. This is a pending implementation decision.
+**Reject reason lowering (CC#11):** `TransitionOutcome.Reject` rows carry an authored `because` message. `ExecutionRow.RejectReason` is the canonical home — `null` for non-reject rows, populated from the `because` clause text for reject rows. The evaluator reads `winningRow.RejectReason` to return the authored `Rejected(string reason)` outcome without re-reading source.
 
 **Catalog-driven compilation:** The expression compiler reads `Operations.GetMeta(kind)`, `Functions.GetMeta(kind)`, and `Types.GetAccessor(type, name)` to emit the correct opcodes. It does not hardcode per-operation behavior — it dispatches on catalog entries. When emitting `BinaryOp` or `UnaryOp`, the builder resolves the `OperationMeta`, fetches the executor delegate from the corresponding `TypeRuntimeMeta.BinaryExecutors[localIndex]` (or `UnaryExecutors`), and embeds it directly in the opcode record. The evaluator never indexes `TypeRuntimeMeta` arrays — the delegate is already embedded.
 
@@ -496,6 +496,22 @@ var bucket = Constraints.GetMeta(constraint.Kind) switch
     _ => throw new InvalidOperationException()
 };
 ```
+
+**`ConstraintMeta` DU hierarchy (CC#7 — Option B, hierarchical with `StateAnchored` grouping node):**
+
+```csharp
+public abstract record ConstraintMeta(...)
+{
+    public sealed record Invariant()         : ConstraintMeta(...);
+    public abstract record StateAnchored()   : ConstraintMeta(...);   // grouping node
+        public sealed record StateResident() : StateAnchored(...);
+        public sealed record StateEntry()    : StateAnchored(...);
+        public sealed record StateExit()     : StateAnchored(...);
+    public sealed record EventPrecondition() : ConstraintMeta(...);
+}
+```
+
+The builder's 5-way bucket switch routes to all five concrete leaf types. The `StateAnchored` abstract intermediate node is available for "is this state-scoped?" grouping checks in the type checker and proof engine (`meta is ConstraintMeta.StateAnchored`) without requiring a separate flag. The catalog is the source of truth; the builder never hardcodes the DU shape.
 
 ### Pass 6 — Fault Backstop Pass
 

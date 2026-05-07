@@ -326,6 +326,7 @@ public sealed record TypedTransitionRow(
     TypedExpression? Guard,
     ImmutableArray<TypedAction> Actions,
     TransitionOutcome Outcome, // Transition | NoTransition | Reject
+    string? RejectReason,      // non-null iff Outcome == Reject; authored "because" text (CC#11)
     QualifierBinding? ResultQualifier,
     ParsedConstruct Syntax
 );
@@ -521,16 +522,14 @@ public sealed record ComputedFieldDep(
 );
 
 public sealed record ConstraintFieldRefs(
-    object ConstraintIdentity,  // TypedRule or TypedEnsure reference
+    ConstraintIdentity ConstraintIdentity,  // typed DU: RuleIdentity or EnsureIdentity (proof-engine.md §2)
     ImmutableArray<string> ReferencedFields,
     ImmutableArray<string> ReferencedArgs
 );
 ```
 
-> **Open Question:** `ConstraintFieldRefs.ConstraintIdentity` typing
-> `ConstraintFieldRefs.ConstraintIdentity` is still typed as `object`, while proof-engine.md defines a dedicated `ConstraintIdentity` DU with `RuleIdentity` and `EnsureIdentity` variants. The type-checker and proof engine need the same structural identity type if they are going to share constraint-reference data without ad hoc casting.
-> *Flagged: 2026-05-04*
-> *Source: catalog-gap-register.md #15*
+> **✅ Resolved (CC#9):** `ConstraintFieldRefs.ConstraintIdentity` uses the proof-engine `ConstraintIdentity` DU — the same `abstract record ConstraintIdentity` with `RuleIdentity` and `EnsureIdentity` subtypes defined in `proof-engine.md §2`. `object` is replaced; compile-time exhaustiveness is guaranteed. The DU crosses from `ProofEngine` into `SemanticIndex` via `ConstraintInfluenceEntry`, so both stages share the identical type.
+> *Closed: 2026-05-06. CC#9 resolved.*
 
 #### SemanticIndex Record
 
@@ -554,6 +553,9 @@ public sealed record SemanticIndex(
     ImmutableArray<TypedStateHook> StateHooks,
     ImmutableArray<TypedEventHandler> EventHandlers,
     ImmutableArray<TypedEditDeclaration> EditDeclarations,
+
+    // Secondary derived indexes over normalized declarations
+    FrozenDictionary<string, ImmutableArray<TypedEnsure>> EnsuresByState,   // CC#22: state-anchored ensures by state name; follows CC#3 pattern
 
     // Dependency facts
     ImmutableArray<ComputedFieldDep> ComputedDeps,
@@ -580,6 +582,9 @@ public sealed record SemanticIndex(
 
 > **Resolved (CC#3):** `SemanticIndex.EventReferences` — first-class output. See ruling above.
 > *Closed: 2026-05-06. CC#3 resolved.*
+
+> **Resolved (CC#22):** `SemanticIndex.EnsuresByState` — `FrozenDictionary<string, ImmutableArray<TypedEnsure>>` added. Follows the CC#3 primary-array + secondary-index pattern. `Ensures` remains the primary ordered array; `EnsuresByState` is the derived O(1) secondary index built at type-checker construction time. Only state-anchored ensures (Kind ∈ `{StateResident, StateEntry, StateExit}` where `AnchorState != null`) are included. Key is the state name string.
+> *Closed: 2026-05-06. CC#22 resolved.*
 
 ---
 
@@ -1062,7 +1067,7 @@ Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The f
 - **No proof obligation discharge:** ProofRequirement *recording* happens here (from catalog entries); ProofRequirement *discharge* is the ProofEngine's responsibility.
 - **No runtime planning:** Descriptor production and execution plan compilation are the Precept Builder's responsibility.
 - **No qualifier runtime identity:** The checker validates qualifier *compatibility* structurally; the Evaluator handles qualifier *values* at runtime.
-- **No expression tree parsing:** Expression-carrying slots currently contain only `SourceSpan` — expression resolution is blocked until the parser produces expression trees.
+- **No expression tree parsing:** The type checker resolves `ParsedExpression` DU nodes (produced by the parser) into `TypedExpression`. Expression tree design was previously blocked; resolved by CC#1 — see `docs/working/cross-cutting-decisions.md`.
 
 ---
 

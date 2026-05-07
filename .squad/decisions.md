@@ -5,6 +5,21 @@
 ## ACTIVE DECISIONS — Current Sprint
 
 ---
+### 2026-05-07T02:20:00Z: Wave 3 Round 1 canonical doc sweep recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file); Frank reported 3 pre-existing `SemanticIndex.cs` errors only.
+
+**Merged source:** `frank-wave3-round1.md`.
+
+- `docs/compiler/type-checker.md` closed CC#9 by switching `ConstraintFieldRefs.ConstraintIdentity` to the `ConstraintIdentity` DU, closed CC#11 by adding `TypedTransitionRow.RejectReason`, and removed the stale CC#1-era "No expression tree parsing" note.
+- `docs/compiler/proof-engine.md` closed catalog-gap #12 (`TryLiteralProof` scope), catalog-gap #13 (Strategy 3 vs. 4 boundary), the CC#1 follow-through around initial-state satisfiability blocking text, the corresponding stale OQ block, and the CC#5 follow-through on `FieldModifierMeta.ProofDischarges`.
+- `docs/runtime/precept-builder.md` closed CC#4 by restoring `Compilation.Tokens`, closed CC#11 by documenting `ExecutionRow.RejectReason`, and closed CC#7 by documenting the `ConstraintMeta.StateAnchored` DU hierarchy.
+- Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
+
+---
+
 ### 2026-05-07T01:26:52Z: Wave 2 cross-cutting decisions all closed; Wave 1 checkbox drift corrected
 
 **By:** Scribe
