@@ -20811,3 +20811,2681 @@ Spike mode is first-class. It must be activated deliberately, enforced consisten
 
 
 ---
+
+# Collection Iteration Research — Frank
+
+
+
+**Date:** 2026-04-29
+
+
+
+**Status:** Research complete, awaiting Shane's direction on whether to open a formal proposal
+
+
+
+---
+
+
+
+## Summary
+
+
+
+Shane asked: what would basic loops over collections look like in Precept, the way CEL does it?
+
+
+
+After reviewing CEL's macro system, the Precept spec (§0.4 "No loops", §0.1 Design Principles, expression grammar), philosophy.md, existing collection operations across samples, and comparable DSLs (OPA/Rego, SQL), my recommendation is:
+
+
+
+**Quantifier predicates (`all`/`any`/`none`) — yes, they belong in Precept and are the natural next step.** They are not loops. They are bounded, deterministic, total predicates over declared collection fields. They strengthen constraint expressiveness without violating any execution model property.
+
+
+
+**Projection/transformation (`map`/`filter`/`reduce`/`sum`) — not yet.** These produce new collections or scalar aggregates, which opens questions about intermediate types, proof obligations, and whether Precept needs computed-collection fields. The pressure isn't there yet.
+
+
+
+---
+
+
+
+## 1. How CEL Does It
+
+
+
+CEL provides five iteration macros that expand to comprehension AST nodes at parse time — they are not runtime constructs:
+
+
+
+| Macro | Semantics | Expansion |
+
+
+
+|-------|-----------|-----------|
+
+
+
+| `list.all(x, predicate)` | Universal: every element satisfies the predicate | Short-circuit false on first failure |
+
+
+
+| `list.exists(x, predicate)` | Existential: at least one element satisfies | Short-circuit true on first match |
+
+
+
+| `list.exists_one(x, predicate)` | Uniqueness: exactly one element satisfies | Must scan all |
+
+
+
+| `list.filter(x, predicate)` | Selection: returns subset where predicate holds | Produces new list |
+
+
+
+| `list.map(x, expression)` | Projection: transforms each element | Produces new list |
+
+
+
+**Key design rationale from CEL:**
+
+
+
+- **Macros, not functions.** CEL is deliberately non-Turing-complete. Macros expand at parse time into a primitive comprehension construct that the evaluator walks. No user-defined macros, no recursion, no unbounded computation.
+
+
+
+- **No general iteration.** CEL does not have `for`, `while`, or `reduce`. The five macros cover the use cases that policy/constraint evaluation needs. The language designers judged that general iteration would undermine static analyzability and bounded evaluation guarantees.
+
+
+
+- **The variable binding is scoped.** `x` in `list.all(x, x > 0)` is a macro-local binding, not a mutable variable. It's closer to a mathematical quantifier than a loop variable.
+
+
+
+**What CEL excludes and why:**
+
+
+
+- No `reduce`/`fold` — would require an accumulator, introducing sequential state.
+
+
+
+- No nested comprehensions — keeps evaluation flat and predictable.
+
+
+
+- No user-defined macros — prevents complexity accretion toward a general-purpose language.
+
+
+
+---
+
+
+
+## 2. The Pressure on Precept
+
+
+
+Looking at the samples and the current collection surface, Precept today has:
+
+
+
+**Collection types:** `set of T`, `queue of T`, `stack of T`
+
+
+
+**Collection accessors:** `.count`, `.min`, `.max`, `.peek`
+
+
+
+**Collection predicates:** `contains` (single-element membership)
+
+
+
+**Collection mutations:** `add`, `remove`, `enqueue`, `dequeue`, `clear`
+
+
+
+What's **missing** — real problems that samples already brush up against:
+
+### A. Validating all elements of a collection
+
+
+
+The InsuranceClaim sample has `MissingDocuments as set of string`. Today there's no way to express:
+
+
+
+```
+
+
+
+rule MissingDocuments all notempty because "Missing document names cannot be blank"
+
+
+
+```
+
+
+
+The constraint can only check `.count` or `contains` — it cannot assert a property about every member. The `notempty` inner-type modifier on `set of ~string` (where `~` marks the inner type) handles this one case at declaration time, but general element-level predicates are impossible.
+
+### B. Computing derived values from collections
+
+
+
+BuildingAccessBadgeRequest works around this by maintaining separate `LowestRequestedFloor` and `HighestRequestedFloor` fields that are manually synced via `set` actions. The `.min` and `.max` accessors exist, but there's no `sum` — and no way to express "total cost = sum of line item amounts" for a collection of structured values (which Precept doesn't yet have, but would need for collection iteration to matter most).
+
+### C. Guards involving element-level properties
+
+
+
+HiringPipeline uses `PendingInterviewers contains RecordInterviewFeedback.Interviewer` — which works because it's single-element membership. But a guard like "approve only if all interviewers have submitted feedback" requires the pattern `PendingInterviewers.count == 0`, which is a workaround. The intent is "no pending interviewers remain," not "the count is zero."
+
+### D. The gap hierarchy
+
+
+
+The pressure is ordered:
+
+
+
+1. **Quantifier predicates over elements** — immediate, real, visible in current samples
+
+
+
+2. **Aggregate functions over elements** (sum, average) — real but depends on collection-of-structured-values, which doesn't exist yet
+
+
+
+3. **Projection/filtering** (map, filter) — only needed if you need to derive new collections, which is a much larger language question
+
+
+
+---
+
+
+
+## 3. Design Options
+
+### Option A: Quantifier Keywords (Recommended)
+
+
+
+**Approach:** Add `all`, `any`, `none` as bounded quantifier predicates on collection fields, using an element-binding syntax.
+
+
+
+```precept
+
+
+
+---
+
+
+
+---
+
+# Universal: every element satisfies
+
+
+
+rule Items.all(item, item > 0)
+
+
+
+    because "All line items must have positive amounts"
+
+
+
+---
+
+
+
+---
+
+# Existential: at least one satisfies
+
+
+
+from Submitted on Approve when Reviewers.any(r, r == Approve.ReviewerName)
+
+
+
+    -> ...
+
+
+
+---
+
+
+
+---
+
+# Negated universal: no element satisfies
+
+
+
+rule Participants.none(p, p == "")
+
+
+
+    because "Participant names cannot be blank"
+
+
+
+```
+
+
+
+**Grammar extension:**
+
+
+
+```
+
+
+
+CollectionQuantifier  :=  CollectionExpr "." ("all" | "any" | "none") "(" Identifier "," BoolExpr ")"
+
+
+
+```
+
+
+
+This produces a `QuantifierExpression` AST node — **not** a macro expansion. The element variable `item` is a scoped binding visible only inside the predicate.
+
+
+
+**Philosophy filter assessment:**
+
+
+
+- ✅ **Prevention:** Enables constraints that were previously inexpressible — strictly strengthens the governance surface.
+
+
+
+- ✅ **Determinism:** Bounded iteration over a finite, declared collection field. Same data, same result. Always terminates.
+
+
+
+- ✅ **Inspectability:** The engine can report which element(s) failed the predicate, with index/value attribution.
+
+
+
+- ✅ **Keyword-anchored:** `all`, `any`, `none` are self-describing quantifier keywords. A domain expert reads `Items.all(item, item > 0)` as "all items are positive."
+
+
+
+- ✅ **AI legibility:** Regular syntax, no nesting, no lambda abstraction. Pattern-matchable by any agent.
+
+
+
+- ✅ **No loops introduced:** These are predicates, not iteration constructs. They produce a boolean, not a side effect. The AST is a quantifier node with a bound variable and a body expression — structurally identical to how the proof engine would reason about universals over finite sets.
+
+
+
+- ✅ **Totality:** Empty collection + `all` → true (vacuous truth), `any` → false, `none` → true. No undefined behavior.
+
+
+
+- ⚠️ **Proof engine impact:** The proof engine must reason about quantified expressions. For `all(item, item > 0)`, the inner-type constraints (e.g., `nonnegative` on a `set of number nonnegative`) may already prove the predicate — the proof engine should recognize this and not require redundant constraints.
+
+
+
+**Main tradeoff:** Introduces a scoped variable binding (`item` in `all(item, predicate)`), which is new for Precept. Today the only variable-like references are field names and event argument dotted names. This is a modest complexity addition, but it's the minimum viable binding for quantification.
+
+### Option B: Keyword-Prefix Quantifiers (No Binding Variable)
+
+
+
+**Approach:** Use `all`/`any`/`none` as prefix keywords with a collection field and a predicate over the implicit "current element," referenced via a reserved word like `each` or `it`.
+
+
+
+```precept
+
+
+
+rule all MissingDocuments each notempty
+
+
+
+    because "Missing document names cannot be blank"
+
+
+
+rule any Items each > 100
+
+
+
+    because "At least one item must exceed $100"
+
+
+
+from UnderReview on Approve when none PendingInterviewers each == ""
+
+
+
+    -> ...
+
+
+
+```
+
+
+
+**Philosophy filter assessment:**
+
+
+
+- ✅ **Keyword-anchored:** `all`, `any`, `none` lead the statement.
+
+
+
+- ✅ **Simpler binding:** `each` is a fixed reference — no user-chosen variable name.
+
+
+
+- ❌ **Reads awkwardly:** `all MissingDocuments each notempty` doesn't read like natural English. The `each` keyword is a strange positional artifact.
+
+
+
+- ❌ **Limits predicate complexity:** `each > 100` works for trivial comparisons, but `each.amount > 100 and each.status != "cancelled"` gets clumsy without a binding name.
+
+
+
+- ❌ **Collision risk:** `all` is already `modify all` / `omit all` in state-scoped access mode declarations. Using it as an expression-level keyword requires disambiguation.
+
+
+
+**Main tradeoff:** Simpler syntax at the cost of natural reading and extensibility. If Precept ever needs compound predicates over elements, this design paints you into a corner.
+
+### Option C: Method-Style Aggregate Functions (Sum/Count/Any/All)
+
+
+
+**Approach:** Extend the collection member access surface with aggregate methods that take predicate arguments.
+
+
+
+```precept
+
+
+
+---
+
+
+
+---
+
+# Aggregate boolean
+
+
+
+rule Items.all(> 0) because "All items must be positive"
+
+
+
+---
+
+
+
+---
+
+# Aggregate numeric
+
+
+
+field Total as decimal -> Items.sum(.amount)
+
+
+
+---
+
+
+
+---
+
+# Conditional count
+
+
+
+rule Items.count(> 100) >= 3 because "At least 3 items must exceed $100"
+
+
+
+```
+
+
+
+**Philosophy filter assessment:**
+
+
+
+- ✅ **Familiar:** LINQ-adjacent. Developers recognize the pattern.
+
+
+
+- ❌ **Implicit element reference:** `.amount` and `> 0` have no explicit subject. What does `Items.all(> 0)` compare to? The element? Which property of the element?
+
+
+
+- ❌ **Mixed semantics:** Some methods return boolean (`all`, `any`), some return numbers (`sum`, `count`), some return collections (`filter`). The member-access surface becomes overloaded.
+
+
+
+- ❌ **Requires structured collection elements:** `Items.sum(.amount)` only works if `Items` is a collection of records with an `amount` field. Precept has `set of string`, `set of number` — not `set of {amount: decimal, status: string}`.
+
+
+
+- ❌ **AI legibility drops:** The implicit subject makes pattern-matching harder for agents.
+
+
+
+**Main tradeoff:** Looks familiar to developers but trades explicit readability for conciseness. Depends on features (structured collection elements) that don't exist yet.
+
+
+
+---
+
+
+
+## 4. My Recommendation
+
+
+
+**Option A — quantifier keywords with explicit element binding** — is the right design.
+
+
+
+Rationale:
+
+
+
+1. **It's not a loop.** It's a predicate. The execution model property §0.4.1 says "no iteration constructs." A quantifier is a logical operation over a finite set — it produces a boolean, not a sequence. The distinction matters: `all(item, item > 0)` is no more a "loop" than `.count > 0` is. The compiler doesn't need fixpoint computation, widening, or any lattice infrastructure. It walks a finite declared collection and evaluates a pure predicate.
+
+
+
+2. **The keywords are already reserved.** `All` and `Any` are in the lexer token table. `All` is currently used for `modify all` / `omit all`. `Any` is currently used for `in any` / `from any`. Both have available expression-level slots — the parser can disambiguate by position (expression context vs. declaration keyword).
+
+
+
+3. **It fills the real gap.** The samples show the pressure clearly. Collection-level membership (`contains`) and aggregate properties (`.count`, `.min`, `.max`) don't cover element-level predicate constraints. Quantifiers close this gap.
+
+
+
+4. **The proof engine benefits.** Universal quantifiers over collections with declared inner-type constraints are statically analyzable. If the field declares `set of number nonnegative`, then `Items.all(item, item >= 0)` is provably true from the type — the proof engine can fold it. This is exactly the kind of reasoning the proof system is designed for.
+
+
+
+5. **It's the minimum viable step.** Quantifiers don't require new collection types, new field kinds, or computed collections. They work on the existing `set of T`, `queue of T`, `stack of T` surface with existing inner types.
+
+
+
+**What I would NOT do right now:**
+
+
+
+- No `map`, `filter`, or `reduce`. These produce values (collections or scalars), not predicates. They open type questions (what is the type of `Items.filter(...)`) and intermediate-value questions that are a separate design space.
+
+
+
+- No `sum` or aggregate projection. This requires structured collection elements (collections of records), which is a much larger language feature. When that lands, aggregate functions should be designed alongside it.
+
+
+
+- No nested quantifiers. `Items.all(item, item.parts.any(part, part > 0))` is tempting but introduces nested scoping that complicates the proof engine and readability. Start with flat quantifiers; extend later if the pressure appears.
+
+
+
+---
+
+
+
+## 5. Open Questions for Shane
+
+
+
+1. **Is the §0.4.1 "No loops" property a hard constraint or a principle that admits bounded quantifiers?** I believe quantifiers are not loops — they're predicates over finite sets. But this is an identity question. If Shane reads §0.4.1 as excluding ALL element-level iteration including bounded quantifiers, that changes the design space.
+
+
+
+2. **Should `none` be a keyword or should it be expressed as `not ... any`?** Adding `none` is a convenience — `not Items.any(item, item == "")` works equivalently. Three keywords is cleaner for readability; two plus negation is simpler for the grammar. I lean toward three.
+
+
+
+3. **Element binding variable: user-named or fixed?** Option A uses `item` as a user-chosen name. An alternative is a fixed keyword like `it` or `each`. User-named is more flexible (especially if nested quantifiers ever land), but fixed is simpler and more keyword-anchored.
+
+
+
+4. **What priority does this have relative to the proof engine and graph analyzer?** Quantifiers require proof-engine support for element-level reasoning. If the proof engine is next, this feature could be designed alongside it. If the proof engine is distant, quantifiers land as runtime-only evaluation (still useful, but without compile-time proof folding).
+
+
+
+5. **Does this interact with the eventual structured-collection-element design?** If Precept ever supports `list of {name: string, amount: decimal}`, quantifiers over structured elements (`Items.all(item, item.amount > 0)`) need member access inside the binding. This is natural — the binding variable has the inner element type, and dotted access works normally — but it should be considered in the design.
+
+
+
+---
+
+
+
+## Precedent Summary
+
+
+
+| Language/DSL | Iteration Surface | Design Choice | Alignment with Precept |
+
+
+
+|-------------|-------------------|---------------|----------------------|
+
+
+
+| CEL | `all`, `exists`, `exists_one`, `filter`, `map` as parse-time macros | Non-Turing-complete; macros not functions; no user-defined macros | High — same constraint-evaluation context, same bounded-evaluation philosophy |
+
+
+
+| OPA/Rego | `some x in xs { pred }`, `all x in xs { pred }`, set comprehensions | Logic-programming with unification; more expressive but less readable for non-developers | Medium — expressiveness model is right, syntax model is wrong for Precept's audience |
+
+
+
+| SQL | `EXISTS (subquery)`, `value op ANY (subquery)`, `value op ALL (subquery)` | Subquery-based; relational not collection-oriented | Low — wrong paradigm, but `ALL`/`ANY` as keywords validates the quantifier concept |
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+# Collection-Level Constraint Rules Research — Frank
+
+
+
+**Date:** 2026-04-29
+
+
+
+**Status:** Research complete, awaiting Shane's direction on which categories to advance to formal proposal
+
+
+
+**Parallel track:** This complements `frank-loop-research.md` (quantifier predicates / iteration). This report focuses on constraint/validation rules, not computation or iteration.
+
+
+
+---
+
+
+
+## Summary
+
+
+
+Shane asked: what collection-level rules could Precept support to express business requirements?
+
+
+
+After surveying 7 external systems, building a taxonomy, and evaluating against Precept's philosophy and existing surface, my recommendation is:
+
+
+
+**Precept already has a strong foundation.** The existing `mincount`/`maxcount`, `contains`, and `.count`/`.min`/`.max` cover cardinality and basic membership. The highest-value next step is extending the **field-constraint vocabulary** — adding `unique`, collection-level `notempty`, and cross-collection modifiers — before reaching for iteration-based rules. This covers ~70% of real-world collection constraints with zero new language constructs.
+
+
+
+The remaining ~30% — element-shape predicates ("all items satisfy X"), aggregate-relational rules ("sum of items > threshold"), and ordering rules — require the quantifier predicates from the parallel loop research track. Those should land second.
+
+
+
+---
+
+
+
+## 1. Reference Survey
+
+### FluentAssertions — Collection Assertion Vocabulary
+
+
+
+| Category | Methods |
+
+
+
+|----------|---------|
+
+
+
+| Cardinality | `HaveCount(n)`, `HaveCountGreaterThan(n)`, `HaveCountLessThan(n)`, `BeEmpty()`, `NotBeEmpty()`, `ContainSingle()` |
+
+
+
+| Membership | `Contain(item)`, `NotContain(item)`, `ContainInOrder(...)` |
+
+
+
+| Uniqueness | `OnlyHaveUniqueItems()` |
+
+
+
+| Element-shape | `OnlyContain(predicate)`, `AllSatisfy(assertion)`, `SatisfyRespectively(...)`, `AllBeOfType<T>()` |
+
+
+
+| Ordering | `BeInAscendingOrder()`, `BeInDescendingOrder()` |
+
+
+
+| Cross-collection | `BeSubsetOf(...)`, `BeSupersetOf(...)`, `IntersectWith(...)`, `BeEquivalentTo(...)`, `Equal(...)` |
+
+
+
+**Mental model:** Fluent chaining on the collection as a whole. Each assertion is a named operation. Predicates are lambdas passed as arguments. The vocabulary is exhaustive — FA covers essentially every collection property a test might assert.
+
+### Zod — Array Schema Validation
+
+
+
+| Category | Methods |
+
+
+
+|----------|---------|
+
+
+
+| Cardinality | `.min(n)`, `.max(n)`, `.length(n)`, `.nonempty()` |
+
+
+
+| Element-shape | Element schema (passed to `z.array(schema)`) |
+
+
+
+| Custom | `.refine(predicate)` — escape hatch for uniqueness, cross-element checks, etc. |
+
+
+
+**Mental model:** Schema composition. The element schema validates each item; the array methods validate the container. Anything beyond cardinality + element schema requires `.refine()` — an explicit escape hatch that acknowledges "the type system doesn't model this."
+
+### Valibot — Array Validation Pipes
+
+
+
+| Category | Methods |
+
+
+
+|----------|---------|
+
+
+
+| Cardinality | `minLength(n)`, `maxLength(n)` |
+
+
+
+| Element-shape | `every(pipe)`, `some(pipe)` |
+
+
+
+| Membership | `includes(value)`, `excludes(value)` |
+
+
+
+**Mental model:** Pipe composition. Pipes are validation steps applied in sequence. `every` and `some` are explicit quantifiers. Cleaner than Zod's `.refine()` escape hatch — Valibot gives quantifiers first-class names.
+
+### FluentValidation — Collection Validators
+
+
+
+| Category | Methods |
+
+
+
+|----------|---------|
+
+
+
+| Element-level | `RuleForEach(x => x.Collection).SetValidator(...)`, `ChildRules(...)` |
+
+
+
+| Collection-level | `RuleFor(x => x.Collection).Must(predicate)` |
+
+
+
+| Cardinality | Via `Must(c => c.Count >= n)` |
+
+
+
+| Uniqueness | Via `Must(c => c.Distinct().Count() == c.Count)` |
+
+
+
+**Mental model:** Two distinct surfaces — element-level (`RuleForEach`) and collection-level (`RuleFor` + `Must`). FluentValidation doesn't have named collection assertions; everything beyond element validation goes through the generic `Must(predicate)` escape hatch. The vocabulary is thin on collection-specific operations.
+
+### OPA/Rego — Collection Rules in Policy
+
+
+
+| Category | Constructs |
+
+
+
+|----------|------------|
+
+
+
+| Element-shape | `every x in xs { predicate }`, `some x in xs` |
+
+
+
+| Cardinality | `count(xs)` |
+
+
+
+| Derived sets | Array/set comprehensions: `[x | x := arr[_]; x > 5]` |
+
+
+
+| Cross-collection | Set operations: `&` (intersection), `|` (union), `-` (difference) |
+
+
+
+**Mental model:** Logic programming. Rules are declarative statements. Comprehensions build derived collections. `every` and `some` are first-class quantifiers. Cross-collection operations use set algebra. The model is powerful but requires logic-programming literacy.
+
+### Bean Validation (JSR-380) — Collection Annotations
+
+
+
+| Category | Annotations |
+
+
+
+|----------|-------------|
+
+
+
+| Cardinality | `@Size(min=n, max=m)`, `@NotEmpty` |
+
+
+
+| Element-cascading | `@Valid` (cascades validation to each element) |
+
+
+
+| Nullability | `@NotNull` |
+
+
+
+**Mental model:** Declarative annotations on fields. Collection constraints are limited to size and emptiness. Element-level validation is delegated via `@Valid` cascading to the element type's own annotations. No uniqueness, no ordering, no cross-collection — those require custom validators.
+
+### SQL Constraints
+
+
+
+| Category | Mechanisms |
+
+
+
+|----------|------------|
+
+
+
+| Cardinality | No direct collection cardinality (tables are collections; row counts are queries) |
+
+
+
+| Uniqueness | `UNIQUE` constraint, `PRIMARY KEY` |
+
+
+
+| Membership | `FOREIGN KEY` (value must exist in referenced table) |
+
+
+
+| Element-shape | `CHECK` constraint on individual rows |
+
+
+
+| Cross-table | Foreign keys, `CHECK` with subqueries (limited support) |
+
+
+
+**Mental model:** Relational. Each row is independently constrained. Cross-row constraints use `UNIQUE`, `FOREIGN KEY`, or table-level `CHECK`. SQL's collection model is fundamentally different (tables are open collections, not declared fields), but `UNIQUE` as a declarative field-level keyword is directly relevant to Precept.
+
+
+
+---
+
+
+
+## 2. Taxonomy of Collection Rules
+
+### Category 1: Cardinality
+
+
+
+Rules about how many elements a collection has.
+
+
+
+| Rule | Example systems |
+
+
+
+|------|----------------|
+
+
+
+| Non-empty | FA, Zod, Valibot, Bean Val |
+
+
+
+| Exact count | FA |
+
+
+
+| Min count | FA, Zod, Valibot, Bean Val |
+
+
+
+| Max count | FA, Zod, Valibot, Bean Val |
+
+
+
+| Single element | FA |
+
+
+
+**Precept today:** `mincount N`, `maxcount N`, `.count` in expressions. **Gap:** No dedicated `notempty` for collections (must use `mincount 1`).
+
+### Category 2: Membership
+
+
+
+Rules about specific values being present or absent.
+
+
+
+| Rule | Example systems |
+
+
+
+|------|----------------|
+
+
+
+| Contains value | FA, Valibot |
+
+
+
+| Not contains value | FA, Valibot |
+
+
+
+| Contains all of (subset) | FA |
+
+
+
+**Precept today:** `contains` operator in expressions/guards. **Gap:** No `not contains` (must negate: `not X contains Y`). No multi-value containment.
+
+### Category 3: Element-Shape (Quantified Predicates)
+
+
+
+Rules about properties that all, some, or no elements satisfy.
+
+
+
+| Rule | Example systems |
+
+
+
+|------|----------------|
+
+
+
+| All satisfy predicate | FA, Valibot, OPA, CEL |
+
+
+
+| Any satisfies predicate | Valibot, OPA, CEL |
+
+
+
+| None satisfies predicate | OPA (via negated `some`) |
+
+
+
+| Exactly one satisfies | FA, CEL |
+
+
+
+| Each element satisfies (cascading) | FV, Bean Val |
+
+
+
+**Precept today:** Inner-type constraints (`set of number nonnegative`) cover the declaration-time case. **Gap:** No runtime predicate quantification. This is the domain of the parallel loop research — quantifier predicates (`all`/`any`/`none`).
+
+### Category 4: Ordering
+
+
+
+Rules about element arrangement.
+
+
+
+| Rule | Example systems |
+
+
+
+|------|----------------|
+
+
+
+| Ascending order | FA |
+
+
+
+| Descending order | FA |
+
+
+
+| Monotone (no duplicates, ordered) | (implicit in ascending + unique) |
+
+
+
+**Precept today:** Not applicable — `set` is unordered by definition; `queue` and `stack` have insertion-order semantics, not sort-order semantics. **Analysis:** Ordering constraints are only meaningful for ordered collection types (lists). Precept doesn't have a `list` type. If one is added, ordering constraints become relevant.
+
+### Category 5: Cross-Collection
+
+
+
+Rules relating two or more collections to each other.
+
+
+
+| Rule | Example systems |
+
+
+
+|------|----------------|
+
+
+
+| Disjoint (no overlap) | OPA (set difference) |
+
+
+
+| Subset | FA, OPA |
+
+
+
+| Superset | FA |
+
+
+
+| Intersection non-empty | FA |
+
+
+
+| Same length | (custom in all) |
+
+
+
+| Equivalence (same elements) | FA |
+
+
+
+**Precept today:** No cross-collection operations. **Gap:** This is a real gap for business rules like "approved reviewers must be a subset of assigned reviewers" or "primary and backup contacts must be disjoint."
+
+### Category 6: Aggregate-Relational
+
+
+
+Rules relating a scalar aggregate of a collection to a threshold or another field.
+
+
+
+| Rule | Example systems |
+
+
+
+|------|----------------|
+
+
+
+| Sum comparison | SQL (aggregates), custom in FV/FA |
+
+
+
+| Min/max comparison | FA (via `BeInAscendingOrder`), SQL |
+
+
+
+| Average comparison | SQL, custom in FV |
+
+
+
+| Count-where comparison | OPA (comprehension + count) |
+
+
+
+**Precept today:** `.min` and `.max` accessors on `set of T` (T orderable). `.count` on all collections. **Gap:** No `.sum`, no `.average`, no count-where. Sum is the most requested — "invoice line items must sum to the total" is a canonical business rule. But this depends on either (a) numeric collections with `.sum` accessor, or (b) structured collection elements with projection, which is a larger feature.
+
+
+
+---
+
+
+
+## 3. Business Requirements Mapping
+
+### Cardinality
+
+
+
+- "An order must have at least one line item" → `mincount 1` (exists today)
+
+
+
+- "A review committee must have exactly 3 members" → `mincount 3 maxcount 3` (exists today)
+
+### Membership
+
+
+
+- "The list of approved currencies must include USD" → `rule ApprovedCurrencies contains "USD"` (exists today)
+
+
+
+- "Blacklisted suppliers must not appear in the vendor list" → needs cross-collection, not today
+
+### Element-Shape
+
+
+
+- "All approvers must have distinct roles" → needs `unique` (proposed) + structured elements (future)
+
+
+
+- "Every line item amount must be positive" → inner-type constraint `set of number positive` (exists at declaration), or quantifier `Items.all(item, item > 0)` (from loop research)
+
+### Ordering
+
+
+
+- "Milestone dates must be in chronological order" → needs ordered collection type + ordering constraint (future)
+
+### Cross-Collection
+
+
+
+- "Primary and backup contacts must be different people" → needs `disjoint` operator
+
+
+
+- "Selected options must be a subset of available options" → needs `subset` operator
+
+### Aggregate-Relational
+
+
+
+- "Invoice line items must sum to the invoice total" → needs `.sum` accessor on numeric collections
+
+
+
+- "Average review score must be at least 3.0" → needs `.sum` / `.count` or `.average` accessor
+
+
+
+---
+
+
+
+## 4. Precept Syntax Options
+
+### Option A: Constraint-Keyword Extensions (Recommended First Step)
+
+
+
+**Approach:** Extend the existing field-constraint vocabulary with new keywords that express collection-level properties declaratively, exactly as `mincount`/`maxcount`/`nonnegative`/`notempty` work for their respective types today.
+
+
+
+```precept
+
+
+
+---
+
+
+
+---
+
+# Uniqueness — elements must be distinct
+
+
+
+field Approvers as set of string unique
+
+
+
+---
+
+
+
+---
+
+# Collection notempty — at least one element required (alias for mincount 1)
+
+
+
+field LineItems as set of number notempty
+
+
+
+---
+
+
+
+---
+
+# Cross-collection subset
+
+
+
+field SelectedOptions as set of string subset AvailableOptions
+
+
+
+---
+
+
+
+---
+
+# Cross-collection disjoint
+
+
+
+field PrimaryContacts as set of string disjoint BackupContacts
+
+
+
+```
+
+
+
+**What's new:** `unique`, collection-level `notempty`, `subset`, `disjoint` as field modifiers.
+
+
+
+**Philosophy filter:**
+
+
+
+- ✅ **Prevention:** Declarative, structural. The constraint is part of the field's type — every mutation is checked.
+
+
+
+- ✅ **Determinism:** All new modifiers are decidable over finite sets.
+
+
+
+- ✅ **Inspectability:** Each modifier is a named property the engine can report on.
+
+
+
+- ✅ **Keyword-anchored:** Same position as existing modifiers. No new syntax forms.
+
+
+
+- ✅ **AI legibility:** Flat, keyword-per-constraint. Trivially parseable.
+
+
+
+- ✅ **No loops:** These are structural properties, not predicates over elements.
+
+
+
+- ✅ **Mandatory rationale:** Constraint modifiers don't carry `because` — they are type-level facts. Consistent with existing `nonnegative`, `positive`, etc.
+
+
+
+- ✅ **Proof engine:** `unique` on `set` is tautological (sets are inherently unique) — the compiler can warn. `unique` on `queue`/`stack` is meaningful. `subset`/`disjoint` are statically checkable when both collections are known.
+
+
+
+**Covers from taxonomy:** Cardinality (complete), Membership (partial — `contains` exists), Cross-Collection (subset, disjoint), Uniqueness.
+
+
+
+**Deliberately excludes:** Element-shape predicates (needs quantifiers), Ordering (needs ordered type), Aggregate-relational (needs `.sum`).
+
+
+
+---
+
+### Option B: Rule-Surface Quantifiers (Recommended Second Step)
+
+
+
+**Approach:** Use quantifier predicates in `rule` and `ensure` expressions. This is the same design as Option A from the parallel loop research — included here for completeness of the constraint picture.
+
+
+
+```precept
+
+
+
+---
+
+
+
+---
+
+# All elements satisfy a predicate
+
+
+
+rule Items.all(item, item > 0)
+
+
+
+    because "All line items must have positive amounts"
+
+
+
+---
+
+
+
+---
+
+# At least one element satisfies
+
+
+
+rule Reviewers.any(reviewer, reviewer != "")
+
+
+
+    because "At least one reviewer must be named"
+
+
+
+---
+
+
+
+---
+
+# State-scoped element constraint
+
+
+
+in Review ensure Scores.all(score, score >= 1 and score <= 5)
+
+
+
+    because "All review scores must be between 1 and 5"
+
+
+
+---
+
+
+
+---
+
+# Guard with quantifier
+
+
+
+from Submitted on Approve when PendingApprovals.all(p, p != "")
+
+
+
+    -> transition Approved
+
+
+
+```
+
+
+
+**Philosophy filter:** See the parallel loop research (`frank-loop-research.md`) for full assessment. Summary: ✅ on all principles. The key tradeoff is introducing a scoped variable binding, which is new for Precept but is the minimum viable form for quantification.
+
+
+
+**Covers from taxonomy:** Element-Shape (complete), and enables some Aggregate-Relational rules when combined with collection accessors.
+
+
+
+**Deliberately excludes:** Cross-collection (use Option A's keyword modifiers), Ordering (needs ordered type), Projection/computation (separate track).
+
+
+
+---
+
+### Option C: Dedicated `check` Blocks (Deferred)
+
+
+
+**Approach:** A new construct that groups multiple collection-level assertions under a single collection reference, with a dedicated keyword.
+
+
+
+```precept
+
+
+
+check LineItems
+
+
+
+    notempty because "Must have at least one line item"
+
+
+
+    unique because "No duplicate line items"
+
+
+
+    all(item, item > 0) because "All amounts must be positive"
+
+
+
+    count <= 50 because "Maximum 50 line items"
+
+
+
+check SelectedOptions
+
+
+
+    subset AvailableOptions because "Selected options must be valid"
+
+
+
+    disjoint ExcludedOptions because "Cannot select excluded options"
+
+
+
+```
+
+
+
+**Philosophy filter:**
+
+
+
+- ✅ **Readability:** Groups related constraints visually. Reads well.
+
+
+
+- ✅ **Mandatory rationale:** Each assertion carries `because`.
+
+
+
+- ❌ **New construct kind.** Precept's constraint surfaces are `rule`, `ensure`, and field modifiers. `check` is a fourth surface. More language surface area = more to learn, more for the compiler to validate, more for tooling to support.
+
+
+
+- ❌ **Redundant expressiveness.** Everything `check` can do is expressible via Option A (modifiers) + Option B (quantifiers in rules/ensures). The grouping is cosmetic, not semantic.
+
+
+
+- ⚠️ **Inspection model.** Does a `check` block report as one constraint or many? If many, it's syntactic sugar over individual rules. If one, it changes the violation attribution model.
+
+
+
+**Assessment:** This is a readability optimization, not a capability extension. Defer until (a) Options A and B are both shipped and (b) authors actually report that collection constraints are scattered and hard to read.
+
+
+
+---
+
+
+
+## 5. Intersection with the Proof Engine
+
+### Statically Provable (compile-time)
+
+
+
+| Rule | Proof mechanism |
+
+
+
+|------|----------------|
+
+
+
+| `unique` on `set of T` | Tautological — sets are unique by definition. Compiler warns. |
+
+
+
+| `mincount N` / `maxcount N` vs initial state | Default is empty collection (count = 0). If `mincount 1` and no initial event populates the collection, the compiler can flag the violation against defaults. |
+
+
+
+| `notempty` vs initial state | Same as `mincount 1` — provable against defaults. |
+
+
+
+| `subset A B` when both are declared | If both collections have `choice`-typed elements with overlapping value sets, subset is provable. If element types differ, it's a type error. |
+
+
+
+| `disjoint A B` when both are declared | Same reasoning as subset — provable when value domains are known. |
+
+
+
+| `all(item, item >= 0)` when field declares `set of number nonnegative` | The inner-type constraint already guarantees the predicate. Proof engine recognizes this and reports the quantifier as tautological. |
+
+### Runtime-Required (with compile-time diagnostic obligation)
+
+
+
+| Rule | Why runtime | Required diagnostic |
+
+
+
+|------|-------------|---------------------|
+
+
+
+| `unique` on `queue of T` / `stack of T` | Elements are added at runtime via events; uniqueness depends on runtime data. | Obligation diagnostic: "uniqueness of `FieldName` depends on runtime data — the compiler cannot prove all insertions produce distinct values." |
+
+
+
+| `all(item, item > threshold)` where `threshold` is a mutable field | The threshold can change; the predicate truth depends on runtime state. | Obligation diagnostic linking to the mutable dependency. |
+
+
+
+| `subset A B` where B is modified by events | Subset relationship depends on which elements are added/removed at runtime. | Obligation diagnostic. |
+
+
+
+| Aggregate-relational rules (`sum > X`) | Aggregate value depends on runtime collection contents. | Obligation diagnostic. |
+
+### The No-Runtime-Faults Bridge
+
+
+
+For every collection rule that requires runtime checking, the compiler must:
+
+
+
+1. **Prove it's handled:** If the rule is a field modifier (`unique`, `subset`, `disjoint`), it's enforced on every mutation — same as `nonnegative` is enforced on every assignment. The engine checks after every `add`/`enqueue`/`push`/`remove`/`dequeue`/`pop` and rejects mutations that violate. No unproven fault.
+
+
+
+2. **Emit obligation diagnostics for quantifier predicates:** If a `rule` or `ensure` uses a quantifier (`all`/`any`/`none`) and the compiler cannot prove the predicate from inner-type constraints alone, it emits a diagnostic: "quantifier constraint on `FieldName` requires runtime evaluation — ensure all code paths that modify the collection maintain the invariant." The constraint is still enforced at runtime (collect-all semantics), but the diagnostic makes the runtime dependency explicit.
+
+
+
+3. **Prove empty-collection safety:** If a quantifier expression is used in a context where the collection might be empty, the compiler must reason about vacuous truth. `Items.all(item, item > 0)` on an empty collection is `true` (vacuous truth — mathematically correct). `Items.any(item, item > 0)` on an empty collection is `false`. If an `any` quantifier is in a `rule` position and the collection can be empty, the rule is falsifiable — the compiler should warn or require a `mincount 1` guard.
+
+
+
+---
+
+
+
+## 6. Recommendation
+
+### Highest value/complexity ratio: Constraint-Keyword Extensions (Option A)
+
+
+
+| Category | Approach | Value | Complexity | Priority |
+
+
+
+|----------|----------|-------|------------|----------|
+
+
+
+| Cardinality | Existing (`mincount`/`maxcount`) + `notempty` | High | Trivial | Now |
+
+
+
+| Uniqueness | `unique` modifier | High | Low | Now |
+
+
+
+| Cross-collection | `subset`, `disjoint` modifiers | Medium-High | Medium | Soon |
+
+
+
+| Element-shape | Quantifier predicates (Option B, from loop research) | High | Medium-High | Second |
+
+
+
+| Aggregate-relational | `.sum` accessor + quantifiers | Medium | High | Third |
+
+
+
+| Ordering | Needs ordered collection type | Low | High | Deferred |
+
+
+
+**Implementation order:**
+
+
+
+1. **Collection `notempty`** — alias for `mincount 1`. Tiny change, high readability value. Many business rules say "must have at least one" and `notempty` reads better than `mincount 1`.
+
+
+
+2. **`unique`** — on `queue` and `stack` (tautological on `set`, compiler warns). Enables "all values must be distinct" without quantifiers.
+
+
+
+3. **Quantifier predicates** — from the parallel loop research. This unlocks element-shape rules.
+
+
+
+4. **Cross-collection modifiers** (`subset`, `disjoint`) — after quantifiers, because the proof engine needs to reason about set relationships.
+
+
+
+5. **`.sum` accessor** — when numeric collection aggregation becomes pressing. Probably alongside structured collection elements.
+
+
+
+---
+
+
+
+## 7. Open Questions for Shane
+
+
+
+1. **Collection `notempty` — new keyword or reuse `notempty`?** Today `notempty` applies to `string` only. Extending it to collections is natural (`field Items as set of number notempty`), but it's a semantic widening of an existing keyword. Is that acceptable, or should it be a distinct keyword (e.g., `required`)?
+
+
+
+2. **`unique` on sets — warn or silently accept?** Sets are inherently unique. If someone writes `field Tags as set of string unique`, should the compiler (a) warn "unique is redundant on set types," (b) silently accept it as a harmless declaration, or (c) reject it as an error? I lean toward (a) — warn but accept.
+
+
+
+3. **Cross-collection modifiers — field modifiers or rule expressions?** `subset` and `disjoint` reference another field. As field modifiers (`field A as set of string subset B`), they're declarative but create a dependency ordering between field declarations. As rule expressions (`rule A subset B because "..."`), they're more flexible but lose the field-level constraint identity. Which surface fits better?
+
+
+
+4. **Does this interact with the eventual `list` type?** If Precept adds an ordered collection type, ordering constraints (`ascending`, `descending`) become relevant. Should the taxonomy include them now for future-proofing, or defer entirely?
+
+
+
+5. **Priority relative to the quantifier track?** The loop research recommends quantifier predicates. This research recommends constraint keywords. They're complementary. Should they be designed together in one proposal, or shipped as separate increments?
+
+
+
+6. **Aggregate accessors — `.sum` and `.average` on numeric collections?** These are straightforward for `set of number` / `set of decimal`. Should they be part of this proposal or a separate one? They don't require quantifiers but do create proof obligations (e.g., `.sum` on an empty collection is 0 — is that always correct?).
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+---
+
+# Decision: Map Access Syntax
+
+
+
+**Date:** 2026-04-29
+
+
+
+**Author:** Frank (Lead Language Designer)
+
+
+
+**Status:** Advisory — pending owner decision
+
+
+
+**Context:** Shane asked whether `CoverageLimits.get(CheckCoverage.CoverageType)` is too C#-like or fits Precept's grammar.
+
+
+
+---
+
+
+
+## 1. Does `.get(key)` Fit Precept's Grammar?
+
+
+
+**Short answer: It partially fits, but it's the wrong design choice.**
+
+
+
+The spec *does* have a precedent for parameterized accessors: `.inZone(tz)` on `instant` and `datetime` (spec §3.3, temporal accessors). The parser already handles `MemberAccessExpression` + `(` → `MethodCallExpression` at binding power 80. So `.get(key)` is *parseable* — the machinery exists.
+
+
+
+However, there's a critical distinction:
+
+
+
+- **`.inZone(tz)` is a type-system accessor** — it's a fixed method name on a specific type, taking a single typed constant argument. It transforms one temporal type to another. It's a narrow, catalog-driven exception.
+
+
+
+- **`.get(key)` is a general-purpose keyed lookup** — the argument is an arbitrary expression, not a type constant. It's closer to subscript access than to a type accessor.
+
+
+
+The quantifier decision (`.all(item, pred)` → `each item in Items (pred)`) rejected multi-argument method-call syntax because it looked like C# and violated Precept's keyword-first declarative style. `.get(key)` is a single-argument form, so it's *less* of a violation — but it still introduces `object.verb(arg)` OOP method-call syntax into a language that otherwise uses `keyword Object Arg` action grammar everywhere:
+
+
+
+```
+
+
+
+-> set Field = Expr        # keyword Field = Expr
+
+
+
+-> add Collection Value    # keyword Collection Value
+
+
+
+-> remove Collection Value # keyword Collection Value
+
+
+
+-> push Collection Value   # keyword Collection Value
+
+
+
+```
+
+
+
+Making map access the one place where `Object.verb(Arg)` appears in expression position is an unnecessary style break.
+
+
+
+## 2. Candidate Evaluation
+
+### A. `CoverageLimits.get(CheckCoverage.CoverageType)` — method call
+
+
+
+- **Parse:** Unambiguous — spec already defines `MemberAccessExpression` + `(` → `MethodCallExpression`.
+
+
+
+- **Style fit:** Poor. OOP method-call form in an otherwise keyword-driven language. The quantifier precedent rejected this pattern.
+
+
+
+- **Contexts:** Works syntactically in rules, actions, and guards. Visually noisy.
+
+
+
+- **Verdict:** Parseable but stylistically wrong. **Reject.**
+
+### B. `CoverageLimits[CheckCoverage.CoverageType]` — subscript bracket
+
+
+
+- **Parse:** Requires adding `[` as a left-denotation token at high binding power. Currently `[` only appears in null-denotation (list literals). Adding it as infix/postfix creates a new parse path.
+
+
+
+- **Style fit:** Familiar from every C-family language, but Precept has no other postfix bracket notation. Brackets currently mean "list literal," not "index into."
+
+
+
+- **Contexts:** Works everywhere, binds tightly. `rule CoverageLimits[CheckCoverage.CoverageType] >= 50000` reads cleanly.
+
+
+
+- **Verdict:** Parseable with grammar extension. Visually compact. But introduces a new syntactic category (postfix brackets) that has no other use in the language. **Acceptable but not preferred.**
+
+### C. `CoverageLimits at CheckCoverage.CoverageType` — keyword `at`
+
+
+
+- **Parse:** `at` as an infix keyword operator (like `contains`) at binding power ~40. Left operand is map-typed expression, right operand is key expression.
+
+
+
+- **Style fit:** Excellent. Reads like English: "coverage limits at this coverage type." Follows the same `Collection operator Key` pattern as `MissingDocuments contains ReceiveDocument.Name`.
+
+
+
+- **Contexts:**
+
+
+
+  - Rule: `rule CoverageLimits at CheckCoverage.CoverageType >= 50000` ✓
+
+
+
+  - Action: `-> set CurrentLimit = CoverageLimits at CheckCoverage.CoverageType` ✓
+
+
+
+  - Guard: `when CoverageLimits at CheckCoverage.CoverageType > MinCoverage` ✓
+
+
+
+- **Precedence concern:** At BP 40 (same as `contains`), `CoverageLimits at CheckCoverage.CoverageType >= 50000` parses as `(CoverageLimits at CheckCoverage.CoverageType) >= 50000` — correct, because `.` binds tighter (80) and comparison binds looser (30).
+
+
+
+- **Lexer:** `at` is a new keyword but has no collision risk — it's not used anywhere in the current grammar.
+
+
+
+- **Verdict:** **Recommended.** Clean English reading, follows `contains` precedent exactly, no grammar conflicts, works in all three contexts.
+
+### D. `CoverageLimits of CheckCoverage.CoverageType` — reuse `of`
+
+
+
+- **Parse:** `of` is already heavily overloaded: `set of T`, `queue of T`, `map of K to V`, `choice of ...`. Using it as an infix expression operator creates parser ambiguity in type positions.
+
+
+
+- **Style fit:** Reads okay in isolation but "limits of coverage type" reverses the natural English meaning (the type is the key, not the possessor).
+
+
+
+- **Verdict:** **Reject.** Too overloaded, semantically backwards.
+
+### E. `CoverageLimits for CheckCoverage.CoverageType` — keyword `for`
+
+
+
+- **Parse:** `for` is not currently a keyword. Could work as infix operator.
+
+
+
+- **Style fit:** "Coverage limits for this coverage type" reads naturally. However, `for` strongly implies iteration in most programming contexts, which conflicts with Precept's no-iteration philosophy.
+
+
+
+- **Verdict:** **Acceptable but risky.** The iteration connotation is a liability.
+
+### F. `lookup CoverageLimits CheckCoverage.CoverageType` — keyword-first
+
+
+
+- **Parse:** Keyword-first form matching action grammar (`keyword Collection Key`).
+
+
+
+- **Style fit:** Matches action patterns but map access is an *expression*, not an action. Keyword-first forms in Precept are statements/actions (`set`, `add`, `remove`, `push`, `transition`). Expressions use infix/postfix notation. A keyword-first expression would be a new grammatical category.
+
+
+
+- **Contexts:** Awkward in rules: `rule lookup CoverageLimits CheckCoverage.CoverageType >= 50000` — where does the `lookup` end and the `>=` begin? Requires parenthesization: `rule (lookup CoverageLimits CheckCoverage.CoverageType) >= 50000`.
+
+
+
+- **Verdict:** **Reject.** Expression-position keyword-first form creates ambiguity and requires parens.
+
+### G. `CoverageLimits.get CheckCoverage.CoverageType` — accessor without parens
+
+
+
+- **Parse:** `.get` would parse as a `MemberAccessExpression` yielding a value, then `CheckCoverage.CoverageType` is a separate expression with no connecting operator. The parser would see two adjacent expressions with no infix operator between them — a parse error.
+
+
+
+- **Style fit:** Looks like a shell command, not a Precept expression.
+
+
+
+- **Verdict:** **Reject.** Unparseable without grammar surgery.
+
+
+
+## 3. Recommendation
+
+
+
+**Use `at` as the map access operator.**
+
+
+
+```
+
+
+
+CoverageLimits at CheckCoverage.CoverageType
+
+
+
+```
+
+### Rationale
+
+
+
+1. **Follows the `contains` precedent exactly.** `contains` is an infix keyword operator that takes a collection on the left and a value on the right. `at` is the same pattern: map on the left, key on the right.
+
+
+
+2. **No method calls in expression position.** The quantifier decision established that Precept prefers keyword forms over method-call syntax. `at` is a keyword, not a method.
+
+
+
+3. **`.inZone(tz)` is the exception, not the rule.** That accessor exists because timezone conversion is a type-system operation (it changes the return type). Map lookup is a data operation — it should use the language's standard expression vocabulary, not the type accessor escape hatch.
+
+
+
+4. **Reads as English.** "Coverage limits at this coverage type" is immediately clear to business stakeholders.
+
+
+
+5. **Proof engine integration is clean.** `containskey` guards the `at` operator the same way `.count > 0` guards `.peek` — the proof engine tracks key-presence from `when CoverageLimits containskey K` and permits `CoverageLimits at K` in the guarded scope.
+
+### Usage in all three contexts
+
+
+
+```precept
+
+
+
+---
+
+
+
+---
+
+# Rule expression
+
+
+
+rule CoverageLimits at CheckCoverage.CoverageType >= 50000
+
+
+
+    because "Each coverage type must meet minimum threshold"
+
+
+
+---
+
+
+
+---
+
+# Action body
+
+
+
+from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.CoverageType
+
+
+
+    -> set CurrentLimit = CoverageLimits at CheckCoverage.CoverageType
+
+
+
+    -> no transition
+
+
+
+---
+
+
+
+---
+
+# Event guard
+
+
+
+from Active on AdjustCoverage
+
+
+
+    when CoverageLimits containskey AdjustCoverage.CoverageType
+
+
+
+    and CoverageLimits at AdjustCoverage.CoverageType > MinCoverage
+
+
+
+    -> ...
+
+
+
+```
+
+### Implementation sketch
+
+
+
+- New lexer keyword: `at` → `TokenKind.At`
+
+
+
+- New left-denotation entry: `At` at binding power 40 → `MapAccessExpression(left, ParseExpression(40))`
+
+
+
+- Type checker: left must be `map of K to V`, right must be assignable to `K`, result type is `V`
+
+
+
+- Proof engine: `at` requires a `containskey` guard in scope for the same map and key expression (new proof obligation: `KeyPresence`)
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+# Advisory: Map Access Keyword — `at` vs `for`
+
+
+
+**Author:** Frank (Lead Language Designer)
+
+
+
+**Date:** 2026-04-29
+
+
+
+**Status:** Advisory (no file changes)
+
+
+
+**Context:** Shane asked whether `for` should replace the previously recommended `at` as the map access infix keyword.
+
+
+
+---
+
+
+
+## 1. Existing Uses in Precept
+
+### `for` — Not a reserved keyword
+
+
+
+`for` does **not** appear in the v2 reserved keyword set (§1.2 of `precept-language-spec.md`). It is an ordinary identifier today. It appears in sample files only inside comments and string literals — never as syntax. Adding `for` as a keyword would be a net-new reservation.
+
+### `at` — Not a reserved keyword
+
+
+
+`at` also does **not** appear in the v2 reserved keyword set. Like `for`, it appears in sample files only inside comments and string literals (e.g., `"capped at half"`, `"at least one floor"`). Adding `at` would also be a net-new reservation.
+
+
+
+**Tie.** Neither keyword carries existing syntactic baggage. Both are fresh reservations.
+
+
+
+---
+
+
+
+## 2. Cognitive Load — What Does English Prime You For?
+
+
+
+This is where the two diverge meaningfully.
+
+### `for` — "intended for / on behalf of / filtered by"
+
+
+
+In English, `for` implies **purpose, benefit, or selection**: "the limit *for* this coverage type," "the fee *for* this transaction." It reads like a natural-language lookup: "get me the value meant for this key."
+
+
+
+In programming, `for` is universally associated with **iteration** — `for` loops, `for-each`, `for...in`, `for...of`. Every mainstream language (C, Java, Python, JavaScript, Go, Rust, Swift, Kotlin) uses `for` as an iteration keyword. Precept has no loops by design (§0.4.1: "No loops"), but adopting `for` as a map access keyword creates a false association for anyone who has ever written code. It will feel like it should iterate. This is a real cognitive cost.
+
+### `at` — "located at / indexed at"
+
+
+
+In English, `at` implies **location or position**: "the value *at* this key," "the element *at* index 3." It reads as spatial lookup — which is exactly what map access is.
+
+
+
+In programming, `at` is used for **element access** — C++ `vector.at(i)`, Java `List.get()` (conceptually "at index"), Python's `__getitem__`. No mainstream language uses `at` for iteration. The association is clean: `at` means "retrieve the thing located here."
+
+
+
+**Advantage: `at`.** The word `for` carries iteration baggage from every programming language. `at` carries lookup/access semantics with no conflicting association.
+
+
+
+---
+
+
+
+## 3. Readability in All Three Contexts
+
+### Rule expression
+
+
+
+```precept
+
+
+
+rule CoverageLimits for CheckCoverage.CoverageType >= 50000
+
+
+
+rule CoverageLimits at CheckCoverage.CoverageType >= 50000
+
+
+
+```
+
+
+
+**`for`** reads: "the coverage limits *for* the coverage type must be ≥ 50,000." Natural English — this is `for`'s strongest context. A business analyst would write it this way.
+
+
+
+**`at`** reads: "the coverage limits *at* the coverage type must be ≥ 50,000." Slightly more technical, but still clear. "At" signals lookup, which is accurate.
+
+
+
+**Edge: `for`** — in isolation, the `for` reading is slightly more natural in this context.
+
+### Action body
+
+
+
+```precept
+
+
+
+-> set SomeField to CoverageLimits for CheckCoverage.CoverageType
+
+
+
+-> set SomeField to CoverageLimits at CheckCoverage.CoverageType
+
+
+
+```
+
+
+
+**`for`** reads: "set SomeField *to* CoverageLimits *for* the coverage type." The `to` ... `for` pairing is natural but introduces a subtle risk: the prepositions `to` and `for` now both appear in the same statement with different structural roles. `to` is the assignment target connector; `for` is the map access operator. A reader must parse two prepositions doing unrelated jobs.
+
+
+
+**`at`** reads: "set SomeField *to* CoverageLimits *at* the coverage type." The `to` ... `at` pairing is clearer — `to` means "assign into," `at` means "look up from." Different prepositions, different roles, no confusion.
+
+
+
+**Edge: `at`** — avoids the `to`/`for` preposition collision in action context.
+
+### Event guard
+
+
+
+```precept
+
+
+
+when CoverageLimits for CheckCoverage.CoverageType > MinCoverage
+
+
+
+when CoverageLimits at CheckCoverage.CoverageType > MinCoverage
+
+
+
+```
+
+
+
+**`for`** reads: "when the coverage limits *for* the coverage type exceed the minimum." Natural, clear.
+
+
+
+**`at`** reads: "when the coverage limits *at* the coverage type exceed the minimum." Clear, slightly more technical.
+
+
+
+**Edge: `for`** — marginal.
+
+### Composite reading
+
+
+
+Across all three contexts, `for` wins on pure English fluency in 2 of 3, but `at` wins on **structural clarity** — it is never ambiguous about what role it plays. The action-body `to`/`for` collision is a real readability problem, not a theoretical one. Precept uses `to` as a core keyword (state-gate ensures, `map of K to V`). Adding `for` as another overloaded preposition increases the preposition density in action statements.
+
+
+
+**Overall edge: `at`.** The structural clarity advantage outweighs the marginal English fluency advantage of `for`.
+
+
+
+---
+
+
+
+## 4. Parse Ambiguity
+
+### `for`
+
+
+
+No **grammatical** ambiguity — `for` is not reserved, so the parser can adopt it as a new infix operator without collision. However, if Precept ever introduces bounded quantifiers (currently proposed in `collection-types.md` §Proposed Extensions — `each`, `any`, `no`), future language evolution could face pressure to use `for` in a quantifier context (e.g., `each item in Items for ...`). Reserving `for` now for map access would block that path.
+
+### `at`
+
+
+
+No grammatical ambiguity. `at` has no plausible future use in Precept's design space beyond element access. It is a dead-end keyword in the best sense — it does exactly one thing and nothing else will ever want it.
+
+
+
+**Advantage: `at`.** Smaller future-reservation footprint.
+
+
+
+---
+
+
+
+## 5. Precedent — Infix Operator Pattern
+
+
+
+Precept's existing infix keyword operator is `contains`:
+
+
+
+```precept
+
+
+
+MissingDocuments contains ReceiveDocument.Name
+
+
+
+```
+
+
+
+Pattern: `Collection <infix-keyword> Operand`
+
+
+
+Both candidates follow this pattern:
+
+
+
+```precept
+
+
+
+CoverageLimits at CheckCoverage.CoverageType       -- map access
+
+
+
+CoverageLimits for CheckCoverage.CoverageType       -- map access
+
+
+
+MissingDocuments contains ReceiveDocument.Name       -- membership
+
+
+
+```
+
+
+
+`contains` is a **verb** — it describes what the collection does with the operand. `at` is a **preposition** — it describes where in the collection to look. `for` is also a preposition but with a purpose/selection flavor.
+
+
+
+The infix slot accepts both verbs and prepositions (precedent: `contains` is a verb, `is` is a verb in `is set`/`is not set`). Neither `at` nor `for` breaks the pattern.
+
+
+
+**Tie.** Both fit the infix precedent.
+
+
+
+---
+
+
+
+## 6. Verdict
+
+
+
+**I recommend `at`.** The original recommendation stands.
+
+
+
+`for` is not bad — it reads beautifully in rule context and guard context. But it has three disadvantages that `at` does not:
+
+
+
+1. **Iteration baggage.** Every programmer alive associates `for` with loops. Precept has no loops. Using `for` for map access creates a false cognitive prime that `at` avoids entirely.
+
+
+
+2. **Preposition collision with `to`.** In action bodies (`-> set F to M for K`), `to` and `for` are both prepositions doing different structural jobs in the same statement. `at` creates no such collision — `to` assigns, `at` looks up.
+
+
+
+3. **Future reservation cost.** `for` is a high-value English word that could plausibly serve quantifier syntax or other future constructs. `at` has no competing future claim.
+
+
+
+The marginal English fluency advantage of `for` in rule and guard contexts does not outweigh these structural disadvantages. `at` reads clearly in all three contexts, parses unambiguously, carries the right programming-language association (element access), and leaves `for` available for future language evolution.
+
+
+
+**Recommendation: `at` confirmed.**
+
+
+
+```precept
+
+
+
+-- Canonical map access syntax
+
+
+
+CoverageLimits at CheckCoverage.CoverageType
+
+
+
+```
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+# Decision: Map Access Keyword — `for` vs `at`
+
+
+
+**By:** Frank (Lead Language Designer)
+
+
+
+**Date:** 2026-04-29
+
+
+
+**Status:** Advisory — owner decision needed
+
+
+
+**Context:** Follow-up to frank-16 (`at` recommendation). Shane asks whether `for` is better.
+
+
+
+---
+
+
+
+## 1. Keyword Inventory Check
+
+
+
+Neither `for` nor `at` is in Precept's v2/v3 reserved keyword set. Both are fresh — no existing meaning to collide with.
+
+
+
+## 2. English Reading Test
+
+
+
+| Form | Reading |
+
+
+
+|------|---------|
+
+
+
+| `CoverageLimits at CheckCoverage.CoverageType` | "coverage limits *at* this coverage type" — spatial/indexing, like looking up a slot |
+
+
+
+| `CoverageLimits for CheckCoverage.CoverageType` | "coverage limits *for* this coverage type" — relational, like asking "which limit applies to this type?" |
+
+
+
+`for` reads more naturally in business-rule English. Domain experts say "the limit **for** auto coverage" not "the limit **at** auto coverage." `at` carries a programmer connotation (array-at-index) that `for` avoids.
+
+
+
+## 3. Grammar Ambiguity Test
+
+### Rule context
+
+
+
+```precept
+
+
+
+rule CoverageLimits for CheckCoverage.CoverageType >= 50000
+
+
+
+    because "Minimum coverage per type"
+
+
+
+```
+
+
+
+Parses cleanly: `CoverageLimits for CheckCoverage.CoverageType` is the LHS expression, `>=` begins the comparison. No ambiguity.
+
+### Action context
+
+
+
+```precept
+
+
+
+-> set SomeField = CoverageLimits for CheckCoverage.CoverageType
+
+
+
+```
+
+
+
+Parses cleanly: `=` left-delimits the RHS expression; `for` is an infix operator binding map-to-key within the expression.
+
+### Guard context
+
+
+
+```precept
+
+
+
+when CoverageLimits for CheckCoverage.CoverageType > MinCoverage
+
+
+
+```
+
+
+
+Parses cleanly: `for` binds tighter than `>`, producing `(CoverageLimits for CheckCoverage.CoverageType) > MinCoverage`.
+
+### Loop/iteration confusion risk
+
+
+
+Precept has **no loops** (§0.4.1 — "No iteration constructs"). There is no `for` loop, no `for-each`, no iteration keyword anywhere in the grammar. The quantifier syntax uses `each`/`any`/`no` + `in`, not `for`. Reserving `for` as a map-access keyword creates no collision with any existing or planned construct. A reader familiar with C-family languages might initially expect `for` to mean iteration — but Precept's keyword-anchored design principle (§0.1.5) means statement kind is identified by the *opening* keyword, and `for` would never appear at statement-opening position. It only appears as an infix operator within an expression.
+
+
+
+## 4. Precedent Check
+
+
+
+`for` does not appear anywhere in Precept's grammar, keyword tables, sample files (checked all 28), or collection-types doc as a language keyword. The only occurrences of "for" in `.precept` files are inside string literals and comments. Zero tension.
+
+
+
+## 5. Verdict: `for` is better than `at`
+
+
+
+**Recommendation: adopt `for` over `at`.**
+
+
+
+Reasons:
+
+
+
+1. **Domain-natural phrasing.** Business users say "the limit *for* this type," not "the limit *at* this type." `for` matches how domain experts talk about keyed lookups.
+
+
+
+2. **No grammar ambiguity.** `for` parses unambiguously in all three usage contexts (rule, action, guard). Binding precedence is straightforward — tighter than comparison operators, same tier as `.` member access.
+
+
+
+3. **No existing keyword collision.** `for` is unused in Precept. No iteration constructs exist or are planned that would conflict.
+
+
+
+4. **Avoids programmer connotation.** `at` suggests array indexing. `for` suggests relational lookup — which is what map access semantically *is* in a business-rule language.
+
+
+
+The only counterargument for `at` is familiarity for developers who know `dict.at(key)` from C++ or similar. But Precept optimizes for domain readability (§0.1.5), not programmer familiarity.
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+# Decision Record: `map` Access Keyword — Working Syntax `for`, Decision Open
+
+
+
+**By:** Frank
+
+
+
+**Date:** 2026-04-29
+
+
+
+**Status:** Open — pending owner sign-off
+
+
+
+## Summary
+
+
+
+`docs/language/collection-types.md` (§ Candidate 6: `map of K to V`) now documents the map key-access syntax using the infix keyword `for`:
+
+
+
+```
+
+
+
+CoverageLimits for CheckCoverage.CoverageType
+
+
+
+```
+
+
+
+This replaces the prior `.get(key)` method-call notation that appeared in the code example, proof-engine implications prose, and action surface bullet.
+
+
+
+## What Changed
+
+
+
+- Code block in the map candidate now uses `F for key` infix form.
+
+
+
+- Proof engine implications updated: `F for key` requires a `containskey` guard.
+
+
+
+- Action surface bullet now lists `for` (infix key access) instead of `.get(key)`.
+
+
+
+- Multimap rejection section updated to reference `for` consistently.
+
+
+
+- An **open-question callout** was added immediately after the grammar fit block, making it explicit that `for` is the working spelling but is **not finalized**. Both `for` and `at` are under consideration.
+
+
+
+## Decision Status
+
+
+
+**Not locked.** Shane is leaning toward `for` but has not committed. The keyword requires explicit owner sign-off before it can advance to a formal proposal or be implemented in the runtime, lexer, or parser.
+
+
+
+## Why `for` is the current lean
+
+
+
+`CoverageLimits for CheckCoverage.CoverageType` reads as natural English — "the coverage limits *for* that coverage type." It aligns with the business-analyst-readability filter. `at` is also plausible (`CoverageLimits at CheckCoverage.CoverageType`) and has precedent in index-access idioms across several languages, but `for` is more semantically precise in a key-value lookup context.
+
+
+
+## Next Step
+
+
+
+Owner decision required. When Shane locks the keyword, update the open-question callout to a resolved note and advance `map` to a formal GitHub issue.
+
+
+
+---
+
+---
+
+### 2026-05-01: LanguageTool.cs — not in scope (MCP layer not yet implemented)
+
+
+
+**By:** Shane (owner)
+
+
+
+**What:** `LanguageTool.cs` (MCP vocabulary tool — `precept_language` endpoint) is not part of the current spike because the MCP layer it depends on does not exist yet in this codebase.
+
+
+
+**Why:** LanguageTool.cs requires the MCP layer to exist first. MCP is not yet implemented in this codebase, so LanguageTool.cs has no surface to plug into. This is not a deferral — it is a dependency on future infrastructure. Not a gap in the Phase 2 plan.
+
+
+
+**Impact:** Acceptance gate for Phase 2 does NOT include LanguageTool.cs. The gate remains the existing 13 points.
+
+---
+
+### 2026-05-01: Analyzer slices 28–32 added to plan
+
+
+
+**By:** Frank (via Shane directive)
+
+
+
+**What:** Shane approved all 4 analyzer recommendations (PRECEPT0020–0023) + 2 hardcoded-pattern items from `analyzer-recommendations.md`. All added to `parser-gap-fixes-plan.md` as Slices 28–32 under new Phase 2e. Process note for `CatalogAnalysisHelpers.CatalogEnumNames` also appended. Acceptance gate expanded to 14 points.
+
+
+
+**Why:** Shane's directive: no gaps, everything in the plan.
+
+
+
+**Details:**
+
+
+
+- **Slice 28** (already present in plan, Phase 2d): PRECEPT0020 — Operators `ByToken`/`OperatorPrecedence` collision analyzer. Full spec was already appended in a prior session.
+
+
+
+- **Slice 29** (new, Phase 2e): `TokenMeta.IsValidAsMemberName` flag + catalog-driven derivation of `KeywordsValidAsMemberName`. Catalog cleanup, not an analyzer.
+
+
+
+- **Slice 30** (new, Phase 2e): PRECEPT0021 — Tokens duplicate `Text` check. Error severity. Silent failure mode (lexer non-determinism).
+
+
+
+- **Slice 31** (new, Phase 2e): PRECEPT0022 — OperatorMeta inline Token reference. Warning severity (consistent with PRECEPT0008c/0011e/0013a).
+
+
+
+- **Slice 32** (new, Phase 2e, deferred): PRECEPT0023 — OperatorMeta DU shape invariants (PRECEPT0023a/b/c). Blocked on Phase 2b completion. Tracked now, implement after George finishes Slices 19–22.
+
+
+
+- **Process note** (new, Phase 2e): `CatalogAnalysisHelpers.CatalogEnumNames` manual maintenance — process discipline item, not a slice. New-catalog checklist must include updating this set.
+
+
+
+---
+
+
+
+---

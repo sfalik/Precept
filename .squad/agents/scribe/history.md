@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+### 2026-05-07T01:22:50Z — CC#26 decision ledger merged
+
+- Pre-check measured `decisions.md` at 668130 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran first.
+- Archived 6 dated decision entries into `decisions-archive.md`, merged `frank-cc26-locked.md` into the active ledger, deleted the processed inbox file, and wrote the Frank orchestration/session logs.
+- Health report: `decisions.md` 668130B -> 605305B; inbox processed = 1; history files summarized = 0.
+
 ### 2026-05-05T15:32:50Z — Value-types reconciliation batch recorded
 
 - Pre-check measured `decisions.md` at 62325 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran before merge and found 0 eligible entries older than 2026-04-28T15:32:50Z.
