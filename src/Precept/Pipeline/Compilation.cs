@@ -6,6 +6,7 @@ namespace Precept.Pipeline;
 public sealed record class Compilation(
     TokenStream                Tokens,
     ConstructManifest          ConstructManifest,
+    SymbolTable                Symbols,
     SemanticIndex              Semantics,
     StateGraph                 Graph,
     ProofLedger                Proof,
