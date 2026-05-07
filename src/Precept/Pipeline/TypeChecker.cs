@@ -221,6 +221,30 @@ internal static class TypeChecker
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  Test entry points (InternalsVisibleTo — Precept.Tests)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Creates a <see cref="CheckContext"/> with Pass 1 symbols populated.
+    /// Used by tests to build a resolution context without going through Check().
+    /// </summary>
+    internal static CheckContext CreateContext(ConstructManifest manifest, SymbolTable symbols)
+    {
+        var ctx = new CheckContext();
+        PopulateFields(symbols, ctx);
+        PopulateStates(symbols, ctx);
+        PopulateEvents(symbols, ctx);
+        return ctx;
+    }
+
+    /// <summary>
+    /// Resolves a single <see cref="ParsedExpression"/> in the given context.
+    /// Thin wrapper over the private <see cref="Resolve"/> for test access.
+    /// </summary>
+    internal static TypedExpression ResolveExpression(ParsedExpression expr, CheckContext ctx) =>
+        Resolve(expr, ctx);
+
+    // ════════════════════════════════════════════════════════════════════════
     //  Pass 2 stubs — declaration normalization (Slices 2–9)
     // ════════════════════════════════════════════════════════════════════════
 
@@ -253,14 +277,16 @@ internal static class TypeChecker
         // ── Unary operation ──
         UnaryOperationExpression un => ResolveUnaryOp(un, ctx),
 
-        // ── Stub arms: return TypedErrorExpression with no diagnostic (Slices 3–9) ──
-        FunctionCallExpression    => new TypedErrorExpression(expr.Span),
-        CIFunctionCallExpression  => new TypedErrorExpression(expr.Span),
-        MemberAccessExpression    => new TypedErrorExpression(expr.Span),
-        MethodCallExpression      => new TypedErrorExpression(expr.Span),
+        // ── Slice 3: functions, accessors, method calls, interpolated strings ──
+        FunctionCallExpression func         => ResolveFunctionCall(func, ctx),
+        CIFunctionCallExpression ciFunc     => ResolveCIFunctionCall(ciFunc, ctx),
+        MemberAccessExpression mem          => ResolveMemberAccess(mem, ctx),
+        MethodCallExpression meth           => ResolveMethodCall(meth, ctx),
+        InterpolatedStringExpression interp => ResolveInterpolatedString(interp, ctx),
+
+        // ── Stub arms: return TypedErrorExpression with no diagnostic (Slices 4–9) ──
         ConditionalExpression     => new TypedErrorExpression(expr.Span),
         QuantifierExpression      => new TypedErrorExpression(expr.Span),
-        InterpolatedStringExpression => new TypedErrorExpression(expr.Span),
         ListLiteralExpression     => new TypedErrorExpression(expr.Span),
         PostfixOperationExpression => new TypedErrorExpression(expr.Span),
 
@@ -514,9 +540,324 @@ internal static class TypeChecker
     private static TypedExpression ResolveQuantifier(QuantifierExpression expr, CheckContext ctx) =>
         throw new NotImplementedException("Slice 9");
 
-    /// <summary>Resolve a function call expression using the Functions catalog overload resolution algorithm.</summary>
-    private static TypedExpression ResolveFunctionCall(FunctionCallExpression expr, CheckContext ctx) =>
-        throw new NotImplementedException("Slice 3");
+    // ════════════════════════════════════════════════════════════════════════
+    //  Expression resolution — Slice 3: Functions, Accessors, Interpolated Strings
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Check whether <paramref name="source"/> is assignable to <paramref name="target"/>
+    /// via identity or single-hop widening from <see cref="TypeMeta.WidensTo"/>.
+    /// ErrorType is assignable to anything (suppresses cascading diagnostics).
+    /// </summary>
+    private static bool IsAssignable(TypeKind source, TypeKind target)
+    {
+        if (source == target) return true;
+        if (source == TypeKind.Error || target == TypeKind.Error) return true;
+        return Types.GetMeta(source).WidensTo.Contains(target);
+    }
+
+    /// <summary>
+    /// Resolve a function call expression using the Functions catalog overload resolution algorithm.
+    /// Looks up <see cref="Functions.FindByName"/>, resolves args, selects best overload via
+    /// arity filter → exact → widened scoring.
+    /// </summary>
+    private static TypedExpression ResolveFunctionCall(FunctionCallExpression expr, CheckContext ctx)
+    {
+        var candidates = Functions.FindByName(expr.FunctionName);
+        if (candidates.Length == 0)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.UndeclaredFunction, expr.Span, expr.FunctionName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        var resolvedArgs = expr.Arguments.Select(a => Resolve(a, ctx)).ToImmutableArray();
+        if (resolvedArgs.Any(a => a is TypedErrorExpression))
+            return new TypedErrorExpression(expr.Span);
+
+        return SelectOverload(candidates, resolvedArgs, expr.FunctionName, expr.Span, ctx);
+    }
+
+    /// <summary>
+    /// Resolve a case-insensitive function call expression. The parser produces
+    /// <see cref="CIFunctionCallExpression"/> with the name sans tilde prefix;
+    /// the CI variant is looked up via <c>"~" + name</c> in <see cref="Functions.ByName"/>.
+    /// </summary>
+    private static TypedExpression ResolveCIFunctionCall(CIFunctionCallExpression expr, CheckContext ctx)
+    {
+        var ciName = "~" + expr.FunctionName;
+        var candidates = Functions.FindByName(ciName);
+        if (candidates.Length == 0)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.UndeclaredFunction, expr.Span, ciName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        var resolvedArgs = expr.Arguments.Select(a => Resolve(a, ctx)).ToImmutableArray();
+        if (resolvedArgs.Any(a => a is TypedErrorExpression))
+            return new TypedErrorExpression(expr.Span);
+
+        return SelectOverload(candidates, resolvedArgs, ciName, expr.Span, ctx);
+    }
+
+    /// <summary>
+    /// Select the best overload across all <paramref name="candidates"/> for the given resolved args.
+    /// Arity filter → exact match (score 0) → widened match (score = widen count) → error.
+    /// </summary>
+    private static TypedExpression SelectOverload(
+        ReadOnlySpan<FunctionMeta> candidates,
+        ImmutableArray<TypedExpression> resolvedArgs,
+        string functionName,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        FunctionKind? bestKind = null;
+        FunctionOverload? bestOverload = null;
+        int bestScore = int.MaxValue;
+
+        foreach (var meta in candidates)
+        {
+            foreach (var overload in meta.Overloads)
+            {
+                if (overload.Parameters.Count != resolvedArgs.Length) continue;
+
+                int score = 0;
+                bool valid = true;
+                for (int i = 0; i < resolvedArgs.Length; i++)
+                {
+                    var argType = resolvedArgs[i].ResultType;
+                    var paramType = overload.Parameters[i].Kind;
+                    if (argType == paramType) continue;
+                    if (IsAssignable(argType, paramType))
+                        score++;
+                    else
+                    {
+                        valid = false;
+                        break;
+                    }
+                }
+
+                if (valid && score < bestScore)
+                {
+                    bestScore = score;
+                    bestKind = meta.Kind;
+                    bestOverload = overload;
+                    if (score == 0) goto selected;
+                }
+            }
+            if (bestScore == 0) goto selected;
+        }
+
+    selected:
+        if (bestOverload is not null)
+        {
+            return new TypedFunctionCall(
+                bestOverload.ReturnType,
+                bestKind!.Value,
+                resolvedArgs,
+                bestOverload.ProofRequirements.ToImmutableArray(),
+                span);
+        }
+
+        // No matching overload — determine arity vs type mismatch for diagnostic
+        bool anyArityMatch = false;
+        foreach (var meta in candidates)
+            foreach (var overload in meta.Overloads)
+                if (overload.Parameters.Count == resolvedArgs.Length)
+                    anyArityMatch = true;
+
+        if (!anyArityMatch)
+        {
+            var arities = new HashSet<int>();
+            foreach (var meta in candidates)
+                foreach (var overload in meta.Overloads)
+                    arities.Add(overload.Parameters.Count);
+            var expected = string.Join(" or ", arities.OrderBy(x => x));
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.FunctionArityMismatch, span,
+                    functionName, expected, resolvedArgs.Length.ToString()));
+        }
+        else
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, span,
+                    functionName,
+                    string.Join(", ", resolvedArgs.Select(a => Types.GetMeta(a.ResultType).DisplayName))));
+        }
+
+        return new TypedErrorExpression(span);
+    }
+
+    /// <summary>
+    /// Resolve a member access expression (property-style dot access).
+    /// Looks up the accessor in <see cref="TypeMeta.Accessors"/> for the receiver's type.
+    /// </summary>
+    private static TypedExpression ResolveMemberAccess(MemberAccessExpression expr, CheckContext ctx)
+    {
+        var receiver = Resolve(expr.Target, ctx);
+        if (receiver is TypedErrorExpression)
+            return new TypedErrorExpression(expr.Span);
+
+        var typeMeta = Types.GetMeta(receiver.ResultType);
+        var accessor = typeMeta.Accessors.FirstOrDefault(a =>
+            string.Equals(a.Name, expr.MemberName, StringComparison.Ordinal));
+
+        if (accessor is null)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.InvalidMemberAccess, expr.Span,
+                    expr.MemberName, typeMeta.DisplayName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        var returnType = ResolveAccessorReturnType(accessor, receiver, ctx);
+        if (returnType == TypeKind.Error)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.InvalidMemberAccess, expr.Span,
+                    expr.MemberName, typeMeta.DisplayName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        return new TypedMemberAccess(
+            returnType,
+            receiver,
+            accessor,
+            accessor.ProofRequirements.ToImmutableArray(),
+            expr.Span);
+    }
+
+    /// <summary>
+    /// Resolve a method call expression (dot access with arguments).
+    /// Same accessor lookup as <see cref="ResolveMemberAccess"/> plus argument validation.
+    /// </summary>
+    private static TypedExpression ResolveMethodCall(MethodCallExpression expr, CheckContext ctx)
+    {
+        var receiver = Resolve(expr.Target, ctx);
+        if (receiver is TypedErrorExpression)
+            return new TypedErrorExpression(expr.Span);
+
+        var typeMeta = Types.GetMeta(receiver.ResultType);
+        var accessor = typeMeta.Accessors.FirstOrDefault(a =>
+            string.Equals(a.Name, expr.MethodName, StringComparison.Ordinal));
+
+        if (accessor is null)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.InvalidMemberAccess, expr.Span,
+                    expr.MethodName, typeMeta.DisplayName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        // Resolve arguments and propagate errors
+        var resolvedArgs = expr.Arguments.Select(a => Resolve(a, ctx)).ToImmutableArray();
+        if (resolvedArgs.Any(a => a is TypedErrorExpression))
+            return new TypedErrorExpression(expr.Span);
+
+        // Determine expected parameter type from accessor DU subtype
+        TypeKind? expectedParamType = accessor switch
+        {
+            FixedReturnAccessor f     => f.ParameterType,
+            ElementParameterAccessor  => GetElementType(receiver, ctx),
+            _                         => accessor.ParameterType,
+        };
+
+        // Validate argument count and type
+        if (expectedParamType is not null)
+        {
+            if (resolvedArgs.Length != 1)
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.FunctionArityMismatch, expr.Span,
+                        expr.MethodName, "1", resolvedArgs.Length.ToString()));
+                return new TypedErrorExpression(expr.Span);
+            }
+            if (!IsAssignable(resolvedArgs[0].ResultType, expectedParamType.Value))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                        Types.GetMeta(expectedParamType.Value).DisplayName,
+                        Types.GetMeta(resolvedArgs[0].ResultType).DisplayName));
+                return new TypedErrorExpression(expr.Span);
+            }
+        }
+
+        var returnType = ResolveAccessorReturnType(accessor, receiver, ctx);
+        if (returnType == TypeKind.Error)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.InvalidMemberAccess, expr.Span,
+                    expr.MethodName, typeMeta.DisplayName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        return new TypedMemberAccess(
+            returnType,
+            receiver,
+            accessor,
+            accessor.ProofRequirements.ToImmutableArray(),
+            expr.Span);
+    }
+
+    /// <summary>
+    /// Determine the return type of an accessor based on its DU subtype.
+    /// Base <see cref="TypeAccessor"/>: returns element type of owning collection.
+    /// <see cref="FixedReturnAccessor"/>: returns <see cref="FixedReturnAccessor.Returns"/>.
+    /// <see cref="ElementParameterAccessor"/>: returns <see cref="TypeKind.Integer"/>.
+    /// </summary>
+    private static TypeKind ResolveAccessorReturnType(TypeAccessor accessor, TypedExpression receiver, CheckContext ctx) =>
+        accessor switch
+        {
+            FixedReturnAccessor f     => f.Returns,
+            ElementParameterAccessor  => TypeKind.Integer,
+            _                         => GetElementType(receiver, ctx) ?? TypeKind.Error,
+        };
+
+    /// <summary>
+    /// Extract the element type from a receiver expression. For <see cref="TypedFieldRef"/>,
+    /// looks up the field in <see cref="CheckContext.FieldLookup"/>.
+    /// Returns null if element type cannot be determined.
+    /// </summary>
+    private static TypeKind? GetElementType(TypedExpression receiver, CheckContext ctx)
+    {
+        if (receiver is TypedFieldRef fieldRef &&
+            ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field))
+            return field.ElementType;
+        return null;
+    }
+
+    /// <summary>
+    /// Resolve an interpolated string expression. Resolves each hole segment's expression.
+    /// ErrorType propagation: if any hole is error, the entire string is <see cref="TypedErrorExpression"/>.
+    /// Result type is always <see cref="TypeKind.String"/>.
+    /// </summary>
+    private static TypedExpression ResolveInterpolatedString(InterpolatedStringExpression expr, CheckContext ctx)
+    {
+        var segments = ImmutableArray.CreateBuilder<TypedInterpolationSegment>(expr.Segments.Length);
+        bool hasError = false;
+
+        foreach (var segment in expr.Segments)
+        {
+            switch (segment)
+            {
+                case TextSegment text:
+                    segments.Add(new TypedTextSegment(text.Text, text.Span));
+                    break;
+                case HoleSegment hole:
+                    var resolved = Resolve(hole.Expression, ctx);
+                    if (resolved is TypedErrorExpression)
+                        hasError = true;
+                    segments.Add(new TypedHoleSegment(resolved, hole.Span));
+                    break;
+            }
+        }
+
+        if (hasError)
+            return new TypedErrorExpression(expr.Span);
+
+        return new TypedInterpolatedString(segments.ToImmutable(), expr.Span);
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     //  Pass 2 stubs — structural validation (Slices 6–8)
