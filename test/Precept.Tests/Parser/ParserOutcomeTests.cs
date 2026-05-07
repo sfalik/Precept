@@ -109,6 +109,29 @@ public class ParserOutcomeTests
     }
 
     [Fact]
+    public void Outcome_UnexpectedTokenAfterArrow_EmitsDiagnostic()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> unknown");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ExpectedOutcome));
+    }
+
+    [Fact]
+    public void Outcome_BareArrow_IsMalformed()
+    {
+        // Bare arrow with nothing following — should parse as malformed and emit diagnostic
+        var tokens = Lexer.Lex("from Draft on Submit ->");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<MalformedOutcome>();
+        manifest.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ExpectedOutcome));
+    }
+
+    [Fact]
     public void Outcome_MissingArrow_SentinelIsMalformed()
     {
         var tokens = Lexer.Lex("from Draft on Submit");
@@ -176,5 +199,56 @@ public class ParserOutcomeTests
 
         outcome.Span.Offset.Should().Be(arrowStart);
         outcome.Span.End.Should().Be(reasonEnd);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  §4. OutcomesCatalog coverage
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void OutcomesCatalog_All_HasExpectedCount()
+    {
+        Outcomes.All.Should().HaveCount(3, "there are exactly 3 outcome forms: Transition, NoTransition, Reject");
+    }
+
+    [Fact]
+    public void OutcomesCatalog_ByLeadingToken_ContainsAllForms()
+    {
+        Outcomes.ByLeadingToken.Should().ContainKey(TokenKind.Transition);
+        Outcomes.ByLeadingToken.Should().ContainKey(TokenKind.No);
+        Outcomes.ByLeadingToken.Should().ContainKey(TokenKind.Reject);
+    }
+
+    [Fact]
+    public void OutcomesCatalog_GetMeta_TransitionKind_HasCorrectMetadata()
+    {
+        var meta = Outcomes.GetMeta(OutcomeKind.Transition);
+        meta.LeadingToken.Should().Be(TokenKind.Transition);
+        meta.ArgumentKind.Should().Be(OutcomeArgumentKind.RequiredIdentifier);
+        meta.ParsedSubtype.Should().Be(typeof(TransitionOutcome));
+    }
+
+    [Fact]
+    public void OutcomesCatalog_GetMeta_NoTransitionKind_HasCorrectMetadata()
+    {
+        var meta = Outcomes.GetMeta(OutcomeKind.NoTransition);
+        meta.LeadingToken.Should().Be(TokenKind.No);
+        meta.ArgumentKind.Should().Be(OutcomeArgumentKind.SecondaryToken);
+        meta.ParsedSubtype.Should().Be(typeof(NoTransitionOutcome));
+    }
+
+    [Fact]
+    public void OutcomesCatalog_GetMeta_RejectKind_HasCorrectMetadata()
+    {
+        var meta = Outcomes.GetMeta(OutcomeKind.Reject);
+        meta.LeadingToken.Should().Be(TokenKind.Reject);
+        meta.ArgumentKind.Should().Be(OutcomeArgumentKind.RequiredStringLiteral);
+        meta.ParsedSubtype.Should().Be(typeof(RejectOutcome));
+    }
+
+    [Fact]
+    public void OutcomesCatalog_NoTransitionSecondaryToken_IsTransition()
+    {
+        Outcomes.NoTransitionSecondaryToken.Should().Be(TokenKind.Transition);
     }
 }

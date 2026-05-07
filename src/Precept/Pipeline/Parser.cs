@@ -16,9 +16,7 @@ public static partial class Parser
     // ── Catalog-derived vocabulary sets (computed once at startup) ────────────────
 
     private static readonly FrozenSet<TokenKind> StateModifierTokens =
-        Modifiers.All.OfType<StateModifierMeta>()
-            .Select(m => m.Token.Kind)
-            .ToFrozenSet();
+        Modifiers.ByStateToken.Keys.ToFrozenSet();
 
     private static readonly FrozenSet<TokenKind> FieldModifierTokens =
         Modifiers.ByFieldToken.Keys.ToFrozenSet();
@@ -304,8 +302,8 @@ public static partial class Parser
         private static SlotValue MakeSentinel(ConstructSlot slot) => slot.Kind switch
         {
             ConstructSlotKind.IdentifierList    => new IdentifierListSlot(ImmutableArray<string>.Empty, SourceSpan.Missing),
-            ConstructSlotKind.TypeExpression    => new TypeExpressionSlot(Types.All.First(), SourceSpan.Missing),
-            ConstructSlotKind.ModifierList      => new ModifierListSlot(ImmutableArray<ModifierKind>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.TypeExpression    => new TypeExpressionSlot(new MissingTypeReference(SourceSpan.Missing), SourceSpan.Missing),
+            ConstructSlotKind.ModifierList      => new ModifierListSlot(ImmutableArray<ParsedModifier>.Empty, SourceSpan.Missing),
             ConstructSlotKind.StateEntryList    => new StateEntryListSlot(ImmutableArray<(string, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
             ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<(string, TypeMeta)>.Empty, SourceSpan.Missing),
             ConstructSlotKind.InitialMarker     => new InitialMarkerSlot(false, SourceSpan.Missing),
@@ -314,7 +312,7 @@ public static partial class Parser
             ConstructSlotKind.RuleExpression    => new RuleExpressionSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ComputeExpression => new ComputeExpressionSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.EnsureClause      => new EnsureClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
-            ConstructSlotKind.ActionChain       => new ActionChainSlot(ImmutableArray<ActionKind>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.ActionChain       => new ActionChainSlot(ImmutableArray<ParsedAction>.Empty, SourceSpan.Missing),
             ConstructSlotKind.Outcome           => new OutcomeSlot(new MalformedOutcome(SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.StateTarget       => new StateTargetSlot(null, SourceSpan.Missing),
             ConstructSlotKind.EventTarget       => new EventTargetSlot(null, SourceSpan.Missing),
@@ -361,7 +359,7 @@ public static partial class Parser
                 SourceSpan.Covering(startSpan, endSpan));
         }
 
-        // ── TypeExpression: "as TypeKeyword" ────────────────────────────────────
+        // ── TypeExpression: "as TypeKeyword [of InnerType] [Qualifiers]" ────────────
 
         private SlotValue ParseTypeExpression(ConstructSlot slot)
         {
@@ -371,32 +369,212 @@ public static partial class Parser
                     return MakeSentinel(slot);
                 _diagnostics.Add(DiagnosticsCatalog.Create(
                     DiagnosticCode.ExpectedToken, Peek().Span, "as", Peek().Text));
-                return new TypeExpressionSlot(Types.All.First(), SourceSpan.Missing);
+                return new TypeExpressionSlot(new MissingTypeReference(SourceSpan.Missing), SourceSpan.Missing);
             }
 
             var asToken = Advance(); // consume 'as'
-            var typeToken = Peek();
+            var typeRef = ParseTypeReference(asToken.Span);
+            var span = SourceSpan.Covering(asToken.Span, typeRef.Span);
+            return new TypeExpressionSlot(typeRef, span);
+        }
 
-            // Handle dual-use 'set' token: in type context, treat Set as SetType
-            var lookupKind = typeToken.Kind == TokenKind.Set ? TokenKind.SetType : typeToken.Kind;
+        /// <summary>
+        /// Parses a type reference after 'as' has been consumed.
+        /// Handles: simple types, ~type (CI), collection types with inner types,
+        /// choice types with domain, and keyed collections (log by, queue by, lookup).
+        /// </summary>
+        private ParsedTypeReference ParseTypeReference(SourceSpan startSpan)
+        {
+            var peekToken = Peek();
 
-            if (Types.ByToken.TryGetValue(lookupKind, out var typeMeta))
+            // Handle CI type prefix: ~string
+            if (peekToken.Kind == TokenKind.Tilde)
             {
-                Advance(); // consume type token
-                var span = SourceSpan.Covering(asToken.Span, typeToken.Span);
-                return new TypeExpressionSlot(typeMeta, span);
+                var tildeToken = Advance();
+                var innerToken = Peek();
+                var lookupKind = innerToken.Kind == TokenKind.Set ? TokenKind.SetType : innerToken.Kind;
+                if (Types.ByToken.TryGetValue(lookupKind, out var innerType))
+                {
+                    Advance();
+                    var span = SourceSpan.Covering(tildeToken.Span, innerToken.Span);
+                    return new CITypeReference(innerType, span);
+                }
+                _diagnostics.Add(DiagnosticsCatalog.Create(
+                    DiagnosticCode.ExpectedToken, innerToken.Span, "type keyword", innerToken.Text));
+                return new MissingTypeReference(tildeToken.Span);
             }
 
-            _diagnostics.Add(DiagnosticsCatalog.Create(
-                DiagnosticCode.ExpectedToken, typeToken.Span, "type keyword", typeToken.Text));
-            return new TypeExpressionSlot(Types.All.First(), asToken.Span);
+            // Handle dual-use 'set' token: in type context, treat Set as SetType
+            var lookupTokenKind = peekToken.Kind == TokenKind.Set ? TokenKind.SetType : peekToken.Kind;
+
+            if (!Types.ByToken.TryGetValue(lookupTokenKind, out var typeMeta))
+            {
+                _diagnostics.Add(DiagnosticsCatalog.Create(
+                    DiagnosticCode.ExpectedToken, peekToken.Span, "type keyword", peekToken.Text));
+                return new MissingTypeReference(startSpan);
+            }
+
+            var typeToken = Advance();
+
+            // Check if this is a choice type: choice of T(...)
+            if (typeMeta.Kind == TypeKind.Choice)
+            {
+                return ParseChoiceType(typeMeta, typeToken.Span);
+            }
+
+            // Check if this is a collection type (needs "of" inner type)
+            if (typeMeta.Category == TypeCategory.Collection)
+            {
+                return ParseCollectionType(typeMeta, typeToken.Span);
+            }
+
+            // Simple type
+            return new SimpleTypeReference(typeMeta, typeToken.Span);
+        }
+
+        private ParsedTypeReference ParseChoiceType(TypeMeta choiceMeta, SourceSpan typeSpan)
+        {
+            TypeMeta? elementType = null;
+            var domain = ImmutableArray.CreateBuilder<string>();
+            var lastSpan = typeSpan;
+
+            // choice of T(...) - look for 'of' and element type
+            if (Peek().Kind == TokenKind.Of)
+            {
+                Advance(); // consume 'of'
+                var elemToken = Peek();
+                var elemLookup = elemToken.Kind == TokenKind.Set ? TokenKind.SetType : elemToken.Kind;
+                if (Types.ByToken.TryGetValue(elemLookup, out var elemMeta))
+                {
+                    Advance();
+                    elementType = elemMeta;
+                    lastSpan = elemToken.Span;
+                }
+            }
+
+            // Parse domain: (value, value, ...)
+            if (Peek().Kind == TokenKind.LeftParen)
+            {
+                Advance(); // consume '('
+                while (Peek().Kind != TokenKind.RightParen && !IsAtEnd && !IsAtConstructBoundary())
+                {
+                    // Accept sign prefix for numeric choices
+                    var signPrefix = "";
+                    if (Peek().Kind == TokenKind.Minus || Peek().Kind == TokenKind.Plus)
+                    {
+                        signPrefix = Peek().Text;
+                        Advance();
+                    }
+
+                    var valueToken = Peek();
+                    if (valueToken.Kind is TokenKind.StringLiteral or TokenKind.NumberLiteral
+                        or TokenKind.True or TokenKind.False or TokenKind.Identifier)
+                    {
+                        domain.Add(signPrefix + valueToken.Text);
+                        lastSpan = Advance().Span;
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    if (Peek().Kind == TokenKind.Comma)
+                        Advance();
+                    else
+                        break;
+                }
+
+                if (Peek().Kind == TokenKind.RightParen)
+                    lastSpan = Advance().Span;
+            }
+
+            var span = SourceSpan.Covering(typeSpan, lastSpan);
+            return new ChoiceTypeReference(choiceMeta, elementType, domain.ToImmutable(), span);
+        }
+
+        private ParsedTypeReference ParseCollectionType(TypeMeta collectionMeta, SourceSpan typeSpan)
+        {
+            var lastSpan = typeSpan;
+            ParsedTypeReference? elementType = null;
+            ParsedTypeReference? keyType = null;
+
+            // Collections require "of" for element type
+            if (Peek().Kind == TokenKind.Of)
+            {
+                Advance(); // consume 'of'
+                elementType = ParseInnerTypeReference();
+                lastSpan = elementType.Span;
+            }
+
+            // Keyed collections (log by, queue by, lookup ... to ...) have a key/ordering type
+            // log of T by K, queue of T by K, lookup of K to V
+            if (collectionMeta.Kind == TypeKind.Lookup && Peek().Kind == TokenKind.To)
+            {
+                Advance(); // consume 'to'
+                keyType = elementType; // In lookup, the first type is the key
+                elementType = ParseInnerTypeReference(); // second is value
+                lastSpan = elementType.Span;
+            }
+            else if ((collectionMeta.Kind is TypeKind.LogBy or TypeKind.QueueBy) && Peek().Kind == TokenKind.By)
+            {
+                Advance(); // consume 'by'
+                keyType = ParseInnerTypeReference();
+                lastSpan = keyType.Span;
+            }
+            else if (Peek().Kind == TokenKind.By)
+            {
+                // Regular log or queue gets promoted to log-by or queue-by
+                Advance(); // consume 'by'
+                keyType = ParseInnerTypeReference();
+                lastSpan = keyType.Span;
+            }
+
+            if (elementType == null)
+            {
+                elementType = new MissingTypeReference(typeSpan);
+            }
+
+            var span = SourceSpan.Covering(typeSpan, lastSpan);
+            return new CollectionTypeReference(collectionMeta, elementType, keyType, span);
+        }
+
+        /// <summary>
+        /// Parses a simple inner type (no nested collections) for collection element types.
+        /// </summary>
+        private ParsedTypeReference ParseInnerTypeReference()
+        {
+            var peekToken = Peek();
+
+            // Handle CI type prefix: ~string
+            if (peekToken.Kind == TokenKind.Tilde)
+            {
+                var tildeToken = Advance();
+                var innerToken = Peek();
+                var lookupKind = innerToken.Kind == TokenKind.Set ? TokenKind.SetType : innerToken.Kind;
+                if (Types.ByToken.TryGetValue(lookupKind, out var innerType))
+                {
+                    Advance();
+                    var span = SourceSpan.Covering(tildeToken.Span, innerToken.Span);
+                    return new CITypeReference(innerType, span);
+                }
+                return new MissingTypeReference(tildeToken.Span);
+            }
+
+            var lookupTokenKind = peekToken.Kind == TokenKind.Set ? TokenKind.SetType : peekToken.Kind;
+            if (Types.ByToken.TryGetValue(lookupTokenKind, out var typeMeta))
+            {
+                var typeToken = Advance();
+                return new SimpleTypeReference(typeMeta, typeToken.Span);
+            }
+
+            return new MissingTypeReference(peekToken.Span);
         }
 
         // ── ModifierList: field modifiers from catalog ──────────────────────────
 
         private SlotValue ParseModifierList(ConstructSlot slot, ConstructMeta constructMeta)
         {
-            var modifiers = new List<ModifierKind>();
+            var modifiers = new List<ParsedModifier>();
             var startSpan = Peek().Span;
             var lastSpan = startSpan;
 
@@ -406,16 +584,26 @@ public static partial class Parser
                 if (Modifiers.ByFieldToken.TryGetValue(modToken.Kind, out var modMeta))
                 {
                     Advance();
-                    modifiers.Add(modMeta.Kind);
                     lastSpan = modToken.Span;
+                    ParsedExpression? valueExpr = null;
 
-                    // Valued modifiers consume the next token as their value
-                    if (modMeta.HasValue && Peek().Kind is TokenKind.NumberLiteral
-                        or TokenKind.StringLiteral or TokenKind.True or TokenKind.False
-                        or TokenKind.Identifier)
+                    // Valued modifiers parse an expression for their value
+                    if (modMeta.HasValue)
                     {
-                        lastSpan = Advance().Span;
+                        // Check if next token starts a value expression
+                        if (Peek().Kind is TokenKind.NumberLiteral
+                            or TokenKind.StringLiteral or TokenKind.True or TokenKind.False
+                            or TokenKind.Identifier or TokenKind.Minus or TokenKind.LeftParen
+                            or TokenKind.LeftBracket or TokenKind.StringStart)
+                        {
+                            valueExpr = ParseExpression(0, () =>
+                                FieldModifierTokens.Contains(Peek().Kind)
+                                || IsAtConstructBoundary());
+                            lastSpan = valueExpr.Span;
+                        }
                     }
+
+                    modifiers.Add(new ParsedModifier(modMeta.Kind, valueExpr));
                 }
                 else
                 {
@@ -476,13 +664,10 @@ public static partial class Parser
 
         private static ModifierKind? MapStateModifierToken(TokenKind token)
         {
-            // Derive from catalog: find the StateModifierMeta whose token matches
-            foreach (var mod in Modifiers.All)
-            {
-                if (mod is StateModifierMeta smm && smm.Token.Kind == token)
-                    return smm.Kind;
-            }
-            return null;
+            // O(1) lookup via catalog index
+            return Modifiers.ByStateToken.TryGetValue(token, out var meta)
+                ? meta.Kind
+                : null;
         }
 
         // ── ArgumentList: "(name as type, ...)" ─────────────────────────────────
@@ -612,7 +797,7 @@ public static partial class Parser
 
         private SlotValue ParseAccessMode(ConstructSlot slot)
         {
-            if (Peek().Kind == TokenKind.Readonly || Peek().Kind == TokenKind.Editable)
+            if (Tokens.AccessModeKeywords.Contains(Peek().Kind))
             {
                 var tok = Advance();
                 return new AccessModeSlot(tok.Kind, tok.Span);
@@ -649,7 +834,7 @@ public static partial class Parser
             if (!Actions.ByTokenKind.ContainsKey(Peek(1).Kind))
                 return MakeSentinel(slot);
 
-            var actions = new List<ActionKind>();
+            var actions = new List<ParsedAction>();
             var startSpan = Peek().Span;
             var lastSpan = startSpan;
 
@@ -663,13 +848,10 @@ public static partial class Parser
                 var actionToken = Peek();
                 if (Actions.ByTokenKind.TryGetValue(actionToken.Kind, out var actionMeta))
                 {
-                    actions.Add(actionMeta.Kind);
-                    lastSpan = Advance().Span;
-                    // Skip action operands until next arrow or boundary
-                    while (!IsAtEnd && Peek().Kind != TokenKind.Arrow && !IsAtConstructBoundary())
-                    {
-                        lastSpan = Advance().Span;
-                    }
+                    var actionStartSpan = Advance().Span; // consume action keyword
+                    var action = ParseActionByShape(actionMeta, actionStartSpan);
+                    actions.Add(action);
+                    lastSpan = action.Span;
                 }
                 else
                 {
@@ -681,6 +863,153 @@ public static partial class Parser
                 return MakeSentinel(slot);
             return new ActionChainSlot(actions.ToImmutableArray(),
                 SourceSpan.Covering(startSpan, lastSpan));
+        }
+
+        /// <summary>
+        /// Parses action operands based on ActionSyntaxShape from catalog metadata.
+        /// </summary>
+        private ParsedAction ParseActionByShape(ActionMeta meta, SourceSpan actionStartSpan)
+        {
+            var kind = meta.Kind;
+
+            // Terminator for action expressions: next arrow or construct boundary
+            Func<bool> isAtActionBoundary = () => Peek().Kind == TokenKind.Arrow || IsAtConstructBoundary();
+
+            switch (meta.SyntaxShape)
+            {
+                case ActionSyntaxShape.AssignValue:
+                {
+                    // verb field = expression
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    Expect(TokenKind.Assign);
+                    var value = ParseExpression(0, isAtActionBoundary);
+                    var span = SourceSpan.Covering(actionStartSpan, value.Span);
+                    return new AssignAction(kind, target, value, span);
+                }
+
+                case ActionSyntaxShape.CollectionValue:
+                {
+                    // verb field expression
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    var value = ParseExpression(0, isAtActionBoundary);
+                    var span = SourceSpan.Covering(actionStartSpan, value.Span);
+                    return new CollectionValueAction(kind, target, value, span);
+                }
+
+                case ActionSyntaxShape.CollectionInto:
+                {
+                    // verb field [into field]
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    var lastSpan = target.Span;
+                    ParsedExpression? intoTarget = null;
+                    if (Peek().Kind == TokenKind.Into)
+                    {
+                        Advance(); // consume 'into'
+                        intoTarget = ParseActionTarget(isAtActionBoundary);
+                        lastSpan = intoTarget.Span;
+                    }
+                    var span = SourceSpan.Covering(actionStartSpan, lastSpan);
+                    return new CollectionIntoAction(kind, target, intoTarget, span);
+                }
+
+                case ActionSyntaxShape.FieldOnly:
+                {
+                    // verb field
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    var span = SourceSpan.Covering(actionStartSpan, target.Span);
+                    return new FieldOnlyAction(kind, target, span);
+                }
+
+                case ActionSyntaxShape.CollectionValueBy:
+                {
+                    // verb field expr by expr
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    var value = ParseExpression(0, () => Peek().Kind == TokenKind.By || isAtActionBoundary());
+                    Expect(TokenKind.By);
+                    var orderingKey = ParseExpression(0, isAtActionBoundary);
+                    var span = SourceSpan.Covering(actionStartSpan, orderingKey.Span);
+                    return new CollectionValueByAction(kind, target, value, orderingKey, span);
+                }
+
+                case ActionSyntaxShape.InsertAt:
+                {
+                    // verb field expr at expr
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    var value = ParseExpression(0, () => Peek().Kind == TokenKind.At || isAtActionBoundary());
+                    Expect(TokenKind.At);
+                    var index = ParseExpression(0, isAtActionBoundary);
+                    var span = SourceSpan.Covering(actionStartSpan, index.Span);
+                    return new InsertAtAction(kind, target, value, index, span);
+                }
+
+                case ActionSyntaxShape.RemoveAtIndex:
+                {
+                    // verb field at expr
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    Expect(TokenKind.At);
+                    var index = ParseExpression(0, isAtActionBoundary);
+                    var span = SourceSpan.Covering(actionStartSpan, index.Span);
+                    return new RemoveAtAction(kind, target, index, span);
+                }
+
+                case ActionSyntaxShape.PutKeyValue:
+                {
+                    // verb field key = value
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    var key = ParseExpression(0, () => Peek().Kind == TokenKind.Assign || isAtActionBoundary());
+                    Expect(TokenKind.Assign);
+                    var value = ParseExpression(0, isAtActionBoundary);
+                    var span = SourceSpan.Covering(actionStartSpan, value.Span);
+                    return new PutKeyValueAction(kind, target, key, value, span);
+                }
+
+                case ActionSyntaxShape.CollectionIntoBy:
+                {
+                    // verb field [into field] [by key]
+                    var target = ParseActionTarget(isAtActionBoundary);
+                    var lastSpan = target.Span;
+                    ParsedExpression? intoTarget = null;
+                    ParsedExpression? orderingCapture = null;
+
+                    if (Peek().Kind == TokenKind.Into)
+                    {
+                        Advance(); // consume 'into'
+                        intoTarget = ParseActionTarget(isAtActionBoundary);
+                        lastSpan = intoTarget.Span;
+                    }
+
+                    if (Peek().Kind == TokenKind.By)
+                    {
+                        Advance(); // consume 'by'
+                        orderingCapture = ParseActionTarget(isAtActionBoundary);
+                        lastSpan = orderingCapture.Span;
+                    }
+
+                    var span = SourceSpan.Covering(actionStartSpan, lastSpan);
+                    return new CollectionIntoByAction(kind, target, intoTarget, orderingCapture, span);
+                }
+
+                default:
+                {
+                    // Unknown shape — produce malformed action
+                    return new MalformedAction(kind, actionStartSpan);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Parses the target (field reference) of an action.
+        /// This is typically an identifier or member access expression.
+        /// </summary>
+        private ParsedExpression ParseActionTarget(Func<bool> terminates)
+        {
+            // Parse a simple expression that stops at action boundaries
+            return ParseExpression(0, () =>
+                Peek().Kind == TokenKind.Assign
+                || Peek().Kind == TokenKind.Into
+                || Peek().Kind == TokenKind.By
+                || Peek().Kind == TokenKind.At
+                || terminates());
         }
 
         // ── Boundary detection ──────────────────────────────────────────────────

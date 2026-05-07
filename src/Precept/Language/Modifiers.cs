@@ -247,4 +247,14 @@ public static class Modifiers
     public static FrozenDictionary<TokenKind, FieldModifierMeta> ByFieldToken { get; } =
         All.OfType<FieldModifierMeta>()
            .ToFrozenDictionary(m => m.Token.Kind);
+
+    /// <summary>
+    /// O(1) lookup from token kind to state modifier metadata.
+    /// Used by <c>ParseStateEntryList</c> to resolve a modifier token to its
+    /// <see cref="StateModifierMeta"/> without a linear scan. Mirrors
+    /// <see cref="ByFieldToken"/> for the state modifier domain.
+    /// </summary>
+    public static FrozenDictionary<TokenKind, StateModifierMeta> ByStateToken { get; } =
+        All.OfType<StateModifierMeta>()
+           .ToFrozenDictionary(m => m.Token.Kind);
 }

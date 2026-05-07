@@ -19,12 +19,15 @@ public abstract record SlotValue(ConstructSlotKind Kind, SourceSpan Span);
 public sealed record IdentifierListSlot(ImmutableArray<string> Names, SourceSpan Span)
     : SlotValue(ConstructSlotKind.IdentifierList, Span);
 
-/// <summary>"as TypeKeyword Qualifiers" type annotation.</summary>
-public sealed record TypeExpressionSlot(TypeMeta Type, SourceSpan Span)
+/// <summary>"as TypeKeyword Qualifiers" type annotation — now carries full structural type reference.</summary>
+public sealed record TypeExpressionSlot(ParsedTypeReference TypeRef, SourceSpan Span)
     : SlotValue(ConstructSlotKind.TypeExpression, Span);
 
-/// <summary>Field modifiers (nonnegative, positive, notempty, etc.).</summary>
-public sealed record ModifierListSlot(ImmutableArray<ModifierKind> Modifiers, SourceSpan Span)
+/// <summary>A parsed modifier with optional value expression (for min/max/default etc.).</summary>
+public sealed record ParsedModifier(ModifierKind Kind, ParsedExpression? Value);
+
+/// <summary>Field modifiers (nonnegative, positive, notempty, etc.) — now carries values for valued modifiers.</summary>
+public sealed record ModifierListSlot(ImmutableArray<ParsedModifier> Modifiers, SourceSpan Span)
     : SlotValue(ConstructSlotKind.ModifierList, Span);
 
 /// <summary>Comma-separated (name modifier*) pairs for state declarations.</summary>
@@ -43,8 +46,8 @@ public sealed record ComputeExpressionSlot(ParsedExpression Expression, SourceSp
 public sealed record GuardClauseSlot(ParsedExpression Expression, SourceSpan Span)
     : SlotValue(ConstructSlotKind.GuardClause, Span);
 
-/// <summary>"-> action -> action" chain.</summary>
-public sealed record ActionChainSlot(ImmutableArray<ActionKind> Actions, SourceSpan Span)
+/// <summary>"-> action -> action" chain — now carries full parsed action structures with operand expressions.</summary>
+public sealed record ActionChainSlot(ImmutableArray<ParsedAction> Actions, SourceSpan Span)
     : SlotValue(ConstructSlotKind.ActionChain, Span);
 
 /// <summary>"-> transition State | -> no transition | -> reject 'reason'" outcome.</summary>
