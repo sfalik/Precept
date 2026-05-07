@@ -22,6 +22,8 @@
 
 - DSL keywords are common identifier traps in tests; use non-keyword names for fields/events unless the test is explicitly about keyword handling.
 
+- Outcome parsing needs full-precept regression anchors in addition to single-row parser checks; missing required outcomes must emit `ExpectedOutcome`, not just a `MalformedOutcome` sentinel.
+
 - Multi-source analyzer tests only need a small harness extension; the rest of the analyzer test shape can stay minimal.
 
 - For operation analyzers, use `ctx.Operation.SemanticModel` (nullable) rather than APIs available only on `SyntaxNodeAnalysisContext`.
@@ -131,3 +133,10 @@
 - Added `test/Precept.Tests/NameBinder/NameBinderTests.cs` with 40 tests spanning 9 behavioral groups for declarations, duplicates, references, shadowing, forward references, and manifest integration.
 - Branch validation closed green at 2929 total passing tests.
 - Frank's companion doc-sync batch eliminated stale NameBinder references, so the implementation and its regression anchors are now durably documented together.
+
+
+### 2026-05-07T18:28:05Z — Outcomes coverage closed; parser gap follow-on launched
+
+- `OutcomesCatalogTests` now lock the supported outcome forms plus malformed/recovery behavior, and the parser emits `ExpectedOutcome` when a required outcome is entirely missing.
+- Coordinator confirmed `ExpressionFormCatalogTests.cs` and `ParserExpressionTests.cs` are included in the 2949-test branch baseline, so exclusion-based green runs are no longer acceptable evidence.
+- Active follow-on: Soup-Nazi-4 is covering seven remaining parser gaps across type refs, action chains, diagnostic codes, wildcards, event args, interpolation, and negative expression cases.

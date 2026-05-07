@@ -82,3 +82,10 @@
 
 
 
+
+
+### 2026-05-07T18:28:05Z — Catalog metadata and diagnostic payload updates recorded
+
+- Shipped parser metadata P4/P5: `ExpressionFormMeta.BindingPower` now owns member-access precedence and `ConstructSlot.TerminationTokens` now owns expression-slot boundary metadata.
+- Shipped diagnostic payload P3: `Diagnostic.RelatedSpans` landed as an init-only additive extension backed by a `readonly record struct RelatedSpan`.
+- Batch validation for the shipped George work closed green inside the 2949-test branch baseline; keep parser/checker follow-through catalog-derived and constructor-stable.
