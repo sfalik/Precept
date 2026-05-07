@@ -151,4 +151,8 @@ public enum DiagnosticCode
     MissingOrderingKey              = 104,
     CollectionInnerTypeError        = 105,
     QuantifierPredicateNotBoolean   = 106,
+
+    // ── NameBinder ───────────────────────────────────────────────
+    /// <summary>Event argument reference not found in scope.</summary>
+    UndeclaredArg                   = 107,
 }

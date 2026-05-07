@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using FluentAssertions;
 using Precept.Language;
 using Precept.Pipeline;
@@ -49,6 +50,27 @@ public class DiagnosticsTests
         var span = new SourceSpan(10, 5, 3, 7, 3, 12);
         var diagnostic = Diagnostics.Create(DiagnosticCode.InputTooLarge, span);
         diagnostic.Span.Should().Be(span);
+    }
+
+    [Fact]
+    public void Create_InitializesRelatedSpans_AsEmpty()
+    {
+        var diagnostic = Diagnostics.Create(DiagnosticCode.InputTooLarge, SourceSpan.Missing);
+        diagnostic.RelatedSpans.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Diagnostic_WithRelatedSpans_PreservesEntries()
+    {
+        var primary = Diagnostics.Create(DiagnosticCode.DuplicateFieldName, SourceSpan.Missing, "amount");
+        var related = new RelatedSpan(new SourceSpan(25, 3, 8, 9, 8, 14), "Original declaration is here");
+
+        var diagnostic = primary with
+        {
+            RelatedSpans = ImmutableArray.Create(related),
+        };
+
+        diagnostic.RelatedSpans.Should().ContainSingle().Which.Should().Be(related);
     }
 
     // ── Stage group invariants ──────────────────────────────────────────────────

@@ -384,6 +384,14 @@ public static class Diagnostics
             "Quantifier predicate must be a boolean expression, but this resolves to {0}",
             DiagnosticCategory.TypeSystem),
 
+        // ── NameBinder ───────────────────────────────────────────────────────────
+        DiagnosticCode.UndeclaredArg => new(
+            nameof(DiagnosticCode.UndeclaredArg),
+            DiagnosticStage.Type, Severity.Error,
+            "Argument '{0}' is not declared on event '{1}'",
+            DiagnosticCategory.Naming,
+            FixHint: "Check that the argument name matches one declared in the event definition"),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

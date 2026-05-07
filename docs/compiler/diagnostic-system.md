@@ -26,7 +26,7 @@ The Precept compiler pipeline produces diagnostics at six stages: lexing, parsin
 ## Responsibilities and Boundaries
 
 **OWNS:**
-- The `Diagnostic` output type — `Severity`, `DiagnosticStage`, `Code`, `Message`, `Span`
+- The `Diagnostic` output type — `Severity`, `DiagnosticStage`, `Code`, `Message`, `Span`, captured `Args`, and optional `RelatedSpans`
 - The `DiagnosticCode` enum — the closed, exhaustive set of all diagnostic rule identifiers
 - The `Diagnostics` static class — exhaustive switch mapping every `DiagnosticCode` to `DiagnosticMeta`
 - The `DiagnosticMeta` record — stage, severity, message template, category, fix hint, related codes, fault prevention link
@@ -70,17 +70,21 @@ Roslyn's diagnostic system was surveyed as the primary reference. It introduces 
 ## The Diagnostic Output Type
 
 ```csharp
+public readonly record struct RelatedSpan(SourceSpan Span, string Message);
+
 public readonly record struct Diagnostic(
-    Severity        Severity,
-    DiagnosticStage Stage,
-    string          Code,       // "UndeclaredField" — derived from enum member name
-    string          Message,    // pre-formatted, final English string
-    SourceSpan      Span,
-    ImmutableArray<SourceSpan> RelatedLocations = default  // CC#20: additional spans for multi-span diagnostics; empty by default
-);
+    Severity              Severity,
+    DiagnosticStage       Stage,
+    string                Code,       // "UndeclaredField" — derived from enum member name
+    string                Message,    // pre-formatted, final English string
+    SourceSpan            Span,
+    ImmutableArray<string> Args = default)
+{
+    public ImmutableArray<RelatedSpan> RelatedSpans { get; init; } = ImmutableArray<RelatedSpan>.Empty;
+}
 ```
 
-Five fields. The message is a pre-formatted string — no templates at the output boundary, no argument arrays, no deferred formatting. Consumers never see the registry.
+The core shape is severity, stage, code, message, and primary span. `Args` preserves the formatted arguments captured at emission time, and `RelatedSpans` carries optional secondary locations for multi-location diagnostics without breaking existing construction sites.
 
 `Diagnostic` is a `readonly record struct` — small, value-typed, zero-allocation-friendly in immutable arrays.
 
@@ -89,6 +93,14 @@ Five fields. The message is a pre-formatted string — no templates at the outpu
 Diagnostics carry a `SourceSpan` — the same unified location type used on every AST node. This means downstream stages can emit located diagnostics directly from `node.Span` without needing the source text. See the parser doc for the full `SourceSpan` definition.
 
 1-based line/column to align with LSP `Position` (which is 0-based — conversion happens at the LS layer, not in the diagnostic). Source spans are required on every diagnostic — every diagnostic must point somewhere in the source.
+
+### Related Spans
+
+`RelatedSpans` exists for diagnostics that need more than one source location to explain the problem. Use it when the author needs to see a primary offending site plus supporting context elsewhere — for example, duplicate declarations (diagnostic on the later declaration, related span on the original declaration).
+
+Keep `RelatedSpans` empty when no second concrete location exists. An undeclared reference still points at the reference site as its primary `Span`; the diagnostic message explains that no declaration was found, but there is no synthetic "missing declaration" span to attach.
+
+Each `RelatedSpan` carries both a `SourceSpan` and a short message. This lets downstream consumers surface multi-location diagnostics without inventing their own per-consumer side tables.
 
 ### Diagnostic Stages
 
@@ -544,8 +556,8 @@ The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarant
 ## Open Questions / Implementation Notes
 
 - **D5 coupling (proof attribution schema):** If proof results require richer structured output (expression trees, interval ranges, witness values), the proof stage may need a way to link diagnostics to proof-model entries. Deferred until proof engine design.
-> **✅ Resolved (CC#20) — Diagnostic Related Locations**
-> `ImmutableArray<SourceSpan> RelatedLocations = default` has been added to `Diagnostic`. Default empty — all existing diagnostics and their construction sites are unaffected. The LS mapper emits LSP `relatedInformation` entries when `RelatedLocations.Length > 0`, using the parent diagnostic's `Message` as each span's message. No per-span message field needed at Precept's scale.
+> **✅ Resolved (CC#20) — Diagnostic Related Spans**
+> `Diagnostic` carries `ImmutableArray<RelatedSpan> RelatedSpans { get; init; } = ImmutableArray<RelatedSpan>.Empty;`. The additive init-only property keeps every existing `Diagnostics.Create(...)` call site compiling unchanged while giving pipeline stages a first-class place to attach secondary source locations and per-location messages.
 > *Resolved: 2026-05-06 — CC#20*
 - **Drift test: diagnostic emission coverage.** For every `DiagnosticCode` referenced by a `[StaticallyPreventable]`, verify that at least one call to `Diagnostics.Create()` with that code exists somewhere in the pipeline. This confirms the compile-time diagnostic isn't just registered — it's actually emitted.
 

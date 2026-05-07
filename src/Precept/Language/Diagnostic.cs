@@ -42,6 +42,8 @@ public enum DiagnosticCategory
     Proof          = 7,
 }
 
+public readonly record struct RelatedSpan(SourceSpan Span, string Message);
+
 public readonly record struct Diagnostic(
     Severity        Severity,
     DiagnosticStage Stage,
@@ -53,6 +55,8 @@ public readonly record struct Diagnostic(
     string          Code,
     string          Message,
     SourceSpan      Span,
-    ImmutableArray<string> Args = default
-);
+    ImmutableArray<string> Args = default)
+{
+    public ImmutableArray<RelatedSpan> RelatedSpans { get; init; } = ImmutableArray<RelatedSpan>.Empty;
+}
 
