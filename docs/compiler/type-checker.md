@@ -1042,11 +1042,13 @@ Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The f
 
 ### Open Questions
 
-1. **Anti-mirroring enforcement mechanism** — structural test that graph analysis, proof, and builder code paths do NOT call back-pointer `.Syntax` properties. How to enforce: Roslyn analyzer, runtime reflection test, or code review convention?
+All three open questions are now **locked** (2026-05-08).
 
-2. **ContentValidation DU landing timeline** — if the catalog shape change is significantly delayed, the hardcoded dispatch table becomes long-lived debt.
+1. ✅ **RESOLVED — Anti-mirroring enforcement mechanism** — **Roslyn Analyzer.** A custom diagnostic fires when `.Syntax` is accessed on a `SemanticIndex`-typed record outside the TypeChecker or test assemblies. GraphAnalyzer, ProofEngine, and Builder must never read data through `.Syntax` back-pointers — those are debugging aids only.
 
-3. **`~string` CI enforcement cataloging** — currently acceptable as 5-rule checker logic. If the CI surface grows beyond 5 rules, revisit whether `CIEnforcementDiagnostic?` belongs on `BinaryOperationMeta`.
+2. ✅ **RESOLVED — ContentValidation DU landing timeline** — **Land before Slice 4 (Typed Constants).** The `ContentValidation` DU (`RegexValidation`, `NodaTimeValidation`, `ClosedSetValidation`) ships as a separate commit before Slice 4 begins, eliminating the hardcoded dispatch debt.
+
+3. ✅ **RESOLVED — `~string` CI enforcement cataloging** — **Acceptable as-is.** The 5 stable CI enforcement rules remain as TypeChecker logic. No `CIEnforcementDiagnostic?` field is added to `BinaryOperationMeta`. The language spec already governs this behavior. Revisit only if a 6th CI rule emerges.
 
 4. **CandidateTypes on TypedErrorExpression** — LOW PRIORITY (post-v1). Consider adding an optional `ImmutableArray<TypeKind>? CandidateTypes` to `TypedErrorExpression` for "did you mean?" suggestions.
 
