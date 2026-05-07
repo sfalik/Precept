@@ -56,7 +56,7 @@ public static partial class Parser
 
                 // ── Identifier or FunctionCall ──────────────────────────
                 case TokenKind.Identifier:
-                    return ParseIdentifierOrFunctionCall();
+                    return ParseIdentifierOrFunctionCall(terminates);
 
                 // ── Grouped expression ──────────────────────────────────
                 case TokenKind.LeftParen:
@@ -144,11 +144,15 @@ public static partial class Parser
             if (kind == TokenKind.Dot)
                 return (80, 81);
 
-            // Is (postfix: is set / is not set) — only if followed by Set or Not
+            // Is (postfix: is set / is not set) — requires full token-sequence check.
+            // peek1 == Not is only valid when peek2 == Set; anything else (e.g. "is not valid")
+            // must return (-1,-1) to stop the led loop — otherwise ParsePostfixIs bails without
+            // consuming tokens and the loop spins forever.
             if (kind == TokenKind.Is)
             {
                 var peek1 = Peek(1).Kind;
-                if (peek1 == TokenKind.Set || peek1 == TokenKind.Not)
+                if (peek1 == TokenKind.Set ||
+                    (peek1 == TokenKind.Not && Peek(2).Kind == TokenKind.Set))
                 {
                     var isMeta = Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set);
                     return isMeta != null ? (isMeta.Precedence, int.MaxValue) : (-1, -1);
@@ -177,10 +181,12 @@ public static partial class Parser
         //  Expression form sub-parsers
         // ═══════════════════════════════════════════════════════════════════════════════
 
-        private ParsedExpression ParseIdentifierOrFunctionCall()
+        private ParsedExpression ParseIdentifierOrFunctionCall(Func<bool> terminates)
         {
             var idToken = Advance();
-            if (Peek().Kind == TokenKind.LeftParen)
+            // Only promote to FunctionCall if '(' is not a termination signal in the outer
+            // context (e.g. quantifier collection stops before the predicate parenthesis).
+            if (Peek().Kind == TokenKind.LeftParen && !terminates())
             {
                 // Function call: name(args)
                 Advance(); // consume '('
