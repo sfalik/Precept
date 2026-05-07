@@ -1,0 +1,1 @@
+Shane asked to start building the parser and requested a pre-requisite audit. Frank was spawned to audit canonical docs and report what is already in place versus what still needs attention before parser work begins.
