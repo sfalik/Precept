@@ -55,15 +55,15 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 | `RuleExpressionSlot` | `ParsedExpression` (typed DU) |
 | `InitialMarkerSlot` | `bool` — presence of `initial` keyword |
 
-> **Decision (2026-05-06):** `TypeExpressionSlot` carries `TypeMeta Type` — the parser resolves the type reference via the `Types` catalog at parse time. The type checker receives an already-resolved `TypeMeta` object (not a span to re-resolve). Rationale: type keywords are a small closed set defined in the `Types` catalog; the parser already consults this catalog for vocabulary recognition, so resolution is trivial and eliminates a re-lookup. The `SourceSpan` on the base record remains available for diagnostics. The type-checker.md table is stale and must be updated to match.
+> **Decision (2026-05-06):** `TypeExpressionSlot` carries `TypeMeta Type` — the parser resolves the type reference via the `Types` catalog at parse time. The type checker receives an already-resolved `TypeMeta` object (not a span to re-resolve). Rationale: type keywords are a small closed set defined in the `Types` catalog; the parser already consults this catalog for vocabulary recognition, so resolution is trivial and eliminates a re-lookup. The `SourceSpan` on the base record remains available for diagnostics.
 
-> **Decision (2026-05-06):** `ModifierListSlot` carries `ImmutableArray<ModifierKind> Modifiers` — the parser normalizes modifier tokens to their semantic `ModifierKind` identity via the `Modifiers` catalog. Rationale: the parser already consults the `Modifiers` catalog for vocabulary recognition; lifting `TokenKind` → `ModifierKind` in the same pass is zero-cost and gives downstream consumers a semantically typed value rather than a raw token to switch on. The type-checker.md table's `ImmutableArray<TokenKind>` is stale.
+> **Decision (2026-05-06):** `ModifierListSlot` carries `ImmutableArray<ModifierKind> Modifiers` — the parser normalizes modifier tokens to their semantic `ModifierKind` identity via the `Modifiers` catalog. Rationale: the parser already consults the `Modifiers` catalog for vocabulary recognition; lifting `TokenKind` → `ModifierKind` in the same pass is zero-cost and gives downstream consumers a semantically typed value rather than a raw token to switch on.
 
-> **Decision (2026-05-06):** `AccessModeSlot` carries `TokenKind AccessMode` — the parser resolves the access mode keyword to its `TokenKind` at parse time. Rationale: access modes are a two-member closed set (`readonly`/`editable`). The parser already identifies which token it consumed; forcing the TC to re-read a span to recover this information is wasteful and violates the principle of resolving closed-vocabulary tokens at their recognition site. **Code update required:** `SlotValue.cs` must add a `TokenKind AccessMode` property to `AccessModeSlot` (currently carries only the base `SourceSpan`).
+> **Decision (2026-05-06):** `AccessModeSlot` carries `TokenKind AccessMode` — the parser resolves the access mode keyword to its `TokenKind` at parse time. Rationale: access modes are a two-member closed set (`readonly`/`editable`). The parser already identifies which token it consumed; forcing the TC to re-read a span to recover this information is wasteful and violates the principle of resolving closed-vocabulary tokens at their recognition site.
 
-> **Decision (2026-05-06):** `BecauseClauseSlot` carries `string Message` — the parser extracts the string literal content at parse time. Rationale: the `because` clause is syntactically a string literal; the parser already validates the token kind and has the lexeme. Downstream consumers (constraint diagnostics, MCP output, LS hover) all need the text, never the raw span. Deferring extraction would require every consumer to re-read source. The type-checker.md table is stale.
+> **Decision (2026-05-06):** `BecauseClauseSlot` carries `string Message` — the parser extracts the string literal content at parse time. Rationale: the `because` clause is syntactically a string literal; the parser already validates the token kind and has the lexeme. Downstream consumers (constraint diagnostics, MCP output, LS hover) all need the text, never the raw span. Deferring extraction would require every consumer to re-read source.
 
-Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
+Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 13 per-form sealed subtypes, one for each `ExpressionFormKind` member. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
 
 ---
 
@@ -235,7 +235,7 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 
 ### Expression Parsing
 
-Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with ~10 sealed subtypes (one per expression form). The expression parser is a Pratt parser (operator-precedence) using `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
+Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with 13 sealed subtypes (one per `ExpressionFormKind` member). The expression parser is a Pratt parser (operator-precedence) using `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
 
 `ParsedExpression` is a closed, strongly-typed DU. Adding a new expression form requires a C# code change (new subtype + update all consumer switches). Exhaustiveness is enforced by sealed hierarchy + Roslyn analyzer test.
 
@@ -390,12 +390,12 @@ When multiple constructs match and disambiguation fails:
 **Decision:** Expression-carrying slots carry `ParsedExpression` — a sealed abstract record DU with per-form sealed subtypes.
 
 **Design:**
-- `ParsedExpression` = sealed abstract record base + ~10 sealed subtypes (one per expression form declared in the `ExpressionForms` catalog)
+- `ParsedExpression` = sealed abstract record base + 13 sealed subtypes (one per `ExpressionFormKind` member declared in the `ExpressionForms` catalog)
 - The type checker resolves these into `TypedExpression` (same DU shape with resolved type information)
 - The set is **closed by design** — new expression form = new catalog entry + new DU subtype + update all consumer switches
 - **Exhaustiveness enforcement:** sealed hierarchy for compiler-level checking + Roslyn analyzer test for build-time verification of all switch arms
 
-**Rationale:** ~10 expression forms is a bounded, catalogable set. Strongly-typed DU eliminates an entire class of runtime errors. The closed set is intentional — expression additions are rare, deliberate language changes that SHOULD require global updates.
+**Rationale:** 13 expression forms is still a bounded, catalogable set. Strongly-typed DU eliminates an entire class of runtime errors. The closed set is intentional — expression additions are rare, deliberate language changes that SHOULD require global updates.
 
 ---
 
@@ -418,7 +418,7 @@ Traditional ASTs have per-node-type properties (`FieldDeclaration.Name`, `EventD
 
 ### ~~Expression Tree Design~~ (RESOLVED)
 
-Expression tree design resolved. Expression-carrying slots carry `ParsedExpression` (sealed DU, ~10 subtypes). See § Expression Tree Design (RESOLVED) above.
+Expression tree design resolved. Expression-carrying slots carry `ParsedExpression` (sealed DU, 13 subtypes). See § Expression Tree Design (RESOLVED) above.
 
 ### Error Recovery Granularity
 

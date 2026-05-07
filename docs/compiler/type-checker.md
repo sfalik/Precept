@@ -47,27 +47,27 @@ The parser produces these slot value types:
 
 | SlotValue Subtype | Contents | Expression Status |
 |---|---|---|
-| `IdentifierListSlot` | `ImmutableArray<string> Identifiers` | N/A — resolved names |
-| `TypeExpressionSlot` | `SourceSpan Span` | Deferred — span only |
-| `ModifierListSlot` | `ImmutableArray<TokenKind> Modifiers` | N/A — resolved tokens |
-| `StateEntryListSlot` | `ImmutableArray<StateEntry> Entries` | N/A — state refs |
-| `ArgumentListSlot` | `ImmutableArray<ArgumentSlotEntry> Arguments` | Deferred — defaults carry span only |
-| `ComputeExpressionSlot` | `SourceSpan Span` | **Deferred — span only** |
-| `GuardClauseSlot` | `SourceSpan Span` | **Deferred — span only** |
-| `ActionChainSlot` | `ImmutableArray<ActionEntry> Actions` | Deferred — action values carry span only |
-| `OutcomeSlot` | `SourceSpan Span` | **Deferred — span only** |
+| `IdentifierListSlot` | `ImmutableArray<string> Names` | N/A — resolved names |
+| `TypeExpressionSlot` | `TypeMeta Type` | N/A — resolved catalog type |
+| `ModifierListSlot` | `ImmutableArray<ModifierKind> Modifiers` | N/A — resolved modifiers |
+| `StateEntryListSlot` | `ImmutableArray<(string Name, ImmutableArray<ModifierKind> Modifiers)> Entries` | N/A — resolved names + modifiers |
+| `ArgumentListSlot` | `ImmutableArray<(string Name, TypeMeta Type)> Args` | N/A — resolved names + types |
+| `ComputeExpressionSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
+| `GuardClauseSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
+| `ActionChainSlot` | `ImmutableArray<ActionKind> Actions` | N/A — resolved actions |
+| `OutcomeSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
 | `StateTargetSlot` | `string? StateName` | N/A — resolved name |
-| `EventTargetSlot` | `string EventName` | N/A — resolved name |
-| `EnsureClauseSlot` | `SourceSpan Span` | **Deferred — span only** |
-| `BecauseClauseSlot` | `SourceSpan Span` | Deferred — span only |
-| `AccessModeSlot` | `TokenKind Mode` | N/A — resolved token |
-| `FieldTargetSlot` | `string FieldName` | N/A — resolved name |
-| `RuleExpressionSlot` | `SourceSpan Span` | **Deferred — span only** |
-| `InitialMarkerSlot` | *(empty)* | N/A |
+| `EventTargetSlot` | `string? EventName` | N/A — resolved name |
+| `EnsureClauseSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
+| `BecauseClauseSlot` | `string Message` | N/A — extracted literal text |
+| `AccessModeSlot` | `TokenKind AccessMode` | N/A — resolved token |
+| `FieldTargetSlot` | `string? FieldName` | N/A — resolved name |
+| `RuleExpressionSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
+| `InitialMarkerSlot` | `bool IsPresent` | N/A — keyword presence |
 
 ### Blocking Dependency: Expression Trees (RESOLVED)
 
-Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`.
+Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 13 per-form sealed subtypes, one for each `ExpressionFormKind` member. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`.
 
 The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers.
 

@@ -49,6 +49,12 @@
 
 ## Recent Updates
 
+### 2026-05-07T04:02:01Z — Parser prerequisite approvals received
+
+- Shane approved Frank's B2 + B3 decisions, so the parser/type-checker handoff is now durably locked.
+- `ParsedExpression.cs` can proceed with the closed-vocabulary rule intact: only open-ended expressions stay deferred; types, modifiers, access modes, and `because` text are parser-resolved.
+- Keep `peek(2)` hardcoded for scoped-construct disambiguation and pair the B1 work with the `AccessModeSlot(TokenKind AccessMode, SourceSpan Span)` fix in `SlotValue.cs`.
+
 ### 2026-05-03T00:51:29Z — Outcomes follow-through narrowed
 - Scribe recorded Frank's outcomes batch and cleared the paired inbox notes.
 - Carry-forward correction: George's earlier "outcome parsing lacks a catalog path" concern should no longer be interpreted as "add Outcomes.cs"; for this batch, the durable ruling is DU-only outcomes with token-level catalog support and `OutcomeProd()` as the parser path.
@@ -147,4 +153,9 @@
 - George-2's runtime review correctly flagged the phantom zero-arg `Possible` state and the proposal-vs-source inspection-shape drift.
 - Same-day Shane rulings and the CC#8 resolution absorbed the design blockers: zero-arg `Possible` is removed, `RowEffect` is the durable row-shape choice, and proposal-only inspection members stay explicitly gated behind CC#8 follow-through.
 - Keep George's durable warning active: when UX specs design against a proposal rather than shipped source, label the dependency explicitly so implementers do not treat draft shapes as already-shipped runtime contracts.
+
+### 2026-05-07T00:02:01.887-04:00 — ParsedExpression DU landed in source
+- `SlotValue` now matches the approved parse-time contract: the 5 expression-carrying slots store `ParsedExpression`, and `AccessModeSlot` stores resolved `TokenKind AccessMode` instead of span-only data.
+- `ParsedExpression` currently has 13 sealed subtypes, one per `ExpressionFormKind`, with parser-owned structural payloads only; semantic resolution remains a `TypedExpression` responsibility.
+- Durable implementation choices to retain: postfix presence checks are represented by one `PostfixOperationExpression` with `bool IsNegated`, and CI function calls stay name-based until the `ByCIVariantOf` vs parser-stamped `FunctionKind` decision is implemented.
 

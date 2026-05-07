@@ -36,13 +36,11 @@ public sealed record ArgumentListSlot(ImmutableArray<(string Name, TypeMeta Type
     : SlotValue(ConstructSlotKind.ArgumentList, Span);
 
 /// <summary>"-> expression" computed value.</summary>
-// TODO: add typed Expression tree once ExpressionNode is designed
-public sealed record ComputeExpressionSlot(SourceSpan Span)
+public sealed record ComputeExpressionSlot(ParsedExpression Expression, SourceSpan Span)
     : SlotValue(ConstructSlotKind.ComputeExpression, Span);
 
 /// <summary>"when expression" guard clause.</summary>
-// TODO: add typed Expression tree once ExpressionNode is designed
-public sealed record GuardClauseSlot(SourceSpan Span)
+public sealed record GuardClauseSlot(ParsedExpression Expression, SourceSpan Span)
     : SlotValue(ConstructSlotKind.GuardClause, Span);
 
 /// <summary>"-> action -> action" chain.</summary>
@@ -50,8 +48,7 @@ public sealed record ActionChainSlot(ImmutableArray<ActionKind> Actions, SourceS
     : SlotValue(ConstructSlotKind.ActionChain, Span);
 
 /// <summary>"-> transition State | -> no transition | -> reject 'reason'" outcome.</summary>
-// TODO: add typed Expression tree once ExpressionNode is designed
-public sealed record OutcomeSlot(SourceSpan Span)
+public sealed record OutcomeSlot(ParsedExpression Expression, SourceSpan Span)
     : SlotValue(ConstructSlotKind.Outcome, Span);
 
 /// <summary>State name or quantifier (any).</summary>
@@ -63,8 +60,7 @@ public sealed record EventTargetSlot(string? EventName, SourceSpan Span)
     : SlotValue(ConstructSlotKind.EventTarget, Span);
 
 /// <summary>"ensure expression because message" clause.</summary>
-// TODO: add typed Expression tree once ExpressionNode is designed
-public sealed record EnsureClauseSlot(SourceSpan Span)
+public sealed record EnsureClauseSlot(ParsedExpression Expression, SourceSpan Span)
     : SlotValue(ConstructSlotKind.EnsureClause, Span);
 
 /// <summary>"because message" clause.</summary>
@@ -72,7 +68,7 @@ public sealed record BecauseClauseSlot(string Message, SourceSpan Span)
     : SlotValue(ConstructSlotKind.BecauseClause, Span);
 
 /// <summary>readonly | editable access mode adjective.</summary>
-public sealed record AccessModeSlot(SourceSpan Span)
+public sealed record AccessModeSlot(TokenKind AccessMode, SourceSpan Span)
     : SlotValue(ConstructSlotKind.AccessModeKeyword, Span);
 
 /// <summary>Field name or "all".</summary>
@@ -80,8 +76,7 @@ public sealed record FieldTargetSlot(string? FieldName, SourceSpan Span)
     : SlotValue(ConstructSlotKind.FieldTarget, Span);
 
 /// <summary>The rule's boolean expression (e.g. amount > 0).</summary>
-// TODO: add typed Expression tree once ExpressionNode is designed
-public sealed record RuleExpressionSlot(SourceSpan Span)
+public sealed record RuleExpressionSlot(ParsedExpression Expression, SourceSpan Span)
     : SlotValue(ConstructSlotKind.RuleExpression, Span);
 
 /// <summary>Optional "initial" keyword on event declarations.</summary>
