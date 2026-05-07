@@ -36,7 +36,6 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 > **Open Question:** `SlotValue` subtype inventory
 > parser.md documents 17 `SlotValue` subtypes, while catalog-system.md still lists 15 `ConstructSlotKind` members and omits `RuleExpressionSlot` and `InitialMarkerSlot`. The parser contract needs one canonical inventory before downstream docs and implementation names can stabilize.
 > *Flagged: 2026-05-04*
-> *Source: catalog-gap-register.md #6*
 
 | Subtype | Carries |
 |---------|---------|
@@ -73,7 +72,6 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 > **Open Question:** `BecauseClauseSlot` canonical shape
 > parser.md treats `BecauseClauseSlot` as the authored diagnostic string, while type-checker.md still documents a raw `SourceSpan`. The contract needs one canonical representation so downstream diagnostics know whether they receive text or syntax to re-read.
 > *Flagged: 2026-05-04*
-> *Source: catalog-gap-register.md #7 — BLOCKING*
 
 Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
 
@@ -201,7 +199,6 @@ report ambiguous construct
 The offset and token set come from catalog metadata — the parser contains no hardcoded disambiguation logic.
 
 > **Open Question (unresolved):** The disambiguation `peek(offset)` doesn't specify the offset value. Is it always 1? If it varies per construct, `DisambiguationEntry` needs an `Offset` field in the catalog.
-> *Source: catalog-gap-register.md #8*
 
 ### Slot Walking
 
@@ -243,7 +240,7 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 
 Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with ~10 sealed subtypes (one per expression form). The expression parser is a Pratt parser (operator-precedence) using `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
 
-`ParsedExpression` is a closed, strongly-typed DU. Adding a new expression form requires a C# code change (new subtype + update all consumer switches). Exhaustiveness is enforced by sealed hierarchy + Roslyn analyzer test. See `docs/working/cross-cutting-decisions.md` CC#1.
+`ParsedExpression` is a closed, strongly-typed DU. Adding a new expression form requires a C# code change (new subtype + update all consumer switches). Exhaustiveness is enforced by sealed hierarchy + Roslyn analyzer test.
 
 ---
 
@@ -403,8 +400,6 @@ When multiple constructs match and disambiguation fails:
 
 **Rationale:** ~10 expression forms is a bounded, catalogable set. Strongly-typed DU eliminates an entire class of runtime errors. The closed set is intentional — expression additions are rare, deliberate language changes that SHOULD require global updates.
 
-See `docs/working/cross-cutting-decisions.md` CC#1 for full ruling.
-
 ---
 
 ## Innovation
@@ -426,7 +421,7 @@ Traditional ASTs have per-node-type properties (`FieldDeclaration.Name`, `EventD
 
 ### ~~Expression Tree Design~~ (RESOLVED)
 
-Expression tree design resolved. Expression-carrying slots carry `ParsedExpression` (sealed DU, ~10 subtypes). See § Expression Tree Design (RESOLVED) above and `docs/working/cross-cutting-decisions.md` CC#1.
+Expression tree design resolved. Expression-carrying slots carry `ParsedExpression` (sealed DU, ~10 subtypes). See § Expression Tree Design (RESOLVED) above.
 
 ### Error Recovery Granularity
 

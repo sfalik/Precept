@@ -27,15 +27,6 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManife
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
 | [tooling-surface.md](tooling-surface.md) | TextMate grammar generation, semantic token two-pass design, completion filtering | Full |
 
-## Superseded Design Drafts
-
-These files exist in `docs/compiler/` but are superseded by the canonical stage docs above. Scheduled for retirement in Wave 5.
-
-| Document | Status |
-|----------|--------|
-| [parser-radical.md](parser-radical.md) | Superseded by [parser.md](parser.md) |
-| [type-checker-radical.md](type-checker-radical.md) | Superseded by [type-checker.md](type-checker.md) |
-
 ## Source Code
 
 All pipeline stages live under `src/Precept/Pipeline/`. Tests are in `test/Precept.Tests/`.

@@ -1444,8 +1444,7 @@ State-machine action verbs — the keywords that appear after `->` in transition
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
-> **Open Question (unresolved):** `ActionMeta` is missing properties referenced elsewhere: `ActionSyntaxShape` (type-checker.md), `HoverDescription` and `SnippetTemplate` (language-server.md), `syntaxShape` (mcp.md). Which should be added?
-> *Source: catalog-gap-register.md #43*
+> **✅ Settled (Wave 4 Gap 6):** `ActionMeta.Description` is the canonical hover/MCP documentation field and is present in the `ActionMeta` shape above. `SyntaxShape` (`ActionSyntaxShape`) is internal to `Action.cs` — not a catalog record field. `SnippetTemplate` is a deferred implementation milestone.
 
 **Members (from `ActionKind.cs`):**
 
@@ -2131,7 +2130,7 @@ The following catalog additions have been identified by pipeline stage design do
 
 **Status:** ✅ Resolved (CC#5, 2026-05-06)
 
-`ProofDischarge[] ProofDischarges = []` added to `FieldModifierMeta` and `ProofDischarge` record defined in this file. The discharge table is locked — see the `FieldModifierMeta` shape definition above and the CC#5 ruling in `docs/working/cross-cutting-decisions.md §CC#5`.
+`ProofDischarge[] ProofDischarges = []` added to `FieldModifierMeta` and `ProofDischarge` record defined in this file. The discharge table is locked — see the `FieldModifierMeta` shape definition above.
 
 **Implementation checklist:**
 - [x] Add `ProofDischarge` record to `src/Precept/Language/Modifier.cs`

@@ -277,7 +277,7 @@ JSON response to agent
     ]
   },
 
-> **✅ Resolved in Source — ModifierMeta.ModifierCategory:** `Modifier.cs` already carries a `Category` property of type `ModifierCategory`. The grouping keys here should be derived from that catalog field rather than hardcoded. Update the MCP serialization to read `ModifierMeta.Category` and use its string representation as the grouping key. *(Was: catalog-gap-register.md #24)*
+> **✅ Resolved in Source — ModifierMeta.ModifierCategory:** `Modifier.cs` already carries a `Category` property of type `ModifierCategory`. The grouping keys here should be derived from that catalog field rather than hardcoded. Update the MCP serialization to read `ModifierMeta.Category` and use its string representation as the grouping key.
 
   "actions": [
     {
@@ -297,7 +297,7 @@ JSON response to agent
     // ... all actions
   ],
 
-> **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property of type `ActionSyntaxShape`. The MCP output should read this field from the catalog rather than hardcoding it. *(Was: catalog-gap-register.md #17)*
+> **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property of type `ActionSyntaxShape`. The MCP output should read this field from the catalog rather than hardcoding it.
 
   "constructs": [
     {

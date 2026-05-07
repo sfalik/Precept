@@ -69,7 +69,7 @@ The parser produces these slot value types:
 
 Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`.
 
-The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers. See `docs/working/cross-cutting-decisions.md` CC#1.
+The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers.
 
 ---
 
@@ -789,7 +789,7 @@ Every expression node type that won't be implemented in its slice has an explici
 | **Modifiers** | `ApplicableTo`, `MutuallyExclusiveWith`, `Subsumes` | Modifier validation |
 | **Actions** | `ApplicableTo`, `AllowedIn`, `ValueRequired`, `ActionSyntaxShape` | Action resolution and classification |
 
-> **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property (`ActionSyntaxShape`). Update `catalog-system.md` to include it in the canonical `ActionMeta` shape and remove this as an open question. *(Was: catalog-gap-register.md #17)*
+> **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property (`ActionSyntaxShape`). Update `catalog-system.md` to include it in the canonical `ActionMeta` shape and remove this as an open question.
 
 ### Catalog-Driven vs Structural Logic (~70/30 Split)
 
@@ -847,7 +847,7 @@ The mapping from `ActionSyntaxShape` → typed DU shape is a stable 3-arm switch
 
 Five stable rules. The 5-rule enforcement surface is small enough that checker logic is acceptable without catalog metadata for the diagnostic dispatch.
 
-> **✅ Resolved in Source — FunctionMeta.HasCIVariant:** `Function.cs` already carries `HasCIVariant` and `CIVariantOf` properties. Update `catalog-system.md` to include them in the canonical `FunctionMeta` shape. *(Was: catalog-gap-register.md #18)*
+> **✅ Resolved in Source — FunctionMeta.HasCIVariant:** `Function.cs` already carries `HasCIVariant` and `CIVariantOf` properties. Update `catalog-system.md` to include them in the canonical `FunctionMeta` shape.
 
 ---
 
@@ -1067,7 +1067,7 @@ Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The f
 - **No proof obligation discharge:** ProofRequirement *recording* happens here (from catalog entries); ProofRequirement *discharge* is the ProofEngine's responsibility.
 - **No runtime planning:** Descriptor production and execution plan compilation are the Precept Builder's responsibility.
 - **No qualifier runtime identity:** The checker validates qualifier *compatibility* structurally; the Evaluator handles qualifier *values* at runtime.
-- **No expression tree parsing:** The type checker resolves `ParsedExpression` DU nodes (produced by the parser) into `TypedExpression`. Expression tree design was previously blocked; resolved by CC#1 — see `docs/working/cross-cutting-decisions.md`.
+- **No expression tree parsing:** The type checker resolves `ParsedExpression` DU nodes (produced by the parser) into `TypedExpression`. Expression tree design was previously blocked; resolved by CC#1.
 
 ---
 

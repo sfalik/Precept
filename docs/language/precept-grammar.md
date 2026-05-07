@@ -15,7 +15,7 @@
 |---|---|
 | Doc purpose | Design reference — grammar principles, structure, and invariants |
 | Primary source | `docs/language/catalog-system.md` (constructs, slots, disambiguation) |
-| Related | `docs/compiler/parser.md` · `docs/compiler/parser-radical.md` · `docs/language/precept-language-spec.md` |
+| Related | `docs/compiler/parser.md` · `docs/language/precept-language-spec.md` |
 | Updated | 2026-05-03 |
 
 ---
