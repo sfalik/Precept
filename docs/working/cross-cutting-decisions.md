@@ -14,11 +14,11 @@
 | CC#5 | `FieldModifierMeta.ProofDischarges` | [Open Question — canonical doc: `docs/language/catalog-system.md §FieldModifierMeta.ProofDischarges`] | Proof Engine Strategy 2 |
 | CC#6 | FaultSiteLink to FaultSiteDescriptor Transformation | [Open Question — canonical doc: `docs/compiler/proof-engine.md §2 Output Shape`] | Proof-to-runtime backstop planting |
 | CC#7 | ConstraintMeta DU Subtype Count | ✅ Resolved — Option B (hierarchical, StateAnchored grouping node). Approved 2026-05-06. | Builder constraint routing, catalog-system alignment |
-| CC#8 | EventInspection Shape | [Open Question — canonical doc: `docs/tooling/language-server.md §7.6 Preview/Inspect`] | Evaluator inspection contract, LS preview, MCP DTO shape |
+| CC#8 | EventInspection Shape | ✅ Resolved — EventInspection shape adopted; OQ-2 (ArgError = string Reason only) and OQ-3 (RowEffect DU) closed. OQ-4 (EventEnsures timing) pending. Canonical: `result-types.md` + `evaluator.md`. Approved 2026-05-06. | Evaluator inspection contract, LS preview, MCP DTO shape |
 | CC#9 | `ConstraintFieldRefs.ConstraintIdentity` Type | ✅ Resolved — uses proof-engine ConstraintIdentity DU. Resolved 2026-05-06. | Type Checker and Proof Engine constraint identity alignment |
 | CC#10 | GraphState Modifier Representation | [Open Question — canonical doc: `docs/compiler/graph-analyzer.md §GraphState shape`] | Graph output shape, modifier-derived facts |
 | CC#11 | `ExecutionRow.RejectReason` Field | ✅ Resolved — string? RejectReason added to TypedTransitionRow and ExecutionRow. Resolved 2026-05-06. | Reject-row lowering, evaluator rejection outcomes |
-| CC#12 | `Faulted(Fault)` as EventOutcome Variant | [Blocked by: CC#8] | Evaluator outcome DU, MCP fire result serialization |
+| CC#12 | `Faulted(Fault)` as EventOutcome Variant | ✅ Resolved — `Faulted(Fault)` added as 8th variant. Canonical: `result-types.md`. | Evaluator outcome DU, MCP fire result serialization |
 | CC#13 | `FaultCode.AmbiguousDispatch` | [Open Question — canonical doc: `docs/runtime/evaluator.md §7 Fire dispatch`] | Evaluator impossible-path faulting, diagnostics linkage |
 | CC#14 | SlotContext vs SlotKind Enum Naming | [Open Question — canonical doc: `docs/tooling/language-server.md §7.3 Completions`] | LS/tooling completion context contract |
 | CC#15 | `precept/inspect` vs `precept/preview` Naming | [Open Question — canonical doc: `docs/tooling/language-server.md §7.6 Preview/Inspect`] | LS custom method name, tooling preview routing |
@@ -29,8 +29,8 @@
 | CC#20 | Diagnostic Related Locations | [Open Question — canonical doc: `docs/compiler/diagnostic-system.md §Open Questions / Implementation Notes`] | Multi-span diagnostics, LSP relatedInformation |
 | CC#21 | Event `optional` Modifier | [Open Question — canonical doc: `docs/compiler/graph-analyzer.md §Event coverage open questions`] | Parser, Type Checker, Graph Analyzer, Evaluator, grammar, completions, hover, MCP |
 | CC#22 | `SemanticIndex.EnsuresByState` | [Blocked by: CC#3] | LS/MCP ensure navigation and indexing |
-| CC#23 | `EventOutcome.mutations` Payload | [Open Question — canonical doc: `docs/tooling/mcp.md §precept_fire`] | Evaluator outcome contract, MCP fire payload |
-| CC#24 | Unmatched Guard Trace Enrichment | [Open Question — canonical doc: `docs/tooling/mcp.md §precept_fire`] | Evaluator unmatched contract, MCP diagnostics |
+| CC#23 | `EventOutcome.mutations` Payload | ✅ Resolved — Option A: `ImmutableArray<FieldMutation> Mutations` attached to `Transitioned` and `Applied`. Canonical: `result-types.md`. | Evaluator outcome contract, MCP fire payload |
+| CC#24 | Unmatched Guard Trace Enrichment | ✅ Resolved — Option A: `Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows)` — same type as inspect path. Canonical: `result-types.md`. | Evaluator unmatched contract, MCP diagnostics |
 | CC#25 | Execution Dispatch Delegate Design | [Decided] | Evaluator, runtime value model, builder plan lowering, catalog runtime metadata |
 | CC#26 | Stateless Precepts `CreateInitialVersion` Semantics | [Open Question — canonical doc: `docs/runtime/runtime-api.md §Stateless Precepts — CreateInitialVersion`] | Runtime API, Evaluator, Graph Analyzer |
 
@@ -70,10 +70,10 @@ Wave 0 is closed. Wave 1 now owns the remaining cross-stage shape decisions; Wav
 - [ ] [Shane] Resolve CC#4 `Compilation.Tokens` access path. [Blocks: `docs/runtime/precept-builder.md §2`, lexical semantic-token flow]
 - [ ] [Shane] Resolve CC#6 proof-to-runtime `FaultSiteLink` lowering. [Blocks: `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, evaluator fault routing]
 - [x] [Shane] Resolve CC#7 `ConstraintMeta` DU hierarchy. [Blocks: builder constraint buckets, catalog-system constraint metadata]
-- [ ] [Shane] Resolve CC#8 canonical `EventInspection` shape. [Blocks: evaluator inspection contract, LS preview, MCP DTOs]
+- [x] [Shane] Resolve CC#8 canonical `EventInspection` shape. [Blocks: evaluator inspection contract, LS preview, MCP DTOs]
 - [x] [Team] Apply the CC#7 ruling to CC#9 `ConstraintFieldRefs.ConstraintIdentity`. [Blocked by: CC#7] [Blocks: type-checker/proof-engine shared identity data]
 - [x] [Team] Add canonical storage for reject-row `because` text (CC#11). [Blocked by: none] [Blocks: `docs/runtime/precept-builder.md §ExecutionRow`, `docs/runtime/evaluator.md` rejection outcomes]
-- [ ] [Team] Apply the CC#8 ruling to CC#12 `Faulted(Fault)` outcome handling. [Blocked by: CC#8] [Blocks: evaluator/MCP outcome parity]
+- [ ] [Team] Apply the CC#8 ruling to CC#12 `Faulted(Fault)` outcome handling. [Blocks: evaluator/MCP outcome parity]
 - [ ] [Shane] Resolve CC#23 `EventOutcome.mutations` ownership. [Blocks: evaluator result contract, `docs/tooling/mcp.md §precept_fire`]
 - [ ] [Shane] Resolve CC#24 unmatched-guard trace richness. [Blocks: evaluator unmatched contract, `docs/tooling/mcp.md §precept_fire`]
 
@@ -366,7 +366,7 @@ public abstract record ConstraintIdentity
 
 ### CC#8. EventInspection Shape
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved
 
 **Affects:** Evaluator, Language Server, MCP
 **Gap register refs:** #33, #64
@@ -379,6 +379,8 @@ public abstract record ConstraintIdentity
 These are different shapes for the same concept. Downstream consumers cannot implement until the shape is resolved.
 
 **Resolution path:** Evaluator.md should be authoritative for runtime shapes; other docs should reference it.
+
+**Resolution (2026-05-06):** EventInspection shape adopted per `docs/working/event-inspection-proposal.md` with OQ-2 (ArgError = string Reason only, no ArgErrorKind — matches field edit error pattern) and OQ-3 (RowEffect DU, not TransitionKind enum — `RowEffect { TransitionTo(TargetState), NoTransition, Rejection(Reason) }`) closed. Canonical shape now lives in `docs/runtime/result-types.md` (type definitions) and `docs/runtime/evaluator.md` (implementation contract). OQ-4 (EventEnsures timing) remains pending. CC#12 unblocked.
 
 ---
 
@@ -403,7 +405,7 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ### CC#12. Faulted(Fault) as EventOutcome Variant
 
-**Status:** 🔵 Pending team resolution (follows from CC#8)
+**Status:** ✅ Resolved — `Faulted(Fault)` added as 8th `EventOutcome` variant. Canonical: `result-types.md`.
 
 **Affects:** Evaluator, MCP
 **Gap register refs:** #21, #63
@@ -413,13 +415,15 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 - **Evaluator** — `Fail()` returns a `Fault`, but `Fault` is not currently a subtype of `EventOutcome`
 - **MCP** — `precept_fire` needs to serialize fault outcomes
 
+**Ruling:** `Faulted(Fault fault)` added as the 8th variant of `EventOutcome`. The evaluator's `Fail()` path now surfaces its `Fault` as a structured outcome rather than an unhandled exception at the runtime boundary. MCP `precept_fire` serializes `Faulted` as `{ "outcome": "Faulted", "fault": { ... } }`.
+
 **Resolution path:** Add `Faulted(Fault)` variant to the `EventOutcome` DU.
 
 ---
 
 ### CC#23. `EventOutcome.mutations` Payload
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — Option A: `ImmutableArray<FieldMutation> Mutations` attached to `Transitioned` and `Applied`. Canonical: `result-types.md`.
 
 **Affects:** Evaluator, MCP
 **Gap register refs:** #28, #65
@@ -434,13 +438,15 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 2. **Dedicated mutation wrapper/result shape** — separate execution result data from the existing DU variants.
 3. **Consumer reconstruction** — keep evaluator output lean and let MCP/tooling compute diffs independently.
 
+**Ruling:** Option A — `ImmutableArray<FieldMutation> Mutations` is attached directly to the `Transitioned` and `Applied` variants. The evaluator already maintains the working copy during execution; computing the diff is zero-cost at that point and eliminates any N+1 re-inspection need at call sites. `FieldMutation` is a sealed record: `FieldMutation(string FieldName, JsonElement? Before, JsonElement? After)`. `Rejected`, `InvalidArgs`, `ConstraintsFailed`, `Unmatched`, `UndefinedEvent`, and `Faulted` carry no mutation payload because no mutations were committed.
+
 **Resolution path:** Lock the ownership and shape of mutation diffs before evolving the `EventOutcome` discriminated union.
 
 ---
 
 ### CC#24. Unmatched Guard Trace Enrichment
 
-**Status:** 🔴 Pending Shane decision
+**Status:** ✅ Resolved — Option A: `Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows)` — same type as inspect path. Canonical: `result-types.md`.
 
 **Affects:** Evaluator, MCP
 **Gap register refs:** #29, #66
@@ -454,6 +460,8 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 1. **Full per-candidate trace** — every evaluated guard and its result is attached to `Unmatched`.
 2. **Best-explanation summary** — only the most relevant failed guard or row explanation is carried.
 3. **Consumer reconstruction** — evaluator stays minimal and tooling derives explanations elsewhere.
+
+**Ruling:** Option A — `Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows)`. Using the same `TransitionInspection` type already defined by CC#8 makes the inspect and commit paths type-consistent. Callers who want to understand *why* no row matched get the full per-candidate trace. The evaluator on the commit path is already running guard evaluation; retaining the per-row results is no additional work. MCP `precept_fire` serializes `EvaluatedRows` using the same DTO as `precept_inspect` transition rows.
 
 **Resolution path:** Decide the required diagnostic richness before changing the `Unmatched` outcome shape and its MCP serialization.
 

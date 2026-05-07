@@ -49,3 +49,11 @@ Task: OQ-5 closed; runtime provides GuardSummary on TransitionInspection.
 ## Elaine-37 — OQ-6 closed
 [2026-05-06]
 Task: OQ-6 closed; V1 event name only, V2 language annotation deferred.
+
+## Elaine-38 — OQ-8 closed
+[2026-05-06]
+Task: OQ-8 closed; both commit modes supported, mode derived from constraint metadata.
+
+## Elaine-39 — OQ-9 closed
+[2026-05-06]
+Task: OQ-9 closed; Event Timeline stays on committed state while buffered edits disable fire actions. All OQs resolved; event interaction UXR document is complete.

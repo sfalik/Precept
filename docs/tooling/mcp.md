@@ -508,11 +508,28 @@ JSON response to agent
 | `data` | object | Yes | Current field values keyed by field name |
 | `eventArgs` | object? | No | Optional event argument values (for event-specific inspection) |
 
-**Core API:** `Version.InspectFire(event, args)` for each available event; `Version.InspectUpdate(patch)` for field editability
+**Core API:** `Version.InspectUpdate(null)` for full landscape (all events); `Version.InspectFire(event, args?)` for single-event inspection
 
-> **Open Question:** `precept_inspect` N+1 API calls
-> `precept_inspect` is currently a composite view that fans out into one inspection call per event plus update inspection, which violates the thin-wrapper story described earlier in the doc. The tooling surface needs to decide whether this tool is explicitly exempt or whether the core runtime gains a batched inspection API.
-> *Flagged: 2026-05-04*
+**Thin wrapper contract:** The MCP tool is a thin wrapper — it deserializes inputs, calls one runtime method, and serializes the output. It does not fan out into N+1 `InspectFire` calls, compute diffs, or generate prose.
+
+**N+1 resolution:** When called with no event arg, `precept_inspect` calls `version.InspectUpdate(null)`. The runtime's `UpdateInspection.Events` already contains a complete `EventInspection` for every event available in the current state — each one self-describing via `EventName`. One call; one result. The previous N+1 fan-out (one `InspectFire` per event) is eliminated from the MCP layer. When called with an event arg and `eventArgs`, it calls `version.InspectFire(event, args)` for single-event detail.
+
+```csharp
+// MCP precept_inspect — thin wrapper
+public object HandleInspect(InspectArgs args)
+{
+    var version = CompileAndRestore(args.Text, args.CurrentState, args.Data);
+    
+    if (args.EventArgs is not null)
+    {
+        // Caller is inspecting a specific event with args — single fire inspection
+        return Serialize(version.InspectFire(args.Event!, args.EventArgs));
+    }
+    
+    // Full landscape — one call
+    return Serialize(version.InspectUpdate(null));
+}
+```
 
 ```json
 {

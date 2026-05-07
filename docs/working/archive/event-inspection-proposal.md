@@ -70,7 +70,8 @@ The user has provided all required args. The consumer should show: will it trans
 - `OverallProspect = Certain` → render as "will fire"
 - Exactly one `TransitionInspection` with `Prospect.Certain` → identify the winning row
 - `TransitionInspection.PostFields` → show every field value after the event, including arg-driven assignments
-- `TransitionInspection.TargetState` → show the state the entity will enter
+- `TransitionInspection.Effect` is `RowEffect.TransitionTo(TargetState)` → show the state the entity will enter
+- `TransitionInspection.GuardSummary = null` when the winning guard passed without ambiguity
 - `TransitionInspection.Constraints` all `Satisfied` → no warnings needed
 
 ### Scenario 2: Args partially supplied
@@ -80,6 +81,7 @@ The user is mid-input. Some required args are present; others are not yet filled
 **What the consumer needs:**
 - `OverallProspect = Possible` → render as "might fire"
 - `TransitionInspection.Prospect = Possible` for rows whose guard references missing args
+- `TransitionInspection.GuardSummary` populated for rows whose guard evaluation is ambiguous → render the runtime-authored guard explanation directly
 - `TransitionInspection.PostFields` with `IsResolved = false` on fields that depend on missing args → render those fields as "pending" or "?"
 - `TransitionInspection.Constraints` with `Status = Unresolvable` on constraints touching unresolved fields → do not show as violations
 
@@ -120,7 +122,7 @@ Shane's direction is consistent with this. He names `Prospect` as the discrimina
 
 ### What `Prospect` must NOT carry
 
-`Prospect` should not carry payload explaining *why* a row is `Impossible`. That information lives in `TransitionInspection.Constraints` (constraint violations), `EventInspection.ArgErrors` (invalid args), or in the guard evaluation itself (guard failure is visible from the row having `Prospect.Impossible` with no constraint violations — the guard failed).
+`Prospect` should not carry payload explaining *why* a row is `Impossible`. That information lives in `TransitionInspection.Constraints` (constraint violations), `EventInspection.ArgErrors` (invalid args), or `TransitionInspection.GuardSummary` (guard failures / ambiguity).
 
 A consumer distinguishes "impossible because constraints fail" from "impossible because args are missing" from "impossible because no matching row" through the combination of `ArgErrors`, `TransitionInspection.Constraints`, and whether any `TransitionInspection` entries exist — not through `Prospect` variants.
 
@@ -148,13 +150,17 @@ public sealed record EventInspection(
 
 public sealed record TransitionInspection(
     Prospect Prospect,
-    TransitionKind Kind,                               // Transition | Apply | Reject
-    string? TargetState,                               // non-null when Kind = Transition
-    string? RejectReason,                              // non-null when Kind = Reject; from ExecutionRow.RejectReason
+    RowEffect Effect,                                  // TransitionTo | NoTransition | Rejection
+    string? GuardSummary,                              // Contract rule: all rule failure surfaces carry a human-readable description. GuardSummary fulfills this contract for guard failures.
     ImmutableArray<ConstraintResult> Constraints,
     ImmutableArray<FieldSnapshot> PostFields);         // projected post-state for this specific row
 
-public enum TransitionKind { Transition, Apply, Reject }
+public abstract record RowEffect
+{
+    public sealed record TransitionTo(string TargetState) : RowEffect;
+    public sealed record NoTransition() : RowEffect;
+    public sealed record Rejection(string Reason) : RowEffect;
+}
 
 public sealed record ArgError(
     string ArgName,
@@ -181,11 +187,11 @@ Unchanged from the evaluator shape. Per-row detail. Empty when `OverallProspect 
 **`EventEnsures`**  
 Unchanged. Event-scoped constraint results for `on<event>` constraints.
 
-**`TransitionKind`**  
-The current `TransitionInspection` has no way to distinguish a reject row from a no-transition row — both have `TargetState = null`. But a consumer rendering "what this row does" needs to know: "This row would reject with reason X" is meaningfully different from "This row would apply mutations without changing state." `TransitionKind` is a three-value enum (not a DU) because the fields are fixed and the consumer renders each case with a simple switch.
+**`RowEffect` (replaces `TransitionKind` enum + nullable strings)**  
+The original proposal used a `TransitionKind` enum with `string? TargetState` and `string? RejectReason` on `TransitionInspection`. Shane closed OQ-3 as the DU. `RowEffect` is adopted: `TransitionTo(TargetState)` encodes the target state directly, `NoTransition()` signals a non-transitioning row, and `Rejection(Reason)` carries the authored rejection message from `ExecutionRow.RejectReason` (CC#11). Consumers pattern-match on `Effect`. The nullable-string encoding is eliminated; the DU is self-describing and matches the source prototype shape.
 
-**`RejectReason`**  
-Carries `ExecutionRow.RejectReason` (from CC#11, already resolved) through to the inspection surface. Non-null when `Kind = Reject`. Gives the consumer the authored rejection message without catalog lookup.
+**`GuardSummary`**  
+A human-readable summary of the guard condition that was evaluated. Provided by the runtime when a guard fails or evaluates ambiguously. The UI renders this string directly — no DSL parsing required. Null when no guard applies or when the guard passed without ambiguity.
 
 ### What was removed from the LS shape (and why)
 
@@ -322,8 +328,8 @@ One line change. `version.Slots` is available before the loop; `BuildFieldSnapsh
 **2. Add `Prospect EvaluateGuardProspect(plan, slots, args?)`**  
 New method alongside the existing `bool EvaluateGuard(...)`. Same opcode walk, different result type. Requires that the opcode stack can carry a Kleene-Unknown signal — the simplest approach is to add a sentinel `PreceptValue` representing `Unknown` at the Kleene level, or use an out-of-band `bool guardIsPartial` flag alongside the binary result for the bootstrap approximation. Full Kleene-accurate implementation requires D8/R4 arg-dependency annotations; the conservative bootstrap is safe and reversible.
 
-**3. Add `TransitionKind` to `TransitionInspection` construction**  
-`ExecutionRow.Outcome` (the `TransitionOutcome` enum: Transition/NoTransition/Reject) is already in scope at the row evaluation site. Mapping it to `TransitionKind` is a trivial switch. `RejectReason` is already on `ExecutionRow` (CC#11 resolved).
+**3. Construct `RowEffect` for `TransitionInspection`**  
+`ExecutionRow.Outcome` (the `TransitionOutcome` enum: Transition/NoTransition/Reject) is already in scope at the row evaluation site. Map to `RowEffect`: `Transition` → `new RowEffect.TransitionTo(targetStateName)`, `NoTransition` → `new RowEffect.NoTransition()`, `Reject` → `new RowEffect.Rejection(row.RejectReason ?? "")`. `RejectReason` is already on `ExecutionRow` (CC#11 resolved).
 
 **4. Populate `EventEnsures`**  
 Currently passes an empty array (noted in `evaluator.md §7.2`). Evaluating `on<event>` constraints requires the `ConstraintPlanIndex` to carry event-keyed buckets. This is a planned gap, not introduced by CC#8.
@@ -345,7 +351,7 @@ The additional fields per `InspectFire` call (worst-case, 15 events, 40 fields):
 | `ArgErrors` | Empty `ImmutableArray<ArgError>.Empty` on the happy path — zero |
 | `CurrentFields` | One `FieldSnapshot[]` → `ImmutableArray<FieldSnapshot>` — same size as the current (broken) `FieldSnapshots` |
 
-The proposed changes do not increase the per-call allocation budget. The existing `PostFields` per `TransitionInspection` row is unchanged. `TransitionKind` is an enum field on the record — no allocation.
+The proposed changes do not increase the per-call allocation budget. The existing `PostFields` per `TransitionInspection` row is unchanged. `RowEffect` adds one small sealed record allocation per row — negligible at DSL scale.
 
 ### Performance
 
@@ -358,11 +364,13 @@ At DSL scale (10–50 fields, 5–15 events per state), `InspectFire` for the fu
 **OQ-1: `DeclaredArgs` or `RequiredArgs`?**  
 `ArgDescriptor` carries whether an arg is required or optional. The field name `DeclaredArgs` was chosen over `RequiredArgs` to include optional args (a consumer building an input form needs to know all declared args, not just required ones). If the team prefers `RequiredArgs` as a name for consistency with `Version.RequiredArgs(eventName)`, the content is the same.
 
-**OQ-2: `ArgError` granularity**  
-The proposed `ArgError(ArgName, Reason)` is a simple string reason. Should it carry a structured error code (parallel to `DiagnosticCode` in the compiler)? A structured code would allow LS/MCP to localize or stylize the error message. Recommendation: start with a string reason and add a code field when there's a concrete need.
+**OQ-2: `ArgError` granularity — CLOSED**  
+~~The proposed `ArgError(ArgName, Reason)` is a simple string reason. Should it carry a structured error code (parallel to `DiagnosticCode` in the compiler)? A structured code would allow LS/MCP to localize or stylize the error message. Recommendation: start with a string reason and add a code field when there's a concrete need.~~
 
-**OQ-3: `TransitionKind` vs sealed record DU**  
-`TransitionKind` is proposed as an enum because the fields `TargetState` and `RejectReason` are already on `TransitionInspection` as nullable strings. An alternative is a sealed DU `RowEffect`:
+> **Resolution (2026-05-06):** Closed. String `Reason` only — matches the field edit error pattern (`ConstraintViolation.Because`, `InvalidFields.Reason`). No `ArgErrorKind`.
+
+**OQ-3: `TransitionKind` vs sealed record DU — CLOSED**  
+~~`TransitionKind` is proposed as an enum because the fields `TargetState` and `RejectReason` are already on `TransitionInspection` as nullable strings. An alternative is a sealed DU `RowEffect`:~~
 ```csharp
 public abstract record RowEffect
 {
@@ -371,7 +379,9 @@ public abstract record RowEffect
     public sealed record Reject(string Reason) : RowEffect;
 }
 ```
-The DU is more type-safe (it eliminates the nullable-string ambiguity for `TargetState` and `RejectReason`), but requires pattern matching at every consumer. The enum approach keeps pattern matching optional. Frank's slight preference: DU, because the nullable-string encoding is a footgun. George's preference: enum, because the consumer surface is simpler. **Pending Shane's call.**
+~~The DU is more type-safe (it eliminates the nullable-string ambiguity for `TargetState` and `RejectReason`), but requires pattern matching at every consumer. The enum approach keeps pattern matching optional. Frank's slight preference: DU, because the nullable-string encoding is a footgun. George's preference: enum, because the consumer surface is simpler. **Pending Shane's call.**~~
+
+> **Resolution (2026-05-06):** Closed. DU adopted — `RowEffect { TransitionTo(TargetState), NoTransition, Rejection(Reason) }`. Matches source prototype. Nullable string fields (`string? TargetState`, `string? RejectReason`) removed from `TransitionInspection`; consumers pattern-match on `Effect`.
 
 **OQ-4: `EventEnsures` timing**  
 `on<event>` constraint evaluation requires evaluating against the post-mutation working copy. Which row's working copy? For a `Certain` outcome, it is the winning row's. For a `Possible` outcome with multiple potentially-matching rows, there is no canonical working copy. Frank's view: `EventEnsures` should move inside `TransitionInspection` (evaluated per-row against that row's post-mutation state). George's view: this changes the public API shape in a way that may surprise consumers who expect `EventEnsures` to be event-level. **Pending Shane's call on scope level.**
@@ -424,8 +434,9 @@ The LS can serialize `EventInspection` directly from the runtime result with no 
 | Field | Current `TransitionInspection` | Proposed | Δ |
 |-------|---------------------------------|----------|---|
 | `Prospect` | `Prospect Prospect` | `Prospect Prospect` | — |
-| Target state | `string? TargetState` | `string? TargetState` | — |
-| Row effect kind | absent | `TransitionKind Kind` | **+** |
-| Reject reason | absent | `string? RejectReason` | **+** |
+| Target state | `string? TargetState` | ~~removed~~ (now inside `RowEffect.TransitionTo`) | **−** |
+| Row effect kind | absent | `RowEffect Effect` | **+** |
+| Reject reason | absent | ~~removed as standalone field~~ (now inside `RowEffect.Rejection`) | **−/+** |
+| Guard summary | absent | `string? GuardSummary` (`null` when guard passed / no guard; populated when guard failed or was ambiguous) | **+** |
 | Constraints | `ImmutableArray<ConstraintResult> Constraints` | `ImmutableArray<ConstraintResult> Constraints` | — |
 | Post-state fields | `ImmutableArray<FieldSnapshot> PostFields` | `ImmutableArray<FieldSnapshot> PostFields` | — |

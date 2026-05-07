@@ -14,7 +14,7 @@
 
 The runtime uses three type families to represent operation results:
 
-1. **EventOutcome** (7 variants) — returned by `Version.Fire`. One committed result.
+1. **EventOutcome** (8 variants) — returned by `Version.Fire`. One committed result.
 2. **UpdateOutcome** (4 variants) — returned by `Version.Update`. One committed result.
 3. **Inspection types** (EventInspection, UpdateInspection) — returned by `Version.InspectFire` and `Version.InspectUpdate`. Progressive annotated landscape.
 
@@ -23,7 +23,7 @@ Faults (evaluator-level errors the type checker should have prevented) throw `Fa
 ## Responsibilities and Boundaries
 
 **OWNS**
-- The sealed result type hierarchies for commit operations: `EventOutcome` (7 variants) and `UpdateOutcome` (4 variants)
+- The sealed result type hierarchies for commit operations: `EventOutcome` (8 variants) and `UpdateOutcome` (4 variants)
 - The inspection type family: `EventInspection`, `UpdateInspection`, `TransitionInspection`
 - Shared primitives: `FieldSnapshot`, `ConstraintResult`
 - The `Prospect` and `ConstraintStatus` enums and their propagation rules
@@ -64,29 +64,37 @@ Sealed hierarchy. Callers pattern-match; any unhandled variant produces a compil
 ```csharp
 public abstract record EventOutcome
 {
-    public sealed record Transitioned(Version Result, FiredArgs Args) : EventOutcome;
-    public sealed record Applied(Version Result, FiredArgs Args) : EventOutcome;
+    public sealed record Transitioned(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;
+    public sealed record Applied(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;
     public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;
     public sealed record InvalidArgs(string Reason) : EventOutcome;
     public sealed record ConstraintsFailed(ImmutableArray<ConstraintViolation> Violations) : EventOutcome;
-    public sealed record Unmatched() : EventOutcome;
+    public sealed record Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows) : EventOutcome;
     public sealed record UndefinedEvent() : EventOutcome;
+    public sealed record Faulted(Fault Fault) : EventOutcome;
 }
 ```
 
 | Variant | Meaning | Pipeline stage | Stateless reachable? |
 |---------|---------|----------------|---------------------|
-| `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted | Stage 10 commit | No (no states) |
-| `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted | Stage 10 commit | Yes |
+| `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Stage 10 commit | No (no states) |
+| `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Stage 10 commit | Yes |
 | `Rejected` | Authored `reject` row matched — business prohibition; `Args` carries what was submitted | Stage 4-5 (reject row) | Yes |
 | `InvalidArgs` | Arg validation failure — wrong type, unknown key | Stage 2 (arg validation) | Yes |
 | `ConstraintsFailed` | Post-mutation constraints violated (rules, state ensures, event ensures) | Stage 9-10 | Yes |
-| `Unmatched` | All guards failed (including `when` precondition) — no row matched | Stage 4-5 | Yes |
+| `Unmatched` | All guards failed (including `when` precondition) — no row matched; `EvaluatedRows` carries per-candidate guard trace | Stage 4-5 | Yes |
 | `UndefinedEvent` | No transition rows or hooks for this event in current state | Stage 1 | Yes |
+| `Faulted` | Evaluator impossible path — a `Fault` that the type checker should have prevented (programmer error, not a business outcome) | Backstop | Yes |
 
 **`Rejected` vs `InvalidArgs`:** `Rejected` is a business decision authored in the precept (`-> reject "reason"`). `InvalidArgs` is a caller error — the args don't match the event's declared contract. Parallel with `UpdateOutcome.InvalidFields`. DDD's "business rejection vs. invalid input" distinction.
 
 **`EventOutcome.ConstraintsFailed` scope:** Covers ALL post-fire constraints: global rules, state ensures (`in`/`to`/`from`), AND event ensures. The containing DU (`EventOutcome`) identifies which operation produced the failure; no operation-type prefix is needed on the variant itself.
+
+**`Transitioned` and `Applied` mutations:** `Mutations` is always populated on success — callers never need a second `InspectFire` call to get before/after field diffs. The evaluator computes the diff against the working copy it already maintains during execution.
+
+**`Unmatched` trace:** `EvaluatedRows` uses the same `TransitionInspection` type as `EventInspection.Transitions`, making inspect and commit paths type-consistent. Callers who want to understand why no row matched get the full per-candidate guard trace at no extra cost — guard evaluation was already running during the commit pass.
+
+**`Faulted` semantics:** A `Fault` represents an evaluator-internal impossible path (e.g., referencing an undeclared field, ambiguous dispatch) that the type checker should have caught. `Faulted` surfaces this as a structured outcome variant rather than a raw exception at the runtime boundary. See `fault-system.md` for the `Fault` type definition. MCP `precept_fire` serializes `Faulted` as `{ "outcome": "Faulted", "fault": { ... } }`.
 
 ---
 
@@ -153,16 +161,22 @@ Where "Unknown" = the expression references an arg not yet provided.
 
 ```csharp
 public sealed record EventInspection(
-    Prospect OverallProspect,
-    ImmutableArray<TransitionInspection> Transitions,
-    ImmutableArray<ConstraintResult> EventEnsures,
-    ImmutableArray<FieldSnapshot> FieldSnapshots);
+    string EventName,                                   // self-describing — essential when embedded in UpdateInspection.Events
+    Prospect OverallProspect,                          // Certain | Possible | Impossible
+    ImmutableArray<ArgDescriptor> DeclaredArgs,        // arg contract for this event — drives UX input form rendering
+    ImmutableArray<ArgError> ArgErrors,                // non-empty when provided args are structurally invalid
+    ImmutableArray<FieldSnapshot> CurrentFields,       // pre-mutation field state — captured once before row loop
+    ImmutableArray<TransitionInspection> Transitions,  // per-row inspection detail; empty = UndefinedEvent
+    ImmutableArray<ConstraintResult> EventEnsures);    // on<event> constraint results
 ```
 
-- `OverallProspect` — reduced from Transitions: if any transition is `Certain` or `Possible`, the event is enabled.
+- `EventName` — makes each `EventInspection` self-describing regardless of access path. When embedded inside `UpdateInspection.Events`, consumers correlate results to events without a separate lookup.
+- `OverallProspect` — reduced from Transitions: if any transition is `Certain` or `Possible`, the event is enabled. Forced to `Impossible` when `ArgErrors` is non-empty.
+- `DeclaredArgs` — the full arg contract from `EventDescriptor.ArgDescriptors`, including both required and optional args. Consumers rendering an input form need all declared args, not just required ones.
+- `ArgErrors` — populated when provided args fail structural validation (type mismatch, unknown keys, etc.). When non-empty, guard/constraint evaluation is not invoked; the evaluator returns directly with `OverallProspect = Impossible`.
+- `CurrentFields` — pre-mutation snapshot of all fields, captured *once* before the row evaluation loop. This is the entity's current state at the time of inspection. Consumers use it alongside per-row `PostFields` to show before/after comparisons. (Renamed from `FieldSnapshots` to fix a latent bug where the value was overwritten per-row iteration.)
 - `Transitions` — empty list = undefined event (no rows/hooks for this event in current state).
-- `EventEnsures` — event-scoped ensures, individually annotated.
-- `FieldSnapshots` — current field values at the time of inspection.
+- `EventEnsures` — event-scoped `on<event>` constraint results. Currently passes empty array until the constraint plan index is wired for event-keyed inspection. **OQ-4 (pending):** whether `EventEnsures` should move inside `TransitionInspection` (per-row, evaluated against each row's post-mutation state) or remain event-level.
 
 Returned by `Version.InspectFire(eventName, args?)`. Also nested inside `UpdateInspection.Events`.
 
@@ -187,17 +201,52 @@ Returned by `Version.InspectUpdate(fields?)`. When called with no patch, returns
 ```csharp
 public sealed record TransitionInspection(
     Prospect Prospect,
-    string? TargetState,
+    RowEffect Effect,                                  // TransitionTo | NoTransition | Rejection
+    string? GuardSummary,                              // null = guard passed or no guard; populated = guard failed or ambiguous
     ImmutableArray<ConstraintResult> Constraints,
     ImmutableArray<FieldSnapshot> PostFields);
 ```
 
+- `Prospect` — would this row fire? `Certain` when guard passed and all constraints satisfied; `Possible` when guard evaluation is ambiguous due to missing args; `Impossible` when guard failed or constraints violated.
+- `Effect` — a discriminated union encoding the row's outcome kind. Replaces the previous `string? TargetState` nullable encoding. Consumers pattern-match on `Effect` to determine transition target, no-transition, or rejection. See `RowEffect` below.
+- `GuardSummary` — human-readable description of the guard condition. All rule failure surfaces carry a human-readable description (contract rule). `null` when no guard applies or when the guard passed without ambiguity. Populated by the runtime when the guard fails or evaluates to `Possible` (ambiguous due to missing args).
 - `PostFields` — ALL non-omitted fields in the target state, post-mutation + recomputation. Fields whose access mode changes upon transition reflect the target state's mode.
-- `TargetState` — the state this transition would enter; `null` for no-transition rows.
+- `Constraints` — constraint evaluation results for this specific row.
+
+### RowEffect
+
+```csharp
+public abstract record RowEffect
+{
+    public sealed record TransitionTo(string TargetState) : RowEffect;
+    public sealed record NoTransition() : RowEffect;
+    public sealed record Rejection(string Reason) : RowEffect;
+}
+```
+
+A discriminated union encoding what a transition row does upon firing. Constructed from `ExecutionRow.Outcome`:
+- `Transition` → `RowEffect.TransitionTo(targetStateName)` — the row transitions the entity to a new state.
+- `NoTransition` → `RowEffect.NoTransition()` — the row fires actions without changing state.
+- `Reject` → `RowEffect.Rejection(row.RejectReason ?? "")` — the row rejects with a human-readable reason from the `because` clause (CC#11).
+
+### ArgError
+
+```csharp
+public sealed record ArgError(
+    string ArgName,
+    string Reason);
+```
+
+Reported when provided event args fail structural validation before the evaluator is invoked. `Reason` is a plain string (e.g., "expected integer, got string") — matches the field edit error pattern (`ConstraintViolation.Because`, `InvalidFields.Reason`). No structured error code; one can be added when a concrete need arises.
 
 ### Shared Primitives
 
 ```csharp
+public sealed record FieldMutation(
+    string FieldName,
+    JsonElement? Before,
+    JsonElement? After);
+
 public sealed record FieldSnapshot(
     string FieldName,
     FieldAccessMode Mode,
@@ -211,6 +260,8 @@ public sealed record ConstraintResult(
     IReadOnlyList<string> FieldNames,
     ConstraintStatus Status);
 ```
+
+**`FieldMutation`:** Carries a single field's before/after diff for successful `Transitioned` and `Applied` outcomes. `Before` is `null` for fields that were unset prior to the event; `After` is `null` for fields cleared by the event. Both are `JsonElement?` to match the existing `FieldSnapshot.Value` JSON representation. Only fields whose value actually changed appear in the `Mutations` array — unchanged fields are omitted.
 
 **`FieldSnapshot.IsResolved`:** `false` when the post-mutation value could not be computed because a required arg dependency is missing. `Value` is `null` when `IsResolved == false` (unresolved computed field or structurally absent). Prevents ambiguity between genuinely-null optional fields (`IsResolved = true, Value` is a JSON null) and stuck assignments.
 
@@ -361,6 +412,8 @@ Guard evaluation under partial args must use Kleene three-value logic. Compariso
 - `EventInspection.cs` — inspection result type
 - `UpdateInspection.cs` — inspection result type
 - `TransitionInspection.cs` — transition-level inspection (replaces `RowInspection.cs`)
+- `RowEffect.cs` — discriminated union for transition row outcome kind
+- `ArgError.cs` — arg validation error record
 - `FieldSnapshot.cs` — shared primitive
 - `ConstraintResult.cs` — shared primitive
 - `FiredArgs.cs` — event arg egress; appears on Transitioned, Applied, Rejected

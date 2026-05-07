@@ -625,6 +625,8 @@ public sealed record TypedEvent(
 
 Preview is a non-standard LSP extension that enables the VS Code extension's preview webview. It shows what each event would do if fired, without actually executing it.
 
+The LS is a thin wrapper: it serializes the runtime result directly. It does not compute, diff, generate prose, or patch field names. `EventName` is on every `EventInspection` from the runtime — no name-patching needed.
+
 ```csharp
 // Custom request type
 [Method("precept/inspect")]
@@ -639,44 +641,32 @@ record InspectParams(
 InspectResult? HandleInspect(InspectParams p)
 {
     var state = _documents[p.Uri];
-    if (state.Precept is not { } precept) return null;  // Only when error-free
+    if (state.Precept is not { } precept) return null;
     
-    // Build version from provided data
     var version = BuildVersion(precept, p.CurrentState, p.Data);
     
-    // If event specified, inspect that event
     if (p.Event is not null)
     {
-        var args = p.EventArgs ?? new();
-        var inspection = precept.Inspect(version, p.Event, args);
-        return MapToResult(inspection);
+        // Single event inspection — args optional
+        var args = BuildArgs(p.EventArgs);  // JSON lane; null if not provided
+        return Serialize(version.InspectFire(p.Event, args));
     }
     
-    // Otherwise, return inspection of all available events
-    var inspections = precept.Events
-        .Select(e => precept.Inspect(version, e.Name, new()))
-        .ToArray();
-    return MapToResult(inspections);
+    // Full landscape — one call returns all EventInspection via UpdateInspection.Events
+    return Serialize(version.InspectUpdate(null));
 }
 ```
 
-**EventInspection Shape** (from evaluator):
+**Canonical `EventInspection` shape:** Defined in `docs/runtime/result-types.md`. The runtime produces a complete, self-describing `EventInspection` with `EventName`, `DeclaredArgs`, `ArgErrors`, `CurrentFields` (pre-mutation, captured once before row loop), `Transitions` (each with `RowEffect`, `GuardSummary`, and `PostFields`), and `EventEnsures`. The LS handler serializes this result without transformation.
 
-```csharp
-public sealed record EventInspection(
-    string EventName,
-    Prospect Outcome,          // Certain, Possible, Impossible
-    string? Explanation,       // Why this outcome
-    ImmutableArray<TransitionRowInspection> Rows,
-    ImmutableArray<FieldSnapshot> BeforeFields,
-    ImmutableArray<FieldSnapshot> AfterFields);
+**What was removed from the LS surface:**
+- `Explanation` — prose generation is a display concern, not a data contract. The webview synthesizes display text from the structured result.
+- `BeforeFields` / `AfterFields` — superseded by `CurrentFields` (pre-mutation, top-level) + `TransitionInspection.PostFields` (per-row projected post-state). The previous shape collapsed per-row post-state into a single `AfterFields`, losing the distinction between rows.
+- `MapToResult(inspection)` enrichment — eliminated. The runtime result is the primary artifact; LS and MCP serialize, they do not compute.
 
-public enum Prospect { Certain, Possible, Impossible }
-```
-
-> **Open Question:** `EventInspection` canonical shape
-> language-server.md still documents `BeforeFields`/`AfterFields`, while evaluator.md describes `EventEnsures` plus per-row `ConstraintResult` data. The inspection surface needs one canonical shape so preview rendering and evaluator output do not drift.
-> *Flagged: 2026-05-04*
+**Calling patterns:**
+- `version.InspectFire(eventName, args?)` — single-event inspection with optional args
+- `version.InspectUpdate(null)` — full landscape; `UpdateInspection.Events` contains a complete `EventInspection` for every event in the current state
 
 The extension calls `precept/preview` whenever the user changes preview state, then renders the result in the preview webview. See `docs/tooling/extension.md` for the webview side.
 

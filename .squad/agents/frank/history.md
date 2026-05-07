@@ -12,6 +12,7 @@
 
 ## Learnings
 
+- CC#8 canonicalization complete (2026-05-06): propagated `event-inspection-proposal.md` into four canonical docs (`result-types.md`, `evaluator.md`, `language-server.md`, `mcp.md`), updated CC#8 references in cross-cutting-decisions.md to point at canonical homes, and archived the working proposal. OQ-4 (EventEnsures timing) remains pending Shane's call. Pattern: when canonicalizing a working proposal, update all downstream docs in one pass, verify CC references point at canonical homes not the proposal, then archive.
 - Mini-spec track complete (2026-05-05): `docs/working/runtime-api-public-surface-spec.md` §3.4 was corrected to align with the locked value-type surface (`currency`, `money`, and `quantity` fixed; internal `Unit` removed; `unitofmeasure`, `dimension`, `price`, and `exchangerate` added), and §12 OQ-3d/OQ-3e now reflect the resolved shapes.
 - Completed mini-spec track: wrote the full inbox drop covering all 17 locked §11 runtime-API decisions plus the OQ resolutions, type contracts, visibility decisions, and supersession markers needed to retire stale `RestoreOutcome`, `ConstraintViolation.FailingValue`, and raw-indexer guidance.
 - Inbox completeness audit (2026-05-05): the existing inbox batch targeted the value-types investigation rather than the runtime API mini-spec. Treat wrong-session inbox drift as a real failure mode and verify the target artifact before assuming the inbox is complete.
@@ -21,6 +22,12 @@
 - Next up: apply 41 canonical doc fixes — `runtime-api.md` (18 findings), `result-types.md` (11), `descriptor-types.md` (4), `evaluator.md` (4), `precept-builder.md` (5), and `business-domain-types.md` (5).
 
 ## Recent Updates
+
+## Frank-159 — GuardSummary contract update
+[2026-05-06]
+Task: Added GuardSummary to TransitionInspection per OQ-5 ruling. Broader contract principle: all failure surfaces carry human-readable descriptions.
+
+---
 
 ## Frank-158 — CC#8 proposal update
 [2026-05-06]

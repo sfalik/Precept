@@ -213,10 +213,13 @@ public abstract record UpdateOutcome
 
 ```csharp
 public sealed record EventInspection(
+    string EventName,                                          // Self-describing — no name-patching needed by consumers
     Prospect OverallProspect,                                  // Certain | Possible | Impossible
+    ImmutableArray<ArgDescriptor> DeclaredArgs,               // Arg contract from EventDescriptor.ArgDescriptors
+    ImmutableArray<ArgError> ArgErrors,                        // Non-empty when provided args are structurally invalid
+    ImmutableArray<FieldSnapshot> CurrentFields,              // Pre-mutation field state — captured once before row loop
     ImmutableArray<TransitionInspection> Transitions,         // Per-row inspection detail
-    ImmutableArray<ConstraintResult> EventEnsures,            // Event-level constraint results
-    ImmutableArray<FieldSnapshot> FieldSnapshots              // Post-mutation field values
+    ImmutableArray<ConstraintResult> EventEnsures             // Event-level constraint results
 );
 ```
 
@@ -225,10 +228,22 @@ public sealed record EventInspection(
 ```csharp
 public sealed record TransitionInspection(
     Prospect Prospect,                                         // Would this row fire?
-    string? TargetState,                                       // null = no-transition or rejection
+    RowEffect Effect,                                          // TransitionTo | NoTransition | Rejection
+    string? GuardSummary,                                      // null = guard passed / no guard; populated = guard failed or ambiguous
     ImmutableArray<ConstraintResult> Constraints,             // Constraint evaluation results
     ImmutableArray<FieldSnapshot> PostFields                  // Projected field values post-mutation
 );
+
+public abstract record RowEffect
+{
+    public sealed record TransitionTo(string TargetState) : RowEffect;
+    public sealed record NoTransition() : RowEffect;
+    public sealed record Rejection(string Reason) : RowEffect;
+}
+
+public sealed record ArgError(
+    string ArgName,
+    string Reason);
 
 public enum Prospect { Certain = 1, Possible = 2, Impossible = 3 }
 public enum ConstraintStatus { Satisfied = 1, Violated = 2, Unresolvable = 3 }
@@ -538,32 +553,70 @@ See `runtime-api.md` § Restoration for the full behavioral specification.
 
 #### InspectFire(event, args)
 
-Returns `EventInspection` — one `RowInspection` per declared transition row for the current state/event:
+Returns `EventInspection` — one `TransitionInspection` per declared transition row for the current state/event:
 
 ```csharp
 EventInspection InspectFire(Precept precept, Version version, EventDescriptor @event, FiredArgs? args)
 {
+    var eventName = @event.Name;
+    var declaredArgs = @event.ArgDescriptors;
+
+    // ── Arg validation gate ──────────────────────────────────────
+    // Args validated before evaluator is invoked. On failure, return directly
+    // with Impossible prospect and populated ArgErrors — no guard/constraint evaluation.
+    if (args is not null)
+    {
+        var argErrors = ValidateArgs(args, @event.ArgDescriptors);
+        if (argErrors.Length > 0)
+            return new EventInspection(eventName, Prospect.Impossible, declaredArgs, argErrors, [], [], []);
+    }
+
+    // ── Dispatch lookup ──────────────────────────────────────────
     if (!precept.DispatchIndex.Rows.TryGetValue((version.CurrentState, @event), out var rows))
-        return new EventInspection(Prospect.Impossible, [], [], []);
+        return new EventInspection(eventName, Prospect.Impossible, declaredArgs, [], [], [], []);
     
+    // ── CurrentFields: captured once before row loop (fixes latent bug) ──
+    // Previously FieldSnapshots was overwritten per-row; the final EventInspection
+    // received only the last row's projected post-state. CurrentFields is the
+    // pre-mutation snapshot, captured here, stable across all rows.
+    var currentFields = BuildFieldSnapshots(version.Slots, precept.Fields, version.CurrentState);
+
     var transitionInspections = new List<TransitionInspection>();
     var overallProspect = Prospect.Impossible;
     ExecutionRow? winningRow = null;
     
     foreach (var row in rows)
     {
-        // Evaluate guard (FiredArgs.Empty if no args provided — no event args means no arg-dependent guards)
-        var guardResult = row.Guard == null || EvaluateGuard(row.Guard, version.Slots, args ?? FiredArgs.Empty);
+        // ── Guard evaluation ─────────────────────────────────────
+        // Inspect path uses EvaluateGuardProspect (Kleene ternary), not EvaluateGuard (bool).
+        // Missing args → Unknown → propagates via Kleene truth table to Possible.
+        // Full args → standard binary evaluation (Certain or Impossible).
+        Prospect guardProspect;
+        string? guardSummary = null;
+
+        if (row.Guard == null)
+        {
+            guardProspect = Prospect.Certain;
+        }
+        else
+        {
+            guardProspect = EvaluateGuardProspect(row.Guard, version.Slots, args);
+            if (guardProspect == Prospect.Impossible)
+                guardSummary = SummarizeGuard(row.Guard);   // Human-readable guard description
+            else if (guardProspect == Prospect.Possible)
+                guardSummary = SummarizeGuard(row.Guard);   // Ambiguous — show the guard expression
+        }
         
-        if (!guardResult)
+        if (guardProspect == Prospect.Impossible)
         {
             // Guard failed — row is impossible
+            var effect = BuildRowEffect(row);
             transitionInspections.Add(new TransitionInspection(
-                Prospect.Impossible, row.TargetState?.Name, [], []));
+                Prospect.Impossible, effect, guardSummary, [], []));
             continue;
         }
         
-        // Guard passed — simulate execution
+        // Guard passed or is ambiguous — simulate execution
         var workingCopy = version.Slots.ToArray();
         foreach (var action in row.Actions)
             ExecuteAction(action, workingCopy, args ?? FiredArgs.Empty);
@@ -573,9 +626,15 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
         
         var violations = EvaluateFireConstraints(...);
         var constraintResults = BuildConstraintResults(violations, ...);
-        var fieldSnapshots = BuildFieldSnapshots(workingCopy, precept.Fields);
+        var postFields = BuildFieldSnapshots(workingCopy, precept.Fields);
+        var effect = BuildRowEffect(row);
         
-        var prospect = violations.Count == 0 ? Prospect.Certain : Prospect.Impossible;
+        var prospect = (guardProspect, violations.Count) switch
+        {
+            (Prospect.Certain, 0) => Prospect.Certain,
+            (Prospect.Possible, 0) => Prospect.Possible,
+            _ => Prospect.Impossible
+        };
         
         // Track if this row would win
         if (prospect == Prospect.Certain && winningRow == null)
@@ -586,27 +645,55 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
         }
         else if (prospect == Prospect.Certain && winningRow != null)
         {
-            // Multiple candidates — ambiguous
+            overallProspect = Prospect.Possible;   // Multiple candidates — ambiguous
+        }
+        else if (prospect == Prospect.Possible && overallProspect == Prospect.Impossible)
+        {
             overallProspect = Prospect.Possible;
         }
         
         transitionInspections.Add(new TransitionInspection(
-            prospect, row.TargetState?.Name, constraintResults, fieldSnapshots));
+            prospect, effect, guardSummary, constraintResults, postFields));
     }
     
-    return new EventInspection(overallProspect, transitionInspections, [], fieldSnapshots);
+    return new EventInspection(eventName, overallProspect, declaredArgs, [], currentFields, transitionInspections, []);
 }
+
+// ── RowEffect construction ───────────────────────────────────────
+// Maps ExecutionRow.Outcome to the RowEffect DU:
+RowEffect BuildRowEffect(ExecutionRow row) => row.Outcome switch
+{
+    TransitionOutcome.Transition => new RowEffect.TransitionTo(row.TargetState!.Name),
+    TransitionOutcome.NoTransition => new RowEffect.NoTransition(),
+    TransitionOutcome.Reject => new RowEffect.Rejection(row.RejectReason ?? ""),
+};
 ```
+
+**`EvaluateGuardProspect` — Kleene ternary guard evaluation for the inspect path:**
+
+The commit path calls `EvaluateGuard(plan, slots, args)` → `bool`. The inspect path calls `EvaluateGuardProspect(plan, slots, args?)` → `Prospect`, which implements Kleene three-value logic:
+
+- Any `LOAD_ARG` opcode for a missing arg produces `Unknown` at the Kleene level
+- The stack machine propagates `Unknown` through boolean operators per the truth table documented in `result-types.md` § Kleene Propagation Rules
+- The final result maps: `true` → `Certain`, `false` → `Impossible`, `Unknown` → `Possible`
+- When `args` is fully provided, `EvaluateGuardProspect` produces the same binary result as `EvaluateGuard` (no `Unknown` values enter the stack)
+
+**Bootstrap path before D8/R4 ships:** Without per-node arg-dependency sets, the evaluator implements a conservative approximation: any expression referencing any arg (detected by attempting evaluation and catching the absent-arg condition) → mark that guard expression as `Unknown → Possible`. This is conservative (may over-report `Possible`) but never wrong. When D8/R4 ships, the precise Kleene evaluation replaces the approximation automatically.
+
+**`DeclaredArgs` population:** Read directly from `EventDescriptor.ArgDescriptors` — one array reference, zero computation. Includes both required and optional args so consumers can render a complete input form.
+
+**`ArgError` collection path:** At the `Version.InspectFire` API boundary, arg validation runs against `EventDescriptor.ArgDescriptors` before the evaluator is invoked. If validation produces errors, the evaluator is not called; the API returns `EventInspection(EventName, Impossible, DeclaredArgs, argErrors, [], [], [])` directly. This matches the commit path where `Fire` returns `EventOutcome.InvalidArgs(reason)` on arg validation failure.
 
 **Multiple-candidate handling:** When inspection finds more than one passing row, `overallProspect` is set to `Possible`. Inspection and commit must stay aligned — when the runtime would produce an `AmbiguousDispatch` fault, inspection reports `Possible` rather than `Certain`.
 
-**Event-level ensures:** `EventEnsures` in `EventInspection` carries event-scoped constraint results (`on<event>` constraints). Population requires evaluating the event ensures against the post-mutation working copy — currently passes empty array until the constraint plan index is wired for inspection.
+**Event-level ensures:** `EventEnsures` in `EventInspection` carries event-scoped constraint results (`on<event>` constraints). Population requires evaluating the event ensures against the post-mutation working copy — currently passes empty array until the constraint plan index is wired for inspection. **OQ-4 (pending):** whether `EventEnsures` should move inside `TransitionInspection` (per-row) or remain event-level. Pending Shane's call.
 
 It evaluates every declared row, not just the winning candidate. Each `TransitionInspection` describes:
-- `Prospect`: Did the guard pass and all constraints satisfy?
+- `Prospect`: Did the guard pass and all constraints satisfy? (`Certain` / `Possible` / `Impossible`)
+- `Effect`: The row's outcome kind — `TransitionTo(TargetState)`, `NoTransition()`, or `Rejection(Reason)`
+- `GuardSummary`: Human-readable guard description when the guard failed or was ambiguous; `null` when passed or absent
 - `Constraints`: Which constraints were evaluated and their results
 - `PostFields`: Projected field values if this row were to fire
-- `TargetState`: The state this row would transition to (`null` for no-transition or reject rows)
 
 #### InspectUpdate(patch)
 
@@ -1865,7 +1952,7 @@ This matrix summarizes which constraint buckets and access-mode checks apply to 
 | `src/Precept/Runtime/Version.cs` | Entity instance — Fire, Update, InspectFire, InspectUpdate, ToJson façade |
 | `src/Precept/Runtime/EventOutcome.cs` | Fire and Create outcome DU (with nested variants) |
 | `src/Precept/Runtime/UpdateOutcome.cs` | Update outcome DU (with nested variants) |
-| `src/Precept/Runtime/Inspection.cs` | Inspection types (`EventInspection`, `UpdateInspection`, `TransitionInspection`, `ConstraintResult`, `FieldSnapshot`) |
+| `src/Precept/Runtime/Inspection.cs` | Inspection types (`EventInspection`, `UpdateInspection`, `TransitionInspection`, `RowEffect`, `ArgError`, `ConstraintResult`, `FieldSnapshot`) |
 | `src/Precept/Runtime/SharedTypes.cs` | `ConstraintViolation`, `ConstraintDescriptor`, `FieldAccessInfo`, `FieldAccessMode` |
 | `src/Precept/Runtime/Descriptors.cs` | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` |
 | `src/Precept/Language/FaultCode.cs` | `FaultCode` enum with `[StaticallyPreventable]` attributes |
