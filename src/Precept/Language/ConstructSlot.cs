@@ -31,4 +31,5 @@ public enum ConstructSlotKind
 public sealed record ConstructSlot(
     ConstructSlotKind Kind,
     bool              IsRequired = true,
-    string?           Description = null);
+    string?           Description = null,
+    TokenKind[]?      TerminationTokens = null);

@@ -10,8 +10,9 @@ public static partial class Parser
         // ═══════════════════════════════════════════════════════════════════════════════
         //  Pratt Expression Parser
         //
-        //  Standard nud/led algorithm driven by binding powers from Operators catalog.
-        //  Termination predicates are passed per-slot to stop at context-sensitive
+        //  Standard nud/led algorithm driven by binding powers from the Operators
+        //  and ExpressionForms catalogs. Termination predicates are passed per-slot
+        //  to stop at context-sensitive
         //  boundaries (when, because, ->, construct leading tokens, etc.).
         // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -140,14 +141,13 @@ public static partial class Parser
         /// </summary>
         private (int LeftBp, int RightBp) GetLedBindingPower(TokenKind kind)
         {
-            // Dot (member access) has highest led binding power
-            if (kind == TokenKind.Dot)
-                return (80, 81);
+            var ledForm = ExpressionForms.LedForms.FirstOrDefault(form => form.LeadTokens.Contains(kind));
+            if (ledForm?.BindingPower is { } bindingPower)
+                return bindingPower;
 
-            // Is (postfix: is set / is not set) — requires full token-sequence check.
-            // peek1 == Not is only valid when peek2 == Set; anything else (e.g. "is not valid")
-            // must return (-1,-1) to stop the led loop — otherwise ParsePostfixIs bails without
-            // consuming tokens and the loop spins forever.
+            // Multi-token postfix operators still need token-sequence validation here:
+            // the ExpressionForms catalog knows that `is` starts a postfix form, but only
+            // the parser can tell whether the actual token stream is `is set` / `is not set`.
             if (kind == TokenKind.Is)
             {
                 var peek1 = Peek(1).Kind;
@@ -160,7 +160,8 @@ public static partial class Parser
                 return (-1, -1);
             }
 
-            // Single-token binary operators
+            // Binary operators continue to derive binding power from the Operators
+            // catalog because precedence and associativity are already metadata there.
             if (Operators.ByToken.TryGetValue((kind, Arity.Binary), out var meta))
             {
                 var leftBp = meta.Precedence;
@@ -375,22 +376,48 @@ public static partial class Parser
         // ── Interpolated string handling ────────────────────────────────────────
 
         [HandlesCatalogMember(ExpressionFormKind.Literal)]
+        [HandlesCatalogMember(ExpressionFormKind.InterpolatedString)]
         private ParsedExpression ParseInterpolatedString()
         {
             var startToken = Advance(); // consume StringStart
+            var segments = ImmutableArray.CreateBuilder<InterpolationSegment>();
+
+            // Add the initial text segment (the text before the first hole)
+            segments.Add(new TextSegment(startToken.Text, startToken.Span));
             var lastSpan = startToken.Span;
 
-            // Advance through interpolation segments until StringEnd
+            // Process segments until StringEnd
             while (!IsAtEnd && Peek().Kind != TokenKind.StringEnd)
             {
-                lastSpan = Advance().Span;
+                if (Peek().Kind == TokenKind.StringMiddle)
+                {
+                    // Text between holes
+                    var middleToken = Advance();
+                    segments.Add(new TextSegment(middleToken.Text, middleToken.Span));
+                    lastSpan = middleToken.Span;
+                }
+                else
+                {
+                    // An embedded expression (hole)
+                    // Parse expression until we hit StringMiddle or StringEnd
+                    var holeExpr = ParseExpression(0, () =>
+                        Peek().Kind == TokenKind.StringMiddle ||
+                        Peek().Kind == TokenKind.StringEnd);
+                    segments.Add(new HoleSegment(holeExpr, holeExpr.Span));
+                    lastSpan = holeExpr.Span;
+                }
             }
 
+            // Consume the StringEnd token (the text after the last hole)
             if (Peek().Kind == TokenKind.StringEnd)
-                lastSpan = Advance().Span;
+            {
+                var endToken = Advance();
+                segments.Add(new TextSegment(endToken.Text, endToken.Span));
+                lastSpan = endToken.Span;
+            }
 
-            return new LiteralExpression(
-                TokenKind.StringStart, startToken.Text,
+            return new InterpolatedStringExpression(
+                segments.ToImmutable(),
                 SourceSpan.Covering(startToken.Span, lastSpan));
         }
 
@@ -438,16 +465,16 @@ public static partial class Parser
         //  Slot-level entry points — called from Parser.cs slot dispatch
         // ═══════════════════════════════════════════════════════════════════════════════
 
+        private bool IsAtSlotTermination(ConstructSlot slot) =>
+            (slot.TerminationTokens?.Contains(Peek().Kind) ?? false) || IsAtConstructBoundary();
+
         private SlotValue ParseRuleExpression(ConstructSlot slot)
         {
             if (IsAtConstructBoundary() && !slot.IsRequired)
                 return MakeSentinel(slot);
 
             var startSpan = Peek().Span;
-            var expr = ParseExpression(0,
-                () => Peek().Kind == TokenKind.When
-                   || Peek().Kind == TokenKind.Because
-                   || IsAtConstructBoundary());
+            var expr = ParseExpression(0, () => IsAtSlotTermination(slot));
 
             if (expr.Span == SourceSpan.Missing && !slot.IsRequired)
                 return MakeSentinel(slot);
@@ -462,16 +489,16 @@ public static partial class Parser
 
             var whenToken = Advance(); // consume 'when'
 
-            if (IsAtEnd || IsAtConstructBoundary())
+            if (IsAtEnd || IsAtSlotTermination(slot))
             {
-                var emptyExpr = new LiteralExpression(TokenKind.True, "true", whenToken.Span);
-                return new GuardClauseSlot(emptyExpr, whenToken.Span);
+                // Empty guard clause — emit diagnostic and use missing expression sentinel
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.ExpectedToken, whenToken.Span, "expression", "end of guard clause"));
+                var missingExpr = new MissingExpression(whenToken.Span);
+                return new GuardClauseSlot(missingExpr, whenToken.Span);
             }
 
-            var expr = ParseExpression(0,
-                () => Peek().Kind == TokenKind.Because
-                   || Peek().Kind == TokenKind.Arrow
-                   || IsAtConstructBoundary());
+            var expr = ParseExpression(0, () => IsAtSlotTermination(slot));
 
             return new GuardClauseSlot(expr,
                 SourceSpan.Covering(whenToken.Span, expr.Span));
@@ -490,13 +517,13 @@ public static partial class Parser
                 _diagnostics.Add(Language.Diagnostics.Create(
                     DiagnosticCode.ExpectedToken, nextToken.Span, "expression", nextToken.Text));
 
-                while (!IsAtEnd && !IsAtConstructBoundary())
+                while (!IsAtEnd && !IsAtSlotTermination(slot))
                     Advance();
 
                 return MakeSentinel(slot);
             }
 
-            var expr = ParseExpression(0, () => IsAtConstructBoundary());
+            var expr = ParseExpression(0, () => IsAtSlotTermination(slot));
 
             return new ComputeExpressionSlot(expr,
                 SourceSpan.Covering(arrowToken.Span, expr.Span));
@@ -519,15 +546,16 @@ public static partial class Parser
                 return MakeSentinel(slot);
             }
 
-            if (IsAtEnd || (IsAtConstructBoundary() && Peek().Kind != TokenKind.Identifier))
+            if (IsAtEnd || IsAtSlotTermination(slot))
             {
-                var emptyExpr = new LiteralExpression(TokenKind.True, "true", startRef);
-                return new EnsureClauseSlot(emptyExpr, startRef);
+                // Empty ensure clause — emit diagnostic and use missing expression sentinel
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.ExpectedToken, startRef, "expression", "end of ensure clause"));
+                var missingExpr = new MissingExpression(startRef);
+                return new EnsureClauseSlot(missingExpr, startRef);
             }
 
-            var expr = ParseExpression(0,
-                () => Peek().Kind == TokenKind.Because
-                   || IsAtConstructBoundary());
+            var expr = ParseExpression(0, () => IsAtSlotTermination(slot));
 
             return new EnsureClauseSlot(expr,
                 SourceSpan.Covering(startRef, expr.Span));
@@ -536,66 +564,91 @@ public static partial class Parser
         private SlotValue ParseOutcome(ConstructSlot slot)
         {
             if (Peek().Kind != TokenKind.Arrow)
+            {
+                if (slot.IsRequired)
+                {
+                    _diagnostics.Add(Language.Diagnostics.Create(
+                        DiagnosticCode.ExpectedOutcome, Peek().Span));
+                }
+
                 return MakeSentinel(slot);
+            }
 
             var arrowToken = Advance(); // consume '->'
             var outcomeToken = Peek();
 
-            switch (outcomeToken.Kind)
+            // Catalog-driven dispatch
+            if (!Outcomes.ByLeadingToken.TryGetValue(outcomeToken.Kind, out var meta))
             {
-                case TokenKind.Transition:
-                {
-                    // -> transition StateName
-                    var transToken = Advance();
-                    var stateToken = Peek();
-                    if (stateToken.Kind == TokenKind.Identifier)
-                    {
-                        Advance();
-                        var span = SourceSpan.Covering(arrowToken.Span, stateToken.Span);
-                        return new OutcomeSlot(new TransitionOutcome(stateToken.Text, span), span);
-                    }
-                    // transition without state name — malformed
-                    var malSpan = SourceSpan.Covering(arrowToken.Span, transToken.Span);
-                    return new OutcomeSlot(new MalformedOutcome(malSpan), malSpan);
-                }
-
-                case TokenKind.No:
-                {
-                    // -> no transition
-                    var noToken = Advance();
-                    if (Peek().Kind == TokenKind.Transition)
-                    {
-                        var transToken = Advance();
-                        var span = SourceSpan.Covering(arrowToken.Span, transToken.Span);
-                        return new OutcomeSlot(new NoTransitionOutcome(span), span);
-                    }
-                    // 'no' without 'transition' — malformed
-                    var malSpan = SourceSpan.Covering(arrowToken.Span, noToken.Span);
-                    return new OutcomeSlot(new MalformedOutcome(malSpan), malSpan);
-                }
-
-                case TokenKind.Reject:
-                {
-                    // -> reject "reason"
-                    var rejectToken = Advance();
-                    if (Peek().Kind == TokenKind.StringLiteral)
-                    {
-                        var reasonToken = Advance();
-                        var span = SourceSpan.Covering(arrowToken.Span, reasonToken.Span);
-                        return new OutcomeSlot(new RejectOutcome(reasonToken.Text, span), span);
-                    }
-                    // reject without reason — malformed
-                    var malSpan = SourceSpan.Covering(arrowToken.Span, rejectToken.Span);
-                    return new OutcomeSlot(new MalformedOutcome(malSpan), malSpan);
-                }
-
-                default:
-                {
-                    // Unexpected token after arrow — malformed outcome
-                    var span = arrowToken.Span;
-                    return new OutcomeSlot(new MalformedOutcome(span), span);
-                }
+                // Unrecognized token after arrow — malformed
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.ExpectedOutcome, arrowToken.Span));
+                return new OutcomeSlot(new MalformedOutcome(arrowToken.Span), arrowToken.Span);
             }
+
+            var leadingToken = Advance(); // consume leading token
+
+            // Dispatch on argument shape — exhaustive switch (CS8509)
+            ParsedOutcome outcome = meta.ArgumentKind switch
+            {
+                OutcomeArgumentKind.RequiredIdentifier => ParseOutcomeIdentifierArg(arrowToken, leadingToken),
+                OutcomeArgumentKind.RequiredStringLiteral => ParseOutcomeStringLiteralArg(arrowToken, leadingToken),
+                OutcomeArgumentKind.SecondaryToken => ParseOutcomeSecondaryToken(arrowToken, leadingToken),
+                OutcomeArgumentKind.None => throw new InvalidOperationException(
+                    $"OutcomeArgumentKind.None is not yet used — add handling if a no-arg outcome form is introduced"),
+                _ => throw new ArgumentOutOfRangeException(nameof(meta.ArgumentKind), meta.ArgumentKind,
+                    $"Unknown OutcomeArgumentKind: {meta.ArgumentKind}"),
+            };
+
+            return new OutcomeSlot(outcome, outcome.Span);
+        }
+
+        private ParsedOutcome ParseOutcomeIdentifierArg(Token arrowToken, Token leadingToken)
+        {
+            // Expects: identifier (state name)
+            var token = Peek();
+            if (token.Kind == TokenKind.Identifier)
+            {
+                Advance();
+                var span = SourceSpan.Covering(arrowToken.Span, token.Span);
+                return new TransitionOutcome(token.Text, span);
+            }
+            // Missing state name — malformed
+            _diagnostics.Add(Language.Diagnostics.Create(
+                DiagnosticCode.ExpectedOutcome, leadingToken.Span));
+            return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span));
+        }
+
+        private ParsedOutcome ParseOutcomeStringLiteralArg(Token arrowToken, Token leadingToken)
+        {
+            // Expects: string literal (reason)
+            var token = Peek();
+            if (token.Kind == TokenKind.StringLiteral)
+            {
+                Advance();
+                var span = SourceSpan.Covering(arrowToken.Span, token.Span);
+                return new RejectOutcome(token.Text, span);
+            }
+            // Missing reason — malformed
+            _diagnostics.Add(Language.Diagnostics.Create(
+                DiagnosticCode.ExpectedOutcome, leadingToken.Span));
+            return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span));
+        }
+
+        private ParsedOutcome ParseOutcomeSecondaryToken(Token arrowToken, Token leadingToken)
+        {
+            // Expects: secondary token (e.g., `transition` after `no`)
+            var token = Peek();
+            if (token.Kind == Outcomes.NoTransitionSecondaryToken)
+            {
+                Advance();
+                var span = SourceSpan.Covering(arrowToken.Span, token.Span);
+                return new NoTransitionOutcome(span);
+            }
+            // `no` without `transition` — malformed
+            _diagnostics.Add(Language.Diagnostics.Create(
+                DiagnosticCode.ExpectedOutcome, leadingToken.Span));
+            return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span));
         }
     }
 }

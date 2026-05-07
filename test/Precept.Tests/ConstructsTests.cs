@@ -267,6 +267,27 @@ public class ConstructsTests
         outcomeSlot.IsRequired.Should().BeTrue("every transition row must specify an outcome");
     }
 
+    [Fact]
+    public void ExpressionBearingSlots_CarryCatalogTerminationTokens()
+    {
+        var ruleSlot = Constructs.GetMeta(ConstructKind.RuleDeclaration).Slots
+            .Single(s => s.Kind == ConstructSlotKind.RuleExpression);
+        ruleSlot.TerminationTokens.Should().BeEquivalentTo([TokenKind.When, TokenKind.Because]);
+
+        var guardSlot = Constructs.GetMeta(ConstructKind.TransitionRow).Slots
+            .Single(s => s.Kind == ConstructSlotKind.GuardClause);
+        guardSlot.TerminationTokens.Should().BeEquivalentTo([TokenKind.Because, TokenKind.Arrow]);
+
+        var ensureSlot = Constructs.GetMeta(ConstructKind.StateEnsure).Slots
+            .Single(s => s.Kind == ConstructSlotKind.EnsureClause);
+        ensureSlot.TerminationTokens.Should().BeEquivalentTo([TokenKind.Because]);
+
+        var computeSlot = Constructs.GetMeta(ConstructKind.FieldDeclaration).Slots
+            .Single(s => s.Kind == ConstructSlotKind.ComputeExpression);
+        computeSlot.TerminationTokens.Should().NotBeNull();
+        computeSlot.TerminationTokens.Should().BeEmpty("compute expressions terminate only at construct boundaries");
+    }
+
     // ── LeadingToken regression anchors ────────────────────────────────────────
 
     [Theory]

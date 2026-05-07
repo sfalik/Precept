@@ -19,20 +19,20 @@ public static class Constructs
     private static readonly ConstructSlot SlotModifierList      = new(ConstructSlotKind.ModifierList,       IsRequired: false);
     private static readonly ConstructSlot SlotStateEntryList    = new(ConstructSlotKind.StateEntryList);
     private static readonly ConstructSlot SlotArgumentList      = new(ConstructSlotKind.ArgumentList,       IsRequired: false);
-    private static readonly ConstructSlot SlotComputeExpression = new(ConstructSlotKind.ComputeExpression,  IsRequired: false);
-    private static readonly ConstructSlot SlotGuardClause       = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression");
+    private static readonly ConstructSlot SlotComputeExpression = new(ConstructSlotKind.ComputeExpression,  IsRequired: false, TerminationTokens: []);
+    private static readonly ConstructSlot SlotGuardClause       = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Because, TokenKind.Arrow]);
     private static readonly ConstructSlot SlotActionChain       = new(ConstructSlotKind.ActionChain,        IsRequired: false);
     private static readonly ConstructSlot SlotOutcome           = new(ConstructSlotKind.Outcome);
     private static readonly ConstructSlot SlotStateTarget       = new(ConstructSlotKind.StateTarget);
     private static readonly ConstructSlot SlotOptStateTarget    = new(ConstructSlotKind.StateTarget,        IsRequired: false);
     private static readonly ConstructSlot SlotEventTarget       = new(ConstructSlotKind.EventTarget);
-    private static readonly ConstructSlot SlotEnsureClause      = new(ConstructSlotKind.EnsureClause);
+    private static readonly ConstructSlot SlotEnsureClause      = new(ConstructSlotKind.EnsureClause,       TerminationTokens: [TokenKind.Because]);
     private static readonly ConstructSlot SlotBecauseClause     = new(ConstructSlotKind.BecauseClause);
-    private static readonly ConstructSlot SlotOptBecauseClause  = new(ConstructSlotKind.BecauseClause,  IsRequired: false);
+    private static readonly ConstructSlot SlotOptBecauseClause  = new(ConstructSlotKind.BecauseClause,      IsRequired: false);
     private static readonly ConstructSlot SlotAccessModeKeyword = new(ConstructSlotKind.AccessModeKeyword);
     private static readonly ConstructSlot SlotFieldTarget       = new(ConstructSlotKind.FieldTarget);
-    private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression);
-    private static readonly ConstructSlot SlotInitialMarker     = new(ConstructSlotKind.InitialMarker,     IsRequired: false);
+    private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression,     TerminationTokens: [TokenKind.When, TokenKind.Because]);
+    private static readonly ConstructSlot SlotInitialMarker     = new(ConstructSlotKind.InitialMarker,      IsRequired: false);
 
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch

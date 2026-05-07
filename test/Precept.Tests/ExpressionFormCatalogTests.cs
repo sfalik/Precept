@@ -17,7 +17,7 @@ public class ExpressionFormCatalogTests
     [Fact]
     public void ExpressionForms_All_HasExpectedCount()
     {
-        ExpressionForms.All.Should().HaveCount(13);
+        ExpressionForms.All.Should().HaveCount(14);
     }
 
     [Fact]
@@ -102,6 +102,20 @@ public class ExpressionFormCatalogTests
     public void ExpressionForms_All_CountMatchesEnumValues()
     {
         ExpressionForms.All.Should().HaveCount(Enum.GetValues<ExpressionFormKind>().Length);
+    }
+
+    [Fact]
+    public void ExpressionForms_MemberAccess_BindingPower_ComesFromCatalog()
+    {
+        var meta = ExpressionForms.GetMeta(ExpressionFormKind.MemberAccess);
+
+        meta.BindingPower.HasValue.Should().BeTrue(
+            "member access participates in the Pratt loop as a catalog-defined led form");
+        meta.BindingPower!.Value.Left.Should().Be(80);
+        meta.BindingPower.Value.Right.Should().Be(81);
+
+        var ledMeta = ExpressionForms.LedForms.Single(m => m.Kind == ExpressionFormKind.MemberAccess);
+        ledMeta.BindingPower.Should().Be(meta.BindingPower);
     }
 
     // ── PostfixOperation shape ────────────────────────────────────────────────

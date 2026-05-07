@@ -24,7 +24,13 @@
 
 - PRECEPT0019-style exhaustiveness is valuable when it is attached to the true owner of a catalog axis, not sprayed broadly.
 
+- Additive extension points on shared value records should land as init-only properties when constructor stability matters; `Diagnostic.RelatedSpans` can grow the diagnostic payload without forcing churn across every `Diagnostics.Create(...)` site.
 
+- Non-operator Pratt led precedence belongs in `ExpressionForms` metadata; `MemberAccess` should not survive as a parser-local binding-power constant.
+
+- Expression-bearing construct slots can own their termination tokens, which lets slot-boundary behavior propagate from the Constructs catalog instead of bespoke parser lambdas.
+
+- Multi-location diagnostics should carry per-location messages, but absence cases stay single-span: if no second concrete source location exists, keep `RelatedSpans` empty and let the primary diagnostic message explain the missing declaration.
 
 ## Recent Updates
 
@@ -65,6 +71,14 @@
 - The durable parser baseline remains: catalog-driven construct parsing, sentinel slot invariants, `EventHandler` without an Outcome slot, and parser-resolved closed vocabularies feeding `ParsedExpression` / `ParsedOutcome` rather than span-only placeholders.
 
 - Use `.squad/decisions.md` for the full per-batch provenance trail and branch-level decision chronology.
+
+### 2026-05-07T09:04:34Z — Parser implementation review recorded
+
+- Reviewed `Lexer.cs`, `Parser.cs`, `Parser.Expressions.cs`, parser payload types, the language spec, and representative samples with a type-checker-readiness lens.
+
+- Blocking findings: the parser drops interpolation hole expressions, type/action/modifier payloads are too lossy for checker work, and several invalid tails still collapse into placeholder `true` / silent sentinels instead of parse diagnostics.
+
+- Catalog follow-up: `LeadingTokenSlot` is still unused, state/access modifier lookups are not fully catalog-derived, and dot/postfix led precedence remains partly hardcoded.
 
 
 

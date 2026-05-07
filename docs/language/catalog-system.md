@@ -302,7 +302,8 @@ ConstructMeta
 ConstructSlot
 ├── Kind              : ConstructSlotKind                ◄── 17-member helper enum (see Level 3)
 ├── IsRequired        : bool                                  whether slot is mandatory
-└── Description       : string?                               optional hint
+├── Description       : string?                               optional hint
+└── TerminationTokens : TokenKind[]?                          optional slot-local Pratt terminators
 
 DisambiguationEntry
 ├── LeadingToken      : TokenKind                        ◄── anchors to Tokens catalog
@@ -1522,13 +1523,15 @@ public sealed record ConstructMeta(
 
 public sealed record ConstructSlot(
     ConstructSlotKind Kind,
-    bool              IsRequired  = true,
-    string?           Description = null
+    bool              IsRequired       = true,
+    string?           Description      = null,
+    TokenKind[]?      TerminationTokens = null
 );
 
-// 15-member enum: IdentifierList, TypeExpression, ModifierList, StateModifierList,
+// 17-member enum: IdentifierList, TypeExpression, ModifierList, StateEntryList,
 // ArgumentList, ComputeExpression, GuardClause, ActionChain, Outcome,
-// StateTarget, EventTarget, EnsureClause, BecauseClause, AccessModeKeyword, FieldTarget
+// StateTarget, EventTarget, EnsureClause, BecauseClause, AccessModeKeyword,
+// FieldTarget, RuleExpression, InitialMarker
 public enum ConstructSlotKind { ... }
 ```
 
@@ -1536,12 +1539,12 @@ public enum ConstructSlotKind { ... }
 
 #### 9. ExpressionForms (✅ Implemented)
 
-Expression grammar forms — the 13-member taxonomy of what the Pratt parser can construct and what role each form plays (null-denotation atom vs. left-denotation extension).
+Expression grammar forms — the 14-member taxonomy of what the Pratt parser can construct and what role each form plays (null-denotation atom vs. left-denotation extension).
 
 | Part | Type |
 |------|------|
-| Kind enum | `ExpressionFormKind` (13 members) |
-| Meta record | `ExpressionFormMeta(Kind, Category, IsLeftDenotation, LeadTokens, HoverDocs)` |
+| Kind enum | `ExpressionFormKind` (14 members) |
+| Meta record | `ExpressionFormMeta(Kind, Category, IsLeftDenotation, LeadTokens, HoverDocs, BindingPower?)` |
 | Supporting type | `ExpressionCategory` (4 members: `Atom`, `Composite`, `Invocation`, `Collection`) |
 | Catalog class | `ExpressionForms` — `GetMeta()`, `All` |
 | Output type | None |
@@ -1550,7 +1553,7 @@ Expression grammar forms — the 13-member taxonomy of what the Pratt parser can
 
 `Literal`, `Identifier`, `Grouped` (atoms — null-denotation); `BinaryOperation`, `UnaryOperation`, `MemberAccess`, `Conditional`, `PostfixOperation` (composites); `FunctionCall`, `MethodCall`, `CIFunctionCall` (invocations); `ListLiteral` (collection); `Quantifier`
 
-**Consumers:** parser coverage enforcement (via `[HandlesCatalogMember]`/`[HandlesCatalogExhaustively]` annotations), MCP vocabulary, reference documentation.
+**Consumers:** parser coverage enforcement (via `[HandlesCatalogMember]`/`[HandlesCatalogExhaustively]` annotations), Pratt led binding-power lookup for non-operator forms such as member access, MCP vocabulary, reference documentation.
 
 #### 10. Constraints (✅ Implemented)
 

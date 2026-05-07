@@ -31,6 +31,9 @@ public enum ExpressionFormKind
     // Quantifier and CI function call forms
     Quantifier       = 12,
     CIFunctionCall   = 13,
+
+    // Interpolated string with embedded expressions
+    InterpolatedString = 14,
 }
 
 /// <summary>
@@ -54,12 +57,17 @@ public enum ExpressionCategory { Atom = 1, Composite = 2, Invocation = 3, Collec
 ///   led dispatch, not by an initial token.
 /// </param>
 /// <param name="HoverDocs">Human-readable description for tooling.</param>
+/// <param name="BindingPower">
+///   Optional Pratt binding power for led forms whose precedence lives in the
+///   ExpressionForms catalog rather than the Operators catalog.
+/// </param>
 public sealed record ExpressionFormMeta(
     ExpressionFormKind        Kind,
     ExpressionCategory        Category,
     bool                      IsLeftDenotation,
     IReadOnlyList<TokenKind>  LeadTokens,
-    string                    HoverDocs);
+    string                    HoverDocs,
+    (int Left, int Right)?    BindingPower = null);
 
 /// <summary>
 /// Catalog of all expression forms the Precept expression parser can produce.
@@ -72,12 +80,12 @@ public static class ExpressionForms
 
     public static ExpressionFormMeta GetMeta(ExpressionFormKind kind) => kind switch
     {
-        ExpressionFormKind.Literal          => new(kind, ExpressionCategory.Atom,       false, [TokenKind.StringLiteral, TokenKind.NumberLiteral, TokenKind.StringStart, TokenKind.TypedConstant, TokenKind.TypedConstantStart, TokenKind.True, TokenKind.False], "A literal value: string, number, boolean, or typed constant."),
+        ExpressionFormKind.Literal          => new(kind, ExpressionCategory.Atom,       false, [TokenKind.StringLiteral, TokenKind.NumberLiteral, TokenKind.TypedConstant, TokenKind.TypedConstantStart, TokenKind.True, TokenKind.False], "A literal value: string, number, boolean, or typed constant."),
         ExpressionFormKind.Identifier       => new(kind, ExpressionCategory.Atom,       false, [TokenKind.Identifier],    "A bare field or parameter name."),
         ExpressionFormKind.Grouped          => new(kind, ExpressionCategory.Atom,       false, [TokenKind.LeftParen],     "A parenthesized expression: (expr)."),
         ExpressionFormKind.BinaryOperation  => new(kind, ExpressionCategory.Composite,  true,  [],                        "An infix binary operation: left op right."),
         ExpressionFormKind.UnaryOperation   => new(kind, ExpressionCategory.Composite,  false, [TokenKind.Not, TokenKind.Minus], "A prefix unary operation: op expr."),
-        ExpressionFormKind.MemberAccess     => new(kind, ExpressionCategory.Composite,  true,  [TokenKind.Dot],           "Dot-access on an expression: target.member."),
+        ExpressionFormKind.MemberAccess     => new(kind, ExpressionCategory.Composite,  true,  [TokenKind.Dot],           "Dot-access on an expression: target.member.", BindingPower: (80, 81)),
         ExpressionFormKind.Conditional      => new(kind, ExpressionCategory.Composite,  false, [TokenKind.If],            "A conditional expression: if cond then valueA else valueB."),
         ExpressionFormKind.FunctionCall     => new(kind, ExpressionCategory.Invocation, false, [TokenKind.Identifier],    "A named function call: name(args)."),
         ExpressionFormKind.MethodCall       => new(kind, ExpressionCategory.Invocation, true,  [TokenKind.LeftParen],     "A method call on an expression: target.method(args)."),
@@ -89,6 +97,9 @@ public static class ExpressionForms
         ExpressionFormKind.CIFunctionCall => new(kind, ExpressionCategory.Invocation, false,
             [TokenKind.Tilde],
             "A case-insensitive function call: ~startsWith(subject, prefix) or ~endsWith(subject, suffix). Both arguments are required. Semantic metadata lives in FunctionKind.TildeStartsWith and FunctionKind.TildeEndsWith (Functions catalog)."),
+        ExpressionFormKind.InterpolatedString => new(kind, ExpressionCategory.Atom, false,
+            [TokenKind.StringStart],
+            "An interpolated string with embedded expressions: \"Hello {name}!\"."),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
@@ -98,4 +109,7 @@ public static class ExpressionForms
 
     public static IReadOnlyList<ExpressionFormMeta> All { get; } =
         Enum.GetValues<ExpressionFormKind>().Select(GetMeta).ToList().AsReadOnly();
+
+    public static IReadOnlyList<ExpressionFormMeta> LedForms { get; } =
+        All.Where(meta => meta.IsLeftDenotation).ToArray();
 }

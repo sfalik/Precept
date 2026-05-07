@@ -1097,6 +1097,52 @@ public class ParserExpressionTests
             "a compound rule expression must produce a BinaryOperationExpression, not a True placeholder");
     }
 
+    [Fact]
+    public void Termination_GuardClause_DoesNotConsumeOutcomeArrow()
+    {
+        const string source = "from Draft on Submit when amount > 0 -> transition Approved";
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var guard = (GuardClauseSlot)row.Slots.Single(s => s.Kind == ConstructSlotKind.GuardClause);
+        guard.Expression.Should().BeOfType<BinaryOperationExpression>()
+            .Which.Operator.Should().Be(TokenKind.GreaterThan);
+
+        var outcome = (OutcomeSlot)row.Slots.Single(s => s.Kind == ConstructSlotKind.Outcome);
+        outcome.Outcome.Should().BeOfType<TransitionOutcome>()
+            .Which.StateName.Should().Be("Approved");
+    }
+
+    [Fact]
+    public void Termination_EnsureClause_DoesNotConsumeBecauseKeyword()
+    {
+        const string source = "in Draft ensure amount > 0 because \"msg\"";
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
+
+        var construct = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.StateEnsure);
+        var ensure = (EnsureClauseSlot)construct.Slots.Single(s => s.Kind == ConstructSlotKind.EnsureClause);
+        ensure.Expression.Should().BeOfType<BinaryOperationExpression>()
+            .Which.Operator.Should().Be(TokenKind.GreaterThan);
+
+        var because = (BecauseClauseSlot)construct.Slots.Single(s => s.Kind == ConstructSlotKind.BecauseClause);
+        because.Message.Should().Be("msg");
+    }
+
+    [Fact]
+    public void Termination_ComputeExpression_StopsAtNextConstructBoundary()
+    {
+        const string source = "field total as number <- subtotal\nrule total > 0 because \"msg\"";
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
+
+        manifest.Diagnostics.Should().BeEmpty();
+        manifest.Constructs.Should().Contain(c => c.Meta.Kind == ConstructKind.RuleDeclaration);
+
+        var field = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.FieldDeclaration);
+        var compute = (ComputeExpressionSlot)field.Slots.Single(s => s.Kind == ConstructSlotKind.ComputeExpression);
+        compute.Expression.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Should().Be("subtotal");
+    }
+
     // ════════════════════════════════════════════════════════════════════════════
     //  §16. ExpressionFormKind catalog coverage — GREEN
     //  Pure catalog tests — no parser invoked. Must stay green.
@@ -1130,10 +1176,10 @@ public class ParserExpressionTests
     }
 
     [Fact]
-    public void ExpressionFormCatalog_All_HasExactly13Members()
+    public void ExpressionFormCatalog_All_HasExactly14Members()
     {
-        // GREEN — the expression form enum must have exactly 13 members.
-        ExpressionForms.All.Should().HaveCount(13,
-            "there are exactly 13 ExpressionFormKind members in the Precept expression grammar");
+        // GREEN — the expression form enum must have exactly 14 members.
+        ExpressionForms.All.Should().HaveCount(14,
+            "there are exactly 14 ExpressionFormKind members in the Precept expression grammar");
     }
 }
