@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+### 2026-05-07T01:26:52Z — Wave 2 closeout recorded
+
+- Pre-check measured `decisions.md` at 72581 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T01:26:52Z.
+- Merged `frank-wave2-complete.md` into the active ledger, deleted the processed inbox file, wrote the Frank orchestration/session logs, refreshed Frank/Scribe history, and summarized Frank back under the 15 KB gate.
+- Health report: `decisions.md` 73849B; inbox processed = 1; history files summarized = 1.
+
 ### 2026-05-07T01:22:50Z — CC#26 decision ledger merged
 
 - Pre-check measured `decisions.md` at 668130 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran first.

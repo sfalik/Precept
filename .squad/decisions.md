@@ -5,6 +5,21 @@
 ## ACTIVE DECISIONS — Current Sprint
 
 ---
+### 2026-05-07T01:26:52Z: Wave 2 cross-cutting decisions all closed; Wave 1 checkbox drift corrected
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file); Frank reported build clean.
+
+**Merged source:** `frank-wave2-complete.md`.
+
+- Wave 2 is durably closed: CC#5, CC#10, CC#13, CC#14, CC#15, CC#16, CC#17, CC#18, CC#19, CC#20, and CC#22 are all resolved and propagated into canonical docs.
+- Canonical synchronization landed in `docs/working/cross-cutting-decisions.md`, `docs/language/catalog-system.md`, `docs/compiler/graph-analyzer.md`, `docs/runtime/evaluator.md`, `docs/compiler/diagnostic-system.md`, `docs/tooling/language-server.md`, `docs/compiler/type-checker.md`, and `docs/compiler/proof-engine.md`.
+- Six Wave 1 display-sync errors were corrected without re-deciding the work: CC#3, CC#4, CC#6, CC#12, CC#23, and CC#24 now show `[x]` to match their already-resolved status rows; CC#26's status row is likewise corrected to `✅ Resolved`.
+- Durable architecture takeaways: `GraphState` stays a derived-facts output record, `SlotContext` and `ConstructSlotKind` stay distinct, catalog metadata owns per-member language knowledge, and default-valued `readonly record struct` additions remain backward-compatible.
+
+---
+
 ### 2026-05-06T10:41:33Z: Event-interaction UX baseline established under current-architecture rules
 
 **By:** Scribe
