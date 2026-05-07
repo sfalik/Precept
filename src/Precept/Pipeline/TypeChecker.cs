@@ -224,12 +224,283 @@ internal static class TypeChecker
     //  Pass 2 stubs — declaration normalization (Slices 2–9)
     // ════════════════════════════════════════════════════════════════════════
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Expression resolution (Slice 2)
+    // ════════════════════════════════════════════════════════════════════════
+
     /// <summary>
     /// Resolve a <see cref="ParsedExpression"/> node to a <see cref="TypedExpression"/>.
-    /// The core recursive resolution function (~250–350 lines when implemented).
+    /// Dispatches on expression form, resolves types via catalogs, and propagates
+    /// <see cref="TypedErrorExpression"/> on failure (D13).
     /// </summary>
-    private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx) =>
-        throw new NotImplementedException("Slice 2");
+    private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx) => expr switch
+    {
+        // ── Missing sentinel → error (no diagnostic — parser already emitted one) ──
+        MissingExpression m => new TypedErrorExpression(m.Span),
+
+        // ── Literal ──
+        LiteralExpression lit => ResolveLiteral(lit),
+
+        // ── Identifier (field, arg, or quantifier binding) ──
+        IdentifierExpression id => ResolveIdentifier(id, ctx),
+
+        // ── Grouped (parenthesized) — unwrap and resolve inner ──
+        GroupedExpression grp => Resolve(grp.Inner, ctx),
+
+        // ── Binary operation ──
+        BinaryOperationExpression bin => ResolveBinaryOp(bin, ctx),
+
+        // ── Unary operation ──
+        UnaryOperationExpression un => ResolveUnaryOp(un, ctx),
+
+        // ── Stub arms: return TypedErrorExpression with no diagnostic (Slices 3–9) ──
+        FunctionCallExpression    => new TypedErrorExpression(expr.Span),
+        CIFunctionCallExpression  => new TypedErrorExpression(expr.Span),
+        MemberAccessExpression    => new TypedErrorExpression(expr.Span),
+        MethodCallExpression      => new TypedErrorExpression(expr.Span),
+        ConditionalExpression     => new TypedErrorExpression(expr.Span),
+        QuantifierExpression      => new TypedErrorExpression(expr.Span),
+        InterpolatedStringExpression => new TypedErrorExpression(expr.Span),
+        ListLiteralExpression     => new TypedErrorExpression(expr.Span),
+        PostfixOperationExpression => new TypedErrorExpression(expr.Span),
+
+        _ => new TypedErrorExpression(expr.Span),
+    };
+
+    /// <summary>
+    /// Resolve a literal expression to a <see cref="TypedLiteral"/> with the appropriate
+    /// <see cref="TypeKind"/> and parsed value.
+    /// </summary>
+    private static TypedExpression ResolveLiteral(LiteralExpression lit) => lit.LiteralKind switch
+    {
+        TokenKind.StringLiteral => new TypedLiteral(TypeKind.String, lit.Text, lit.Span),
+        TokenKind.True          => new TypedLiteral(TypeKind.Boolean, true, lit.Span),
+        TokenKind.False         => new TypedLiteral(TypeKind.Boolean, false, lit.Span),
+        TokenKind.NumberLiteral => ResolveNumericLiteral(lit),
+
+        // Typed constants are Slice 4 stubs
+        TokenKind.TypedConstant      => new TypedErrorExpression(lit.Span),
+        TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span),
+
+        _ => new TypedErrorExpression(lit.Span),
+    };
+
+    /// <summary>
+    /// Resolve a numeric literal to integer or decimal based on the presence of a decimal point.
+    /// Bottom-up resolution only — context retry for widening is Slice 4.
+    /// </summary>
+    private static TypedLiteral ResolveNumericLiteral(LiteralExpression lit)
+    {
+        if (lit.Text.Contains('.'))
+        {
+            _ = decimal.TryParse(lit.Text, System.Globalization.NumberStyles.AllowDecimalPoint,
+                System.Globalization.CultureInfo.InvariantCulture, out var decVal);
+            return new TypedLiteral(TypeKind.Decimal, decVal, lit.Span);
+        }
+
+        _ = long.TryParse(lit.Text, System.Globalization.CultureInfo.InvariantCulture, out var intVal);
+        return new TypedLiteral(TypeKind.Integer, intVal, lit.Span);
+    }
+
+    /// <summary>
+    /// Resolve an identifier to a field reference, event arg reference, or quantifier binding.
+    /// Priority (D20): quantifier bindings > event args > fields.
+    /// Forward-reference prohibition (D8) applies when <see cref="CheckContext.CurrentScope"/>
+    /// is <see cref="FieldScopeMode.PriorFieldsOnly"/>.
+    /// </summary>
+    private static TypedExpression ResolveIdentifier(IdentifierExpression id, CheckContext ctx)
+    {
+        var name = id.Name;
+
+        // 1. Quantifier bindings (innermost scope, highest priority)
+        foreach (var binding in ctx.QuantifierBindings)
+        {
+            if (string.Equals(binding.Name, name, StringComparison.Ordinal))
+                return new TypedFieldRef(binding.Type, name, false, id.Span);
+        }
+
+        // 2. Event args (second priority)
+        if (ctx.CurrentEventArgs is not null &&
+            ctx.CurrentEventArgs.TryGetValue(name, out var arg))
+        {
+            return new TypedArgRef(arg.ResolvedType, arg.EventName, arg.Name, id.Span);
+        }
+
+        // 3. Fields (lowest priority)
+        if (ctx.FieldLookup.TryGetValue(name, out var field))
+        {
+            // D8: Forward-reference prohibition in PriorFieldsOnly scope
+            if (ctx.CurrentScope == FieldScopeMode.PriorFieldsOnly)
+            {
+                int fieldIndex = ctx.Fields.IndexOf(field);
+                if (fieldIndex >= ctx.CurrentFieldIndex)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.DefaultForwardReference, id.Span,
+                            ctx.Fields[ctx.CurrentFieldIndex].Name, name));
+                    return new TypedErrorExpression(id.Span);
+                }
+            }
+
+            // Record field reference site for LS navigation
+            ctx.FieldReferences.Add(new FieldReference(field, id.Span));
+
+            return new TypedFieldRef(field.ResolvedType, field.Name, false, id.Span);
+        }
+
+        // Unknown identifier
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.UndeclaredField, id.Span, name));
+        return new TypedErrorExpression(id.Span);
+    }
+
+    /// <summary>
+    /// Resolve a binary operation expression. Resolves both operands, propagates ErrorType (D13),
+    /// then performs catalog lookup via <see cref="Operations.FindCandidates"/> with widening
+    /// fallback (D16) and qualifier disambiguation (D9).
+    /// </summary>
+    private static TypedExpression ResolveBinaryOp(BinaryOperationExpression bin, CheckContext ctx)
+    {
+        var left = Resolve(bin.Left, ctx);
+        var right = Resolve(bin.Right, ctx);
+
+        // D13: ErrorType propagation — if either operand is error, propagate
+        if (left is TypedErrorExpression || right is TypedErrorExpression)
+            return new TypedErrorExpression(bin.Span);
+
+        // Map TokenKind → OperatorKind via the Operators catalog
+        if (!Operators.ByToken.TryGetValue((bin.Operator, Arity.Binary), out var opMeta))
+            return new TypedErrorExpression(bin.Span);
+
+        var opKind = opMeta.Kind;
+
+        // Attempt resolution: exact → left widen → right widen → both widen
+        var result = TryResolveBinaryWithWidening(opKind, left.ResultType, right.ResultType);
+
+        if (result is not null)
+        {
+            return new TypedBinaryOp(
+                result.Result,
+                result.Kind,
+                left, right,
+                ResultQualifier: MapQualifierBinding(result),
+                ProofRequirements: result.ProofRequirements.ToImmutableArray(),
+                Span: bin.Span);
+        }
+
+        // No match at any widening level
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.TypeMismatch, bin.Span,
+                Types.GetMeta(left.ResultType).DisplayName,
+                Types.GetMeta(right.ResultType).DisplayName));
+        return new TypedErrorExpression(bin.Span);
+    }
+
+    /// <summary>
+    /// Try to resolve a binary operation with the 4-level widening fallback algorithm (D16/§7.3).
+    /// Returns the first matching <see cref="BinaryOperationMeta"/>, or null if no match at any level.
+    /// </summary>
+    private static BinaryOperationMeta? TryResolveBinaryWithWidening(
+        OperatorKind op, TypeKind lhsType, TypeKind rhsType)
+    {
+        // Level 1: Exact match (no widening)
+        var exact = DisambiguateCandidates(Operations.FindCandidates(op, lhsType, rhsType));
+        if (exact is not null) return exact;
+
+        // Level 2: Left widening only
+        foreach (var lwt in Types.GetMeta(lhsType).WidensTo)
+        {
+            var match = DisambiguateCandidates(Operations.FindCandidates(op, lwt, rhsType));
+            if (match is not null) return match;
+        }
+
+        // Level 3: Right widening only
+        foreach (var rwt in Types.GetMeta(rhsType).WidensTo)
+        {
+            var match = DisambiguateCandidates(Operations.FindCandidates(op, lhsType, rwt));
+            if (match is not null) return match;
+        }
+
+        // Level 4: Both widening
+        foreach (var lwt in Types.GetMeta(lhsType).WidensTo)
+        {
+            foreach (var rwt in Types.GetMeta(rhsType).WidensTo)
+            {
+                var match = DisambiguateCandidates(Operations.FindCandidates(op, lwt, rwt));
+                if (match is not null) return match;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Disambiguate binary operation candidates using qualifier matching (D9/§7.3).
+    /// Returns a single <see cref="BinaryOperationMeta"/> if unambiguous, or null if no candidates.
+    /// For multi-candidate results (qualifier-disambiguated operations), selects the
+    /// <see cref="QualifierMatch.Same"/> entry by default — the checker assumes same-qualifier
+    /// until runtime qualifier values prove otherwise. The ProofEngine adds obligations to verify.
+    /// </summary>
+    private static BinaryOperationMeta? DisambiguateCandidates(ReadOnlySpan<BinaryOperationMeta> candidates)
+    {
+        if (candidates.Length == 0) return null;
+        if (candidates.Length == 1) return candidates[0];
+
+        // Multi-candidate: qualifier disambiguation.
+        // Default to QualifierMatch.Same — the structurally safe assumption.
+        // ProofEngine will verify qualifier compatibility at deeper analysis.
+        foreach (var c in candidates)
+        {
+            if (c.Match == QualifierMatch.Same) return c;
+        }
+
+        // Fallback: return first candidate if no Same entry exists
+        return candidates[0];
+    }
+
+    /// <summary>
+    /// Map a <see cref="BinaryOperationMeta"/>'s qualifier match to the corresponding
+    /// <see cref="QualifierBinding"/> for the typed expression result.
+    /// </summary>
+    private static QualifierBinding? MapQualifierBinding(BinaryOperationMeta meta) => meta.Match switch
+    {
+        QualifierMatch.Same      => new SameQualifierRequired(),
+        QualifierMatch.Different => null, // different-qualifier operations produce unqualified results
+        _                        => null, // QualifierMatch.Any — no qualifier constraint
+    };
+
+    /// <summary>
+    /// Resolve a unary operation expression. Resolves the operand, propagates ErrorType (D13),
+    /// then performs catalog lookup via <see cref="Operations.FindUnary"/>.
+    /// </summary>
+    private static TypedExpression ResolveUnaryOp(UnaryOperationExpression un, CheckContext ctx)
+    {
+        var operand = Resolve(un.Operand, ctx);
+
+        // D13: ErrorType propagation
+        if (operand is TypedErrorExpression)
+            return new TypedErrorExpression(un.Span);
+
+        // Map TokenKind → OperatorKind via the Operators catalog
+        if (!Operators.ByToken.TryGetValue((un.Operator, Arity.Unary), out var opMeta))
+            return new TypedErrorExpression(un.Span);
+
+        var resolved = Operations.FindUnary(opMeta.Kind, operand.ResultType);
+        if (resolved is not null)
+        {
+            return new TypedUnaryOp(
+                resolved.Result,
+                resolved.Kind,
+                operand,
+                un.Span);
+        }
+
+        // No matching unary operation
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.TypeMismatch, un.Span,
+                Types.GetMeta(operand.ResultType).DisplayName, opMeta.Kind.ToString()));
+        return new TypedErrorExpression(un.Span);
+    }
 
     /// <summary>Normalize a transition row construct into a <see cref="TypedTransitionRow"/>.</summary>
     private static TypedTransitionRow NormalizeTransitionRow(ParsedConstruct construct, CheckContext ctx) =>
