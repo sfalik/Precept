@@ -11,7 +11,7 @@ namespace Precept.Pipeline;
 /// Catalog-driven parser — transforms a <see cref="TokenStream"/> into a <see cref="ConstructManifest"/>.
 /// Dispatch, slot walking, and vocabulary recognition are all derived from catalog metadata.
 /// </summary>
-public static class Parser
+public static partial class Parser
 {
     // ── Catalog-derived vocabulary sets (computed once at startup) ────────────────
 
@@ -40,7 +40,7 @@ public static class Parser
     //  ParserState — private mutable cursor over the token array
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    private sealed class ParserState
+    private sealed partial class ParserState
     {
         private readonly ImmutableArray<Token> _tokens;
         private int _position;
@@ -280,12 +280,12 @@ public static class Parser
                 ConstructSlotKind.ArgumentList      => ParseArgumentList(slot),
                 ConstructSlotKind.InitialMarker     => ParseInitialMarker(slot),
                 ConstructSlotKind.BecauseClause     => ParseBecauseClause(slot),
-                ConstructSlotKind.RuleExpression    => ParseExpressionPlaceholder(slot),
-                ConstructSlotKind.GuardClause       => ParseGuardClausePlaceholder(slot),
-                ConstructSlotKind.ComputeExpression => ParseComputeExpressionPlaceholder(slot),
-                ConstructSlotKind.EnsureClause      => ParseEnsureClausePlaceholder(slot),
+                ConstructSlotKind.RuleExpression    => ParseRuleExpression(slot),
+                ConstructSlotKind.GuardClause       => ParseGuardClause(slot),
+                ConstructSlotKind.ComputeExpression => ParseComputeExpression(slot),
+                ConstructSlotKind.EnsureClause      => ParseEnsureClause(slot),
                 ConstructSlotKind.ActionChain       => ParseActionChainPlaceholder(slot),
-                ConstructSlotKind.Outcome           => ParseOutcomePlaceholder(slot),
+                ConstructSlotKind.Outcome           => ParseOutcome(slot),
                 ConstructSlotKind.StateTarget       => ParseStateTarget(slot),
                 ConstructSlotKind.EventTarget       => ParseEventTarget(slot),
                 ConstructSlotKind.AccessModeKeyword => ParseAccessMode(slot),
@@ -634,97 +634,8 @@ public static class Parser
         }
 
         // ── Expression placeholders (Slice 1) ───────────────────────────────────
-        // These advance past tokens until a construct boundary. Expression parsing
-        // (Pratt parser) is deferred to Slice 3.
-
-        private SlotValue ParseExpressionPlaceholder(ConstructSlot slot)
-        {
-            // RuleExpression: everything after 'rule' until 'when', 'because', or boundary
-            var startSpan = Peek().Span;
-            if (IsAtConstructBoundary() && !slot.IsRequired)
-                return MakeSentinel(slot);
-            var lastSpan = startSpan;
-            while (!IsAtEnd && !IsExpressionTerminator())
-            {
-                lastSpan = Advance().Span;
-            }
-
-            if (lastSpan.Offset == startSpan.Offset && lastSpan.Length == startSpan.Length
-                && !slot.IsRequired)
-                return MakeSentinel(slot);
-            var span = SourceSpan.Covering(startSpan, lastSpan);
-            var placeholder = new LiteralExpression(TokenKind.True, "true", span);
-            return new RuleExpressionSlot(placeholder, span);
-        }
-
-        private SlotValue ParseGuardClausePlaceholder(ConstructSlot slot)
-        {
-            if (Peek().Kind != TokenKind.When)
-                return MakeSentinel(slot);
-
-            var whenToken = Advance(); // consume 'when'
-            var startSpan = Peek().Span;
-            var lastSpan = whenToken.Span;
-
-            while (!IsAtEnd && !IsExpressionTerminatorAfterGuard())
-            {
-                lastSpan = Advance().Span;
-            }
-
-            var span = SourceSpan.Covering(whenToken.Span, lastSpan);
-            var placeholder = new LiteralExpression(TokenKind.True, "true", span);
-            return new GuardClauseSlot(placeholder, span);
-        }
-
-        private SlotValue ParseComputeExpressionPlaceholder(ConstructSlot slot)
-        {
-            if (Peek().Kind != TokenKind.Arrow)
-                return MakeSentinel(slot);
-
-            var arrowToken = Advance(); // consume '->'
-            var startSpan = Peek().Span;
-            var lastSpan = arrowToken.Span;
-
-            while (!IsAtEnd && !IsAtConstructBoundary())
-            {
-                lastSpan = Advance().Span;
-            }
-
-            var span = SourceSpan.Covering(arrowToken.Span, lastSpan);
-            var placeholder = new LiteralExpression(TokenKind.True, "true", span);
-            return new ComputeExpressionSlot(placeholder, span);
-        }
-
-        private SlotValue ParseEnsureClausePlaceholder(ConstructSlot slot)
-        {
-            SourceSpan startRef;
-
-            if (Peek().Kind == TokenKind.Ensure)
-            {
-                // Direct parse path — consume the ensure keyword
-                startRef = Advance().Span;
-            }
-            else if (slot.IsRequired)
-            {
-                // Required slot but ensure already consumed as disambiguation keyword —
-                // parse expression tokens directly
-                startRef = Peek().Span;
-            }
-            else
-            {
-                return MakeSentinel(slot);
-            }
-
-            var lastSpan = startRef;
-            while (!IsAtEnd && Peek().Kind != TokenKind.Because && !IsAtConstructBoundary())
-            {
-                lastSpan = Advance().Span;
-            }
-
-            var span = SourceSpan.Covering(startRef, lastSpan);
-            var placeholder = new LiteralExpression(TokenKind.True, "true", span);
-            return new EnsureClauseSlot(placeholder, span);
-        }
+        // Replaced by Pratt parser in Parser.Expressions.cs (Slice 3).
+        // ParseActionChainPlaceholder remains — action chains are not expressions.
 
         private SlotValue ParseActionChainPlaceholder(ConstructSlot slot)
         {
@@ -769,39 +680,12 @@ public static class Parser
                 SourceSpan.Covering(startSpan, lastSpan));
         }
 
-        private SlotValue ParseOutcomePlaceholder(ConstructSlot slot)
-        {
-            // Outcomes follow action chains: "-> transition State", "-> no transition", "-> reject ..."
-            if (Peek().Kind != TokenKind.Arrow)
-                return MakeSentinel(slot);
-
-            var startSpan = Peek().Span;
-            var lastSpan = startSpan;
-
-            while (!IsAtEnd && !IsAtConstructBoundary())
-            {
-                lastSpan = Advance().Span;
-            }
-
-            var span = SourceSpan.Covering(startSpan, lastSpan);
-            var placeholder = new LiteralExpression(TokenKind.True, "true", span);
-            return new OutcomeSlot(placeholder, span);
-        }
+        // ParseOutcomePlaceholder removed — replaced by ParseOutcome in Parser.Expressions.cs
 
         // ── Boundary detection ──────────────────────────────────────────────────
 
         private bool IsAtConstructBoundary() =>
             ConstructsCatalog.LeadingTokens.Contains(Peek().Kind) || IsAtEnd;
-
-        private bool IsExpressionTerminator() =>
-            Peek().Kind == TokenKind.When
-            || Peek().Kind == TokenKind.Because
-            || IsAtConstructBoundary();
-
-        private bool IsExpressionTerminatorAfterGuard() =>
-            Peek().Kind == TokenKind.Because
-            || Peek().Kind == TokenKind.Arrow
-            || IsAtConstructBoundary();
     }
 }
 
