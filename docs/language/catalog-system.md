@@ -822,8 +822,9 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
-> **Open Question (unresolved):** Should `TokenMeta.SemanticTokenModifiers?` be added? Both language-server.md and tooling-surface.md reference it, but it's not in this shape.
-> *Source: catalog-gap-register.md #41*
+> **✅ Resolved — No `SemanticTokenModifiers` field on `TokenMeta`**
+> Precept tokens carry zero LSP semantic token modifier bits. The modifier flags defined in the LSP specification (`readonly`, `defaultLibrary`, `deprecated`, etc.) describe declaration-role dimensions that have no meaning in Precept's token taxonomy. Tokens are categorized by their structural role (keyword, identifier, operator, etc.); that role is fully captured by `SemanticTokenType`. The language server hardcodes `tokenModifiers: 0` for all tokens and no catalog property is needed.
+> *Resolved: 2026-05-07 — Wave 4, team-autonomous*
 
 **Consumers:** MCP vocabulary, LS semantic tokens, LS completions, lexer keyword lookup, TextMate grammar keyword alternations.
 
@@ -1488,9 +1489,7 @@ Grammar forms / declaration shapes.
 |------|------|
 | Kind enum | `ConstructKind` (11 members) |
 | Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], LeadingToken, SnippetTemplate?)` — see full shape below |
-| Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (15-member enum) |
-
-> **Open Question (unresolved):** parser.md claims 17 `ConstructSlotKind` members including `RuleExpressionSlot` and `InitialMarkerSlot`. This inventory shows 15. Which is correct?
+| Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (17-member enum) |
 
 | Catalog class | `Constructs` — `GetMeta()`, `All` |
 | Output type | None |

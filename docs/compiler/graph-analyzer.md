@@ -608,19 +608,19 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 
 3. **Incremental analysis:** The current design is whole-graph analysis. Future work may introduce incremental updates for language server responsiveness, but this is not required initially.
 
-### To Be Resolved During Implementation
+### Implementation Notes
 
-> **Open Question:** `EventCoverageEntry` granularity
-> The graph analyzer does not yet settle whether guarded and unguarded transition coverage stay separate or collapse into one coarser event-coverage entry. That choice affects diagnostics, tooling summaries, and whether guard-conditioned reachability remains visible downstream.
-> *Flagged: 2026-05-04*
+> **✅ Resolved — `EventCoverageEntry` stays at event-level granularity**
+> `EventCoverageEntry` tracks events against all reachable states without splitting by guard presence. Guard-conditioned reachability (which specific transition rows actually fire under which guards) is the proof engine's domain via `ProofForwardingFact`. The graph analyzer cannot evaluate guards — it operates on structural facts only. Event-level coverage is sufficient for `UnhandledEvent` diagnostics and proof forwarding. Guard-split granularity would require guard evaluation, which belongs downstream.
+> *Resolved: 2026-05-07 — Wave 4, team-autonomous*
 
-> **Open Question:** Back-edge definition
-> The current text mixes a BFS-ancestor notion of back-edge with classic DFS back-edge terminology. The graph contract needs one definition because cycle detection and `irreversible` reasoning change depending on which graph-theory meaning is canonical.
-> *Flagged: 2026-05-04*
+> **✅ Resolved — BFS-ancestor definition is canonical for back-edges**
+> A back-edge is an edge whose target state is a BFS-tree ancestor of the source state (established by traversal from the initial state). DFS back-edges are not used. BFS ancestor is the correct notion because reachability analysis and irreversibility constraints operate on the same BFS traversal order. The pseudocode already says "ancestor in the BFS tree" — that phrasing is canonical.
+> *Resolved: 2026-05-07 — Wave 4, team-autonomous*
 
-> **Open Question:** `GraphEvent.IsInitial` derivation
-> `GraphEvent` exposes `IsInitial`, but the doc never defines whether that flag comes from initial-state reachability, explicit event metadata, or creation-only routing. The analyzer needs one derivation rule before event facts can be treated as structural output.
-> *Flagged: 2026-05-04*
+> **✅ Resolved — `GraphEvent.IsInitial` is derived from outgoing edges of the initial state**
+> `GraphEvent.IsInitial = true` if and only if the event has at least one `GraphEdge` whose source state has `GraphState.IsInitial = true`. This is a purely structural derivation: the graph analyzer identifies the initial state (via `StateModifierMeta` for the `initial` modifier), then marks any event that fires from it. No event-level metadata is consulted — the derivation is entirely structural from the edge set.
+> *Resolved: 2026-05-07 — Wave 4, team-autonomous*
 
 ---
 
@@ -676,7 +676,7 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 |------|------|-------------|
 | 80 | `UnreachableState` | A state cannot be reached from the initial state |
 | 81 | `UnhandledEvent` | An event declared in the precept has zero transition rows in any state — it can never be fired successfully |
-| TBD | `TerminalStateHasOutgoingEdges` | A terminal state has outgoing transitions |
-| TBD | `IrreversibleStateHasBackEdge` | An irreversible state has a transition returning to an ancestor |
-| TBD | `RequiredStateDoesNotDominateTerminal` | A required state does not dominate any terminal state |
-| TBD | `NoInitialState` | No state is marked with the `initial` modifier |
+| 82 | `TerminalStateHasOutgoingEdges` | A terminal state has outgoing transitions |
+| 83 | `IrreversibleStateHasBackEdge` | An irreversible state has a transition returning to a BFS ancestor |
+| 84 | `RequiredStateDoesNotDominateTerminal` | A required state does not dominate any terminal state |
+| 85 | `NoInitialState` | No state is marked with the `initial` modifier |

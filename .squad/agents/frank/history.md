@@ -17,8 +17,26 @@
 - `GraphState` is a derived-facts output record, never a source-model mirror; booleans are the right shape when the question is structural.
 - `SlotContext` and `ConstructSlotKind` are different concepts; mapping between them is legitimate, aliasing them is not.
 - Default-valued field additions on `readonly record struct` contracts are acceptable when they preserve existing call sites and the new data is structurally optional.
+- `EventCoverageEntry` stays at event-level; guard-conditioned reachability belongs to the proof engine via `ProofForwardingFact`. Graph analysis is structural, not evaluative.
+- Back-edges in the graph analyzer are BFS-ancestor edges, not DFS back-edges. BFS ancestor is canonical because reachability and irreversibility use the same traversal order.
+- Graph structural diagnostic codes (82-85) precede proof engine codes (86+) by pipeline stage order.
 
 ## Recent Updates
+
+### 2026-05-07 — Wave 4: Final consistency pass + 6 genuine gap triage
+
+- All 6 Wave 3 follow-up gaps resolved as team-autonomous; no owner-required items.
+- **Gap 1 (TokenMeta.SemanticTokenModifiers #41):** No field added. All Precept tokens carry zero modifier bits — LSP modifier flags have no analog in Precept's token taxonomy. `language-server.md` code comment updated; `catalog-system.md` OQ closed.
+- **Gap 2 (EventCoverageEntry granularity):** Event-level granularity confirmed. Guard-split is the proof engine's domain. `graph-analyzer.md` OQ closed.
+- **Gap 3 (back-edge definition):** BFS-ancestor is canonical; DFS not used. `graph-analyzer.md` OQ closed.
+- **Gap 4 (GraphEvent.IsInitial):** Derived structurally from edges originating from the initial-state vertex. `graph-analyzer.md` OQ closed.
+- **Gap 5 (TBD diagnostic codes):** Assigned 82=TerminalStateHasOutgoingEdges, 83=IrreversibleStateHasBackEdge, 84=RequiredStateDoesNotDominateTerminal, 85=NoInitialState; proof codes start at 86. `graph-analyzer.md` appendix updated; `proof-engine.md` source-file note corrected.
+- **Gap 6 (ActionMeta LS/MCP alignment #43):** Description surfaces in LS hover and MCP; SyntaxShape is internal; SnippetTemplate is a deferred milestone. Pattern settled. `language-server.md` OQ converted to settled note.
+- Terminology sweep: 6 `precept/preview` occurrences corrected to `precept/inspect` in `tooling-surface.md`; no other mismatches found (OrphanedEvent, FieldChange, MutationRecord, SlotKind-as-cursor all clean).
+- `ConstructSlotKind` count fixed: 15 → 17 in `catalog-system.md §Constructs`; stale OQ about parser.md discrepancy removed (canonical count is 17).
+- `docs/compiler/README.md` updated: superseded-doc section added for parser-radical.md and type-checker-radical.md.
+- `docs/working/cross-cutting-decisions.md`: Wave 3 marked ✅ COMPLETE; Wave 4 marked ✅ COMPLETE with full outcome block.
+- Validation unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
 
 ### 2026-05-07 — Wave 3 Round 2: canonical doc sweep recorded
 

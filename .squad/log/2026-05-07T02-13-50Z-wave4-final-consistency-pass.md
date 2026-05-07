@@ -1,0 +1,3 @@
+# Session log — wave4-final-consistency-pass
+
+At 2026-05-07T02:13:50Z, Scribe recorded Frank's Wave 4 final consistency pass: `decisions.md` measured 77092 bytes with 1 inbox file, so the archive gate ran on both thresholds and found 0 active entries older than 2026-04-07T02:13:50Z (30-day) and 0 active entries older than 2026-04-30T02:13:50Z (7-day). Merged `frank-wave4-pass.md` into the active ledger, cleared the processed inbox file, wrote the frank-165 orchestration log, refreshed Frank/Scribe history, and preserved the validation note that `dotnet build src/Precept/Precept.csproj` still fails only on the 3 pre-existing `SemanticIndex.cs` errors. Health report: `decisions.md` 77092B -> 79066B; inbox 1 -> 0; decisions archived = 0; history files summarized = 0.

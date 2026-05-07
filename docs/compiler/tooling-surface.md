@@ -61,7 +61,7 @@ The extension (`tools/Precept.VsCode/`) bridges the tooling surface to the edito
 |---|---|---|
 | Semantic resolution | TypeChecker | Tooling surface reads `SemanticIndex`, never produces it |
 | Diagnostic production | Pipeline stages | Tooling surface reads `Compilation.Diagnostics`, never produces them |
-| Preview/inspect runtime | Evaluator | Preview panel dispatches to LS `precept/preview`, which calls evaluator |
+| Preview/inspect runtime | Evaluator | Preview panel dispatches to LS `precept/inspect`, which calls evaluator |
 | Catalog definitions | `src/Precept/Language/` | Tooling surface is a consumer of catalogs, not a producer |
 | LSP protocol handling | Language server | Tooling surface provides data; LS handles protocol |
 
@@ -272,7 +272,7 @@ The `precept.openPreview` command opens a webview panel showing a live preview o
 | Opens beside editor | `vscode.ViewColumn.Beside` |
 | Follows active editor | `onDidChangeActiveTextEditor` subscription (when unlocked) |
 | Lock to specific file | `precept.togglePreviewLocking` command |
-| Content source | LS `precept/preview` custom command → evaluator inspection |
+| Content source | LS `precept/inspect` custom command → evaluator inspection |
 | Current state | Placeholder ("Coming in v2") — awaiting evaluator integration |
 
 ---
@@ -714,7 +714,7 @@ string FormatEventHover(TypedEvent evt)
 | `TokenStream` | Lexer | Token sequence for Pass 1 semantic tokens |
 | `ConstructManifest` | Parser | Cursor context for completions |
 | `SemanticIndex` | TypeChecker | Resolved symbols for Pass 2, identifier completions, hover |
-| `Precept` (runtime) | Builder | Preview/inspect via LS `precept/preview` |
+| `Precept` (runtime) | Builder | Preview/inspect via LS `precept/inspect` |
 
 ### Downstream Consumers
 
@@ -726,7 +726,7 @@ string FormatEventHover(TypedEvent evt)
 | VS Code semantic highlighting | LSP `SemanticTokens` → identifier colorization |
 | VS Code IntelliSense | LSP `CompletionItem[]` → completion popup |
 | VS Code editor | LSP `Hover` → hover tooltip |
-| Preview webview | LS `precept/preview` → inspection rendering |
+| Preview webview | LS `precept/inspect` → inspection rendering |
 
 ### Integration Points
 
@@ -757,7 +757,7 @@ string FormatEventHover(TypedEvent evt)
 |---|---|
 | Client → Server | `textDocument/didOpen`, `textDocument/didChange`, `textDocument/completion`, `textDocument/hover`, `textDocument/semanticTokens/full` |
 | Server → Client | `textDocument/publishDiagnostics`, completion responses, hover responses, semantic token responses |
-| Custom | `precept/preview` (client → server → evaluator → JSON response) |
+| Custom | `precept/inspect` (client → server → evaluator → JSON response) |
 
 ---
 
@@ -1088,7 +1088,7 @@ This document describes the **designed** state. Current implementation differs i
    These should be reconciled with `TokenMeta.SemanticTokenType` values when implementing full semantic token support.
 
 5. **Preview panel integration:** The current placeholder shows a "Coming in v2" message. When the evaluator is implemented:
-   - Add LS `precept/preview` custom command
+   - Add LS `precept/inspect` custom command
    - Call `Precept.InspectFire` / `Precept.InspectUpdate` 
    - Serialize result as JSON for webview rendering
    - Update webview HTML to render the inspection result
@@ -1145,7 +1145,7 @@ This document describes the **designed** state. Current implementation differs i
 
 **Excluded:** Preview panel implementing its own evaluation logic.
 
-**Rationale:** The preview panel dispatches to the LS `precept/preview` command, which calls the evaluator. The webview is a rendering layer only. Evaluation logic lives in `src/Precept/Runtime/`.
+**Rationale:** The preview panel dispatches to the LS `precept/inspect` command, which calls the evaluator. The webview is a rendering layer only. Evaluation logic lives in `src/Precept/Runtime/`.
 
 ### E6: No IDE-Specific Grammar Variants
 

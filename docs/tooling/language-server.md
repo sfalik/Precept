@@ -242,7 +242,7 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
             character: token.Span.StartColumn,
             length: token.Span.Length,
             tokenType: meta.SemanticTokenType,
-            tokenModifiers: 0);  // TokenMeta.SemanticTokenModifiers pending catalog addition (catalog-gap #41)
+            tokenModifiers: 0);  // No SemanticTokenModifiers on TokenMeta — Precept tokens carry zero modifier bits (resolved: Wave 4)
     }
     
     return builder.Build();
@@ -1328,8 +1328,8 @@ void Update(Compilation compilation)
 
 ### Open Questions
 
-> **Documentation strings across catalog entries (CC#19 closed `TokenMeta`; broader expansion pending):**
-> `TokenMeta.HoverDescription` is confirmed (CC#19). `FieldModifierMeta.HoverDescription`, `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, and `OperatorMeta.HoverDescription` already exist. `ActionMeta.SnippetTemplate` and remaining modifier subtypes are incremental catalog additions (catalog-gap #43). The pattern is settled; completion is an implementation milestone, not a design question.
+> **Documentation strings across catalog entries — pattern settled:**
+> `TokenMeta.HoverDescription` is confirmed (CC#19). `FieldModifierMeta.HoverDescription`, `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, and `OperatorMeta.HoverDescription` already exist. `ActionMeta.Description` is the hover/MCP source for action documentation (confirmed in Wave 3). `ActionMeta.SnippetTemplate` is a deferred catalog addition — not yet added, but follows the settled pattern when needed (catalog-gap #43). LS/MCP alignment for `ActionMeta`: `Description` surfaces in both LS hover and MCP vocabulary; `SyntaxShape` is internal routing only. The design pattern is settled; remaining items are implementation milestones, not design questions.
 
 > **Workspace/symbol (`workspace/symbol`):** Deferred. Precepts are single-file by design. Revisit only if the language surface expands to multi-file.
 

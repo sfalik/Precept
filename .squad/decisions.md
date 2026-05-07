@@ -37,6 +37,24 @@
 
 ---
 
+### 2026-05-07T02:13:50Z: Wave 4 final consistency pass recorded; 6 gaps closed and terminology sweep completed
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file); Frank reported 3 pre-existing `SemanticIndex.cs` errors only.
+
+**Merged source:** `frank-wave4-pass.md`.
+
+- All 6 preserved follow-up gaps from Wave 3 Round 2 were resolved as team-autonomous and propagated into canonical docs with no owner-required items remaining.
+- Closed the SemanticTokenModifiers question by documenting that Precept tokens carry zero LSP modifier bits, leaving `TokenMeta` unchanged and the language server hardcoding `tokenModifiers: 0`.
+- Locked graph-analyzer semantics on three fronts: `EventCoverageEntry` remains event-level only, back-edges are BFS-tree ancestors, and `GraphEvent.IsInitial` is structurally derived from edges whose source state is initial.
+- Assigned structural diagnostic codes 82-85 (`TerminalStateHasOutgoingEdges`, `IrreversibleStateHasBackEdge`, `RequiredStateDoesNotDominateTerminal`, `NoInitialState`) and confirmed proof-engine codes begin at 86.
+- Settled the `ActionMeta` tooling pattern: `Description` surfaces in LS hover and MCP vocabulary, `SyntaxShape` stays internal, and `SnippetTemplate` remains a deferred catalog addition.
+- Cleaned stale language across `docs/compiler/graph-analyzer.md`, `docs/language/catalog-system.md`, `docs/tooling/language-server.md`, and `docs/compiler/proof-engine.md`; corrected 6 `precept/preview` → `precept/inspect` terminology drifts in `docs/compiler/tooling-surface.md`; updated `docs/compiler/README.md` to mark `parser-radical.md` and `type-checker-radical.md` as superseded; and marked Waves 3 and 4 `✅ COMPLETE` in `docs/working/cross-cutting-decisions.md`.
+- Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
+
+---
+
 ### 2026-05-07T01:26:52Z: Wave 2 cross-cutting decisions all closed; Wave 1 checkbox drift corrected
 
 **By:** Scribe

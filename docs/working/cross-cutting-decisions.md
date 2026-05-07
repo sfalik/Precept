@@ -103,14 +103,14 @@ Wave 1 is done when the cross-stage shape questions stop living only in this dri
 
 Wave 2 is done when the remaining single-stage or lightly coupled questions become mechanical documentation and implementation work instead of architecture debates.
 
-## Wave 3 — Open Question Resolution
+## Wave 3 — Open Question Resolution ✅ COMPLETE
 
 ### Execution Checklist
 
-- [ ] [Team] Use `docs/working/Archived/structural-gap-register-migrated.md` as a routing index only; burn down each migrated structural open question in its owning canonical doc. [Blocked by: Waves 1–2]
-- [ ] [Team] Use `docs/working/Archived/catalog-gap-register-migrated.md` as a routing index only; burn down each migrated catalog open question in `docs/language/catalog-system.md` and dependent docs. [Blocked by: Waves 1–2]
-- [ ] [Team] Sweep `docs/compiler/type-checker.md`, `docs/compiler/proof-engine.md`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`, `docs/tooling/language-server.md`, `docs/tooling/mcp.md`, `docs/language/catalog-system.md`, `docs/compiler/graph-analyzer.md`, and `docs/compiler/diagnostic-system.md` so the canonical docs become the only live trackers. [Blocked by: Waves 1–2]
-- [ ] [Shane] Review any item that remains a real product choice after the team closes the mechanical migrations. [Blocked by: Team sweep]
+- [x] [Team] Use `docs/working/Archived/structural-gap-register-migrated.md` as a routing index only; burn down each migrated structural open question in its owning canonical doc. [Blocked by: Waves 1–2]
+- [x] [Team] Use `docs/working/Archived/catalog-gap-register-migrated.md` as a routing index only; burn down each migrated catalog open question in `docs/language/catalog-system.md` and dependent docs. [Blocked by: Waves 1–2]
+- [x] [Team] Sweep `docs/compiler/type-checker.md`, `docs/compiler/proof-engine.md`, `docs/runtime/precept-builder.md`, `docs/runtime/evaluator.md`, `docs/tooling/language-server.md`, `docs/tooling/mcp.md`, `docs/language/catalog-system.md`, `docs/compiler/graph-analyzer.md`, and `docs/compiler/diagnostic-system.md` so the canonical docs become the only live trackers. [Blocked by: Waves 1–2]
+- [x] [Shane] Review any item that remains a real product choice after the team closes the mechanical migrations. — Reviewed; 6 follow-up gaps were preserved and resolved in Wave 4 (all team-autonomous).
 
 ### Canonical-Doc Burn-Down Order
 
@@ -119,14 +119,30 @@ Wave 2 is done when the remaining single-stage or lightly coupled questions beco
 3. `docs/runtime/evaluator.md` + `docs/tooling/language-server.md` + `docs/tooling/mcp.md` — CC#8, CC#12, CC#23, CC#24
 4. `docs/language/catalog-system.md` + `docs/compiler/graph-analyzer.md` + `docs/compiler/diagnostic-system.md` — CC#5, CC#10, CC#13, CC#16–CC#21, CC#26
 
-## Wave 4 — Doc Finalization
+### Outcome
+
+Wave 3 is complete. 33 open question markers closed across 9 canonical docs in two rounds (Round 1: type-checker, proof-engine, precept-builder; Round 2: evaluator, language-server, mcp, catalog-system, graph-analyzer, diagnostic-system). Six genuine follow-up gaps deferred to Wave 4 for triage.
+
+## Wave 4 — Doc Finalization ✅ COMPLETE
 
 ### Execution Checklist
 
-- [ ] [Team] Run a final consistency pass across compiler, runtime, tooling, and catalog docs after Wave 3 closes. [Blocked by: Wave 3]
-- [ ] [Team] Replace stale `pending`, `provisional`, and cross-doc disagreement language for any CC decision already locked. [Blocked by: Wave 3]
-- [ ] [Team] Update `docs/compiler/README.md` and any navigation tables so canonical docs are the first and only destination. [Blocked by: Wave 3]
-- [ ] [Shane] Sign off any owner-only open question that still prevents a doc from reaching Full status. [Blocked by: Team final pass]
+- [x] [Team] Run a final consistency pass across compiler, runtime, tooling, and catalog docs after Wave 3 closes. [Blocked by: Wave 3]
+- [x] [Team] Replace stale `pending`, `provisional`, and cross-doc disagreement language for any CC decision already locked. [Blocked by: Wave 3]
+- [x] [Team] Update `docs/compiler/README.md` and any navigation tables so canonical docs are the first and only destination. [Blocked by: Wave 3]
+- [x] [Shane] Sign off any owner-only open question — no owner-required gaps found; all 6 Wave 3 follow-up gaps were team-autonomous.
+
+### Outcome
+
+Wave 4 is complete. All 6 Wave 3 follow-up gaps were resolved as team-autonomous (no product-semantic decisions required):
+1. **`TokenMeta.SemanticTokenModifiers`** — No field added; Precept tokens carry zero modifier bits. LS hardcodes `tokenModifiers: 0`.
+2. **`EventCoverageEntry` granularity** — Stays at event-level; guard-conditioned coverage is the proof engine's domain.
+3. **Back-edge definition** — BFS-ancestor is canonical; DFS back-edges not used.
+4. **`GraphEvent.IsInitial` derivation** — Derived from outgoing edges of the initial state (structural, no metadata lookup).
+5. **TBD structural diagnostic codes** — Assigned: 82=`TerminalStateHasOutgoingEdges`, 83=`IrreversibleStateHasBackEdge`, 84=`RequiredStateDoesNotDominateTerminal`, 85=`NoInitialState`. Proof engine codes start at 86.
+6. **`ActionMeta` LS/MCP alignment** — `Description` surfaces in both LS hover and MCP vocabulary; `SyntaxShape` is internal; `SnippetTemplate` is a deferred implementation milestone.
+
+Stale language cleaned: 3 graph-analyzer OQ blocks closed, 2 catalog-system OQs closed (SemanticTokenModifiers + ConstructSlotKind count), LS tokenModifiers comment updated, proof-engine source file note fixed, 6 `precept/preview` occurrences in tooling-surface.md corrected to `precept/inspect`. `docs/compiler/README.md` updated with superseded-doc entries.
 
 ## Wave 5 — Archive
 

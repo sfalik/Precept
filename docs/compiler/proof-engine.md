@@ -1086,6 +1086,6 @@ Unlike SPARK Ada's `pragma Annotate` or Dafny's `assert`/`assume`, Precept does 
 | `src/Precept/Language/ProofRequirements.cs` | `ProofRequirements` catalog with `GetMeta()` and `All` |
 | `src/Precept/Language/FaultCode.cs` | `FaultCode` enum with `[StaticallyPreventable]` attributes |
 | `src/Precept/Language/Faults.cs` | `Faults` catalog with `GetMeta()` and fault message templates |
-| `src/Precept/Language/Modifier.cs` | `ModifierMeta` DU including `FieldModifierMeta` (to be extended with `ProofDischarges`) |
+| `src/Precept/Language/Modifier.cs` | `ModifierMeta` DU including `FieldModifierMeta` with `ProofDischarges[]` (CC#5 resolved) |
 | `src/Precept/Language/Modifiers.cs` | `Modifiers` catalog |
-| `src/Precept/Language/DiagnosticCode.cs` | `DiagnosticCode` enum including proof-related codes (§82–84) |
+| `src/Precept/Language/DiagnosticCode.cs` | `DiagnosticCode` enum including proof-related codes (graph analyzer uses codes 80–85; proof engine codes start at 86) |

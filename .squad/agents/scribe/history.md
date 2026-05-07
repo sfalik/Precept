@@ -27,6 +27,12 @@
 - Merged `frank-wave3-round1.md` into the active ledger, deleted the processed inbox file, wrote the Frank orchestration/session logs, and refreshed Frank/Scribe history.
 - Health report: `decisions.md` 73849B -> 75117B; inbox processed = 1; history files summarized = 0.
 
+### 2026-05-07T02:13:50Z — Wave 4 final consistency pass recorded
+
+- Pre-check measured `decisions.md` at 77092 bytes with 1 inbox file, so the hard-gate 30-day archive pass ran first and found 0 active entries older than 2026-04-07T02:13:50Z; the file still exceeded 50KB, so the 7-day overflow pass also ran and found 0 active entries older than 2026-04-30T02:13:50Z.
+- Merged `frank-wave4-pass.md` into the active ledger, deleted the processed inbox file, wrote the Frank orchestration/session logs for frank-165, and refreshed Frank/Scribe history.
+- Health report: `decisions.md` 77092B -> 79066B; inbox processed = 1; history files summarized = 0.
+
 ### 2026-05-07T01:26:52Z — Wave 2 closeout recorded
 
 - Pre-check measured `decisions.md` at 72581 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T01:26:52Z.
