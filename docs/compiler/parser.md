@@ -3,8 +3,8 @@
 ## Status
 
 **Stage:** Design Complete  
-**Implementation:** Stub — `Parser.Parse` returns empty arrays  
-**Blocking:** ~~Expression tree design~~ — resolved. Expression slots now carry `ParsedExpression`.
+**Implementation:** Complete — Slices 1–4  
+**Blocking:** None — all expression slots carry `ParsedExpression` via Pratt parser.
 
 ---
 
@@ -220,22 +220,22 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 | `ModifierList` | Parse modifier keywords via `Modifiers` catalog |
 | `StateEntryList` | Parse `Name [Modifiers]` entries |
 | `ArgumentList` | Parse `(name: Type, ...)` |
-| `ComputeExpression` | Capture span, defer expression tree |
-| `GuardClause` | Capture `when` clause span |
+| `ComputeExpression` | Parse `->` expression via Pratt parser → `ParsedExpression` |
+| `GuardClause` | Parse `when` expression via Pratt parser → `ParsedExpression` |
 | `ActionChain` | Parse action keywords via `Actions` catalog |
-| `Outcome` | Capture `=>` expression span |
+| `Outcome` | Parse `-> transition/no transition/reject` → `ParsedExpression` |
 | `StateTarget` | Parse optional state name after `to` |
 | `EventTarget` | Parse optional event name after `fire` |
-| `EnsureClause` | Capture `ensure` expression span |
+| `EnsureClause` | Parse `ensure` expression via Pratt parser → `ParsedExpression` |
 | `BecauseClause` | Parse `because "message"` |
 | `AccessModeKeyword` | Capture access mode span |
 | `FieldTarget` | Parse field name after `for` |
-| `RuleExpression` | Capture rule body span |
+| `RuleExpression` | Parse rule body via Pratt parser → `ParsedExpression` |
 | `InitialMarker` | Check for `initial` keyword presence |
 
-### Expression Parsing
+### Expression Parsing (Implemented)
 
-Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with 13 sealed subtypes (one per `ExpressionFormKind` member). The expression parser is a Pratt parser (operator-precedence) using `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
+Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with 13 sealed subtypes (one per `ExpressionFormKind` member). The expression parser is a Pratt parser (operator-precedence) implemented in `Parser.Expressions.cs`, using the `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
 
 `ParsedExpression` is a closed, strongly-typed DU. Adding a new expression form requires a C# code change (new subtype + update all consumer switches). Exhaustiveness is enforced by sealed hierarchy + Roslyn analyzer test.
 
@@ -286,7 +286,7 @@ Error recovery synchronizes on these boundaries.
 | `Modifiers` catalog | Modifier vocabulary |
 | `Actions` catalog | Action vocabulary |
 | `Types` catalog | Type vocabulary |
-| `Operators` catalog | Operator precedence (future) |
+| `Operators` catalog | Operator precedence and associativity |
 
 ### Downstream Consumers
 

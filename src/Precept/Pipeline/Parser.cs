@@ -284,7 +284,7 @@ public static partial class Parser
                 ConstructSlotKind.GuardClause       => ParseGuardClause(slot),
                 ConstructSlotKind.ComputeExpression => ParseComputeExpression(slot),
                 ConstructSlotKind.EnsureClause      => ParseEnsureClause(slot),
-                ConstructSlotKind.ActionChain       => ParseActionChainPlaceholder(slot),
+                ConstructSlotKind.ActionChain       => ParseActionChain(slot),
                 ConstructSlotKind.Outcome           => ParseOutcome(slot),
                 ConstructSlotKind.StateTarget       => ParseStateTarget(slot),
                 ConstructSlotKind.EventTarget       => ParseEventTarget(slot),
@@ -633,11 +633,7 @@ public static partial class Parser
             return new FieldTargetSlot(null, Peek().Span);
         }
 
-        // ── Expression placeholders (Slice 1) ───────────────────────────────────
-        // Replaced by Pratt parser in Parser.Expressions.cs (Slice 3).
-        // ParseActionChainPlaceholder remains — action chains are not expressions.
-
-        private SlotValue ParseActionChainPlaceholder(ConstructSlot slot)
+        private SlotValue ParseActionChain(ConstructSlot slot)
         {
             if (Peek().Kind != TokenKind.Arrow)
                 return MakeSentinel(slot);
@@ -679,8 +675,6 @@ public static partial class Parser
             return new ActionChainSlot(actions.ToImmutableArray(),
                 SourceSpan.Covering(startSpan, lastSpan));
         }
-
-        // ParseOutcomePlaceholder removed — replaced by ParseOutcome in Parser.Expressions.cs
 
         // ── Boundary detection ──────────────────────────────────────────────────
 
