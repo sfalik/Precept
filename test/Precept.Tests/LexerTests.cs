@@ -143,7 +143,7 @@ public class LexerTests
     [Fact]
     public void Lex_OperatorsAndPunctuation_ProduceExpectedTokenKindsInOrder()
     {
-        var stream = Lexer.Lex("== != ~= !~ >= <= > < = + - * / % -> . , ( ) [ ]");
+        var stream = Lexer.Lex("== != ~= !~ >= <= > < = + - * / % -> <- . , ( ) [ ]");
 
         stream.Tokens.Select(token => token.Kind).Should().Equal(
             TokenKind.DoubleEquals,
@@ -161,6 +161,7 @@ public class LexerTests
             TokenKind.Slash,
             TokenKind.Percent,
             TokenKind.Arrow,
+            TokenKind.BackArrow,
             TokenKind.Dot,
             TokenKind.Comma,
             TokenKind.LeftParen,
@@ -169,6 +170,41 @@ public class LexerTests
             TokenKind.RightBracket,
             TokenKind.EndOfSource);
 
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_BackArrow_ProducesBackArrowToken()
+    {
+        var stream = Lexer.Lex("<-");
+
+        stream.Tokens.Should().Contain(t => t.Kind == TokenKind.BackArrow);
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_BackArrow_NoCollisionWithLessThanOrEqual()
+    {
+        var stream = Lexer.Lex("<- <=");
+
+        stream.Tokens.Select(t => t.Kind).Should().Equal(
+            TokenKind.BackArrow,
+            TokenKind.LessThanOrEqual,
+            TokenKind.EndOfSource);
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_LessThanMinus_WithSpace_DoesNotProduceBackArrow()
+    {
+        var stream = Lexer.Lex("x < -y");
+
+        stream.Tokens.Select(t => t.Kind).Should().Equal(
+            TokenKind.Identifier,
+            TokenKind.LessThan,
+            TokenKind.Minus,
+            TokenKind.Identifier,
+            TokenKind.EndOfSource);
         stream.Diagnostics.Should().BeEmpty();
     }
 

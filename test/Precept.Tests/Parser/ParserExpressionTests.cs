@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using FluentAssertions;
 using Precept.Language;
 using Precept.Pipeline;
@@ -121,12 +121,12 @@ public class ParserExpressionTests
     [InlineData("rule ~startsWith(name, \"A\") because \"msg\"")]
     [InlineData("rule ~endsWith(name, \"Z\") because \"msg\"")]
     [InlineData("rule amount > 0 when active because \"msg\"")]
-    [InlineData("field label as string -> \"hello\"")]
-    [InlineData("field val as number -> -amount")]
-    [InlineData("field tax as number -> subtotal * 0.1")]
-    [InlineData("field tags as number -> [1, 2, 3]")]
-    [InlineData("field tags as number -> []")]
-    [InlineData("field dt as date -> '2026-01-01'")]
+    [InlineData("field label as string <- \"hello\"")]
+    [InlineData("field val as number <- -amount")]
+    [InlineData("field tax as number <- subtotal * 0.1")]
+    [InlineData("field tags as number <- [1, 2, 3]")]
+    [InlineData("field tags as number <- []")]
+    [InlineData("field dt as date <- '2026-01-01'")]
     [InlineData("from Draft on Submit when amount > 0 -> transition Approved")]
     [InlineData("in Draft ensure amount > 0 because \"msg\"")]
     [InlineData("in Draft ensure amount > 0 when active because \"msg\"")]
@@ -180,7 +180,7 @@ public class ParserExpressionTests
     public void Literal_StringLiteral_InComputeExpression_ProducesLiteralExpression()
     {
         // RED-E: Slice 3 — expression parsing
-        var expr = GetCompute("field label as string -> \"hello\"");
+        var expr = GetCompute("field label as string <- \"hello\"");
 
         expr.Should().BeOfType<LiteralExpression>();
         var lit = (LiteralExpression)expr;
@@ -193,7 +193,7 @@ public class ParserExpressionTests
     public void Literal_TypedConstant_InComputeExpression_ProducesLiteralExpression()
     {
         // RED-E: Slice 3 — expression parsing
-        var expr = GetCompute("field dt as date -> '2026-01-01'");
+        var expr = GetCompute("field dt as date <- '2026-01-01'");
 
         expr.Should().BeOfType<LiteralExpression>();
         var lit = (LiteralExpression)expr;
@@ -474,7 +474,7 @@ public class ParserExpressionTests
         // Unary minus before an identifier must produce UnaryOperationExpression.
         // Per spec §1.3, only '-' followed by a NumberLiteral is constant-folded;
         // '-identifier' remains a runtime negate.
-        var expr = GetCompute("field val as number -> -amount");
+        var expr = GetCompute("field val as number <- -amount");
 
         var unary = expr.Should().BeOfType<UnaryOperationExpression>().Subject;
         unary.Operator.Should().Be(TokenKind.Minus,
@@ -740,7 +740,7 @@ public class ParserExpressionTests
     public void ListLiteral_ThreeElementList_InComputeExpression_ProducesListLiteralExpression()
     {
         // RED-E: Slice 3 — expression parsing
-        var expr = GetCompute("field tags as number -> [1, 2, 3]");
+        var expr = GetCompute("field tags as number <- [1, 2, 3]");
 
         expr.Should().BeOfType<ListLiteralExpression>();
         ((ListLiteralExpression)expr).Elements.Should().HaveCount(3,
@@ -751,7 +751,7 @@ public class ParserExpressionTests
     public void ListLiteral_AllElements_AreLiteralExpressions()
     {
         // RED-E: Slice 3 — expression parsing
-        var expr = GetCompute("field tags as number -> [1, 2, 3]");
+        var expr = GetCompute("field tags as number <- [1, 2, 3]");
 
         var list = (ListLiteralExpression)expr;
         list.Elements.Should().AllSatisfy(e => e.Should().BeOfType<LiteralExpression>(),
@@ -762,7 +762,7 @@ public class ParserExpressionTests
     public void ListLiteral_Empty_ProducesListLiteralExpressionWithNoElements()
     {
         // RED-E: Slice 3 — expression parsing
-        var expr = GetCompute("field tags as number -> []");
+        var expr = GetCompute("field tags as number <- []");
 
         expr.Should().BeOfType<ListLiteralExpression>();
         ((ListLiteralExpression)expr).Elements.Should().BeEmpty("[] is an empty list literal");
@@ -979,12 +979,12 @@ public class ParserExpressionTests
     public void SlotPlumbing_FieldDeclaration_ComputeExpressionSlot_IsPresentAndContainsBinaryOp()
     {
         // RED-E: Slice 3 — expression parsing
-        const string source = "field tax as number -> subtotal * 0.1";
+        const string source = "field tax as number <- subtotal * 0.1";
         var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
 
         var construct = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.FieldDeclaration);
         construct.Slots.Should().Contain(s => s.Kind == ConstructSlotKind.ComputeExpression,
-            "FieldDeclaration '-> subtotal * 0.1' must materialize a ComputeExpression slot");
+            "FieldDeclaration '<- subtotal * 0.1' must materialize a ComputeExpression slot");
 
         var compute = (ComputeExpressionSlot)construct.Slots.Single(s => s.Kind == ConstructSlotKind.ComputeExpression);
         compute.Expression.Should().BeOfType<BinaryOperationExpression>()

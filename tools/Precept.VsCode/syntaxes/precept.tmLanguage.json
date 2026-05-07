@@ -399,6 +399,10 @@
     "arrowOperator": {
       "patterns": [
         {
+          "name": "keyword.operator.arrow.precept",
+          "match": "<-"
+        },
+        {
           "name": "punctuation.separator.arrow.precept",
           "match": "->"
         }

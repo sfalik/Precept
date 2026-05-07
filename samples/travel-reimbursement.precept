@@ -11,7 +11,7 @@ field LodgingTotal as decimal default 0
 field MealsTotal as decimal default 0
 field MileageTotal as decimal default 0 maxplaces 2
 field MileageRate as number default 0.67
-field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal nonnegative
+field RequestedTotal as number <- LodgingTotal + MealsTotal + MileageTotal nonnegative
 field ApprovedTotal as number default 0 nonnegative
 field FinanceNote as string optional
 rule ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the request"

@@ -7,5 +7,5 @@ precept ComputedTaxNet
 field Subtotal as number default 120 positive writable
 field TaxRate as number default 0.08 min 0 max 0.99 writable
 
-field Tax as number nonnegative -> Subtotal * TaxRate
-field Net as number positive -> Subtotal - Tax
+field Tax as number nonnegative <- Subtotal * TaxRate
+field Net as number positive <- Subtotal - Tax

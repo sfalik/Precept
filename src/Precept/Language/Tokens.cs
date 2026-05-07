@@ -336,6 +336,8 @@ public static class Tokens
             TextMateScope: "keyword.operator.precept", SemanticTokenType: "operator"),
         TokenKind.Arrow               => new(kind, "->", Cat_Op, "Action chain / outcome separator",
             TextMateScope: "keyword.operator.arrow.precept", SemanticTokenType: "operator"),
+        TokenKind.BackArrow           => new(kind, "<-", Cat_Op, "Computed field derivation",
+            TextMateScope: "keyword.operator.arrow.precept", SemanticTokenType: "operator"),
 
         // ── Punctuation ────────────────────────────────────────────
         TokenKind.Dot          => new(kind, ".",  Cat_Pun, "Member access",

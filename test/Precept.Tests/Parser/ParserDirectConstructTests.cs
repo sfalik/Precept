@@ -853,7 +853,7 @@ public class ParserDirectConstructTests
     [Theory]
     [InlineData(ConstructKind.PreceptHeader,    "precept LoanApp")]
     [InlineData(ConstructKind.StateDeclaration, "state Draft initial")]
-    [InlineData(ConstructKind.FieldDeclaration, "field amount as number nonnegative -> 0")]
+    [InlineData(ConstructKind.FieldDeclaration, "field amount as number nonnegative <- 0")]
     [InlineData(ConstructKind.EventDeclaration, "event Submit(approver as string) initial")]
     [InlineData(ConstructKind.RuleDeclaration,  "rule amount > 0 when active because \"reason\"")]
     public void DirectConstruct_ParsedSlotCount_MatchesCatalogMetaSlotCount_WhenAllOptionalSlotsPresent(

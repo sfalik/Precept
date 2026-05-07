@@ -1828,12 +1828,12 @@ public record ConstructSlot(
 Example — `FieldDeclaration`:
 
 ```
-field Identifier ("," Identifier)* as TypeRef Modifier* ("->" Expr)?
+field Identifier ("," Identifier)* as TypeRef Modifier* ("<-" Expr)?
 ```
 
 Modeled as:
 ```
-Keyword("field")  Identifier  Separator(",", repeatable)  Keyword("as")  TypeRef  Modifier(repeatable)  Arrow("->", optional)  Expression(optional)
+Keyword("field")  Identifier  Separator(",", repeatable)  Keyword("as")  TypeRef  Modifier(repeatable)  BackArrow("<-", optional)  Expression(optional)
 ```
 
 **Why this matters:** Because Precept is entirely line-oriented, construct slot arrays can model 100% of the grammar. Slots reference other catalogs — `TypeRef` slots enumerate `Types.All` for type alternation, `Keyword` slots reference `Tokens`. The entire TextMate grammar is derivable from: Constructs (slot patterns) × Tokens (keyword alternations) × Types (type name alternations).

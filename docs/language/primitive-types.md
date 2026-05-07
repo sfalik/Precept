@@ -604,7 +604,7 @@ _TBD — open questions will be captured here as the type checker and evaluator 
 | `field Pct as decimal maxplaces -1` | Constraint value must be non-negative — `InvalidModifierValue`. |
 | `field Name as string maxplaces 2` | `maxplaces` only applies to `decimal` — `InvalidModifierForType`. |
 | `field Score as decimal nonnegative positive` | `positive` subsumes `nonnegative` — `RedundantModifier` (warning). Remove `nonnegative`. |
-| `field Total as decimal -> Amount * Rate` and `default 0` | A computed field cannot also have a default — `ComputedFieldWithDefault`. Remove the `default`. |
+| `field Total as decimal <- Amount * Rate` and `default 0` | A computed field cannot also have a default — `ComputedFieldWithDefault`. Remove the `default`. |
 
 ### String / `~string` errors
 

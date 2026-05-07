@@ -80,7 +80,7 @@ to     →  StateEnsure | StateAction                   (disambiguated by 2nd ke
 
 #### 3. Named slots
 
-Within a construct, each piece of information occupies a **named, typed position** defined by the construct's `ConstructMeta.Slots` entry in the Constructs catalog. Slots are never positional in the C-style sense — slot markers are keywords (`as`, `when`, `because`, `->`) that make each slot's role self-evident in the source text.
+Within a construct, each piece of information occupies a **named, typed position** defined by the construct's `ConstructMeta.Slots` entry in the Constructs catalog. Slots are never positional in the C-style sense — slot markers are keywords (`as`, `when`, `because`, `<-`) that make each slot's role self-evident in the source text.
 
 ```
 field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
@@ -224,14 +224,14 @@ field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
 ```
 
 ```
-field  LineTotal  as  number  ->  TaxableAmount + TaxAmount  nonnegative
+field  LineTotal  as  number  <-  TaxableAmount + TaxAmount  nonnegative
   │       │         ↑    │      ↑              │               │
  [1]     [2]      slot  [3]   slot            [4]             [5]
                   marker      marker
 [1] Leading token: `field`
 [2] IdentifierList slot — the field name
 [3] TypeExpression slot — `as` is the slot marker; `number` is the type
-[4] ComputeExpression slot — `->` is the slot marker; the expression computes the field value
+[4] ComputeExpression slot — `<-` is the slot marker; the expression computes the field value
 [5] ModifierList slot — optional trailing modifiers still apply to computed fields
 ```
 
@@ -445,8 +445,8 @@ While `field` is a single Direct construct, it has three surface forms distingui
 
 ```
 field  Name  as  Type  [modifiers]           → stored field
-field  Name  as  Type  ->  Expr              → computed field
-field  Name  as  Type  ->  Expr  [modifiers] → computed field with constraints
+field  Name  as  Type  <-  Expr              → computed field
+field  Name  as  Type  <-  Expr  [modifiers] → computed field with constraints
 ```
 
 These are all `FieldDeclaration`; the distinction is in slot values, not construct kind. The parser sees one `ConstructMeta`, walks all slots, and the type checker interprets the presence of a `ComputeExpression` slot to classify the field.
@@ -474,7 +474,7 @@ The 17 `ConstructSlotKind` values cover every distinct slot type in the language
 | `ModifierList` | Zero or more modifier keywords (some with values) | `nonnegative maxplaces 2 default 0` |
 | `StateEntryList` | Comma-separated (name modifier*) pairs for state declarations | `Draft initial, Submitted, Approved terminal success` |
 | `ArgumentList` | Typed parameter list | `(Amount as number, Note as string optional)` |
-| `ComputeExpression` | Computed field body expression | `-> UnitPrice * Quantity` |
+| `ComputeExpression` | Computed field body expression | `<- UnitPrice * Quantity` |
 | `GuardClause` | Optional `when` condition expression | `when DocumentsVerified and CreditScore >= 680` |
 | `ActionChain` | Sequence of `-> action` steps | `-> set ApprovedAmount = ...` |
 | `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "..."` / `-> no transition` |
@@ -510,7 +510,7 @@ Slot # │ Kind             │ Required │ Notes
 
 ### Named positions vs. positional arguments
 
-Precept slots are named positions, not positional arguments. The slot markers (`as`, `when`, `because`, `->`, `on`) appear in the source text and make each slot's role explicit. An author reading:
+Precept slots are named positions, not positional arguments. The slot markers (`as`, `when`, `because`, `<-`, `on`) appear in the source text and make each slot's role explicit. An author reading:
 
 ```
 field RequestedAmount as number default 0 nonnegative
@@ -533,7 +533,7 @@ Expressions appear **only** in expression-typed slots. The six expression-typed 
 
 | Slot kind | Where it appears | Example |
 |-----------|-----------------|---------|
-| `ComputeExpression` | Computed field body | `field Subtotal as number -> UnitPrice * Quantity` |
+| `ComputeExpression` | Computed field body | `field Subtotal as number <- UnitPrice * Quantity` |
 | `GuardClause` | Transition row guard, rule scope | `when DocumentsVerified and CreditScore >= 680` |
 | `EnsureClause` | State/event constraint expression | `ensure ApprovedAmount > 0` |
 | `RuleExpression` | Rule body | `rule ExistingDebt <= AnnualIncome * 3` |
@@ -568,14 +568,14 @@ The expression grammar is parsed by a Pratt parser (operator-precedence parsing)
 ### Expression structure within a slot
 
 ```
-field  TaxAmount  as  number  ->  TaxableAmount  *  TaxRate  /  100
+field  TaxAmount  as  number  <-  TaxableAmount  *  TaxRate  /  100
                               ↑   │               │    │      │   │
                            slot  [Identifier]  [Op]  [Id]  [Op] [Literal]
                            mark                           └── BinaryOperation (right sub-expr)
                                 └───────── BinaryOperation (full expression tree) ─────────┘
 ```
 
-The `->` is the slot marker for a `ComputeExpression` slot. Everything to its right is the expression — parsed as a tree, but contained entirely within the slot.
+The `<-` is the slot marker for a `ComputeExpression` slot. Everything to its right is the expression — parsed as a tree, but contained entirely within the slot.
 
 ### The open design question on expression trees
 

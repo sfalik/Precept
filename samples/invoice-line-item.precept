@@ -13,10 +13,10 @@ field DiscountPercent as number default 0 nonnegative max 100 writable
 field TaxRate as number default 8
 
 # Computed fields — derived from editable source fields.
-field Subtotal as number -> UnitPrice * Quantity
-field DiscountAmount as number -> Subtotal * DiscountPercent / 100
-field TaxableAmount as number -> Subtotal - DiscountAmount
-field TaxAmount as number -> TaxableAmount * TaxRate / 100
-field LineTotal as number -> TaxableAmount + TaxAmount nonnegative
+field Subtotal as number <- UnitPrice * Quantity
+field DiscountAmount as number <- Subtotal * DiscountPercent / 100
+field TaxableAmount as number <- Subtotal - DiscountAmount
+field TaxAmount as number <- TaxableAmount * TaxRate / 100
+field LineTotal as number <- TaxableAmount + TaxAmount nonnegative
 
 # Only source fields are editable; derived totals are locked.

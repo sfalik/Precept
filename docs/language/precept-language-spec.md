@@ -764,10 +764,10 @@ After the `precept <Name>` header, the parser enters a loop that dispatches on t
 #### `field` declaration
 
 ```
-field Identifier ("," Identifier)* as TypeRef FieldModifier* ("->" Expr)?
+field Identifier ("," Identifier)* as TypeRef FieldModifier* ("<-" Expr)?
 ```
 
-Multi-name shorthand: `field A, B, C as string` declares three fields of the same type. Modifiers appear before the computed expression arrow. The `->` introduces a computed expression.
+Multi-name shorthand: `field A, B, C as string` declares three fields of the same type. Modifiers appear before the computed expression arrow. The `<-` introduces a computed expression.
 
 #### `state` declaration
 
@@ -1171,7 +1171,7 @@ Fields, states, and events are all declared at the top level. They are visible e
 | State action guard / actions | All field names |
 | Event handler actions | All field names + current event's args |
 | Default value expression | Field names declared **before** this field (no self-reference, no forward reference) |
-| Computed expression (`field X as T -> Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
+| Computed expression (`field X as T <- Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
 | Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
 
 #### Quantifier binding variable scope
@@ -1544,7 +1544,7 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | Self-reference | Computed expression references its own field | `CircularComputedField` |
 | Transitive cycle | Computed fields form a dependency cycle (A→B→A, or A→B→C→A, etc.) | `CircularComputedField` |
 | Expression type mismatch | Computed expression type doesn't match field type | `TypeMismatch` |
-| Computed with default | Field has both `->` and `default` | `ComputedFieldWithDefault` |
+| Computed with default | Field has both `<-` and `default` | `ComputedFieldWithDefault` |
 | Computed as write target | `set` action targets a computed field | `ComputedFieldNotWritable` |
 
 #### Choice type validation

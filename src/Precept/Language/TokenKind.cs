@@ -147,6 +147,7 @@ public enum TokenKind
     Slash                     = 102,
     Percent                   = 103,
     Arrow                     = 104,
+    BackArrow                 = 139,
 
     // ── Punctuation ────────────────────────────────────────────────
     Dot          = 105,

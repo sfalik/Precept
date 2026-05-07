@@ -466,10 +466,10 @@ public static partial class Parser
 
         private SlotValue ParseComputeExpression(ConstructSlot slot)
         {
-            if (Peek().Kind != TokenKind.Arrow)
+            if (Peek().Kind != TokenKind.BackArrow)
                 return MakeSentinel(slot);
 
-            var arrowToken = Advance(); // consume '->'
+            var arrowToken = Advance(); // consume '<-'
 
             if (IsAtEnd || IsAtConstructBoundary())
             {

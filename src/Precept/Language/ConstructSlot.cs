@@ -11,7 +11,7 @@ public enum ConstructSlotKind
     ModifierList      =  3, // field modifiers (nonnegative, positive, notempty, etc.)
     StateEntryList    =  4, // comma-separated (name modifier*) pairs for state declarations
     ArgumentList      =  5, // event parameter list "(name as type, ...)"
-    ComputeExpression =  6, // "-> expression" computed value
+    ComputeExpression =  6, // "<- expression" computed value
     GuardClause       =  7, // "when expression"
     ActionChain       =  8, // "-> action -> action" chain
     Outcome           =  9, // "-> transition State | -> no transition | -> reject 'reason'"
