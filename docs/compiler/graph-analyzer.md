@@ -9,7 +9,7 @@ The graph analyzer is the fourth pipeline stage, transforming the type checker's
 **Pipeline Position:**
 
 ```text
-Source Text → Lexer → Parser → Type Checker → [Graph Analyzer] → Proof Engine → Runtime
+Source Text → Lexer → Parser → Name Binder → Type Checker → [Graph Analyzer] → Proof Engine → Runtime
                                    ↓                  ↓
                             SemanticIndex       StateGraph
 ```

@@ -128,7 +128,7 @@ When `!HasErrors`, the LS also holds a `Precept` (built from `Compilation`) for 
 | Diagnostics | `Compilation.Diagnostics` | All stages (accumulated) |
 | Lexical semantic tokens (Pass 1) | `TokenStream` + `TokenMeta.SemanticTokenType` | Lexer |
 | Identifier semantic tokens (Pass 2) | `SemanticIndex` reference bindings | TypeChecker |
-| Completions | Catalogs + `ConstructManifest` context + `SemanticIndex` | Parser + TypeChecker |
+| Completions | Catalogs + `ConstructManifest` context + `SymbolTable` + `SemanticIndex` | Parser + NameBinder + TypeChecker |
 | Hover | `SemanticIndex` + catalog documentation | TypeChecker + Catalogs |
 | Go-to-definition | `SemanticIndex` reference → `ParsedConstruct Syntax` back-pointer | TypeChecker |
 | Preview/inspect | `Precept` + inspection runtime | Builder + Evaluator |
@@ -1249,7 +1249,7 @@ void Update(Compilation compilation)
 
 ### Decision 2: Full-Pipeline Recompile on Change
 
-**Choice:** Every `didChange` event triggers a complete lexer → parser → type checker → graph analyzer → proof engine pass.
+**Choice:** Every `didChange` event triggers a complete lexer → parser → name binder → type checker → graph analyzer → proof engine pass.
 
 **Rationale:** At DSL scale, full recompile is fast enough (<5ms typical). Incremental compilation adds an entire class of invalidation bugs (stale symbol tables, partial updates, reference counting). The cost/benefit ratio strongly favors simplicity.
 

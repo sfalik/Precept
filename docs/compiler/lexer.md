@@ -91,7 +91,7 @@ string source  →  Lexer.Lex  →  TokenStream
 public static TokenStream Lex(string source)
 ```
 
-`Lexer.Lex(string source)` is a static pure function. No instance, no DI, no configuration. This matches the pipeline pattern used by all five stages (`Lexer.Lex`, `Parser.Parse`, `TypeChecker.Check`, `GraphAnalyzer.Analyze`, `ProofEngine.Prove`). Tests call the method directly and assert on the output.
+`Lexer.Lex(string source)` is a static pure function. No instance, no DI, no configuration. This matches the pipeline pattern used by all six stages (`Lexer.Lex`, `Parser.Parse`, `NameBinder.Bind`, `TypeChecker.Check`, `GraphAnalyzer.Analyze`, `ProofEngine.Prove`). Tests call the method directly and assert on the output.
 
 **Input families:**
 
@@ -549,7 +549,7 @@ For quoted literals (`StringLiteral`, `StringStart`, `StringMiddle`, `StringEnd`
 
 **Decision:** The lexer is a static pure function with no instance state between calls.
 
-**Rationale:** Pure functions are directly testable — tests call `Lexer.Lex(source)` and assert on the output without setup or teardown. No DI, no configuration, no hidden state. This matches the pipeline pattern used by all five compilation stages.
+**Rationale:** Pure functions are directly testable — tests call `Lexer.Lex(source)` and assert on the output without setup or teardown. No DI, no configuration, no hidden state. This matches the pipeline pattern used by all six compilation stages.
 
 ### Catalog-Derived Vocabulary
 

@@ -82,7 +82,7 @@ The evaluator is scoped precisely to execution — the smallest component that c
 
 **Why not inline into `Version`?**
 
-The evaluator is a static class with pure functions — aligned with the pipeline pattern (`Lexer.Lex`, `Parser.Parse`, `TypeChecker.Check`). `Version` is a thin façade: it holds identity (Precept + state + slots) and delegates to `Evaluator`. This separation keeps `Version` focused on identity and the evaluator focused on execution mechanics.
+The evaluator is a static class with pure functions — aligned with the pipeline pattern (`Lexer.Lex`, `Parser.Parse`, `NameBinder.Bind`, `TypeChecker.Check`). `Version` is a thin façade: it holds identity (Precept + state + slots) and delegates to `Evaluator`. This separation keeps `Version` focused on identity and the evaluator focused on execution mechanics.
 
 **Why not merge into `Precept`?**
 

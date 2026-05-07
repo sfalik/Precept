@@ -4,19 +4,20 @@ Implementation blueprints for each stage of the Precept compiler pipeline. Each 
 
 ## Pipeline Order
 
-The compiler is a linear five-stage pipeline. Read the stage docs in this order:
+The compiler is a linear six-stage pipeline. Read the stage docs in this order:
 
 ```
-Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManifest → TypeChecker.Check → SemanticIndex → GraphAnalyzer.Analyze → StateGraph → ProofEngine.Prove → ProofLedger → Compiler.Compile → Compilation
+Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManifest → NameBinder.Bind → SymbolTable → TypeChecker.Check → SemanticIndex → GraphAnalyzer.Analyze → StateGraph → ProofEngine.Prove → ProofLedger → Compiler.Compile → Compilation
 ```
 
 | Stage | Document | Doc maturity | Impl state |
 |-------|----------|--------------|------------|
 | 1. Lexer | [lexer.md](lexer.md) | Full | Implemented |
-| 2. Parser | [parser.md](parser.md) | Full | Stub |
-| 3. Type Checker | [type-checker.md](type-checker.md) | Full | Stub |
-| 4. Graph Analyzer | [graph-analyzer.md](graph-analyzer.md) | Full | Stub |
-| 5. Proof Engine | [proof-engine.md](proof-engine.md) | Full | Stub |
+| 2. Parser | [parser.md](parser.md) | Full | Implemented |
+| 3. Name Binder | [name-binder.md](name-binder.md) | Full | Implemented |
+| 4. Type Checker | [type-checker.md](type-checker.md) | Full | Stub |
+| 5. Graph Analyzer | [graph-analyzer.md](graph-analyzer.md) | Full | Stub |
+| 6. Proof Engine | [proof-engine.md](proof-engine.md) | Full | Stub |
 
 ## Cross-Cutting Infrastructure
 

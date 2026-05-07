@@ -19,7 +19,7 @@ The proof engine is the fifth and final analysis stage before the Precept Builde
 **Pipeline Position:**
 
 ```text
-Source Text → Lexer → Parser → Type Checker → Graph Analyzer → [Proof Engine] → Precept Builder
+Source Text → Lexer → Parser → Name Binder → Type Checker → Graph Analyzer → [Proof Engine] → Precept Builder
                                     ↓               ↓                ↓
                               SemanticIndex    StateGraph       ProofLedger
 ```

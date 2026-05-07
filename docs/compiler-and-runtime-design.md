@@ -3,7 +3,7 @@
 > **Status:** Canonical design — catalog-first pipeline
 > **Audience:** compiler, runtime, language-server, MCP, and documentation authors
 
-**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
+**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Section 5b covers NameBinder. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
 
 ## 1. What Precept promises
 
@@ -44,7 +44,7 @@ Precept's pipeline is purpose-built for Precept's specific shape: a declarative 
 
 ### Unified pipeline
 
-The system has compilation phases (lexing, parsing, type checking, graph analysis, proof) and runtime phases (Precept building, evaluation, constraint enforcement, structured outcomes). These are sequential stages of one system. They share the same catalog metadata. They produce artifacts that flow forward. Compilation builds understanding; runtime acts on it.
+The system has compilation phases (lexing, parsing, name binding, type checking, graph analysis, proof) and runtime phases (Precept building, evaluation, constraint enforcement, structured outcomes). These are sequential stages of one system. They share the same catalog metadata. They produce artifacts that flow forward. Compilation builds understanding; runtime acts on it.
 
 Two top-level products emerge from this pipeline:
 
@@ -87,6 +87,10 @@ flowchart TD
             direction TB
             PAR(Parser):::stage --> ST>"ConstructManifest"]:::out
         end
+        subgraph c2b[ ]
+            direction TB
+            NB(NameBinder):::stage --> SYM>"SymbolTable"]:::out
+        end
         subgraph c3[ ]
             direction TB
             TC(TypeChecker):::stage --> SI>"SemanticIndex"]:::out
@@ -100,7 +104,7 @@ flowchart TD
             PE(ProofEngine):::stage --> PL>"ProofLedger"]:::out
         end
 
-        SRC --> c1 --> c2 --> c3 --> c4 --> c5
+        SRC --> c1 --> c2 --> c2b --> c3 --> c4 --> c5
     end
 
     CR>"Compilation"]:::out
@@ -130,6 +134,7 @@ flowchart TD
     style CATALOGS fill:#ecfeff,stroke:#22d3ee,color:#164e63
     style c1 fill:#f8fafc,stroke:#cbd5e1
     style c2 fill:#f8fafc,stroke:#cbd5e1
+    style c2b fill:#f8fafc,stroke:#cbd5e1
     style c3 fill:#f8fafc,stroke:#cbd5e1
     style c4 fill:#f8fafc,stroke:#cbd5e1
     style c5 fill:#f8fafc,stroke:#cbd5e1
@@ -152,7 +157,8 @@ TokenStream   tokens    = Lexer.Lex(source);
 // ParsedConstruct: (ConstructMeta Meta, ImmutableArray<SlotValue> Slots, SourceSpan Span)
 // ⚠ SlotValue subtype field shapes have open mismatches between parser.md and type-checker.md — see parser.md open questions
 ConstructManifest manifest   = Parser.Parse(tokens);
-SemanticIndex semantics = TypeChecker.Check(manifest);
+SymbolTable   symbols   = NameBinder.Bind(manifest);
+SemanticIndex semantics = TypeChecker.Check(manifest, symbols);
 StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
 ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
 
@@ -160,6 +166,7 @@ ImmutableArray<Diagnostic> diagnostics =
 [
     ..tokens.Diagnostics,
     ..manifest.Diagnostics,   // parse-phase diagnostics on ConstructManifest.Diagnostics
+    ..symbols.Diagnostics,    // name-binding diagnostics (duplicates, undeclared references)
     ..semantics.Diagnostics,
     ..graph.Diagnostics,
     ..proof.Diagnostics,
@@ -168,6 +175,7 @@ ImmutableArray<Diagnostic> diagnostics =
 return new Compilation(
     Tokens:      tokens,
     ConstructManifest:  manifest,
+    Symbols:     symbols,
     Semantics:   semantics,
     Graph:       graph,
     Proof:       proof,
@@ -178,7 +186,7 @@ return new Compilation(
 
 Every stage starts from two roots. The first root is the `.precept` source text: the program the author wrote. The second root is the catalogs: the language specification that supplies the identities and metadata the compiler must preserve. Those catalogs enter as soon as a stage can know something from them, and later stages carry that catalog-stamped identity forward instead of reconstructing it with hardcoded switches.
 
-The stages produce progressively richer artifacts. Lexing produces a `TokenStream`. Parsing produces a `ConstructManifest` of `ParsedConstruct` nodes — one uniform type per construct carrying `ConstructMeta`, slot values, and a source span, with no per-construct AST node types. Type checking produces a `SemanticIndex`. Graph analysis produces a `StateGraph`. Proof analysis produces a `ProofLedger`. `Compilation` is the aggregate over those artifacts plus the merged diagnostic stream and the `HasErrors` summary. It is the compiler's complete output, not a success token.
+The stages produce progressively richer artifacts. Lexing produces a `TokenStream`. Parsing produces a `ConstructManifest` of `ParsedConstruct` nodes — one uniform type per construct carrying `ConstructMeta`, slot values, and a source span, with no per-construct AST node types. Name binding produces a `SymbolTable` of declared symbols and resolved references. Type checking produces a `SemanticIndex`. Graph analysis produces a `StateGraph`. Proof analysis produces a `ProofLedger`. `Compilation` is the aggregate over those artifacts plus the merged diagnostic stream and the `HasErrors` summary. It is the compiler's complete output, not a success token.
 
 `Compilation` is the last compile-time aggregate. Execution starts only when that aggregate is transformed into runtime-native structures.
 
@@ -321,15 +329,15 @@ flowchart LR
 
 **How it serves the guarantee:** Structural fidelity means the type checker and downstream stages work from a faithful representation of the author's intent, including malformed programs — authoring tools can diagnose problems precisely because the structure is preserved, not discarded on error.
 
-### Parser/TypeChecker contract boundary
+### Parser/NameBinder/TypeChecker contract boundary
 
-The parser guarantees to the type checker:
+The parser guarantees to the name binder and type checker:
 
 - Every parsed region produces a `ParsedConstruct` node. Missing or invalid slots produce synthesized placeholder `SlotValue` instances — required content is never silently absent. The type checker does not re-validate structural completeness.
 - The `ConstructKind` for each construct is stamped via `Meta.Kind` at parse time. `ActionKind` and `ModifierKind` are resolved and stored in `ActionChainSlot` and `ModifierListSlot` subtypes at parse time.
 - `TypeKind` IS stamped at parse time — `TypeExpressionSlot` carries `TypeMeta`; the parser resolves type references via the `Types` catalog at parse time (Decision 2026-05-06 in parser.md). The type checker receives an already-resolved `TypeMeta` object.
 
-What the parser does NOT guarantee: name resolution, type compatibility, overload selection, or semantic legality. The type checker owns all semantic resolution.
+What the parser does NOT guarantee: name resolution, type compatibility, overload selection, or semantic legality. The name binder owns name resolution and reference binding; the type checker owns all semantic resolution.
 
 ### Error recovery
 

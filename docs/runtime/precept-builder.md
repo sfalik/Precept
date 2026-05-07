@@ -19,7 +19,7 @@ The Precept Builder is the **compile-to-runtime boundary** — the one-way trans
 **Pipeline Position:**
 
 ```text
-Source Text → Lexer → Parser → Type Checker → Graph Analyzer → Proof Engine → [Precept Builder] → Evaluator
+Source Text → Lexer → Parser → Name Binder → Type Checker → Graph Analyzer → Proof Engine → [Precept Builder] → Evaluator
                                     ↓               ↓               ↓                ↓
                               SemanticIndex    StateGraph      ProofLedger        Precept
 ```

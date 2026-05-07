@@ -7,29 +7,30 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Implemented — all 13 catalogs in `src/Precept/`; team review complete (2026-04-25) |
+| Implementation state | Implemented — all 14 catalogs in `src/Precept/`; team review complete (2026-04-25) |
 | Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
 
 ## Overview
 
-The catalog system is the **authoritative machine-readable definition of the Precept language.** Thirteen catalogs — eleven describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the thirteen-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
+The catalog system is the **authoritative machine-readable definition of the Precept language.** Fourteen catalogs — twelve describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the fourteen-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
 
 ## Vision: Metadata for the Entire Language
 
-Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, diagnostics, and faults — is defined as structured metadata in a static, compiler-enforced catalog. Thirteen catalogs cover the complete language surface. Their union IS the language specification in machine-readable form.
+Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, outcome forms, diagnostics, and faults — is defined as structured metadata in a static, compiler-enforced catalog. Fourteen catalogs cover the complete language surface. Their union IS the language specification in machine-readable form.
 
 Every consumer reads from these catalogs:
 
 | Consumer | What it reads |
 |----------|---------------|
-| MCP `precept_language` | All keywords, types, operators, operations, functions, constraints, grammar forms |
+| MCP `precept_language` | All keywords, types, operators, operations, functions, constraints, grammar forms, outcome forms |
 | TextMate grammar | Token keyword alternations, type name alternations, construct slot patterns |
-| LS completions | Types, functions, modifiers, actions — context-dependent |
-| LS hover | Type documentation, function signatures, operator descriptions |
+| LS completions | Types, functions, modifiers, actions, outcome forms — context-dependent |
+| LS hover | Type documentation, function signatures, operator descriptions, outcome descriptions |
 | LS semantic tokens | Token categories |
 | Type checker | Modifier applicability, function signatures, operation legality |
-| AI grounding | All 13 catalogs — complete language knowledge |
-| Reference docs | All 11 language definition catalogs |
+| Parser (outcome dispatch) | `Outcomes.ByLeadingToken`, `OutcomeMeta.ArgumentKind` |
+| AI grounding | All 14 catalogs — complete language knowledge |
+| Reference docs | All 12 language definition catalogs |
 
 No consumer maintains its own parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface. The compiler refuses to build if any member is missing metadata.
 
@@ -39,7 +40,7 @@ No consumer maintains its own parallel copy. Adding a language feature to an enu
 
 The test: **if I enumerated every catalog's `All` property, would I have a complete description of Precept?** The catalogs needed are those whose union covers the entire language surface.
 
-Thirteen catalogs in two groups.
+Fourteen catalogs in two groups.
 
 **Language Definition (what the language IS):**
 
@@ -56,15 +57,16 @@ Thirteen catalogs in two groups.
 | 9 | **ExpressionForms** | Expression grammar forms — expression node kinds (literal, identifier, binary op, function call, quantifier, CI function call, etc.) |
 | 10 | **Constraints** | Constraint declaration forms — invariant, state-anchored, event precondition (DU as identity) |
 | 11 | **ProofRequirements** | Proof obligation kinds — numeric, presence, dimension, modifier, qualifier compatibility (DU as identity) |
+| 12 | **Outcomes** | Transition-row outcome forms — transition, no transition, reject (closed 3-member vocabulary) |
 
 **Failure Modes (how it tells you what's wrong):**
 
 | # | Catalog | What it covers |
 |---|---------|----------------|
-| 12 | **Diagnostics** | Compile-time rules |
-| 13 | **Faults** | Runtime failure modes |
+| 13 | **Diagnostics** | Compile-time rules |
+| 14 | **Faults** | Runtime failure modes |
 
-If a fourteenth aspect of the language emerges that isn't covered by these thirteen, it needs a catalog. The system is complete when the catalogs are.
+If a fifteenth aspect of the language emerges that isn't covered by these fourteen, it needs a catalog. The system is complete when the catalogs are.
 
 ### Enums that remain bare
 
@@ -160,7 +162,8 @@ flowchart TB
 
     subgraph L2["② Grammar / structure"]
         Constructs["Constructs (12)"]
-        ExpressionForms["ExpressionForms (13)"]
+        ExpressionForms["ExpressionForms (14)"]
+        Outcomes["Outcomes (3)"]
         Constraints["Constraints (5)"]
     end
 
@@ -179,13 +182,14 @@ flowchart TB
         Faults["Faults (13)"]
     end
 
-    %% Six catalogs anchor to Tokens
+    %% Seven catalogs anchor to Tokens
     Types       --> Tokens
     Operators   --> Tokens
     Modifiers   --> Tokens
     Actions     --> Tokens
     Constructs  --> Tokens
     ExpressionForms --> Tokens
+    Outcomes    --> Tokens
 
     %% Semantic wiring
     Functions  -->|param/return types| Types
@@ -530,7 +534,8 @@ Complete enum counts and key groupings. See source files for the full member lis
 | **Modifiers** | `ModifierKind` | 29 | Field (15), State (7), Event (1), Access (4), Anchor (3) — see DU anatomy above | `ModifierKind.cs` |
 | **Actions** | `ActionKind` | 15 | Scalar (1: `set`), Set collection (3), Queue (4), Stack (3), Universal (1: `clear`), Compound (3: `append`, `insert`, `put`) | `ActionKind.cs` |
 | **Constructs** | `ConstructKind` | 12 | Header (1), Direct declarations (4), State-scoped (5), Event-scoped (2) | `ConstructKind.cs` |
-| **ExpressionForms** | `ExpressionFormKind` | 13 | Atoms (3: literal, identifier, grouped), Composites (5), Invocations (3), Collections (1: list), Quantifier (1) | `ExpressionForms.cs` |
+| **ExpressionForms** | `ExpressionFormKind` | 14 | Atoms (3: literal, identifier, grouped), Composites (5), Invocations (3), Collections (1: list), Quantifier (1), InterpolatedString (1) | `ExpressionForms.cs` |
+| **Outcomes** | `OutcomeKind` | 3 | Transition (1), NoTransition (1), Reject (1) | `Outcomes.cs` |
 | **Constraints** | `ConstraintKind` | 5 | Invariant (1), StateAnchored (3: resident/entry/exit), EventPrecondition (1) | `ConstraintKind.cs` |
 | **ProofRequirements** | `ProofRequirementKind` | 5 | Numeric, Presence, Dimension, Modifier, QualifierCompatibility | `ProofRequirementKind.cs` |
 | **Diagnostics** | `DiagnosticCode` | 106 | By stage — Lex (8), Parse (7+), Type (50+), Graph (2+), Proof (3+) | `DiagnosticCode.cs` |
@@ -1610,9 +1615,39 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
 
 **Consumers:** proof engine (obligation dispatch), type checker, Roslyn analyzers (PRECEPT0005/0006), MCP vocabulary.
 
+#### 12. Outcomes (✅ Implemented)
+
+The three transition-row outcome forms — the ways a transition row can conclude. Outcomes are a closed 3-member vocabulary resolved at parse time; they are not expressions and do not participate in expression resolution.
+
+| Part | Type |
+|------|------|
+| Kind enum | `OutcomeKind` (3 members: `Transition`, `NoTransition`, `Reject`) |
+| Meta record | `OutcomeMeta(Kind, LeadingToken, ArgumentKind, ParsedSubtype, Description, Example)` |
+| Supporting enum | `OutcomeArgumentKind { None, RequiredIdentifier, RequiredStringLiteral, SecondaryToken }` |
+| Catalog class | `Outcomes` — `GetMeta()`, `All`, `ByLeadingToken`, `LeadingTokens`, `NoTransitionSecondaryToken` |
+| Output type | `ParsedOutcome` abstract record + 4 sealed subtypes: `TransitionOutcome(StateName, Span)`, `NoTransitionOutcome(Span)`, `RejectOutcome(Reason, Span)`, `MalformedOutcome(Span)` |
+
+**Outcome entry summary:**
+
+| OutcomeKind | LeadingToken | ArgumentKind | Produces |
+|-------------|--------------|--------------|----------|
+| `Transition` | `TokenKind.Transition` | `RequiredIdentifier` | `TransitionOutcome(stateName)` |
+| `NoTransition` | `TokenKind.No` | `SecondaryToken` | `NoTransitionOutcome()` |
+| `Reject` | `TokenKind.Reject` | `RequiredStringLiteral` | `RejectOutcome(reason)` |
+
+**Derived indexes:**
+
+- `ByLeadingToken` — O(1) `FrozenDictionary<TokenKind, OutcomeMeta>` for parser dispatch after consuming the arrow.
+- `LeadingTokens` — `FrozenSet<TokenKind>` of all tokens that can follow the outcome arrow; used for vocabulary recognition and error recovery.
+- `NoTransitionSecondaryToken` — structural constant (`TokenKind.Transition`) for the compound `no transition` form.
+
+**Cross-catalog dependency:** Depends on `Tokens` (like all grammar catalogs) but has no other catalog dependencies.
+
+**Consumers:** parser (outcome dispatch via `Outcomes.ByLeadingToken` and `OutcomeMeta.ArgumentKind`), LS completions (outcome context suggestions via `Outcomes.All`), LS hover (`OutcomeMeta.Description`, `OutcomeMeta.Example`), MCP `precept_language` (grammar vocabulary).
+
 ### Failure Mode Catalogs
 
-#### 12. Diagnostics (✅ Implemented)
+#### 13. Diagnostics (✅ Implemented)
 
 Compile-time rules — every error and warning the pipeline can produce. Currently 78 members across Lex (8), Parse (5), Type (35+16+2), Graph (2), and Proof (3) stages.
 
@@ -1626,7 +1661,7 @@ Compile-time rules — every error and warning the pipeline can produce. Current
 
 `DiagnosticCategory` describes *what* a diagnostic is about, complementing `DiagnosticStage` which describes *when* it fires. Used by the language server for filtering, documentation generation, and AI grounding.
 
-#### 13. Faults (✅ Implemented)
+#### 14. Faults (✅ Implemented)
 
 Runtime failure modes — every fault the evaluator can produce. Currently 13 members. Each `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compile-time rule that should prevent that site.
 

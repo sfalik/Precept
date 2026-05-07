@@ -45,7 +45,7 @@ The relationship between the two systems is structural, not incidental. Every `F
 
 The fault system mirrors the compiler's diagnostic system but is trimmed for the evaluator's narrower surface.
 
-`DiagnosticMeta` carries `Stage` and a three-level `Severity` (`Info`, `Warning`, `Error`) because the compiler produces diagnostics at five stages with meaningfully different severity levels. The evaluator has no pipeline stages — every fault is fatal (the transition is aborted, no state changes are committed) — so `FaultMeta` replaces the stage axis entirely and uses a single-variant `FaultSeverity.Fatal` for severity. `FaultSeverity` is not collapsed to a boolean because a second variant (e.g. non-aborting `Warning` faults) may be needed as the evaluator design matures.
+`DiagnosticMeta` carries `Stage` and a three-level `Severity` (`Info`, `Warning`, `Error`) because the compiler produces diagnostics at six stages with meaningfully different severity levels. The evaluator has no pipeline stages — every fault is fatal (the transition is aborted, no state changes are committed) — so `FaultMeta` replaces the stage axis entirely and uses a single-variant `FaultSeverity.Fatal` for severity. `FaultSeverity` is not collapsed to a boolean because a second variant (e.g. non-aborting `Warning` faults) may be needed as the evaluator design matures.
 
 `FaultMeta` adds two fields `DiagnosticMeta` does not have:
 

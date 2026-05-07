@@ -485,7 +485,7 @@ JSON response to agent
 }
 ```
 
-**Behavior:** Compiles precept source through the full pipeline (lexer → parser → type checker → graph analyzer → proof engine). Returns diagnostics (errors, warnings, hints) and a structured definition on success. AI agents use this to validate precept source and understand its structure before runtime operations.
+**Behavior:** Compiles precept source through the full pipeline (lexer → parser → name binder → type checker → graph analyzer → proof engine). Returns diagnostics (errors, warnings, hints) and a structured definition on success. AI agents use this to validate precept source and understand its structure before runtime operations.
 
 **Error handling:** When compilation fails, `definition` is null and only `diagnostics` are returned. The `Compilation.SemanticIndex` may contain partial information but is not exposed through this tool.
 
@@ -1196,7 +1196,7 @@ The MCP server trusts its caller. No API keys, no user identity, no permission c
 | Catalog system (vocabulary source) | `docs/language/catalog-system.md` |
 | Runtime API (`Precept`, `Version`, outcomes) | `docs/runtime/runtime-api.md` |
 | Evaluator (expression evaluation, constraint checking) | `docs/runtime/evaluator.md` |
-| Compiler pipeline (lexer → parser → type checker → etc.) | `docs/compiler/` |
+| Compiler pipeline (lexer → parser → name binder → type checker → etc.) | `docs/compiler/` |
 | VS Code extension (MCP server launch) | `docs/tooling/extension.md` |
 | Plugin (agent + skills that call MCP) | `docs/tooling/plugin.md` |
 | Type system (types, accessors, qualifiers) | `docs/language/type-system.md` |

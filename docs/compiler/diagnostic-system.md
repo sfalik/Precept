@@ -7,14 +7,14 @@
 | Doc maturity | Draft |
 | Implementation state | Implemented |
 | Source | `src/Precept/Language/Diagnostic.cs`, `src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs` |
-| Upstream | Lexer, Parser, TypeChecker, GraphAnalyzer, ProofEngine |
+| Upstream | Lexer, Parser, NameBinder, TypeChecker, GraphAnalyzer, ProofEngine |
 | Downstream | Language Server, MCP (`precept_compile`, `precept_language`), drift tests |
 
 ---
 
 ## Overview
 
-The Precept compiler pipeline produces diagnostics at five stages: lexing, parsing, type checking, graph analysis, and proof. This document defines:
+The Precept compiler pipeline produces diagnostics at six stages: lexing, parsing, name binding, type checking, graph analysis, and proof. This document defines:
 
 1. The **Diagnostic** output type — what consumers see
 2. The **DiagnosticCode** enum — the closed registry of all diagnostic rules
@@ -37,7 +37,7 @@ The Precept compiler pipeline produces diagnostics at five stages: lexing, parsi
 - The `Diagnostics.All` enumeration surface — consumed by MCP and LS without compilation
 
 **Does NOT OWN:**
-- Diagnostic emission sites — each pipeline stage (`Lexer`, `Parser`, `TypeChecker`, `GraphAnalyzer`, `ProofEngine`) owns its calls to `Diagnostics.Create()`
+- Diagnostic emission sites — each pipeline stage (`Lexer`, `Parser`, `NameBinder`, `TypeChecker`, `GraphAnalyzer`, `ProofEngine`) owns its calls to `Diagnostics.Create()`
 - LSP-level filtering, range conversion (0-based), and severity mapping — owned by the Language Server
 - Downstream diagnostic suppression logic (upstream-error cascading) — owned by the Language Server
 - MCP serialization format — owned by the MCP tool layer
@@ -535,7 +535,7 @@ If a future consumer needs machine-readable attribution, a single additional fie
 
 The prototype's diagnostic system (`DiagnosticCatalog` + `LanguageConstraint` + `ConstraintViolationException`) evolved to mitigate the N-Copy Grammar Sync problem documented in `CatalogInfrastructureDesign.md`. In a codebase without a proper lexer — where 7 components independently recognize keywords through their own regex patterns — centralizing language knowledge as data was the right move.
 
-The new compiler pipeline (Lexer → Parser → TypeChecker → GraphAnalyzer → ProofEngine) eliminates the N-Copy problem structurally. The lexer's token stream replaces all the regex-based keyword recognition. But the enumeration surface for consumer surfaces (MCP, LS, drift tests) remains necessary. The new design retains enumeration via the `DiagnosticCode` enum + `Diagnostics.All`, while replacing the runtime-registered `LanguageConstraint` records with compiler-enforced exhaustive switches. The "catalog" architectural concept is gone — `Diagnostics` is just a static helper class.
+The new compiler pipeline (Lexer → Parser → NameBinder → TypeChecker → GraphAnalyzer → ProofEngine) eliminates the N-Copy problem structurally. The lexer's token stream replaces all the regex-based keyword recognition. But the enumeration surface for consumer surfaces (MCP, LS, drift tests) remains necessary. The new design retains enumeration via the `DiagnosticCode` enum + `Diagnostics.All`, while replacing the runtime-registered `LanguageConstraint` records with compiler-enforced exhaustive switches. The "catalog" architectural concept is gone — `Diagnostics` is just a static helper class.
 
 The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarantee the prototype does not have: that every evaluator failure mode is covered by a compile-time diagnostic. This is the "prevention applies inward" principle from `ArchitecturalCoherenceDesign.md`.
 

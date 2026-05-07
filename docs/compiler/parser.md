@@ -45,7 +45,7 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 | `ComputeExpressionSlot` | `ParsedExpression` (typed DU) |
 | `GuardClauseSlot` | `ParsedExpression` (typed DU) |
 | `ActionChainSlot` | `ImmutableArray<ActionKind>` |
-| `OutcomeSlot` | `ParsedExpression` (typed DU) |
+| `OutcomeSlot` | `ParsedOutcome` (typed DU) |
 | `StateTargetSlot` | `string?` — target state name |
 | `EventTargetSlot` | `string?` — target event name |
 | `EnsureClauseSlot` | `ParsedExpression` (typed DU) |
@@ -63,7 +63,7 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 
 > **Decision (2026-05-06):** `BecauseClauseSlot` carries `string Message` — the parser extracts the string literal content at parse time. Rationale: the `because` clause is syntactically a string literal; the parser already validates the token kind and has the lexeme. Downstream consumers (constraint diagnostics, MCP output, LS hover) all need the text, never the raw span. Deferring extraction would require every consumer to re-read source.
 
-Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 13 per-form sealed subtypes, one for each `ExpressionFormKind` member. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`.
+Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 13 per-form sealed subtypes, one for each `ExpressionFormKind` member. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`. Note: `OutcomeSlot` carries `ParsedOutcome`, not `ParsedExpression` — outcomes are a separate 4-member DU.
 
 ---
 
@@ -220,10 +220,10 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 | `ModifierList` | Parse modifier keywords via `Modifiers` catalog |
 | `StateEntryList` | Parse `Name [Modifiers]` entries |
 | `ArgumentList` | Parse `(name: Type, ...)` |
-| `ComputeExpression` | Parse `->` expression via Pratt parser → `ParsedExpression` |
+| `ComputeExpression` | Parse `<-` expression via Pratt parser → `ParsedExpression` |
 | `GuardClause` | Parse `when` expression via Pratt parser → `ParsedExpression` |
 | `ActionChain` | Parse action keywords via `Actions` catalog |
-| `Outcome` | Parse `-> transition/no transition/reject` → `ParsedExpression` |
+| `Outcome` | Parse `-> transition/no transition/reject` → `ParsedOutcome` |
 | `StateTarget` | Parse optional state name after `to` |
 | `EventTarget` | Parse optional event name after `fire` |
 | `EnsureClause` | Parse `ensure` expression via Pratt parser → `ParsedExpression` |
@@ -292,7 +292,8 @@ Error recovery synchronizes on these boundaries.
 
 | Component | What It Receives |
 |-----------|------------------|
-| Type Checker | `ConstructManifest` with typed slots |
+| Name Binder | `ConstructManifest` — collects declarations, resolves references |
+| Type Checker | `ConstructManifest` (+ `SymbolTable` from NameBinder) with typed slots |
 | Language Server | Spans for diagnostics, hover, go-to-definition |
 
 > **Open Question:** `ConstructManifest` as a graph-analyzer input
@@ -456,6 +457,7 @@ Expressions are structural data. The evaluator interprets them against runtime s
 | Document | Relationship |
 |----------|--------------|
 | [Lexer](./lexer.md) | Upstream — produces token stream |
+| [Name Binder](./name-binder.md) | Downstream — collects declarations, resolves references |
 | [Type Checker](./type-checker.md) | Downstream — validates semantics |
 | [Catalog System](../language/catalog-system.md) | Defines construct metadata architecture |
 | [Precept Language Spec](../language/precept-language-spec.md) | Grammar this parser implements |
@@ -466,7 +468,7 @@ Expressions are structural data. The evaluator interprets them against runtime s
 
 | File | Purpose |
 |------|---------|
-| `src/Precept/Pipeline/Parser.cs` | Parser entry point (currently stub) |
+| `src/Precept/Pipeline/Parser.cs` | Parser entry point |
 | `src/Precept/Pipeline/ParsedConstruct.cs` | Output type definition |
 | `src/Precept/Pipeline/SlotValue.cs` | 17-subtype discriminated union |
 | `src/Precept/Pipeline/ConstructManifest.cs` | Parser output container |

@@ -712,6 +712,7 @@ string FormatEventHover(TypedEvent evt)
 | `Constructs.All` | Catalog | `ConstructMeta.Slots`, `LeadingTokens`, `RoutingFamily` |
 | `TokenStream` | Lexer | Token sequence for Pass 1 semantic tokens |
 | `ConstructManifest` | Parser | Cursor context for completions |
+| `SymbolTable` | NameBinder | Declared names for identifier completions, "did you mean?" suggestions |
 | `SemanticIndex` | TypeChecker | Resolved symbols for Pass 2, identifier completions, hover |
 | `Precept` (runtime) | Builder | Preview/inspect via LS `precept/inspect` |
 

@@ -7,7 +7,7 @@
 | Doc maturity | Full |
 | Implementation state | Stub — not yet implemented |
 | Source | `src/Precept/Pipeline/TypeChecker.cs`, `src/Precept/Pipeline/SemanticIndex.cs` |
-| Upstream | `ConstructManifest` (from Parser) |
+| Upstream | `ConstructManifest` (from Parser) + `SymbolTable` (from NameBinder) |
 | Downstream | GraphAnalyzer, ProofEngine, PreceptBuilder, LS semantic features |
 
 ---
@@ -55,7 +55,7 @@ The parser produces these slot value types:
 | `ComputeExpressionSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
 | `GuardClauseSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
 | `ActionChainSlot` | `ImmutableArray<ActionKind> Actions` | N/A — resolved actions |
-| `OutcomeSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
+| `OutcomeSlot` | `ParsedOutcome Outcome` | Parser-owned outcome DU |
 | `StateTargetSlot` | `string? StateName` | N/A — resolved name |
 | `EventTargetSlot` | `string? EventName` | N/A — resolved name |
 | `EnsureClauseSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
@@ -67,7 +67,7 @@ The parser produces these slot value types:
 
 ### Blocking Dependency: Expression Trees (RESOLVED)
 
-Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 13 per-form sealed subtypes, one for each `ExpressionFormKind` member. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`.
+Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 13 per-form sealed subtypes, one for each `ExpressionFormKind` member. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`. Note: `OutcomeSlot` carries `ParsedOutcome`, not `ParsedExpression` — outcomes are a separate 4-member DU (TransitionOutcome, NoTransitionOutcome, RejectOutcome, MalformedOutcome).
 
 The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via: (1) sealed class hierarchy (CS8509/CS8524 on switch expressions); (2) `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + PRECEPT0019 for multi-method consumers.
 
@@ -90,7 +90,7 @@ The type checker has **medium complexity** — more involved than the lexer or t
 | Estimated LOC | 800–1200 | ~350 expression resolution + ~300 declaration normalization + ~200 structural validation |
 | Catalog dependency | ~70% | Most logic is "look up catalog, record result" |
 | Structural logic | ~30% | Symbol tables, scope management, cycles, choice sets |
-| Expression forms | 17 | One arm per `ExpressionFormKind` + error stub |
+| Expression forms | 13 | One arm per `ExpressionFormKind` + error stub |
 | Construct kinds | ~20 | One dispatch arm per `ConstructKind` that matters to the checker |
 
 The checker is NOT a general-purpose compiler component — it's purpose-built for Precept's closed type system and finite construct vocabulary.
@@ -101,7 +101,7 @@ The checker is NOT a general-purpose compiler component — it's purpose-built f
 
 ### Input
 
-`ConstructManifest` containing `ImmutableArray<ParsedConstruct>` from the parser. The type checker iterates over constructs and dispatches on `ConstructKind`.
+`ConstructManifest` containing `ImmutableArray<ParsedConstruct>` from the parser, plus `SymbolTable` from the NameBinder containing pre-resolved declarations and references. The type checker dispatches on `ConstructKind` for semantic validation and expression resolution. It does not perform name lookup — all names are pre-resolved in the `SymbolTable`.
 
 ### Output
 
@@ -163,29 +163,19 @@ void RegisterField(ParsedConstruct construct)
 
 The slot array layout for each `ConstructKind` is defined by the `ConstructMeta.Slots` property in the Constructs catalog.
 
-### Pass 1: Registration (Symbol Table Construction)
+### Symbol Table (from NameBinder)
 
-**Input:** `ConstructManifest.Constructs`
-**Output:** Mutable symbol tables (field, state, event) in `CheckContext`
+> **Note:** Symbol table construction — collecting field/state/event/arg declarations, building name lookup dictionaries, detecting duplicate names, and resolving identifier references — is performed by the **NameBinder** stage, which runs before the TypeChecker. See [name-binder.md](./name-binder.md) for the full design.
 
-No expression checking. No diagnostics beyond duplicates and structural errors.
-
-Dispatches on `ConstructKind`:
-
-| ConstructKind | Action |
-|---|---|
-| `FieldDeclaration` | Register field name + resolve type → `TypeKind` |
-| `StateDeclaration` | Register state name + resolve modifiers |
-| `EventDeclaration` | Register event name + resolve arg types |
-| *(all others)* | Skip — processed in Pass 2 |
+The TypeChecker receives a pre-resolved `SymbolTable` via its `Check(ConstructManifest, SymbolTable)` signature. It trusts that all names are collected, all references are resolved (or marked `UnresolvedTarget`), and all naming diagnostics are already emitted. The TypeChecker never performs name lookup or duplicate detection.
 
 **TypeRef resolution:** Query `Types.ByTokenKind` for the keyword token → get `TypeMeta` → stamp `TypeKind`. For collections, extract element type. For choice, extract the choice definition. Pure catalog lookup — no expression resolution needed.
 
-**Initial state / terminal / required validation** fires here (counting state modifiers).
+**Initial state / terminal / required validation** fires here (counting state modifiers from the `SymbolTable`).
 
-### Pass 2: Checking (Expression Resolution + Normalization + Structural Validation)
+### Checking (Expression Resolution + Normalization + Structural Validation)
 
-**Input:** Symbol tables (from Pass 1) + `ConstructManifest.Constructs`
+**Input:** `SymbolTable` (from NameBinder) + `ConstructManifest.Constructs`
 **Output:** `SemanticIndex`
 
 Pass 2 has three generic sub-passes.
@@ -221,7 +211,7 @@ After all expressions are resolved:
 
 - **Computed field cycle detection** — build dependency graph from `ComputedExpression` references, DFS for cycles
 - **Choice validation** — validate choice value sets, subset relationships, ordering constraints
-- **Forward-reference prohibition** — default expressions may only reference fields declared before the current field
+- **Forward-reference prohibition** — default expressions may only reference fields declared before the current field (structural check; forward-reference *detection* in computed fields is already handled by the NameBinder)
 - **Stateless/stateful cross-validation** — states present + event handlers conflict
 - **Initial event field assignment completeness** — if initial event exists, verify required fields are assigned
 
@@ -595,7 +585,8 @@ public sealed record SemanticIndex(
 ```csharp
 internal sealed class CheckContext
 {
-    // Symbol tables (populated in Pass 1)
+    // Symbol tables (pre-resolved by NameBinder — CheckContext reads from SymbolTable)
+    // TypeChecker populates these typed versions from SymbolTable declarations
     public List<TypedField> Fields { get; } = [];
     public Dictionary<string, TypedField> FieldLookup { get; } = new();
     public List<TypedState> States { get; } = [];
@@ -983,9 +974,9 @@ Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The f
 - **No logic, no behavioral tests** — build verification only
 - This commit unblocks all numbered slices
 
-**Slice 1: Symbol Tables (Pass 1)**
-- Field/state/event/arg registration into `CheckContext`
-- Duplicate-name detection (emit diagnostic, retain first)
+**Slice 1: Typed Symbol Population**
+- Populate `CheckContext` typed fields/states/events from `SymbolTable` declarations
+- Type resolution via `TypeMeta` → `TypeKind` mapping
 - Initial/terminal state counting and validation
 
 **Slice 2: Scalar Expression Resolution — Binary & Unary Ops**
@@ -1088,7 +1079,7 @@ Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The f
 
 | File | Purpose |
 |---|---|
-| `src/Precept/Pipeline/TypeChecker.cs` | Type checker implementation — `TypeChecker` static class with `Check(ConstructManifest)` entry point |
+| `src/Precept/Pipeline/TypeChecker.cs` | Type checker implementation — `TypeChecker` static class with `Check(ConstructManifest, SymbolTable)` entry point |
 | `src/Precept/Pipeline/SemanticIndex.cs` | `SemanticIndex` — flat semantic inventory artifact |
 | `src/Precept/Pipeline/ParsedConstruct.cs` | `ParsedConstruct` — generic input node type with `ConstructMeta` and `SlotValue[]` |
 | `src/Precept/Pipeline/SlotValue.cs` | 17 `SlotValue` subtypes — the typed slot discriminated union |

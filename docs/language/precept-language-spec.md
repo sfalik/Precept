@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Incremental — grows as each compiler stage is designed and implemented |
-| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4–5 stubs (pre-implementation contracts in §0.5–0.6) |
+| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Name Binding and Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4–5 stubs (pre-implementation contracts in §0.5–0.6) |
 | Grounding | `docs/PreceptLanguageDesign.md` (v1 spec); vision archived at `docs/archive/language-design/precept-language-vision.md` |
 | Clean room rule | References v1 grammar and keyword inventory; does not import v1 implementation details |
 
@@ -1041,26 +1041,32 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 
 ---
 
-## 3. Type Checker
+## 3. Name Binding and Type Checking
 
-The type checker transforms a `ConstructManifest` into a `SemanticIndex` — a flat collection of symbol tables, resolved declarations, and diagnostics. It always produces a result, even on broken input (the pipeline's resilient contract).
+The name binder collects all declarations from the `ConstructManifest` into a `SymbolTable` and resolves all identifier references to their declarations. The type checker then validates the resolved symbols and expressions semantically, transforming the `ConstructManifest` + `SymbolTable` into a `SemanticIndex` — a flat collection of typed declarations and diagnostics. Both stages always produce a result, even on broken input (the pipeline's resilient contract).
 
 ```
-ConstructManifest  →  TypeChecker.Check  →  SemanticIndex
+ConstructManifest  →  NameBinder.Bind  →  SymbolTable
+ConstructManifest + SymbolTable  →  TypeChecker.Check  →  SemanticIndex
 ```
 
-The public surface is a static method:
+The public surfaces are static methods:
 
 ```csharp
-public static SemanticIndex Check(ConstructManifest manifest)
+public static SymbolTable Bind(ConstructManifest manifest)
+public static SemanticIndex Check(ConstructManifest manifest, SymbolTable symbols)
 ```
 
 ### 3.1 Processing Model
 
-The type checker makes two passes over the declaration list:
+Name binding makes two passes:
 
-1. **Registration pass.** Walk all declarations, build symbol tables: field names → types, state names, event names → argument types. No expression checking. This pass ensures all names are available regardless of declaration order.
-2. **Checking pass.** Walk all declarations again, resolve expressions, validate types, emit diagnostics.
+1. **Declaration pass.** Walk all declarations, collect symbols: field names → types, state names, event names → arguments. Detect duplicate names. Build O(1) lookup dictionaries.
+2. **Reference pass.** Walk all constructs again, resolve identifier references in expressions, slot targets, and outcomes. Emit diagnostics for undeclared references.
+
+The type checker then makes a checking pass over the constructs:
+
+1. **Checking pass.** Walk all declarations, resolve expressions, validate types, emit diagnostics. The TypeChecker reads from the pre-resolved `SymbolTable` — it never performs name lookup.
 
 Declaration order does not matter. A rule at line 5 can reference a field declared at line 50. A transition row can reference states declared after it.
 

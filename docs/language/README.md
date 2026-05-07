@@ -6,7 +6,7 @@ Documents defining the Precept DSL surface — what the language looks like to a
 
 | Document | Purpose | Status |
 |----------|---------|--------|
-| [precept-language-spec.md](precept-language-spec.md) | Formal language specification (v2). Grows incrementally as each compiler stage locks decisions. Sections: §1 Lexer, §2 Parser, §3 Type Checker. | Incremental |
+| [precept-language-spec.md](precept-language-spec.md) | Formal language specification (v2). Grows incrementally as each compiler stage locks decisions. Sections: §1 Lexer, §2 Parser, §3 Name Binding and Type Checker. | Incremental |
 | [precept-language-vision.md](../archive/language-design/precept-language-vision.md) | **Archived.** Former target language surface — superseded by the spec. | Archived |
 | [primitive-types.md](primitive-types.md) | Canonical reference for `string`, `integer`, `decimal`, `number`, `boolean`, `choice`. Owns numeric lane rules, conversion map, constraints, and built-in functions. | Active |
 | [temporal-type-system.md](temporal-type-system.md) | NodaTime-aligned temporal types (`date`, `time`, `datetime`, `instant`, `period`, `duration`, `timezone`, `zoneddatetime`). Typed constants, operators, and bridge functions. | Draft — [Issue #107](https://github.com/sfalik/Precept/issues/107) |
