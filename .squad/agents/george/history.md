@@ -89,3 +89,23 @@
 - Shipped parser metadata P4/P5: `ExpressionFormMeta.BindingPower` now owns member-access precedence and `ConstructSlot.TerminationTokens` now owns expression-slot boundary metadata.
 - Shipped diagnostic payload P3: `Diagnostic.RelatedSpans` landed as an init-only additive extension backed by a `readonly record struct RelatedSpan`.
 - Batch validation for the shipped George work closed green inside the 2949-test branch baseline; keep parser/checker follow-through catalog-derived and constructor-stable.
+
+### 2026-05-07T18:51:59Z — H1 housekeeping: committed outstanding working-tree changes
+
+- Working tree on Precept-V2-Radical had ~650 lines of uncommitted changes across 14 modified files and 7 new untracked files representing completed pipeline work.
+- Contents committed (9 commits):
+  - **Outcomes catalog** (`Outcomes.cs`, `OutcomesCatalogTests.cs`): OutcomeKind, OutcomeArgumentKind, OutcomeMeta as catalog #14.
+  - **ParsedAction + ParsedTypeReference DU nodes** (`ParsedAction.cs`, `ParsedTypeReference.cs`, `ParsedExpression.cs`): full structural type-reference DU, action DU, MissingExpression sentinel, InterpolatedStringExpression with segment nodes.
+  - **Parser enrichment** (`Parser.cs`, `Modifiers.cs`, `SlotValue.cs`, `ParsedConstruct.cs`, `ConstructManifest.cs`, + 4 test files): structured type parsing, CI-type prefix, action DU emission, interpolation parsing, Modifiers.ByStateToken, ConstructManifest.ByKind, ParsedConstruct slot helpers and IsComplete.
+  - **Diagnostic payload** (`Diagnostic.cs`, `DiagnosticCode.cs`, `Diagnostics.cs`, `DiagnosticsTests.cs`, `diagnostic-system.md`): RelatedSpan struct, RelatedSpans init-only property, UndeclaredArg code 107.
+  - **NameBinder stage** (`NameBinder.cs`, `SymbolTable.cs`, `Compiler.cs`, `Compilation.cs`, `TypeChecker.cs`, `NameBinderTests.cs`): two-pass binder wired into pipeline.
+  - **Docs**: type-checker.md OQ1–3 locked; catalog-system.md ActionMeta.SyntaxShape and FunctionMeta CI fields.
+  - **Squad housekeeping**: removed addressed inbox item; added pipeline-stage-design skill; updated Frank history.
+- Commit SHAs: 1536d0c, 5f731f4, 3187bb5, e0dc066, 0592da3, 3c17e38, a8adcb5, a469217, 2337fd0
+- Test count after all commits: **2974 passing, 0 failing**.
+- Surprise: two additional modified files found beyond the 14/7 in the brief — `docs/language/catalog-system.md` and `.squad/agents/frank/history.md` were unstaged but in working tree; committed them as their own docs/chore commits.
+
+### 2026-05-07T22:51:59Z — H1 housekeeping closeout recorded
+
+- Scribe recorded George-9's nine committed housekeeping slices as the durable batch closeout and preserved the clean working-tree / 2974-test baseline.
+- Frank-12's catalog doc sync was deduplicated into the same squad record because commit `a469217` was already part of the George-9 train.

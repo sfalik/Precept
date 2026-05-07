@@ -28,6 +28,20 @@
 
 ---
 
+### 2026-05-07T22:51:59Z: H1 housekeeping closeout recorded; Frank C2 catalog doc sync deduplicated into the same batch
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `george-h1-committed.md`, `frank-c2-catalog-doc-sync.md`.
+
+- Recorded George-9's nine-commit Precept-V2-Radical housekeeping batch as the durable closeout: Outcomes catalog, parsed action/type-reference DUs, parser enrichment, diagnostic payload expansion, NameBinder, type-checker OQ doc locks, catalog-system doc sync, and history housekeeping all landed with the working tree clean.
+- Deduplicated Frank-12's catalog doc note into the same canonical entry because commit `a469217` already carried the `docs/language/catalog-system.md` additions for `ActionMeta.SyntaxShape`, `FunctionMeta.HasCIVariant`, and `FunctionMeta.CIVariantOf` inside the George-9 batch.
+- Validation at handoff: 2974 tests passing; no history files crossed the 15 KB summarization gate in this pass.
+
+---
+
 ### 2026-05-07: OQ1 anti-mirroring enforcement locks to a Roslyn analyzer
 
 **By:** Shane Falik (via Copilot)

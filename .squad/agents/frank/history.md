@@ -75,3 +75,8 @@
 - Frank-11 completed the exhaustive NameBinder doc sync, created `docs/compiler/name-binder.md`, and updated 18 documentation files with zero stale references remaining.
 - Soup-Nazi-2 added `test/Precept.Tests/NameBinder/NameBinderTests.cs` with 40 tests across 9 groups, closing the batch with 2929 total passing tests.
 - No new architectural decisions were required; the remaining durable record now lives in the canonical docs, the decision ledger, and the orchestration/session logs.
+
+### 2026-05-07T22:51:59Z — Catalog doc sync folded into George-9 housekeeping closeout
+
+- Scribe recorded the `docs/language/catalog-system.md` sync as part of George-9's nine-commit housekeeping batch rather than as a separate decision entry.
+- Durable field additions now called out in squad records: `ActionMeta.SyntaxShape`, `FunctionMeta.HasCIVariant`, `FunctionMeta.CIVariantOf`.

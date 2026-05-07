@@ -111,3 +111,8 @@
 - Pre-check measured `decisions.md` at 808541 bytes with 7 inbox files, so the hard-gate 7-day archive pass ran before merge.
 - Archived 0 dated records into `decisions-archive.md`, merged the 7 Frank inbox notes into 4 canonical persistence decisions, wrote the Frank orchestration log plus the session log, and refreshed Frank/Scribe history with no summarization required.
 
+### 2026-05-07T22:51:59Z — H1/C2 batch recorded
+- Pre-check measured `decisions.md` at 93384 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T22:51:59Z.
+- Deduplicated `george-h1-committed.md` plus `frank-c2-catalog-doc-sync.md` into one canonical decision entry, wrote george-9 / frank-12 orchestration logs plus the `typechecker-h1-c2` session log, refreshed George and Frank history, and cleared the processed inbox files.
+- Health report: `decisions.md` 93384B -> 94420B; inbox processed = 2; history files summarized = 0.
+
