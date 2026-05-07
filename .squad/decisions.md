@@ -5,6 +5,23 @@
 ## ACTIVE DECISIONS — Current Sprint
 
 ---
+### 2026-05-07T04:02:01Z: Parser prerequisite decisions locked; `peek(2)` kept as a structural invariant
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `frank-parser-prereqs-b2-b3.md`, `frank-disambiguation-catalog.md`.
+
+- Shane approved Frank's B2 + B3 parser-prerequisite decisions as the durable baseline for the parser/type-checker handoff.
+- Closed-vocabulary slot values stay parser-resolved: `TypeExpressionSlot` carries `TypeMeta`, `ModifierListSlot` carries `ImmutableArray<ModifierKind>`, `BecauseClauseSlot` carries extracted string text, and `AccessModeSlot` must carry `TokenKind AccessMode` rather than span-only data.
+- `docs/compiler/type-checker.md`'s `SlotValue` subtype table is stale for those slot contracts and remains the follow-up doc-sync target.
+- The disambiguation rule is locked as `peek(2).Kind ∈ DisambiguationEntry.DisambiguationTokens`; no `Offset` field belongs on `DisambiguationEntry`.
+- Rationale: state/event anchors are grammar-level single-token productions, so the offset never varies by construct kind; it is universal parser geometry, not per-member metadata.
+- George is unblocked to implement `ParsedExpression.cs` (B1) and the paired `AccessModeSlot` fix against the approved slot-value contracts and invariant disambiguation rule.
+
+---
+
 ### 2026-05-07T03:00:00Z: Wave 3 Round 2 canonical doc sweep recorded
 
 **By:** Scribe

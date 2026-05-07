@@ -12,6 +12,11 @@
 
 ## Learnings
 
+- SlotValue shape principle: closed-vocabulary tokens (types, modifiers, access modes) are resolved by the parser at recognition time — never deferred as spans. String literals (`because` clause) are extracted at parse time. Only expressions (open-ended, precedence-sensitive) are deferred as `ParsedExpression`.
+- Disambiguation offset for StateScoped/EventScoped constructs is structurally invariant at 2: `peek(2)` always hits the disambiguation token because the anchor name is always a single identifier at position 1.
+- `AccessModeSlot` in `SlotValue.cs` needs a code fix: must carry `TokenKind AccessMode` (currently stores only base `SourceSpan`).
+- `type-checker.md` § SlotValue Subtypes table is stale (carries pre-resolution shapes for 4 slots); must be updated as a follow-up.
+
 - Diagnostic policy follows the philosophy's "proven violations only" rule: per-state event coverage gaps are design choices, but zero-handler events across all states justify `UnhandledEvent`.
 - When a working proposal becomes canonical, update every downstream contract in one pass and repoint CC references to canonical homes before archiving the proposal.
 - `GraphState` is a derived-facts output record, never a source-model mirror; booleans are the right shape when the question is structural.
@@ -23,6 +28,24 @@
 
 ## Recent Updates
 
+### 2026-05-07T04:02:01Z — Parser prerequisite decisions approved
+
+- Shane approved Frank's B2 + B3 parser-prerequisite decisions and Scribe merged the paired inbox notes into one canonical ledger entry.
+- Durable parser rule: keep `peek(2)` as the scoped-construct disambiguation invariant because anchor names are single-token grammar productions and the offset never varies by construct kind.
+- George is unblocked on `ParsedExpression.cs`; the remaining paired code fix is `AccessModeSlot(TokenKind AccessMode, SourceSpan Span)` in `SlotValue.cs`.
+
+---
+
+### 2026-05-06 — Disambiguation offset: structural invariant confirmed
+
+- Assessed whether `peek(2)` in the disambiguation protocol should be a `DisambiguationEntry` catalog field. Verdict: KEEP as structural invariant.
+- Key reasoning: the offset does not vary by construct kind — it is universally 2 for all StateScoped/EventScoped entries. A field with a single constant value for all members is not metadata; it is grammar geometry.
+- Confirmed `StateTarget` (Identifier | Any) and `EventTarget` (Identifier) are formally single-token productions in the grammar spec. This is a language-level guarantee, not an unstated assumption.
+- The catalog-driven principle governs per-member domain knowledge that varies by kind. The disambiguation offset is applied uniformly before any member is identified — it is machinery topology, not a per-construct fact.
+- Decision written to `.squad/decisions/inbox/frank-disambiguation-catalog.md`.
+
+---
+
 ### 2026-05-06 — Wave 5: Archive & Cleanup
 
 - Deleted `docs/working/` entirely (67 files): cross-cutting-decisions.md, both migrated gap registers, all Archived and inbox working artifacts.
@@ -32,6 +55,8 @@
 - `catalog-system.md` ActionMeta "Open Question (unresolved)" converted to "✅ Settled (Wave 4 Gap 6)" — Description is canonical, SyntaxShape is internal, SnippetTemplate is deferred.
 - Build validation: 3 pre-existing SemanticIndex.cs errors, 0 new. Baseline unchanged.
 - Commit: `421605afc9ec32ff0c28468b5927656bc725441c`
+
+---
 
 ### 2026-05-07 — Wave 4: Final consistency pass + 6 genuine gap triage
 
@@ -48,65 +73,7 @@
 - `docs/working/cross-cutting-decisions.md`: Wave 3 marked ✅ COMPLETE; Wave 4 marked ✅ COMPLETE with full outcome block.
 - Validation unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
 
-### 2026-05-07 — Wave 3 Round 2: canonical doc sweep recorded
-
-- Closed 20 Wave 3 Round 2 markers across `evaluator.md`, `language-server.md`, `mcp.md`, `catalog-system.md`, and `graph-analyzer.md`; `diagnostic-system.md` CC#13 / CC#20 were re-verified complete with no doc edits.
-- `evaluator.md` locked the `EventOutcome` DU follow-through: `Faulted(Fault)`, `Mutations` on `Transitioned` / `Applied`, enriched `Unmatched(EvaluatedRows)`, `RejectReason` closure, `AmbiguousDispatch`, and fire pseudocode alignment.
-- `language-server.md` confirmed `Compilation.Tokens`, `SemanticIndex.References`, `TypeMeta.IsUserFacing`, and `ActionMeta.Description` as the hover source, while converting §13 open questions into decided notes.
-- `mcp.md` closed null-data bootstrap, `firePipeline` scope, `EnsuresByState`, mutations payload, and unmatched guard-trace shape; `catalog-system.md` and `graph-analyzer.md` closed the `ConstraintMeta` hierarchy and wildcard ordering markers.
-- Six genuine follow-up gaps were preserved for owner attention: `TokenMeta.SemanticTokenModifiers` (#41), `EventCoverageEntry` granularity, back-edge definition, `GraphEvent.IsInitial` derivation, TBD structural diagnostic codes, and `ActionMeta` LS/MCP alignment (#43).
-- Validation remains unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
-
-### 2026-05-07 — Wave 3 Round 1: canonical doc sweep recorded
-
-- Closed 13 Wave 3 Round 1 markers across `docs/compiler/type-checker.md`, `docs/compiler/proof-engine.md`, and `docs/runtime/precept-builder.md`.
-- `type-checker.md`: CC#9 `ConstraintIdentity` DU, CC#11 `RejectReason`, and the stale CC#1-era expression-tree note are now closed.
-- `proof-engine.md`: catalog-gap #12 and #13 are closed, CC#1 / CC#5 follow-through notes are complete, and the stale initial-state OQ block is gone.
-- `precept-builder.md`: CC#4 `Compilation.Tokens`, CC#11 `ExecutionRow.RejectReason`, and CC#7 `ConstraintMeta.StateAnchored` hierarchy documentation are now canonical.
-- Validation remains unchanged: `dotnet build src/Precept/Precept.csproj` reports only the 3 pre-existing `SemanticIndex.cs` errors.
-
-### 2026-05-06 — Wave 3 Round 2: canonical doc sweep
-
-Swept six docs to close remaining open question markers by propagating locked CC decisions.
-
-**evaluator.md:** `EventOutcome` DU updated with three changes: (1) `ImmutableArray<FieldMutation> Mutations` added to `Transitioned` and `Applied` variants (CC#23); (2) `Unmatched()` → `Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows)` (CC#24); (3) `Faulted(Fault Fault)` added as 8th variant (CC#12, catalog gap #21). `FieldMutation` record defined: `(string FieldName, JsonElement? Before, JsonElement? After)`. Stale pending note for `RejectReason` replaced with factual closure (CC#11). `FaultCode` table updated — `AmbiguousDispatch` confirmed with `[StaticallyPreventable]` (CC#13). Implementation Note 7 closed. In-domain failures table gained `Faulted` row. Fire pseudocode updated with mutations and new Unmatched signature.
-
-**language-server.md:** `Compilation.Tokens` OQ closed (CC#4). `SemanticIndex.References` OQ closed — Pass 2 reconstructs reference sites by walking typed declarations; `EnsuresByState` is the one first-class grouping (CC#22). `TypeMeta.IsUserFacing` OQ closed (CC#16). `ActionMeta.HoverDescription` OQ closed — `Description` field sufficient; `SnippetTemplate` is future catalog addition. §13 Open Questions 1–3 converted from unresolved to decided notes.
-
-**mcp.md:** Null-data bootstrap OQ closed. `firePipeline` OQ closed as out-of-scope (catalog-gap #25). `SemanticIndex.EnsuresByState` OQ closed (CC#22). Mutations payload OQ closed (CC#23) — JSON example updated to `before`/`after` shape. Unmatched guard trace OQ closed (CC#24) — `evaluatedGuards` → `evaluatedRows` with `TransitionInspection` shape.
-
-**catalog-system.md:** `ConstraintMeta` hierarchy OQ closed — full five-subtype hierarchy documented (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`; three state kinds subtypes of `StateAnchored`). CC#5, CC#13, CC#16, CC#19 verified complete.
-
-**graph-analyzer.md:** Wildcard expansion ordering OQ closed — declaration order confirmed; note moved inline to §6.1. CC#10, CC#21, CC#26 verified complete.
-
-**diagnostic-system.md:** CC#13 and CC#20 verified complete — no changes needed.
-
-Pattern: When a pending note in prose contradicts an already-resolved code block in the same section, remove the note. When an OQ has a recommendation already (workspace/symbol, rename), convert to a decided note rather than leaving "(unresolved)".
-
-### 2026-05-06 — Wave 2 cross-cutting decisions fully closed
-
-- Closed all 11 Wave 2 team-autonomous items: CC#5, CC#10, CC#13, CC#14, CC#15, CC#16, CC#17, CC#18, CC#19, CC#20, and CC#22.
-- Corrected stale Wave 1 checkbox drift for CC#3, CC#4, CC#6, CC#12, CC#23, and CC#24, plus the CC#26 status row, where the status table was already authoritative.
-- Propagated the locked rulings through `cross-cutting-decisions.md`, `catalog-system.md`, `graph-analyzer.md`, `evaluator.md`, `diagnostic-system.md`, `language-server.md`, `type-checker.md`, and `proof-engine.md` with a clean build reported.
-
-### 2026-05-06 — Wave 3 Round 1: canonical doc sweep
-
-Swept three docs to close all open question markers by propagating the locked CC decisions.
-
-**type-checker.md:** `ConstraintFieldRefs.ConstraintIdentity` changed from `object` to `ConstraintIdentity` DU (CC#9). `string? RejectReason` added to `TypedTransitionRow` (CC#11). Stale §14 "No expression tree parsing" bullet removed (contradicted CC#1 resolution already in the doc).
-
-**proof-engine.md:** Five OQ blocks closed — `TryLiteralProof` scope (intentional, Strategy 1 = numeric only); Strategy 3 vs Strategy 4 boundary (explicitly specified — direct subject guard vs. relational guard); initial-state satisfiability blocking note corrected (CC#1 resolved design, remaining dependency = TC implementation); corresponding stale OQ block replaced with implementation note; `FieldModifierMeta.ProofDischarges` stale OQ removed (CC#5 canonical in catalog-system.md).
-
-**precept-builder.md:** `TokenStream Tokens` added to `Compilation` code block (CC#4). `string? RejectReason` added to `ExecutionRow` code block (CC#11). `ConstraintMeta` DU hierarchy with `StateAnchored` abstract intermediate node documented after 5-way routing switch (CC#7).
-
-Pattern: When a doc has a code block and a prose "pending" note about the same field, fix both in one edit — the code block and the prose must be consistent. When an OQ block is stale relative to an earlier resolved note in the same doc, remove it — don't leave contradictory annotations.
-
-### 2026-05-06 — Wave 2 cross-cutting decisions: all 11 closed
-
-- Frank-156's UX accuracy review fed directly into the same-day Elaine correction pass; the dead zero-arg `Possible` state and the undefined-event rendering error are durably closed.
-- Frank-157-1's fit assessment became the acceptance bar for CC#8: once OQ-2 and OQ-3 closed, the proposal was fit to adopt.
-- Frank-158-1 applied those closures in `event-inspection-proposal.md`, resolved CC#8 in the cross-cutting register, and unblocked CC#12.
-- Wave 1 facilitation opened with CC#7 first; keep the hierarchical `ConstraintMeta.StateAnchored` recommendation attached to that handoff until Shane rules.
+---
 
 ### Historical summary through 2026-05-05
 

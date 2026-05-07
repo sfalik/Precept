@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+### 2026-05-07T04:02:01Z — Parser prerequisite decisions recorded
+
+- Pre-check measured `decisions.md` at 80481 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran first and found 0 active dated entries eligible to move.
+- Merged `frank-parser-prereqs-b2-b3.md` plus `frank-disambiguation-catalog.md` into one canonical decision entry, cleared the processed inbox files, and wrote the Frank orchestration/session logs.
+- Refreshed Frank/George/Scribe history, summarized oversized histories as needed, and logged the parser-prereq handoff as George-unblocking context.
+
 ### 2026-05-07T03:00:00Z — Wave 3 Round 2 sweep recorded
 
 - Pre-check measured `decisions.md` at 75117 bytes with 1 inbox file, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T03:00:00Z.
