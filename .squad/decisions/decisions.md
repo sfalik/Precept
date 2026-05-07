@@ -84,8 +84,6 @@
 
 4. **`FiredArgs` placement on `EventOutcome` variants** (`Transitioned.Args`, `Applied.Args`, `Rejected.Args`) is documented here but the `result-types.md` doc may need parallel updates. This was not in scope for this pass — flagging for follow-up.
 
-
-
 # CC#2 — SlotValue Subtype Shapes: Locked Decisions
 
 
@@ -268,8 +266,6 @@ This closes the cross-cutting ambiguity blocking parser and TC work. With the DU
 
 Future changes to slot shapes now carry a higher bar because the DU is declared stable. That rigidity is accepted to end churn and give the pipeline a canonical contract.
 
-
-
 # CC#25 Q6 Addendum — Sync-Only API (Async Clarification)
 
 
@@ -311,8 +307,6 @@ If async were ever required (e.g., persistence hooks, external validation), that
 
 
 Public API docs should state: "Precept execution is CPU-bound. Async wrappers provide no scalability benefit and are not provided."
-
-
 
 # CC#25 Q6 — Eval Stack Allocation
 
@@ -712,8 +706,6 @@ Explicit call required. Neither path is automatic.
 
 **Note:** "Preserves structural components" distinguishes period from duration negation.
 
-
-
 # Decision: HandlesCatalogMember rename propagation complete
 
 
@@ -831,8 +823,6 @@ George completed the mechanical rename from `[HandlesForm]` to `[HandlesCatalogM
 
 
 ---
-
-
 
 # Parser Coverage Assertion Against ExpressionFormKind
 
@@ -1744,8 +1734,6 @@ public void ParseAtom_Handles_All_Nud_Form_LeadTokens()
 
 ---
 
-
-
 # Collection Iteration Research — Frank
 
 
@@ -1962,8 +1950,6 @@ The pressure is ordered:
 
 ---
 
-
-
 # Universal: every element satisfies
 
 
@@ -1982,8 +1968,6 @@ rule Items.all(item, item > 0)
 
 ---
 
-
-
 # Existential: at least one satisfies
 
 
@@ -2001,8 +1985,6 @@ from Submitted on Approve when Reviewers.any(r, r == Approve.ReviewerName)
 
 
 ---
-
-
 
 # Negated universal: no element satisfies
 
@@ -2162,8 +2144,6 @@ from UnderReview on Approve when none PendingInterviewers each == ""
 
 ---
 
-
-
 # Aggregate boolean
 
 
@@ -2178,8 +2158,6 @@ rule Items.all(> 0) because "All items must be positive"
 
 ---
 
-
-
 # Aggregate numeric
 
 
@@ -2193,8 +2171,6 @@ field Total as decimal -> Items.sum(.amount)
 
 
 ---
-
-
 
 # Conditional count
 
@@ -2353,8 +2329,6 @@ Rationale:
 
 
 ---
-
-
 
 # Collection-Level Constraint Rules Research — Frank
 
@@ -2922,8 +2896,6 @@ Rules relating a scalar aggregate of a collection to a threshold or another fiel
 
 ---
 
-
-
 # Uniqueness — elements must be distinct
 
 
@@ -2937,8 +2909,6 @@ field Approvers as set of string unique
 
 
 ---
-
-
 
 # Collection notempty — at least one element required (alias for mincount 1)
 
@@ -2954,8 +2924,6 @@ field LineItems as set of number notempty
 
 ---
 
-
-
 # Cross-collection subset
 
 
@@ -2969,8 +2937,6 @@ field SelectedOptions as set of string subset AvailableOptions
 
 
 ---
-
-
 
 # Cross-collection disjoint
 
@@ -3052,8 +3018,6 @@ field PrimaryContacts as set of string disjoint BackupContacts
 
 ---
 
-
-
 # All elements satisfy a predicate
 
 
@@ -3071,8 +3035,6 @@ rule Items.all(item, item > 0)
 
 
 ---
-
-
 
 # At least one element satisfies
 
@@ -3092,8 +3054,6 @@ rule Reviewers.any(reviewer, reviewer != "")
 
 ---
 
-
-
 # State-scoped element constraint
 
 
@@ -3111,8 +3071,6 @@ in Review ensure Scores.all(score, score >= 1 and score <= 5)
 
 
 ---
-
-
 
 # Guard with quantifier
 
@@ -3474,8 +3432,6 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 ---
 
-
-
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
 
 
@@ -3647,8 +3603,6 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 ---
-
-
 
 # Decision: Combined Design v2 Comprehensive Revision Pass
 
@@ -4032,68 +3986,6 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 ---
 
-
-
-# Spike Mode Is First-Class
-
-
-
-**By:** Frank (Lead/Architect)
-
-
-
-**Date:** 2026-04-28T23:09:18.057-04:00
-
-
-
-**What:** Spike mode is now formally encoded across routing, ceremonies, wisdom, and `CONTRIBUTING.md`. Activation and exit intents are explicit, spike branches follow the `spike/{kebab-description}` convention, PR-demanding ceremonies are suppressed while `spike_mode: true`, and spike work exits through a structured closeout.
-
-
-
-**Why:** Exploratory work is a real process mode, not an informal exception. If routing, ceremonies, durable wisdom, and contributor workflow docs do not encode spike mode together, the system incorrectly demands implementation gates, PRs, and branch churn during spikes.
-
-
-
-## Encoded surfaces
-
-
-
-- `.squad/routing.md` now recognizes spike activation and exit intents and suppresses PR-demanding auto-triggers during a spike.
-
-
-
-- `.squad/ceremonies.md` now suppresses Design Review and PR Review when `spike_mode: true`, and defines manual Spike Kickoff / Spike Closeout ceremonies.
-
-
-
-- `.squad/identity/wisdom.md` now records the spike branch naming convention and the rule that spike mode suppresses PR-dependent ceremonies.
-
-
-
-- `CONTRIBUTING.md` now defines the contributor-facing spike workflow, including activation, branch rules, ceremony suppression, and deliberate closeout.
-
-
-
-## Architectural decision
-
-
-
-Spike mode is first-class. It must be activated deliberately, enforced consistently, and closed out explicitly. Exploratory work does not bypass process; it follows its own process.
-
-
-
----
-
-
-
----
-
-
-
----
-
-
-
 # Decision: Map Access Syntax
 
 
@@ -4366,8 +4258,6 @@ CoverageLimits at CheckCoverage.CoverageType
 
 ---
 
-
-
 # Rule expression
 
 
@@ -4385,8 +4275,6 @@ rule CoverageLimits at CheckCoverage.CoverageType >= 50000
 
 
 ---
-
-
 
 # Action body
 
@@ -4409,8 +4297,6 @@ from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.Cover
 
 
 ---
-
-
 
 # Event guard
 
@@ -4463,8 +4349,6 @@ from Active on AdjustCoverage
 
 
 ---
-
-
 
 # Advisory: Map Access Keyword — `at` vs `for`
 
@@ -4804,8 +4688,6 @@ CoverageLimits at CheckCoverage.CoverageType
 
 ---
 
-
-
 # Decision: Map Access Keyword — `for` vs `at`
 
 
@@ -4980,8 +4862,6 @@ The only counterargument for `at` is familiarity for developers who know `dict.a
 
 ---
 
-
-
 # Decision Record: `map` Access Keyword — Working Syntax `for`, Decision Open
 
 
@@ -5143,8 +5023,6 @@ Owner decision required. When Shane locks the keyword, update the open-question 
 
 
 ---
-
-
 
 # Phase 2b Decision Notes — OperatorMeta DU Restructure
 
@@ -5328,8 +5206,6 @@ case additions) → **2274 passing, 0 failing**.
 
 ---
 
-
-
 # Decision Note — Phase 2c Complete (Slices 23–26)
 
 
@@ -5464,8 +5340,6 @@ Phase 2c closes the PRECEPT0019 promotion work. All four slices landed in a sing
 
 ---
 
-
-
 # Decision Note: Phase 2d Complete — Parser.cs Structural Split
 
 
@@ -5575,8 +5449,6 @@ Phase 2d (Slice 27) is the only slice in this phase. Phase 2d is now complete.
 
 
 ---
-
-
 
 # Full Architecture Review — spike/Precept-V2
 
@@ -6066,8 +5938,6 @@ This branch is ready to merge to main.
 
 ---
 
-
-
 # George: G2 + G3 Fix — RS1030 and Phase 3 CatalogEnumNames TODO
 
 
@@ -6279,8 +6149,6 @@ enforcement takes effect immediately.
 
 
 **Why:** User request — captured for team memory
-
-
 
 # Catalog-Driven Type Checker Design Review
 
@@ -7126,8 +6994,6 @@ The recurring theme is: **Precept's type system is closed and small enough to pr
 
 **Why:** Align the public language spec with the existing `Functions` catalog and close GAP-047 without any code changes.
 
-
-
 # Frank — Iteration 11 doc/catalog audit findings
 
 
@@ -7214,8 +7080,6 @@ Date: 2026-05-02
 
 - Do CI string-function rules need richer catalog metadata (e.g. CI-sensitive parameter position), or is out-of-band checker logic the intended design?
 
-
-
 # Decision: Parser Catalog-Driven Review Complete
 
 
@@ -7265,8 +7129,6 @@ Completed a full catalog-driven design review of the parser (`src/Precept/Pipeli
 
 
 Review written to: `docs/working/frank-catalog-driven-parser-review.md`
-
-
 
 # George's Catalog-Driven Type Checker Review
 
@@ -8226,8 +8088,6 @@ The modifier bounds-pair issue (Gap C) is lower-priority but real. The parser pa
 
 Frank should decide whether Proposals 1-3 are blocking the slice plan or deferred debt. My read: Proposals 2 and 3 are genuine Slice 4 blockers because they directly cause hardcoded per-TypeKind switches in Slice 4 itself. Proposal 1 is a Slice 5 blocker for the same reason.
 
-
-
 # George — Iteration 11 Catalog-Impl Audit Findings
 
 
@@ -8398,8 +8258,6 @@ The following priority areas from the task brief were checked and found clean:
 
 - **Lexer**: ✅ Fully catalog-driven (keywords, operators, punctuation all via Tokens catalog).
 
-
-
 # Decision: Parser Rebuild Rejected — Path C (Targeted Improvements) Selected
 
 
@@ -8456,8 +8314,6 @@ Shane asked: "Should we delete the parser and re-implement as a radical idea?"
 
 Don't rebuild infrastructure to satisfy architectural aesthetics before building the thing that reveals whether the aesthetics are correct.
 
-
-
 # Decision Note: Parser Rebuild Reassessment (AI Velocity Correction)
 
 
@@ -8506,8 +8362,6 @@ Shane corrected Frank's 1-2 week rebuild estimate by noting the entire parser wa
 
 Lock the stashed-guard pattern design before starting. It's the gap that breaks the slot-sequential model most fundamentally and has no plausible workaround without new design work.
 
-
-
 # Decision: Slots Field Removed from ConstructMeta (Radical Parser Design)
 
 
@@ -8547,8 +8401,6 @@ The `ImmutableArray<ConstructSlot> Slots` field is removed from `ConstructMeta` 
 
 
 `ExtractNamedCaptures(ParseRule grammar)` walks the combinator tree, collects all `Tag` node names, and returns `ImmutableArray<string>`. Called once per `ConstructMeta` at catalog initialization.
-
-
 
 # Decision: Slots as a Separate Catalog Concept — Drop Them
 
@@ -8816,8 +8668,6 @@ The design doc's note *"keep — used for documentation/tooling"* was defensive 
 
 - The two-sentence clarification "Both say the same thing; `Grammar` is the executable form" must go — it was the tell that we were maintaining parallel truth.
 
-
-
 # George Pipeline Review Complete
 
 
@@ -8956,8 +8806,6 @@ The reviews are ready for discussion. Before Frank and George align on a final i
 
 ---
 
-
-
 # Decision: Delete AST SyntaxNodes and AstNodeTests
 
 
@@ -9027,8 +8875,6 @@ The clean-slate approach mirrors what was already done with the TypeChecker stub
 
 
 ---
-
-
 
 # Decision: Parser and AST Stubbed
 
@@ -9144,8 +8990,6 @@ Owner-directed cleanup. The existing parser was a complete recursive-descent imp
 
 ---
 
-
-
 # Decision: Per-Consumer Pipeline Implementation Recommendations
 
 
@@ -9183,8 +9027,6 @@ Owner-directed cleanup. The existing parser was a complete recursive-descent imp
 
 
 ---
-
-
 
 # Decision: Proof-Discharge Cataloging Depth
 
@@ -9267,8 +9109,6 @@ Over-cataloging is worse than under-cataloging for Precept. A false discharge in
 
 
 ---
-
-
 
 # Decision: Semantic Constraint Metadata Placement
 
@@ -9361,8 +9201,6 @@ record CrossConstructConstraint(string SlotName, ReferenceNamespace TargetNamesp
 
 
 ---
-
-
 
 # Decision: Option F AST Stub — Generic ParsedConstruct + SlotValue DU
 
@@ -9483,8 +9321,6 @@ Option F was chosen over per-construct typed AST nodes (38 files, just deleted) 
 
 
 ---
-
-
 
 # Decision: Remove `[HandlesCatalogExhaustively]` from Pipeline Consumers
 
@@ -9638,8 +9474,6 @@ Remove from consumers. Retain in the catalog layer. The compiler's own exhaustiv
 
 ---
 
-
-
 # Decision: Remove [HandlesCatalogExhaustively] / [HandlesCatalogMember] from pipeline consumer stubs
 
 
@@ -9730,8 +9564,6 @@ Any test that enforces annotation presence via reflection must be removed alongs
 
 ---
 
-
-
 # Decision: Ensure BecauseClause slot split closed at the catalog layer
 
 
@@ -9766,8 +9598,6 @@ Any test that enforces annotation presence via reflection must be removed alongs
 
 ---
 
-
-
 # Decision: StateEntryList owns the full state-entry modifier surface
 
 
@@ -9794,8 +9624,6 @@ Any test that enforces annotation presence via reflection must be removed alongs
 
 ---
 
-
-
 # Decision note: catalog schema diagram baseline is 13 catalogs
 
 
@@ -9817,8 +9645,6 @@ Any test that enforces annotation presence via reflection must be removed alongs
 
 
 **Reference:** `frank-catalog-schema-diagram.md` (inbox memo deleted after merge; recoverable from git history if the full inventory/mapping details are needed).
-
-
 
 # Frank — Catalog Schema Doc Complete
 
@@ -10102,8 +9928,6 @@ No existing sections were restructured or rewritten. The new section was inserte
 
 ---
 
-
-
 # TypeRuntimes Construction — Architecture Decision
 
 
@@ -10332,8 +10156,6 @@ None from Frank. The following are sequencing dependencies that affect when the 
 
 ---
 
-
-
 # `in PreceptValue` / `out PreceptValue` / `ref` asymmetry — CC#25 JSON API
 
 
@@ -10457,8 +10279,6 @@ The previously recorded `ref PreceptValue` on `ReadJson` is superseded by `out P
 
 
 ---
-
-
 
 # Collection types and `in PreceptValue` — does the slot abstraction hold?
 
@@ -10739,8 +10559,6 @@ The `in PreceptValue slot` decision was never "collections are stored as arrays.
 
 
 ---
-
-
 
 # Stack-Only Evaluator — Shane's Directive
 
@@ -11130,8 +10948,6 @@ Option A (row-level only) would have provided only pass/fail per row, not per-cl
 
 ---
 
-
-
 # Evaluation: Opcodes in CompilationResult
 
 
@@ -11367,8 +11183,6 @@ This is already the canonical design per `docs/compiler-and-runtime-design.md` �
 
 
 ---
-
-
 
 # CC#25: Collections + TypeRuntimeMeta Q&A
 
@@ -12046,8 +11860,6 @@ These arose during this analysis but belong in their own decision cycles:
 
 **Why:** The two concepts share a word but not a lifecycle, representation, or owner. Builder-time slot assignment happens mechanically inside Precept.From() in declaration order, so discussions that cross parser and runtime layers must explicitly distinguish construct slots from field slots.
 
-
-
 # CC#25 Q6 Revision — Stack Depth Enforcement (LS Diagnostic)
 
 
@@ -12344,8 +12156,6 @@ The prior Q6 answer described enforcement in builder Pass 5. This revision moves
 
 The `ExecutionPlan.MaxStackDepth` field remains useful for debug assertions but is no longer the enforcement point.
 
-
-
 # Frank — Chunk 2 Gaps
 
 
@@ -12484,8 +12294,6 @@ consumer code references it explicitly.
 
 - Both `Precept` and `Version` have `using System.Text.Json;`. Build passes 0 errors / 0 warnings.
 
-
-
 # Frank — Chunk 3 Gap Notes
 
 **Date:** 2026-05-04T00:02:05.132-04:00  
@@ -12614,8 +12422,6 @@ README.md contains no `IReadOnlyDictionary<string, object?>` examples, no `new D
 
 **Why:** Report statuses were stale — several gaps were fixed by prior agents but status markers not updated.
 
-
-
 # Catalog Gap Register Migration — Completed
 
 
@@ -12730,8 +12536,6 @@ Four entries (#12, #25, #27, #36) were API design or tooling implementation ques
 
 Eight entries were already tracked in `docs/working/cross-cutting-decisions.md` (#10, #14, #19, #26, #28, #29, #32, #38). Source attributions added to the register; no new migration needed.
 
-
-
 # Frank — Cross-Cutting Execution Driver Restructure
 
 
@@ -12787,8 +12591,6 @@ I converted the top of `docs/working/cross-cutting-decisions.md` into a real exe
 Open the status summary first to see which decisions are decided, which are blocked, and which canonical doc currently owns each open question.
 
 Then work wave by wave from the checklists; the retained detailed entries are there for design context, not for coordination.
-
-
 
 # Frank — structural gaps migrated
 
@@ -12897,8 +12699,6 @@ Then work wave by wave from the checklists; the retained detailed entries are th
 
 
 **Why:** Omitting unresolved fields is the only round-trip-safe representation and avoids conflating unresolved values with JSON `null`. Throwing on direct reads keeps the programmer-error contract consistent with the rest of the public runtime surface.
-
-
 
 # API Naming Assessment — Public Runtime Surface
 
@@ -13168,8 +12968,6 @@ With nesting: `UpdateOutcome.Updated`. Reads cleanly: `if (outcome is UpdateOutc
 
 - Whether `ConstraintKind` enum values need simplification — they mirror DSL, so they're correct as-is; documentation solves the clarity need.
 
-
-
 # ConstraintsFailed Naming and DU Nesting
 
 
@@ -13290,8 +13088,6 @@ Partial nesting — where `ConstraintsFailed` is nested inside `EventOutcome` bu
 
 - `docs/working/runtime-api-public-surface-spec.md` — §2.1, §2.2 (nested structure + rename), §11 (decisions #11 and #12)
 
-
-
 # Elaine Naming Pass — Applied to Runtime API Surface Spec
 
 
@@ -13392,8 +13188,6 @@ Frank-96's entries (#11 — DU nesting, #12 — ConstraintsFailed rename) were c
 
 - `docs/working/runtime-api-public-surface-spec.md` — §2.2, §2.3, §2.7, §11 (decisions #13–17 added)
 
-
-
 # Decision Note: copilot-directive-value-suffix-drop
 
 
@@ -13405,8 +13199,6 @@ Frank-96's entries (#11 — DU nesting, #12 — ConstraintsFailed rename) were c
 **What:** Drop the `Value` suffix from all business and temporal CLR type names in the public API. `MoneyValue` → `Money`, `QuantityValue` → `Quantity`, `PriceValue` → `Price`, `ExchangeRateValue` → `ExchangeRate`, `DateRangeValue` → `DateRange`, etc.
 
 **Why:** User request — captured for team memory
-
-
 
 # Decision: Collection CLR API Analysis v2
 
@@ -13849,8 +13641,6 @@ The mini-spec §13.4 should add an implementation note:
 
 
 No public API changes. No new types. No signature changes. The correction is internal implementation guidance only.
-
-
 
 # Decision Record: Collection CoW Protocol for Multi-Mutation Events
 
@@ -14582,8 +14372,6 @@ ArrayPool<PreceptValue>.Shared.Return(workingCopy);
 
 3. **Builder growth hints — when to implement?** The protocol works with a default growth factor (`count + 4` or `count * 2`). Builder annotations are a refinement for later. Don't block implementation on this.
 
-
-
 # Decision Record: Collection Types Investigation Doc — Consolidated Patch
 
 
@@ -14661,8 +14449,6 @@ The canonical collection types investigation doc was extended from a public-API-
 
 
 All 6 decision records (frank-105 through frank-110) are now accurately reflected in one canonical document. The inbox files remain as provenance/rationale records.
-
-
 
 # Decision Record: Multi-Dimensional vs Stride-2 for Pair Collections
 
@@ -15200,8 +14986,6 @@ The frank-106 decision stands unmodified. All 9 collection kinds use `PreceptVal
 
 - Helper ref-accessors (`Key(arr, i)`, `Val(arr, i)`) provide ergonomic parity without type pollution
 
-
-
 # Decision Record: Collection Scalability and Lazy-Load Extensibility
 
 
@@ -15544,8 +15328,6 @@ Logs are append-only by design. A Precept modeling a loan lifecycle might accumu
 
 | What's the mitigation? | **`maxcount` as mandatory best practice for logs.** Lint warning if omitted. Archival patterns for long-lived entities. Structural sharing or lazy backing deferred to vFuture if needed. |
 
-
-
 # Decision: Collection Types Public API Surface
 
 
@@ -15609,8 +15391,6 @@ Logs are append-only by design. A Precept modeling a loan lifecycle might accumu
 §13: add `KeyedElement<,>` and `PreceptLookup<K,V>` definitions.
 
 §4.2: add descriptor-build-time wrapping logic for the three collection shapes.
-
-
 
 # Decision Record: Custom Collection Wrapper Types
 
@@ -16300,8 +16080,6 @@ Collection mutation is not special. It follows the same pattern: prebuilt plan �
 
 - Clean migration path to `ICollectionBacking` when/if needed — change the parameter types, nothing else.
 
-
-
 # Decision Record: Internal Collection Representation
 
 
@@ -16682,8 +16460,6 @@ How does `PreceptValue` (32-byte struct) represent a collection reference? Optio
 
 This is a `PreceptValue` layout decision — adjacent to but separate from this collection representation decision.
 
-
-
 # Decision: Value Types Investigation Doc — Canonical Alignment Patches
 
 
@@ -16758,8 +16534,6 @@ Canonical design docs (`docs/language/`) are the source of truth. Working docs (
 
 - Percentage: deferred to its own investigation
 
-
-
 # Frank Decision Record — Mini-spec unit row + OQ-7 open questions
 
 
@@ -16791,8 +16565,6 @@ Canonical design docs (`docs/language/`) are the source of truth. Working docs (
 - The mini-spec needed to stop implying `Unit` was just an abstract conceptual value and instead state the actual public CLR contract and the identity/interning rationale that justifies it.
 
 - The business value type assessment already surfaced unresolved design questions; the mini-spec now carries them explicitly so the open decision set is visible in the same contract document rather than stranded in investigation notes.
-
-
 
 # Decision: Mini-spec aligned to collection types investigation
 
@@ -16873,8 +16645,6 @@ The runtime API public surface spec now fully reflects the collection types inve
 - §13 — Header, §13.5 closure, §13.6 adapter inventory, §13.7 remaining OQs
 
 - Status line — updated to reflect OQ-5 resolution
-
-
 
 # Decision: Drop `Value` Suffix from Business and Temporal CLR Type Names
 
@@ -16992,8 +16762,6 @@ Applied to all three working docs:
 
 Post-application scan confirmed: no `MoneyValue`, `QuantityValue`, `PriceValue`, `ExchangeRateValue`, or `DateRangeValue` remain in any of the three files. `PreceptValue` occurrence counts unchanged (48, 7, 20 respectively).
 
-
-
 # Decision: Value Types Investigation Doc — Final Patch Pass
 
 
@@ -17059,8 +16827,6 @@ Shane requested a comprehensive patch of the value-types investigation doc again
 - OQ-7f: Whether `DateTimeRange` (Instant-bounded) is needed
 
 - Percentage: deferred to its own investigation
-
-
 
 # Value Types Investigation — Canonical Review Findings
 
@@ -17131,8 +16897,6 @@ The investigation doc is structurally sound and internally consistent. Its core 
 4. **Fix `DateRange` to use `DateOnly?`** not `LocalDate?` for the public CLR surface.
 
 5. **Add coverage note** acknowledging the 5 types the investigation doesn't treat in depth (`price`, `currency`, `unitofmeasure`, `dimension`, `period` extensions).
-
-
 
 # CLR Collection Surface: `ImmutableArray<T>` vs `IReadOnlyList<T>`
 
@@ -17548,8 +17312,6 @@ The tradeoffs are clear. Hold the lazy adapter.
 
 **Path forward:** No changes to the collection surface spec. OQ-C1, OQ-C2, OQ-C3 go to Shane for confirmation as originally planned.
 
-
-
 # OQ-C3: Direction Storage for Pair Collections — LOCKED
 
 
@@ -17693,8 +17455,6 @@ Rejected because:
 **What:** Do not run the decisions.md archive step (moving old entries to decisions-archive.md) while a working-doc review and closeout session is in progress. Archival is only permitted after all working docs under review have been fully walked through and closed out.
 
 **Why:** User request — captured for team memory
-
-
 
 # Catalog-Delegate Evaluation — Should Executor Logic Live on `OperationMeta` Entries?
 
@@ -19258,3 +19018,540 @@ Each finding was cross-referenced in both directions:
 **`precept-builder.md`** — 1 MAJOR gap (F-022): descriptor shapes missing `ClrType` in Pass 1. OQ blocks and BecauseClause rename are MINOR. RestoreOutcome reference (F-024b) is MINOR.
 
 **`business-domain-types.md`** — No action required. All 5 findings resolved by frank-152.
+
+# CC#12, CC#23, CC#24 — Resolved (2026-05-06)
+
+**Decision maker:** Shane  
+**Coordinator:**  main session  
+
+---
+
+## CC#12 — Faulted(Fault) as EventOutcome Variant
+
+**Ruling:** Yes — `Faulted(Fault fault)` added as the 8th variant of `EventOutcome`.
+
+The evaluator's `Fail()` path surfaces its `Fault` as a structured outcome rather than an unhandled exception at the runtime boundary. MCP `precept_fire` serializes `Faulted` as `{ "outcome": "Faulted", "fault": { ... } }`.
+
+**Files updated:** `docs/runtime/result-types.md`, `docs/working/cross-cutting-decisions.md`
+
+---
+
+## CC#23 — EventOutcome.mutations Payload
+
+**Ruling:** Option A — `ImmutableArray<FieldMutation> Mutations` attached to `Transitioned` and `Applied`.
+
+`FieldMutation(string FieldName, JsonElement? Before, JsonElement? After)` — only changed fields included. The evaluator computes the diff against the working copy it already maintains; no second call needed. Faulted/failed variants carry no mutation payload.
+
+**Files updated:** `docs/runtime/result-types.md`, `docs/working/cross-cutting-decisions.md`
+
+---
+
+## CC#24 — Unmatched Guard Trace Enrichment
+
+**Ruling:** Option A — `Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows)`.
+
+Uses the same `TransitionInspection` type as the inspect path (CC#8), making commit and inspect paths type-consistent. Guard evaluation was already running during the commit pass; retaining per-row results is no extra cost. MCP `precept_fire` serializes `EvaluatedRows` using the same DTO as `precept_inspect` transition rows.
+
+**Files updated:** `docs/runtime/result-types.md`, `docs/working/cross-cutting-decisions.md`
+
+# CC#3, CC#4, CC#6 — Resolved (2026-05-06)
+
+**Decision maker:** Shane  
+**Coordinator:** main session  
+
+---
+
+## CC#3 — SemanticIndex Reference-Tracking Collections
+
+**Ruling:** Option A — typed reference arrays on `SemanticIndex`.
+
+Three per-category arrays added:
+- `ImmutableArray<FieldReference> FieldReferences`
+- `ImmutableArray<StateReference> StateReferences`
+- `ImmutableArray<EventReference> EventReferences`
+
+Reference types: `FieldReference(TypedField Field, SourceSpan Site)`, `StateReference(TypedState State, SourceSpan Site)`, `EventReference(TypedEvent Event, SourceSpan Site)`. No general heterogeneous `References` array needed.
+
+**Files updated:** `docs/compiler/type-checker.md §7.1`, `src/Precept/Pipeline/SemanticIndex.cs`, `docs/working/cross-cutting-decisions.md`
+
+---
+
+## CC#4 — Compilation.Tokens Field
+
+**Ruling:** Already resolved by code stub. `Compilation` carries `TokenStream Tokens` (first field). `TokenStream` wraps `ImmutableArray<Token>` + lex diagnostics.
+
+**Files updated:** `docs/working/cross-cutting-decisions.md` (status only)
+
+---
+
+## CC#6 — FaultSiteLink to FaultSiteDescriptor Transformation
+
+**Ruling:** Option A — nullable `FaultSiteAnnotation?` on each opcode.
+
+Key insight: `FaultSiteLink` is only produced for `Unresolved` obligations. Unresolved = compile error. Proof elision is structural absence — proved sites have no annotation, no check, zero runtime overhead. Matches SPARK Ada model.
+
+```csharp
+public sealed record FaultSiteAnnotation(
+    FaultCode Code,
+    DiagnosticCode PreventedBy,
+    SourceSpan Site
+);
+// On Opcode: FaultSiteAnnotation? FaultSite  (null = proven safe)
+```
+
+Builder matches `ProofObligation.Site` (TypedExpression) → stamps annotation on resulting opcode. Evaluator checks `op.FaultSite` after dispatch; null = no check.
+
+**Files to update (Frank's work item):** `docs/compiler/proof-engine.md §2 Output Shape`, `docs/runtime/precept-builder.md §Pass 6`, `docs/runtime/evaluator.md §7 fault dispatch`
+
+# CC#21 — Locked Ruling: Old UnhandledEvent Removal + UnhandledEvent Recycled (Tighter Definition)
+
+**Date:** 2026-05-06
+**Name approved:** 2026-05-06 (Shane)
+**Executor:** Frank
+
+## Rulings
+
+### 1. Remove the old `UnhandledEvent` diagnostic entirely
+
+**Rationale:** A partial event-handler matrix (event handled in some states but not others) is valid, intentional authoring — not broken code. Flagging it violates §0.6 principle 2 ("only flag proven violations"). The author's decision to handle an event in some states but not others is a design choice, not an error.
+
+### 2. Add `UnhandledEvent` diagnostic (recycled name, tighter definition)
+
+An event declared with zero transition rows handling it in ANY state is a provably dead declaration — definitively broken. This warrants a diagnostic.
+
+**Name rationale:** `UnhandledEvent` was chosen by Elaine and approved by Shane. It names the structural cause (no handlers exist) rather than implying parentage ("orphan"). It distinguishes cleanly from `EventNeverSucceeds` — the event has no handler rows anywhere, not merely a blocked execution path. The old `UnhandledEvent` meant "not handled in some states" (partial coverage). The new `UnhandledEvent` means "not handled in ANY state" — a strictly narrower, provably-broken case.
+
+**Spec:**
+- **Code:** `DiagnosticCode.UnhandledEvent` (ordinal 81, reuses slot)
+- **Stage:** Graph
+- **Severity:** Warning
+- **Category:** Structure
+- **Message:** `"Event '{0}' has no transition rows in any state — it can never be fired successfully"`
+- **FixHint:** `"Add at least one transition row that handles this event, or remove the event declaration"`
+
+### 3. `optional` event modifier — moot
+
+With the old broad `UnhandledEvent` gone, there is nothing to suppress. No modifier needed.
+
+## Key Distinction
+
+- **Partial coverage** (some states handle, some don't) = intentional authoring → no diagnostic
+- **Zero coverage** (no state handles the event anywhere) = provably dead → `UnhandledEvent` warning
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `docs/working/cross-cutting-decisions.md` | CC#21 status → ✅ Resolved; ruling documented; OrphanedEvent → UnhandledEvent |
+| `docs/compiler/graph-analyzer.md` | §6.5 rewritten: OrphanedEvent → UnhandledEvent; appendix updated |
+| `docs/compiler/diagnostic-system.md` | Enum and switch updated to UnhandledEvent |
+| `src/Precept/Language/DiagnosticCode.cs` | `OrphanedEvent` → `UnhandledEvent` (ordinal 81 retained) |
+| `src/Precept/Language/Diagnostics.cs` | Switch case renamed; message updated |
+| `test/Precept.Tests/DiagnosticsTests.cs` | Test renamed and updated |
+
+## Design Notes
+
+- `EventCoverageEntry` computation is retained — it feeds proof forwarding for dead guard sharpening regardless of diagnostic emission.
+- Ordinal 81 is reused (renamed, not removed+added) to maintain stable diagnostic code numbering.
+- The name `UnhandledEvent` is recycled with a strictly narrower definition. Documentation explicitly distinguishes the old meaning (partial coverage) from the new meaning (zero coverage).
+
+# Decision: Remove `UnhandledEvent` Diagnostic Entirely
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-06
+**Context:** CC#21 — `optional` event modifier proposal (closing)
+**Requested by:** Shane
+
+---
+
+## Recommendation
+
+**Remove it. Shane is right.**
+
+`UnhandledEvent` violates the language's own design principles. It should be deleted — the diagnostic code, the graph analyzer emission, and the spec references to C49.
+
+---
+
+## Analysis
+
+### 1. Philosophy Verdict: UnhandledEvent Is a Nag, Not a Proof
+
+Spec §0.6 principle 2 is unambiguous:
+
+> "The language reports what is definitively broken, not what might be broken. Flagging possible violations turns the compiler into a nag that trains authors to ignore warnings. Flagging only proven violations makes it a trusted guide — when it speaks, it is right."
+
+`UnhandledEvent` flags a **valid design choice** — not a broken definition. A partial event-handler matrix is the normal, expected, correct authoring pattern for any non-trivial precept. An `Approve` event that only fires in `PendingReview` is not broken; it is precise. Flagging it in `Draft` or `Active` is noise that teaches the author to ignore the compiler.
+
+The diagnostic's own message ("firing it will always be rejected") is factually wrong — the runtime returns `EventOutcome.Unmatched`, not `Rejected`. But even fixing the message doesn't save it. Telling the author "this event won't fire here" is telling them something they already know and intentionally designed.
+
+### 2. Language Spec: No Invariant Requires Full Coverage
+
+The spec defines no invariant that every event must be handled in every state. The execution model (§0.4) describes a finite state space with declared transitions. The transition topology is the author's design — not a coverage obligation.
+
+The spec's "C49 (orphaned events)" reference in the modifier interaction paragraph (§0.5) describes events with **zero handlers anywhere** — an event declared but never used in any transition. That is a genuinely dead declaration. `UnhandledEvent` as implemented is broader: it fires per (state, event) gap, even when the event is handled in other states. These are different diagnostics with different justifications.
+
+### 3. Is There ANY Scenario Where This Catches a Real Mistake?
+
+I thought hard about this. The only case: an author declares an event, writes transitions for it in some states, and *forgets* to add a handler in a state where they intended one. But:
+
+- The runtime handles this gracefully — `Unmatched` with full inspection data.
+- The author discovers it immediately during testing/preview (inspect shows the event isn't available).
+- The false-positive rate on real precepts would be enormous. In a 5-state, 4-event precept, a typical coverage matrix might be 60% — that's 8 false warnings.
+- No other structural diagnostic in Precept has this "maybe you forgot" character. Everything else proves something is broken.
+
+Verdict: the diagnostic catches a hypothetical forgetting scenario at the cost of crying wolf on every valid partial matrix. That's exactly what principle 2 prohibits.
+
+### 4. C49 (OrphanedEvent) Is Different
+
+The spec's "C49" is about **orphaned events** — events with no handler in ANY state. That's a genuinely dead declaration (like an unreachable state). It is a proven structural fact: this event can never fire anywhere. That diagnostic is worth keeping — but it doesn't exist yet in the codebase (no `OrphanedEvent` code is defined).
+
+`UnhandledEvent` (code 81) is the per-state-gap diagnostic, which is the one Shane is proposing to remove. These are not the same check.
+
+**Recommendation:** When we implement the graph analyzer, consider adding `OrphanedEvent` (event with zero handlers across all reachable states) as a separate diagnostic. That one satisfies principle 2 — it's provably dead. But `UnhandledEvent` (partial coverage gaps) does not.
+
+### 5. Removal Impact
+
+| Artifact | Change |
+|----------|--------|
+| `src/Precept/Language/DiagnosticCode.cs` | Remove `UnhandledEvent = 81` (or reserve the ordinal) |
+| `src/Precept/Language/Diagnostics.cs` | Remove the metadata entry at line 281 |
+| `docs/compiler/graph-analyzer.md` §6.5 | Remove the diagnostic emission. The `EventCoverageEntry` computation **stays** — it feeds `EventCoverageFact` for proof forwarding (dead guard sharpening uses it). The section just stops emitting a diagnostic for gaps. |
+| `docs/compiler/graph-analyzer.md` §2 | Update "Diagnostic emission" row to remove `UnhandledEvent` |
+| `docs/compiler/graph-analyzer.md` appendix | Remove code 81 row |
+| `docs/compiler/graph-analyzer.md` open question | Delete it — resolved by removal |
+| `docs/compiler/diagnostic-system.md` | Remove references |
+| `docs/language/precept-language-spec.md` §0.5 | Update "C49 (orphaned events)" reference — clarify this means totally orphaned, not per-state gaps |
+| `UnreachableState` RelatedCodes | Remove `UnhandledEvent` from the related-codes array |
+| `optional` modifier | No connection. The modifier proposal is about suppressing the diagnostic; removing the diagnostic eliminates the entire motivation for the modifier. This validates declining the modifier. |
+
+### 6. Alternative: Opt-In `universal` Modifier?
+
+Considered and rejected. Adding `universal` would mean:
+
+- New keyword/modifier in the catalog
+- Parser, type checker, graph analyzer changes
+- Language complexity for a feature with near-zero demand
+
+If an author wants coverage guarantees, they can use testing and inspection. The language's job is to prove structural violations, not to enforce coverage policies. Coverage is a linting concern, not a language concern.
+
+If we ever get signal that authors genuinely want this, we can add it later. But adding complexity speculatively violates the language's minimalism principle.
+
+---
+
+## Decision
+
+1. **Remove `UnhandledEvent` (code 81) entirely.** Reserve the ordinal to prevent reuse.
+2. **Retain `EventCoverageEntry` computation** in §6.5 — it feeds proof forwarding.
+3. **Plan a future `OrphanedEvent` diagnostic** (event with zero handlers in any reachable state) — that satisfies principle 2.
+4. **Close CC#21** with "declined — diagnostic removed, modifier unnecessary."
+5. **Fix the `UnreachableState` RelatedCodes** to not reference the deleted code.
+
+---
+
+## Principle Alignment
+
+| Principle | Alignment |
+|-----------|-----------|
+| §0.6 P2 (proven violations only) | ✅ Removal eliminates a "possible violation" diagnostic |
+| §0.1 P7 (compile-time-first) | ✅ Structural analysis retained; only the noisy diagnostic removed |
+| §0.1 P4 (inspectability) | ✅ Runtime `Unmatched` outcome already provides full visibility |
+| Minimalism | ✅ Removes code, removes noise, removes a never-needed modifier proposal |
+
+# CC#6 Analysis — FaultSiteLink to FaultSiteDescriptor Transformation
+
+**By:** Frank  
+**Date:** 2026-05-06  
+**Status:** Recommendation for Shane decision  
+**Blocks:** `docs/compiler/proof-engine.md §2`, `docs/runtime/precept-builder.md`, evaluator fault routing
+
+---
+
+## 1. What the Proof Engine Actually Proves
+
+The proof engine produces a `ProofLedger` with two dispositions:
+
+- **Proved** — obligation discharged by one of four bounded strategies (Literal, Modifier, GuardInPath, FlowNarrowing)
+- **Unresolved** — no strategy succeeded; a diagnostic is emitted AND a `FaultSiteLink` is produced
+
+**Critical insight:** `FaultSiteLink` is produced *only* for `Unresolved` obligations. The proof engine's contract (§10 Fault Chain Integrity) states:
+
+> Every `FaultSiteLink` has a 1:1 correspondence with an `Unresolved` obligation and a `FaultCode` that carries `[StaticallyPreventable(DiagnosticCode)]`.
+
+This means: **there is no such thing as a "proven-safe fault site" in Precept's model.** A `FaultSiteLink` exists precisely because the obligation *could not* be proven safe. If the proof succeeds, no link is created, no descriptor is planted, no backstop exists at runtime.
+
+The proof engine does NOT produce "this site is safe, skip checking" annotations — it simply doesn't create fault links for proved sites.
+
+---
+
+## 2. What the Backstop Is Actually For
+
+From `proof-engine.md` §11 Decision 2 and `precept-builder.md` §Pass 6:
+
+> `FaultSiteDescriptor` backstops are defense-in-depth — they should **never fire** if proof is correct. They exist for belt-and-suspenders safety, not as a proof continuation mechanism.
+
+And:
+
+> Fault backstops are defense-in-depth. A correctly-proven program never reaches them at runtime.
+
+The backstop catches **compiler bugs and edge cases**, not user-provided data faults. The proof engine's four-strategy set covers the DSL's constrained expression surface. If the type checker emits no errors, the evaluator should never fault (§ Fault–diagnostic correspondence guarantee).
+
+**Therefore:** The backstop is strictly for "the proof said this was safe but something went wrong" — it's a *compiler integrity check*, not a user-data validation path. Constraint violations (which *do* fire at runtime from user data) are handled by the constraint evaluation system, not fault backstops.
+
+---
+
+## 3. Research Findings on Proof-Elision
+
+### SPARK Ada / GNATprove
+
+SPARK proves Absence of Runtime Errors (AoRTE). When GNATprove proves a check, the **GNAT compiler strips the runtime check entirely from the generated code** — no annotation, no skip flag, the code simply isn't emitted. This is safe because:
+- SPARK is a strict subset of Ada with no escape hatches in the verified subset
+- The proof is sound (backed by CVC5/Z3 with bounded resource limits)
+- Unproved checks remain as Ada runtime checks
+
+**Model:** Binary — either prove and strip, or leave the runtime check in place.
+
+### Rust Borrow Checker
+
+Rust's model is even simpler: the borrow checker is a **gate, not an annotation**. Safety is implicit in successful compilation. There are no runtime borrow checks to elide — the type system *prevents* the unsafe code from compiling at all. No concept of "proven safe but still checked at runtime."
+
+### Dafny
+
+Dafny verifies at compile time and **compiles verified programs to target languages (C#, Java, etc.) without runtime assertion checks**. The verification IS the check — no residue crosses into the compiled output. Contrast with `assert` in C which is a runtime check.
+
+### D Language Contracts
+
+D's `in`/`out`/`invariant` contracts are runtime-checked by default but can be compiled out with `-release` flag. This is a *build configuration* choice, not a per-site proof-driven decision. No selective elision based on proof.
+
+### Summary of External Models
+
+| System | Model | Granularity |
+|--------|-------|-------------|
+| SPARK Ada | Proved → strip check entirely | Per-check |
+| Rust | Gate (no runtime check exists to strip) | Compilation unit |
+| Dafny | All verified → no runtime residue | Whole program |
+| D contracts | Build flag removes all contracts | Build configuration |
+
+**Key pattern:** Systems that do per-site proof-based elision (SPARK) have a *general solver* that can fail on individual checks. Systems with bounded/structural proof (Rust, Precept) use the gate model — you either pass or you don't.
+
+---
+
+## 4. Recommended Approach
+
+### Should proven-safe fault sites elide their runtime backstop?
+
+**This question is already answered by the architecture.** Precept already uses the gate model:
+
+- If proof succeeds → no `FaultSiteLink` → no `FaultSiteDescriptor` → nothing to check at runtime
+- If proof fails → `FaultSiteLink` → `FaultSiteDescriptor` planted → backstop fires if reached
+
+There is no "proven-safe site with a runtime check that could be skipped" — that state doesn't exist. The external research confirms Precept's architecture is already doing the right thing for a bounded-strategy proof system.
+
+**Shane's question about "turning OFF runtime fault checking at proven-safe sites" is already what happens.** The proof engine doesn't produce links for proved obligations, so no backstop is planted. The "elision" is structural absence, not a skip flag.
+
+### Which option is right for the unresolved-obligation sites?
+
+**Recommendation: Option A — Opcode annotation**, with the following rationale:
+
+1. **No proof-elision flag needed.** Since backstops only exist for unresolved obligations, every planted descriptor is active. No conditional evaluation logic.
+
+2. **Structural binding.** The builder knows exactly which opcode it's compiling when it encounters an unresolved obligation's expression site. It can stamp the annotation directly — no span-to-opcode lookup table needed.
+
+3. **Zero runtime overhead for proven programs.** A fully-proven precept has zero `FaultSiteDescriptor` entries and zero annotation checks. This is the SPARK model realized through structural absence.
+
+4. **Option B's span-to-opcode map is unnecessary.** The builder compiles expressions to opcodes sequentially. When it processes an expression that has an unresolved obligation, it knows the current opcode offset. No reverse lookup needed.
+
+5. **Option C's inline guard opcodes add runtime overhead to every execution path.** Even for proven programs, `FAULT_CHECK` opcodes would need to be no-ops (or stripped, which is Option A with extra steps).
+
+### Why not a new Option D?
+
+Option A already embodies the correct design when you account for the proof-gate model. No new option is needed. The annotation is present only at unresolved sites, making it inherently proof-elided by construction.
+
+---
+
+## 5. Concrete C# Shape
+
+```csharp
+/// <summary>
+/// Annotation on an opcode that identifies a defense-in-depth fault backstop.
+/// Present ONLY on opcodes compiled from expressions with Unresolved proof obligations.
+/// Proved obligations produce no annotation — elision is structural absence.
+/// </summary>
+public sealed record FaultSiteAnnotation(
+    FaultCode Code,                    // Runtime fault to fire if reached
+    DiagnosticCode PreventedBy,        // The authoring-time diagnostic that would prevent this
+    SourceSpan Site                    // Source location for diagnostics/logging
+);
+
+/// <summary>
+/// An opcode in an ExecutionPlan. Annotations are nullable — null means proven safe.
+/// </summary>
+public sealed record Opcode(
+    OpcodeKind Kind,
+    // ... operands per kind ...
+    FaultSiteAnnotation? FaultSite     // Non-null only for unresolved-obligation sites
+);
+```
+
+**Builder planting pseudocode:**
+
+```csharp
+// During expression compilation in the builder:
+Opcode CompileExpression(TypedExpression expr, ProofLedger ledger)
+{
+    var opcode = EmitOpcode(expr);
+    
+    // Check if this expression site has an unresolved obligation
+    var link = ledger.FaultSiteLinks
+        .FirstOrDefault(l => l.Obligation.Site == expr);
+    
+    if (link is not null)
+    {
+        opcode = opcode with {
+            FaultSite = new FaultSiteAnnotation(
+                link.FaultCode,
+                link.DiagnosticCode,
+                link.Site)
+        };
+    }
+    
+    return opcode;
+}
+```
+
+**Evaluator consumption pseudocode:**
+
+```csharp
+// During opcode execution:
+PreceptValue Execute(Opcode op, EvaluationContext ctx)
+{
+    var result = Dispatch(op, ctx);
+    
+    // Defense-in-depth: if this opcode has a fault annotation and the
+    // operation actually faulted, produce structured Fault
+    if (op.FaultSite is { } annotation && IsFaultCondition(result, op))
+    {
+        return Fail(annotation.Code, ctx.BuildFaultArgs(annotation));
+    }
+    
+    return result;
+}
+```
+
+---
+
+## 6. Resolution of the Open Question
+
+The proof-engine.md Open Question at line 226:
+
+> `FaultSiteLink.Site` is still only a `SourceSpan`, while runtime backstops ultimately need a structural binding such as an `ExecutionRow`, constraint descriptor, or opcode offset.
+
+**Answer:** The builder resolves this during compilation. When the builder visits a `TypedExpression` to emit an opcode, it matches against `ProofLedger.FaultSiteLinks` by obligation site identity. The structural binding is the opcode itself — the annotation lives on the opcode, not on a separate lookup structure.
+
+The `FaultSiteLink.Site` (SourceSpan) is used for diagnostic reporting in the annotation. The structural binding is `ProofObligation.Site` (TypedExpression) matched against the expression being compiled.
+
+---
+
+## Summary for Shane
+
+| Question | Answer |
+|----------|--------|
+| Should proven-safe sites elide backstops? | Already happens — no link, no descriptor, no check |
+| Option A, B, or C? | **Option A** — opcode annotation |
+| Proof-elision flag needed? | No — structural absence IS the elision |
+| Key external precedent | SPARK strips proven checks; Precept's gate model achieves same result architecturally |
+| Data structure | `FaultSiteAnnotation?` nullable field on `Opcode` |
+| Open Question resolution | Builder matches by `TypedExpression` identity during compilation |
+
+---
+
+## Caveats
+
+1. **`ProofObligation.Site` identity** — The related Open Question at proof-engine.md line 207 about structural identity of `ProofObligation.Site` feeds into this. If `TypedExpression` reference equality isn't stable across pipeline stages, we may need a synthetic obligation ID. Recommend resolving that OQ concurrently.
+
+2. **Constraint backstops vs expression backstops** — The `FaultSiteDescriptor` planting mechanism note (precept-builder.md line 479) mentions placement on `ExecutionRow` or `ConstraintDescriptor`. The opcode annotation handles expression-site faults; constraint-level faults (if any exist at the backstop level rather than the constraint evaluation level) may need a parallel annotation on `ConstraintDescriptor`. Current architecture suggests all constraint evaluation is runtime-dynamic (not backstop territory), so this may be moot.
+
+3. **Flat array alternative** — `Precept.FaultBackstops` as a flat array (the third option mentioned in precept-builder.md) would work for diagnostic enumeration ("what backstops does this precept carry?") but is wrong for execution routing. The annotation-on-opcode model is the right execution contract. A materialized flat array could be derived for tooling/inspection without affecting the execution path.
+
+# CC#6 Canonicalization — FaultSiteAnnotation on Opcode
+
+**By:** Frank
+**Date:** 2026-05-06
+**Status:** Complete — canonical docs updated
+
+---
+
+## What Changed
+
+Propagated the locked CC#6 ruling (Option A — nullable `FaultSiteAnnotation?` on each opcode) into three canonical docs:
+
+### `docs/compiler/proof-engine.md`
+- Closed the `ProofObligation.Site` structural identity Open Question → Resolved (CC#6): builder matches by `TypedExpression` identity during Pass 4 compilation.
+- Closed the `FaultSiteLink.Site` to `FaultSiteDescriptor` binding Open Question → Resolved (CC#6): builder stamps `FaultSiteAnnotation` directly on the emitted opcode. Added canonical annotation shape and structural elision model description.
+- Updated Decision 2 and §12 summary: `FaultSiteDescriptor` → `FaultSiteAnnotation` as the artifact that crosses the compile-runtime boundary.
+
+### `docs/runtime/precept-builder.md`
+- Added `FaultSiteAnnotation` type definition and planting contract to Pass 4 (expression compilation) — the canonical site where annotation stamping occurs.
+- Added `FaultSiteAnnotation?` to the `Opcode` base record.
+- Updated Pass 6 to clarify its residual role: `Precept.FaultBackstops` is a derived/tooling artifact, not the execution-path contract. `FaultSiteDescriptor` remains as the materialized tooling shape.
+- Updated pipeline overview diagram, pass dependency table, and invariants.
+
+### `docs/runtime/evaluator.md`
+- Updated §7.3 dispatch loop with inline `FaultSiteAnnotation` check after each opcode dispatch.
+- Added two-layer defense note: compile gate (first line) + runtime backstop (second line for force-builds/catalog evolution).
+- Updated fault backstop routing description, resolved design question #10, and integration table.
+
+## Cross-references added
+- proof-engine.md → precept-builder.md §Pass 4 (planting contract)
+- proof-engine.md → evaluator.md §7.3 (consumption contract)
+- precept-builder.md → proof-engine.md §2 (output shape)
+- precept-builder.md → evaluator.md §7.3 (consumption contract)
+- evaluator.md → proof-engine.md §2 (structural elision model)
+- evaluator.md → precept-builder.md §Pass 4 (planting contract)
+
+# CC#8 Canonicalization Complete
+
+**Author:** Frank  
+**Date:** 2026-05-06  
+**Decision:** CC#8 EventInspection shape — working proposal propagated into canonical docs and archived.
+
+## What was canonicalized
+
+The finalized `docs/working/event-inspection-proposal.md` (CC#8, all non-OQ-4 decisions locked) has been propagated into four canonical docs:
+
+### 1. `docs/runtime/result-types.md` (primary)
+- `EventInspection` updated with canonical shape: `EventName`, `OverallProspect`, `DeclaredArgs`, `ArgErrors`, `CurrentFields` (renamed from `FieldSnapshots`; capture-before-loop bug fix), `Transitions`, `EventEnsures`
+- `TransitionInspection` updated: added `RowEffect Effect`, `string? GuardSummary`; removed `string? TargetState`
+- Added `RowEffect` abstract record DU definition (`TransitionTo`, `NoTransition`, `Rejection`)
+- Added `ArgError` record definition
+- OQ-4 (EventEnsures timing) noted as pending
+
+### 2. `docs/runtime/evaluator.md`
+- §5 output definitions updated to canonical shapes (EventInspection, TransitionInspection, RowEffect, ArgError)
+- §7.2 InspectFire completely rewritten: `CurrentFields` capture-before-loop fix, `EvaluateGuardProspect` Kleene ternary method, `RowEffect` construction from `ExecutionRow.Outcome`, `ArgError` collection path, `DeclaredArgs` population
+- Bootstrap path for Kleene evaluation before D8/R4 documented
+- OQ-4 flagged as pending
+- Source files table updated to include `RowEffect` and `ArgError`
+
+### 3. `docs/tooling/language-server.md`
+- §7.6 superseded: removed conflicting shape (`Explanation`, `BeforeFields`, `AfterFields`, `TransitionRowInspection`)
+- Replaced with thin-wrapper pattern: LS serializes runtime result directly
+- Documented calling patterns: `InspectFire(eventName, args?)` for single event, `InspectUpdate(null)` for full landscape
+- Removed stale open question about canonical shape
+
+### 4. `docs/tooling/mcp.md`
+- `precept_inspect` section updated: N+1 fan-out eliminated
+- Documented thin-wrapper pattern with `InspectUpdate(null)` for full landscape
+- Added code example showing the thin wrapper
+- Removed stale open question about N+1 API calls
+
+### 5. `docs/working/cross-cutting-decisions.md`
+- CC#8 status table updated to reference canonical docs (`result-types.md` + `evaluator.md`) instead of working proposal
+- CC#8 body updated to note OQ-4 still pending and canonical homes
+
+### 6. Archive
+- `docs/working/event-inspection-proposal.md` moved to `docs/working/archive/event-inspection-proposal.md`
+
+## What was NOT changed
+- OQ-4 (EventEnsures timing) — still pending Shane's call; noted in result-types.md and evaluator.md
+- CC#12, CC#23, CC#24 — untouched; separate decisions
+- No redesign — pure canonicalization of already-approved decisions

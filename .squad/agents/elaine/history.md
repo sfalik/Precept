@@ -57,3 +57,7 @@ Task: OQ-8 closed; both commit modes supported, mode derived from constraint met
 ## Elaine-39 — OQ-9 closed
 [2026-05-06]
 Task: OQ-9 closed; Event Timeline stays on committed state while buffered edits disable fire actions. All OQs resolved; event interaction UXR document is complete.
+
+## Elaine-40 — CC#21 UnhandledEvent naming
+[2026-05-06]
+Task: Proposed three candidate names for the new graph-analyzer diagnostic for events with zero handlers in any state. Top recommendation `UnhandledEvent` was adopted; it names the missing-handler cause directly and avoids the misleading parentage implication of `OrphanedEvent`.

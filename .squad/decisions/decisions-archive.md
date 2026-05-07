@@ -72,8 +72,6 @@ Created `docs/working/cross-cutting-decisions.md` documenting:
 
 Schedule a design session to resolve Priority 1 decisions before implementation sprints begin. These cannot be resolved stage-by-stage — they require coordinated decision-making.
 
-
-
 # Technical Review: Elaine's `lookup`/`queue` Surface Proposals
 
 
@@ -234,8 +232,6 @@ The `containskey` and `removekey` tokens can be removed from the lexer's keyword
 
 ---
 
-
-
 # Decision: README Image Link Fixes
 
 
@@ -301,8 +297,6 @@ The README's narrative around the hero example remains valid: it correctly notes
 
 
 ---
-
-
 
 # Decision: README Hero DSL PNG Rendering
 
@@ -370,8 +364,6 @@ If the hero snippet changes, re-render with:
 
 ---
 
-
-
 # One-shot: install puppeteer, screenshot, remove
 
 npm install --no-save puppeteer
@@ -393,8 +385,6 @@ Future improvement: automate this as a build script or CI step.
 
 
 ---
-
-
 
 # Steinbrenner Final Point Decision
 
@@ -436,8 +426,6 @@ Future improvement: automate this as a build script or CI step.
 
 ---
 
-
-
 # Decision: Issue #22 Design Fidelity Directive
 
 
@@ -457,8 +445,6 @@ When implementing issue #22, if anything the team is going to implement strays f
 
 
 ---
-
-
 
 # Decision: Issue #22 — Data-Only Precepts Design Q&A (12 Decisions)
 
@@ -550,8 +536,6 @@ Use `customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`
 
 ---
 
-
-
 # Decision: Slice 7 Test Coverage — Known Gaps (Deferred)
 
 
@@ -583,8 +567,6 @@ These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
 
 
 ---
-
-
 
 # Decision: combined-design-v2 promoted to canonical location
 
@@ -631,8 +613,6 @@ The combined-design-v2 doc had accumulated all review feedback, innovations call
 
 
 ---
-
-
 
 # Decision: Graph topology crosses the lowering boundary as runtime-native shapes
 
@@ -742,8 +722,6 @@ These don't cross because no runtime operation needs them — the prohibition is
 
 ---
 
-
-
 # Design Evaluation: Per-Field `readonly` Modifier as Access Default Inversion
 
 
@@ -763,8 +741,6 @@ These don't cross because no runtime operation needs them — the prohibition is
 
 
 ---
-
-
 
 # Decision Record: Research Grounding for compiler-and-runtime-design.md
 
@@ -894,8 +870,6 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 
 ---
 
-
-
 # Doc Audit: `writable` Field Modifier — Findings & Decisions
 
 
@@ -913,8 +887,6 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 
 
 ---
-
-
 
 # Soup Nazi: writable Test Coverage Review
 
@@ -935,8 +907,6 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 
 
 ---
-
-
 
 # Decision: README hero PNG fallback
 
@@ -989,8 +959,6 @@ Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a l
 
 
 ---
-
-
 
 # Precept V2 — Exhaustive Parser & Lexer Test Coverage Audit
 
@@ -1882,8 +1850,6 @@ All TypeChecker-level validations (§3 of the spec) are blocked by `NotImplement
 
 ---
 
-
-
 # Soup Nazi — Full Test Coverage Review: spike/Precept-V2
 
 
@@ -2259,8 +2225,6 @@ All six are straightforward to add. No implementation changes needed. Write the 
 
 
 No soup for you.
-
-
 
 # Calculated Field Arrow Direction: `<-` vs `->` Analysis
 
@@ -2696,8 +2660,6 @@ Compare the two:
 
 ---
 
-
-
 # Design Session Round 1: Catalog-Driven Parser Full Vision
 
 
@@ -2771,8 +2733,6 @@ See `## For George` section in the design doc. Key areas: `Entries` replacing `L
 
 
 ---
-
-
 
 # Decision: Catalog-Driven Parser Design — Round 3 Resolutions
 
@@ -2995,8 +2955,6 @@ None. All decisions locked and documented above.
 
 
 ---
-
-
 
 # Frank — `writable` Field Modifier Review
 
@@ -3239,8 +3197,6 @@ Items 2–4 are doc-only and may land in the same commit as item 1.
 
 
 ---
-
-
 
 # Decision Note: Catalog-Driven Parser Design Round 2
 
@@ -3535,8 +3491,6 @@ fixes at design time.
 
 
 ---
-
-
 
 # Soup Nazi — Writable Coverage Review
 
@@ -4410,8 +4364,6 @@ Both fixes are one-liners or near-one-liners. No soup until then.
 
 ---
 
-
-
 # George — Technical Review: combined-design-v2.md
 
 
@@ -4724,8 +4676,6 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 
 ---
 
-
-
 # Current (->)
 
 
@@ -4747,8 +4697,6 @@ field Net as number positive -> Subtotal - Tax
 
 
 ---
-
-
 
 # Proposed (<-)
 
@@ -5108,8 +5056,6 @@ The right-pointing arrow:
 
 ---
 
-
-
 # Decision: Access-mode shorthand grammar and AST split
 
 
@@ -5313,8 +5259,6 @@ v8 approved after fix verification — proceed to Phase 2.
 
 
 ---
-
-
 
 # George's Review of catalog-parser-design-v8.md
 
@@ -5712,8 +5656,6 @@ v8 is substantially correct — the OmitDeclaration split is clean, the FieldTar
 
 ---
 
-
-
 # Deep Re-Review: Catalog Extensibility CS8509 Enforcement
 
 
@@ -5971,8 +5913,6 @@ After these fixes, every catalog enum switch in the parser will use the same pat
 
 
 ---
-
-
 
 # Enum Deviation Review — `feature/catalog-extensibility`
 
@@ -6470,8 +6410,6 @@ The only remaining caveat is the observation under B1: if a developer adds a new
 
 ---
 
-
-
 # Deviation Review: George's Catalog Extensibility Implementation
 
 
@@ -6637,8 +6575,6 @@ Wait — correction: `_ =>` in a switch expression **does** suppress CS8509 beca
 
 
 ---
-
-
 
 # PRECEPT0018 — Semantic Enum Zero-Slot Analyzer
 
@@ -7656,8 +7592,6 @@ These are the catalog enums where the first semantic member currently sits at im
 
 ---
 
-
-
 # Zero-Slot Enum Audit — `src/Precept/`
 
 
@@ -8372,8 +8306,6 @@ This policy, if encoded in a Roslyn analyzer or code review checklist, would hav
 
 ---
 
-
-
 # Decision: ActionSyntaxShape — Explicit 1-Based Integer Values
 
 
@@ -8491,8 +8423,6 @@ Serialized integer values for `ActionSyntaxShape` (if any external system ever p
 
 
 ---
-
-
 
 # George → Frank: B1–B7 Fixed — Re-review Requested
 
@@ -8664,8 +8594,6 @@ explicit arms for all named members · `#pragma CS8524` to suppress unnamed-inte
 
 ---
 
-
-
 # Decision: Catalog Extensibility Implementation Complete (PR #138)
 
 
@@ -8797,8 +8725,6 @@ Parser internal only. No grammar, language server, MCP, or sample changes needed
 
 
 ---
-
-
 
 # Decision: All Semantic Zero-Slot Enums Use Explicit 1-Based Values
 
@@ -9097,8 +9023,6 @@ superseded by `each` — `each` is grammatically correct where `all` would be br
 
 
 ---
-
-
 
 # Under consideration:
 
@@ -9404,8 +9328,6 @@ collision is non-issue parsing. No change to the approved syntax.
 
 ---
 
-
-
 # Decision: `ordered` as Collection Modifier vs `sortedset` as Named Type
 
 
@@ -9448,8 +9370,6 @@ Shane proposed reusing the existing `ordered` keyword at the collection level:
 
 ---
 
-
-
 # Instead of:
 
 
@@ -9463,8 +9383,6 @@ field ApprovalLevels as sortedset of string
 
 
 ---
-
-
 
 # Shane's proposal:
 
@@ -9760,8 +9678,6 @@ The `ordered` modifier has one meaning, one valid application site, and zero amb
 
 ---
 
-
-
 # Decision: `sorted` as Collection-Level Modifier vs `sortedset` as Named Type
 
 
@@ -9994,8 +9910,6 @@ field Tags as set of string notempty maxcount 10
 
 ---
 
-
-
 # → still a hash-backed set; notempty and maxcount are constraints on values
 
 
@@ -10005,8 +9919,6 @@ field Tags as set of string notempty maxcount 10
 
 
 ---
-
-
 
 # → if you remove those modifiers, you still have the same underlying type
 
@@ -10022,8 +9934,6 @@ field Tags as set of string sorted
 
 ---
 
-
-
 # → tree-backed set; sorted iteration; safe .min/.max
 
 
@@ -10033,8 +9943,6 @@ field Tags as set of string sorted
 
 
 ---
-
-
 
 # → if you remove `sorted`, you have a fundamentally different type
 
@@ -10273,8 +10181,6 @@ The remaining objections are not merely grammar preferences. They reflect struct
 
 
 ---
-
-
 
 # Decision: Priorityqueue Design — Five Open Questions Resolved
 
@@ -10565,8 +10471,6 @@ The second `ScalarType` (after `priority`) must be orderable — numeric types, 
 
 
 ---
-
-
 
 # Collection Surface Re-evaluation: Three Challenges Answered
 
@@ -11048,8 +10952,6 @@ In this taxonomy, there are no "base types" — every type IS its contract. `que
 
 ---
 
-
-
 # `list of T` — Oversight Acknowledgment and Full Evaluation
 
 
@@ -11436,8 +11338,6 @@ This is not a reject — ring buffer was rejected on philosophy grounds (silent 
 
 ---
 
-
-
 # Decision: `sortedset of T` — Value Assessment
 
 
@@ -11576,8 +11476,6 @@ field ApprovalLevels as sortedset of choice("team-lead", "director", "vp", "cfo"
 
 ---
 
-
-
 # .max is always safe
 
 
@@ -11591,8 +11489,6 @@ field ApprovalLevels as set of choice("team-lead", "director", "vp", "cfo") orde
 
 
 ---
-
-
 
 # .max is also always safe — identical proof obligation
 
@@ -11745,8 +11641,6 @@ If Precept ever adds ordered-iteration constructs, the design review at that tim
 
 
 ---
-
-
 
 # ScalarType Extension — Temporal and Business-Domain Inner Types
 
@@ -12390,8 +12284,6 @@ PriceQualifier    :=  in '<currency>/<unit>'
 
 ---
 
-
-
 # `choice(...)` Design Analysis
 
 
@@ -12518,8 +12410,6 @@ from Active on SetPriority
 
 ---
 
-
-
 # Comparison also valid — identical sequence, same rank
 
 
@@ -12549,8 +12439,6 @@ from Active on SetPriority when SetPriority.Level > Priority
 
 
 ---
-
-
 
 # Subset arg — different choice set → still a type error
 
@@ -12666,8 +12554,6 @@ The `of` keyword here is the same connector used in `set of T` — it specifies 
 
 ---
 
-
-
 # String choice (current behavior preserved)
 
 
@@ -12681,8 +12567,6 @@ field Status as choice("draft", "active", "closed") default "draft"
 
 
 ---
-
-
 
 # Integer choice — explicit codes
 
@@ -12698,8 +12582,6 @@ field ErrorCode as choice of integer(0, 404, 500) default 0
 
 ---
 
-
-
 # Decimal choice — fixed rate tier
 
 
@@ -12713,8 +12595,6 @@ field TaxRate as choice of decimal(0.0, 0.05, 0.10, 0.20) default 0.0
 
 
 ---
-
-
 
 # Event arg with typed choice
 
@@ -13326,8 +13206,6 @@ field Priority as choice("Low","Medium","High") default "Low"
 
 ---
 
-
-
 # Can I do this?
 
 
@@ -13660,8 +13538,6 @@ The thing I want to say plainly: **the current design is incomplete, not wrong.*
 
 ---
 
-
-
 # What the sealed vocabulary model looks like in practice
 
 
@@ -13679,8 +13555,6 @@ field Notes as string writable
 
 
 ---
-
-
 
 # These compile:
 
@@ -13703,8 +13577,6 @@ set Priority = EscalationEvent.Target                # Target as choice("High","
 
 
 ---
-
-
 
 # These are type errors:
 
@@ -13812,8 +13684,6 @@ field Priority as choice("Low", "Medium", "High") default "Low"
 
 ---
 
-
-
 # Valid — {"Low","Medium"} ⊆ {"Low","Medium","High"}
 
 
@@ -13835,8 +13705,6 @@ from Active on Triage
 
 
 ---
-
-
 
 # Valid — {"High"} ⊆ {"Low","Medium","High"}
 
@@ -13860,8 +13728,6 @@ from Active on MarkUrgent
 
 ---
 
-
-
 # TYPE ERROR — "Critical" ∉ {"Low","Medium","High"}
 
 
@@ -13883,8 +13749,6 @@ from Active on Escalate
 
 
 ---
-
-
 
 # TYPE ERROR — superset: field may hold "Low" which isn't in arg's set
 
@@ -13946,8 +13810,6 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 ---
 
-
-
 # Declared ranks: Low=1, Medium=2, High=3
 
 
@@ -13998,8 +13860,6 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 ---
 
-
-
 # Concrete example — assignment valid, ordinal comparison valid
 
 
@@ -14021,8 +13881,6 @@ from Active on Triage when Triage.Level < Priority
 
 
 ---
-
-
 
 # Assignment valid, ordinal comparison TypeMismatch (reversed order)
 
@@ -14058,8 +13916,6 @@ from Active on InvertedTriage when InvertedTriage.Level < Priority  # TypeMismat
 
 ---
 
-
-
 # Declaration order = rank order for all types
 
 
@@ -14073,8 +13929,6 @@ field ErrorCode as choice of integer(200, 404, 500) ordered default 200
 
 
 ---
-
-
 
 # Ranks: 200=1, 404=2, 500=3 — author listed ascending; natural and declared order agree
 
@@ -14090,8 +13944,6 @@ field SeverityCode as choice of integer(500, 404, 200) ordered default 500
 
 ---
 
-
-
 # Ranks: 500=1, 404=2, 200=3 — deliberately reversed; the author controls this
 
 
@@ -14101,8 +13953,6 @@ field SeverityCode as choice of integer(500, 404, 200) ordered default 500
 
 
 ---
-
-
 
 # 500 < 404 < 200 by declared rank
 
@@ -14168,8 +14018,6 @@ ChoiceValueExpr   := StringLiteral | IntegerLiteral | DecimalLiteral | NumberLit
 
 ---
 
-
-
 # String choice — unchanged
 
 
@@ -14183,8 +14031,6 @@ field Status as choice("draft", "active", "closed") default "draft"
 
 
 ---
-
-
 
 # Integer choice — HTTP status codes, numeric tiers
 
@@ -14200,8 +14046,6 @@ field ErrorCode as choice of integer(200, 404, 500) ordered default 200
 
 ---
 
-
-
 # Decimal choice — exact rate tiers (base-10 precision required)
 
 
@@ -14215,8 +14059,6 @@ field TaxRate as choice of decimal(0.00, 0.05, 0.10, 0.20) default 0.00
 
 
 ---
-
-
 
 # Number choice — threshold picker (IEEE 754 precision acceptable for this domain)
 
@@ -14232,8 +14074,6 @@ field AlertThreshold as choice of number(1500, 2500, 5000) default 2500
 
 ---
 
-
-
 # Boolean choice — full domain declared explicitly
 
 
@@ -14247,8 +14087,6 @@ field IsActive as choice of boolean(true, false) default true
 
 
 ---
-
-
 
 # Event arg using typed choice — subset subtype applies
 
@@ -14338,8 +14176,6 @@ from Active on SetRate
 
 ---
 
-
-
 # Lexicographic — "High" < "Low" < "Medium"
 
 
@@ -14349,8 +14185,6 @@ from Active on SetRate
 
 
 ---
-
-
 
 # A comparison Priority > "Low" returns true when Priority == "High" — backwards
 
@@ -14573,8 +14407,6 @@ This question is independent of the subset subtype model (§2), which governs ch
 
 
 ---
-
-
 
 # Decision Record: Choice Field Diagnostic Messages
 
@@ -14930,8 +14762,6 @@ field Priority as choice("Low", "Medium", "High") default "Low"
 
 ---
 
-
-
 # "Critical" is not in {"Low","Medium","High"}
 
 
@@ -14953,8 +14783,6 @@ from Active on Escalate
 
 
 ---
-
-
 
 # "Critical" and "Urgent" both outside the field's set
 
@@ -15246,8 +15074,6 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 ---
 
-
-
 # Declared ranks: Low=1, Medium=2, High=3
 
 
@@ -15257,8 +15083,6 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 
 
 ---
-
-
 
 # Rank conflict: in this arg, Medium=1 and Low=2 — inverted from the field
 
@@ -15505,8 +15329,6 @@ For `choice of integer` and `choice of decimal` values, no string quotes are use
 
 
 ---
-
-
 
 # Design Consultation: `lookup` and `queue by P` Language Surface
 
@@ -15842,8 +15664,6 @@ rule each claim in ClaimQueue (claim.value.length > 5)
 
 ---
 
-
-
 # Design Decision: `priorityqueue` Backing Structure and Tiebreak Guarantee
 
 
@@ -16045,8 +15865,6 @@ The bucket model is the implementation. The spec exposes the contract only.
 
 
 ---
-
-
 
 # Design Advisory: `priorityqueue` Syntax Alternatives
 
@@ -16350,8 +16168,6 @@ Owner to pick one:
 
 ---
 
-
-
 # Frank — whitespace-insensitivity docs sync
 
 
@@ -16437,8 +16253,6 @@ This is the enduring design intent of Precept's keyword-led surface:
 
 
 ---
-
-
 
 # WSI Implementation Decisions (Slices 2–5)
 
@@ -16598,8 +16412,6 @@ This is the enduring design intent of Precept's keyword-led surface:
 
 ---
 
-
-
 # Owner Decision: choice of T — Explicit Element Type Required
 
 
@@ -16693,8 +16505,6 @@ A new diagnostic is needed: choice(...) without of T → error pointing the auth
 
 
 ---
-
-
 
 # WSI Test Coverage: Findings and Coverage Gaps
 
@@ -17012,8 +16822,6 @@ The project's canonical regression protocol requires 4 rounds of `precept_compil
 
 ---
 
-
-
 # Frank gap analysis inbox
 
 
@@ -17119,8 +16927,6 @@ Requested by: Shane
 
 
 ---
-
-
 
 # George gap analysis inbox — parser implementation
 
@@ -17824,8 +17630,6 @@ Pragmatic sequencing: **GAP-2 immediately** (five lines, zero design risk), **GA
 
 ---
 
-
-
 # Parser Gap Fixes — Catalog Compliance Audit Decision
 
 
@@ -17907,8 +17711,6 @@ If additional multi-token operators enter the language (beyond `is set`/`is not 
 
 
 ---
-
-
 
 # Decision: Catalog Compliance Verdict on Parser Gap Fixes
 
@@ -18020,8 +17822,6 @@ An operator must exist in the Operators catalog even if the parser doesn't read 
 
 ---
 
-
-
 # Decision: Catalog Vision Ordering — Strengthened Wording
 
 
@@ -18091,8 +17891,6 @@ The principle was implicitly present in the document's existing "Completeness Pr
 
 
 ---
-
-
 
 # Decision: Expression Form Catalog Placement — Separate vs. Extend Constructs
 
@@ -18494,8 +18292,6 @@ The analysis is clear enough that I don't see a remaining open question. If Shan
 
 ---
 
-
-
 # Decision: Expression Forms Do Not Get a Catalog
 
 
@@ -18601,8 +18397,6 @@ The catalog system's Completeness Principle asks: "If I enumerated every catalog
 
 
 ---
-
-
 
 # Decision: Expression Forms Belong in the Catalog (Revised)
 
@@ -18885,8 +18679,6 @@ Should expression forms be a separate 13th catalog (`ExpressionForms`) or an ext
 
 
 ---
-
-
 
 # Parser vs. Spec: Full Audit — Frank
 
@@ -19838,8 +19630,6 @@ Before marking any of these gaps as fixed, the test suite must have:
 
 ---
 
-
-
 # Decision: Parser Gap Fixes Implementation Plan
 
 
@@ -19947,8 +19737,6 @@ Before marking any of these gaps as fixed, the test suite must have:
 
 
 ---
-
-
 
 # George — Architectural Concerns from Parser Gap Plan Review
 
@@ -20119,8 +19907,6 @@ _End of George's architectural concerns inbox item._
 
 
 ---
-
-
 
 # Decision: Full-Vision Annotation-Bridge Pattern
 
@@ -20516,8 +20302,6 @@ These are complementary layers:
 
 ---
 
-
-
 # Phase 2 Gap Audit
 
 
@@ -20860,8 +20644,6 @@ Gap 1 is the only one that requires a new slice. Gaps 2–4 are addenda to exist
 
 ---
 
-
-
 # Pre-Implementation Q&A — Phase 2 Blockers
 
 
@@ -20971,3 +20753,61 @@ Full-text search of `docs/language/precept-language-spec.md` for both `OperatorF
 
 
 | `OperatorFamily` in catalog-system doc only | `docs/language/catalog-system.md` supporting-enum table |
+
+# Spike Mode Is First-Class
+
+
+
+**By:** Frank (Lead/Architect)
+
+
+
+**Date:** 2026-04-28T23:09:18.057-04:00
+
+
+
+**What:** Spike mode is now formally encoded across routing, ceremonies, wisdom, and `CONTRIBUTING.md`. Activation and exit intents are explicit, spike branches follow the `spike/{kebab-description}` convention, PR-demanding ceremonies are suppressed while `spike_mode: true`, and spike work exits through a structured closeout.
+
+
+
+**Why:** Exploratory work is a real process mode, not an informal exception. If routing, ceremonies, durable wisdom, and contributor workflow docs do not encode spike mode together, the system incorrectly demands implementation gates, PRs, and branch churn during spikes.
+
+
+
+## Encoded surfaces
+
+
+
+- `.squad/routing.md` now recognizes spike activation and exit intents and suppresses PR-demanding auto-triggers during a spike.
+
+
+
+- `.squad/ceremonies.md` now suppresses Design Review and PR Review when `spike_mode: true`, and defines manual Spike Kickoff / Spike Closeout ceremonies.
+
+
+
+- `.squad/identity/wisdom.md` now records the spike branch naming convention and the rule that spike mode suppresses PR-dependent ceremonies.
+
+
+
+- `CONTRIBUTING.md` now defines the contributor-facing spike workflow, including activation, branch rules, ceremony suppression, and deliberate closeout.
+
+
+
+## Architectural decision
+
+
+
+Spike mode is first-class. It must be activated deliberately, enforced consistently, and closed out explicitly. Exploratory work does not bypass process; it follows its own process.
+
+
+
+---
+
+
+
+---
+
+
+
+---
