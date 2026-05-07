@@ -553,6 +553,37 @@ public class ParserDirectConstructTests
     }
 
     [Fact]
+    public void EventDeclaration_WithMultipleArguments_ArgumentListSlot_PreservesOrderAndTypes()
+    {
+        var tokens = Lexer.Lex("event Submit(amount as number, note as string)");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
+        var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
+
+        argSlot.Args.Select(a => a.Name).Should().Equal("amount", "note");
+        argSlot.Args.Select(a => a.Type.Kind).Should().Equal(TypeKind.Number, TypeKind.String);
+    }
+
+    [Fact]
+    public void EventDeclaration_WithThreeArguments_ArgumentListSlot_CapturesEveryArgument()
+    {
+        var tokens = Lexer.Lex("event Submit(amount as number, note as string, approved as boolean)");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
+        var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
+
+        argSlot.Args.Should().HaveCount(3);
+        argSlot.Args.Select(a => a.Name).Should().Equal("amount", "note", "approved");
+        argSlot.Args.Select(a => a.Type.Kind).Should().Equal(TypeKind.Number, TypeKind.String, TypeKind.Boolean);
+    }
+
+    [Fact]
     public void EventDeclaration_WithInitialKeyword_InitialMarkerSlot_IsPresent_AndTrue()
     {
         // RED-P: The optional InitialMarker slot must be materialized and carry IsPresent = true.

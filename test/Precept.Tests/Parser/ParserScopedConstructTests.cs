@@ -338,6 +338,20 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
+    public void TransitionRow_FromAny_UsesWildcardStateTarget_AndPreservesTransitionOutcome()
+    {
+        var tokens = Lexer.Lex("from any on Submit -> transition Approved");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        row.Slots.OfType<StateTargetSlot>().Single().StateName.Should().Be("any");
+        row.Slots.OfType<OutcomeSlot>().Single().Outcome.Should().BeOfType<TransitionOutcome>()
+            .Which.StateName.Should().Be("Approved");
+    }
+
+    [Fact]
     public void TransitionRow_HappyPath_OutcomeSlot_IsPresent()
     {
         // RED-P: Parser is a stub. Outcome is a required slot on TransitionRow.
@@ -664,6 +678,19 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
+    public void AccessMode_ModifyAll_UsesFieldWildcard_AndRequestedMode()
+    {
+        var tokens = Lexer.Lex("in Draft modify all readonly");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var access = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.AccessMode);
+        access.Slots.OfType<FieldTargetSlot>().Single().FieldName.Should().Be("all");
+        access.Slots.OfType<AccessModeSlot>().Single().AccessMode.Should().Be(TokenKind.Readonly);
+    }
+
+    [Fact]
     public void AccessMode_WithGuard_GuardClauseSlot_IsPresent()
     {
         // RED-P: Optional GuardClause is materialized when a 'when' clause is present.
@@ -763,6 +790,19 @@ public class ParserScopedConstructTests
         fieldSlot.Should().NotBeNull("OmitDeclaration must contain a FieldTargetSlot");
         fieldSlot!.FieldName.Should().Be("InternalNotes",
             "FieldTargetSlot must carry the excluded field name 'InternalNotes'");
+    }
+
+    [Fact]
+    public void OmitDeclaration_OmitAll_UsesFieldWildcard()
+    {
+        var tokens = Lexer.Lex("in Draft omit all");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var omit = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.OmitDeclaration);
+        omit.Slots.OfType<StateTargetSlot>().Single().StateName.Should().Be("Draft");
+        omit.Slots.OfType<FieldTargetSlot>().Single().FieldName.Should().Be("all");
     }
 
     [Fact]

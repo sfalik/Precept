@@ -1144,7 +1144,73 @@ public class ParserExpressionTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  §16. ExpressionFormKind catalog coverage — GREEN
+    //  §16. Negative / recovery coverage
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Negative_IncompleteBinaryExpression_EmitsExpectedToken_AndUsesPlaceholderRightOperand()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("rule a + because \"msg\""));
+
+        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+
+        var rule = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.RuleDeclaration);
+        var expression = rule.GetRequiredSlot<RuleExpressionSlot>(ConstructSlotKind.RuleExpression).Expression;
+        var binary = expression.Should().BeOfType<BinaryOperationExpression>().Subject;
+
+        binary.Operator.Should().Be(TokenKind.Plus);
+        binary.Right.Should().BeOfType<LiteralExpression>()
+            .Which.Text.Should().Be("true",
+                "the parser currently recovers missing right operands with its expression placeholder literal");
+    }
+
+    [Fact]
+    public void Negative_UnclosedParen_EmitsExpectedToken_AndPreservesGroupedExpression()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("field amount as number <- (a + b"));
+
+        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+
+        var field = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.FieldDeclaration);
+        var expression = field.GetRequiredSlot<ComputeExpressionSlot>(ConstructSlotKind.ComputeExpression).Expression;
+        var grouped = expression.Should().BeOfType<GroupedExpression>().Subject;
+
+        grouped.Inner.Should().BeOfType<BinaryOperationExpression>().Which.Operator.Should().Be(TokenKind.Plus);
+    }
+
+    [Fact]
+    public void Negative_EmptyGuardClause_EmitsExpectedToken_AndUsesMissingExpressionSentinel()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("from Draft on Submit when -> transition Approved"));
+
+        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        row.GetRequiredSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause).Expression.Should().BeOfType<MissingExpression>();
+    }
+
+    [Fact]
+    public void Negative_UnknownFunctionName_StillProducesFunctionCallExpression()
+    {
+        var expression = GetRuleExpression("rule mystery(amount) because \"msg\"");
+
+        expression.Should().BeOfType<FunctionCallExpression>()
+            .Which.FunctionName.Should().Be("mystery");
+    }
+
+    [Fact]
+    public void Negative_MissingBecauseClause_EmitsExpectedToken_AndMaterializesEmptyBecauseClauseSlot()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("rule amount > 0"));
+
+        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+
+        var rule = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.RuleDeclaration);
+        rule.GetRequiredSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause).Message.Should().BeEmpty();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  §17. ExpressionFormKind catalog coverage — GREEN
     //  Pure catalog tests — no parser invoked. Must stay green.
     // ════════════════════════════════════════════════════════════════════════════
 

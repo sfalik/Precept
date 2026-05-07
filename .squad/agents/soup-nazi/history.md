@@ -140,3 +140,9 @@
 - `OutcomesCatalogTests` now lock the supported outcome forms plus malformed/recovery behavior, and the parser emits `ExpectedOutcome` when a required outcome is entirely missing.
 - Coordinator confirmed `ExpressionFormCatalogTests.cs` and `ParserExpressionTests.cs` are included in the 2949-test branch baseline, so exclusion-based green runs are no longer acceptable evidence.
 - Active follow-on: Soup-Nazi-4 is covering seven remaining parser gaps across type refs, action chains, diagnostic codes, wildcards, event args, interpolation, and negative expression cases.
+
+### 2026-05-07T18:45:00Z — Parser coverage gaps closed with AST-shape assertions
+
+- Added dedicated parser coverage for `ParsedTypeReference`, interpolated-string segments, collection mutation action payloads, wildcard routing forms, and richer event argument lists.
+- The current parser surface matters more than remembered DSL sketches: collection actions parse as `verb target value`, plain quoted strings stay `LiteralExpression`, and bare `queue` currently resolves through `TypeKind.QueueBy` metadata.
+- Recovery assertions should pin actual parser sentinels, not imagined ones: empty guards use `MissingExpression`, while incomplete binary operands currently recover with the parser's placeholder literal plus `ExpectedToken`.
