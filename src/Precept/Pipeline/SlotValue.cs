@@ -48,7 +48,7 @@ public sealed record ActionChainSlot(ImmutableArray<ActionKind> Actions, SourceS
     : SlotValue(ConstructSlotKind.ActionChain, Span);
 
 /// <summary>"-> transition State | -> no transition | -> reject 'reason'" outcome.</summary>
-public sealed record OutcomeSlot(ParsedExpression Expression, SourceSpan Span)
+public sealed record OutcomeSlot(ParsedOutcome Outcome, SourceSpan Span)
     : SlotValue(ConstructSlotKind.Outcome, Span);
 
 /// <summary>State name or quantifier (any).</summary>

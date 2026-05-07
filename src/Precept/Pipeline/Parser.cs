@@ -308,7 +308,7 @@ public static partial class Parser
             ConstructSlotKind.ComputeExpression => new ComputeExpressionSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.EnsureClause      => new EnsureClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ActionChain       => new ActionChainSlot(ImmutableArray<ActionKind>.Empty, SourceSpan.Missing),
-            ConstructSlotKind.Outcome           => new OutcomeSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
+            ConstructSlotKind.Outcome           => new OutcomeSlot(new MalformedOutcome(SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.StateTarget       => new StateTargetSlot(null, SourceSpan.Missing),
             ConstructSlotKind.EventTarget       => new EventTargetSlot(null, SourceSpan.Missing),
             ConstructSlotKind.AccessModeKeyword => new AccessModeSlot(TokenKind.Readonly, SourceSpan.Missing),

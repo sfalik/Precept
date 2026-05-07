@@ -1,0 +1,180 @@
+using System.Linq;
+using FluentAssertions;
+using Precept.Language;
+using Precept.Pipeline;
+using Xunit;
+
+namespace Precept.Tests.Parser;
+
+/// <summary>
+/// Tests for the ParsedOutcome discriminated union.
+/// Verifies that ParseOutcome() produces the correct DU subtype for each
+/// outcome form, handles error recovery with MalformedOutcome, and tracks
+/// span coverage correctly.
+/// </summary>
+public class ParserOutcomeTests
+{
+    // ════════════════════════════════════════════════════════════════════════════
+    //  §1. Happy-path DU subtype extraction
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TransitionOutcome_HappyPath_ExtractsStateName()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> transition Submitted");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<TransitionOutcome>()
+            .Which.StateName.Should().Be("Submitted");
+    }
+
+    [Fact]
+    public void NoTransitionOutcome_HappyPath()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> no transition");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<NoTransitionOutcome>();
+    }
+
+    [Fact]
+    public void RejectOutcome_HappyPath_ExtractsReason()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> reject \"invalid\"");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<RejectOutcome>()
+            .Which.Reason.Should().Be("invalid");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  §2. Error recovery — MalformedOutcome
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TransitionOutcome_MissingStateName_IsMalformed()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> transition");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<MalformedOutcome>();
+    }
+
+    [Fact]
+    public void NoTransitionOutcome_MissingTransitionKeyword_IsMalformed()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> no");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<MalformedOutcome>();
+    }
+
+    [Fact]
+    public void RejectOutcome_MissingReason_IsMalformed()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> reject");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<MalformedOutcome>();
+    }
+
+    [Fact]
+    public void Outcome_UnexpectedTokenAfterArrow_IsMalformed()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit -> 42");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<MalformedOutcome>();
+    }
+
+    [Fact]
+    public void Outcome_MissingArrow_SentinelIsMalformed()
+    {
+        var tokens = Lexer.Lex("from Draft on Submit");
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+
+        outcomeSlot.Outcome.Should().BeOfType<MalformedOutcome>();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  §3. Span coverage
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TransitionOutcome_SpanCoversArrowThroughStateName()
+    {
+        var input = "from Draft on Submit -> transition Submitted";
+        var tokens = Lexer.Lex(input);
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+        var outcome = outcomeSlot.Outcome.Should().BeOfType<TransitionOutcome>().Subject;
+
+        var arrowStart = input.IndexOf("->");
+        var submittedEnd = input.IndexOf("Submitted") + "Submitted".Length;
+
+        outcome.Span.Offset.Should().Be(arrowStart);
+        outcome.Span.End.Should().Be(submittedEnd);
+    }
+
+    [Fact]
+    public void NoTransitionOutcome_SpanCoversArrowThroughTransition()
+    {
+        var input = "from Draft on Submit -> no transition";
+        var tokens = Lexer.Lex(input);
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+        var outcome = outcomeSlot.Outcome.Should().BeOfType<NoTransitionOutcome>().Subject;
+
+        var arrowStart = input.IndexOf("->");
+        var transitionEnd = input.IndexOf("transition") + "transition".Length;
+
+        outcome.Span.Offset.Should().Be(arrowStart);
+        outcome.Span.End.Should().Be(transitionEnd);
+    }
+
+    [Fact]
+    public void RejectOutcome_SpanCoversArrowThroughReason()
+    {
+        var input = "from Draft on Submit -> reject \"invalid\"";
+        var tokens = Lexer.Lex(input);
+        var manifest = Pipeline.Parser.Parse(tokens);
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+        var outcome = outcomeSlot.Outcome.Should().BeOfType<RejectOutcome>().Subject;
+
+        var arrowStart = input.IndexOf("->");
+        var reasonEnd = input.IndexOf("\"invalid\"") + "\"invalid\"".Length;
+
+        outcome.Span.Offset.Should().Be(arrowStart);
+        outcome.Span.End.Should().Be(reasonEnd);
+    }
+}

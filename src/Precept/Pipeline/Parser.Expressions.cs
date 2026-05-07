@@ -532,17 +532,12 @@ public static partial class Parser
                     if (stateToken.Kind == TokenKind.Identifier)
                     {
                         Advance();
-                        var left = new IdentifierExpression(transToken.Text, transToken.Span);
-                        var right = new IdentifierExpression(stateToken.Text, stateToken.Span);
-                        var expr = new BinaryOperationExpression(
-                            left, TokenKind.Transition, right,
-                            SourceSpan.Covering(arrowToken.Span, stateToken.Span));
-                        return new OutcomeSlot(expr, expr.Span);
+                        var span = SourceSpan.Covering(arrowToken.Span, stateToken.Span);
+                        return new OutcomeSlot(new TransitionOutcome(stateToken.Text, span), span);
                     }
-                    // transition without state name
-                    var transExpr = new IdentifierExpression(transToken.Text, transToken.Span);
-                    return new OutcomeSlot(transExpr,
-                        SourceSpan.Covering(arrowToken.Span, transToken.Span));
+                    // transition without state name — malformed
+                    var malSpan = SourceSpan.Covering(arrowToken.Span, transToken.Span);
+                    return new OutcomeSlot(new MalformedOutcome(malSpan), malSpan);
                 }
 
                 case TokenKind.No:
@@ -552,16 +547,12 @@ public static partial class Parser
                     if (Peek().Kind == TokenKind.Transition)
                     {
                         var transToken = Advance();
-                        var left = new IdentifierExpression(noToken.Text, noToken.Span);
-                        var right = new IdentifierExpression(transToken.Text, transToken.Span);
-                        var expr = new BinaryOperationExpression(
-                            left, TokenKind.No, right,
-                            SourceSpan.Covering(arrowToken.Span, transToken.Span));
-                        return new OutcomeSlot(expr, expr.Span);
+                        var span = SourceSpan.Covering(arrowToken.Span, transToken.Span);
+                        return new OutcomeSlot(new NoTransitionOutcome(span), span);
                     }
-                    var noExpr = new IdentifierExpression(noToken.Text, noToken.Span);
-                    return new OutcomeSlot(noExpr,
-                        SourceSpan.Covering(arrowToken.Span, noToken.Span));
+                    // 'no' without 'transition' — malformed
+                    var malSpan = SourceSpan.Covering(arrowToken.Span, noToken.Span);
+                    return new OutcomeSlot(new MalformedOutcome(malSpan), malSpan);
                 }
 
                 case TokenKind.Reject:
@@ -571,24 +562,19 @@ public static partial class Parser
                     if (Peek().Kind == TokenKind.StringLiteral)
                     {
                         var reasonToken = Advance();
-                        var left = new IdentifierExpression(rejectToken.Text, rejectToken.Span);
-                        var right = new LiteralExpression(TokenKind.StringLiteral, reasonToken.Text, reasonToken.Span);
-                        var expr = new BinaryOperationExpression(
-                            left, TokenKind.Reject, right,
-                            SourceSpan.Covering(arrowToken.Span, reasonToken.Span));
-                        return new OutcomeSlot(expr, expr.Span);
+                        var span = SourceSpan.Covering(arrowToken.Span, reasonToken.Span);
+                        return new OutcomeSlot(new RejectOutcome(reasonToken.Text, span), span);
                     }
-                    var rejectExpr = new IdentifierExpression(rejectToken.Text, rejectToken.Span);
-                    return new OutcomeSlot(rejectExpr,
-                        SourceSpan.Covering(arrowToken.Span, rejectToken.Span));
+                    // reject without reason — malformed
+                    var malSpan = SourceSpan.Covering(arrowToken.Span, rejectToken.Span);
+                    return new OutcomeSlot(new MalformedOutcome(malSpan), malSpan);
                 }
 
                 default:
                 {
-                    // Unexpected token after arrow — general expression parse
-                    var expr = ParseExpression(0, () => IsAtConstructBoundary());
-                    return new OutcomeSlot(expr,
-                        SourceSpan.Covering(arrowToken.Span, expr.Span));
+                    // Unexpected token after arrow — malformed outcome
+                    var span = arrowToken.Span;
+                    return new OutcomeSlot(new MalformedOutcome(span), span);
                 }
             }
         }
