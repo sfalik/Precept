@@ -210,7 +210,7 @@ The `ProofForwardingFact` DU defines the interface between the graph analyzer an
 | Fact Subtype | Data Carried | Proof Engine Consumption |
 |---|---|---|
 | `ReachabilityFact` | `StateName`, `IsReachable`, `PathFromInitial` (path from initial state, or null if unreachable) | The proof engine uses unreachable-state facts to suppress proof obligations on transitions originating from unreachable states — those transitions can never fire, so their proof requirements are vacuously satisfied. Reachable paths feed causal diagnostic explanations. |
-| `DominancePathFact` | `RequiredState`, `DominatedTerminals` (which terminal states this required state dominates) | The proof engine verifies the required-state guarantee: every execution path to a terminal passes through the required state. If `DominatedTerminals` is empty, the graph analyzer has already emitted `RequiredStateDoesNotDominateTerminal` (code 84); the proof engine records this as a structural violation in the proof ledger. |
+| `DominancePathFact` | `RequiredState`, `DominatedTerminals` (which terminal states this required state dominates) | The proof engine verifies the required-state guarantee: every execution path to a terminal passes through the required state. If `DominatedTerminals` is empty, the graph analyzer has already emitted `RequiredStateDoesNotDominateTerminal` (code 111); the proof engine records this as a structural violation in the proof ledger. |
 | `EventCoverageFact` | `EventName`, `UnhandledReachableStates` (reachable states that have no transition row for this event) | The proof engine uses coverage gaps to reason about guard completeness: in states where an event is handled, are the guards sufficient to cover all possible data states? Coverage gaps are structural facts; guard satisfiability is the proof engine's domain. |
 | `TerminalCompletenessFact` | `AllTerminalsReachable`, `UnreachableTerminals` (terminal states that cannot be reached from the initial state) | The proof engine uses terminal completeness to assess whether the state machine can reach completion. Unreachable terminals may indicate dead-end design or missing transitions — the proof engine records these for the proof ledger without emitting additional diagnostics (the graph analyzer already emits `UnreachableState` for each one). |
 | `DeadEndStateFact` | `DeadEndStates` (reachable non-terminal states with no path to any terminal state), `DeadEndCount` | The proof engine uses dead-end facts to annotate the proof ledger with structural completeness failures. Dead-end states represent lifecycle traps — entities that enter these states can never reach completion. The graph analyzer emits `DeadEndState` (Warning, code 108) for each dead-end state. The proof engine records these facts without emitting additional diagnostics. |
@@ -761,10 +761,10 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 
 | Code | Name | Description |
 |------|------|-------------|
+| 32 | `NoInitialState` | No state is marked with the `initial` modifier (emitted defensively when upstream did not already diagnose) |
 | 80 | `UnreachableState` | A state cannot be reached from the initial state |
 | 81 | `UnhandledEvent` | An event declared in the precept has zero transition rows in any state — it can never be fired successfully |
-| 82 | `TerminalStateHasOutgoingEdges` | A terminal state has outgoing transitions |
-| 83 | `IrreversibleStateHasBackEdge` | An irreversible state has a transition returning to a BFS ancestor |
-| 84 | `RequiredStateDoesNotDominateTerminal` | A required state does not dominate any terminal state |
-| 85 | `NoInitialState` | No state is marked with the `initial` modifier |
 | 108 | `DeadEndState` | A reachable non-terminal state has no structural path to any terminal state — the entity can enter this state but can never reach completion |
+| 109 | `TerminalStateHasOutgoingEdges` | A terminal state has outgoing transitions to other states |
+| 110 | `IrreversibleStateHasBackEdge` | An irreversible state has a transition returning to a BFS ancestor |
+| 111 | `RequiredStateDoesNotDominateTerminal` | A required state does not dominate any terminal state |

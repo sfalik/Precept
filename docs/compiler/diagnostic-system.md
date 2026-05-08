@@ -233,6 +233,10 @@ public enum DiagnosticCode
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,
     UnhandledEvent                     =  81,
+    DeadEndState                       = 108,
+    TerminalStateHasOutgoingEdges      = 109,
+    IrreversibleStateHasBackEdge       = 110,
+    RequiredStateDoesNotDominateTerminal = 111,
 
     // ── Proof ────────────────────────────────────────────
     UnsatisfiableGuard                 =  82,
@@ -274,7 +278,7 @@ public enum DiagnosticCode
 }
 ```
 
-**108 total diagnostic codes** across 5 diagnostic stages: 8 Lex, 8 Parse, 89 Type (including NameBinder codes that use `DiagnosticStage.Type`), 3 Graph, 3 Proof. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
+**111 total diagnostic codes** across 5 diagnostic stages: 8 Lex, 8 Parse, 89 Type (including NameBinder codes that use `DiagnosticStage.Type`), 6 Graph, 3 Proof. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 
@@ -303,7 +307,7 @@ public static class Diagnostics
 {
     public static DiagnosticMeta GetMeta(DiagnosticCode code) => code switch
     {
-        // 108 arms — one per DiagnosticCode member.
+        // 111 arms — one per DiagnosticCode member.
         // Each arm maps the code to its stage, severity, message template, category,
         // and optional related codes, fix hints, fault prevention links, and suggestion sources.
         // Representative examples:
@@ -312,7 +316,7 @@ public static class Diagnostics
         DiagnosticCode.UndeclaredField               => new(..., DiagnosticCategory.Naming, SuggestionSources: [SuggestionSource.UserFields]),
         DiagnosticCode.UnreachableState              => new(..., DiagnosticCategory.Safety),
         DiagnosticCode.DivisionByZero                => new(..., DiagnosticCategory.Proof, PreventsFault: FaultCode.DivisionByZero),
-        // ... (all 108 arms present in source)
+        // ... (all 111 arms present in source)
     };
 
     public static Diagnostic Create(

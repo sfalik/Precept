@@ -33,6 +33,24 @@
 - Earlier branch work locked the parser/checker boundary, the slot-value policy for parsed expressions vs. closed vocabularies, the NameBinder contract, and the rule that doc sync must ship in the same batch as language or runtime changes.
 - Durable catalog learnings preserved from the fuller history: `ActionMeta.SyntaxShape`, `FunctionMeta.HasCIVariant`, and `FunctionMeta.CIVariantOf` now live in the canonical docs and should be treated as the downstream contract for parser/tooling consumers.
 
+### 2026-05-07 — Comprehensive sprint audit completed
+- Audited all Wave 2 code (`053406b`), Wave 2.5 artifacts, 6 doc overhauls, LS test port, grammar generator, and cross-surface sync.
+- Code quality confirmed good: TypeChecker 3-way split compiles clean, EventOutcome/UpdateOutcome renames correct, ConstraintViolation 5-field expansion correct, DiagnosticCode.DeadEndState wired properly. 3,345 tests green.
+- Found one doc error: `diagnostic-system.md` still says "107 total" — must be 108 after DeadEndState addition.
+- R4 review gate was bypassed — George-22 started GraphAnalyzer without explicit R4 clearance. This audit serves as the R4 equivalent. No blocking defects found.
+- Three test coverage gaps flagged: no shape tests for EventOutcome.Faulted, FieldSnapshot.ClrType, or ConstraintViolation 5-field construction.
+- Grammar generator works but output would regress hand-authored tmLanguage.json — generator needs completion before replacing the hand-authored file.
+- LS→core dependency direction approved as architecturally correct. LocationOrDocumentSymbol is a tactical implementation detail, not an architectural concern.
+- Findings written to `.squad/decisions/inbox/frank-comprehensive-audit.md`.
+
+### 2026-05-07 — R4 Architectural Review completed for GraphAnalyzer (67d42b2)
+- Reviewed GraphAnalyzer.cs (587L), StateGraph.cs (98L), SemanticIndex/TypeChecker span additions, and doc updates.
+- Verdict: R4 CONDITIONAL — architecturally sound but one blocking defect: three structural-violation diagnostics (TerminalStateHasOutgoingEdges, IrreversibleStateHasBackEdge, RequiredStateDoesNotDominateTerminal) are specified in the design doc but neither registered in DiagnosticCode nor emitted. Violations are detected and recorded in data structures but produce zero user-visible feedback.
+- Design doc appendix has stale code-number collision: claims 82–84 for graph diagnostics but those slots are Proof-stage codes.
+- Catalog-driven modifier dispatch (GetStateFlags via StateModifierMeta) is correct. Proof-forwarding DU complete. Error recovery correct. Pipeline isolation clean.
+- Reject-outcome self-edges flagged as an architectural concern for terminal-violation analysis — no user impact today but should be filtered when violation diagnostics are implemented.
+- Findings written to `.squad/decisions/inbox/frank-r4-review.md`.
+
 ### 2026-05-08T03:35:00Z — GraphAnalyzer OQ1/OQ2 resolved
 - Landed the GraphAnalyzer OQ1/OQ2 implementation: dead-end states now produce a separate `DeadEndStateFact` with `DiagnosticCode.DeadEndState = 108` detected via reverse-reachability BFS from terminal states in Phase 2.
 - Locked the event-handler coverage question as a structural impossibility: `EventHandlerInStatefulPrecept` blocks handlers in stateful precepts, the graph analyzer only runs on stateful precepts, and `docs/compiler/graph-analyzer.md` §4 plus `docs/compiler/proof-engine.md` were corrected accordingly.

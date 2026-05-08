@@ -85,7 +85,7 @@ public static class GraphAnalyzer
             reachability = ComputeReachability(initialState.Name, semantics.States, adjacency);
 
             var unreachableStateSet = reachability.UnreachableOrdered.ToImmutableHashSet(StringComparer.Ordinal);
-        foreach (var state in semantics.States.Where(state => unreachableStateSet.Contains(state.Name)))
+            foreach (var state in semantics.States.Where(state => unreachableStateSet.Contains(state.Name)))
             {
                 diagnostics.Add(Diagnostics.Create(
                     DiagnosticCode.UnreachableState,
@@ -146,6 +146,22 @@ public static class GraphAnalyzer
         var terminalViolations = BuildTerminalViolations(semantics.States, stateFlags, adjacency);
         var backEdgeViolations = BuildBackEdgeViolations(semantics.States, stateFlags, adjacency, reachability.Parents);
 
+        foreach (var violation in terminalViolations)
+        {
+            diagnostics.Add(Diagnostics.Create(
+                DiagnosticCode.TerminalStateHasOutgoingEdges,
+                semantics.StatesByName[violation.StateName].NameSpan,
+                violation.StateName));
+        }
+
+        foreach (var violation in backEdgeViolations)
+        {
+            diagnostics.Add(Diagnostics.Create(
+                DiagnosticCode.IrreversibleStateHasBackEdge,
+                semantics.StatesByName[violation.StateName].NameSpan,
+                violation.StateName));
+        }
+
         var unreachableTerminals = semantics.States
             .Where(state => stateFlags[state.Name].IsTerminal && !reachability.Reachable.Contains(state.Name))
             .Select(state => state.Name)
@@ -172,6 +188,14 @@ public static class GraphAnalyzer
                 .Where(terminal => dominanceResult.Dominators.TryGetValue(terminal, out var dominators) && dominators.Contains(state.Name))
                 .ToImmutableArray();
             proofFacts.Add(new DominancePathFact(state.Name, dominatedTerminals));
+
+            if (dominatedTerminals.IsEmpty)
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.RequiredStateDoesNotDominateTerminal,
+                    semantics.StatesByName[state.Name].NameSpan,
+                    state.Name));
+            }
         }
 
         foreach (var coverage in eventCoverage.Entries.Where(entry => !entry.NonHandlingReachableStates.IsEmpty))
@@ -492,7 +516,9 @@ public static class GraphAnalyzer
         var violations = ImmutableArray.CreateBuilder<TerminalOutgoingViolation>();
         foreach (var state in states.Where(state => stateFlags[state.Name].IsTerminal))
         {
-            var outgoing = adjacency[state.Name];
+            var outgoing = adjacency[state.Name]
+                .Where(edge => edge.ToState != edge.FromState)
+                .ToImmutableArray();
             if (!outgoing.IsEmpty)
             {
                 violations.Add(new TerminalOutgoingViolation(state.Name, outgoing));

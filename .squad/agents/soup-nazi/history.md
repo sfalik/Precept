@@ -173,6 +173,14 @@
 - Key learning: qualifier disambiguation (same/different/none paths) is easy to miss because money operations look uniform from the outside — the QualifierMatch enum is an internal resolution axis that needs explicit path tests, not just happy-path integration tests.
 - The `CaseInsensitiveValueInCaseSensitiveContains` diagnostic and `CircularComputedField` arm are live TypeChecker code with no triggerable tests; both need follow-on tests when their underlying features (contains operator, computed expression deps) land.
 
+### 2026-05-07T23:58:00Z — R4 GraphAnalyzer test coverage review completed
+
+- Reviewed George's 5-test `GraphAnalyzerTests.cs` against the `graph-analyzer.md` spec and `GraphAnalyzer.cs` implementation (~600L).
+- Found 8 behavioral areas with ZERO test coverage: wildcard expansion, wildcard suppression, missing-initial-state recovery, stateless precept, terminal outgoing violations, irreversible back-edge violations, positive terminal-completeness, and single-state/cycle edge cases.
+- Found 5 test quality issues: conflated test names, missing negative assertions on dead-end/unreachable exclusions, partition completeness invariant unasserted, diagnostic severity unasserted.
+- Verdict: R4 TESTS CONDITIONAL — ProofEngine work may proceed but 8 required test stubs must be implemented before R4 gate formally closes.
+- Key learning: 5 tests covering 143 lines is deceptively sparse for a 600-line analyzer with 4 phases. Each phase (edge construction, reachability, structural analysis, proof forwarding) needs its own test cluster, not just end-to-end happy-paths.
+
 ### 2026-05-07T22:36:33Z — R3 G1–G4 gaps closed (3 tests + 1 documented)
 
 - G1 (§10 G5 Determinism): `Check_SameInput_ReturnsDeterministicOutput` added to `TypeCheckerAssemblyTests` Category 6. Calls `Check()` twice on `TrafficLightPrecept` and asserts identical counts, field resolved type, and guarded-row binary op.

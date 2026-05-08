@@ -117,6 +117,21 @@ public enum DiagnosticCode
     /// The entity can enter this state but can never reach completion from it.
     /// </summary>
     DeadEndState                       = 108,
+    /// <summary>
+    /// A terminal state has outgoing transitions to other states, violating the
+    /// terminal modifier contract that no further transitions are allowed.
+    /// </summary>
+    TerminalStateHasOutgoingEdges      = 109,
+    /// <summary>
+    /// An irreversible state has a transition returning to a BFS ancestor,
+    /// violating the irreversible modifier contract that prevents back-edges.
+    /// </summary>
+    IrreversibleStateHasBackEdge       = 110,
+    /// <summary>
+    /// A required state does not dominate any terminal state, meaning there exist
+    /// complete execution paths that bypass the required state entirely.
+    /// </summary>
+    RequiredStateDoesNotDominateTerminal = 111,
 
     // ── Proof ────────────────────────────────────────────
     UnsatisfiableGuard                 =  82,

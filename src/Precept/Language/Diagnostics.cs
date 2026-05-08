@@ -281,6 +281,12 @@ public static class Diagnostics
             FixHint: "Add at least one transition row that handles this event, or remove the event declaration"),
         DiagnosticCode.DeadEndState                   => new(nameof(DiagnosticCode.DeadEndState),                   DiagnosticStage.Graph, Severity.Warning, "State '{0}' is reachable but has no path to any terminal state — entities entering this state can never reach completion",   DiagnosticCategory.Structure,
             FixHint: "Add a transition from this state toward a terminal state, or mark it as 'terminal' if it is an intended endpoint"),
+        DiagnosticCode.TerminalStateHasOutgoingEdges  => new(nameof(DiagnosticCode.TerminalStateHasOutgoingEdges),  DiagnosticStage.Graph, Severity.Error,   "Terminal state '{0}' has outgoing transitions — terminal states must not transition to other states",                        DiagnosticCategory.Structure,
+            FixHint: "Remove the outgoing transitions from this terminal state, or remove the 'terminal' modifier"),
+        DiagnosticCode.IrreversibleStateHasBackEdge   => new(nameof(DiagnosticCode.IrreversibleStateHasBackEdge),   DiagnosticStage.Graph, Severity.Error,   "Irreversible state '{0}' has a transition returning to an earlier state — irreversible states must not have back-edges",    DiagnosticCategory.Structure,
+            FixHint: "Remove the back-edge transition, or remove the 'irreversible' modifier"),
+        DiagnosticCode.RequiredStateDoesNotDominateTerminal => new(nameof(DiagnosticCode.RequiredStateDoesNotDominateTerminal), DiagnosticStage.Graph, Severity.Warning, "Required state '{0}' does not dominate any terminal state — some execution paths can bypass it entirely", DiagnosticCategory.Structure,
+            FixHint: "Ensure all paths to terminal states pass through this required state, or remove the 'required' modifier"),
 
         // ── Proof ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UnsatisfiableGuard             => new(nameof(DiagnosticCode.UnsatisfiableGuard),             DiagnosticStage.Proof, Severity.Warning, "The condition '{0}' on event '{1}' can never be true when {2} — this transition will never fire",                                      DiagnosticCategory.Proof,
