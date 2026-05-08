@@ -25869,3 +25869,23 @@ Shane challenged the initial placement of R3 (immutability guarantees). Resoluti
 
 
 ---
+
+---
+
+## Archive Batch — 2026-05-08T04:26:28Z
+
+Archived 1 decision entries from `decisions.md` after the active ledger measured 165330 bytes and crossed the 7-day archival gate.
+
+---
+
+### 2025-07-11: Grammar generator + language-server test port recorded from Kramer inbox
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `kramer-gramgen-lstests-done.md`.
+
+- Kramer recorded the completed `tools/Precept.GrammarGen/` console tool that emits `precept.tmLanguage.json` from catalog token metadata plus hand-authored structural composition rules, with `--output <path>` support for pipeline use.
+- The inbox also recorded the v1-to-v2 port of 13 `test/Precept.LanguageServer.Tests/` files (~190 tests), the `src/Precept/` project reference from `tools/Precept.LanguageServer/`, and the language-server stub/preview-protocol scaffolding required to compile the suite.
+- Durable state at handoff: the ~190 language-server tests compile but intentionally stay red behind `NotImplementedException`, grammar-generation structural patterns remain hand-authored pending richer catalog/construct metadata, and the LS dependency-direction question remains explicitly noted for follow-up.

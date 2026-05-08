@@ -6,6 +6,10 @@
 
 ## Learnings
 
+- Self-edges (`ToState == FromState`) from `Reject` and `NoTransition` outcomes must be filtered out of terminal-violation analysis — a terminal state that only rejects events is honoring its contract, not violating it.
+- When the spec says "Emit Diagnostic(X)" in pseudocode, verify the actual `Diagnostics.Create()` call exists in the code — violation data structures can be populated correctly while diagnostic emission is entirely missing.
+- Doc appendix code numbers can drift from the actual `DiagnosticCode` enum when codes are added out-of-sequence (e.g., `DeadEndState = 108` was added after the Proof block at 82–84, but the appendix assumed contiguous Graph-stage numbering).
+
 - `Types.GetMeta(...).ImpliedModifiers` is the durable source of truth for implied field modifiers.
 - Error propagation in the TypeChecker should return `TypedErrorExpression` without layering extra diagnostics on parent nodes — but the error SOURCE must emit a TC-level diagnostic to satisfy D26 self-containment.
 - `ParsedConstruct.LeadingTokenKind` is the minimal surface for recovering the anchor scope keyword (in/to/from/on) consumed by the parser but not previously stored.
@@ -65,3 +69,8 @@
 - Frank-19 resolved the active GraphAnalyzer open questions: model dead-end states as a separate `DeadEndStateFact` (not an expansion of `TerminalCompletenessFact`) and emit `DiagnosticCode.DeadEndState = 108` using reverse-reachability BFS from terminal states in Phase 2.
 - Event handlers are outside GraphAnalyzer event coverage by construction: PRECEPT0092 (`EventHandlerInStatefulPrecept`) forbids handlers in stateful precepts, and the graph analyzer only runs on stateful precepts.
 - Frank also corrected `docs/compiler/graph-analyzer.md` §4 and `docs/compiler/proof-engine.md`; treat these as the durable analyzer/proof-engine contract for downstream GraphAnalyzer work.
+
+### 2026-05-08T04:26:28Z — GraphAnalyzer R4 blocker fix batch closed
+- Commit `5398435` closed the real GraphAnalyzer R4 blockers: structural diagnostics 109/110/111 now exist, emit at analysis time, and the graph doc appendix matches the live enum again.
+- `Reject` / `NoTransition` self-loops are now filtered out of terminal outgoing-edge violations, preserving the rule that a terminal state may reject without violating its contract.
+- Validation at George handoff closed green at 3370 `Precept.Tests` passing before Soup-Nazi-7's follow-on test batch extended the branch baseline.

@@ -1,197 +1,35 @@
 ## Core Context
 
-
-
 - Owns test discipline across parser, type checker, runtime, MCP, language server, and analyzer validation.
-
 - Treats behavioral claims as unproven until executable evidence exists and records gaps as actionable findings.
-
-- Historical summary: established the sample-file promotion gate, large parser coverage matrices, analyzer-harness expectations, and the rule that spec/catalog changes are not complete until regression anchors exist.
-
-
+- Pushes for full-surface coverage matrices, honest red tests when behavior is missing, and regression anchors that match the real AST/runtime shape.
 
 ## Learnings
 
-
-
 - Sample-file integration tests catch parser and language-surface gaps that isolated unit tests miss.
-
-- Hardcoded enum/count assertions are acceptable regression anchors only when they are intentionally updated alongside catalog growth.
-
-- Expression-level diagnostics often need a full parser host (rule/transition row) instead of the bare expression helper.
-
-- DSL keywords are common identifier traps in tests; use non-keyword names for fields/events unless the test is explicitly about keyword handling.
-
-- Outcome parsing needs full-precept regression anchors in addition to single-row parser checks; missing required outcomes must emit `ExpectedOutcome`, not just a `MalformedOutcome` sentinel.
-
-- Multi-source analyzer tests only need a small harness extension; the rest of the analyzer test shape can stay minimal.
-
-- For operation analyzers, use `ctx.Operation.SemanticModel` (nullable) rather than APIs available only on `SyntaxNodeAnalysisContext`.
-
-- 2026-05-08T00:18:05.162-04:00 — GraphAnalyzer wildcard coverage can rely on the full pipeline even while `from any` still carries upstream diagnostics; the semantic output still preserves the null `FromState` the analyzer consumes.
-
-- 2026-05-08T00:18:05.162-04:00 — Reachability suites need explicit partition and exclusion assertions so unreachable states do not silently drift into dead-end classification.
-- 2026-05-08T00:26:28.084-04:00 — GraphAnalyzer event-coverage tests must isolate zero-handler diagnostics from partial-coverage proof facts: `UnhandledEvent` belongs only to events with no handlers anywhere.
-- 2026-05-08T00:26:28.084-04:00 — `reject` and `no transition` share self-edge resolution in `GraphAnalyzer`, but both outcomes need separate direct regression anchors because they are distinct semantic outcomes.
-
-
+- Hardcoded enum/count assertions are acceptable only when they are intentionally updated alongside catalog growth.
+- Expression diagnostics often need a full parser host (rule/transition row), not the bare expression helper.
+- DSL keywords are common identifier traps in tests; use non-keyword names unless the test is explicitly about keyword handling.
+- Analyzer suites need partition/exclusion assertions, diagnostic severities, and direct edge/topology checks — not just happy-path end-to-end outcomes.
+- `reject` / `no transition` rows can matter structurally as self-edges even when they do not change state.
 
 ## Recent Updates
 
-
+### 2026-05-08T04:26:28Z — GraphAnalyzer R4 test surface closed across both Soup batches
+- Commit `7c674bd` added the required GraphAnalyzer R4 coverage for wildcard expansion/suppression, missing-initial recovery, stateless precepts, terminal/back-edge structural violations, positive terminal completeness, and single-state / cycle / diamond / multi-dead-end topologies.
+- The strengthened suite also pinned dead-end exclusion, reachability partitioning, warning severities, and the previously under-specified dominance/proof-forwarding boundary where applicable.
+- A late-arriving Round 2 inbox note then closed TQ1, EC5, EC6, and Gap 8 with isolated zero-handler / partial-coverage assertions plus explicit `reject` / `no transition` self-edge tests, bringing `GraphAnalyzerTests.cs` to 20 facts and the branch baseline to 3385 passing tests.
 
 ### 2026-05-08T03:08:18Z — R3 G1-G4 test pass closed
 - Added the G1 determinism, G3 non-null `TypedInputAction.SecondaryRole`, and G4 non-optional event-arg `is set` regression anchors; all pass.
-- G2 is now durably recorded as dead code at the TypeChecker level until qualifier-aware candidate disambiguation exists. Commit: `fcc9760`.
+- G2 is durably recorded as dead code at the TypeChecker level until qualifier-aware candidate disambiguation exists. Commit: `fcc9760`.
 
-### 2026-05-01T20:36:28Z — Full review gaps closed and branch green
+### 2026-05-07T23:58:00Z — GraphAnalyzer R4 review opened
+- Reviewed George's 5-test `GraphAnalyzerTests.cs` against the ~600-line analyzer and the spec.
+- Found eight zero-coverage behavioral areas plus five test-quality gaps; that review directly drove the R4 test matrix George and Soup later closed.
 
-- The full coverage review is now durably recorded end-to-end: the initial review found 6 missing tests, and Soup-Nazi-4 landed all 6 (M1-M6) plus the RS1030 follow-on fix.
+## Historical Summary
 
-- Validation closed green at 2687 passing tests across the branch; no skipped tests were introduced.
-
-- Treat the coverage review as resolved, not merely advisory: the missing test matrix is now implemented.
-
-
-
-### 2026-05-01 — 6 coverage gaps from full review implemented (M1-M6)
-
-- Wrote the six missing tests for postfix arity, multi-token operator token sequences, postfix round-trip coverage, PRECEPT0020 MultiTokenOp skip behavior, chained `is set` behavior, and postfix precedence.
-
-- Fixed the PRECEPT0013 follow-on issue by switching to `ctx.Operation.SemanticModel` with a null-guard.
-
-- Branch validation finished green with no new failures.
-
-
-
-### 2026-05-01 — Full-surface review summary compressed
-
-- Historical branch review work already established the sample integration gate, parser remediation anchors, whitespace-insensitivity regression layer, and the broad gap matrix that drove the spike's later test additions.
-
-- Earlier detailed notes were summarized here to keep the active history compact while preserving durable testing patterns and the branch's executed outcomes.
-
-
-
-### 2026-05-02T21:58:21Z — Canonical type checker batch closed
-
-- Soup-Nazi's checker test-strategy review is now part of the implementation baseline: expect roughly 450-550 tests, 3 non-negotiable validation gates, and 4 high-risk areas to anchor the slice-by-slice rollout.
-
-- The canonical checker design is now implementation-ready after Frank's response to George; treat the test review as required follow-through, not advisory commentary.
-
-- Future checker slices should keep error recovery, scope/binding behavior, qualifier-sensitive operations, and cross-consumer regression coverage explicitly pinned in tests.
-
-
-
-### 2026-05-03T11:11:04Z — BecauseClause slot split tests written
-
-- Added 35 tests in `EnsureBecauseClauseSlotTests.cs` covering the catalog defect fix that splits `BecauseClause` out of `EnsureClause` for `StateEnsure` and `EventEnsure`.
-
-- George had already applied the 3-slot structure by the time tests ran: `HasThreeSlots`, `SlotAtIndex2_IsBecauseClause`, and `SlotAtIndex0/1` tests all pass green.
-
-- A real defect was surfaced: `BecauseClause` slot is `IsRequired: true` on both constructs but must be `IsRequired: false` (ensures without `because` are valid DSL). Two RED-C tests document this.
-
-- 7 RED-P tests document expected parser behavior (stub returns empty manifest); 4 RED-R tests document expected runtime behavior (not yet implemented). All 13 red tests are intentionally honest — no skips.
-
-- Finding: When George uses the shared `SlotBecauseClause` instance (required=true) for StateEnsure/EventEnsure, a new optional variant (`SlotOptBecauseClause = new(ConstructSlotKind.BecauseClause, IsRequired: false)`) is required to match the design intent.
-
-
-
-### 2026-05-03T15:18:05Z — Ensure-slot test matrix closed over George's fix
-
-- The because-clause test batch is now durably closed at the catalog layer: 35 tests exist, George cleared the 2 RED-C optional-slot defects, and the remaining 11 red tests stay as honest parser/runtime stubs.
-
-- Cross-team correction to preserve in future diagram-related testing/docs work: schema diagrams should count 13 catalogs including `ExpressionForms`; `ConstructSlotKind` is helper schema only.
-
-- User routing directive: Elaine owns diagram authoring across both ASCII and Mermaid, so future diagram polish or anatomy rendering requests should route there rather than treating diagrams as Frank-only follow-through.
-
-
-
-### 2026-05-07T08:22:32Z — BackArrow parser coverage added
-
-- Added `ParserBackArrowTests.cs` to lock the new `<-` computed-field delimiter and the `->` regression boundary for transition rows and event handlers.
-
-- Coverage includes happy-path computed fields, multi-field coexistence, span anchoring at `<-`, token catalog registration, and two honest negative cases for wrong-position `<-` usage.
-
-- Current high-value defect anchor: `field amount as number <-` should raise a parse diagnostic instead of silently accepting a placeholder expression.
-
-
-
-### 2026-05-07T08:40:33Z — BackArrow test red case closed
-
-- Soup-Nazi wrote 11 `ParserBackArrowTests` and correctly left the bare `<-` case red instead of masking it with a fake parser placeholder.
-
-- George-5 closed the defect and added the narrow exhaustiveness annotations; the full parser batch now sits inside the 2810/2810 green run.
-
-- Durable lesson: new syntax work needs both happy-path/regression coverage and at least one honest negative case that forces recovery behavior.
-
-
-
-### 2026-05-07T09:04:34Z — Parser coverage audit flagged critical gaps
-
-- Parser-focused run is green at 459 passed, 0 failed, 0 skipped across the 6 files under `test/Precept.Tests/Parser/`.
-
-- The strongest gap cluster is type-checker-facing parser surface: full `TypeRef` syntax, collection/lookup/choice shapes, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), rich event args, and stateless handler trailing `ensure` all lack meaningful parser coverage.
-
-- Action parsing is especially under-anchored: parser tests prove `ActionChain` slot presence, but not action kind/operand detail for the collection mutation surface.
-
-- Catalog drift protection is strong and distributed (`TokensTests`, `OperatorsTests`, `ActionsTests`, `ConstructsTests`, `ExpressionForm*`, `SlotOrderingDriftTests`), but parser diagnostic-code coverage is near-zero — many tests still stop at `NotBeEmpty()` or `Stage == Parse`.
-
-- Durable lesson: a green parser suite can still be checker-hostile when it does not pin the actual AST payloads and diagnostic identities that later stages consume.
-
-### 2026-05-07T15:18:42Z — NameBinder suite complete
-
-- Added `test/Precept.Tests/NameBinder/NameBinderTests.cs` with 40 tests spanning 9 behavioral groups for declarations, duplicates, references, shadowing, forward references, and manifest integration.
-- Branch validation closed green at 2929 total passing tests.
-- Frank's companion doc-sync batch eliminated stale NameBinder references, so the implementation and its regression anchors are now durably documented together.
-
-
-### 2026-05-07T18:28:05Z — Outcomes coverage closed; parser gap follow-on launched
-
-- `OutcomesCatalogTests` now lock the supported outcome forms plus malformed/recovery behavior, and the parser emits `ExpectedOutcome` when a required outcome is entirely missing.
-- Coordinator confirmed `ExpressionFormCatalogTests.cs` and `ParserExpressionTests.cs` are included in the 2949-test branch baseline, so exclusion-based green runs are no longer acceptable evidence.
-- Active follow-on: Soup-Nazi-4 is covering seven remaining parser gaps across type refs, action chains, diagnostic codes, wildcards, event args, interpolation, and negative expression cases.
-
-### 2026-05-07T18:45:00Z — Parser coverage gaps closed with AST-shape assertions
-
-- Added dedicated parser coverage for `ParsedTypeReference`, interpolated-string segments, collection mutation action payloads, wildcard routing forms, and richer event argument lists.
-- The current parser surface matters more than remembered DSL sketches: collection actions parse as `verb target value`, plain quoted strings stay `LiteralExpression`, and bare `queue` currently resolves through `TypeKind.QueueBy` metadata.
-- Recovery assertions should pin actual parser sentinels, not imagined ones: empty guards use `MissingExpression`, while incomplete binary operands currently recover with the parser's placeholder literal plus `ExpectedToken`.
-
-
-### 2026-05-07T21:07:33Z — Scribe merged coverage-gap inbox  - Scribe merged `.squad/decisions/inbox/soup-nazi-coverage-gaps-addressed.md` into `.squad/decisions/decisions.md` and cleared the inbox copy.
-
-### 2026-05-07T19:22:15Z — TypeChecker Slice 1 tests written
-- 55 tests in `TypeCheckerSymbolTests.cs` covering 9 behavioral categories: TypeKind resolution (21 types), collection ElementType (D2), optional modifier, modifier preservation, ImpliedModifiers (D3), state modifiers, event args, initial/terminal diagnostics (D7), and lookup index population.
-- At commit time: 2 pass, 53 fail — George's Slice 1 implementation not yet committed; TypeChecker.Check() returns empty SemanticIndex.
-- Confirmed DiagnosticCode names: `NoInitialState` (=32), `MultipleInitialStates` (=31).
-- TypedState uses `ImmutableArray<ModifierKind> Modifiers` for lifecycle flags (InitialState, Terminal, Error) — no separate IsInitial boolean (unlike TypedEvent which has `bool IsInitial`).
-- ImpliedModifiers confirmed from Types catalog: Timezone, Currency, UnitOfMeasure, Dimension all imply `Notempty`.
-- Existing suite stable at 2974 passing tests.
-
-
-
-### 2026-05-07T22:28:41Z — R3 TypeChecker full coverage review completed
-
-- Reviewed all 10 TypeChecker test files (313 tests total): SymbolTests, ExpressionTests, FunctionTests, TypedConstantTests, TransitionTests, StructuralTests, ModifierTests, CITests, QuantifierTests, AssemblyTests.
-- All 13 TypedExpression DU subtypes have test coverage; all 28 emittable diagnostics reviewed — 2 are untestable (dormant code paths), 1 has only negative-case coverage (CircularComputedField never actually triggered), and IsSetOnNonOptional's TypedArgRef path is unexercised.
-- Verdict: BLOCKED on 4 gaps: G5 determinism (zero coverage, §10 guarantee), QualifierMatch.Different disambiguation path, TypedInputAction non-null SecondaryRole invariant, and IsSetOnNonOptional for non-optional event args.
-- Key learning: a suite of 313 tests can still miss a §10 first-class guarantee entirely (determinism). Coverage breadth does not substitute for systematically walking each spec guarantee as a mandatory test target.
-- Key learning: qualifier disambiguation (same/different/none paths) is easy to miss because money operations look uniform from the outside — the QualifierMatch enum is an internal resolution axis that needs explicit path tests, not just happy-path integration tests.
-- The `CaseInsensitiveValueInCaseSensitiveContains` diagnostic and `CircularComputedField` arm are live TypeChecker code with no triggerable tests; both need follow-on tests when their underlying features (contains operator, computed expression deps) land.
-
-### 2026-05-07T23:58:00Z — R4 GraphAnalyzer test coverage review completed
-
-- Reviewed George's 5-test `GraphAnalyzerTests.cs` against the `graph-analyzer.md` spec and `GraphAnalyzer.cs` implementation (~600L).
-- Found 8 behavioral areas with ZERO test coverage: wildcard expansion, wildcard suppression, missing-initial-state recovery, stateless precept, terminal outgoing violations, irreversible back-edge violations, positive terminal-completeness, and single-state/cycle edge cases.
-- Found 5 test quality issues: conflated test names, missing negative assertions on dead-end/unreachable exclusions, partition completeness invariant unasserted, diagnostic severity unasserted.
-- Verdict: R4 TESTS CONDITIONAL — ProofEngine work may proceed but 8 required test stubs must be implemented before R4 gate formally closes.
-- Key learning: 5 tests covering 143 lines is deceptively sparse for a 600-line analyzer with 4 phases. Each phase (edge construction, reachability, structural analysis, proof forwarding) needs its own test cluster, not just end-to-end happy-paths.
-
-### 2026-05-07T22:36:33Z — R3 G1–G4 gaps closed (3 tests + 1 documented)
-
-- G1 (§10 G5 Determinism): `Check_SameInput_ReturnsDeterministicOutput` added to `TypeCheckerAssemblyTests` Category 6. Calls `Check()` twice on `TrafficLightPrecept` and asserts identical counts, field resolved type, and guarded-row binary op.
-- G2 (QualifierMatch.Different path): Documented as structurally unreachable. `DisambiguateCandidates` always returns the `QualifierMatch.Same` entry first; the Different entries (`MoneyDivideMoneyCrossCurrency`, `QuantityDivideQuantityCrossDimension`) are never selected. `MapQualifierBinding(Different) → null` is dead code at the TypeChecker level. TODO comment added to `TypeCheckerExpressionTests` before section 13. Inbox record written.
-- G3 (TypedInputAction non-null SecondaryRole): `TypedInputAction_WithSecondaryExpression_SecondaryRoleAndExpressionBothNonNull` added to `TypeCheckerTransitionTests` Category 7. Uses `insert … at` on a list field; asserts `SecondaryRole = ActionSecondaryRole.Index`, `SecondaryExpression != null`, and invariant consistency.
-- G4 (IsSetOnNonOptional on event arg): `IsSet_OnNonOptionalEventArg_EmitsIsSetOnNonOptionalDiagnostic` added to `TypeCheckerExpressionTests` section 14. Uses `Submit.Amount is set` where Amount is non-optional.
-- Durable lesson: `QualifierMatch.Different` is a disambiguation axis the TypeChecker is aware of but cannot yet select — the disambiguation always defaults to Same. No test can pin it until DisambiguateCandidates gains qualifier-aware selection. Flag this as a follow-on when qualifier tracking lands.
-- Commit: fcc9760. 3 new passing tests; pre-existing 17 failures unchanged.
+- 2026-05-07 parser/testing work locked broad parser coverage discipline: sample integration, AST-shape assertions, diagnostic-identity anchors, and the rule that green parser runs can still be checker-hostile when payloads are under-tested.
+- 2026-05-03 through 2026-05-07, Soup-Nazi authored the canonical TypeChecker strategy review, ensure/because-clause coverage, NameBinder regression anchors, outcomes coverage, and the parser gap sweep that filled type-ref, action-chain, wildcard, interpolation, event-arg, and negative-expression holes.
+- 2026-05-01 review work established the pattern that full reviews must convert missing coverage into shipped tests, not advisory notes; that batch also locked the sample-file gate and multi-source analyzer harness expectations.

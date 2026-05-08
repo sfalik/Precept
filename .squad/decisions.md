@@ -12,6 +12,50 @@
 
 ---
 
+### 2026-05-08T00:22:50Z: R4 hard gate expanded to every remaining conditional GraphAnalyzer item
+
+**By:** Shane (via Copilot)
+
+**Status:** Locked — applies before any ProofEngine work begins.
+
+**Merged source:** `copilot-directive-20260508.md`.
+
+- No R4 conditional follow-on stays optional anymore: TQ1, EC5, EC6, and Gap 8 must all land before ProofEngine work begins.
+- Scribe merged the directive immediately without waiting for the still-running `soup-nazi-8` batch so the team ledger reflects the hard gate now, not after the remaining follow-up lands.
+
+---
+
+### 2026-05-08T04:26:28Z: GraphAnalyzer structural blockers and both R4 test batches are durably recorded
+
+**By:** Scribe
+
+**Status:** Merged from inbox; George's blocker fixes plus Soup-Nazi's primary and late-arriving Round 2 test batches are now all durably recorded.
+
+**Merged sources:** `frank-r4-review.md`, `soup-nazi-r4-review.md`, `george-graph-analyzer-done.md`, `george-r4-fixes-done.md`, `soup-nazi-r4-tests-done.md`, `soup-nazi-r4-round2-done.md`.
+
+- George's GraphAnalyzer implementation baseline is now durably recorded: declaration spans stay hoisted on typed inputs, missing-initial recovery keeps analysis total, wildcard expansion remains deterministic with explicit-row suppression, event coverage stays event-level, and terminal-completeness vs. dead-end facts remain separate proof artifacts.
+- Frank's R4 architectural review is now canon: the real blockers were the three missing structural diagnostics plus the stale appendix code collision; the `Reject`/`NoTransition` self-edge nuance and the indentation defect were explicitly carried forward as cleanup items.
+- George closed B1/B2/F10/F11 in commit `5398435` by registering and emitting `TerminalStateHasOutgoingEdges` (109), `IrreversibleStateHasBackEdge` (110), and `RequiredStateDoesNotDominateTerminal` (111), filtering terminal self-edges, and correcting the doc appendix / indentation drift.
+- Soup-Nazi-7 closed the required GraphAnalyzer test matrix in commit `7c674bd` for wildcard behavior, missing-initial recovery, stateless precepts, structural violations, positive terminal completeness, and the single-state / cycle / diamond / multi-dead-end edges, with 3381 tests passing at handoff.
+- During the same Scribe pass, the late-arriving `soup-nazi-r4-round2-done.md` inbox note was merged mechanically without waiting for orchestration: TQ1 was renamed to match its actual assertions, EC5 was split into zero-handler vs. partial-coverage tests, EC6 added explicit `reject` self-edge coverage, Gap 8 added explicit `no transition` self-edge coverage, and validation closed green at 3385/3385.
+- The locked 2026-05-08 directive is therefore preserved together with the evidence that its remaining conditional GraphAnalyzer test items have now landed in the ledger.
+
+---
+
+### 2026-05-07: R4 gate stays separate from the comprehensive audit, and the grammar generator cannot replace the hand-authored grammar until parity exists
+
+**By:** Shane
+
+**Status:** Locked — recorded from the audit follow-up.
+
+**Merged sources:** `frank-comprehensive-audit.md`, `shane-d7-d8-decisions.md`.
+
+- D7 locked the process ruling: Frank's comprehensive audit did **not** count as the dedicated R4 final review, so George's GraphAnalyzer work stayed held in the inbox until the separate Frank + Soup-Nazi review path completed.
+- D8 locked the tooling ruling: the grammar generator must reach hand-authored `tmLanguage.json` quality before it becomes canonical; no generated base + manual-edit hybrid workflow is allowed.
+- Durable implication: the catalog-driven architecture still demands a single generated source of truth, but the current generator output remains scaffold-quality and must not overwrite production grammar assets yet.
+
+---
+
 ### 2026-05-07T23:22:15Z: TypeChecker Slice 1 test inventory recorded ahead of symbol population
 
 **By:** Scribe
@@ -1653,6 +1697,8 @@ George may proceed to Slice 5.
 
 ## What Was Verified
 
+---
+
 ### SemanticIndex shape (D1–D5)
 
 - **D1:** `SemanticIndex` is a `sealed record` — ✓
@@ -1661,6 +1707,8 @@ George may proceed to Slice 5.
 - **D4:** Primary storage is `ImmutableArray<T>`, secondary is `FrozenDictionary<K,V>`. No `ImmutableDictionary` used anywhere — ✓
 - **D5:** `ActionSecondaryRole?` on `TypedInputAction` with XML-documented invariant `SecondaryRole.HasValue == (SecondaryExpression != null)` — ✓
 
+---
+
 ### Resolution behavior (D6–D10)
 
 - **D6:** `FieldScopeMode` enum (`AllFields`, `PriorFieldsOnly`) in `CheckContext.cs` — ✓
@@ -1668,6 +1716,8 @@ George may proceed to Slice 5.
 - **D8:** Forward-reference prohibition enforced in `ResolveIdentifier` when `CurrentScope == PriorFieldsOnly` — uses `>=` comparison on field index — ✓
 - **D9:** `QualifierBinding` DU with `InheritedQualifier(string FieldName)` and `SameQualifierRequired` — ✓. `DisambiguateCandidates` selects `QualifierMatch.Same` by default, `MapQualifierBinding` maps to the DU — ✓
 - **D10:** `TypedTransitionRow.FromState` is `string?` with `null` = any-state wildcard. XML doc present on the parameter with explicit semantics — ✓
+
+---
 
 ### Expression resolution (D11–D18)
 
@@ -1680,6 +1730,8 @@ George may proceed to Slice 5.
 - **D17:** Accessor resolution via `Types.GetMeta(receiver.ResultType).Accessors` — ✓
 - **D18:** `TypedMemberAccess` carries `TypeAccessor ResolvedAccessor` — ✓
 
+---
+
 ### Typed constants (D19–D23)
 
 - **D19:** `TypedTypedConstant` carries `TypeKind ResultType`, `string RawText`, `object? ParsedValue` — ✓
@@ -1688,10 +1740,14 @@ George may proceed to Slice 5.
 - **D22:** `NodaTimeValidation` — `ValidateNodaTime` dispatches on `NodaTimePattern` to select the correct NodaTime parser — ✓
 - **D23:** `RegexValidation` — `ValidateRegex` uses `Regex.IsMatch` against the pattern — ✓
 
+---
+
 ### Structural (D24–D26)
 
 - **D24:** `TypedEditDeclaration` is a placeholder record with no logic — ✓
 - **D26:** `Debug.Assert` for ErrorGuaranteed invariant correctly deferred to Slice 10 per plan — ✓
+
+---
 
 ### Catalog-driven compliance
 
@@ -1701,6 +1757,8 @@ George may proceed to Slice 5.
 - **No hardcoded lists of type names, function names, or operator symbols.** All resolution goes through catalog APIs: `Types.GetMeta`, `Operations.FindCandidates`, `Operations.FindUnary`, `Functions.FindByName`, `Operators.ByToken`.
 - **`NotImplementedException` stubs:** Present in 5 methods (`NormalizeTransitionRow`, `NormalizeEventHandler`, `ResolveQuantifier`, `ValidateModifiers`, `ValidateStructural`, `ValidateCIEnforcement`, `BuildSemanticIndex`). All are **unreachable dead code** — `Check()` does not call any of them. The expression-level stubs in the `Resolve` switch correctly return `TypedErrorExpression` with no diagnostic.
 - **No stub arm emits a diagnostic.** All 4 expression stub arms (`ConditionalExpression`, `QuantifierExpression`, `ListLiteralExpression`, `PostfixOperationExpression`) return `TypedErrorExpression` silently — ✓
+
+---
 
 ### Test quality
 
@@ -1788,6 +1846,8 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `george-ci-fix-done.md`.
 
+---
+
 ### CI Enforcement Bug Fixes
 **Commit:** 7424785
 **Bug 1 fix:** `EnforceCIInExpression` in `src/Precept/Pipeline/TypeChecker.cs` — all 5 `Diagnostics.Create` call sites for CI codes 66, 95–98 now pass the CI field name as the `{0}` template argument. Added `GetCIFieldName` helper (line ~2197) that extracts the field name from whichever binary operand is the `~string` `TypedFieldRef`. For function calls (codes 97, 98), extracts directly from `func.Arguments[0]`.
@@ -1805,6 +1865,8 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `george-parser-fix-done.md`.
 
+---
+
 ### 2026-05-07: Parser gap fixes complete
 **Commit:** 514f82f
 **Bug 1 (Token collision):** `src/Precept/Language/Types.cs` line 644 — changed `dict[meta.Token.Kind] = meta` to `dict.TryAdd(meta.Token.Kind, meta)` in `BuildByToken()`. Base types (Log/Queue) now win over By-variants (LogBy/QueueBy) since they appear first in enum iteration order.
@@ -1821,6 +1883,8 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `george-slice-1-done.md`.
+
+---
 
 ### 2026-05-07: Slice 1 — Typed Symbol Population Complete
 **By:** George (for Soup Nazi)
@@ -1854,6 +1918,8 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `george-slice-10-done.md`.
 
+---
+
 ### Slice 10 Complete — Ready for R3
 **Commit:** 844f00e
 **BuildSemanticIndex:** All 16 ImmutableArray primaries + 4 FrozenDictionary secondaries confirmed — populated from CheckContext, no empty stubs remaining.
@@ -1873,6 +1939,8 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `george-slice-2-done.md`.
+
+---
 
 ### 2026-05-07: Slice 2 — Scalar Expression Resolution Complete
 **By:** George (for Soup Nazi)
@@ -1917,6 +1985,8 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `george-slice-3-done.md`.
+
+---
 
 ### 2026-05-07: Slice 3 Complete
 **By:** George (for Soup Nazi)
@@ -1986,6 +2056,8 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 
 **Merged source:** `george-slice-4-done.md`.
 
+---
+
 ### 2026-05-07: Slice 4 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `ac95de2`
@@ -2041,6 +2113,8 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 **Merged source:** `george-slice-5-done.md`.
 
+---
+
 ### 2026-05-07: Slice 5 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `687d364`
@@ -2094,6 +2168,8 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 **Merged source:** `george-slice-6-done.md`.
 
+---
+
 ### 2026-05-07: Slice 6 Complete
 **By:** George (for Soup Nazi)
 **Commit:** fe358ef
@@ -2117,6 +2193,8 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 **Merged source:** `george-slice-7-done.md`.
 
+---
+
 ### 2026-05-07: Slice 7 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `687d364` (co-committed with Slice 5 due to parallel file edits)
@@ -2137,6 +2215,8 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `george-slice-8-done.md`.
+
+---
 
 ### Slice 8 Complete
 **By:** George (for Soup Nazi)
@@ -2201,6 +2281,8 @@ when "admin@example.com" == Email
 
 **Merged source:** `george-slice-9-done.md`.
 
+---
+
 ### Slice 9 Complete
 **By:** George (for Soup Nazi)
 **Commit:** 54fa59b
@@ -2237,6 +2319,8 @@ when "admin@example.com" == Email
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `george-slice5-restored.md`.
+
+---
 
 ### Slice 5 Restoration Complete
 **Commit:** 4e1efd8
@@ -2315,6 +2399,8 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 **Merged source:** `soup-nazi-slice-1-triage.md`.
 
+---
+
 ### Slice 1 Test Failure Triage — 2026-05-07
 
 | Test | Failure Type | Root Cause | Action Taken |
@@ -2328,6 +2414,8 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 | EventArgWithNotempty_ModifierPreserved | TYPE B | Parser `ParseArgumentList` (Parser.cs:675–721) parses `Name as Type` only — does not consume modifiers (`notempty`, `optional`) after the type token. Samples use this syntax but it silently fails. | Documented — parser gap |
 | EventWithOptionalArg_ArgIsOptional | TYPE B | Same root cause as above — `ParseArgumentList` does not support `optional` modifier on event args. | Documented — parser gap |
 
+---
+
 ### TYPE A — Test Bugs Fixed (4 tests)
 
 All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'kg'`, `in 'USD/each'`, `in 'USD' to 'EUR'`) that the parser does not yet support. The tests were testing **TypeKind resolution**, not qualifier parsing, so the qualifiers were unnecessary. Removed qualifiers; all four now pass.
@@ -2336,6 +2424,8 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 - `QuantityType_ResolvesToQuantityTypeKind` — `field Weight as quantity in 'kg'` → `field Weight as quantity`
 - `PriceType_ResolvesToPriceTypeKind` — `field UnitPrice as price in 'USD/each'` → `field UnitPrice as price`
 - `ExchangeRateType_ResolvesToExchangeRateTypeKind` — `field FxRate as exchangerate in 'USD' to 'EUR'` → `field FxRate as exchangerate`
+
+---
 
 ### TYPE B — Real Upstream Gaps (4 tests)
 
@@ -2357,6 +2447,8 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 
 **Fix approach:** After consuming the type token in `ParseArgumentList`, loop over modifier tokens (check against `Modifiers.ByToken` or the modifier catalog) and collect them into a modifiers list. The `(string Name, TypeMeta Type)` tuple in the arg list should be expanded to include modifiers.
 
+---
+
 ### Recommended next action
 
 George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken overwrite is a data-integrity issue that affects any code path using `Types.ByToken` for these types. The event arg modifier gap blocks testing of a feature that's already used in samples. Both are contained fixes in Parser.cs and Types.cs — no TypeChecker changes needed.
@@ -2372,6 +2464,8 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `soup-nazi-slice-10-done.md`.
+
+---
 
 ### Slice 10 Tests Complete — R3-Ready
 **Commit:** 703000a
@@ -2427,6 +2521,8 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 **Merged source:** `soup-nazi-slice-2-done.md`.
 
+---
+
 ### Slice 2 Tests Complete — 2026-05-07
 **Commit:** d4053c1
 **Total tests written:** 46
@@ -2448,6 +2544,8 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `soup-nazi-slice-3-done.md`.
+
+---
 
 ### Slice 3 Tests Complete — 2026-05-07
 **Commit:** 23edd54
@@ -2475,6 +2573,8 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 **Merged source:** `soup-nazi-slice-4-done.md`.
 
+---
+
 ### Slice 4 Tests Complete — 2026-05-07
 **Commit:** `1c29fe6`
 **Total tests written:** 44
@@ -2498,6 +2598,8 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `soup-nazi-slice-5-done.md`.
+
+---
 
 ### Slice 5 Tests Complete — 2026-05-07
 **Commit:** (see below)
@@ -2530,6 +2632,8 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 **Merged source:** `soup-nazi-slice-6-done.md`.
 
+---
+
 ### Slice 6 Tests Complete
 **Commit:** 78d1774
 **Total written:** 17
@@ -2546,6 +2650,8 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Status:** Merged from inbox — merged from inbox.
 
 **Merged source:** `soup-nazi-slice-7-done.md`.
+
+---
 
 ### Slice 7 Tests Complete
 **Commit:** 26208fe
@@ -2577,6 +2683,8 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 **Merged source:** `soup-nazi-slice-8-done.md`.
 
+---
+
 ### Slice 8 Tests Complete
 **Commit:** 9472824
 **Total written:** 30
@@ -2603,6 +2711,8 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 **Merged source:** `soup-nazi-slice-9-done.md`.
 
+---
+
 ### Slice 9 Tests Complete
 **Commit:** f14a664
 **Total written:** 22
@@ -2617,6 +2727,8 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **What:** Dead-end states get a new, separate `DeadEndStateFact` rather than being an expansion of `TerminalCompletenessFact`. New `DiagnosticCode.DeadEndState = 108` (Warning) added. Detection uses reverse-reachability BFS from terminal states in Phase 2.
 **Why:** Clean separation of concerns — TerminalCompletenessFact assesses reachability of terminal states; DeadEndStateFact identifies states with no outbound transitions to terminals. Mixing them would conflate two distinct structural properties.
 
+---
+
 ### 2026-05-07: GraphAnalyzer OQ2 — EventHandlers structurally excluded from EventCoverage
 **By:** Frank (frank-graphanalyzer-oqs)
 **What:** TypedEventHandler entries do NOT count toward event coverage and cannot coexist with the graph analyzer in any valid precept. EventHandlers are only valid in stateless precepts (PRECEPT0092 `EventHandlerInStatefulPrecept` blocks them in stateful precepts). The graph analyzer only runs on stateful precepts. The coexistence scenario is structurally impossible. Corrected graph-analyzer.md §4 which incorrectly claimed event handlers were consumed for coverage.
@@ -2624,14 +2736,3 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
-### 2025-07-11: Grammar generator + language-server test port recorded from Kramer inbox
-
-**By:** Scribe
-
-**Status:** Merged from inbox.
-
-**Merged source:** `kramer-gramgen-lstests-done.md`.
-
-- Kramer recorded the completed `tools/Precept.GrammarGen/` console tool that emits `precept.tmLanguage.json` from catalog token metadata plus hand-authored structural composition rules, with `--output <path>` support for pipeline use.
-- The inbox also recorded the v1-to-v2 port of 13 `test/Precept.LanguageServer.Tests/` files (~190 tests), the `src/Precept/` project reference from `tools/Precept.LanguageServer/`, and the language-server stub/preview-protocol scaffolding required to compile the suite.
-- Durable state at handoff: the ~190 language-server tests compile but intentionally stay red behind `NotImplementedException`, grammar-generation structural patterns remain hand-authored pending richer catalog/construct metadata, and the LS dependency-direction question remains explicitly noted for follow-up.
