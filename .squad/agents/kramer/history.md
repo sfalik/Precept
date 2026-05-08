@@ -21,6 +21,40 @@
 - Kramer corrected `docs/tooling/extension.md`, `docs/tooling/language-server.md`, and `docs/compiler/tooling-surface.md` to match the branch's actual tooling state.
 - Durable follow-ups now logged in `.squad/decisions.md`: clarify design-spec vs. implementation-status docs, recover the missing LS test corpus, and decide the grammar-generator ownership path.
 
+### 2026-05-08T01:15:57-04:00 — Grammar generator implementation complete
+
+**Task:** Implement grammar generator per frank-grammar-spec.md (docs/working/).  
+**Branch:** `feature/grammar-generator-implementation` | **PR:** #139
+
+**What was wrong with the generator scaffold:**
+- stateDeclaration only recognized `initial`; 6 other state modifiers absent
+- eventWithArgsDeclaration used retired `with` syntax; broken `$ref` usage
+- assertStatement used retired `assert` keyword; should be `ensure`
+- fieldScalarDeclaration hardcoded 6 types; should be all 27 from catalog
+- fieldCollectionDeclaration inner type list missing `integer`, `decimal`
+- 8 construct-level patterns missing entirely: ruleDeclaration, stateAction, stateEnsure, eventHandler, eventEnsure, accessMode, omitDeclaration, noTransition
+- functionCalls pattern missing; no catalog-derived function name list
+- rootEditDeclaration present but stale (edit not in TokenKind, no samples use it)
+- Top-level pattern ordering didn't match Frank's spec priority rules
+- No punctuation pattern for parens/brackets
+
+**What was implemented:**
+- All 16 must-fix items from frank-grammar-spec.md completed
+- messageStrings gold pattern present from prior commit
+- ScopeToRepositoryKey descriptive names present from prior commit
+- All structural patterns derive type/modifier/function alternations from catalog
+- 42 repository keys, 41 top-level patterns in correct spec-defined order
+- Stale patterns removed: eventWithArgsDeclaration, assertStatement, machineDeclaration, rootEditDeclaration
+- Stale keywords absent from output: nullable, invariant, assert, with
+- TODO comment in generator at exact function-arg message-string wire-in point (blocked on FunctionMeta positional flag)
+
+**Key files:**
+- `tools/Precept.GrammarGen/Program.cs` — generator implementation
+- `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` — generated output
+- `.squad/decisions/inbox/kramer-grammar-gen-impl.md` — implementation decisions
+
+**Test status:** LS tests were pre-existing 194 failures (stubs, not regressions). Generator builds and produces valid JSON.
+
 ### Historical summary through 2026-05-07
 - Prior active work covered grammar/completion sync for guards, conditional expressions, `and`/`or`/`not`, stateless edit forms, semantic-token metadata propagation, README/tooling accuracy passes, and the C93 divisor-safety tooling fixes.
 - The standing tooling baseline is unchanged: docs must reflect reality, tests are the safest spec anchor for language-server behavior, and future tooling derivation should come from catalog metadata rather than hand-maintained lists.
