@@ -12,6 +12,34 @@
 
 ---
 
+### 2026-05-08T05:27:37Z: Grammar generator design doc locks the generator contract and exposes the unreachable message-string path
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `frank-grammar-generator-doc.md`.
+
+- Frank's `docs/compiler/grammar-generator.md` is now the canonical generator design reference, locking the four-step algorithm, structural-pattern inventory, output contract, and its boundary with the catalog-system and tooling-surface docs.
+- Durable bug record: the generator builds `#messageStrings` in `AddStructuralPatterns()` but never includes it in `BuildTopLevelPatterns()`, so `because` / `reject` message strings stay unreachable in generated output.
+- Catalog gap locked: add `TokenMeta.IsMessagePosition` on `Because` and `Reject` so the generator can derive the gold message-string rule catalog-first before inserting `#messageStrings` ahead of `#strings`.
+
+---
+
+### 2026-05-08T05:27:37Z: Grammar generator implementation closes the spec must-fix inventory while leaving the catalog-blocked message-position gap explicit
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `kramer-grammar-gen-impl.md`.
+
+- Kramer closed all 16 must-fix items on PR #139: the generator now emits 42 repository patterns, orders 41 top-level patterns per spec, derives structural alternations from catalogs, and removes stale patterns plus the retired `nullable`, `invariant`, `assert`, and `with` keywords.
+- Durable boundary: function-argument message strings still cannot receive gold scoping without new positional metadata, so the implementation leaves an explicit TODO at the exact wire-in point instead of hardcoding names or argument positions.
+- Validation at handoff stayed clean: the generator build passed, the emitted grammar JSON was valid, and promotion to the canonical grammar remains gated on full parity plus the message-position catalog gap.
+
+---
+
 ### 2026-05-08T04:55:35Z: ProofEngine implementation is blocked on unresolved spec and contract gaps
 
 **By:** Scribe
