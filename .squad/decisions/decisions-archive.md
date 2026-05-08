@@ -23489,3 +23489,1669 @@ Owner decision required. When Shane locks the keyword, update the open-question 
 
 
 ---
+
+# Decision: HandlesCatalogMember rename propagation complete
+
+
+
+**Date:** 2026-05-01
+
+
+
+**Agent:** george-7
+
+
+
+**Commit:** `08fdf85`
+
+
+
+**Status:** Completed
+
+
+
+George completed the mechanical rename from `[HandlesForm]` to `[HandlesCatalogMember]` across the attribute definition, every active call site, PRECEPT0019, tests, and docs with no behavior change.
+
+
+
+## Scope
+
+
+
+- Rename the shared handler annotation to `[HandlesCatalogMember]` so distributed-dispatch exhaustiveness stays catalog-agnostic and symmetric with `[HandlesCatalogExhaustively]`.
+
+
+
+- Propagate the new name through parser/type-checker/graph-analyzer coverage points, analyzer enforcement, tests, and working docs so the retired `[HandlesForm]` name remains historical context only.
+
+
+
+## Changed Files
+
+
+
+- `src/Precept/Language/HandlesCatalogMemberAttribute.cs` (renamed from `HandlesFormAttribute.cs`)
+
+
+
+- `src/Precept/HandlesCatalogExhaustivelyAttribute.cs`
+
+
+
+- `src/Precept/Pipeline/Parser.Expressions.cs`
+
+
+
+- `src/Precept/Pipeline/TypeChecker.cs`
+
+
+
+- `src/Precept/Pipeline/GraphAnalyzer.cs`
+
+
+
+- `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`
+
+
+
+- `test/Precept.Tests/ExpressionFormCoverageTests.cs`
+
+
+
+- `test/Precept.Analyzers.Tests/Precept0019Tests.cs`
+
+
+
+- `docs/working/parser-gap-fixes-plan.md`
+
+
+
+- `docs/working/analyzer-recommendations.md`
+
+
+
+## Validation
+
+
+
+- `dotnet build src/Precept/ --no-restore` ✅
+
+
+
+- `dotnet build tools/Precept.LanguageServer/ --no-restore` ✅
+
+
+
+- `dotnet test test/Precept.Tests/ --no-build` ✅ (2424 passed)
+
+
+
+- `dotnet test test/Precept.LanguageServer.Tests/ --no-build` ✅ (0 discovered; existing warning)
+
+
+
+## Notes
+
+
+
+- Background batch completed before closeout; no further follow-up is recorded in this pass.
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+# Parser Coverage Assertion Against ExpressionFormKind
+
+
+
+**Date:** 2026-05-01
+
+
+
+**Author:** Frank (Lead Architect)
+
+
+
+**Status:** Exploration / Recommendation
+
+
+
+**Triggered by:** Shane's observation that the parser can assert coverage against the catalog
+
+
+
+---
+
+
+
+## Executive Summary
+
+
+
+The parser CAN meaningfully assert coverage against `ExpressionFormKind`, but the enforcement level is **test-time**, not compile-time. This adds real value — it guarantees that adding a new expression form to the catalog without adding parser support becomes a failing test. It does NOT require changes to `ExpressionFormMeta`'s shape and should be a **follow-on slice** (not expand Slice 4).
+
+
+
+---
+
+
+
+## Analysis
+
+### The Structural Problem
+
+
+
+The parser dispatches on **tokens**, not on expression form kinds. This is fundamental to how Pratt parsers work:
+
+
+
+```csharp
+
+
+
+// ParseAtom — dispatches on TokenKind
+
+
+
+switch (current.Kind)
+
+
+
+{
+
+
+
+    case TokenKind.NumberLiteral:    // → Literal form
+
+
+
+    case TokenKind.StringLiteral:   // → Literal form (same form, different token)
+
+
+
+    case TokenKind.Identifier:      // → Identifier OR FunctionCall (lookahead decides)
+
+
+
+    case TokenKind.LeftParen:       // → Grouped form
+
+
+
+    case TokenKind.Not:             // → UnaryOperation form
+
+
+
+    case TokenKind.Minus:           // → UnaryOperation form
+
+
+
+    case TokenKind.If:              // → Conditional form
+
+
+
+    ...
+
+
+
+}
+
+
+
+// Led loop — dispatches on TokenKind
+
+
+
+if (current.Kind == TokenKind.Dot) { /* MemberAccess */ }
+
+
+
+if (OperatorPrecedence.TryGetValue(current.Kind, ...)) { /* BinaryOperation */ }
+
+
+
+```
+
+
+
+The relationship between tokens and expression forms is **many-to-one** (multiple tokens → one form) and sometimes **one-to-many with lookahead** (Identifier token → Identifier OR FunctionCall, depending on `(`). This means you cannot write:
+
+
+
+```csharp
+
+
+
+// IMPOSSIBLE: compile-time exhaustive switch on ExpressionFormKind in the parser
+
+
+
+ExpressionFormKind form = ??? // No way to derive this BEFORE parsing
+
+
+
+switch (form) { ... }         // CS8509 requires knowing the key first
+
+
+
+```
+
+
+
+The parser must read tokens to DISCOVER which form it's building. The form kind is an OUTPUT of parsing, not an input to routing.
+
+### Question 1: What Would Catalog-Driven Coverage Look Like?
+
+
+
+**Recommended approach: A test-time structural assertion.**
+
+
+
+The pattern is an xUnit test that iterates `ExpressionForms.All` and asserts each member has parser support. The assertion doesn't run the parser — it verifies that the parser's dispatch tables and switch arms collectively cover every catalog member.
+
+
+
+```csharp
+
+
+
+[Fact]
+
+
+
+public void Parser_Covers_All_ExpressionFormKinds()
+
+
+
+{
+
+
+
+    var coveredForms = new HashSet<ExpressionFormKind>();
+
+
+
+    // Nud forms: verify ParseAtom handles them
+
+
+
+    foreach (var form in ExpressionForms.All.Where(f => !f.IsLeftDenotation))
+
+
+
+    {
+
+
+
+        // Each nud form must map to at least one token case in ParseAtom
+
+
+
+        var tokens = form.LeadTokens; // new ExpressionFormMeta field
+
+
+
+        tokens.Should().NotBeEmpty(
+
+
+
+            because: $"nud form {form.Kind} must declare its lead tokens for parser coverage");
+
+
+
+        coveredForms.Add(form.Kind);
+
+
+
+    }
+
+
+
+    // Led forms: verify the Pratt loop handles them
+
+
+
+    foreach (var form in ExpressionForms.All.Where(f => f.IsLeftDenotation))
+
+
+
+    {
+
+
+
+        // BinaryOperation: covered if OperatorPrecedence has entries
+
+
+
+        // MemberAccess: covered if Dot handling exists
+
+
+
+        // MethodCall: covered when implemented
+
+
+
+        var tokens = form.LeadTokens;
+
+
+
+        tokens.Should().NotBeEmpty(
+
+
+
+            because: $"led form {form.Kind} must declare its lead tokens for parser coverage");
+
+
+
+        coveredForms.Add(form.Kind);
+
+
+
+    }
+
+
+
+    // The actual coverage assertion
+
+
+
+    var allForms = Enum.GetValues<ExpressionFormKind>().ToHashSet();
+
+
+
+    coveredForms.Should().BeEquivalentTo(allForms,
+
+
+
+        because: "every ExpressionFormKind must have parser support");
+
+
+
+}
+
+
+
+```
+
+
+
+**But the stronger version** — the one that provides real enforcement — is a compile-time exhaustive switch in a *coverage witness method*:
+
+
+
+```csharp
+
+
+
+// In ExpressionForms.cs (the catalog itself)
+
+
+
+/// <summary>
+
+
+
+/// Coverage witness: the C# compiler (CS8509) refuses to build if any
+
+
+
+/// ExpressionFormKind member is added without updating this switch.
+
+
+
+/// The returned tokens are the parser's dispatch keys for this form.
+
+
+
+/// </summary>
+
+
+
+public static IReadOnlyList<TokenKind> GetLeadTokens(ExpressionFormKind kind) => kind switch
+
+
+
+{
+
+
+
+    ExpressionFormKind.Literal        => [TokenKind.NumberLiteral, TokenKind.StringLiteral,
+
+
+
+                                          TokenKind.True, TokenKind.False, TokenKind.StringStart],
+
+
+
+    ExpressionFormKind.Identifier     => [TokenKind.Identifier],
+
+
+
+    ExpressionFormKind.Grouped        => [TokenKind.LeftParen],
+
+
+
+    ExpressionFormKind.UnaryOperation => [TokenKind.Not, TokenKind.Minus],
+
+
+
+    ExpressionFormKind.Conditional    => [TokenKind.If],
+
+
+
+    ExpressionFormKind.FunctionCall   => [TokenKind.Identifier], // disambiguated by lookahead
+
+
+
+    ExpressionFormKind.ListLiteral    => [TokenKind.LeftBracket],
+
+
+
+    // Led forms — tokens that trigger them in the left-denotation loop
+
+
+
+    ExpressionFormKind.BinaryOperation => Operators.All
+
+
+
+        .Where(op => op.Arity == Arity.Binary)
+
+
+
+        .Select(op => op.Token.Kind).Distinct().ToArray(),
+
+
+
+    ExpressionFormKind.MemberAccess    => [TokenKind.Dot],
+
+
+
+    ExpressionFormKind.MethodCall      => [TokenKind.LeftParen], // after member access
+
+
+
+};
+
+
+
+```
+
+
+
+**THIS is the bridge.** The exhaustive switch lives in the catalog, keyed on `ExpressionFormKind`. CS8509 fires at compile time. The returned `LeadTokens` connect the catalog to the parser's token-based dispatch. A test then verifies that for every non-led form, at least one of its `LeadTokens` appears as a case in `ParseAtom`'s switch.
+
+### Question 2: Where Does IsLeftDenotation Fit?
+
+
+
+`IsLeftDenotation` already partitions expression forms into nud vs. led. The parser could use this to verify its OWN structure:
+
+
+
+```csharp
+
+
+
+// Structural assertion: every led form's tokens appear in the Pratt loop dispatch
+
+
+
+var ledForms = ExpressionForms.All.Where(f => f.IsLeftDenotation);
+
+
+
+foreach (var form in ledForms)
+
+
+
+{
+
+
+
+    // Assert: the led loop handles form.LeadTokens
+
+
+
+}
+
+
+
+```
+
+
+
+**However, the parser should NOT derive its routing from `IsLeftDenotation` at runtime.** The Pratt loop's structure is inherently:
+
+
+
+1. Call `ParseAtom()` (handles all nud forms)
+
+
+
+2. Loop: check for led-triggering tokens (dot, operators)
+
+
+
+This is the correct Pratt structure. Having the parser read `IsLeftDenotation` to decide "should I route this to ParseAtom or the led loop?" would be backwards — the parser already knows by construction. `IsLeftDenotation` is metadata for CONSUMERS (hover docs, MCP vocabulary, coverage tests), not for the parser's own routing logic.
+
+
+
+**Verdict:** `IsLeftDenotation` informs the coverage test's assertion structure (nud forms → check ParseAtom, led forms → check Pratt loop), but does not drive runtime routing.
+
+### Question 3: Compile-Time vs. Test-Time vs. Runtime Assertion
+
+
+
+| Level | Mechanism | What It Catches | Verdict |
+
+
+
+|-------|-----------|-----------------|---------|
+
+
+
+| **Compile-time** | Exhaustive switch in `GetLeadTokens(ExpressionFormKind)` | New enum member added without declaring its tokens | ✅ **YES — achievable and recommended** |
+
+
+
+| **Test-time** | xUnit test iterating `ExpressionForms.All` against parser dispatch | New form with tokens declared but parser switch/loop not updated | ✅ **YES — the second layer** |
+
+
+
+| **Runtime** | Startup assertion | Same as test-time but fails in production | ❌ **Overkill — test-time is sufficient** |
+
+
+
+**Recommended: Two-layer enforcement.**
+
+
+
+1. **Compile-time (CS8509):** The `GetLeadTokens` exhaustive switch in the catalog forces you to declare tokens for any new `ExpressionFormKind` member. You literally cannot add a member without the compiler demanding you specify how it enters the parser.
+
+
+
+2. **Test-time (xUnit):** A test verifies that for each form's declared `LeadTokens`, the parser actually handles them. This catches the case where you add the catalog entry but forget to update `ParseAtom` or the led loop.
+
+
+
+Together: you cannot add a form without declaring its tokens (compile-time), and you cannot declare tokens without the parser handling them (test-time). **Full coverage guarantee.**
+
+### Question 4: Impact on Gap Fixes Plan
+
+
+
+**Recommendation: Do NOT expand Slice 4. Add a follow-on Slice (4b or new Slice after 4).**
+
+
+
+Rationale:
+
+
+
+- Slice 4 as currently scoped creates the catalog, `ExpressionFormMeta`, and `ExpressionFormKind`. That's already a meaningful deliverable with its own test surface.
+
+
+
+- Coverage assertion requires the `GetLeadTokens` method (or a `LeadTokens` field in `ExpressionFormMeta`) which is straightforward but conceptually distinct — it bridges the catalog to parser internals.
+
+
+
+- The coverage test itself needs the parser gaps (GAP-6 list literals, GAP-7 method calls) to be FIXED first, or it must be written to explicitly acknowledge known gaps. Sequencing it after Slices 5-6 is cleaner.
+
+
+
+**Impact on `ExpressionFormMeta` shape:** Yes, one addition needed.
+
+
+
+Current planned shape:
+
+
+
+```csharp
+
+
+
+public record ExpressionFormMeta(
+
+
+
+    ExpressionFormKind Kind,
+
+
+
+    ExpressionFormCategory Category,
+
+
+
+    bool IsLeftDenotation,
+
+
+
+    string HoverDocs);
+
+
+
+```
+
+
+
+With coverage assertion:
+
+
+
+```csharp
+
+
+
+public record ExpressionFormMeta(
+
+
+
+    ExpressionFormKind Kind,
+
+
+
+    ExpressionFormCategory Category,
+
+
+
+    bool IsLeftDenotation,
+
+
+
+    string HoverDocs,
+
+
+
+    IReadOnlyList<TokenKind> LeadTokens);  // NEW: parser coverage bridge
+
+
+
+```
+
+
+
+Alternatively, `LeadTokens` can be a computed method (`GetLeadTokens`) rather than a stored field — either works for CS8509 enforcement. I lean toward the method approach because it keeps the `ExpressionFormMeta` record clean and puts the exhaustive switch (the real enforcement mechanism) in a visually distinct location.
+
+### Question 5: Honest Assessment — Real Value or Theater?
+
+
+
+**This is genuinely valuable, not theater.** Here's why:
+
+
+
+The **meaningful coverage guarantee** is: *you cannot add a new expression form to Precept's language description without the build system demanding you wire it into the parser.*
+
+
+
+Without this assertion, adding `ExpressionFormKind.ListLiteral` to the catalog (which we're about to do) would compile and pass all tests — even if nobody updates `ParseAtom` to handle `[`. The catalog would claim the language has list literals, but the parser would reject them. That's exactly the kind of silent drift that catalogs are supposed to prevent.
+
+
+
+**What it does NOT prevent:** It doesn't prevent a form's parser implementation from being wrong. It ensures the parser HANDLES the form — not that it handles it correctly. Correctness is the job of behavioral tests.
+
+
+
+**The coverage guarantee in plain English:**
+
+
+
+- "Every expression form the catalog describes is wired into the parser" — YES, enforced.
+
+
+
+- "The parser correctly implements every expression form" — NO, that requires behavioral tests (which exist separately).
+
+
+
+This is the same level of guarantee that CS8509 gives everywhere else in the catalog system: the exhaustive switch forces you to CONSIDER every member. It doesn't force you to consider it correctly. But forcing consideration is 90% of the battle — most bugs come from forgetting, not from misunderstanding.
+
+
+
+**Not theater because:** The catalog already has a consumer (the parser) that MUST handle every member. The assertion makes that implicit requirement explicit and enforced. That's what catalogs DO.
+
+
+
+---
+
+
+
+## Recommended Approach (Summary)
+
+
+
+1. **Add `GetLeadTokens(ExpressionFormKind)` exhaustive switch** to `ExpressionForms.cs` — compile-time coverage via CS8509.
+
+
+
+2. **Add xUnit test** that verifies parser dispatch tables handle all declared `LeadTokens` — test-time gap detection.
+
+
+
+3. **Keep `ExpressionFormMeta` shape unchanged** — use a method rather than a field for `LeadTokens`.
+
+
+
+4. **Sequence as follow-on slice** after Slice 4 (catalog creation) and after Slices 5-6 (GAP-6/GAP-7 fixes), so the coverage test passes clean on merge.
+
+
+
+5. **Do NOT attempt runtime routing from catalog metadata** — the Pratt parser's structure is correct as-is; the catalog informs validation, not dispatch.
+
+
+
+---
+
+
+
+## Code Sketch: Complete Pattern
+
+
+
+```csharp
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+
+
+
+// In src/Precept/Language/ExpressionForms.cs
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+
+
+
+/// <summary>
+
+
+
+/// Parser coverage bridge: maps each expression form to the token(s) that
+
+
+
+/// trigger its parsing. CS8509 enforces exhaustiveness at compile time.
+
+
+
+/// </summary>
+
+
+
+public static IReadOnlyList<TokenKind> GetLeadTokens(ExpressionFormKind kind) => kind switch
+
+
+
+{
+
+
+
+    ExpressionFormKind.Literal        => [TokenKind.NumberLiteral, TokenKind.StringLiteral,
+
+
+
+                                          TokenKind.True, TokenKind.False, TokenKind.StringStart],
+
+
+
+    ExpressionFormKind.Identifier     => [TokenKind.Identifier],
+
+
+
+    ExpressionFormKind.Grouped        => [TokenKind.LeftParen],
+
+
+
+    ExpressionFormKind.UnaryOperation => [TokenKind.Not, TokenKind.Minus],
+
+
+
+    ExpressionFormKind.Conditional    => [TokenKind.If],
+
+
+
+    ExpressionFormKind.FunctionCall   => [TokenKind.Identifier],
+
+
+
+    ExpressionFormKind.ListLiteral    => [TokenKind.LeftBracket],
+
+
+
+    ExpressionFormKind.BinaryOperation => Operators.All
+
+
+
+        .Where(op => op.Arity == Arity.Binary)
+
+
+
+        .Select(op => op.Token.Kind).Distinct().ToArray(),
+
+
+
+    ExpressionFormKind.MemberAccess   => [TokenKind.Dot],
+
+
+
+    ExpressionFormKind.MethodCall     => [TokenKind.LeftParen],
+
+
+
+};
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+
+
+
+// In test/Precept.Tests/ExpressionFormCoverageTests.cs
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+
+
+
+[Fact]
+
+
+
+public void Every_ExpressionFormKind_Has_LeadTokens_Declared()
+
+
+
+{
+
+
+
+    // CS8509 already enforces this at compile-time via GetLeadTokens,
+
+
+
+    // but this test makes the contract visible in test output.
+
+
+
+    foreach (var kind in Enum.GetValues<ExpressionFormKind>())
+
+
+
+    {
+
+
+
+        var tokens = ExpressionForms.GetLeadTokens(kind);
+
+
+
+        tokens.Should().NotBeEmpty(
+
+
+
+            because: $"{kind} must declare at least one lead token for parser coverage");
+
+
+
+    }
+
+
+
+}
+
+
+
+[Fact]
+
+
+
+public void ParseAtom_Handles_All_Nud_Form_LeadTokens()
+
+
+
+{
+
+
+
+    var nudForms = ExpressionForms.All.Where(f => !f.IsLeftDenotation);
+
+
+
+    foreach (var form in nudForms)
+
+
+
+    {
+
+
+
+        var tokens = ExpressionForms.GetLeadTokens(form.Kind);
+
+
+
+        foreach (var token in tokens)
+
+
+
+        {
+
+
+
+            // Parse a minimal expression starting with this token kind
+
+
+
+            // and verify it produces a non-error AST node.
+
+
+
+            var source = GetMinimalSourceForToken(token);
+
+
+
+            var result = Compiler.Compile($"precept Test\nfield x as number\nrule {source} because \"test\"");
+
+
+
+            result.Diagnostics.Should().NotContain(d => d.Code == DiagnosticCode.ExpectedToken,
+
+
+
+                because: $"ParseAtom must handle {token} (form: {form.Kind})");
+
+
+
+        }
+
+
+
+    }
+
+
+
+}
+
+
+
+```
+
+
+
+---
+
+
+
+## Open Questions for Shane
+
+
+
+1. **Slice sequencing preference:** Should the coverage slice (4b) go immediately after Slice 4 (accepting that it will initially mark GAP-6/GAP-7 forms as `// TODO: pending implementation`), or after Slices 5-6 when all parser gaps are fixed?
+
+
+
+2. **Method vs. field:** `GetLeadTokens` as a method (my recommendation) keeps the record clean but means `LeadTokens` aren't queryable from `ExpressionForms.All` without calling the method. If MCP consumers want to report "which tokens trigger list literals?" they'd call the method. Is that acceptable, or should it be a field on `ExpressionFormMeta`?
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+# Phase 2b Decision Notes — OperatorMeta DU Restructure
+
+
+
+**Date:** 2026-05-01
+
+
+
+**Author:** George
+
+
+
+**Branch:** spike/Precept-V2
+
+
+
+**Slices:** 19–22
+
+
+
+---
+
+
+
+## Decision: FrozenDictionary covariance requires explicit value selector
+
+
+
+When building `FrozenDictionary<TKey, TBase>` from a filtered sequence of `TDerived`
+
+
+
+(where `TDerived : TBase`), `ToFrozenDictionary` infers the value type as `TDerived` — not
+
+
+
+`TBase`. C# generic type inference never widens. The fix is to provide a value selector with
+
+
+
+an explicit cast: `.ToFrozenDictionary(k => ..., v => (TBase)v)`.
+
+
+
+This was the only compile error after the initial DU implementation. Applies to both:
+
+
+
+- `Operators.ByToken`: `.OfType<SingleTokenOp>().ToFrozenDictionary(..., m => (OperatorMeta)m)`
+
+
+
+- `Operators._byTokenSequence`: `.OfType<MultiTokenOp>().ToFrozenDictionary(..., m => (OperatorMeta)m)`
+
+
+
+## Decision: Parser.OperatorPrecedence must be narrowed to SingleTokenOp
+
+
+
+`Parser.OperatorPrecedence` builds from `Operators.All.Where(op => op.Arity == Arity.Binary)`.
+
+
+
+After the DU, `Operators.All` includes `MultiTokenOp` entries with `Arity.Postfix`. The
+
+
+
+`Arity.Binary` filter would pass them if ever set to `Binary`. More importantly, `MultiTokenOp`
+
+
+
+has no `.Token` property — accessing `op.Token.Kind` on a base-typed variable is a compile
+
+
+
+error. The fix is to narrow the source: `.OfType<SingleTokenOp>().Where(op => op.Arity == Arity.Binary)`.
+
+
+
+## Decision: ByToken returns OperatorMeta, not SingleTokenOp
+
+
+
+The public API `ByToken` is typed as `FrozenDictionary<(TokenKind, Arity), OperatorMeta>`.
+
+
+
+While the values are always `SingleTokenOp` at runtime, returning the base type maintains
+
+
+
+API stability for consumers that only need base-class properties (Kind, Precedence, Associativity).
+
+
+
+Callers that need `Token` must pattern-match: `if (meta is SingleTokenOp sop) sop.Token`.
+
+
+
+## Decision: ByTokenSequence uses params TokenKind[] with 3-tuple key
+
+
+
+The sequence key `(TokenKind, TokenKind?, TokenKind?)` covers all current multi-token operators
+
+
+
+(2-token `is set`, 3-token `is not set`) and any future additions up to 3 tokens. The params
+
+
+
+overload `ByTokenSequence(params TokenKind[] tokens)` lets callers write natural call syntax:
+
+
+
+`Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)`.
+
+
+
+If a 4-token sequence is ever needed, the key type must change. That is an acceptable deferred
+
+
+
+cost given that no 4-token operator exists in the spec.
+
+
+
+## File paths confirmed
+
+
+
+- `src/Precept/Language/Operator.cs` — contains `Arity`, `OperatorFamily`, `Associativity`, and the `OperatorMeta` DU types
+
+
+
+- `src/Precept/Language/OperatorKind.cs` — contains `OperatorKind` enum
+
+
+
+- `src/Precept/Language/Operators.cs` — contains `Operators` static class (`GetMeta`, `All`, `ByToken`, `ByTokenSequence`)
+
+
+
+- `src/Precept/Language/ExpressionForms.cs` — contains `ExpressionFormKind`, `ExpressionFormMeta`, `ExpressionForms`
+
+
+
+- `src/Precept/Pipeline/Parser.cs` — single file (1757+ lines), `OperatorPrecedence` at ~line 34, `[HandlesForm]` at ~line 1406
+
+
+
+## Test count baseline correction
+
+
+
+The plan doc said "2482 tests at Phase 1 exit". The actual count at Phase 1 exit (commit caca30f
+
+
+
+and related) was **2247 total: 2240 passing + 7 intentional KnownBrokenFiles failures**.
+
+
+
+Phase 2a corrected those 7 → 2261 passing, 0 failing.
+
+
+
+Phase 2b added 13 new tests (8 in OperatorsTests, 3 in ExpressionFormCatalogTests, 2 theory
+
+
+
+case additions) → **2274 passing, 0 failing**.
+
+
+
+---
+
+
+
+---
+
+# Decision Note — Phase 2c Complete (Slices 23–26)
+
+
+
+**Date:** 2026-05-01
+
+
+
+**Author:** George
+
+
+
+**Branch:** spike/Precept-V2
+
+
+
+---
+
+
+
+## What Shipped
+
+
+
+Phase 2c closes the PRECEPT0019 promotion work. All four slices landed in a single pass with no deferred items.
+
+### Slice 23 — TypeChecker [HandlesForm] coverage
+
+
+
+- `TypeChecker.cs` received `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class.
+
+
+
+- `private static void CheckExpression(Expression expression)` stub added with all 11 `[HandlesForm]` annotations.
+
+
+
+- Both `TypeChecker` and `GraphAnalyzer` are `public static class` — stubs are `private static`, not instance methods.
+
+### Slice 24 — GraphAnalyzer [HandlesForm] coverage
+
+
+
+- `GraphAnalyzer.cs` received the same class attribute.
+
+
+
+- `private static void AnalyzeExpression(Expression expression)` stub with all 11 `[HandlesForm]` annotations.
+
+### Slice 25 — ExpressionFormCoverageTests Layer 2
+
+
+
+- New file: `test/Precept.Tests/Language/ExpressionFormCoverageTests.cs` (namespace `Precept.Tests.Language`).
+
+
+
+- 26 tests: count assertion, per-kind GetMeta + HoverDocs theories (11 each), IsLeftDenotation correctness for led/nud forms, LeadTokens contract.
+
+
+
+- Existing `test/Precept.Tests/ExpressionFormCoverageTests.cs` (Layer 3 reflection+round-trip) updated: `ContainSingle` → `HaveCount(3)`, added `BindingFlags.Static` to method search, changed from `First()` to iterating all annotated types.
+
+### Slice 26 — PRECEPT0019 promoted to Error
+
+
+
+- `defaultSeverity` flipped from `DiagnosticSeverity.Warning` to `DiagnosticSeverity.Error`.
+
+
+
+- `<WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>` and its comment removed from `Precept.csproj`.
+
+
+
+- `Precept0019Tests.cs` TP1+TP2 severity assertions updated to `DiagnosticSeverity.Error`.
+
+
+
+- Pre-condition (zero PRECEPT0019 warnings before flip) verified explicitly.
+
+
+
+---
+
+
+
+## Key Design Decisions
+
+
+
+**Static class stubs require `BindingFlags.Static`** — The PRECEPT0019 analyzer uses Roslyn's symbol model (not reflection) and finds static methods fine. The xUnit reflection test in `ExpressionFormCoverageTests` however used `BindingFlags.Instance` only, which would silently miss static-class annotations. Fixed.
+
+
+
+**Three-type annotation contract** — `ParseSession`, `TypeChecker`, and `GraphAnalyzer` each carry `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`. The reflection test now asserts `HaveCount(3)`. When Phase 3 adds more pipeline stages they must update this count.
+
+
+
+**Layer split preserved** — `test/Precept.Tests/ExpressionFormCoverageTests.cs` = Layer 3 (reflection bridge + parse round-trips). `test/Precept.Tests/Language/ExpressionFormCoverageTests.cs` = Layer 2 (catalog shape, per-kind metadata). `test/Precept.Tests/ExpressionFormCatalogTests.cs` = Layer 1 (enum + GetMeta). All three coexist in different namespaces.
+
+
+
+---
+
+
+
+## Exit State
+
+
+
+- Build: 0 errors, 0 warnings (pre-existing RS1030 in `Precept.Analyzers.csproj` is unrelated)
+
+
+
+- Tests: 2300 passing, 0 failing (+26 vs Phase 2b baseline of 2274)
+
+
+
+- PRECEPT0019 severity: `DiagnosticSeverity.Error`
+
+
+
+- `<WarningsNotAsErrors>`: removed
+
+
+
+---
+
+
+
+---
+
+# Decision Note: Phase 2d Complete — Parser.cs Structural Split
+
+
+
+**Date:** 2026-05-01
+
+
+
+**Author:** George (Runtime Developer)
+
+
+
+**Branch:** spike/Precept-V2
+
+
+
+**Slice:** 27 (Work Item S1)
+
+
+
+---
+
+
+
+## What was done
+
+
+
+Sliced `src/Precept/Pipeline/Parser.cs` (~1757 lines) into three `partial` files:
+
+
+
+| File | Lines | Contents |
+
+
+
+|------|-------|----------|
+
+
+
+| `Parser.cs` | ~504 | Core shell: outer `Parser` static class statics (vocabulary FrozenSets/FrozenDictionaries), `Parse()` entry point, `BuildNode()`, and `ParseSession` primary declaration with constructor, token navigation, dispatch loop, and `IsOutcomeAhead`/`SyncToNextDeclaration` |
+
+
+
+| `Parser.Declarations.cs` | ~1012 | All declaration-level and scope-level parsers: in/to/from/on-scoped constructs, action helpers, non-disambiguated parsers, slot system, type reference parsing, choice helpers, field modifier parsing, `GetLastSlotSpan` |
+
+
+
+| `Parser.Expressions.cs` | ~330 | Pratt loop (`ParseExpression`), atom dispatcher (`ParseAtom`), interpolated string/typed-constant parsers, list literal parser, and `ExpectIdentifierOrKeywordAsMemberName` |
+
+
+
+## Key structural rules applied
+
+
+
+- `public static partial class Parser` and `internal ref partial struct ParseSession` declared in all three files.
+
+
+
+- `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` present exactly once — on the primary `ParseSession` declaration in `Parser.cs`.
+
+
+
+- `[HandlesForm(...)]` attributes moved with their methods (`ParseExpression` and `ParseAtom` to `Parser.Expressions.cs`).
+
+
+
+- `KeywordsValidAsMemberName` is a static field on the outer `Parser` class (confirmed correct — `ref struct` cannot have static fields).
+
+
+
+- `ExpectIdentifierOrKeywordAsMemberName()` moved to `Parser.Expressions.cs` (alongside its only caller, the `Dot` handler in `ParseExpression`).
+
+
+
+- `BuildNode` stays in `Parser.cs` as a `static` method on the outer `Parser` class.
+
+
+
+## Verification
+
+
+
+- Build: `dotnet build src/Precept/ -v q` — 0 errors, 0 warnings.
+
+
+
+- Tests: `dotnet test test/Precept.Tests/ --no-build` — 2300 passing, 0 failing.
+
+
+
+- `git diff --stat` shows exactly 3 parser files: `Parser.cs` modified, `Parser.Declarations.cs` added, `Parser.Expressions.cs` added.
+
+
+
+## Phase 2d status
+
+
+
+Phase 2d (Slice 27) is the only slice in this phase. Phase 2d is now complete.
+
+
+
+---
+
+
+
+---
+
+# George: G2 + G3 Fix — RS1030 and Phase 3 CatalogEnumNames TODO
+
+
+
+**Date:** 2026-05-01
+
+
+
+**Branch:** spike/Precept-V2
+
+
+
+**Commit:** 27f5eff
+
+
+
+**Requested by:** Shane (Frank's architecture review items G2 and G3)
+
+
+
+---
+
+
+
+## G3 — RS1030: `Compilation.GetSemanticModel()` in PRECEPT0013
+
+### Problem
+
+
+
+`PRECEPT0013ActionsCrossRef.CheckEmptyAllowedIn` was acquiring a semantic model via
+
+
+
+`compilation.GetSemanticModel(syntaxNode.SyntaxTree)`. Roslyn best practice RS1030
+
+
+
+says analyzers must use the context-provided semantic model, not acquire one manually
+
+
+
+from the compilation object. The violation was in the field-resolution path: when
+
+
+
+`AllowedIn` referenced a shared static field, the code followed the field's declaring
+
+
+
+syntax and called `compilation.GetSemanticModel()` to get operations for the
+
+
+
+initializer.
+
+
+
+The `compilation` object was flowing in from a `RegisterCompilationStartAction` closure
+
+
+
+purely to support this one call.
+
+### Fix
+
+
+
+1. Replaced `RegisterCompilationStartAction` wrapper with direct `RegisterOperationAction`
+
+
+
+   on `context` — the only reason for the wrapper was to capture `compilation`.
+
+
+
+2. Removed `Compilation compilation` parameter from `Analyze` and `CheckEmptyAllowedIn`.
+
+
+
+3. In `CheckEmptyAllowedIn`, added a guard:
+
+
+
+   ```csharp
+
+
+
+   if (syntaxNode.SyntaxTree != ctx.SemanticModel.SyntaxTree)
+
+
+
+       return; // Different tree — assume non-empty to avoid false positives.
+
+
+
+   var model = ctx.SemanticModel;
+
+
+
+   ```
+
+### Tradeoff accepted
+
+
+
+If a shared `AllowedIn` field is declared in a different file than the `GetMeta` switch,
+
+
+
+the check skips it (assumes non-empty, no diagnostic). In practice, all `ActionKind`
+
+
+
+catalog code lives in a single file (`Actions.cs`), so the guard never fires. The
+
+
+
+alternative — accepting RS1030 for a theoretical multi-file edge case — was rejected.
+
+
+
+---
+
+
+
+## G2 — Phase 3 TODO: `ConstraintKind` / `ProofRequirementKind` in `CatalogEnumNames`
+
+### Problem
+
+
+
+`ConstraintKind` and `ProofRequirementKind` are both catalog enums but are absent from
+
+
+
+`CatalogEnumNames` in `CatalogAnalysisHelpers.cs`. Adding them now would cause
+
+
+
+PRECEPT0007 to fire on the existing discard arms (`_ =>`) in their `GetMeta` switches,
+
+
+
+breaking the build. The prerequisite is that those discard arms be removed first (Phase 3
+
+
+
+work).
+
+### Fix
+
+
+
+Added a TODO comment at the `CatalogEnumNames` definition capturing the Phase 3
+
+
+
+prerequisite and citing the review item:
+
+
+
+```csharp
+
+
+
+// Phase 3: Add ConstraintKind and ProofRequirementKind once their GetMeta switches
+
+
+
+// drop the discard arm (_ =>). Currently excluded to avoid PRECEPT0007 violations
+
+
+
+// on the existing fallback arms. See frank-full-review-spike-v2.md G2.
+
+
+
+```
+
+### Decision
+
+
+
+No runtime or logic change — comment only. When Phase 3 removes the discard arms, the
+
+
+
+enums should be added to `CatalogEnumNames` in the same commit so PRECEPT0007 coverage
+
+
+
+enforcement takes effect immediately.
+
+
+
+---
+
+### 2026-05-02T18:15:09-04:00: User directive
+
+
+
+**By:** Shane (via Copilot)
+
+
+
+**What:** Implement the type checker on the current spike branch. No GitHub issue — skip the formal issue/PR workflow. This is a spike implementation.
+
+
+
+**Why:** User request — captured for team memory

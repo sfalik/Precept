@@ -15,6 +15,11 @@
 
 ## Recent Updates
 
+### 2026-05-08T03:29:02Z — Wave 2 design batch recorded
+- Frank-17 and Frank-18 closed the graph-analyzer and proof-engine design-doc corrections; all six D1–D6 decision gates are now durably closed in `.squad/decisions.md`.
+- Frank-19 remains in flight on `TerminalCompletenessFact` and `EventCoverage`, so future analyzer/proof work should treat those contracts as the active continuation thread.
+
+
 ### 2026-05-08T03:08:18Z — Comprehensive language/compiler review closed
 - Completed the comprehensive language/compiler doc review: `catalog-system.md` and `precept-grammar.md` were synchronized directly, while philosophy/runtime-claim drift plus graph-analyzer/proof-engine design gaps were recorded for owner review in the decision ledger.
 - The durable follow-up is now in `.squad/decisions.md`, the orchestration log, and the session log rather than the doc inbox.

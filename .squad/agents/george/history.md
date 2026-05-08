@@ -15,6 +15,11 @@
 
 ## Recent Updates
 
+### 2026-05-08T03:29:02Z — Wave 2 closeout recorded
+- George's Wave 2 slices are durably closed: compiler-stage doc corrections, runtime stub alignment, the `TypeChecker` partial split, MCP compile DTO shapes, and the `FieldSnapshot.ClrType` + outcome-hierarchy updates.
+- All six Wave 2 design gates D1–D6 were closed through the merged decision inbox, giving downstream graph/proof/tooling work a settled runtime and compiler baseline.
+
+
 
 
 ### 2026-05-08T03:08:18Z — R3 blockers B1/B2/B3 closed

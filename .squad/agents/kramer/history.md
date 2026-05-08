@@ -1,138 +1,26 @@
 ## Core Context
 
-- Owns tooling surfaces: language server, VS Code extension, grammar sync, plugin wiring, and executable developer workflows.
-- Keeps grammar, completions, semantic tokens, and tooling docs synchronized with the real DSL surface.
-- Historical summary (pre-2026-04-13): handled grammar/completion passes for `when` guards, new scalar/choice types, stateless edit syntax, conditional expressions, and broader preview/tooling audits.
-- Owns tooling surfaces: language server, VS Code extension, MCP server, plugin wiring, and developer workflow accuracy.
-- Tooling docs must stay synchronized with actual commands, artifacts, sample counts, and installation paths.
-- README/tooling polish should improve usability without introducing claims the extension or servers cannot support.
+- Owns tooling surfaces: language server, VS Code extension, grammar sync, plugin wiring, MCP ergonomics, and executable developer workflows.
+- Keeps grammar, completions, semantic tokens, tests, and tooling docs synchronized with the actual DSL and server surface.
+- The durable tooling rule: prefer precise, runnable guidance and avoid claims the extension, language server, or generators cannot currently support.
+
+## Learnings
+
+- Tooling trust depends on accurate status language: metadata readiness is not the same thing as implemented handlers.
+- Grammar/completion changes are safest when specific patterns land before generic catch-alls and are backed by regression tests.
+- Proof diagnostics become brittle when they depend on prose instead of structured metadata; keep publication paths but prefer durable data contracts.
+- For custom DSL documentation, truthful code-fence labels and accurate path/build guidance matter more than cosmetic approximations.
 
 ## Recent Updates
 
-
+### 2026-05-08T03:29:02Z — Wave 2 tooling closeout recorded
+- `kramer-invest` confirmed the Precept Language Server test corpus still exists on `main`; the v2 branch is intentionally stubbed rather than accidentally regressed.
+- All six Wave 2 design gates D1–D6 are now closed in `.squad/decisions.md`, and Kramer's active continuation work remains the grammar-generator scaffold plus LS test-port follow-through.
 
 ### 2026-05-08T03:08:18Z — Comprehensive tooling doc review recorded
 - Kramer corrected `docs/tooling/extension.md`, `docs/tooling/language-server.md`, and `docs/compiler/tooling-surface.md` to match the branch's actual tooling state.
 - Durable follow-ups now logged in `.squad/decisions.md`: clarify design-spec vs. implementation-status docs, recover the missing LS test corpus, and decide the grammar-generator ownership path.
 
-### 2026-04-05 - Comprehensive tooling knowledge refresh
-- Consolidated the current toolchain, build/test commands, and major extension/MCP/plugin responsibilities.
-- Key learning: the fastest tooling documentation win is precise, executable instructions with no stale paths.
-
-### 2026-04-05 - README badge cleanup and sample count fix
-- Tightened badge/presentation details while correcting surfaced counts and tooling-adjacent metadata.
-- Key learning: small public inconsistencies erode confidence in larger tooling claims.
-
-### 2026-04-05 - Inspector/Preview panel audit for PRD
-- Audited `inspector-preview.html` (3,464 lines), `extension.ts`, mockup, archived spec, and brand review.
-- Key finding: implementation is far ahead of what `inspector-panel-review.md` describes. The review predates edit mode, rule violation banners, state-rules indicator, field icons, and null toggle.
-- Color system mismatch (review's Priority 1) is still 100% unaddressed — all 7 color tokens remain on the custom palette, not the brand system.
-- The mockup's round pill event buttons became skewed parallelograms in the live implementation — deliberate design evolution.
-- Header current-state label was present in mockup, removed in implementation (state shown only in SVG diagram).
-- Key file paths: `tools/Precept.VsCode/webview/inspector-preview.html` (source of truth), `tools/Precept.VsCode/src/extension.ts` (host/protocol).
-- Decision inbox: `.squad/decisions/inbox/kramer-preview-audit.md`
-
-### 2026-04-08 - Slice 5 — Grammar, completions, semantic tokens (issue-22 data-only precepts)
-
-- Grammar (`precept.tmLanguage.json`): added `all` to `controlKeywords` alternation (sibling of `any`).
-- Grammar: added `rootEditDeclaration` repository pattern — matches `edit all` and `edit Field1, Field2` at line start; highlights `edit` as `keyword.other`, `all` as `keyword.control`, fields as `variable.other.field`; inserted before `controlKeywords` catch-all for correct priority.
-- Completions (`PreceptAnalyzer.cs`): new root-level `edit` branch suggests `all` + field names (stateless precept context).
-- Completions: updated `in State edit` branch to also suggest `all` (supports `in any edit all`).
-- Semantic tokens: no changes — `PreceptToken.All` auto-picked up via `[TokenCategory(Grammar)]` from Slice 1.
-- Both builds green: LS 0 errors, npm compile clean.
-- Key learning: always check `node_modules` before running `npm run compile` — directory may not exist on a fresh checkout.
-
-### 2026-04-05 - Retired legacy proposal labels in sync workflow
-
-- Added `needs-decision` and `decided` to `RETIRED_LABELS` in both the active workflow (`.github/workflows/sync-squad-labels.yml`) and the template copy (`.squad/templates/workflows/sync-squad-labels.yml`).
-- Key learning: when a label retirement pass exists, always check it covers *all* superseded label families — the `go:*` cleanup was done, the proposal-state labels were missed. Template sync must always mirror the active workflow or they diverge silently.
-
-- Investigated improving syntax highlighting for DSL code fences in README.
-- Research confirmed GitHub Linguist does not support `precept` language identifier.
-- Current approach (```precept fence) is already optimal: truthful, future-proof, follows DSL industry practice.
-- Key learning: for custom DSLs, using the language name in code fences is standard practice even without Linguist support. Provides documentation value and future-proofs for potential Linguist addition. Alternative approaches (mislabeling as similar language, using no tag) provide no real improvement and introduce misleading claims.
-- Decision documented in .squad/decisions/inbox/kramer-readme-syntax-highlighting.md
-
-### 2026-05-18 - GitHub README width contract clarified
-- Split README sizing research into two separate ceilings: the broader repo/article layout (`~1280px` shell, `~1012px` article) and the actual repo-view README image display cap (`~830px`) that governs the DSL hero asset.
-- Recorded the reusable audit workflow at `.squad/skills/github-readme-width-audit/SKILL.md` and preserved the merged sizing outcome in `.squad/decisions.md`.
-- Key learning: for README hero images, composition guidance and final image-display limits are different measurements; size the shipped asset to the image cap, not the wider article container.
-
-### 2026-04-10 — Issue #31 shipped
-- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
-
-### 2026-04-10 - Slice 5: Grammar + Language Server (issue #31 — and/or/not keywords)
-
-- Grammar (`precept.tmLanguage.json`): added `and`, `or`, `not` to `actionKeywords` alternation (same group as `contains`) — these are operator-category tokens used in expression positions, so they fit naturally alongside `contains`.
-- Grammar: removed the `keyword.operator.logical.precept` block (`&&|\\|\\||!`) from `operators` entirely; `!=` lives in the comparison block and was untouched.
-- Completions (`PreceptAnalyzer.cs`): replaced `&&`, `||`, `!` `Operator` items with `and`, `or`, `not` `Keyword` items in `ExpressionOperatorItems` — the static list consumed by `BuildGuardCompletions`, `BuildExpressionCompletions`, and `BuildDataExpressionCompletions`.
-- Global `KeywordItems` required no change — `BuildKeywordItems()` auto-discovers `And`/`Or`/`Not` from `PreceptToken` enum via `[TokenCategory(Operator)]` + alphabetic symbol filter.
-- Semantic tokens: verified `BuildSemanticTypeMap()` iterates all enum values; `TokenCategory.Operator → "preceptKeywordGrammar"` covers `And`/`Or`/`Not` automatically. Zero handler changes.
-- Build: 0 errors. Tests: 87/87 pass.
-- Commit: `8f3bdab` — "feat(#31): grammar and language server — and/or/not keywords (slice 5)"
-
-### 2026-05-07 — Comprehensive tooling doc review
-
-- Audited `docs/tooling/extension.md`, `docs/tooling/language-server.md`, and `docs/compiler/tooling-surface.md` against actual implementation (`extension.ts`, `Program.cs`, test directories).
-- Key finding: `extension.md` was the most stale — stated "no custom commands or webview implemented" when all three commands, LS client lifecycle, status bar, and preview scaffold are fully implemented.
-- Key finding: `tooling-surface.md` conflated catalog metadata readiness (TokenMeta fields populated) with LS handler implementation. "Semantic tokens Pass 1 implemented" was wrong — no LS handlers exist.
-- Key finding: `language-server.md` §2 used present tense to describe features the bootstrap-only LS doesn't provide. Status table was accurate; the body contradicted it.
-- Resolved two stale Open Questions in tooling-surface.md (SlotContext/ConstructSlotKind naming, SemanticIndex reference arrays) using resolutions already recorded in language-server.md.
-- Flagged three design issues: dual-purpose doc pattern (status vs. design spec), empty LS test directory, and the unbuilt grammar generator drifting from its "One Atom Test" promise.
-- Commit: `2ed7628`
-
-## Learnings
-
-- Tooling docs drift fastest at status tables — the body can be aspirational design spec (acceptable) but the status row must reflect current branch state.
-- "Implemented" means handler code exists and runs, not "the metadata fields that would power this handler are ready." Catalog metadata readiness ≠ feature implementation.
-- When a doc has both a status table and a present-tense body, a developer reading only the body gets a false picture. Add callout boxes or section markers to distinguish design spec from live behavior.
-- The extension is further ahead than its doc claimed. Always diff `extension.ts` against `extension.md` before writing off the extension as "not yet done."
-
-- Tooling trust depends on precise, runnable instructions and zero stale paths.
-- Grammar/completion work is most reliable when specific patterns are ordered before generic catch-alls.
-- Public tooling docs should improve usability without claiming behavior the extension or servers do not yet support.
-- C93 code actions: extracting structured info (divisor name, field vs event-arg) from diagnostic messages via regex is reliable when the message format is stable. The `Divisor '{name}'` pattern carries enough to distinguish field refs from dotted event-arg refs and drive all three fix variants.
-- For `when` guard insertion, splitting the transition row at the first `->` and checking for ` when ` in the prefix is the simplest reliable approach — no need to re-parse the row.
-- Tooling trust collapses faster from false-positive-heavy proof diagnostics than from selective under-approximation; if Principle #8 tightens, proof-gap diagnostics need distinct wording and actionable fixes instead of generic red squiggles.
-- Proof diagnostics already have a working Problems-panel publication path through `PreceptAnalyzer` and `PreceptTextDocumentSyncHandler`; the real tooling risk is missing structured proof metadata, because hover and quick fixes both become brittle as soon as diagnostic prose shifts to truth-based/natural-language rendering.
-
-## Recent Updates
-
-### 2026-04-17 — C93 divisor safety code actions (Slice 7 of #106)
-- Added three quick-fix code actions for C93 unproven-divisor warnings:
-  1. "Add `positive` constraint" — inserts `positive` after the type keyword in field or event-arg declarations.
-  2. "Add `ensure > 0`" — inserts an event ensure line (event-arg divisors only).
-  3. "Add `when != 0` guard" — prepends or appends to the transition row's guard clause.
-- 4 new tests covering field-positive, arg-positive, arg-ensure, and guard-append scenarios.
-- All 173 LS tests + 1290 core tests pass.
-
-### 2026-04-12 — Conditional expression tooling sync
-- Added `if/then/else` grammar keywords and expression-context completions while preserving statement-level keyword discipline.
-
-### 2026-04-11 — `when` guard completions + grammar verification
-- Confirmed grammar support and added context-aware completions for declaration guards and guarded edit forms.
-
-### 2026-04-19 — Diagnostic range mapping depends on upstream span fidelity
-- When editor ranges look wrong, first inspect the upstream diagnostic payload; a language-server mapping bug and a coarse source span can present the same symptom.
-- Honor `EndColumn` when it is present and reserve full-line fallback for diagnostics that are genuinely line-scoped, otherwise tooling precision regresses silently.
-- Focused LS span tests should pin both the precise-range path and the line-level fallback path so later runtime precision work does not get flattened in the editor.
-
-### 2026-04-25 — M7 + M8: TextMateScope and SemanticTokenType on TokenMeta
-
-- Added `TextMateScope: string?` and `SemanticTokenType: string?` fields to `TokenMeta` in `src/Precept/Language/Token.cs`.
-- Populated all ~90 token entries in `src/Precept/Language/Tokens.cs` with their scope and semantic type values using named arguments.
-- Scope strategy: Declaration/Preposition/Control → `keyword.*.precept`; StateModifiers → `storage.modifier.state.precept`; Types (all ~21 type tokens + Set dual) → `storage.type.precept`; Constraints/min/max → `keyword.other.constraint.precept`; Operators → `keyword.operator.precept`; Arrow → `keyword.operator.arrow.precept`; Punctuation → `punctuation.precept`; Booleans → `constant.language.boolean.precept`; NumberLiteral → `constant.numeric.precept`; Strings → `string.quoted.double.precept`; TypedConstants → `string.quoted.single.precept`; Identifiers → `entity.name.precept`; Comments → `comment.line.precept`; NewLine/EndOfSource → null.
-- LSP semantic type strategy: types → `"type"`, state modifiers → `"modifier"`, constraints → `"decorator"`, operators/logical/punct → `"operator"`, everything keyword-shaped → `"keyword"`, literals → `"number"`/`"string"`, identifiers → `"variable"`, comments → `"comment"`, structural null-tokens → null.
-- Build: 0 errors, 0 warnings.
-
-### 2026-04-25 — Catalog metadata tooling impact review
-- Audited `PreceptAnalyzer.cs` (completions), `precept.tmLanguage.json` (grammar), `PreceptSemanticTokensHandler.cs` (semantic tokens), and `PreceptDocumentIntellisense.cs` (hover) against the 10-catalog system design in `docs.next/catalog-system.md`.
-- Found 14 hardcoded completion lists, 12 hand-maintained grammar alternations, and 1 hardcoded function hover dictionary — all replaceable by catalog metadata as catalogs land.
-- Semantic tokens already ~90% catalog-driven via `BuildSemanticTypeMap()`. Hover ~80% catalog-driven (function hover is the gap).
-- Recommended drift tests over grammar auto-generation; incremental per-catalog migration over big-bang rewrite; keeping regex-based context detection until Construct Slot Model matures.
-- Decision inbox: `.squad/decisions/inbox/kramer-catalog-metadata-tooling-review.md`
-
-### 2026-05-02T21:58:21Z — Canonical type checker batch closed
-- Kramer's tooling review is now durably linked to the canonical checker plan: no tooling-level blockers, 2 medium LS-derivable gaps, and 7 recommendations remain the consumer-facing follow-through list.
-- Frank accepted the placeholder-only TypedEditDeclaration direction and rejected mirroring ResolvedArgs on TypedTransitionRow as anti-mirroring, preserving the rule that tooling should derive from the canonical typed model rather than cached duplicate payloads.
-- The checker design is now implementation-ready; future LS/hover/completion work should project from the typed model and catalog metadata once the real checker slices land.
+### Historical summary through 2026-05-07
+- Prior active work covered grammar/completion sync for guards, conditional expressions, `and`/`or`/`not`, stateless edit forms, semantic-token metadata propagation, README/tooling accuracy passes, and the C93 divisor-safety tooling fixes.
+- The standing tooling baseline is unchanged: docs must reflect reality, tests are the safest spec anchor for language-server behavior, and future tooling derivation should come from catalog metadata rather than hand-maintained lists.
