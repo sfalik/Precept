@@ -7,6 +7,14 @@
 
 ## Learnings
 
+### 2026-05-08T01:00:51Z — ProofEngine PE-G1/G2/G3 design decisions resolved
+- All three blocking gaps resolved without new proof strategies. The three "unhandled" requirement kinds (Dimension, Modifier, QualifierCompatibility) are all field-declaration-attribute checks that belong in an expanded Strategy 2.
+- Key architectural insight: Strategy 2's scope should be "Declaration Attribute Proof" not just "Modifier Proof" — modifiers, qualifier bindings, and dimension qualifiers are all compile-time-known field declaration attributes that the proof engine reads identically.
+- `ProofDischarge` catalog type designed: 6 fixed-value entries + 4 parameterized entries (null threshold = read from modifier parameter). The `DischargeCovers` subsumption logic is proof-engine-internal, not per-modifier.
+- `ConstraintIdentity` spec divergence found and resolved: spec had `RuleName` and separate `AnchorState`/`AnchorEvent` fields that don't exist in the source. Source shapes win — rules are anonymous, anchor discrimination is via `ConstraintKind`.
+- ProofLedger output type confirmed sound: 6 new record types needed, all with concrete downstream consumers. No overengineering.
+- 7 SIGNIFICANT gaps triaged: 3 ACCEPT-AS-IS, 3 SPEC-UPDATE-NEEDED, 1 DESIGN-DECISION-DEFERRED (initial-state satisfiability, blocked on TypeChecker expression evaluation).
+
 ### 2026-05-08T04:30:00Z — Exhaustive GraphAnalyzer post-implementation audit completed
 - Three-dimensional review (requirements, catalog compliance, code quality) across 70 findings total: 39+7+14 pass, 4+3+2 advisory, 1 non-blocking gap.
 - Verdict: APPROVED. No blocking defects. All 7 Graph-stage diagnostics (80, 81, 108, 109, 110, 111 + defensive 32) are registered, correctly staged/severed, and emitted. Catalog-driven modifier dispatch in `GetStateFlags()` is exemplary. `IsInitial` direct enum check is acceptable (topological entry point, not structural constraint). `TransitionRowOutcome` switch is DU dispatch, not catalog violation.
@@ -29,6 +37,9 @@
 - When a working proposal becomes canonical, every downstream contract should be updated in one pass and stale references retired immediately.
 
 ## Recent Updates
+
+### 2026-05-08T01:00:51Z — ProofEngine PE-G1/G2/G3 design decisions delivered
+- Resolved all three BLOCKING gaps from the gap analysis. Strategy 2 expanded to "Declaration Attribute Proof" covering modifiers, qualifier bindings, and dimension qualifiers. `ProofDischarge` catalog type designed with 10 modifier entries. `ProofLedger` output type confirmed sound with `ConstraintIdentity` spec corrections. 8 spec updates and 4 catalog changes ordered for implementation readiness. Decision document at `.squad/decisions/inbox/frank-proof-engine-design-decisions.md`.
 
 ### 2026-05-08T00:56:00Z — Grammar spec and ProofEngine readiness captured
 - The authoritative TextMate grammar spec review is now durably recorded with 35 missing constructs, 10 stale patterns, 16 scope misassignments, 28 repository patterns, a 49-scope vocabulary, and 24 generator-completion requirements.
