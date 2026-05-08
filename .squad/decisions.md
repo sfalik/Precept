@@ -2609,3 +2609,29 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Passing:** 22/22
 **Any red tests:** None from this file. 13 pre-existing reds in TypeCheckerCITests (unrelated).
 **R3-readiness for Slice 9:** YES
+
+---
+
+### 2026-05-07: GraphAnalyzer OQ1 — DeadEndStateFact is a separate fact from TerminalCompletenessFact
+**By:** Frank (frank-graphanalyzer-oqs)
+**What:** Dead-end states get a new, separate `DeadEndStateFact` rather than being an expansion of `TerminalCompletenessFact`. New `DiagnosticCode.DeadEndState = 108` (Warning) added. Detection uses reverse-reachability BFS from terminal states in Phase 2.
+**Why:** Clean separation of concerns — TerminalCompletenessFact assesses reachability of terminal states; DeadEndStateFact identifies states with no outbound transitions to terminals. Mixing them would conflate two distinct structural properties.
+
+### 2026-05-07: GraphAnalyzer OQ2 — EventHandlers structurally excluded from EventCoverage
+**By:** Frank (frank-graphanalyzer-oqs)
+**What:** TypedEventHandler entries do NOT count toward event coverage and cannot coexist with the graph analyzer in any valid precept. EventHandlers are only valid in stateless precepts (PRECEPT0092 `EventHandlerInStatefulPrecept` blocks them in stateful precepts). The graph analyzer only runs on stateful precepts. The coexistence scenario is structurally impossible. Corrected graph-analyzer.md §4 which incorrectly claimed event handlers were consumed for coverage.
+**Why:** This was a doc error, not a policy question. The language semantics make it impossible.
+
+---
+
+### 2025-07-11: Grammar generator + language-server test port recorded from Kramer inbox
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `kramer-gramgen-lstests-done.md`.
+
+- Kramer recorded the completed `tools/Precept.GrammarGen/` console tool that emits `precept.tmLanguage.json` from catalog token metadata plus hand-authored structural composition rules, with `--output <path>` support for pipeline use.
+- The inbox also recorded the v1-to-v2 port of 13 `test/Precept.LanguageServer.Tests/` files (~190 tests), the `src/Precept/` project reference from `tools/Precept.LanguageServer/`, and the language-server stub/preview-protocol scaffolding required to compile the suite.
+- Durable state at handoff: the ~190 language-server tests compile but intentionally stay red behind `NotImplementedException`, grammar-generation structural patterns remain hand-authored pending richer catalog/construct metadata, and the LS dependency-direction question remains explicitly noted for follow-up.

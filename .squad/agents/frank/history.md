@@ -32,3 +32,8 @@
 - The R0/R1/R2/R3 review line established the canonical TypeChecker baseline: the `TransitionRowOutcome` naming blocker was closed, slices 1–7 were approved, R3 surfaced B1/B2/B3 as the final consumer blockers, and the resolution path stayed catalog-driven.
 - Earlier branch work locked the parser/checker boundary, the slot-value policy for parsed expressions vs. closed vocabularies, the NameBinder contract, and the rule that doc sync must ship in the same batch as language or runtime changes.
 - Durable catalog learnings preserved from the fuller history: `ActionMeta.SyntaxShape`, `FunctionMeta.HasCIVariant`, and `FunctionMeta.CIVariantOf` now live in the canonical docs and should be treated as the downstream contract for parser/tooling consumers.
+
+### 2026-05-08T03:35:00Z — GraphAnalyzer OQ1/OQ2 resolved
+- Landed the GraphAnalyzer OQ1/OQ2 implementation: dead-end states now produce a separate `DeadEndStateFact` with `DiagnosticCode.DeadEndState = 108` detected via reverse-reachability BFS from terminal states in Phase 2.
+- Locked the event-handler coverage question as a structural impossibility: `EventHandlerInStatefulPrecept` blocks handlers in stateful precepts, the graph analyzer only runs on stateful precepts, and `docs/compiler/graph-analyzer.md` §4 plus `docs/compiler/proof-engine.md` were corrected accordingly.
+- Manifest validation closed green at 3345 tests.

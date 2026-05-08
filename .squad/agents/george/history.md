@@ -58,3 +58,8 @@
 - George's housekeeping closeout committed OutcomesCatalog, parsed action/type-reference DU nodes, NameBinder wiring, diagnostic `RelatedSpans`, and related doc/squad sync across the nine-commit batch ending at `2337fd0`.
 - Use `.squad/decisions.md` for full per-batch provenance and branch-level decision chronology.
 - R3 self-review (2026-05-07): expression resolution core is correct across all 15 ParsedExpression forms. Widening, qualifier disambiguation, ErrorType propagation, QuantifierBindings symmetry, and D26 invariant all verified. Key gaps: field default/computed expression resolution never fires (always null), and 5 of 8 construct kinds (StateEnsure, EventEnsure, AccessMode, OmitDeclaration, StateAction) lack normalization — their CheckContext accumulators are always empty. These are the next implementation frontier. No stubs or TODOs remain in TypeChecker.cs.
+
+### 2026-05-08T03:35:00Z — GraphAnalyzer OQ1/OQ2 decisions recorded
+- Frank-19 resolved the active GraphAnalyzer open questions: model dead-end states as a separate `DeadEndStateFact` (not an expansion of `TerminalCompletenessFact`) and emit `DiagnosticCode.DeadEndState = 108` using reverse-reachability BFS from terminal states in Phase 2.
+- Event handlers are outside GraphAnalyzer event coverage by construction: PRECEPT0092 (`EventHandlerInStatefulPrecept`) forbids handlers in stateful precepts, and the graph analyzer only runs on stateful precepts.
+- Frank also corrected `docs/compiler/graph-analyzer.md` §4 and `docs/compiler/proof-engine.md`; treat these as the durable analyzer/proof-engine contract for downstream GraphAnalyzer work.
