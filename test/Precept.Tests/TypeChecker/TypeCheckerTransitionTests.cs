@@ -511,4 +511,36 @@ public class TypeCheckerTransitionTests
         row.Actions.Should().HaveCount(2);
         row.Outcome.Should().Be(TransitionRowOutcome.NoTransition);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 6: Wildcard FromState (D10)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TransitionRow_WildcardFromState_NullFromState()
+    {
+        // D10: "from any" wildcard produces FromState == null.
+        // The TypeChecker also emits UndeclaredState for "any" (wildcard surface
+        // not yet recognized as special), so use Check() not CheckExpectingClean().
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Draft initial
+            state Published
+            event Publish
+            from any on Publish -> set Count = Count + 1 -> no transition
+            from Draft on Publish -> set Count = Count + 1 -> transition Published
+            """;
+
+        var (index, _) = TypeCheckerTestHelpers.Check(precept);
+
+        // Wildcard row: FromState is null per D10
+        index.TransitionRows.Should().Contain(row => row.FromState == null,
+            because: "the 'from any' wildcard must produce a null FromState (D10)");
+
+        // Named row: FromState is the declared state name
+        index.TransitionRows.Should().Contain(
+            row => row.FromState != null && row.FromState == "Draft",
+            because: "a named from-state must resolve to the state name");
+    }
 }

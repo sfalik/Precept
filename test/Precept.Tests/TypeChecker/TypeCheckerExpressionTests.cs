@@ -1015,4 +1015,48 @@ public class TypeCheckerExpressionTests
         var conditional = (TypedConditional)row.Guard!;
         conditional.ResultType.Should().Be(TypeKind.Boolean);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  12. QualifierBinding — ResultQualifier assertion (D11)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void BinaryOp_MoneyOperation_ResultQualifierPopulated()
+    {
+        // D11: money ÷ money triggers multi-candidate qualifier disambiguation.
+        // The TypeChecker selects the QualifierMatch.Same entry and maps it
+        // to SameQualifierRequired on TypedBinaryOp.ResultQualifier.
+        var ctx = BuildContext("""
+            precept Invoice
+            field Cost as money
+            field Revenue as money
+            state Open initial
+            """);
+
+        var left  = new IdentifierExpression("Cost", TestSpan);
+        var right = new IdentifierExpression("Revenue", TestSpan);
+        var expr  = new BinaryOperationExpression(left, TokenKind.Slash, right, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedBinaryOp>();
+        var binOp = (TypedBinaryOp)result;
+        binOp.ResultQualifier.Should().NotBeNull(
+            because: "money ÷ money is a qualifier-disambiguated operation (D11)");
+        binOp.ResultQualifier.Should().BeOfType<SameQualifierRequired>(
+            because: "the TypeChecker defaults to QualifierMatch.Same for multi-candidate operations");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  13. Stub arm — ConditionalExpression (deferred, tested in section 8)
+    //
+    //  R3 audit: The original 9 stub arms have been reduced to 2 by
+    //  implementation of QuantifierExpression, ListLiteralExpression, and
+    //  PostfixOperationExpression resolvers. The remaining stubs are:
+    //    1. ConditionalExpression (tested above in section 8, full resolver
+    //       landing separately via ResolveConditional)
+    //    2. _ default arm in Resolve (unreachable — all ParsedExpression
+    //       subtypes have explicit match arms)
+    //  No additional stub arm tests are needed at this time.
+    // ════════════════════════════════════════════════════════════════════════
 }
