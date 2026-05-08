@@ -31,6 +31,8 @@
 - 2026-05-08T00:18:05.162-04:00 — GraphAnalyzer wildcard coverage can rely on the full pipeline even while `from any` still carries upstream diagnostics; the semantic output still preserves the null `FromState` the analyzer consumes.
 
 - 2026-05-08T00:18:05.162-04:00 — Reachability suites need explicit partition and exclusion assertions so unreachable states do not silently drift into dead-end classification.
+- 2026-05-08T00:26:28.084-04:00 — GraphAnalyzer event-coverage tests must isolate zero-handler diagnostics from partial-coverage proof facts: `UnhandledEvent` belongs only to events with no handlers anywhere.
+- 2026-05-08T00:26:28.084-04:00 — `reject` and `no transition` share self-edge resolution in `GraphAnalyzer`, but both outcomes need separate direct regression anchors because they are distinct semantic outcomes.
 
 
 

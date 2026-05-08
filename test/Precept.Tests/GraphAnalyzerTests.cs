@@ -80,16 +80,48 @@ public class GraphAnalyzerTests
             state Draft initial
             state Active
             event Stay
-            event OnlyDraft
-            event Unused
             from Draft on Stay when Count >= 0 -> transition Active
             from Active on Stay when Count >= 0 -> transition Draft
-            from Draft on OnlyDraft when Count >= 0 -> no transition
             """);
 
         var stayCoverage = graph.EventCoverage.Single(entry => entry.EventName == "Stay");
         stayCoverage.HandlingStates.Should().Equal("Draft", "Active");
         stayCoverage.NonHandlingReachableStates.Should().BeEmpty();
+        graph.ProofFacts.OfType<EventCoverageFact>().Should().BeEmpty();
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnhandledEvent));
+    }
+
+    [Fact]
+    public void Analyze_EventWithNoHandlers_EmitsUnhandledEventDiagnostic()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Active
+            event Move
+            event Unused
+            from Draft on Move -> transition Active
+            from Active on Move -> no transition
+            """);
+
+        var unusedCoverage = graph.EventCoverage.Single(entry => entry.EventName == "Unused");
+        unusedCoverage.HandlingStates.Should().BeEmpty();
+        graph.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnhandledEvent) && d.Message.Contains("Unused"));
+    }
+
+    [Fact]
+    public void Analyze_EventWithPartialCoverage_EmitsNoDiagnostic()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Active
+            event Move
+            event OnlyDraft
+            from Draft on Move -> transition Active
+            from Active on Move -> no transition
+            from Draft on OnlyDraft -> no transition
+            """);
 
         var onlyDraftCoverage = graph.EventCoverage.Single(entry => entry.EventName == "OnlyDraft");
         onlyDraftCoverage.HandlingStates.Should().Equal("Draft");
@@ -97,8 +129,7 @@ public class GraphAnalyzerTests
 
         var onlyDraftFact = graph.ProofFacts.OfType<EventCoverageFact>().Single(f => f.EventName == "OnlyDraft");
         onlyDraftFact.UnhandledReachableStates.Should().Equal("Active");
-        graph.ProofFacts.OfType<EventCoverageFact>().Should().NotContain(f => f.EventName == "Stay");
-        graph.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnhandledEvent) && d.Message.Contains("Unused"));
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnhandledEvent));
     }
 
     [Fact]
@@ -119,7 +150,41 @@ public class GraphAnalyzerTests
     }
 
     [Fact]
-    public void Analyze_RequiredState_DominatesTerminalsAndForwardsFacts()
+    public void Analyze_RejectOutcome_CreatesSelfEdge()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            event Submit
+            from Draft on Submit -> reject "Denied"
+            """);
+
+        graph.Edges.Should().ContainSingle(edge =>
+            edge.EventName == "Submit"
+            && edge.Outcome == TransitionRowOutcome.Reject
+            && edge.FromState == "Draft"
+            && edge.ToState == "Draft");
+    }
+
+    [Fact]
+    public void Analyze_NoTransitionOutcome_CreatesSelfEdge()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            event Stay
+            from Draft on Stay -> no transition
+            """);
+
+        graph.Edges.Should().ContainSingle(edge =>
+            edge.EventName == "Stay"
+            && edge.Outcome == TransitionRowOutcome.NoTransition
+            && edge.FromState == "Draft"
+            && edge.ToState == "Draft");
+    }
+
+    [Fact]
+    public void Analyze_RequiredState_ProducesDominanceFact()
     {
         var graph = Analyze("""
             precept Workflow
