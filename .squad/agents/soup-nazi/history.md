@@ -15,6 +15,10 @@
 
 ## Recent Updates
 
+### 2026-05-08T00:56:00Z — A-series regression batch recorded
+- Added four A-series GraphAnalyzer regression tests (`RS-109`, `RS-110`, `RS-111`, and `DEDUP-NoInitialState`) in commit `c0ca3ae`.
+- The batch raised the recorded branch baseline to 3389 total tests and is durably logged even though no decision-inbox note was present for merge.
+
 ### 2026-05-08T04:26:28Z — GraphAnalyzer R4 test surface closed across both Soup batches
 - Commit `7c674bd` added the required GraphAnalyzer R4 coverage for wildcard expansion/suppression, missing-initial recovery, stateless precepts, terminal/back-edge structural violations, positive terminal completeness, and single-state / cycle / diamond / multi-dead-end topologies.
 - The strengthened suite also pinned dead-end exclusion, reachability partitioning, warning severities, and the previously under-specified dominance/proof-forwarding boundary where applicable.

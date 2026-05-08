@@ -30,6 +30,10 @@
 
 ## Recent Updates
 
+### 2026-05-08T00:56:00Z — Grammar spec and ProofEngine readiness captured
+- The authoritative TextMate grammar spec review is now durably recorded with 35 missing constructs, 10 stale patterns, 16 scope misassignments, 28 repository patterns, a 49-scope vocabulary, and 24 generator-completion requirements.
+- The ProofEngine pre-implementation review concluded the stage is not ready: blocking gaps `PE-G1`, `PE-G2`, and `PE-G3` must close before implementation begins.
+
 ### 2026-05-08T04:55:35Z — ProofEngine gap analysis and grammar spec draft merged
 - Frank marked ProofEngine implementation NOT READY until the discharge-strategy, `FieldModifierMeta.ProofDischarges`, and `ProofLedger` contract gaps are closed.
 - Frank also drafted the authoritative TextMate grammar spec, locking catalog scopes and parity-or-better generator output as the replacement bar for `precept.tmLanguage.json`.
