@@ -14,7 +14,9 @@
 
 ## 2. Overview
 
-The language server implements the LSP protocol for Precept `.precept` files. It provides diagnostics, completions, hover, go-to-definition, semantic tokens, preview (inspect), document outline, and folding capabilities to editors. It consumes pipeline artifacts by responsibility — each feature reads from exactly the artifact that owns the information it needs.
+The language server is designed to implement the LSP protocol for Precept `.precept` files. When fully implemented it will provide diagnostics, completions, hover, go-to-definition, semantic tokens, preview (inspect), document outline, and folding capabilities to editors. It consumes pipeline artifacts by responsibility — each feature reads from exactly the artifact that owns the information it needs.
+
+> **Current state:** Bootstrap only — the server process boots and waits for exit (`Program.cs`). No LSP feature handlers are implemented yet. Sections 7.1–7.10 of this document are the design specification for each feature, not descriptions of current behavior.
 
 The LS is NOT a pipeline stage. It's a hosting layer that runs the pipeline on demand and projects results to the editor. The compiler and runtime do all semantic work; the LS routes requests, manages document state, and translates between LSP protocol types and Precept artifacts.
 

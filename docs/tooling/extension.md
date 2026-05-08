@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Stub |
-| Implementation state | Bootstrap only (extension loads, grammar activates, MCP server launches; no custom commands or webview implemented) |
+| Implementation state | Substantially implemented — LS client lifecycle (dev-build-shadow-copy and bundled modes), status bar item, three commands (`precept.openPreview`, `precept.togglePreviewLocking`, `precept.showLanguageServerMode`), dev file watcher with auto-restart, and preview panel scaffold (placeholder UI — full inspector content pending LS v2) |
 | Source | `tools/Precept.VsCode/` |
 | Upstream | Language server, MCP server, TextMate grammar (generated) |
 | Downstream | VS Code UI (editor, problems panel, commands) |
@@ -14,7 +14,7 @@
 
 ## Overview
 
-The VS Code extension hosts the language server, launches the MCP server, provides the TextMate grammar for syntax highlighting, and will surface Precept-specific commands and the preview webview. It is the thin host shell — all intelligence comes from the language server and compiler.
+The VS Code extension hosts the language server, launches the MCP server, provides the TextMate grammar for syntax highlighting, and surfaces Precept-specific commands and the preview webview panel. It is the thin host shell — all intelligence comes from the language server and compiler.
 
 ---
 
@@ -66,13 +66,26 @@ The MCP server is launched as a separate process via the workspace-local `.vscod
 
 ### Commands
 
-Planned commands:
-- `Precept: Compile` — force recompile and surface diagnostics
-- `Precept: Preview state machine` — open the preview webview for the active `.precept` file
+Three commands are registered:
+
+- `precept.openPreview` (`Precept: Open Preview`) — opens the preview webview panel beside the active `.precept` editor; re-reveals and retargets if already open
+- `precept.togglePreviewLocking` (`Precept: Toggle Preview Locking`) — locks the preview to the current file or resumes following the active editor; updates the panel title with `[Locked]` indicator
+- `precept.showLanguageServerMode` (`Precept: Show Language Server Mode`) — logs and shows the current launch mode (dev-build-shadow-copy or bundled) in the Precept output channel
+
+> **Note:** `Precept: Compile` is not implemented. Diagnostics are pushed automatically on every document change by the language server — no manual compile command is needed.
 
 ### Preview Webview
 
-Planned: a webview panel that renders the state diagram and shows inspection results for the current document. Layout: state machine diagram on the left, field/constraint details on the right. Inspection driven by the LS preview/inspect API.
+The preview panel is implemented as a scaffold: the `precept.openPreview` command opens a webview beside the active `.precept` editor. Currently it displays a placeholder UI ("Coming in v2 — the interactive state inspector is being rebuilt") while the LS v2 inspector is under development.
+
+**Implemented behaviors:**
+- Opens `vscode.ViewColumn.Beside` preserving focus
+- Follows active `.precept` editor when unlocked (`onDidChangeActiveTextEditor` subscription)
+- Lock/unlock via `precept.togglePreviewLocking`; title shows `[Locked]` when locked
+- Panel title shows the current file name
+- Panel state cleaned up on dispose
+
+**Pending:** actual state diagram + inspection content driven by LS `precept/inspect`.
 
 ---
 
@@ -114,11 +127,8 @@ The extension is a thin host shell by design. All value comes from the LS, compi
 
 ## Open Questions / Implementation Notes
 
-1. Extension bootstrap only — LS client, commands, and webview not yet implemented.
-2. Implement LS client activation first (connects extension to language server, surfaces diagnostics).
-3. Preview webview: define the state-diagram + inspection visualization before implementing.
-4. Commands: confirm the command list — at minimum "Precept: Compile" and "Precept: Preview state machine".
-5. Confirm MCP server launch is correctly configured in `.vscode/mcp.json` and works with inner-loop development.
+1. Preview webview full content (state diagram + inspection) pending LS v2 `precept/inspect` integration.
+2. Confirm MCP server launch is correctly configured in `.vscode/mcp.json` and works with inner-loop development.
 
 ---
 

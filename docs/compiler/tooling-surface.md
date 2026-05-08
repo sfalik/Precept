@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Grammar is hand-crafted (designed: catalog-driven generation); semantic tokens Pass 1 implemented, Pass 2 blocked on TypeChecker; completions partially implemented; hover partially implemented |
+| Implementation state | Grammar is hand-crafted (designed: catalog-driven generation); catalog metadata infrastructure ready (`TokenMeta.TextMateScope` and `SemanticTokenType` populated on all ~90 tokens, M7+M8); all LS features (semantic tokens, completions, hover, go-to-definition) pending LS handler implementation |
 | Source | `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` (currently hand-crafted), `tools/Precept.LanguageServer/` |
 | Upstream | Catalog metadata (Tokens, Types, Constructs, Operators, Actions, Modifiers) |
 | Downstream | VS Code syntax highlighting, LS semantic tokens, LS completions, LS hover |
@@ -453,7 +453,7 @@ void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
     }
 ```
 
-> **Open Question (unresolved):** `SemanticIndex.FieldReferences`, `.StateReferences`, `.EventReferences`, and `.EventArgs` do not exist in type-checker.md §7.1. Should the type checker emit reference-site arrays, or should Pass 2 reconstruct reference sites by walking typed declarations?
+> **✅ Resolved:** Pass 2 reconstructs reference sites by walking the typed declaration tree (pattern-matching on `TypedFieldRef`, `TypedArgRef`, `TypedStateRef`, `TypedEventRef` nodes). The type checker does not emit reference-site arrays — tooling-specific accumulation is a Pass 2 implementation concern. See `language-server.md §7.2` for the canonical resolution.
 
 ```csharp
     // State declarations and references
@@ -509,7 +509,7 @@ enum SlotContext
     InArgDefault,       // Default value position in event arg
 }
 
-> **Open Question (unresolved):** `SlotContext` is defined here and in `language-server.md` §7.3. This maps `ConstructSlotKind` values; language-server.md maps `SlotKind`. Which document is canonical, and are these the same enum under different names?
+> **✅ Resolved (CC#14):** `SlotContext` is canonical (cursor completion context enum). `ConstructSlotKind` is the catalog schema slot kind. `language-server.md` is the authoritative source for `SlotContext`; this document mirrors its definition. The switch arms use `ConstructSlotKind` members — two distinct concepts, not the same enum under different names.
 
 SlotContext GetCursorContext(ConstructManifest manifest, Position position)
 {
