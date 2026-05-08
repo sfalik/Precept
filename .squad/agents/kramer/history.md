@@ -15,6 +15,11 @@
 
 ## Recent Updates
 
+### 2026-05-08T22:36:50Z — Message-position generator gap closed
+- The grammar generator now derives `messageStrings` patterns from `Tokens.All.Where(m => m.IsMessagePosition)` and the parallel `FunctionMeta` path.
+- Current output stays token-only because no built-ins opt in yet; `precept.tmLanguage.json` regenerated with zero diff on commit `7f3842fd`.
+- Future trailing message-string built-ins now have catalog support with no new hardcoded grammar logic required.
+
 ### 2026-05-08T05:27:37Z — Grammar generator implementation durably recorded
 - Scribe merged Kramer's PR #139 implementation note into `.squad/decisions.md`, capturing the 16 must-fix closures, 42 repository patterns, stale pattern and keyword removals, and the remaining function-argument message-string metadata block.
 - Active follow-up stays narrow: the generator cannot gold-scope function-argument message strings until message-position metadata exists, so promotion to the canonical grammar remains gated.

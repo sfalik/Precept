@@ -15,6 +15,11 @@
 
 ## Recent Updates
 
+### 2026-05-08T22:36:50Z — Message-position gap batch recorded
+- Pre-check measured `decisions.md` at 929818 bytes with 2 inbox files, so the hard-gate archive moved all dated pre-2026-05-08 top-level entries into `decisions-archive.md` before merge.
+- Merged the George/Kramer inbox notes into one canonical message-position decision entry, deleted the processed inbox files, and wrote paired orchestration logs plus the `is-message-position-gap` session log.
+- Health report: `decisions.md` 929818B -> 179718B; `decisions-archive.md` 632704B -> 1409298B; history files summarized = 0.
+
 ### 2026-05-07T23:22:15Z — R0 B1 resolution recorded
 
 - Pre-check measured `decisions.md` at 94420 bytes with 3 inbox files, so the hard-gate 7-day archive pass ran first and found 0 active entries older than 2026-04-30T23:22:15Z.

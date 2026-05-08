@@ -23,6 +23,11 @@
 
 ## Recent Updates
 
+### 2026-05-08T22:36:50Z — Message-position metadata recorded
+- `IsMessagePosition` now lives on both `TokenMeta` and `FunctionMeta`; active token flags are `because` and `reject` only.
+- George validated the metadata pass with clean build/test results and closed it in commits `105a42a7` and `315b00c9`.
+- Downstream generator wiring is complete too, so the catalog gap for message-position strings is now closed end-to-end.
+
 ### 2026-05-08T00:49:00Z — GraphAnalyzer advisory fix batch closed
 - Commit `79c3403` closed all 8 addressable GraphAnalyzer advisory items: structural diagnostics gained `RelatedSpans`, graph codes gained `RelatedCodes`, the docs now state zero-terminal semantics and the real analyzer input set, `HasDiagnostic()` replaced fragile string dedup, and the coverage / initial-event scans now share a precomputed edge index.
 - Gap1 remains deliberately deferred: GraphAnalyzer still does not consume `EventModifierMeta.RequiredAnalysis` until richer event modifiers exist.
