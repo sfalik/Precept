@@ -44,9 +44,9 @@ Tokens.All
     ▼
 ③ Structural pattern composition
     Append hand-written multi-token patterns to the repository:
-    comment, messageStrings, strings, typedConstants, numbers, construct-level patterns
-    (machineDeclaration, stateDeclaration, event variants, field variants, etc.),
-    and the catch-all identifierReference.
+    comment, messageStrings, ruleDesugaringModifiers, strings, typedConstants, numbers,
+    construct-level patterns (machineDeclaration, stateDeclaration, event variants,
+    field variants, etc.), and the catch-all identifierReference.
     │
     ▼
 ④ Top-level include list + JSON emit
@@ -54,7 +54,7 @@ Tokens.All
     Serialize the complete grammar object as indented JSON to stdout or --output path.
 ```
 
-The generator's main catalog inputs are `Tokens.All` (keyword/operator scope groups and token-position message strings) and `Functions.All` (function-call and future function-position message-string patterns). It does not read `Constructs`, `Types`, `Modifiers`, or `Actions` directly — those catalogs' keywords are already present in `Tokens.All` via their respective `TokenKind` entries.
+The generator's main catalog inputs are `Tokens.All` (keyword/operator scope groups and token-position message strings), `Functions.All` (function-call and future function-position message-string patterns), and `Modifiers.All` (rule-desugaring modifier highlights). It does not read `Constructs`, `Types`, or `Actions` directly — those catalogs' keywords are already present in `Tokens.All` via their respective `TokenKind` entries.
 
 ---
 
@@ -115,6 +115,7 @@ Not all grammar patterns can be derived from individual token metadata. Patterns
 |---|---|
 | `comment` | `#` to end-of-line |
 | `messageStrings` | Catalog-derived message-position strings — currently `because "..."` and `reject "..."`; function wiring exists for future flagged built-ins |
+| `ruleDesugaringModifiers` | Catalog-derived modifiers where `ModifierMeta.DesugarsToRule == true`; emitted as `keyword.other.grammar.precept` so they keep the legacy gold rule color |
 | `strings` | Double-quoted string literal with escape sequences |
 | `typedConstants` | Single-quoted typed constants (`'USD'`, `'kg'`) |
 | `numbers` | Integer and decimal literals |
@@ -166,6 +167,12 @@ With this flag in place, `AddStructuralPatterns()`:
 4. Emits a simple function-call variant for any flagged built-in function so future trailing message arguments can use the same gold scope without new generator-side hardcoding.
 
 No built-in functions currently set `IsMessagePosition`, so today's generated `messageStrings` repository still contains only the token-derived `because` and `reject` patterns. That empty-by-default function path is intentional and architecturally complete.
+
+## Rule-Desugaring Modifier Context
+
+Some field modifiers are surface sugar for rule semantics and must render in the same gold keyword scope as rule grammar. `ModifierMeta.DesugarsToRule` is the catalog flag for that contract.
+
+With this flag in place, `AddStructuralPatterns()` emits `ruleDesugaringModifiers` from `Modifiers.All.Where(m => m.DesugarsToRule)`, assigns `keyword.other.grammar.precept`, and includes that repository entry before `#constraintKeywords` anywhere modifier patterns are composed. That ordering keeps the gold rule-desugaring scope from being swallowed by the generic constraint keyword alternation.
 
 ---
 
@@ -227,7 +234,7 @@ The following are intentionally outside the generator's scope:
 | Catalog schema and metadata-driven architecture | `docs/language/catalog-system.md` |
 | Generator's place in the tooling ecosystem | `docs/compiler/tooling-surface.md` |
 
-The generator does not handle `Constructs`, `Modifiers`, `Actions`, or `Functions` catalogs directly. All keywords in those catalogs are represented in `Tokens.All` via their `TokenKind` entries; the generator reaches them through `Tokens.All` without needing to read the secondary catalogs.
+The generator does not handle `Constructs` or `Actions` catalogs directly. Most keyword surface still comes through `Tokens.All` via `TokenKind` entries; the explicit exceptions are `Functions.All` for function/message-string structural patterns and `Modifiers.All` for `DesugarsToRule` gold-keyword derivation.
 
 The generator does not produce begin/end patterns for multi-token construct bodies (e.g., a `begin: "from"` / `end: "$"` block for the full transition row body). Construct-level nesting is handled by the structural patterns in `AddStructuralPatterns()`. Automating construct-body patterns from `Constructs.All` would require the generator to read slot sequences and termination tokens — possible in principle but not implemented and not required for the current feature set.
 

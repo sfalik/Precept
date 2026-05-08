@@ -164,6 +164,30 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         ["patterns"] = messageStringPatterns
     };
 
+    // ── ruleDesugaringModifiers — GOLD highlight for rule-desugaring modifiers ──
+    // MUST precede generic constraint keyword patterns so catalog-flagged modifiers win first-match ordering.
+    var ruleDesugaringModifierAlt = string.Join("|", Modifiers.All
+        .Where(m => m.DesugarsToRule && m.Token.Text is not null)
+        .Select(m => Regex.Escape(m.Token.Text!))
+        .Distinct(StringComparer.Ordinal)
+        .OrderByDescending(t => t.Length)
+        .ThenBy(t => t, StringComparer.Ordinal));
+
+    var ruleDesugaringModifierPatterns = new JsonArray();
+    if (!string.IsNullOrEmpty(ruleDesugaringModifierAlt))
+    {
+        ruleDesugaringModifierPatterns.Add(new JsonObject
+        {
+            ["name"] = "keyword.other.grammar.precept",
+            ["match"] = $"\\b({ruleDesugaringModifierAlt})\\b"
+        });
+    }
+
+    repo["ruleDesugaringModifiers"] = new JsonObject
+    {
+        ["patterns"] = ruleDesugaringModifierPatterns
+    };
+
     // ── strings ──────────────────────────────────────────────────────────
     repo["strings"] = new JsonObject
     {
@@ -293,6 +317,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                                 ["captures"] = new JsonObject { ["1"] = new JsonObject { ["name"] = "variable.parameter.precept" } }
                             },
                             new JsonObject { ["include"] = "#declarationKeywords" },
+                            new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
                             new JsonObject { ["include"] = "#constraintKeywords" },
                             new JsonObject { ["include"] = "#typeKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
@@ -341,6 +366,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                     {
                         ["patterns"] = new JsonArray
                         {
+                            new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
                             new JsonObject { ["include"] = "#constraintKeywords" },
                             new JsonObject { ["include"] = "#declarationKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
@@ -380,6 +406,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                         ["patterns"] = new JsonArray
                         {
                             new JsonObject { ["include"] = "#arrowOperators" },
+                            new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
                             new JsonObject { ["include"] = "#constraintKeywords" },
                             new JsonObject { ["include"] = "#declarationKeywords" },
                             new JsonObject { ["include"] = "#typeKeywords" },
@@ -807,6 +834,7 @@ static JsonArray BuildTopLevelPatterns()
         "#logicalOperators",
         "#membershipOperators",
         "#stateModifiers",
+        "#ruleDesugaringModifiers",
         "#constraintKeywords",
         "#typeKeywords",
         "#declarationKeywords",

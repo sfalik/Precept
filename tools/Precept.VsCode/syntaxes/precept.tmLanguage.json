@@ -88,6 +88,9 @@
       "include": "#stateModifiers"
     },
     {
+      "include": "#ruleDesugaringModifiers"
+    },
+    {
       "include": "#constraintKeywords"
     },
     {
@@ -228,6 +231,14 @@
         }
       ]
     },
+    "ruleDesugaringModifiers": {
+      "patterns": [
+        {
+          "name": "keyword.other.grammar.precept",
+          "match": "\\b(nonnegative|maxlength|maxplaces|minlength|maxcount|mincount|notempty|positive|nonzero|max|min)\\b"
+        }
+      ]
+    },
     "strings": {
       "patterns": [
         {
@@ -353,6 +364,9 @@
                   "include": "#declarationKeywords"
                 },
                 {
+                  "include": "#ruleDesugaringModifiers"
+                },
+                {
                   "include": "#constraintKeywords"
                 },
                 {
@@ -418,6 +432,9 @@
             "13": {
               "patterns": [
                 {
+                  "include": "#ruleDesugaringModifiers"
+                },
+                {
                   "include": "#constraintKeywords"
                 },
                 {
@@ -467,6 +484,9 @@
               "patterns": [
                 {
                   "include": "#arrowOperators"
+                },
+                {
+                  "include": "#ruleDesugaringModifiers"
                 },
                 {
                   "include": "#constraintKeywords"
