@@ -21,6 +21,12 @@
 
 ## Recent Updates
 
+### 2026-05-08T00:49:00Z — GraphAnalyzer advisory fix batch closed
+- Commit `79c3403` closed all 8 addressable GraphAnalyzer advisory items: structural diagnostics gained `RelatedSpans`, graph codes gained `RelatedCodes`, the docs now state zero-terminal semantics and the real analyzer input set, `HasDiagnostic()` replaced fragile string dedup, and the coverage / initial-event scans now share a precomputed edge index.
+- Gap1 remains deliberately deferred: GraphAnalyzer still does not consume `EventModifierMeta.RequiredAnalysis` until richer event modifiers exist.
+- Validation closed green at 3385/3385 `Precept.Tests`.
+
+
 ### 2026-05-08T03:29:02Z — Wave 2 closeout recorded
 - George's Wave 2 slices are durably closed: compiler-stage doc corrections, runtime stub alignment, the `TypeChecker` partial split, MCP compile DTO shapes, and the `FieldSnapshot.ClrType` + outcome-hierarchy updates.
 - All six Wave 2 design gates D1–D6 were closed through the merged decision inbox, giving downstream graph/proof/tooling work a settled runtime and compiler baseline.

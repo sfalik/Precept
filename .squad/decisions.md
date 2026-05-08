@@ -12,6 +12,62 @@
 
 ---
 
+### 2026-05-08T04:55:35Z: ProofEngine implementation is blocked on unresolved spec and contract gaps
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `frank-proof-engine-gap-analysis.md`.
+
+- Frank reviewed the ProofEngine spec against commit `79c3403` and marked implementation **NOT READY**: three blocking gaps and seven significant gaps prevent a clean start.
+- The blockers are now explicit in the ledger: three `ProofRequirementKind` variants still lack discharge-strategy coverage, the spec's canonical `FieldModifierMeta.ProofDischarges` property does not exist in source, and the specified `ProofLedger` output shape diverges materially from the stub and `Compilation` contract.
+- Durable implementation gate: close the discharge-model, catalog-shape, and output-type mismatches before any ProofEngine slice starts; source-alignment gaps like `SemanticIndex.AllTypedExpressions` and the `ConstraintIdentity` shapes remain follow-up work.
+
+---
+
+### 2026-05-08T04:55:17Z: TextMate grammar replacement must be catalog-complete and parity-or-better before the generator becomes canonical
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `frank-grammar-spec.md`.
+
+- Frank drafted an authoritative grammar spec after reviewing the token/catalog sources, the hand-authored grammar, the generator scaffold, the design-system docs, and all `.precept` samples.
+- Durable finding: both the shipped `precept.tmLanguage.json` and the current generator are stale (retired keywords and syntax, missing construct patterns, collapsed scope groups), so replacement is only valid when the generator emits the full catalog-derived language surface, including the dedicated rule-message string scope.
+- Resolution baseline: catalog `TextMateScope` assignments win over conflicting brand-doc keyword lists, and the generator must reach hand-authored parity-or-better before it can replace the shipped grammar.
+
+---
+
+### 2026-05-08T00:36:25Z: Full GraphAnalyzer advisory inventory reconstructed and locked for durable follow-up tracking
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `frank-advisory-reconstruction.md`.
+
+- Frank reconstructed the full post-review inventory after the earlier exhaustive-review merge omitted the detailed advisory list: 9 advisory items (A1-A9) plus Gap1.
+- Durable breakdown: requirements/docs follow-ups A1-A4 (`RelatedSpans`, zero-terminal semantics, `RelatedCodes`, graph-analyzer input-table correction), catalog/compliance follow-ups A5-A7 (planned event-modifier dispatch note, `IsInitial` rationale, typed `NoInitialState` dedup), and quality follow-ups A8-A9 (event-per-state edge index for coverage and `GraphEvent.IsInitial`).
+- Gap1 remains the deliberate future-touch item: GraphAnalyzer still must consume `EventModifierMeta.RequiredAnalysis` when richer event modifiers ship.
+
+---
+
+### 2026-05-08T00:49:00Z: GraphAnalyzer advisory fix batch closed on-branch except the deferred event-modifier gap
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `george-advisory-fixes-done.md`.
+
+- George closed all 8 addressable items from Frank's advisory list in commit `79c3403`: structural diagnostics 109/110/111 now carry `RelatedSpans`, graph diagnostics gained `RelatedCodes`, the graph-analyzer docs now spell out zero-terminal semantics and the real analyzer input set, the planned `EventModifierMeta.RequiredAnalysis` consumption path is marked, `IsInitial`'s direct enum check is documented, and the fragile `nameof()` dedup was replaced with `HasDiagnostic()`.
+- The event-coverage and initial-event scans now share a precomputed edge index, removing the redundant O(events × edges) lookups without changing behavior.
+- Validation at handoff closed green at 3385/3385 `Precept.Tests` passing.
+
+---
+
 ### 2026-05-08T00:22:50Z: R4 hard gate expanded to every remaining conditional GraphAnalyzer item
 
 **By:** Shane (via Copilot)

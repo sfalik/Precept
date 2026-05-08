@@ -7,6 +7,21 @@
 
 ## Learnings
 
+### 2026-05-08T04:30:00Z — Exhaustive GraphAnalyzer post-implementation audit completed
+- Three-dimensional review (requirements, catalog compliance, code quality) across 70 findings total: 39+7+14 pass, 4+3+2 advisory, 1 non-blocking gap.
+- Verdict: APPROVED. No blocking defects. All 7 Graph-stage diagnostics (80, 81, 108, 109, 110, 111 + defensive 32) are registered, correctly staged/severed, and emitted. Catalog-driven modifier dispatch in `GetStateFlags()` is exemplary. `IsInitial` direct enum check is acceptable (topological entry point, not structural constraint). `TransitionRowOutcome` switch is DU dispatch, not catalog violation.
+- Single ❌: `EventModifierMeta.RequiredAnalysis` is declared in the catalog but not consumed by the analyzer. Zero risk today (only `initial` event modifier exists and is handled equivalently). Becomes a must-fix when future event modifiers ship.
+- Three should-fix items for future polish: event-per-state index for O(1) lookups, `RelatedSpans` on structural violation diagnostics, code comment for planned `EventModifierMeta` consumption path.
+- Diagnostic count verified: 111 codes in enum, 111 claimed in `diagnostic-system.md`, 6 Graph codes — all consistent.
+
+### 2026-05-08T00:36:25Z — Full advisory list reconstructed from re-examination
+- Scribe merged and deleted the exhaustive review file before the full advisory list was extracted. Re-examined all GraphAnalyzer sources to reconstruct the complete 9+1 list.
+- Requirements (4): A1 RelatedSpans on 109/110/111, A2 TerminalCompletenessFact zero-terminal semantics, A3 Graph diagnostics lack RelatedCodes, A4 Doc §4 lists Fields/StateHooks as inputs but they're not consumed.
+- Catalog (3): A5 missing planned-consumption comment for EventModifierMeta, A6 IsInitial enum check lacks explanatory comment, A7 NoInitialState dedup uses fragile string comparison.
+- Quality (2): A8 event-per-state index for O(1) coverage, A9 GraphEvent.IsInitial duplicates linear scan.
+- Gap1: EventModifierMeta.RequiredAnalysis not consumed (future).
+- 8 of 9 advisories are addressable now. Written to `.squad/decisions/inbox/frank-advisory-reconstruction.md`.
+
 - Closed-vocabulary syntax (types, modifiers, access modes) should be resolved by the parser at recognition time; only open-ended expressions stay deferred as parsed expression trees.
 - Symbol binding is a separate concern from type inference: the binder owns declarations/references, then the TypeChecker owns semantic normalization.
 - Tooling consumption is layered: TokenStream for lexical work, ConstructManifest for syntax, SymbolTable for name-aware features, SemanticIndex for semantic features.
@@ -14,6 +29,17 @@
 - When a working proposal becomes canonical, every downstream contract should be updated in one pass and stale references retired immediately.
 
 ## Recent Updates
+
+### 2026-05-08T04:55:35Z — ProofEngine gap analysis and grammar spec draft merged
+- Frank marked ProofEngine implementation NOT READY until the discharge-strategy, `FieldModifierMeta.ProofDischarges`, and `ProofLedger` contract gaps are closed.
+- Frank also drafted the authoritative TextMate grammar spec, locking catalog scopes and parity-or-better generator output as the replacement bar for `precept.tmLanguage.json`.
+
+
+### 2026-05-08T00:49:00Z — Advisory reconstruction durably merged and implementation confirmed
+- The reconstructed 9+1 GraphAnalyzer advisory inventory is now durably captured in `decisions.md`, preserving A1-A9 plus Gap1 after the earlier exhaustive-review merge dropped the detailed list.
+- George subsequently closed all 8 addressable items in commit `79c3403`; only Gap1 (future `EventModifierMeta.RequiredAnalysis` dispatch) remains open by design.
+- Validation at George handoff closed green at 3385/3385 `Precept.Tests`.
+
 
 ### 2026-05-08T03:29:02Z — Wave 2 design batch recorded
 - Frank-17 and Frank-18 closed the graph-analyzer and proof-engine design-doc corrections; all six D1–D6 decision gates are now durably closed in `.squad/decisions.md`.
