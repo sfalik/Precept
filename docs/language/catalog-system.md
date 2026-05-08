@@ -365,7 +365,7 @@ classDiagram
     ModifierMeta <|-- FieldModifierMeta : 15 members
     ModifierMeta <|-- StateModifierMeta : 7 members
     ModifierMeta <|-- EventModifierMeta : 1 member
-    ModifierMeta <|-- AccessModifierMeta : 4 members
+    ModifierMeta <|-- AccessModifierMeta : 3 members
     ModifierMeta <|-- AnchorModifierMeta : 3 members
 ```
 
@@ -376,10 +376,10 @@ classDiagram
 | `FieldModifierMeta` | 15 | `optional`, `writable`, `nonnegative`, `positive`, `notempty`, `min`, `max`, `ordered` |
 | `StateModifierMeta` | 7 | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` |
 | `EventModifierMeta` | 1 | `initial` (event) |
-| `AccessModifierMeta` | 4 | `modify`, `readonly`, `editable`, `omit` |
+| `AccessModifierMeta` | 3 | `editable` (Write), `readonly` (Read), `omit` (Omit) |
 | `AnchorModifierMeta` | 3 | `in`, `to`, `from` |
 
-> The `initial` keyword appears in two subtypes — `InitialState` (`StateModifierMeta`) and `InitialEvent` (`EventModifierMeta`) — same token text, different subtypes, different metadata. `AnchorTarget` disambiguates the three anchor kinds between ensure and state-action contexts.
+> The `modify` keyword is a construct-level verb that introduces the AccessMode construct — it is not a `ModifierKind` member. The access adjective (`editable`, `readonly`) or the `omit` verb determines the `ModifierKind`. The `initial` keyword appears in two subtypes— `InitialState` (`StateModifierMeta`) and `InitialEvent` (`EventModifierMeta`) — same token text, different subtypes, different metadata. `AnchorTarget` disambiguates the three anchor kinds between ensure and state-action contexts.
 
 ---
 
@@ -1257,7 +1257,7 @@ All declaration-attached modifiers across the language surface — field constra
 
 | Part | Type |
 |------|------|
-| Kind enum | `ModifierKind` (28 members across 5 subtypes) |
+| Kind enum | `ModifierKind` (29 members across 5 subtypes) |
 | Meta record | `ModifierMeta` — abstract DU base with `FieldModifierMeta`, `StateModifierMeta`, `EventModifierMeta`, `AccessModifierMeta`, `AnchorModifierMeta` sealed subtypes (see below) |
 | Supporting enums | `ModifierCategory`, `GraphAnalysisKind`, `AnchorScope`, `AnchorTarget` |
 | Catalog class | `Modifiers` — `GetMeta()`, `All` |
@@ -1270,7 +1270,7 @@ All declaration-attached modifiers across the language surface — field constra
 | `FieldModifierMeta` | `optional`, `writable`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 15 |
 | `StateModifierMeta` | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` | 7 |
 | `EventModifierMeta` | `initial` (event) | 1 |
-| `AccessModifierMeta` | `modify`, `readonly`, `editable`, `omit` | 4 |
+| `AccessModifierMeta` | `editable` (Write), `readonly` (Read), `omit` (Omit) | 3 |
 | `AnchorModifierMeta` | `in`, `to`, `from` | 3 (with `AnchorTarget` disambiguating ensure vs state-action) |
 
 **Consumers:** MCP vocabulary, LS completions (modifier names after type, state modifiers in state declarations, access modes in state blocks), LS hover, type checker (modifier applicability per TypeKind, access mode enforcement, state modifier graph analysis), graph analyzer (structural modifier validation).
@@ -1340,7 +1340,8 @@ public sealed record EventModifierMeta(
     GraphAnalysisKind  RequiredAnalysis = GraphAnalysisKind.None
 ) : ModifierMeta(Kind, Token, Description, Category);
 
-// ── Access modes (4: modify, readonly, editable, omit) ──
+// ── Access modes (3: editable/Write, readonly/Read, omit/Omit) ──
+// Note: `modify` is the construct verb, not a ModifierKind member.
 public sealed record AccessModifierMeta(
     ModifierKind     Kind,
     TokenMeta        Token,
@@ -1454,18 +1455,25 @@ State-machine action verbs — the keywords that appear after `->` in transition
 
 **Members (from `ActionKind.cs`):**
 
-| Action | ApplicableTo (`TypeTarget[]`) | Value | Into | AllowedIn |
-|--------|-------------------------------|-------|------|----------|
-| `set` | any `TypeKind` (empty = caller validates) | required (`= Expr`) | no | `[ConstructKind.EventDeclaration]` |
-| `add` | `[TypeTarget(Set)]` | required (`Expr`) | no | `[ConstructKind.EventDeclaration]` |
-| `remove` | `[TypeTarget(Set)]` | required (`Expr`) | no | `[ConstructKind.EventDeclaration]` |
-| `enqueue` | `[TypeTarget(Queue)]` | required (`Expr`) | no | `[ConstructKind.EventDeclaration]` |
-| `dequeue` | `[TypeTarget(Queue)]` | no value | yes (`into Field`) | `[ConstructKind.EventDeclaration]` |
-| `push` | `[TypeTarget(Stack)]` | required (`Expr`) | no | `[ConstructKind.EventDeclaration]` |
-| `pop` | `[TypeTarget(Stack)]` | no value | yes (`into Field`) | `[ConstructKind.EventDeclaration]` |
-| `clear` | `[TypeTarget(Set), TypeTarget(Queue), TypeTarget(Stack), ModifiedTypeTarget(null, [Optional])]` | no value | no | `[ConstructKind.EventDeclaration]` |
+| Action | ApplicableTo (`TypeTarget[]`) | Value | Into | AllowedIn | SyntaxShape |
+|--------|-------------------------------|-------|------|----------|-------------|
+| `set` | any `TypeKind` (empty = caller validates) | required (`= Expr`) | no | all action contexts | `AssignValue` |
+| `add` | `[TypeTarget(Set), TypeTarget(Bag)]` | required (`Expr`) | no | all action contexts | `CollectionValue` |
+| `remove` | `[TypeTarget(Set), TypeTarget(Bag), TypeTarget(List), TypeTarget(Lookup)]` | required (`Expr`) | no | all action contexts | `CollectionValue` |
+| `enqueue` | `[TypeTarget(Queue)]` | required (`Expr`) | no | all action contexts | `CollectionValue` |
+| `dequeue` | `[TypeTarget(Queue), TypeTarget(QueueBy)]` | no value | yes (`into Field`) | all action contexts | `CollectionInto` |
+| `push` | `[TypeTarget(Stack)]` | required (`Expr`) | no | all action contexts | `CollectionValue` |
+| `pop` | `[TypeTarget(Stack)]` | no value | yes (`into Field`) | all action contexts | `CollectionInto` |
+| `clear` | `[TypeTarget(Set), TypeTarget(Queue), TypeTarget(Stack), TypeTarget(Bag), TypeTarget(List), TypeTarget(QueueBy), ModifiedTypeTarget(null, [Optional])]` | no value | no | all action contexts | `FieldOnly` |
+| `append` | `[TypeTarget(Log), TypeTarget(List)]` | required (`Expr`) | no | all action contexts | `CollectionValue` |
+| `append ... by` | `[TypeTarget(LogBy)]` | required (`Expr by Expr`) | no | all action contexts | `CollectionValueBy` |
+| `insert` | `[TypeTarget(List)]` | required (`Expr at Expr`) | no | all action contexts | `InsertAt` |
+| `remove ... at` | `[TypeTarget(List)]` | no value | no | all action contexts | `RemoveAtIndex` |
+| `put` | `[TypeTarget(Lookup)]` | required (`Key = Value`) | no | all action contexts | `PutKeyValue` |
+| `enqueue ... by` | `[TypeTarget(QueueBy)]` | required (`Expr by Expr`) | no | all action contexts | `CollectionValueBy` |
+| `dequeue ... by` | `[TypeTarget(QueueBy)]` | no value | yes (`into Field by Field`) | all action contexts | `CollectionIntoBy` |
 
-`clear` on optional scalars: `ModifiedTypeTarget(Kind: null, RequiredModifiers: [ModifierKind.Optional])` — matches any field with the `Optional` modifier, regardless of type kind. `TargetCollectionKind?` is replaced by `ApplicableTo TypeTarget[]` uniformly across the catalog.
+"All action contexts" means `[ConstructKind.EventDeclaration, ConstructKind.StateAction, ConstructKind.TransitionRow]`. `clear` on optional scalars: `ModifiedTypeTarget(Kind: null, RequiredModifiers: [ModifierKind.Optional])` — matches any field with the `Optional` modifier, regardless of type kind. Actions with `ProofRequirements` (`dequeue`, `pop`, `insert`, `remove ... at`, `dequeue ... by`) require emptiness/bounds proofs. Actions with `PrimaryActionKind` (`append ... by`, `remove ... at`, `enqueue ... by`, `dequeue ... by`) share a keyword token with the primary action; disambiguation is by target type.
 
 ##### ActionMeta — full shape
 

@@ -118,3 +118,27 @@
 - EventName.ArgName fix confirmed: ResolveMemberAccess produces TypedArgRef, not TypedMemberAccess; end-to-end validated by Submit.Label in modifier tests.
 - Pipeline call order verified correct after Slice 5 restoration: PopulateFields → PopulateStates → PopulateEvents → PopulateTransitionRows → PopulateEventHandlers → ValidateModifiers → ValidateStructural.
 - Non-blocking observations: stale regression note in TransitionTests header, D10 wildcard test gap (parser-surface limitation), D5 positive-case test gap (collection action coverage needed).
+
+### 2026-05-08T02:28:00Z — R3 Final Gate Review — TypeChecker BLOCKED (3 blockers)
+
+- **Verdict: BLOCKED.** 3602 tests passing (3339 + 263). Three blockers prevent consumer stages from beginning.
+- **B1: Missing field expression resolution.** TypedField.DefaultExpression, ComputedExpression, and Qualifier are always null. No slice in §13 covers field expression resolution. ComputedFieldDep entries are never populated → cycle detection in ValidateStructural is dead code. PreceptBuilder can't build runtime descriptors.
+- **B2: Missing construct normalization for 4 kinds.** StateEnsure, EventEnsure, AccessMode, StateAction constructs are parsed but never processed by the TypeChecker. CheckContext accumulators and SemanticIndex fields exist but are never populated. GraphAnalyzer needs StateHooks; ProofEngine needs Ensures.
+- **B3: D26 invariant violation from MissingExpression.** MissingExpression → TypedErrorExpression emits no TC diagnostic. Parser diagnostic is in a separate list. D26 Debug.Assert checks only TC diagnostics → fires on MissingExpression-only errors.
+- Expression resolution engine (Slices 2–4, 8–9) is architecturally excellent: fully catalog-driven binary/unary/function/accessor resolution, clean DU dispatch, no hardcoded sets. ContentValidation DU dispatch correct. ActionSyntaxShape dispatch via parsed action DU subtypes. Modifier validation fully catalog-driven.
+- SemanticSubjects on TypedRule always empty (W1). ConstraintFieldRefs never populated.
+- Doc staleness: §1 still says "Stub", §4 LOC estimate 800–1200 vs actual ~2425.
+- Resolution path: ~300 lines of new normalization code following established patterns. B3 is a 5-minute fix (emit diagnostic on MissingExpression). B1 and B2 are ~150 lines each of familiar slot-extraction + Resolve + accumulate patterns.
+- Lesson: Slice plans must be verified against the full spec §6 Sub-pass 2b table, not just the expression resolution scope. The plan covered the expression engine thoroughly but missed material normalization steps for 4 construct kinds and 2 field expression categories.
+
+### 2026-05-07: Comprehensive Language/Compiler Doc Review
+
+- **Reviewed 12 docs** against catalog source reality. 7 clean, 2 fixed, 3 flagged.
+- **catalog-system.md fixes:** AccessModifierMeta count 4→3 (`modify` is a construct verb, not a ModifierKind member); ModifierKind total 28→29; Actions table expanded from 8 to 15 members with corrected ApplicableTo (e.g., `add` serves Set+Bag, not just Set), corrected AllowedIn (all action contexts, not EventDeclaration only), and added SyntaxShape column.
+- **precept-grammar.md fix:** ExpressionFormKind count 13→14; added InterpolatedString row to expression kinds table.
+- **philosophy.md flagged (6 items):** Core runtime operations, state reachability proof, expression safety proof, full inspectability, and stateless precepts are all described as implemented features but are stubs/planned. Restore operation not mentioned. Flagged to inbox per standing rule — no edits made.
+- **graph-analyzer.md flagged (4 items):** Domain-knowledge claims overstated, incomplete SemanticIndex input spec, proof-forwarding contract underspecified, missing structural assumptions section.
+- **proof-engine.md flagged (3 items):** Strategy count contradiction (4 claimed vs 3 described in compiler-and-runtime-design.md), constraint influence sourcing unclear, strategy discharge pseudocode missing.
+- **Type system docs (primitive, business-domain, temporal, collection) all clean.** Every type, operation, function, and constraint in the docs matches the catalogs exactly. 30 documented types match 30 user-facing TypeKind members. 23 functions match. 198 operations superset documented correctly.
+- **Language spec clean.** All actions, modifiers, constraints, and functions in spec match catalog entries by name.
+- **Lesson:** When catalogs gain members (the v3 collection wave added 7 actions), doc tables must be updated in the same pass. The Actions table was stale since the collection wave — it still listed the original 8 actions with wrong ApplicableTo values and wrong AllowedIn scope.

@@ -553,7 +553,7 @@ An expression is always embedded inside a slot, inside a construct. This constra
 
 ### Expression kinds
 
-The 13 `ExpressionFormKind` values (from the ExpressionForms catalog) cover the full expression grammar:
+The 14 `ExpressionFormKind` values (from the ExpressionForms catalog) cover the full expression grammar:
 
 | Category | Kinds | Examples |
 |----------|-------|---------|
@@ -562,6 +562,7 @@ The 13 `ExpressionFormKind` values (from the ExpressionForms catalog) cover the 
 | **Invocation** | `FunctionCall`, `MethodCall`, `CIFunctionCall` | `min(a, b)`, `amount.currency`, `startswith~("val")` |
 | **Collection** | `ListLiteral` | `[1, 2, 3]` |
 | **Quantifier** | `Quantifier` | `each item in Items satisfies item > 0` |
+| **Interpolated** | `InterpolatedString` | `"Order {OrderId} total: {Amount}"` |
 
 The expression grammar is parsed by a Pratt parser (operator-precedence parsing) using the Operators catalog for precedence and associativity metadata.
 
