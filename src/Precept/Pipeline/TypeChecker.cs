@@ -34,6 +34,7 @@ internal static class TypeChecker
         // Pass 2: normalize transition rows and event handlers (Slice 5)
         PopulateTransitionRows(manifest, ctx);
         PopulateEventHandlers(manifest, ctx);
+        PopulateRules(manifest, ctx);
 
         // Modifier validation (Slice 7) — depends only on Pass 1 symbols
         ValidateModifiers(ctx);
@@ -251,7 +252,7 @@ internal static class TypeChecker
             StatesByName: states.ToFrozenDictionary(s => s.Name),
             EventsByName: events.ToFrozenDictionary(e => e.Name),
             TransitionRows: ctx.TransitionRows.ToImmutableArray(),
-            Rules: ImmutableArray<TypedRule>.Empty,
+            Rules: ctx.Rules.ToImmutableArray(),
             Ensures: ImmutableArray<TypedEnsure>.Empty,
             AccessModes: ImmutableArray<TypedAccessMode>.Empty,
             StateHooks: ImmutableArray<TypedStateHook>.Empty,
@@ -939,6 +940,33 @@ internal static class TypeChecker
             !ctx.EventHandlers.Any(h => h.Actions.Any(a => a is TypedInputAction ia && ContainsErrorExpressionInAction(ia))) ||
             ctx.Diagnostics.Any(d => d.Severity == Severity.Error),
             "D26: TypedErrorExpression present in event handlers but no Error-severity diagnostic emitted.");
+    }
+
+    /// <summary>
+    /// Iterate all <see cref="ConstructKind.RuleDeclaration"/> constructs from the manifest,
+    /// resolve each to a <see cref="TypedRule"/>, and accumulate into <see cref="CheckContext.Rules"/>.
+    /// </summary>
+    private static void PopulateRules(ConstructManifest manifest, CheckContext ctx)
+    {
+        if (!manifest.ByKind.Contains(ConstructKind.RuleDeclaration))
+            return;
+
+        foreach (var construct in manifest.ByKind[ConstructKind.RuleDeclaration])
+        {
+            var ruleSlot = construct.GetRequiredSlot<RuleExpressionSlot>(ConstructSlotKind.RuleExpression);
+            ctx.CurrentScope = FieldScopeMode.AllFields;
+            var condition = Resolve(ruleSlot.Expression, ctx);
+
+            TypedExpression? guard = null;
+            var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+            if (guardSlot is not null)
+                guard = Resolve(guardSlot.Expression, ctx);
+
+            var becauseSlot = construct.GetRequiredSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause);
+            var message = new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span);
+
+            ctx.Rules.Add(new TypedRule(condition, guard, message, ImmutableArray<string>.Empty, construct));
+        }
     }
 
     /// <summary>Normalize a transition row construct into a <see cref="TypedTransitionRow"/>.</summary>
@@ -2102,15 +2130,17 @@ internal static class TypeChecker
                 if (bin.ResolvedOp == OperationKind.StringEqualsString &&
                     (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
                 {
+                    var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals, bin.Span));
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals, bin.Span, ciFieldName));
                 }
                 // Rule 2: != with ~string operand
                 else if (bin.ResolvedOp == OperationKind.StringNotEqualsString &&
                          (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
                 {
+                    var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals, bin.Span));
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals, bin.Span, ciFieldName));
                 }
                 // Rule 3: contains with ~string value in case-sensitive collection
                 // (fires when contains OperationKind entries land — currently no-op)
@@ -2119,8 +2149,9 @@ internal static class TypeChecker
                          bin.Left is TypedFieldRef collRef &&
                          !ctx.CIElementCollections.Contains(collRef.FieldName))
                 {
+                    var ciFieldName = ((TypedFieldRef)bin.Right).FieldName;
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains, bin.Span));
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains, bin.Span, ciFieldName, collRef.FieldName));
                 }
 
                 EnforceCIInExpression(bin.Left, ctx);
@@ -2132,15 +2163,17 @@ internal static class TypeChecker
                 if (func.ResolvedFunction == FunctionKind.StartsWith &&
                     func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
                 {
+                    var ciFieldName = ((TypedFieldRef)func.Arguments[0]).FieldName;
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith, func.Span));
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith, func.Span, ciFieldName));
                 }
                 // Rule 5: endsWith with ~string first arg
                 else if (func.ResolvedFunction == FunctionKind.EndsWith &&
                          func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
                 {
+                    var ciFieldName = ((TypedFieldRef)func.Arguments[0]).FieldName;
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith, func.Span));
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith, func.Span, ciFieldName));
                 }
 
                 foreach (var arg in func.Arguments)
@@ -2187,6 +2220,10 @@ internal static class TypeChecker
     /// <summary>Returns true if the expression resolves to a <c>~string</c> field reference.</summary>
     private static bool IsCIExpression(TypedExpression expr) =>
         expr is TypedFieldRef { IsCaseInsensitive: true };
+
+    /// <summary>Returns the field name from whichever operand is a <c>~string</c> field reference.</summary>
+    private static string GetCIFieldName(TypedExpression left, TypedExpression right) =>
+        IsCIExpression(left) ? ((TypedFieldRef)left).FieldName : ((TypedFieldRef)right).FieldName;
 
     /// <summary>
     /// Returns true if the operation is a <c>contains</c> membership test.

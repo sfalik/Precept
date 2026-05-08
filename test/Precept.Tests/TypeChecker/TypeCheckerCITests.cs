@@ -11,11 +11,6 @@ namespace Precept.Tests.TypeChecker;
 /// Covers all 5 CI rules from §3.8: valid + violation cases per rule,
 /// TypedFieldRef.IsCaseInsensitive population, CI variant function selection,
 /// non-CI function in CI-required context enforcement, and multi-violation emission.
-///
-/// TYPE B (implementation bug): Diagnostics.Create for CI enforcement codes 66, 95, 97, 98
-/// throws FormatException because diagnostic templates contain '{0}' but EnforceCIInExpression
-/// does not pass field name arguments. All violation tests that trigger CI diagnostics are
-/// expected to throw FormatException until George fixes the Diagnostics.Create calls.
 /// </summary>
 public class TypeCheckerCITests
 {
@@ -40,8 +35,6 @@ public class TypeCheckerCITests
     [Fact]
     public void Equals_OnCIField_EmitsTildeEqualsRequired()
     {
-        // TYPE B: FormatException — Diagnostics.Create(CaseInsensitiveFieldRequiresTildeEquals, span)
-        // does not pass field name for '{0}' placeholder in template.
         var precept = """
             precept Widget
             field Email as ~string
@@ -50,15 +43,12 @@ public class TypeCheckerCITests
             from Open on Check when Email == "admin@example.com" -> no transition
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg not passed by EnforceCIInExpression");
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals);
     }
 
     [Fact]
     public void Equals_OnCIField_RHSPosition_EmitsTildeEqualsRequired()
     {
-        // TYPE B: FormatException — same root cause as above
         var precept = """
             precept Widget
             field Email as ~string
@@ -67,9 +57,7 @@ public class TypeCheckerCITests
             from Open on Check when "admin@example.com" == Email -> no transition
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg not passed by EnforceCIInExpression");
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals);
     }
 
     [Fact]
@@ -108,7 +96,6 @@ public class TypeCheckerCITests
     [Fact]
     public void NotEquals_OnCIField_EmitsTildeNotEqualsRequired()
     {
-        // TYPE B: FormatException — same root cause
         var precept = """
             precept Widget
             field Email as ~string
@@ -117,9 +104,7 @@ public class TypeCheckerCITests
             from Open on Check when Email != "test@test.com" -> no transition
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg not passed by EnforceCIInExpression");
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals);
     }
 
     [Fact]
@@ -165,7 +150,6 @@ public class TypeCheckerCITests
     [Fact]
     public void StartsWith_OnCIField_EmitsTildeStartsWithRequired()
     {
-        // TYPE B: FormatException — same root cause
         var precept = """
             precept Widget
             field Email as ~string
@@ -174,9 +158,7 @@ public class TypeCheckerCITests
             from Open on Check when startsWith(Email, "info@") -> no transition
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg not passed by EnforceCIInExpression");
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith);
     }
 
     [Fact]
@@ -214,7 +196,6 @@ public class TypeCheckerCITests
     [Fact]
     public void EndsWith_OnCIField_EmitsTildeEndsWithRequired()
     {
-        // TYPE B: FormatException — same root cause
         var precept = """
             precept Widget
             field Email as ~string
@@ -223,9 +204,7 @@ public class TypeCheckerCITests
             from Open on Check when endsWith(Email, ".com") -> no transition
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg not passed by EnforceCIInExpression");
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith);
     }
 
     [Fact]
@@ -385,11 +364,8 @@ public class TypeCheckerCITests
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Equals_OnCIField_InRule_NoDiagnosticEmitted()
+    public void Equals_OnCIField_InRule_EmitsTildeEqualsRequired()
     {
-        // TYPE B observation: == on ~string in rule condition does not fire
-        // CaseInsensitiveFieldRequiresTildeEquals. May be a coverage gap in
-        // ValidateCIEnforcement rule traversal — documenting current behavior.
         var precept = """
             precept Widget
             field Email as ~string
@@ -397,8 +373,7 @@ public class TypeCheckerCITests
             rule Email == "admin@example.com" because "bad rule"
             """;
 
-        // Currently no error is emitted — this documents the gap.
-        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals);
     }
 
     [Fact]
@@ -428,10 +403,8 @@ public class TypeCheckerCITests
     }
 
     [Fact]
-    public void NotEquals_OnCIField_InRule_NoDiagnosticEmitted()
+    public void NotEquals_OnCIField_InRule_EmitsTildeNotEqualsRequired()
     {
-        // TYPE B observation: != on ~string in rule condition does not fire
-        // CaseInsensitiveFieldRequiresTildeNotEquals — same gap as == case above.
         var precept = """
             precept Widget
             field Email as ~string
@@ -439,8 +412,7 @@ public class TypeCheckerCITests
             rule Email != "test@test.com" because "bad rule"
             """;
 
-        // Currently no error is emitted — this documents the gap.
-        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -448,9 +420,8 @@ public class TypeCheckerCITests
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void MultipleCIViolations_EqualAndNotEqual_ThrowsFormatException()
+    public void MultipleCIViolations_EqualAndNotEqual_EmitsBothDiagnostics()
     {
-        // TYPE B: FormatException — first violation encountered throws
         var precept = """
             precept Widget
             field Email as ~string
@@ -461,15 +432,14 @@ public class TypeCheckerCITests
             rule Domain != "test.com" because "bad"
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg");
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals.ToString());
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals.ToString());
     }
 
     [Fact]
-    public void MultipleCIViolations_EqualAndStartsWith_ThrowsFormatException()
+    public void MultipleCIViolations_EqualAndStartsWith_EmitsBothDiagnostics()
     {
-        // TYPE B: FormatException — same root cause
         var precept = """
             precept Widget
             field Email as ~string
@@ -479,15 +449,14 @@ public class TypeCheckerCITests
             rule startsWith(Email, "info@") because "bad"
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg");
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals.ToString());
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith.ToString());
     }
 
     [Fact]
-    public void MultipleCIViolations_ThreeRules_ThrowsFormatException()
+    public void MultipleCIViolations_ThreeRules_EmitsAllDiagnostics()
     {
-        // TYPE B: FormatException — same root cause
         var precept = """
             precept Widget
             field Email as ~string
@@ -499,9 +468,10 @@ public class TypeCheckerCITests
             rule endsWith(Email, ".com") because "suffix check"
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg");
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals.ToString());
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals.ToString());
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith.ToString());
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -526,7 +496,6 @@ public class TypeCheckerCITests
     [Fact]
     public void MixedFields_CIFieldTriggersViolation_RegularFieldDoesNot()
     {
-        // TYPE B: FormatException — same root cause (Email == triggers it)
         var precept = """
             precept Widget
             field Email as ~string
@@ -538,9 +507,9 @@ public class TypeCheckerCITests
             from Open on B when Name == "y" -> no transition
             """;
 
-        var act = () => TypeCheckerTestHelpers.Check(precept);
-        act.Should().Throw<System.FormatException>(
-            because: "TYPE B bug: CI diagnostic template expects field name arg");
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().ContainSingle(d => d.Code == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals.ToString(),
+            because: "only the CI field Email should trigger a violation, not Name");
     }
 
     // ════════════════════════════════════════════════════════════════════════
