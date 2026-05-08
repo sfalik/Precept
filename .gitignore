@@ -22,6 +22,9 @@ temp/
 src/Precept/temp/
 tools/Precept.LanguageServer/temp/
 
+# Test runner artifacts — generated, never commit
+**/TestResults/
+
 # VS Code extension generated files
 tools/Precept.VsCode/node_modules/
 tools/Precept.VsCode/out/
