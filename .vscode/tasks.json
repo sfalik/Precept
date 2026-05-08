@@ -55,6 +55,20 @@
                 "${workspaceFolder}/tools/scripts/sync-precept-plugin-assets.js"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "grammar: regenerate",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/tools/Precept.GrammarGen",
+                "--",
+                "--output",
+                "${workspaceFolder}/tools/Precept.VsCode/syntaxes/precept.tmLanguage.json"
+            ],
+            "problemMatcher": "$msCompile"
         }
     ]
 }

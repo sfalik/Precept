@@ -12,6 +12,7 @@
 - For custom DSL documentation, truthful code-fence labels and accurate path/build guidance matter more than cosmetic approximations.
 - `IsMessagePosition` now drives `messageStrings` generation in `Precept.GrammarGen`: token flags emit keyword-plus-gold-string patterns, and function flags reserve the future trailing-argument path.
 - No built-in functions currently opt into `IsMessagePosition`; the generator intentionally emits only token-derived message patterns today while keeping the function wiring live.
+- Added the VS Code task label `grammar: regenerate`, which runs `dotnet run --project tools/Precept.GrammarGen -- --output tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` so developers can refresh the generated TextMate grammar after catalog changes.
 
 ## Recent Updates
 
