@@ -49,11 +49,14 @@ static JsonObject BuildGrammar()
         .Where(kvp => kvp.Value.Any(m => !m.Text!.All(c => char.IsLetterOrDigit(c) || c == '_')))
         .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-    // Keyword patterns use word boundaries (\b); operators use literal escape
+    // Keyword patterns use word boundaries (\b); longer keywords before shorter to prevent prefix matches
     foreach (var (scope, tokens) in keywordScopes.OrderBy(kv => kv.Key))
     {
         var key = ScopeToRepositoryKey(scope);
-        var alternation = string.Join("|", tokens.Select(m => Regex.Escape(m.Text!)).OrderBy(t => t));
+        var alternation = string.Join("|", tokens
+            .Select(m => Regex.Escape(m.Text!))
+            .OrderByDescending(t => t.Length)
+            .ThenBy(t => t));
         repository[key] = new JsonObject
         {
             ["name"] = scope,
@@ -62,8 +65,6 @@ static JsonObject BuildGrammar()
     }
 
     // Operator patterns — no word boundaries; longer tokens must come first
-    // Group operator tokens by scope into their respective repo entries.
-    // Different operator scopes get separate entries; same scope tokens are merged.
     foreach (var (scope, tokens) in operatorScopes.OrderBy(kv => kv.Key))
     {
         var key = ScopeToRepositoryKey(scope);
@@ -76,9 +77,7 @@ static JsonObject BuildGrammar()
         };
     }
 
-    // ── Structural patterns (grammar-level, not catalog-driven) ────────────
-    // These patterns cover constructs that require context beyond a single token.
-
+    // ── Structural patterns ────────────────────────────────────────────────
     AddStructuralPatterns(repository, keywordsByScope);
 
     // ── Top-level grammar patterns list ────────────────────────────────────
@@ -96,20 +95,54 @@ static JsonObject BuildGrammar()
 
 static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<TokenMeta>> keywordsByScope)
 {
-    // Comment: # to end of line
+    // ── Derive catalog-driven alternation strings for use in structural patterns ──
+
+    // All type keywords from catalog (scalar + temporal + business + collection)
+    var typeAlt = string.Join("|", keywordsByScope.TryGetValue("storage.type.precept", out var typeTokens)
+        ? typeTokens
+            .Select(m => Regex.Escape(m.Text!))
+            .OrderByDescending(t => t.Length)
+            .ThenBy(t => t)
+        : []);
+
+    // Collection type keywords only (subset of typeKeywords)
+    var collectionTypes = new HashSet<string> { "set", "queue", "stack", "bag", "list", "log", "lookup" };
+    var collTypeAlt = string.Join("|", collectionTypes
+        .Select(Regex.Escape)
+        .OrderByDescending(t => t.Length)
+        .ThenBy(t => t));
+
+    // State modifier keywords from catalog
+    var stateModifierAlt = string.Join("|", keywordsByScope.TryGetValue("storage.modifier.state.precept", out var stateModTokens)
+        ? stateModTokens.Select(m => Regex.Escape(m.Text!)).OrderByDescending(t => t.Length).ThenBy(t => t)
+        : []);
+
+    // Function names from Functions catalog (excluding CI variants — handled separately)
+    var funcNames = Functions.All
+        .Where(f => f.CIVariantOf is null)
+        .Select(f => Regex.Escape(f.Name))
+        .OrderByDescending(n => n.Length)
+        .ThenBy(n => n)
+        .ToList();
+    var ciVariantNames = Functions.All
+        .Where(f => f.CIVariantOf is not null)
+        .Select(f => Regex.Escape(f.Name))
+        .OrderByDescending(n => n.Length)
+        .ThenBy(n => n)
+        .ToList();
+
+    // ── comment ───────────────────────────────────────────────────────────
     repo["comment"] = new JsonObject
     {
         ["patterns"] = new JsonArray
         {
-            new JsonObject
-            {
-                ["name"] = "comment.line.number-sign.precept",
-                ["match"] = "#.*$"
-            }
+            new JsonObject { ["name"] = "comment.line.number-sign.precept", ["match"] = "#.*$" }
         }
     };
 
-    // Message strings — GOLD highlighting for "because "..." and "reject "..." (MUST precede strings)
+    // ── messageStrings — GOLD highlight for because/reject message payloads ──
+    // MUST precede generic strings pattern to prevent gold strings from being consumed as regular strings.
+    // Per Frank spec §2.2 and visual system: string.quoted.double.message.precept → #FBBF24 gold.
     repo["messageStrings"] = new JsonObject
     {
         ["patterns"] = new JsonArray
@@ -137,7 +170,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    // Double-quoted strings (message strings, default values)
+    // ── strings ──────────────────────────────────────────────────────────
     repo["strings"] = new JsonObject
     {
         ["patterns"] = new JsonArray
@@ -149,45 +182,41 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 ["end"] = "\"",
                 ["patterns"] = new JsonArray
                 {
-                    new JsonObject
-                    {
-                        ["name"] = "constant.character.escape.precept",
-                        ["match"] = "\\\\."
-                    }
+                    new JsonObject { ["name"] = "constant.character.escape.precept", ["match"] = "\\\\." }
                 }
             }
         }
     };
 
-    // Single-quoted typed constants ('USD', 'kg', etc.)
+    // ── typedConstants ────────────────────────────────────────────────────
     repo["typedConstants"] = new JsonObject
     {
         ["patterns"] = new JsonArray
         {
-            new JsonObject
-            {
-                ["name"] = "string.quoted.single.precept",
-                ["begin"] = "'",
-                ["end"] = "'"
-            }
+            new JsonObject { ["name"] = "string.quoted.single.precept", ["begin"] = "'", ["end"] = "'" }
         }
     };
 
-    // Numbers (integer and decimal)
+    // ── numbers ───────────────────────────────────────────────────────────
     repo["numbers"] = new JsonObject
     {
         ["patterns"] = new JsonArray
         {
-            new JsonObject
-            {
-                ["name"] = "constant.numeric.precept",
-                ["match"] = "\\b\\d+(?:\\.\\d+)?\\b"
-            }
+            new JsonObject { ["name"] = "constant.numeric.precept", ["match"] = "\\b\\d+(?:\\.\\d+)?\\b" }
         }
     };
 
-    // Precept declaration (header line) — highlights name as entity.name
-    repo["machineDeclaration"] = new JsonObject
+    // ── punctuation ───────────────────────────────────────────────────────
+    repo["punctuation"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject { ["name"] = "punctuation.precept", ["match"] = "[()\\[\\].,]" }
+        }
+    };
+
+    // ── preceptHeader ─────────────────────────────────────────────────────
+    repo["preceptHeader"] = new JsonObject
     {
         ["patterns"] = new JsonArray
         {
@@ -197,14 +226,14 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 ["match"] = "^(\\s*)(precept)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
                 ["captures"] = new JsonObject
                 {
-                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
                     ["4"] = new JsonObject { ["name"] = "entity.name.precept.message.precept" }
                 }
             }
         }
     };
 
-    // State declaration — highlights state names and modifiers
+    // ── stateDeclaration — all 7 state modifiers from catalog ────────────
     repo["stateDeclaration"] = new JsonObject
     {
         ["patterns"] = new JsonArray
@@ -215,26 +244,21 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 ["match"] = "^(\\s*)(state)(\\s+)(.*)",
                 ["captures"] = new JsonObject
                 {
-                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
                     ["4"] = new JsonObject
                     {
                         ["patterns"] = new JsonArray
                         {
-                            new JsonObject
+                            // initial is a declaration keyword (keyword.declaration.precept)
+                            new JsonObject { ["name"] = "keyword.declaration.precept", ["match"] = "\\binitial\\b" },
+                            // terminal, required, irreversible, success, warning, error from catalog
+                            string.IsNullOrEmpty(stateModifierAlt) ? null! : new JsonObject
                             {
-                                ["name"] = "keyword.control.precept",
-                                ["match"] = "\\binitial\\b"
+                                ["name"] = "storage.modifier.state.precept",
+                                ["match"] = $"\\b({stateModifierAlt})\\b"
                             },
-                            new JsonObject
-                            {
-                                ["name"] = "entity.name.type.state.precept",
-                                ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
-                            },
-                            new JsonObject
-                            {
-                                ["name"] = "punctuation.separator.comma.precept",
-                                ["match"] = ","
-                            }
+                            new JsonObject { ["name"] = "entity.name.type.state.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
+                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
                         }
                     }
                 }
@@ -242,19 +266,20 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    // Event declarations — with and without args
-    repo["eventWithArgsDeclaration"] = new JsonObject
+    // ── eventDeclaration — parenthesized args (current syntax) ───────────
+    // Replaces stale eventWithArgsDeclaration that used retired `with` syntax.
+    repo["eventDeclaration"] = new JsonObject
     {
-        ["comment"] = "event Name[, Name, ...] with Arg as type, Arg2 as type",
+        ["comment"] = "event Name[, Name, ...] or event Name(Arg as type, ...)",
         ["patterns"] = new JsonArray
         {
             new JsonObject
             {
                 ["name"] = "meta.declaration.event.precept",
-                ["match"] = "^(\\s*)(event)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(with)(\\s+)(.*)",
+                ["match"] = "^(\\s*)(event)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s*\\(.*)?",
                 ["captures"] = new JsonObject
                 {
-                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
                     ["4"] = new JsonObject
                     {
                         ["patterns"] = new JsonArray
@@ -263,20 +288,23 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                             new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
                         }
                     },
-                    ["6"] = new JsonObject { ["name"] = "keyword.other.precept" },
-                    ["8"] = new JsonObject
+                    ["5"] = new JsonObject
                     {
                         ["patterns"] = new JsonArray
                         {
-                            new JsonObject { ["$ref"] = "#/repository/storage.type.precept" },
-                            new JsonObject { ["include"] = "#numbers" },
-                            new JsonObject { ["include"] = "#strings" },
+                            // argument name before 'as'
                             new JsonObject
                             {
-                                ["comment"] = "argument name before 'as'",
                                 ["match"] = "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s+as\\b)",
                                 ["captures"] = new JsonObject { ["1"] = new JsonObject { ["name"] = "variable.parameter.precept" } }
                             },
+                            new JsonObject { ["include"] = "#declarationKeywords" },
+                            new JsonObject { ["include"] = "#constraintKeywords" },
+                            new JsonObject { ["include"] = "#typeKeywords" },
+                            new JsonObject { ["include"] = "#numbers" },
+                            new JsonObject { ["include"] = "#strings" },
+                            new JsonObject { ["include"] = "#booleanLiterals" },
+                            new JsonObject { ["name"] = "punctuation.precept", ["match"] = "[()]" },
                             new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
                         }
                     }
@@ -285,40 +313,21 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    repo["eventDeclaration"] = new JsonObject
-    {
-        ["patterns"] = new JsonArray
-        {
-            new JsonObject
-            {
-                ["name"] = "meta.declaration.event.precept",
-                ["match"] = "^(\\s*)(event)(\\s+)(.*)",
-                ["captures"] = new JsonObject
-                {
-                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
-                    ["4"] = new JsonObject
-                    {
-                        ["patterns"] = new JsonArray
-                        {
-                            new JsonObject { ["name"] = "entity.name.function.event.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
-                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
-                        }
-                    }
-                }
-            }
-        }
-    };
+    // ── fieldCollectionDeclaration — all collection types + full inner type list ──
+    var innerTypeAlt = string.Join("|", new[] { "string", "number", "integer", "decimal", "boolean" }
+        .Select(Regex.Escape)
+        .OrderByDescending(t => t.Length)
+        .ThenBy(t => t));
 
-    // Field declarations — collection and scalar
     repo["fieldCollectionDeclaration"] = new JsonObject
     {
-        ["comment"] = "field Name[, ...] as set|queue|stack|bag|list|log|lookup of type",
+        ["comment"] = "field Name[, ...] as set|queue|stack|bag|list|log|lookup of [~]type",
         ["patterns"] = new JsonArray
         {
             new JsonObject
             {
-                ["name"] = "meta.field-declaration.collection.precept",
-                ["match"] = "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack|bag|list|log|lookup)(\\s+)(of)(\\s+)(string|number|integer|decimal|boolean|choice|~?string|~?number)",
+                ["name"] = "meta.field-declaration.precept",
+                ["match"] = $"^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)({collTypeAlt})(\\s+)(of)(\\s+)(~?(?:{innerTypeAlt}))(.*)",
                 ["captures"] = new JsonObject
                 {
                     ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
@@ -333,21 +342,32 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                     ["6"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
                     ["8"] = new JsonObject { ["name"] = "storage.type.precept" },
                     ["10"] = new JsonObject { ["name"] = "keyword.control.precept" },
-                    ["12"] = new JsonObject { ["name"] = "storage.type.precept" }
+                    ["12"] = new JsonObject { ["name"] = "storage.type.precept" },
+                    ["13"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["include"] = "#constraintKeywords" },
+                            new JsonObject { ["include"] = "#declarationKeywords" },
+                            new JsonObject { ["include"] = "#numbers" },
+                            new JsonObject { ["include"] = "#strings" }
+                        }
+                    }
                 }
             }
         }
     };
 
+    // ── fieldScalarDeclaration — all scalar/temporal/business types from catalog ──
     repo["fieldScalarDeclaration"] = new JsonObject
     {
-        ["comment"] = "field Name[, ...] as string|number|integer|decimal|boolean|choice(...)",
+        ["comment"] = "field Name[, ...] as <type> [modifiers...] [<- expr]",
         ["patterns"] = new JsonArray
         {
             new JsonObject
             {
-                ["name"] = "meta.field-declaration.scalar.precept",
-                ["match"] = "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|integer|decimal|boolean|choice)(.*)",
+                ["name"] = "meta.field-declaration.precept",
+                ["match"] = $"^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)({typeAlt})(.*)",
                 ["captures"] = new JsonObject
                 {
                     ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
@@ -365,34 +385,15 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                     {
                         ["patterns"] = new JsonArray
                         {
+                            new JsonObject { ["include"] = "#arrowOperators" },
+                            new JsonObject { ["include"] = "#constraintKeywords" },
+                            new JsonObject { ["include"] = "#declarationKeywords" },
+                            new JsonObject { ["include"] = "#typeKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
-                            new JsonObject { ["include"] = "#strings" }
-                        }
-                    }
-                }
-            }
-        }
-    };
-
-    // root-level edit declaration (stateless precepts)
-    repo["rootEditDeclaration"] = new JsonObject
-    {
-        ["comment"] = "Root-level edit declaration (stateless precepts): edit all | edit Field1, Field2",
-        ["patterns"] = new JsonArray
-        {
-            new JsonObject
-            {
-                ["name"] = "meta.declaration.edit.root.precept",
-                ["match"] = "^(\\s*)(edit)(\\s+)(all|(?:[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*))",
-                ["captures"] = new JsonObject
-                {
-                    ["2"] = new JsonObject { ["name"] = "keyword.other.precept" },
-                    ["4"] = new JsonObject
-                    {
-                        ["patterns"] = new JsonArray
-                        {
-                            new JsonObject { ["name"] = "keyword.control.precept", ["match"] = "\\ball\\b" },
-                            new JsonObject { ["name"] = "variable.other.field.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
+                            new JsonObject { ["include"] = "#strings" },
+                            new JsonObject { ["include"] = "#typedConstants" },
+                            new JsonObject { ["include"] = "#booleanLiterals" },
+                            new JsonObject { ["name"] = "punctuation.precept", ["match"] = "[()\\[\\]]" },
                             new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
                         }
                     }
@@ -401,7 +402,179 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    // from/on transition header
+    // ── ruleDeclaration — `rule` keyword at line start ───────────────────
+    repo["ruleDeclaration"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.rule.precept",
+                ["match"] = "^(\\s*)(rule)\\b",
+                ["captures"] = new JsonObject
+                {
+                    ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" }
+                }
+            }
+        }
+    };
+
+    // ── stateAction — `to/from State ->` ─────────────────────────────────
+    // Must precede stateEnsure (both start with to/from); disambiguated by `->`.
+    repo["stateAction"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.action.state.precept",
+                ["match"] = "^(\\s*)(to|from)(\\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\\s+)(->)",
+                ["captures"] = new JsonObject
+                {
+                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["4"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "keyword.other.quantifier.precept", ["match"] = "\\bany\\b" },
+                            new JsonObject { ["name"] = "entity.name.type.state.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" }
+                        }
+                    },
+                    ["6"] = new JsonObject { ["name"] = "keyword.operator.arrow.precept" }
+                }
+            }
+        }
+    };
+
+    // ── stateEnsure — `in/to/from State ensure` ───────────────────────────
+    repo["stateEnsure"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.ensure.state.precept",
+                ["match"] = "^(\\s*)(in|to|from)(\\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\\s+)(ensure)\\b",
+                ["captures"] = new JsonObject
+                {
+                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["4"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "keyword.other.quantifier.precept", ["match"] = "\\bany\\b" },
+                            new JsonObject { ["name"] = "entity.name.type.state.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" }
+                        }
+                    },
+                    ["6"] = new JsonObject { ["name"] = "keyword.declaration.precept" }
+                }
+            }
+        }
+    };
+
+    // ── eventHandler — `on Event ->` ──────────────────────────────────────
+    // Must precede eventEnsure (both start with `on`); disambiguated by `->`.
+    repo["eventHandler"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.handler.event.precept",
+                ["match"] = "^(\\s*)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(->)",
+                ["captures"] = new JsonObject
+                {
+                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["4"] = new JsonObject { ["name"] = "entity.name.function.event.precept" },
+                    ["6"] = new JsonObject { ["name"] = "keyword.operator.arrow.precept" }
+                }
+            }
+        }
+    };
+
+    // ── eventEnsure — `on Event ensure` ───────────────────────────────────
+    repo["eventEnsure"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.ensure.event.precept",
+                ["match"] = "^(\\s*)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(ensure)\\b",
+                ["captures"] = new JsonObject
+                {
+                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["4"] = new JsonObject { ["name"] = "entity.name.function.event.precept" },
+                    ["6"] = new JsonObject { ["name"] = "keyword.declaration.precept" }
+                }
+            }
+        }
+    };
+
+    // ── accessMode — `in State modify Field editable|readonly` ───────────
+    repo["accessMode"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.access-mode.precept",
+                ["match"] = "^(\\s*)(in)(\\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\\s+)(modify)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*|all)(\\s+)(editable|readonly)",
+                ["captures"] = new JsonObject
+                {
+                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["4"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "keyword.other.quantifier.precept", ["match"] = "\\bany\\b" },
+                            new JsonObject { ["name"] = "entity.name.type.state.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" }
+                        }
+                    },
+                    ["6"] = new JsonObject { ["name"] = "keyword.other.access-mode.precept" },
+                    ["8"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "keyword.other.quantifier.precept", ["match"] = "\\ball\\b" },
+                            new JsonObject { ["name"] = "variable.other.field.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
+                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
+                        }
+                    },
+                    ["10"] = new JsonObject { ["name"] = "keyword.other.access-mode.precept" }
+                }
+            }
+        }
+    };
+
+    // ── omitDeclaration — `in State omit Field` ───────────────────────────
+    repo["omitDeclaration"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.omit.precept",
+                ["match"] = "^(\\s*)(in)(\\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\\s+)(omit)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+                ["captures"] = new JsonObject
+                {
+                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
+                    ["4"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "keyword.other.quantifier.precept", ["match"] = "\\bany\\b" },
+                            new JsonObject { ["name"] = "entity.name.type.state.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" }
+                        }
+                    },
+                    ["6"] = new JsonObject { ["name"] = "keyword.other.access-mode.precept" },
+                    ["8"] = new JsonObject { ["name"] = "variable.other.field.precept" }
+                }
+            }
+        }
+    };
+
+    // ── fromOnHeader — `from State on Event` ─────────────────────────────
     repo["fromOnHeader"] = new JsonObject
     {
         ["patterns"] = new JsonArray
@@ -413,7 +586,15 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 ["captures"] = new JsonObject
                 {
                     ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
-                    ["4"] = new JsonObject { ["name"] = "entity.name.type.state.precept" },
+                    ["4"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "keyword.other.quantifier.precept", ["match"] = "\\bany\\b" },
+                            new JsonObject { ["name"] = "entity.name.type.state.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
+                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
+                        }
+                    },
                     ["6"] = new JsonObject { ["name"] = "keyword.control.precept" },
                     ["8"] = new JsonObject { ["name"] = "entity.name.function.event.precept" }
                 }
@@ -421,10 +602,28 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    // transition StateName
+    // ── noTransition — `no transition` compound keyword ───────────────────
+    // Must precede transitionTarget to prevent `no` from consuming `transition`.
+    repo["noTransition"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["match"] = "\\b(no)(\\s+)(transition)\\b",
+                ["captures"] = new JsonObject
+                {
+                    ["1"] = new JsonObject { ["name"] = "keyword.other.outcome.precept" },
+                    ["3"] = new JsonObject { ["name"] = "keyword.other.outcome.precept" }
+                }
+            }
+        }
+    };
+
+    // ── transitionTarget — `transition StateName` ─────────────────────────
     repo["transitionTarget"] = new JsonObject
     {
-        ["comment"] = "transition StateName — highlights the state name after transition keyword",
+        ["comment"] = "transition StateName",
         ["patterns"] = new JsonArray
         {
             new JsonObject
@@ -440,26 +639,75 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    // assert statement on EventName assert Expr
-    repo["assertStatement"] = new JsonObject
+    // ── functionCalls — built-in function names from Functions catalog ────
+    // Derives name list from Functions.All; CI variants (~startsWith, ~endsWith) get separate pattern.
+    // TODO: Once the Functions catalog adds a positional flag for message-string arguments
+    //       (e.g., FunctionMeta.IsMessageStringPosition), add a pattern here that applies
+    //       string.quoted.double.message.precept gold scope to strings in those positions.
+    if (funcNames.Count > 0)
     {
+        var funcAlt = string.Join("|", funcNames);
+        repo["functionCalls"] = new JsonObject
+        {
+            ["comment"] = "Built-in function name calls, derived from Functions catalog",
+            ["patterns"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["match"] = $"\\b({funcAlt})(\\s*\\()",
+                    ["captures"] = new JsonObject
+                    {
+                        ["1"] = new JsonObject { ["name"] = "support.function.precept" },
+                        ["2"] = new JsonObject { ["name"] = "punctuation.precept" }
+                    }
+                }
+            }
+        };
+    }
+
+    if (ciVariantNames.Count > 0)
+    {
+        var ciAlt = string.Join("|", ciVariantNames.Select(n => Regex.Escape(n)));
+        repo["functionCallsCI"] = new JsonObject
+        {
+            ["comment"] = "CI variant function calls (~startsWith, ~endsWith), derived from Functions catalog",
+            ["patterns"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["match"] = $"({ciAlt})(\\s*\\()",
+                    ["captures"] = new JsonObject
+                    {
+                        ["1"] = new JsonObject { ["name"] = "support.function.precept" },
+                        ["2"] = new JsonObject { ["name"] = "punctuation.precept" }
+                    }
+                }
+            }
+        };
+    }
+
+    // ── collectionMemberAccess — Collection.count, Queue.peek, etc. ───────
+    // Must precede eventArgReference to prevent Collection.count → event scope.
+    repo["collectionMemberAccess"] = new JsonObject
+    {
+        ["comment"] = "Collection member access (count, countof, min, max, peek, peekby)",
         ["patterns"] = new JsonArray
         {
             new JsonObject
             {
-                ["name"] = "meta.assert.precept",
-                ["match"] = "^(\\s*)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(assert)\\b",
+                ["name"] = "meta.collection-member.precept",
+                ["match"] = "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(count|countof|min|max|peek|peekby)\\b",
                 ["captures"] = new JsonObject
                 {
-                    ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
-                    ["4"] = new JsonObject { ["name"] = "entity.name.function.event.precept" },
-                    ["6"] = new JsonObject { ["name"] = "keyword.declaration.precept" }
+                    ["1"] = new JsonObject { ["name"] = "variable.other.field.precept" },
+                    ["2"] = new JsonObject { ["name"] = "punctuation.accessor.precept" },
+                    ["3"] = new JsonObject { ["name"] = "variable.other.property.precept" }
                 }
             }
         }
     };
 
-    // Event.arg dot access
+    // ── eventArgReference — Event.arg dot access ─────────────────────────
     repo["eventArgReference"] = new JsonObject
     {
         ["patterns"] = new JsonArray
@@ -478,33 +726,14 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    // Collection member access: Coll.count, Coll.min, etc.
-    repo["collectionMemberAccess"] = new JsonObject
-    {
-        ["comment"] = "Collection.count, Collection.min, etc.",
-        ["patterns"] = new JsonArray
-        {
-            new JsonObject
-            {
-                ["match"] = "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(count|countof|min|max|peek|peekby)\\b",
-                ["captures"] = new JsonObject
-                {
-                    ["1"] = new JsonObject { ["name"] = "variable.other.field.precept" },
-                    ["2"] = new JsonObject { ["name"] = "punctuation.accessor.precept" },
-                    ["3"] = new JsonObject { ["name"] = "variable.other.property.precept" }
-                }
-            }
-        }
-    };
-
-    // Catch-all identifier
+    // ── identifierReference — catch-all (MUST be last) ────────────────────
     repo["identifierReference"] = new JsonObject
     {
         ["patterns"] = new JsonArray
         {
             new JsonObject
             {
-                ["comment"] = "catch-all for bare identifier references in expression positions",
+                ["comment"] = "catch-all identifier reference",
                 ["name"] = "variable.other.precept",
                 ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
             }
@@ -514,41 +743,50 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
 
 static JsonArray BuildTopLevelPatterns()
 {
-    // Ordering matters: more specific patterns before catch-alls
+    // Per Frank spec §3 — ordered from most-specific to least-specific.
     string[] includeOrder =
     [
         "#comment",
+        "#messageStrings",        // MUST precede #strings — gold message payloads
         "#strings",
         "#typedConstants",
-        "#machineDeclaration",
+        "#preceptHeader",
         "#stateDeclaration",
-        "#eventWithArgsDeclaration",
         "#eventDeclaration",
         "#fieldCollectionDeclaration",
         "#fieldScalarDeclaration",
-        "#rootEditDeclaration",
+        "#ruleDeclaration",
+        "#stateAction",           // before stateEnsure — both start with to/from
+        "#stateEnsure",
+        "#eventHandler",          // before eventEnsure — both start with on
+        "#eventEnsure",
+        "#accessMode",
+        "#omitDeclaration",
         "#fromOnHeader",
+        "#noTransition",          // before transitionTarget — compound keyword
         "#transitionTarget",
-        "#assertStatement",
+        "#functionCalls",
+        "#functionCallsCI",
+        "#collectionMemberAccess", // before eventArgReference — prevent F.count → event scope
         "#eventArgReference",
-        "#collectionMemberAccess",
-        "#keyword.operator.arrow.preceptOperators",
-        "#keyword.operator.logical.preceptKeywords",
-        "#keyword.operator.membership.preceptKeywords",
-        "#storage.modifier.state.preceptKeywords",
-        "#keyword.other.constraint.preceptKeywords",
-        "#storage.type.preceptKeywords",
-        "#keyword.control.preceptKeywords",
-        "#keyword.declaration.preceptKeywords",
-        "#keyword.other.action.preceptKeywords",
-        "#keyword.other.outcome.preceptKeywords",
-        "#keyword.other.access-mode.preceptKeywords",
-        "#keyword.other.quantifier.preceptKeywords",
-        "#keyword.other.preceptKeywords",
-        "#constant.language.boolean.preceptKeywords",
-        "#keyword.operator.preceptOperators",
+        "#arrowOperators",
+        "#symbolOperators",
+        "#logicalOperators",
+        "#membershipOperators",
+        "#stateModifiers",
+        "#constraintKeywords",
+        "#typeKeywords",
+        "#declarationKeywords",
+        "#controlKeywords",
+        "#actionKeywords",
+        "#outcomeKeywords",
+        "#accessModeKeywords",
+        "#quantifierKeywords",
+        "#memberNameKeywords",
+        "#booleanLiterals",
         "#numbers",
-        "#identifierReference"
+        "#punctuation",
+        "#identifierReference"    // catch-all — MUST be last
     ];
 
     var arr = new JsonArray();
@@ -557,27 +795,22 @@ static JsonArray BuildTopLevelPatterns()
     return arr;
 }
 
-static string ScopeToRepositoryKey(string scope)
+static string ScopeToRepositoryKey(string scope) => scope switch
 {
-    // Convert scope like "keyword.control.precept" to descriptive name like "controlKeywords"
-    // This provides readable repository keys that match the hand-authored grammar conventions.
-    return scope switch
-    {
-        "keyword.declaration.precept" => "declarationKeywords",
-        "keyword.control.precept" => "controlKeywords",
-        "keyword.other.action.precept" => "actionKeywords",
-        "keyword.other.outcome.precept" => "outcomeKeywords",
-        "keyword.other.access-mode.precept" => "accessModeKeywords",
-        "keyword.other.quantifier.precept" => "quantifierKeywords",
-        "keyword.other.constraint.precept" => "constraintKeywords",
-        "keyword.operator.logical.precept" => "logicalOperators",
-        "keyword.operator.membership.precept" => "membershipOperators",
-        "storage.modifier.state.precept" => "stateModifiers",
-        "storage.type.precept" => "typeKeywords",
-        "constant.language.boolean.precept" => "booleanLiterals",
-        "keyword.operator.precept" => "symbolOperators",
-        "keyword.operator.arrow.precept" => "arrowOperators",
-        "keyword.other.precept" => "memberNameKeywords",
-        _ => scope.Replace(".precept", "").Replace(".", "_") + "Keywords"
-    };
-}
+    "keyword.declaration.precept"       => "declarationKeywords",
+    "keyword.control.precept"           => "controlKeywords",
+    "keyword.other.action.precept"      => "actionKeywords",
+    "keyword.other.outcome.precept"     => "outcomeKeywords",
+    "keyword.other.access-mode.precept" => "accessModeKeywords",
+    "keyword.other.quantifier.precept"  => "quantifierKeywords",
+    "keyword.other.constraint.precept"  => "constraintKeywords",
+    "keyword.operator.logical.precept"  => "logicalOperators",
+    "keyword.operator.membership.precept" => "membershipOperators",
+    "storage.modifier.state.precept"    => "stateModifiers",
+    "storage.type.precept"              => "typeKeywords",
+    "constant.language.boolean.precept" => "booleanLiterals",
+    "keyword.operator.precept"          => "symbolOperators",
+    "keyword.operator.arrow.precept"    => "arrowOperators",
+    "keyword.other.precept"             => "memberNameKeywords",
+    _ => scope.Replace(".precept", "").Replace(".", "_") + "Keywords"
+};
