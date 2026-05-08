@@ -40,3 +40,7 @@
 
 ### 2026-04-11 — Declaration guard DTO contract
 - Locked the additive `precept_compile` expansion for invariants, state asserts, event asserts, and edit blocks with nullable `when`.
+
+### 2026-05-08T02:26:13Z — PRECEPT0024 batch recorded
+- Scribe recorded the shipped anti-mirroring analyzer batch and durable OQ1 closeout after the committed work validated green.
+- Guarded surface remains the 10 `Typed*` records with `.Syntax` access allowed only inside `TypeChecker`; no MCP contract changes were required.
