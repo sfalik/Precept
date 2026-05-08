@@ -1,144 +1,29 @@
 # Core Context
 
-
-
 - Owns language research, spec wording, and cross-surface architecture documentation for Precept's DSL and runtime.
-
-- Catalogs remain the language truth; runtime, tooling, and docs derive behavior from metadata and shape rather than hardcoded enum identity or parallel lists.
-
-- Public API surfaces must expose stable CLR/JSON interchange types; evaluator internals stay internal and never leak into the durable surface.
-
-- Operation legality lives in `Language.Operations`; computation lives in `TypeRuntime` plus the runtime dispatch registry. The evaluator stays zero-knowledge.
-
-- Identity-type work follows the dual-shape rule: enriched internal entities when metadata/lifetime demands it, lightweight API-boundary code/value shapes when callers need stable interchange.
-
-- Collection internals are settled around universal `PreceptValue[]` backing, stride-2 pair storage, static `CollectionActions` helpers, and evaluator-owned copy-on-write.
-
-- Collection CLR adapters are lazy at the `Version` level and eager on first materialization, not per-index lazy.
-
-- Working docs drift quickly during heavy deliberation; canonical docs and squad records must be synchronized as soon as a decision locks.
-
-- Investigation docs may be archived once their outcomes are captured in canonical docs, proposals, or the squad decision ledger.
-
-
+- Catalogs remain the language truth; runtime, tooling, and docs must derive behavior from metadata and durable shape rather than enum-identity switch logic or parallel lists.
+- Public API surfaces expose stable CLR/JSON interchange contracts; evaluator internals stay internal.
+- Investigation docs can be archived once their outcomes are captured in canonical docs, proposals, or the squad decision ledger.
 
 ## Learnings
 
-### 2026-05-07: R0 Review — TypeChecker Shape (S0)
-
-- **Verdict: BLOCKED on B1.** One naming violation: `TypedOutcomeKind` must be `TransitionRowOutcome`. The spec name `TransitionOutcome` is unavailable — it's already a `sealed record` in `Precept.Pipeline` (the `ParsedOutcome` DU subtype). George's `TypedOutcomeKind` solves the collision but applies the `Typed` prefix to an enum, violating established convention (`ActionSecondaryRole`, `FieldScopeMode` — no Typed prefix). `TransitionRowOutcome` is the correct redirect.
-
-- **Everything else in S0 is clean.** D4 (ImmutableArray primary / FrozenDictionary secondary), D5 (SecondaryRole invariant documented), D9 (QualifierBinding DU with correct subtypes), D10 (FromState null-doc), D24 (TypedEditDeclaration placeholder), D26 (SemanticIndex debug-assert XML doc) — all compliant. CheckContext is pure accumulator state, TypeChecker stubs throw NotImplementedException, test helpers wire the full pipeline.
-
-- **TypedOutcomeKind naming pattern to watch:** When spec names collide with existing types in the same namespace, implementors will reach for prefix/suffix disambiguation. `Typed` prefix on enums is wrong. Always check whether the spec name is available first; if blocked, use a compound noun (`TransitionRowOutcome`) rather than a prefix convention.
-
-- **S0 shape quality is high.** 14 TypedExpression subtypes (13 spec + TypedPostfixOp for IsSet/IsNotSet), QualifierBinding DU correct, ConstraintIdentity DU correctly shared, segment types for TypedInterpolatedString correct, SemanticIndex.Empty factory present, CheckContext fully mirrors the spec shape including quantifier binding stack.
-
-
-
-
-
-- SlotValue shape principle: closed-vocabulary tokens (types, modifiers, access modes) are resolved by the parser at recognition time — never deferred as spans. String literals (`because` clause) are extracted at parse time. Only expressions (open-ended, precedence-sensitive) are deferred as `ParsedExpression`.
-
-- SymbolTable stage design principle: name binding is a separate concern from type inference. The SymbolTable collects declarations (field/state/event/arg) and resolves identifier references — pure name resolution requiring no type information. The type checker then receives pre-resolved names and performs semantic analysis. This follows the pipeline principle that each stage owns exactly one category of resolution.
-
-- LS artifact consumption is layered: lexical features → TokenStream; syntax features → ConstructManifest; name-level features (completions for field/state/event targets, "did you mean?", identifier semantic tokens) → SymbolTable; semantic features (hover with type info, typed expression tokens, operation resolution) → SemanticIndex. The SymbolTable gives the LS useful data even when the TC has errors.
-
-- Current `SemanticIndex.cs` stub is minimal (FieldReferences, StateReferences, EventReferences + diagnostics). The canonical design (`compiler-and-runtime-design.md` §6) specifies a much richer inventory: Symbols, Bindings, Normalized Declarations, Typed Expressions, Dependency Facts. The stub needs major expansion during TC implementation.
-
-- `language-server.md` is fully designed with complete per-feature mechanics (§7.1–7.10), cursor context determination via `SlotContext`, catalog-driven completions, two-pass semantic tokens, "did you mean?" fuzzy matching with Levenshtein ≤3. It reads `SemanticIndex` properties like `FieldsByName`, `StatesByName`, `EventsByName`, `UserFields`, `UserStates`, `UserEvents` that don't yet exist on the stub.
-
-- Disambiguation offset for StateScoped/EventScoped constructs is structurally invariant at 2: `peek(2)` always hits the disambiguation token because the anchor name is always a single identifier at position 1.
-
-- `AccessModeSlot` in `SlotValue.cs` needs a code fix: must carry `TokenKind AccessMode` (currently stores only base `SourceSpan`).
-
-- `type-checker.md` § SlotValue Subtypes table is stale (carries pre-resolution shapes for 4 slots); must be updated as a follow-up.
-
-
-
-- Diagnostic policy follows the philosophy's "proven violations only" rule: per-state event coverage gaps are design choices, but zero-handler events across all states justify `UnhandledEvent`.
-
-- When a working proposal becomes canonical, update every downstream contract in one pass and repoint CC references to canonical homes before archiving the proposal.
-
-- `GraphState` is a derived-facts output record, never a source-model mirror; booleans are the right shape when the question is structural.
-
-- `SlotContext` and `ConstructSlotKind` are different concepts; mapping between them is legitimate, aliasing them is not.
-
-- Default-valued field additions on `readonly record struct` contracts are acceptable when they preserve existing call sites and the new data is structurally optional.
-
-- `EventCoverageEntry` stays at event-level; guard-conditioned reachability belongs to the proof engine via `ProofForwardingFact`. Graph analysis is structural, not evaluative.
-
-- Back-edges in the graph analyzer are BFS-ancestor edges, not DFS back-edges. BFS ancestor is canonical because reachability and irreversibility use the same traversal order.
-
-- Graph structural diagnostic codes (82-85) precede proof engine codes (86+) by pipeline stage order.
-- `docs/language/catalog-system.md` now records `ActionMeta.SyntaxShape` (`ActionSyntaxShape`) as a real Actions-catalog field and documents that parser, TypeChecker, and PreceptBuilder read it for action-shape dispatch.
-- `docs/language/catalog-system.md` now records `FunctionMeta.HasCIVariant` and `FunctionMeta.CIVariantOf` as Functions-catalog fields used by the TypeChecker to resolve CI-qualified function calls.
-
-### 2026-05-07: R1 Gate Review — TypeChecker Slices 1–4
-
-- **Verdict: APPROVED.** Zero blockers. George may proceed to Slice 5.
-- 3170/3170 tests passing. 196 TypeChecker-specific tests across 4 files (55 + 46 + 51 + 44).
-- All 26 locked decisions verified in scope: D1–D5 (SemanticIndex shape), D6–D10 (resolution behavior), D11–D18 (expression resolution), D19–D23 (typed constants), D24/D26 (structural).
-- Catalog-driven compliance confirmed: no TypeKind switches encoding per-type behavior, no hardcoded lists, all resolution through catalog APIs (Types.GetMeta, Operations.FindCandidates, Functions.FindByName, Operators.ByToken).
-- Expression stub arms return TypedErrorExpression with no diagnostic — correct. Method-level NotImplementedException stubs are unreachable dead code (Check() doesn't call them) — acceptable.
-- D13 ErrorType propagation tested rigorously: binary (left/right/both), unary, function args, interpolated holes — all confirm parent is TypedErrorExpression AND no second diagnostic emitted.
-- ContentValidation DU dispatch (NodaTimeValidation, ClosedSetValidation, RegexValidation) is correct DU subtype dispatch, not catalog-member identity switching.
-- Observation for Slices 5+: ValidateNodaTime dispatches on 4 NodaTimePattern string values — acceptable but will need branches if new NodaTime types are added. Also: ensure StateReference/EventReference sites are recorded when resolving names in transition rows.
+- Closed-vocabulary syntax (types, modifiers, access modes) should be resolved by the parser at recognition time; only open-ended expressions stay deferred as parsed expression trees.
+- Symbol binding is a separate concern from type inference: the binder owns declarations/references, then the TypeChecker owns semantic normalization.
+- Tooling consumption is layered: TokenStream for lexical work, ConstructManifest for syntax, SymbolTable for name-aware features, SemanticIndex for semantic features.
+- Event coverage remains a structural graph concern; guard-conditioned reachability belongs to the proof engine.
+- When a working proposal becomes canonical, every downstream contract should be updated in one pass and stale references retired immediately.
 
 ## Recent Updates
 
-### 2026-05-07T23:22:15Z — R0 TypeChecker shape review closed
+### 2026-05-08T03:08:18Z — Comprehensive language/compiler review closed
+- Completed the comprehensive language/compiler doc review: `catalog-system.md` and `precept-grammar.md` were synchronized directly, while philosophy/runtime-claim drift plus graph-analyzer/proof-engine design gaps were recorded for owner review in the decision ledger.
+- The durable follow-up is now in `.squad/decisions.md`, the orchestration log, and the session log rather than the doc inbox.
 
-- Frank-13's R0 review found one blocker only: `TypedOutcomeKind` had to become `TransitionRowOutcome` because `TransitionOutcome` is already occupied by the parsed-outcome DU and enum `Typed` prefixes are non-canonical.
-- All other Slice 0 D# decisions were compliant, and George-12 resolved the blocker in `350f386`; the durable record now lives in `decisions.md` plus the paired orchestration/session logs.
+### 2026-05-08T03:08:18Z — TypeChecker consumer gate cleared
+- George-16 resolved B1/B2/B3, updated `docs/compiler/type-checker.md`, and validated green at 3342 `Precept.Tests` + 263 `Precept.Analyzers.Tests`.
+- GraphAnalyzer and downstream consumer-stage work are now unblocked.
 
-### Historical summary through 2026-05-07T09:36:17Z — Parser and NameBinder design baseline
-
-- Closed the parser-prerequisite and computed-field waves: `<-` is the computed-field delimiter, parser exhaustiveness stays scoped to expression handlers, and the parser remains catalog-driven without new architectural blockers.
-- Completed the independent and creative parser reviews, surfacing one medium-priority follow-up (action operand structure) plus ergonomics ideas, while keeping the current parser/type-checker boundary intact.
-- Produced the SymbolTable/NameBinder stage sketch that formalized the new pipeline slot between Parser and TypeChecker and established the declaration/reference-only contract for `SymbolTable`.
-
-### 2026-05-07T15:18:42Z — NameBinder implementation closed
-
-- Frank-11 completed the exhaustive NameBinder doc sync, created `docs/compiler/name-binder.md`, and updated 18 documentation files with zero stale references remaining.
-- Soup-Nazi-2 added `test/Precept.Tests/NameBinder/NameBinderTests.cs` with 40 tests across 9 groups, closing the batch with 2929 total passing tests.
-- No new architectural decisions were required; the remaining durable record now lives in the canonical docs, the decision ledger, and the orchestration/session logs.
-
-### 2026-05-07T22:51:59Z — Catalog doc sync folded into George-9 housekeeping closeout
-
-- Scribe recorded the `docs/language/catalog-system.md` sync as part of George-9's nine-commit housekeeping batch rather than as a separate decision entry.
-- Durable field additions now called out in squad records: `ActionMeta.SyntaxShape`, `FunctionMeta.HasCIVariant`, `FunctionMeta.CIVariantOf`.
-
-### 2026-05-08T01:00:00Z — R2 Gate Review — Slices 5–7 APPROVED
-
-- **Verdict: APPROVED.** 3242/3242 tests passing. No blockers. Slices 8–9 may proceed.
-- Slices reviewed: 5 (PopulateTransitionRows, PopulateEventHandlers, NormalizeTransitionRow, NormalizeEventHandler, ResolveAction, ResolveActionTarget), 6 (ValidateStructural: cycles, forward-ref, IsSet/choice), 7 (ValidateModifiers, ValidateFieldModifiers, IsTypeApplicable).
-- Locked decisions verified: D5 (SecondaryRole invariant via Debug.Assert), D9 (QualifierBinding DU — no raw qualifier strings), D10 (FromState == null for wildcard with XML doc), D26 (ErrorExpression Debug.Assert in both population methods), D3 (modifier validation fully catalog-driven from FieldModifierMeta).
-- §13/§14 boundary confirmed: ValidateStructural contains only cycle detection + forward-ref + IsSet/choice — no reachability/dead-end/unreachable.
-- EventName.ArgName fix confirmed: ResolveMemberAccess produces TypedArgRef, not TypedMemberAccess; end-to-end validated by Submit.Label in modifier tests.
-- Pipeline call order verified correct after Slice 5 restoration: PopulateFields → PopulateStates → PopulateEvents → PopulateTransitionRows → PopulateEventHandlers → ValidateModifiers → ValidateStructural.
-- Non-blocking observations: stale regression note in TransitionTests header, D10 wildcard test gap (parser-surface limitation), D5 positive-case test gap (collection action coverage needed).
-
-### 2026-05-08T02:28:00Z — R3 Final Gate Review — TypeChecker BLOCKED (3 blockers)
-
-- **Verdict: BLOCKED.** 3602 tests passing (3339 + 263). Three blockers prevent consumer stages from beginning.
-- **B1: Missing field expression resolution.** TypedField.DefaultExpression, ComputedExpression, and Qualifier are always null. No slice in §13 covers field expression resolution. ComputedFieldDep entries are never populated → cycle detection in ValidateStructural is dead code. PreceptBuilder can't build runtime descriptors.
-- **B2: Missing construct normalization for 4 kinds.** StateEnsure, EventEnsure, AccessMode, StateAction constructs are parsed but never processed by the TypeChecker. CheckContext accumulators and SemanticIndex fields exist but are never populated. GraphAnalyzer needs StateHooks; ProofEngine needs Ensures.
-- **B3: D26 invariant violation from MissingExpression.** MissingExpression → TypedErrorExpression emits no TC diagnostic. Parser diagnostic is in a separate list. D26 Debug.Assert checks only TC diagnostics → fires on MissingExpression-only errors.
-- Expression resolution engine (Slices 2–4, 8–9) is architecturally excellent: fully catalog-driven binary/unary/function/accessor resolution, clean DU dispatch, no hardcoded sets. ContentValidation DU dispatch correct. ActionSyntaxShape dispatch via parsed action DU subtypes. Modifier validation fully catalog-driven.
-- SemanticSubjects on TypedRule always empty (W1). ConstraintFieldRefs never populated.
-- Doc staleness: §1 still says "Stub", §4 LOC estimate 800–1200 vs actual ~2425.
-- Resolution path: ~300 lines of new normalization code following established patterns. B3 is a 5-minute fix (emit diagnostic on MissingExpression). B1 and B2 are ~150 lines each of familiar slot-extraction + Resolve + accumulate patterns.
-- Lesson: Slice plans must be verified against the full spec §6 Sub-pass 2b table, not just the expression resolution scope. The plan covered the expression engine thoroughly but missed material normalization steps for 4 construct kinds and 2 field expression categories.
-
-### 2026-05-07: Comprehensive Language/Compiler Doc Review
-
-- **Reviewed 12 docs** against catalog source reality. 7 clean, 2 fixed, 3 flagged.
-- **catalog-system.md fixes:** AccessModifierMeta count 4→3 (`modify` is a construct verb, not a ModifierKind member); ModifierKind total 28→29; Actions table expanded from 8 to 15 members with corrected ApplicableTo (e.g., `add` serves Set+Bag, not just Set), corrected AllowedIn (all action contexts, not EventDeclaration only), and added SyntaxShape column.
-- **precept-grammar.md fix:** ExpressionFormKind count 13→14; added InterpolatedString row to expression kinds table.
-- **philosophy.md flagged (6 items):** Core runtime operations, state reachability proof, expression safety proof, full inspectability, and stateless precepts are all described as implemented features but are stubs/planned. Restore operation not mentioned. Flagged to inbox per standing rule — no edits made.
-- **graph-analyzer.md flagged (4 items):** Domain-knowledge claims overstated, incomplete SemanticIndex input spec, proof-forwarding contract underspecified, missing structural assumptions section.
-- **proof-engine.md flagged (3 items):** Strategy count contradiction (4 claimed vs 3 described in compiler-and-runtime-design.md), constraint influence sourcing unclear, strategy discharge pseudocode missing.
-- **Type system docs (primitive, business-domain, temporal, collection) all clean.** Every type, operation, function, and constraint in the docs matches the catalogs exactly. 30 documented types match 30 user-facing TypeKind members. 23 functions match. 198 operations superset documented correctly.
-- **Language spec clean.** All actions, modifiers, constraints, and functions in spec match catalog entries by name.
-- **Lesson:** When catalogs gain members (the v3 collection wave added 7 actions), doc tables must be updated in the same pass. The Actions table was stale since the collection wave — it still listed the original 8 actions with wrong ApplicableTo values and wrong AllowedIn scope.
+### Historical summary through 2026-05-08T01:00:00Z
+- The R0/R1/R2/R3 review line established the canonical TypeChecker baseline: the `TransitionRowOutcome` naming blocker was closed, slices 1–7 were approved, R3 surfaced B1/B2/B3 as the final consumer blockers, and the resolution path stayed catalog-driven.
+- Earlier branch work locked the parser/checker boundary, the slot-value policy for parsed expressions vs. closed vocabularies, the NameBinder contract, and the rule that doc sync must ship in the same batch as language or runtime changes.
+- Durable catalog learnings preserved from the fuller history: `ActionMeta.SyntaxShape`, `FunctionMeta.HasCIVariant`, and `FunctionMeta.CIVariantOf` now live in the canonical docs and should be treated as the downstream contract for parser/tooling consumers.

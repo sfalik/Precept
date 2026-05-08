@@ -23,6 +23,12 @@
 
 ## Recent Updates
 
+
+
+### 2026-05-08T03:08:18Z — Comprehensive runtime/MCP doc review recorded
+- Newman-1 corrected runtime and MCP doc inaccuracies across descriptor/result/runtime API docs and `docs/tooling/mcp.md`.
+- Remaining runtime/MCP contract divergences (outcome naming, restore shape, constraint violation payloads, MCP DTO gaps) are now preserved in `.squad/decisions.md` for owner follow-up.
+
 ### 2026-05-07 — PRECEPT0024 anti-mirroring enforcement landed
 - Implemented Roslyn analyzer `Precept0024AntiMirroringEnforcement` guarding `.Syntax` access on 10 Typed* records outside TypeChecker.
 - 8 tests (4 TP, 4 TN) cover GraphAnalyzer/ProofEngine/Builder access, lambda closures, nested classes, non-guarded types, and non-Syntax properties.

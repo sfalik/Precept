@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+
+
+### 2026-05-08T03:08:18Z — R3 blockers B1/B2/B3 closed
+- George-16 resolved the TypeChecker consumer blockers: MissingExpression now emits a TC-level diagnostic, field default/computed expressions and computed deps are populated, and ensures/access modes/state hooks/edit declarations are normalized.
+- `docs/compiler/type-checker.md` was synchronized in the same batch, and validation closed green at 3342 `Precept.Tests` + 263 `Precept.Analyzers.Tests`.
+
 ### 2026-05-08T07:00:00Z — R3 blockers B1/B2/B3 fixed
 - Fixed B3 (MissingExpression D26 gap), B1 (field default/computed expression resolution + ComputedFieldDep extraction), B2 (ensures, access modes, state hooks, edit declaration normalization).
 - Added `ParsedConstruct.LeadingTokenKind` for anchor scope determination.

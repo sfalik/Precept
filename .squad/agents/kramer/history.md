@@ -9,6 +9,12 @@
 
 ## Recent Updates
 
+
+
+### 2026-05-08T03:08:18Z — Comprehensive tooling doc review recorded
+- Kramer corrected `docs/tooling/extension.md`, `docs/tooling/language-server.md`, and `docs/compiler/tooling-surface.md` to match the branch's actual tooling state.
+- Durable follow-ups now logged in `.squad/decisions.md`: clarify design-spec vs. implementation-status docs, recover the missing LS test corpus, and decide the grammar-generator ownership path.
+
 ### 2026-04-05 - Comprehensive tooling knowledge refresh
 - Consolidated the current toolchain, build/test commands, and major extension/MCP/plugin responsibilities.
 - Key learning: the fastest tooling documentation win is precise, executable instructions with no stale paths.
@@ -65,7 +71,22 @@
 - Build: 0 errors. Tests: 87/87 pass.
 - Commit: `8f3bdab` — "feat(#31): grammar and language server — and/or/not keywords (slice 5)"
 
+### 2026-05-07 — Comprehensive tooling doc review
+
+- Audited `docs/tooling/extension.md`, `docs/tooling/language-server.md`, and `docs/compiler/tooling-surface.md` against actual implementation (`extension.ts`, `Program.cs`, test directories).
+- Key finding: `extension.md` was the most stale — stated "no custom commands or webview implemented" when all three commands, LS client lifecycle, status bar, and preview scaffold are fully implemented.
+- Key finding: `tooling-surface.md` conflated catalog metadata readiness (TokenMeta fields populated) with LS handler implementation. "Semantic tokens Pass 1 implemented" was wrong — no LS handlers exist.
+- Key finding: `language-server.md` §2 used present tense to describe features the bootstrap-only LS doesn't provide. Status table was accurate; the body contradicted it.
+- Resolved two stale Open Questions in tooling-surface.md (SlotContext/ConstructSlotKind naming, SemanticIndex reference arrays) using resolutions already recorded in language-server.md.
+- Flagged three design issues: dual-purpose doc pattern (status vs. design spec), empty LS test directory, and the unbuilt grammar generator drifting from its "One Atom Test" promise.
+- Commit: `2ed7628`
+
 ## Learnings
+
+- Tooling docs drift fastest at status tables — the body can be aspirational design spec (acceptable) but the status row must reflect current branch state.
+- "Implemented" means handler code exists and runs, not "the metadata fields that would power this handler are ready." Catalog metadata readiness ≠ feature implementation.
+- When a doc has both a status table and a present-tense body, a developer reading only the body gets a false picture. Add callout boxes or section markers to distinguish design spec from live behavior.
+- The extension is further ahead than its doc claimed. Always diff `extension.ts` against `extension.md` before writing off the extension as "not yet done."
 
 - Tooling trust depends on precise, runnable instructions and zero stale paths.
 - Grammar/completion work is most reliable when specific patterns are ordered before generic catch-alls.

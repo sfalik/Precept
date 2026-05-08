@@ -34,6 +34,10 @@
 
 
 
+### 2026-05-08T03:08:18Z — R3 G1-G4 test pass closed
+- Added the G1 determinism, G3 non-null `TypedInputAction.SecondaryRole`, and G4 non-optional event-arg `is set` regression anchors; all pass.
+- G2 is now durably recorded as dead code at the TypeChecker level until qualifier-aware candidate disambiguation exists. Commit: `fcc9760`.
+
 ### 2026-05-01T20:36:28Z — Full review gaps closed and branch green
 
 - The full coverage review is now durably recorded end-to-end: the initial review found 6 missing tests, and Soup-Nazi-4 landed all 6 (M1-M6) plus the RS1030 follow-on fix.
@@ -157,3 +161,23 @@
 - TypedState uses `ImmutableArray<ModifierKind> Modifiers` for lifecycle flags (InitialState, Terminal, Error) — no separate IsInitial boolean (unlike TypedEvent which has `bool IsInitial`).
 - ImpliedModifiers confirmed from Types catalog: Timezone, Currency, UnitOfMeasure, Dimension all imply `Notempty`.
 - Existing suite stable at 2974 passing tests.
+
+
+
+### 2026-05-07T22:28:41Z — R3 TypeChecker full coverage review completed
+
+- Reviewed all 10 TypeChecker test files (313 tests total): SymbolTests, ExpressionTests, FunctionTests, TypedConstantTests, TransitionTests, StructuralTests, ModifierTests, CITests, QuantifierTests, AssemblyTests.
+- All 13 TypedExpression DU subtypes have test coverage; all 28 emittable diagnostics reviewed — 2 are untestable (dormant code paths), 1 has only negative-case coverage (CircularComputedField never actually triggered), and IsSetOnNonOptional's TypedArgRef path is unexercised.
+- Verdict: BLOCKED on 4 gaps: G5 determinism (zero coverage, §10 guarantee), QualifierMatch.Different disambiguation path, TypedInputAction non-null SecondaryRole invariant, and IsSetOnNonOptional for non-optional event args.
+- Key learning: a suite of 313 tests can still miss a §10 first-class guarantee entirely (determinism). Coverage breadth does not substitute for systematically walking each spec guarantee as a mandatory test target.
+- Key learning: qualifier disambiguation (same/different/none paths) is easy to miss because money operations look uniform from the outside — the QualifierMatch enum is an internal resolution axis that needs explicit path tests, not just happy-path integration tests.
+- The `CaseInsensitiveValueInCaseSensitiveContains` diagnostic and `CircularComputedField` arm are live TypeChecker code with no triggerable tests; both need follow-on tests when their underlying features (contains operator, computed expression deps) land.
+
+### 2026-05-07T22:36:33Z — R3 G1–G4 gaps closed (3 tests + 1 documented)
+
+- G1 (§10 G5 Determinism): `Check_SameInput_ReturnsDeterministicOutput` added to `TypeCheckerAssemblyTests` Category 6. Calls `Check()` twice on `TrafficLightPrecept` and asserts identical counts, field resolved type, and guarded-row binary op.
+- G2 (QualifierMatch.Different path): Documented as structurally unreachable. `DisambiguateCandidates` always returns the `QualifierMatch.Same` entry first; the Different entries (`MoneyDivideMoneyCrossCurrency`, `QuantityDivideQuantityCrossDimension`) are never selected. `MapQualifierBinding(Different) → null` is dead code at the TypeChecker level. TODO comment added to `TypeCheckerExpressionTests` before section 13. Inbox record written.
+- G3 (TypedInputAction non-null SecondaryRole): `TypedInputAction_WithSecondaryExpression_SecondaryRoleAndExpressionBothNonNull` added to `TypeCheckerTransitionTests` Category 7. Uses `insert … at` on a list field; asserts `SecondaryRole = ActionSecondaryRole.Index`, `SecondaryExpression != null`, and invariant consistency.
+- G4 (IsSetOnNonOptional on event arg): `IsSet_OnNonOptionalEventArg_EmitsIsSetOnNonOptionalDiagnostic` added to `TypeCheckerExpressionTests` section 14. Uses `Submit.Amount is set` where Amount is non-optional.
+- Durable lesson: `QualifierMatch.Different` is a disambiguation axis the TypeChecker is aware of but cannot yet select — the disambiguation always defaults to Same. No test can pin it until DisambiguateCandidates gains qualifier-aware selection. Flag this as a follow-on when qualifier tracking lands.
+- Commit: fcc9760. 3 new passing tests; pre-existing 17 failures unchanged.
