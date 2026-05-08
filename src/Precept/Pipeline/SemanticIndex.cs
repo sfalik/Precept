@@ -256,6 +256,7 @@ public sealed record TypedField(
 public sealed record TypedState(
     string Name,
     ImmutableArray<ModifierKind> Modifiers,
+    SourceSpan NameSpan,
     ParsedConstruct Syntax
 );
 
@@ -264,6 +265,7 @@ public sealed record TypedEvent(
     string Name,
     ImmutableArray<TypedArg> Args,
     bool IsInitial,
+    SourceSpan NameSpan,
     ParsedConstruct Syntax
 );
 

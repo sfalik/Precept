@@ -131,6 +131,12 @@ public class DiagnosticsTests
     }
 
     [Fact]
+    public void DeadEndState_HasWarningSeverity()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.DeadEndState).Severity.Should().Be(Severity.Warning);
+    }
+
+    [Fact]
     public void UnsatisfiableGuard_HasWarningSeverity()
     {
         Diagnostics.GetMeta(DiagnosticCode.UnsatisfiableGuard).Severity.Should().Be(Severity.Warning);
@@ -271,6 +277,7 @@ public class DiagnosticsTests
     {
         DiagnosticCode.UnreachableState,
         DiagnosticCode.UnhandledEvent,
+        DiagnosticCode.DeadEndState,
     };
 
     public static TheoryData<DiagnosticCode> ProofCodes=> new()

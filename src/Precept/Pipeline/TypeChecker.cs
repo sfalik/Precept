@@ -180,6 +180,7 @@ internal static partial class TypeChecker
             var typedState = new TypedState(
                 Name: declared.Name,
                 Modifiers: declared.Modifiers,
+                NameSpan: declared.NameSpan,
                 Syntax: declared.Syntax);
 
             ctx.States.Add(typedState);
@@ -236,6 +237,7 @@ internal static partial class TypeChecker
                 Name: declared.Name,
                 Args: typedArgs,
                 IsInitial: declared.IsInitial,
+                NameSpan: declared.NameSpan,
                 Syntax: declared.Syntax);
 
             ctx.Events.Add(typedEvent);

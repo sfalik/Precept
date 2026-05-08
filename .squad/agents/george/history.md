@@ -12,6 +12,8 @@
 - Context-sensitive literal retry is valuable when catalogs make typed constants or overload resolution depend on expected type.
 - Parser metadata should expose the lookup axes the parser actually queries (`BindingPower`, termination tokens, closed vocabularies) instead of duplicating parser-local tables.
 - Multi-location diagnostics can grow additively through payload fields like `RelatedSpans` without destabilizing constructor-heavy call sites.
+- When PRECEPT0024 blocks downstream `.Syntax` access, hoist declaration `SourceSpan` data (for example `TypedState.NameSpan` / `TypedEvent.NameSpan`) into the typed artifact instead of reaching back to parse constructs.
+- Graph wildcard expansion should stay structural: expand `FromState == null` rows per declared state, but suppress the expanded edge when that state already has an explicit row for the same event.
 
 ## Recent Updates
 

@@ -1,6 +1,6 @@
 # Graph Analyzer
 
-> **Status:** Design — implementation pending.
+> **Status:** Implemented.
 
 ## 1. Overview
 
@@ -137,7 +137,7 @@ public sealed record GraphEdge(
     string EventName,
     string ToState,       // resolved: self-transitions become explicit
     bool HasGuard,
-    TransitionOutcome Outcome
+    TransitionRowOutcome Outcome
 );
 ```
 
@@ -203,7 +203,7 @@ public sealed record DeadEndStateFact(
 
 The `ProofForwardingFact` DU defines the interface between the graph analyzer and the proof engine. Each subtype carries the structural data that the proof engine needs to instantiate proof obligations from graph-level analysis. The proof engine pattern-matches on these subtypes in Pass 1 (Obligation Instantiation) — see `docs/compiler/proof-engine.md §6` for the consumption contract.
 
-> **Design spec — implementation pending.** The `ProofForwardingFact` hierarchy is currently an abstract base record stub in `StateGraph.cs` with no subtypes. The four subtypes below are the design-specified contract. Implementation will add them to `src/Precept/Pipeline/GraphTypes.cs` or an adjacent file.
+> **Implemented.** The `ProofForwardingFact` hierarchy now lives in `src/Precept/Pipeline/StateGraph.cs` alongside the `StateGraph` topology records. The subtype set below is the current contract consumed by the proof engine.
 
 **Fact types, data, and proof engine consumption:**
 
@@ -555,7 +555,7 @@ A stateless precept declares no `state` blocks. This is a valid, complete config
 A stateful precept without an initial state has no entry point for graph traversal. This differs from a stateless precept — the author declared states but omitted the `initial` modifier.
 
 - **Detection:** `index.States.Any()` is true, but `!index.States.Any(s => s.Modifiers.Contains(ModifierKind.Initial))`
-- **Recovery:** Emit `Diagnostic(NoInitialState)`, return empty reachability sets.
+- **Recovery:** Emit `Diagnostic(NoInitialState)` if the upstream stage did not already do so, treat all declared states as unreachable, and continue analysis so downstream tooling still receives coverage and proof-forwarding facts.
 
 ### 8.2 Structural Violations
 
@@ -750,7 +750,7 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 |------|---------|
 | `src/Precept/Pipeline/GraphAnalyzer.cs` | Main entry point: `GraphAnalyzer.Analyze(SemanticIndex)` |
 | `src/Precept/Pipeline/StateGraph.cs` | Output type definition |
-| `src/Precept/Pipeline/GraphTypes.cs` | Supporting types: `GraphState`, `GraphEvent`, `GraphEdge`, analysis facts |
+| `src/Precept/Pipeline/StateGraph.cs` | Supporting types: `GraphState`, `GraphEvent`, `GraphEdge`, analysis facts, proof-forwarding facts |
 | `src/Precept/Language/Modifiers.cs` | Modifiers catalog with `StateModifierMeta` entries |
 | `src/Precept/Language/Modifier.cs` | `ModifierMeta` discriminated union hierarchy |
 | `test/Precept.Tests/Pipeline/GraphAnalyzerTests.cs` | Unit tests |
