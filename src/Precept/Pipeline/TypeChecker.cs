@@ -1,5 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using NodaTime;
+using NodaTime.Text;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -241,8 +243,8 @@ internal static class TypeChecker
     /// Resolves a single <see cref="ParsedExpression"/> in the given context.
     /// Thin wrapper over the private <see cref="Resolve"/> for test access.
     /// </summary>
-    internal static TypedExpression ResolveExpression(ParsedExpression expr, CheckContext ctx) =>
-        Resolve(expr, ctx);
+    internal static TypedExpression ResolveExpression(ParsedExpression expr, CheckContext ctx, TypeKind? expectedType = null) =>
+        Resolve(expr, ctx, expectedType);
 
     // ════════════════════════════════════════════════════════════════════════
     //  Pass 2 stubs — declaration normalization (Slices 2–9)
@@ -257,13 +259,13 @@ internal static class TypeChecker
     /// Dispatches on expression form, resolves types via catalogs, and propagates
     /// <see cref="TypedErrorExpression"/> on failure (D13).
     /// </summary>
-    private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx) => expr switch
+    private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx, TypeKind? expectedType = null) => expr switch
     {
         // ── Missing sentinel → error (no diagnostic — parser already emitted one) ──
         MissingExpression m => new TypedErrorExpression(m.Span),
 
         // ── Literal ──
-        LiteralExpression lit => ResolveLiteral(lit),
+        LiteralExpression lit => ResolveLiteral(lit, ctx, expectedType),
 
         // ── Identifier (field, arg, or quantifier binding) ──
         IdentifierExpression id => ResolveIdentifier(id, ctx),
@@ -295,27 +297,30 @@ internal static class TypeChecker
 
     /// <summary>
     /// Resolve a literal expression to a <see cref="TypedLiteral"/> with the appropriate
-    /// <see cref="TypeKind"/> and parsed value.
+    /// <see cref="TypeKind"/> and parsed value. When <paramref name="expectedType"/> is non-null
+    /// and the target type has <see cref="TypeMeta.ContentValidation"/>, numeric literals are
+    /// re-interpreted as the expected type and typed constants are validated.
     /// </summary>
-    private static TypedExpression ResolveLiteral(LiteralExpression lit) => lit.LiteralKind switch
+    private static TypedExpression ResolveLiteral(LiteralExpression lit, CheckContext ctx, TypeKind? expectedType) => lit.LiteralKind switch
     {
         TokenKind.StringLiteral => new TypedLiteral(TypeKind.String, lit.Text, lit.Span),
         TokenKind.True          => new TypedLiteral(TypeKind.Boolean, true, lit.Span),
         TokenKind.False         => new TypedLiteral(TypeKind.Boolean, false, lit.Span),
-        TokenKind.NumberLiteral => ResolveNumericLiteral(lit),
+        TokenKind.NumberLiteral => ResolveNumericLiteral(lit, expectedType),
 
-        // Typed constants are Slice 4 stubs
-        TokenKind.TypedConstant      => new TypedErrorExpression(lit.Span),
-        TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span),
+        // Typed constants: resolve with content validation from expectedType context
+        TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType),
+        TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span), // Interpolated typed constants deferred
 
         _ => new TypedErrorExpression(lit.Span),
     };
 
     /// <summary>
     /// Resolve a numeric literal to integer or decimal based on the presence of a decimal point.
-    /// Bottom-up resolution only — context retry for widening is Slice 4.
+    /// When <paramref name="expectedType"/> is a numeric type compatible via widening, the literal
+    /// is resolved as that type directly (context-sensitive numeric resolution).
     /// </summary>
-    private static TypedLiteral ResolveNumericLiteral(LiteralExpression lit)
+    private static TypedLiteral ResolveNumericLiteral(LiteralExpression lit, TypeKind? expectedType = null)
     {
         if (lit.Text.Contains('.'))
         {
@@ -325,7 +330,275 @@ internal static class TypeChecker
         }
 
         _ = long.TryParse(lit.Text, System.Globalization.CultureInfo.InvariantCulture, out var intVal);
+
+        // Context-sensitive: if expectedType is a type that integer widens to, resolve as that type
+        if (expectedType is not null && expectedType != TypeKind.Integer)
+        {
+            if (IsAssignable(TypeKind.Integer, expectedType.Value))
+                return new TypedLiteral(expectedType.Value, intVal, lit.Span);
+        }
+
         return new TypedLiteral(TypeKind.Integer, intVal, lit.Span);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Typed constant resolution (Slice 4)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Resolve a typed constant (single-quoted string literal) to a <see cref="TypedTypedConstant"/>
+    /// using the <paramref name="expectedType"/> context. If the target type has
+    /// <see cref="TypeMeta.ContentValidation"/>, the content is validated against it.
+    /// Without context, emits <see cref="DiagnosticCode.UnresolvedTypedConstant"/>.
+    /// </summary>
+    private static TypedExpression ResolveTypedConstant(LiteralExpression lit, CheckContext ctx, TypeKind? expectedType)
+    {
+        var rawText = lit.Text;
+
+        // No context: we don't know which type to validate against
+        if (expectedType is null || expectedType == TypeKind.Error)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.UnresolvedTypedConstant, lit.Span, rawText));
+            return new TypedErrorExpression(lit.Span);
+        }
+
+        var targetType = expectedType.Value;
+        var meta = Types.GetMeta(targetType);
+        var cv = meta.ContentValidation;
+
+        // Type has no content validation — treat as a plain typed constant (trusted)
+        if (cv is null)
+            return new TypedTypedConstant(targetType, rawText, rawText, lit.Span);
+
+        // Validate content against the ContentValidation DU
+        var (isValid, parsedValue, errorMessage) = ValidateContent(cv, rawText, meta.DisplayName);
+
+        if (isValid)
+            return new TypedTypedConstant(targetType, rawText, parsedValue, lit.Span);
+
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.InvalidTypedConstantContent, lit.Span,
+                rawText, errorMessage ?? meta.DisplayName));
+        return new TypedErrorExpression(lit.Span);
+    }
+
+    /// <summary>
+    /// Validate a typed constant's raw text against a <see cref="ContentValidation"/> strategy.
+    /// Returns (isValid, parsedValue, errorMessage). On success, parsedValue is the parsed
+    /// NodaTime object or the raw string. On failure, errorMessage describes the issue.
+    /// </summary>
+    private static (bool IsValid, object? ParsedValue, string? ErrorMessage) ValidateContent(
+        ContentValidation cv, string rawText, string displayName) => cv switch
+    {
+        NodaTimeValidation noda => ValidateNodaTime(noda, rawText, displayName),
+        ClosedSetValidation closed => ValidateClosedSet(closed, rawText),
+        RegexValidation regex => ValidateRegex(regex, rawText, displayName),
+        _ => (true, rawText, null),
+    };
+
+    private static (bool, object?, string?) ValidateNodaTime(
+        NodaTimeValidation noda, string rawText, string displayName)
+    {
+        // Dispatch to the appropriate NodaTime parser based on the pattern string.
+        // The NodaTimePattern field identifies which parser to use.
+        if (noda.NodaTimePattern == "uuuu'-'MM'-'dd")
+        {
+            var result = LocalDatePattern.Iso.Parse(rawText);
+            return result.Success
+                ? (true, result.Value, null)
+                : (false, null, $"{displayName} ({noda.FormatDescription})");
+        }
+
+        if (noda.NodaTimePattern == "HH':'mm':'ss")
+        {
+            var result = LocalTimePattern.ExtendedIso.Parse(rawText);
+            return result.Success
+                ? (true, result.Value, null)
+                : (false, null, $"{displayName} ({noda.FormatDescription})");
+        }
+
+        if (noda.NodaTimePattern == "uuuu'-'MM'-'dd'T'HH':'mm':'ss")
+        {
+            var result = LocalDateTimePattern.ExtendedIso.Parse(rawText);
+            return result.Success
+                ? (true, result.Value, null)
+                : (false, null, $"{displayName} ({noda.FormatDescription})");
+        }
+
+        if (noda.NodaTimePattern == "NormalizingIso")
+        {
+            var result = PeriodPattern.NormalizingIso.Parse(rawText);
+            return result.Success
+                ? (true, result.Value, null)
+                : (false, null, $"{displayName} ({noda.FormatDescription})");
+        }
+
+        // Unknown NodaTime pattern — accept without validation
+        return (true, rawText, null);
+    }
+
+    private static (bool, object?, string?) ValidateClosedSet(ClosedSetValidation closed, string rawText)
+    {
+        if (closed.AllowedValues.Contains(rawText))
+            return (true, rawText, null);
+
+        return (false, null, $"{closed.SetName} value");
+    }
+
+    private static (bool, object?, string?) ValidateRegex(
+        RegexValidation regex, string rawText, string displayName)
+    {
+        if (System.Text.RegularExpressions.Regex.IsMatch(rawText, regex.Pattern))
+            return (true, rawText, null);
+
+        return (false, null, $"{displayName} ({regex.FormatDescription})");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Context retry for binary operations (Slice 4)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Attempt to re-resolve a literal operand with <paramref name="expectedType"/> context
+    /// when bottom-up binary operation resolution fails. This handles cases like
+    /// <c>amount &gt; 100</c> where <c>amount: money</c> and <c>100</c> needs to be re-resolved as money.
+    /// </summary>
+    private static TypedExpression? TryContextRetryBinaryOp(
+        BinaryOperationExpression bin, TypedExpression left, TypedExpression right,
+        OperatorKind opKind, CheckContext ctx)
+    {
+        // Only retry if exactly one operand is a bare literal
+        bool leftIsLiteral = bin.Left is LiteralExpression;
+        bool rightIsLiteral = bin.Right is LiteralExpression;
+
+        if (!leftIsLiteral && !rightIsLiteral)
+            return null;
+
+        // Try retrying the literal side with the other side's type as context
+        if (rightIsLiteral && !leftIsLiteral)
+        {
+            var retried = Resolve(bin.Right, ctx, left.ResultType);
+            if (retried is not TypedErrorExpression && retried.ResultType != right.ResultType)
+            {
+                var result = TryResolveBinaryWithWidening(opKind, left.ResultType, retried.ResultType);
+                if (result is not null)
+                {
+                    return new TypedBinaryOp(
+                        result.Result, result.Kind, left, retried,
+                        ResultQualifier: MapQualifierBinding(result),
+                        ProofRequirements: result.ProofRequirements.ToImmutableArray(),
+                        Span: bin.Span);
+                }
+            }
+        }
+
+        if (leftIsLiteral && !rightIsLiteral)
+        {
+            var retried = Resolve(bin.Left, ctx, right.ResultType);
+            if (retried is not TypedErrorExpression && retried.ResultType != left.ResultType)
+            {
+                var result = TryResolveBinaryWithWidening(opKind, retried.ResultType, right.ResultType);
+                if (result is not null)
+                {
+                    return new TypedBinaryOp(
+                        result.Result, result.Kind, retried, right,
+                        ResultQualifier: MapQualifierBinding(result),
+                        ProofRequirements: result.ProofRequirements.ToImmutableArray(),
+                        Span: bin.Span);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Attempt context retry for function overload resolution. For each arity-matching overload,
+    /// re-resolves literal arguments with the parameter's type as <c>expectedType</c>.
+    /// Returns the best match or null.
+    /// </summary>
+    private static (FunctionKind Kind, FunctionOverload Overload, ImmutableArray<TypedExpression> Args)?
+        TryContextRetryOverload(
+            ReadOnlySpan<FunctionMeta> candidates,
+            ImmutableArray<TypedExpression> resolvedArgs,
+            ImmutableArray<ParsedExpression> parsedArgs,
+            CheckContext ctx)
+    {
+        // Only retry if at least one arg is a bare literal
+        bool hasLiteral = false;
+        for (int i = 0; i < parsedArgs.Length; i++)
+        {
+            if (parsedArgs[i] is LiteralExpression) { hasLiteral = true; break; }
+        }
+        if (!hasLiteral) return null;
+
+        FunctionKind? bestKind = null;
+        FunctionOverload? bestOverload = null;
+        ImmutableArray<TypedExpression> bestArgs = default;
+        int bestScore = int.MaxValue;
+
+        foreach (var meta in candidates)
+        {
+            foreach (var overload in meta.Overloads)
+            {
+                if (overload.Parameters.Count != resolvedArgs.Length) continue;
+
+                var retriedArgs = new TypedExpression[resolvedArgs.Length];
+                int score = 0;
+                bool valid = true;
+
+                for (int i = 0; i < resolvedArgs.Length; i++)
+                {
+                    var paramType = overload.Parameters[i].Kind;
+                    var argType = resolvedArgs[i].ResultType;
+
+                    if (argType == paramType)
+                    {
+                        retriedArgs[i] = resolvedArgs[i];
+                        continue;
+                    }
+
+                    // If this arg is a literal, re-resolve with parameter type context
+                    if (parsedArgs[i] is LiteralExpression)
+                    {
+                        var retried = Resolve(parsedArgs[i], ctx, paramType);
+                        if (retried is not TypedErrorExpression && IsAssignable(retried.ResultType, paramType))
+                        {
+                            retriedArgs[i] = retried;
+                            if (retried.ResultType != paramType) score++;
+                            continue;
+                        }
+                    }
+
+                    if (IsAssignable(argType, paramType))
+                    {
+                        retriedArgs[i] = resolvedArgs[i];
+                        score++;
+                    }
+                    else
+                    {
+                        valid = false;
+                        break;
+                    }
+                }
+
+                if (valid && score < bestScore)
+                {
+                    bestScore = score;
+                    bestKind = meta.Kind;
+                    bestOverload = overload;
+                    bestArgs = [..retriedArgs];
+                    if (score == 0) goto found;
+                }
+            }
+        }
+
+    found:
+        if (bestOverload is not null)
+            return (bestKind!.Value, bestOverload, bestArgs);
+
+        return null;
     }
 
     /// <summary>
@@ -414,7 +687,12 @@ internal static class TypeChecker
                 Span: bin.Span);
         }
 
-        // No match at any widening level
+        // Slice 4: context retry — re-resolve literal operands with the other side's type as context
+        var retried = TryContextRetryBinaryOp(bin, left, right, opKind, ctx);
+        if (retried is not null)
+            return retried;
+
+        // No match at any widening level or context retry
         ctx.Diagnostics.Add(
             Diagnostics.Create(DiagnosticCode.TypeMismatch, bin.Span,
                 Types.GetMeta(left.ResultType).DisplayName,
@@ -575,7 +853,7 @@ internal static class TypeChecker
         if (resolvedArgs.Any(a => a is TypedErrorExpression))
             return new TypedErrorExpression(expr.Span);
 
-        return SelectOverload(candidates, resolvedArgs, expr.FunctionName, expr.Span, ctx);
+        return SelectOverload(candidates, resolvedArgs, expr.Arguments, expr.FunctionName, expr.Span, ctx);
     }
 
     /// <summary>
@@ -598,16 +876,17 @@ internal static class TypeChecker
         if (resolvedArgs.Any(a => a is TypedErrorExpression))
             return new TypedErrorExpression(expr.Span);
 
-        return SelectOverload(candidates, resolvedArgs, ciName, expr.Span, ctx);
+        return SelectOverload(candidates, resolvedArgs, expr.Arguments, ciName, expr.Span, ctx);
     }
 
     /// <summary>
     /// Select the best overload across all <paramref name="candidates"/> for the given resolved args.
-    /// Arity filter → exact match (score 0) → widened match (score = widen count) → error.
+    /// Arity filter → exact match (score 0) → widened match (score = widen count) → context retry for literals → error.
     /// </summary>
     private static TypedExpression SelectOverload(
         ReadOnlySpan<FunctionMeta> candidates,
         ImmutableArray<TypedExpression> resolvedArgs,
+        ImmutableArray<ParsedExpression> parsedArgs,
         string functionName,
         SourceSpan span,
         CheckContext ctx)
@@ -658,6 +937,21 @@ internal static class TypeChecker
                 resolvedArgs,
                 bestOverload.ProofRequirements.ToImmutableArray(),
                 span);
+        }
+
+        // Slice 4: context retry — re-resolve literal args with each candidate's parameter type
+        if (parsedArgs.Length > 0)
+        {
+            var retryResult = TryContextRetryOverload(candidates, resolvedArgs, parsedArgs, ctx);
+            if (retryResult is not null)
+            {
+                return new TypedFunctionCall(
+                    retryResult.Value.Overload.ReturnType,
+                    retryResult.Value.Kind,
+                    retryResult.Value.Args,
+                    retryResult.Value.Overload.ProofRequirements.ToImmutableArray(),
+                    span);
+            }
         }
 
         // No matching overload — determine arity vs type mismatch for diagnostic

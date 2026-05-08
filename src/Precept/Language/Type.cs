@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace Precept.Language;
 
 // ── TypeCategory ───────────────────────────────────────────────────────────────
@@ -110,6 +112,37 @@ public sealed record ElementParameterAccessor(
     ProofRequirement[]? ProofRequirements = null
 ) : TypeAccessor(Name, Description, null, RequiredTraits, ProofRequirements);
 
+// ── ContentValidation DU ───────────────────────────────────────────────────────
+
+/// <summary>
+/// Describes how a typed constant's string content is validated for a given <see cref="TypeKind"/>.
+/// Subtypes carry the validation strategy: regex pattern, NodaTime temporal parsing, or closed set membership.
+/// </summary>
+public abstract record ContentValidation(string FormatDescription, string[] Examples);
+
+/// <summary>
+/// Validates typed constant content against a regular expression pattern.
+/// </summary>
+public sealed record RegexValidation(
+    string Pattern, string FormatDescription, string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
+/// <summary>
+/// Validates typed constant content by parsing as a NodaTime temporal type.
+/// <see cref="NodaTimePattern"/> is the NodaTime pattern string used for parsing.
+/// </summary>
+public sealed record NodaTimeValidation(
+    string NodaTimePattern, string FormatDescription, string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
+/// <summary>
+/// Validates typed constant content against a closed set of allowed string values.
+/// <see cref="SetName"/> is a human-readable label (e.g., "ISO 4217 currencies").
+/// </summary>
+public sealed record ClosedSetValidation(
+    string SetName, FrozenSet<string> AllowedValues, string FormatDescription, string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
 // ── TypeMeta ───────────────────────────────────────────────────────────────────
 
 /// <summary>
@@ -144,7 +177,13 @@ public record TypeMeta(
     /// The parser derives both the signed-prefix path and the literal validity check from this
     /// field — no per-type identity switch in <c>ParseChoiceValue</c>.
     /// </summary>
-    IReadOnlyList<TokenKind>?    ChoiceLiteralTokens = null
+    IReadOnlyList<TokenKind>?    ChoiceLiteralTokens = null,
+    /// <summary>
+    /// Content validation strategy for typed constants of this type.
+    /// Non-null for types whose typed constant literals require content validation
+    /// (temporal types via NodaTime, currency/unit via closed set membership).
+    /// </summary>
+    ContentValidation?           ContentValidation = null
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>

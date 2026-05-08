@@ -53,6 +53,101 @@ public static class Types
 
     private static readonly TypeKind[] IntegerWidens = [TypeKind.Decimal, TypeKind.Number];
 
+    // ── ContentValidation instances ─────────────────────────────────────────────
+
+    /// <summary>Active ISO 4217 currency codes.</summary>
+    private static readonly FrozenSet<string> Iso4217CurrencyCodes = new[]
+    {
+        "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN",
+        "BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL",
+        "BSD","BTN","BWP","BYN","BZD","CAD","CDF","CHF","CLP","CNY",
+        "COP","CRC","CUP","CVE","CZK","DJF","DKK","DOP","DZD","EGP",
+        "ERN","ETB","EUR","FJD","FKP","GBP","GEL","GHS","GIP","GMD",
+        "GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS",
+        "INR","IQD","IRR","ISK","JMD","JOD","JPY","KES","KGS","KHR",
+        "KMF","KPW","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD",
+        "LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRU",
+        "MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK",
+        "NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG",
+        "QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SDG","SEK",
+        "SGD","SHP","SLE","SOS","SRD","SSP","STN","SVC","SYP","SZL",
+        "THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH",
+        "UGX","USD","UYU","UZS","VES","VND","VUV","WST","XAF","XCD",
+        "XOF","XPF","YER","ZAR","ZMW","ZWL",
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Recognized unit-of-measure identifiers.</summary>
+    private static readonly FrozenSet<string> RecognizedUnits = new[]
+    {
+        // Mass
+        "kg","g","mg","lb","oz","ton","tonne",
+        // Length
+        "m","km","cm","mm","mi","miles","yd","ft","in",
+        // Volume
+        "l","ml","gal","qt","pt","floz",
+        // Area
+        "sqm","sqft","sqmi","acre","hectare",
+        // Time
+        "s","ms","min","hr","h",
+        // Temperature
+        "C","F","K",
+        // Count / generic
+        "each","unit","piece","pair","dozen","gross",
+        // Speed / rate
+        "mph","kph","mps",
+        // Energy
+        "J","kJ","cal","kcal","Wh","kWh",
+        // Pressure
+        "Pa","kPa","bar","psi","atm",
+        // Force
+        "N","kN","lbf",
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Recognized dimension family identifiers.</summary>
+    private static readonly FrozenSet<string> RecognizedDimensions = new[]
+    {
+        "length","mass","time","temperature","volume","area",
+        "speed","energy","pressure","force","count",
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly NodaTimeValidation DateValidation = new(
+        "uuuu'-'MM'-'dd",
+        "ISO 8601 date (YYYY-MM-DD)",
+        ["2026-01-15", "2024-12-31"]);
+
+    private static readonly NodaTimeValidation TimeValidation = new(
+        "HH':'mm':'ss",
+        "ISO 8601 extended time (HH:mm:ss)",
+        ["09:00:00", "14:30:00"]);
+
+    private static readonly NodaTimeValidation DateTimeValidation = new(
+        "uuuu'-'MM'-'dd'T'HH':'mm':'ss",
+        "ISO 8601 date-time (YYYY-MM-DDThh:mm:ss)",
+        ["2026-04-13T09:00:00", "2024-12-31T23:59:59"]);
+
+    private static readonly NodaTimeValidation PeriodValidation = new(
+        "NormalizingIso",
+        "ISO 8601 period (PnYnMnDTnHnMnS)",
+        ["P30D", "P1Y6M", "PT2H30M"]);
+
+    private static readonly ClosedSetValidation CurrencyValidation = new(
+        "ISO 4217",
+        Iso4217CurrencyCodes,
+        "ISO 4217 currency code",
+        ["USD", "EUR", "GBP"]);
+
+    private static readonly ClosedSetValidation UnitOfMeasureValidation = new(
+        "recognized units",
+        RecognizedUnits,
+        "Unit of measure identifier",
+        ["kg", "miles", "each"]);
+
+    private static readonly ClosedSetValidation DimensionValidation = new(
+        "recognized dimensions",
+        RecognizedDimensions,
+        "Dimension family identifier",
+        ["length", "mass", "time"]);
+
     // ── Collection accessor helpers ─────────────────────────────────────────────
 
     private static readonly FixedReturnAccessor CollectionCountAccessor =
@@ -282,7 +377,8 @@ public static class Types
             Accessors: DateComponentAccessors,
             DisplayName: "date",
             HoverDescription: "A calendar date (year-month-day) with no time component. Supports .year, .month, .day, and .dayOfWeek accessors.",
-            UsageExample: "field DueDate as date default '2026-06-01'"
+            UsageExample: "field DueDate as date default '2026-06-01'",
+            ContentValidation: DateValidation
         ),
 
         TypeKind.Time => new(
@@ -293,7 +389,8 @@ public static class Types
             Accessors: TimeComponentAccessors,
             DisplayName: "time",
             HoverDescription: "A time of day (hour-minute-second) with no date or timezone. Supports .hour, .minute, and .second accessors.",
-            UsageExample: "field AppointmentTime as time default '09:00:00'"
+            UsageExample: "field AppointmentTime as time default '09:00:00'",
+            ContentValidation: TimeValidation
         ),
 
         TypeKind.Instant => new(
@@ -349,7 +446,8 @@ public static class Types
             ],
             DisplayName: "period",
             HoverDescription: "A calendar-relative duration measured in years, months, and days. Use for business deadlines and date offsets.",
-            UsageExample: "field GracePeriod as period default '30 days'"
+            UsageExample: "field GracePeriod as period default '30 days'",
+            ContentValidation: PeriodValidation
         ),
 
         TypeKind.Timezone => new(
@@ -398,7 +496,8 @@ public static class Types
             ],
             DisplayName: "date-time",
             HoverDescription: "A date and time without a timezone. Use when timezone context is handled externally or is not relevant.",
-            UsageExample: "field ScheduledFor as datetime default '2026-04-13T09:00:00'"
+            UsageExample: "field ScheduledFor as datetime default '2026-04-13T09:00:00'",
+            ContentValidation: DateTimeValidation
         ),
 
         // ── Business-Domain ────────────────────────────────────────────
@@ -426,7 +525,8 @@ public static class Types
             ImpliedModifiers: [ModifierKind.Notempty],
             DisplayName: "currency",
             HoverDescription: "An ISO 4217 currency code identifier such as 'USD' or 'EUR'. Carries notempty implicitly.",
-            UsageExample: "field BaseCurrency as currency default 'USD'"
+            UsageExample: "field BaseCurrency as currency default 'USD'",
+            ContentValidation: CurrencyValidation
         ),
 
         TypeKind.Quantity => new(
@@ -458,7 +558,8 @@ public static class Types
             ],
             DisplayName: "unit of measure",
             HoverDescription: "A unit-of-measure identifier such as 'kg' or 'miles'. Carries notempty implicitly. Use .dimension to read the unit's dimension family.",
-            UsageExample: "field StockingUom as unitofmeasure default 'each'"
+            UsageExample: "field StockingUom as unitofmeasure default 'each'",
+            ContentValidation: UnitOfMeasureValidation
         ),
 
         TypeKind.Dimension => new(
@@ -469,7 +570,8 @@ public static class Types
             ImpliedModifiers: [ModifierKind.Notempty],
             DisplayName: "dimension",
             HoverDescription: "A dimension family identifier such as 'length' or 'mass'. Used to enforce dimensional consistency in quantity arithmetic.",
-            UsageExample: "field MeasuredDimension as dimension default 'mass'"
+            UsageExample: "field MeasuredDimension as dimension default 'mass'",
+            ContentValidation: DimensionValidation
         ),
 
         TypeKind.Price => new(

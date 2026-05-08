@@ -12,6 +12,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NodaTime" Version="3.*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Precept.Tests" />
   </ItemGroup>
 
