@@ -13,8 +13,10 @@ namespace Precept.Pipeline;
 /// <see cref="SemanticIndex"/>.
 /// </summary>
 /// <remarks>
-/// Implementation is staged across Slices 1–10. Slice 1 (typed symbol population) is live.
-/// Remaining private methods throw <see cref="NotImplementedException"/> until their owning slice lands.
+/// Pipeline stages: PopulateFields → PopulateStates → PopulateEvents →
+/// PopulateTransitionRows → PopulateEventHandlers → PopulateRules →
+/// ValidateModifiers → ValidateStructural → ValidateCIEnforcement →
+/// BuildSemanticIndex (final assembly with D26 global assert).
 /// </remarks>
 internal static class TypeChecker
 {
@@ -47,9 +49,7 @@ internal static class TypeChecker
         // walks resolved expression trees for ~string consistency violations.
         ValidateCIEnforcement(ctx);
 
-        // Remaining final assembly deferred to Slice 10.
-        // Return a partial SemanticIndex with the symbol tables populated.
-        return BuildPartialSemanticIndex(ctx);
+        return BuildSemanticIndex(ctx);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -231,40 +231,6 @@ internal static class TypeChecker
             ctx.Events.Add(typedEvent);
             ctx.EventLookup[declared.Name] = typedEvent;
         }
-    }
-
-    /// <summary>
-    /// Build a partial <see cref="SemanticIndex"/> from the populated <see cref="CheckContext"/>.
-    /// Only symbol tables (Fields, States, Events) and diagnostics are populated;
-    /// normalized declarations and dependency facts are empty pending Slices 2–10.
-    /// </summary>
-    private static SemanticIndex BuildPartialSemanticIndex(CheckContext ctx)
-    {
-        var fields = ctx.Fields.ToImmutableArray();
-        var states = ctx.States.ToImmutableArray();
-        var events = ctx.Events.ToImmutableArray();
-
-        return new SemanticIndex(
-            Fields: fields,
-            States: states,
-            Events: events,
-            FieldsByName: fields.ToFrozenDictionary(f => f.Name),
-            StatesByName: states.ToFrozenDictionary(s => s.Name),
-            EventsByName: events.ToFrozenDictionary(e => e.Name),
-            TransitionRows: ctx.TransitionRows.ToImmutableArray(),
-            Rules: ctx.Rules.ToImmutableArray(),
-            Ensures: ImmutableArray<TypedEnsure>.Empty,
-            AccessModes: ImmutableArray<TypedAccessMode>.Empty,
-            StateHooks: ImmutableArray<TypedStateHook>.Empty,
-            EventHandlers: ctx.EventHandlers.ToImmutableArray(),
-            EditDeclarations: ImmutableArray<TypedEditDeclaration>.Empty,
-            EnsuresByState: FrozenDictionary<string, ImmutableArray<TypedEnsure>>.Empty,
-            ComputedDeps: ImmutableArray<ComputedFieldDep>.Empty,
-            ConstraintRefs: ImmutableArray<ConstraintFieldRefs>.Empty,
-            FieldReferences: ctx.FieldReferences.ToImmutableArray(),
-            StateReferences: ctx.StateReferences.ToImmutableArray(),
-            EventReferences: ctx.EventReferences.ToImmutableArray(),
-            Diagnostics: ctx.Diagnostics.ToImmutableArray());
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -2234,13 +2200,159 @@ internal static class TypeChecker
         false; // Placeholder: no contains OperationKind values exist yet
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Final assembly stub (Slice 10)
+    //  Final assembly (Slice 10)
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Transform <see cref="CheckContext"/> mutable accumulators into the immutable <see cref="SemanticIndex"/>.
-    /// Derives frozen-dictionary secondary indexes from primary arrays.
+    /// Derives frozen-dictionary secondary indexes from primary arrays (D4).
+    /// Enforces D26 global invariant: any <see cref="TypedErrorExpression"/> in the index
+    /// requires ≥1 <see cref="Severity.Error"/> diagnostic.
     /// </summary>
-    private static SemanticIndex BuildSemanticIndex(CheckContext ctx) =>
-        throw new NotImplementedException("Slice 10");
+    private static SemanticIndex BuildSemanticIndex(CheckContext ctx)
+    {
+        var fields = ctx.Fields.ToImmutableArray();
+        var states = ctx.States.ToImmutableArray();
+        var events = ctx.Events.ToImmutableArray();
+        var ensures = ctx.Ensures.ToImmutableArray();
+
+        var index = new SemanticIndex(
+            Fields:           fields,
+            States:           states,
+            Events:           events,
+            FieldsByName:     fields.ToFrozenDictionary(f => f.Name),
+            StatesByName:     states.ToFrozenDictionary(s => s.Name),
+            EventsByName:     events.ToFrozenDictionary(e => e.Name),
+            TransitionRows:   ctx.TransitionRows.ToImmutableArray(),
+            Rules:            ctx.Rules.ToImmutableArray(),
+            Ensures:          ensures,
+            AccessModes:      ctx.AccessModes.ToImmutableArray(),
+            StateHooks:       ctx.StateHooks.ToImmutableArray(),
+            EventHandlers:    ctx.EventHandlers.ToImmutableArray(),
+            EditDeclarations: ctx.EditDeclarations.ToImmutableArray(),
+            EnsuresByState:   ensures
+                                  .Where(e => e.AnchorState is not null)
+                                  .GroupBy(e => e.AnchorState!)
+                                  .ToFrozenDictionary(g => g.Key, g => g.ToImmutableArray()),
+            ComputedDeps:     ctx.ComputedDeps.ToImmutableArray(),
+            ConstraintRefs:   ctx.ConstraintRefs.ToImmutableArray(),
+            FieldReferences:  ctx.FieldReferences.ToImmutableArray(),
+            StateReferences:  ctx.StateReferences.ToImmutableArray(),
+            EventReferences:  ctx.EventReferences.ToImmutableArray(),
+            Diagnostics:      ctx.Diagnostics.ToImmutableArray());
+
+        // D26: If any TypedErrorExpression exists, at least one Error diagnostic must be present
+        Debug.Assert(
+            !ContainsAnyErrorExpression(index) ||
+            index.Diagnostics.Any(d => d.Severity == Severity.Error),
+            "D26 violated: TypedErrorExpression present but no Error diagnostic in SemanticIndex");
+
+        return index;
+    }
+
+    /// <summary>
+    /// Walk all expression-bearing sites in the <see cref="SemanticIndex"/> and return
+    /// <c>true</c> if any <see cref="TypedErrorExpression"/> is found. Used by D26.
+    /// </summary>
+    private static bool ContainsAnyErrorExpression(SemanticIndex index)
+    {
+        // Fields: default + computed expressions
+        foreach (var f in index.Fields)
+        {
+            if (ContainsError(f.DefaultExpression) || ContainsError(f.ComputedExpression))
+                return true;
+        }
+
+        // Events: arg default expressions
+        foreach (var ev in index.Events)
+        {
+            foreach (var arg in ev.Args)
+            {
+                if (ContainsError(arg.DefaultExpression))
+                    return true;
+            }
+        }
+
+        // Transition rows: guard + actions
+        foreach (var row in index.TransitionRows)
+        {
+            if (ContainsError(row.Guard))
+                return true;
+            if (ActionsContainError(row.Actions))
+                return true;
+        }
+
+        // Rules: condition + guard + message
+        foreach (var rule in index.Rules)
+        {
+            if (ContainsError(rule.Condition) || ContainsError(rule.Guard) || ContainsError(rule.Message))
+                return true;
+        }
+
+        // Ensures: condition + guard + message
+        foreach (var ensure in index.Ensures)
+        {
+            if (ContainsError(ensure.Condition) || ContainsError(ensure.Guard) || ContainsError(ensure.Message))
+                return true;
+        }
+
+        // Access modes: guard
+        foreach (var am in index.AccessModes)
+        {
+            if (ContainsError(am.Guard))
+                return true;
+        }
+
+        // State hooks: guard + actions
+        foreach (var hook in index.StateHooks)
+        {
+            if (ContainsError(hook.Guard))
+                return true;
+            if (ActionsContainError(hook.Actions))
+                return true;
+        }
+
+        // Event handlers: actions
+        foreach (var handler in index.EventHandlers)
+        {
+            if (ActionsContainError(handler.Actions))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Returns true if any action in the list contains a <see cref="TypedErrorExpression"/>.</summary>
+    private static bool ActionsContainError(ImmutableArray<TypedAction> actions)
+    {
+        foreach (var action in actions)
+        {
+            if (action is TypedInputAction input)
+            {
+                if (ContainsError(input.InputExpression) || ContainsError(input.SecondaryExpression))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Recursively check whether <paramref name="expr"/> is or contains a <see cref="TypedErrorExpression"/>.
+    /// Returns false for null expressions.
+    /// </summary>
+    private static bool ContainsError(TypedExpression? expr) => expr switch
+    {
+        null => false,
+        TypedErrorExpression => true,
+        TypedBinaryOp bin => ContainsError(bin.Left) || ContainsError(bin.Right),
+        TypedUnaryOp un => ContainsError(un.Operand),
+        TypedFunctionCall fn => fn.Arguments.Any(ContainsError),
+        TypedMemberAccess ma => ContainsError(ma.Object),
+        TypedConditional cond => ContainsError(cond.Condition) || ContainsError(cond.ThenBranch) || ContainsError(cond.ElseBranch),
+        TypedQuantifier q => ContainsError(q.Collection) || ContainsError(q.Predicate),
+        TypedInterpolatedString interp => interp.Segments.Any(s => s is TypedHoleSegment hole && ContainsError(hole.Expression)),
+        TypedListLiteral list => list.Elements.Any(ContainsError),
+        TypedPostfixOp post => ContainsError(post.Operand),
+        _ => false, // TypedFieldRef, TypedArgRef, TypedLiteral, TypedTypedConstant — leaf nodes
+    };
 }
