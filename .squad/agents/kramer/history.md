@@ -10,6 +10,8 @@
 - Grammar and completion changes are safest when specific patterns land before generic catch-alls and are backed by regression tests.
 - Proof diagnostics become brittle when they depend on prose instead of structured metadata; keep publication paths but prefer durable data contracts.
 - For custom DSL documentation, truthful code-fence labels and accurate path/build guidance matter more than cosmetic approximations.
+- `IsMessagePosition` now drives `messageStrings` generation in `Precept.GrammarGen`: token flags emit keyword-plus-gold-string patterns, and function flags reserve the future trailing-argument path.
+- No built-in functions currently opt into `IsMessagePosition`; the generator intentionally emits only token-derived message patterns today while keeping the function wiring live.
 
 ## Recent Updates
 

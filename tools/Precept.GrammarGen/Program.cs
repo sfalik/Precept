@@ -140,34 +140,28 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 
-    // ── messageStrings — GOLD highlight for because/reject message payloads ──
+    // ── messageStrings — GOLD highlight for catalog-declared message payloads ──
     // MUST precede generic strings pattern to prevent gold strings from being consumed as regular strings.
     // Per Frank spec §2.2 and visual system: string.quoted.double.message.precept → #FBBF24 gold.
+    var messageStringPatterns = new JsonArray();
+
+    foreach (var token in Tokens.All
+        .Where(m => m.IsMessagePosition && m.Text is not null && m.TextMateScope is not null)
+        .OrderBy(m => m.Text, StringComparer.Ordinal))
+    {
+        messageStringPatterns.Add(CreateTokenMessageStringPattern(token));
+    }
+
+    foreach (var function in Functions.All
+        .Where(f => f.IsMessagePosition)
+        .OrderBy(f => f.Name, StringComparer.Ordinal))
+    {
+        messageStringPatterns.Add(CreateFunctionMessageStringPattern(function));
+    }
+
     repo["messageStrings"] = new JsonObject
     {
-        ["patterns"] = new JsonArray
-        {
-            new JsonObject
-            {
-                ["name"] = "meta.message.because.precept",
-                ["match"] = "\\b(because)(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
-                ["captures"] = new JsonObject
-                {
-                    ["1"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
-                    ["3"] = new JsonObject { ["name"] = "string.quoted.double.message.precept" }
-                }
-            },
-            new JsonObject
-            {
-                ["name"] = "meta.message.reject.precept",
-                ["match"] = "\\b(reject)(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
-                ["captures"] = new JsonObject
-                {
-                    ["1"] = new JsonObject { ["name"] = "keyword.other.outcome.precept" },
-                    ["3"] = new JsonObject { ["name"] = "string.quoted.double.message.precept" }
-                }
-            }
-        }
+        ["patterns"] = messageStringPatterns
     };
 
     // ── strings ──────────────────────────────────────────────────────────
@@ -641,9 +635,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
 
     // ── functionCalls — built-in function names from Functions catalog ────
     // Derives name list from Functions.All; CI variants (~startsWith, ~endsWith) get separate pattern.
-    // TODO: Once the Functions catalog adds a positional flag for message-string arguments
-    //       (e.g., FunctionMeta.IsMessageStringPosition), add a pattern here that applies
-    //       string.quoted.double.message.precept gold scope to strings in those positions.
+    // Entries without IsMessagePosition still participate here; they simply add no messageStrings pattern above.
     if (funcNames.Count > 0)
     {
         var funcAlt = string.Join("|", funcNames);
@@ -740,6 +732,47 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         }
     };
 }
+
+static JsonObject CreateTokenMessageStringPattern(TokenMeta token)
+{
+    var keyword = token.Text ?? throw new InvalidOperationException("Message-position tokens must declare text.");
+    var scope = token.TextMateScope ?? throw new InvalidOperationException("Message-position tokens must declare a TextMate scope.");
+
+    return new JsonObject
+    {
+        ["name"] = $"meta.message.{MessagePatternNameSegment(keyword)}.precept",
+        ["match"] = $"\\b({Regex.Escape(keyword)})(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
+        ["captures"] = new JsonObject
+        {
+            ["1"] = new JsonObject { ["name"] = scope },
+            ["3"] = new JsonObject { ["name"] = "string.quoted.double.message.precept" }
+        }
+    };
+}
+
+static JsonObject CreateFunctionMessageStringPattern(FunctionMeta function)
+{
+    var functionName = function.Name;
+    var prefix = functionName.StartsWith("~", StringComparison.Ordinal)
+        ? $"({Regex.Escape(functionName)})"
+        : $"\\b({Regex.Escape(functionName)})";
+
+    return new JsonObject
+    {
+        ["name"] = $"meta.message.{MessagePatternNameSegment(functionName)}.precept",
+        ["match"] = $"{prefix}(\\s*\\()(?:[^)]*?,\\s*)*(\"(?:\\\\.|[^\"\\\\])*\")(\\s*\\))",
+        ["captures"] = new JsonObject
+        {
+            ["1"] = new JsonObject { ["name"] = "support.function.precept" },
+            ["2"] = new JsonObject { ["name"] = "punctuation.precept" },
+            ["3"] = new JsonObject { ["name"] = "string.quoted.double.message.precept" },
+            ["4"] = new JsonObject { ["name"] = "punctuation.precept" }
+        }
+    };
+}
+
+static string MessagePatternNameSegment(string name) =>
+    Regex.Replace(name.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
 
 static JsonArray BuildTopLevelPatterns()
 {
