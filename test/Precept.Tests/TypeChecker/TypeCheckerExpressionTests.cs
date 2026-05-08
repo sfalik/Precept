@@ -813,4 +813,206 @@ public class TypeCheckerExpressionTests
             r => r.Field.Name == "Name",
             because: "field reference sites should be recorded for LS semantic tokens");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  12. Conditional expressions — ResolveConditional (R3)
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── Happy path ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Conditional_BooleanCondition_ReturnsTypedConditional()
+    {
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.True, "true", TestSpan);
+        var then  = new LiteralExpression(TokenKind.NumberLiteral, "10", TestSpan);
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "20", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedConditional>();
+        var typed = (TypedConditional)result;
+        typed.Condition.Should().BeOfType<TypedLiteral>();
+        typed.ThenBranch.Should().BeOfType<TypedLiteral>();
+        typed.ElseBranch.Should().BeOfType<TypedLiteral>();
+        ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Conditional_IntegerBranches_ResultTypeInteger()
+    {
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.False, "false", TestSpan);
+        var then  = new LiteralExpression(TokenKind.NumberLiteral, "42", TestSpan);
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "99", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedConditional>();
+        result.ResultType.Should().Be(TypeKind.Integer);
+        ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Conditional_WideningBranches_ResultTypeWider()
+    {
+        // Integer widens to Decimal
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.True, "true", TestSpan);
+        var then  = new LiteralExpression(TokenKind.NumberLiteral, "1", TestSpan);    // integer
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "2.5", TestSpan);  // decimal
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedConditional>();
+        result.ResultType.Should().Be(TypeKind.Decimal);
+        ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Conditional_StringBranches_ResultTypeString()
+    {
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.True, "true", TestSpan);
+        var then  = new LiteralExpression(TokenKind.StringLiteral, "yes", TestSpan);
+        var @else = new LiteralExpression(TokenKind.StringLiteral, "no", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedConditional>();
+        result.ResultType.Should().Be(TypeKind.String);
+        ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    // ── Boolean enforcement on condition ─────────────────────────────────
+
+    [Fact]
+    public void Conditional_NonBooleanCondition_EmitsTypeMismatch()
+    {
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.NumberLiteral, "42", TestSpan);   // integer, not boolean
+        var then  = new LiteralExpression(TokenKind.NumberLiteral, "1", TestSpan);
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "2", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        Resolve(expr, ctx);
+
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.TypeMismatch));
+    }
+
+    [Fact]
+    public void Conditional_NonBooleanCondition_ReturnsTypedErrorExpression()
+    {
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.StringLiteral, "not-a-bool", TestSpan);
+        var then  = new LiteralExpression(TokenKind.NumberLiteral, "1", TestSpan);
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "2", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+    }
+
+    // ── D13 error propagation ────────────────────────────────────────────
+
+    [Fact]
+    public void Conditional_ConditionIsError_ReturnsErrorNoSecondDiagnostic()
+    {
+        // Undeclared field in condition → TypedErrorExpression from identifier resolution.
+        // ResolveConditional should propagate the error without emitting a second diagnostic.
+        var ctx = MinimalContext();
+        var cond  = new IdentifierExpression("NoSuchField", TestSpan);
+        var then  = new LiteralExpression(TokenKind.NumberLiteral, "1", TestSpan);
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "2", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        // Only the UndeclaredField diagnostic from identifier resolution — no TypeMismatch from conditional
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.UndeclaredField));
+    }
+
+    [Fact]
+    public void Conditional_ThenBranchIsError_ReturnsError()
+    {
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.True, "true", TestSpan);
+        var then  = new IdentifierExpression("Ghost", TestSpan);                      // undeclared → error
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "2", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        // Only UndeclaredField from identifier resolution — no branch-type diagnostic
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.UndeclaredField));
+    }
+
+    [Fact]
+    public void Conditional_ElseBranchIsError_ReturnsError()
+    {
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.True, "true", TestSpan);
+        var then  = new LiteralExpression(TokenKind.NumberLiteral, "1", TestSpan);
+        var @else = new IdentifierExpression("Phantom", TestSpan);                    // undeclared → error
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.UndeclaredField));
+    }
+
+    // ── Branch type incompatibility ──────────────────────────────────────
+
+    [Fact]
+    public void Conditional_IncompatibleBranchTypes_EmitsTypeMismatch()
+    {
+        // String and Integer cannot widen to each other → TypeMismatch
+        var ctx = MinimalContext();
+        var cond  = new LiteralExpression(TokenKind.True, "true", TestSpan);
+        var then  = new LiteralExpression(TokenKind.StringLiteral, "hello", TestSpan);
+        var @else = new LiteralExpression(TokenKind.NumberLiteral, "42", TestSpan);
+        var expr  = new ConditionalExpression(cond, then, @else, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.TypeMismatch));
+    }
+
+    // ── Integration: conditional in guard ────────────────────────────────
+
+    [Fact]
+    public void Conditional_InGuard_ResolvedCorrectly()
+    {
+        var precept = """
+            precept Widget
+            field Score as integer default 0
+            field Bonus as integer default 0
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close when if Score > 0 then Bonus > 10 else Bonus > 5 -> transition Closed
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var row = index.TransitionRows.Single();
+
+        row.Guard.Should().NotBeNull();
+        row.Guard.Should().BeOfType<TypedConditional>();
+        var conditional = (TypedConditional)row.Guard!;
+        conditional.ResultType.Should().Be(TypeKind.Boolean);
+    }
 }
