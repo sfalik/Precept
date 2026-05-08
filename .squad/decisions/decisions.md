@@ -1,3 +1,448 @@
+# ProofEngine Design Decisions — PE-G1, PE-G2, PE-G3
+
+**Date:** 2026-05-08
+**Author:** Frank
+**Resolves:** PE-G1 (three unhandled obligation kinds), PE-G2 (ProofDischarges catalog prereq), PE-G3 (ProofLedger divergence)
+**Status:** DECISIONS MADE — pending Shane sign-off before spec update or implementation
+
+## Summary
+
+Deep source analysis of the five `ProofRequirementKind` values, the Operations catalog's actual usage, the TypeChecker's resolution pipeline, and the existing SemanticIndex contract reveals that all three blocking gaps are resolvable without new proof strategies. The three "unhandled" requirement kinds (Dimension, Modifier, QualifierCompatibility) are all field-declaration-attribute checks — they belong in an expanded Strategy 2 that reads qualifier bindings alongside modifiers. The `ProofDischarge` catalog prerequisite is well-scoped: 6 of 15 `FieldModifierMeta` entries carry concrete discharges. The `ProofLedger` output type needs ~6 new record types but the spec's shape is sound — the only revisions are `ConstraintIdentity` field-name corrections to match the source-of-truth `SemanticIndex.cs` definitions.
+
+---
+
+## PE-G1a: DimensionProofRequirement
+
+**Obligation:** "The period operand must have the required time dimension (Date or Time) for the arithmetic operation to be semantically valid."
+
+**Source:** `ProofRequirement.cs` lines 81–85. `DimensionProofRequirement(ProofSubject Subject, PeriodDimension RequiredDimension, string Description)`. The `PeriodDimension` enum has three values: `Any`, `Date`, `Time`.
+
+**Catalog usage:** `Operations.cs` lines 248, 257, 275, 284 — four temporal arithmetic entries:
+- `DatePlusPeriod` / `DateMinusPeriod` → require `PeriodDimension.Date`
+- `TimePlusPeriod` / `TimeMinusPeriod` → require `PeriodDimension.Time`
+
+**TypeChecker analysis:** The TypeChecker resolves qualifier bindings on field declarations (`TypedField.Qualifier`) and operation results (`TypedBinaryOp.ResultQualifier`). Period fields accept qualifiers on the `TemporalDimension` axis (`period of 'date'`, `period of 'time'`) and the `TemporalUnit` axis (`period in 'days'`). The qualifier binding is resolved at type-checking time and available in `TypedField.Qualifier`. The TypeChecker does NOT validate the dimension constraint itself — it stamps the `DimensionProofRequirement` from the `BinaryOperationMeta` catalog entry and defers to the proof engine. Grep for `Dimension`, `PeriodDimension`, `QualifierAxis` in `TypeChecker.cs` and `TypeChecker.Expressions.cs` returned no validation logic for this constraint. **Confirmed: the TypeChecker does not pre-discharge this.**
+
+**Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), extended to read qualifier bindings.**
+
+**Rationale:** The period field's qualifier binding on the `TemporalDimension` axis is a compile-time-known declaration attribute, structurally identical to a modifier. When the proof subject resolves to a field with `TypeKind.Period`, Strategy 2 reads `TypedField.Qualifier` and checks whether a qualifier on `QualifierAxis.TemporalDimension` maps to the required `PeriodDimension`:
+- Qualifier value `"date"` → satisfies `PeriodDimension.Date`
+- Qualifier value `"time"` → satisfies `PeriodDimension.Time`
+- `PeriodDimension.Any` → always satisfied (any temporal dimension)
+- No qualifier on `TemporalDimension` axis → obligation **unresolved** (period without dimension is ambiguous)
+
+**Alternatives rejected:**
+- _New Strategy 5_: Unnecessary — this is a field-declaration attribute check, exactly what Strategy 2 does. Adding a strategy for one requirement kind when the existing strategy can be extended is overengineering.
+- _Pre-discharge by TypeChecker_: Would violate the catalog-driven architecture. The type checker stamps requirements, the proof engine discharges them. The type checker's job is operation selection and requirement attachment, not requirement evaluation.
+
+**Tradeoff accepted:** Strategy 2 becomes slightly more complex — it dispatches on requirement kind (Numeric → ProofDischarge lookup, Dimension → qualifier binding check). This is a single `switch` arm, not a separate strategy.
+
+**Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `DimensionProofRequirement` branch to `TryModifierProof` that reads the subject field's qualifier binding on `QualifierAxis.TemporalDimension` and compares against `RequiredDimension`. Add to the Strategy 2 coverage table.
+
+---
+
+## PE-G1b: ModifierRequirement
+
+**Obligation:** "The field operand must declare the required modifier (e.g., `ordered`) for the operation to be valid."
+
+**Source:** `ProofRequirement.cs` lines 112–116. `ModifierRequirement(ProofSubject Subject, ModifierKind Required, string Description)`.
+
+**Catalog usage:** `Operations.cs` lines 760, 768, 776, 784 — four choice ordinal comparison entries (`ChoiceLessThan`, `ChoiceGreaterThan`, `ChoiceLessThanOrEqual`, `ChoiceGreaterThanOrEqual`) all declare `ModifierRequirement(PChoice, ModifierKind.Ordered, ...)`. Both operands share the same `PChoice` parameter reference, so the requirement applies to all matching operand positions.
+
+**TypeChecker analysis:** The TypeChecker resolves choice operations via the Operations catalog and stamps the `ModifierRequirement` on the `TypedBinaryOp`. It does NOT check whether the field has the `ordered` modifier itself — that's deferred to the proof engine. Grep for `ModifierRequirement`, `CheckModifier`, `modifier.*check` in `TypeChecker.cs` returned no hits. **Confirmed: the TypeChecker does not pre-discharge this.**
+
+**Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), via direct modifier presence check.**
+
+**Rationale:** This is the simplest possible Strategy 2 case. The proof subject resolves to a field. Strategy 2 checks `field.Modifiers.Contains(requirement.Required)`. If the field has the `ordered` modifier, the obligation is discharged. If not, unresolved — emit diagnostic.
+
+This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries map modifiers → numeric/presence requirements they discharge (e.g., `positive` discharges `> 0`). `ModifierRequirement` is the inverse: it asserts that a specific modifier must be present on the field. Strategy 2 handles both paths:
+
+1. **ProofDischarge path** (for `NumericProofRequirement`, `PresenceProofRequirement`): "Does any modifier on this field carry a `ProofDischarge` that covers this requirement?"
+2. **Modifier presence path** (for `ModifierRequirement`): "Does this field have the required modifier?"
+
+**Alternatives rejected:**
+- _Pre-discharge by TypeChecker_: Same rationale as PE-G1a — type checker stamps requirements, proof engine discharges them.
+- _Always a type error (Option C)_: Wrong — `ordered` is an optional modifier on choice fields. Not having it isn't a type error; it's a proof failure for ordinal operations specifically.
+
+**Tradeoff accepted:** None significant. This is a trivial addition to Strategy 2.
+
+**Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `ModifierRequirement` branch that checks `field.Modifiers.Contains(requirement.Required)`. Add to the Strategy 2 coverage table.
+
+---
+
+## PE-G1c: QualifierCompatibilityProofRequirement
+
+**Obligation:** "Two operands in a binary operation must have matching qualifier values on the specified axis (e.g., both `quantity in 'kg'` or both `money in 'USD'`)."
+
+**Source:** `ProofRequirement.cs` lines 96–101. `QualifierCompatibilityProofRequirement(ProofSubject LeftSubject, ProofSubject RightSubject, QualifierAxis Axis, string Description)`. This is the only dual-subject requirement kind.
+
+**Catalog usage:** Extensively used in `Operations.cs`:
+- **Quantity arithmetic** (lines 475, 484, 921–966): `QualifierAxis.Unit` — operands must have the same unit qualifier
+- **Price arithmetic** (lines 557–570, 977–1023): Both `QualifierAxis.Unit` AND `QualifierAxis.Currency` — operands must match on both axes
+- **Money arithmetic**: `QualifierAxis.Currency` (via `QualifierMatch.Same` entries)
+
+**TypeChecker analysis:** The TypeChecker handles qualifier disambiguation at operation resolution time (`TypeChecker.Expressions.cs` lines 560–591). For multi-candidate operations, it defaults to `QualifierMatch.Same` — the structurally safe assumption. It maps this to `SameQualifierRequired` on `TypedBinaryOp.ResultQualifier` and explicitly comments: "ProofEngine will verify qualifier compatibility at deeper analysis" (line 573). **Confirmed: the TypeChecker defers qualifier verification to the proof engine.**
+
+**Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), extended to read qualifier bindings on both operand fields.**
+
+**Rationale:** Both operands' qualifier bindings are compile-time-known declaration attributes. The proof engine:
+1. Resolves both subjects (`LeftSubject`, `RightSubject`) to their respective fields
+2. Reads the qualifier binding on the specified `QualifierAxis` from each `TypedField.Qualifier`
+3. If both fields have explicit qualifiers on that axis AND the values match → discharged
+4. If either field lacks a qualifier on that axis → **unresolved** (cannot prove compatibility without declared qualifiers)
+5. If both have qualifiers but they differ → **unresolved** (type-incompatible operation)
+
+**Alternatives rejected:**
+- _New Strategy 5 (Qualifier Strategy)_: Unnecessary — this is a field-declaration attribute comparison. Strategy 2 already reads field declarations. Adding the qualifier binding read is architecturally consistent with its existing responsibility.
+- _Always a type error_: Wrong — the type checker intentionally defers this to the proof engine. Making it a type error would duplicate logic and violate the catalog-driven obligation model.
+- _Runtime-only check_: Wrong — qualifier values are declaration-time constants (string literals in `in 'USD'`, `in 'kg'`). They're always statically knowable. Deferring to runtime would miss a guaranteed-provable obligation.
+
+**Tradeoff accepted:** Strategy 2 now handles two structural patterns — single-subject (modifiers, qualifier, dimension) and dual-subject (qualifier compatibility). The implementation must check for `QualifierCompatibilityProofRequirement` specifically and resolve both subjects. This is a single additional branch, not a general multi-subject framework.
+
+**Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `QualifierCompatibilityProofRequirement` branch that resolves both subjects, reads their qualifier bindings on the specified axis, and compares values. Add to the Strategy 2 coverage table. Update Strategy 2's name from "Modifier Proof" to "Declaration Attribute Proof" to reflect its expanded scope.
+
+---
+
+## PE-G2: ProofDischarge Catalog Design
+
+### 1. ProofDischarge Record Type
+
+```csharp
+/// <summary>
+/// Declares a proof obligation that a field modifier statically discharges.
+/// Read by Strategy 2 of the proof engine — no per-modifier switch needed.
+/// </summary>
+public sealed record ProofDischarge(
+    ProofRequirementKind RequirementKind,  // which obligation kind this discharges
+    OperatorKind? Comparison,              // for Numeric: the comparison operator
+    decimal? Threshold                     // for Numeric: the threshold value
+                                           //   null = read from modifier's HasValue parameter
+);
+```
+
+**Design rationale:** The `Threshold` field is nullable. For fixed-value modifiers (`positive`, `nonnegative`, `nonzero`, `notempty`), the threshold is a literal. For parameterized modifiers (`min(N)`, `max(N)`, `mincount(N)`, `maxcount(N)`), the threshold is `null`, signaling the proof engine to read the value from the field declaration's modifier parameter at proof time. This keeps the catalog entry declarative while supporting parameterized constraints.
+
+### 2. FieldModifierMeta Update
+
+Add `ProofDischarges` property to the existing `FieldModifierMeta` record in `Modifier.cs`:
+
+```csharp
+public sealed record FieldModifierMeta(
+    ModifierKind Kind,
+    TokenMeta Token,
+    string Description,
+    ModifierCategory Category,
+    TypeTarget[] ApplicableTo,
+    bool HasValue = false,
+    ModifierKind[] Subsumes = default!,
+    ProofDischarge[] ProofDischarges = default!,  // ← NEW
+    string? HoverDescription = null,
+    string? UsageExample = null,
+    string? SnippetTemplate = null,
+    ModifierKind[]? MutuallyExclusiveWith = null)
+    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith)
+{
+    public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+    public ProofDischarge[] ProofDischarges { get; init; } = ProofDischarges ?? [];
+}
+```
+
+### 3. Modifier Entries Requiring ProofDischarges
+
+| Modifier | `ProofDischarges` value | Rationale |
+|---|---|---|
+| `positive` | `[ProofDischarge(Numeric, GreaterThan, 0)]` | Field > 0 — subsumes `!= 0` and `>= 0` via `DischargeCovers` subsumption logic |
+| `nonnegative` | `[ProofDischarge(Numeric, GreaterThanOrEqual, 0)]` | Field ≥ 0 |
+| `nonzero` | `[ProofDischarge(Numeric, NotEquals, 0)]` | Field ≠ 0 |
+| `notempty` | `[ProofDischarge(Numeric, GreaterThan, 0)]` | Collection count > 0 or string length > 0 |
+| `min(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | Field ≥ N where N is modifier parameter |
+| `max(N)` | `[ProofDischarge(Numeric, LessThanOrEqual, null)]` | Field ≤ N where N is modifier parameter |
+| `minlength(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | String length ≥ N |
+| `maxlength(N)` | `[ProofDischarge(Numeric, LessThanOrEqual, null)]` | String length ≤ N |
+| `mincount(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | Collection count ≥ N |
+| `maxcount(N)` | `[ProofDischarge(Numeric, LessThanOrEqual, null)]` | Collection count ≤ N |
+
+**Modifiers with NO ProofDischarges (empty array):**
+
+| Modifier | Why empty |
+|---|---|
+| `optional` | Does not *discharge* a proof obligation — its absence is what guarantees presence. Strategy 2 handles presence via the non-optional check, not via ProofDischarge. |
+| `ordered` | Handled by the modifier-presence path of Strategy 2 (for `ModifierRequirement`), not via ProofDischarge entries. |
+| `default(expr)` | Provides initial value — does not establish a runtime bound. |
+| `maxplaces(N)` | No current proof obligation targets decimal-place constraints. |
+| `writable` | Access control, not a value constraint. |
+
+### 4. File Location
+
+**New file: `src/Precept/Language/ProofDischarge.cs`.**
+
+**Rationale:** `ProofDischarge` is a first-class catalog type shared between the modifier catalog (`Modifiers.cs`) and the proof engine (`ProofEngine.cs`). It belongs in `Language/` because it's catalog metadata, not pipeline logic. It gets its own file because it's a distinct record type with its own semantic purpose — nesting it inside `Modifier.cs` would bury it among the modifier DU hierarchy. This mirrors the pattern of `ProofRequirement.cs` (catalog metadata type) having its own file.
+
+### 5. Catalog Architecture Compliance
+
+Verified against `docs/language/catalog-system.md`:
+
+- **ProofDischarges is catalog metadata.** It declares what a modifier *means* for the proof system. The proof engine reads it — it does not compute it. This is exactly the metadata-driven architecture: domain knowledge lives in the catalog, pipeline stages are generic readers.
+- **No per-modifier switch in the proof engine.** Strategy 2 iterates `field.Modifiers`, reads `Modifiers.GetMeta(kind).ProofDischarges`, and calls `DischargeCovers`. No `ModifierKind.Positive => ...` switches anywhere in `ProofEngine.cs`.
+- **Subsumption is a generic algorithm.** `DischargeCovers` performs comparison-operator subsumption (e.g., `> 0` covers `!= 0`). This logic is proof-engine-internal, not per-modifier — it works for any `ProofDischarge` entry regardless of which modifier declares it.
+
+---
+
+## PE-G3: ProofLedger Output Type
+
+### New Record Types Needed
+
+The spec's §5 Output defines 8 types. Current source has only `ProofLedger(ImmutableArray<Diagnostic> Diagnostics)`. The following types must be added:
+
+#### 1. `ProofObligation` — `Pipeline/ProofLedger.cs`
+
+```csharp
+public sealed record ProofObligation(
+    ProofRequirement Requirement,
+    TypedExpression Site,
+    ProofDisposition Disposition,
+    ProofStrategy? Strategy,
+    DiagnosticCode? EmittedDiagnostic
+);
+```
+
+Dependencies: `ProofRequirement` (Language), `TypedExpression` (Pipeline/SemanticIndex.cs), `DiagnosticCode` (Language)
+
+#### 2. `ProofDisposition` enum — `Pipeline/ProofLedger.cs`
+
+```csharp
+public enum ProofDisposition { Proved, Unresolved }
+```
+
+#### 3. `ProofStrategy` enum — `Pipeline/ProofLedger.cs`
+
+```csharp
+public enum ProofStrategy
+{
+    Literal,
+    DeclarationAttribute,  // renamed from "Modifier" — covers modifiers, qualifiers, dimensions
+    GuardInPath,
+    FlowNarrowing
+}
+```
+
+**Note:** Renamed from `Modifier` to `DeclarationAttribute` per PE-G1 decisions. The spec should be updated accordingly.
+
+#### 4. `FaultSiteLink` — `Pipeline/ProofLedger.cs`
+
+```csharp
+public sealed record FaultSiteLink(
+    ProofObligation Obligation,
+    FaultCode FaultCode,
+    DiagnosticCode DiagnosticCode,
+    SourceSpan Site
+);
+```
+
+Dependencies: `FaultCode` (Language)
+
+#### 5. `ConstraintInfluenceEntry` — `Pipeline/ProofLedger.cs`
+
+```csharp
+public sealed record ConstraintInfluenceEntry(
+    ConstraintIdentity Constraint,
+    ImmutableArray<string> ReferencedFields,
+    ImmutableArray<EventArgReference> ReferencedArgs
+);
+
+public sealed record EventArgReference(string EventName, string ArgName);
+```
+
+Dependencies: `ConstraintIdentity` (Pipeline/SemanticIndex.cs — shared type, already exists)
+
+#### 6. `InitialStateSatisfiabilityResult` — `Pipeline/ProofLedger.cs`
+
+```csharp
+public sealed record InitialStateSatisfiabilityResult(
+    string StateName,
+    bool IsSatisfiable,
+    ImmutableArray<UnsatisfiedConstraint> Violations
+);
+
+public sealed record UnsatisfiedConstraint(
+    ConstraintIdentity Constraint,
+    string Reason
+);
+```
+
+#### 7. Updated `ProofLedger` — `Pipeline/ProofLedger.cs`
+
+```csharp
+public sealed record ProofLedger(
+    ImmutableArray<ProofObligation> Obligations,
+    ImmutableArray<FaultSiteLink> FaultSiteLinks,
+    ImmutableArray<ConstraintInfluenceEntry> ConstraintInfluence,
+    ImmutableArray<InitialStateSatisfiabilityResult> InitialStateResults,
+    ImmutableArray<Diagnostic> Diagnostics
+);
+```
+
+### Decision: Match the spec — the shape is sound
+
+**Rationale:** The spec was written after the catalog architecture was established and correctly reflects what the Precept Builder needs from the proof engine:
+
+- `Obligations` — complete audit trail (which obligations exist and how they were resolved)
+- `FaultSiteLinks` — consumed by Precept Builder Pass 4 for `FaultSiteAnnotation` planting
+- `ConstraintInfluence` — consumed by Precept Builder for `ConstraintInfluenceMap`
+- `InitialStateResults` — consumed by diagnostics (unsatisfiable initial state is a compile-time error)
+- `Diagnostics` — merged into the final diagnostic stream
+
+None of these fields are overengineered. Each has a concrete downstream consumer documented in the spec.
+
+**One revision:** The `ConstraintIdentity` subtypes in the spec differ from the source. The **source is correct** (it's the implemented, tested shape). The spec must be updated:
+
+| Spec shape | Source shape | Verdict |
+|---|---|---|
+| `RuleIdentity(string RuleName, int Index)` | `RuleIdentity(int RuleIndex)` | **Source wins** — Precept rules are anonymous (no `RuleName`). The spec's `RuleName` field doesn't exist in the DSL surface. |
+| `EnsureIdentity(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)` | `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)` | **Source wins** — `AnchorName` collapses state/event discrimination. The `ConstraintKind` already indicates whether the anchor is a state or event. |
+
+### File organization
+
+All new types go in `Pipeline/ProofLedger.cs` alongside the `ProofLedger` record. This follows the existing pattern: `SemanticIndex.cs` contains both the index record and all its constituent types (`TypedField`, `TypedState`, `TypedTransitionRow`, etc.). Putting `ProofObligation`, `FaultSiteLink`, etc. in `ProofLedger.cs` keeps the proof engine's output contract in one file.
+
+Exception: `ProofDischarge` goes in `Language/ProofDischarge.cs` (catalog metadata, not pipeline output).
+
+---
+
+## Significant Gaps — Terse Verdicts
+
+### SIG-1: Missing `AllTypedExpressions` API on `SemanticIndex`
+
+**Verdict: SPEC UPDATE NEEDED**
+
+The spec's Pass 1 pseudocode (line 967) iterates `semantics.AllTypedExpressions` — this property does not exist on `SemanticIndex`. The implementer must define a traversal method that walks all expression-bearing records (`TransitionRows` → actions/guards, `Rules` → conditions, `Ensures` → conditions, `ComputedDeps` → computed expressions, `StateHooks` → actions). This is an **implementer responsibility** — the traversal is mechanical and the implementer knows the SemanticIndex shape. The spec should note this as a "to be implemented" API rather than assuming it exists.
+
+### SIG-2: `ConstraintIdentity` shape mismatch
+
+**Verdict: SPEC UPDATE NEEDED**
+
+Covered in PE-G3 above. The spec's `ConstraintIdentity` subtypes have fields that don't exist in the source (`RuleName`, separate `AnchorState`/`AnchorEvent`). The spec must be updated to match the source shapes: `RuleIdentity(int RuleIndex)` and `EnsureIdentity(ConstraintKind Kind, string? AnchorName, int EnsureIndex)`.
+
+### SIG-3: Unspecified `FindEnclosingTransitionRow` helper
+
+**Verdict: ACCEPT AS-IS**
+
+This is a straightforward lookup: given a `TypedExpression`, find which `TypedTransitionRow` contains it. The implementer walks `SemanticIndex.TransitionRows` and checks whether any row's guard or action chain contains the expression (by reference identity or span containment). No design decision needed — it's a utility function, not an architectural concern. The spec correctly identifies it as a helper without over-specifying implementation.
+
+### SIG-4: Unspecified `ResolveSubject` helper
+
+**Verdict: ACCEPT AS-IS**
+
+`ResolveSubject` maps a `ProofSubject` to a concrete `TypedExpression` node. For `ParamSubject(ParameterMeta)`, it matches the parameter by object identity against the expression's operands. For `SelfSubject`, it returns the receiver expression. Implementation is mechanical — the spec correctly leaves it to the implementer.
+
+### SIG-5: Underspecified initial-state satisfiability
+
+**Verdict: DESIGN DECISION REQUIRED — deferred**
+
+The spec says to check whether initial-state constraints are satisfiable given default field values. This requires evaluating default expressions against constraint expressions — essentially a mini-evaluator at compile time. The spec's description (lines 866–883) is correct in intent but implementation is blocked pending the type checker's expression resolution engine being fully operational (as the spec itself notes on line 883). **Owner: spec author + implementer, post-TypeChecker completion.**
+
+### SIG-6: Collection-empty obligation ownership ambiguity
+
+**Verdict: ACCEPT AS-IS**
+
+Collection non-empty obligations are declared in catalog metadata (`TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements`). The type checker stamps them on `TypedMemberAccess` and `TypedAction` nodes. The proof engine discharges them via Strategy 1 (literal), Strategy 2 (`notempty` modifier), or Strategy 3 (`count > 0` guard). There is no ownership ambiguity — the catalog declares, the type checker stamps, the proof engine discharges. The spec's §7 "Collection Non-Empty Proof" section (lines 886–899) correctly describes the flow. No change needed.
+
+### SIG-7: Guard decomposition rules
+
+**Verdict: SPEC UPDATE NEEDED**
+
+The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)` but does not define the decomposition rules for complex guard expressions. The spec should specify:
+
+1. **Supported connectives:** `and` decomposes into individual constraints (each arm of `A and B` is a separate constraint). `or` does NOT decompose (cannot prove either arm independently).
+2. **Supported atomic forms:** `field OP literal`, `count(collection) > 0`, `collection.count > 0`, `field is set`, `field is not set`.
+3. **Unsupported forms:** Function calls (other than `count`), nested expressions, field-vs-field comparisons (those are Strategy 4).
+
+**Owner: spec author.** These rules define the proof engine's guard recognition language. They should be specified in the spec before implementation.
+
+---
+
+## Required Spec Updates (in order)
+
+1. **§7 Strategy 2 — Rename and expand scope.** Rename from "Modifier Proof" to "Declaration Attribute Proof." Add three new branches to `TryModifierProof` (renamed to `TryDeclarationAttributeProof`):
+   - `ModifierRequirement` → direct `field.Modifiers.Contains(requirement.Required)` check
+   - `DimensionProofRequirement` → read `TypedField.Qualifier` on `QualifierAxis.TemporalDimension`, compare to `RequiredDimension`
+   - `QualifierCompatibilityProofRequirement` → resolve both subjects, read qualifier bindings on specified axis, compare values
+
+2. **§7 Strategy 2 — Update coverage table.** Add rows for Dimension, Modifier, and QualifierCompatibility requirement kinds.
+
+3. **§7 Strategy 2 — Update `ProofDischarge` pseudocode.** Show `DischargeCovers` handling nullable `Threshold` (reads from modifier parameter for `HasValue` modifiers).
+
+4. **§5 Output — Fix `ConstraintIdentity` shapes.** Replace `RuleIdentity(string RuleName, int Index)` with `RuleIdentity(int RuleIndex)`. Replace `EnsureIdentity(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)` with `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)`.
+
+5. **§5 Output — Update `ProofStrategy` enum.** Rename `Modifier` to `DeclarationAttribute`.
+
+6. **§7 Strategy 3 — Add guard decomposition rules.** Specify `and` connective decomposition, `or` non-decomposition, supported atomic guard forms.
+
+7. **§9 — Add `AllTypedExpressions` note.** Document that `SemanticIndex` requires a traversal method/property to enumerate all typed expressions across all declaration kinds.
+
+8. **§7 initial-state satisfiability — Add blocking dependency note.** Explicitly state that implementation is blocked pending TypeChecker expression evaluation capability.
+
+---
+
+## Required Catalog Changes (in order)
+
+1. **Add `ProofDischarge.cs`** — new file in `src/Precept/Language/` containing the `ProofDischarge` record type.
+
+2. **Update `FieldModifierMeta` in `Modifier.cs`** — add `ProofDischarge[] ProofDischarges = default!` parameter after `Subsumes`, with `ProofDischarges` property initialization `= ProofDischarges ?? []`.
+
+3. **Update `Modifiers.cs` entries** — populate `ProofDischarges` on 10 modifier entries:
+   - `Nonnegative`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, 0)]`
+   - `Positive`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThan, 0)]`
+   - `Nonzero`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.NotEquals, 0)]`
+   - `Notempty`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThan, 0)]`
+   - `Min`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, null)]`
+   - `Max`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+   - `Minlength`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, null)]`
+   - `Maxlength`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+   - `Mincount`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, null)]`
+   - `Maxcount`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+
+4. **Update `ProofLedger.cs`** — replace stub with full output contract (ProofObligation, ProofDisposition, ProofStrategy, FaultSiteLink, ConstraintInfluenceEntry, EventArgReference, InitialStateSatisfiabilityResult, UnsatisfiedConstraint).
+
+---
+
+## Shane Sign-Off Required On
+
+- **Strategy 2 rename to "Declaration Attribute Proof"**: This broadens Strategy 2's scope from modifier-only to all field declaration attributes (modifiers, qualifiers, dimensions). The alternative is keeping the name "Modifier Proof" and adding separate subroutines for qualifier/dimension checks under the same strategy. The rename is more honest but changes the spec vocabulary. Shane should confirm the rename is acceptable.
+
+- **`PeriodDimension.Any` behavior**: When a period field has no `TemporalDimension` qualifier, should the Dimension obligation be unresolved (forcing authors to always qualify their period fields for temporal arithmetic), or should unqualified periods be treated as `PeriodDimension.Any` (accepting any dimension)? Current decision: **unresolved** — the author must declare `period of 'date'` or `period of 'time'` for temporal arithmetic to be proven safe. This is the conservative choice but may be annoying for simple precepts.
+
+- **SIG-5 initial-state satisfiability deferral**: This is marked as blocked pending TypeChecker expression evaluation. Should it be deferred entirely from the proof engine's initial implementation scope, or should a minimal version (literals-only default values against simple comparison constraints) be included in the first implementation?
+
+# Shane Sign-Off — ProofEngine Design Decisions
+
+**Date:** 2026-05-08
+**Source:** Direct conversation with Shane
+
+## Decision 1 — Strategy 2 Rename: APPROVED ✅
+
+**Approved:** Rename Strategy 2 from "Modifier Proof" to "Declaration Attribute Proof."
+
+Strategy 2's expanded scope (modifiers, qualifier bindings, and temporal dimension qualifiers) makes the rename accurate. The old name "Modifier Proof" was too narrow given the PE-G1 expansion.
+
+## Decision 2 — Unqualified Period Behavior: Permissive ✅
+
+**Approved:** Treat unqualified periods as `PeriodDimension.Any` — accept any dimension.
+
+When a `period` field has no `TemporalDimension` qualifier (no `period of 'date'` or `period of 'time'`), the `DimensionProofRequirement` is considered **satisfied** rather than unresolved. This is the permissive choice — authors are not forced to qualify period fields for temporal arithmetic to be proven safe.
+
+## Decision 3 — Initial-State Satisfiability: PENDING FRANK DEEP DIVE ⏸
+
+Shane raised the question: "why not just use the evaluator?" instead of a mini-evaluator at compile time.
+
+Frank has been tasked with a deep dive on this architectural question. Key questions:
+1. Does the evaluator depend on compiled Compiler-stage output, or can it operate on SemanticIndex?
+2. Can evaluation logic be shared between ProofEngine (compile-time) and Evaluator (runtime)?
+3. What are the architectural implications of using the evaluator for initial-state satisfiability?
+4. What is the recommended design?
+
+**Status:** Blocked on Frank deep dive. No implementation decision authorized yet.
+
 # Doc Sync Confirmation — runtime-api.md
 
 

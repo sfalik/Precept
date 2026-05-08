@@ -66,7 +66,7 @@ static JsonObject BuildGrammar()
     // Different operator scopes get separate entries; same scope tokens are merged.
     foreach (var (scope, tokens) in operatorScopes.OrderBy(kv => kv.Key))
     {
-        var key = ScopeToRepositoryKey(scope) + "Operators";
+        var key = ScopeToRepositoryKey(scope);
         var sorted = tokens.OrderByDescending(m => m.Text!.Length).ThenBy(m => m.Text);
         var alternation = string.Join("|", sorted.Select(m => Regex.Escape(m.Text!)));
         repository[key] = new JsonObject
@@ -79,7 +79,7 @@ static JsonObject BuildGrammar()
     // ── Structural patterns (grammar-level, not catalog-driven) ────────────
     // These patterns cover constructs that require context beyond a single token.
 
-    AddStructuralPatterns(repository);
+    AddStructuralPatterns(repository, keywordsByScope);
 
     // ── Top-level grammar patterns list ────────────────────────────────────
     var patterns = BuildTopLevelPatterns();
@@ -94,7 +94,7 @@ static JsonObject BuildGrammar()
     };
 }
 
-static void AddStructuralPatterns(JsonObject repo)
+static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<TokenMeta>> keywordsByScope)
 {
     // Comment: # to end of line
     repo["comment"] = new JsonObject
@@ -105,6 +105,34 @@ static void AddStructuralPatterns(JsonObject repo)
             {
                 ["name"] = "comment.line.number-sign.precept",
                 ["match"] = "#.*$"
+            }
+        }
+    };
+
+    // Message strings — GOLD highlighting for "because "..." and "reject "..." (MUST precede strings)
+    repo["messageStrings"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "meta.message.because.precept",
+                ["match"] = "\\b(because)(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
+                ["captures"] = new JsonObject
+                {
+                    ["1"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
+                    ["3"] = new JsonObject { ["name"] = "string.quoted.double.message.precept" }
+                }
+            },
+            new JsonObject
+            {
+                ["name"] = "meta.message.reject.precept",
+                ["match"] = "\\b(reject)(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
+                ["captures"] = new JsonObject
+                {
+                    ["1"] = new JsonObject { ["name"] = "keyword.other.outcome.precept" },
+                    ["3"] = new JsonObject { ["name"] = "string.quoted.double.message.precept" }
+                }
             }
         }
     };
@@ -531,7 +559,25 @@ static JsonArray BuildTopLevelPatterns()
 
 static string ScopeToRepositoryKey(string scope)
 {
-    // Convert scope like "keyword.control.precept" to "keyword.control.precept"
-    // (used as-is with "Keywords" or "Operators" suffix added by caller)
-    return scope + "Keywords";
+    // Convert scope like "keyword.control.precept" to descriptive name like "controlKeywords"
+    // This provides readable repository keys that match the hand-authored grammar conventions.
+    return scope switch
+    {
+        "keyword.declaration.precept" => "declarationKeywords",
+        "keyword.control.precept" => "controlKeywords",
+        "keyword.other.action.precept" => "actionKeywords",
+        "keyword.other.outcome.precept" => "outcomeKeywords",
+        "keyword.other.access-mode.precept" => "accessModeKeywords",
+        "keyword.other.quantifier.precept" => "quantifierKeywords",
+        "keyword.other.constraint.precept" => "constraintKeywords",
+        "keyword.operator.logical.precept" => "logicalOperators",
+        "keyword.operator.membership.precept" => "membershipOperators",
+        "storage.modifier.state.precept" => "stateModifiers",
+        "storage.type.precept" => "typeKeywords",
+        "constant.language.boolean.precept" => "booleanLiterals",
+        "keyword.operator.precept" => "symbolOperators",
+        "keyword.operator.arrow.precept" => "arrowOperators",
+        "keyword.other.precept" => "memberNameKeywords",
+        _ => scope.Replace(".precept", "").Replace(".", "_") + "Keywords"
+    };
 }

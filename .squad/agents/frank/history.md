@@ -38,6 +38,11 @@
 
 ## Recent Updates
 
+### 2026-05-08T05:15:57Z — Shane locked PE decisions 1 and 2; evaluator architecture deep dive requested
+- Shane approved renaming Strategy 2 to `Declaration Attribute Proof` and locked unqualified periods to the permissive `PeriodDimension.Any` behavior.
+- Decision 3 remains open: Frank must deep-dive whether initial-state satisfiability should reuse evaluator architecture or a compile-time mini-evaluator, including SemanticIndex/runtime dependencies and shared-logic boundaries.
+- Durable record merged from `.squad/decisions/inbox/frank-proof-engine-design-decisions.md` and `.squad/decisions/inbox/shane-pe-signoffs.md` into `.squad/decisions/decisions.md`.
+
 ### 2026-05-08T01:00:51Z — ProofEngine PE-G1/G2/G3 design decisions delivered
 - Resolved all three BLOCKING gaps from the gap analysis. Strategy 2 expanded to "Declaration Attribute Proof" covering modifiers, qualifier bindings, and dimension qualifiers. `ProofDischarge` catalog type designed with 10 modifier entries. `ProofLedger` output type confirmed sound with `ConstraintIdentity` spec corrections. 8 spec updates and 4 catalog changes ordered for implementation readiness. Decision document at `.squad/decisions/inbox/frank-proof-engine-design-decisions.md`.
 
