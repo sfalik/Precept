@@ -12,6 +12,17 @@
 
 ## Learnings
 
+### 2026-05-07T23:00:00Z — Slice 6: Structural Validation shipped
+
+- Commit: `fe358ef`. Methods: `ResolvePostfixOp`, `ValidateStructural`, `DetectCycles`. Choice validation added inline to `PopulateFields`.
+- DiagnosticCodes used: `IsSetOnNonOptional` (49), `EmptyChoice` (46), `DuplicateChoiceValue` (45), `CircularComputedField` (40), `DefaultForwardReference` (54). No new codes added.
+- IsSet/IsNotSet: PostfixOperationExpression stub replaced with full resolution. Validates operand is optional field/arg; non-optional emits IsSetOnNonOptional.
+- Choice validation: in PopulateFields, ChoiceTypeReference domain checked for empty (EmptyChoice) and duplicates (DuplicateChoiceValue).
+- Computed field cycle detection: three-color DFS on ComputedDeps adjacency graph. O(n). Currently no-op (ComputedDeps empty until expression resolution wired).
+- Forward-reference belt-and-suspenders: post-hoc check on ComputedDeps field ordering. Redundant with D8 in ResolveIdentifier.
+- §13 Slice 6 scope followed — §14 explicitly excludes graph topology from TypeChecker.
+- ValidateStructural wired into Check() after Pass 1. 3177 passing (baseline 3170). 19 pre-existing failures unchanged.
+
 ### 2026-05-07T21:00:00Z — Slice 4: TypedConstants + Context-Sensitive Resolution shipped
 
 - Commit: `ac95de2`. Methods: `ResolveTypedConstant`, `ValidateContent`, `ValidateNodaTime`, `ValidateClosedSet`, `ValidateRegex`, `TryContextRetryBinaryOp`, `TryContextRetryOverload`.
