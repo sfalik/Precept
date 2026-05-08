@@ -28,6 +28,10 @@
 
 - For operation analyzers, use `ctx.Operation.SemanticModel` (nullable) rather than APIs available only on `SyntaxNodeAnalysisContext`.
 
+- 2026-05-08T00:18:05.162-04:00 — GraphAnalyzer wildcard coverage can rely on the full pipeline even while `from any` still carries upstream diagnostics; the semantic output still preserves the null `FromState` the analyzer consumes.
+
+- 2026-05-08T00:18:05.162-04:00 — Reachability suites need explicit partition and exclusion assertions so unreachable states do not silently drift into dead-end classification.
+
 
 
 ## Recent Updates
