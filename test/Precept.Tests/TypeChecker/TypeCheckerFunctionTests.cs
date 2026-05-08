@@ -296,8 +296,8 @@ public class TypeCheckerFunctionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "ErrorType propagation suppresses downstream diagnostics (D13)");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveFunctionCall resolves the MissingExpression argument and emits one lightweight TC diagnostic before propagation");
     }
 
     [Fact]
@@ -312,8 +312,8 @@ public class TypeCheckerFunctionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "ErrorType in any arg propagates without new diagnostic");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveFunctionCall resolves all args, and the single MissingExpression arg emits one lightweight TC diagnostic");
     }
 
     [Fact]
@@ -629,8 +629,8 @@ public class TypeCheckerFunctionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "ErrorType propagation suppresses downstream diagnostics (D13)");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveMemberAccess resolves the MissingExpression receiver and emits one lightweight TC diagnostic before propagation");
     }
 
     [Fact]
@@ -730,8 +730,8 @@ public class TypeCheckerFunctionTests
 
         result.Should().BeOfType<TypedErrorExpression>(
             because: "any error hole in interpolated string → entire result is TypedErrorExpression");
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "MissingExpression → no diagnostic, error propagates silently");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveInterpolatedString resolves the MissingExpression hole and emits one lightweight TC diagnostic");
     }
 
     [Fact]

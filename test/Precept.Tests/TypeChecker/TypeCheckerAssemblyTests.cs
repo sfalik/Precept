@@ -207,22 +207,19 @@ public class TypeCheckerAssemblyTests
     }
 
     [Fact]
-    public void CleanPrecept_EnsuresNotYetPopulated()
+    public void CleanPrecept_EnsuresPopulated()
     {
-        // NOTE: Ensures are parsed by the Parser as scoped constructs but the TypeChecker
-        // does not yet populate ctx.Ensures. This test documents the current state.
-        // When ensure population is implemented, change this to NotBeEmpty.
         var index = TypeCheckerTestHelpers.CheckExpectingClean(FullPrecept);
-        index.Ensures.Should().BeEmpty("scoped ensure constructs not yet wired into TypeChecker");
+        index.Ensures.Should().HaveCount(3,
+            "FullPrecept declares one state ensure and two event ensures");
     }
 
     [Fact]
-    public void CleanPrecept_AccessModesNotYetPopulated()
+    public void CleanPrecept_AccessModesPopulated()
     {
-        // NOTE: AccessModes are parsed as scoped constructs but the TypeChecker
-        // does not yet populate ctx.AccessModes. This test documents the current state.
         var index = TypeCheckerTestHelpers.CheckExpectingClean(FullPrecept);
-        index.AccessModes.Should().BeEmpty("scoped access-mode constructs not yet wired into TypeChecker");
+        index.AccessModes.Should().ContainSingle(
+            "FullPrecept declares one scoped access-mode construct");
     }
 
     [Fact]
@@ -259,16 +256,16 @@ public class TypeCheckerAssemblyTests
     {
         var index = TypeCheckerTestHelpers.CheckExpectingClean(FullPrecept);
 
-        // All 16 primary ImmutableArray fields should be accessible
+        // All primary ImmutableArray fields should be accessible.
         index.Fields.Should().NotBeEmpty();
         index.States.Should().NotBeEmpty();
         index.Events.Should().NotBeEmpty();
         index.TransitionRows.Should().NotBeEmpty();
         index.Rules.Should().NotBeEmpty();
-        // Ensures and AccessModes are not yet populated by TypeChecker (scoped construct gap)
-        // EventHandlers may be empty depending on precept structure
-        // StateHooks, EditDeclarations, ComputedDeps may also be empty
-        // ConstraintRefs, Ensures, AccessModes are not yet populated by TypeChecker
+        index.Ensures.Should().NotBeEmpty();
+        index.AccessModes.Should().NotBeEmpty();
+        // EventHandlers may be empty depending on precept structure.
+        // StateHooks, EditDeclarations, and ComputedDeps may also be empty.
         index.FieldReferences.Should().NotBeEmpty();
         index.StateReferences.Should().NotBeEmpty();
         index.EventReferences.Should().NotBeEmpty();
@@ -390,13 +387,13 @@ public class TypeCheckerAssemblyTests
     }
 
     [Fact]
-    public void EnsuresByState_EmptyUntilScopedEnsuresPopulated()
+    public void EnsuresByState_GroupsStateScopedEnsures()
     {
-        // NOTE: EnsuresByState is derived from Ensures, which are not yet populated.
-        // This test documents the current state and will flip when ensures land.
         var index = TypeCheckerTestHelpers.CheckExpectingClean(FullPrecept);
-        index.EnsuresByState.Should().BeEmpty(
-            "scoped ensures not yet wired into TypeChecker — EnsuresByState derived from empty Ensures");
+        index.EnsuresByState.Should().ContainKey("Approved",
+            "FullPrecept declares one state-scoped ensure on Approved");
+        index.EnsuresByState["Approved"].Should().ContainSingle(
+            "only the state-scoped ensure should appear in EnsuresByState");
     }
 
     // ════════════════════════════════════════════════════════════════════════

@@ -7,12 +7,19 @@
 ## Learnings
 
 - `Types.GetMeta(...).ImpliedModifiers` is the durable source of truth for implied field modifiers.
-- Error propagation in the TypeChecker should return `TypedErrorExpression` without layering extra diagnostics on parent nodes.
+- Error propagation in the TypeChecker should return `TypedErrorExpression` without layering extra diagnostics on parent nodes — but the error SOURCE must emit a TC-level diagnostic to satisfy D26 self-containment.
+- `ParsedConstruct.LeadingTokenKind` is the minimal surface for recovering the anchor scope keyword (in/to/from/on) consumed by the parser but not previously stored.
 - Context-sensitive literal retry is valuable when catalogs make typed constants or overload resolution depend on expected type.
 - Parser metadata should expose the lookup axes the parser actually queries (`BindingPower`, termination tokens, closed vocabularies) instead of duplicating parser-local tables.
 - Multi-location diagnostics can grow additively through payload fields like `RelatedSpans` without destabilizing constructor-heavy call sites.
 
 ## Recent Updates
+
+### 2026-05-08T07:00:00Z — R3 blockers B1/B2/B3 fixed
+- Fixed B3 (MissingExpression D26 gap), B1 (field default/computed expression resolution + ComputedFieldDep extraction), B2 (ensures, access modes, state hooks, edit declaration normalization).
+- Added `ParsedConstruct.LeadingTokenKind` for anchor scope determination.
+- Updated docs §1/§4/§13. Updated 17 tests to match new behavior.
+- Validation closed green at 3342/3342 + 263/263 tests.
 
 ### 2026-05-08T05:30:00Z — Slice 8: CI Enforcement shipped
 - Commit: `00ef822`.
@@ -39,3 +46,4 @@
 - Parser baseline before the checker push locked in `ParsedOutcome` (`94dec3b`), the `<-` computed-field delimiter (`266ee5a`), the bare-`<-` recovery fix plus `PRECEPT0019` exhaustiveness guard, and metadata moves for member-access precedence / expression-slot termination.
 - George's housekeeping closeout committed OutcomesCatalog, parsed action/type-reference DU nodes, NameBinder wiring, diagnostic `RelatedSpans`, and related doc/squad sync across the nine-commit batch ending at `2337fd0`.
 - Use `.squad/decisions.md` for full per-batch provenance and branch-level decision chronology.
+- R3 self-review (2026-05-07): expression resolution core is correct across all 15 ParsedExpression forms. Widening, qualifier disambiguation, ErrorType propagation, QuantifierBindings symmetry, and D26 invariant all verified. Key gaps: field default/computed expression resolution never fires (always null), and 5 of 8 construct kinds (StateEnsure, EventEnsure, AccessMode, OmitDeclaration, StateAction) lack normalization — their CheckContext accumulators are always empty. These are the next implementation frontier. No stubs or TODOs remain in TypeChecker.cs.

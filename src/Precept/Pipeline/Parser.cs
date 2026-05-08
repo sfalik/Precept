@@ -218,7 +218,7 @@ public static partial class Parser
                 : startSpan;
             var span = SourceSpan.Covering(startSpan, endSpan);
 
-            _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span));
+            _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span, startToken.Kind));
         }
 
         // ── Scoped construct parsing ────────────────────────────────────────────
@@ -269,7 +269,7 @@ public static partial class Parser
                 : startSpan;
             var span = SourceSpan.Covering(startSpan, endSpan);
 
-            _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span));
+            _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span, startToken.Kind));
         }
 
         // ── Slot sub-parsers ────────────────────────────────────────────────────

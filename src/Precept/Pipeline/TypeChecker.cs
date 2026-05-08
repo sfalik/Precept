@@ -14,9 +14,10 @@ namespace Precept.Pipeline;
 /// </summary>
 /// <remarks>
 /// Pipeline stages: PopulateFields → PopulateStates → PopulateEvents →
-/// PopulateTransitionRows → PopulateEventHandlers → PopulateRules →
-/// ValidateModifiers → ValidateStructural → ValidateCIEnforcement →
-/// BuildSemanticIndex (final assembly with D26 global assert).
+/// ResolveFieldExpressions → PopulateTransitionRows → PopulateEventHandlers →
+/// PopulateRules → PopulateEnsures → PopulateAccessModes → PopulateStateHooks →
+/// PopulateEditDeclarations → ValidateModifiers → ValidateStructural →
+/// ValidateCIEnforcement → BuildSemanticIndex (final assembly with D26 global assert).
 /// </remarks>
 internal static class TypeChecker
 {
@@ -33,10 +34,19 @@ internal static class TypeChecker
         PopulateStates(symbols, ctx);
         PopulateEvents(symbols, ctx);
 
+        // Pass 1b: resolve field default/computed expressions (B1)
+        ResolveFieldExpressions(symbols, ctx);
+
         // Pass 2: normalize transition rows and event handlers (Slice 5)
         PopulateTransitionRows(manifest, ctx);
         PopulateEventHandlers(manifest, ctx);
         PopulateRules(manifest, ctx);
+
+        // Pass 2b: normalize ensures, access modes, state hooks, edit declarations (B2)
+        PopulateEnsures(manifest, ctx);
+        PopulateAccessModes(manifest, ctx);
+        PopulateStateHooks(manifest, ctx);
+        PopulateEditDeclarations(manifest, ctx);
 
         // Modifier validation (Slice 7) — depends only on Pass 1 symbols
         ValidateModifiers(ctx);
@@ -234,6 +244,109 @@ internal static class TypeChecker
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  Pass 1b — field expression resolution (B1)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Resolve default and computed expressions on fields. Populates
+    /// <see cref="TypedField.DefaultExpression"/>, <see cref="TypedField.ComputedExpression"/>,
+    /// and <see cref="CheckContext.ComputedDeps"/> entries. Uses <see cref="FieldScopeMode.PriorFieldsOnly"/>
+    /// to enforce forward-reference prohibition (D8).
+    /// </summary>
+    private static void ResolveFieldExpressions(SymbolTable symbols, CheckContext ctx)
+    {
+        for (int i = 0; i < ctx.Fields.Count; i++)
+        {
+            var typedField = ctx.Fields[i];
+            var declared = symbols.Fields[i];
+
+            // —— Default expression (from modifier with HasValue) ——
+            var defaultMod = declared.Modifiers.FirstOrDefault(
+                m => m.Kind == ModifierKind.Default);
+            if (defaultMod?.Value is not null and not MissingExpression)
+            {
+                ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
+                ctx.CurrentFieldIndex = i;
+                var resolved = Resolve(defaultMod.Value, ctx, typedField.ResolvedType);
+                ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };
+                ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                ctx.CurrentFieldIndex = -1;
+            }
+
+            // —— Computed expression (from ComputeExpressionSlot on the field's Syntax) ——
+            var computeSlot = declared.Syntax.GetSlot<ComputeExpressionSlot>(
+                ConstructSlotKind.ComputeExpression);
+            if (computeSlot is not null && computeSlot.Expression is not MissingExpression)
+            {
+                ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
+                ctx.CurrentFieldIndex = i;
+                var resolved = Resolve(computeSlot.Expression, ctx, typedField.ResolvedType);
+                ctx.Fields[i] = ctx.Fields[i] with { ComputedExpression = resolved };
+                ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                ctx.CurrentFieldIndex = -1;
+
+                // Extract ComputedFieldDep entries by walking TypedFieldRef nodes
+                var deps = new List<string>();
+                CollectFieldRefs(resolved, deps);
+                if (deps.Count > 0)
+                {
+                    ctx.ComputedDeps.Add(new ComputedFieldDep(
+                        FieldName: typedField.Name,
+                        DependsOn: deps.Distinct().ToImmutableArray()));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Recursively collect all <see cref="TypedFieldRef.FieldName"/> values from an expression tree.
+    /// Used by <see cref="ResolveFieldExpressions"/> to build <see cref="ComputedFieldDep"/> entries.
+    /// </summary>
+    private static void CollectFieldRefs(TypedExpression expr, List<string> refs)
+    {
+        switch (expr)
+        {
+            case TypedFieldRef fr:
+                refs.Add(fr.FieldName);
+                break;
+            case TypedBinaryOp bin:
+                CollectFieldRefs(bin.Left, refs);
+                CollectFieldRefs(bin.Right, refs);
+                break;
+            case TypedUnaryOp un:
+                CollectFieldRefs(un.Operand, refs);
+                break;
+            case TypedFunctionCall fn:
+                foreach (var arg in fn.Arguments) CollectFieldRefs(arg, refs);
+                break;
+            case TypedMemberAccess ma:
+                CollectFieldRefs(ma.Object, refs);
+                break;
+            case TypedConditional cond:
+                CollectFieldRefs(cond.Condition, refs);
+                CollectFieldRefs(cond.ThenBranch, refs);
+                CollectFieldRefs(cond.ElseBranch, refs);
+                break;
+            case TypedQuantifier q:
+                CollectFieldRefs(q.Collection, refs);
+                CollectFieldRefs(q.Predicate, refs);
+                break;
+            case TypedInterpolatedString interp:
+                foreach (var seg in interp.Segments)
+                    if (seg is TypedHoleSegment hole) CollectFieldRefs(hole.Expression, refs);
+                break;
+            case TypedListLiteral list:
+                foreach (var elem in list.Elements) CollectFieldRefs(elem, refs);
+                break;
+            case TypedPostfixOp post:
+                CollectFieldRefs(post.Operand, refs);
+                break;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  Test entry points (InternalsVisibleTo — Precept.Tests)
     // ════════════════════════════════════════════════════════════════════════
 
@@ -268,8 +381,8 @@ internal static class TypeChecker
     /// </summary>
     private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx, TypeKind? expectedType = null) => expr switch
     {
-        // ── Missing sentinel → error (no diagnostic — parser already emitted one) ──
-        MissingExpression m => new TypedErrorExpression(m.Span),
+        // ── Missing sentinel → error + lightweight TC diagnostic to satisfy D26 ──
+        MissingExpression m => ResolveMissing(m, ctx),
 
         // ── Literal ──
         LiteralExpression lit => ResolveLiteral(lit, ctx, expectedType),
@@ -301,6 +414,19 @@ internal static class TypeChecker
 
         _ => new TypedErrorExpression(expr.Span),
     };
+
+    /// <summary>
+    /// Resolve a <see cref="MissingExpression"/> sentinel: emit a lightweight TC-level diagnostic
+    /// to satisfy D26 self-containment (the parser already emitted a detailed diagnostic, but
+    /// that lives in <see cref="ConstructManifest.Diagnostics"/>, not <see cref="CheckContext.Diagnostics"/>).
+    /// Uses <see cref="DiagnosticCode.TypeMismatch"/> as the nearest existing Error-severity TC code.
+    /// </summary>
+    private static TypedErrorExpression ResolveMissing(MissingExpression m, CheckContext ctx)
+    {
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.TypeMismatch, m.Span, "expression", "missing"));
+        return new TypedErrorExpression(m.Span);
+    }
 
     /// <summary>
     /// Resolve a literal expression to a <see cref="TypedLiteral"/> with the appropriate
@@ -938,6 +1064,309 @@ internal static class TypeChecker
             var message = new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span);
 
             ctx.Rules.Add(new TypedRule(condition, guard, message, ImmutableArray<string>.Empty, construct));
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Pass 2b — construct normalization (B2)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Process <see cref="ConstructKind.StateEnsure"/> and <see cref="ConstructKind.EventEnsure"/>
+    /// constructs into <see cref="TypedEnsure"/> records.
+    /// </summary>
+    private static void PopulateEnsures(ConstructManifest manifest, CheckContext ctx)
+    {
+        // —— State ensures (in/to/from State ensure Expr because Msg) ——
+        if (manifest.ByKind.Contains(ConstructKind.StateEnsure))
+        {
+            foreach (var construct in manifest.ByKind[ConstructKind.StateEnsure])
+            {
+                var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
+                string? anchorState = null;
+                if (stateSlot?.StateName is not null)
+                {
+                    if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
+                    {
+                        anchorState = typedState.Name;
+                        ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
+                    }
+                    else
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.Span, stateSlot.StateName));
+                    }
+                }
+
+                // Determine constraint kind from leading token (in/to/from)
+                var constraintKind = construct.LeadingTokenKind switch
+                {
+                    TokenKind.In   => ConstraintKind.StateResident,
+                    TokenKind.To   => ConstraintKind.StateEntry,
+                    TokenKind.From => ConstraintKind.StateExit,
+                    _              => ConstraintKind.StateResident, // fallback
+                };
+
+                var ensureSlot = construct.GetSlot<EnsureClauseSlot>(ConstructSlotKind.EnsureClause);
+                if (ensureSlot is null) continue;
+
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                var condition = Resolve(ensureSlot.Expression, ctx);
+
+                var becauseSlot = construct.GetSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause);
+                var message = becauseSlot is not null
+                    ? new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span)
+                    : new TypedLiteral(TypeKind.String, "", construct.Span);
+
+                ctx.Ensures.Add(new TypedEnsure(
+                    Kind: constraintKind,
+                    AnchorState: anchorState,
+                    AnchorEvent: null,
+                    Condition: condition,
+                    Guard: null,
+                    Message: message,
+                    SemanticSubjects: ImmutableArray<string>.Empty,
+                    Syntax: construct));
+            }
+        }
+
+        // —— Event ensures (on Event ensure Expr because Msg) ——
+        if (manifest.ByKind.Contains(ConstructKind.EventEnsure))
+        {
+            foreach (var construct in manifest.ByKind[ConstructKind.EventEnsure])
+            {
+                var eventSlot = construct.GetSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
+                string? anchorEvent = null;
+                TypedEvent? resolvedEvent = null;
+                if (eventSlot?.EventName is not null)
+                {
+                    if (ctx.EventLookup.TryGetValue(eventSlot.EventName, out var evTyped))
+                    {
+                        anchorEvent = evTyped.Name;
+                        resolvedEvent = evTyped;
+                        ctx.EventReferences.Add(new EventReference(evTyped, eventSlot.Span));
+                    }
+                    else
+                    {
+                        anchorEvent = eventSlot.EventName;
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventSlot.Span, eventSlot.EventName));
+                    }
+                }
+
+                // Set event args scope for the ensure expression
+                IReadOnlyDictionary<string, TypedArg>? previousArgs = ctx.CurrentEventArgs;
+                if (resolvedEvent is not null)
+                    ctx.CurrentEventArgs = resolvedEvent.Args.ToFrozenDictionary(a => a.Name);
+
+                try
+                {
+                    var ensureSlot = construct.GetSlot<EnsureClauseSlot>(ConstructSlotKind.EnsureClause);
+                    if (ensureSlot is null) continue;
+
+                    ctx.CurrentScope = FieldScopeMode.AllFields;
+                    var condition = Resolve(ensureSlot.Expression, ctx);
+
+                    var becauseSlot = construct.GetSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause);
+                    var message = becauseSlot is not null
+                        ? new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span)
+                        : new TypedLiteral(TypeKind.String, "", construct.Span);
+
+                    ctx.Ensures.Add(new TypedEnsure(
+                        Kind: ConstraintKind.EventPrecondition,
+                        AnchorState: null,
+                        AnchorEvent: anchorEvent,
+                        Condition: condition,
+                        Guard: null,
+                        Message: message,
+                        SemanticSubjects: ImmutableArray<string>.Empty,
+                        Syntax: construct));
+                }
+                finally
+                {
+                    ctx.CurrentEventArgs = previousArgs;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Process <see cref="ConstructKind.AccessMode"/> constructs into
+    /// <see cref="TypedAccessMode"/> records.
+    /// </summary>
+    private static void PopulateAccessModes(ConstructManifest manifest, CheckContext ctx)
+    {
+        if (!manifest.ByKind.Contains(ConstructKind.AccessMode))
+            return;
+
+        foreach (var construct in manifest.ByKind[ConstructKind.AccessMode])
+        {
+            // —— State reference ——
+            var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
+            string stateName = "";
+            if (stateSlot?.StateName is not null)
+            {
+                if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
+                {
+                    stateName = typedState.Name;
+                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
+                }
+                else
+                {
+                    stateName = stateSlot.StateName;
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.Span, stateSlot.StateName));
+                }
+            }
+
+            // —— Field reference ——
+            var fieldSlot = construct.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
+            string fieldName = "";
+            if (fieldSlot?.FieldName is not null)
+            {
+                if (ctx.FieldLookup.TryGetValue(fieldSlot.FieldName, out var typedField))
+                {
+                    fieldName = typedField.Name;
+                    ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.Span));
+                }
+                else
+                {
+                    fieldName = fieldSlot.FieldName;
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.UndeclaredField, fieldSlot.Span, fieldSlot.FieldName));
+                }
+            }
+
+            // —— Mode (readonly / editable → Read / Write) ——
+            var modeSlot = construct.GetSlot<AccessModeSlot>(ConstructSlotKind.AccessModeKeyword);
+            ModifierKind mode = modeSlot?.AccessMode switch
+            {
+                TokenKind.Editable => ModifierKind.Write,
+                _                  => ModifierKind.Read,
+            };
+
+            // —— Optional guard ——
+            TypedExpression? guard = null;
+            var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+            if (guardSlot is not null)
+            {
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                guard = Resolve(guardSlot.Expression, ctx);
+                if (guard is not TypedErrorExpression && guard.ResultType != TypeKind.Boolean)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.TypeMismatch, guardSlot.Expression.Span,
+                            Types.GetMeta(TypeKind.Boolean).DisplayName,
+                            Types.GetMeta(guard.ResultType).DisplayName));
+                    guard = new TypedErrorExpression(guardSlot.Expression.Span);
+                }
+            }
+
+            ctx.AccessModes.Add(new TypedAccessMode(
+                StateName: stateName,
+                FieldName: fieldName,
+                Mode: mode,
+                Guard: guard,
+                Syntax: construct));
+        }
+    }
+
+    /// <summary>
+    /// Process <see cref="ConstructKind.StateAction"/> constructs (on-entry/on-exit action chains)
+    /// into <see cref="TypedStateHook"/> records.
+    /// </summary>
+    private static void PopulateStateHooks(ConstructManifest manifest, CheckContext ctx)
+    {
+        if (!manifest.ByKind.Contains(ConstructKind.StateAction))
+            return;
+
+        foreach (var construct in manifest.ByKind[ConstructKind.StateAction])
+        {
+            // —— State reference ——
+            var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
+            string stateName = "";
+            if (stateSlot?.StateName is not null)
+            {
+                if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
+                {
+                    stateName = typedState.Name;
+                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
+                }
+                else
+                {
+                    stateName = stateSlot.StateName;
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.Span, stateSlot.StateName));
+                }
+            }
+
+            // —— Hook scope from leading token (to → OnEntry, from → OnExit) ——
+            var scope = construct.LeadingTokenKind switch
+            {
+                TokenKind.From => AnchorScope.OnExit,
+                _              => AnchorScope.OnEntry, // 'to' and fallback
+            };
+
+            // —— Guard (state hooks may support guards in future; currently none in slot list) ——
+            TypedExpression? guard = null;
+
+            // —— Action chain ——
+            var actionChainSlot = construct.GetSlot<ActionChainSlot>(ConstructSlotKind.ActionChain);
+            var actions = ImmutableArray<TypedAction>.Empty;
+            if (actionChainSlot is not null)
+            {
+                var builder = ImmutableArray.CreateBuilder<TypedAction>(actionChainSlot.Actions.Length);
+                foreach (var parsedAction in actionChainSlot.Actions)
+                    builder.Add(ResolveAction(parsedAction, ctx));
+                actions = builder.MoveToImmutable();
+            }
+
+            ctx.StateHooks.Add(new TypedStateHook(
+                Scope: scope,
+                StateName: stateName,
+                Guard: guard,
+                Actions: actions,
+                Syntax: construct));
+        }
+    }
+
+    /// <summary>
+    /// D24 placeholder — process edit declaration constructs into
+    /// <see cref="TypedEditDeclaration"/> records. Currently a no-op if
+    /// no edit declaration <see cref="ConstructKind"/> exists in the manifest.
+    /// </summary>
+    private static void PopulateEditDeclarations(ConstructManifest manifest, CheckContext ctx)
+    {
+        // Edit declarations use ConstructKind.OmitDeclaration or a future dedicated kind.
+        // For now, OmitDeclaration is the closest existing construct for field exclusion.
+        // Full edit declaration support (D24) will arrive with stateless-precept design.
+        if (!manifest.ByKind.Contains(ConstructKind.OmitDeclaration))
+            return;
+
+        foreach (var construct in manifest.ByKind[ConstructKind.OmitDeclaration])
+        {
+            var fieldSlot = construct.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
+            var fields = ImmutableArray<string>.Empty;
+            bool isEditAll = false;
+
+            if (fieldSlot is not null)
+            {
+                if (fieldSlot.FieldName is null)
+                {
+                    isEditAll = true;
+                }
+                else
+                {
+                    fields = [fieldSlot.FieldName];
+                    if (ctx.FieldLookup.TryGetValue(fieldSlot.FieldName, out var typedField))
+                        ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.Span));
+                }
+            }
+
+            ctx.EditDeclarations.Add(new TypedEditDeclaration(
+                EditableFields: fields,
+                IsEditAll: isEditAll,
+                Syntax: construct));
         }
     }
 

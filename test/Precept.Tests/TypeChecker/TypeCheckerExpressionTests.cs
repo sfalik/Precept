@@ -488,8 +488,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "D13: MissingExpression → no diagnostic, error propagates silently");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: the resolved MissingExpression now emits one lightweight TC diagnostic before D13 propagation");
     }
 
     [Fact]
@@ -503,8 +503,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "D13: error from right operand propagates without new diagnostic");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: the resolved MissingExpression now emits one lightweight TC diagnostic before D13 propagation");
     }
 
     [Fact]
@@ -518,7 +518,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty();
+        ctx.Diagnostics.Should().HaveCount(2,
+            because: "B3: ResolveBinaryOp resolves both MissingExpression operands before propagating the error");
     }
 
     [Fact]
@@ -531,8 +532,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "D13: error from operand propagates without new diagnostic");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveUnaryOp resolves the MissingExpression operand and emits one lightweight TC diagnostic before propagation");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -654,7 +655,7 @@ public class TypeCheckerExpressionTests
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void MissingExpression_ReturnsErrorExpression_NoDiagnostic()
+    public void MissingExpression_ReturnsErrorExpression_EmitsDiagnostic()
     {
         var ctx = MinimalContext();
         var expr = new MissingExpression(TestSpan);
@@ -662,8 +663,9 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "parser already emitted the diagnostic for the missing expression");
+        ctx.Diagnostics.Should().ContainSingle(
+                because: "B3: TC emits lightweight diagnostic on MissingExpression to satisfy D26")
+            .Which.Code.Should().Be(nameof(DiagnosticCode.TypeMismatch));
     }
 
     // ════════════════════════════════════════════════════════════════════════

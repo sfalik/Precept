@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Stub — not yet implemented |
+| Implementation state | Implemented |
 | Source | `src/Precept/Pipeline/TypeChecker.cs`, `src/Precept/Pipeline/SemanticIndex.cs` |
 | Upstream | `ConstructManifest` (from Parser) + `SymbolTable` (from NameBinder) |
 | Downstream | GraphAnalyzer, ProofEngine, PreceptBuilder, LS semantic features |
@@ -87,7 +87,7 @@ The type checker has **medium complexity** — more involved than the lexer or t
 
 | Metric | Value | Rationale |
 |---|---|---|
-| Estimated LOC | 800–1200 | ~350 expression resolution + ~300 declaration normalization + ~200 structural validation |
+| Estimated LOC | ~2700 | ~350 expression resolution + ~300 declaration normalization + ~200 structural validation + ~150 field expression resolution + ~150 construct normalization + ~170 CI enforcement + ~80 D26 walker |
 | Catalog dependency | ~70% | Most logic is "look up catalog, record result" |
 | Structural logic | ~30% | Symbol tables, scope management, cycles, choice sets |
 | Expression forms | 13 | One arm per `ExpressionFormKind` + error stub |
@@ -957,9 +957,9 @@ The type checker dispatches on `ConstructKind` enum values via exhaustive switch
 
 ## 13. Open Questions / Implementation Notes
 
-### Implementation Plan (UNBLOCKED)
+### Implementation Plan (COMPLETED)
 
-Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The following slices can proceed:
+Implementation complete. All 10 slices shipped, plus B1 (field expression resolution), B2 (ensure/access-mode/state-hook/edit-declaration normalization), and B3 (D26 MissingExpression diagnostic). Remaining open items: W1 (SemanticSubjects extraction), W2 (NodaTime dispatch refactor — non-blocking), G1–G3 (catalog-driven opportunities — low priority).
 
 **Pre-Slice 0: Shape Commit (unblocks everything)**
 - All `TypedField`, `TypedState`, `TypedEvent`, `TypedArg` record definitions

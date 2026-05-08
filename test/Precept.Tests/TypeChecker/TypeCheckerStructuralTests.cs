@@ -281,9 +281,9 @@ public class TypeCheckerStructuralTests
     //  Category 4: Forward-reference belt-and-suspenders
     // ════════════════════════════════════════════════════════════════════════
     //
-    // NOTE: Forward-reference validation in ValidateStructural reads ComputedDeps,
-    // which is currently empty. These tests verify the no-op path is clean.
-    // The primary forward-ref enforcement is in ResolveIdentifier (D8, Slice 2).
+    // Forward-reference validation in ValidateStructural reads ComputedDeps.
+    // With computed/default expression wiring in place, default-expression dependencies
+    // now contribute forward-reference diagnostics here as well.
 
     [Fact]
     public void FieldDeclaredBeforeDependency_NoDiagnostic()
@@ -304,14 +304,11 @@ public class TypeCheckerStructuralTests
     }
 
     [Fact]
-    public void ForwardReference_InDefaultExpression_NoForwardRefDiagnostic_UntilComputedDepsWired()
+    public void ForwardReference_InDefaultExpression_EmitsForwardRefDiagnostic()
     {
-        // D8: field A references field B declared after A.
-        // Currently default expression resolution is deferred (Slice 2+), so
-        // ResolveIdentifier doesn't fire and ComputedDeps remains empty.
-        // ValidateStructural belt-and-suspenders is a no-op with empty ComputedDeps.
-        // This test documents the current state; will flip to CheckExpectingError
-        // once computed expression resolution populates ComputedDeps.
+        // D8: field Total references field SubTotal declared after Total.
+        // With default-expression dependency wiring in place, ValidateStructural
+        // should surface the forward-reference diagnostic.
         var precept = """
             precept Widget
             field Total as number default SubTotal
@@ -322,8 +319,8 @@ public class TypeCheckerStructuralTests
         var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
 
         diagnostics
-            .Where(d => d.Code == nameof(DiagnosticCode.DefaultForwardReference))
-            .Should().BeEmpty("ComputedDeps is empty until expression resolution is wired");
+            .Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.DefaultForwardReference),
+                "computed/default dependencies now participate in forward-reference validation");
     }
 
     [Fact]

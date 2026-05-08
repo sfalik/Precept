@@ -274,7 +274,7 @@ public class TypeCheckerQuantifierTests
     public void QuantifierTarget_IsErrorExpression_ReturnsError_NoSecondDiagnostic()
     {
         var ctx = CollectionContext();
-        // D13: error collection → TypedErrorExpression, no additional diagnostic
+        // B3: error collection → TypedErrorExpression after one lightweight TC diagnostic
         var collection = new MissingExpression(TestSpan);
         var predicate = new LiteralExpression(TokenKind.True, "true", TestSpan);
         var expr = new QuantifierExpression(TokenKind.Each, "x", collection, predicate, TestSpan);
@@ -282,8 +282,8 @@ public class TypeCheckerQuantifierTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "D13: MissingExpression produces no diagnostic, error propagates silently");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveQuantifier resolves the MissingExpression collection first and short-circuits after that single diagnostic");
     }
 
     [Fact]
@@ -297,8 +297,8 @@ public class TypeCheckerQuantifierTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "D13: MissingExpression error propagates without new diagnostic");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveQuantifier resolves the MissingExpression predicate and emits one lightweight TC diagnostic before propagation");
     }
 
     [Fact]
@@ -451,8 +451,8 @@ public class TypeCheckerQuantifierTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "D13: MissingExpression error propagates without new diagnostic");
+        ctx.Diagnostics.Should().HaveCount(1,
+            because: "B3: ResolveListLiteral resolves every element, and the single MissingExpression element emits one lightweight TC diagnostic");
     }
 
     [Fact]
@@ -467,7 +467,8 @@ public class TypeCheckerQuantifierTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty();
+        ctx.Diagnostics.Should().HaveCount(2,
+            because: "B3: ResolveListLiteral resolves both MissingExpression elements before returning the propagated error");
     }
 
     [Fact]

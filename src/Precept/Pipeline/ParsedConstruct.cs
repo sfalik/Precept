@@ -12,7 +12,8 @@ namespace Precept.Pipeline;
 public sealed record ParsedConstruct(
     ConstructMeta             Meta,
     ImmutableArray<SlotValue> Slots,
-    SourceSpan                Span
+    SourceSpan                Span,
+    TokenKind?                LeadingTokenKind = null
 )
 {
     /// <summary>
