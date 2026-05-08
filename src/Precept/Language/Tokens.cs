@@ -116,7 +116,7 @@ public static class Tokens
         TokenKind.Writable    => new(kind, "writable",    Cat_Decl, "Field writable-baseline modifier",
             TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword", ValidAfter: VA_FieldModifier),
         TokenKind.Because     => new(kind, "because",     Cat_Decl, "Reason clause",
-            TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword"),
+            TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword", IsMessagePosition: true),
         TokenKind.Initial     => new(kind, "initial",     Cat_Decl, "Initial state/event marker",
             TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword", ValidAfter: VA_StateModifier),
 
@@ -168,7 +168,7 @@ public static class Tokens
         TokenKind.No          => new(kind, "no",          Cat_Out, "Prefix for 'no transition'",
             TextMateScope: "keyword.other.outcome.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),
         TokenKind.Reject      => new(kind, "reject",      Cat_Out, "Rejection outcome",
-            TextMateScope: "keyword.other.outcome.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),
+            TextMateScope: "keyword.other.outcome.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow, IsMessagePosition: true),
 
         // ── Keywords: Access Modes (B4 — 2026-04-28) ──────────────────
         // Write and Read retired: vocabulary locked B4. New: modify/readonly/editable.

@@ -141,7 +141,7 @@ TextMate applies the first match in the top-level `patterns` array. The ordering
 3. Construct-level structural patterns (`#machineDeclaration` through `#collectionMemberAccess`) — most-specific multi-token patterns first. Among event patterns, `#eventWithArgsDeclaration` precedes `#eventDeclaration` because `with` in the event signature would be silently consumed by the more general pattern if ordered second.
 4. Catalog-derived keyword and operator groups — in scope-family order, ending with the fallback `#identifierReference`.
 
-**Current gap:** `#messageStrings` is defined in the repository by `AddStructuralPatterns()` but is absent from the `BuildTopLevelPatterns()` include list. As a result, `because "..."` and `reject "..."` strings receive plain `string.quoted.double.precept` scope rather than the gold `string.quoted.double.message.precept` scope. Fixing this requires both closing the catalog gap (see below) and inserting `#messageStrings` before `#strings` in the include order.
+**Current gap:** `#messageStrings` is already emitted and included before `#strings`, but the leader list (`because`, `reject`) is still hardcoded in `AddStructuralPatterns()`. Fixing this requires closing the remaining catalog gap (see below) so the generator can derive message-position patterns from metadata instead of a hand-maintained keyword list.
 
 ### begin/end pairs
 
@@ -163,18 +163,18 @@ The generator cannot derive this pattern from existing catalog metadata. `TokenK
 
 ### What catalog change closes the gap
 
-Add `IsMessagePosition: bool` to `TokenMeta`, defaulting to `false`. Set it `true` on `TokenKind.Because` and `TokenKind.Reject`.
+Add `IsMessagePosition: bool` to `TokenMeta`, defaulting to `false`, and set it `true` on `TokenKind.Because` and `TokenKind.Reject`. Add the same flag to `FunctionMeta` so future built-ins can describe trailing message arguments from catalog metadata without inventing a second mechanism.
 
 With this flag in place, the generator can:
 1. Find all tokens where `IsMessagePosition == true`.
 2. Auto-generate the `messageStrings` repository entry as a capture-group pattern for each such token, applying `string.quoted.double.message.precept` to the captured string.
-3. Include `#messageStrings` in the top-level pattern list before `#strings`.
+3. Reuse the same metadata shape for any future function whose trailing argument is a user-facing message string.
 
-This closes the gap completely and makes the gold message-string pattern catalog-driven rather than hardcoded.
+This closes the catalog-schema gap and makes the next generator change mechanical instead of introducing new per-surface hardcoding.
 
 ### Interim behavior
 
-Until the gap is closed, the generator produces a `messageStrings` repository entry via `AddStructuralPatterns()`, but the entry is not referenced in the top-level `patterns` list. Strings following `because` and `reject` receive plain `string.quoted.double.precept` scope. No gold highlighting is applied in the generated grammar. The hand-authored `precept.tmLanguage.json` has the correct behavior and must remain in production until the gap is closed and the generator's output is verified equivalent.
+Until the generator is rewired to consume `IsMessagePosition`, it still produces the `messageStrings` repository entry via `AddStructuralPatterns()` with a hardcoded leader list. The generated grammar already applies the gold message scope, but the pattern is not yet catalog-derived. The hand-authored `precept.tmLanguage.json` remains the production baseline until the generated output is verified equivalent across the canonical samples.
 
 ---
 
@@ -215,8 +215,8 @@ Because the generator derives patterns exclusively from `Tokens.All`, stale keyw
 The generated grammar replaces the hand-authored `precept.tmLanguage.json` in production when:
 
 1. All 49 scopes in the visual system vocabulary are correctly assigned in generated output.
-2. The message-string catalog gap is closed (`IsMessagePosition` flag added and generator updated).
-3. `#messageStrings` is present in the top-level `patterns` list before `#strings`.
+2. The message-string metadata is catalog-driven (`IsMessagePosition` present on the relevant catalog records and consumed by the generator).
+3. `#messageStrings` is generated from catalog metadata and remains present before `#strings`.
 4. A diff comparison between the generated output and the hand-authored file shows no scope regressions on the canonical sample files in `samples/`.
 
 Until these conditions are met, the hand-authored file remains in production and the generator output is a build artifact for comparison only.

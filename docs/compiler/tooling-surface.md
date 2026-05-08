@@ -292,13 +292,15 @@ Each `TokenMeta` in `Tokens.All` carries:
 // From src/Precept/Language/Token.cs
 public sealed record TokenMeta(
     TokenKind                      Kind,
-    string?                        Text,           // keyword/operator text ("state", "==")
-    IReadOnlyList<TokenCategory>   Categories,     // grouping for grammar repository sections
+    string?                        Text,              // keyword/operator text ("state", "==")
+    IReadOnlyList<TokenCategory>   Categories,        // grouping for grammar repository sections
     string                         Description,
-    string?                        TextMateScope,  // e.g., "keyword.control.precept"
+    string?                        TextMateScope,     // e.g., "keyword.control.precept"
     string?                        SemanticTokenType,
     TokenKind[]?                   ValidAfter = null,
-    ...
+    bool                           IsAccessModeAdjective = false,
+    bool                           IsValidAsMemberName = false,
+    bool                           IsMessagePosition = false
 );
 ```
 
@@ -309,6 +311,7 @@ public sealed record TokenMeta(
 | `Text` | The literal text to match (`"state"`, `"=="`) |
 | `TextMateScope` | The scope name to assign (`keyword.control.precept`, `keyword.operator.comparison.precept`) |
 | `Categories` | Grouping for repository sections (`TokenCategory.Declaration`, `TokenCategory.Operator`) |
+| `IsMessagePosition` | Marks keywords whose following string literal is a gold-scoped user-facing message |
 
 #### Output Grammar Structure
 

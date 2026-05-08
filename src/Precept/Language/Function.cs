@@ -39,4 +39,10 @@ public sealed record FunctionMeta(
     string? SnippetTemplate = null,
     string? HoverDescription = null,
     bool HasCIVariant = false,
-    FunctionKind? CIVariantOf = null);
+    FunctionKind? CIVariantOf = null,
+    /// <summary>
+    /// True when this function's trailing argument is a user-facing message string.
+    /// The grammar generator uses this flag to emit the gold
+    /// <c>string.quoted.double.message.precept</c> scope at that argument position.
+    /// </summary>
+    bool IsMessagePosition = false);

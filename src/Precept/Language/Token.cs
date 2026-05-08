@@ -61,7 +61,15 @@ public sealed record TokenMeta(
     /// and <c>max</c> are DSL aggregation keywords but also idiomatic member-accessor names).
     /// Drives <see cref="Pipeline.Parser.KeywordsValidAsMemberName"/>.
     /// </summary>
-    bool                           IsValidAsMemberName = false
+    bool                           IsValidAsMemberName = false,
+    /// <summary>
+    /// True when this keyword introduces a position whose string argument is a user-facing
+    /// message. The grammar generator uses this flag to emit the gold
+    /// <c>string.quoted.double.message.precept</c> scope at those positions, derived from
+    /// catalog metadata rather than hardcoded in tmLanguage.json.
+    /// Applies to: <c>because</c>, <c>reject</c>.
+    /// </summary>
+    bool                           IsMessagePosition = false
 );
 
 /// <summary>

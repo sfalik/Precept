@@ -574,10 +574,12 @@ public sealed record TokenMeta(
     string?                        Text,
     IReadOnlyList<TokenCategory>   Categories,
     string                         Description,
-    string?                        TextMateScope      = null,
-    string?                        SemanticTokenType  = null,
-    IReadOnlyList<TokenKind>?      ValidAfter         = null,
-    string?                        HoverDescription   = null   // CC#19: user-facing hover text for this token; null = no hover
+    string?                        TextMateScope,
+    string?                        SemanticTokenType,
+    TokenKind[]?                   ValidAfter = null,
+    bool                           IsAccessModeAdjective = false,
+    bool                           IsValidAsMemberName = false,
+    bool                           IsMessagePosition = false
 );
 ```
 
@@ -824,7 +826,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Part | Type |
 |------|------|
 | Kind enum | `TokenKind` |
-| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TextMateScope?, SemanticTokenType?, ValidAfter[]?, HoverDescription?)` |
+| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TextMateScope?, SemanticTokenType?, ValidAfter[]?, IsAccessModeAdjective, IsValidAsMemberName, IsMessagePosition)` |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
@@ -1033,7 +1035,7 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 | Part | Type |
 |------|------|
 | Kind enum | `FunctionKind` (21 members) |
-| Meta record | `FunctionMeta(Kind, Name, Description, Overloads[], Category, UsageExample?, SnippetTemplate?, HoverDescription?, HasCIVariant, CIVariantOf)` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
+| Meta record | `FunctionMeta(Kind, Name, Description, Overloads[], Category, UsageExample?, SnippetTemplate?, HoverDescription?, HasCIVariant, CIVariantOf, IsMessagePosition)` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
 | Catalog class | `Functions` — `GetMeta()`, `All` |
 | Output type | None — functions are evaluated inline |
 
@@ -1069,17 +1071,18 @@ public sealed record FunctionMeta(
     string                          Description,
     IReadOnlyList<FunctionOverload> Overloads,
     FunctionCategory                Category,
-    string?                         UsageExample     = null,
-    string?                         SnippetTemplate  = null,
+    string?                         UsageExample = null,
+    string?                         SnippetTemplate = null,
     string?                         HoverDescription = null,
-    bool                            HasCIVariant     = false,
-    FunctionKind?                   CIVariantOf      = null
+    bool                            HasCIVariant = false,
+    FunctionKind?                   CIVariantOf = null,
+    bool                            IsMessagePosition = false
 );
 ```
 
 Parameters are declared as named statics so `ParamSubject` can reference them by object identity — see Proof Obligations.
 
-Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions. `FunctionCategory` groups functions by semantic domain (`Numeric`, `String`, `Temporal`) for completions and MCP vocabulary presentation. `HasCIVariant` marks the canonical case-sensitive function that has a CI-qualified partner, and `CIVariantOf` points from the CI-qualified function back to its canonical base. The type checker reads these fields when resolving CI-qualified function calls such as `~startsWith(...)`.
+Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions. `FunctionCategory` groups functions by semantic domain (`Numeric`, `String`, `Temporal`) for completions and MCP vocabulary presentation. `HasCIVariant` marks the canonical case-sensitive function that has a CI-qualified partner, and `CIVariantOf` points from the CI-qualified function back to its canonical base. `IsMessagePosition` reserves a catalog-driven way to mark functions whose trailing argument is a user-facing message string; no built-in functions populate it yet. The type checker reads these fields when resolving CI-qualified function calls such as `~startsWith(...)`. 
 
 ##### Business-type overloads and QualifierMatch
 
