@@ -1,0 +1,375 @@
+using System.Linq;
+using FluentAssertions;
+using Precept.Language;
+using Xunit;
+
+namespace Precept.Tests.TypeChecker;
+
+/// <summary>
+/// Slice 7 — Modifier Validation.
+/// Covers type-applicability (catalog-driven), duplicate detection, mutual exclusivity,
+/// subsumption redundancy, implied-modifier redundancy, writable-on-event-arg,
+/// and computed-field-not-writable diagnostics.
+/// </summary>
+public class TypeCheckerModifierTests
+{
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 1: Valid modifiers — no diagnostic
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void OptionalModifier_OnStringField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string optional
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void NotemptyModifier_OnStringField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string notempty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void NonnegativeModifier_OnIntegerField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer nonnegative
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void WritableModifier_OnStringField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string writable
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void PositiveModifier_OnDecimalField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Price as decimal positive
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void OrderedModifier_OnChoiceField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Priority as choice of string("Low","Medium","High") ordered
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void NotemptyModifier_OnSetOfStringField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Tags as set of string notempty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 2: Invalid modifier for type
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("boolean", "nonnegative")]
+    [InlineData("string", "nonnegative")]
+    [InlineData("date", "positive")]
+    [InlineData("boolean", "nonzero")]
+    [InlineData("integer", "ordered")]
+    public void Modifier_NotApplicableToType_EmitsInvalidModifierForType(string typeName, string modifier)
+    {
+        var precept = $"""
+            precept Widget
+            field MyField as {typeName} {modifier}
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    [Fact]
+    public void NotemptyModifier_OnBooleanField_EmitsInvalidModifierForType()
+    {
+        var precept = """
+            precept Widget
+            field Flag as boolean notempty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    [Fact]
+    public void MinlengthModifier_OnIntegerField_EmitsInvalidModifierForType()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer minlength 3
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    [Fact]
+    public void MaxplacesModifier_OnIntegerField_EmitsInvalidModifierForType()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer maxplaces 2
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    [Fact]
+    public void MincountModifier_OnStringField_EmitsInvalidModifierForType()
+    {
+        var precept = """
+            precept Widget
+            field Name as string mincount 1
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    [Fact]
+    public void EventArg_WithModifierNotApplicableToArgType_EmitsInvalidModifierForType()
+    {
+        var precept = """
+            precept Widget
+            field Status as string
+            state Open initial
+            state Closed
+            event Close(Reason as boolean nonnegative)
+            from Open on Close -> set Status = "done" -> Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 3: Duplicate modifier + mutual exclusivity
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void SameModifierTwice_EmitsDuplicateModifier()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer nonnegative nonnegative
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DuplicateModifier);
+    }
+
+    [Fact]
+    public void OptionalModifierTwice_EmitsDuplicateModifier()
+    {
+        var precept = """
+            precept Widget
+            field Name as string optional optional
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DuplicateModifier);
+    }
+
+    [Fact]
+    public void NonnegativeAndPositive_MutuallyExclusive_EmitsConflict()
+    {
+        // nonnegative has MutuallyExclusiveWith: [Positive]
+        // positive has MutuallyExclusiveWith: [Nonnegative]
+        var precept = """
+            precept Widget
+            field Count as integer nonnegative positive
+            state Open initial
+            """;
+
+        // Mutual exclusivity emits InvalidModifierForType with conflict description
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    [Fact]
+    public void PositiveAndNonnegative_ReversedOrder_EmitsConflict()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer positive nonnegative
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 4: Redundant modifier (subsumption + implied)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void PositiveSubsumesNonnegative_EmitsRedundantModifier()
+    {
+        // positive.Subsumes = [Nonnegative, Nonzero]
+        // Order: positive first → nonnegative second → redundant
+        var precept = """
+            precept Widget
+            field Count as integer positive nonnegative
+            state Open initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.RedundantModifier))
+            .Should().NotBeEmpty(
+                because: "'nonnegative' is subsumed by 'positive'");
+    }
+
+    [Fact]
+    public void PositiveSubsumesNonzero_EmitsRedundantModifier()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer positive nonzero
+            state Open initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.RedundantModifier))
+            .Should().NotBeEmpty(
+                because: "'nonzero' is subsumed by 'positive'");
+    }
+
+    [Fact]
+    public void NotemptyOnTimezoneField_ImpliedModifier_EmitsRedundantModifier()
+    {
+        // timezone type has ImpliedModifiers: [Notempty]
+        var precept = """
+            precept Widget
+            field Tz as timezone notempty
+            state Open initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.RedundantModifier))
+            .Should().NotBeEmpty(
+                because: "'notempty' is already implied by the timezone type");
+    }
+
+    [Fact]
+    public void NotemptyOnCurrencyField_ImpliedModifier_EmitsRedundantModifier()
+    {
+        // currency type has ImpliedModifiers: [Notempty]
+        var precept = """
+            precept Widget
+            field Cur as currency notempty
+            state Open initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.RedundantModifier))
+            .Should().NotBeEmpty(
+                because: "'notempty' is already implied by the currency type");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 5: Event arg modifier validation
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void EventArg_WithValidModifier_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            state Open initial
+            event Submit(Label as string optional)
+            from Open on Submit -> set Name = Submit.Label -> no transition
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void EventArg_WithWritableModifier_EmitsWritableOnEventArg()
+    {
+        var precept = """
+            precept Widget
+            field Status as string
+            state Open initial
+            state Closed
+            event Close(Reason as string writable)
+            from Open on Close -> set Status = "done" -> Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.WritableOnEventArg);
+    }
+
+    [Fact]
+    public void ComputedField_WithWritableModifier_EmitsComputedFieldNotWritable()
+    {
+        var precept = """
+            precept Widget
+            field Price as number writable
+            field Tax as number writable <- Price
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ComputedFieldNotWritable);
+    }
+
+    [Fact]
+    public void ComputedField_WithoutWritable_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Price as number writable
+            field Tax as number <- Price
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+}
