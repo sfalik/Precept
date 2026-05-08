@@ -1045,7 +1045,7 @@ Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The f
 
 All three open questions are now **locked** (2026-05-08).
 
-1. ✅ **RESOLVED — Anti-mirroring enforcement mechanism** — **Roslyn Analyzer.** A custom diagnostic fires when `.Syntax` is accessed on a `SemanticIndex`-typed record outside the TypeChecker or test assemblies. GraphAnalyzer, ProofEngine, and Builder must never read data through `.Syntax` back-pointers — those are debugging aids only.
+1. ✅ **CLOSED — Anti-mirroring enforcement mechanism** — **PRECEPT0024 implemented** (`src/Precept.Analyzers/Precept0024AntiMirroringEnforcement.cs`). Roslyn analyzer fires `Error` when `.Syntax` is accessed on any guarded `Typed*` record (TypedField, TypedState, TypedEvent, TypedTransitionRow, TypedRule, TypedEnsure, TypedAccessMode, TypedStateHook, TypedEventHandler, TypedEditDeclaration) outside the `TypeChecker` class. Tests in `test/Precept.Analyzers.Tests/Precept0024Tests.cs`.
 
 2. ✅ **RESOLVED — ContentValidation DU landing timeline** — **Land before Slice 4 (Typed Constants).** The `ContentValidation` DU (`RegexValidation`, `NodaTimeValidation`, `ClosedSetValidation`) ships as a separate commit before Slice 4 begins, eliminating the hardcoded dispatch debt.
 

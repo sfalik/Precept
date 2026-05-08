@@ -13,7 +13,15 @@
 - `precept_language` already has the right catalog-driven insertion point for proof diagnostics, but `id`/`phase`/`rule` alone is too thin for contradiction-vs-unresolved proof semantics.
 - Repo-local MCP config now has three explicit surfaces: repo-root `.mcp.json` for Copilot CLI, `.vscode/mcp.json` for VS Code workspace development, and `tools/Precept.Plugin/.mcp.json` for the shipped payload.
 
+- PRECEPT0024 anti-mirroring enforcement: `RegisterOperationAction` on `OperationKind.PropertyReference` is the cleanest Roslyn hook for guarding member access. Namespace-qualified type resolution prevents false positives on unrelated types sharing a property name. Walking `ContainingSymbol` up through nested types handles lambdas, local functions, and inner classes correctly.
+
 ## Recent Updates
+
+### 2026-05-07 — PRECEPT0024 anti-mirroring enforcement landed
+- Implemented Roslyn analyzer `Precept0024AntiMirroringEnforcement` guarding `.Syntax` access on 10 Typed* records outside TypeChecker.
+- 8 tests (4 TP, 4 TN) cover GraphAnalyzer/ProofEngine/Builder access, lambda closures, nested classes, non-guarded types, and non-Syntax properties.
+- Closes OQ1 from type-checker.md §13.
+
 
 ### 2026-04-27 — Dual-surface MCP config landed and validated
 - Implemented the approved minimal change: repo-root `.mcp.json` now gives Copilot CLI a repo-local `mcpServers.precept` entry pointing at `node tools/scripts/start-precept-mcp.js`.
