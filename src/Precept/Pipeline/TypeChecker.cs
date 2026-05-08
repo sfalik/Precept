@@ -42,7 +42,11 @@ internal static class TypeChecker
         // (populated during expression resolution) for cycle detection.
         ValidateStructural(ctx);
 
-        // Remaining Pass 2 + final assembly deferred to Slices 8–10.
+        // CI enforcement (Slice 8) — runs after all expression resolution;
+        // walks resolved expression trees for ~string consistency violations.
+        ValidateCIEnforcement(ctx);
+
+        // Remaining final assembly deferred to Slice 10.
         // Return a partial SemanticIndex with the symbol tables populated.
         return BuildPartialSemanticIndex(ctx);
     }
@@ -111,6 +115,12 @@ internal static class TypeChecker
 
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;
+
+            // CI tracking (Slice 8): record ~string fields and ~string-element collections
+            if (declared.Type is CITypeReference)
+                ctx.CIFields.Add(declared.Name);
+            else if (declared.Type is CollectionTypeReference { ElementType: CITypeReference })
+                ctx.CIElementCollections.Add(declared.Name);
 
             // Choice domain validation (Slice 6): empty domain and duplicate values
             if (declared.Type is ChoiceTypeReference choiceRef)
@@ -678,7 +688,8 @@ internal static class TypeChecker
             // Record field reference site for LS navigation
             ctx.FieldReferences.Add(new FieldReference(field, id.Span));
 
-            return new TypedFieldRef(field.ResolvedType, field.Name, false, id.Span);
+            return new TypedFieldRef(field.ResolvedType, field.Name,
+                ctx.CIFields.Contains(field.Name), id.Span);
         }
 
         // Unknown identifier
@@ -2017,9 +2028,173 @@ internal static class TypeChecker
         black.Add(node);
     }
 
-    /// <summary>CI enforcement sub-pass: validate ~string usage on CI functions and operators.</summary>
-    private static void ValidateCIEnforcement(CheckContext ctx) =>
-        throw new NotImplementedException("Slice 8");
+    /// <summary>
+    /// CI enforcement sub-pass (Slice 8): validate <c>~string</c> usage consistency.
+    /// Walks all resolved expression trees and checks the 5 CI enforcement rules
+    /// from the language spec §3.8. Rules 1–2 fire on <c>==</c> / <c>!=</c> with a
+    /// <c>~string</c> operand. Rules 3 fires on <c>contains</c> with a <c>~string</c>
+    /// value in a case-sensitive collection. Rules 4–5 fire on <c>startsWith</c> /
+    /// <c>endsWith</c> with a <c>~string</c> first argument.
+    /// </summary>
+    private static void ValidateCIEnforcement(CheckContext ctx)
+    {
+        // Collect all root expression trees from the context
+        foreach (var field in ctx.Fields)
+        {
+            if (field.DefaultExpression is not null)
+                EnforceCIInExpression(field.DefaultExpression, ctx);
+            if (field.ComputedExpression is not null)
+                EnforceCIInExpression(field.ComputedExpression, ctx);
+        }
+
+        foreach (var row in ctx.TransitionRows)
+        {
+            if (row.Guard is not null)
+                EnforceCIInExpression(row.Guard, ctx);
+            foreach (var action in row.Actions)
+                EnforceCIInAction(action, ctx);
+        }
+
+        foreach (var handler in ctx.EventHandlers)
+        {
+            foreach (var action in handler.Actions)
+                EnforceCIInAction(action, ctx);
+        }
+
+        foreach (var rule in ctx.Rules)
+        {
+            EnforceCIInExpression(rule.Condition, ctx);
+            if (rule.Guard is not null)
+                EnforceCIInExpression(rule.Guard, ctx);
+            EnforceCIInExpression(rule.Message, ctx);
+        }
+
+        foreach (var ensure in ctx.Ensures)
+        {
+            EnforceCIInExpression(ensure.Condition, ctx);
+            if (ensure.Guard is not null)
+                EnforceCIInExpression(ensure.Guard, ctx);
+            EnforceCIInExpression(ensure.Message, ctx);
+        }
+    }
+
+    /// <summary>Check a single action for CI violations.</summary>
+    private static void EnforceCIInAction(TypedAction action, CheckContext ctx)
+    {
+        if (action is TypedInputAction ia)
+        {
+            EnforceCIInExpression(ia.InputExpression, ctx);
+            if (ia.SecondaryExpression is not null)
+                EnforceCIInExpression(ia.SecondaryExpression, ctx);
+        }
+    }
+
+    /// <summary>
+    /// Recursively walk a <see cref="TypedExpression"/> tree and emit CI enforcement
+    /// diagnostics at each violation site.
+    /// </summary>
+    private static void EnforceCIInExpression(TypedExpression expr, CheckContext ctx)
+    {
+        switch (expr)
+        {
+            case TypedBinaryOp bin:
+                // Rule 1: == with ~string operand
+                if (bin.ResolvedOp == OperationKind.StringEqualsString &&
+                    (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals, bin.Span));
+                }
+                // Rule 2: != with ~string operand
+                else if (bin.ResolvedOp == OperationKind.StringNotEqualsString &&
+                         (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals, bin.Span));
+                }
+                // Rule 3: contains with ~string value in case-sensitive collection
+                // (fires when contains OperationKind entries land — currently no-op)
+                else if (IsContainsOperation(bin.ResolvedOp) &&
+                         IsCIExpression(bin.Right) &&
+                         bin.Left is TypedFieldRef collRef &&
+                         !ctx.CIElementCollections.Contains(collRef.FieldName))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains, bin.Span));
+                }
+
+                EnforceCIInExpression(bin.Left, ctx);
+                EnforceCIInExpression(bin.Right, ctx);
+                break;
+
+            case TypedFunctionCall func:
+                // Rule 4: startsWith with ~string first arg
+                if (func.ResolvedFunction == FunctionKind.StartsWith &&
+                    func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith, func.Span));
+                }
+                // Rule 5: endsWith with ~string first arg
+                else if (func.ResolvedFunction == FunctionKind.EndsWith &&
+                         func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith, func.Span));
+                }
+
+                foreach (var arg in func.Arguments)
+                    EnforceCIInExpression(arg, ctx);
+                break;
+
+            case TypedUnaryOp un:
+                EnforceCIInExpression(un.Operand, ctx);
+                break;
+
+            case TypedConditional cond:
+                EnforceCIInExpression(cond.Condition, ctx);
+                EnforceCIInExpression(cond.ThenBranch, ctx);
+                EnforceCIInExpression(cond.ElseBranch, ctx);
+                break;
+
+            case TypedQuantifier quant:
+                EnforceCIInExpression(quant.Collection, ctx);
+                EnforceCIInExpression(quant.Predicate, ctx);
+                break;
+
+            case TypedMemberAccess mem:
+                EnforceCIInExpression(mem.Object, ctx);
+                break;
+
+            case TypedInterpolatedString interp:
+                foreach (var seg in interp.Segments)
+                {
+                    if (seg is TypedHoleSegment hole)
+                        EnforceCIInExpression(hole.Expression, ctx);
+                }
+                break;
+
+            case TypedListLiteral list:
+                foreach (var elem in list.Elements)
+                    EnforceCIInExpression(elem, ctx);
+                break;
+
+            // Leaf nodes: TypedFieldRef, TypedArgRef, TypedLiteral, TypedTypedConstant,
+            // TypedPostfixOp, TypedErrorExpression — no sub-expressions to walk
+        }
+    }
+
+    /// <summary>Returns true if the expression resolves to a <c>~string</c> field reference.</summary>
+    private static bool IsCIExpression(TypedExpression expr) =>
+        expr is TypedFieldRef { IsCaseInsensitive: true };
+
+    /// <summary>
+    /// Returns true if the operation is a <c>contains</c> membership test.
+    /// Currently no <see cref="OperationKind"/> entries exist for <c>contains</c> —
+    /// this predicate will match them when they land.
+    /// </summary>
+    private static bool IsContainsOperation(OperationKind op) =>
+        false; // Placeholder: no contains OperationKind values exist yet
 
     // ════════════════════════════════════════════════════════════════════════
     //  Final assembly stub (Slice 10)

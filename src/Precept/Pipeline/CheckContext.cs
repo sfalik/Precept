@@ -119,6 +119,22 @@ internal sealed class CheckContext
     /// <summary>Event reference sites recorded at resolution time for LS semantic tokens.</summary>
     public List<EventReference> EventReferences { get; } = [];
 
+    // ── CI tracking ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Field names declared with <c>~string</c> (<see cref="CITypeReference"/>).
+    /// Used by CI enforcement and identifier resolution to set
+    /// <see cref="TypedFieldRef.IsCaseInsensitive"/>.
+    /// </summary>
+    public HashSet<string> CIFields { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Field names whose collection element type is <c>~string</c>.
+    /// A <c>contains</c> on such a collection is CI-aware and does NOT trigger
+    /// <see cref="DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains"/>.
+    /// </summary>
+    public HashSet<string> CIElementCollections { get; } = new(StringComparer.Ordinal);
+
     // ── Diagnostics accumulator ───────────────────────────────────────────
 
     /// <summary>All diagnostics emitted during the check pass.</summary>
