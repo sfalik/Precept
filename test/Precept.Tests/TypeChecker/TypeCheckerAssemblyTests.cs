@@ -605,4 +605,49 @@ public class TypeCheckerAssemblyTests
         var (index, _) = TypeCheckerTestHelpers.Check(TrafficLightPrecept);
         index.Should().NotBeNull("BuildSemanticIndex must complete without exception");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 6: Determinism (§10 G5)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Check_SameInput_ReturnsDeterministicOutput()
+    {
+        // §10 G5: Same source → identical SemanticIndex. The type checker is a
+        // total function with no internal mutable state, so calling Check() twice
+        // on the same string must produce structurally equal output.
+        var (index1, diag1) = TypeCheckerTestHelpers.Check(TrafficLightPrecept);
+        var (index2, diag2) = TypeCheckerTestHelpers.Check(TrafficLightPrecept);
+
+        // Diagnostic count must be stable across calls.
+        diag1.Count.Should().Be(diag2.Count,
+            because: "diagnostic count must be deterministic on the same input");
+
+        // Symbol table sizes must be identical.
+        index1.Fields.Length.Should().Be(index2.Fields.Length,
+            because: "field count must be deterministic");
+        index1.States.Length.Should().Be(index2.States.Length,
+            because: "state count must be deterministic");
+        index1.Events.Length.Should().Be(index2.Events.Length,
+            because: "event count must be deterministic");
+        index1.TransitionRows.Length.Should().Be(index2.TransitionRows.Length,
+            because: "transition row count must be deterministic");
+
+        // Spot-check: first field's resolved type is stable across runs.
+        index1.Fields.Should().NotBeEmpty();
+        index1.Fields[0].ResolvedType.Should().Be(index2.Fields[0].ResolvedType,
+            because: "field type resolution must be deterministic (§10 G5)");
+
+        // Spot-check: first guarded row's binary op resolves to the same operation.
+        var guardedRow1 = index1.TransitionRows.FirstOrDefault(r => r.Guard is TypedBinaryOp);
+        var guardedRow2 = index2.TransitionRows.FirstOrDefault(r => r.Guard is TypedBinaryOp);
+
+        if (guardedRow1 is not null && guardedRow2 is not null)
+        {
+            var op1 = ((TypedBinaryOp)guardedRow1.Guard!).ResolvedOp;
+            var op2 = ((TypedBinaryOp)guardedRow2.Guard!).ResolvedOp;
+            op1.Should().Be(op2,
+                because: "binary operation resolution in guards must be deterministic (§10 G5)");
+        }
+    }
 }

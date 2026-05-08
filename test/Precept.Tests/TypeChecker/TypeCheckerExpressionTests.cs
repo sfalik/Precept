@@ -1048,6 +1048,31 @@ public class TypeCheckerExpressionTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  G2 GAP — QualifierMatch.Different disambiguation path not reachable
+    //
+    //  The Operations catalog defines two entries with QualifierMatch.Different:
+    //    MoneyDivideMoneyCrossCurrency    (money ÷ money → exchangerate)
+    //    QuantityDivideQuantityCrossDimension  (quantity ÷ quantity → quantity)
+    //
+    //  However, DisambiguateCandidates in TypeChecker.cs always returns the
+    //  QualifierMatch.Same entry when candidates contain both Same and Different
+    //  options. Since both qualifier-disambiguated groups (money÷money,
+    //  quantity÷quantity) each contain a Same entry, the Different entry is
+    //  never selected. MapQualifierBinding(QualifierMatch.Different) → null is
+    //  therefore dead code at the type-checker level.
+    //
+    //  This path becomes testable when DisambiguateCandidates gains
+    //  qualifier-aware selection that can pick the Different candidate (e.g.,
+    //  once the ProofEngine wires field-level qualifier tracking through to the
+    //  type-checker disambiguation step).
+    //
+    //  TODO: Add BinaryOp_DifferentQualifierMoney_ResultQualifierReflectsDifferentPath
+    //        test once DisambiguateCandidates can select the Different candidate
+    //        and MapQualifierBinding(Different) → null is reachable.
+    //        See .squad/decisions/inbox/soup-nazi-g1-g4-tests-written.md §G2.
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ════════════════════════════════════════════════════════════════════════
     //  13. Stub arm — ConditionalExpression (deferred, tested in section 8)
     //
     //  R3 audit: The original 9 stub arms have been reduced to 2 by
@@ -1059,4 +1084,31 @@ public class TypeCheckerExpressionTests
     //       subtypes have explicit match arms)
     //  No additional stub arm tests are needed at this time.
     // ════════════════════════════════════════════════════════════════════════
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  14. IsSetOnNonOptional — event arg path (G4)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void IsSet_OnNonOptionalEventArg_EmitsIsSetOnNonOptionalDiagnostic()
+    {
+        // DiagnosticCode.IsSetOnNonOptional covers three sub-cases:
+        //   (a) non-optional field ref   — TypeCheckerStructuralTests.NonOptionalField_IsSet_InGuard_*
+        //   (b) non-field/non-arg expr   — PostfixOperationExpression_NonField_EmitsIsSetOnNonOptional (§8)
+        //   (c) non-optional event arg   — THIS TEST (R3 gap G4)
+        //
+        // 'Amount' is declared without 'optional' → TypedArg.IsOptional = false.
+        // When the guard 'Submit.Amount is set' is type-checked, ResolvePostfixOp
+        // finds the arg in ctx.CurrentEventArgs and emits IsSetOnNonOptional.
+        var precept = """
+            precept Widget
+            field Count as integer default 0
+            state Draft initial
+            state Done
+            event Submit(Amount as decimal)
+            from Draft on Submit when Submit.Amount is set -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.IsSetOnNonOptional);
+    }
 }

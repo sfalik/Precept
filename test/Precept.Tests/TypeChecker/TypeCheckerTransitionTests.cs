@@ -543,4 +543,44 @@ public class TypeCheckerTransitionTests
             row => row.FromState != null && row.FromState == "Draft",
             because: "a named from-state must resolve to the state name");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 7: ActionSecondaryRole D5 invariant (R3 gap G3)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TypedInputAction_WithSecondaryExpression_SecondaryRoleAndExpressionBothNonNull()
+    {
+        // D5 invariant: SecondaryRole.HasValue == (SecondaryExpression != null).
+        // SimpleAssignAction_IsTypedInputAction tests the null side (both null).
+        // This test pins the non-null side using 'insert … at <index>':
+        //   SecondaryRole = ActionSecondaryRole.Index
+        //   SecondaryExpression = resolved index expression
+        var precept = """
+            precept Widget
+            field Items as list of string
+            state Open initial
+            event AddFirst
+            from Open on AddFirst -> insert Items "entry" at 0 -> no transition
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var row = index.TransitionRows.Should().ContainSingle().Subject;
+        var action = row.Actions.Should().ContainSingle().Subject;
+
+        action.Should().BeOfType<TypedInputAction>();
+        var input = (TypedInputAction)action;
+
+        // Non-null side of the D5 invariant
+        input.SecondaryRole.Should().NotBeNull(
+            because: "insert … at produces SecondaryRole = Index (D5)");
+        input.SecondaryExpression.Should().NotBeNull(
+            because: "insert … at produces SecondaryExpression = resolved index (D5)");
+        input.SecondaryRole.Should().Be(ActionSecondaryRole.Index,
+            because: "the 'at <index>' slot maps to ActionSecondaryRole.Index");
+
+        // Invariant consistency: both set or both null
+        input.SecondaryRole.HasValue.Should().Be(input.SecondaryExpression is not null,
+            because: "D5: SecondaryRole.HasValue must equal (SecondaryExpression != null)");
+    }
 }
