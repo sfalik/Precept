@@ -275,6 +275,25 @@ public class GraphAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_NoInitialState_DoesNotDuplicateDiagnosticWhenTypeCheckerAlreadyReportedIt()
+    {
+        var (_, diagnostics, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft
+            state Review
+            state Approved terminal
+            event Submit
+            from Draft on Submit -> transition Review
+            """);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.NoInitialState));
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.NoInitialState));
+        diagnostics.Concat(graph.Diagnostics)
+            .Count(d => d.Code == nameof(DiagnosticCode.NoInitialState))
+            .Should().Be(1);
+    }
+
+    [Fact]
     public void Analyze_StatelessPrecept_ReturnsMinimalGraph()
     {
         var graph = Analyze("""
@@ -337,6 +356,88 @@ public class GraphAnalyzerTests
         violation.BackEdge.ToState.Should().Be("Draft");
 
         graph.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.IrreversibleStateHasBackEdge));
+    }
+
+    [Fact]
+    public void Analyze_TerminalStateOutgoingDiagnostic_IncludesOutgoingEventRelatedSpans()
+    {
+        var (index, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft initial
+            state Approved terminal
+            event Approve
+            event Reopen
+            event Archive
+            from Draft on Approve -> transition Approved
+            from Approved on Reopen -> transition Draft
+            from Approved on Archive -> transition Draft
+            """);
+
+        var diagnostic = graph.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.TerminalStateHasOutgoingEdges));
+
+        diagnostic.RelatedSpans.IsEmpty.Should().BeFalse();
+        diagnostic.RelatedSpans.Should().OnlyContain(related => related.Span.Length > 0);
+        diagnostic.RelatedSpans.Select(related => related.Span)
+            .Should().BeEquivalentTo([
+                index.EventsByName["Reopen"].NameSpan,
+                index.EventsByName["Archive"].NameSpan
+            ]);
+    }
+
+    [Fact]
+    public void Analyze_IrreversibleBackEdgeDiagnostic_IncludesBackEdgeEventRelatedSpan()
+    {
+        var (index, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft initial
+            state Processing irreversible
+            state Approved terminal
+            event Start
+            event Complete
+            event Reset
+            from Draft on Start -> transition Processing
+            from Processing on Complete -> transition Approved
+            from Processing on Reset -> transition Draft
+            """);
+
+        var diagnostic = graph.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.IrreversibleStateHasBackEdge));
+
+        diagnostic.RelatedSpans.IsEmpty.Should().BeFalse();
+        diagnostic.RelatedSpans.Should().OnlyContain(related => related.Span.Length > 0);
+        diagnostic.RelatedSpans.Select(related => related.Span)
+            .Should().BeEquivalentTo([
+                index.EventsByName["Reset"].NameSpan
+            ]);
+    }
+
+    [Fact]
+    public void Analyze_RequiredStateDominanceDiagnostic_IncludesUndominatedTerminalRelatedSpans()
+    {
+        var (index, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft initial
+            state Review required
+            state Approved terminal
+            state Rejected terminal
+            event Submit
+            event Approve
+            event Reject
+            from Draft on Submit -> transition Review
+            from Draft on Approve -> transition Approved
+            from Draft on Reject -> transition Rejected
+            from Review on Approve -> transition Approved
+            from Review on Reject -> transition Rejected
+            """);
+
+        var diagnostic = graph.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.RequiredStateDoesNotDominateTerminal));
+
+        diagnostic.RelatedSpans.IsEmpty.Should().BeFalse();
+        diagnostic.RelatedSpans.Should().OnlyContain(related => related.Span.Length > 0);
+        diagnostic.RelatedSpans.Select(related => related.Span)
+            .Should().BeEquivalentTo([
+                index.StatesByName["Approved"].NameSpan,
+                index.StatesByName["Rejected"].NameSpan
+            ]);
     }
 
     [Fact]
