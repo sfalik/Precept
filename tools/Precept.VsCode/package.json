@@ -209,7 +209,20 @@
             { "scope": "punctuation.accessor.precept",           "settings": { "foreground": "#6366F1" } },
             { "scope": "punctuation.section.group.begin.precept", "settings": { "foreground": "#6366F1" } },
             { "scope": "punctuation.section.group.end.precept",   "settings": { "foreground": "#6366F1" } },
-            { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#9096A6", "fontStyle": "italic" } }
+            { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#9096A6", "fontStyle": "italic" } },
+            { "scope": "keyword.declaration.precept",            "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+            { "scope": "keyword.other.grammar.precept",          "settings": { "foreground": "#FBBF24" } },
+            { "scope": "keyword.other.action.precept",           "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+            { "scope": "keyword.other.outcome.precept",          "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+            { "scope": "keyword.other.access-mode.precept",      "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+            { "scope": "keyword.other.quantifier.precept",       "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+            { "scope": "storage.modifier.state.precept",         "settings": { "foreground": "#9AA8B5" } },
+            { "scope": "constant.language.boolean.precept",      "settings": { "foreground": "#84929F" } },
+            { "scope": "string.quoted.single.precept",           "settings": { "foreground": "#84929F" } },
+            { "scope": "keyword.operator.arrow.precept",         "settings": { "foreground": "#6366F1" } },
+            { "scope": "keyword.operator.membership.precept",    "settings": { "foreground": "#6366F1" } },
+            { "scope": "keyword.operator.precept",               "settings": { "foreground": "#6366F1" } },
+            { "scope": "punctuation.precept",                    "settings": { "foreground": "#6366F1" } }
           ]
         }
       }
