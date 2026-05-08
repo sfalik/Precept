@@ -322,8 +322,8 @@ internal static class TypeChecker
 
         // ── Stub arms: return TypedErrorExpression with no diagnostic (Slices 4–9) ──
         ConditionalExpression     => new TypedErrorExpression(expr.Span),
-        QuantifierExpression      => new TypedErrorExpression(expr.Span),
-        ListLiteralExpression     => new TypedErrorExpression(expr.Span),
+        QuantifierExpression q    => ResolveQuantifier(q, ctx),
+        ListLiteralExpression l   => ResolveListLiteral(l, ctx),
         PostfixOperationExpression postfix => ResolvePostfixOp(postfix, ctx),
 
         _ => new TypedErrorExpression(expr.Span),
@@ -1309,9 +1309,112 @@ internal static class TypeChecker
         return false;
     }
 
-    /// <summary>Resolve a quantifier expression arm (push/pop binding stack).</summary>
-    private static TypedExpression ResolveQuantifier(QuantifierExpression expr, CheckContext ctx) =>
-        throw new NotImplementedException("Slice 9");
+    /// <summary>
+    /// Resolve a quantifier expression: resolve collection, extract element type,
+    /// push binding onto <see cref="CheckContext.QuantifierBindings"/>, resolve predicate
+    /// (must be boolean), pop binding, return <see cref="TypedQuantifier"/>.
+    /// </summary>
+    private static TypedExpression ResolveQuantifier(QuantifierExpression expr, CheckContext ctx)
+    {
+        // 1. Resolve the collection expression
+        var collection = Resolve(expr.Collection, ctx);
+        if (collection is TypedErrorExpression)
+            return new TypedErrorExpression(expr.Span);
+
+        // 2. Extract element type from the collection via field lookup
+        var elementType = GetElementType(collection, ctx);
+        if (elementType is null)
+        {
+            // Not a collection type — emit InvalidQuantifierTarget
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.InvalidQuantifierTarget, expr.Collection.Span,
+                    collection is TypedFieldRef fr ? fr.FieldName : collection.ResultType.ToString()));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        // 3. Push binding variable into scope (shadows event args and fields)
+        ctx.QuantifierBindings.Push((expr.BindingName, elementType.Value));
+
+        // 4. Resolve predicate with binding in scope
+        var predicate = Resolve(expr.Predicate, ctx);
+
+        // 5. Pop binding
+        ctx.QuantifierBindings.Pop();
+
+        // 6. ErrorType propagation on predicate
+        if (predicate is TypedErrorExpression)
+            return new TypedErrorExpression(expr.Span);
+
+        // 7. Predicate must be boolean
+        if (predicate.ResultType != TypeKind.Boolean)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.QuantifierPredicateNotBoolean, expr.Predicate.Span,
+                    predicate.ResultType.ToString()));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        return new TypedQuantifier(
+            TypeKind.Boolean,
+            expr.BindingName,
+            elementType.Value,
+            collection,
+            predicate,
+            expr.Span);
+    }
+
+    /// <summary>
+    /// Resolve a list literal expression: resolve each element, unify element types
+    /// (with widening), return <see cref="TypedListLiteral"/>.
+    /// </summary>
+    private static TypedExpression ResolveListLiteral(ListLiteralExpression expr, CheckContext ctx)
+    {
+        // Empty list — can't infer element type; return Error-typed list
+        if (expr.Elements.Length == 0)
+            return new TypedListLiteral(TypeKind.List, TypeKind.Error, ImmutableArray<TypedExpression>.Empty, expr.Span);
+
+        var elements = ImmutableArray.CreateBuilder<TypedExpression>(expr.Elements.Length);
+        bool hasError = false;
+
+        foreach (var elem in expr.Elements)
+        {
+            var resolved = Resolve(elem, ctx);
+            if (resolved is TypedErrorExpression)
+                hasError = true;
+            elements.Add(resolved);
+        }
+
+        if (hasError)
+            return new TypedErrorExpression(expr.Span);
+
+        // Unify element types: start with first element's type, widen if needed
+        var unified = elements[0].ResultType;
+        for (int i = 1; i < elements.Count; i++)
+        {
+            var elemType = elements[i].ResultType;
+            if (elemType == unified)
+                continue;
+
+            // Try widening: elemType → unified
+            if (IsAssignable(elemType, unified))
+                continue;
+
+            // Try widening: unified → elemType (promote unified)
+            if (IsAssignable(unified, elemType))
+            {
+                unified = elemType;
+                continue;
+            }
+
+            // Incompatible types
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Elements[i].Span,
+                    unified.ToString(), elemType.ToString()));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        return new TypedListLiteral(TypeKind.List, unified, elements.ToImmutable(), expr.Span);
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     //  Expression resolution — Slice 3: Functions, Accessors, Interpolated Strings

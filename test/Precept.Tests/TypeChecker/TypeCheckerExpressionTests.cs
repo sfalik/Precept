@@ -701,7 +701,7 @@ public class TypeCheckerExpressionTests
     }
 
     [Fact]
-    public void QuantifierExpression_Stub_ReturnsErrorExpression_NoDiagnostic()
+    public void QuantifierExpression_NonCollectionTarget_EmitsInvalidQuantifierTarget()
     {
         var ctx = MinimalContext();
         var collection = new IdentifierExpression("Amount", TestSpan);
@@ -711,8 +711,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "quantifier expressions are deferred to later slices");
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.InvalidQuantifierTarget));
     }
 
     // ════════════════════════════════════════════════════════════════════════
