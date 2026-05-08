@@ -276,16 +276,21 @@ public static class Diagnostics
 
         // ── Graph ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UnreachableState               => new(nameof(DiagnosticCode.UnreachableState),               DiagnosticStage.Graph, Severity.Warning, "State '{0}' is unreachable from initial state '{1}'",                                                                                  DiagnosticCategory.Structure,
+            RelatedCodes: [DiagnosticCode.NoInitialState],
             FixHint: "Add a transition to this state, or remove it if it is no longer needed"),
         DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "Event '{0}' has no transition rows in any state — it can never be fired successfully",                                       DiagnosticCategory.Structure,
             FixHint: "Add at least one transition row that handles this event, or remove the event declaration"),
         DiagnosticCode.DeadEndState                   => new(nameof(DiagnosticCode.DeadEndState),                   DiagnosticStage.Graph, Severity.Warning, "State '{0}' is reachable but has no path to any terminal state — entities entering this state can never reach completion",   DiagnosticCategory.Structure,
+            RelatedCodes: [DiagnosticCode.UnreachableState],
             FixHint: "Add a transition from this state toward a terminal state, or mark it as 'terminal' if it is an intended endpoint"),
         DiagnosticCode.TerminalStateHasOutgoingEdges  => new(nameof(DiagnosticCode.TerminalStateHasOutgoingEdges),  DiagnosticStage.Graph, Severity.Error,   "Terminal state '{0}' has outgoing transitions — terminal states must not transition to other states",                        DiagnosticCategory.Structure,
+            RelatedCodes: [DiagnosticCode.IrreversibleStateHasBackEdge],
             FixHint: "Remove the outgoing transitions from this terminal state, or remove the 'terminal' modifier"),
         DiagnosticCode.IrreversibleStateHasBackEdge   => new(nameof(DiagnosticCode.IrreversibleStateHasBackEdge),   DiagnosticStage.Graph, Severity.Error,   "Irreversible state '{0}' has a transition returning to an earlier state — irreversible states must not have back-edges",    DiagnosticCategory.Structure,
+            RelatedCodes: [DiagnosticCode.TerminalStateHasOutgoingEdges],
             FixHint: "Remove the back-edge transition, or remove the 'irreversible' modifier"),
         DiagnosticCode.RequiredStateDoesNotDominateTerminal => new(nameof(DiagnosticCode.RequiredStateDoesNotDominateTerminal), DiagnosticStage.Graph, Severity.Warning, "Required state '{0}' does not dominate any terminal state — some execution paths can bypass it entirely", DiagnosticCategory.Structure,
+            RelatedCodes: [DiagnosticCode.UnreachableState],
             FixHint: "Ensure all paths to terminal states pass through this required state, or remove the 'required' modifier"),
 
         // ── Proof ─────────────────────────────────────────────────────────────────

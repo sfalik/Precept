@@ -59,6 +59,7 @@ public static class GraphAnalyzer
         }
 
         var edges = BuildEdges(semantics);
+        var edgeIndex = edges.ToLookup(e => e.EventName, e => e.FromState, StringComparer.Ordinal);
         var adjacency = BuildAdjacency(semantics.States.Select(state => state.Name), edges, useReverseEdges: false);
         var reverseAdjacency = BuildAdjacency(semantics.States.Select(state => state.Name), edges, useReverseEdges: true);
         var declarationOrder = semantics.States
@@ -71,7 +72,7 @@ public static class GraphAnalyzer
         ReachabilityResult reachability;
         if (initialState is null)
         {
-            if (!semantics.Diagnostics.Any(d => d.Code == nameof(DiagnosticCode.NoInitialState)))
+            if (!HasDiagnostic(semantics.Diagnostics, DiagnosticCode.NoInitialState))
             {
                 diagnostics.Add(Diagnostics.Create(
                     DiagnosticCode.NoInitialState,
@@ -114,7 +115,7 @@ public static class GraphAnalyzer
             ? DominanceResult.Empty
             : ComputeDominance(initialState.Name, semantics.States, reachability.Reachable, reverseAdjacency, declarationOrder);
 
-        var eventCoverage = BuildEventCoverage(semantics, reachability.Reachable, edges);
+        var eventCoverage = BuildEventCoverage(semantics, reachability.Reachable, edgeIndex);
         foreach (var evt in semantics.Events)
         {
             if (semantics.States.Length > 0 && !eventCoverage.HandlingStatesByEvent[evt.Name].Any())
@@ -136,10 +137,14 @@ public static class GraphAnalyzer
                 IsReachable: reachability.Reachable.Contains(state.Name)))
             .ToImmutableArray();
 
+        // TODO(Gap1): When additional event modifiers with RequiredAnalysis ship, add an
+        // EventModifierMeta dispatch loop here reading EventModifierMeta.RequiredAnalysis
+        // (GraphAnalysisKind) and routing to the appropriate analysis subroutine,
+        // mirroring the StateModifierMeta dispatch in GetStateFlags().
         var graphEvents = semantics.Events
             .Select(evt => new GraphEvent(
                 Name: evt.Name,
-                IsInitial: initialState is not null && edges.Any(edge => edge.EventName == evt.Name && edge.FromState == initialState.Name),
+                IsInitial: initialState is not null && edgeIndex[evt.Name].Contains(initialState.Name),
                 HandledInStates: eventCoverage.HandlingStatesByEvent[evt.Name]))
             .ToImmutableArray();
 
@@ -148,18 +153,20 @@ public static class GraphAnalyzer
 
         foreach (var violation in terminalViolations)
         {
+            var relatedSpans = CollectEdgeSpans(semantics, violation.OutgoingEdges);
             diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.TerminalStateHasOutgoingEdges,
                 semantics.StatesByName[violation.StateName].NameSpan,
-                violation.StateName));
+                violation.StateName) with { RelatedSpans = relatedSpans });
         }
 
         foreach (var violation in backEdgeViolations)
         {
+            var relatedSpans = CollectEdgeSpans(semantics, [violation.BackEdge]);
             diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.IrreversibleStateHasBackEdge,
                 semantics.StatesByName[violation.StateName].NameSpan,
-                violation.StateName));
+                violation.StateName) with { RelatedSpans = relatedSpans });
         }
 
         var unreachableTerminals = semantics.States
@@ -191,10 +198,14 @@ public static class GraphAnalyzer
 
             if (dominatedTerminals.IsEmpty)
             {
+                var undominatedTerminalSpans = terminalStates
+                    .Where(terminal => !dominatedTerminals.Contains(terminal))
+                    .Select(terminal => new RelatedSpan(semantics.StatesByName[terminal].NameSpan, $"terminal state '{terminal}' not dominated"))
+                    .ToImmutableArray();
                 diagnostics.Add(Diagnostics.Create(
                     DiagnosticCode.RequiredStateDoesNotDominateTerminal,
                     semantics.StatesByName[state.Name].NameSpan,
-                    state.Name));
+                    state.Name) with { RelatedSpans = undominatedTerminalSpans });
             }
         }
 
@@ -484,16 +495,17 @@ public static class GraphAnalyzer
     private static EventCoverageResult BuildEventCoverage(
         SemanticIndex semantics,
         HashSet<string> reachableStates,
-        ImmutableArray<GraphEdge> edges)
+        ILookup<string, string> edgeIndex)
     {
         var entries = ImmutableArray.CreateBuilder<EventCoverageEntry>();
         var handlingStatesByEvent = new Dictionary<string, ImmutableArray<string>>(StringComparer.Ordinal);
 
         foreach (var evt in semantics.Events)
         {
+            var eventFromStates = edgeIndex[evt.Name].ToHashSet(StringComparer.Ordinal);
             var handlingStates = semantics.States
                 .Select(state => state.Name)
-                .Where(stateName => edges.Any(edge => edge.EventName == evt.Name && edge.FromState == stateName))
+                .Where(stateName => eventFromStates.Contains(stateName))
                 .ToImmutableArray();
             var handlingStateSet = handlingStates.ToImmutableHashSet(StringComparer.Ordinal);
             var nonHandlingReachableStates = semantics.States
@@ -591,6 +603,10 @@ public static class GraphAnalyzer
         }
 
         return new StateFlags(
+            // IsInitial identifies the BFS entry point — a topological role, not a structural
+            // constraint. Unlike terminal/required/irreversible, it is not derived from
+            // StateModifierMeta because no catalog flag governs traversal entry; the initial
+            // modifier's meaning is "this is where graph traversal starts."
             IsInitial: state.Modifiers.Contains(ModifierKind.InitialState),
             IsTerminal: isTerminal,
             IsRequired: isRequired,
@@ -631,5 +647,38 @@ public static class GraphAnalyzer
     private sealed record EventCoverageResult(
         ImmutableArray<EventCoverageEntry> Entries,
         Dictionary<string, ImmutableArray<string>> HandlingStatesByEvent);
+
+    /// <summary>
+    /// Collects <see cref="RelatedSpan"/> entries for structural violation edges.
+    /// Uses event and target-state <see cref="TypedState.NameSpan"/>/<see cref="TypedEvent.NameSpan"/>
+    /// because <see cref="TypedTransitionRow.Syntax"/> is blocked by PRECEPT0024 outside the TypeChecker.
+    /// </summary>
+    private static ImmutableArray<RelatedSpan> CollectEdgeSpans(
+        SemanticIndex semantics,
+        ImmutableArray<GraphEdge> violatingEdges)
+    {
+        var spans = ImmutableArray.CreateBuilder<RelatedSpan>();
+
+        foreach (var edge in violatingEdges)
+        {
+            if (semantics.EventsByName.TryGetValue(edge.EventName, out var evt))
+            {
+                spans.Add(new RelatedSpan(evt.NameSpan, $"event '{edge.EventName}' causes transition to '{edge.ToState}'"));
+            }
+        }
+
+        return spans.ToImmutable();
+    }
+
+    /// <summary>
+    /// Typed cross-stage diagnostic lookup — avoids fragile string literals by deriving
+    /// the code name from the <see cref="DiagnosticCode"/> enum value, matching the
+    /// <c>nameof(DiagnosticCode.X)</c> convention used by <see cref="Diagnostics.Create"/>.
+    /// </summary>
+    private static bool HasDiagnostic(ImmutableArray<Diagnostic> diagnostics, DiagnosticCode code)
+    {
+        var codeString = code.ToString();
+        return diagnostics.Any(d => d.Code == codeString);
+    }
 }
 
