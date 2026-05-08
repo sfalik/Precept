@@ -1000,13 +1000,14 @@ Implementation unblocked. Parser now produces `ParsedExpression` DU nodes. The f
 - Numeric literal context retry mechanism (`expectedType` propagation into binary ops and function calls)
 - **Out-of-range literal checking:** validate numeric literal value against resolved type's representable range
 
-**Slice 5: Transition Row + EventHandler Normalization**
+**Slice 5: Transition Row + EventHandler + Rule Normalization**
 - Guard expression resolution (boolean result required)
 - Action chain resolution per `ActionSyntaxShape` → TypedAction DU
 - `SecondaryExpression` + `SecondaryRole` assignment
 - Transition target validation (state name lookup in symbol table)
 - Partial result policy: failed guard/action → `TypedErrorExpression`, row still emitted
 - Scope: set `CurrentEventArgs` when entering transition row OR event handler
+- `PopulateRules`: resolve rule condition + guard + message → `TypedRule`
 
 **Slice 6: Structural Validation**
 - IsSet/IsNotSet → operand must be optional field, result = boolean

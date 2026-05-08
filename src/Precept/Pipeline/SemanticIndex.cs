@@ -380,7 +380,7 @@ public sealed record ComputedFieldDep(
 /// Used by the ProofEngine for obligation scoping and by the LS for semantic subjects.
 /// </summary>
 public sealed record ConstraintFieldRefs(
-    ConstraintIdentity ConstraintId,
+    ConstraintIdentity ConstraintIdentity,
     ImmutableArray<string> ReferencedFields,
     ImmutableArray<string> ReferencedArgs
 );

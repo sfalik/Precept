@@ -12,6 +12,24 @@
 
 ## Learnings
 
+### 2026-05-08T05:30:00Z — Slice 8: CI Enforcement shipped
+
+- Commit: `00ef822`. Methods: `ValidateCIEnforcement`, `EnforceCIInExpression`, `EnforceCIInAction`, `IsCIExpression`, `IsContainsOperation`.
+- DiagnosticCodes used: `CaseInsensitiveFieldRequiresTildeEquals` (66), `CaseInsensitiveFieldRequiresTildeNotEquals` (95), `CaseInsensitiveValueInCaseSensitiveContains` (96, dormant), `CaseInsensitiveFieldRequiresTildeStartsWith` (97), `CaseInsensitiveFieldRequiresTildeEndsWith` (98).
+- CI tracking: `CheckContext.CIFields` and `CIElementCollections` HashSets populated during `PopulateFields` from `CITypeReference` checks. `TypedFieldRef.IsCaseInsensitive` now correctly set in `ResolveIdentifier`.
+- Post-pass walks all resolved expression trees: field defaults/computeds, transition row guards/actions, event handler actions, rules, ensures.
+- `contains` enforcement structurally correct but dormant — `IsContainsOperation` returns false until contains OperationKind entries land.
+- 3242/3242 tests pass. No regressions.
+
+### 2026-05-08T01:30:00Z — Slice 9: Quantifiers + List Literals shipped
+
+- Commit: `54fa59b`. Methods: `ResolveQuantifier`, `ResolveListLiteral`. Stub arms promoted in `Resolve()` switch.
+- DiagnosticCodes used: `InvalidQuantifierTarget` (102), `QuantifierPredicateNotBoolean` (106), `TypeMismatch` (18).
+- TypedQuantifier: collection → GetElementType → push binding onto QuantifierBindings stack → resolve predicate (must be Boolean) → pop binding. Returns TypedQuantifier with ResultType=Boolean.
+- TypedListLiteral: resolve each element → unify via bidirectional IsAssignable widening → return TypedListLiteral(List, unifiedElementType, elements). Empty lists → ElementType=Error.
+- Existing stub test updated: `QuantifierExpression_Stub_ReturnsErrorExpression_NoDiagnostic` → `QuantifierExpression_NonCollectionTarget_EmitsInvalidQuantifierTarget`.
+- 3242/3242 tests passing. No regressions.
+
 ### 2026-05-07T23:00:00Z — Slice 6: Structural Validation shipped
 
 - Commit: `fe358ef`. Methods: `ResolvePostfixOp`, `ValidateStructural`, `DetectCycles`. Choice validation added inline to `PopulateFields`.
@@ -190,3 +208,11 @@
 - **Secondary fix**: Qualified event arg references (EventName.ArgName in guards/rules) were emitting UndeclaredField instead of resolving as TypedArgRef. Added early check in ResolveMemberAccess per language spec §3.5.
 - **Commit**: 4e1efd8
 - **Test result**: 3196/3196 passing (26/26 TypeCheckerTransitionTests).
+
+### 2026-05-08T04:30:00Z — Slice 10: Final assembly + D26 global assert
+- **BuildSemanticIndex**: Replaced `BuildPartialSemanticIndex` with full `BuildSemanticIndex` — assembles all 16 ImmutableArray primaries and 4 FrozenDictionary secondaries (D4) from CheckContext.
+- **D26 assert**: `Debug.Assert` at line ~2245 in `BuildSemanticIndex` — calls `ContainsAnyErrorExpression` which recursively walks all expression-bearing sites (Fields, Events args, TransitionRows, Rules, Ensures, AccessModes, StateHooks, EventHandlers) and their sub-expressions.
+- **Last NotImplementedException removed**: `BuildSemanticIndex` was the final stub.
+- **Full pipeline order**: PopulateFields → PopulateStates → PopulateEvents → PopulateTransitionRows → PopulateEventHandlers → PopulateRules → ValidateModifiers → ValidateStructural → ValidateCIEnforcement → BuildSemanticIndex.
+- **Commit**: 844f00e
+- **Test result**: 3294/3294 passing, 118 integration tests passing. TypeChecker implementation DONE.

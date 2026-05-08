@@ -55,7 +55,7 @@ public class TypeCheckerSymbolTests
     {
         var precept = """
             precept Widget
-            field Cost as money in 'USD'
+            field Cost as money
             state Open initial
             """;
 
@@ -70,7 +70,7 @@ public class TypeCheckerSymbolTests
     {
         var precept = """
             precept Widget
-            field Weight as quantity in 'kg'
+            field Weight as quantity
             state Open initial
             """;
 
@@ -85,7 +85,7 @@ public class TypeCheckerSymbolTests
     {
         var precept = """
             precept Widget
-            field UnitPrice as price in 'USD/each'
+            field UnitPrice as price
             state Open initial
             """;
 
@@ -100,7 +100,7 @@ public class TypeCheckerSymbolTests
     {
         var precept = """
             precept Widget
-            field FxRate as exchangerate in 'USD' to 'EUR'
+            field FxRate as exchangerate
             state Open initial
             """;
 

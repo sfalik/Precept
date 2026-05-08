@@ -74,6 +74,17 @@
 - `docs/language/catalog-system.md` now records `ActionMeta.SyntaxShape` (`ActionSyntaxShape`) as a real Actions-catalog field and documents that parser, TypeChecker, and PreceptBuilder read it for action-shape dispatch.
 - `docs/language/catalog-system.md` now records `FunctionMeta.HasCIVariant` and `FunctionMeta.CIVariantOf` as Functions-catalog fields used by the TypeChecker to resolve CI-qualified function calls.
 
+### 2026-05-07: R1 Gate Review — TypeChecker Slices 1–4
+
+- **Verdict: APPROVED.** Zero blockers. George may proceed to Slice 5.
+- 3170/3170 tests passing. 196 TypeChecker-specific tests across 4 files (55 + 46 + 51 + 44).
+- All 26 locked decisions verified in scope: D1–D5 (SemanticIndex shape), D6–D10 (resolution behavior), D11–D18 (expression resolution), D19–D23 (typed constants), D24/D26 (structural).
+- Catalog-driven compliance confirmed: no TypeKind switches encoding per-type behavior, no hardcoded lists, all resolution through catalog APIs (Types.GetMeta, Operations.FindCandidates, Functions.FindByName, Operators.ByToken).
+- Expression stub arms return TypedErrorExpression with no diagnostic — correct. Method-level NotImplementedException stubs are unreachable dead code (Check() doesn't call them) — acceptable.
+- D13 ErrorType propagation tested rigorously: binary (left/right/both), unary, function args, interpolated holes — all confirm parent is TypedErrorExpression AND no second diagnostic emitted.
+- ContentValidation DU dispatch (NodaTimeValidation, ClosedSetValidation, RegexValidation) is correct DU subtype dispatch, not catalog-member identity switching.
+- Observation for Slices 5+: ValidateNodaTime dispatches on 4 NodaTimePattern string values — acceptable but will need branches if new NodaTime types are added. Also: ensure StateReference/EventReference sites are recorded when resolving names in transition rows.
+
 ## Recent Updates
 
 ### 2026-05-07T23:22:15Z — R0 TypeChecker shape review closed
@@ -97,3 +108,13 @@
 
 - Scribe recorded the `docs/language/catalog-system.md` sync as part of George-9's nine-commit housekeeping batch rather than as a separate decision entry.
 - Durable field additions now called out in squad records: `ActionMeta.SyntaxShape`, `FunctionMeta.HasCIVariant`, `FunctionMeta.CIVariantOf`.
+
+### 2026-05-08T01:00:00Z — R2 Gate Review — Slices 5–7 APPROVED
+
+- **Verdict: APPROVED.** 3242/3242 tests passing. No blockers. Slices 8–9 may proceed.
+- Slices reviewed: 5 (PopulateTransitionRows, PopulateEventHandlers, NormalizeTransitionRow, NormalizeEventHandler, ResolveAction, ResolveActionTarget), 6 (ValidateStructural: cycles, forward-ref, IsSet/choice), 7 (ValidateModifiers, ValidateFieldModifiers, IsTypeApplicable).
+- Locked decisions verified: D5 (SecondaryRole invariant via Debug.Assert), D9 (QualifierBinding DU — no raw qualifier strings), D10 (FromState == null for wildcard with XML doc), D26 (ErrorExpression Debug.Assert in both population methods), D3 (modifier validation fully catalog-driven from FieldModifierMeta).
+- §13/§14 boundary confirmed: ValidateStructural contains only cycle detection + forward-ref + IsSet/choice — no reachability/dead-end/unreachable.
+- EventName.ArgName fix confirmed: ResolveMemberAccess produces TypedArgRef, not TypedMemberAccess; end-to-end validated by Submit.Label in modifier tests.
+- Pipeline call order verified correct after Slice 5 restoration: PopulateFields → PopulateStates → PopulateEvents → PopulateTransitionRows → PopulateEventHandlers → ValidateModifiers → ValidateStructural.
+- Non-blocking observations: stale regression note in TransitionTests header, D10 wildcard test gap (parser-surface limitation), D5 positive-case test gap (collection action coverage needed).

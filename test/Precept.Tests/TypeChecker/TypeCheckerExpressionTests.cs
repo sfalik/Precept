@@ -671,7 +671,7 @@ public class TypeCheckerExpressionTests
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void ConditionalExpression_Stub_ReturnsErrorExpression_NoDiagnostic()
+    public void ConditionalExpression_BooleanCondition_SameTypeBranches_ReturnsTypedConditional()
     {
         var ctx = MinimalContext();
         var cond = new LiteralExpression(TokenKind.True, "true", TestSpan);
@@ -681,9 +681,9 @@ public class TypeCheckerExpressionTests
 
         var result = Resolve(expr, ctx);
 
-        result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "conditional expressions are deferred to later slices");
+        result.Should().BeOfType<TypedConditional>();
+        result.ResultType.Should().Be(TypeKind.Integer);
+        ctx.Diagnostics.Should().BeEmpty();
     }
 
     [Fact]

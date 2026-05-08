@@ -149,3 +149,11 @@
 
 
 ### 2026-05-07T21:07:33Z — Scribe merged coverage-gap inbox  - Scribe merged `.squad/decisions/inbox/soup-nazi-coverage-gaps-addressed.md` into `.squad/decisions/decisions.md` and cleared the inbox copy.
+
+### 2026-05-07T19:22:15Z — TypeChecker Slice 1 tests written
+- 55 tests in `TypeCheckerSymbolTests.cs` covering 9 behavioral categories: TypeKind resolution (21 types), collection ElementType (D2), optional modifier, modifier preservation, ImpliedModifiers (D3), state modifiers, event args, initial/terminal diagnostics (D7), and lookup index population.
+- At commit time: 2 pass, 53 fail — George's Slice 1 implementation not yet committed; TypeChecker.Check() returns empty SemanticIndex.
+- Confirmed DiagnosticCode names: `NoInitialState` (=32), `MultipleInitialStates` (=31).
+- TypedState uses `ImmutableArray<ModifierKind> Modifiers` for lifecycle flags (InitialState, Terminal, Error) — no separate IsInitial boolean (unlike TypedEvent which has `bool IsInitial`).
+- ImpliedModifiers confirmed from Types catalog: Timezone, Currency, UnitOfMeasure, Dimension all imply `Notempty`.
+- Existing suite stable at 2974 passing tests.

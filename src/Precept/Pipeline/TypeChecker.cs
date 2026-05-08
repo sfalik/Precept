@@ -258,11 +258,7 @@ internal static class TypeChecker
         Resolve(expr, ctx, expectedType);
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Pass 2 stubs — declaration normalization (Slices 2–9)
-    // ════════════════════════════════════════════════════════════════════════
-
-    // ════════════════════════════════════════════════════════════════════════
-    //  Expression resolution (Slice 2)
+    //  Expression resolution
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -297,8 +293,8 @@ internal static class TypeChecker
         MethodCallExpression meth           => ResolveMethodCall(meth, ctx),
         InterpolatedStringExpression interp => ResolveInterpolatedString(interp, ctx),
 
-        // ── Stub arms: return TypedErrorExpression with no diagnostic (Slices 4–9) ──
-        ConditionalExpression     => new TypedErrorExpression(expr.Span),
+        // ── Conditionals, quantifiers, lists, postfix ──
+        ConditionalExpression cond => ResolveConditional(cond, ctx),
         QuantifierExpression q    => ResolveQuantifier(q, ctx),
         ListLiteralExpression l   => ResolveListLiteral(l, ctx),
         PostfixOperationExpression postfix => ResolvePostfixOp(postfix, ctx),
@@ -926,7 +922,17 @@ internal static class TypeChecker
             TypedExpression? guard = null;
             var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
             if (guardSlot is not null)
+            {
                 guard = Resolve(guardSlot.Expression, ctx);
+                if (guard is not TypedErrorExpression && guard.ResultType != TypeKind.Boolean)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.TypeMismatch, guardSlot.Expression.Span,
+                            Types.GetMeta(TypeKind.Boolean).DisplayName,
+                            Types.GetMeta(guard.ResultType).DisplayName));
+                    guard = new TypedErrorExpression(guardSlot.Expression.Span);
+                }
+            }
 
             var becauseSlot = construct.GetRequiredSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause);
             var message = new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span);
@@ -993,6 +999,14 @@ internal static class TypeChecker
             {
                 ctx.CurrentScope = FieldScopeMode.AllFields;
                 guard = Resolve(guardSlot.Expression, ctx);
+                if (guard is not TypedErrorExpression && guard.ResultType != TypeKind.Boolean)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.TypeMismatch, guardSlot.Expression.Span,
+                            Types.GetMeta(TypeKind.Boolean).DisplayName,
+                            Types.GetMeta(guard.ResultType).DisplayName));
+                    guard = new TypedErrorExpression(guardSlot.Expression.Span);
+                }
             }
 
             // —— Action chain resolution ——
@@ -1366,6 +1380,59 @@ internal static class TypeChecker
             collection,
             predicate,
             expr.Span);
+    }
+
+    /// <summary>
+    /// Resolve an if/then/else conditional expression. Validates boolean condition (D13),
+    /// unifies branch types via widening, and returns <see cref="TypedConditional"/>.
+    /// </summary>
+    private static TypedExpression ResolveConditional(ConditionalExpression expr, CheckContext ctx)
+    {
+        var condition = Resolve(expr.Condition, ctx);
+        if (condition is TypedErrorExpression)
+            return new TypedErrorExpression(expr.Span);
+
+        if (condition.ResultType != TypeKind.Boolean)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Condition.Span,
+                    Types.GetMeta(TypeKind.Boolean).DisplayName,
+                    Types.GetMeta(condition.ResultType).DisplayName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        var thenBranch = Resolve(expr.ThenBranch, ctx);
+        var elseBranch = Resolve(expr.ElseBranch, ctx);
+
+        if (thenBranch is TypedErrorExpression || elseBranch is TypedErrorExpression)
+            return new TypedErrorExpression(expr.Span);
+
+        var thenType = thenBranch.ResultType;
+        var elseType = elseBranch.ResultType;
+
+        TypeKind resultType;
+        if (thenType == elseType)
+        {
+            resultType = thenType;
+        }
+        else if (IsAssignable(thenType, elseType))
+        {
+            resultType = elseType;
+        }
+        else if (IsAssignable(elseType, thenType))
+        {
+            resultType = thenType;
+        }
+        else
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                    Types.GetMeta(thenType).DisplayName,
+                    Types.GetMeta(elseType).DisplayName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
+        return new TypedConditional(resultType, condition, thenBranch, elseBranch, expr.Span);
     }
 
     /// <summary>
@@ -1771,7 +1838,7 @@ internal static class TypeChecker
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Pass 2 stubs — structural validation (Slices 6–8)
+    //  Modifier and structural validation
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>Validate modifier applicability, conflicts, and subsumption for all fields and states.</summary>
