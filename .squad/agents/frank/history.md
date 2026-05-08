@@ -7,6 +7,33 @@
 
 ## Learnings
 
+### 2026-05-08T01:24:29Z — PE Decision 3: Evaluator architecture deep dive completed
+
+- Investigated whether the runtime `Evaluator` can serve the ProofEngine's initial-state satisfiability check (SIG-5). Answer: **no — and it doesn't need to.**
+- The Evaluator is strictly downstream of the ProofEngine in the pipeline (`ProofEngine → ProofLedger → Compilation → Precept.From() → Evaluator`). Calling it from ProofEngine would create a circular dependency. The Evaluator is also a complete stub — every method throws `NotImplementedException`, blocked on D8/R4.
+- The ProofEngine already receives everything needed: `TypedField.DefaultExpression` (resolved default values) and `TypedEnsure.Condition` (resolved constraint expressions) are both `TypedExpression` trees in the `SemanticIndex`. Satisfiability = substitute field refs with defaults, constant-fold, check for `false`.
+- Recommendation: Option C — ProofEngine implements satisfiability natively as bounded constant folding on `TypedExpression` trees. Same pattern as Strategy 1 (Literal Proof) scaled to multi-field constraints. ~50 LOC, no new dependencies, no runtime coupling.
+- Tier 1 (literal defaults, simple comparisons) is implementable now. Tier 2 (computed defaults, complex expressions) deferred to Evaluator runtime enforcement. Tradeoff accepted: most common violations caught at compile time; edge cases caught at runtime.
+- Decision written to `.squad/decisions/inbox/frank-pe-decision3.md`, awaiting Shane sign-off.
+
+### 2026-05-08T01:19:35Z — Grammar generator design doc written
+
+- `docs/compiler/grammar-generator.md` is the authoritative reference for the generator at `tools/Precept.GrammarGen/Program.cs`. Covers algorithm, pattern templates, structural composition, catalog gap, scope vocabulary boundary, output contract, and deliberate exclusions.
+- Key architectural fact: the generator reads only `Tokens.All`. All keywords from `Types`, `Modifiers`, `Actions`, `Functions` are already in `Tokens.All` via their `TokenKind` entries. No secondary catalog reads needed.
+- **Active bug documented:** `AddStructuralPatterns()` creates the `messageStrings` repository entry, but `BuildTopLevelPatterns()` does not include `#messageStrings` in the top-level list. The gold highlighting for `because "msg"` / `reject "msg"` is unreachable in the generated grammar. Two steps needed to fix: (1) close the catalog gap, (2) insert `#messageStrings` before `#strings` in the include order.
+- **Catalog gap:** `TokenMeta` has no `IsMessagePosition: bool` flag. Adding it to `TokenKind.Because` and `TokenKind.Reject` (defaulting false everywhere else) unblocks catalog-driven derivation of the gold message-string pattern. Proposal in `.squad/decisions/inbox/frank-grammar-generator-doc.md`.
+- The hand-authored `precept.tmLanguage.json` must remain in production until the four-condition maturity threshold in the design doc is met.
+
+
+
+### 2026-05-08T01:00:51Z — ProofEngine PE-G1/G2/G3 design decisions resolved
+- All three blocking gaps resolved without new proof strategies. The three "unhandled" requirement kinds (Dimension, Modifier, QualifierCompatibility) are all field-declaration-attribute checks that belong in an expanded Strategy 2.
+- Key architectural insight: Strategy 2's scope should be "Declaration Attribute Proof" not just "Modifier Proof" — modifiers, qualifier bindings, and dimension qualifiers are all compile-time-known field declaration attributes that the proof engine reads identically.
+- `ProofDischarge` catalog type designed: 6 fixed-value entries + 4 parameterized entries (null threshold = read from modifier parameter). The `DischargeCovers` subsumption logic is proof-engine-internal, not per-modifier.
+- `ConstraintIdentity` spec divergence found and resolved: spec had `RuleName` and separate `AnchorState`/`AnchorEvent` fields that don't exist in the source. Source shapes win — rules are anonymous, anchor discrimination is via `ConstraintKind`.
+- ProofLedger output type confirmed sound: 6 new record types needed, all with concrete downstream consumers. No overengineering.
+- 7 SIGNIFICANT gaps triaged: 3 ACCEPT-AS-IS, 3 SPEC-UPDATE-NEEDED, 1 DESIGN-DECISION-DEFERRED (initial-state satisfiability, blocked on TypeChecker expression evaluation).
+
 ### 2026-05-08T04:30:00Z — Exhaustive GraphAnalyzer post-implementation audit completed
 - Three-dimensional review (requirements, catalog compliance, code quality) across 70 findings total: 39+7+14 pass, 4+3+2 advisory, 1 non-blocking gap.
 - Verdict: APPROVED. No blocking defects. All 7 Graph-stage diagnostics (80, 81, 108, 109, 110, 111 + defensive 32) are registered, correctly staged/severed, and emitted. Catalog-driven modifier dispatch in `GetStateFlags()` is exemplary. `IsInitial` direct enum check is acceptable (topological entry point, not structural constraint). `TransitionRowOutcome` switch is DU dispatch, not catalog violation.
