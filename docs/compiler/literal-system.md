@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Draft |
-| Implementation state | In design |
+| Implementation state | Partially implemented — lexer and parser literal handling complete; type checker typed-constant validation infrastructure (`ITypedConstantValidator`) not yet implemented |
 | Source | `src/Precept/` — lexer, parser, type checker, evaluator |
 | Upstream | Language source text; field type declarations; expression context for type inference |
 | Downstream | All pipeline stages (Lexer, Parser, Type Checker, Evaluator); runtime evaluator; diagnostics engine |
@@ -45,7 +45,7 @@ The literal system is cross-cutting. Each pipeline stage transforms a different 
 | Stage | Input | Output |
 |---|---|---|
 | **Lexer** | Raw source characters inside `"..."`, `'...'`, `[...]`, and bare token positions | `StringLiteral`, `StringStart/Middle/End`, `TypedConstant`, `TypedConstantStart/Middle/End`, `NumberLiteral`, `True`, `False`, `LeftBracket`, `Comma`, `RightBracket` |
-| **Parser** | Literal token sequences from the lexer | Leaf AST nodes: `StringLiteralNode`, `InterpolatedStringNode`, `TypedConstantNode`, `InterpolatedTypedConstantNode`, `NumericLiteralNode`, `BooleanLiteralNode`, `ListLiteralNode` |
+| **Parser** | Literal token sequences from the lexer | `ParsedExpression` subtypes: `LiteralExpression` (for strings, numbers, booleans, typed constants), `InterpolatedStringExpression` (for `"...{expr}..."` and `'...{expr}...'`), `ListLiteralExpression` (for `[...]`). Token kind on `LiteralExpression` distinguishes the literal category. |
 | **Type Checker** | AST literal nodes + expression context (field type, operator peer, function parameter) | Typed literal nodes with resolved types; compile errors for missing context, failed content validation, or type mismatches |
 | **Evaluator** | Typed literal nodes + resolved types + runtime field values | Materialized CLR values; coerced string segments for interpolation; typed constant instances (NodaTime, Money, Quantity, etc.) |
 
@@ -545,6 +545,6 @@ The literal system spans multiple pipeline stages in `src/Precept/`:
 | Component | Location | Responsibility |
 |---|---|---|
 | Lexer | `src/Precept/Pipeline/Lexer.cs` | Mode stack, literal token kinds, escape handling, interpolation segmentation |
-| Parser | `src/Precept/Parser/` | AST node shapes for all literal forms, interpolation reassembly |
-| Type Checker | `src/Precept/Pipeline/TypeChecker.cs` | Context-born resolution, `ITypedConstantValidator` registry, quantity type tables |
-| Evaluator | `src/Precept/Evaluator/` | Value materialization, string coercion (invariant-culture), typed constant instantiation |
+| Parser | `src/Precept/Pipeline/Parser.cs`, `src/Precept/Pipeline/Parser.Expressions.cs` | Expression parsing including all literal forms, interpolation reassembly |
+| Type Checker | `src/Precept/Pipeline/TypeChecker.cs` | Context-born resolution, quantity type tables |
+| Evaluator | `src/Precept/Runtime/Evaluator.cs` | Value materialization, string coercion (invariant-culture), typed constant instantiation |

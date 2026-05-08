@@ -4,7 +4,7 @@
 
 | Property | Value |
 |---|---|
-| Doc maturity | Draft |
+| Doc maturity | Full |
 | Implementation state | Implemented |
 | Source | `src/Precept/Language/Diagnostic.cs`, `src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs` |
 | Upstream | Lexer, Parser, NameBinder, TypeChecker, GraphAnalyzer, ProofEngine |
@@ -42,7 +42,7 @@ The Precept compiler pipeline produces diagnostics at six stages: lexing, parsin
 - Downstream diagnostic suppression logic (upstream-error cascading) — owned by the Language Server
 - MCP serialization format — owned by the MCP tool layer
 - Fix application — Precept has no code-fix providers
-- Roslyn rules PRECEPT0001–PRECEPT0004 — owned by the analyzer project
+- Roslyn rules PRECEPT0001–PRECEPT0024 — owned by the analyzer project (`src/Precept.Analyzers/`)
 
 ---
 
@@ -115,7 +115,7 @@ public enum DiagnosticStage
 }
 ```
 
-One value per pipeline stage. The lexer has its own stage — unterminated strings, invalid characters, and unrecognized tokens are `Lex` diagnostics, distinct from `Parse` (structural syntax) errors. This matches the actual pipeline shape: the lexer is a separate stage that can fail independently.
+One value per pipeline stage. The lexer has its own stage — unterminated strings, invalid characters, and unrecognized tokens are `Lex` diagnostics, distinct from `Parse` (structural syntax) errors. This matches the actual pipeline shape: the lexer is a separate stage that can fail independently. NameBinder diagnostics use `DiagnosticStage.Type` — name binding is a pipeline stage but not a diagnostic stage. Adding a `Bind` stage would break the upstream-error suppression model in the LS.
 
 ### Severity
 
@@ -137,64 +137,144 @@ Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is sm
 ```csharp
 public enum DiagnosticCode
 {
-    // ── Lex ──────────────────────────────────────────────
-    UnterminatedStringLiteral,
-    InvalidCharacter,
+    // ── Lex (8 codes) ────────────────────────────────────
+    InputTooLarge                      =   1,
+    UnterminatedStringLiteral          =   2,
+    UnterminatedTypedConstant          =   3,
+    UnterminatedInterpolation          =   4,
+    InvalidCharacter                   =   5,
+    UnrecognizedStringEscape           =   6,
+    UnrecognizedTypedConstantEscape    =   7,
+    UnescapedBraceInLiteral            =   8,
 
-    // ── Parse ────────────────────────────────────────────
-    ExpectedToken,
-    UnexpectedKeyword,
+    // ── Parse (8 codes) ──────────────────────────────────
+    ExpectedToken                      =   9,
+    NonAssociativeComparison           =  10,
+    UnexpectedKeyword                  =  11,
+    InvalidCallTarget                  =  12,
+    OmitDoesNotSupportGuard            =  13,
+    EventHandlerDoesNotSupportGuard    =  14,
+    PreEventGuardNotAllowed            =  15,
+    ExpectedOutcome                    =  16,
 
-    // ── Type ─────────────────────────────────────────────
-    UndeclaredField,
-    TypeMismatch,
-    NullInNonNullableContext,
-    InvalidMemberAccess,
-    FunctionArityMismatch,
-    FunctionArgConstraintViolation,
+    // ── Type (core) ──────────────────────────────────────
+    UndeclaredField                    =  17,
+    TypeMismatch                       =  18,
+    NullInNonNullableContext           =  19,
+    InvalidMemberAccess                =  20,
+    FunctionArityMismatch              =  21,
+    FunctionArgConstraintViolation     =  22,
+    MutuallyExclusiveQualifiers        =  23,
+    DuplicateFieldName                 =  24,
+    DuplicateStateName                 =  25,
+    DuplicateEventName                 =  26,
+    DuplicateArgName                   =  27,
+    UndeclaredState                    =  28,
+    UndeclaredEvent                    =  29,
+    UndeclaredFunction                 =  30,
+    MultipleInitialStates              =  31,
+    NoInitialState                     =  32,
+    InvalidModifierForType             =  33,
+    InvalidModifierBounds              =  34,
+    InvalidModifierValue               =  35,
+    DuplicateModifier                  =  36,
+    RedundantModifier                  =  37,
+    ComputedFieldNotWritable           =  38,
+    ComputedFieldWithDefault           =  39,
+    CircularComputedField              =  40,
+    WritableOnEventArg                 =  41,
+    ConflictingAccessModes             =  42,
+    RedundantAccessMode                =  43,
+    ListLiteralOutsideDefault          =  44,
+    DuplicateChoiceValue               =  45,
+    EmptyChoice                        =  46,
+    CollectionOperationOnScalar        =  47,
+    ScalarOperationOnCollection        =  48,
+    IsSetOnNonOptional                 =  49,
+    EventArgOutOfScope                 =  50,
+    InvalidInterpolationCoercion       =  51,
+    UnresolvedTypedConstant            =  52,
+    InvalidTypedConstantContent        =  53,
+    DefaultForwardReference            =  54,
 
-    // ── Type: Access modes ───────────────────────────────
-    WritableOnEventArg,
+    // ── Type (temporal) ──────────────────────────────────
+    InvalidDateValue                   =  55,
+    InvalidDateFormat                  =  56,
+    InvalidTimeValue                   =  57,
+    InvalidInstantFormat               =  58,
+    InvalidTimezoneId                  =  59,
+    UnqualifiedPeriodArithmetic        =  60,
+    MissingTemporalUnit                =  61,
+    FractionalUnitValue                =  62,
 
-    // ── Type: Business-domain ────────────────────────────
-    QualifierMismatch,
-    DimensionCategoryMismatch,
-    CrossCurrencyArithmetic,
-    CrossDimensionArithmetic,
-    DenominatorUnitMismatch,
-    DurationDenominatorMismatch,
-    CompoundPeriodDenominator,
-    MutuallyExclusiveQualifiers,
-    InvalidUnitString,
-    InvalidCurrencyCode,
-    InvalidDimensionString,
-    MaxPlacesExceeded,
+    // ── Type (collection safety) ─────────────────────────
+    UnguardedCollectionAccess          =  63,
+    UnguardedCollectionMutation        =  64,
+    NonOrderableCollectionExtreme      =  65,
+    CaseInsensitiveFieldRequiresTildeEquals = 66,
 
-    // ── Type: Temporal ────────────────────────────────────
-    InvalidDateValue,
-    InvalidDateFormat,
-    InvalidTimeValue,
-    InvalidInstantFormat,
-    InvalidTimezoneId,
-    UnqualifiedPeriodArithmetic,
-    MissingTemporalUnit,
-    FractionalUnitValue,
+    // ── Type (business-domain) ───────────────────────────
+    MaxPlacesExceeded                  =  67,
+    QualifierMismatch                  =  68,
+    DimensionCategoryMismatch          =  69,
+    CrossCurrencyArithmetic            =  70,
+    CrossDimensionArithmetic           =  71,
+    DenominatorUnitMismatch            =  72,
+    DurationDenominatorMismatch        =  73,
+    CompoundPeriodDenominator          =  74,
+    InvalidUnitString                  =  75,
+    InvalidCurrencyCode                =  76,
+    InvalidDimensionString             =  77,
 
-    // ── Type: Collection safety ───────────────────────────
-    UnguardedCollectionAccess,
-    UnguardedCollectionMutation,
+    // ── Runtime / value safety ───────────────────────────
+    NumericOverflow                    =  78,
+    OutOfRange                         =  79,
 
     // ── Graph ────────────────────────────────────────────
-    UnreachableState,
-    UnhandledEvent,
+    UnreachableState                   =  80,
+    UnhandledEvent                     =  81,
 
     // ── Proof ────────────────────────────────────────────
-    UnsatisfiableGuard,
-    DivisionByZero,
-    SqrtOfNegative,
-    AmbiguousDispatch,   // CC#13: guard expressions provably ambiguous for same (state, event) pair
+    UnsatisfiableGuard                 =  82,
+    DivisionByZero                     =  83,
+    SqrtOfNegative                     =  84,
+
+    // ── Type (choice) ────────────────────────────────────
+    NonChoiceAssignedToChoice          =  85,
+    ChoiceLiteralNotInSet              =  86,
+    ChoiceArgOutsideFieldSet           =  87,
+    ChoiceElementTypeMismatch          =  88,
+    ChoiceRankConflict                 =  89,
+    ChoiceMissingElementType           =  90,
+
+    // ── Type (lifecycle validation) ──────────────────────
+    AmbiguousTypedConstant             =  91,
+    EventHandlerInStatefulPrecept      =  92,
+    RequiredFieldsNeedInitialEvent     =  93,
+    InitialEventMissingAssignments     =  94,
+
+    // ── Type (CI enforcement) ────────────────────────────
+    CaseInsensitiveFieldRequiresTildeNotEquals  =  95,
+    CaseInsensitiveValueInCaseSensitiveContains =  96,
+    CaseInsensitiveFieldRequiresTildeStartsWith =  97,
+    CaseInsensitiveFieldRequiresTildeEndsWith   =  98,
+
+    // ── Type (collection safety — additional) ────────────
+    KeyPresenceSafety               =  99,
+    IndexBoundsGuard                = 100,
+    KeyUniquenessGuard              = 101,
+    InvalidQuantifierTarget         = 102,
+    BindingShadowsField             = 103,
+    MissingOrderingKey              = 104,
+    CollectionInnerTypeError        = 105,
+    QuantifierPredicateNotBoolean   = 106,
+
+    // ── NameBinder ───────────────────────────────────────
+    UndeclaredArg                   = 107,
 }
 ```
+
+**107 total diagnostic codes** across 5 diagnostic stages: 8 Lex, 8 Parse, 89 Type (including NameBinder codes that use `DiagnosticStage.Type`), 2 Graph, 3 Proof. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 
@@ -208,62 +288,31 @@ Member names are descriptive (`UndeclaredField`, not `PRECEPT201`). The string c
 
 ```csharp
 public sealed record DiagnosticMeta(
-    string          Code,
-    DiagnosticStage Stage,
-    Severity        Severity,
-    string          MessageTemplate
+    string              Code,
+    DiagnosticStage     Stage,
+    Severity            Severity,
+    string              MessageTemplate,
+    DiagnosticCategory  Category,
+    DiagnosticCode[]?   RelatedCodes      = null,
+    string?             FixHint           = null,
+    FaultCode?          PreventsFault     = null,
+    SuggestionSource[]? SuggestionSources = null
 );
 
 public static class Diagnostics
 {
     public static DiagnosticMeta GetMeta(DiagnosticCode code) => code switch
     {
-        DiagnosticCode.UnterminatedStringLiteral      => new(nameof(DiagnosticCode.UnterminatedStringLiteral),      DiagnosticStage.Lex,   Severity.Error,   "Unterminated string literal"),
-        DiagnosticCode.InvalidCharacter               => new(nameof(DiagnosticCode.InvalidCharacter),               DiagnosticStage.Lex,   Severity.Error,   "Invalid character '{0}'"),
-        DiagnosticCode.ExpectedToken                  => new(nameof(DiagnosticCode.ExpectedToken),                  DiagnosticStage.Parse, Severity.Error,   "Expected '{0}' but found '{1}'"),
-        DiagnosticCode.UnexpectedKeyword              => new(nameof(DiagnosticCode.UnexpectedKeyword),              DiagnosticStage.Parse, Severity.Error,   "Unexpected keyword '{0}' inside {1} block"),
-        DiagnosticCode.UndeclaredField                => new(nameof(DiagnosticCode.UndeclaredField),                DiagnosticStage.Type,  Severity.Error,   "Field '{0}' is not declared"),
-        DiagnosticCode.TypeMismatch                   => new(nameof(DiagnosticCode.TypeMismatch),                   DiagnosticStage.Type,  Severity.Error,   "Type mismatch: expected '{0}', got '{1}'"),
-        DiagnosticCode.NullInNonNullableContext       => new(nameof(DiagnosticCode.NullInNonNullableContext),       DiagnosticStage.Type,  Severity.Error,   "Null value used where non-nullable '{0}' is required"),
-        DiagnosticCode.InvalidMemberAccess            => new(nameof(DiagnosticCode.InvalidMemberAccess),            DiagnosticStage.Type,  Severity.Error,   "Member accessor '{0}' is not supported on type '{1}'"),
-        DiagnosticCode.FunctionArityMismatch          => new(nameof(DiagnosticCode.FunctionArityMismatch),          DiagnosticStage.Type,  Severity.Error,   "Function '{0}' expects {1} arguments, got {2}"),
-        DiagnosticCode.FunctionArgConstraintViolation => new(nameof(DiagnosticCode.FunctionArgConstraintViolation), DiagnosticStage.Type,  Severity.Error,   "Argument {0} to '{1}' violates constraint: {2}"),
-        DiagnosticCode.WritableOnEventArg             => new(nameof(DiagnosticCode.WritableOnEventArg),             DiagnosticStage.Type,  Severity.Error,   "The 'writable' modifier cannot appear on event argument '{0}'"),
-
-        // Business-domain type diagnostics
-        DiagnosticCode.QualifierMismatch              => new(nameof(DiagnosticCode.QualifierMismatch),              DiagnosticStage.Type,  Severity.Error,   "Value does not match the '{0}' qualifier on field '{1}'"),
-        DiagnosticCode.DimensionCategoryMismatch      => new(nameof(DiagnosticCode.DimensionCategoryMismatch),      DiagnosticStage.Type,  Severity.Error,   "Dimension '{0}' does not match the declared category '{1}' on field '{2}'"),
-        DiagnosticCode.CrossCurrencyArithmetic        => new(nameof(DiagnosticCode.CrossCurrencyArithmetic),        DiagnosticStage.Type,  Severity.Error,   "Cannot combine '{0}' ({1}) with '{2}' ({3}) — different currencies"),
-        DiagnosticCode.CrossDimensionArithmetic       => new(nameof(DiagnosticCode.CrossDimensionArithmetic),       DiagnosticStage.Type,  Severity.Error,   "Cannot combine '{0}' ({1}) with '{2}' ({3}) — incompatible dimensions"),
-        DiagnosticCode.DenominatorUnitMismatch        => new(nameof(DiagnosticCode.DenominatorUnitMismatch),        DiagnosticStage.Type,  Severity.Error,   "Denominator unit '{0}' does not match operand unit '{1}'"),
-        DiagnosticCode.DurationDenominatorMismatch    => new(nameof(DiagnosticCode.DurationDenominatorMismatch),    DiagnosticStage.Type,  Severity.Error,   "Duration cannot cancel '{0}' denominator — days, weeks, months, and years have variable length"),
-        DiagnosticCode.CompoundPeriodDenominator      => new(nameof(DiagnosticCode.CompoundPeriodDenominator),      DiagnosticStage.Type,  Severity.Error,   "Compound period '{0}' cannot cancel single-unit denominator '{1}' — decompose to a single basis first"),
-        DiagnosticCode.MutuallyExclusiveQualifiers    => new(nameof(DiagnosticCode.MutuallyExclusiveQualifiers),    DiagnosticStage.Parse, Severity.Error,   "'in' and 'of' cannot both appear on the same field declaration"),
-        DiagnosticCode.InvalidUnitString              => new(nameof(DiagnosticCode.InvalidUnitString),              DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a valid unit — structural characters ('/', '*') are not allowed in an atomic unit value"),
-        DiagnosticCode.InvalidCurrencyCode            => new(nameof(DiagnosticCode.InvalidCurrencyCode),            DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized ISO 4217 currency code"),
-        DiagnosticCode.InvalidDimensionString         => new(nameof(DiagnosticCode.InvalidDimensionString),         DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized dimension — did you mean a dimension name like 'length' or 'mass' instead of a unit name?"),
-        DiagnosticCode.MaxPlacesExceeded              => new(nameof(DiagnosticCode.MaxPlacesExceeded),              DiagnosticStage.Type,  Severity.Error,   "Value has {0} decimal places, but field '{1}' allows at most {2}"),
-
-        // Temporal type diagnostics
-        DiagnosticCode.InvalidDateValue               => new(nameof(DiagnosticCode.InvalidDateValue),               DiagnosticStage.Type,  Severity.Error,   "Invalid date: {0} does not exist"),
-        DiagnosticCode.InvalidDateFormat              => new(nameof(DiagnosticCode.InvalidDateFormat),              DiagnosticStage.Type,  Severity.Error,   "Dates must be written as YYYY-MM-DD. Use '{0}'"),
-        DiagnosticCode.InvalidTimeValue               => new(nameof(DiagnosticCode.InvalidTimeValue),               DiagnosticStage.Type,  Severity.Error,   "Invalid time: {0} must be 0\u201323 for hours, 0\u201359 for minutes and seconds"),
-        DiagnosticCode.InvalidInstantFormat           => new(nameof(DiagnosticCode.InvalidInstantFormat),           DiagnosticStage.Type,  Severity.Error,   "Instants must end with Z to indicate UTC. Use '{0}Z'"),
-        DiagnosticCode.InvalidTimezoneId              => new(nameof(DiagnosticCode.InvalidTimezoneId),              DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized timezone \u2014 use canonical IANA form like 'America/New_York'"),
-        DiagnosticCode.UnqualifiedPeriodArithmetic    => new(nameof(DiagnosticCode.UnqualifiedPeriodArithmetic),    DiagnosticStage.Type,  Severity.Error,   "Period field '{0}' may contain {1} components \u2014 use `period of '{2}'` to constrain it"),
-        DiagnosticCode.MissingTemporalUnit            => new(nameof(DiagnosticCode.MissingTemporalUnit),            DiagnosticStage.Type,  Severity.Error,   "A bare number doesn't specify a unit. Use '{0} + ''{1}''' to add {1}"),
-        DiagnosticCode.FractionalUnitValue            => new(nameof(DiagnosticCode.FractionalUnitValue),            DiagnosticStage.Type,  Severity.Error,   "Unit values must be whole numbers. Use smaller units for fractions: '{0}'"),
-
-        // Collection safety diagnostics
-        DiagnosticCode.UnguardedCollectionAccess       => new(nameof(DiagnosticCode.UnguardedCollectionAccess),       DiagnosticStage.Type,  Severity.Error,   "'{0}' may be empty — guard with `if {0}.count > 0` before accessing `.{1}`"),
-        DiagnosticCode.UnguardedCollectionMutation     => new(nameof(DiagnosticCode.UnguardedCollectionMutation),     DiagnosticStage.Type,  Severity.Error,   "'{0}' may be empty — guard with `if {0}.count > 0` before `{1}`"),
-
-        DiagnosticCode.UnreachableState               => new(nameof(DiagnosticCode.UnreachableState),               DiagnosticStage.Graph, Severity.Warning, "State '{0}' is unreachable from initial state '{1}'"),
-        DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "Event '{0}' has no transition rows in any state — it can never be fired successfully"),
-        DiagnosticCode.UnsatisfiableGuard             => new(nameof(DiagnosticCode.UnsatisfiableGuard),             DiagnosticStage.Proof, Severity.Warning, "Guard '{0}' on event '{1}' is provably unsatisfiable when {2}"),
-        DiagnosticCode.DivisionByZero                 => new(nameof(DiagnosticCode.DivisionByZero),                 DiagnosticStage.Proof, Severity.Error,   "Division by zero: '{0}' can be zero when {1}"),
-        DiagnosticCode.SqrtOfNegative                 => new(nameof(DiagnosticCode.SqrtOfNegative),                 DiagnosticStage.Proof, Severity.Error,   "sqrt() operand '{0}' can be negative when {1}"),
-        DiagnosticCode.AmbiguousDispatch              => new(nameof(DiagnosticCode.AmbiguousDispatch),              DiagnosticStage.Proof, Severity.Error,   "Guard expressions are provably ambiguous — multiple rows can simultaneously match in state '{0}' on event '{1}'"),
+        // 107 arms — one per DiagnosticCode member.
+        // Each arm maps the code to its stage, severity, message template, category,
+        // and optional related codes, fix hints, fault prevention links, and suggestion sources.
+        // Representative examples:
+        DiagnosticCode.InputTooLarge                 => new(..., DiagnosticCategory.Safety),
+        DiagnosticCode.UnterminatedStringLiteral     => new(..., DiagnosticCategory.Structure),
+        DiagnosticCode.UndeclaredField               => new(..., DiagnosticCategory.Naming, SuggestionSources: [SuggestionSource.UserFields]),
+        DiagnosticCode.UnreachableState              => new(..., DiagnosticCategory.Safety),
+        DiagnosticCode.DivisionByZero                => new(..., DiagnosticCategory.Proof, PreventsFault: FaultCode.DivisionByZero),
+        // ... (all 107 arms present in source)
     };
 
     public static Diagnostic Create(
@@ -276,6 +325,33 @@ public static class Diagnostics
 
     public static IReadOnlyList<DiagnosticMeta> All { get; } =
         Enum.GetValues<DiagnosticCode>().Select(GetMeta).ToList();
+}
+```
+
+`DiagnosticCategory` is a thematic grouping orthogonal to pipeline stage:
+
+```csharp
+public enum DiagnosticCategory
+{
+    Naming         = 1,  // Duplicate names, undeclared references
+    TypeSystem     = 2,  // Type mismatches, invalid operations
+    Temporal       = 3,  // Date/time validation
+    BusinessDomain = 4,  // Qualifier, currency, dimension, unit validation
+    Structure      = 5,  // Syntax, unterminated literals, expected tokens
+    Safety         = 6,  // Collection safety, input limits, CI enforcement
+    Proof          = 7,  // Guard satisfiability, division by zero, ambiguity
+}
+```
+
+`SuggestionSource` identifies the symbol namespace for "did you mean?" suggestions:
+
+```csharp
+public enum SuggestionSource
+{
+    UserFields      = 1,
+    UserStates      = 2,
+    UserEvents      = 3,
+    FunctionCatalog = 4,
 }
 ```
 
@@ -336,37 +412,43 @@ public sealed class StaticallyPreventableAttribute(DiagnosticCode code) : Attrib
 public enum FaultCode
 {
     [StaticallyPreventable(DiagnosticCode.DivisionByZero)]
-    DivisionByZero,
+    DivisionByZero             =  1,
 
     [StaticallyPreventable(DiagnosticCode.SqrtOfNegative)]
-    SqrtOfNegative,
+    SqrtOfNegative             =  2,
 
     [StaticallyPreventable(DiagnosticCode.TypeMismatch)]
-    TypeMismatch,
+    TypeMismatch               =  3,
 
     [StaticallyPreventable(DiagnosticCode.UndeclaredField)]
-    UndeclaredField,
+    UndeclaredField            =  4,
 
     [StaticallyPreventable(DiagnosticCode.NullInNonNullableContext)]
-    UnexpectedNull,
+    UnexpectedNull             =  5,
 
     [StaticallyPreventable(DiagnosticCode.InvalidMemberAccess)]
-    InvalidMemberAccess,
+    InvalidMemberAccess        =  6,
 
     [StaticallyPreventable(DiagnosticCode.FunctionArityMismatch)]
-    FunctionArityMismatch,
+    FunctionArityMismatch      =  7,
 
     [StaticallyPreventable(DiagnosticCode.FunctionArgConstraintViolation)]
-    FunctionArgConstraintViolation,
+    FunctionArgConstraintViolation =  8,
 
     [StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]
-    EmptyCollectionAccess,
+    CollectionEmptyOnAccess    =  9,
 
     [StaticallyPreventable(DiagnosticCode.UnguardedCollectionMutation)]
-    EmptyCollectionMutation,
+    CollectionEmptyOnMutation  = 10,
 
-    [StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]
-    AmbiguousDispatch,   // CC#13: evaluator backstop when proof could not eliminate ambiguous rows
+    [StaticallyPreventable(DiagnosticCode.QualifierMismatch)]
+    QualifierMismatch          = 11,
+
+    [StaticallyPreventable(DiagnosticCode.NumericOverflow)]
+    NumericOverflow            = 12,
+
+    [StaticallyPreventable(DiagnosticCode.OutOfRange)]
+    OutOfRange                 = 13,
 }
 ```
 
@@ -390,9 +472,11 @@ public static class Faults
         FaultCode.InvalidMemberAccess            => new(nameof(FaultCode.InvalidMemberAccess),            "Member accessor not supported on this type"),
         FaultCode.FunctionArityMismatch          => new(nameof(FaultCode.FunctionArityMismatch),          "Function called with wrong number of arguments"),
         FaultCode.FunctionArgConstraintViolation => new(nameof(FaultCode.FunctionArgConstraintViolation), "Function argument violates constraint"),
-        FaultCode.EmptyCollectionAccess          => new(nameof(FaultCode.EmptyCollectionAccess),          "Accessor called on empty collection"),
-        FaultCode.EmptyCollectionMutation        => new(nameof(FaultCode.EmptyCollectionMutation),        "Dequeue/pop called on empty collection"),
-        FaultCode.AmbiguousDispatch              => new(nameof(FaultCode.AmbiguousDispatch),              "Multiple transition rows match simultaneously — guard expressions are ambiguous"),
+        FaultCode.CollectionEmptyOnAccess        => new(nameof(FaultCode.CollectionEmptyOnAccess),        "Accessor called on empty collection"),
+        FaultCode.CollectionEmptyOnMutation      => new(nameof(FaultCode.CollectionEmptyOnMutation),      "Dequeue/pop called on empty collection"),
+        FaultCode.QualifierMismatch              => new(nameof(FaultCode.QualifierMismatch),              "Value does not match required qualifier"),
+        FaultCode.NumericOverflow                => new(nameof(FaultCode.NumericOverflow),                "Numeric operation overflowed"),
+        FaultCode.OutOfRange                     => new(nameof(FaultCode.OutOfRange),                     "Value is out of the allowed range"),
     };
 }
 ```
@@ -418,6 +502,14 @@ case BinaryOperator.Divide:
 | Fault catalog completeness — every `FaultCode` has metadata | CS8509 exhaustive switch on `Faults.GetMeta()` | No — C# compiler |
 | Referenced `DiagnosticCode` member exists | Enum type safety | No — C# compiler |
 | Fault bypass — every `Fault` is constructed via `Faults.Create()` | Roslyn **PRECEPT0004** | Yes |
+| Catalog cross-reference integrity | Roslyn **PRECEPT0005–0017** (per-catalog cross-ref analyzers) | Yes |
+| Semantic enum zero-slot protection | Roslyn **PRECEPT0018** | Yes |
+| Pipeline coverage exhaustiveness — every catalog member handled | Roslyn **PRECEPT0019** | Yes |
+| Operator token/precedence collision detection | Roslyn **PRECEPT0020** | Yes |
+| Token text uniqueness enforcement | Roslyn **PRECEPT0021** | Yes |
+| Operator inline-token validation | Roslyn **PRECEPT0022** | Yes |
+| Operator DU shape invariants | Roslyn **PRECEPT0023** | Yes |
+| Anti-mirroring enforcement — no parallel copies of catalog data | Roslyn **PRECEPT0024** | Yes |
 
 ### The full enforcement chain — no reflection
 
@@ -435,7 +527,7 @@ Add FaultCode.StackUnderflow
   → build passes
 ```
 
-Every step is compiler-enforced or Roslyn-enforced. One custom attribute. Two exhaustive switches. Four Roslyn rules. The chain is unbreakable without making the build fail.
+Every step is compiler-enforced or Roslyn-enforced. One custom attribute. Two exhaustive switches. 24 Roslyn rules (PRECEPT0001–PRECEPT0024). The chain is unbreakable without making the build fail.
 
 ### Why PRECEPT0003 and PRECEPT0004 are both needed
 

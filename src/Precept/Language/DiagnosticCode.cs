@@ -112,6 +112,11 @@ public enum DiagnosticCode
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,
     UnhandledEvent                     =  81,
+    /// <summary>
+    /// A reachable non-terminal state has no structural path to any terminal state.
+    /// The entity can enter this state but can never reach completion from it.
+    /// </summary>
+    DeadEndState                       = 108,
 
     // ── Proof ────────────────────────────────────────────
     UnsatisfiableGuard                 =  82,

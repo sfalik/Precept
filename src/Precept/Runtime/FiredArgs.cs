@@ -2,8 +2,8 @@ namespace Precept.Runtime;
 
 /// <summary>
 /// Event arg egress — carries the arg values that were submitted to an event call.
-/// Appears on <see cref="Transitioned.Args"/>, <see cref="Applied.Args"/>, and
-/// <see cref="Rejected.Args"/>.
+/// Appears on <see cref="EventOutcome.Transitioned.Args"/>, <see cref="EventOutcome.Applied.Args"/>, and
+/// <see cref="EventOutcome.Rejected.Args"/>.
 /// </summary>
 /// <remarks>
 /// The raw indexer returns <see cref="PreceptValue"/>; <see cref="Get{T}"/> resolves

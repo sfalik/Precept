@@ -9,7 +9,7 @@ namespace Precept.Runtime;
 /// Each <see cref="Set{T}"/> call is resolved through the registered
 /// <c>TypeRuntime&lt;T&gt;</c> for zero-boxing conversion to <see cref="PreceptValue"/>.
 /// The builder internally produces a slot array populated via a presence mask.
-/// Unset args remain absent; <see cref="InvalidArgs"/> is returned if required args
+/// Unset args remain absent; <see cref="EventOutcome.InvalidArgs"/> is returned if required args
 /// are missing at evaluation time.
 /// </remarks>
 public interface IArgBuilder

@@ -18,14 +18,16 @@ The parser produces exactly one output type:
 
 ```csharp
 public sealed record ParsedConstruct(
-    ConstructMeta Meta,
+    ConstructMeta             Meta,
     ImmutableArray<SlotValue> Slots,
-    SourceSpan Span);
+    SourceSpan                Span,
+    TokenKind?                LeadingTokenKind = null);
 ```
 
 - **Meta** — The catalog entry describing this construct's kind, slots, and routing
 - **Slots** — Parsed values in declaration order matching `Meta.Slots`
 - **Span** — Source location from first to last consumed token
+- **LeadingTokenKind** — The anchor scope keyword (`in`/`to`/`from`/`on`) consumed by the parser, preserved for downstream stages that need it (e.g., the TypeChecker's construct-kind determination). `null` for non-scoped constructs.
 
 There are no per-construct AST node types. The traditional N construct kinds × M consumers explosion is eliminated: every consumer works with `ParsedConstruct` uniformly.
 
@@ -63,7 +65,7 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 
 > **Decision (2026-05-06):** `BecauseClauseSlot` carries `string Message` — the parser extracts the string literal content at parse time. Rationale: the `because` clause is syntactically a string literal; the parser already validates the token kind and has the lexeme. Downstream consumers (constraint diagnostics, MCP output, LS hover) all need the text, never the raw span. Deferring extraction would require every consumer to re-read source.
 
-Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 13 per-form sealed subtypes, one for each `ExpressionFormKind` member. The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`. Note: `OutcomeSlot` carries `ParsedOutcome`, not `ParsedExpression` — outcomes are a separate 4-member DU.
+Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) now carry `ParsedExpression` — a sealed abstract record DU with 15 subtypes: 14 per-form sealed subtypes (one per `ExpressionFormKind` member) plus `MissingExpression` (a sentinel for absent or failed expression parsing that reuses `ExpressionFormKind.Literal`). The parser produces these typed expression nodes; the type checker resolves them into `TypedExpression`. Note: `OutcomeSlot` carries `ParsedOutcome`, not `ParsedExpression` — outcomes are a separate 4-member DU.
 
 ---
 
@@ -87,7 +89,7 @@ Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureCl
 
 ### Boundary with Lexer
 
-The lexer produces `Token` records with `TokenKind`, `Lexeme`, and `SourceSpan`. The parser consumes this stream. Token classification (keyword vs identifier, operator precedence) is fully determined by catalog metadata.
+The lexer produces `Token` records with `TokenKind`, `Text`, and `SourceSpan`. The parser consumes this stream. Token classification (keyword vs identifier, operator precedence) is fully determined by catalog metadata.
 
 ### Boundary with Type Checker
 
@@ -118,10 +120,10 @@ These responsibilities live in later pipeline stages where full context is avail
 ### Input
 
 ```csharp
-ImmutableArray<Token> tokens
+TokenStream tokens
 ```
 
-Token stream from lexer, including trivia tokens (whitespace, comments) for span calculations.
+The `TokenStream` record from the lexer, carrying `ImmutableArray<Token> Tokens` and `ImmutableArray<Diagnostic> Diagnostics`. Whitespace is consumed silently by the lexer and does not appear in the token stream; comments are emitted as `TokenKind.Comment` tokens.
 
 ### Output
 
@@ -235,7 +237,7 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 
 ### Expression Parsing (Implemented)
 
-Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with 13 sealed subtypes (one per `ExpressionFormKind` member). The expression parser is a Pratt parser (operator-precedence) implemented in `Parser.Expressions.cs`, using the `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
+Expression-carrying slots produce `ParsedExpression` — a sealed abstract record DU with 15 subtypes: 14 per-form sealed subtypes (one per `ExpressionFormKind` member) plus `MissingExpression` (a sentinel for absent or failed expression parsing). The expression parser is a Pratt parser (operator-precedence) implemented in `Parser.Expressions.cs`, using the `Operators` catalog for precedence and associativity metadata. This is the irreducible algorithmic core — expressions require precedence climbing, which cannot be eliminated by catalog-driven dispatch.
 
 `ParsedExpression` is a closed, strongly-typed DU. Adding a new expression form requires a C# code change (new subtype + update all consumer switches). Exhaustiveness is enforced by sealed hierarchy + Roslyn analyzer test.
 
@@ -392,12 +394,12 @@ When multiple constructs match and disambiguation fails:
 **Decision:** Expression-carrying slots carry `ParsedExpression` — a sealed abstract record DU with per-form sealed subtypes.
 
 **Design:**
-- `ParsedExpression` = sealed abstract record base + 13 sealed subtypes (one per `ExpressionFormKind` member declared in the `ExpressionForms` catalog)
+- `ParsedExpression` = sealed abstract record base + 15 subtypes: 14 per-form sealed subtypes (one per `ExpressionFormKind` member declared in the `ExpressionForms` catalog) + `MissingExpression` sentinel
 - The type checker resolves these into `TypedExpression` (same DU shape with resolved type information)
 - The set is **closed by design** — new expression form = new catalog entry + new DU subtype + update all consumer switches
 - **Exhaustiveness enforcement:** sealed hierarchy for compiler-level checking + Roslyn analyzer test for build-time verification of all switch arms
 
-**Rationale:** 13 expression forms is still a bounded, catalogable set. Strongly-typed DU eliminates an entire class of runtime errors. The closed set is intentional — expression additions are rare, deliberate language changes that SHOULD require global updates.
+**Rationale:** 14 expression forms is still a bounded, catalogable set. Strongly-typed DU eliminates an entire class of runtime errors. The closed set is intentional — expression additions are rare, deliberate language changes that SHOULD require global updates.
 
 ---
 
@@ -420,7 +422,7 @@ Traditional ASTs have per-node-type properties (`FieldDeclaration.Name`, `EventD
 
 ### ~~Expression Tree Design~~ (RESOLVED)
 
-Expression tree design resolved. Expression-carrying slots carry `ParsedExpression` (sealed DU, 13 subtypes). See § Expression Tree Design (RESOLVED) above.
+Expression tree design resolved. Expression-carrying slots carry `ParsedExpression` (sealed DU, 15 subtypes: 14 per-form + MissingExpression sentinel). See § Expression Tree Design (RESOLVED) above.
 
 ### Error Recovery Granularity
 
@@ -440,7 +442,7 @@ Traditional parsers produce `FieldDeclarationSyntax`, `EventDeclarationSyntax`, 
 
 ### No Symbol Table in Parser
 
-Name resolution happens in the type checker with full context. The parser only captures names as strings; it does not build or consult symbol tables.
+Name resolution happens in the NameBinder (declaration collection + reference resolution) and then the TypeChecker (semantic validation). The parser only captures names as strings; it does not build or consult symbol tables.
 
 ### No Semantic Validation
 

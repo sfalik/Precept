@@ -67,13 +67,16 @@ The `SemanticIndex` is the type checker's output — a fully resolved, well-type
 
 **Graph-relevant fields:**
 
-| Field | Purpose |
-|-------|---------|
-| `States` | `ImmutableArray<TypedState>` — state names and modifiers |
-| `TransitionRows` | `ImmutableArray<TypedTransitionRow>` — edge definitions |
-| `StateHooks` | `ImmutableArray<TypedStateHook>` — entry/exit hooks (stub — no downstream consumer yet) |
+| Field | Type | Purpose |
+|-------|------|---------|
+| `States` | `ImmutableArray<TypedState>` | State names and modifiers — nodes in the graph |
+| `TransitionRows` | `ImmutableArray<TypedTransitionRow>` | Edge definitions — source state × event × target state × guard × outcome |
+| `Events` | `ImmutableArray<TypedEvent>` | Event declarations — needed for state coverage analysis (§6.5) and transition completeness: which events exist vs. which have transition rows |
+| `Fields` | `ImmutableArray<TypedField>` | Field declarations — needed for proof forwarding: computed fields and constrained fields are forwarded to the proof engine for satisfiability and influence analysis |
+| `EventHandlers` | `ImmutableArray<TypedEventHandler>` | Event handler declarations — **not consumed for event coverage analysis.** Event handlers are valid only in stateless precepts (the type checker emits `EventHandlerInStatefulPrecept` if states coexist with handlers). Since the graph analyzer operates on stateful precepts, no valid `TypedEventHandler` entries exist when graph analysis runs. This field is listed for completeness; the graph analyzer does not read it. See §12 (OQ2 resolution). |
+| `StateHooks` | `ImmutableArray<TypedStateHook>` | Entry/exit hooks — forwarded as structural context for proof engine constraint scoping |
 
-The graph analyzer reads only the topology-relevant subset of `SemanticIndex`. It does not consume `Fields`, `Rules`, `Ensures`, `AccessModes`, or `EventHandlers` — those belong to the proof engine and runtime builder.
+The graph analyzer reads the topology-relevant and proof-relevant subsets of `SemanticIndex`. It does not consume `Rules`, `Ensures`, `AccessModes`, or `EditDeclarations` — those belong to the proof engine and runtime builder.
 
 ### Output: `StateGraph`
 
@@ -189,7 +192,51 @@ public sealed record TerminalCompletenessFact(
     bool AllTerminalsReachable,
     ImmutableArray<string> UnreachableTerminals
 ) : ProofForwardingFact;
+
+public sealed record DeadEndStateFact(
+    ImmutableArray<string> DeadEndStates,
+    int DeadEndCount
+) : ProofForwardingFact;
 ```
+
+#### Proof Forwarding Contract
+
+The `ProofForwardingFact` DU defines the interface between the graph analyzer and the proof engine. Each subtype carries the structural data that the proof engine needs to instantiate proof obligations from graph-level analysis. The proof engine pattern-matches on these subtypes in Pass 1 (Obligation Instantiation) — see `docs/compiler/proof-engine.md §6` for the consumption contract.
+
+> **Design spec — implementation pending.** The `ProofForwardingFact` hierarchy is currently an abstract base record stub in `StateGraph.cs` with no subtypes. The four subtypes below are the design-specified contract. Implementation will add them to `src/Precept/Pipeline/GraphTypes.cs` or an adjacent file.
+
+**Fact types, data, and proof engine consumption:**
+
+| Fact Subtype | Data Carried | Proof Engine Consumption |
+|---|---|---|
+| `ReachabilityFact` | `StateName`, `IsReachable`, `PathFromInitial` (path from initial state, or null if unreachable) | The proof engine uses unreachable-state facts to suppress proof obligations on transitions originating from unreachable states — those transitions can never fire, so their proof requirements are vacuously satisfied. Reachable paths feed causal diagnostic explanations. |
+| `DominancePathFact` | `RequiredState`, `DominatedTerminals` (which terminal states this required state dominates) | The proof engine verifies the required-state guarantee: every execution path to a terminal passes through the required state. If `DominatedTerminals` is empty, the graph analyzer has already emitted `RequiredStateDoesNotDominateTerminal` (code 84); the proof engine records this as a structural violation in the proof ledger. |
+| `EventCoverageFact` | `EventName`, `UnhandledReachableStates` (reachable states that have no transition row for this event) | The proof engine uses coverage gaps to reason about guard completeness: in states where an event is handled, are the guards sufficient to cover all possible data states? Coverage gaps are structural facts; guard satisfiability is the proof engine's domain. |
+| `TerminalCompletenessFact` | `AllTerminalsReachable`, `UnreachableTerminals` (terminal states that cannot be reached from the initial state) | The proof engine uses terminal completeness to assess whether the state machine can reach completion. Unreachable terminals may indicate dead-end design or missing transitions — the proof engine records these for the proof ledger without emitting additional diagnostics (the graph analyzer already emits `UnreachableState` for each one). |
+| `DeadEndStateFact` | `DeadEndStates` (reachable non-terminal states with no path to any terminal state), `DeadEndCount` | The proof engine uses dead-end facts to annotate the proof ledger with structural completeness failures. Dead-end states represent lifecycle traps — entities that enter these states can never reach completion. The graph analyzer emits `DeadEndState` (Warning, code 108) for each dead-end state. The proof engine records these facts without emitting additional diagnostics. |
+
+**Emission rules:**
+
+- One `ReachabilityFact` per state (reachable and unreachable).
+- One `DominancePathFact` per state with `RequiresDominator = true` (from `StateModifierMeta`).
+- One `EventCoverageFact` per event that has at least one `UnhandledReachableState` (events with full coverage are not forwarded — no obligation needed).
+- Exactly one `TerminalCompletenessFact` per analysis run.
+- Exactly one `DeadEndStateFact` per analysis run (even if `DeadEndStates` is empty — the fact records the analysis was performed).
+
+---
+
+## 4a. Structural Preconditions
+
+The graph analyzer assumes the following invariants about its inputs, all established and enforced by upstream stages. These are assert-level assumptions — the graph analyzer does not re-validate them.
+
+| Precondition | Enforced By | Rationale |
+|---|---|---|
+| **Exactly one state has `IsInitial = true`** (for stateful precepts) | TypeChecker — emits `MultipleInitialStates` / `NoInitialState` diagnostics | BFS traversal requires a single entry point. The graph analyzer checks for the missing-initial-state case (§8.1) as a defensive fallback, but the TypeChecker is the primary enforcer. |
+| **All modifier references are fully resolved** — each `TypedState.Modifiers` array contains valid `ModifierKind` values with populated `ModifierMeta` entries in the `Modifiers` catalog | TypeChecker — resolves modifiers during symbol population (Slice 1) | The graph analyzer calls `Modifiers.GetMeta(kind)` without null-checking the result. Unresolved modifiers would cause a catalog lookup failure. |
+| **All state and event names referenced in `TypedTransitionRow` resolve to declared states/events** — `FromState` (when non-null) exists in `SemanticIndex.StatesByName`, and `EventName` exists in `SemanticIndex.EventsByName` | TypeChecker — emits `UndeclaredState` / `UndeclaredEvent` diagnostics via NameBinder resolution | Edge construction (§6.1) uses state/event names as dictionary keys. Unresolved references would produce edges to nonexistent nodes. |
+| **All expression nodes in transitions and rules are `TypedExpression` subtypes — no `MissingExpression` nodes propagate to this stage** | TypeChecker — converts `MissingExpression` to `TypedErrorExpression` with a diagnostic (B3 fix) | The graph analyzer does not evaluate expressions (guards are opaque), but `TypedTransitionRow.Guard` and `TypedTransitionRow.Outcome` carry `TypedExpression` nodes. `MissingExpression` would indicate an incomplete parse that the TypeChecker should have caught. |
+| **`TypedTransitionRow.Outcome` is never `MalformedOutcome`** | TypeChecker — emits a diagnostic and does not produce a `TypedTransitionRow` for malformed outcomes | Edge construction assumes every transition row has a well-formed outcome with a resolvable target state (or null for self-transition). |
+| **`SemanticIndex` collections are non-null** — all `ImmutableArray<T>` fields are initialized (possibly empty, never default/null) | TypeChecker — `SemanticIndex.Empty` factory initializes all fields; `CheckContext` accumulator produces non-null arrays | The graph analyzer iterates all input collections without null guards. |
 
 ---
 
@@ -217,7 +264,9 @@ The graph analyzer executes four sequential phases, each building on prior resul
 │  Phase 2: Reachability Analysis                                      │
 │  • BFS from initial state                                            │
 │  • Partition into ReachableStates / UnreachableStates                │
+│  • Reverse-reachability from terminal states → detect dead-end states│
 │  • Emit UnreachableState diagnostics                                 │
+│  • Emit DeadEndState diagnostics                                     │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
@@ -237,6 +286,7 @@ The graph analyzer executes four sequential phases, each building on prior resul
 │  • Emit DominancePathFact for required states                        │
 │  • Emit EventCoverageFact for events with gaps                       │
 │  • Emit TerminalCompletenessFact                                     │
+│  • Emit DeadEndStateFact                                             │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
@@ -328,6 +378,28 @@ Output: (ReachableStates, UnreachableStates, pathMap)
 6. UnreachableStates = AllStates - visited
 7. Emit Diagnostic(UnreachableState) for each unreachable state
 ```
+
+**Dead-end detection (reverse-reachability from terminals):**
+
+After forward reachability, compute reverse-reachability from all terminal states to identify dead-end states — reachable non-terminal states that have no structural path to any terminal.
+
+```text
+Input: adjacency map (reversed), ReachableStates, TerminalStates
+Output: DeadEndStates
+
+1. Build reverse adjacency map (edge.ToState → edge.FromState)
+2. Initialize reverseVisited = {}
+3. For each terminal state t in TerminalStates:
+   a. If t not in reverseVisited:
+      - BFS backward from t using reverse adjacency
+      - Add all visited states to reverseVisited
+4. DeadEndStates = { s ∈ ReachableStates : s ∉ TerminalStates AND s ∉ reverseVisited }
+5. Emit Diagnostic(DeadEndState, Warning) for each dead-end state
+```
+
+A dead-end state is reachable from initial (it's not an unreachable state) but cannot reach any terminal (it's a lifecycle trap). This is distinct from `UnreachableState` — the state IS reachable, it just has no exit toward completion.
+
+**Severity:** Warning, not error. Dead-end states may be intentional in designs that use certain states as permanent holds (e.g., a "Suspended" state from which entities are never expected to complete). The author can suppress the warning by adding the `terminal` modifier if the state is intended as an endpoint.
 
 ### 6.3 Dominator Computation (Phase 3)
 
@@ -422,6 +494,8 @@ Package analysis results as typed facts for the proof engine:
 
 4. **TerminalCompletenessFact:** Whether all terminal states are reachable.
 
+5. **DeadEndStateFact:** Which reachable non-terminal states have no path to any terminal state.
+
 ---
 
 ## 7. Dependencies and Integration Points
@@ -432,7 +506,7 @@ Package analysis results as typed facts for the proof engine:
 |-----------|-----------------|---------------|
 | Type Checker | Pipeline predecessor | `SemanticIndex` — resolved states, events, transitions |
 | `Modifiers` catalog | Static metadata | `StateModifierMeta.AllowsOutgoing`, `.RequiresDominator`, `.PreventsBackEdge` |
-| `Diagnostics` | Static metadata | `DiagnosticCode.UnreachableState`, `.UnhandledEvent` |
+| `Diagnostics` | Static metadata | `DiagnosticCode.UnreachableState`, `.UnhandledEvent`, `.DeadEndState` |
 
 ### Downstream Consumers
 
@@ -509,11 +583,16 @@ The graph analyzer maintains these invariants:
 
 ### Preconditions
 
+See §4a (Structural Preconditions) for the full precondition inventory with rationale. Summary:
+
 | Precondition | Enforced By |
 |--------------|-------------|
-| `SemanticIndex` is well-formed (no null collections) | Type checker |
-| State and event names are non-null, non-empty | Type checker |
-| Transition references resolve to declared states/events | Type checker |
+| Exactly one initial state (stateful precepts) | Type checker |
+| All modifier references fully resolved with `ModifierMeta` populated | Type checker |
+| All state/event name references in transitions resolve to declarations | Type checker (via NameBinder) |
+| No `MissingExpression` nodes — all converted to `TypedErrorExpression` | Type checker |
+| No `MalformedOutcome` — malformed transitions produce diagnostics, not rows | Type checker |
+| `SemanticIndex` collections are non-null (possibly empty) | Type checker (`SemanticIndex.Empty` factory) |
 
 ### Postconditions
 
@@ -582,11 +661,11 @@ The graph analyzer maintains these invariants:
 
 ## 11. Innovation
 
-### 11.1 Catalog-Derived Constraint Checking
+### 11.1 Catalog-Driven Modifier Applicability
 
-Unlike traditional compilers where modifier semantics are embedded in analysis code, Precept's graph analyzer derives constraint checks from catalog metadata. The `StateModifierMeta` record declares the structural properties; the analyzer reads them and applies generic checks.
+Modifier applicability is catalog-driven — each `ModifierMeta` carries an `ApplicableTo` set that the graph analyzer reads to validate which constructs a modifier may appear on, and `StateModifierMeta` declares structural constraint flags (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) that the analyzer reads to determine what structural checks to apply. The graph traversal algorithms themselves (reachability, dead-state detection, liveness analysis, dominator computation) are generic machinery — they do not hardcode per-modifier behavior.
 
-This inverts the typical pattern: instead of "the analyzer knows what `terminal` means," the catalog declares "terminal means AllowsOutgoing = false" and the analyzer enforces "states with AllowsOutgoing = false must have no outgoing edges."
+This inverts the typical pattern for modifier semantics: instead of "the analyzer knows what `terminal` means," the catalog declares "terminal means `AllowsOutgoing = false`" and the analyzer enforces "states with `AllowsOutgoing = false` must have no outgoing edges." But the BFS, dominator tree, and event coverage algorithms are standard graph algorithms — they are not catalog-derived.
 
 ### 11.2 Proof Forwarding Pipeline
 
@@ -621,6 +700,14 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 > **✅ Resolved — `GraphEvent.IsInitial` is derived from outgoing edges of the initial state**
 > `GraphEvent.IsInitial = true` if and only if the event has at least one `GraphEdge` whose source state has `GraphState.IsInitial = true`. This is a purely structural derivation: the graph analyzer identifies the initial state (via `StateModifierMeta` for the `initial` modifier), then marks any event that fires from it. No event-level metadata is consulted — the derivation is entirely structural from the edge set.
 > *Resolved: 2026-05-07 — Wave 4, team-autonomous*
+
+> **✅ Resolved (OQ1) — DeadEndStateFact: separate fact type for dead-end state detection**
+> Dead-end states (reachable non-terminal states with no path to any terminal state) are a distinct structural concern from terminal completeness (whether terminals are reachable from initial). `TerminalCompletenessFact` answers "can each terminal be reached?" — a forward perspective from the initial state. `DeadEndStateFact` answers "can each non-terminal reach a terminal?" — a forward perspective from each reachable state. Different questions, different data shapes, different proof consumption patterns. `DeadEndStateFact` carries `DeadEndStates` (the trapped states) and `DeadEndCount`. Detection uses reverse-reachability BFS from terminal states — any reachable non-terminal state not in the reverse-reachable set is a dead-end. The graph analyzer emits `DeadEndState` (Warning, code 108) per dead-end state. Warning severity, not error: dead-end states may be intentional permanent-hold designs; the author can suppress by adding the `terminal` modifier to declare the state as an intended endpoint.
+> *Resolved: 2026-05-07 — OQ design session*
+
+> **✅ Resolved (OQ2) — EventHandler entries do NOT count toward event coverage**
+> Event handlers (`on Event -> actions`) are valid only in stateless precepts. The type checker emits `EventHandlerInStatefulPrecept` (code 92) if event handlers coexist with state declarations. The graph analyzer operates exclusively on stateful precepts — when graph analysis runs, no valid `TypedEventHandler` entries exist. Therefore, the question "should handlers count toward event coverage?" is structurally moot: the type system prevents the coexistence scenario. `EventCoverageFact` counts transition rows only. The `EventHandlers` field in `SemanticIndex` is not consumed by the graph analyzer — it is listed in §4 for completeness only. This is not a policy choice; it is a consequence of the type checker's stateless/stateful mutual exclusion rule (language spec §3.8).
+> *Resolved: 2026-05-07 — OQ design session*
 
 ---
 
@@ -680,3 +767,4 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 | 83 | `IrreversibleStateHasBackEdge` | An irreversible state has a transition returning to a BFS ancestor |
 | 84 | `RequiredStateDoesNotDominateTerminal` | A required state does not dominate any terminal state |
 | 85 | `NoInitialState` | No state is marked with the `initial` modifier |
+| 108 | `DeadEndState` | A reachable non-terminal state has no structural path to any terminal state — the entity can enter this state but can never reach completion |

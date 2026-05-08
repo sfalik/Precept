@@ -15,6 +15,9 @@ public enum ConstraintStatus { Satisfied = 1, Violated = 2, Unresolvable = 3 }
 public sealed record EventInspection(
     string EventName,
     Prospect OverallProspect,
+    IReadOnlyList<ArgDescriptor> DeclaredArgs,
+    IReadOnlyList<ArgError> ArgErrors,
+    IReadOnlyList<FieldSnapshot> CurrentFields,
     IReadOnlyList<ConstraintResult> EventEnsures,
     IReadOnlyList<RowInspection> Rows);
 
@@ -50,6 +53,15 @@ public sealed record Rejection(string Reason) : RowEffect;
 // ─── Shared inspection primitives ───────────────────────────────────
 
 /// <summary>
+/// Argument validation error produced during event inspection when a
+/// supplied or missing argument fails type/presence validation against
+/// the event's <see cref="ArgDescriptor"/>s.
+/// </summary>
+public sealed record ArgError(
+    string ArgName,
+    string Message);
+
+/// <summary>
 /// Post-mutation field value with access mode and resolvability.
 /// <see cref="IsResolved"/> is <c>false</c> when a required arg dependency
 /// is missing — <see cref="Value"/> is meaningless in that case.
@@ -63,7 +75,8 @@ public sealed record FieldSnapshot(
     FieldAccessMode Mode,
     string FieldType,                           // TODO D8/R4: carried by descriptor
     bool IsResolved,
-    object? Value);
+    object? Value,
+    Type? ClrType);
 
 /// <summary>
 /// Constraint evaluation result with field attribution. <see cref="FieldNames"/>

@@ -150,6 +150,16 @@ public sealed record EventCoverageFact(
     string EventName,
     ImmutableArray<string> UnhandledReachableStates
 ) : ProofForwardingFact;
+
+public sealed record TerminalCompletenessFact(
+    bool AllTerminalsReachable,
+    ImmutableArray<string> UnreachableTerminals
+) : ProofForwardingFact;
+
+public sealed record DeadEndStateFact(
+    ImmutableArray<string> DeadEndStates,
+    int DeadEndCount
+) : ProofForwardingFact;
 ```
 
 **Catalog metadata** — read at proof time for FaultCode↔DiagnosticCode correspondence:
@@ -417,23 +427,30 @@ Each strategy is a simple predicate function — not a solver. The first strateg
 - `x / 0` — divisor `0` → strategy **fails**
 - Negative literals for `sqrt()` → strategy **fails**
 
+**Discharge predicate pseudocode:**
+
 ```csharp
+// Strategy 1: Literal Proof — Discharge Predicate
+// Input: ProofObligation (from Pass 1)
+// Reads: obligation.Site (TypedExpression), obligation.Requirement
+// Scope: NumericProofRequirement ONLY — PresenceProofRequirement is Strategy 2/3
+
 bool TryLiteralProof(ProofObligation obligation)
 {
+    // 1. Gate: only numeric requirements are literal-provable
     if (obligation.Requirement is not NumericProofRequirement numeric)
         return false;
-```
 
-> **Intentional scope:** `TryLiteralProof` covers `NumericProofRequirement` only. `PresenceProofRequirement` obligations (null/empty checks) are discharged by Strategy 2 (field modifiers, e.g. `notempty`) or Strategy 3 (guard-in-path, e.g. `when count(x) > 0`). Literal values never statically establish presence — routing `PresenceProofRequirement` to literal proof would be incorrect. The bounded scope is deliberate.
-
-```csharp
+    // 2. Resolve the proof subject to a concrete expression node
     var subject = ResolveSubject(numeric.Subject, obligation.Site);
     if (subject is not TypedLiteral literal)
-        return false;
-    
+        return false;  // subject is not a compile-time constant — cannot prove
+
+    // 3. Extract numeric value (int or decimal)
     var value = literal.Value as decimal? ?? (literal.Value as int?)?.ToDecimal();
     if (value is null) return false;
-    
+
+    // 4. Evaluate the requirement predicate against the literal value
     return numeric.Comparison switch
     {
         OperatorKind.NotEquals          => value != numeric.Threshold,
@@ -443,8 +460,13 @@ bool TryLiteralProof(ProofObligation obligation)
         OperatorKind.LessThanOrEqual    => value <= numeric.Threshold,
         _ => false
     };
+    // Passes if the literal value satisfies the comparison against the threshold.
+    // Fails (returns false) if the subject isn't a literal, isn't numeric, or
+    // the literal violates the requirement (e.g., x / 0, sqrt(-1)).
 }
 ```
+
+> **Intentional scope:** `TryLiteralProof` covers `NumericProofRequirement` only. `PresenceProofRequirement` obligations (null/empty checks) are discharged by Strategy 2 (field modifiers, e.g. `notempty`) or Strategy 3 (guard-in-path, e.g. `when count(x) > 0`). Literal values never statically establish presence — routing `PresenceProofRequirement` to literal proof would be incorrect. The bounded scope is deliberate.
 
 #### Strategy 2: Modifier Proof
 
@@ -502,6 +524,50 @@ public sealed record ProofDischarge(
 );
 ```
 
+**Discharge predicate pseudocode:**
+
+```csharp
+// Strategy 2: Modifier Proof — Discharge Predicate
+// Input: ProofObligation (from Pass 1)
+// Reads: SemanticIndex.FieldsByName (to get TypedField.Modifiers),
+//        FieldModifierMeta.ProofDischarges (from Modifiers catalog)
+// Scope: Any obligation whose subject resolves to a declared field with modifiers
+
+bool TryModifierProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    // 1. Resolve the proof subject to a field name
+    var fieldName = GetFieldName(obligation.Requirement.Subject, obligation.Site);
+    if (fieldName is null) return false;
+
+    // 2. Look up the field's modifiers from SemanticIndex
+    if (!semantics.FieldsByName.TryGetValue(fieldName, out var field))
+        return false;
+
+    // 3. For each modifier on the field, check catalog-declared ProofDischarges
+    foreach (var modifier in field.Modifiers)
+    {
+        var meta = Modifiers.GetMeta(modifier.Kind);
+
+        foreach (var discharge in meta.ProofDischarges)
+        {
+            // 4. Check if this discharge covers the obligation's requirement
+            if (DischargeCovers(discharge, obligation.Requirement))
+                return true;  // modifier statically establishes the bound
+        }
+    }
+
+    return false;  // no modifier discharges this requirement
+}
+
+// DischargeCovers: checks whether a ProofDischarge entry covers a requirement.
+// For NumericProofRequirement: discharge.RequirementKind == Numeric
+//   AND discharge.Comparison subsumes requirement.Comparison at discharge.Threshold.
+// For PresenceProofRequirement: discharge.RequirementKind == Presence.
+// Subsumption: positive (>, 0) covers both (!=, 0) and (>=, 0).
+// The subsumption logic mirrors GuardSubsumes (Strategy 3) but reads from catalog
+// metadata rather than from a guard expression.
+```
+
 > **✅ Resolved (CC#5) — FieldModifierMeta.ProofDischarges is now canonical**
 > `ProofDischarge[]` has been added to `FieldModifierMeta` in `catalog-system.md`. The `ProofDischarge` record is also defined there. Strategy 2 can now be implemented by reading `modifier.ProofDischarges` from the catalog — no per-modifier switch in the engine.
 > *Resolved: 2026-05-06 — CC#5*
@@ -543,25 +609,75 @@ on Process when Value >= 0
 
 **Constraint subsumption:** `> 0` subsumes `!= 0` and `>= 0`. `< 0` subsumes `!= 0`. The proof engine checks subsumption, not just exact matches.
 
+**Discharge predicate pseudocode:**
+
 ```csharp
+// Strategy 3: Guard-in-Path Proof — Discharge Predicate
+// Input: ProofObligation (from Pass 1)
+// Reads: TypedTransitionRow.Guard (the enclosing when clause),
+//        obligation.Requirement (NumericProofRequirement or PresenceProofRequirement)
+// Scope: Obligations where the enclosing guard directly constrains the proof subject
+//        (field or collection named in the guard matches the obligation's subject)
+
+bool TryGuardInPathProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    // 1. Find the enclosing transition row for this obligation's expression site
+    var row = FindEnclosingTransitionRow(obligation.Site, semantics);
+    if (row?.Guard is null) return false;  // no guard → cannot prove
+
+    // 2. Decompose the guard into simple constraint forms
+    //    Supported forms: field OP literal, count(collection) > 0, field is set
+    var guardConstraints = ExtractGuardConstraints(row.Guard);
+
+    // 3. For each guard constraint, check if it covers the requirement
+    foreach (var guard in guardConstraints)
+    {
+        if (obligation.Requirement is NumericProofRequirement numeric)
+        {
+            if (GuardSubsumes(guard, numeric))
+                return true;
+        }
+        else if (obligation.Requirement is PresenceProofRequirement presence)
+        {
+            // "field is set" guard discharges presence requirements
+            // "count(collection) > 0" guard discharges collection non-empty
+            if (guard.Field == GetFieldName(presence.Subject)
+                && guard.IsPresenceCheck)
+                return true;
+        }
+    }
+
+    return false;  // no guard constraint covers the requirement
+}
+
 bool GuardSubsumes(GuardConstraint guard, NumericProofRequirement requirement)
 {
     if (guard.Field != GetFieldName(requirement.Subject)) return false;
-    
+
     return (guard.Comparison, requirement.Comparison) switch
     {
         // > 0 guard subsumes != 0 and >= 0 requirements
-        (OperatorKind.GreaterThan, OperatorKind.NotEquals) when guard.Value == 0 && requirement.Threshold == 0 => true,
-        (OperatorKind.GreaterThan, OperatorKind.GreaterThanOrEqual) when guard.Value >= requirement.Threshold => true,
-        
+        (OperatorKind.GreaterThan, OperatorKind.NotEquals)
+            when guard.Value == 0 && requirement.Threshold == 0 => true,
+        (OperatorKind.GreaterThan, OperatorKind.GreaterThanOrEqual)
+            when guard.Value >= requirement.Threshold => true,
+
         // >= N guard subsumes >= M when N >= M
-        (OperatorKind.GreaterThanOrEqual, OperatorKind.GreaterThanOrEqual) when guard.Value >= requirement.Threshold => true,
-        
+        (OperatorKind.GreaterThanOrEqual, OperatorKind.GreaterThanOrEqual)
+            when guard.Value >= requirement.Threshold => true,
+
+        // < 0 subsumes != 0
+        (OperatorKind.LessThan, OperatorKind.NotEquals)
+            when guard.Value == 0 && requirement.Threshold == 0 => true,
+
         // Exact match
-        _ when guard.Comparison == requirement.Comparison && guard.Value == requirement.Threshold => true,
-        
+        _ when guard.Comparison == requirement.Comparison
+            && guard.Value == requirement.Threshold => true,
+
         _ => false
     };
+    // Passes if the guard establishes a range that implies the requirement.
+    // Key: the guard must name the SAME field as the obligation's subject.
 }
 ```
 
@@ -584,6 +700,71 @@ This strategy handles the case where a guard establishes a *relative* constraint
 1. The guard is in the same transition row
 2. The guard establishes a simple relational constraint
 3. The proof site references the constrained field
+
+**Discharge predicate pseudocode:**
+
+```csharp
+// Strategy 4: Straightforward Flow Narrowing — Discharge Predicate
+// Input: ProofObligation (from Pass 1)
+// Reads: TypedTransitionRow.Guard (same-row guard),
+//        obligation.Site (TypedBinaryOp expression involving two fields)
+// Scope: Obligations where the guard establishes a relational invariant between
+//        two non-literal operands, and the obligation involves an expression
+//        over both of those operands.
+// Key discriminator vs Strategy 3: Strategy 3 fires when the guard names the
+// proof subject directly (field vs literal). Strategy 4 fires when the guard
+// names TWO fields in relation (field vs field) and the obligation is about
+// an expression combining both.
+
+bool TryFlowNarrowingProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    // 1. Find the enclosing transition row
+    var row = FindEnclosingTransitionRow(obligation.Site, semantics);
+    if (row?.Guard is null) return false;
+
+    // 2. Decompose the guard — look for field-vs-field comparisons only
+    //    e.g., "when Quantity > ReorderPoint" → (Quantity, >, ReorderPoint)
+    var relationalGuards = ExtractFieldToFieldConstraints(row.Guard);
+    if (relationalGuards.IsEmpty) return false;  // no field-vs-field guards
+
+    // 3. Check if the obligation's expression site uses both fields from a guard
+    if (obligation.Site is not TypedBinaryOp binaryOp) return false;
+
+    var leftField = GetFieldName(binaryOp.Left);
+    var rightField = GetFieldName(binaryOp.Right);
+    if (leftField is null || rightField is null) return false;
+
+    // 4. For each relational guard, check if it establishes a constraint
+    //    that makes the binary operation safe
+    foreach (var guard in relationalGuards)
+    {
+        // Guard: A > B (or A >= B, A < B, etc.)
+        // Obligation site: expression involving A and B (e.g., A - B, B / A)
+        if (!InvolvesFields(guard, leftField, rightField)) continue;
+
+        // 5. Check if the guard's established relation implies the obligation
+        //    Example: guard "Quantity > ReorderPoint" + site "ReorderPoint - Quantity"
+        //    → guard proves Quantity > ReorderPoint
+        //    → therefore (ReorderPoint - Quantity) < 0 — result range is known
+        //    → if obligation is "result won't overflow" or "divisor != 0" for
+        //      an expression involving both fields, the guard covers it
+        if (GuardRelationImpliesObligation(guard, binaryOp, obligation.Requirement))
+            return true;
+    }
+
+    return false;
+}
+
+// GuardRelationImpliesObligation: given guard "A op B" and obligation on
+// an expression f(A, B), check whether the guard's established relation
+// implies the obligation predicate. This is a simple pattern match on
+// (guard.Op, expression.Op, requirement.Comparison) triples — not a solver.
+// Example triples:
+//   guard A > B  + expr A - B  + req result >= 0  → true (A-B > 0 > requirement)
+//   guard A > B  + expr B / A  + req divisor != 0 → true (A > B and both fields,
+//                                                          but need A != 0 separately)
+//   guard A >= B + expr A - B  + req result >= 0  → true (A-B >= 0)
+```
 
 > **Strategy 3 vs Strategy 4 boundary (resolved):**
 > - **Strategy 3 (guard-in-path):** The `when <guard>` clause protects all actions in the row. The guard must directly constrain the proof subject — the field (or collection) being checked for the required property appears as the operand in the guard comparison (e.g., `when Divisor != 0` discharges a `divisor != 0` proof obligation for `A / Divisor`). Strategy 3 applies when the subject is a *named field or arg* and the guard is a *simple comparison or presence check* on that subject.
@@ -640,29 +821,42 @@ The proof engine threads obligations through a chain that connects compile-time 
 
 ### Constraint Influence Analysis
 
-For each rule and ensure constraint, the proof engine records which fields and event args the constraint expression references. This is a simple traversal of the typed expression tree — no proof logic required.
+For each rule and ensure constraint, the proof engine records which fields and event args the constraint expression references. **The ProofEngine reads `SemanticIndex.ConstraintRefs` (populated by the TypeChecker) to build `ConstraintInfluenceEntry` records. It does NOT re-walk expression trees.** The TypeChecker already traverses constraint expressions during type checking and records field/arg references in `ConstraintFieldRefs` entries. The proof engine projects these into the richer `ConstraintInfluenceEntry` shape, enriching arg references with event-qualified identity.
 
 ```csharp
-ConstraintInfluenceEntry AnalyzeInfluence(TypedRule rule)
+// The proof engine reads SemanticIndex.ConstraintRefs — NOT expression trees.
+// ConstraintFieldRefs (from TypeChecker):
+//   ConstraintIdentity, ImmutableArray<string> ReferencedFields, ImmutableArray<string> ReferencedArgs
+// ConstraintInfluenceEntry (proof engine output):
+//   ConstraintIdentity, ImmutableArray<string> ReferencedFields, ImmutableArray<EventArgReference> ReferencedArgs
+//
+// The shape difference: ConstraintFieldRefs carries arg names as bare strings;
+// ConstraintInfluenceEntry carries EventArgReference(EventName, ArgName).
+// The proof engine resolves arg names to event-qualified references using
+// SemanticIndex.EventsByName to find the owning event for each arg.
+
+ImmutableArray<ConstraintInfluenceEntry> ProjectConstraintInfluence(SemanticIndex semantics)
 {
-    var fields = new HashSet<string>();
-    var args = new List<EventArgReference>();
-    
-    TraverseExpression(rule.Condition, (expr) =>
+    var entries = new List<ConstraintInfluenceEntry>();
+
+    foreach (var cfr in semantics.ConstraintRefs)
     {
-        if (expr is TypedFieldReference fieldRef)
-            fields.Add(fieldRef.FieldName);
-        if (expr is TypedArgReference argRef)
-            args.Add(new EventArgReference(argRef.EventName, argRef.ArgName));
-    });
-    
-    return new ConstraintInfluenceEntry(
-        new RuleIdentity(rule.Name, rule.Index),
-        fields.ToImmutableArray(),
-        args.ToImmutableArray()
-    );
+        // Enrich bare arg names → EventArgReference using the event index
+        var qualifiedArgs = cfr.ReferencedArgs
+            .Select(argName => ResolveArgToEvent(argName, cfr.ConstraintIdentity, semantics))
+            .ToImmutableArray();
+
+        entries.Add(new ConstraintInfluenceEntry(
+            cfr.ConstraintIdentity,
+            cfr.ReferencedFields,
+            qualifiedArgs));
+    }
+
+    return entries.ToImmutableArray();
 }
 ```
+
+> **Design note:** `SemanticIndex.ConstraintRefs` carries `ImmutableArray<string> ReferencedArgs` (bare arg names), while `ConstraintInfluenceEntry.ReferencedArgs` carries `ImmutableArray<EventArgReference>` (event-qualified). The proof engine resolves this by looking up which event owns each arg name via `SemanticIndex.EventsByName`. If a future TypeChecker change populates `ConstraintFieldRefs` with event-qualified arg references directly, the proof engine projection simplifies to a 1:1 copy.
 
 The Precept Builder consumes these entries and reorganizes them into a `ConstraintInfluenceMap` — a precomputed artifact that enables AI agents to reason causally: "which fields affect which constraints?"
 
@@ -703,6 +897,18 @@ Collection non-empty obligations arise from several sources:
 **Modifier-proof strategy:** The `notempty` modifier discharges collection non-empty requirements.
 
 **Guard-in-path strategy:** `count(collection) > 0` or `collection.count > 0` guards discharge the requirement.
+
+### ProofForwardingFact Consumption Contract
+
+The proof engine consumes `ProofForwardingFact` entries from the `StateGraph` during Pass 1 (Obligation Instantiation). Each fact subtype has a specific consumption pattern:
+
+| Fact Subtype | Consumption |
+|---|---|
+| `ReachabilityFact` | Unreachable-state facts suppress proof obligations on transitions originating from unreachable states — those transitions can never fire, so their proof requirements are vacuously satisfied. Reachable paths feed causal diagnostic explanations. |
+| `DominancePathFact` | Verifies the required-state guarantee. If `DominatedTerminals` is empty, records a structural violation in the proof ledger (the graph analyzer already emitted `RequiredStateDoesNotDominateTerminal`). |
+| `EventCoverageFact` | Uses coverage gaps to reason about guard completeness: in states where an event is handled, are the guards sufficient? Coverage gaps are structural facts; guard satisfiability is the proof engine's domain. |
+| `TerminalCompletenessFact` | Records terminal completeness in the proof ledger for structural completeness reasoning. No additional diagnostics — the graph analyzer emits `UnreachableState` for each unreachable terminal. |
+| `DeadEndStateFact` | Records dead-end states in the proof ledger as structural completeness failures. Dead-end states represent lifecycle traps — entities entering these states can never reach completion. The proof engine suppresses proof obligations on transitions originating FROM dead-end states to other dead-end states (those paths are already structurally broken). Transitions INTO dead-end states retain their obligations — those transitions are the ones the author likely needs to fix. No additional diagnostics — the graph analyzer emits `DeadEndState` (Warning, code 108) for each dead-end state. |
 
 ---
 
@@ -781,7 +987,7 @@ public static ProofLedger Prove(SemanticIndex semantics, StateGraph graph)
     return new ProofLedger(
         obligations.ToImmutableArray(),
         faultSiteLinks.ToImmutableArray(),
-        AnalyzeConstraintInfluence(semantics).ToImmutableArray(),
+        AnalyzeConstraintInfluence(semantics).ToImmutableArray(),  // reads SemanticIndex.ConstraintRefs
         CheckInitialStateSatisfiability(semantics).ToImmutableArray(),
         diagnostics.ToImmutableArray()
     );
@@ -881,14 +1087,15 @@ If the `SemanticIndex` contains `TypedErrorExpression` nodes (from type checker 
 
 ### Decision 4: Constraint Influence as Proof Engine Output
 
-**Decision:** The proof engine produces `ConstraintInfluenceEntry` records as part of its output.
+**Decision:** The proof engine produces `ConstraintInfluenceEntry` records as part of its output, by reading `SemanticIndex.ConstraintRefs` (populated by the TypeChecker) and projecting them into the richer `ConstraintInfluenceEntry` shape.
 
 **Rationale:**
-- **Efficiency:** The proof engine already traverses typed expression trees for obligation instantiation. Collecting field references costs nothing additional.
-- **Semantic completeness:** Constraint influence is part of the static analysis picture. The proof engine is the last analysis stage — it has full visibility into constraint expressions.
+- **No duplicate traversal:** The TypeChecker already walks constraint expressions during type checking and populates `SemanticIndex.ConstraintRefs` with field/arg references. The proof engine reads these — it does NOT re-walk expression trees.
+- **Enrichment responsibility:** `ConstraintFieldRefs` carries bare arg name strings; `ConstraintInfluenceEntry` carries event-qualified `EventArgReference` records. The proof engine enriches arg names with event identity using `SemanticIndex.EventsByName`.
+- **Semantic completeness:** Constraint influence is part of the static analysis picture. The proof engine is the last analysis stage — it has full visibility to produce the final enriched shape.
 - **Consumer convenience:** The Precept Builder can reorganize influence entries into whatever map structure runtime needs without duplicating the traversal.
 
-**Alternative considered:** Having the type checker produce influence facts. Rejected because the type checker produces expression-level structures, not constraint-level summaries.
+**Alternative considered:** Having the type checker produce the final `ConstraintInfluenceEntry` shape directly. Deferred because the TypeChecker's `ConstraintFieldRefs` is already a correct intermediate representation, and the enrichment step (arg name → EventArgReference) is trivial.
 
 ### Decision 5: Modifier-Proof via Catalog Metadata
 

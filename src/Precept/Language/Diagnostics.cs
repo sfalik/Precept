@@ -279,6 +279,8 @@ public static class Diagnostics
             FixHint: "Add a transition to this state, or remove it if it is no longer needed"),
         DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "Event '{0}' has no transition rows in any state — it can never be fired successfully",                                       DiagnosticCategory.Structure,
             FixHint: "Add at least one transition row that handles this event, or remove the event declaration"),
+        DiagnosticCode.DeadEndState                   => new(nameof(DiagnosticCode.DeadEndState),                   DiagnosticStage.Graph, Severity.Warning, "State '{0}' is reachable but has no path to any terminal state — entities entering this state can never reach completion",   DiagnosticCategory.Structure,
+            FixHint: "Add a transition from this state toward a terminal state, or mark it as 'terminal' if it is an intended endpoint"),
 
         // ── Proof ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UnsatisfiableGuard             => new(nameof(DiagnosticCode.UnsatisfiableGuard),             DiagnosticStage.Proof, Severity.Warning, "The condition '{0}' on event '{1}' can never be true when {2} — this transition will never fire",                                      DiagnosticCategory.Proof,

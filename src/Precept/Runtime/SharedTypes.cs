@@ -50,14 +50,13 @@ public sealed record ConstraintDescriptor(
 
 /// <summary>
 /// Constraint violation produced by the collect-all constraint evaluator.
-/// References the <see cref="ConstraintDescriptor"/> that was violated.
+/// References the <see cref="ConstraintDescriptor"/> that was violated and
+/// carries the evaluation-time context: which fields were involved, the
+/// innermost failing subexpression, and the value at the failure site.
 /// </summary>
-/// <remarks>
-/// TODO G1/G9: FieldNames is a provisional flat list. The prototype uses
-/// a typed ConstraintTarget hierarchy (field, event-arg, event, state,
-/// definition) for rich UI attribution. Should become a typed target list
-/// referencing descriptor identity.
-/// </remarks>
 public sealed record ConstraintViolation(
     ConstraintDescriptor Constraint,
-    IReadOnlyList<string> FieldNames);          // TODO G1/G9: typed target list — transitive expansion of computed field refs
+    string Because,
+    IReadOnlyList<string> RelevantFields,
+    string? FailingSubexpression,
+    object? FailingValue);

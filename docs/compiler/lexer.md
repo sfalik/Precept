@@ -684,7 +684,7 @@ Most lexers handle string interpolation with a recursive scanner or a heap-alloc
 
 | File | Purpose |
 |------|---------|
-| `src/Precept/Pipeline/Lexer.cs` | Lexer implementation — `Lexer` static class, `Scanner` struct, `ModeState` struct, `LexerMode` enum (~775 lines) |
+| `src/Precept/Pipeline/Lexer.cs` | Lexer implementation — `Lexer` static class, `Scanner` struct, `ModeState` struct, `LexerMode` enum (~687 lines) |
 | `src/Precept/Pipeline/TokenStream.cs` | `TokenStream` record — immutable token sequence and diagnostics artifact |
 | `src/Precept/Pipeline/SourceSpan.cs` | `SourceSpan` record struct — offset/length/line/column span type |
 | `src/Precept/Language/TokenKind.cs` | `TokenKind` enum — all token kind values |
