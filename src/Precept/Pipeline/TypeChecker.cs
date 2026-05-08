@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using NodaTime;
 using NodaTime.Text;
 using Precept.Language;
@@ -30,11 +31,18 @@ internal static class TypeChecker
         PopulateStates(symbols, ctx);
         PopulateEvents(symbols, ctx);
 
-        // Structural validation (Slice 6) — runs after Pass 1; reads ComputedDeps
+        // Pass 2: normalize transition rows and event handlers (Slice 5)
+        PopulateTransitionRows(manifest, ctx);
+        PopulateEventHandlers(manifest, ctx);
+
+        // Modifier validation (Slice 7) — depends only on Pass 1 symbols
+        ValidateModifiers(ctx);
+
+        // Structural validation (Slice 6) — runs after Pass 2; reads ComputedDeps
         // (populated during expression resolution) for cycle detection.
         ValidateStructural(ctx);
 
-        // Pass 2 + final assembly deferred to Slices 2–10.
+        // Remaining Pass 2 + final assembly deferred to Slices 8–10.
         // Return a partial SemanticIndex with the symbol tables populated.
         return BuildPartialSemanticIndex(ctx);
     }
@@ -232,19 +240,19 @@ internal static class TypeChecker
             FieldsByName: fields.ToFrozenDictionary(f => f.Name),
             StatesByName: states.ToFrozenDictionary(s => s.Name),
             EventsByName: events.ToFrozenDictionary(e => e.Name),
-            TransitionRows: ImmutableArray<TypedTransitionRow>.Empty,
+            TransitionRows: ctx.TransitionRows.ToImmutableArray(),
             Rules: ImmutableArray<TypedRule>.Empty,
             Ensures: ImmutableArray<TypedEnsure>.Empty,
             AccessModes: ImmutableArray<TypedAccessMode>.Empty,
             StateHooks: ImmutableArray<TypedStateHook>.Empty,
-            EventHandlers: ImmutableArray<TypedEventHandler>.Empty,
+            EventHandlers: ctx.EventHandlers.ToImmutableArray(),
             EditDeclarations: ImmutableArray<TypedEditDeclaration>.Empty,
             EnsuresByState: FrozenDictionary<string, ImmutableArray<TypedEnsure>>.Empty,
             ComputedDeps: ImmutableArray<ComputedFieldDep>.Empty,
             ConstraintRefs: ImmutableArray<ConstraintFieldRefs>.Empty,
-            FieldReferences: ImmutableArray<FieldReference>.Empty,
-            StateReferences: ImmutableArray<StateReference>.Empty,
-            EventReferences: ImmutableArray<EventReference>.Empty,
+            FieldReferences: ctx.FieldReferences.ToImmutableArray(),
+            StateReferences: ctx.StateReferences.ToImmutableArray(),
+            EventReferences: ctx.EventReferences.ToImmutableArray(),
             Diagnostics: ctx.Diagnostics.ToImmutableArray());
     }
 
@@ -878,13 +886,428 @@ internal static class TypeChecker
         return new TypedErrorExpression(postfix.Span);
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Pass 2 — transition row + event handler normalization (Slice 5)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Iterate all <see cref="ConstructKind.TransitionRow"/> constructs from the manifest,
+    /// resolve each to a <see cref="TypedTransitionRow"/>, and accumulate into <see cref="CheckContext.TransitionRows"/>.
+    /// Records <see cref="StateReference"/> and <see cref="EventReference"/> sites for LS navigation.
+    /// </summary>
+    private static void PopulateTransitionRows(ConstructManifest manifest, CheckContext ctx)
+    {
+        foreach (var construct in manifest.ByKind[ConstructKind.TransitionRow])
+        {
+            var row = NormalizeTransitionRow(construct, ctx);
+            ctx.TransitionRows.Add(row);
+        }
+
+        // D26: if any TypedErrorExpression in transition rows → at least one Error diagnostic must exist
+        Debug.Assert(
+            !ctx.TransitionRows.Any(r => ContainsErrorExpression(r)) ||
+            ctx.Diagnostics.Any(d => d.Severity == Severity.Error),
+            "D26: TypedErrorExpression present in transition rows but no Error-severity diagnostic emitted.");
+    }
+
+    /// <summary>
+    /// Iterate all <see cref="ConstructKind.EventHandler"/> constructs from the manifest,
+    /// resolve each to a <see cref="TypedEventHandler"/>, and accumulate into <see cref="CheckContext.EventHandlers"/>.
+    /// Records <see cref="EventReference"/> sites for LS navigation.
+    /// </summary>
+    private static void PopulateEventHandlers(ConstructManifest manifest, CheckContext ctx)
+    {
+        foreach (var construct in manifest.ByKind[ConstructKind.EventHandler])
+        {
+            var handler = NormalizeEventHandler(construct, ctx);
+            ctx.EventHandlers.Add(handler);
+        }
+
+        // D26: if any TypedErrorExpression in event handlers → at least one Error diagnostic must exist
+        Debug.Assert(
+            !ctx.EventHandlers.Any(h => h.Actions.Any(a => a is TypedInputAction ia && ContainsErrorExpressionInAction(ia))) ||
+            ctx.Diagnostics.Any(d => d.Severity == Severity.Error),
+            "D26: TypedErrorExpression present in event handlers but no Error-severity diagnostic emitted.");
+    }
+
     /// <summary>Normalize a transition row construct into a <see cref="TypedTransitionRow"/>.</summary>
-    private static TypedTransitionRow NormalizeTransitionRow(ParsedConstruct construct, CheckContext ctx) =>
-        throw new NotImplementedException("Slice 5");
+    private static TypedTransitionRow NormalizeTransitionRow(ParsedConstruct construct, CheckContext ctx)
+    {
+        // —— FromState resolution ——
+        var stateTargetSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
+        string? fromState = null;
+        if (stateTargetSlot is not null && stateTargetSlot.StateName is not null)
+        {
+            if (ctx.StateLookup.TryGetValue(stateTargetSlot.StateName, out var fromTypedState))
+            {
+                fromState = fromTypedState.Name;
+                ctx.StateReferences.Add(new StateReference(fromTypedState, stateTargetSlot.Span));
+            }
+            else
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.UndeclaredState, stateTargetSlot.Span, stateTargetSlot.StateName));
+            }
+        }
+        // StateName == null → any-state wildcard (D10): FromState stays null, no error
+
+        // —— Event resolution ——
+        var eventTargetSlot = construct.GetRequiredSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
+        string eventName = "";
+        TypedEvent? resolvedEvent = null;
+        if (eventTargetSlot.EventName is not null)
+        {
+            if (ctx.EventLookup.TryGetValue(eventTargetSlot.EventName, out var evTyped))
+            {
+                eventName = evTyped.Name;
+                resolvedEvent = evTyped;
+                ctx.EventReferences.Add(new EventReference(evTyped, eventTargetSlot.Span));
+            }
+            else
+            {
+                eventName = eventTargetSlot.EventName;
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.Span, eventTargetSlot.EventName));
+            }
+        }
+
+        // —— Set event args scope ——
+        IReadOnlyDictionary<string, TypedArg>? previousArgs = ctx.CurrentEventArgs;
+        if (resolvedEvent is not null)
+        {
+            ctx.CurrentEventArgs = resolvedEvent.Args
+                .ToFrozenDictionary(a => a.Name);
+        }
+
+        try
+        {
+            // —— Guard resolution ——
+            TypedExpression? guard = null;
+            var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+            if (guardSlot is not null)
+            {
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                guard = Resolve(guardSlot.Expression, ctx);
+            }
+
+            // —— Action chain resolution ——
+            var actionChainSlot = construct.GetSlot<ActionChainSlot>(ConstructSlotKind.ActionChain);
+            var actions = ImmutableArray<TypedAction>.Empty;
+            if (actionChainSlot is not null)
+            {
+                var builder = ImmutableArray.CreateBuilder<TypedAction>(actionChainSlot.Actions.Length);
+                foreach (var parsedAction in actionChainSlot.Actions)
+                    builder.Add(ResolveAction(parsedAction, ctx));
+                actions = builder.MoveToImmutable();
+            }
+
+            // —— Outcome resolution ——
+            var outcomeSlot = construct.GetSlot<OutcomeSlot>(ConstructSlotKind.Outcome);
+            TransitionRowOutcome outcome = TransitionRowOutcome.NoTransition;
+            string? targetState = null;
+            string? rejectReason = null;
+
+            if (outcomeSlot is not null)
+            {
+                switch (outcomeSlot.Outcome)
+                {
+                    case TransitionOutcome trans:
+                        outcome = TransitionRowOutcome.Transition;
+                        if (ctx.StateLookup.TryGetValue(trans.StateName, out var toTypedState))
+                        {
+                            targetState = toTypedState.Name;
+                            ctx.StateReferences.Add(new StateReference(toTypedState, trans.Span));
+                        }
+                        else
+                        {
+                            ctx.Diagnostics.Add(
+                                Diagnostics.Create(DiagnosticCode.UndeclaredState, trans.Span, trans.StateName));
+                        }
+                        break;
+                    case NoTransitionOutcome:
+                        outcome = TransitionRowOutcome.NoTransition;
+                        break;
+                    case RejectOutcome reject:
+                        outcome = TransitionRowOutcome.Reject;
+                        rejectReason = reject.Reason;
+                        break;
+                    case MalformedOutcome:
+                        outcome = TransitionRowOutcome.NoTransition;
+                        break;
+                }
+            }
+
+            return new TypedTransitionRow(
+                FromState: fromState,
+                EventName: eventName,
+                TargetState: targetState,
+                Guard: guard,
+                Actions: actions,
+                Outcome: outcome,
+                RejectReason: rejectReason,
+                ResultQualifier: null,
+                Syntax: construct);
+        }
+        finally
+        {
+            ctx.CurrentEventArgs = previousArgs;
+        }
+    }
 
     /// <summary>Normalize an event handler construct into a <see cref="TypedEventHandler"/>.</summary>
-    private static TypedEventHandler NormalizeEventHandler(ParsedConstruct construct, CheckContext ctx) =>
-        throw new NotImplementedException("Slice 5");
+    private static TypedEventHandler NormalizeEventHandler(ParsedConstruct construct, CheckContext ctx)
+    {
+        // —— Event resolution ——
+        var eventTargetSlot = construct.GetRequiredSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
+        string eventName = "";
+        TypedEvent? resolvedEvent = null;
+        if (eventTargetSlot.EventName is not null)
+        {
+            if (ctx.EventLookup.TryGetValue(eventTargetSlot.EventName, out var evTyped))
+            {
+                eventName = evTyped.Name;
+                resolvedEvent = evTyped;
+                ctx.EventReferences.Add(new EventReference(evTyped, eventTargetSlot.Span));
+            }
+            else
+            {
+                eventName = eventTargetSlot.EventName;
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.Span, eventTargetSlot.EventName));
+            }
+        }
+
+        // —— Set event args scope ——
+        IReadOnlyDictionary<string, TypedArg>? previousArgs = ctx.CurrentEventArgs;
+        if (resolvedEvent is not null)
+        {
+            ctx.CurrentEventArgs = resolvedEvent.Args
+                .ToFrozenDictionary(a => a.Name);
+        }
+
+        try
+        {
+            // —— Action chain resolution ——
+            var actionChainSlot = construct.GetSlot<ActionChainSlot>(ConstructSlotKind.ActionChain);
+            var actions = ImmutableArray<TypedAction>.Empty;
+            if (actionChainSlot is not null)
+            {
+                var builder = ImmutableArray.CreateBuilder<TypedAction>(actionChainSlot.Actions.Length);
+                foreach (var parsedAction in actionChainSlot.Actions)
+                    builder.Add(ResolveAction(parsedAction, ctx));
+                actions = builder.MoveToImmutable();
+            }
+
+            return new TypedEventHandler(
+                EventName: eventName,
+                Actions: actions,
+                Syntax: construct);
+        }
+        finally
+        {
+            ctx.CurrentEventArgs = previousArgs;
+        }
+    }
+
+    /// <summary>
+    /// Resolve a <see cref="ParsedAction"/> DU node into a <see cref="TypedAction"/> DU node.
+    /// Dispatches on the parsed action shape, resolves operand expressions, and applies the
+    /// <see cref="ActionSecondaryRole"/> invariant (D5): <c>SecondaryRole.HasValue == (SecondaryExpression != null)</c>.
+    /// </summary>
+    private static TypedAction ResolveAction(ParsedAction parsedAction, CheckContext ctx)
+    {
+        // Resolve the target field from the identifier expression
+        string fieldName = "";
+        TypeKind fieldType = TypeKind.Error;
+        var proofReqs = Actions.GetMeta(parsedAction.Kind).ProofRequirements;
+
+        switch (parsedAction)
+        {
+            case AssignAction assign:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(assign.Target, ctx);
+                var value = Resolve(assign.Value, ctx);
+                return new TypedInputAction(
+                    assign.Kind, fieldName, fieldType,
+                    InputExpression: value,
+                    SecondaryExpression: null,
+                    SecondaryRole: null,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: assign.Span);
+            }
+
+            case CollectionValueAction colVal:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(colVal.Target, ctx);
+                var value = Resolve(colVal.Value, ctx);
+                return new TypedInputAction(
+                    colVal.Kind, fieldName, fieldType,
+                    InputExpression: value,
+                    SecondaryExpression: null,
+                    SecondaryRole: null,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: colVal.Span);
+            }
+
+            case CollectionIntoAction colInto:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(colInto.Target, ctx);
+                string? binding = null;
+                if (colInto.IntoTarget is IdentifierExpression intoId)
+                    binding = intoId.Name;
+                return new TypedBindingAction(
+                    colInto.Kind, fieldName, fieldType,
+                    Binding: binding,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: colInto.Span);
+            }
+
+            case FieldOnlyAction fieldOnly:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(fieldOnly.Target, ctx);
+                return new TypedAction(
+                    fieldOnly.Kind, fieldName, fieldType,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: fieldOnly.Span);
+            }
+
+            case CollectionValueByAction colBy:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(colBy.Target, ctx);
+                var value = Resolve(colBy.Value, ctx);
+                var key = Resolve(colBy.OrderingKey, ctx);
+                // D5: SecondaryRole = Key, SecondaryExpression = key
+                Debug.Assert(key is not null, "D5: SecondaryExpression for CollectionValueBy must not be null");
+                return new TypedInputAction(
+                    colBy.Kind, fieldName, fieldType,
+                    InputExpression: value,
+                    SecondaryExpression: key,
+                    SecondaryRole: ActionSecondaryRole.Key,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: colBy.Span);
+            }
+
+            case InsertAtAction insertAt:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(insertAt.Target, ctx);
+                var value = Resolve(insertAt.Value, ctx);
+                var index = Resolve(insertAt.Index, ctx);
+                // D5: SecondaryRole = Index, SecondaryExpression = index
+                Debug.Assert(index is not null, "D5: SecondaryExpression for InsertAt must not be null");
+                return new TypedInputAction(
+                    insertAt.Kind, fieldName, fieldType,
+                    InputExpression: value,
+                    SecondaryExpression: index,
+                    SecondaryRole: ActionSecondaryRole.Index,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: insertAt.Span);
+            }
+
+            case RemoveAtAction removeAt:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(removeAt.Target, ctx);
+                var index = Resolve(removeAt.Index, ctx);
+                // RemoveAt has an index but no value — use TypedInputAction with index as primary
+                return new TypedInputAction(
+                    removeAt.Kind, fieldName, fieldType,
+                    InputExpression: index,
+                    SecondaryExpression: null,
+                    SecondaryRole: null,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: removeAt.Span);
+            }
+
+            case PutKeyValueAction put:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(put.Target, ctx);
+                var value = Resolve(put.Value, ctx);
+                var key = Resolve(put.Key, ctx);
+                // D5: SecondaryRole = Key, SecondaryExpression = key
+                Debug.Assert(key is not null, "D5: SecondaryExpression for PutKeyValue must not be null");
+                return new TypedInputAction(
+                    put.Kind, fieldName, fieldType,
+                    InputExpression: value,
+                    SecondaryExpression: key,
+                    SecondaryRole: ActionSecondaryRole.Key,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: put.Span);
+            }
+
+            case CollectionIntoByAction colIntoBy:
+            {
+                (fieldName, fieldType) = ResolveActionTarget(colIntoBy.Target, ctx);
+                string? binding = null;
+                if (colIntoBy.IntoTarget is IdentifierExpression intoId)
+                    binding = intoId.Name;
+                return new TypedBindingAction(
+                    colIntoBy.Kind, fieldName, fieldType,
+                    Binding: binding,
+                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    Span: colIntoBy.Span);
+            }
+
+            case MalformedAction malformed:
+            {
+                return new TypedAction(
+                    malformed.Kind, "", TypeKind.Error,
+                    ProofRequirements: ImmutableArray<ProofRequirement>.Empty,
+                    Span: malformed.Span);
+            }
+
+            default:
+                return new TypedAction(
+                    parsedAction.Kind, "", TypeKind.Error,
+                    ProofRequirements: ImmutableArray<ProofRequirement>.Empty,
+                    Span: parsedAction.Span);
+        }
+    }
+
+    /// <summary>
+    /// Resolve an action target expression (the field identifier) to its name and type.
+    /// Records a <see cref="FieldReference"/> if the field is found.
+    /// </summary>
+    private static (string FieldName, TypeKind FieldType) ResolveActionTarget(ParsedExpression target, CheckContext ctx)
+    {
+        if (target is IdentifierExpression id)
+        {
+            if (ctx.FieldLookup.TryGetValue(id.Name, out var field))
+            {
+                ctx.FieldReferences.Add(new FieldReference(field, id.Span));
+                return (field.Name, field.ResolvedType);
+            }
+
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.UndeclaredField, id.Span, id.Name));
+            return (id.Name, TypeKind.Error);
+        }
+
+        // Non-identifier target — resolve as expression for error reporting
+        var resolved = Resolve(target, ctx);
+        return ("", resolved.ResultType);
+    }
+
+    /// <summary>Check whether a transition row contains any <see cref="TypedErrorExpression"/>.</summary>
+    private static bool ContainsErrorExpression(TypedTransitionRow row)
+    {
+        if (row.Guard is TypedErrorExpression) return true;
+        foreach (var action in row.Actions)
+        {
+            if (action is TypedInputAction ia)
+            {
+                if (ia.InputExpression is TypedErrorExpression) return true;
+                if (ia.SecondaryExpression is TypedErrorExpression) return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Check whether a typed input action contains a <see cref="TypedErrorExpression"/>.</summary>
+    private static bool ContainsErrorExpressionInAction(TypedInputAction action)
+    {
+        if (action.InputExpression is TypedErrorExpression) return true;
+        if (action.SecondaryExpression is TypedErrorExpression) return true;
+        return false;
+    }
 
     /// <summary>Resolve a quantifier expression arm (push/pop binding stack).</summary>
     private static TypedExpression ResolveQuantifier(QuantifierExpression expr, CheckContext ctx) =>
@@ -1061,6 +1484,20 @@ internal static class TypeChecker
     /// </summary>
     private static TypedExpression ResolveMemberAccess(MemberAccessExpression expr, CheckContext ctx)
     {
+        // Qualified event arg reference: EventName.ArgName (§3.5 Event arg access)
+        if (expr.Target is IdentifierExpression eventId &&
+            ctx.EventLookup.TryGetValue(eventId.Name, out var ev))
+        {
+            var arg = ev.Args.FirstOrDefault(a =>
+                string.Equals(a.Name, expr.MemberName, StringComparison.Ordinal));
+            if (arg is not null)
+                return new TypedArgRef(arg.ResolvedType, ev.Name, arg.Name, expr.Span);
+
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.UndeclaredField, expr.Span, expr.MemberName));
+            return new TypedErrorExpression(expr.Span);
+        }
+
         var receiver = Resolve(expr.Target, ctx);
         if (receiver is TypedErrorExpression)
             return new TypedErrorExpression(expr.Span);
@@ -1230,8 +1667,144 @@ internal static class TypeChecker
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>Validate modifier applicability, conflicts, and subsumption for all fields and states.</summary>
-    private static void ValidateModifiers(CheckContext ctx) =>
-        throw new NotImplementedException("Slice 7");
+    private static void ValidateModifiers(CheckContext ctx)
+    {
+        foreach (var field in ctx.Fields)
+        {
+            if (field.ResolvedType == TypeKind.Error) continue;
+            ValidateFieldModifiers(field.Modifiers, field.ResolvedType, field.ImpliedModifiers,
+                field.IsComputed, field.Syntax.Span, field.Name, isEventArg: false, ctx);
+        }
+
+        foreach (var evt in ctx.Events)
+        {
+            foreach (var arg in evt.Args)
+            {
+                if (arg.ResolvedType == TypeKind.Error) continue;
+                ValidateFieldModifiers(arg.Modifiers, arg.ResolvedType, ImmutableArray<ModifierKind>.Empty,
+                    isComputed: false, arg.Span, arg.Name, isEventArg: true, ctx);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Catalog-driven modifier validation for a single field or event arg declaration.
+    /// Checks applicability, duplicates, mutual exclusivity, subsumption, redundancy with
+    /// implied modifiers, and writable restrictions.
+    /// </summary>
+    private static void ValidateFieldModifiers(
+        ImmutableArray<ModifierKind> modifiers,
+        TypeKind resolvedType,
+        ImmutableArray<ModifierKind> impliedModifiers,
+        bool isComputed,
+        SourceSpan span,
+        string declarationName,
+        bool isEventArg,
+        CheckContext ctx)
+    {
+        var seen = new HashSet<ModifierKind>();
+
+        for (int i = 0; i < modifiers.Length; i++)
+        {
+            var kind = modifiers[i];
+            var meta = Modifiers.GetMeta(kind);
+
+            // Duplicate check
+            if (!seen.Add(kind))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.DuplicateModifier, span, meta.Token.Text));
+                continue;
+            }
+
+            // Only FieldModifierMeta modifiers are valid on fields/args
+            if (meta is not FieldModifierMeta fieldMeta)
+                continue;
+
+            // Applicability: empty ApplicableTo = any type; otherwise check membership
+            if (fieldMeta.ApplicableTo.Length > 0 &&
+                !IsTypeApplicable(fieldMeta.ApplicableTo, resolvedType, modifiers))
+            {
+                var typeName = Types.GetMeta(resolvedType).DisplayName;
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.InvalidModifierForType, span, meta.Token.Text, typeName));
+            }
+
+            // Mutual exclusivity
+            foreach (var conflict in meta.MutuallyExclusiveWith)
+            {
+                if (seen.Contains(conflict))
+                {
+                    var conflictMeta = Modifiers.GetMeta(conflict);
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.InvalidModifierForType, span,
+                            meta.Token.Text, $"it conflicts with '{conflictMeta.Token.Text}'"));
+                }
+            }
+
+            // Subsumption: if another explicit modifier already subsumes this one
+            foreach (var other in seen)
+            {
+                if (other == kind) continue;
+                var otherMeta = Modifiers.GetMeta(other);
+                if (otherMeta is FieldModifierMeta otherField && otherField.Subsumes.Contains(kind))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                            meta.Token.Text, otherMeta.Token.Text));
+                }
+            }
+
+            // Redundancy with implied modifiers (type already implies this modifier)
+            if (impliedModifiers.Contains(kind))
+            {
+                var typeName = Types.GetMeta(resolvedType).DisplayName;
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                        meta.Token.Text, typeName));
+            }
+
+            // Writable on event arg
+            if (kind == ModifierKind.Writable && isEventArg)
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.WritableOnEventArg, span, declarationName));
+            }
+
+            // Writable on computed field
+            if (kind == ModifierKind.Writable && isComputed)
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, span, declarationName));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Check whether a resolved type matches any entry in a modifier's ApplicableTo array.
+    /// Handles both simple <see cref="TypeTarget"/> and <see cref="ModifiedTypeTarget"/> entries.
+    /// </summary>
+    private static bool IsTypeApplicable(TypeTarget[] applicableTo, TypeKind resolvedType, ImmutableArray<ModifierKind> modifiers)
+    {
+        foreach (var target in applicableTo)
+        {
+            // Kind == null means "any type" within the target
+            if (target.Kind is null || target.Kind == resolvedType)
+            {
+                if (target is ModifiedTypeTarget modified)
+                {
+                    // All required modifiers must be present
+                    if (modified.RequiredModifiers.All(m => modifiers.Contains(m)))
+                        return true;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     /// <summary>
     /// Structural validation sub-pass: computed-field cycle detection and
