@@ -149,15 +149,15 @@ public sealed class Precept
     public EventOutcome Create(Action<IArgBuilder>? args = null);
     public EventInspection InspectCreate(Action<IArgBuilder>? args = null);
 
-    // Entity restoration — JSON only (no typed overload for FromJson)
-    public Version FromJson(JsonElement document);
+    // Entity restoration — JSON only (no typed overload)
+    public RestoreOutcome Restore(string? state, JsonElement fields);
 
     // Definition-level queries (structural — precomputed from graph analysis)
-    public IReadOnlyList<string> States { get; }
+    public IReadOnlyList<StateDescriptor> States { get; }
     public IReadOnlyList<FieldDescriptor> Fields { get; }
     public IReadOnlyList<EventDescriptor> Events { get; }
-    public string? InitialState { get; }
-    public string? InitialEvent { get; }             // null = no initial event, args optional
+    public StateDescriptor? InitialState { get; }
+    public EventDescriptor? InitialEvent { get; }        // null = no initial event, args optional
     public bool IsStateless { get; }
 
     // Constraint catalog (Tier 1 — all declared constraints)
@@ -170,8 +170,8 @@ public sealed class Precept
 - **Definition-level queries are structural.** They are precomputed from graph analysis during construction. No evaluator involved — zero runtime cost.
 - **Single `Precept` per definition.** Thread-safe, shareable, cacheable. Mirrors CEL's `Program` (one compiled program evaluated against many activations) and OPA's `PreparedEvalQuery`.
 - **Construction mirrors operations.** `Create` / `InspectCreate` parallel `Version.Fire` / `Version.InspectFire`. Same pipeline, same outcome types, same pattern matching. No special construction path.
-- **`InitialEvent` nullable.** `null` means no initial event is declared — `Create()` builds from defaults (always `Applied`). Non-null means the initial event fires atomically during construction. The compiler ensures (`RequiredFieldsNeedInitialEvent`/`InitialEventMissingAssignments`) that this is coherent.
-- **`InitialState` nullable.** `null` for stateless precepts.
+- **`InitialEvent` nullable.** `null` means no initial event is declared — `Create()` builds from defaults (always `Applied`). Non-null (`EventDescriptor`) means the initial event fires atomically during construction. The compiler ensures (`RequiredFieldsNeedInitialEvent`/`InitialEventMissingAssignments`) that this is coherent.
+- **`InitialState` nullable.** `null` for stateless precepts; otherwise a `StateDescriptor`.
 - **Constraint catalog is definition-level.** `Precept.Constraints` exposes every declared constraint (rules, state ensures, event ensures) with full metadata: kind, scope, anchor, `because` rationale, referenced fields, guard presence. This is the full catalog — unfiltered by state. Callers use it for definition-level introspection (e.g., "what rules does this precept declare?").
 
 ---
@@ -179,32 +179,22 @@ public sealed class Precept
 ## Restoration
 
 ```csharp
-// Hydration from persisted storage — returns Version directly
-Version version = precept.FromJson(document);
+// Restore from persisted state — returns structured RestoreOutcome
+RestoreOutcome outcome = precept.Restore(state: "Pending", fields: storedJsonElement);
 
-// Persistence — produce the storage envelope
-JsonElement document = version.ToJson();
+Version version = outcome switch
+{
+    Restored r                      => r.Result,
+    RestoreConstraintsFailed f      => HandleSchemaDrift(f.Violations),
+    RestoreInvalidInput e           => throw new ArgumentException(e.Reason),
+};
 ```
 
-`FromJson` is hydration from persisted storage. It is not a validated business operation — it is the inverse of `ToJson()`, forming a round-trip contract. No constraint validation occurs.
+`Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately, recomputes computed fields, and evaluates constraints against the restored state.
 
-**Document envelope:** The input must be a JSON object containing:
-- `$precept` (string, required) — must match `precept.Name` exactly (case-sensitive)
-- `fields` (object, required) — field values keyed by field name
-- `$state` (string, optional) — the state name; absent or `null` for stateless precepts
+> ⚠️ **Design note:** The implementation diverges from the original `FromJson` design in two ways: (1) the method is `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — rather than a single `FromJson(JsonElement document)` accepting an envelope object; (2) it returns a structured `RestoreOutcome` (including `RestoreConstraintsFailed` for schema drift) rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
 
-Unknown `$`-prefixed properties (e.g., `$version`, `$timestamp`) are silently ignored — this enables forward-compatible storage schemas.
-
-**Throws `ArgumentException` on programmer errors:**
-- `$precept` does not match the precept name
-- `$state` names an unknown state
-- Required fields are missing or have invalid types
-
-**Why no constraint validation:** Restoration is not a business transaction. Data was committed when it satisfied the rules in effect at that time. The definition may have evolved since — constraint validation on restore would block all existing data on every schema change, making evolution impossible. Callers who need to validate restored state should call `version.InspectFire` or `version.InspectUpdate` after restoration.
-
-**Access modes are bypassed.** Fields that are `readonly` in the restored state were `editable` when previously written. `FromJson` accepts all stored fields regardless of the current state's access declarations.
-
-**Round-trip contract:** `precept.FromJson(version.ToJson())` must produce a semantically identical `Version` (same state, same field values). The runtime guarantees this for documents it produced — callers must not modify the envelope between `ToJson()` and `FromJson()`.
+**Access modes are bypassed.** Fields that are `readonly` in the restored state were `editable` when previously written. `Restore` accepts all stored fields regardless of the current state's access declarations.
 
 ---
 
@@ -228,7 +218,7 @@ public sealed record Version
 
     // Structural queries (precomputed — zero evaluation cost)
     public IReadOnlyList<EventDescriptor> AvailableEvents { get; }           // events with rows in current state
-    public IReadOnlyList<ArgDescriptor> RequiredArgs(string eventName); // typed arg descriptors per arg
+    public IReadOnlyList<ArgDescriptor> RequiredArgs(EventDescriptor @event); // typed arg descriptors per arg
 
     // Applicable constraints (Tier 2 — filtered for current state)
     public IReadOnlyList<ConstraintDescriptor> ApplicableConstraints { get; }
@@ -335,7 +325,7 @@ All three tiers use `ConstraintDescriptor` as the canonical identity. Tier 3 res
 #### ConstraintDescriptor
 
 ```csharp
-public enum ConstraintKind { Rule, StateEnsureIn, StateEnsureTo, StateEnsureFrom, EventEnsure }
+public enum ConstraintKind { Invariant = 1, StateResident = 2, StateEntry = 3, StateExit = 4, EventPrecondition = 5 }
 
 public sealed record ConstraintDescriptor(
     ConstraintKind Kind,
@@ -414,10 +404,10 @@ For stateless precepts, `ApplicableConstraints` includes all global rules and al
 ```csharp
 public sealed record FieldAccessInfo(
     FieldDescriptor Field,
-    FieldAccessMode Mode,       // Readonly or Editable
-    JsonElement CurrentValue);
+    FieldAccessMode Mode,
+    object? CurrentValue);
 
-public enum FieldAccessMode { Readonly, Editable }
+public enum FieldAccessMode { Read, Write }
 ```
 
 Returned by `Version.FieldAccess`. Lists every non-omitted field in the current state with its access mode and current value. `Omit`ted fields are structurally absent — they don't appear in this list.
@@ -425,10 +415,10 @@ Returned by `Version.FieldAccess`. Lists every non-omitted field in the current 
 #### ArgDescriptor
 
 ```csharp
-public sealed record ArgDescriptor(string Name, string Type, bool IsOptional, int SlotIndex);
+public sealed record ArgDescriptor(string Name, TypeKind Type, bool IsOptional, string? DefaultExpression, int SourceLine);
 ```
 
-Returned by `Version.RequiredArgs(eventName)`. Enables the UI to render typed input controls for event arguments.
+Returned by `Version.RequiredArgs(EventDescriptor @event)`. Enables the UI to render typed input controls for event arguments.
 
 ### Ingress Types
 

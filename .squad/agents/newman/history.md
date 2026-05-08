@@ -15,6 +15,12 @@
 
 - PRECEPT0024 anti-mirroring enforcement: `RegisterOperationAction` on `OperationKind.PropertyReference` is the cleanest Roslyn hook for guarding member access. Namespace-qualified type resolution prevents false positives on unrelated types sharing a property name. Walking `ContainingSymbol` up through nested types handles lambdas, local functions, and inner classes correctly.
 
+- Runtime doc accuracy gap: design docs (result-types.md, runtime-api.md, evaluator.md) describe the TARGET API, but code stubs deviated in several places. Key divergences to watch: EventOutcome/UpdateOutcome naming (nested vs flat, variant names), FieldAccessMode values (Read/Write vs Readonly/Editable), FromJson→Restore API shape change, ConstraintKind enum naming. All divergences documented in inbox.
+- Restoration design changed significantly from the original `FromJson` design: the implementation chose `Restore(string? state, JsonElement fields) → RestoreOutcome` over `FromJson(JsonElement) → Version (throws)`. The structured `RestoreConstraintsFailed` variant captures schema-drift scenarios the original design silently skipped.
+- The 5 non-ping MCP tools have zero implementation — no stubs, no DTOs, no handlers. "Stubbed" in the doc was inaccurate; corrected.
+- `ConstraintKind` enum names in the runtime docs were stale aliases that never matched the actual Language catalog names (`Invariant/StateResident/StateEntry/StateExit/EventPrecondition`).
+- Descriptor types (`FieldDescriptor`, `ArgDescriptor`, etc.) are fully implemented in `Descriptors.cs` — the doc was still saying "Planned". Also, `ClrType` and `SlotIndex` on `ArgDescriptor` described in the doc never made it into the implementation.
+
 ## Recent Updates
 
 ### 2026-05-07 — PRECEPT0024 anti-mirroring enforcement landed

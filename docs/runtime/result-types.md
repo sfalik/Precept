@@ -288,7 +288,7 @@ public sealed record Version
     public T Get<T>(string fieldName);
     public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }
     public IReadOnlyList<EventDescriptor> AvailableEvents { get; }
-    public IReadOnlyList<ArgDescriptor> RequiredArgs(string eventName);
+    public IReadOnlyList<ArgDescriptor> RequiredArgs(EventDescriptor @event);
     public IReadOnlyList<ConstraintDescriptor> ApplicableConstraints { get; }
 
     // Commit — JSON lane (wire callers)
@@ -306,16 +306,13 @@ public sealed record Version
     // Inspect — typed lane
     public EventInspection  InspectFire(string eventName, Action<IArgBuilder>? args = null);
     public UpdateInspection InspectUpdate(Action<IFieldBuilder>? fields = null);
-
-    // Persistence
-    public JsonElement ToJson();
 }
 
-public sealed record FieldAccessInfo(FieldDescriptor Field, FieldAccessMode Mode, JsonElement CurrentValue);
-public enum FieldAccessMode { Readonly, Editable }
+public sealed record FieldAccessInfo(FieldDescriptor Field, FieldAccessMode Mode, object? CurrentValue);
+public enum FieldAccessMode { Read, Write }
 ```
 
-**Two lanes for commit and inspect:** Every operation has a JSON lane (`JsonElement?`) for wire callers and a typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) for in-process callers. There are no `IReadOnlyDictionary<string, object?>` overloads. **`FromJson` is JSON-only** — no typed overload; restoration is a hydration path from persisted storage.
+**Two lanes for commit and inspect:** Every operation has a JSON lane (`JsonElement?`) for wire callers and a typed lane (`Action<IArgBuilder>?` / `Action<IFieldBuilder>?`) for in-process callers. There are no `IReadOnlyDictionary<string, object?>` overloads. **`Restore` is JSON-only** — no typed overload; restoration is a hydration path from persisted storage.
 
 **Four commit/inspect pairs, consistent naming:** Every commit verb (`Fire`, `Update`) has an `Inspect___` counterpart. Fire/Update require complete input and return one committed outcome. InspectFire/InspectUpdate accept optional partial input and return an annotated landscape.
 

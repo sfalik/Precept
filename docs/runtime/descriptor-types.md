@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Stub |
-| Implementation state | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` defined in `Descriptors.cs`; `ConstraintDescriptor` in `SharedTypes.cs`. Builder population pending (R3/R6). |
+| Implementation state | Implemented — `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` defined in `Descriptors.cs`; `ConstraintDescriptor` in `SharedTypes.cs`. Builder population pending (R3/R6). |
 | Source | `src/Precept/Runtime/Descriptors.cs`, `src/Precept/Runtime/SharedTypes.cs` |
 | Upstream | Precept Builder (constructs descriptors), SemanticIndex (source shapes) |
 | Downstream | All runtime operations, Precept structural query API, Version API, MCP DTOs |
@@ -59,8 +59,7 @@ sealed record FieldDescriptor(
     IReadOnlyList<ModifierKind> Modifiers,
     string? DefaultExpression,
     bool IsComputed,
-    int SourceLine,
-    Type ClrType);       // resolved at Precept Builder time; IReadOnlyList<T> for collection-typed fields
+    int SourceLine);
 
 // State descriptor — carries modifier set for dispatch decisions
 sealed record StateDescriptor(
@@ -75,15 +74,13 @@ sealed record EventDescriptor(
     IReadOnlyList<ArgDescriptor> Args,
     int SourceLine);
 
-// Arg descriptor — carries type, optionality, and arg slot index for evaluator access
+// Arg descriptor — carries type, optionality, and default expression
 sealed record ArgDescriptor(
     string Name,
     TypeKind Type,
     bool IsOptional,
-    int SlotIndex,
     string? DefaultExpression,
-    int SourceLine,
-    Type ClrType);       // resolved at Precept Builder time
+    int SourceLine);
 
 // FaultSiteDescriptor — planted by builder, read by evaluator backstops
 sealed record FaultSiteDescriptor(
@@ -157,9 +154,7 @@ Descriptors are the "no string aliasing" principle applied at the runtime API bo
 
 ## Notes
 
-`ClrType` on `FieldDescriptor` and `ArgDescriptor` is `System.Type` — the CLR projection valid for `Get<T>()` / `Set<T>()`. For collection-typed fields, `FieldDescriptor.ClrType` encodes the full constructed generic type (e.g., `typeof(IReadOnlyList<long>)` for `list of integer`). Resolved at Precept Builder time from `TypeMeta.ClrType` plus collection wrapping. See `runtime-api.md` § Typed Lane for the complete valid-`T` table.
-
-`ConstraintDescriptor` exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy will replace it when the constraint evaluation attribution model is implemented.
+`ConstraintDescriptor`exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy will replace it when the constraint evaluation attribution model is implemented.
 
 ---
 
@@ -184,7 +179,7 @@ Descriptors are the "no string aliasing" principle applied at the runtime API bo
 
 | File | Purpose |
 |---|---|
-| `src/Precept/Runtime/Descriptors.cs` | Planned — all 5 missing descriptor sealed records |
+| `src/Precept/Runtime/Descriptors.cs` | Implemented — all 5 descriptor sealed records |
 | `src/Precept/Runtime/SharedTypes.cs` | Contains existing `ConstraintDescriptor` |
 | `src/Precept/Runtime/Precept.cs` | Structural query surfaces to update to descriptor types |
 | `src/Precept/Runtime/Version.cs` | API surfaces to update to descriptor types |

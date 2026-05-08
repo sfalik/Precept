@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Partial (`precept_ping` implemented; other tools stubbed awaiting pipeline/evaluator) |
+| Implementation state | Partial (`precept_ping` implemented; `precept_language`, `precept_compile`, `precept_inspect`, `precept_fire`, `precept_update` not yet implemented — awaiting compiler pipeline and evaluator) |
 | Source | `tools/Precept.Mcp/` |
 | Upstream | Compiler (`Compilation`), Runtime (`Precept` + `Version`), Catalogs |
 | Downstream | AI agents, Copilot, developer workflow |
