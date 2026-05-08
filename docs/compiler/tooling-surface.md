@@ -5,12 +5,12 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Grammar is hand-crafted (designed: catalog-driven generation); catalog metadata infrastructure ready (`TokenMeta.TextMateScope` and `SemanticTokenType` populated on all ~90 tokens, M7+M8); all LS features (semantic tokens, completions, hover, go-to-definition) pending LS handler implementation |
-| Source | `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` (currently hand-crafted), `tools/Precept.LanguageServer/` |
+| Implementation state | Grammar generator is implemented in `tools/Precept.GrammarGen/`; `precept.tmLanguage.json` is now catalog-generated; LS features (semantic tokens, completions, hover, go-to-definition) remain in the implementation states documented below |
+| Source | `tools/Precept.GrammarGen/`, `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`, `tools/Precept.LanguageServer/` |
 | Upstream | Catalog metadata (Tokens, Types, Constructs, Operators, Actions, Modifiers) |
 | Downstream | VS Code syntax highlighting, LS semantic tokens, LS completions, LS hover |
 
-**Implementation Note:** The stub document stated "Grammar generator implemented" — this is aspirational. The current `precept.tmLanguage.json` (23.9KB) is **hand-crafted** with patterns like `machineDeclaration`, `stateDeclaration`, `fieldCollectionDeclaration` that do not derive from catalog metadata. The grammar generator does not exist. This document describes the **designed** state where all editor artifacts derive from catalogs.
+**Implementation Note:** The grammar generator is now implemented in `tools/Precept.GrammarGen/`, and `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` is generated from catalog metadata. This document still distinguishes shipped grammar generation from LS features that remain partial or pending.
 
 ---
 
@@ -27,7 +27,7 @@ The central architectural principle: **every editor-facing artifact derives from
 
 | Surface | Execution Time | Input | Output |
 |---|---|---|---|
-| TextMate grammar | Build (extension `npm run` pipeline) | `Tokens`, `Types`, `Operators` catalogs | `precept.tmLanguage.json` |
+| TextMate grammar | Build (grammar regeneration task / extension packaging) | `Tokens`, `Types`, `Operators` catalogs | `precept.tmLanguage.json` |
 | Semantic tokens | LSP request | `TokenStream` + `TokenMeta`, `SemanticIndex` | LSP `SemanticTokens` response |
 | Completions | LSP request | Catalogs + `ConstructManifest` cursor context + `SemanticIndex` | LSP `CompletionItem[]` response |
 | Hover | LSP request | `SemanticIndex` + catalog documentation | LSP `Hover` response |
@@ -147,7 +147,7 @@ If any of these require manual tooling changes, the design is violated. The sing
 
 - **File:** `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`
 - **Format:** TextMate grammar JSON with `$schema`, `name`, `scopeName`, `patterns`, and `repository` sections
-- **Header:** Generated file includes `// AUTO-GENERATED — do not edit. Run 'npm run generate-grammar' to regenerate.`
+- **Header:** The generated file currently emits plain JSON with no `_comment` header; regenerate it with the VS Code task `grammar: regenerate`
 
 ### LS Features (Request Time)
 
@@ -197,7 +197,7 @@ If any of these require manual tooling changes, the design is violated. The sing
 │  TIME    ▼           ▼           ▼            │           │           │          │
 │      ┌───────────────────────────────────┐   │           │           │          │
 │      │       Grammar Generator           │   │           │           │          │
-│      │  (npm run generate-grammar)       │   │           │           │          │
+│      │  (task: grammar: regenerate)      │   │           │           │          │
 │      └─────────────────┬─────────────────┘   │           │           │          │
 │                        │                      │           │           │          │
 │                        ▼                      │           │           │          │
@@ -367,20 +367,15 @@ FOR EACH TokenCategory c IN [Declaration, Control, Type, Action, Outcome, Operat
 
 #### Build Integration
 
-The grammar generator runs as part of the extension build:
+The grammar generator is implemented as a standalone .NET tool and is regenerated through the canonical VS Code task:
 
 ```bash
-# From package.json scripts
-npm run generate-grammar  # Runs generator, outputs to syntaxes/precept.tmLanguage.json
-npm run compile           # TypeScript compilation (after grammar generation)
-npm run package:local     # Package VSIX
+# VS Code tasks / commands
+Task: grammar: regenerate  # Runs tools/Precept.GrammarGen, outputs to syntaxes/precept.tmLanguage.json
+Task: extension: install   # Repackage + install VSIX after grammar changes
 ```
 
-> **Open Question (unresolved):** The grammar generator does not currently exist. Should it be:
-> - A TypeScript script (`tools/Precept.VsCode/scripts/generate-grammar.ts`) that imports catalog data from a JSON export?
-> - A .NET tool (`dotnet run --project tools/Precept.GrammarGenerator`) that reads catalogs directly?
-> 
-> The TypeScript approach requires a catalog export step; the .NET approach is more direct but adds build complexity.
+> **Resolved:** The shipped generator is the .NET tool at `tools/Precept.GrammarGen/Program.cs`, which reads catalog metadata from the compiled assembly and writes `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`.
 
 ### 7.2 Semantic Token Two-Pass Design
 
@@ -770,12 +765,12 @@ string FormatEventHover(TypedEvent evt)
 
 | Failure Mode | Cause | Recovery |
 |---|---|---|
-| Generator script not found | Missing `npm run generate-grammar` script | Build fails with clear error; no partial output |
+| Grammar regeneration task unavailable | Missing `grammar: regenerate` task or `tools/Precept.GrammarGen/` project | Regeneration fails clearly; no partial output |
 | Catalog read failure | .NET build error in `src/Precept/` | Build fails before grammar generation |
 | Invalid regex pattern | Token text with unescaped regex metacharacters | Generator escapes all token text via `Regex.Escape()` |
 | File write failure | Permission issue or locked file | Build fails; retry after fixing permissions |
 
-**Constraint:** Grammar generation is a build-time tool — failures are build failures, not runtime failures. The extension never runs with a stale grammar because the grammar is regenerated on every build.
+**Constraint:** Grammar generation is a build-time tool — failures are build failures, not runtime failures. The extension should be repackaged from freshly regenerated grammar output, not from hand-edited JSON.
 
 ### Semantic Token Failures
 
@@ -829,9 +824,9 @@ string FormatEventHover(TypedEvent evt)
 
 | Contract | Guarantee |
 |---|---|
-| **Catalog derivation** | Every pattern in `precept.tmLanguage.json` derives from a catalog entry with `TextMateScope != null`. No patterns exist that are not in a catalog. |
-| **Completeness** | Every `TokenKind` in `Tokens.All` with `TextMateScope != null` appears in the generated grammar. |
-| **No manual editing** | The grammar file is always overwritten on build. Manual edits are lost. A header comment warns: `// AUTO-GENERATED — do not edit.` |
+| **Catalog derivation** | Every pattern in `precept.tmLanguage.json` derives from catalog metadata (`Tokens.All`, modifier metadata, or construct metadata). No parallel hand-authored keyword list exists. |
+| **Completeness** | Every `TokenKind` in `Tokens.All` with `TextMateScope != null` appears in the generated grammar, alongside catalog-driven construct and message-position patterns. |
+| **No manual editing** | The grammar file is regenerated from catalogs via `grammar: regenerate`. Manual edits are replaced on regeneration. |
 | **Idempotence** | Running the generator twice with unchanged catalogs produces identical output. |
 
 ### Semantic Token Contracts
@@ -1000,6 +995,8 @@ The dev-build shadow copy mode with file watching creates a tight development lo
 4. LS auto-restarts with new code
 5. No window reload, no extension reinstall
 
+Grammar changes are different: regenerate with `grammar: regenerate`, then run `extension: install` and reload the VS Code window. The shadow-copy loop applies to LS binaries, not the packaged grammar asset.
+
 **Innovation:** Sub-second feedback for language server development.
 
 ---
@@ -1012,8 +1009,8 @@ This document describes the **designed** state. Current implementation differs i
 
 | Component | Designed State | Current Implementation State |
 |---|---|---|
-| TextMate grammar | Generated from catalogs | **Hand-crafted** (23.9KB with patterns like `machineDeclaration`, `stateDeclaration`) |
-| Grammar generator | TypeScript or .NET tool | **Does not exist** |
+| TextMate grammar | Generated from catalogs | ✅ Implemented |
+| Grammar generator | TypeScript or .NET tool | ✅ Implemented as `tools/Precept.GrammarGen/` (.NET tool) |
 | Semantic tokens Pass 1 | Reads `TokenMeta.SemanticTokenType` | Implemented |
 | Semantic tokens Pass 2 | Reads `SemanticIndex` | **Blocked on TypeChecker** |
 | Completions | Catalog-driven with `SlotContext` | Partially implemented (basic keyword completions) |
@@ -1022,41 +1019,11 @@ This document describes the **designed** state. Current implementation differs i
 
 ### Open Questions
 
-> **Open Question (unresolved):** Should the grammar generator be a TypeScript script or a .NET tool?
-> 
-> **TypeScript approach:**
-> - Fits naturally in `npm run` build pipeline
-> - Requires catalog data export (JSON file or build-time generation)
-> - Extension build is self-contained
-> 
-> **.NET approach:**
-> - Can read `Tokens.All` directly from compiled assembly
-> - No separate export step
-> - Adds .NET dependency to extension build
-> 
-> Recommendation: Start with .NET tool for directness; consider TypeScript if build complexity becomes problematic.
-
-> **Open Question (unresolved):** How should complex TextMate patterns (multi-line, nested scopes) be represented in catalog metadata?
-> 
-> The current hand-crafted grammar has patterns like `machineDeclaration` that span multiple captures and reference other patterns. A simple "token → scope" mapping may be insufficient.
-> 
-> Options:
-> 1. Extend `TokenMeta` with optional `TextMatePatternJson` for complex cases
-> 2. Generate simple patterns from catalogs, hand-maintain complex patterns in a separate file merged at build time
-> 3. Use `Constructs.All` to generate structural patterns with slot-level scopes
-> 
-> Recommendation: Option 3 aligns best with catalog-driven architecture but requires construct-level grammar generation design.
+Open questions from this section have been resolved. See `docs/compiler/grammar-generator.md` for the generator design.
 
 ### Implementation Notes
 
-1. **Grammar file header:** When the generator is implemented, add this comment header to the generated file:
-   ```json
-   {
-     "_comment": "AUTO-GENERATED by tools/Precept.GrammarGenerator — do not edit manually. Run 'npm run generate-grammar' to regenerate.",
-     "$schema": "...",
-     ...
-   }
-   ```
+1. **Grammar file header:** The shipped generated file currently does **not** include a `_comment` field. Regeneration is done through the VS Code task `grammar: regenerate`, which runs `dotnet run --project tools/Precept.GrammarGen -- --output tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`.
 
 2. **CI check:** Add a CI step that regenerates the grammar and fails if it differs from the committed file. This catches manual edits.
 
@@ -1117,10 +1084,10 @@ This document describes the **designed** state. Current implementation differs i
 
 **Excluded:** Manual edits to `precept.tmLanguage.json`.
 
-**Rationale:** The grammar is a build output. Manual edits are overwritten on every build. The grammar cannot drift from the catalog because it is regenerated from the catalog.
+**Rationale:** The grammar is a build output. Manual edits are replaced on regeneration. The grammar cannot drift from the catalog because it is regenerated from the catalog.
 
 **Enforcement:**
-- Header comment: `// AUTO-GENERATED — do not edit`
+- VS Code task: `grammar: regenerate`
 - CI check: regenerate and diff, fail if different
 
 ### E3: No Speculative Semantic Classifications
@@ -1189,7 +1156,7 @@ This document describes the **designed** state. Current implementation differs i
 |---|---|
 | `tools/Precept.VsCode/src/extension.ts` | Extension host: LS launch, preview panel, commands |
 | `tools/Precept.VsCode/package.json` | VS Code manifest: grammars, semantic token types, commands |
-| `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` | TextMate grammar (currently hand-crafted) |
+| `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` | TextMate grammar (generated, catalog-driven) |
 | `tools/Precept.VsCode/language-configuration.json` | Bracket matching, comment toggling |
 
 ---
@@ -1200,8 +1167,8 @@ This document describes the **designed** state. Current implementation differs i
 
 | File | Purpose | Status |
 |---|---|---|
-| `tools/Precept.GrammarGenerator/` | Grammar generator tool (reads catalogs, emits tmLanguage.json) | **Not yet implemented** |
-| `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` | TextMate grammar (should be generated, currently hand-crafted) | **Hand-crafted** (23.9KB) |
+| `tools/Precept.GrammarGen/` | Grammar generator tool (reads catalogs, emits tmLanguage.json) | **Implemented** |
+| `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` | TextMate grammar (generated from catalogs) | **Generated (catalog-driven)** |
 
 ### Catalog Metadata (Input to Tooling Surface)
 

@@ -12,6 +12,9 @@
 - Tooling consumption is layered: TokenStream for lexical work, ConstructManifest for syntax, SymbolTable for name-aware features, and SemanticIndex for semantic features.
 - Event coverage remains a structural graph concern; guard-conditioned reachability belongs to the proof engine.
 - ProofEngine satisfiability can stay compile-time and bounded: default expressions plus ensure conditions already exist as `TypedExpression` trees, so many initial-state violations can be discharged without evaluator coupling.
+- tooling-surface.md updated to reflect shipped grammar generator
+- CONTRIBUTING.md reload rules updated with grammar: regenerate step
+- Key decision: .NET tool approach confirmed, Constructs-based complex pattern resolution confirmed
 
 ## Recent Updates
 

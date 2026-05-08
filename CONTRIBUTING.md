@@ -330,6 +330,7 @@ Do not let these files drift into separate hand-authored contracts. Both `.vscod
 | What you changed | Command | Reload VS Code? |
 |------------------|---------|------------------|
 | C# runtime or language server | `Ctrl+Shift+B` (Build task) | No |
+| Catalog metadata (grammar changes) | Task: `grammar: regenerate`, then Task: `extension: install` | Yes |
 | TypeScript, webview, or syntax | Task: `extension: install` | Yes |
 | Agent or skill markdown | Reload Window | Yes |
 | MCP server | Reload Window | Lazy rebuild on next tool call |
