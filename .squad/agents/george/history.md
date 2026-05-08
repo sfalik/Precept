@@ -12,7 +12,50 @@
 
 ## Learnings
 
+### 2026-05-07T21:00:00Z — Slice 4: TypedConstants + Context-Sensitive Resolution shipped
 
+- Commit: `ac95de2`. Methods: `ResolveTypedConstant`, `ValidateContent`, `ValidateNodaTime`, `ValidateClosedSet`, `ValidateRegex`, `TryContextRetryBinaryOp`, `TryContextRetryOverload`.
+- DiagnosticCodes used: `UnresolvedTypedConstant` (52), `InvalidTypedConstantContent` (53).
+- ContentValidation DU (prerequisite C1) landed in same commit: `ContentValidation` abstract record → `RegexValidation`, `NodaTimeValidation`, `ClosedSetValidation` subtypes. Added `ContentValidation?` field to `TypeMeta`.
+- Populated on: Date (NodaTime ISO), Time (NodaTime ExtendedIso), DateTime (NodaTime ExtendedIso), Period (NodaTime NormalizingIso), Currency (ISO 4217 ClosedSet), UnitOfMeasure (recognized units ClosedSet), Dimension (recognized families ClosedSet).
+- Context threading: `expectedType` parameter added to `Resolve()` as `TypeKind? expectedType = null`. Callers provide target type for typed constant resolution and numeric literal context-sensitive widening.
+- Context retry for binary ops: when bottom-up fails and one operand is a bare `LiteralExpression`, re-resolve with the other side's resolved type as `expectedType`. Handles `amount > 100` where `amount: money`.
+- Context retry for function overloads: when no overload matches bottom-up, re-resolve literal args with each candidate parameter type. Handles `min(amount, 100)` where `amount: money`.
+- NodaTime 3.x added as PackageReference to Precept.csproj.
+- `ResolveNumericLiteral` now accepts `expectedType` — if integer widens to expectedType, literal resolves as that type directly.
+- All 3126 tests pass (above 3075 baseline).
+
+### 2026-05-07T20:15:00Z — Slice 3: Functions, Accessors, Interpolated Strings shipped
+
+- Commit: `fa87df9`. Methods: `ResolveFunctionCall`, `ResolveCIFunctionCall`, `SelectOverload`, `ResolveMemberAccess`, `ResolveMethodCall`, `ResolveInterpolatedString`, `ResolveAccessorReturnType`, `GetElementType`, `IsAssignable`.
+- DiagnosticCodes used: `UndeclaredFunction` (30), `InvalidMemberAccess` (20), `FunctionArityMismatch` (21), `TypeMismatch` (18).
+- `Functions.FindByName(name)` returns `ReadOnlySpan<FunctionMeta>` — may contain multiple entries for same-name functions (e.g., "round" → Round + RoundPlaces with different arities).
+- Overload scoring: arity filter first, then exact (score 0) vs widened (score = widen count). `IsAssignable` encapsulates identity + single-hop `WidensTo`. Lowest score wins; exact match short-circuits.
+- CI function call: parser produces `CIFunctionCallExpression` with name sans tilde; type checker prepends `~` for `Functions.FindByName("~" + name)` lookup.
+- Accessor return type resolution via DU: `FixedReturnAccessor.Returns`, `ElementParameterAccessor` → `TypeKind.Integer`, base `TypeAccessor` → owning field's `ElementType` via `GetElementType`.
+- `GetElementType` only resolves `TypedFieldRef` receivers via `FieldLookup`; chained collection access returns null (acceptable for current surface).
+- InterpolatedString: `TypedInterpolatedString` record hardcodes `TypeKind.String` as result; ErrorType propagation on any hole failure.
+- All 3029 baseline tests pass. Untracked WIP test file (`TypeCheckerExpressionTests.cs`) exists and must be moved aside for builds.
+
+### 2026-05-07T19:22:15Z — Slice 2: Scalar Expression Resolution shipped
+
+- Commit: `1111da4`. Method: `Resolve(ParsedExpression, CheckContext)` with helpers: `ResolveLiteral`, `ResolveNumericLiteral`, `ResolveIdentifier`, `ResolveBinaryOp`, `ResolveUnaryOp`, `TryResolveBinaryWithWidening`, `DisambiguateCandidates`, `MapQualifierBinding`.
+- DiagnosticCodes used: `UndeclaredField` (17), `DefaultForwardReference` (54), `TypeMismatch` (18).
+- `Operations.FindCandidates(OperatorKind, TypeKind, TypeKind)` returns `ReadOnlySpan<BinaryOperationMeta>` — may contain >1 entry for qualifier-disambiguated operations (money/money, quantity/quantity division).
+- `Operations.FindUnary(OperatorKind, TypeKind)` returns `UnaryOperationMeta?` — null if no match.
+- TokenKind → OperatorKind mapping: `Operators.ByToken[(tokenKind, arity)]` → `OperatorMeta.Kind`.
+- Widening algorithm: 4-level (exact → left widen → right widen → both). `Types.GetMeta(typeKind).WidensTo` gives targets. Single-hop only (D15). Only integer has widening targets: `[Decimal, Number]`.
+- Qualifier disambiguation: multi-candidate → select `QualifierMatch.Same` by default. Sets `SameQualifierRequired` on TypedBinaryOp.ResultQualifier.
+- Stub arms return `TypedErrorExpression` without diagnostic for unimplemented expression forms (Slices 3–9).
+- All 2974 baseline + 47/55 Slice 1 tests pass. Same 8 pre-existing failures.
+
+### 2026-05-07T19:30:00Z — Slice 1: Typed Symbol Population shipped
+
+- Commit: `e882396`. Methods: `ResolveTypeKind`, `PopulateFields`, `PopulateStates`, `PopulateEvents`, `BuildPartialSemanticIndex`.
+- DiagnosticCodes used: `TypeMismatch` (18), `NoInitialState` (32), `MultipleInitialStates` (31).
+- Catalog field `TypeMeta.ImpliedModifiers` is the D3 source of truth for implied modifiers — it returns `ModifierKind[]` directly; no need to query the Modifiers catalog for this.
+- `ParsedTypeReference` DU subtypes drive `ResolveTypeKind`: `SimpleTypeReference` → `.Type.Kind`, `CollectionTypeReference` → `.CollectionType.Kind` + recursive element resolution, `MissingTypeReference` → `TypeKind.Error`.
+- Known upstream gap: `DeclaredArg` lacks modifiers/IsOptional; 8 new TypeCheckerSymbolTests fail for this + parser qualified-type errors + queue/log TypeKind ambiguity. All 2974 baseline tests pass.
 
 - Closed-vocabulary slot data resolves at parse time: types, modifiers, access modes, and `because` text should not be deferred as raw spans.
 
