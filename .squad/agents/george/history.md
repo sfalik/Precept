@@ -182,3 +182,11 @@
 
 - Scribe recorded George-9's nine committed housekeeping slices as the durable batch closeout and preserved the clean working-tree / 2974-test baseline.
 - Frank-12's catalog doc sync was deduplicated into the same squad record because commit `a469217` was already part of the George-9 train.
+
+### 2026-05-08T03:45:00Z — Slice 5+7 restoration + event arg ref fix
+- **Problem**: Slice 6 commit (fe358ef) overwrote all of Slice 5's TypeChecker methods (PopulateTransitionRows, PopulateEventHandlers, NormalizeTransitionRow, NormalizeEventHandler, ResolveAction, ResolveActionTarget, ContainsErrorExpression, ContainsErrorExpressionInAction) and Slice 7's modifier validation methods (ValidateModifiers, ValidateFieldModifiers, IsTypeApplicable). BuildPartialSemanticIndex was also returning empty arrays instead of wiring CheckContext data.
+- **Root cause**: Concurrent agent writes — Slice 6 was authored from a base that didn't include Slice 5/7 changes.
+- **Prevention**: Always pull/merge before committing when parallel agents are running.
+- **Secondary fix**: Qualified event arg references (EventName.ArgName in guards/rules) were emitting UndeclaredField instead of resolving as TypedArgRef. Added early check in ResolveMemberAccess per language spec §3.5.
+- **Commit**: 4e1efd8
+- **Test result**: 3196/3196 passing (26/26 TypeCheckerTransitionTests).
