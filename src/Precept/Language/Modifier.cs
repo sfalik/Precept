@@ -91,8 +91,19 @@ public abstract record ModifierMeta(
     TokenMeta Token,
     string Description,
     ModifierCategory Category,
+    /// <summary>
+    /// When true, this modifier is syntactic sugar for a rule construct and
+    /// should be highlighted in the same gold color as message-position keywords.
+    /// </summary>
+    bool DesugarsToRule = false,
     ModifierKind[]? MutuallyExclusiveWith = null)
 {
+    /// <summary>
+    /// When true, this modifier is syntactic sugar for a rule construct and
+    /// should be highlighted in the same gold color as message-position keywords.
+    /// </summary>
+    public bool DesugarsToRule { get; } = DesugarsToRule;
+
     /// <summary>
     /// Modifiers that are mutually exclusive with this one — at most one member
     /// of the group may appear on a declaration. Empty for most modifiers.
@@ -113,8 +124,9 @@ public sealed record FieldModifierMeta(
     string? HoverDescription = null,
     string? UsageExample = null,
     string? SnippetTemplate = null,
+    bool DesugarsToRule = false,
     ModifierKind[]? MutuallyExclusiveWith = null)
-    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith)
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith)
 {
     /// <summary>Modifiers this one makes redundant. Empty for most.</summary>
     public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
@@ -129,8 +141,9 @@ public sealed record StateModifierMeta(
     bool AllowsOutgoing = true,
     bool RequiresDominator = false,
     bool PreventsBackEdge = false,
+    bool DesugarsToRule = false,
     ModifierKind[]? MutuallyExclusiveWith = null)
-    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith);
 
 /// <summary>Event modifiers (1 v2 member: initial event).</summary>
 public sealed record EventModifierMeta(
@@ -138,8 +151,9 @@ public sealed record EventModifierMeta(
     TokenMeta Token,
     string Description,
     ModifierCategory Category,
-    GraphAnalysisKind RequiredAnalysis = GraphAnalysisKind.None)
-    : ModifierMeta(Kind, Token, Description, Category);
+    GraphAnalysisKind RequiredAnalysis = GraphAnalysisKind.None,
+    bool DesugarsToRule = false)
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule);
 
 /// <summary>Access mode modifiers (3 members: write, read, omit).</summary>
 public sealed record AccessModifierMeta(
@@ -149,8 +163,9 @@ public sealed record AccessModifierMeta(
     ModifierCategory Category,
     bool IsPresent = true,
     bool IsWritable = true,
+    bool DesugarsToRule = false,
     ModifierKind[]? MutuallyExclusiveWith = null)
-    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith);
 
 /// <summary>Ensure/action anchor modifiers (3 members: in, to, from).</summary>
 public sealed record AnchorModifierMeta(
@@ -159,5 +174,6 @@ public sealed record AnchorModifierMeta(
     string Description,
     ModifierCategory Category,
     AnchorScope Scope,
-    AnchorTarget Target = AnchorTarget.Ensure)
-    : ModifierMeta(Kind, Token, Description, Category);
+    AnchorTarget Target = AnchorTarget.Ensure,
+    bool DesugarsToRule = false)
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule);

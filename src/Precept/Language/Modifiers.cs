@@ -63,6 +63,7 @@ public static class Modifiers
             "Value ≥ 0",
             ModifierCategory.Structural, NumericTypes,
             HoverDescription: "The field's value must be zero or greater. Enforced on every assignment.",
+            DesugarsToRule: true,
             MutuallyExclusiveWith: [ModifierKind.Positive]),
 
         ModifierKind.Positive => new FieldModifierMeta(
@@ -71,19 +72,22 @@ public static class Modifiers
             ModifierCategory.Structural, NumericTypes,
             Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero],
             HoverDescription: "The field's value must be strictly greater than zero. Implies nonnegative and nonzero.",
+            DesugarsToRule: true,
             MutuallyExclusiveWith: [ModifierKind.Nonnegative]),
 
         ModifierKind.Nonzero => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonzero),
             "Value ≠ 0",
             ModifierCategory.Structural, NumericTypes,
-            HoverDescription: "The field's value must not be zero. Allows negative values."),
+            HoverDescription: "The field's value must not be zero. Allows negative values.",
+            DesugarsToRule: true),
 
         ModifierKind.Notempty => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Notempty),
             "String or collection is non-empty",
             ModifierCategory.Structural, StringAndCollectionTypes,
-            HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time."),
+            HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time.",
+            DesugarsToRule: true),
 
         ModifierKind.Default => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Default),
@@ -95,43 +99,50 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Min),
             "Minimum value",
             ModifierCategory.Structural, NumericTypes, HasValue: true,
-            HoverDescription: "The field's value must be at least this minimum. Enforced on every assignment."),
+            HoverDescription: "The field's value must be at least this minimum. Enforced on every assignment.",
+            DesugarsToRule: true),
 
         ModifierKind.Max => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Max),
             "Maximum value",
             ModifierCategory.Structural, NumericTypes, HasValue: true,
-            HoverDescription: "The field's value must be at most this maximum. Enforced on every assignment."),
+            HoverDescription: "The field's value must be at most this maximum. Enforced on every assignment.",
+            DesugarsToRule: true),
 
         ModifierKind.Minlength => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Minlength),
             "Minimum string length",
             ModifierCategory.Structural, StringOnly, HasValue: true,
-            HoverDescription: "The text field must have at least this many characters."),
+            HoverDescription: "The text field must have at least this many characters.",
+            DesugarsToRule: true),
 
         ModifierKind.Maxlength => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxlength),
             "Maximum string length",
             ModifierCategory.Structural, StringOnly, HasValue: true,
-            HoverDescription: "The text field must have at most this many characters."),
+            HoverDescription: "The text field must have at most this many characters.",
+            DesugarsToRule: true),
 
         ModifierKind.Mincount => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Mincount),
             "Minimum collection count",
             ModifierCategory.Structural, CollectionTypes, HasValue: true,
-            HoverDescription: "The collection must have at least this many elements."),
+            HoverDescription: "The collection must have at least this many elements.",
+            DesugarsToRule: true),
 
         ModifierKind.Maxcount => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxcount),
             "Maximum collection count",
             ModifierCategory.Structural, CollectionTypes, HasValue: true,
-            HoverDescription: "The collection must have at most this many elements."),
+            HoverDescription: "The collection must have at most this many elements.",
+            DesugarsToRule: true),
 
         ModifierKind.Maxplaces => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxplaces),
             "Maximum decimal places",
             ModifierCategory.Structural, DecimalOnly, HasValue: true,
-            HoverDescription: "The decimal field must have at most this many digits after the decimal point."),
+            HoverDescription: "The decimal field must have at most this many digits after the decimal point.",
+            DesugarsToRule: true),
 
         ModifierKind.Writable => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Writable),
