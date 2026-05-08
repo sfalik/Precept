@@ -12,6 +12,18 @@
 
 ## Learnings
 
+### 2026-05-07T22:15:00Z — Slice 5: Transition Row + EventHandler Normalization shipped
+
+- Commit: `687d364`. Methods: `PopulateTransitionRows`, `PopulateEventHandlers`, `NormalizeTransitionRow`, `NormalizeEventHandler`, `ResolveAction`, `ResolveActionTarget`, `ContainsErrorExpression`, `ContainsErrorExpressionInAction`.
+- DiagnosticCodes used: `UndeclaredState` (28), `UndeclaredEvent` (29), `UndeclaredField` (17).
+- StateReference/EventReference recording at every state/event resolution site (Frank R1 note).
+- Action DU dispatch: 9 ParsedAction subtypes + MalformedAction → TypedAction/TypedInputAction/TypedBindingAction.
+- ActionSecondaryRole: Key for CollectionValueBy/PutKeyValue, Index for InsertAt; null otherwise. D5 invariant structurally guaranteed.
+- CurrentEventArgs scope: set from resolved event's args via FrozenDictionary; saved/restored in try/finally.
+- D26 Debug.Assert at end of PopulateTransitionRows and PopulateEventHandlers.
+- FromState wildcard: StateName == null → FromState == null (D10, any-state).
+- All 3163/3170 pass (7 pre-existing failures unchanged).
+
 ### 2026-05-07T21:00:00Z — Slice 4: TypedConstants + Context-Sensitive Resolution shipped
 
 - Commit: `ac95de2`. Methods: `ResolveTypedConstant`, `ValidateContent`, `ValidateNodaTime`, `ValidateClosedSet`, `ValidateRegex`, `TryContextRetryBinaryOp`, `TryContextRetryOverload`.
