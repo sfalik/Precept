@@ -25,6 +25,20 @@
 
 ---
 
+### 2026-05-08T04:26:28Z: Exhaustive GraphAnalyzer review approves the current implementation and narrows the remaining follow-up to future event-modifier work
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `frank-graphanalyzer-exhaustive-review.md`.
+
+- Frank's exhaustive review approved commit `d10513d` as architecturally sound, spec-complete for the currently implemented language surface, and catalog-driven in the required dimensions.
+- The only red finding (`EventModifierMeta.RequiredAnalysis` not yet consumed) is explicitly zero-risk today because the only event modifier with graph-analysis implications is `initial`, which the analyzer already handles equivalently through edge/topology derivation.
+- Durable future-touch follow-up: when richer event modifiers land, GraphAnalyzer must consume `EventModifierMeta.RequiredAnalysis`; the next touch is also the right time to consider an event-per-state index for the O(events × edges) scans and `RelatedSpans` on structural-violation diagnostics.
+
+---
+
 ### 2026-05-08T04:26:28Z: GraphAnalyzer structural blockers and both R4 test batches are durably recorded
 
 **By:** Scribe

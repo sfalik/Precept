@@ -74,3 +74,8 @@
 - Commit `5398435` closed the real GraphAnalyzer R4 blockers: structural diagnostics 109/110/111 now exist, emit at analysis time, and the graph doc appendix matches the live enum again.
 - `Reject` / `NoTransition` self-loops are now filtered out of terminal outgoing-edge violations, preserving the rule that a terminal state may reject without violating its contract.
 - Validation at George handoff closed green at 3370 `Precept.Tests` passing before Soup-Nazi-7's follow-on test batch extended the branch baseline.
+
+### 2026-05-08T04:26:28Z — Exhaustive GraphAnalyzer review approved
+- Frank's exhaustive review approved the current GraphAnalyzer implementation as spec-complete for the live language surface and catalog-driven where it needs to be.
+- The only future-risk note is deferred deliberately: when richer event modifiers ship, GraphAnalyzer must start consuming `EventModifierMeta.RequiredAnalysis` the same way it already consumes state-modifier metadata.
+- Next-touch polish items are now explicit: consider an event-per-state index for event coverage / `GraphEvent.IsInitial`, and add `RelatedSpans` to structural-violation diagnostics.
