@@ -18,6 +18,8 @@
 - Multi-location diagnostics can grow additively through payload fields like `RelatedSpans` without destabilizing constructor-heavy call sites.
 - When PRECEPT0024 blocks downstream `.Syntax` access, hoist declaration `SourceSpan` data (for example `TypedState.NameSpan` / `TypedEvent.NameSpan`) into the typed artifact instead of reaching back to parse constructs.
 - Graph wildcard expansion should stay structural: expand `FromState == null` rows per declared state, but suppress the expanded edge when that state already has an explicit row for the same event.
+- `IsMessagePosition` now exists on both `TokenMeta` and `FunctionMeta`; populated token entries are `TokenKind.Because` and `TokenKind.Reject`.
+- No current built-in `FunctionMeta` entries set `IsMessagePosition`; Kramer needs to wire the grammar generator to consume the new catalog flag next.
 
 ## Recent Updates
 
