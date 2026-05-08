@@ -687,7 +687,7 @@ public class TypeCheckerExpressionTests
     }
 
     [Fact]
-    public void PostfixOperationExpression_Stub_ReturnsErrorExpression_NoDiagnostic()
+    public void PostfixOperationExpression_NonField_EmitsIsSetOnNonOptional()
     {
         var ctx = MinimalContext();
         var operand = new LiteralExpression(TokenKind.StringLiteral, "hello", TestSpan);
@@ -696,8 +696,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().BeEmpty(
-            because: "postfix operations are deferred to later slices");
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.IsSetOnNonOptional));
     }
 
     [Fact]

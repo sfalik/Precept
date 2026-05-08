@@ -30,6 +30,10 @@ internal static class TypeChecker
         PopulateStates(symbols, ctx);
         PopulateEvents(symbols, ctx);
 
+        // Structural validation (Slice 6) — runs after Pass 1; reads ComputedDeps
+        // (populated during expression resolution) for cycle detection.
+        ValidateStructural(ctx);
+
         // Pass 2 + final assembly deferred to Slices 2–10.
         // Return a partial SemanticIndex with the symbol tables populated.
         return BuildPartialSemanticIndex(ctx);
@@ -99,6 +103,28 @@ internal static class TypeChecker
 
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;
+
+            // Choice domain validation (Slice 6): empty domain and duplicate values
+            if (declared.Type is ChoiceTypeReference choiceRef)
+            {
+                if (choiceRef.Domain.IsEmpty)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.EmptyChoice, declared.NameSpan));
+                }
+                else
+                {
+                    var seen = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var value in choiceRef.Domain)
+                    {
+                        if (!seen.Add(value))
+                        {
+                            ctx.Diagnostics.Add(
+                                Diagnostics.Create(DiagnosticCode.DuplicateChoiceValue, declared.NameSpan, value));
+                        }
+                    }
+                }
+            }
 
             // Diagnostic for unknown type (MissingTypeReference → TypeKind.Error).
             // The parser already emits a diagnostic for the missing type token;
@@ -290,7 +316,7 @@ internal static class TypeChecker
         ConditionalExpression     => new TypedErrorExpression(expr.Span),
         QuantifierExpression      => new TypedErrorExpression(expr.Span),
         ListLiteralExpression     => new TypedErrorExpression(expr.Span),
-        PostfixOperationExpression => new TypedErrorExpression(expr.Span),
+        PostfixOperationExpression postfix => ResolvePostfixOp(postfix, ctx),
 
         _ => new TypedErrorExpression(expr.Span),
     };
@@ -806,6 +832,52 @@ internal static class TypeChecker
         return new TypedErrorExpression(un.Span);
     }
 
+    /// <summary>
+    /// Resolve a postfix presence check: <c>field is set</c> / <c>field is not set</c>.
+    /// Operand must resolve to an optional field; result type is always boolean.
+    /// Emits <see cref="DiagnosticCode.IsSetOnNonOptional"/> if the operand field is not optional.
+    /// </summary>
+    private static TypedExpression ResolvePostfixOp(PostfixOperationExpression postfix, CheckContext ctx)
+    {
+        var operand = Resolve(postfix.Operand, ctx);
+
+        // ErrorType propagation (D13)
+        if (operand is TypedErrorExpression)
+            return new TypedErrorExpression(postfix.Span);
+
+        // Operand must be a field reference to check optionality
+        if (operand is TypedFieldRef fieldRef)
+        {
+            if (ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field) && !field.IsOptional)
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.IsSetOnNonOptional, postfix.Span, fieldRef.FieldName));
+                return new TypedErrorExpression(postfix.Span);
+            }
+
+            return new TypedPostfixOp(operand, postfix.IsNegated, postfix.Span);
+        }
+
+        // Arg refs with optional flag are also valid targets
+        if (operand is TypedArgRef argRef)
+        {
+            if (ctx.CurrentEventArgs is not null &&
+                ctx.CurrentEventArgs.TryGetValue(argRef.ArgName, out var arg) && !arg.IsOptional)
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.IsSetOnNonOptional, postfix.Span, argRef.ArgName));
+                return new TypedErrorExpression(postfix.Span);
+            }
+
+            return new TypedPostfixOp(operand, postfix.IsNegated, postfix.Span);
+        }
+
+        // Non-field, non-arg operand: 'is set' doesn't apply
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.IsSetOnNonOptional, postfix.Span, "expression"));
+        return new TypedErrorExpression(postfix.Span);
+    }
+
     /// <summary>Normalize a transition row construct into a <see cref="TypedTransitionRow"/>.</summary>
     private static TypedTransitionRow NormalizeTransitionRow(ParsedConstruct construct, CheckContext ctx) =>
         throw new NotImplementedException("Slice 5");
@@ -1162,11 +1234,112 @@ internal static class TypeChecker
         throw new NotImplementedException("Slice 7");
 
     /// <summary>
-    /// Structural validation sub-pass: computed-field cycle detection, choice validation,
-    /// forward-reference prohibition, stateless/stateful cross-validation.
+    /// Structural validation sub-pass: computed-field cycle detection and
+    /// forward-reference belt-and-suspenders validation.
+    /// Reads <see cref="CheckContext.ComputedDeps"/> (populated during computed expression
+    /// resolution) and <see cref="CheckContext.Fields"/>.
     /// </summary>
-    private static void ValidateStructural(CheckContext ctx) =>
-        throw new NotImplementedException("Slice 6");
+    private static void ValidateStructural(CheckContext ctx)
+    {
+        // ── Computed field cycle detection (DFS) ──────────────────────────
+        // Build adjacency list from ComputedDeps: fieldName → set of dependent field names.
+        // O(n) construction, O(n) DFS traversal.
+        if (ctx.ComputedDeps.Count > 0)
+        {
+            var adjacency = new Dictionary<string, List<string>>(ctx.ComputedDeps.Count);
+            foreach (var dep in ctx.ComputedDeps)
+            {
+                if (!adjacency.TryGetValue(dep.FieldName, out var deps))
+                {
+                    deps = [];
+                    adjacency[dep.FieldName] = deps;
+                }
+                deps.AddRange(dep.DependsOn);
+            }
+
+            // DFS with three-color marking: white (unvisited), gray (in stack), black (done)
+            var white = new HashSet<string>(adjacency.Keys);
+            var gray = new HashSet<string>();
+            var black = new HashSet<string>();
+
+            foreach (var startNode in adjacency.Keys)
+            {
+                if (!white.Contains(startNode)) continue;
+                DetectCycles(startNode, adjacency, white, gray, black, [], ctx);
+            }
+        }
+
+        // ── Forward-reference belt-and-suspenders ─────────────────────────
+        // Verify computed field deps don't reference fields declared after the computed field.
+        // This is a redundant check — ResolveIdentifier already enforces D8 at expression
+        // resolution time. This pass catches any gap if expression resolution was bypassed.
+        if (ctx.ComputedDeps.Count > 0)
+        {
+            var fieldIndex = new Dictionary<string, int>(ctx.Fields.Count);
+            for (int i = 0; i < ctx.Fields.Count; i++)
+                fieldIndex[ctx.Fields[i].Name] = i;
+
+            foreach (var dep in ctx.ComputedDeps)
+            {
+                if (!fieldIndex.TryGetValue(dep.FieldName, out var sourceIdx)) continue;
+
+                foreach (var target in dep.DependsOn)
+                {
+                    if (fieldIndex.TryGetValue(target, out var targetIdx) && targetIdx >= sourceIdx)
+                    {
+                        // Find the field's syntax span for the diagnostic
+                        var field = ctx.FieldLookup[dep.FieldName];
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.DefaultForwardReference, field.Syntax.Span,
+                                dep.FieldName, target));
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// DFS cycle detection helper. Walks the adjacency graph using three-color marking.
+    /// On back-edge detection (gray → gray), emits <see cref="DiagnosticCode.CircularComputedField"/>.
+    /// </summary>
+    private static void DetectCycles(
+        string node,
+        Dictionary<string, List<string>> adjacency,
+        HashSet<string> white,
+        HashSet<string> gray,
+        HashSet<string> black,
+        List<string> path,
+        CheckContext ctx)
+    {
+        white.Remove(node);
+        gray.Add(node);
+        path.Add(node);
+
+        if (adjacency.TryGetValue(node, out var neighbors))
+        {
+            foreach (var neighbor in neighbors)
+            {
+                if (gray.Contains(neighbor))
+                {
+                    // Back edge → cycle. Build cycle description from path.
+                    int cycleStart = path.IndexOf(neighbor);
+                    var cycle = string.Join(" → ", path.Skip(cycleStart)) + " → " + neighbor;
+                    var field = ctx.FieldLookup[neighbor];
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CircularComputedField, field.Syntax.Span,
+                            neighbor, cycle));
+                }
+                else if (white.Contains(neighbor))
+                {
+                    DetectCycles(neighbor, adjacency, white, gray, black, path, ctx);
+                }
+            }
+        }
+
+        path.RemoveAt(path.Count - 1);
+        gray.Remove(node);
+        black.Add(node);
+    }
 
     /// <summary>CI enforcement sub-pass: validate ~string usage on CI functions and operators.</summary>
     private static void ValidateCIEnforcement(CheckContext ctx) =>
