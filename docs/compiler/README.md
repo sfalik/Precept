@@ -27,6 +27,7 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManife
 | [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Draft |
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
 | [tooling-surface.md](tooling-surface.md) | TextMate grammar generation, semantic token two-pass design, completion filtering | Full |
+| [grammar-generator.md](grammar-generator.md) | Grammar generator algorithm, pattern templates, structural composition, catalog gap | Full |
 
 ## Source Code
 
