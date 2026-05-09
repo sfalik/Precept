@@ -22,6 +22,8 @@
 - Descriptor types (`FieldDescriptor`, `ArgDescriptor`, etc.) are fully implemented in `Descriptors.cs` — the doc was still saying "Planned". Also, `ClrType` and `SlotIndex` on `ArgDescriptor` described in the doc never made it into the implementation.
 - `precept_language` is structurally correct but expensive as a first-call AI contract: the compact payload is ~196.9 KB (~50k tokens), and `domains` + `tokens` + `diagnostics` + `types` consume ~82% of it. If the goal is AI authoring, explicit companion tools (especially a tiny syntax-first reference) are cleaner than a single giant catalog dump.
 
+- **8 new MCP tools (2026-05-09):** Thin-wrapper pattern using `LanguageTool.Language()` as an internal projection entry-point works well: focused tools call it and extract the relevant catalog subsets, keeping each tool response small. `precept_language` deregistered (attribute removed, implementation kept). `precept_diagnostic` lookup supports both code-name ("UndeclaredField") and PRE-number ("PRE0017") formats via simple string prefix check. `precept_domains` adds `UcumPrefixCatalog` which was absent from the base `LanguageTool.Language()` domains payload. `precept_operations(category?)` filters by LhsType string (case-insensitive) — natural because unary ops put operand in LhsType and binary ops put lhs type there. All 59 MCP tests green; 3733 core tests unaffected.
+
 ## Recent Updates
 
 ### 2026-05-09T15:26:09Z — MCP diagnosis/fix closeout recorded
