@@ -7,12 +7,35 @@
 
 ## Learnings
 
-- Typed-literal pre-work is governed by `docs/Working/typed-literal-system-plan.md`, a 12-slice execution plan covering data loaders, parsers, validation framework updates, runtime stubs, and canonical doc sync. Work should not expand beyond that plan.
+- Language Server design at `docs/tooling/language-server.md` is implementation-ready across all 10 feature areas (diagnostics, two-pass semantic tokens, catalog-driven completions, hover, go-to-definition, preview/inspect, document outline, folding, diagnostic enrichment, code actions). Finalized implementation plan at `docs/Working/language-server-implementation-plan.md` — 12 vertical slices with method-level specificity, 173 existing red tests as the acceptance contract.
+- Key catalog gap for LS: `ConstructMeta.IsOutlineNode` and `LspSymbolKind` resolved in design (CC#18) but not yet added to code. Temporary `ConstructKind` switch in Slice 6 is acceptable — isolated to one private method, trivially replaceable when catalog fields land.
+- The stub API in `LanguageServerStubs.cs` defines the test-facing contract for 173 ported tests. Implementations must satisfy these exact signatures — the OmniSharp handler layer delegates to the same classes. Two parallel API surfaces (OmniSharp handlers + stub classes) are acceptable for a component this thin (~500-700 LOC).
+- `SemanticIndex` already carries `FieldReferences`, `StateReferences`, `EventReferences` (CC#3) — the reference site records needed for Pass 2 semantic tokens and go-to-definition. No reconstruction from typed expression trees needed; the type checker populates them at resolution time.
+- `TypeMeta.IsUserFacing` is not on the record but `Token != null` is a structural equivalent for filtering internal types from completions. No catalog change required.
+- Levenshtein distance for "did you mean?" enrichment belongs in the LS (`tools/Precept.LanguageServer/`), not in `src/Precept/`. Fuzzy matching is a tooling concern.
+- Preview/Inspect (Slice 10) is blocked on the runtime evaluator (Phase 3 — entirely stubbed). Handler shell ships to complete the capability declaration; tests remain red until evaluator lands.
+- Typed-literal pre-work is governed by`docs/Working/typed-literal-system-plan.md`, a 12-slice execution plan covering data loaders, parsers, validation framework updates, runtime stubs, and canonical doc sync. Work should not expand beyond that plan.
 - Durable typed-literal boundaries are locked: `ContentValidation` remains the catalog hook; compile-time literal validation goes through `TypedConstantValidation.Validate(...)`; runtime Fire/Update/Restore JSON lanes go through `TypeRuntime<T>` / `TypeRuntimeMeta`; format-only validation stays in constraints, not typed literals.
 - ISO 4217 and UCUM are external reference datasets, not Precept catalog metadata. They ship as embedded XML resources loaded into typed records, while Precept-owned augmentations like currency symbols stay in source.
 - The UCUM evaluator-facing plan fixes are now explicit: `UcumParsedUnit` preserves annotations for display only, Slice 1d uses a two-phase/transitive loader for defined units, and Slice 10 interns runtime `Unit` instances by `(DimensionVector, UcumExactFactor)`.
+- `precept_language` currently exposes only 9 language catalogs plus domains and a static `firePipeline` array (`tokens`, `types`, `modifiers`, `actions`, `constructs`, `constraints`, `operators`, `functions`, `diagnostics`). It does **not** yet expose `Operations`, `ExpressionForms`, `ProofRequirements`, `Outcomes`, `Faults`, or `SyntaxReference`, despite architecture docs claiming all 13 catalogs plus `SyntaxReference` should ground AI authoring.
+- The biggest AI-authoring gaps are not missing keywords but missing legality and guidance: `TypeMeta.ContentValidation`, type/action/function/modifier examples, proof requirements, outcome forms, and operation compatibility are already present in source metadata but dropped by `LanguageTool.cs`. Payload size is also dominated by low-authoring-value sections (`ucumTier1Units`, tokens, diagnostics).
+- AI authoring tool suite designed: 8 new tools (`precept_quickstart`, `precept_syntax`, `precept_types`, `precept_operations`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`, `precept_domains`) plus existing `precept_language` and `precept_compile`. Named tools, not parameterized sections — tool names are the discoverability surface. Full design at `research/language/precept-ai-authoring-tool-suite.md`.
+- Newman's 3-tool proposal was good architecture but insufficient coverage: missing operator/type legality (Operations), guard/proof obligations, outcome vocabulary, expression forms, diagnostic recovery, and common patterns. Those gaps cause first-try authoring failures in concrete scenarios (money arithmetic, collection guards, outcome syntax).
+- `SyntaxReference.CommonPatterns` "Computed field" example is compile-invalid — it applies `nonnegative` to a computed field, which the parser rejects. Must be fixed before exposing patterns through MCP.
+- Typical cold-start authoring session with the new suite costs ~57 KB (quickstart + syntax + patterns + types) vs. ~192 KB for `precept_language` alone — every byte is authoring-relevant.
 
 ## Recent Updates
+
+### 2026-05-09T19:55:00Z — Full design gap audit for typed literal / business domain types
+- Completed comprehensive audit against `docs/language/business-domain-types.md` (D1–D18), research doc, language spec, catalog system doc, and runtime API doc.
+- **Critical gap (P0):** Qualifier values (`in 'USD'`, `of 'mass'`) never flow from parser → type checker → semantic model. `TypeChecker.cs:128,240` hardcodes `DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty`. The proof engine reads qualifiers correctly but always sees empty. This blocks all qualifier-dependent features: `in`/`of` enforcement, dimension checks, operator preconditions, narrowing, implicit `maxplaces`.
+- **Fully implemented:** CurrencyCatalog (159 currencies + symbols), UcumAtomCatalog (≥300 atoms), UcumParser (full grammar), DimensionCatalog (10 categories), all 7 type definitions + qualifier shapes, 198 operation kinds, 12 diagnostic codes, content validation dispatch, TextMate grammar, MCP type vocabulary.
+- **Not implemented:** Runtime evaluator (entire layer stubbed — Phase 3), runtime value types (Money/Quantity/Price/ExchangeRate records don't exist), language server (31 stubs), all IntelliSense completions, discrete equality narrowing, unit conversion, compound cancellation, sample files, drift tests.
+- **UCUM Tier 1:** BrowseTier1() returns 10 units; design says ~150. No canonical enumeration exists in any doc.
+- **DimensionCatalog:** Has 10 categories (design says 7 + post-v1). `speed`, `force`, `count` added beyond v1 spec — needs ratification.
+- Full report at `.squad/decisions/inbox/frank-design-gap-audit.md`.
+
 
 ### 2026-05-09T16:55:27Z — UCUM evaluator gap analysis durably merged
 - Scribe merged Frank's eight-area UCUM evaluator review into `.squad/decisions.md` and deleted the inbox copy.
