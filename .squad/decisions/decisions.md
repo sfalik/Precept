@@ -6711,3 +6711,10 @@ None of the gaps are architectural blockers — they are specification omissions
 | 8 | Interning and identity | GAP | Low — document `(Vector, Scale)` as interning key in Slice 10 |
 
 **Recommendation:** Amend the plan with the 3 fixes above before George begins Slice 1d. The derived unit chain gap (#7) is the most important — it affects loader design and slice dependency ordering.
+
+
+### 2026-05-09T15:50:01Z: OQ-DISP-1 closed — runtime aggregation registry concept killed
+
+**By:** Shane (via Copilot)
+**What:** OQ-DISP-1 (naming the runtime-layer aggregation registry / `OperationRegistry` placeholder) is closed with no action. The concept was eliminated — the global aggregation array was removed before implementation. The Builder embeds executor delegates directly into opcodes at build time; the evaluator calls `opcode.Executor(l, r)` with zero runtime lookup. No aggregation class, no registry, no naming decision needed.
+**Why:** User directive — concept no longer exists; open item is stale.
