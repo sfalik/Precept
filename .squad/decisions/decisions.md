@@ -5991,3 +5991,39 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 - Operand metadata identity matters: `integer / number` and `number / number` do not stress subject resolution the same way because catalog parameter instances differ.
 - Boolean guard composition (`and` / `or`) can go red at type-check time if the catalog does not carry the boolean operation entries the proof strategy assumes.
 - Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.
+
+# Soup Nazi review — `precept_language`
+
+**Verdict:** BLOCKED
+
+## Scope
+- Reviewed commit `bd4e6e30`.
+- Repo spec source for this tool is `docs/tooling/mcp.md` (`precept_language` section). `docs/McpServerDesign.md` is not present.
+- `test/Precept.Mcp.Tests/LanguageToolTests.cs` started this review at 12 tests.
+
+## Why blocked
+Original coverage was not sufficient.
+
+Missing or weak before remediation:
+- No schema-serialization test for the documented camelCase top-level contract.
+- No assertion that every top-level catalog section is present and populated through the response shape.
+- No completeness/order checks for `Tokens`, `Types`, `Actions`, `Constructs`, `Constraints`, or `Diagnostics`.
+- No modifier subgroup completeness check for `field`, `state`, `event`, `access`, and `anchor`.
+- `Operators` and `Functions` only had count/spot checks, not full catalog/order assertions.
+- No representative field-mapping checks for tokens, types, modifiers, actions, constructs, or diagnostics.
+- Token-floor test was stricter than the spec-friendly contract (`> 80` instead of `>= 80`).
+
+## Remediation shipped
+Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests covering:
+- serialized schema shape
+- token/type/action/construct/operator/function/diagnostic catalog completeness in declaration order
+- modifier subgroup completeness plus subtype-specific mapping anchors
+- constraint mapping
+- fire-pipeline exact order
+- token floor `>= 80`
+
+## Validation
+- `dotnet test test\Precept.Mcp.Tests\Precept.Mcp.Tests.csproj --no-build -q -m:1 /nr:false` → **19 passed, 0 failed**.
+- `dotnet test --no-build -q -m:1 /nr:false` → **baseline repo still red: 194 failures**.
+  - Failures are pre-existing language-server completion tests throwing `NotImplementedException` from `tools/Precept.LanguageServer/LanguageServerStubs.cs:31`.
+  - No failure implicated `LanguageTool` or the new MCP tests.

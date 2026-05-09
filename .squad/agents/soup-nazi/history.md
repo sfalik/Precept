@@ -27,6 +27,11 @@
 
 ## Recent Updates
 
+### 2026-05-09T14:14:17Z — LanguageTool coverage review closed
+- Reviewed Newman's `precept_language` batch against `docs/tooling/mcp.md` and found 7 concrete test gaps in `LanguageToolTests.cs`.
+- The batch was blocked until remediation landed; after expanding the suite from 12 to 19 tests, `test/Precept.Mcp.Tests` passed clean at 19/19 and the review was recorded as remediated.
+- The remaining `dotnet test --no-build -q -m:1 /nr:false` failures stayed isolated to 194 pre-existing language-server stub failures and did not implicate `LanguageTool`.
+
 ### 2026-05-09T14:04:05Z — LanguageTool coverage review opened
 - Started reviewing `LanguageToolTests.cs` against `McpServerDesign.md` after Newman's `precept_language` implementation landed.
 - This batch closed with the review still in flight, so no new durable pass/fail verdict is recorded yet.

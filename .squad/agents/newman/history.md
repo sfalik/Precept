@@ -23,6 +23,10 @@
 
 ## Recent Updates
 
+### 2026-05-09T14:14:17Z — `precept_language` tests expanded post-review
+- Soup Nazi's review found 7 concrete `LanguageToolTests.cs` gaps after the initial `precept_language` shipment: missing schema coverage, missing top-level completeness/order assertions, missing modifier subgroup checks, weak operator/function validation, representative mapping gaps, and an overly strict token-floor assertion.
+- The remediation expanded the suite from 12 total project tests to 19, locking catalog completeness/order coverage and the documented `>= 80` token-floor contract without changing the shipped `LanguageTool` surface.
+
 ### 2026-05-09T14:04:05Z — `precept_language` shipped
 - Implemented `LanguageTool.cs`, added 12 `LanguageToolTests.cs` cases, and synced `docs/tooling/mcp.md` on commit `bd4e6e30`.
 - The shipped MCP vocabulary baseline is now durably recorded as tokens/types/grouped modifiers/actions/constructs/constraints/operators/functions/diagnostics plus static `firePipeline`.
