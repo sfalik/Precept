@@ -1,3 +1,15 @@
+### 2026-05-09T17:41:32.9988470Z: Typed-literal system implementation is complete
+
+**By:** George
+
+**Status:** Inbox
+
+- Completed the full typed-literal system plan in slice order: embedded ISO 4217 + UCUM data, XML-backed currency/UCUM loaders, temporal and UCUM parsers, typed-constant validation framework, domain validators, `TypeMeta.ContentValidation` wiring, TypeChecker migration, canonical doc sync, and retirement of superseded working docs.
+- Durable architecture: compile-time typed-literal validation is catalog-driven through `TypeMeta.ContentValidation` and `TypedConstantValidation.Validate(...)`; there is no interface-based validator registry.
+- `unitofmeasure` now validates through the shared UCUM subsystem and `currency` through the XML-backed `CurrencyCatalog`; temporal typed constants share the canonical parser stack in `src/Precept/Language/Time/`.
+- Validation evidence: `dotnet build src\Precept\Precept.csproj` and `dotnet test test\Precept.Tests\Precept.Tests.csproj` both pass, closing at 3721 passing tests.
+- Known boundary left explicit by the plan: `src/Precept/Runtime/Measures/Unit.cs`, `MeasureDimension.cs`, and `UnitFactory.cs` are intentional runtime stubs for future measure arithmetic work.
+
 ### 2026-05-09: Data family expanded — field + arg added
 **By:** Shane
 **What:** Field (#A5B4FC) and arg (#9AD8E8) added to Data color family. Spec updated to allow semantically-grouped families with distinct hues (not tonal-variants-only). Fields and args are data tokens in the DSL — they belong in Data.
