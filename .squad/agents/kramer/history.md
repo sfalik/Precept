@@ -16,8 +16,13 @@
 - Added the VS Code task label `grammar: regenerate`, which runs `dotnet run --project tools/Precept.GrammarGen -- --output tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` so developers can refresh the generated TextMate grammar after catalog changes.
 - `ModifierMeta.DesugarsToRule` now wires into `Precept.GrammarGen` through a derived `ruleDesugaringModifiers` repository entry built from `Modifiers.All.Where(m => m.DesugarsToRule)` rather than a hand-maintained modifier list.
 - The gold keyword scope for rule-desugaring modifier highlights is `keyword.other.grammar.precept`; it must stay ahead of `#constraintKeywords` anywhere modifier patterns are composed so first-match TextMate ordering preserves the gold scope.
+- ProofEngine presence diagnostics were missing because `docs/compiler/proof-engine.md` §9 assigned codes 112–115 for four proof requirement families but omitted `PresenceProofRequirement`; fixing the spec gap required adding `UnprovedPresenceRequirement = 116`, wiring the diagnostics catalog and `ProofEngine.cs`, and updating `test/Precept.Tests/DiagnosticsTests.cs` plus `test/Precept.Tests/ProofEngineTests.cs`.
 
 ## Recent Updates
+
+### 2026-05-09T09:49:38Z — Token/action parser cleanup batch recorded
+- `kramer-3` closed the `TokenKind.Set` dual-category bug: token metadata is now action-only, language-server type completions derive vocabulary from `Types.All`, and the language spec reflects the `Set`/`SetType` split.
+- `kramer-4` split `ParseActionByShape` into nine named handlers and enrolled `ActionSyntaxShape` in PRECEPT0019 while preserving malformed-action recovery; targeted analyzer/parser validation stayed green aside from the pre-existing 2 `TokensTests` baseline failures.
 
 ### 2026-05-08T22:36:50Z — Message-position generator gap closed
 - The grammar generator now derives `messageStrings` patterns from `Tokens.All.Where(m => m.IsMessagePosition)` and the parallel `FunctionMeta` path.

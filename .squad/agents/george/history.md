@@ -38,6 +38,10 @@
 
 ## Recent Updates
 
+### 2026-05-09T09:49:38Z — Analyzer and TypeChecker catalog batch recorded
+- `george-4` shipped `PRECEPT0026` and extended `PRECEPT0025` to switch statements, with analyzer coverage closing green at 280/280.
+- `george-5` removed four hardcoded TypeChecker dispatch sites by adding CI diagnostic metadata plus `Constraints.ByToken`, `Modifiers.ByAccessToken`, and `Modifiers.ByAnchorToken`; targeted runtime tests closed green at 3646/3646.
+
 ### 2026-05-09T04:35:00Z — ProofEngine Phase 2 fixes closed
 - George landed ProofEngine Phase 2 across commits `46c9a4d4` and `36618ef9`, then fixed the last 5 red tests in `d3657b70`.
 - Branch validation now closes at 158/158 `ProofEngineTests` and 3609/3611 full-suite tests, with only the 2 pre-existing `TokensTests` failures remaining.

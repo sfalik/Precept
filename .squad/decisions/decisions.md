@@ -1,3 +1,1582 @@
+### 2026-05-09T09:34:41: User directive
+**By:** Shane (via Copilot)
+**What:** Always include a running tally of in-flight agent threads when multiple work streams are active. Format: emoji + agent name + one-line status (running/done/blocked). Keep it updated every response.
+**Why:** User request — captured for team memory
+
+# PRECEPT0019 Exhaustiveness Audit
+
+## Summary
+The audit found one clear PRECEPT0019 expansion that is both valuable and implementable now: `Parser.ParserState` for `OutcomeArgumentKind`. One additional parser-local enrollment is worthwhile after refactor: `Parser.ParserState` for `ActionSyntaxShape`. Everywhere else, the pipeline is either already correctly catalog-driven, or the remaining handwritten dispatch is the wrong shape for PRECEPT0019 (subset semantics, type-based DU dispatch, or multiple independent dispatch families where class-level coverage would create false confidence).
+
+## Already Enrolled
+- **ParserState / ExpressionFormKind** is already enrolled at `src/Precept/Pipeline/Parser.cs:47`.
+- Coverage is complete across all 14 `ExpressionFormKind` members from `src/Precept/Language/ExpressionForms.cs:8-37`:
+  - `Literal` → `ParseLiteral` (`Parser.Expressions.cs:118-123`), `ParseInterpolatedString` (`378-421`), `ParseInterpolatedTypedConstant` (`424-440`)
+  - `UnaryOperation` → `ParseUnaryOperation` (`125-134`)
+  - `Identifier`, `FunctionCall` → `ParseIdentifierOrFunctionCall` (`185-203`)
+  - `Grouped` → `ParseGrouped` (`205-213`)
+  - `ListLiteral` → `ParseListLiteral` (`215-238`)
+  - `Conditional` → `ParseConditional` (`240-253`)
+  - `Quantifier` → `ParseQuantifier` (`256-271`)
+  - `CIFunctionCall` → `ParseCIFunctionCall` (`273-284`)
+  - `MemberAccess`, `MethodCall` → `ParseMemberAccessOrMethodCall` (`286-318`)
+  - `PostfixOperation` → `ParsePostfixIs` (`326-356`)
+  - `BinaryOperation` → `ParseBinaryInfix` (`358-374`)
+  - `InterpolatedString` → `ParseInterpolatedString` (`378-421`)
+- This is the canonical PRECEPT0019 shape: one parser-local catalog (`ExpressionFormKind`), one handler family, and method-level ownership per member.
+
+## Recommended Enrollments (prioritized)
+
+### 1. Enroll now
+- **Class**: `Precept.Pipeline.Parser.ParserState`
+- **Catalog Enum**: `OutcomeArgumentKind` (discovered during audit in `src/Precept/Language/Outcomes.cs:19-32`)
+- **Dispatch pattern**: `ParseOutcome` resolves the outcome form catalog-correctly via `Outcomes.ByLeadingToken` (`Parser.Expressions.cs:580-587`), then performs handwritten argument-shape dispatch with a switch on `meta.ArgumentKind` (`591-600`). The per-shape methods already exist:
+  - `ParseOutcomeIdentifierArg` (`606-620`)
+  - `ParseOutcomeStringLiteralArg` (`622-636`)
+  - `ParseOutcomeSecondaryToken` (`638-652`)
+- **Coverage gap risk**: High. If a new `OutcomeArgumentKind` member is added, the parser currently falls into runtime handling (`None` throws explicitly; unknown values hit `ArgumentOutOfRangeException`). That is a parser gap discovered only when the new form is exercised.
+- **Feasibility**: High. The method-per-member pattern already exists for 3 of the 4 members. The only obstacle is `OutcomeArgumentKind.None`: it needs an explicit handler method (even if that method deliberately throws until a no-arg outcome ships) so PRECEPT0019 can force deliberate ownership of the member.
+- **Recommendation**: **Enroll now.** This is the highest-confidence expansion because the dispatch point is singular, local, and already factored into per-member helper methods.
+
+### 2. Enroll after refactor
+- **Class**: `Precept.Pipeline.Parser.ParserState`
+- **Catalog Enum**: `ActionSyntaxShape` (`src/Precept/Language/Action.cs:30-50`)
+- **Dispatch pattern**: Action lookup is catalog-driven up to the action verb (`Actions.ByTokenKind` in `Parser.cs:843-861`), but `ParseActionByShape` then switches manually on `meta.SyntaxShape` (`Parser.cs:887-1005`) and inlines all 9 shapes in one monolithic method.
+- **Coverage gap risk**: Medium-high. If a new `ActionSyntaxShape` member is added, the default branch returns `MalformedAction` (`1001-1005`). That is worse than an honest compile failure: the parser degrades into recovery output rather than forcing the new syntax shape to be implemented deliberately.
+- **Feasibility**: Medium. The current analyzer needs method-level annotations, so `ParseActionByShape` must be split into per-shape methods (`ParseAssignValueAction`, `ParseCollectionValueAction`, etc.) and then annotated.
+- **Recommendation**: **Enroll after refactor.** This is a real PRECEPT0019 target, but only after the shape-specific parsing logic is broken out of the monolith.
+
+### 3. Do not enroll with PRECEPT0019; use a different mechanism
+- **Class**: `Precept.Pipeline.ProofEngine`
+- **Catalog Enum**: `ProofRequirementKind`
+- **Dispatch pattern**: The engine handles proof kinds in several separate places, mostly by DU subtype rather than enum identity:
+  - strategy 1 numeric-only literal proof (`ProofEngine.cs:334-360`)
+  - strategy 2 kind-specific declaration proof (`365-421`)
+  - guard-path proof branches (`526-536`)
+  - diagnostic construction (`841-889`)
+  - fault-link construction (`907-920`)
+- **Coverage gap risk**: High if new proof kinds are added; a new kind can easily be forgotten in one of these families and degrade into fallback behavior.
+- **Feasibility**: Low for PRECEPT0019 specifically. The analyzer is class-level and only requires that some method in the class is annotated for each member. That would not guarantee that every independent dispatch family (`TryDeclarationAttributeProof`, `CreateDiagnostic`, `CreateFaultSiteLink`, etc.) handles every kind. With the current analyzer shape, enrollment would create false confidence.
+- **Recommendation**: **Skip for PRECEPT0019.** If stronger compile-time confidence is desired here, use a different enforcement mechanism: either split each dispatch family into its own handler type, or add a new analyzer that audits proof-requirement DU switches/families directly.
+
+### 4. Do not enroll with PRECEPT0019; make the logic catalog-driven instead
+- **Class**: `Precept.Pipeline.TypeChecker`
+- **Catalog Enum**: `FunctionKind`, `OperationKind`, `ConstraintKind`, `ModifierKind`
+- **Dispatch pattern**:
+  - CI enforcement hardcodes specific `OperationKind` values (`TypeChecker.Validation.cs:334-358`) and specific `FunctionKind` values (`365-380`)
+  - ensure normalization hardcodes `TokenKind -> ConstraintKind` (`TypeChecker.cs:449-456`)
+  - access-mode normalization hardcodes `TokenKind.Editable -> ModifierKind.Write` and fallback-to-read (`589-594`)
+  - state-hook normalization hardcodes `TokenKind.From -> AnchorScope.OnExit`, fallback-to-entry (`652-656`)
+- **Coverage gap risk**: Medium. These sites can silently mis-handle future surface additions because they use subset logic with fallback arms.
+- **Feasibility**: Low for PRECEPT0019. These are not “handle every member of the enum” sites. They either care about a small semantic subset of a much larger enum, or they are token-to-catalog mappings.
+- **Recommendation**: **Skip PRECEPT0019.** Fix these, if desired, by moving more meaning into catalog metadata/indexes (for example, access/anchor token indexes in `Modifiers`, or CI-enforcement metadata in `Functions` / `Operations`).
+
+### 5. No current candidate
+- **Classes**: `Precept.Runtime.Evaluator`, `Precept.Runtime.Precept`
+- **Assessment**: No PRECEPT0019 recommendation today. Both files are still largely runtime stubs/TODOs (`src/Precept/Runtime/Evaluator.cs`, `src/Precept/Runtime/Precept.cs`), so there is not yet a stable handwritten enum/member dispatch surface worth enrolling.
+- **Recommendation**: Revisit only when runtime execution logic becomes real and there is an actual per-catalog dispatch family to audit.
+
+## Already Covered by Other Analyzers
+- **All current `GetMeta` catalogs covered by PRECEPT0007 today**:
+  - `TypeKind` → `Types.GetMeta` (`src/Precept/Language/Types.cs:301-725`)
+  - `TokenKind` → `Tokens.GetMeta` (`Tokens.cs:95-432`)
+  - `OperatorKind` → `Operators.GetMeta` (`Operators.cs:15-156`)
+  - `OperationKind` → `Operations.GetMeta` (`Operations.cs:43-...`)
+  - `ModifierKind` → `Modifiers.GetMeta` (`Modifiers.cs:46-309`)
+  - `FunctionKind` → `Functions.GetMeta` (`Functions.cs:38-307`)
+  - `ActionKind` → `Actions.GetMeta` (`Actions.cs:66-205`)
+  - `ConstructKind` → `Constructs.GetMeta` (`Constructs.cs:41-169`)
+  - `DiagnosticCode` → `Diagnostics.GetMeta` (`Diagnostics.cs:37-438`)
+  - `FaultCode` → `Faults.GetMeta` (`Faults.cs:12-40`)
+  - `ExpressionFormKind` → `ExpressionForms.GetMeta` (`ExpressionForms.cs:81-104`)
+- **Diagnostics/Fault catalog consistency already has dedicated analyzer coverage**:
+  - `FaultCode` ↔ `DiagnosticCode` statically-preventable mapping is enforced by **PRECEPT0002** (`src/Precept.Analyzers/Precept0002FaultCodeMustHaveStaticallyPreventable.cs`)
+  - `Diagnostics.GetMeta` self-consistency is enforced by **PRECEPT0015** (`src/Precept.Analyzers/Precept0015DiagnosticsCrossRef.cs:11-191`)
+- **Proof requirement metadata placement/identity already has targeted analyzer coverage**:
+  - `ParamSubject` reference identity → **PRECEPT0005**
+  - proof-subject placement validity → **PRECEPT0006**
+- These analyzers do not replace PRECEPT0019 for pipeline code, but they do mean the catalogs themselves are already guarded in several important places.
+
+## Catalog-Driven (Correct — No Enrollment Needed)
+These are exactly the places where the catalog already is the source of truth and PRECEPT0019 would be redundant noise.
+
+- **Lexer / TokenKind**
+  - keyword recognition uses `Tokens.Keywords` (`Lexer.cs:97-99`, `688-697`)
+  - operator recognition uses `Tokens.TwoCharOperators`, `Tokens.SingleCharOperators`, `Tokens.TwoCharOperatorStarters` (`736-760`)
+  - punctuation recognition uses `Tokens.PunctuationChars` (`762-772`)
+  - the only switch is on internal `LexerMode` (`157-168`), not on `TokenKind`
+- **Parser / ConstructKind**
+  - top-level construct routing is driven by `Constructs.ByLeadingToken` and `DisambiguationEntry.DisambiguationTokens` (`Parser.cs:138-179`)
+- **Parser / TypeKind, ModifierKind, ActionKind, OutcomeKind**
+  - types via `Types.ByToken` (`Parser.cs:396-422`, `544-570`)
+  - field/state modifiers via `Modifiers.ByFieldToken` / `Modifiers.ByStateToken` (`581-607`, `634-670`)
+  - action verbs via `Actions.ByTokenKind` (`843-861`)
+  - outcome forms via `Outcomes.ByLeadingToken` (`Parser.Expressions.cs:580-587`)
+- **TypeChecker / OperationKind, FunctionKind, ActionKind, TypeKind**
+  - binary/unary operator legality via `Operations.FindCandidates` / `FindUnary` and `Operators.ByToken` (`TypeChecker.Expressions.cs:488-510`, `525-625`)
+  - functions via `Functions.FindByName` + overload metadata (`1031-1145`)
+  - action proof requirements via `Actions.GetMeta(parsedAction.Kind).ProofRequirements` (`683-684`)
+  - member/method accessors via `Types.GetMeta(receiver.ResultType).Accessors` (`1199-1240`, `1255-1312`)
+- **GraphAnalyzer / ModifierKind**
+  - state modifier semantics are read from `StateModifierMeta` (`GraphAnalyzer.cs:595-603`)
+  - this is the correct architecture: graph algorithms stay hand-written, modifier meaning lives in metadata
+- **ProofEngine / OperationKind, FunctionKind, ModifierKind**
+  - subject resolution uses `Operations.GetMeta` / `Functions.GetMeta` (`264-279`)
+  - declaration proof reads `Modifiers.GetMeta` and proof satisfactions (`399-407`)
+  - guard decomposition uses operator metadata from `Operations.GetMeta(...).Op` (`553-604`, `728-739`, `1079-1090`)
+
+## Structural Obstacles
+- **`ProofRequirementKind` in `ProofEngine` is a real risk surface, but PRECEPT0019 is the wrong tool.**
+  - The engine has multiple independent proof-kind dispatch families. Class-level coverage would only prove that each kind is handled somewhere, not everywhere it must be handled.
+  - This is a false-confidence hazard. If Shane wants compile-time exhaustiveness here, the analyzer must be more precise than PRECEPT0019, or the code must be reorganized into one handler family per kind.
+- **`ActionSyntaxShape` needs method extraction before PRECEPT0019 can help.**
+  - Today the entire shape dispatch lives in one switch statement (`Parser.cs:887-1005`). PRECEPT0019 only works when the handling surface is factored into methods that can carry `[HandlesCatalogMember]`.
+- **`OutcomeArgumentKind.None` is a currently-unused member.**
+  - That is not a blocker; it is exactly why enrollment is useful. But it does require a deliberate handler method rather than relying on the current inline throw in `ParseOutcome`.
+- **Several TypeChecker sites are really missing indexes/metadata, not PRECEPT0019.**
+  - `ConstraintKind` is being synthesized from leading tokens (`TypeChecker.cs:449-456`) rather than derived from a constraint/anchor index.
+  - access-mode and anchor mapping are handwritten (`589-594`, `652-656`) even though `Modifiers.GetMeta` already knows access and anchor semantics.
+  - Those should become catalog-derived lookups if we want confidence there; forcing whole-enum PRECEPT0019 coverage would be the wrong abstraction.
+- **CI enforcement is subset dispatch, not full-enum dispatch.**
+  - `TypeChecker.Validation` only cares about CI-sensitive operations/functions, not every `OperationKind` / `FunctionKind` member.
+  - The right fix is metadata (`HasCIVariant`, operator family/CI flags), not whole-enum class enrollment.
+
+## Phase 3 Assessment
+`src/Precept.Analyzers/CatalogAnalysisHelpers.cs:57-68` has an outdated TODO. `ConstraintKind` and `ProofRequirementKind` are now ready to join PRECEPT0007’s `CatalogEnumNames` list.
+
+- **`ConstraintKind`**
+  - Enum lives in `src/Precept/Language/ConstraintKind.cs:6-25`
+  - `Constraints.GetMeta` is fully explicit and ends in `_ => throw`, not discard fallback (`src/Precept/Language/Constraints.cs:13-21`)
+- **`ProofRequirementKind`**
+  - Enum lives in `src/Precept/Language/ProofRequirementKind.cs:6-24`
+  - `ProofRequirements.GetMeta` is fully explicit and ends in `_ => throw`, not discard fallback (`src/Precept/Language/ProofRequirements.cs:13-21`)
+
+**Verdict:** add both names to `CatalogAnalysisHelpers.CatalogEnumNames` now. There are no remaining `_ =>` discard-arm blockers in the catalog `GetMeta` switches. The current blocker is only the stale TODO comment, not the code.
+
+# ProofEngine Architecture Audit — Findings
+
+**Date:** 2026-05-09T08:52:00-04:00
+**By:** Frank (Lead/Architect)
+**Verdict:** CONCERNS — 4 required fixes, 2 design gaps
+
+---
+
+## Required Fixes
+
+### FIX-1: `IsSubtractionOp` uses string-based enum name matching (VIOLATION)
+
+**Location:** `ProofEngine.cs` line 773–777
+
+```csharp
+private static bool IsSubtractionOp(OperationKind op)
+{
+    var name = op.ToString();
+    return name.Contains("Minus", StringComparison.Ordinal);
+}
+```
+
+The Operations catalog already carries `BinaryOperationMeta.Op == OperatorKind.Minus`. This should be `Operations.GetMeta(op).Op == OperatorKind.Minus`. String-matching on enum member names is fragile, non-catalog-driven, and breaks if enum names are refactored.
+
+---
+
+### FIX-2: `CreateDiagnostic` maps `PresenceProofRequirement` to `DivisionByZero` (BUG)
+
+**Location:** `ProofEngine.cs` lines 883–889
+
+```csharp
+PresenceProofRequirement presence =>
+    Diagnostics.Create(DiagnosticCode.DivisionByZero, ...),  // WRONG
+
+_ => Diagnostics.Create(DiagnosticCode.DivisionByZero, ...)  // WRONG
+```
+
+Unresolved presence obligations and unknown requirement types both fall through to `DiagnosticCode.DivisionByZero`. A presence proof failure ("optional field accessed without guard") is not a division-by-zero error. Requires a dedicated `UnprovedPresenceRequirement` diagnostic code (proposed 116) or, if presence obligations are always handled upstream by the TypeChecker's collection safety diagnostics, this code path should be unreachable with an explicit `throw new UnreachableException()`.
+
+---
+
+### FIX-3: `CreateFaultSiteLink` default fallback to `DivisionByZero` (BUG)
+
+**Location:** `ProofEngine.cs` lines 919, 926
+
+```csharp
+_ => DiagnosticCode.DivisionByZero     // line 919 — catch-all
+_ => FaultCode.DivisionByZero          // line 926 — catch-all
+```
+
+Same issue as FIX-2 — the fault site link defaults to `DivisionByZero` for any requirement kind not explicitly matched. `PresenceProofRequirement` specifically has no mapping. If the presence fallback is reachable, it needs a correct `FaultCode` and `DiagnosticCode`.
+
+---
+
+### FIX-4: Missing `UnprovedPresenceRequirement` diagnostic code (SPEC + IMPL GAP)
+
+Neither the design doc's diagnostic table (§9) nor `DiagnosticCode.cs` defines a presence-specific proof diagnostic code. The diagnostic table at line 1577 of the spec lists codes 82–84 and 112–115 but has no entry for "optional field used without proving it is set." This is the root cause of FIX-2 and FIX-3.
+
+**Resolution:** Add `UnprovedPresenceRequirement = 116` to `DiagnosticCode.cs` and a corresponding `Diagnostics` catalog entry. Update `CreateDiagnostic` and `CreateFaultSiteLink` to use it for `PresenceProofRequirement`.
+
+---
+
+## Design Gaps (Non-Blocking)
+
+### GAP-1: Design doc pseudocode vs. implementation minor discrepancies
+
+1. **ResolveParamInBinaryOp** — spec references `opMeta.Left`/`opMeta.Right`; implementation correctly uses `bom.Lhs`/`bom.Rhs` and checks Rhs before Lhs (documented improvement for shared-parameter resolution). Spec should be updated to match.
+2. **Strategy 2 modifier walk** — spec pseudocode omits `ImpliedModifiers`; implementation correctly includes them via `.Concat(attributeField.ImpliedModifiers)`. Spec prose at line 826 correctly states this, but pseudocode at line 729 doesn't. Minor spec consistency issue.
+
+### GAP-2: `GuardRelationImpliesObligation` implementation accepts additional parameters vs spec
+
+Spec signature: `GuardRelationImpliesObligation(guard, expr, requirement)` (3 params).
+Implementation signature: `GuardRelationImpliesObligation(guard, expr, exprLeftField, exprRightField, requirement)` (5 params).
+
+The implementation pre-resolves field names and passes them as arguments. Functionally equivalent, slightly different shape. Spec should be updated if a spec-update pass occurs.
+
+# Design Ruling: ProofEngine × ProofRequirementKind Exhaustiveness Mechanism
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-09
+**Status:** RULING — awaiting Shane sign-off
+**Requested by:** Shane (no deferrals, right solution not easiest)
+
+---
+
+## Context
+
+The PRECEPT0019 audit identified `ProofEngine × ProofRequirementKind` as a real coverage risk but concluded that enrolling it in PRECEPT0019 would give **false confidence**. The engine has multiple independent dispatch families — some that MUST handle every `ProofRequirement` subtype, and others that are intentionally partial. A class-level annotation can't distinguish between these.
+
+Shane's directive: find the architecturally correct enforcement mechanism. No deferrals.
+
+## Findings from Source
+
+### Dispatch Families in ProofEngine
+
+I count **seven** sites that operate on `ProofRequirement` subtypes. They fall into two categories:
+
+**Category A — Must-Be-Exhaustive (2 families):**
+
+1. **`CreateDiagnostic`** (line 840–878) — switch statement over `obligation.Requirement` with explicit type-pattern arms for all 5 subtypes, followed by `throw`. Every requirement kind MUST produce a diagnostic when unresolved. Missing an arm means silent failure.
+
+2. **`CreateFaultSiteLink`** (line 900–917) — switch statement over `obligation.Requirement` with explicit type-pattern arms for all 5 subtypes, followed by `throw`. Every requirement kind MUST produce a fault-site link.
+
+**Category B — Intentionally Partial (5 families):**
+
+3. **`TryLiteralProof`** (Strategy 1, line 334) — handles only `NumericProofRequirement`. By design: only numeric requirements can be discharged by literal comparison.
+
+4. **`TryDeclarationAttributeProof`** (Strategy 2, line 365) — handles `DimensionProofRequirement`, `ModifierRequirement`, `NumericProofRequirement`, `PresenceProofRequirement`. By design: `QualifierCompatibilityProofRequirement` has its own dedicated strategy.
+
+5. **`TryGuardInPathProof`** (Strategy 3, line 511) — handles `NumericProofRequirement`, `PresenceProofRequirement`. By design: guard decomposition only produces numeric and presence constraints.
+
+6. **`TryFlowNarrowingProof`** (Strategy 4, line 681) — handles only `NumericProofRequirement`. By design: flow narrowing applies only to subtraction operand relationships.
+
+7. **`TryQualifierCompatibilityProof`** (Strategy 5, line 779) — handles only `QualifierCompatibilityProofRequirement`. By design: this is the dedicated dual-subject strategy.
+
+### Key Architectural Insight
+
+The strategies are organized by **proof technique**, not by **requirement kind**. A single strategy handles multiple kinds (Strategy 2 handles 4 of 5), and the same kind is handled by multiple strategies (Numeric is attempted by Strategies 1, 2, 3, and 4). This is the correct decomposition. The strategies chain via `TryDischarge` (line 316–330): each returns false for inapplicable kinds, and the loop tries the next strategy.
+
+If no strategy can discharge an obligation, it stays `Unresolved`. That is **safe** — it's conservative. `CreateDiagnostic` then fires, producing an error for the user. The danger is never "we failed to prove something" (that's correctly conservative). The danger is in the must-be-exhaustive families: "we failed to emit the right diagnostic" or "we failed to link the right fault code."
+
+### What PRECEPT0025 Actually Covers Today
+
+`ProofRequirement` already carries `[CatalogDU]` (line 41 of ProofRequirement.cs). PRECEPT0025 fires. But:
+
+1. **PRECEPT0025 only covers switch expressions** — it registers for `OperationKind.SwitchExpression` (line 55). The two must-be-exhaustive families (`CreateDiagnostic`, `CreateFaultSiteLink`) use switch **statements**. PRECEPT0025 does not see them.
+
+2. **PRECEPT0025 only prohibits wildcards** — it checks for `_ =>`, `BaseType x =>`, and `BaseType =>` patterns. It does NOT check that every sealed subtype has an arm. A switch with 4 of 5 arms and no wildcard passes PRECEPT0025 — but it's incomplete.
+
+3. **PRECEPT0025 doesn't force switches to exist** — if someone adds a new method that processes obligations without switching, nothing fires. (This is acceptable for strategies — see below.)
+
+### Why Converting to Switch Expressions Doesn't Work
+
+`TreatWarningsAsErrors` is `true` in `Precept.csproj`. C# emits CS8509 for non-exhaustive switch expressions, which would become a compile error. But C# cannot prove exhaustiveness for abstract type hierarchies — even with all subtypes sealed, the base type is not itself sealed. The developer would need `_ => throw new InvalidOperationException(...)` as the final arm. PRECEPT0025 would flag that `_ =>` pattern as prohibited.
+
+This is a genuine tension: C# requires a discard for type-pattern exhaustiveness on non-sealed bases, and PRECEPT0025 prohibits discards. Switch statements avoid this tension — they don't require compiler-proved exhaustiveness.
+
+---
+
+## Recommended Option: PRECEPT0026 — CatalogDU Switch Arm Completeness
+
+### The Mechanism
+
+A new Roslyn analyzer, **PRECEPT0026**, that enforces **subtype completeness** for every switch (expression or statement) over a `[CatalogDU]`-marked type:
+
+1. **Detect** any switch expression or switch statement whose discriminant type inherits from a `[CatalogDU]`-marked abstract record.
+2. **Enumerate** all sealed subtypes of the DU base in the current compilation.
+3. **Enumerate** all type-pattern arms in the switch.
+4. **Report an error** for each sealed subtype that has no corresponding type-pattern arm.
+
+**Diagnostic shape:** `"Switch over [CatalogDU] type '{0}' is missing arm(s) for subtype(s): {1}"`
+
+### What This Enforces — Precisely
+
+When a 6th `ProofRequirement` subtype is added:
+
+- **`CreateDiagnostic`**: PRECEPT0026 fires — "missing arm for `NewSubtype`." Compile error. Developer must add an explicit `case NewSubtype:` arm with the correct diagnostic code. ✅
+- **`CreateFaultSiteLink`**: PRECEPT0026 fires — "missing arm for `NewSubtype`." Compile error. Developer must add an explicit `case NewSubtype:` arm with the correct fault code. ✅
+- **Strategy methods**: No switch exists. PRECEPT0026 doesn't fire. The new kind is not discharged by any existing strategy. The obligation stays `Unresolved`. `CreateDiagnostic` fires (guaranteed exhaustive by PRECEPT0026). **Correct conservative behavior.** ✅
+
+Combined with existing PRECEPT0025:
+
+- **PRECEPT0025** prevents wildcards from silently absorbing new subtypes (no `_ =>` or `default:` that hides a missing arm).
+- **PRECEPT0026** requires every known subtype to have an explicit arm.
+- Together: every subtype has exactly one explicit arm, new subtypes produce compile errors at every switch site, and no wildcard provides false safety.
+
+### What's Required to Implement
+
+1. **New analyzer file**: `src/Precept.Analyzers/Precept0026CatalogDUCompleteness.cs`
+   - Register for both `OperationKind.SwitchExpression` and `OperationKind.Switch` (switch statements).
+   - Reuse `CatalogAnalysisHelpers` and PRECEPT0025's `FindCatalogDUBase` pattern (extract to shared helper or duplicate — the walk logic is 10 lines).
+   - To enumerate sealed subtypes: scan `compilation.GetSymbolsWithName()` or walk the DU base's containing assembly for types that inherit from it and are sealed. The subtypes are always in the same assembly as the base (Precept.dll).
+
+2. **Extend PRECEPT0025 to also cover switch statements**: Register for `OperationKind.Switch` in addition to `OperationKind.SwitchExpression`. Adapt `IsProhibitedPattern` to handle `ISwitchCaseOperation` (switch statement case clauses). This ensures `default:` arms in switch statements are also caught.
+
+3. **Tests**: Add analyzer tests in `test/Precept.Analyzers.Tests/` for both PRECEPT0026 and the PRECEPT0025 extension.
+
+4. **No ProofEngine changes required.** The existing switch statements in `CreateDiagnostic` and `CreateFaultSiteLink` are already in the correct shape — explicit type-pattern arms for all 5 subtypes, no wildcard. PRECEPT0026 would pass on them today and fire the moment a 6th subtype is added.
+
+### Annotation Surface
+
+**None required.** PRECEPT0026 operates on the `[CatalogDU]` attribute that already exists. Every switch over a `[CatalogDU]` type gets completeness checking automatically. No method-level annotations, no family-level markers, no opt-in. This is the correct annotation surface: the DU type itself carries the enforcement marker, and every consumer switch is independently checked.
+
+---
+
+## Explicit Comparison: Why Each Alternative Was Rejected
+
+### Option 1 — Reorganize ProofEngine into one handler type per ProofRequirementKind
+
+**Rejected.** Architecturally wrong decomposition axis.
+
+The five proof strategies are organized by *proof technique* — literal comparison, declaration attribute inspection, guard path analysis, flow narrowing, qualifier compatibility. This is the correct axis because:
+
+- A single strategy handles multiple requirement kinds (Strategy 2 handles 4 of 5).
+- Multiple strategies attempt the same kind (Numeric is tried by Strategies 1, 2, 3, and 4).
+- The strategies compose in a chain: try each technique until one succeeds.
+
+Splitting by kind would scatter proof logic across 5 handler classes. Strategy 2's declaration attribute logic would be duplicated into 4 separate classes. The guard decomposition machinery (shared between Strategy 3 and 4) would either be duplicated or require a shared base, creating the same cross-cutting dependency it claims to eliminate.
+
+Worse: it solves the wrong problem. The must-be-exhaustive families (`CreateDiagnostic`, `CreateFaultSiteLink`) are already single-site switches — splitting them gains nothing. The strategies are intentionally partial — forcing per-kind handlers gives false confidence that each handler is complete when its partiality is the design intent.
+
+This option would also destroy the natural test surface. The current tests verify strategy behavior end-to-end (given an obligation, which strategy discharges it?). Per-kind handlers would fragment tests into artificial boundaries that don't match how the engine actually reasons.
+
+### Option 3 — Use PRECEPT0025 ([CatalogDU]) directly
+
+**Rejected.** Insufficient — three independent gaps:
+
+1. **Switch statements are invisible.** PRECEPT0025 registers for `OperationKind.SwitchExpression` only. The two must-be-exhaustive families use switch statements. PRECEPT0025 doesn't see them.
+
+2. **Wildcards ≠ completeness.** Even if PRECEPT0025 were extended to statements, it only prohibits wildcards. A switch with 4 of 5 arms and no wildcard passes PRECEPT0025 but is incomplete. PRECEPT0025 answers "is this switch safe against future subtypes?" but not "does this switch handle all current subtypes?"
+
+3. **C# tension.** If switch statements were converted to expressions (to enter PRECEPT0025's scope), C# requires `_ => throw` for type-pattern exhaustiveness on non-sealed bases (CS8509 + TreatWarningsAsErrors). PRECEPT0025 would then flag that required `_ =>` as prohibited. The two rules conflict.
+
+PRECEPT0025 is a necessary complement to PRECEPT0026, not a substitute for it. Together they provide the full guarantee; neither alone is sufficient.
+
+### Option 2 (as originally framed) — Family-level method annotation
+
+**Rejected in favor of a simpler variant.** The original option 2 proposed method-level or family-level annotations — marking each dispatch family and requiring exhaustiveness within the annotated scope. This adds annotation overhead and introduces a new concept (dispatch families as annotated groups) that doesn't exist elsewhere in the analyzer infrastructure.
+
+PRECEPT0026 achieves the same guarantee without any annotations. Every switch over a `[CatalogDU]` type is automatically checked. The enforcement is structural (inherent in the switch + DU type), not declarative (requiring developers to remember to annotate). Structural enforcement is always preferred — it cannot be forgotten.
+
+---
+
+## Risks and Tradeoffs
+
+1. **PRECEPT0026 doesn't force switches to exist.** If someone adds a new method that processes proof obligations via `if/else` chains or individual `is` type checks instead of a switch, PRECEPT0026 doesn't fire. This is acceptable because:
+   - The intentionally-partial strategies already use `if (obligation.Requirement is not FooType) return false;` patterns — forcing them into switches would be wrong.
+   - The must-be-exhaustive sites (`CreateDiagnostic`, `CreateFaultSiteLink`) are already switches and there's no architectural reason to add more must-be-exhaustive sites.
+   - Code review remains the backstop for architectural patterns that analyzers can't enforce.
+
+2. **Sealed subtype enumeration at analysis time.** The analyzer must discover all sealed subtypes of a `[CatalogDU]` base. In the same compilation (single assembly), this is straightforward — walk `compilation.GlobalNamespace` descendants. Cross-assembly DU hierarchies would be harder, but all Precept DUs live in the same assembly. If DUs ever cross assembly boundaries, the enumeration logic would need enhancement.
+
+3. **PRECEPT0025 extension to switch statements requires adapting pattern-matching logic.** Switch statement case clauses (`ISwitchCaseOperation`) have a different IOperation shape than switch expression arms (`ISwitchExpressionArmOperation`). The adaptation is mechanical but needs careful testing. A `default:` case in a switch statement is represented differently than `_ =>` in a switch expression.
+
+4. **The "no strategy handles it" gap is by design.** When a new `ProofRequirementKind` is added, no existing strategy discharges it. All obligations of the new kind stay `Unresolved`. `CreateDiagnostic` produces an error. This is correct conservative behavior — but it means the developer must also implement a strategy for the new kind, and nothing enforces that beyond code review. Acceptable: a failing-safe default is the right tradeoff.
+
+---
+
+## Implementation Routing
+
+- **George** builds PRECEPT0026 and the PRECEPT0025 switch-statement extension. He owns the analyzer infrastructure, just shipped PRECEPT0025, and has the Roslyn IOperation expertise. This is pure analyzer work — no runtime changes.
+
+- **Kramer** is not needed. No ProofEngine structural changes are required. The existing switch statements are already in the correct shape.
+
+- **Estimated scope**: ~150 lines of analyzer code for PRECEPT0026, ~30 lines of adaptation for the PRECEPT0025 extension, plus test coverage. Small, focused, no structural risk.
+
+---
+
+## Summary
+
+**PRECEPT0026 (CatalogDU Switch Arm Completeness)** is the architecturally correct mechanism. It enforces per-switch exhaustiveness without reorganizing the engine, without adding annotations, and without the false-confidence hazard of class-level enrollment. Combined with PRECEPT0025 (wildcard prohibition, extended to switch statements), it provides the complete compile-time guarantee:
+
+- Every sealed DU subtype has an explicit arm in every switch.
+- No wildcard silently absorbs new subtypes.
+- New subtypes produce compile errors at every must-be-exhaustive site.
+- Intentionally-partial strategies are not forced into false completeness.
+
+This is the right solution because it enforces the actual safety property (every switch is complete) at the actual enforcement boundary (each switch independently) without distorting the engine's natural decomposition (strategies by technique, not by kind).
+
+# Frank ruling — `set` / `SetType` token metadata
+
+## Verdict
+
+**Option A.** Remove `TokenCategory.Type` from `TokenKind.Set`.
+
+`SetType` is already the type-position token. The catalog should use it.
+
+## Rationale
+
+The current metadata is internally contradictory.
+
+- `TokenKind.Set` carries **single-valued** visual metadata: `TextMateScope = "keyword.other.action.precept"` and `SemanticTokenType = "keyword"`.
+- The same entry also claims `TokenCategory.Type`.
+- The two failing tests are not wrong in spirit; they are exposing that contradiction.
+
+A token cannot honestly be both:
+- an action-keyword token for grammar/lexical semantic coloring, **and**
+- a type-keyword token for the same single metadata fields.
+
+That is exactly why `TokenKind.SetType` exists.
+
+The design already has the right separation:
+
+- **Lexer emits** `TokenKind.Set`
+- **Parser reinterprets** `Set` as `SetType` in type position
+- **Types.ByToken** maps both `Set` and `SetType` to the same `TypeMeta`
+
+That is the architecture. The dual-use surface word is modeled as **two token kinds with different roles**, not one token kind with contradictory category metadata.
+
+### Why not B
+
+Option B makes the tests lie down and accept a bad catalog. It forces consumers to special-case a contradiction the catalog should have resolved.
+
+### Why not C
+
+Option C paints action-position `set` as a type everywhere. That is worse. The grammar generator and lexical semantic-token pass are driven by one field each; they cannot make `set` both action-colored and type-colored from one `TokenMeta` row.
+
+## Architectural rule this locks
+
+**Token categories on lexer-emitted tokens describe the role of that token kind as emitted.**
+
+If a surface word is context-disambiguated into a separate parser token kind, the context-specific role belongs on the disambiguated token kind (`SetType`), not back on the lexer token (`Set`).
+
+Corollary: consumers that mean **“what type keywords are valid here?”** should read the **Types catalog / parser type vocabulary**, not sweep `Tokens.All` by `TokenCategory.Type` and hope that lexical categories encode parser context.
+
+## Exact code changes required
+
+### 1. `src/Precept/Language/Tokens.cs`
+
+Change `TokenKind.Set` from:
+
+- `Cat_ActType`
+
+To:
+
+- `Cat_Act`
+
+Also update the description/comment so it no longer claims the token itself is the type token. Suggested intent:
+
+- `Set` = lexer-emitted surface word for the action keyword; parser reinterprets it as `SetType` in type position.
+
+Leave these unchanged:
+
+- `TokenKind.Set.TextMateScope = "keyword.other.action.precept"`
+- `TokenKind.Set.SemanticTokenType = "keyword"`
+- `TokenKind.SetType` remains the type-category token
+- parser disambiguation logic
+- `Types.ByToken` alias behavior
+
+If `Cat_ActType` becomes unused, delete it.
+
+### 2. `test/Precept.Tests/TokensTests.cs`
+
+Replace the old invariant:
+
+- `GetMeta_SetToken_HasBothActionAndTypeCategories`
+
+With the correct split-role assertions:
+
+- `Set` **contains** `TokenCategory.Action`
+- `Set` **does not contain** `TokenCategory.Type`
+- `SetType` **contains** `TokenCategory.Type`
+- `SetType` **does not contain** `TokenCategory.Action`
+
+Do **not** add exceptions to:
+
+- `TypeKeywords_HaveStorageTypeScope`
+- `TypeKeywords_HaveTypeSemanticTokenType`
+
+Those sweeps should remain generic. After the catalog fix, they pass naturally.
+
+### 3. `test/Precept.LanguageServer.Tests/PreceptAnalyzerCompletionTests.cs`
+
+Two drift tests currently use `PreceptTokenMeta.GetByCategory(TokenCategory.Type)` as a proxy for type vocabulary:
+
+- `AllTypeTokens_AppearInTypeItems`
+- `AllScalarTypeTokens_AppearInScalarTypeItems`
+
+That source is architecturally wrong for `set` once the catalog is corrected.
+
+Update those tests to derive expected type symbols from the **Types catalog** instead:
+
+- source from `Types.All` or `Types.ByToken`
+- exclude non-surface types like `Error` and `StateRef`
+- dedupe the `Set` / `SetType` alias to one surface word
+- keep the existing scalar-only exclusion for collection-only types (`set`, `queue`, `stack`)
+
+This preserves the real invariant: **type completions must track the type system**, not lexical token categories.
+
+### 4. `docs/language/precept-language-spec.md`
+
+Sync the wording so the spec matches the corrected catalog model:
+
+- In the **action keyword** table, `Set` should be described as the action token.
+- In the **type keyword** table / disambiguation section, keep `SetType` as the type-position representation.
+- In §1.6, make the modeling explicit: the surface word `set` is dual-use, but the token model is `Set` (lexer) + `SetType` (parser-synthesized type alias), not one dual-category token.
+
+## Tests to update
+
+### Must update
+
+- `test/Precept.Tests/TokensTests.cs`
+  - replace the dual-category invariant test
+
+### Should update
+
+- `test/Precept.LanguageServer.Tests/PreceptAnalyzerCompletionTests.cs`
+  - move type-vocabulary expectations from token-category sweeps to `Types`
+
+### Should not change
+
+- `TypeKeywords_HaveStorageTypeScope`
+- `TypeKeywords_HaveTypeSemanticTokenType`
+
+If those need an exemption, the catalog is still wrong.
+
+## Downstream impact
+
+### Grammar generator
+
+No new behavior is required for this fix.
+
+`tools/Precept.GrammarGen` groups tokens by `TokenMeta.TextMateScope`. Under the current architecture, the surface word `set` will continue to receive the action-keyword scope from the lexer token. That is acceptable for this ruling because the goal here is to make the catalog honest.
+
+If we later want **context-sensitive** type coloring for `set` in `set of string`, that is a separate tooling enhancement. It must be solved with context-aware grammar/semantic-token logic, not by lying in `TokenKind.Set` metadata.
+
+### Language server semantic tokens
+
+Same conclusion.
+
+The documented lexical semantic-token pass reads `Compilation.Tokens` + `TokenMeta.SemanticTokenType`. One `SemanticTokenType` field cannot represent both action and type for the same lexer token. So `Set` should stay `"keyword"`, and any future context-sensitive treatment must come from parser/semantic context, not dual categories on `Set`.
+
+### MCP
+
+`precept_language` becomes cleaner, not weaker:
+
+- `Set` is the action token
+- `SetType` is the type token
+
+The actual type vocabulary remains intact through `Types` and `Types.ByToken`.
+
+## Bottom line
+
+The fix is not to carve out an exception and not to repaint `Set` as a type.
+
+The fix is to stop claiming that the lexer token `Set` is a type token when the architecture already has `SetType` for that job.
+
+# TypeChecker Catalog-Driven Metadata Design
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-09
+**Source:** PRECEPT0019 audit § "Do not enroll with PRECEPT0019; make the logic catalog-driven instead"
+**Status:** Spec for implementation — all 4 sites approved by Shane with no deferrals
+
+---
+
+## Overview
+
+The PRECEPT0019 audit identified 4 hardcoded dispatch sites in TypeChecker that switch on specific `OperationKind`/`FunctionKind`/`TokenKind` values when the behavior should be derived from catalog metadata. This spec defines the exact metadata additions and TypeChecker refactors for each site.
+
+---
+
+## Site 1: CI Enforcement in `TypeChecker.Validation.cs`
+
+### Problem
+
+`EnforceCIInExpression` (lines 328–385) hardcodes specific enum members to detect case-sensitive operations/functions used with `~string` fields:
+
+- **Rule 1:** `bin.ResolvedOp == OperationKind.StringEqualsString` → emit `CaseInsensitiveFieldRequiresTildeEquals`
+- **Rule 2:** `bin.ResolvedOp == OperationKind.StringNotEqualsString` → emit `CaseInsensitiveFieldRequiresTildeNotEquals`
+- **Rule 3:** `IsContainsOperation(bin.ResolvedOp)` → emit `CaseInsensitiveValueInCaseSensitiveContains` (currently no-op — placeholder returns `false`)
+- **Rule 4:** `func.ResolvedFunction == FunctionKind.StartsWith` → emit `CaseInsensitiveFieldRequiresTildeStartsWith`
+- **Rule 5:** `func.ResolvedFunction == FunctionKind.EndsWith` → emit `CaseInsensitiveFieldRequiresTildeEndsWith`
+
+Each rule is a separate `if`/`else if` branch that tests a specific enum value. When new CI-sensitive operations or functions land, a developer must find this method and add another branch — the catalog doesn't force it.
+
+### Metadata Change: `BinaryOperationMeta`
+
+**File:** `src/Precept/Language/Operation.cs`
+
+Add two optional parameters to `BinaryOperationMeta`:
+
+```csharp
+public sealed record BinaryOperationMeta(
+    OperationKind Kind,
+    OperatorKind Op,
+    ParameterMeta Lhs,
+    ParameterMeta Rhs,
+    TypeKind Result,
+    string Description,
+    bool BidirectionalLookup = false,
+    QualifierMatch Match = QualifierMatch.Any,
+    ProofRequirement[]? ProofRequirements = null,
+    bool HasCIVariant = false,                    // ← NEW
+    DiagnosticCode? CIDiagnosticCode = null)       // ← NEW
+    : OperationMeta(Kind, Op, Result, Description)
+```
+
+- **`HasCIVariant`** — `true` when a case-insensitive counterpart exists for this operation. Mirrors the existing `FunctionMeta.HasCIVariant` field.
+- **`CIDiagnosticCode`** — the diagnostic to emit when this case-sensitive operation is used with a `~string` field. `null` when `HasCIVariant` is `false`.
+
+### Metadata Change: `FunctionMeta`
+
+**File:** `src/Precept/Language/Function.cs`
+
+Add one optional parameter:
+
+```csharp
+public sealed record FunctionMeta(
+    FunctionKind Kind,
+    string Name,
+    string Description,
+    IReadOnlyList<FunctionOverload> Overloads,
+    FunctionCategory Category,
+    string? UsageExample = null,
+    string? SnippetTemplate = null,
+    string? HoverDescription = null,
+    bool HasCIVariant = false,
+    FunctionKind? CIVariantOf = null,
+    bool IsMessagePosition = false,
+    DiagnosticCode? CIDiagnosticCode = null);      // ← NEW
+```
+
+- **`CIDiagnosticCode`** — the diagnostic to emit when this function is used with a `~string` first argument. `null` when `HasCIVariant` is `false`.
+
+### Catalog Value Assignments
+
+**`Operations.cs` — `GetMeta` switch:**
+
+| OperationKind | HasCIVariant | CIDiagnosticCode |
+|---|---|---|
+| `StringEqualsString` | `true` | `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals` |
+| `StringNotEqualsString` | `true` | `DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals` |
+| All other `BinaryOperationMeta` entries | `false` (default) | `null` (default) |
+
+When `contains` operations land in the future, they will set `HasCIVariant: true` and `CIDiagnosticCode: DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains`.
+
+**`Functions.cs` — `GetMeta` switch:**
+
+| FunctionKind | HasCIVariant | CIDiagnosticCode |
+|---|---|---|
+| `StartsWith` | `true` (already set) | `DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith` |
+| `EndsWith` | `true` (already set) | `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith` |
+| All other entries | `false` (default) | `null` (default) |
+
+### TypeChecker Change
+
+**Before** (5 separate rule branches, each hardcoding a specific enum member):
+
+```csharp
+case TypedBinaryOp bin:
+    if (bin.ResolvedOp == OperationKind.StringEqualsString &&
+        (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
+    {
+        ctx.Diagnostics.Add(Diagnostics.Create(
+            DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals, bin.Span, ...));
+    }
+    else if (bin.ResolvedOp == OperationKind.StringNotEqualsString && ...)
+    { ... }
+    else if (IsContainsOperation(bin.ResolvedOp) && ...)
+    { ... }
+    // ... recurse ...
+
+case TypedFunctionCall func:
+    if (func.ResolvedFunction == FunctionKind.StartsWith && ...)
+    { ... }
+    else if (func.ResolvedFunction == FunctionKind.EndsWith && ...)
+    { ... }
+    // ... recurse ...
+```
+
+**After** (one metadata-driven check per expression node type):
+
+```csharp
+case TypedBinaryOp bin:
+    if (Operations.GetMeta(bin.ResolvedOp) is BinaryOperationMeta
+            { HasCIVariant: true, CIDiagnosticCode: { } diagCode } &&
+        (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
+    {
+        var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
+        ctx.Diagnostics.Add(Diagnostics.Create(diagCode, bin.Span, ciFieldName));
+    }
+    EnforceCIInExpression(bin.Left, ctx);
+    EnforceCIInExpression(bin.Right, ctx);
+    break;
+
+case TypedFunctionCall func:
+    var funcMeta = Functions.GetMeta(func.ResolvedFunction);
+    if (funcMeta is { HasCIVariant: true, CIDiagnosticCode: { } diagCode } &&
+        func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
+    {
+        var ciFieldName = ((TypedFieldRef)func.Arguments[0]).FieldName;
+        ctx.Diagnostics.Add(Diagnostics.Create(diagCode, func.Span, ciFieldName));
+    }
+    foreach (var arg in func.Arguments)
+        EnforceCIInExpression(arg, ctx);
+    break;
+```
+
+**Remove:** The `IsContainsOperation` helper method. It is currently a dead placeholder returning `false`. When `contains` operations land, they will carry `HasCIVariant: true` in their catalog entry, and the unified binary-op check above will handle them automatically. The separate `CIElementCollections` check (Rule 3's additional logic about CI elements in case-sensitive containers) is also currently dead; if it needs distinct handling when contains ships, that is a future concern and should be designed at that time.
+
+### New Index
+
+None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` calls are sufficient — no new lookup index needed.
+
+### Test Coverage
+
+1. **Catalog value tests** (`Precept.Tests`):
+   - `Operations.GetMeta(OperationKind.StringEqualsString)` returns `BinaryOperationMeta` with `HasCIVariant == true` and `CIDiagnosticCode == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`
+   - `Operations.GetMeta(OperationKind.StringNotEqualsString)` returns with `HasCIVariant == true` and `CIDiagnosticCode == DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals`
+   - `Functions.GetMeta(FunctionKind.StartsWith).CIDiagnosticCode == DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith`
+   - `Functions.GetMeta(FunctionKind.EndsWith).CIDiagnosticCode == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith`
+   - Verify all `BinaryOperationMeta` entries with `HasCIVariant == false` also have `CIDiagnosticCode == null` (consistency)
+2. **Behavioral regression** — existing CI enforcement tests must continue to pass unchanged. No new behavioral tests needed; this is a refactor.
+
+---
+
+## Site 2: ConstraintKind Synthesis from Leading Tokens
+
+### Problem
+
+`TypeChecker.cs` line 449–456 synthesizes `ConstraintKind` from the leading `TokenKind` with an inline switch:
+
+```csharp
+var constraintKind = construct.LeadingTokenKind switch
+{
+    TokenKind.In   => ConstraintKind.StateResident,
+    TokenKind.To   => ConstraintKind.StateEntry,
+    TokenKind.From => ConstraintKind.StateExit,
+    _              => ConstraintKind.StateResident, // fallback
+};
+```
+
+This is a token→constraint mapping that belongs in catalog metadata.
+
+### Metadata Change: `ConstraintMeta.StateAnchored`
+
+**File:** `src/Precept/Language/Constraint.cs`
+
+Add a `LeadingToken` property to the `StateAnchored` abstract record:
+
+```csharp
+public abstract record StateAnchored(
+    ConstraintKind Kind,
+    string Description,
+    TokenKind LeadingToken)          // ← NEW
+    : ConstraintMeta(Kind, Description);
+```
+
+Update the three sealed subtypes:
+
+```csharp
+public sealed record StateResident()
+    : StateAnchored(ConstraintKind.StateResident,
+        "State residency — enforced while in state",
+        TokenKind.In);
+
+public sealed record StateEntry()
+    : StateAnchored(ConstraintKind.StateEntry,
+        "State entry — enforced on transition into state",
+        TokenKind.To);
+
+public sealed record StateExit()
+    : StateAnchored(ConstraintKind.StateExit,
+        "State exit — enforced on transition out of state",
+        TokenKind.From);
+```
+
+### New Index: `Constraints.ByToken`
+
+**File:** `src/Precept/Language/Constraints.cs`
+
+Add a `FrozenDictionary<TokenKind, ConstraintKind>` index:
+
+```csharp
+/// <summary>
+/// O(1) lookup from leading token kind to state-anchored constraint kind.
+/// Used by the type checker to resolve the constraint form from the
+/// construct's leading token without an inline switch.
+/// Mirrors <see cref="Modifiers.ByFieldToken"/> and <see cref="Types.ByToken"/>.
+/// </summary>
+public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
+    All.OfType<ConstraintMeta.StateAnchored>()
+       .ToFrozenDictionary(m => m.LeadingToken, m => m.Kind);
+```
+
+**Value type rationale:** `ConstraintKind` (not `ConstraintMeta`) because the TypeChecker consumer only needs the kind value to stamp onto `TypedEnsure`. If a future consumer needs full metadata, they can chain `Constraints.GetMeta(kind)`.
+
+### Catalog Value Assignments
+
+| TokenKind | ConstraintKind |
+|---|---|
+| `TokenKind.In` | `ConstraintKind.StateResident` |
+| `TokenKind.To` | `ConstraintKind.StateEntry` |
+| `TokenKind.From` | `ConstraintKind.StateExit` |
+
+### TypeChecker Change
+
+**Before:**
+
+```csharp
+var constraintKind = construct.LeadingTokenKind switch
+{
+    TokenKind.In   => ConstraintKind.StateResident,
+    TokenKind.To   => ConstraintKind.StateEntry,
+    TokenKind.From => ConstraintKind.StateExit,
+    _              => ConstraintKind.StateResident, // fallback
+};
+```
+
+**After:**
+
+```csharp
+var constraintKind = Constraints.ByToken.TryGetValue(construct.LeadingTokenKind, out var ck)
+    ? ck
+    : ConstraintKind.StateResident; // fallback for non-state-anchored leading tokens
+```
+
+### Test Coverage
+
+1. **Index completeness** — `Constraints.ByToken` contains exactly 3 entries: `In`, `To`, `From`
+2. **Round-trip** — for each entry, `Constraints.ByToken[token]` matches the `LeadingToken` on the corresponding `ConstraintMeta.StateAnchored` subtype
+3. **Behavioral regression** — existing ensure-constraint tests pass unchanged
+
+---
+
+## Site 3: Access-Mode Normalization
+
+### Problem
+
+`TypeChecker.cs` lines 589–594 map an access-mode token to a `ModifierKind` with a hardcoded switch:
+
+```csharp
+ModifierKind mode = modeSlot?.AccessMode switch
+{
+    TokenKind.Editable => ModifierKind.Write,
+    _                  => ModifierKind.Read,
+};
+```
+
+The `Modifiers` catalog already contains `AccessModifierMeta` entries that map tokens to modifier kinds (e.g., `ModifierKind.Write` → `TokenKind.Editable`). The TypeChecker should look up the catalog rather than hardcoding the mapping.
+
+### Metadata Change
+
+**None.** `AccessModifierMeta` already carries:
+- `Kind` (the `ModifierKind` — `Write`, `Read`, `Omit`)
+- `Token` (the `TokenMeta` with `.Kind` = `TokenKind.Editable`, `TokenKind.Readonly`, `TokenKind.Omit`)
+- `IsPresent`, `IsWritable` (semantic flags)
+
+The metadata shape is complete. What is missing is an **index** to look up by token.
+
+### New Index: `Modifiers.ByAccessToken`
+
+**File:** `src/Precept/Language/Modifiers.cs`
+
+Add alongside `ByFieldToken` and `ByStateToken`:
+
+```csharp
+/// <summary>
+/// O(1) lookup from token kind to access modifier metadata.
+/// Used by the type checker to resolve an access-mode token to its
+/// <see cref="AccessModifierMeta"/> without a hardcoded switch.
+/// Mirrors <see cref="ByFieldToken"/> and <see cref="ByStateToken"/>.
+/// </summary>
+public static FrozenDictionary<TokenKind, AccessModifierMeta> ByAccessToken { get; } =
+    All.OfType<AccessModifierMeta>()
+       .ToFrozenDictionary(m => m.Token.Kind);
+```
+
+### Catalog Value Assignments
+
+Index is auto-derived from existing catalog entries. Contents:
+
+| TokenKind | AccessModifierMeta.Kind |
+|---|---|
+| `TokenKind.Editable` | `ModifierKind.Write` |
+| `TokenKind.Readonly` | `ModifierKind.Read` |
+| `TokenKind.Omit` | `ModifierKind.Omit` |
+
+### TypeChecker Change
+
+**Before:**
+
+```csharp
+var modeSlot = construct.GetSlot<AccessModeSlot>(ConstructSlotKind.AccessModeKeyword);
+ModifierKind mode = modeSlot?.AccessMode switch
+{
+    TokenKind.Editable => ModifierKind.Write,
+    _                  => ModifierKind.Read,
+};
+```
+
+**After:**
+
+```csharp
+var modeSlot = construct.GetSlot<AccessModeSlot>(ConstructSlotKind.AccessModeKeyword);
+ModifierKind mode = modeSlot?.AccessMode is { } accessToken
+                    && Modifiers.ByAccessToken.TryGetValue(accessToken, out var accessMeta)
+    ? accessMeta.Kind
+    : ModifierKind.Read; // default: absent slot → read-only
+```
+
+### Test Coverage
+
+1. **Index completeness** — `Modifiers.ByAccessToken` contains exactly 3 entries: `Editable`, `Readonly`, `Omit`
+2. **Value correctness** — `ByAccessToken[TokenKind.Editable].Kind == ModifierKind.Write`, `ByAccessToken[TokenKind.Readonly].Kind == ModifierKind.Read`, `ByAccessToken[TokenKind.Omit].Kind == ModifierKind.Omit`
+3. **Behavioral regression** — existing access-mode tests pass unchanged
+
+---
+
+## Site 4: Anchor/State-Hook Normalization
+
+### Problem
+
+`TypeChecker.cs` lines 652–656 map a leading token to an `AnchorScope` with a hardcoded switch:
+
+```csharp
+var scope = construct.LeadingTokenKind switch
+{
+    TokenKind.From => AnchorScope.OnExit,
+    _              => AnchorScope.OnEntry, // 'to' and fallback
+};
+```
+
+The `Modifiers` catalog already contains `AnchorModifierMeta` entries that carry `AnchorScope` (e.g., `ModifierKind.From` → `AnchorScope.OnExit`, `ModifierKind.To` → `AnchorScope.OnEntry`). The TypeChecker should read the catalog.
+
+### Metadata Change
+
+**None.** `AnchorModifierMeta` already carries:
+- `Kind` (`ModifierKind` — `In`, `To`, `From`)
+- `Token` (`TokenMeta` with `.Kind` = `TokenKind.In`, `TokenKind.To`, `TokenKind.From`)
+- `Scope` (`AnchorScope` — `InState`, `OnEntry`, `OnExit`)
+- `Target` (`AnchorTarget` — `Ensure`, `StateAction`)
+
+The metadata is complete.
+
+### New Index: `Modifiers.ByAnchorToken`
+
+**File:** `src/Precept/Language/Modifiers.cs`
+
+Add alongside the other indexes:
+
+```csharp
+/// <summary>
+/// O(1) lookup from token kind to anchor modifier metadata.
+/// Used by the type checker to resolve a leading anchor token to its
+/// <see cref="AnchorModifierMeta"/> (which carries <see cref="AnchorScope"/>)
+/// without a hardcoded switch.
+/// Mirrors <see cref="ByFieldToken"/>, <see cref="ByStateToken"/>, and
+/// <see cref="ByAccessToken"/>.
+/// </summary>
+public static FrozenDictionary<TokenKind, AnchorModifierMeta> ByAnchorToken { get; } =
+    All.OfType<AnchorModifierMeta>()
+       .ToFrozenDictionary(m => m.Token.Kind);
+```
+
+### Catalog Value Assignments
+
+Index is auto-derived from existing catalog entries. Contents:
+
+| TokenKind | AnchorModifierMeta.Kind | AnchorModifierMeta.Scope |
+|---|---|---|
+| `TokenKind.In` | `ModifierKind.In` | `AnchorScope.InState` |
+| `TokenKind.To` | `ModifierKind.To` | `AnchorScope.OnEntry` |
+| `TokenKind.From` | `ModifierKind.From` | `AnchorScope.OnExit` |
+
+### TypeChecker Change
+
+**Before:**
+
+```csharp
+var scope = construct.LeadingTokenKind switch
+{
+    TokenKind.From => AnchorScope.OnExit,
+    _              => AnchorScope.OnEntry,
+};
+```
+
+**After:**
+
+```csharp
+var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out var anchorMeta)
+    ? anchorMeta.Scope
+    : AnchorScope.OnEntry; // fallback
+```
+
+### Test Coverage
+
+1. **Index completeness** — `Modifiers.ByAnchorToken` contains exactly 3 entries: `In`, `To`, `From`
+2. **Value correctness** — `ByAnchorToken[TokenKind.From].Scope == AnchorScope.OnExit`, `ByAnchorToken[TokenKind.To].Scope == AnchorScope.OnEntry`, `ByAnchorToken[TokenKind.In].Scope == AnchorScope.InState`
+3. **Behavioral regression** — existing state-hook tests pass unchanged
+
+---
+
+## Dependency Analysis
+
+### Are these 4 sites independent?
+
+**Yes — fully independent.** Each site touches a different catalog file and a different location in TypeChecker. No site's metadata change is required by another site.
+
+| Site | Catalog File(s) Modified | TypeChecker File Modified | Location |
+|---|---|---|---|
+| 1 | `Operation.cs`, `Operations.cs`, `Function.cs`, `Functions.cs` | `TypeChecker.Validation.cs` | lines 328–438 |
+| 2 | `Constraint.cs`, `Constraints.cs` | `TypeChecker.cs` | lines 449–456 |
+| 3 | `Modifiers.cs` (index only) | `TypeChecker.cs` | lines 589–594 |
+| 4 | `Modifiers.cs` (index only) | `TypeChecker.cs` | lines 652–656 |
+
+**Sites 3 and 4** both add indexes to `Modifiers.cs` but at non-overlapping locations (appended after existing indexes). They can be implemented in the same slice or separate slices without conflict.
+
+### Recommended Slicing
+
+Kramer can implement all 4 in parallel. If he prefers sequential slices for cleaner commits:
+
+1. **Slice A:** Sites 3 + 4 together (both are `Modifiers.cs` index additions — smallest, simplest, no record shape changes)
+2. **Slice B:** Site 2 (`Constraint.cs` record shape + `Constraints.cs` index)
+3. **Slice C:** Site 1 (`Operation.cs` + `Function.cs` record shape changes + `Operations.cs`/`Functions.cs` value assignments + `TypeChecker.Validation.cs` refactor — largest, most lines touched)
+
+This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (which touches the most files) lands last.
+
+---
+
+## Summary of All Changes
+
+| File | Change Type | What |
+|---|---|---|
+| `src/Precept/Language/Operation.cs` | Record shape | Add `HasCIVariant`, `CIDiagnosticCode` to `BinaryOperationMeta` |
+| `src/Precept/Language/Operations.cs` | Catalog values | Set `HasCIVariant`/`CIDiagnosticCode` on 2 entries |
+| `src/Precept/Language/Function.cs` | Record shape | Add `CIDiagnosticCode` to `FunctionMeta` |
+| `src/Precept/Language/Functions.cs` | Catalog values | Set `CIDiagnosticCode` on 2 entries |
+| `src/Precept/Language/Constraint.cs` | Record shape | Add `LeadingToken` to `StateAnchored` and 3 sealed subtypes |
+| `src/Precept/Language/Constraints.cs` | New index | `ByToken: FrozenDictionary<TokenKind, ConstraintKind>` |
+| `src/Precept/Language/Modifiers.cs` | New indexes (×2) | `ByAccessToken`, `ByAnchorToken` |
+| `src/Precept/Pipeline/TypeChecker.Validation.cs` | Refactor | Replace 5-rule CI enforcement with 2 metadata-driven checks; remove `IsContainsOperation` |
+| `src/Precept/Pipeline/TypeChecker.cs` | Refactor (×3) | Lines 449–456, 589–594, 652–656 become catalog lookups |
+
+# OutcomeArgumentKind enrollment
+
+- Enrolled `Precept.Pipeline.Parser.ParserState` in PRECEPT0019 for `OutcomeArgumentKind` alongside the existing `ExpressionFormKind` enrollment.
+- Added `[HandlesCatalogMember]` ownership markers for the three live outcome argument shapes: `RequiredIdentifier`, `RequiredStringLiteral`, and `SecondaryToken`.
+- Added `ParseOutcomeNoArg` for `OutcomeArgumentKind.None` and wired it into `ParseOutcome`. Decision: recover with `DiagnosticCode.ExpectedOutcome` + `MalformedOutcome` instead of throwing. Rationale: no cataloged outcome currently uses the no-arg shape, so the parser should claim ownership while preserving the normal parse diagnostic/recovery path if that shape is ever reached before a real surface feature ships.
+- Validation:
+  - `dotnet build src\Precept\Precept.csproj` is currently blocked by a pre-existing `PRECEPT0025` in `src\Precept\Pipeline\ProofEngine.cs` (left untouched per instruction).
+  - Targeted binary test run after compiling `Precept.dll` with analyzers disabled: `Precept.Tests` = 3629 passed / 2 failed (`TokensTests` only), `Precept.Analyzers.Tests` = 272 passed / 0 failed.
+
+# George — PRECEPT0025 Done
+
+**Date:** 2026-05-09
+**Task:** Implement PRECEPT0025 — CatalogDU Wildcard Prohibition
+**Commits:** `ea91cf3d` (attribute + analyzer + tests), `07ab8782` (Phase 3 enablement)
+
+---
+
+## What PRECEPT0025 Does
+
+PRECEPT0025 catches the class of bug that caused diagnostic code 116 (`UnprovedPresenceRequirement`) to be unreachable: when a new sealed subtype is added to an abstract record hierarchy (a catalog DU), a `_ =>` wildcard arm in a downstream type-pattern switch silently absorbs it instead of forcing an explicit branch.
+
+The analyzer registers on `SwitchExpression` operations. For each switch:
+
+1. It walks the switch value's type hierarchy looking for a type carrying `[CatalogDU]`.
+2. If found, it inspects each arm. Any arm with:
+   - A discard pattern (`_ =>`)
+   - A declaration pattern over the abstract base (`SomeDUBase x =>`)
+   - A type pattern over the abstract base (`SomeDUBase =>`)
+   …is reported as PRECEPT0025 at Error severity.
+3. Suppressed in test files (file path contains `.Tests`) to allow partial scaffolded switches.
+
+The diagnostic message names the `[CatalogDU]` abstract base type and instructs the developer to add explicit arms.
+
+---
+
+## `[CatalogDU]` Attribute
+
+**File:** `src/Precept/Language/CatalogDUAttribute.cs`
+
+```csharp
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class CatalogDUAttribute : Attribute { }
+```
+
+The attribute lives in `src/Precept/Language/` alongside other catalog attribute definitions (`HandlesCatalogMemberAttribute`, `HandlesCatalogExhaustivelyAttribute`). The analyzer reads it by name (string comparison `attr.AttributeClass?.Name == "CatalogDUAttribute"`) — no direct project reference from the analyzer assembly to the analyzed project.
+
+### `[CatalogDU]` types applied so far
+
+None yet. **See the open item below.**
+
+---
+
+## Open Item: `[CatalogDU]` NOT Applied to `ProofRequirement`
+
+The task called for applying `[CatalogDU]` to the `ProofRequirement` abstract record. I investigated and found that Kramer's fix is **partially complete**:
+
+- ✅ `PresenceProofRequirement presence =>` was added to `CreateDiagnostic` (code 116 now reachable)
+- ✅ `PresenceProofRequirement => ...` was added to `CreateFaultSiteLink`
+- ❌ The `_ => Diagnostics.Create(...)` fallback arm in `CreateDiagnostic` is **still present** (dead code)
+- ❌ The `_ => DiagnosticCode.DivisionByZero` fallback arm in `CreateFaultSiteLink` is **still present** (dead code)
+
+If I applied `[CatalogDU]` to `ProofRequirement` now, PRECEPT0025 would fire on those two dead `_ =>` arms in `ProofEngine.cs`, breaking the `src/Precept/` build. Since the task constraint says "Do not modify ProofEngine.cs — Kramer owns those fixes," and the build must be clean, I deferred the attribute application.
+
+**Action needed from Kramer:** Remove the two dead `_ =>` arms from `CreateDiagnostic` and `CreateFaultSiteLink` in `ProofEngine.cs`. Once removed, apply `[CatalogDU]` to `ProofRequirement` in `src/Precept/Language/ProofRequirement.cs`. The attribute placement is straightforward:
+
+```csharp
+[CatalogDU]
+public abstract record ProofRequirement(ProofRequirementKind Kind, string Description);
+```
+
+After that, PRECEPT0025 will guard all future switches over `ProofRequirement` subtypes.
+
+Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `ProofRequirementMeta`, `ProofSatisfaction`, `SatisfactionProjection`, `NumericBoundSource`, `DimensionSource`, `ConstraintMeta`, `ObligationContext` (if it's a DU).
+
+---
+
+## Phase 3 Enablement
+
+**Enabled:** Both `ConstraintKind` and `ProofRequirementKind` are now in `CatalogEnumNames` in `CatalogAnalysisHelpers.cs`.
+
+**Why it was safe:** Both `Constraints.GetMeta` and `ProofRequirements.GetMeta` already have explicit arms for every member of their respective enums. PRECEPT0007 only reports *missing* members — it does not object to a `_ => throw` fallback arm being present alongside exhaustive explicit arms. No new violations arose: `dotnet build src/Precept/` is clean at 0 warnings, 0 errors.
+
+**Why it was previously deferred:** The TODO was written before Kramer's Phase 2 completion. At the time, some members may have been missing from the GetMeta switches. Now they are all covered.
+
+---
+
+## Test Coverage
+
+9 tests added in `test/Precept.Analyzers.Tests/Precept0025Tests.cs`:
+
+| Test | What it covers |
+|------|----------------|
+| TP1: `DiscardArm_OverCatalogDUType_Reports` | Pure `_ =>` arm fires |
+| TP2: `DeclarationPattern_OverAbstractBase_Reports` | `Shape x =>` fires |
+| TP3: `MultipleWildcardArms_ReportsEach` | Each offending arm reported independently |
+| TP4: `SwitchOverDerivedType_WalksHierarchyAndReports` | Walks base hierarchy to find `[CatalogDU]` |
+| TN1: `ExhaustiveSwitch_NoDiagnostic` | No `_` arm = no diagnostic |
+| TN2: `DiscardArm_OverNonCatalogDUType_NoDiagnostic` | Non-`[CatalogDU]` type is ignored |
+| TN3: `GuardedAndConcretePatterns_NoDiagnostic` | Specific subtype patterns don't fire |
+| TN4: `DiscardArm_OnEnum_NoDiagnostic` | Enum switches are not affected |
+| TN5: `DiscardArm_InTestFile_Suppressed` | File path `.Tests` suppression works |
+
+Full suite: 272/272 analyzer tests pass. Main Precept tests: 3629/3631 (2 pre-existing `TokensTests` failures, unrelated to this work).
+
+---
+
+## Design Note
+
+The analyzer uses type hierarchy walking (`FindCatalogDUBase`) rather than checking only the exact switch expression type. This means a switch over a concrete subtype (`Circle c => ...`) is also governed if `Circle`'s base `Shape` has `[CatalogDU]`. This is intentional — it prevents the pattern `new List<Circle> { ... }.Select(...) switch { Circle => ..., _ => ... }` from slipping through.
+
+The catch-all declaration pattern check (`IDeclarationPatternOperation where MatchedType == catalogDUBase`) ensures that `ProofRequirement r =>` — a named binding over the abstract base — is treated the same as `_`. Both are structurally equivalent catch-alls.
+
+# George — PRECEPT0025 / PRECEPT0026 closeout
+
+## Summary of deliverables
+
+- Added `PRECEPT0026` in `src/Precept.Analyzers/Precept0026CatalogDUCompleteness.cs`.
+  - Covers both `OperationKind.SwitchExpression` and `OperationKind.Switch`.
+  - Walks the discriminant type upward to the `[CatalogDU]` base.
+  - Enumerates sealed subtypes from `compilation.GlobalNamespace`.
+  - Reports one error per missing sealed subtype arm.
+- Extended `PRECEPT0025` in `src/Precept.Analyzers/Precept0025CatalogDUWildcard.cs`.
+  - Now covers switch statements as well as switch expressions.
+  - Flags `default:` clauses in switch statements.
+  - Flags abstract-base pattern clauses in switch statements the same way it already flags catch-all arms in switch expressions.
+- Added analyzer coverage in `test/Precept.Analyzers.Tests/Precept0025Tests.cs` and new `test/Precept.Analyzers.Tests/Precept0026Tests.cs`.
+
+## Key implementation decisions
+
+- Extracted shared CatalogDU infrastructure into `CatalogAnalysisHelpers`:
+  - test-file suppression helper
+  - `[CatalogDU]` base discovery
+  - sealed subtype enumeration
+  - subtype inheritance test
+- `PRECEPT0026` only treats explicit sealed-subtype type patterns as coverage.
+  - Base-type catch-alls are still rejected by `PRECEPT0025`.
+  - Missing subtypes are reported independently for deterministic diagnostics and test coverage.
+- Added `AnalyzerTestHelper.AnalyzeWithFilePathAsync<TAnalyzer>` so both analyzers can verify `.Tests` suppression without duplicating compilation harness code.
+
+## Final test counts
+
+- `dotnet test test\Precept.Analyzers.Tests\Precept.Analyzers.Tests.csproj --no-build -q`
+  - **280 passed, 0 failed**
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build -q`
+  - **3646 passed, 0 failed**
+- `dotnet test --no-build -q`
+  - **4127 total, 3933 passed, 194 failed**
+  - Failures are pre-existing `Precept.LanguageServer.Tests` stub / not-implemented failures.
+- `dotnet build -m:1`
+  - Still blocked by pre-existing `Precept.LanguageServer.Tests` compile errors unrelated to PRECEPT0025 / PRECEPT0026.
+
+# George — TypeChecker catalog fixes
+
+## Sites fixed
+- Site 1: CI enforcement in `src/Precept/Pipeline/TypeChecker.Validation.cs`
+- Site 2: constraint-kind synthesis from leading tokens in `src/Precept/Pipeline/TypeChecker.cs`
+- Site 3: access-mode normalization in `src/Precept/Pipeline/TypeChecker.cs`
+- Site 4: anchor/state-hook normalization in `src/Precept/Pipeline/TypeChecker.cs`
+
+## Catalog shape changes
+- `BinaryOperationMeta` now carries `HasCIVariant` and `CIDiagnosticCode`.
+- `FunctionMeta` now carries `CIDiagnosticCode`.
+- `ConstraintMeta.StateAnchored` now carries `LeadingToken`.
+- Catalog values assigned per spec:
+  - `OperationKind.StringEqualsString` → `HasCIVariant: true`, `CIDiagnosticCode: CaseInsensitiveFieldRequiresTildeEquals`
+  - `OperationKind.StringNotEqualsString` → `HasCIVariant: true`, `CIDiagnosticCode: CaseInsensitiveFieldRequiresTildeNotEquals`
+  - `FunctionKind.StartsWith` → `CIDiagnosticCode: CaseInsensitiveFieldRequiresTildeStartsWith`
+  - `FunctionKind.EndsWith` → `CIDiagnosticCode: CaseInsensitiveFieldRequiresTildeEndsWith`
+  - State-anchored constraints now encode `In`/`To`/`From` directly in metadata.
+
+## New indexes
+- `Constraints.ByToken : FrozenDictionary<TokenKind, ConstraintKind>`
+- `Modifiers.ByAccessToken : FrozenDictionary<TokenKind, AccessModifierMeta>`
+- `Modifiers.ByAnchorToken : FrozenDictionary<TokenKind, AnchorModifierMeta>`
+
+## Validation
+- Targeted runtime validation:
+  - `dotnet build src\Precept\Precept.csproj -p:BuildProjectReferences=false`
+  - `dotnet build test\Precept.Tests\Precept.Tests.csproj -p:BuildProjectReferences=false`
+  - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build`
+- Final `Precept.Tests` count: **3646 passed / 0 failed**.
+- Repo-wide `dotnet test --no-build -q` result: **3847 total, 3653 passed, 194 failed**.
+
+## Deviations from Frank's spec
+- No implementation deviations.
+- Validation used targeted `Precept`/`Precept.Tests` builds because solution-level validation is currently blocked by pre-existing unrelated failures:
+  - `src/Precept.Analyzers/Precept0025CatalogDUWildcard.cs` fails solution build with `CS0246` on `ISwitchCaseClauseOperation`.
+  - `dotnet test --no-build -q` reports a missing `Precept.Analyzers.Tests.dll` and 194 pre-existing `Precept.LanguageServer.Tests` failures.
+
+# Kramer — ActionSyntaxShape enrollment in PRECEPT0019
+
+## What I split
+- Refactored `src/Precept/Pipeline/Parser.cs` so `ParseActionByShape(ActionMeta meta, SourceSpan actionStartSpan)` is now a thin dispatcher.
+- Moved each existing `ActionSyntaxShape` switch arm into its own annotated handler method.
+- Added `[HandlesCatalogExhaustively(typeof(ActionSyntaxShape))]` to `ParserState` alongside the existing class-level coverage attributes.
+- Confirmed `ActionSyntaxShape` enum members match the 9 parser cases exactly; no missing or extra switch arms were found.
+
+## Final handler method names
+- `ParseAssignValueAction`
+- `ParseCollectionValueAction`
+- `ParseCollectionIntoAction`
+- `ParseFieldOnlyAction`
+- `ParseCollectionValueByAction`
+- `ParseInsertAtAction`
+- `ParseRemoveAtIndexAction`
+- `ParsePutKeyValueAction`
+- `ParseCollectionIntoByAction`
+
+## Default arm decision
+- Kept the `default:` recovery arm returning `MalformedAction`.
+- Reason: this preserves the parser's prior fallback behavior exactly and avoids introducing a behavior change in a refactor-only slice, even though PRECEPT0019 should make the path unreachable in normal catalog-driven operation.
+
+## Verification notes
+- Clean verifier worktree (`precept-architecture-kramer-verify`):
+  - `dotnet build` succeeded, but not clean: 2 pre-existing `VSTHRD200` warnings in `tools/Precept.LanguageServer/LanguageServerStubs.cs`.
+  - `dotnet test test/Precept.Analyzers.Tests/Precept.Analyzers.Tests.csproj` passed: 272/272.
+  - `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~Precept.Tests.ActionsTests|FullyQualifiedName~Precept.Tests.Parser.ActionChainTests"` passed: 64/64.
+  - Full `dotnet test test/Precept.Tests/Precept.Tests.csproj` did not stay green in that clean verifier baseline: 3611 total, 3609 passed, 2 failed in unrelated `TokensTests` assertions.
+- Current shared workspace:
+  - Root `dotnet build` is blocked by unrelated in-progress changes outside this slice (LanguageServer and analyzer compile failures already present in the working tree), so the requested clean 0-warning/0-error root validation could not be reproduced safely without disturbing other users' work.
+
+# Kramer — ProofEngine fixes
+
+## Decision
+- Added `UnprovedPresenceRequirement = 116`.
+
+## Rationale
+- Spec gap: `docs/compiler/proof-engine.md` §9 was incomplete, so `PresenceProofRequirement` had no diagnostic code and `ProofEngine` fell back to `DivisionByZero`.
+
+## Files changed
+- `docs/compiler/proof-engine.md`
+- `src/Precept/Language/DiagnosticCode.cs`
+- `src/Precept/Language/Diagnostics.cs`
+- `src/Precept/Pipeline/ProofEngine.cs`
+- `test/Precept.Tests/DiagnosticsTests.cs`
+- `test/Precept.Tests/ProofEngineTests.cs`
+
+# Kramer — ProofEngine dead arms removed
+
+- Removed the dead `ProofRequirement` catch-all from `CreateDiagnostic` in `src/Precept/Pipeline/ProofEngine.cs` by switching explicitly over the five concrete requirement subtypes. `PresenceProofRequirement` now routes to `DiagnosticCode.UnprovedPresenceRequirement`, and numeric requirements share `GetNumericRequirementDiagnosticCode(...)`.
+- Removed the dead catch-all from `CreateFaultSiteLink` in the same file. The dispatch now has explicit cases for `NumericProofRequirement`, `ModifierRequirement`, `DimensionProofRequirement`, `QualifierCompatibilityProofRequirement`, and `PresenceProofRequirement`.
+- Applied `[CatalogDU]` to `ProofRequirement` in `src/Precept/Language/ProofRequirement.cs` and removed the remaining wildcard-bearing `ProofRequirement` switch expression in `ProofEngine.cs` so PRECEPT0025 stays quiet.
+- Validation:
+  - `dotnet build src/Precept/Precept.csproj` ✅ clean (0 errors, 0 warnings)
+  - `dotnet test --no-build -q` current workspace baseline: 3908 passed, 196 failed total
+    - `Precept.Tests`: 3629 passed, 2 failed (`TokensTests`)
+    - `Precept.Analyzers.Tests`: 272 passed
+    - `Precept.Mcp.Tests`: 7 passed
+    - `Precept.LanguageServer.Tests`: 194 failed (existing `LanguageServerStubs` / completion stub failures)
+
+# Kramer note — `set` token catalog fix
+
+## What changed
+
+- `src/Precept/Language/Tokens.cs`
+  - Changed `TokenKind.Set` from `Cat_ActType` to `Cat_Act`.
+  - Removed `Cat_ActType`; `TokenKind.Set` was its only remaining use.
+- `test/Precept.Tests/TokensTests.cs`
+  - Replaced the old dual-category `Set` assertion with two split-role tests:
+    - `Set` has `Action`, not `Type`
+    - `SetType` has `Type`, not `Action`
+- `test/Precept.LanguageServer.Tests/PreceptAnalyzerCompletionTests.cs`
+  - Updated `AllTypeTokens_AppearInTypeItems` and `AllScalarTypeTokens_AppearInScalarTypeItems` to derive expected type vocabulary from `Types.All` instead of `TokenCategory.Type` sweeps.
+  - Kept the scalar-only collection exclusion and deduped surface words via set construction.
+- `docs/language/precept-language-spec.md`
+  - Synced the spec to the split model: `set` is the lexer action token, `SetType` is the parser-synthesized type-position alias, and the model is `Set` + `SetType`, not one dual-category token.
+
+## Test counts
+
+### Before
+- `Precept.Tests`: 3626 passed, 2 failed
+- `Precept.Analyzers.Tests`: 272 passed, 0 failed
+- `Precept.Mcp.Tests`: 7 passed, 0 failed
+- `Precept.LanguageServer.Tests`: 3 passed, 194 failed
+- Total: 3908 passed, 196 failed (4104 total)
+
+### After
+- `Precept.Tests`: 3629 passed, 0 failed
+- `Precept.Analyzers.Tests`: 272 passed, 0 failed
+- `Precept.Mcp.Tests`: 7 passed, 0 failed
+- `Precept.LanguageServer.Tests`: 3 passed, 194 failed (unchanged pre-existing stub failures)
+- Total: 3911 passed, 194 failed (4105 total)
+
+## Verification
+
+- `dotnet build`
+- `dotnet test --no-build -q`
+
+`Cat_ActType` was removed.
+
+# Newman — `precept_compile` implementation complete
+
+## Implementation decisions
+
+- Added `..\..\src\Precept\Precept.csproj` as a direct `ProjectReference` from `tools/Precept.Mcp/Precept.Mcp.csproj` so the MCP tool can call `Compiler.Compile` and map `Compilation` output without duplicating runtime logic.
+- Implemented `tools/Precept.Mcp/Tools/CompileTool.cs` as a thin wrapper: call `Compiler.Compile(text)`, map diagnostics, return `definition: null` when `HasErrors` is true, otherwise project `SemanticIndex` into DTOs.
+- Diagnostic codes are serialized as `PRE####` by parsing `Diagnostic.Code` back to `DiagnosticCode` and formatting the enum value numerically; `Severity.Info` is projected as `Hint` to match the MCP contract.
+- Expression, guard, action, and rule/ensure message text is rendered by slicing the original source with `SourceSpan.Offset`/`Length` and trimming the result.
+- Field qualifier text is reconstructed from explicit `DeclaredQualifiers` metadata rather than from `TypedField.Qualifier`, because the latter models propagation semantics, not the authored declaration surface.
+- Precept name comes from the parsed `PreceptHeader` construct via `ConstructManifest`, not from a mirrored MCP-side naming cache.
+
+## Deferred / notable limitations
+
+- Event arg and field type strings are currently emitted as resolved type keywords (`string`, `number`, `choice`, etc.); the current DTO contract does not yet expose full structural type detail for collection/keyed/choice domains.
+- The current `CompileResultDto` contract does not surface proof-ledger details, access modes, state hooks, or choice-option arrays at top level. Those remain future contract-expansion work if the spec tightens around them.
+
+## Test coverage summary
+
+Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
+
+1. valid stateful compile success
+2. field projection (`Name`, `TypeName`, `IsOptional`, `IsWritable`, `Modifiers`)
+3. invalid compile returning diagnostics and null definition
+4. diagnostic code formatting as `PRE####`
+5. event + transition row projection
+6. stateless precept detection
+7. rule projection
+
+## Validation
+
+- `dotnet build tools\Precept.Mcp\Precept.Mcp.csproj` ✅
+- `dotnet test test\Precept.Mcp.Tests\Precept.Mcp.Tests.csproj` ✅ (7/7)
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` ⚠️ unrelated existing failures in `TokensTests` (`TypeKeywords_HaveStorageTypeScope`, `TypeKeywords_HaveTypeSemanticTokenType`)
+
+# Soup-Nazi — ProofEngine gap closeout
+
+- Filled gaps: Strategy 4 positive proof, Code 112 emission, Code 113 emission, Code 114 pipeline emission, presence guard discharge, presence no-guard diagnostic emission, collection `.count > 0` guard discharge, member-access count guard discharge, TypedPostfixOp `is set` extraction, StateHookContext guard discharge, same-type `number / number` divisor regression anchor, vacuous-proof diagnostic absence, and multiple obligations on the same field/site.
+- Code 116 dependency: resolved in this branch by wiring `DiagnosticCode.UnprovedPresenceRequirement` through diagnostics + ProofEngine, so the new presence diagnostic test compiles and passes.
+- Test count: before 158 (per the audit request); after 173 passing in the filtered `ProofEngineTests` run.
+- Validation: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~ProofEngineTests"` passed 173/173. Full `dotnet test test/Precept.Tests/` still has the pre-existing two `TokensTests` failures about `Set` keyword type scoping/token type.
+
+# ProofEngine Test Coverage Gap Report
+
+**Author:** Soup Nazi
+**Date:** 2026-05-09
+**Suite audited:** `test/Precept.Tests/ProofEngineTests.cs` (158 tests)
+**Files audited against:**
+- `src/Precept/Pipeline/ProofEngine.cs`
+- `src/Precept/Language/ProofRequirement.cs`
+- `docs/compiler/proof-engine.md`
+
+---
+
+## Verdict: GAPS FOUND
+
+The 158-test suite is broad and structurally sound. Pass 1 (obligation collection), error-tainted suppression, forwarding facts, initial-state satisfiability, and Strategies 1–3 all have credible positive + negative test coverage. However, five areas have zero or near-zero coverage of their success paths, and several specific behavior paths in the implementation are never exercised.
+
+---
+
+## Missing Tests (Action Items)
+
+### Priority 1 — Critical (uncovered success paths in shipped code)
+
+**Gap 1 — Strategy 4 has no positive proof test.**
+Every Strategy 4 test asserts that `FlowNarrowing` does NOT fire or that the obligation is `Unresolved`. The strategy IS implemented (`TryFlowNarrowingProof`, lines 682–715 of ProofEngine.cs). The triple table in the design doc (PE-G14) specifies 8 positive cases (e.g., `A > B` guard + `A - B` expression → `result > 0` proved). Not one of these is tested with `obligation.Strategy == ProofStrategy.FlowNarrowing`.
+**What to add:** At minimum two tests: (a) `A > B` guard + `set X = A - B` proving `result > 0` with `ProofStrategy.FlowNarrowing`, and (b) `A >= B` guard + `set X = A - B` proving `result >= 0`.
+
+**Gap 2 — Diagnostic code 112 (UnprovedModifierRequirement) never fires.**
+`Diagnostic_UnprovedModifierRequirement_HasCode112` only verifies the enum integer value. No test causes a `ModifierRequirement` to fail all strategies and emit the diagnostic. The `CreateDiagnostic` and `CreateFaultSiteLink` arms for `ModifierRequirement` are dead code from a test perspective.
+**What to add:** A test using an operation that stamps a `ModifierRequirement` (e.g., an `ordered` field operation on an unordered field) and asserts `d.Code == nameof(DiagnosticCode.UnprovedModifierRequirement)`.
+
+**Gap 3 — Diagnostic code 113 (UnprovedDimensionRequirement) never fires.**
+Same pattern as Gap 2. The `DimensionProofRequirement` arm in `TryDeclarationAttributeProof` (lines 368–373) and the corresponding `CreateDiagnostic` arm are never reached by any test.
+**What to add:** A test with a period-typed operand missing the required temporal dimension qualifier, asserting code 113 fires.
+
+**Gap 4 — Diagnostic code 114 (UnprovedQualifierCompatibility) never fires via DSL.**
+All Strategy 5 tests are metadata record equality checks. No test compiles DSL source that generates a `QualifierCompatibilityProofRequirement` and runs it through `ProofEngine.Prove`. The `ResolveQualifierOnAxis` function and the `leftQualifier == rightQualifier` comparison are never exercised end-to-end.
+**What to add:** A DSL-level test that forces two operands with incompatible qualifier values on the same axis, asserting code 114 fires (or the obligation stays `Unresolved`). Also a positive case where qualifiers match → `ProofStrategy.QualifierCompatibility` + `ProofDisposition.Proved`.
+
+**Gap 5 — PresenceProofRequirement end-to-end path never exercised.**
+No test exercises `PresenceProofRequirement` from DSL compilation through strategy dispatch to outcome. All presence tests are metadata shape assertions. The strategy 2 presence-discharge path (reading `DeclaredPresenceMeta.Guaranteed`) and the strategy 3 presence-guard path (reading `IsPresenceCheck`) are both untested at the DSL level.
+**What to add:** (a) A test accessing an optional field without a guard → unresolved + diagnostic. (b) A test with `when field is set` guard → `ProofStrategy.GuardInPath` for presence.
+
+---
+
+### Priority 2 — High (implementation code paths with no coverage)
+
+**Gap 6 — `count(collection) > 0` guard pattern is untested.**
+`ExtractGuardConstraintsCore` has specific handling for `TypedFunctionCall(Count, [TypedFieldRef])` comparisons (lines ~581–587 of ProofEngine.cs). `Strategy3_CountGuard_DischargesCollectionNonEmpty` actually uses a plain `D > 0` guard, not a collection count guard. The count-function guard branch is dead code from a test perspective.
+**What to add:** A test with `when count(Items) > 0` guard protecting a `first(Items)` or dequeue action.
+
+**Gap 7 — `collection.count > 0` member-accessor guard pattern is untested.**
+`ExtractGuardConstraintsCore` handles `TypedMemberAccess { Object: TypedFieldRef, ResolvedAccessor: "count" }` comparisons separately. No test exercises this path.
+**What to add:** A test with `when Items.count > 0` guard.
+
+**Gap 8 — `field is set` TypedPostfixOp guard pattern is untested.**
+`ExtractGuardConstraintsCore` handles `TypedPostfixOp { IsNegated: false, Operand: TypedFieldRef }` → `IsPresenceCheck: true` (lines ~592–594). `Strategy3_IsSetGuard_DischargesPresenceRequirement` uses `D != 0`, not `D is set`. The `is set` postfix operator guard path is never tested.
+**What to add:** A test with `when Field is set` guard protecting an optional field access.
+
+**Gap 9 — StateHookContext + guard path in Strategy 3 is untested.**
+Strategy 3 reads guards from both `TransitionRowContext` and `StateHookContext`. The `StateHookContext` arm is exercised only in `CollectObligations_StateHookWithDivision_CreatesStateHookContext`, which does not test guard-based proof. No test has a state hook with a guard and a proof obligation.
+**What to add:** A test with a guarded state hook (`to Draft when D != 0 -> set X = Y / D`) proving Strategy 3 applies from StateHookContext.
+
+**Gap 10 — RHS-before-LHS regression anchor for same-type division.**
+The `ResolveParamInBinaryOp` fix (checking Rhs before Lhs) was motivated by shared `ParameterMeta` instances on same-type binary operations. All existing tests use `integer / number` to avoid the ambiguity. There is no `number / number` test that would fail if Lhs were checked before Rhs.
+**What to add:** A `number / number` division test using the `NumberDivideNumber` operation (if it exists in the catalog), where the divisor carries a `nonzero` modifier and Strategy 2 proves it. This test would regress if Lhs/Rhs order were swapped.
+
+---
+
+### Priority 3 — Medium (completeness assertions and edge cases)
+
+**Gap 11 — Forwarding facts do not assert diagnostic absence.**
+Tests in Slice 12 verify `obligation.Disposition == ProofDisposition.Proved` for vacuously-proved obligations, but do not assert that `ledger.Diagnostics` contains no entry for those obligations. Add: `ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DivisionByZero))` to the unreachable-state test.
+
+**Gap 12 — `PresenceProofRequirement` fallthrough in `CreateDiagnostic`.**
+The `CreateDiagnostic` method maps `PresenceProofRequirement` to `DiagnosticCode.DivisionByZero` (lines 883–886 of ProofEngine.cs). This is likely a placeholder or bug — presence failures should not emit a `DivisionByZero` diagnostic. No test exercises this branch, so the mapping is unverified and potentially wrong.
+**What to add:** Once an end-to-end presence test exists (Gap 5), assert the emitted diagnostic code is correct for presence failures.
+
+**Gap 13 — Multiple simultaneous obligations on the same field.**
+No test has a single expression generating more than one proof obligation (e.g., `sqrt(X / D)` which would generate both a `!= 0` and a `>= 0` obligation). The proof engine should handle multiple obligations in the same site correctly.
+**What to add:** A test with `sqrt(Y / D)` (D = nonzero, Y = nonnegative) where both obligations are proved, one by Strategy 2 and one by Strategy 2.
+
+**Gap 14 — Wildcard transitions (`from * on E`).**
+No test uses wildcard transitions with proof obligations. The forwarding-fact suppression logic reads `trc.Row.FromState` and guards with `if (fromState is null) continue` for wildcard rows. This null guard path is untested.
+**What to add:** A test with `from * on Event -> set X = Y / D -> no transition` to verify wildcard rows are processed correctly.
+
+**Gap 15 — Proof spanning multiple states (same field, different transition rows).**
+No test verifies correct obligation tracking when the same field is used as a divisor in transitions from multiple states. Not a critical gap but documents a topology-coverage hole.
+
+---
+
+## Strategy Coverage Matrix
+
+| Strategy | Positive (Proved) Tests | Negative (Unresolved) Tests | Status |
+|---|---|---|---|
+| S1 Literal | 4 (literal divisors, literal sqrt args) | 3 (zero literal, negative sqrt, non-literal) | ✅ Covered |
+| S2 DeclarationAttribute | 7 (nonzero, positive, nonneg+sqrt, presence) | 3 (unqualified, optional, nonneg-for-!=0) | ✅ Covered |
+| S3 GuardInPath | 7 (!=0, >0, <0, negated, inverted, hook-skipped) | 3 (no guard, EventHandler, OR guard) | ✅ Covered |
+| S4 FlowNarrowing | **0** | 10+ (all cases document strategy NOT firing) | ❌ **MISSING positive case** |
+| S5 QualifierCompatibility | **0 DSL-level** (3 metadata equality checks) | 2 (metadata not-equal) | ⚠️ **Partially covered** |
+
+---
+
+## Diagnostic Coverage Matrix
+
+| Code | Fires-Case Tested | Suppressed-Case Tested | Status |
+|---|---|---|---|
+| DivisionByZero (83) | ✅ | ✅ | Covered |
+| SqrtOfNegative (84) | ✅ | ✅ | Covered |
+| UnprovedModifierRequirement (112) | ❌ (enum value only) | N/A | **MISSING** |
+| UnprovedDimensionRequirement (113) | ❌ (enum value only) | N/A | **MISSING** |
+| UnprovedQualifierCompatibility (114) | ❌ (enum value only) | N/A | **MISSING** |
+| UnsatisfiableInitialState (115) | ✅ | ✅ | Covered |
+
+---
+
+## Bug Fix Regression Coverage
+
+| Fix | Test | Status |
+|---|---|---|
+| Forwarding-fact suppression sets `Proved` | `ForwardingFacts_UnreachableState_ObligationsVacuouslyProved` | ✅ Covered |
+| Strategy 2 null guard (non-field-ref subject) | `GetFieldName_NonFieldRef_ReturnsNull`, `Strategy4_AGreaterThanB_SubtractionSqrtProved` | ✅ Implicitly covered |
+| RHS-before-LHS in `ResolveParamInBinaryOp` | Integer/Number tests (avoid same ParameterMeta) | ⚠️ **No same-type regression anchor** |
+
+---
+
+## ObligationContext DU Coverage
+
+| Subtype | Exercised? |
+|---|---|
+| TransitionRowContext | ✅ |
+| EventHandlerContext | ✅ |
+| StateHookContext | ✅ (obligation collection only; no guard-path test) |
+| ConstraintContext (RuleIdentity) | ✅ |
+| ConstraintContext (EnsureIdentity) | ✅ |
+| FieldExpressionContext | ✅ |
+
+---
+
+## ProofDisposition Coverage
+
+| Outcome | Tested? |
+|---|---|
+| Proved | ✅ |
+| Unresolved | ✅ |
+| Unsatisfiable (InitialState) | ✅ (via `IsSatisfiable == false`) |
+
+---
+
+## Coverage Statistics
+
+- **Total tests:** 158
+- **Strategy breakdown (approximate):**
+  - S1 Literal: ~7 tests
+  - S2 DeclarationAttribute: ~18 tests
+  - S3 GuardInPath: ~14 tests
+  - S4 FlowNarrowing: ~15 tests (ALL negative/boundary)
+  - S5 QualifierCompatibility: ~9 tests (ALL metadata-level, no DSL proof)
+- **Positive cases (proof succeeds):** ~35
+- **Negative cases (proof fails/unresolved):** ~45
+- **Code/enum verification:** ~15
+- **Metadata/structural:** ~30
+- **Integration/end-to-end:** ~33
+
+---
+
+## Prioritized Additions
+
+1. **Strategy 4 positive proof** (Gap 1) — Without this, Strategy 4's success path is completely untested. Any regression in `TryFlowNarrowingProof` or `GuardRelationImpliesObligation` is invisible.
+2. **Code 112/113/114 actually firing** (Gaps 2, 3, 4) — Three diagnostic emission paths are dead from a test perspective.
+3. **Strategy 5 DSL-level test** (Gap 4, overlap) — Strategy 5 logic (`ResolveQualifierOnAxis`, `leftQualifier == rightQualifier`) is never exercised via the pipeline.
+4. **PresenceProofRequirement end-to-end** (Gap 5) — The full presence proof cycle is untested.
+5. **`count()` and `collection.count` guard patterns** (Gaps 6, 7) — Implemented guard extraction branches are dead.
+6. **`field is set` guard pattern** (Gap 8) — Implemented but untested.
+7. **StateHookContext guard → Strategy 3** (Gap 9) — Code path implemented, untested.
+8. **RHS-before-LHS same-type anchor** (Gap 10) — Fragile if catalog gains a symmetric same-type division operator.
+9. **Forwarding facts + diagnostic absence assertion** (Gap 11) — Tests verify disposition but not diagnostic list.
+10. **`PresenceProofRequirement` → `DivisionByZero` mapping in CreateDiagnostic** (Gap 12) — Potential bug, no test catches it.
+
 # Message-position catalog metadata closed
 
 **Date:** 2026-05-08
@@ -2343,7 +3922,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 - **Severity:** SIGNIFICANT
 - **Location:** `proof-engine.md` §7 Strategy 3, line 625; Strategy 4, line 722
 - **Description:** Both Strategy 3 and Strategy 4 call `FindEnclosingTransitionRow(obligation.Site, semantics)` to find the transition row that encloses the proof obligation's expression site. The spec never defines this function. The proof engine must know: given a `TypedExpression`, how do you find which `TypedTransitionRow` contains it?
-  
+
   This is non-trivial because:
   1. `TypedExpression` nodes don't carry parent pointers or transition-row back-references.
   2. The proof engine would need to either build an expression→row index in Pass 1, or walk `TransitionRows[].Actions` looking for expression identity matches.
@@ -2359,7 +3938,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 - **Description:** Strategy 1 calls `ResolveSubject(numeric.Subject, obligation.Site)` and Strategy 2 calls `GetFieldName(obligation.Requirement.Subject, obligation.Site)`. Neither is defined. Given the `ProofSubject` DU:
   - `ParamSubject(ParameterMeta Parameter)` — how do you resolve a parameter to a concrete expression node from the obligation site? The `ParameterMeta` has object identity, but how does one locate the corresponding argument expression in a `TypedFunctionCall` or operand in a `TypedBinaryOp`?
   - `SelfSubject(TypeAccessor? Accessor)` — how does one resolve "self" to the receiver expression in a `TypedMemberAccess`?
-  
+
   The spec says `ParamSubject` "must be reference-equal to one of the `ParameterMeta` instances in the containing overload's `Parameters` list" (ProofRequirement.cs, line 16), which gives identity, but the resolution logic from identity to expression is missing.
 - **Why it matters:** Subject resolution is the first step in every strategy. Without it being specified, the implementer must infer the mapping from `ParameterMeta` identity to `TypedExpression` arguments — a non-trivial piece of logic.
 - **Suggested resolution:** Add a `ResolveSubject` pseudocode section that handles both `ParamSubject` and `SelfSubject`:
@@ -2393,9 +3972,9 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
   - 82: `UnsatisfiableGuard` (Warning)
   - 83: `DivisionByZero` (Error)
   - 84: `SqrtOfNegative` (Error)
-  
+
   There is no proof-stage diagnostic for "collection may be empty when `first()` is called." The type-checker stage has `UnguardedCollectionAccess` (63) and `UnguardedCollectionMutation` (64), but these are `DiagnosticStage.Type` — they fire during type checking, not proof. If the proof engine is supposed to handle collection non-empty proof discharge, it needs its own diagnostic code for the "unresolved" case. Or alternatively, collection safety is fully handled by the type checker and the proof engine should NOT create obligations for them.
-  
+
   The `FaultCode` enum has `CollectionEmptyOnAccess = 9` with `[StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]` — linking to the type-checker code, not a proof code.
 - **Why it matters:** The spec says the proof engine handles collection non-empty obligations, but there's no diagnostic to emit if the obligation is unresolved. Either the spec is wrong (collection safety is the type checker's job entirely) or diagnostic codes are missing.
 - **Suggested resolution:** Clarify which pipeline stage owns collection non-empty safety:
@@ -3070,8 +4649,8 @@ Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior
 
 # PE-G2 Full Design — `ProofSatisfaction` and all five requirement kinds
 
-**Date:** 2026-05-09  
-**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-09
+**Author:** Frank (Lead/Architect)
 **Status:** Complete design for implementation — no deferrals
 
 ## 1. Final decision
@@ -3092,7 +4671,7 @@ That yields one proof metadata vocabulary, but not one carrier. The carriers are
 
 ## 2. `ProofSatisfaction` DU — final C# shape
 
-**File:** `src/Precept/Language/ProofRequirement.cs`  
+**File:** `src/Precept/Language/ProofRequirement.cs`
 **Namespace:** `Precept.Language`
 
 ```csharp
@@ -3201,7 +4780,7 @@ Why this is the right carrier:
 
 ## 4.3 Full type definition
 
-**File:** `src/Precept/Language/DeclaredPresence.cs`  
+**File:** `src/Precept/Language/DeclaredPresence.cs`
 **Namespace:** `Precept.Language`
 
 ```csharp
@@ -3277,7 +4856,7 @@ Why this is the right carrier:
 
 ## 5.4 Full type definition
 
-**File:** `src/Precept/Language/DeclaredQualifierMeta.cs`  
+**File:** `src/Precept/Language/DeclaredQualifierMeta.cs`
 **Namespace:** `Precept.Language`
 
 ```csharp
@@ -3426,8 +5005,8 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 ## 6.1 `NumericProofRequirement`
 
-**Satisfying fact:** a field modifier establishes a numeric bound on the field value or on an accessor projection.  
-**Carrier:** existing `FieldModifierMeta`.  
+**Satisfying fact:** a field modifier establishes a numeric bound on the field value or on an accessor projection.
+**Carrier:** existing `FieldModifierMeta`.
 **New carrier type required:** no.
 
 ## Fully populated relevant `ProofSatisfactions`
@@ -3453,8 +5032,8 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 ## 6.2 `PresenceProofRequirement`
 
-**Satisfying fact:** the declaration is guaranteed present.  
-**Carrier:** new `DeclaredPresenceMeta`.  
+**Satisfying fact:** the declaration is guaranteed present.
+**Carrier:** new `DeclaredPresenceMeta`.
 **New carrier type required:** yes — defined above.
 
 ## Fully populated entries
@@ -3470,8 +5049,8 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 ## 6.3 `DimensionProofRequirement`
 
-**Satisfying fact:** the declaration resolves to a temporal-dimension fact.  
-**Carrier:** new `DeclaredQualifierMeta`, specifically normalized `TemporalDimension` entries.  
+**Satisfying fact:** the declaration resolves to a temporal-dimension fact.
+**Carrier:** new `DeclaredQualifierMeta`, specifically normalized `TemporalDimension` entries.
 **New carrier type required:** yes — defined above.
 
 ## Fully populated entries
@@ -3488,8 +5067,8 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 ## 6.4 `ModifierRequirement`
 
-**Satisfying fact:** the field declaration’s normalized modifier set contains the required modifier.  
-**Carrier:** the declaration’s modifier membership itself (`TypedField.Modifiers` + effective implied modifiers where appropriate).  
+**Satisfying fact:** the field declaration’s normalized modifier set contains the required modifier.
+**Carrier:** the declaration’s modifier membership itself (`TypedField.Modifiers` + effective implied modifiers where appropriate).
 **New carrier type required:** no.
 
 ## Definitive recommendation
@@ -3513,8 +5092,8 @@ That is architecturally correct, not a shortcut.
 
 ## 6.5 `QualifierCompatibilityProofRequirement`
 
-**Satisfying fact:** both declarations resolve to concrete bindings on the same axis and those bindings compare equal.  
-**Carrier:** new `DeclaredQualifierMeta`.  
+**Satisfying fact:** both declarations resolve to concrete bindings on the same axis and those bindings compare equal.
+**Carrier:** new `DeclaredQualifierMeta`.
 **New carrier type required:** yes — defined above.
 
 ## Fully populated entries
@@ -3676,52 +5255,52 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 ## 8. Implementation checklist — exact files, dependency order
 
-1. **`src/Precept/Language/ProofRequirement.cs`**  
+1. **`src/Precept/Language/ProofRequirement.cs`**
    Add `ProofSatisfaction`, `SatisfactionProjection`, `NumericBoundSource`, and `DimensionSource`.
 
-2. **`src/Precept/Language/DeclaredPresence.cs`** *(new)*  
+2. **`src/Precept/Language/DeclaredPresence.cs`** *(new)*
    Add `DeclaredPresenceMeta`.
 
-3. **`src/Precept/Language/DeclaredQualifierMeta.cs`** *(new)*  
+3. **`src/Precept/Language/DeclaredQualifierMeta.cs`** *(new)*
    Add `QualifierOrigin` and `DeclaredQualifierMeta` DU.
 
-4. **`src/Precept/Language/Modifier.cs`**  
+4. **`src/Precept/Language/Modifier.cs`**
    Add `FieldModifierMeta.ProofSatisfactions`.
 
-5. **`src/Precept/Language/Modifiers.cs`**  
+5. **`src/Precept/Language/Modifiers.cs`**
    Populate numeric `ProofSatisfactions` rows.
 
-6. **`src/Precept/Language/Types.cs`**  
+6. **`src/Precept/Language/Types.cs`**
    Expose the normalization metadata needed to resolve units to dimensions and temporal units to `PeriodDimension`.
 
-7. **`src/Precept/Pipeline/ParsedTypeReference.cs`**  
+7. **`src/Precept/Pipeline/ParsedTypeReference.cs`**
    Preserve parsed qualifier clauses on type references.
 
-8. **`src/Precept/Pipeline/Parser.cs`**  
+8. **`src/Precept/Pipeline/Parser.cs`**
    Parse declaration qualifier clauses using `TypeMeta.QualifierShape`.
 
-9. **`src/Precept/Pipeline/SymbolTable.cs`**  
+9. **`src/Precept/Pipeline/SymbolTable.cs`**
    Carry parsed qualifier data through declared field / arg symbols.
 
-10. **`src/Precept/Pipeline/SemanticIndex.cs`**  
+10. **`src/Precept/Pipeline/SemanticIndex.cs`**
     Add `DeclaredPresenceMeta Presence` and `ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers` to `TypedField` and `TypedArg`.
 
-11. **`src/Precept/Pipeline/TypeChecker.cs`**  
+11. **`src/Precept/Pipeline/TypeChecker.cs`**
     Normalize declaration presence and qualifiers into the new carriers; emit derived/baseline qualifier facts.
 
-12. **`src/Precept/Pipeline/TypeChecker.Expressions.cs`**  
+12. **`src/Precept/Pipeline/TypeChecker.Expressions.cs`**
     Ensure qualifier-aware expression resolution and proof-obligation stamping consume the normalized declaration metadata instead of ad hoc null checks.
 
-13. **`src/Precept/Pipeline/ProofEngine.cs`**  
+13. **`src/Precept/Pipeline/ProofEngine.cs`**
     Implement Strategy 2 against `DeclaredPresenceMeta`, `DeclaredQualifierMeta`, and modifier `ProofSatisfactions`; keep direct modifier-membership fast path; implement Strategy 5 against normalized qualifier carriers.
 
-14. **`docs/compiler/proof-engine.md`**  
+14. **`docs/compiler/proof-engine.md`**
     Replace `ProofDischarge` with `ProofSatisfaction`; document the new carriers and the direct-membership modifier arm.
 
-15. **`docs/language/catalog-system.md`**  
+15. **`docs/language/catalog-system.md`**
     Add the new carrier types and the updated `FieldModifierMeta` shape.
 
-16. **`docs/language/precept-language-spec.md`**  
+16. **`docs/language/precept-language-spec.md`**
     Sync the qualifier and proof sections with the normalized declaration-fact model.
 
 ---
@@ -4412,4 +5991,3 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 - Operand metadata identity matters: `integer / number` and `number / number` do not stress subject resolution the same way because catalog parameter instances differ.
 - Boolean guard composition (`and` / `or`) can go red at type-check time if the catalog does not carry the boolean operation entries the proof strategy assumes.
 - Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.
-

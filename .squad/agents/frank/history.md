@@ -7,6 +7,8 @@
 
 ## Learnings
 
+- Exhaustive ProofEngine audit (2026-05-09): implementation is architecturally sound and catalog-driven in all required dimensions. Four issues found: (1) `IsSubtractionOp` string-matches on enum names instead of reading `Operations.GetMeta(op).Op`; (2-3) `CreateDiagnostic` and `CreateFaultSiteLink` fallback to `DivisionByZero` for `PresenceProofRequirement` — wrong semantic; (4) no `UnprovedPresenceRequirement` diagnostic code exists in spec or source (proposed code 116). All five strategies are fully implemented. No TODOs/FIXMEs. All DU shapes match the approved design. ObligationContext, ProofDisposition, ProofStrategy, ProofSatisfaction, ProofObligation, FaultSiteLink, ConstraintInfluenceEntry, and InitialStateSatisfiabilityResult all match spec exactly. PE-G13 annotation at line 62 is a cross-reference comment, not a live gap.
+
 - All 18 ProofEngine gaps are resolved and applied to the canonical spec. The spec-update pass taught that large spec rewrites should be delegated to a focused agent with exhaustive instructions — the spec grew by ~25 lines net but touched 15+ sections. Context-at-instantiation (ObligationContext DU) is the right pattern for any analysis stage that needs to look up enclosing scope — avoids O(N²) post-hoc search.
 
 - Implementation planning requires reading ACTUAL source code, not spec assumptions. The spec referenced diagnostic codes 96–99, but source already has those allocated (CI enforcement, collection safety). Caught by reading `DiagnosticCode.cs` exhaustively — reallocated to 112–115. TypedField/TypedArg record shape changes are high-touch: every construction site across TypeChecker, test helpers, and potentially MCP must be updated. Always search exhaustively for `new TypedField(` before estimating effort on record shape additions.
@@ -24,6 +26,9 @@
 - Key decision: .NET tool approach confirmed, Constructs-based complex pattern resolution confirmed
 
 ## Recent Updates
+
+### 2026-05-09T09:49:38Z — TypeChecker catalog-fix spec recorded
+- `frank-13` locked the four-site TypeChecker catalog-driven design: CI enforcement metadata, `Constraints.ByToken`, `Modifiers.ByAccessToken`, and `Modifiers.ByAnchorToken`, with explicit file-level slicing and regression anchors for implementation.
 
 ### 2026-05-08T22:54:50.625-04:00 — PE-G4 through PE-G18 incorporated into canonical spec
 > All 15 remaining gap resolutions applied to `docs/compiler/proof-engine.md` with full fidelity. Key additions: `ObligationContext` DU (5 subtypes), `ResolveSubject`/`GetFieldName` utilities, full `ExtractGuardConstraints` decomposition spec, exhaustive `GuardRelationImpliesObligation` triple table, full initial-state satisfiability algorithm with bounded constant folding, builder proof-consumption contract, diagnostic formatting table with 4 new codes (96–99), error-tainted obligation suppression, stateless precept handling, reference-equality site matching. All 18 gaps now RESOLVED. Gap analysis updated. Decision record: `.squad/decisions/inbox/frank-pe-spec-complete.md`.
