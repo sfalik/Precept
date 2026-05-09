@@ -55,3 +55,8 @@
 ### Historical summary through 2026-05-07
 - Prior active work covered grammar and completion sync for guards, conditional expressions, `and` / `or` / `not`, stateless edit forms, semantic-token metadata propagation, README/tooling accuracy passes, and the C93 divisor-safety tooling fixes.
 - The standing tooling baseline is unchanged: docs must reflect reality, tests are the safest spec anchor for language-server behavior, and future tooling derivation should come from catalog metadata rather than hand-maintained lists.
+
+### 2026-05-09T11:15:46.104-04:00 — Event-arg member ref color override fixed
+- Added a TextMate compound selector override in `tools/Precept.VsCode/package.json`: `meta.event-arg-ref.precept variable.other.property.precept` now maps to `#9AD8E8` before the general `variable.other.property.precept` field-color rule.
+- This closes the precision gap where `LoadParcel.Recipient`-style event arg member references inherited the field color `#A5B4FC` even though they semantically belong to the arg color family.
+- Lesson: `variable.other.property.precept` is reused across both field references and event-arg member references, so context-sensitive color intent must be expressed with compound selectors rather than assuming the base scope is unique.
