@@ -12,8 +12,13 @@
 - DSL keywords are common identifier traps in tests; use non-keyword names unless the test is explicitly about keyword handling.
 - Analyzer suites need partition/exclusion assertions, diagnostic severities, and direct edge/topology checks — not just happy-path end-to-end outcomes.
 - `reject` / `no transition` rows can matter structurally as self-edges even when they do not change state.
+- 2026-05-08T23:45:00.367-04:00 — ProofEngine test authoring exposed three easy-to-miss proof-surface traps: operand-metadata identity can change subject resolution (`integer / number` behaves differently from `number / number`), missing boolean catalog entries can turn `and` / `or` guard tests red for type-check reasons instead of proof reasons, and forwarding-fact suppression only holds if later discharge passes preserve already-proved obligations.
 
 ## Recent Updates
+
+### 2026-05-09T04:35:00Z — ProofEngine Phase 2 suite validated
+- Soup-Nazi's 158-test `ProofEngineTests.cs` matrix for S1-S13 is now fully green after George's follow-up fixes.
+- The recorded red cases successfully flushed out forwarding-fact suppression drift and the Strategy 2 null-guard bug before branch closeout.
 
 ### 2026-05-08T00:56:00Z — A-series regression batch recorded
 - Added four A-series GraphAnalyzer regression tests (`RS-109`, `RS-110`, `RS-111`, and `DEDUP-NoInitialState`) in commit `c0ca3ae`.

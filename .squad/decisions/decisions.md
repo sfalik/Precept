@@ -127,7 +127,7 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 ## PE-G2: ProofDischarge Catalog Design
 
-### 1. ProofDischarge Record Type
+## 1. ProofDischarge Record Type
 
 ```csharp
 /// <summary>
@@ -144,7 +144,7 @@ public sealed record ProofDischarge(
 
 **Design rationale:** The `Threshold` field is nullable. For fixed-value modifiers (`positive`, `nonnegative`, `nonzero`, `notempty`), the threshold is a literal. For parameterized modifiers (`min(N)`, `max(N)`, `mincount(N)`, `maxcount(N)`), the threshold is `null`, signaling the proof engine to read the value from the field declaration's modifier parameter at proof time. This keeps the catalog entry declarative while supporting parameterized constraints.
 
-### 2. FieldModifierMeta Update
+## 2. FieldModifierMeta Update
 
 Add `ProofDischarges` property to the existing `FieldModifierMeta` record in `Modifier.cs`:
 
@@ -169,7 +169,7 @@ public sealed record FieldModifierMeta(
 }
 ```
 
-### 3. Modifier Entries Requiring ProofDischarges
+## 3. Modifier Entries Requiring ProofDischarges
 
 | Modifier | `ProofDischarges` value | Rationale |
 |---|---|---|
@@ -194,13 +194,13 @@ public sealed record FieldModifierMeta(
 | `maxplaces(N)` | No current proof obligation targets decimal-place constraints. |
 | `writable` | Access control, not a value constraint. |
 
-### 4. File Location
+## 4. File Location
 
 **New file: `src/Precept/Language/ProofDischarge.cs`.**
 
 **Rationale:** `ProofDischarge` is a first-class catalog type shared between the modifier catalog (`Modifiers.cs`) and the proof engine (`ProofEngine.cs`). It belongs in `Language/` because it's catalog metadata, not pipeline logic. It gets its own file because it's a distinct record type with its own semantic purpose — nesting it inside `Modifier.cs` would bury it among the modifier DU hierarchy. This mirrors the pattern of `ProofRequirement.cs` (catalog metadata type) having its own file.
 
-### 5. Catalog Architecture Compliance
+## 5. Catalog Architecture Compliance
 
 Verified against `docs/language/catalog-system.md`:
 
@@ -212,11 +212,11 @@ Verified against `docs/language/catalog-system.md`:
 
 ## PE-G3: ProofLedger Output Type
 
-### New Record Types Needed
+## New Record Types Needed
 
 The spec's §5 Output defines 8 types. Current source has only `ProofLedger(ImmutableArray<Diagnostic> Diagnostics)`. The following types must be added:
 
-#### 1. `ProofObligation` — `Pipeline/ProofLedger.cs`
+## 1. `ProofObligation` — `Pipeline/ProofLedger.cs`
 
 ```csharp
 public sealed record ProofObligation(
@@ -230,13 +230,13 @@ public sealed record ProofObligation(
 
 Dependencies: `ProofRequirement` (Language), `TypedExpression` (Pipeline/SemanticIndex.cs), `DiagnosticCode` (Language)
 
-#### 2. `ProofDisposition` enum — `Pipeline/ProofLedger.cs`
+## 2. `ProofDisposition` enum — `Pipeline/ProofLedger.cs`
 
 ```csharp
 public enum ProofDisposition { Proved, Unresolved }
 ```
 
-#### 3. `ProofStrategy` enum — `Pipeline/ProofLedger.cs`
+## 3. `ProofStrategy` enum — `Pipeline/ProofLedger.cs`
 
 ```csharp
 public enum ProofStrategy
@@ -250,7 +250,7 @@ public enum ProofStrategy
 
 **Note:** Renamed from `Modifier` to `DeclarationAttribute` per PE-G1 decisions. The spec should be updated accordingly.
 
-#### 4. `FaultSiteLink` — `Pipeline/ProofLedger.cs`
+## 4. `FaultSiteLink` — `Pipeline/ProofLedger.cs`
 
 ```csharp
 public sealed record FaultSiteLink(
@@ -263,7 +263,7 @@ public sealed record FaultSiteLink(
 
 Dependencies: `FaultCode` (Language)
 
-#### 5. `ConstraintInfluenceEntry` — `Pipeline/ProofLedger.cs`
+## 5. `ConstraintInfluenceEntry` — `Pipeline/ProofLedger.cs`
 
 ```csharp
 public sealed record ConstraintInfluenceEntry(
@@ -277,7 +277,7 @@ public sealed record EventArgReference(string EventName, string ArgName);
 
 Dependencies: `ConstraintIdentity` (Pipeline/SemanticIndex.cs — shared type, already exists)
 
-#### 6. `InitialStateSatisfiabilityResult` — `Pipeline/ProofLedger.cs`
+## 6. `InitialStateSatisfiabilityResult` — `Pipeline/ProofLedger.cs`
 
 ```csharp
 public sealed record InitialStateSatisfiabilityResult(
@@ -292,7 +292,7 @@ public sealed record UnsatisfiedConstraint(
 );
 ```
 
-#### 7. Updated `ProofLedger` — `Pipeline/ProofLedger.cs`
+## 7. Updated `ProofLedger` — `Pipeline/ProofLedger.cs`
 
 ```csharp
 public sealed record ProofLedger(
@@ -304,7 +304,7 @@ public sealed record ProofLedger(
 );
 ```
 
-### Decision: Match the spec — the shape is sound
+## Decision: Match the spec — the shape is sound
 
 **Rationale:** The spec was written after the catalog architecture was established and correctly reflects what the Precept Builder needs from the proof engine:
 
@@ -323,7 +323,7 @@ None of these fields are overengineered. Each has a concrete downstream consumer
 | `RuleIdentity(string RuleName, int Index)` | `RuleIdentity(int RuleIndex)` | **Source wins** — Precept rules are anonymous (no `RuleName`). The spec's `RuleName` field doesn't exist in the DSL surface. |
 | `EnsureIdentity(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)` | `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)` | **Source wins** — `AnchorName` collapses state/event discrimination. The `ConstraintKind` already indicates whether the anchor is a state or event. |
 
-### File organization
+## File organization
 
 All new types go in `Pipeline/ProofLedger.cs` alongside the `ProofLedger` record. This follows the existing pattern: `SemanticIndex.cs` contains both the index record and all its constituent types (`TypedField`, `TypedState`, `TypedTransitionRow`, etc.). Putting `ProofObligation`, `FaultSiteLink`, etc. in `ProofLedger.cs` keeps the proof engine's output contract in one file.
 
@@ -333,43 +333,43 @@ Exception: `ProofDischarge` goes in `Language/ProofDischarge.cs` (catalog metada
 
 ## Significant Gaps — Terse Verdicts
 
-### SIG-1: Missing `AllTypedExpressions` API on `SemanticIndex`
+## SIG-1: Missing `AllTypedExpressions` API on `SemanticIndex`
 
 **Verdict: SPEC UPDATE NEEDED**
 
 The spec's Pass 1 pseudocode (line 967) iterates `semantics.AllTypedExpressions` — this property does not exist on `SemanticIndex`. The implementer must define a traversal method that walks all expression-bearing records (`TransitionRows` → actions/guards, `Rules` → conditions, `Ensures` → conditions, `ComputedDeps` → computed expressions, `StateHooks` → actions). This is an **implementer responsibility** — the traversal is mechanical and the implementer knows the SemanticIndex shape. The spec should note this as a "to be implemented" API rather than assuming it exists.
 
-### SIG-2: `ConstraintIdentity` shape mismatch
+## SIG-2: `ConstraintIdentity` shape mismatch
 
 **Verdict: SPEC UPDATE NEEDED**
 
 Covered in PE-G3 above. The spec's `ConstraintIdentity` subtypes have fields that don't exist in the source (`RuleName`, separate `AnchorState`/`AnchorEvent`). The spec must be updated to match the source shapes: `RuleIdentity(int RuleIndex)` and `EnsureIdentity(ConstraintKind Kind, string? AnchorName, int EnsureIndex)`.
 
-### SIG-3: Unspecified `FindEnclosingTransitionRow` helper
+## SIG-3: Unspecified `FindEnclosingTransitionRow` helper
 
 **Verdict: ACCEPT AS-IS**
 
 This is a straightforward lookup: given a `TypedExpression`, find which `TypedTransitionRow` contains it. The implementer walks `SemanticIndex.TransitionRows` and checks whether any row's guard or action chain contains the expression (by reference identity or span containment). No design decision needed — it's a utility function, not an architectural concern. The spec correctly identifies it as a helper without over-specifying implementation.
 
-### SIG-4: Unspecified `ResolveSubject` helper
+## SIG-4: Unspecified `ResolveSubject` helper
 
 **Verdict: ACCEPT AS-IS**
 
 `ResolveSubject` maps a `ProofSubject` to a concrete `TypedExpression` node. For `ParamSubject(ParameterMeta)`, it matches the parameter by object identity against the expression's operands. For `SelfSubject`, it returns the receiver expression. Implementation is mechanical — the spec correctly leaves it to the implementer.
 
-### SIG-5: Underspecified initial-state satisfiability
+## SIG-5: Underspecified initial-state satisfiability
 
 **Verdict: DESIGN DECISION REQUIRED — deferred**
 
 The spec says to check whether initial-state constraints are satisfiable given default field values. This requires evaluating default expressions against constraint expressions — essentially a mini-evaluator at compile time. The spec's description (lines 866–883) is correct in intent but implementation is blocked pending the type checker's expression resolution engine being fully operational (as the spec itself notes on line 883). **Owner: spec author + implementer, post-TypeChecker completion.**
 
-### SIG-6: Collection-empty obligation ownership ambiguity
+## SIG-6: Collection-empty obligation ownership ambiguity
 
 **Verdict: ACCEPT AS-IS**
 
 Collection non-empty obligations are declared in catalog metadata (`TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements`). The type checker stamps them on `TypedMemberAccess` and `TypedAction` nodes. The proof engine discharges them via Strategy 1 (literal), Strategy 2 (`notempty` modifier), or Strategy 3 (`count > 0` guard). There is no ownership ambiguity — the catalog declares, the type checker stamps, the proof engine discharges. The spec's §7 "Collection Non-Empty Proof" section (lines 886–899) correctly describes the flow. No change needed.
 
-### SIG-7: Guard decomposition rules
+## SIG-7: Guard decomposition rules
 
 **Verdict: SPEC UPDATE NEEDED**
 
@@ -467,1101 +467,583 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 # Readability Review: combined-design-v2.md (2026-07-17)
 
-
-
 **Reviewer:** Elaine (UX Designer)
-
-
 
 **Doc:** `docs/working/combined-design-v2.md`
 
-
-
 **Verdict:** APPROVED-WITH-CONCERNS
-
-
 
 ## Top 3 Findings
 
-
-
 1. **Parser section needs shape specificity.** The section explains the parser's *philosophy* (source-faithful, recovery-aware) but doesn't give an implementer enough to know what SyntaxTree nodes to define. Missing: error recovery node shape, concrete node inventory or shape sketch, and explicit contract for how malformed input is represented. A parser design doc author would need to invent these from scratch.
-
-
 
 2. **Missing navigation guide.** A 486-line doc serving two audiences (human implementers and AI agents) needs a "How to read this document" paragraph after the status block. Three sentences: what §1–§3 cover (commitments and pipeline overview), what §4–§8 cover (per-stage contracts), what §9–§12 cover (runtime and integration). This is the single highest-ROI addition for both audiences.
 
-
-
 3. **"How it serves the guarantee" paragraphs become formulaic.** Useful for Lexer through Graph Analyzer. By Proof Engine and Lowering, the pattern is predictable and the content is restating the opening sentence. Recommendation: fold the guarantee connection into the stage's opening paragraph for §8–§10 and drop the separate labeled paragraph.
-
-
 
 ## Genre Assessment
 
-
-
 The rewrite succeeds. §1 opens with a problem statement and architectural commitment, not an inventory. Per-stage sections lead with design decisions. The philosophy-first framing is consistent throughout. This is a design document, not a reference manual.
-
-
 
 ## Decision
 
-
-
 This doc is ready to serve as the architectural foundation for per-stage design docs (starting with the parser). The concerns above are improvements, not blockers — the parser concern is the most urgent because that's the immediate next use case.
 
-
-
 ---
 
-
-
 ---
-
-
 
 ---
 
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
 
-
-
 **Reviewer:** Frank (Lead Architect)
-
-
 
 **Date:** 2026-06-03
 
-
-
 **Document:** `docs/working/combined-design-v2.md`
-
-
 
 **Context:** Only the Lexer is implemented. All other pipeline stages are stubs.
 
-
-
 ---
-
-
 
 ## VERDICT: APPROVED-WITH-CONCERNS
 
-
-
 The document is architecturally sound and well-structured. It reads as a unified design explanation rooted in philosophy, not a defense of two separate systems. The pipeline is coherent, the artifact boundaries are clean, and the lowered executable model is concrete enough to implement against. The concerns below are real design gaps that will cost us if we hit them mid-implementation rather than addressing them now.
 
-
-
 ---
-
-
 
 ## Soundness Issues
 
-
-
 1. **The proof strategy set is closed but its coverage boundary is unstated.** The doc lists four strategies (literal, modifier, guard-in-path, flow narrowing) and says "any obligation outside this set is unresolvable." But it never states what percentage of real-world proof obligations these four strategies can discharge. If most `ProofRequirement` instances in practice require cross-field reasoning (e.g., `ApprovedAmount <= RequestedAmount`), then the four strategies are a beautiful design that rejects most real programs. The doc should include a coverage analysis against the sample corpus — even an informal one — so implementers know whether the strategy set is right-sized or whether a fifth strategy (e.g., relational pair narrowing) is needed before v1.
-
-
 
 2. **`Restore` bypasses access-mode but evaluates constraints — the interaction with computed fields is unspecified.** If persisted data includes stale computed-field values, does Restore recompute before constraint evaluation? The recomputation index is listed as a Restore input, but the evaluation order (recompute → validate vs. validate → recompute) is not specified. Getting this wrong means Restore either rejects valid persisted data or accepts invalid computed values.
 
-
-
 3. **The `Create` without initial event path evaluates `always` + `in <initial>` — but default values may not satisfy `in <initial>` constraints.** The doc doesn't specify whether this is a compile-time guarantee (the proof engine should catch it) or a runtime domain outcome. The static-reasoning research (C3) says this is a known check, but the combined design doesn't thread it through the proof/fault chain. An author who writes `field X as number default 0` and `in Draft ensure X > 5` gets no compile-time warning in the current design — only a runtime `EventConstraintsFailed` on create. That violates the prevention promise.
-
-
 
 4. **`ConstraintActivation` discriminant is described but not typed.** The doc says it "distinguishes whether a constraint binds to the current state, the source state, or the target state." But it doesn't specify whether this is an enum, a DU, or a tag on the descriptor. Given the catalog-driven architecture, this should be cataloged — it's language-surface knowledge that consumers need, not an implementation detail.
 
-
-
 ---
-
-
 
 ## Completeness Gaps
 
-
-
 1. **No error recovery strategy for the parser.** The doc says `SyntaxTree` preserves "recovery shape for broken programs" and mentions "missing-node representation," but there is no recovery algorithm specified. Panic-mode? Synchronization tokens? The parser recovery strategy directly affects LS quality — a bad recovery model means completions and diagnostics degrade on every keystroke. This is a design decision, not an implementation detail, and it should be locked before the parser is built.
-
-
 
 2. **No incremental compilation model.** The doc treats the pipeline as a single-shot transformation: source → tokens → tree → model → graph → proof → CompilationResult. But the language server needs incremental re-analysis on every keystroke. The doc should specify the invalidation boundary — does a keystroke re-lex the whole file? Re-parse? Re-typecheck? For a single-file DSL this may be "just re-run everything" and that's fine — but say so explicitly, with a size-ceiling argument for why that's acceptable (the 64KB source limit helps here).
 
-
-
 3. **No serialization contract for `Version`.** The doc specifies `Restore` as the reconstitution path, but never specifies what the caller provides. What is the serialization shape of a `Version`? Is it `(stateName, fieldValues)`? `(stateDescriptor, slotArray)`? The host application needs a defined contract for what to persist and what to hand back to `Restore`. Without it, every host will invent its own serialization and we'll get impedance mismatches.
-
-
 
 4. **No definition versioning or migration story.** When a `.precept` file changes (field added, state renamed, constraint tightened), what happens to persisted `Version` instances compiled against the old definition? `Restore` will reject them if they don't satisfy the new constraints. The doc should at least name this as a known gap and specify whether migration is in-scope or explicitly deferred.
 
-
-
 5. **No observability hooks.** The doc specifies structured outcomes and inspections, but no tracing, logging, or metric emission points. For a production runtime, host applications need to observe: which events fired, which constraints failed, how long evaluation took, which proof strategies were used. These hooks shape the evaluator's internal architecture — bolting them on later means refactoring the evaluator.
 
-
-
 ---
-
-
 
 ## Innovation Opportunities
 
-
-
 1. **The proof engine should guarantee initial-state satisfiability at compile time.** The research base (static-reasoning-expansion.md, C3/C4/C5) already describes per-field interval analysis. The combined design should commit to a concrete compile-time guarantee: *if default field values and initial-state constraints are both statically known, the proof engine verifies satisfiability and emits a diagnostic if no valid initial configuration exists.* This is unique among DSL runtimes — no validator, state machine library, or rules engine provides this. It's the proof engine's signature contribution and it's achievable with the bounded strategy set already designed.
-
-
 
 2. **Precompute a "constraint influence map" during lowering for AI-native inspection.** Currently the inspection API tells you *what* constraints are active and *whether* they passed. It doesn't tell you *which fields drive which constraints* — the dependency graph exists in the `TypedModel` but is not lowered into an inspectable form. If lowering also produces a `ConstraintInfluenceMap` (constraint → contributing fields, with expression-text excerpts), then an AI agent can answer "why did this constraint fail?" and "which field change would fix it?" without reverse-engineering expressions. This is a structural differentiator for the MCP surface.
 
-
-
 3. **The executable model should be a compiled decision table, not a tree walk.** The doc says lowering produces "lowered expression nodes and action plans" but doesn't specify the execution model. For Precept's small, closed expression language, the optimal model is a flat evaluation plan — precomputed slot references, operation opcodes, and result slots — not a recursive tree interpreter. Think of it as a register-based bytecode where "registers" are field slots. This makes evaluation predictable-time, cache-friendly, and trivially serializable for inspection. The doc should commit to "flat evaluation plan" as the executable model shape and explicitly reject tree-walking.
-
-
 
 4. **Emit a machine-readable "contract digest" alongside `CompilationResult`.** A deterministic hash of the compiled definition's semantic content (fields, types, constraints, states, transitions — excluding whitespace and comments) would let host applications detect definition changes without diffing source text. Pair it with a structural diff API (`ContractDiff(old, new)` → added/removed/changed fields, states, constraints) and you have the foundation for the migration story (gap #4 above) and a production deployment safety net.
 
-
-
 5. **The constraint evaluation matrix should surface "why not" explanations as structured data.** When `Fire` returns `Rejected` or `EventConstraintsFailed`, the outcome carries `ConstraintViolation` objects. But the doc doesn't specify whether violations carry *explanation depth* — just the failing expression text, or also the evaluated field values, the guard that scoped the constraint, and the specific sub-expression that failed. For AI legibility, violations should carry structured explanation: `{ constraint, expression, evaluatedValues: { field: value }, guardContext?, failingSubExpression? }`. This is cheap to compute during evaluation and transforms MCP from "it failed" to "it failed because X was 3 and the constraint requires X > 5."
 
-
-
 ---
-
-
 
 ## Right-Sizing Issues
 
-
-
 1. **The `SyntaxTree` vs `TypedModel` anti-mirroring rules are over-specified for a doc at this level.** Four numbered rules about what `TypedModel` must not do, plus a seven-item "required inventory" — this is component-level design specification embedded in an architecture document. The architectural decision (they are separate artifacts with separate jobs) is correct and should stay. The implementation contract should move to a parser/type-checker-specific design doc that the implementer reads when building those stages.
-
-
 
 2. **The five constraint-plan families and four activation indexes are correctly designed but could be simplified in the implementation.** The `from` and `to` families only activate during `Fire`. The `on` family only activates during `Fire`. The `in` family activates during `Update`, `Create`-without-event, and `Restore`. The `always` family activates everywhere. This means the evaluator really has two modes: "fire mode" (all five families) and "edit mode" (always + in). The doc could name these modes to simplify the mental model without losing the family distinction.
 
-
-
 ---
-
-
 
 ## Top 3 Recommended Changes Before This Doc Drives Per-Component Design
 
-### 1. Add a proof coverage analysis against the sample corpus.
-
-
+## 1. Add a proof coverage analysis against the sample corpus.
 
 Run the four proof strategies against every `ProofRequirement` that would arise from the 20 sample files. Report how many obligations each strategy discharges and how many remain unresolvable. If coverage is below ~90%, design a fifth strategy before implementation begins. This is the highest-risk unknown in the document — the proof engine's value proposition depends on it.
 
-### 2. Specify the parser error recovery strategy.
-
-
+## 2. Specify the parser error recovery strategy.
 
 Lock one of: (a) panic-mode with synchronization at declaration keywords, (b) token-deletion/insertion with cost model, (c) "re-lex everything, re-parse everything" with the 64KB ceiling as the performance argument. The LS team cannot build completion/diagnostic features without knowing what the tree looks like on broken input.
 
-### 3. Commit to a flat evaluation plan as the executable model.
-
-
+## 3. Commit to a flat evaluation plan as the executable model.
 
 Replace "lowered expression nodes and action plans" with a concrete specification: slot-addressed evaluation plans with operation opcodes, field-slot references, literal constants, and result slots. This prevents the implementation from defaulting to a recursive AST interpreter — which would be correct but would sacrifice the performance and inspectability properties that make Precept's runtime distinctive.
 
-
-
 ---
-
-
 
 *This review is direct because the timing demands it. Addressing these three items now — before the parser, type checker, and evaluator are built — is nearly free. Addressing them after implementation begins is expensive. The architecture is sound. These are the gaps that would bite us.*
 
-
-
 ---
 
-
-
 ---
-
-
 
 ---
 
 # Decision: Combined Design v2 Comprehensive Revision Pass
 
-
-
 **By:** Frank
-
-
 
 **Date:** 2026-07-17
 
-
-
 **Status:** Applied
-
-
 
 ## Summary
 
-
-
 Applied all team review feedback (Frank design review, George technical accuracy, Elaine readability) to `docs/working/combined-design-v2.md` in a single revision pass. Added Precept Innovations callouts to every major section. Added two new sections: §12 TextMate Grammar Generation and §13 MCP Integration.
-
-
 
 ## What Changed
 
-### Review feedback applied (all three reviewers)
-
-
+## Review feedback applied (all three reviewers)
 
 - Navigation guide ("How to read this document") after status block
 
-
-
 - Parser: error recovery shape, node inventory, catalog-to-grammar mapping, anti-Roslyn guidance, ActionKind dual-use, parser/TypeChecker contract boundary
-
-
 
 - TypeChecker: anti-pattern for per-construct check methods
 
-
-
 - Proof engine: coverage boundary, flow narrowing clarification, initial-state satisfiability
-
-
 
 - Compilation snapshot: no-incremental-compilation model, contract digest hash, definition versioning gap
 
-
-
 - Lowering: fixed "catalogs not re-read" claim, descriptor shapes, flat evaluation plan, anti-pattern warnings, ConstraintActivation cataloging, Version serialization contract
-
-
 
 - Runtime: Restore recomputation order, structured "why not" violations
 
-### New content
-
-
+## New content
 
 - **Precept Innovations callouts** in every major section (§2–§14), 2–4 bullets each
 
-
-
 - **§12 TextMate grammar generation** — catalog contributions table, anti-pattern, zero-drift guarantee
-
-
 
 - **§13 MCP integration** — tool inventory, thin-wrapper principle, AI-first design, catalog-derived vocabulary
 
-### Structural changes
-
-
+## Structural changes
 
 - Former §12 (LS integration) renumbered to §14
 
-
-
 - Doc grew from 486 to 694 lines
-
-
 
 - Formulaic guarantee paragraphs folded into stage openings for §8–§10
 
-
-
 ## Decisions Locked
-
-
 
 - Parser error recovery: construct-level panic mode with `MissingNode` + `SkippedTokens`
 
-
-
 - Expression evaluation: flat slot-addressed evaluation plans, tree-walk explicitly rejected
-
-
 
 - Incremental compilation: "re-run everything" is the intended model (64KB ceiling)
 
-
-
 - Definition versioning: known gap, deferred beyond v1
-
-
 
 - `ConstraintActivation`: should be cataloged (language-surface knowledge)
 
-
-
 ---
-
-
 
 ## Proposal Summary
 
-
-
 Invert D3: make `write` the universal default for (field, state) pairs. Add a `readonly` modifier on field declarations to permanently lock fields from ever being written in any state. Eliminate root-level `write` declarations entirely.
 
-
-
 ---
-
-
 
 ## Question 1: Does inverting D3 weaken the conservative guarantee?
 
-
-
 **Yes. Fundamentally.**
-
-
 
 D3 as specified (§2.2 Access Mode, composition rule 1) states: "D3 is the universal per-pair baseline — undeclared (field, state) pairs default to `read`." The design principle behind this is explicit: "Authors declare only exceptions to readonly — `write` opens a field for editing in that state."
 
-
-
 This is a **closed-world access model**. Nothing is writable unless explicitly opened. The omission failure mode is safe: if an author forgets to declare a `write`, the field is locked in that state. The author must take a deliberate action — writing the `write` keyword — to open the attack surface.
-
-
 
 The proposal inverts this to an **open-world access model**. Everything is writable unless explicitly restricted. The omission failure mode is unsafe: if an author forgets to mark a field `readonly`, it is exposed in every state to direct mutation via `Update`.
 
-
-
 This is the firewall-rule principle. Good security defaults to DENY; you add ALLOW exceptions. D3 defaults to DENY (read-only) and authors add ALLOW exceptions (`write`). The proposal defaults to ALLOW (writable) and authors add DENY exceptions (`readonly`). In a **governance** language — one whose entire identity is built on "invalid configurations are structurally impossible" (Principle 1: Prevention, not detection) — the conservative default is non-negotiable.
 
-### Corpus evidence
-
-
+## Corpus evidence
 
 The sample set confirms that the conservative default reflects real domain proportions:
 
-
-
 - **Stateful precepts with zero write declarations:** `hiring-pipeline`, `loan-application` (except one guarded write), `apartment-rental-application`, `restaurant-waitlist`, `library-hold-request`, `travel-reimbursement`, `warranty-repair-request`. These precepts rely entirely on event-driven mutation. The D3 default silently protects all fields from direct editing. Under the proposal, all those fields would be writable by default — an enormous, invisible expansion of the attack surface.
-
-
 
 - **Stateful precepts with 1–2 write declarations:** `crosswalk-signal` (1), `clinic-appointment-scheduling` (1), `building-access-badge-request` (1), `insurance-claim` (2), `maintenance-work-order` (1), `refund-request` (1), `subscription-cancellation-retention` (1), `event-registration` (2), `it-helpdesk-ticket` (1), `utility-outage-report` (1), `vehicle-service-appointment` (1). The typical pattern is opening 1–3 fields in 1–2 states. The remaining (field, state) pairs — the overwhelming majority — stay protected by D3.
 
-
-
 - **Stateless precepts:** `fee-schedule` (3 of 5 writable), `payment-method` (2 of 6 writable), `computed-tax-net` (2 of 4 writable), `invoice-line-item` (4 of N writable). Even in stateless precepts, the typical pattern is that some fields are intentionally locked. `customer-profile` is the only sample using `write all`.
-
-
 
 The verbosity cost of the current model is 1–2 lines per precept. The safety cost of the proposed model is an invisible, unbounded expansion of the mutation surface whenever an author omits a `readonly` marker.
 
-### Principle citations
-
-
+## Principle citations
 
 - **Principle 1 (Prevention, not detection):** The proposal turns field-level access control from structurally prevented to structurally permitted. An author who omits `readonly` on a field that should be locked has created a governance gap. Under D3, the same omission creates no gap.
 
-
-
 - **Principle 4 (Full inspectability):** Auditability is stronger when the declared surface is the exception set (small, explicit) rather than the restriction set (requiring mental subtraction from a universal default). "What can a user directly edit here?" is answered by scanning for `write` keywords under D3. Under the proposal, the answer is "everything, minus what's marked `readonly`" — which requires reading every field declaration to check for the absence of a modifier.
 
-
-
 ---
-
-
 
 ## Question 2: Does `readonly` on a field cleanly complement or conflict with computed fields?
 
-
-
 **It creates a semantic inconsistency.**
-
-
 
 Computed fields (`field Tax as number -> Subtotal * TaxRate`) are already implicitly readonly. The spec enforces this structurally — `ComputedFieldNotWritable` is a type-checker diagnostic (§3.8). A computed field's readonly nature arises from its derivation: it has an expression, so it cannot be directly assigned. This is not a modifier; it is a structural consequence of the field's kind.
 
-
-
 Under the proposal, the access defaults would be:
-
-
 
 | Field kind | Proposed default | Actual access |
 
-
-
 |---|---|---|
-
-
 
 | Stored field (no `readonly`) | write | write |
 
-
-
 | Stored field (with `readonly`) | write → overridden to read | read |
-
-
 
 | Computed field | write (in theory) | read (structurally) |
 
-
-
 The computed field's access mode would be inconsistent with the declared default. A stored field and a computed field would have different effective defaults despite the language claiming "write is the default." The author would need to understand that computed fields are a hidden exception to the stated default — undermining Principle 4 (inspectability) and Principle 5 (keyword-anchored readability).
-
-
 
 Under D3, the picture is consistent:
 
-
-
 | Field kind | D3 default | Actual access |
-
-
 
 |---|---|---|
 
-
-
 | Stored field (no `write`) | read | read |
-
-
 
 | Stored field (with `write`) | read → overridden to write | write |
 
-
-
 | Computed field | read | read |
-
-
 
 All fields default to read. Computed fields are naturally aligned with the default. Stored fields that need to be writable are explicitly opened. There is no inconsistency to explain.
 
-
-
 Adding `readonly` as a modifier also creates a redundancy question: should `readonly` on a computed field be a warning (redundant modifier), an error (modifier conflicts with structural readonly), or silently accepted? Each answer has downsides. Under D3, the question never arises — there is no `readonly` keyword, and computed fields simply match the default.
 
-
-
 ---
-
-
 
 ## Question 3: Does "write default, restrict per state" change the auditability story?
 
-
-
 **Yes. It weakens it materially.**
-
-
 
 In a stateful precept under D3, the audit question "which fields can a user directly edit in state S?" is answered by reading the `in S write` declarations. If there are none, the answer is "nothing — all mutation happens through events." This is a **closed-world audit**: the write declarations ARE the complete answer.
 
-
-
 Under the proposal, the same question is answered by: "every field, minus those marked `readonly` on the field declaration, minus those restricted by `in S read` or `in S omit` declarations." This is an **open-world audit** requiring cross-referencing the field declarations (for `readonly` markers), the state-scoped access declarations (for per-state restrictions), and computing the difference. The mental model is subtraction from a universal set rather than enumeration of an explicit set.
-
-
 
 For a governance language — one where the point is to make the access contract **explicit and visible** — the open-world model is the wrong posture. The current model's strength is that the write declarations positively assert what is open. The proposed model requires the reader to infer what is open from what is not restricted.
 
-
-
 This matters especially for AI consumers. Precept's Principle 3 (deterministic semantics) and Principle 5 (keyword-anchored readability) are designed partly for AI legibility. A closed-world access model is easier for AI agents to reason about: "find all `write` declarations" is a simple, complete query. "Find all fields, subtract `readonly` fields, subtract per-state restrictions" is a compositional query with a higher error surface.
 
-
-
 ---
-
-
 
 ## Additional Concerns
 
-### The `readonly` keyword itself is misaligned
-
-
+## The `readonly` keyword itself is misaligned
 
 `readonly` is a **programming-language concept** from C#, Java, Rust, TypeScript. It carries connotations of compile-time immutability, final binding, memory-model guarantees. Precept's access model is about **editability** — which fields can the host application directly mutate via the `Update` operation. These are different concepts. A field that is `read` in a given state is not immutable — events can still `set` it during transitions. It is merely not directly editable by the external caller. Introducing `readonly` would import programming-language semantics into a domain-configuration language, violating the philosophy's positioning of Precept as a language for domain experts and business analysts, not software developers (§ Who authors a precept in philosophy.md).
 
-### Root-level `write` elimination is a false economy
-
-
+## Root-level `write` elimination is a false economy
 
 The proposal motivates itself partly by eliminating root-level `write` declarations. But the current model already makes these declarations do useful work:
 
-
-
 - `write BaseFee, DiscountPercent, MinimumCharge` in `fee-schedule` — the `write` keyword positively documents the author's intent. Reading it, you know immediately which fields are editable. The comment above it ("Only pricing levers are editable; TaxRate and CurrencyCode are locked") is restating what the `write` declaration already says.
-
-
 
 - `write all` in `customer-profile` — a deliberate, visible assertion that everything is open. Under the proposal, this becomes the invisible default, and the author's deliberate intent vanishes from the surface.
 
-
-
 The `write` keyword carries semantic weight as a positive assertion. Replacing it with the absence of `readonly` loses that signal.
 
-
-
 ---
-
-
 
 ## Verdict: **Reject**
 
-
-
 The proposal inverts Precept's conservative access posture from closed-world (safe by default, explicitly opened) to open-world (exposed by default, explicitly restricted). This:
-
-
 
 1. **Weakens the omission failure mode** from safe (field locked) to unsafe (field exposed).
 
-
-
 2. **Creates an access-default inconsistency** between stored and computed fields.
-
-
 
 3. **Degrades auditability** from positive enumeration to negative subtraction.
 
-
-
 4. **Imports programming-language semantics** (`readonly`) into a domain-configuration language.
-
-
 
 5. **Eliminates the positive-assertion value** of `write` declarations for marginal verbosity savings (1–2 lines per precept).
 
-
-
 D3 is philosophically correct, empirically well-calibrated to real domain proportions, and consistent with the governance identity. It should not be inverted.
 
-### What would need to change for reconsideration
-
-
+## What would need to change for reconsideration
 
 If the underlying concern is verbosity in stateless precepts that happen to have mostly-writable fields, there are narrower solutions that preserve D3:
 
-
-
 - A `write all` shorthand already exists and handles the fully-open case.
-
-
 
 - If a `write all except F1, F2` syntax were needed, it could be evaluated without inverting the default. The exception list would still be a positive declaration against a positively-declared baseline.
 
-
-
 Neither of these requires abandoning the conservative default. The proposal conflates "reduce boilerplate" with "invert the safety model." Only the former is a real problem; the latter is the wrong solution.
 
-
-
 ---
 
-
-
 ---
-
-
 
 ---
 
 # Full Architecture Review — spike/Precept-V2
 
-
-
 **Reviewer:** Frank (Lead Architect)
-
-
 
 **Branch:** `spike/Precept-V2`
 
-
-
 **Commits reviewed:** 36ccec4..4831cb3 (full branch vs main)
-
-
 
 **Build:** ✅ Clean (1 pre-existing RS1030 warning in PRECEPT0013)
 
-
-
 **Tests:** ✅ 2678 passing (2424 Precept.Tests + 254 Precept.Analyzers.Tests), 0 failures
 
-
-
 ---
-
-
 
 ## 1. Annotation Bridge Architecture (PRECEPT0019)
 
-### Files Reviewed
-
-
+## Files Reviewed
 
 - `src/Precept/HandlesCatalogExhaustivelyAttribute.cs`
 
-
-
 - `src/Precept/Language/HandlesCatalogMemberAttribute.cs`
-
-
 
 - `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`
 
-
-
 - `src/Precept/Pipeline/Parser.cs` (class marker on `ParseSession`)
-
-
 
 - `src/Precept/Pipeline/TypeChecker.cs` (class marker + 11 member annotations)
 
-
-
 - `src/Precept/Pipeline/GraphAnalyzer.cs` (class marker + 11 member annotations)
 
-### Assessment
-
-
+## Assessment
 
 The annotation bridge is clean and catalog-agnostic as specified. The class marker accepts `Type catalogEnum` — any enum can opt in. Method markers use `object kind` for call-site type safety without analyzer rewrites.
 
-
-
 PRECEPT0019 correctly:
-
-
 
 - Extracts `typeof(T)` from the class marker
 
-
-
 - Collects all enum fields with constant values
-
-
 
 - Resolves method marker arguments by matching `arg.Type` against the catalog enum
 
-
-
 - Reports missing members with clear diagnostic formatting
-
-
 
 - Is registered as `DiagnosticSeverity.Error` (was previously Warning, promoted per Slice 26)
 
-
-
 Parser coverage: `ParseSession` (ref partial struct) has both `ParseExpression` and `ParseAtom` annotated, covering all 11 `ExpressionFormKind` members across the two methods. TypeChecker and GraphAnalyzer have placeholder methods with all 11 annotations each — correct forward-declarations for Phase 3.
 
-
-
 ---
-
-
 
 ## 2. Catalog Integrity Analyzers (PRECEPT0020–0023)
 
-### PRECEPT0020 — Operators Token Collision
-
-
+## PRECEPT0020 — Operators Token Collision
 
 Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.Kind` collision). Both correctly:
 
-
-
 - Scope to `OperatorKind` switches via `TryGetCatalogSwitchKind`
-
-
 
 - Skip `MultiTokenOp` arms (correct — those are PRECEPT0023's domain)
 
-
-
 - Extract token kind via `Tokens.GetMeta(TokenKind.X)` invocation walking
-
-
 
 - Report against the creation syntax location (not the arm)
 
-### PRECEPT0021 — Tokens Duplicate Text
-
-
+## PRECEPT0021 — Tokens Duplicate Text
 
 - Correctly skips null `Text` (synthetic tokens like `SetType`, `Identifier`)
 
-
-
 - Uses `ResolveStringConstant` which handles nameof, const fields, and string literals
-
-
 
 - Only fires for `TokenKind` switches
 
-### PRECEPT0022 — Operators Inline Token Reference
-
-
+## PRECEPT0022 — Operators Inline Token Reference
 
 - Detects `new TokenMeta(...)` construction where `Tokens.GetMeta(TokenKind.X)` is required
 
-
-
 - Clean single-purpose analyzer — no false-positive risk from DU subtype checks
 
-### PRECEPT0023 — OperatorMeta DU Shape Invariants
-
-
+## PRECEPT0023 — OperatorMeta DU Shape Invariants
 
 Three sub-rules:
 
-
-
 - **0023a:** MultiTokenOp < 2 tokens → Error. Correct.
-
-
 
 - **0023b:** SingleTokenOp vs MultiTokenOp lead-token collision. Cross-checks single/multi dictionaries post-loop. Correct.
 
-
-
 - **0023c:** Duplicate full token sequences. Uses `BuildFullSequenceKey` joining all tokens. Correctly checks the full sequence (e.g., "Is,Set" vs "Is,Not,Set"), not just the lead token. The diagnostic name says "MultiLeadCollision" but the invariant checks the **full sequence** — naming is slightly misleading but functionally correct.
 
-### CatalogAnalysisHelpers
-
-
+## CatalogAnalysisHelpers
 
 Shared infrastructure is well-factored:
 
-
-
 - `TryGetCatalogSwitchKind` correctly guards scope (method named "GetMeta", in `Precept.Language`, known enum type)
-
-
 
 - `EnumerateCollectionElements` handles both collection expressions and array initializers
 
-
-
 - `UnwrapConversions` handles implicit conversion chains
-
-
 
 - `FlagsEnumContains` supports single-ref, bitwise-OR-tree, and constant-folded forms
 
-
-
 ---
-
-
 
 ## 3. Parser Fixes
 
-### GAP-A: `when` guard on StateEnsure/EventEnsure
-
-
+## GAP-A: `when` guard on StateEnsure/EventEnsure
 
 `ParseStateEnsure` and `ParseEventEnsure` both implement post-condition `when` guards correctly:
 
-
-
 - Check if `stashedGuard` exists (pre-ensure guard from outer dispatch)
-
-
 
 - Only consume `when` if no stashed guard — prevents double-guard ambiguity
 
-
-
 - Guard comes **after** the condition expression, before `because` — matches spec §2.2
 
-### GAP-B: Modifiers after computed field expressions
-
-
+## GAP-B: Modifiers after computed field expressions
 
 Verified via `ExpressionBoundaryTokens` and the Pratt loop's natural termination on boundary tokens. The parser correctly stops expression parsing when it encounters modifier keywords because they're in `ExpressionBoundaryTokens` via `Constructs.LeadingTokens`. No explicit handling needed — clean by construction.
 
-### GAP-C: Keyword-as-member-name and keyword-as-function-call
-
-
+## GAP-C: Keyword-as-member-name and keyword-as-function-call
 
 Two complementary fixes:
 
-
-
 1. `ExpectIdentifierOrKeywordAsMemberName()` — accepts tokens in `KeywordsValidAsMemberName` after `.`
-
-
 
 2. `ParseAtom` — `case TokenKind.Min: case TokenKind.Max:` falls through to identifier/function-call handling
 
-
-
 Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)` in expression position.
 
-### is/is-not-set, method call, list literal, TypedConstant
-
-
+## is/is-not-set, method call, list literal, TypedConstant
 
 - `is set` / `is not set`: Correctly uses separate `IsSetExpression`/`IsNotSetExpression` nodes. Precedence 60 matches `Operators.GetMeta(OperatorKind.IsSet).Precedence`. Non-associative by break-on-entry (`minPrecedence > 60`).
 
-
-
 - Method call: Detects `LeftParen` following `MemberAccessExpression` at binding power 90. Correct.
-
-
 
 - List literal: Dispatches from `ParseAtom` via `TokenKind.LeftBracket`. Correct.
 
-
-
 - TypedConstant/InterpolatedTypedConstant: Both handled in `ParseAtom` correctly.
 
-
-
 ---
-
-
 
 ## 4. ExpressionFormKind Catalog
 
-### Members (11 total — correct)
-
-
+## Members (11 total — correct)
 
 1. Literal, 2. Identifier, 3. Grouped, 4. BinaryOperation, 5. UnaryOperation,
 
-
-
 6. MemberAccess, 7. Conditional, 8. FunctionCall, 9. MethodCall, 10. ListLiteral,
-
-
 
 11. PostfixOperation
 
-### Metadata Shape
-
-
+## Metadata Shape
 
 `ExpressionFormMeta` record carries: Kind, Category, IsLeftDenotation, LeadTokens, HoverDocs. All fields populated. LeadTokens empty for led forms, non-empty for nud forms — structurally enforced by the Layer 2 test.
 
-### Coverage Tests
-
-
+## Coverage Tests
 
 Two test classes provide layered enforcement:
 
-
-
 - `Tests.Language.ExpressionFormCoverageTests` — Layer 2: count, GetMeta completeness, HoverDocs, IsLeftDenotation, LeadTokens contract
-
-
 
 - `Tests.ExpressionFormCoverageTests` — Layer 3: catalog completeness, annotation bridge xUnit mirror, parse round-trips
 
-
-
 ---
-
-
 
 ## 5. OperatorMeta DU Shape
 
-
-
 Clean discriminated union:
-
-
 
 - `OperatorMeta` (abstract base) → `SingleTokenOp` / `MultiTokenOp`
 
-
-
 - `MultiTokenOp` carries `IReadOnlyList<TokenMeta> Tokens` with `LeadToken => Tokens[0]`
-
-
 
 - `ByToken` FrozenDictionary indexed by `(TokenKind, Arity)` — excludes MultiTokenOp
 
-
-
 - `ByTokenSequence` FrozenDictionary indexed by `(TokenKind, TokenKind?, TokenKind?)` — covers MultiTokenOp
-
-
 
 - `BuildSequenceKey` correctly handles 2-token and 3-token sequences
 
-
-
 Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multiplication level. This is correct per spec §2.1 — presence checks bind tighter than comparisons but at the same level as multiplicative arithmetic.
 
-
-
 ---
-
-
 
 ## 6. TokenMeta.IsValidAsMemberName
 
-
-
 - Property added to `TokenMeta` record with `bool IsValidAsMemberName = false` default
-
-
 
 - Set to `true` on `TokenKind.Min` and `TokenKind.Max` only
 
-
-
 - `Parser.KeywordsValidAsMemberName` derived from `Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet()`
-
-
 
 - No hardcoded `{ Min, Max }` array remains — pure catalog derivation
 
-
-
 - Tests: `TokenMetaMemberNameTests` covers true/false/theory cases
-
-
 
 - `SetType` handled correctly: `Text: null`, `TextMateScope: null`, `SemanticTokenType: null` — parser-synthesized token with no tooling metadata. Excluded from `Keywords` FrozenDictionary via explicit `m.Kind != TokenKind.SetType` filter. This prevents the `Text: null` duplicate-text false positive that would otherwise fire.
 
-
-
 ---
-
-
 
 ## 7. Parser Split
 
-
-
 Three partial files with clean responsibility separation:
-
-
 
 - `Parser.cs` — vocabulary FrozenDictionaries, boundary sets, `Parse()` entry point, `ParseSession` struct definition, token navigation
 
-
-
 - `Parser.Declarations.cs` — construct parsers (state ensure, event ensure, access mode, omit, transition row, outcomes, action statements)
-
-
 
 - `Parser.Expressions.cs` — Pratt expression parser (ParseExpression led loop, ParseAtom nud switch, interpolation parsers, list literal)
 
-
-
 No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `ParseSession` in `Parser.cs`; the `HandlesCatalogMember` annotations are distributed across `Parser.Expressions.cs` methods. This is correct — the ref partial struct spans files.
 
-
-
 ---
-
-
 
 ## 8. Documentation Accuracy
 
-
-
 `docs/language/catalog-system.md` § Exhaustiveness Enforcement Strategies:
-
-
 
 - Correctly describes both strategies (CS8509 vs annotation bridge)
 
-
-
 - Decision rule table is clear and actionable
-
-
 
 - Phase 3 note correctly defers TypeChecker/ProofEngine dispatch decision
 
-
-
 - Consumer table for current CS8509 sites is accurate (`ConstructKind`, `ActionKind`, etc.)
 
-
-
 ---
-
-
 
 ## Findings
 
-### Blockers
-
-
+## Blockers
 
 None.
 
-### Guidance
-
-
+## Guidance
 
 - **G1:** [`src/Precept.Analyzers/Precept0023OperatorsDUShapeInvariants.cs:30`] The constant `DiagnosticId_MultiLeadCollision = "PRECEPT0023c"` and field name `MultiLeadCollisionRule` use "lead" in their identifiers, but the invariant actually checks the **full token sequence** (not just the lead). Consider renaming to `DiagnosticId_MultiSequenceCollision` / `MultiSequenceCollisionRule` for clarity. The diagnostic message is correct — only the code-level naming is misleading.
 
-
-
 - **G2:** [`src/Precept.Analyzers/CatalogAnalysisHelpers.cs:57-62`] `CatalogEnumNames` is missing `ConstraintKind` and `ProofRequirementKind`. Both have `GetMeta` switches in `Precept.Language`. Currently their switches use discard arms (`_ =>`), so PRECEPT0007 would flag them anyway if they were included. When those catalogs drop the discard arm (expected in Phase 3), they should be added to `CatalogEnumNames` to enable PRECEPT0007 coverage. Track this as a Phase 3 prerequisite.
-
-
 
 - **G3:** [`src/Precept.Analyzers/Precept0013ActionsCrossRef.cs:136`] Pre-existing RS1030 warning (`Compilation.GetSemanticModel()` inside analyzer). Not introduced on this branch, but should be addressed eventually — Roslyn best practice violation.
 
-### Observations
-
-
+## Observations
 
 - **O1:** TypeChecker and GraphAnalyzer currently throw `NotImplementedException` — the `[HandlesCatalogMember]` annotations are forward declarations. This is correct by design (Phase 3 work); PRECEPT0019 validates the annotation set at compile time regardless of implementation status.
 
-
-
 - **O2:** The `contains` chaining test (Slice 18) correctly validates `NonAssociativeComparison` diagnostic for `a contains b contains c` via the Pratt loop's non-associativity detection in lines 113-126 of `Parser.Expressions.cs`. Binding power 40 is correct per catalog.
-
-
 
 - **O3:** The test count increased from ~2000 (pre-spike) to 2678 — a ~34% test growth proportional to the implementation surface. Healthy ratio.
 
-
-
 - **O4:** `ExpressionFormKind` is enumerated 1–11 (no zero slot). This is consistent with the other catalog enums that use `PRECEPT0018SemanticEnumZeroSlot` to enforce meaningful zero absence.
 
-
-
 ---
-
-
 
 ## VERDICT: APPROVED — 0 blockers, 3 guidance items
 
-
-
 The annotation bridge architecture is sound, catalog-agnostic, and correctly enforced at `DiagnosticSeverity.Error`. The four new analyzers (PRECEPT0020–0023) cover real invariants that would otherwise manifest as startup crashes. Parser fixes are correct and well-tested. The ExpressionFormKind catalog and OperatorMeta DU are structurally complete. Documentation is accurate. The 3 guidance items are naming clarity and forward-looking hygiene — none block merge.
-
-
 
 This branch is ready to merge to main.
 
-
-
 ---
-
-
 
 ---
 
@@ -1580,13 +1062,13 @@ The parser suite is green, but it is **not** comprehensive enough to support typ
 
 ## Changes
 
-### B3: MissingExpression D26 gap (5 LOC)
+## B3: MissingExpression D26 gap (5 LOC)
 
 `ResolveMissing()` now emits a lightweight `DiagnosticCode.TypeMismatch` diagnostic with args `("expression", "missing")` before returning `TypedErrorExpression`. This closes the D26 self-containment invariant — every error path through Resolve() now records a TC-level diagnostic.
 
 No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the closest existing Error-severity TC code.
 
-### B1: Field expression resolution (~100 LOC)
+## B1: Field expression resolution (~100 LOC)
 
 `ResolveFieldExpressions()` resolves default and computed expressions on `TypedField` entries:
 - Default expressions from `ParsedModifier` with `Kind == ModifierKind.Default`
@@ -1596,7 +1078,7 @@ No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the
 - Qualifier binding left as null (no parser-level qualifier slot on field constructs yet)
 - Event arg defaults left as null (DeclaredArg carries only ModifierKind, not values)
 
-### B2: Construct normalization (~200 LOC)
+## B2: Construct normalization (~200 LOC)
 
 Four new normalization methods following the established `manifest.ByKind` + Resolve + accumulate pattern:
 - `PopulateEnsures()` — StateEnsure (in/to/from → ConstraintKind) and EventEnsure (on → EventPrecondition)
@@ -1604,7 +1086,7 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 - `PopulateStateHooks()` — state reference, leading token → AnchorScope, action chain via ResolveAction()
 - `PopulateEditDeclarations()` — D24 placeholder using ConstructKind.OmitDeclaration, field targets recorded
 
-### Supporting changes
+## Supporting changes
 
 - `ParsedConstruct.LeadingTokenKind` — added `TokenKind?` to the positional record (2 parser sites updated) for anchor scope determination
 - Doc updates W3 (§1 status), W4 (§4 LOC estimate → ~2700), W5 (§13 preamble → COMPLETED)
@@ -1690,7 +1172,7 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 | 20 | Punctuation | `#6366F1` | normal | `punctuation.precept`, `punctuation.separator.comma.precept`, `punctuation.accessor.precept` | `.`, `,`, `(`, `)`, `[`, `]` |
 | 21 | Member names | (brand: data names) | normal | `keyword.other.precept` | Special member accessors: `countof`, `peekby` |
 
-### Brand-to-Catalog Misalignment Notes
+## Brand-to-Catalog Misalignment Notes
 
 The brand decisions doc (`brand-decisions.md`) lists specific keywords under "Structure · Semantic" that the catalog assigns to different scope categories:
 
@@ -1711,7 +1193,7 @@ The brand decisions doc (`brand-decisions.md`) lists specific keywords under "St
 
 Complete enumeration of every token/construct type from the catalog, with canonical TextMateScope.
 
-### 2.1 Keywords — Declaration (`keyword.declaration.precept`)
+## 2.1 Keywords — Declaration (`keyword.declaration.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1730,7 +1212,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | Ascending | `ascending` | TokenKind.Ascending (=130) |
 | Descending | `descending` | TokenKind.Descending (=131) |
 
-### 2.2 Keywords — Prepositions/Control (`keyword.control.precept`)
+## 2.2 Keywords — Prepositions/Control (`keyword.control.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1748,7 +1230,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | At | `at` | TokenKind.At (=129) |
 | For | `for` | TokenKind.For (=136) |
 
-### 2.3 Keywords — Actions (`keyword.other.action.precept`)
+## 2.3 Keywords — Actions (`keyword.other.action.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1765,7 +1247,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 **Note:** `set` (TokenKind.Set =23) is dual-use (action AND collection type). Catalog assigns `storage.type.precept`. Appears in both action chains and type positions.
 
-### 2.4 Keywords — Outcomes (`keyword.other.outcome.precept`)
+## 2.4 Keywords — Outcomes (`keyword.other.outcome.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1773,7 +1255,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | No | `no` | TokenKind.No (=32) |
 | Reject | `reject` | TokenKind.Reject (=33) |
 
-### 2.5 Keywords — Access Modes (`keyword.other.access-mode.precept`)
+## 2.5 Keywords — Access Modes (`keyword.other.access-mode.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1782,7 +1264,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | Editable | `editable` | TokenKind.Editable (=36) |
 | Omit | `omit` | TokenKind.Omit (=37) |
 
-### 2.6 Keywords — Logical Operators (`keyword.operator.logical.precept`)
+## 2.6 Keywords — Logical Operators (`keyword.operator.logical.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1790,14 +1272,14 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | Or | `or` | TokenKind.Or (=39) |
 | Not | `not` | TokenKind.Not (=40) |
 
-### 2.7 Keywords — Membership (`keyword.operator.membership.precept`)
+## 2.7 Keywords — Membership (`keyword.operator.membership.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
 | Contains | `contains` | TokenKind.Contains (=41) |
 | Is | `is` | TokenKind.Is (=42) |
 
-### 2.8 Keywords — Quantifiers (`keyword.other.quantifier.precept`)
+## 2.8 Keywords — Quantifiers (`keyword.other.quantifier.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1805,7 +1287,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | Any | `any` | TokenKind.Any (=44) |
 | Each | `each` | TokenKind.Each (=135) |
 
-### 2.9 Keywords — State Modifiers (`storage.modifier.state.precept`)
+## 2.9 Keywords — State Modifiers (`storage.modifier.state.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1816,7 +1298,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | Warning | `warning` | TokenKind.Warning (=49) |
 | Error | `error` | TokenKind.Error (=50) |
 
-### 2.10 Keywords — Constraints (`keyword.other.constraint.precept`)
+## 2.10 Keywords — Constraints (`keyword.other.constraint.precept`)
 
 | Token | Text | Source |
 |-------|------|--------|
@@ -1833,7 +1315,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | Maxplaces | `maxplaces` | TokenKind.Maxplaces (=61) |
 | Ordered | `ordered` | TokenKind.Ordered (=62) |
 
-### 2.11 Keywords — Type Names (`storage.type.precept`)
+## 2.11 Keywords — Type Names (`storage.type.precept`)
 
 | Token | Text | Family | Source |
 |-------|------|--------|--------|
@@ -1866,7 +1348,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | PriceType | `price` | Business | TokenKind.PriceType (=85) |
 | ExchangeRateType | `exchangerate` | Business | TokenKind.ExchangeRateType (=86) |
 
-### 2.12 Literals
+## 2.12 Literals
 
 | Token | Scope | Description |
 |-------|-------|-------------|
@@ -1878,7 +1360,7 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 **Note:** `null` is NOT a keyword in the token catalog. The hand-authored grammar includes it in `booleanNull` — this is stale. Precept uses `is set`/`is not set` for presence, not `null`.
 
-### 2.13 Symbol Operators (`keyword.operator.precept`)
+## 2.13 Symbol Operators (`keyword.operator.precept`)
 
 | Token | Text | Description |
 |-------|------|-------------|
@@ -1898,14 +1380,14 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | Slash | `/` | Division |
 | Percent | `%` | Modulo |
 
-### 2.14 Arrow Operators (`keyword.operator.arrow.precept`)
+## 2.14 Arrow Operators (`keyword.operator.arrow.precept`)
 
 | Token | Text | Description |
 |-------|------|-------------|
 | Arrow | `->` | Action chain / outcome separator |
 | BackArrow | `<-` | Computed field derivation |
 
-### 2.15 Punctuation (`punctuation.precept`)
+## 2.15 Punctuation (`punctuation.precept`)
 
 | Token | Text | Description |
 |-------|------|-------------|
@@ -1916,14 +1398,14 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 | LeftBracket | `[` | Open bracket |
 | RightBracket | `]` | Close bracket |
 
-### 2.16 Member-Name Tokens (`keyword.other.precept`)
+## 2.16 Member-Name Tokens (`keyword.other.precept`)
 
 | Token | Text | Description |
 |-------|------|-------------|
 | Countof | `countof` | Bag element count accessor |
 | Peekby | `peekby` | Priority queue ordering-key peek |
 
-### 2.17 Built-in Functions (21 total — not keywords, scoped as identifiers)
+## 2.17 Built-in Functions (21 total — not keywords, scoped as identifiers)
 
 Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer keywords. In TextMate, they match as generic identifiers unless a function-call pattern highlights them. The grammar SHOULD have a pattern for known function names followed by `(`.
 
@@ -1952,7 +1434,7 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 | ~startsWith | `~startsWith` (CI variant) |
 | ~endsWith | `~endsWith` (CI variant) |
 
-### 2.18 Constructs (12 — from `Constructs.cs`)
+## 2.18 Constructs (12 — from `Constructs.cs`)
 
 | # | ConstructKind | Leading Token(s) | Disambiguation | Example |
 |---|---------------|-------------------|----------------|---------|
@@ -1973,7 +1455,7 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 ## 3. Hand-Authored Grammar Audit
 
-### 3.1 Coverage Gap Table
+## 3.1 Coverage Gap Table
 
 | # | Language Construct / Token | In Hand Grammar? | Scope Assignment | Gap / Issue |
 |---|---------------------------|:---:|------------------|-------------|
@@ -2013,7 +1495,7 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 | G34 | Ascending/descending | ❌ NO | — | Sort order modifiers missing. |
 | G35 | `is set` / `is not set` operators | ❌ NO | — | Multi-token presence operators not highlighted. |
 
-### 3.2 Stale / Incorrect Patterns
+## 3.2 Stale / Incorrect Patterns
 
 | # | Pattern | Line | Issue |
 |---|---------|------|-------|
@@ -2028,7 +1510,7 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 | S9 | `controlKeywords` mix | L356-361 | INCORRECT. Mixes declaration keywords (`precept`, `state`, `event`) with control flow (`if`, `when`). Should use catalog-derived scope groups. |
 | S10 | `actionKeywords` mix | L380-385 | INCORRECT. Mixes actions (`set`, `add`), prepositions (`into`), membership (`contains`), and logical operators (`and`, `or`, `not`) into one scope. |
 
-### 3.3 Scope Assignment Errors
+## 3.3 Scope Assignment Errors
 
 | # | Token | Grammar Scope | Catalog Scope | Visual System Role |
 |---|-------|--------------|---------------|--------------------|
@@ -2055,13 +1537,13 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 ## 4. Generator Audit
 
-### 4.1 Generator Strengths
+## 4.1 Generator Strengths
 
 1. **Catalog-driven keyword emission** (L38-77): Reads `Tokens.All`, groups by `TextMateScope`, emits one alternation pattern per scope. This correctly picks up all 139 tokens. ✓
 2. **Typed constants** (L134-146): Handles single-quoted `'...'` strings. Hand-authored grammar doesn't. ✓
 3. **Collection member access** (L453-470): Includes `countof` and `peekby`. ✓
 
-### 4.2 Generator Gap Table
+## 4.2 Generator Gap Table
 
 | # | Language Construct / Feature | Generator Pattern? | Correct Scope? | Gap |
 |---|-----------------------------|----|----|----|
@@ -2090,7 +1572,7 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 ## 5. Authoritative Grammar Specification
 
-### Spec Section 1: Scope Vocabulary
+## Spec Section 1: Scope Vocabulary
 
 Every TextMate scope used in the Precept grammar, with semantic meaning and visual system role.
 
@@ -2146,58 +1628,58 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 | S48 | `meta.event-arg-ref.precept` | Event.arg dot access (meta) | — | — |
 | S49 | `meta.collection-member.precept` | Collection.property access (meta) | — | — |
 
-### Spec Section 2: Repository Patterns (Complete Enumeration)
+## Spec Section 2: Repository Patterns (Complete Enumeration)
 
-#### 2.1 Comment
+## 2.1 Comment
 
 - **Key:** `comment`
 - **Type:** `match`
-- **Scope:** `comment.line.number-sign.precept`
+**Scope:** `comment.line.number-sign.precept`
 - **Regex:** `#.*$`
 - **Covers:** Line comments
 
-#### 2.2 Message Strings
+## 2.2 Message Strings
 
 - **Key:** `messageStrings`
 - **Type:** `match` (two patterns)
-- **Scope:** captures `keyword.declaration.precept` for keyword, `string.quoted.double.message.precept` for message
+**Scope:** captures `keyword.declaration.precept` for keyword, `string.quoted.double.message.precept` for message
 - **Regex pattern 1:** `\b(because)(\s+)("(?:\\.|[^"\\])*")`
 - **Regex pattern 2:** `\b(reject)(\s+)("(?:\\.|[^"\\])*")`
 - **Covers:** Gold message payload in `because "..."` and `reject "..."` positions
 - **Priority:** MUST precede generic `strings` pattern to prevent message strings from being consumed as regular strings
 - **Visual system:** This is the **only** pattern that produces `string.quoted.double.message.precept` — the gold visual interrupt
 
-#### 2.3 Strings
+## 2.3 Strings
 
 - **Key:** `strings`
 - **Type:** `begin/end`
-- **Scope:** `string.quoted.double.precept`
+**Scope:** `string.quoted.double.precept`
 - **Begin:** `"`   End: `"`
 - **Inner pattern:** `constant.character.escape.precept` for `\\.`
 - **Covers:** All non-message double-quoted strings
 
-#### 2.4 Typed Constants
+## 2.4 Typed Constants
 
 - **Key:** `typedConstants`
 - **Type:** `begin/end`
-- **Scope:** `string.quoted.single.precept`
+**Scope:** `string.quoted.single.precept`
 - **Begin:** `'`   End: `'`
 - **Covers:** Single-quoted typed constants (`'USD'`, `'kg'`, `'2026-01-15'`)
 
-#### 2.5 Precept Header
+## 2.5 Precept Header
 
 - **Key:** `preceptHeader`
 - **Type:** `match`
-- **Scope:** `meta.declaration.precept.precept`
+**Scope:** `meta.declaration.precept.precept`
 - **Regex:** `^(\s*)(precept)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
 - **Captures:** `2` → `keyword.declaration.precept`, `4` → `entity.name.precept.message.precept`
 - **Covers:** `precept LoanApplication`
 
-#### 2.6 State Declaration
+## 2.6 State Declaration
 
 - **Key:** `stateDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.declaration.state.precept`
+**Scope:** `meta.declaration.state.precept`
 - **Regex:** `^(\s*)(state)(\s+)(.*)`
 - **Captures:** `2` → `keyword.declaration.precept`, `4` → sub-patterns:
   - State modifiers from catalog: `\b(initial|terminal|required|irreversible|success|warning|error)\b` → `storage.modifier.state.precept` (for `terminal`/`required`/`irreversible`/`success`/`warning`/`error`) and `keyword.declaration.precept` (for `initial`)
@@ -2206,11 +1688,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `state Draft initial, Submitted, Approved terminal success`
 - **Critical change from current:** Must recognize ALL 7 state modifiers, not just `initial`
 
-#### 2.7 Event Declaration (Parenthesized Args)
+## 2.7 Event Declaration (Parenthesized Args)
 
 - **Key:** `eventDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.declaration.event.precept`
+**Scope:** `meta.declaration.event.precept`
 - **Regex:** `^(\s*)(event)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*)(\s*\(.*)?`
 - **Captures:**
   - `2` → `keyword.declaration.precept`
@@ -2227,11 +1709,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `event Submit(Applicant as string notempty, Amount as number)`
 - **Critical change:** Replaces stale `eventWithArgsDeclaration` (used `with` syntax)
 
-#### 2.8 Field Declaration (Scalar)
+## 2.8 Field Declaration (Scalar)
 
 - **Key:** `fieldScalarDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.field-declaration.precept`
+**Scope:** `meta.field-declaration.precept`
 - **Regex:** `^(\s*)(field)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*)(\s+)(as)(\s+)(string|number|integer|decimal|boolean|choice|date|time|instant|duration|period|timezone|zoneddatetime|datetime|money|currency|quantity|unitofmeasure|dimension|price|exchangerate)(.*)`
 - **Captures:**
   - `2` → `keyword.declaration.precept`
@@ -2242,11 +1724,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** All scalar field declarations including temporal and business-domain types
 - **Note:** Type name list MUST be derived from the catalog (`Tokens.All` where category is `Type` and text is not null)
 
-#### 2.9 Field Declaration (Collection)
+## 2.9 Field Declaration (Collection)
 
 - **Key:** `fieldCollectionDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.field-declaration.precept`
+**Scope:** `meta.field-declaration.precept`
 - **Regex:** `^(\s*)(field)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*)(\s+)(as)(\s+)(set|queue|stack|bag|list|log|lookup)(\s+)(of)(\s+)(~?(?:string|number|integer|decimal|boolean))(.*)`
 - **Captures:**
   - `2` → `keyword.declaration.precept`
@@ -2258,27 +1740,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
   - `13` → sub-patterns for constraint keywords, modifiers
 - **Covers:** `field Tags as set of string`, `field Items as bag of ~string`
 
-#### 2.10 Computed Field Declaration
+## 2.10 Computed Field Declaration
 
 - **Key:** `computedFieldDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.computed-field.precept`
+**Scope:** `meta.computed-field.precept`
 - **Regex:** `^(\s*)(field)(\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+)(as)(\s+)(string|number|integer|decimal|boolean|..types..)(\s+.*)?(<-)(\s+.*)`
 - **Note:** This is hard to capture in a single regex because the `<-` can appear after optional modifiers. Recommend a separate pattern that matches `<-` preceded by field context, or handle via the existing field declaration patterns plus the arrow operator pattern.
 - **Alternative approach:** The `<-` operator is already in the catalog. The constraint keywords and type keywords are already catalog-derived. A computed field declaration is just a field declaration that happens to contain `<-`. The structural pattern can be the same as `fieldScalarDeclaration` if the tail sub-patterns include the `<-` operator and expression patterns.
 
-#### 2.11 Root Edit Declaration
+## 2.11 Root Edit Declaration
 
 - **Key:** `rootEditDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.declaration.edit.root.precept`
-- **Status:** **NEEDS VERIFICATION.** The `edit` keyword is not in the `TokenKind` enum. No sample file uses root-level `edit`. This pattern may be stale. If confirmed stale, remove. If still valid, add `edit` to TokenKind.
+**Scope:** `meta.declaration.edit.root.precept`
+**Status:** **NEEDS VERIFICATION.** The `edit` keyword is not in the `TokenKind` enum. No sample file uses root-level `edit`. This pattern may be stale. If confirmed stale, remove. If still valid, add `edit` to TokenKind.
 
-#### 2.12 Transition Row Header
+## 2.12 Transition Row Header
 
 - **Key:** `fromOnHeader`
 - **Type:** `match`
-- **Scope:** `meta.transition.header.precept`
+**Scope:** `meta.transition.header.precept`
 - **Regex:** `^(\s*)(from)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)(\s+)(on)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
 - **Captures:**
   - `2` → `keyword.control.precept` (`from`)
@@ -2288,11 +1770,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `from Draft on Submit`, `from any on Cancel`
 - **Note:** `any` in state position should get quantifier scope, not state scope. Needs sub-pattern.
 
-#### 2.13 State Ensure
+## 2.13 State Ensure
 
 - **Key:** `stateEnsure`
 - **Type:** `match`
-- **Scope:** `meta.ensure.state.precept`
+**Scope:** `meta.ensure.state.precept`
 - **Regex:** `^(\s*)(in|to|from)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(ensure)\b`
 - **Captures:**
   - `2` → `keyword.control.precept` (anchor preposition)
@@ -2300,11 +1782,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
   - `6` → `keyword.declaration.precept` (`ensure`)
 - **Covers:** `in Approved ensure amount > 0 because "..."`
 
-#### 2.14 Event Ensure
+## 2.14 Event Ensure
 
 - **Key:** `eventEnsure`
 - **Type:** `match`
-- **Scope:** `meta.ensure.event.precept`
+**Scope:** `meta.ensure.event.precept`
 - **Regex:** `^(\s*)(on)(\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+)(ensure)\b`
 - **Captures:**
   - `2` → `keyword.control.precept` (`on`)
@@ -2312,11 +1794,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
   - `6` → `keyword.declaration.precept` (`ensure`)
 - **Covers:** `on Submit ensure Amount > 0 because "..."`
 
-#### 2.15 Access Mode
+## 2.15 Access Mode
 
 - **Key:** `accessMode`
 - **Type:** `match`
-- **Scope:** `meta.access-mode.precept`
+**Scope:** `meta.access-mode.precept`
 - **Regex:** `^(\s*)(in)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(modify)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*|all)(\s+)(editable|readonly)`
 - **Captures:**
   - `2` → `keyword.control.precept`
@@ -2326,11 +1808,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
   - `10` → `keyword.other.access-mode.precept` (`editable`/`readonly`)
 - **Covers:** `in Draft modify Amount editable`, `in UnderReview modify AdjusterName editable when not FraudFlag`
 
-#### 2.16 Omit Declaration
+## 2.16 Omit Declaration
 
 - **Key:** `omitDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.omit.precept`
+**Scope:** `meta.omit.precept`
 - **Regex:** `^(\s*)(in)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(omit)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
 - **Captures:**
   - `2` → `keyword.control.precept`
@@ -2339,11 +1821,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
   - `8` → `variable.other.field.precept`
 - **Covers:** `in Draft omit InternalNotes`
 
-#### 2.17 State Action
+## 2.17 State Action
 
 - **Key:** `stateAction`
 - **Type:** `match`
-- **Scope:** `meta.action.state.precept`
+**Scope:** `meta.action.state.precept`
 - **Regex:** `^(\s*)(to|from)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(->)`
 - **Captures:**
   - `2` → `keyword.control.precept` (anchor preposition)
@@ -2352,11 +1834,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `to Confirmed -> set PaymentReceived = true`
 - **Note:** Must precede `stateEnsure` in pattern order since both start with `to`/`from`. Disambiguated by `->` vs `ensure`.
 
-#### 2.18 Event Handler
+## 2.18 Event Handler
 
 - **Key:** `eventHandler`
 - **Type:** `match`
-- **Scope:** `meta.handler.event.precept`
+**Scope:** `meta.handler.event.precept`
 - **Regex:** `^(\s*)(on)(\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+)(->)`
 - **Captures:**
   - `2` → `keyword.control.precept` (`on`)
@@ -2365,43 +1847,43 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `on UpdateName -> set name = newName` (stateless precepts)
 - **Note:** Must precede `eventEnsure` in pattern order since both start with `on`.
 
-#### 2.19 Rule Declaration
+## 2.19 Rule Declaration
 
 - **Key:** `ruleDeclaration`
 - **Type:** `match`
-- **Scope:** `meta.rule.precept`
+**Scope:** `meta.rule.precept`
 - **Regex:** `^(\s*)(rule)\b`
 - **Captures:** `2` → `keyword.declaration.precept`
 - **Covers:** `rule amount > 0 because "..."`
 - **Note:** Only needs to capture the `rule` keyword. The rest of the line is handled by included patterns (operators, identifiers, message strings, etc.)
 
-#### 2.20 Transition Target
+## 2.20 Transition Target
 
 - **Key:** `transitionTarget`
 - **Type:** `match`
-- **Scope:** `meta.transition.target.precept`
+**Scope:** `meta.transition.target.precept`
 - **Regex:** `\b(transition)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
 - **Captures:**
   - `1` → `keyword.other.outcome.precept`
   - `3` → `entity.name.type.state.precept`
 - **Covers:** `transition Approved`
 
-#### 2.21 No Transition
+## 2.21 No Transition
 
 - **Key:** `noTransition`
 - **Type:** `match`
-- **Scope:** (captures only)
+**Scope:** (captures only)
 - **Regex:** `\b(no)(\s+)(transition)\b`
 - **Captures:**
   - `1` → `keyword.other.outcome.precept`
   - `3` → `keyword.other.outcome.precept`
 - **Covers:** `no transition`
 
-#### 2.22 Event Arg Reference (Dot Access)
+## 2.22 Event Arg Reference (Dot Access)
 
 - **Key:** `eventArgReference`
 - **Type:** `match`
-- **Scope:** `meta.event-arg-ref.precept`
+**Scope:** `meta.event-arg-ref.precept`
 - **Regex:** `\b([A-Za-z_][A-Za-z0-9_]*)(\.)([A-Za-z_][A-Za-z0-9_]*)`
 - **Captures:**
   - `1` → `entity.name.function.event.precept` (event name)
@@ -2410,7 +1892,7 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `Submit.Amount`, `Approve.Note`
 - **Note:** This pattern is ambiguous — it also matches `Collection.count`. The `collectionMemberAccess` pattern must precede this one.
 
-#### 2.23 Collection Member Access
+## 2.23 Collection Member Access
 
 - **Key:** `collectionMemberAccess`
 - **Type:** `match`
@@ -2422,11 +1904,11 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `MissingDocuments.count`, `Queue.peek`
 - **Priority:** Must precede `eventArgReference` to prevent `Collection.count` from being highlighted as event.arg.
 
-#### 2.24 Function Calls
+## 2.24 Function Calls
 
 - **Key:** `functionCalls`
 - **Type:** `match`
-- **Scope:** (captures only)
+**Scope:** (captures only)
 - **Regex:** `\b(min|max|abs|clamp|floor|ceil|truncate|round|approximate|pow|sqrt|trim|startsWith|endsWith|toLower|toUpper|left|right|mid|now)(\s*\()`
 - **Captures:**
   - `1` → `support.function.precept`
@@ -2434,7 +1916,7 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 - **Covers:** `min(x, y)`, `round(amount, 2)`, `trim(name)`, `now()`
 - **Note:** Function name list MUST be derived from `Functions.All` (via the function catalog). CI variants `~startsWith` and `~endsWith` need a separate pattern: `(~)(startsWith|endsWith)(\s*\()`.
 
-#### 2.25 Catalog-Derived Keyword Groups
+## 2.25 Catalog-Derived Keyword Groups
 
 These are generated automatically by reading `Tokens.All`, grouping by `TextMateScope`, and emitting one alternation pattern per scope. The generator already does this (L38-77 of `Program.cs`).
 
@@ -2458,29 +1940,29 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 | `arrowOperators` | `keyword.operator.arrow.precept` | `->`, `<-` |
 | `memberNameKeywords` | `keyword.other.precept` | `countof`, `peekby` |
 
-#### 2.26 Numbers
+## 2.26 Numbers
 
 - **Key:** `numbers`
 - **Type:** `match`
-- **Scope:** `constant.numeric.precept`
+**Scope:** `constant.numeric.precept`
 - **Regex:** `\b\d+(?:\.\d+)?\b`
 
-#### 2.27 Punctuation
+## 2.27 Punctuation
 
 - **Key:** `punctuation`
 - **Type:** `match`
-- **Scope:** `punctuation.precept`
+**Scope:** `punctuation.precept`
 - **Regex:** `[()[\].,]` (individual captures for finer scoping optional)
 
-#### 2.28 Identifier Reference (Catch-All)
+## 2.28 Identifier Reference (Catch-All)
 
 - **Key:** `identifierReference`
 - **Type:** `match`
-- **Scope:** `variable.other.precept`
+**Scope:** `variable.other.precept`
 - **Regex:** `\b[A-Za-z_][A-Za-z0-9_]*\b`
 - **Priority:** LAST in pattern order. This is the catch-all.
 
-### Spec Section 3: Top-Level Pattern Ordering
+## Spec Section 3: Top-Level Pattern Ordering
 
 Ordered from most-specific to least-specific to prevent false matches.
 
@@ -2550,7 +2032,7 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 ## 6. Coverage Gaps (Current Grammar)
 
-### Gaps in the hand-authored grammar (35 items from audit section 3.1, G1–G35)
+## Gaps in the hand-authored grammar (35 items from audit section 3.1, G1–G35)
 
 See Section 3.1 above for the complete gap table. Summary of critical gaps:
 
@@ -2558,7 +2040,7 @@ See Section 3.1 above for the complete gap table. Summary of critical gaps:
 2. **10 stale/incorrect patterns** (S1–S10) — 3 retired keywords, 2 retired syntax forms, 5 scope misassignments
 3. **16 scope assignment errors** (E1–E16) — tokens assigned to wrong semantic category
 
-### Gaps in the grammar generator (20 items from audit section 4.2, GG1–GG20)
+## Gaps in the grammar generator (20 items from audit section 4.2, GG1–GG20)
 
 See Section 4.2 above. Summary of critical gaps:
 
@@ -2575,7 +2057,7 @@ See Section 4.2 above. Summary of critical gaps:
 
 Numbered list keyed to spec entries above.
 
-### Must-Fix (blocks parity with hand-authored grammar + visual system compliance)
+## Must-Fix (blocks parity with hand-authored grammar + visual system compliance)
 
 1. **Add `messageStrings` pattern (Spec §2.2).** This is the single most important pattern for visual system compliance. Without it, message payloads are indistinguishable from regular strings — destroying the gold visual interrupt that the brand mandates. Emit TWO match patterns: one for `because "..."`, one for `reject "..."`. Captures must assign `keyword.declaration.precept` to the keyword and `string.quoted.double.message.precept` to the string.
 
@@ -2609,7 +2091,7 @@ Numbered list keyed to spec entries above.
 
 16. **Update top-level pattern ordering (Spec §3).** Current ordering (L491-524) must be restructured per spec. `messageStrings` must come before `strings`. New construct patterns must be inserted at correct priority.
 
-### Should-Fix (improves correctness and visual system alignment)
+## Should-Fix (improves correctness and visual system alignment)
 
 17. **Add `any` quantifier sub-pattern in state position.** In `fromOnHeader`, `stateEnsure`, `accessMode`, etc., `any` should get `keyword.other.quantifier.precept`, not `entity.name.type.state.precept`.
 
@@ -2621,7 +2103,7 @@ Numbered list keyed to spec entries above.
 
 21. **Handle `choice of string("a","b","c")` syntax.** The parenthesized choice options need string highlighting within the type declaration. Currently the strings would be captured by the generic `strings` pattern, which is acceptable.
 
-### Won't-Fix in Grammar (semantic tokens only)
+## Won't-Fix in Grammar (semantic tokens only)
 
 22. **Italic for constrained states/events.** TextMate cannot apply `fontStyle: italic` based on semantic context (whether a state participates in `ensure` rules). This requires the semantic token provider, which already exists in the language server.
 
@@ -2739,7 +2221,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 ## Gap Inventory
 
-### [BLOCKING] Gaps
+## [BLOCKING] Gaps
 
 ---
 
@@ -2811,7 +2293,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 ---
 
-### [SIGNIFICANT] Gaps
+## [SIGNIFICANT] Gaps
 
 ---
 
@@ -2939,7 +2421,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 ---
 
-### [ADVISORY] Gaps
+## [ADVISORY] Gaps
 
 ---
 
@@ -3005,7 +2487,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 ---
 
-### [DOC-ONLY] Gaps
+## [DOC-ONLY] Gaps
 
 ---
 
@@ -3027,7 +2509,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 ## Cross-Stage Seam Issues
 
-### GraphAnalyzer → ProofEngine
+## GraphAnalyzer → ProofEngine
 
 1. **ReachabilityFact emission is per-state.** The GraphAnalyzer emits one `ReachabilityFact` per state (line 186 of GraphAnalyzer.cs). The spec's consumption table (line 907) says "suppress proof obligations on transitions originating from unreachable states." This is correct — the proof engine can look up `ReachabilityFact.IsReachable` for a transition's `FromState`. **No gap.**
 
@@ -3035,7 +2517,7 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 3. **DominancePathFact:** The spec says "if `DominatedTerminals` is empty, records a structural violation in the proof ledger." But the GraphAnalyzer already emits `RequiredStateDoesNotDominateTerminal` (111) for this case. The proof engine recording it again is redundant. **Clarify whether the proof engine adds to the structural record or merely records the fact for downstream consumption without additional diagnostics.**
 
-### ProofEngine → Runtime (via Precept Builder)
+## ProofEngine → Runtime (via Precept Builder)
 
 4. **No `precept-builder.md` exists.** The spec references it in three CC#6 resolution boxes (lines 218, 236, 250). The downstream contract is hypothetical. **Covered by PE-G11.**
 
@@ -3073,13 +2555,13 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 **NOT READY** — three BLOCKING gaps prevent implementation from starting.
 
-### Blockers (must resolve before any implementation work):
+## Blockers (must resolve before any implementation work):
 
 1. **PE-G1:** Three of five `ProofRequirementKind` values have no discharge strategy. The implementer cannot write discharge logic for `Dimension`, `Modifier`, or `QualifierCompatibility` obligations without spec guidance.
 2. **PE-G2:** `FieldModifierMeta.ProofDischarges` does not exist in source. Strategy 2 cannot be implemented as specified.
 3. **PE-G3:** Output type `ProofLedger` and ~10 supporting record types don't exist. Shape declarations must be created before coding begins.
 
-### Conditions (must resolve before implementation is complete, but won't block starting if blockers are cleared):
+## Conditions (must resolve before implementation is complete, but won't block starting if blockers are cleared):
 
 4. **PE-G4:** `AllTypedExpressions` doesn't exist — Pass 1 walk targets must be enumerated.
 5. **PE-G5:** `ConstraintIdentity` shapes must match source, not spec.
@@ -3110,3 +2592,1824 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 8. **Add compound guard decomposition rules (PE-G10)** — Specify `and`/`or`/`not` handling.
 
 9. **Add stateless precept handling section (PE-G15)** — Small but prevents a class of missed-obligation bugs.
+
+## 2026-05-08T22:46:03: User directive
+**By:** Shane (via Copilot)
+**What:** After Frank finishes G4-G18 and the design is approved, route G1 and G2 prework to George. Prework = shape/type definitions and catalog metadata only (e.g., ProofSatisfaction DU, DeclaredPresence, DeclaredQualifierMeta, Modifiers rows). Engine work (Parser qualifier clauses, TypeChecker qualifier resolution, ProofEngine Strategy 2 & 5) waits until after prework lands.
+**Why:** User directive — G1/G2 prework is in the same category as G3 (structural definitions, not engine logic). Prework can proceed immediately after design is finalized; engine implementation is a separate phase.
+
+# PE-G1 Detailed Analysis — Frank
+
+**Date:** 2026-05-08
+**Author:** Frank (Lead/Architect)
+**Status:** Ready for design decision
+
+## Summary
+
+All three unhandled `ProofRequirementKind` values are **live** — they have real obligation-generating callers in `Operations.cs`, they are stamped onto `TypedBinaryOp` nodes by the TypeChecker's expression resolver, and the TypeChecker does **not** enforce any of them independently. Each reaches the proof engine as an open obligation. None is dead code. None is pre-discharged.
+
+---
+
+## DimensionProofRequirement
+
+**Determination: B — Strategy 2 (Declaration Attribute Proof) handles this.**
+
+## Rationale
+
+**Callers (4 sites in `Operations.cs`):**
+- `DatePlusPeriod` (line 248): `DimensionProofRequirement(PPeriod, PeriodDimension.Date, ...)`
+- `DateMinusPeriod` (line 257): `DimensionProofRequirement(PPeriod, PeriodDimension.Date, ...)`
+- `TimePlusPeriod` (line 275): `DimensionProofRequirement(PPeriod, PeriodDimension.Time, ...)`
+- `TimeMinusPeriod` (line 284): `DimensionProofRequirement(PPeriod, PeriodDimension.Time, ...)`
+
+All four attach the requirement to binary operations where one operand is a `period` type. The requirement says: "this period operand must have the correct time dimension (date-level for date arithmetic, time-level for time arithmetic)."
+
+**TypeChecker behavior:** The TypeChecker (`TypeChecker.Expressions.cs` lines 479–519) resolves binary operations by type matching via `TryResolveBinaryWithWidening`. It resolves `Date + Period → DatePlusPeriod` purely on type structure, stamps `result.ProofRequirements` onto the `TypedBinaryOp` (line 504), and does NOT validate period dimensions. The `Qualifier` field on `TypedField` is even set to `null` with a `// Slice 2+` comment (TypeChecker.cs line 121), confirming qualifier resolution is future work.
+
+**Why Strategy 2:** Strategy 2 was renamed to "Declaration Attribute Proof" (per Shane's lock decision 2026-05-08T05:15:57Z). It reads declaration-site attributes of the subject field. Period dimension is determined by the field's type qualifier — a declaration attribute. The predicate is:
+
+1. Resolve the proof subject to an expression node.
+2. Determine the expression's period dimension:
+   - **Field reference:** Read the field's resolved qualifier on the `TemporalDimension` axis (once qualifier resolution ships). Map to `PeriodDimension`.
+   - **Literal period:** Extract dimension from the literal's temporal unit (e.g., `3 days` → Date, `2 hours` → Time).
+   - **Unqualified/unknown:** Treat as `PeriodDimension.Any` (per Shane's locked decision on permissive unqualified periods).
+3. Discharge condition: `resolvedDimension == PeriodDimension.Any || resolvedDimension == requirement.RequiredDimension`.
+
+**Why not Strategy 1:** Strategy 1 (Literal Proof) is explicitly scoped to `NumericProofRequirement` only (spec §7.1, line 436: "Gate: only numeric requirements are literal-provable"). The literal-period case fits naturally into Strategy 2's expanded scope — the literal IS the declaration in that context.
+
+**Why not a new strategy:** The dimension check reads a declaration-site attribute (the period's qualifier/dimension). This is exactly what Strategy 2 does — read field declaration metadata to discharge an obligation. No new strategy machinery is needed.
+
+## Concrete answer for the spec
+
+Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
+
+```
+// DimensionProofRequirement: check if subject's period dimension satisfies the requirement
+if (obligation.Requirement is DimensionProofRequirement dimReq)
+{
+    var dimension = ResolvePeriodDimension(subject, semantics);
+    // PeriodDimension.Any always satisfies (permissive unqualified periods — locked decision)
+    return dimension == PeriodDimension.Any || dimension == dimReq.RequiredDimension;
+}
+```
+
+Add to §6 `DimensionProofRequirement` description: "Discharged by Strategy 2 (Declaration Attribute Proof). The strategy reads the subject's resolved period dimension — from field qualifier metadata for field references, from literal temporal unit for literal periods. Unqualified periods resolve to `PeriodDimension.Any`, which permissively satisfies any dimension requirement."
+
+---
+
+## ModifierRequirement
+
+**Determination: B — Strategy 2 (Declaration Attribute Proof) handles this.**
+
+## Rationale
+
+**Callers (4 sites in `Operations.cs`):**
+- `ChoiceLessThanChoice` (line 760): `ModifierRequirement(PChoice, ModifierKind.Ordered, ...)`
+- `ChoiceGreaterThanChoice` (line 768): same
+- `ChoiceLessThanOrEqualChoice` (line 776): same
+- `ChoiceGreaterThanOrEqualChoice` (line 784): same
+
+All four attach the requirement to ordinal comparison operations on `choice` fields. The requirement says: "the choice field must declare the `ordered` modifier to permit ordinal comparison."
+
+**TypeChecker behavior:** The TypeChecker resolves `Choice < Choice → ChoiceLessThanChoice` by type matching. It stamps the `ModifierRequirement` onto the `TypedBinaryOp` (line 504). It does NOT check whether the choice field has the `ordered` modifier — the modifiers are resolved on `TypedField` (TypeChecker.cs lines 99–117) but never cross-referenced against operation requirements.
+
+**Why Strategy 2:** This is the purest case of a declaration attribute check. The predicate is:
+
+1. Resolve the proof subject to a field name.
+2. Look up the field's `Modifiers` array from `SemanticIndex.FieldsByName`.
+3. Discharge condition: `field.Modifiers.Contains(requirement.Required)` OR `field.ImpliedModifiers.Contains(requirement.Required)`.
+
+This is simpler than the `ProofDischarges` lookup path. The `ProofDischarges` mechanism maps modifiers → requirements they discharge (modifier "positive" discharges numeric requirement "> 0"). `ModifierRequirement` is the inverse — it asks "does the field have modifier X?" This is a direct membership check, not a discharge-table lookup.
+
+**Both arms coexist in Strategy 2.** The `ProofDischarges` path handles: "modifier presence implies numeric/presence bound" (e.g., `positive` → `> 0`). The `ModifierRequirement` path handles: "field must have this modifier" (e.g., `ordered` for choice comparison). Same strategy, two predicate shapes.
+
+## Concrete answer for the spec
+
+Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
+
+```
+// ModifierRequirement: check if subject field declares the required modifier
+if (obligation.Requirement is ModifierRequirement modReq)
+{
+    var fieldName = GetFieldName(modReq.Subject, obligation.Site);
+    if (fieldName is null) return false;
+    if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return false;
+
+    // Direct modifier check — does the field's declaration include the required modifier?
+    return field.Modifiers.Contains(modReq.Required)
+        || field.ImpliedModifiers.Contains(modReq.Required);
+}
+```
+
+Add to §6 `ModifierRequirement` description: "Discharged by Strategy 2 (Declaration Attribute Proof). The strategy resolves the subject to a field and checks whether the field's declared or implied modifiers include `requirement.Required`. This is a direct membership check — it does not use the `ProofDischarges` table."
+
+---
+
+## QualifierCompatibilityProofRequirement
+
+**Determination: C — A new strategy (Strategy 5: Qualifier Compatibility Proof) is required.**
+
+## Rationale
+
+**Callers (24+ sites in `Operations.cs`):**
+- Quantity arithmetic (lines 475, 484, 921–966): `QualifierAxis.Unit` — operands must share unit qualifier
+- Price arithmetic (lines 557–559, 568–570, 977–1034): `QualifierAxis.Unit` AND `QualifierAxis.Currency` — operands must share both unit and currency qualifiers
+
+All use `new ParamSubject(PQuantity)` or `new ParamSubject(PPrice)` for BOTH `LeftSubject` and `RightSubject` — same parameter reference. At the use site, these map to two different field expressions (e.g., `FieldA + FieldB` where both are quantity fields). The proof engine must verify that the two concrete field expressions share the same qualifier value on the specified axis.
+
+**TypeChecker behavior:** The TypeChecker disambiguates binary operation candidates using `QualifierMatch.Same` as the default assumption (TypeChecker.Expressions.cs line 576). The comment at line 573 explicitly says: "ProofEngine will verify qualifier compatibility at deeper analysis." The TypeChecker defers this check to the proof engine by design.
+
+**Why none of the four existing strategies work:**
+
+1. **Strategy 1 (Literal Proof):** Operates on a single subject's literal value. Does not handle dual subjects. Does not read qualifier metadata.
+2. **Strategy 2 (Declaration Attribute Proof):** Operates on a single subject's field declaration. `QualifierCompatibilityProofRequirement` is the ONLY dual-subject requirement kind — it has `LeftSubject` and `RightSubject`, not a single `Subject`. Strategy 2's predicate shape (resolve one subject → read its attributes → compare against requirement threshold) cannot express "compare two subjects against each other."
+3. **Strategy 3 (Guard-in-Path):** Guards don't establish qualifier relationships. A `when` clause says things like `when Quantity > 0`, not `when FieldA.unit == FieldB.unit`.
+4. **Strategy 4 (Flow Narrowing):** Same limitation as Strategy 3 — handles relational constraints between field values, not qualifier compatibility.
+
+**Strategy 5: Qualifier Compatibility Proof**
+
+Shape:
+
+```
+// Strategy 5: Qualifier Compatibility Proof — Discharge Predicate
+// Input: ProofObligation with QualifierCompatibilityProofRequirement
+// Reads: Both subjects' resolved qualifier bindings from SemanticIndex
+// Scope: Dual-subject obligations where two operands must share a qualifier value
+
+bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    if (obligation.Requirement is not QualifierCompatibilityProofRequirement qcReq)
+        return false;
+
+    // 1. Resolve both subjects to their qualifier bindings
+    var leftQualifier = ResolveQualifierOnAxis(qcReq.LeftSubject, qcReq.Axis, obligation.Site, semantics);
+    var rightQualifier = ResolveQualifierOnAxis(qcReq.RightSubject, qcReq.Axis, obligation.Site, semantics);
+
+    // 2. If either qualifier is unresolved (unqualified field), cannot prove — Unresolved
+    if (leftQualifier is null || rightQualifier is null)
+        return false;
+
+    // 3. Compare: both must have the same qualifier value on the specified axis
+    return leftQualifier == rightQualifier;
+}
+```
+
+**Inputs required:**
+- `QualifierCompatibilityProofRequirement.LeftSubject` and `RightSubject` — both `ProofSubject` instances
+- `QualifierCompatibilityProofRequirement.Axis` — the `QualifierAxis` to compare on (Unit, Currency, etc.)
+- Resolved qualifier bindings from `SemanticIndex` — requires qualifier resolution to be implemented (currently `Qualifier: null` in TypeChecker, Slice 2+ dependency)
+
+**Dependency:** Strategy 5 depends on qualifier resolution shipping in the TypeChecker. Until then, all `QualifierCompatibilityProofRequirement` obligations will be `Unresolved` — which is correct defensive behavior. The proof engine should still instantiate the obligations; it just can't discharge them yet.
+
+## Concrete answer for the spec
+
+Add new §7.5 to `proof-engine.md`:
+
+> **Strategy 5: Qualifier Compatibility Proof**
+>
+> **When it applies:** The obligation is a `QualifierCompatibilityProofRequirement` — the only dual-subject requirement kind.
+>
+> **How it works:** Resolve both subjects to their qualifier bindings on the specified `QualifierAxis`. If both resolve to the same qualifier value, discharge. If either is unqualified or the values differ, the obligation remains `Unresolved`.
+>
+> **Examples:**
+> - `quantity of 'kg' + quantity of 'kg'` → both Unit qualifiers match → discharged
+> - `quantity of 'kg' + quantity of 'miles'` → Unit qualifiers differ → Unresolved → diagnostic
+> - `quantity + quantity` (unqualified) → cannot prove → Unresolved → diagnostic
+>
+> **Dependency:** Requires qualifier resolution in the TypeChecker (currently Slice 2+ future work). Until qualifier resolution ships, all `QualifierCompatibilityProofRequirement` obligations produce `Unresolved` — the correct conservative behavior.
+
+Add to §6 `QualifierCompatibilityProofRequirement` description: "Discharged by Strategy 5 (Qualifier Compatibility Proof) — the only strategy that handles dual-subject obligations. Compares both subjects' resolved qualifier bindings on the specified `QualifierAxis`. Requires qualifier resolution to be operational."
+
+---
+
+## Spec update instructions
+
+## §6 — ProofRequirementKind subtypes (lines 348–389)
+
+After each subtype's existing description, add the discharge strategy reference:
+
+1. **Line ~374 (DimensionProofRequirement):** Add: "Discharged by Strategy 2 (Declaration Attribute Proof). Reads the subject's resolved period dimension — from field qualifier for field references, from literal temporal unit for literals. `PeriodDimension.Any` permissively satisfies any dimension requirement."
+
+2. **Line ~381 (ModifierRequirement):** Add: "Discharged by Strategy 2 (Declaration Attribute Proof). Checks direct modifier membership: `field.Modifiers.Contains(requirement.Required)`. Does not use the `ProofDischarges` table — this is a presence check, not a discharge mapping."
+
+3. **Line ~389 (QualifierCompatibilityProofRequirement):** Add: "Discharged by Strategy 5 (Qualifier Compatibility Proof). The only dual-subject requirement kind — requires a dedicated strategy that compares two subjects' qualifier bindings. Depends on qualifier resolution in the TypeChecker."
+
+## §7 — Strategy 2 pseudocode (lines 536–569)
+
+Expand the `TryModifierProof` function to include the two new arms (DimensionProofRequirement and ModifierRequirement) in addition to the existing ProofDischarges loop. Rename if desired to `TryDeclarationAttributeProof` to match the locked rename.
+
+## §7 — New Strategy 5 section (after Strategy 4, line ~767)
+
+Add the full Strategy 5: Qualifier Compatibility Proof section as specified above.
+
+## §7 header (line 410)
+
+Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
+
+---
+
+## Catalog implications
+
+## No new catalog changes required for ModifierRequirement or DimensionProofRequirement
+
+- `ModifierRequirement` reads existing `TypedField.Modifiers` and `TypedField.ImpliedModifiers`. No new metadata needed.
+- `DimensionProofRequirement` reads the field's resolved qualifier (future Slice 2+ work) and literal temporal units. No new catalog property needed — it reads existing type metadata.
+
+## QualifierCompatibilityProofRequirement depends on qualifier resolution
+
+- The `QualifierAxis` enum already exists in `Type.cs` (line 39).
+- The `QualifierSlot` and `QualifierShape` types already exist in `Type.cs` and `Types.cs`.
+- What's missing: `TypedField.Qualifier` is currently `null` (TypeChecker.cs line 121). Qualifier resolution must ship before Strategy 5 can discharge obligations. Until then, all qualifier compatibility obligations are correctly `Unresolved`.
+
+## PE-G2 (ProofDischarges) is still a prerequisite for Strategy 2's existing NumericProofRequirement path
+
+The `FieldModifierMeta.ProofDischarges` property (PE-G2) is needed for the "modifier discharges numeric/presence bound" arm of Strategy 2. The two new arms (DimensionProofRequirement, ModifierRequirement) do NOT depend on `ProofDischarges` — they use different predicate shapes. PE-G2 remains a blocking prerequisite only for Strategy 2's original `ProofDischarges` path.
+
+---
+
+## Decision summary for Shane
+
+| Requirement Kind | Determination | Strategy | Blocking dependency? |
+|---|---|---|---|
+| `DimensionProofRequirement` | **B** — existing strategy handles it | Strategy 2 (Declaration Attribute Proof) | No (literal path works now; field path needs qualifier resolution) |
+| `ModifierRequirement` | **B** — existing strategy handles it | Strategy 2 (Declaration Attribute Proof) | No (reads existing `TypedField.Modifiers`) |
+| `QualifierCompatibilityProofRequirement` | **C** — new strategy required | **Strategy 5** (Qualifier Compatibility Proof) | Yes — depends on qualifier resolution (Slice 2+) |
+
+Two of three are absorbed into the existing Strategy 2. One requires a fifth strategy. The spec's "Four Proof Strategies" becomes "Five Proof Strategies." The fifth strategy is the only one with a qualifier-resolution dependency — it can be stubbed during initial ProofEngine implementation and activated when qualifier resolution ships.
+
+## 2026-05-08T21:22:17Z: PE-G1 resolved — Shane sign-off
+**Decision:** All three PE-G1 determinations approved by Shane.
+**DimensionProofRequirement:** Strategy 2 (new arm)
+**ModifierRequirement:** Strategy 2 (new arm)
+**QualifierCompatibilityProofRequirement:** Strategy 5 (new strategy, stubbed until qualifier resolution)
+**Spec updated:** docs/compiler/proof-engine.md — five strategies, §6 discharge references, §7 pseudocode arms
+**Gap analysis updated:** docs/Working/frank-proof-engine-gap-analysis.md — PE-G1 marked RESOLVED
+
+# PE-G2 Analysis — ProofDischarge + FieldModifierMeta.ProofDischarges
+
+**Date:** 2026-05-08T21:29:51.919-04:00
+**Author:** Frank (Lead/Architect)
+**Status:** Ready for Shane sign-off
+
+## 1. Source-verified findings
+
+1. `FieldModifierMeta` currently exposes `Kind`, `Token`, `Description`, `Category`, `ApplicableTo`, `HasValue`, `Subsumes`, `HoverDescription`, `UsageExample`, `SnippetTemplate`, `DesugarsToRule`, and `MutuallyExclusiveWith`; there is no `ProofDischarges` constructor parameter or property in source today. (`src/Precept/Language/Modifier.cs:116-133`)
+2. The catalog population for modifiers is not in `Modifier.cs`; it lives in `Modifiers.cs`. The relevant field modifiers are declared there: `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, and `maxcount`. (`src/Precept/Language/Modifiers.cs:10-29`, `src/Precept/Language/Modifiers.cs:61-145`)
+3. `NumericProofRequirement` already fixes `Kind` to `ProofRequirementKind.Numeric` and carries the actual proof payload as `(Subject, Comparison, Threshold, Description)`. The kind metadata is separately recoverable through `ProofRequirements.GetMeta(kind)`. `ProofDischarge` therefore does **not** need a redundant `ProofRequirementKind` field. (`src/Precept/Language/ProofRequirement.cs:41-53`, `src/Precept/Language/ProofRequirements.cs:13-19`)
+4. Current live numeric obligation shapes are broader than `Operations.cs` alone:
+   - `Operations.cs` emits only `OperatorKind.NotEquals, 0m` obligations at every numeric site. (`src/Precept/Language/Operations.cs:100`, `src/Precept/Language/Operations.cs:109`, `src/Precept/Language/Operations.cs:131`, `src/Precept/Language/Operations.cs:140`, `src/Precept/Language/Operations.cs:162`, `src/Precept/Language/Operations.cs:171`, `src/Precept/Language/Operations.cs:193`, `src/Precept/Language/Operations.cs:202`, `src/Precept/Language/Operations.cs:224`, `src/Precept/Language/Operations.cs:233`, `src/Precept/Language/Operations.cs:335`, `src/Precept/Language/Operations.cs:344`, `src/Precept/Language/Operations.cs:353`, `src/Precept/Language/Operations.cs:418`, `src/Precept/Language/Operations.cs:428`, `src/Precept/Language/Operations.cs:438`, `src/Precept/Language/Operations.cs:447`, `src/Precept/Language/Operations.cs:456`, `src/Precept/Language/Operations.cs:465`, `src/Precept/Language/Operations.cs:497`, `src/Precept/Language/Operations.cs:507`, `src/Precept/Language/Operations.cs:517`, `src/Precept/Language/Operations.cs:526`, `src/Precept/Language/Operations.cs:535`, `src/Precept/Language/Operations.cs:595`, `src/Precept/Language/Operations.cs:613`)
+   - `Functions.cs` emits `OperatorKind.GreaterThanOrEqual, 0m` for integer `pow` exponents and `sqrt` arguments. (`src/Precept/Language/Functions.cs:163-188`)
+   - `Types.cs` and `Actions.cs` emit `OperatorKind.GreaterThan, 0m` and one `OperatorKind.GreaterThanOrEqual, 0m` against collection cardinality (`SelfSubject(CollectionCountAccessor)`). (`src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Types.cs:166-288`, `src/Precept/Language/Actions.cs:92-100`, `src/Precept/Language/Actions.cs:110-118`, `src/Precept/Language/Actions.cs:145-166`, `src/Precept/Language/Actions.cs:189-198`)
+5. Because collection non-empty obligations target `SelfSubject(CollectionCountAccessor)`, declaration-attribute proof must distinguish **field-value** bounds from **cardinality** bounds; comparison + threshold alone is not enough. The shared accessor is literally `count`. (`src/Precept/Language/Types.cs:153-154`, `src/Precept/Language/Types.cs:163-170`, `src/Precept/Language/Types.cs:181-288`)
+6. Valued modifiers are parsed and preserved as `ParsedModifier(ModifierKind Kind, ParsedExpression? Value)` on `DeclaredField`, but `TypedField.Modifiers` keeps only `ModifierKind`. The original field syntax is still retained on `TypedField.Syntax`, and `ParsedConstruct.GetSlot<T>()` can recover the `ModifierListSlot`. Therefore parametric discharges (`min`, `max`, `mincount`, etc.) must encode “threshold comes from the modifier value,” not a fixed decimal stored in catalog metadata. (`src/Precept/Pipeline/SlotValue.cs:26-30`, `src/Precept/Pipeline/SymbolTable.cs:54-62`, `src/Precept/Pipeline/TypeChecker.cs:99-102`, `src/Precept/Pipeline/SemanticIndex.cs:239-253`, `src/Precept/Pipeline/ParsedConstruct.cs:20-29`)
+7. Existing spec text is not implementable as written: both `proof-engine.md` and `catalog-system.md` currently model `ProofDischarge` as `(ProofRequirementKind, OperatorKind?, decimal?)`, which cannot represent (a) whether the discharge applies to the field value vs cardinality and (b) whether the threshold is fixed vs modifier-sourced. (`docs/compiler/proof-engine.md:517-607`, `docs/compiler/proof-engine.md:1179-1203`, `docs/language/catalog-system.md:1298-1324`)
+
+## 2. Recommended `ProofDischarge` record definition
+
+## Recommendation
+
+Use a single top-level `ProofDischarge` record with a **narrow subject discriminator** and a **threshold-source DU**:
+
+```csharp
+public enum ProofDischargeSubject
+{
+    FieldValue  = 1,
+    Cardinality = 2,
+}
+
+public sealed record ProofDischarge(
+    ProofDischargeSubject Subject,
+    OperatorKind Comparison,
+    ProofDischargeThreshold Threshold);
+
+public abstract record ProofDischargeThreshold
+{
+    public sealed record Fixed(decimal Value) : ProofDischargeThreshold;
+    public sealed record ModifierValue() : ProofDischargeThreshold;
+}
+```
+
+## Why this shape
+
+- **No `ProofRequirementKind`:** `FieldModifierMeta.ProofDischarges` is only for Strategy-2 numeric declaration proofs, and `NumericProofRequirement` already fixes `Kind = Numeric`; storing the kind again is redundant metadata. (`src/Precept/Language/ProofRequirement.cs:41-53`, `src/Precept/Language/ProofRequirements.cs:13-19`)
+- **Needs a subject discriminator:** the source emits both field-value proofs (`x != 0`, `x >= 0`) and cardinality proofs (`collection.count > 0`, `collection.count >= 0`). `notempty` and `mincount` do not establish the same thing as `positive` and `min`. (`src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Types.cs:181-288`, `src/Precept/Language/Actions.cs:92-100`, `src/Precept/Language/Functions.cs:163-188`, `src/Precept/Language/Operations.cs:100-613`)
+- **Needs a threshold source, not just a threshold value:** fixed modifiers (`positive`, `nonnegative`, `nonzero`, `notempty`) prove against `0m`; valued modifiers (`min`, `max`, `mincount`, etc.) must read the declaration’s own value expression. (`src/Precept/Language/Modifiers.cs:61-145`, `src/Precept/Pipeline/SlotValue.cs:26-30`, `src/Precept/Pipeline/TypeChecker.cs:99-102`)
+- **DU only where shape actually varies:** the only shape variation is threshold source (`Fixed(decimal)` vs `ModifierValue()`), so the DU belongs there. The top-level discharge row is still the same shape for every modifier: subject axis + comparison + threshold source.
+
+## 3. Recommended `ProofDischarges` property signature on `FieldModifierMeta`
+
+## Recommendation
+
+Use the same small-array pattern the language catalogs already use for proof metadata:
+
+```csharp
+public sealed record FieldModifierMeta(
+    ModifierKind Kind,
+    TokenMeta Token,
+    string Description,
+    ModifierCategory Category,
+    TypeTarget[] ApplicableTo,
+    bool HasValue = false,
+    ModifierKind[] Subsumes = default!,
+    ProofDischarge[]? ProofDischarges = null,
+    string? HoverDescription = null,
+    string? UsageExample = null,
+    string? SnippetTemplate = null,
+    bool DesugarsToRule = false,
+    ModifierKind[]? MutuallyExclusiveWith = null)
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith)
+{
+    public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+    public ProofDischarge[] ProofDischarges { get; init; } = ProofDischarges ?? [];
+}
+```
+
+## Why `ProofDischarge[]` instead of `ImmutableArray<>` / `FrozenSet<>`
+
+- Strategy 2’s access pattern is a tiny linear scan: `foreach (var discharge in meta.ProofDischarges)`. There is no key lookup to justify `FrozenSet<>`. (`docs/compiler/proof-engine.md:586-593`)
+- Adjacent catalog surfaces already use the same array shape for proof metadata: `TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements`, and `FunctionOverload.ProofRequirements`. (`src/Precept/Language/Type.cs:77-87`, `src/Precept/Language/Action.cs:7-26`, `src/Precept/Language/Function.cs:18-26`)
+- `FieldModifierMeta` already uses arrays for other tiny metadata bags (`ApplicableTo`, `Subsumes`, `MutuallyExclusiveWith`). (`src/Precept/Language/Modifier.cs:116-133`)
+
+## 4. Per-modifier population table
+
+## Recommended population
+
+| Modifier | Recommended `ProofDischarges` entries | Live against current source? | Notes |
+|---|---|---:|---|
+| `positive` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.GreaterThan, new ProofDischargeThreshold.Fixed(0m))` | Yes | Canonical fact is `value > 0`; generic subsumption can cover `!= 0` and `>= 0` from that stronger bound. `positive` already structurally subsumes `nonnegative` and `nonzero`. (`src/Precept/Language/Modifiers.cs:69-76`, `docs/compiler/proof-engine.md:600-606`) |
+| `nonnegative` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.Fixed(0m))` | Yes | Directly matches current `sqrt` / integer-`pow` proof obligations. (`src/Precept/Language/Modifiers.cs:61-67`, `src/Precept/Language/Functions.cs:163-188`) |
+| `nonzero` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.NotEquals, new ProofDischargeThreshold.Fixed(0m))` | Yes | Directly matches current divide/modulo-style obligations from `Operations.cs`. (`src/Precept/Language/Modifiers.cs:78-83`, `src/Precept/Language/Operations.cs:100-613`) |
+| `notempty` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.GreaterThan, new ProofDischargeThreshold.Fixed(0m))` | Yes | This is a cardinality fact, not a presence fact. It discharges current collection `.count > 0` obligations and, via subsumption, `.count >= 0` obligations. (`src/Precept/Language/Modifiers.cs:85-90`, `src/Precept/Language/ModifierKind.cs:21-22`, `src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Actions.cs:92-100`) |
+| `min(N)` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Yes | Parameterized lower bound on the field value. With a concrete declaration value, this can discharge current `>= 0`, and may also subsume `> 0` / `!= 0` when `N > 0`. (`src/Precept/Language/Modifiers.cs:98-103`, `src/Precept/Pipeline/SlotValue.cs:26-30`) |
+| `max(N)` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Semantically correct upper-bound metadata; current source does not emit any `<=` numeric obligations yet, but this belongs in the catalog because `max` is a first-class declaration of that bound. (`src/Precept/Language/Modifiers.cs:105-110`) |
+| `mincount(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Yes | Current collection-accessor/action obligations are cardinality-based, so `mincount` is relevant and should not be omitted. (`src/Precept/Language/Modifiers.cs:126-131`, `src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Actions.cs:92-100`) |
+| `maxcount(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Semantically correct upper-bound metadata for future cardinality upper-bound obligations. (`src/Precept/Language/Modifiers.cs:133-138`) |
+| `minlength(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Current source has no string-cardinality proof emitters, but this is the string parallel to `mincount`. (`src/Precept/Language/Modifiers.cs:112-117`) |
+| `maxlength(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Current source has no string-cardinality upper-bound proof emitters, but catalog truth should still declare the bound. (`src/Precept/Language/Modifiers.cs:119-124`) |
+
+## Modifiers that should **not** get `ProofDischarges`
+
+- `optional` — presence/nullability is not modeled by the current numeric discharge path. (`src/Precept/Language/Modifiers.cs:49-53`, `src/Precept/Language/ProofRequirement.cs:56-63`)
+- `ordered` — used by direct `ModifierRequirement`, not numeric discharge lookup. (`src/Precept/Language/Modifiers.cs:55-59`, `src/Precept/Language/ProofRequirement.cs:103-116`)
+- `default` — initialization expression, not a declaration-time proof bound. (`src/Precept/Language/Modifiers.cs:92-96`)
+- `maxplaces` — decimal precision constraint; there is no corresponding `ProofRequirement` shape in source. (`src/Precept/Language/Modifiers.cs:140-145`, `src/Precept/Language/ProofRequirement.cs:41-116`)
+- `writable` — access-mode/editability semantics, not proof discharge. (`src/Precept/Language/Modifiers.cs:147-151`)
+
+## 5. `proof-engine.md` update instructions
+
+1. **Replace the flat `ProofDischarge(ProofRequirementKind, OperatorKind?, decimal?)` snippet** in Strategy 2 and Decision 5 with the subject-aware + threshold-source shape above. The current doc shape cannot represent cardinality-vs-field-value or modifier-sourced thresholds. (`docs/compiler/proof-engine.md:517-537`, `docs/compiler/proof-engine.md:1188-1193`)
+2. **Remove `PresenceProofRequirement` from the `ProofDischarges` path.** Strategy 2’s catalog lookup arm should be numeric-only. `notempty` is a cardinality/numeric proof, not a presence proof, and the source’s current non-empty callers all emit `NumericProofRequirement`, not `PresenceProofRequirement`. (`docs/compiler/proof-engine.md:571-603`, `src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Actions.cs:92-100`)
+3. **Teach the pseudocode to compare the discharge subject axis** (`FieldValue` vs `Cardinality`) against the resolved requirement subject. The current pseudocode only compares requirement kind/comparison/threshold, which is insufficient. (`docs/compiler/proof-engine.md:542-607`, `src/Precept/Language/Types.cs:153-154`)
+4. **Update Strategy 2 pseudocode to read valued modifier arguments from field syntax** (for example via `attributeField.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)`), because `TypedField.Modifiers` is kind-only. Without this, `min/max/mincount/...` cannot discharge anything parameterized. (`docs/compiler/proof-engine.md:580-590`, `src/Precept/Pipeline/TypeChecker.cs:99-102`, `src/Precept/Pipeline/SemanticIndex.cs:239-253`, `src/Precept/Pipeline/ParsedConstruct.cs:20-29`)
+5. **Iterate both declared and implied modifiers** when doing declaration-attribute proof. Strategy 2 text already says it reads “modifier-implied metadata,” but the pseudocode currently walks only `attributeField.Modifiers`. (`docs/compiler/proof-engine.md:485-487`, `docs/compiler/proof-engine.md:586-590`, `src/Precept/Pipeline/SemanticIndex.cs:244-245`, `src/Precept/Language/Types.cs:458-460`, `src/Precept/Language/Types.cs:525-529`, `src/Precept/Language/Types.cs:554-562`, `src/Precept/Language/Types.cs:565-574`)
+6. **Expand the modifier table** so it includes the semantically relevant cardinality modifiers (`mincount`, `maxcount`, `minlength`, `maxlength`) or explicitly state that the table is intentionally current-consumer-only. Right now the doc table is incomplete relative to the modifier catalog. (`docs/compiler/proof-engine.md:489-499`, `docs/compiler/proof-engine.md:1196-1203`, `src/Precept/Language/Modifiers.cs:112-138`)
+7. **Remove the “resolved in source” language until code lands.** The doc currently claims CC#5 is already canonical/in source, but the actual `FieldModifierMeta` shape still lacks the property. (`docs/compiler/proof-engine.md:609-611`, `src/Precept/Language/Modifier.cs:116-133`)
+
+## 6. Decision summary
+
+| Decision | Recommendation | Rationale |
+|---|---|---|
+| 1. `ProofDischarge` shape | Use `ProofDischarge(ProofDischargeSubject Subject, OperatorKind Comparison, ProofDischargeThreshold Threshold)` with `ProofDischargeThreshold.Fixed(decimal)` / `ModifierValue()`; do **not** store `ProofRequirementKind`. | Numeric declaration proof needs subject axis + comparison + threshold source, and only the threshold source has shape variation. |
+| 2. `FieldModifierMeta.ProofDischarges` signature | Add `ProofDischarge[]? ProofDischarges = null` to the record constructor and materialize `public ProofDischarge[] ProofDischarges { get; init; } = ProofDischarges ?? [];`. | Strategy 2 linearly enumerates tiny per-modifier tables, and adjacent catalog surfaces already use arrays for proof metadata. |
+| 3. Population entries | Populate all bound-establishing field modifiers now: live rows for `positive`, `nonnegative`, `nonzero`, `notempty`, `min`, `mincount`; semantically complete dormant rows for `max`, `maxcount`, `minlength`, and `maxlength`. | This keeps modifier meaning catalog-declared instead of consumer-hardcoded and prevents the next proof-engine feature from reopening the same metadata gap. |
+
+# PE-G2 Broader Design Review — Should `ProofDischarge` cover all requirement kinds?
+
+**Date:** 2026-05-08T21:41:41.253-04:00
+**Author:** Frank (Lead/Architect)
+**Status:** Ready for Shane sign-off
+**Trigger:** Shane challenged the narrow numeric-only `ProofDischarge` scope — asking whether a broader DU covering all three Strategy 2 proof requirement kinds would be more coherent.
+
+## 1. Verdict: Narrow is correct
+
+The narrow numeric-only `ProofDischarge` shape from the prior analysis is the architecturally correct design. A broader DU would add structural complexity with zero information gain — two of the three subtypes would either be tautological or permanently empty.
+
+## 2. Per-arm analysis against the metadata-driven architecture principle
+
+The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind` enum value to apply per-member behavior?"* If yes, that behavior belongs in catalog metadata. Let me apply this test rigorously to each Strategy 2 arm.
+
+## Arm 1: `NumericProofRequirement` — ProofDischarges path ✅ Catalog-driven
+
+**Current design:** Strategy 2 reads `FieldModifierMeta.ProofDischarges` and calls `DischargeCovers(discharge, requirement)`. The proof engine never switches on `ModifierKind`. It iterates the discharge array generically. Domain knowledge (which modifiers establish which bounds) lives entirely in catalog metadata entries.
+
+**Verdict:** This is textbook metadata-driven architecture. The `ProofDischarge` catalog entry carries the domain knowledge; the engine is generic machinery. No change needed.
+
+## Arm 2: `ModifierRequirement` — Direct presence check ✅ Already generic machinery
+
+**Current pseudocode:** `field.Modifiers.Contains(modReq.Required)` — a single generic set-membership test.
+
+**Does it switch on a `ModifierKind` value to apply per-member behavior?** No. It doesn't switch on *which* modifier is required. The `Required` value comes from the obligation itself (emitted by the Operations catalog — e.g., choice ordering operations emit `ModifierRequirement(Subject, ModifierKind.Ordered, ...)`). The proof engine simply checks: "does the field have it?" This is structurally identical to `list.Contains(item)` — the most generic possible predicate.
+
+**Would `ProofDischarge.ModifierPresence(ModifierKind.Ordered)` on the `ordered` modifier's metadata add information?** No. It would be tautological metadata: "the `ordered` modifier proves that the field has the `ordered` modifier." The modifier's *existence on the field* is the proof — declaring that fact as a separate metadata entry restates identity as data. The engine can derive this from the modifier's presence without any catalog entry.
+
+**Is there any modifier whose proof-discharge relationship to `ModifierRequirement` is non-obvious or non-identity?** No. The subsumption relationship (`positive` subsumes `nonzero`) exists only in numeric bound semantics. For modifier presence, `ordered` is `ordered` — there is no "modifier A implies modifier B is present" relationship that would benefit from catalog declaration.
+
+**Verdict:** The `ModifierRequirement` arm is generic machinery that reads a value from the obligation and checks set membership. No per-member behavior exists. Adding `ModifierPresence` discharges would be tautological metadata that restates the modifier's identity. The current arm is correct as-is.
+
+## Arm 3: `DimensionProofRequirement` — Period dimension resolution ✅ Different knowledge source
+
+**Current pseudocode:** `ResolvePeriodDimension(subject, semantics)` reads the period dimension from the literal's temporal unit or the field's type qualifier, then compares against `dimReq.RequiredDimension`.
+
+**Does this involve modifier metadata at all?** No. Period dimension is a property of the *type system* (qualifier on a `period` field or unit on a period literal), not a property of any modifier. The dimension data lives in `TypedField`'s qualifier metadata and in period literal units — neither of which are modifiers.
+
+**Are there modifiers in the catalog that declare a period dimension?** No. Checking `Modifiers.cs` exhaustively: there are no `year`, `month`, `day`, `week`, `hour`, `minute`, or `second` modifiers. Period temporal granularity is not expressed through field modifiers — it's expressed through type qualifiers (e.g., `field DueDate as period of days`).
+
+**Would `ProofDischarge.Dimension(PeriodDimension.Date)` entries on any `FieldModifierMeta` have entries?** Zero entries. No modifier in the catalog establishes a period dimension. This subtype would be permanently empty — a shape that exists but is never populated.
+
+**Verdict:** Period dimension is type-system knowledge, not modifier knowledge. `FieldModifierMeta.ProofDischarges` is the wrong home for dimension data. The current arm correctly reads from the type/qualifier system. Adding a `Dimension` discharge subtype would create a permanently empty DU arm — the exact shape-without-substance anti-pattern.
+
+## 3. Why the broader DU fails the architecture test
+
+The proposed broader DU:
+
+```csharp
+public abstract record ProofDischarge {
+    public sealed record Numeric(...) : ProofDischarge;
+    public sealed record ModifierPresence(ModifierKind Required) : ProofDischarge;
+    public sealed record Dimension(PeriodDimension Dimension) : ProofDischarge;
+}
+```
+
+Fails on three counts:
+
+| Criterion | Result |
+|---|---|
+| **Does it eliminate hardcoded per-member logic from the proof engine?** | No. The `ModifierRequirement` arm has no per-member logic to eliminate — `Contains` is generic. The `DimensionProofRequirement` arm reads from the type system, not modifiers. |
+| **Does it actually add catalog entries where domain knowledge currently lives in pipeline code?** | No. `ModifierPresence` entries would be tautological (identity = proof). `Dimension` entries would be empty (no modifier declares a dimension). |
+| **Does it have the right shape variation? (DU only where shapes actually differ)** | No. Two of three arms would be degenerate: `ModifierPresence` restates what the modifier already is; `Dimension` has zero inhabitants. DU arms with zero or tautological members are structural noise, not shape variation. |
+
+The metadata-driven principle says: *catalog what IS domain knowledge.* But not everything is domain knowledge:
+
+- **"The `ordered` modifier proves `ordered` is present"** is not domain knowledge — it's a logical tautology.
+- **"Period dimension comes from the type qualifier"** is not modifier domain knowledge — it's type-system domain knowledge that lives in a different catalog surface.
+
+Cataloging these would violate the principle's corollary: catalogs carry *meaningful* metadata that consumers can't derive from the member's identity alone.
+
+## 4. What makes the Strategy 2 arms NOT hardcoded per-member knowledge
+
+The metadata-driven principle targets a specific smell: `kind switch { FooKind.Bar => ..., FooKind.Baz => ... }` where each branch exists because "the language says so." Here's why each arm avoids that smell:
+
+| Arm | What it switches on | Why it's not the smell |
+|---|---|---|
+| **NumericProofRequirement** | Nothing — iterates `ProofDischarges[]` generically | Catalog-driven loop, no per-modifier branching |
+| **ModifierRequirement** | Nothing — calls `field.Modifiers.Contains(modReq.Required)` | Generic set-membership test. The `Required` value comes from the obligation emitter (Operations catalog), not from a switch in the proof engine |
+| **DimensionProofRequirement** | `PeriodDimension` enum — but this comparison is `resolved == required`, not a per-member behavior switch | Reads dimension from type metadata and compares to requirement. No per-dimension branching logic. `dimension == PeriodDimension.Any \|\| dimension == dimReq.RequiredDimension` is a universal pattern (wildcard + exact match), not per-member dispatch |
+
+The proof engine switches on **requirement subtype** (`is DimensionProofRequirement`, `is ModifierRequirement`, `is NumericProofRequirement`) to dispatch to the correct arm. This is switching on a DU subtype — which the architecture rules explicitly permit: *"Switching on a DU subtype is correct — the subtype is the metadata shape, not a classification axis."*
+
+## 5. Decision summary
+
+| Decision | Recommendation | Rationale | Tradeoff accepted |
+|---|---|---|---|
+| Narrow vs. broader `ProofDischarge` | **Narrow** — keep `ProofDischarge` as the numeric-only shape from the prior analysis | `ModifierPresence` discharges would be tautological (identity = proof). `Dimension` discharges would be permanently empty (no modifier declares a period dimension). Neither arm has per-member pipeline logic to extract. | The three Strategy 2 arms remain structurally distinct code paths rather than a single unified catalog loop. This is the correct design because they read from *different knowledge sources* (modifier catalog, field modifier set, type qualifier system). |
+| Strategy 2 arm structure | Keep three dedicated arms: (1) ProofDischarges catalog loop for `NumericProofRequirement`, (2) `Contains` check for `ModifierRequirement`, (3) dimension resolution for `DimensionProofRequirement` | Each arm reads from a different metadata surface. Unifying them into a single `ProofDischarges` loop would force modifier and dimension knowledge into the wrong catalog surface (`FieldModifierMeta`) where it doesn't naturally belong. | Strategy 2 has three code paths instead of one. But each path is ~3-5 lines of generic machinery. Simplicity of the unified loop is illusory — it would push complexity into tautological or empty catalog entries. |
+
+## 6. Recommendation
+
+Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior PE-G2 analysis. The broader DU is architecturally weaker, not stronger — it would catalog non-knowledge (tautologies and empty sets) in pursuit of a false uniformity. The current three-arm Strategy 2 design is the correct metadata-driven architecture because each arm reads from the *right* metadata source for its proof obligation kind.
+
+# PE-G2 Full Design — `ProofSatisfaction` and all five requirement kinds
+
+**Date:** 2026-05-09  
+**Author:** Frank (Lead/Architect)  
+**Status:** Complete design for implementation — no deferrals
+
+## 1. Final decision
+
+Shane is right. The broader design must be finished now, not postponed.
+
+The correct architecture is:
+
+1. **Rename** `ProofDischarge` → `ProofSatisfaction`.
+2. **Keep `FieldModifierMeta` as the numeric carrier** for modifier-established bounds.
+3. **Add a positive presence carrier** so Presence proof does not depend on the absence of `optional`.
+4. **Add a normalized declaration-qualifier carrier** so dimension and qualifier-compatibility proof read declaration metadata rather than parser/type-checker folklore.
+5. **Keep direct modifier membership as the canonical `ModifierRequirement` path.** Do not duplicate `ordered proves ordered` into metadata rows.
+
+That yields one proof metadata vocabulary, but not one carrier. The carriers are different because the declaration facts are different.
+
+---
+
+## 2. `ProofSatisfaction` DU — final C# shape
+
+**File:** `src/Precept/Language/ProofRequirement.cs`  
+**Namespace:** `Precept.Language`
+
+```csharp
+namespace Precept.Language;
+
+public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
+{
+    public sealed record Numeric(
+        SatisfactionProjection Projection,
+        OperatorKind Comparison,
+        NumericBoundSource Bound)
+        : ProofSatisfaction(ProofRequirementKind.Numeric);
+
+    public sealed record Presence()
+        : ProofSatisfaction(ProofRequirementKind.Presence);
+
+    public sealed record Dimension(
+        DimensionSource Source)
+        : ProofSatisfaction(ProofRequirementKind.Dimension);
+
+    public sealed record Modifier(
+        ModifierKind RequiredModifier)
+        : ProofSatisfaction(ProofRequirementKind.Modifier);
+
+    public sealed record QualifierCompatibility(
+        QualifierAxis Axis)
+        : ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
+}
+
+public abstract record SatisfactionProjection
+{
+    public sealed record SelfValue() : SatisfactionProjection;
+    public sealed record Accessor(string Name) : SatisfactionProjection;
+}
+
+public abstract record NumericBoundSource
+{
+    public sealed record Constant(decimal Value) : NumericBoundSource;
+    public sealed record DeclarationValue() : NumericBoundSource;
+}
+
+public abstract record DimensionSource
+{
+    public sealed record Constant(PeriodDimension Value) : DimensionSource;
+    public sealed record DeclaredTemporalDimension() : DimensionSource;
+}
+```
+
+## Why this is the final shape
+
+- **Numeric** needs a projection plus a bound source.
+- **Presence** is pure existential proof — the entry itself is the fact.
+- **Dimension** needs a dimension source, because the satisfied dimension may come from the carrier entry.
+- **Modifier** exists in the DU for vocabulary completeness, but current implementation does **not** need populated rows.
+- **QualifierCompatibility** is axis-based; the compared value lives on the qualifier carrier itself.
+
+---
+
+## 3. `FieldModifierMeta` change — exact shape
+
+**File:** `src/Precept/Language/Modifier.cs`
+
+```csharp
+public sealed record FieldModifierMeta(
+    ModifierKind Kind,
+    TokenMeta Token,
+    string Description,
+    ModifierCategory Category,
+    TypeTarget[] ApplicableTo,
+    bool HasValue = false,
+    ModifierKind[] Subsumes = default!,
+    ProofSatisfaction[]? ProofSatisfactions = null,
+    string? HoverDescription = null,
+    string? UsageExample = null,
+    string? SnippetTemplate = null,
+    bool DesugarsToRule = false,
+    ModifierKind[]? MutuallyExclusiveWith = null)
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith)
+{
+    public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+    public ProofSatisfaction[] ProofSatisfactions { get; init; } = ProofSatisfactions ?? [];
+}
+```
+
+**Placement matters:** `ProofSatisfactions` belongs beside `Subsumes`. Both are semantic metadata declared by the modifier catalog.
+
+---
+
+## 4. New carrier type — Presence
+
+## 4.1 What fact satisfies `PresenceProofRequirement`?
+
+**Fact:** the declaration is **structurally guaranteed present**.
+
+That is the positive fact the proof engine needs. The absence of `optional` is not the carrier. The compiler must normalize that absence into a positive declaration fact.
+
+## 4.2 Natural carrier
+
+**Carrier:** new declaration-attached metadata type `DeclaredPresenceMeta`.
+
+Why this is the right carrier:
+
+- `PresenceProofRequirement` is about **nullability / absence semantics**, not numeric bounds.
+- `optional` has no opposite surface modifier, so reading “not optional” directly is a negative test, not metadata.
+- The engine needs a **positive**, normalized fact on every field and arg.
+
+## 4.3 Full type definition
+
+**File:** `src/Precept/Language/DeclaredPresence.cs`  
+**Namespace:** `Precept.Language`
+
+```csharp
+namespace Precept.Language;
+
+public abstract record DeclaredPresenceMeta(
+    string Description,
+    ProofSatisfaction[]? ProofSatisfactions = null)
+{
+    public ProofSatisfaction[] ProofSatisfactions { get; } = ProofSatisfactions ?? [];
+
+    public sealed record Guaranteed()
+        : DeclaredPresenceMeta(
+            "Value is structurally present on every instance",
+            [new ProofSatisfaction.Presence()]);
+
+    public sealed record Optional()
+        : DeclaredPresenceMeta(
+            "Value may be absent");
+}
+```
+
+## 4.4 Populated entries
+
+| Carrier member | `ProofSatisfactions` | Meaning |
+|---|---|---|
+| `DeclaredPresenceMeta.Guaranteed` | `new ProofSatisfaction.Presence()` | Required field / required arg / computed field value is always present |
+| `DeclaredPresenceMeta.Optional` | _none_ | Presence must be proven by guard, not declaration |
+
+## 4.5 Normalization rule
+
+The type checker must attach one `DeclaredPresenceMeta` to every `TypedField` and `TypedArg`:
+
+- declaration contains `optional` → `new DeclaredPresenceMeta.Optional()`
+- otherwise → `new DeclaredPresenceMeta.Guaranteed()`
+
+That is the full answer. Presence proof becomes positive metadata, not absence-check folklore.
+
+---
+
+## 5. New carrier type — normalized declaration qualifiers
+
+## 5.1 What fact satisfies `DimensionProofRequirement`?
+
+**Fact:** the declaration resolves to a concrete **temporal-dimension fact**.
+
+Examples:
+
+- `period of 'date'` → `Date`
+- `period of 'time'` → `Time`
+- `period in 'days'` → derived `Date`
+- unqualified `period` → baseline `Any` (per Shane’s already-locked permissive decision)
+
+## 5.2 What fact satisfies `QualifierCompatibilityProofRequirement`?
+
+**Fact:** the declaration resolves to a concrete qualifier binding on the required axis.
+
+Examples:
+
+- `money in 'USD'` → `Currency = USD`
+- `quantity in 'kg'` → `Unit = kg`, derived `Dimension = mass`
+- `price in 'USD/each'` → `Currency = USD`, `Unit = each`, derived `Dimension = count`
+
+## 5.3 Natural carrier
+
+**Carrier:** new normalized declaration-attached metadata type `DeclaredQualifierMeta`.
+
+Why this is the right carrier:
+
+- `TypeMeta.QualifierShape` describes **allowed slots**, not the declaration’s chosen value.
+- `FieldModifierMeta` is the wrong layer; qualifiers are part of the type annotation, not modifiers.
+- The proof engine needs **resolved per-axis values**, including derived ones.
+
+## 5.4 Full type definition
+
+**File:** `src/Precept/Language/DeclaredQualifierMeta.cs`  
+**Namespace:** `Precept.Language`
+
+```csharp
+namespace Precept.Language;
+
+public enum QualifierOrigin
+{
+    Explicit = 1,
+    Derived  = 2,
+    Baseline = 3,
+}
+
+public abstract record DeclaredQualifierMeta(
+    QualifierAxis Axis,
+    QualifierOrigin Origin,
+    TokenKind? Preposition,
+    ProofSatisfaction[]? ProofSatisfactions = null)
+{
+    public ProofSatisfaction[] ProofSatisfactions { get; } = ProofSatisfactions ?? [];
+
+    public sealed record Currency(
+        string CurrencyCode,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.In,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.Currency, Origin, Preposition, ProofSatisfactions);
+
+    public sealed record Unit(
+        string UnitCode,
+        string DimensionName,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.In,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.Unit, Origin, Preposition, ProofSatisfactions);
+
+    public sealed record Dimension(
+        string DimensionName,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.Of,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.Dimension, Origin, Preposition, ProofSatisfactions);
+
+    public sealed record FromCurrency(
+        string CurrencyCode,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.In,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.FromCurrency, Origin, Preposition, ProofSatisfactions);
+
+    public sealed record ToCurrency(
+        string CurrencyCode,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.To,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.ToCurrency, Origin, Preposition, ProofSatisfactions);
+
+    public sealed record Timezone(
+        string TimezoneId,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.In,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.Timezone, Origin, Preposition, ProofSatisfactions);
+
+    public sealed record TemporalDimension(
+        PeriodDimension Value,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.Of,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.TemporalDimension, Origin, Preposition, ProofSatisfactions);
+
+    public sealed record TemporalUnit(
+        string UnitName,
+        PeriodDimension DerivedDimension,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.In,
+        ProofSatisfaction[]? ProofSatisfactions = null)
+        : DeclaredQualifierMeta(QualifierAxis.TemporalUnit, Origin, Preposition, ProofSatisfactions);
+}
+```
+
+## 5.5 Populated entries
+
+## 5.5.1 `DimensionProofRequirement`
+
+| Carrier member | `ProofSatisfactions` | Notes |
+|---|---|---|
+| `DeclaredQualifierMeta.TemporalDimension(Date/Time)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` | explicit `of 'date'` / `of 'time'` |
+| `DeclaredQualifierMeta.TemporalDimension(Any, Origin: Baseline, Preposition: null)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` | unqualified `period` baseline fact |
+| `DeclaredQualifierMeta.TemporalUnit(...)` | _none directly_ | normalize to a second derived `TemporalDimension` entry |
+
+**Rule:** `TemporalUnit` does not directly carry dimension proof. The type checker emits a second normalized `TemporalDimension` entry with `Origin = Derived`.
+
+## 5.5.2 `QualifierCompatibilityProofRequirement`
+
+| Carrier member | `ProofSatisfactions` |
+|---|---|
+| `DeclaredQualifierMeta.Currency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Currency)` |
+| `DeclaredQualifierMeta.Unit` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Unit)` |
+| `DeclaredQualifierMeta.Dimension` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Dimension)` |
+| `DeclaredQualifierMeta.FromCurrency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.FromCurrency)` |
+| `DeclaredQualifierMeta.ToCurrency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.ToCurrency)` |
+| `DeclaredQualifierMeta.Timezone` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Timezone)` |
+| `DeclaredQualifierMeta.TemporalUnit` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.TemporalUnit)` |
+| `DeclaredQualifierMeta.TemporalDimension` with `Value != PeriodDimension.Any` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.TemporalDimension)` |
+| `DeclaredQualifierMeta.TemporalDimension` with `Value == PeriodDimension.Any` | _none_ |
+
+`Any` is deliberately excluded from qualifier compatibility. It satisfies dimension proof per Shane’s locked decision; it does **not** prove same-axis compatibility with another operand.
+
+## 5.6 Normalization rules
+
+The type checker must normalize a declaration’s qualifier surface into zero or more `DeclaredQualifierMeta` entries.
+
+## `money`
+- `money in 'USD'` → `Currency("USD")`
+
+## `quantity`
+- `quantity in 'kg'` → `Unit("kg", "mass")` **plus** derived `Dimension("mass", Origin: Derived, Preposition: TokenKind.In)`
+- `quantity of 'mass'` → `Dimension("mass")`
+
+## `price`
+- `price in 'USD/each'` → `Currency("USD")` + `Unit("each", "count")` + derived `Dimension("count", Origin: Derived, Preposition: TokenKind.In)`
+- `price in 'USD' of 'mass'` → `Currency("USD")` + `Dimension("mass")`
+
+## `exchange rate`
+- `exchangerate in 'USD' to 'EUR'` → `FromCurrency("USD")` + `ToCurrency("EUR")`
+
+## `period`
+- `period of 'date'` → `TemporalDimension(PeriodDimension.Date)`
+- `period of 'time'` → `TemporalDimension(PeriodDimension.Time)`
+- `period in 'days'` → `TemporalUnit("days", PeriodDimension.Date)` + derived `TemporalDimension(PeriodDimension.Date, Origin: Derived, Preposition: TokenKind.In)`
+- `period in 'hours'` → `TemporalUnit("hours", PeriodDimension.Time)` + derived `TemporalDimension(PeriodDimension.Time, Origin: Derived, Preposition: TokenKind.In)`
+- unqualified `period` → baseline `TemporalDimension(PeriodDimension.Any, Origin: Baseline, Preposition: null)`
+
+## 5.7 Storage on typed declarations
+
+To make the carriers usable, the semantic model must attach them to declarations.
+
+- `TypedField` gains `DeclaredPresenceMeta Presence` and `ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers`
+- `TypedArg` gains `DeclaredPresenceMeta Presence` and `ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers`
+
+The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carrier. That type is result-qualifier propagation for expressions. It must remain separate.
+
+---
+
+## 6. Requirement-by-requirement carrier decisions
+
+## 6.1 `NumericProofRequirement`
+
+**Satisfying fact:** a field modifier establishes a numeric bound on the field value or on an accessor projection.  
+**Carrier:** existing `FieldModifierMeta`.  
+**New carrier type required:** no.
+
+## Fully populated relevant `ProofSatisfactions`
+
+| Modifier | `ProofSatisfactions` |
+|---|---|
+| `positive` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThan, new NumericBoundSource.Constant(0m))` |
+| `nonnegative` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.Constant(0m))` |
+| `nonzero` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.NotEquals, new NumericBoundSource.Constant(0m))` |
+| `notempty` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("length"), OperatorKind.GreaterThan, new NumericBoundSource.Constant(0m))`  **and** `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("count"), OperatorKind.GreaterThan, new NumericBoundSource.Constant(0m))` |
+| `min(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+| `max(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.LessThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+| `minlength(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("length"), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+| `maxlength(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("length"), OperatorKind.LessThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+| `mincount(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("count"), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+| `maxcount(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("count"), OperatorKind.LessThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+
+**Not numeric proof carriers:** `optional`, `ordered`, `default`, `writable`, `maxplaces`.
+
+**Important completeness note:** the proof engine must read **effective modifiers** = declared modifiers + `TypeMeta.ImpliedModifiers`. That is how `timezone`, `currency`, `unitofmeasure`, and `dimension` inherit `notempty` proof facts without duplicating them on `TypeMeta`.
+
+---
+
+## 6.2 `PresenceProofRequirement`
+
+**Satisfying fact:** the declaration is guaranteed present.  
+**Carrier:** new `DeclaredPresenceMeta`.  
+**New carrier type required:** yes — defined above.
+
+## Fully populated entries
+
+| Carrier member | `ProofSatisfactions` |
+|---|---|
+| `DeclaredPresenceMeta.Guaranteed` | `new ProofSatisfaction.Presence()` |
+| `DeclaredPresenceMeta.Optional` | _none_ |
+
+**Explicit ruling:** `notempty` does **not** satisfy presence. An optional string with `notempty` may still be absent; it merely constrains present values.
+
+---
+
+## 6.3 `DimensionProofRequirement`
+
+**Satisfying fact:** the declaration resolves to a temporal-dimension fact.  
+**Carrier:** new `DeclaredQualifierMeta`, specifically normalized `TemporalDimension` entries.  
+**New carrier type required:** yes — defined above.
+
+## Fully populated entries
+
+| Carrier member | `ProofSatisfactions` |
+|---|---|
+| `DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Date, ...)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` |
+| `DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Time, ...)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` |
+| `DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Any, Origin: Baseline, Preposition: null, ...)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` |
+
+**Normalization rule:** `TemporalUnit` entries must emit a derived `TemporalDimension` entry. That is how `period in 'days'` and `period in 'hours'` participate in Strategy 2 without hardcoded proof-engine special cases.
+
+---
+
+## 6.4 `ModifierRequirement`
+
+**Satisfying fact:** the field declaration’s normalized modifier set contains the required modifier.  
+**Carrier:** the declaration’s modifier membership itself (`TypedField.Modifiers` + effective implied modifiers where appropriate).  
+**New carrier type required:** no.
+
+## Definitive recommendation
+
+**Keep direct membership as the canonical path. Do not populate modifier self-rows.**
+
+Why:
+
+1. `Contains(requiredModifier)` is already **generic machinery**.
+2. It does **not** switch on modifier identity to apply per-member behavior.
+3. Adding `ProofSatisfaction.Modifier(ModifierKind.Ordered)` to `ordered` is tautological duplication: the modifier membership is already the fact.
+4. Duplicating identity into metadata creates drift risk with zero gain.
+
+## Populated `ProofSatisfactions` entries
+
+**None.** `ProofSatisfaction.Modifier` stays in the DU for vocabulary completeness, but no current catalog member needs to populate it.
+
+That is architecturally correct, not a shortcut.
+
+---
+
+## 6.5 `QualifierCompatibilityProofRequirement`
+
+**Satisfying fact:** both declarations resolve to concrete bindings on the same axis and those bindings compare equal.  
+**Carrier:** new `DeclaredQualifierMeta`.  
+**New carrier type required:** yes — defined above.
+
+## Fully populated entries
+
+| Carrier member | `ProofSatisfactions` |
+|---|---|
+| `DeclaredQualifierMeta.Currency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Currency)` |
+| `DeclaredQualifierMeta.Unit` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Unit)` |
+| `DeclaredQualifierMeta.Dimension` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Dimension)` |
+| `DeclaredQualifierMeta.FromCurrency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.FromCurrency)` |
+| `DeclaredQualifierMeta.ToCurrency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.ToCurrency)` |
+| `DeclaredQualifierMeta.Timezone` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Timezone)` |
+| `DeclaredQualifierMeta.TemporalUnit` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.TemporalUnit)` |
+| `DeclaredQualifierMeta.TemporalDimension` where `Value` is `Date` or `Time` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.TemporalDimension)` |
+| `DeclaredQualifierMeta.TemporalDimension` where `Value` is `Any` | _none_ |
+
+**Compatibility rule:** Strategy 5 compares the carrier payload value on the requested axis. No field has to “know about” the other field. The proof engine just compares two normalized declaration facts.
+
+---
+
+## 7. Concrete `Modifiers.cs` population
+
+These are the exact rows that must appear on the relevant modifier catalog entries.
+
+```csharp
+ModifierKind.Positive => new FieldModifierMeta(
+    kind, Tokens.GetMeta(TokenKind.Positive),
+    "Value > 0",
+    ModifierCategory.Structural, NumericTypes,
+    Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero],
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.SelfValue(),
+            OperatorKind.GreaterThan,
+            new NumericBoundSource.Constant(0m)),
+    ],
+    HoverDescription: "The field's value must be strictly greater than zero. Implies nonnegative and nonzero.",
+    DesugarsToRule: true,
+    MutuallyExclusiveWith: [ModifierKind.Nonnegative]),
+
+ModifierKind.Nonnegative => new FieldModifierMeta(
+    kind, Tokens.GetMeta(TokenKind.Nonnegative),
+    "Value ≥ 0",
+    ModifierCategory.Structural, NumericTypes,
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.SelfValue(),
+            OperatorKind.GreaterThanOrEqual,
+            new NumericBoundSource.Constant(0m)),
+    ],
+    HoverDescription: "The field's value must be zero or greater. Enforced on every assignment.",
+    DesugarsToRule: true,
+    MutuallyExclusiveWith: [ModifierKind.Positive]),
+
+ModifierKind.Nonzero => new FieldModifierMeta(
+    kind, Tokens.GetMeta(TokenKind.Nonzero),
+    "Value ≠ 0",
+    ModifierCategory.Structural, NumericTypes,
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.SelfValue(),
+            OperatorKind.NotEquals,
+            new NumericBoundSource.Constant(0m)),
+    ],
+    HoverDescription: "The field's value must not be zero. Allows negative values.",
+    DesugarsToRule: true),
+
+ModifierKind.Notempty => new FieldModifierMeta(
+    kind, Tokens.GetMeta(TokenKind.Notempty),
+    "String or collection is non-empty",
+    ModifierCategory.Structural, StringAndCollectionTypes,
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.Accessor("length"),
+            OperatorKind.GreaterThan,
+            new NumericBoundSource.Constant(0m)),
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.Accessor("count"),
+            OperatorKind.GreaterThan,
+            new NumericBoundSource.Constant(0m)),
+    ],
+    HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time.",
+    DesugarsToRule: true),
+
+ModifierKind.Min => new FieldModifierMeta(
+    kind, Tokens.GetMeta(TokenKind.Min),
+    "Minimum value",
+    ModifierCategory.Structural, NumericTypes, HasValue: true,
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.SelfValue(),
+            OperatorKind.GreaterThanOrEqual,
+            new NumericBoundSource.DeclarationValue()),
+    ],
+    HoverDescription: "The field's value must be at least this minimum. Enforced on every assignment.",
+    DesugarsToRule: true),
+
+ModifierKind.Max => new FieldModifierMeta(
+    kind, Tokens.GetMeta(TokenKind.Max),
+    "Maximum value",
+    ModifierCategory.Structural, NumericTypes, HasValue: true,
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.SelfValue(),
+            OperatorKind.LessThanOrEqual,
+            new NumericBoundSource.DeclarationValue()),
+    ],
+    HoverDescription: "The field's value must be at most this maximum. Enforced on every assignment.",
+    DesugarsToRule: true),
+```
+
+And for completeness:
+
+```csharp
+ModifierKind.Minlength => new FieldModifierMeta(...
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.Accessor("length"),
+            OperatorKind.GreaterThanOrEqual,
+            new NumericBoundSource.DeclarationValue()),
+    ], ...),
+
+ModifierKind.Maxlength => new FieldModifierMeta(...
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.Accessor("length"),
+            OperatorKind.LessThanOrEqual,
+            new NumericBoundSource.DeclarationValue()),
+    ], ...),
+
+ModifierKind.Mincount => new FieldModifierMeta(...
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.Accessor("count"),
+            OperatorKind.GreaterThanOrEqual,
+            new NumericBoundSource.DeclarationValue()),
+    ], ...),
+
+ModifierKind.Maxcount => new FieldModifierMeta(...
+    ProofSatisfactions:
+    [
+        new ProofSatisfaction.Numeric(
+            new SatisfactionProjection.Accessor("count"),
+            OperatorKind.LessThanOrEqual,
+            new NumericBoundSource.DeclarationValue()),
+    ], ...),
+```
+
+---
+
+## 8. Implementation checklist — exact files, dependency order
+
+1. **`src/Precept/Language/ProofRequirement.cs`**  
+   Add `ProofSatisfaction`, `SatisfactionProjection`, `NumericBoundSource`, and `DimensionSource`.
+
+2. **`src/Precept/Language/DeclaredPresence.cs`** *(new)*  
+   Add `DeclaredPresenceMeta`.
+
+3. **`src/Precept/Language/DeclaredQualifierMeta.cs`** *(new)*  
+   Add `QualifierOrigin` and `DeclaredQualifierMeta` DU.
+
+4. **`src/Precept/Language/Modifier.cs`**  
+   Add `FieldModifierMeta.ProofSatisfactions`.
+
+5. **`src/Precept/Language/Modifiers.cs`**  
+   Populate numeric `ProofSatisfactions` rows.
+
+6. **`src/Precept/Language/Types.cs`**  
+   Expose the normalization metadata needed to resolve units to dimensions and temporal units to `PeriodDimension`.
+
+7. **`src/Precept/Pipeline/ParsedTypeReference.cs`**  
+   Preserve parsed qualifier clauses on type references.
+
+8. **`src/Precept/Pipeline/Parser.cs`**  
+   Parse declaration qualifier clauses using `TypeMeta.QualifierShape`.
+
+9. **`src/Precept/Pipeline/SymbolTable.cs`**  
+   Carry parsed qualifier data through declared field / arg symbols.
+
+10. **`src/Precept/Pipeline/SemanticIndex.cs`**  
+    Add `DeclaredPresenceMeta Presence` and `ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers` to `TypedField` and `TypedArg`.
+
+11. **`src/Precept/Pipeline/TypeChecker.cs`**  
+    Normalize declaration presence and qualifiers into the new carriers; emit derived/baseline qualifier facts.
+
+12. **`src/Precept/Pipeline/TypeChecker.Expressions.cs`**  
+    Ensure qualifier-aware expression resolution and proof-obligation stamping consume the normalized declaration metadata instead of ad hoc null checks.
+
+13. **`src/Precept/Pipeline/ProofEngine.cs`**  
+    Implement Strategy 2 against `DeclaredPresenceMeta`, `DeclaredQualifierMeta`, and modifier `ProofSatisfactions`; keep direct modifier-membership fast path; implement Strategy 5 against normalized qualifier carriers.
+
+14. **`docs/compiler/proof-engine.md`**  
+    Replace `ProofDischarge` with `ProofSatisfaction`; document the new carriers and the direct-membership modifier arm.
+
+15. **`docs/language/catalog-system.md`**  
+    Add the new carrier types and the updated `FieldModifierMeta` shape.
+
+16. **`docs/language/precept-language-spec.md`**  
+    Sync the qualifier and proof sections with the normalized declaration-fact model.
+
+---
+
+## 9. Open questions for Shane
+
+**None.** The design choices that matter have now been made in the design itself:
+
+- Presence is a positive normalized declaration fact.
+- Dimension and qualifier compatibility use normalized declaration qualifier facts.
+- Modifier requirement stays direct membership.
+- Unqualified `period` keeps Shane’s already-locked permissive `Any` behavior for dimension proof only.
+
+There is nothing here that requires another deferral ceremony.
+
+## 2026-05-08: PE-G2 ProofSatisfaction design — LOCKED
+
+**By:** Shane (owner sign-off)
+**What:** Full no-deferral PE-G2 design approved. All 5 ProofRequirementKind subtypes fully specified with carriers.
+**Locked decisions:**
+- `ProofDischarge` renamed to `ProofSatisfaction` (DU, 5 subtypes + 3 supporting DUs)
+- New `DeclaredPresenceMeta` carrier type defined (DeclaredPresence.cs)
+- New `DeclaredQualifierMeta` carrier type defined (7 subtypes, all qualifier axes)
+- `FieldModifierMeta` gains `ProofSatisfactions` property (10 modifier entries populated)
+- `TypedField` and `TypedArg` gain `Presence` + `DeclaredQualifiers` properties
+- `ModifierRequirement` uses direct `Contains()` — no metadata rows
+- `notempty` carries TWO satisfaction rows: Accessor("length") AND Accessor("count")
+- `TemporalDimension(Any)` satisfies Dimension proof but NOT QualifierCompatibility
+- Implementation checklist: 16 files in dependency order (see frank-pe-g2-full-design.md)
+**Why:** ProofEngine requires positive carrier facts for all 5 requirement kinds. Absence-checking is fragile and non-canonical.
+
+# PE-G2 Rename Analysis — `ProofDischarge` → `ProofSatisfaction`
+
+**Date:** 2026-05-09
+**Author:** Frank (Lead/Architect)
+**Status:** Recommendation for Shane
+
+## 1. Source-grounded constraints
+
+1. `FieldModifierMeta` is currently a field-modifier-specific catalog record with no proof metadata property today. (`src/Precept/Language/Modifier.cs:116-133`)
+2. `ProofRequirement` is already a five-shape DU: `NumericProofRequirement`, `PresenceProofRequirement`, `DimensionProofRequirement`, `ModifierRequirement`, and `QualifierCompatibilityProofRequirement`. Their payload shapes are materially different. (`src/Precept/Language/ProofRequirement.cs`)
+3. Strategy 2 in `docs/compiler/proof-engine.md` currently uses `ProofDischarge` as if it were a catalog row on `FieldModifierMeta`, but the documented flat shape is too narrow and the name reads like a runtime act, not catalog metadata. (`docs/compiler/proof-engine.md:517-610`)
+4. `docs/language/catalog-system.md` is explicit: if shapes vary by kind, the shape is a DU; flat records with inapplicable nullable fields are the anti-pattern. (`docs/language/catalog-system.md:85-141`)
+5. The earlier narrow design failed because it tried to make *all* Strategy-2 proof knowledge live on `FieldModifierMeta`. Shane’s correction is right: the type itself should be broad enough for all proof-requirement kinds, but that does **not** mean every requirement kind naturally belongs on `FieldModifierMeta`.
+
+## 2. Rename recommendation
+
+## Rename
+
+- **Type:** `ProofDischarge` → `ProofSatisfaction`
+- **Property:** `ProofDischarges` → `ProofSatisfactions`
+
+## Why `ProofSatisfaction` is better than `ProofDischarge`
+
+1. **It names the catalog fact, not the engine action.**
+   - A proof engine **discharges** a concrete `ProofObligation` at runtime-analysis time.
+   - A catalog entry does not perform a discharge; it declares that a declaration attribute **satisfies** a proof-requirement shape.
+   - `ProofDischarge` therefore sounds like ledger/runtime vocabulary in the wrong layer.
+
+2. **It scales cleanly beyond modifier-based numeric bounds.**
+   - `ProofDischarge` came from the original narrow numeric/modifier design.
+   - `ProofSatisfaction` names the general relation: “this declaration-attached fact satisfies this class of proof requirement.”
+   - That wording remains correct for numeric, dimension, modifier, presence, and qualifier-compatibility shapes.
+
+3. **It mirrors existing proof vocabulary cleanly.**
+   - `ProofRequirement` = what must be proven.
+   - `ProofSatisfaction` = catalog-declared fact that can satisfy it.
+   - `ProofObligation` = instantiated requirement at a proof site.
+   - `ProofLedger` = result ledger.
+   This is a coherent noun family. `ProofDischarge` breaks the pattern by naming the *resulting act* instead of the *declared metadata relation*.
+
+4. **It is less misleading to a cold implementer.**
+   - `meta.ProofSatisfactions` immediately reads as “these are the proof facts this metadata entry establishes.”
+   - `meta.ProofDischarges` invites the wrong question: “what exactly is being discharged here, and when?”
+
+## 3. Recommended C# shape
+
+## Verdict
+
+Use a **DU** rooted in `ProofRequirementKind`, with subtype payloads that mirror the actual requirement shapes. Do **not** use a flat record with nullable fields.
+
+## Recommended sketch
+
+```csharp
+namespace Precept.Language;
+
+public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
+{
+    public sealed record Numeric(
+        SatisfactionProjection Projection,
+        OperatorKind Comparison,
+        NumericBoundSource Bound)
+        : ProofSatisfaction(ProofRequirementKind.Numeric);
+
+    public sealed record Presence()
+        : ProofSatisfaction(ProofRequirementKind.Presence);
+
+    public sealed record Dimension(
+        DimensionSource RequiredDimension)
+        : ProofSatisfaction(ProofRequirementKind.Dimension);
+
+    public sealed record Modifier(
+        ModifierKind RequiredModifier)
+        : ProofSatisfaction(ProofRequirementKind.Modifier);
+
+    public sealed record QualifierCompatibility(
+        QualifierAxis Axis)
+        : ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
+}
+
+public abstract record SatisfactionProjection
+{
+    public sealed record SelfValue() : SatisfactionProjection;
+    public sealed record Accessor(string Name) : SatisfactionProjection;
+}
+
+public abstract record NumericBoundSource
+{
+    public sealed record Constant(decimal Value) : NumericBoundSource;
+    public sealed record DeclarationValue() : NumericBoundSource;
+}
+
+public abstract record DimensionSource
+{
+    public sealed record Constant(PeriodDimension Value) : DimensionSource;
+    public sealed record DeclaredTemporalDimension() : DimensionSource;
+}
+```
+
+## Why this shape is correct
+
+## A. Why DU, not flat record
+
+Because the five proof-requirement kinds do **not** share one metadata shape:
+
+- **Numeric** needs a projection (`self value` vs accessor such as `count`/`length`), a comparison, and a bound source.
+- **Presence** needs no extra payload.
+- **Dimension** needs a period-dimension source.
+- **Modifier** needs a specific `ModifierKind`.
+- **QualifierCompatibility** needs a `QualifierAxis`.
+
+A flat record would immediately collapse into something like:
+
+```csharp
+(RequirementKind, Comparison?, Threshold?, RequiredModifier?, RequiredDimension?, Axis?, Projection?, ...)
+```
+
+That is exactly the catalog anti-pattern the architecture doc forbids: one record full of meaningless nullable fields plus external “if kind == X then field Y must be set” rules.
+
+The DU is the correct design because:
+
+- the subtype **is** the semantic signal,
+- exhaustiveness is compiler-enforced,
+- consumers pattern-match on real shapes instead of a nullability matrix,
+- future `ProofRequirementKind` additions force explicit metadata-shape handling.
+
+## B. Why `Numeric` needs `Projection`
+
+The earlier flat `ProofDischarge(RequirementKind, Comparison, Threshold)` shape is wrong even before broadening because numeric satisfactions are not all about the field’s raw value.
+
+Examples already in source:
+
+- `positive`, `nonnegative`, `nonzero`, `min`, `max` establish bounds on the **field value**.
+- non-empty collection proof obligations target `SelfSubject(CollectionCountAccessor)` — that is a bound on an **accessor projection** (`count`), not on the raw field value. (`src/Precept/Language/Types.cs:153-154`, `src/Precept/Language/Types.cs:163-288`, `src/Precept/Language/Actions.cs:98-196`)
+
+Without `Projection`, `notempty` is under-specified.
+
+## C. Why `Numeric` needs `BoundSource`
+
+`min(N)` and `max(N)` do not establish a constant threshold from the catalog entry. They establish a threshold taken from the **declaration instance’s modifier value**. The catalog row must be able to say “use the declaration’s value here,” not only “use constant 0.”
+
+## D. Why `Dimension` needs `DimensionSource`
+
+If the broader model is real, dimension satisfactions cannot assume every carrier will hardcode `PeriodDimension.Date` or `PeriodDimension.Time`.
+
+- A future qualifier-based carrier would want: “read the declared temporal-dimension qualifier and compare it to the obligation.”
+- A constant arm still belongs in the shape because a future dedicated declaration attribute could hardcode a specific period dimension.
+
+## Where the type should live
+
+**Recommendation:** define `ProofSatisfaction` in `src/Precept/Language/ProofRequirement.cs` directly alongside `ProofRequirement` and `ProofRequirementMeta`.
+
+Why:
+
+1. It is the declarative inverse of `ProofRequirement`; they belong in the same proof-domain vocabulary file.
+2. The subtypes line up one-for-one with `ProofRequirementKind` and should stay co-located with that kind’s shapes.
+3. A separate file is defensible later if the proof domain gets much larger, but today splitting it would make the proof model harder to read, not easier.
+
+## 4. `FieldModifierMeta` usage — numeric rows
+
+For `FieldModifierMeta`, the property should be:
+
+```csharp
+ProofSatisfaction[]? ProofSatisfactions = null
+```
+
+materialized as the usual array property:
+
+```csharp
+public ProofSatisfaction[] ProofSatisfactions { get; init; } = ProofSatisfactions ?? [];
+```
+
+## Recommended populated entries
+
+These are the **minimal canonical rows**. Stronger numeric facts should be listed once and weaker obligations should be covered by generic numeric subsumption logic in the proof engine.
+
+| Modifier | Recommended `ProofSatisfactions` entries | Why |
+|---|---|---|
+| `positive` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThan, new NumericBoundSource.Constant(0m))` | Canonical fact is `value > 0`; generic subsumption can cover `!= 0` and `>= 0`. |
+| `nonnegative` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.Constant(0m))` | Directly expresses `value >= 0`. |
+| `nonzero` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.NotEquals, new NumericBoundSource.Constant(0m))` | Directly expresses `value != 0`. |
+| `notempty` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("count"), OperatorKind.GreaterThan, new NumericBoundSource.Constant(0m))` | Covers the current live non-empty collection obligations (`collection.count > 0`). |
+| `min(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.DeclarationValue())` | The lower bound comes from the declaration instance’s `min` value. |
+| `max(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.LessThanOrEqual, new NumericBoundSource.DeclarationValue())` | The upper bound comes from the declaration instance’s `max` value. |
+
+## Important note on `notempty`
+
+`notempty` semantically spans **string length** and **collection count** in the modifier catalog. (`src/Precept/Language/Modifiers.cs:85-90`)
+
+So there are two coherent options:
+
+1. **Current-proof-surface option (minimal today):** keep only the `Accessor("count")` row because that is what current proof obligations actually emit.
+2. **Catalog-complete option (my preference):** add a second row now for string length:
+
+```csharp
+new ProofSatisfaction.Numeric(
+    new SatisfactionProjection.Accessor("length"),
+    OperatorKind.GreaterThan,
+    new NumericBoundSource.Constant(0m))
+```
+
+The architecture document says completeness beats current-consumer demand. On that basis, I prefer the second option.
+
+## 5. Which catalog entry types should carry this property?
+
+This is the part that must stay disciplined. The **type** is broad. The **property placement** is selective.
+
+Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfactions` onto every `*Meta` record.” That would be cargo-cult abstraction. The right question is: **which catalog entry kinds naturally represent declaration-attached facts that can satisfy proof requirements?**
+
+## Requirement-kind analysis
+
+| Requirement kind | Natural declaration-attached satisfier | Existing catalog entry type that should carry `ProofSatisfactions` now? | Notes |
+|---|---|---:|---|
+| `NumericProofRequirement` | Field modifiers that establish bounds (`positive`, `min`, `notempty`, etc.) | **Yes — `FieldModifierMeta`** | This is the original and still-correct home for modifier-established numeric facts. |
+| `PresenceProofRequirement` | A declaration attribute that guarantees set-ness | **No existing carrier today** | Precept currently models optionality as the presence/absence of `optional`, not as a positive cataloged “always set” attribute. There is no existing top-level catalog entry that naturally carries this today. |
+| `DimensionProofRequirement` | A declaration attribute that fixes a period’s temporal dimension | **No existing carrier today** | The satisfier is the field/arg’s **declared temporal qualifier**, not a field modifier. Current catalogs do not expose qualifier values as first-class top-level entries, so there is nowhere honest to hang this property yet. |
+| `ModifierRequirement` | The required field modifier itself (for example `ordered`) | **Conditionally yes — `FieldModifierMeta`** | The generalized type should be able to express this. Whether the proof engine should actually route direct modifier presence through `ProofSatisfactions` is an implementation choice; the current `Contains(requiredModifier)` arm is already generic and may remain the fast path. |
+| `QualifierCompatibilityProofRequirement` | A declaration attribute that pins a qualifier value on an axis | **No existing carrier today** | The satisfier is a resolved qualifier binding (`currency`, `unit`, etc.) on the field declaration, not a modifier. Again, current catalogs do not expose qualifier values as their own catalog entry type. |
+
+## Specific recommendation on existing catalog types
+
+## `FieldModifierMeta`
+
+**Yes.** This is the one existing entry type that clearly should carry `ProofSatisfactions` now.
+
+## `TypeMeta`
+
+**No, not directly.**
+
+Reason: a type entry like `money`, `quantity`, or `period` does not itself establish the concrete qualifier value that satisfies a proof. The proof-relevant value lives on the field declaration (`in 'USD'`, `of 'mass'`, `of 'date'`, etc.), not on the generic type catalog row.
+
+Also: `TypeMeta` already has `ImpliedModifiers`. If a type implies a modifier and that modifier carries `ProofSatisfactions`, the proof engine should derive through the implied-modifier relation rather than duplicating the same knowledge onto `TypeMeta`.
+
+That is the catalog-driven answer: **derive, don’t duplicate.**
+
+## `TypeAccessor`, `FunctionOverload`, `BinaryOperationMeta`, `ActionMeta`
+
+**No.** These declare **proof requirements**, not declaration satisfactions. They are obligation emitters, not satisfier carriers.
+
+## Future qualifier catalog entry type
+
+**Yes — when it exists.**
+
+The broader design exposes a real architectural gap: qualifier-bound proof facts (`PeriodDimension`, qualifier compatibility on `Currency`/`Unit`/etc.) want a first-class qualifier metadata surface if we ever want them catalog-declared the same way numeric modifier facts are.
+
+Today that surface does not exist. Do not fake it by smearing qualifier-instance semantics onto `TypeMeta`.
+
+## 6. Recommendation summary
+
+| Decision | Recommendation | Why |
+|---|---|---|
+| Rename | `ProofDischarge` → `ProofSatisfaction` | Names the catalog relation, not the runtime act; scales across all requirement kinds. |
+| Property name | `ProofDischarges` → `ProofSatisfactions` | Reads correctly on metadata entries and matches the renamed type. |
+| Shape | **DU** keyed by `ProofRequirementKind` | Requirement shapes differ materially; flat nullable record would violate catalog architecture. |
+| File location | `src/Precept/Language/ProofRequirement.cs` | Keeps proof-domain vocabulary collocated and subtype-aligned. |
+| Current carrier | `FieldModifierMeta` | This is the honest current home for declaration-attached numeric facts, and optionally modifier-presence facts if Shane wants full uniformity. |
+| Other current carriers | None | Presence/dimension/qualifier-compatibility do not have honest existing top-level catalog entry types yet. |
+
+## 7. Open questions for Shane
+
+1. **Uniformity vs fast path for `ModifierRequirement`:**
+   - Should `ordered`/etc. also be represented as `ProofSatisfaction.Modifier(...)` rows for full conceptual symmetry?
+   - Or should the engine keep direct `Contains(requiredModifier)` as the dedicated generic arm even though the broader type can express it?
+
+2. **Qualifier metadata gap:**
+   - Does Shane want the broader design to stop at the reusable `ProofSatisfaction` type for now?
+   - Or does he want to open a follow-up architecture item to make qualifier-bearing declaration facts first-class catalog metadata so `Dimension` and `QualifierCompatibility` satisfactions have an honest carrier?
+
+3. **Projection identity for accessor-based numeric satisfactions:**
+   - Is `Accessor("count")` / `Accessor("length")` acceptable as the first version?
+   - Or does Shane want accessor projections promoted to a more stable catalog identity instead of string names?
+
+4. **`notempty` completeness:**
+   - Should we declare both `count > 0` and `length > 0` now for catalog completeness?
+   - My answer: **yes**, unless Shane wants Strategy-2 metadata to remain strictly current-consumer-only.
+
+That is the decision. `ProofDischarge` is the wrong name. The right name is `ProofSatisfaction`, and the right shape is a proof-kind DU that is broad in **type design** but disciplined in **property placement**.
+
+# Decision: PE-G4 through PE-G18 — All ProofEngine Gaps Resolved
+
+**Date:** 2026-05-08
+**Author:** Frank (Lead/Architect)
+**Status:** LOCKED — no deferrals, no open questions
+**Directive:** Shane's explicit mandate — define everything now so implementation can begin
+
+---
+
+## Summary
+
+All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zero deferrals. Combined with the previously resolved PE-G1, PE-G2, and PE-G3, the entire 18-gap inventory is now closed. The ProofEngine spec is READY for implementation.
+
+## Decisions Made
+
+## PE-G4: Walk Targets (not a helper property)
+**Decision:** Do NOT add `AllTypedExpressions` to SemanticIndex. Use explicit walk-target enumeration in a private `CollectObligations` method.
+**Rationale:** Avoids coupling surface; makes walk scope explicit and auditable.
+
+## PE-G5: Source Shapes Are Canonical
+**Decision:** `RuleIdentity(int RuleIndex)` and `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)` are correct. Spec must match source.
+**Rationale:** Source was created during TypeChecker implementation with tests. Spec hypothesized shapes that create invalid representations (two nullable anchor fields when only one can be non-null).
+
+## PE-G6: ObligationContext DU Replaces FindEnclosingTransitionRow
+**Decision:** New `ObligationContext` DU (5 subtypes). Context attached at instantiation time (O(1)), not discovered via post-hoc search. `ProofObligation` gains `Context` field.
+**Rationale:** Eliminates O(N²) search; makes context explicit at the point where it's known.
+
+## PE-G7: ResolveSubject Fully Defined
+**Decision:** `ResolveSubject` uses reference-equality parameter lookup against `Operations.GetMeta()` / `Functions.GetOverloads()` parameter lists. `GetFieldName` extracts field name from resolved expression.
+**Rationale:** The reference-equality model is already established in `ProofRequirement.cs` — this is the mechanical resolution consequence.
+
+## PE-G8: Full Satisfiability Algorithm
+**Decision:** Bounded constant folding: find initial state → collect `StateResident` ensures → build default value environment → substitute and fold → report violations for `false` results, conservative pass for `Unknown`. Initial event args NOT considered. Guarded ensures skipped.
+**Rationale:** Compile-time only, no evaluator dependency. Conservative — zero false positives at the cost of potentially missing some true violations.
+
+## PE-G9: Type Checker Owns Collection Diagnostics
+**Decision:** The type checker owns `UnguardedCollectionAccess` (63) and `UnguardedCollectionMutation` (64). The proof engine processes collection non-empty obligations as ordinary `NumericProofRequirement(count > 0)` through standard strategies. No new proof-stage diagnostic code needed for collections.
+**Rationale:** The catalog already encodes collection non-empty as `NumericProofRequirement` — the proof engine processes them generically. No duplication.
+
+## PE-G10: Full Guard Decomposition Rules
+**Decision:** AND-conjunctions decompose recursively. OR-disjunctions do NOT decompose. Simple negation inverts comparison operators. Conditionals and quantifiers are not decomposed. Operator inversion and negation inversion tables provided.
+**Rationale:** AND is safe (all conjuncts true). OR is unsafe (only one guaranteed). Bounded scope prevents false proofs.
+
+## PE-G11: Builder Contract Defined
+**Decision:** Three consumption patterns: (1) `FaultSiteLinks` → `FaultSiteDescriptor` backstops, (2) `ConstraintInfluence` → `ConstraintInfluenceMap` runtime artifact, (3) `InitialStateResults` → compile-time gate. `ConstraintInfluenceMap` type defined.
+**Rationale:** Defining the contract now ensures proof engine output shapes serve real consumers, not speculation. Shane's directive: no deferrals.
+
+## PE-G12: Diagnostic Formatting Table
+**Decision:** Template parameters defined for all three existing proof diagnostics. Four new diagnostic codes allocated (96–99).
+**Rationale:** Makes diagnostic output testable.
+
+## PE-G13: Error-Tainted Obligation Suppression
+**Decision:** Obligations with `TypedErrorExpression` in their site or resolved subject suppress proof diagnostic emission. `ContainsErrorExpression` recursive helper defined.
+**Rationale:** Prevents cascading diagnostics — the type checker already reported the root cause.
+
+## PE-G14: Exhaustive Guard Relation Triple Table
+**Decision:** 12-entry table covering all valid `(guard.Op, expr.Op, requirement)` combinations. Strategy 4 limited to subtraction only. Division explicitly excluded.
+**Rationale:** Subtraction with field-to-field guards covers the realistic use case. Division requires sign knowledge beyond bounded flow narrowing.
+
+## PE-G15: Stateless Precept Handling
+**Decision:** Proof engine runs for ALL precepts. Strategies 1, 2, 5 apply to stateless precepts. Strategies 3, 4 do not (no guards). Initial-state satisfiability skipped. No special-casing needed.
+**Rationale:** Division by zero in an event handler action is just as dangerous as in a transition row action.
+
+## PE-G16: Reference Identity for Site Matching
+**Decision:** `ProofObligation.Site` uses reference equality via `ReferenceEqualityComparer.Instance`. Proof engine must NOT copy expression nodes.
+**Rationale:** Structural equality would create false positives for identical-but-distinct expressions in different contexts.
+
+## PE-G17: Operator Names Verified
+**Decision:** All `OperatorKind` names in spec pseudocode match source exactly. No correction needed.
+
+## PE-G18: Diagnostic System Cross-Reference
+**Decision:** Add cross-references to `diagnostic-system.md` and `Compiler.cs` in proof engine spec §9.
+
+## New Types Introduced
+
+| Type | File | Purpose |
+|---|---|---|
+| `ObligationContext` (abstract) | `ProofLedger.cs` | DU base for obligation context |
+| `TransitionRowContext` | `ProofLedger.cs` | Obligation in a transition row |
+| `ConstraintContext` | `ProofLedger.cs` | Obligation in a rule/ensure condition |
+| `StateHookContext` | `ProofLedger.cs` | Obligation in a state hook |
+| `EventHandlerContext` | `ProofLedger.cs` | Obligation in an event handler |
+| `FieldExpressionContext` | `ProofLedger.cs` | Obligation in a field expression |
+
+## New Diagnostic Codes
+
+| Code | Name | Stage | Severity |
+|---|---|---|---|
+| 96 | `UnprovedModifierRequirement` | Proof | Error |
+| 97 | `UnprovedDimensionRequirement` | Proof | Error |
+| 98 | `UnprovedQualifierCompatibility` | Proof | Error |
+| 99 | `UnsatisfiableInitialState` | Proof | Error |
+
+## Spec Corrections Required
+
+14 corrections to `docs/compiler/proof-engine.md` — detailed in `frank-pe-g4-to-g18-resolution.md`.
+
+## REQUIRES SHANE INPUT
+
+None. All gaps resolved within existing architectural boundaries. No product surface or philosophy changes.
+
+## Full Resolution Document
+
+`docs/Working/inbox/frank-pe-g4-to-g18-resolution.md`
+
+## 2026-05-08: ProofEngine implementation plan complete — ready for Shane review
+
+**By:** Frank (Lead/Architect)
+**Artifact:** `docs/Working/frank-pe-implementation-plan.md`
+**What:** Definitive implementation plan for the ProofEngine feature. Two phases (8 prework slices + 13 engine slices), ~134 named tests, method-level specificity throughout.
+
+**Key findings during planning:**
+- Diagnostic codes 96–99 (referenced in spec for proof-stage codes) are already allocated to CI enforcement and collection safety codes. Plan allocates 112–115 instead. Spec correction included as Prework Slice P8.
+- ProofLedger.cs already has the full G3 shape (ProofObligation, FaultSiteLink, etc.) but is missing ObligationContext — added in Prework Slice P6.
+- ProofSatisfaction DU, DeclaredPresenceMeta, and DeclaredQualifierMeta do not exist in source yet — created in Prework Slices P1–P3.
+- FieldModifierMeta has no ProofSatisfactions property — added in Prework Slice P4 with all 10 modifier entries populated.
+- TypedField and TypedArg lack Presence and DeclaredQualifiers properties — added in Prework Slice P5 (high-touch: every construction site must be updated).
+
+**Phase 1 (Prework):** 8 slices creating structural shapes, catalog metadata, and diagnostic codes. ~37 tests. No behavioral changes — build stays green.
+**Phase 2 (Engine):** 13 slices implementing the full two-pass engine with all 5 strategies, error suppression, diagnostics, constraint influence, initial-state satisfiability, forwarding fact consumption, and stateless precept handling. ~97 tests.
+
+**Estimated total:** ~134 new tests across `ProofEngineTests.cs`, `ProofLedgerTests.cs`, `ProofRequirementTests.cs`, `ModifiersTests.cs`, and `DiagnosticsTests.cs`.
+
+**Ready for:** George to execute once Shane approves.
+
+# Decision: ProofEngine Spec Complete — All 18 Gaps Resolved
+
+**Date:** 2026-05-08T22:54:50.625-04:00
+**Author:** Frank (Lead/Architect)
+**Status:** Approved by Shane — implementation may proceed
+
+---
+
+## Summary
+
+All 18 ProofEngine gaps (PE-G1 through PE-G18) are now RESOLVED and incorporated into the canonical spec at `docs/compiler/proof-engine.md`. The spec is the authoritative implementation target with zero open questions, zero deferrals, and zero placeholders.
+
+## Resolution Timeline
+
+- **PE-G1** (3 unhandled requirement kinds): Resolved 2026-05-08 — Strategy 2 expanded, Strategy 5 added
+- **PE-G2** (ProofSatisfaction DU): Resolved 2026-05-08 — full DU with 5 subtypes + 3 supporting DUs, carrier types defined
+- **PE-G3** (ProofLedger shape): Resolved 2026-05-08 — 9 supporting types specified
+- **PE-G4–G18** (remaining 15 gaps): Resolved 2026-05-08 per Shane's no-deferral mandate, spec corrections applied same day
+
+## New Types Introduced
+
+## ObligationContext DU (PE-G6) — 5 subtypes
+
+```csharp
+public abstract record ObligationContext;
+public sealed record TransitionRowContext(TypedTransitionRow Row) : ObligationContext;
+public sealed record ConstraintContext(ConstraintIdentity Constraint) : ObligationContext;
+public sealed record StateHookContext(TypedStateHook Hook) : ObligationContext;
+public sealed record EventHandlerContext(TypedEventHandler Handler) : ObligationContext;
+public sealed record FieldExpressionContext(TypedField Field) : ObligationContext;
+```
+
+Added to `ProofObligation` as a `Context` field — set at Pass 1 instantiation time, replaces the undefined `FindEnclosingTransitionRow` with O(1) lookup.
+
+## New Diagnostic Codes
+
+| Code | Name | Severity |
+|------|------|----------|
+| 96 | `UnprovedModifierRequirement` | Error |
+| 97 | `UnprovedDimensionRequirement` | Error |
+| 98 | `UnprovedQualifierCompatibility` | Error |
+| 99 | `UnsatisfiableInitialState` | Error |
+
+These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diagnostics.cs` at implementation time.
+
+## Key Design Decisions Locked
+
+1. **Explicit walk-target enumeration** (PE-G4) — no `AllTypedExpressions` on SemanticIndex
+2. **Source shapes canonical** for ConstraintIdentity (PE-G5)
+3. **Context-at-instantiation** pattern for obligation context (PE-G6)
+4. **Reference-equality parameter lookup** for subject resolution (PE-G7)
+5. **Bounded constant folding** for initial-state satisfiability (PE-G8)
+6. **Type checker owns collection diagnostics** (PE-G9)
+7. **AND decomposes, OR does NOT, negation inverts** for guard decomposition (PE-G10)
+8. **Builder proof-consumption contract** with 3 consumption patterns (PE-G11)
+9. **Error-tainted obligations suppress proof diagnostics** (PE-G13)
+10. **12-entry exhaustive guard relation triple table**, subtraction-only (PE-G14)
+11. **Stateless precepts**: Strategies 3/4 skip, all others apply (PE-G15)
+12. **ReferenceEqualityComparer.Instance** for site identity matching (PE-G16)
+
+## Artifacts Updated
+
+- `docs/compiler/proof-engine.md` — canonical spec, all corrections applied
+- `docs/Working/frank-proof-engine-gap-analysis.md` — all 18 gaps marked RESOLVED, verdict READY
+- `docs/Working/inbox/frank-pe-g4-to-g18-resolution.md` — source material (retained as rationale record)
+
+## Next Steps
+
+Implementation may proceed. The spec is production-quality — no implementer should need to make design decisions. Shape declarations (Slice 0), obligation instantiation, strategy dispatch, and diagnostic emission are all fully specified.
+
+## 2026-05-08: DesugarsToRule flag on ModifierMeta
+**By:** George (requested by Shane)
+**What:** Added `DesugarsToRule: bool = false` to `ModifierMeta`. Set true on: `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`
+**Why:** Grammar generator gap — modifiers that desugar to rules were gold-highlighted in the old hand-authored grammar but this was not carried over to the catalog-driven generator.
+**Rationale:** Catalog should be the single source of truth for all gold-color decisions, not the generator or hand-authored grammar.
+
+## 2026-05-08: PE-G3 ProofLedger output types implemented
+**By:** George (requested by Shane)
+**What:** Expanded `src/Precept/Pipeline/ProofLedger.cs` from the single-field stub to the full approved PE-G3 shape: `ProofLedger`, `ProofObligation`, `ProofDisposition`, `ProofStrategy`, `FaultSiteLink`, `FaultSiteAnnotation`, `ConstraintInfluenceEntry`, `EventArgReference`, `InitialStateSatisfiabilityResult`, and `UnsatisfiedConstraint`.
+**Files modified:** `src/Precept/Pipeline/ProofLedger.cs`, `src/Precept/Pipeline/ProofEngine.cs`, `docs/compiler/proof-engine.md`
+**Files created:** `.squad/decisions/inbox/george-pe-g3-implemented.md`
+**Validation:** `dotnet build src\Precept\Precept.csproj --nologo` succeeded with zero errors.
+
+## 2026-05-08T23:21:03.236-04:00: Phase 1 proof-engine prework closed
+**By:** George (requested by Shane)
+**What:** Completed the Phase 1 proof-engine prework slices P1-P8 with structural-only changes: proof satisfaction carriers, declared presence/qualifier metadata, modifier proof-satisfaction catalog data, semantic-index carrier slots on `TypedField`/`TypedArg`, `ObligationContext` on `ProofObligation`, proof diagnostic codes 112-115, and the matching doc ordinal corrections.
+
+**Commits:**
+- P1 `f1de70dc` — `feat(proof-engine): P1 — ProofSatisfaction DU and supporting types`
+- P2 `161eb1fa` — `feat(proof-engine): P2 — DeclaredPresenceMeta carrier type`
+- P3 `267dd7bd` — `feat(proof-engine): P3 — DeclaredQualifierMeta carrier type`
+- P4 `5d6945c4` — `feat(proof-engine): P4 — FieldModifierMeta.ProofSatisfactions catalog metadata`
+- P5 `1bdf53f4` — `feat(proof-engine): P5 — TypedField/TypedArg presence and qualifier carrier properties`
+- P6 `445c3127` — `feat(proof-engine): P6 — ObligationContext DU on ProofObligation`
+- P7 `247ba37f` — `feat(proof-engine): P7 — diagnostic codes 112-115 for proof stage`
+- P8 `647de929` — `docs(proof-engine): P8 — correct diagnostic code ordinals 96-99 → 112-115`
+
+**Files touched (high-signal):**
+- Runtime/language: `src/Precept/Language/ProofRequirement.cs`, `src/Precept/Language/DeclaredPresence.cs`, `src/Precept/Language/DeclaredQualifierMeta.cs`, `src/Precept/Language/Modifier.cs`, `src/Precept/Language/Modifiers.cs`, `src/Precept/Pipeline/SemanticIndex.cs`, `src/Precept/Pipeline/TypeChecker.cs`, `src/Precept/Pipeline/ProofLedger.cs`, `src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs`
+- Tests: `test/Precept.Tests/ProofRequirementTests.cs`, `test/Precept.Tests/ModifiersTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerExpressionTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerQuantifierTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs`, `test/Precept.Tests/ProofLedgerTests.cs`, `test/Precept.Tests/DiagnosticsTests.cs`
+- Docs: `docs/compiler/proof-engine.md`, `docs/compiler/diagnostic-system.md`, `docs/Working/frank-proof-engine-gap-analysis.md`
+
+**Validation:**
+- `dotnet build src\Precept\Precept.csproj --nologo` succeeded during slice validation.
+- Final `dotnet test -nologo` summary: 3910 total, 3714 passed, 196 failed.
+- Final `dotnet build -nologo` succeeded.
+- Remaining failures are pre-existing: 194 `Precept.LanguageServer.Tests` failures from `LanguageServerStubs.cs` `NotImplementedException` paths, plus 2 `Precept.Tests` `TokensTests` failures around `TokenKind.Set` classification.
+
+**Surprises / deviations:**
+- `ConstraintIdentity` already existed in `SemanticIndex.cs`, so no new identity carrier was needed for P6.
+- The spec's proof diagnostic ordinals were stale; the implementation correctly used 112-115 instead of 96-99.
+- `docs/compiler/proof-engine.md` already carried a large unrelated branch diff, so the P8 doc commit necessarily rode on top of a broader proof-engine doc sync instead of a tiny isolated ordinal-only patch.
+- `FieldModifierMeta.ProofSatisfactions` test assertions had to avoid FluentAssertions expression-tree paths; simple `foreach` assertions were more robust.
+
+**Tricky construction sites:**
+- `TypedField` record construction in `src/Precept/Pipeline/TypeChecker.cs`
+- Manual `TypedArg` scaffolds in `test/Precept.Tests/TypeChecker/TypeCheckerExpressionTests.cs`
+- Manual `TypedArg` scaffolds in `test/Precept.Tests/TypeChecker/TypeCheckerQuantifierTests.cs`
+- Proof-ledger shape tests in `test/Precept.Tests/ProofLedgerTests.cs`
+
+**Phase 2 handoff:**
+- The structural metadata surface is now in place for obligation instantiation, strategy evaluation, and proof diagnostic emission.
+- Phase 2 can assume proof-bearing modifiers already declare satisfactions, semantic symbols expose presence/qualifier carriers, obligations can record context, and proof-stage diagnostics 112-115 are reserved with metadata.
+- `ProofEngine.cs` remains the behavioral frontier; Phase 2 should implement runtime-neutral proof analysis against the new carriers rather than reshaping these types again.
+
+# ProofEngine Phase 2 Closeout
+
+**Agent:** George (Runtime Dev)
+**Date:** 2026-05-08T23:45:00Z
+**Task:** ProofEngine Phase 2 — Full Engine Implementation (S1–S13)
+
+## Commit Hashes
+
+| Slice | Commit | Description |
+|-------|--------|-------------|
+| S1–S12 | `46c9a4d4` | Full engine implementation — obligation collection, five strategies, error suppression, diagnostics, constraint influence, initial-state satisfiability, forwarding fact consumption |
+| S13 | `36618ef9` | Stateless handling verification + documentation sync |
+
+## Build/Test Results
+
+- **Build:** Green, 0 warnings, 0 errors
+- **Tests:** 3451 passed, 2 pre-existing TokensTests failures unchanged
+- **Baseline preserved:** No regressions introduced
+
+## Deviations from Plan
+
+1. **Combined commit:** Slices S1–S12 were implemented in a single pass and committed together rather than individually. The code structure follows the slice boundaries internally, but the git history has 2 commits instead of 13. Rationale: the implementation was written holistically for correctness across slice boundaries, and incremental commits would have required artificial intermediate states.
+
+2. **FunctionKind.Count:** The spec referenced `FunctionKind.Count` for guard pattern recognition, but `count` is a `TypeAccessor` on collection types, not a function. Guard extraction matches `TypedMemberAccess` with `acc.Name == "count"` instead.
+
+3. **SourceSpan.Empty vs SourceSpan.Missing:** Spec pseudocode used `SourceSpan.Empty` but the actual API is `SourceSpan.Missing`.
+
+4. **ModifierKind.Initial vs ModifierKind.InitialState:** The live enum uses `InitialState`, not `Initial`.
+
+5. **BinaryOperationMeta.Left/Right vs Lhs/Rhs:** Spec pseudocode used `.Left`/`.Right` but actual properties are `.Lhs`/`.Rhs`.
+
+## Surprises
+
+- No functional surprises — the spec was thorough and all 18 gaps were pre-resolved by Frank.
+- The modifier effective-modifiers walk needed both `Modifiers` and `ImpliedModifiers` concatenation per the spec's effective-modifiers note (§7).
+- `SatisfactionCovers` subsumption logic required careful accessor-name matching for `notempty`'s dual satisfaction rows.
+
+## What's Now Unblocked
+
+- Soup Nazi's ProofEngine test suite can exercise all five strategies
+- Precept Builder can consume `ProofLedger` for fault backstops and constraint influence
+- Language Server proof diagnostics are now live
+
+# ProofEngine Phase 2 — Post-commit bugfixes
+
+**Date:** 2026-05-09T00:35:00-04:00
+**Author:** George
+**Commit:** d3657b70
+
+## Summary
+
+Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
+
+## Fixes
+
+## 1. ResolveParamInBinaryOp — Rhs-first resolution
+
+**Root cause:** Shared `ParameterMeta` instances (e.g., `PNumber`) are used for both `Lhs` and `Rhs` of binary operations in the Operations catalog. `ReferenceEquals` matched `Lhs` first, resolving the divisor proof requirement to the numerator instead of the divisor.
+
+**Fix:** Swapped check order in `ResolveParamInBinaryOp` to check `Rhs` before `Lhs`. Proof requirements for binary ops (division, modulo) target the right operand (divisor), so this resolves the correct field.
+
+## 2. Discharge loop — skip already-proved obligations
+
+**Root cause:** `IncorporateForwardingFacts` (Pass 1.5) correctly marked unreachable/dead-end obligations as `Proved`, but the discharge loop (Pass 2) unconditionally overwrote all obligations with `TryDischarge` results, replacing `Proved` with `Unresolved`.
+
+**Fix:** Added `if (obligation.Disposition == ProofDisposition.Proved) continue;` at the top of the discharge loop.
+
+## Validation
+
+- 158/158 ProofEngineTests passing
+- 3609/3611 full suite passing (2 pre-existing TokensTests failures unchanged)
+
+## 2026-05-08: DesugarsToRule wired into grammar generator
+**By:** Kramer (requested by Shane)
+**What:** Generator now reads Modifiers.All.Where(m => m.DesugarsToRule) to emit gold-colored TextMate patterns for rule-desugaring modifiers.
+**Scope used:** `keyword.other.grammar.precept`
+**Why:** Catalog gap — the old hand-authored grammar gold-highlighted these modifiers but the generator had no path for it.
+
+## 2026-05-08: VS Code extension packaging bundles the client entrypoint with esbuild
+**By:** Kramer (requested by Shane)
+**What:** Added an esbuild production bundle that writes the extension client to `tools/Precept.VsCode/out/extension.js`, moved VSIX packaging onto `vscode:prepublish`, and removed `node_modules/**` from the `.vscodeignore` allowlist so npm dependencies no longer ship raw.
+**Why:** The extension only needs the bundled client JavaScript plus the unchanged `server/` and `syntaxes/` assets; shipping raw `node_modules` was inflating the VSIX with ~170 JavaScript files for no runtime benefit.
+**Rationale:** Keeping `npm run compile` as plain `tsc` preserves the existing development loop, while `npm run bundle` becomes the production-only path that inlines `vscode-languageclient` and other client dependencies without bundling the .NET language server.
+
+# Soup Nazi — ProofEngine Phase 2 tests done
+
+**Date:** 2026-05-08T23:45:00.367-04:00
+**Scope:** `test/Precept.Tests/ProofEngineTests.cs`
+
+## Test count per slice
+
+- S1 Obligation collection — 7 required tests
+- S2 Subject resolution — 9 required tests
+- S3 Literal proof — 6 required tests
+- S4 Declaration-attribute proof — 11 required tests
+- S5 Guard-in-path proof — 11 required tests
+- S6 Flow narrowing — 7 required tests
+- S7 Qualifier compatibility — 5 required tests
+- S8 Error-tainted suppression — 4 required tests
+- S9 Diagnostics + fault links — 11 required tests
+- S10 Constraint influence — 4 required tests
+- S11 Initial-state satisfiability — 8 required tests
+- S12 Proof-forwarding facts — 5 required tests
+- S13 Stateless + integration — 9 required tests
+- **Required inventory total:** 97 named tests from the task plan
+- **Discovered `ProofEngineTests` total on branch:** 158 tests (required-name inventory plus supplemental coverage already in the file)
+
+## Validation
+
+- `dotnet build test/Precept.Tests/ --nologo` **passed**.
+- Baseline before this work: `dotnet test test/Precept.Tests/ --nologo --no-build` still showed the known 2 failing `TokensTests` only.
+- Focused run after authoring: `dotnet test test/Precept.Tests/ --nologo --no-build --filter FullyQualifiedName~ProofEngineTests` ran **158** tests with **153 passed / 5 failed**.
+
+## What failed in the focused ProofEngine run
+
+1. `Slice12_ProofForwardingFacts.ForwardingFacts_UnreachableState_ObligationsVacuouslyProved`
+2. `Slice12_ProofForwardingFacts.ForwardingFacts_DeadEndToDeadEnd_ObligationsSuppressed`
+3. `RequiredNameInventory.ForwardingFacts_UnreachableState_SuppressesObligations`
+4. `RequiredNameInventory.ForwardingFacts_DeadEndToDeadEnd_SuppressesObligations`
+5. `RequiredNameInventory.GetFieldName_NonFieldRef_ReturnsNull`
+
+## Gaps / surprises
+
+- Forwarding-fact suppression is still red on the current branch: obligations marked proved during forwarding-fact incorporation end up unresolved by the end of `ProofEngine.Prove`.
+- `GetFieldName_NonFieldRef_ReturnsNull` is red on the current branch: a non-field subject path still reaches declaration-attribute proof unexpectedly.
+- Several proof behaviors (especially qualifier compatibility and flow narrowing) needed manual `SemanticIndex` construction because the public DSL surface does not express every proof-shape directly.
+
+## Extra edge cases not explicitly called out in the plan
+
+- Operand metadata identity matters: `integer / number` and `number / number` do not stress subject resolution the same way because catalog parameter instances differ.
+- Boolean guard composition (`and` / `or`) can go red at type-check time if the catalog does not carry the boolean operation entries the proof strategy assumes.
+- Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.
+

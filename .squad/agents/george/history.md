@@ -6,8 +6,15 @@
 
 ## Learnings
 
+- When shared `ParameterMeta` instances are used for both Lhs and Rhs of a binary operation (e.g., `PNumber` in `NumberDivideNumber`), `ReferenceEquals` in `ResolveParamInBinaryOp` matches both sides — checking Rhs before Lhs ensures proof requirements (divisor ≠ 0) resolve to the correct operand.
+- Forwarding-fact suppression (Pass 1.5) must be followed by a skip guard in the discharge loop (Pass 2): without `if (obligation.Disposition == ProofDisposition.Proved) continue;`, `TryDischarge` unconditionally overwrites already-proved obligations with `Unresolved`.
+
 - Self-edges (`ToState == FromState`) from `Reject` and `NoTransition` outcomes must be filtered out of terminal-violation analysis — a terminal state that only rejects events is honoring its contract, not violating it.
 - When the spec says "Emit Diagnostic(X)" in pseudocode, verify the actual `Diagnostics.Create()` call exists in the code — violation data structures can be populated correctly while diagnostic emission is entirely missing.
+- ProofEngine Phase 2: Spec pseudocode can diverge from source names (`opMeta.Left`/`Right` vs actual `Lhs`/`Rhs`, `SourceSpan.Empty` vs `SourceSpan.Missing`, `ModifierKind.Initial` vs `ModifierKind.InitialState`). Always verify enum/property names against the live source before writing implementation code.
+- `count` is a TypeAccessor on collection types, not a FunctionKind — guard extraction for `count(X) > 0` should match `TypedMemberAccess` patterns, not `TypedFunctionCall` with a nonexistent function kind.
+- The UnknownSentinel pattern (private object instance for tristate fold results) avoids boxing bool? and keeps constant folding type-safe without allocating nullable wrappers.
+- ProofForwardingFact consumption must happen BEFORE the discharge loop — unreachable/dead-end suppression is a Pass 1.5 step, not Pass 2.
 - Doc appendix code numbers can drift from the actual `DiagnosticCode` enum when codes are added out-of-sequence (e.g., `DeadEndState = 108` was added after the Proof block at 82–84, but the appendix assumed contiguous Graph-stage numbering).
 
 - `Types.GetMeta(...).ImpliedModifiers` is the durable source of truth for implied field modifiers.
@@ -30,6 +37,18 @@
 - Current validation baseline after Phase 1 is stable: full-solution build is green, while full-solution tests still fail only in pre-existing areas (`Precept.LanguageServer.Tests` stubs and the two `TokensTests` keyword-classification assertions).
 
 ## Recent Updates
+
+### 2026-05-09T04:35:00Z — ProofEngine Phase 2 fixes closed
+- George landed ProofEngine Phase 2 across commits `46c9a4d4` and `36618ef9`, then fixed the last 5 red tests in `d3657b70`.
+- Branch validation now closes at 158/158 `ProofEngineTests` and 3609/3611 full-suite tests, with only the 2 pre-existing `TokensTests` failures remaining.
+
+### 2026-05-08T23:45:00Z — ProofEngine Phase 2 complete
+- Full ProofEngine body implemented across S1–S13 in `src/Precept/Pipeline/ProofEngine.cs`.
+- Commits: `46c9a4d4` (S1–S12 engine implementation), `36618ef9` (S13 documentation sync).
+- All five strategies operational: Literal, DeclarationAttribute, GuardInPath, FlowNarrowing, QualifierCompatibility.
+- Error-tainted obligation suppression (PE-G13), ProofForwardingFact consumption, constraint influence analysis, initial-state satisfiability with bounded constant folding — all implemented.
+- Validation: 3451 passed, 2 pre-existing TokensTests failures unchanged. Build green, 0 warnings.
+- Documentation synced: `docs/compiler/proof-engine.md` §1 status → Implemented, §13 items 1–2 removed.
 
 ### 2026-05-08T22:36:50Z — Message-position metadata recorded
 - `IsMessagePosition` now lives on both `TokenMeta` and `FunctionMeta`; active token flags are `because` and `reject` only.
