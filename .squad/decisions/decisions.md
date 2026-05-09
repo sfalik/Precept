@@ -6027,3 +6027,68 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 - `dotnet test --no-build -q -m:1 /nr:false` → **baseline repo still red: 194 failures**.
   - Failures are pre-existing language-server completion tests throwing `NotImplementedException` from `tools/Precept.LanguageServer/LanguageServerStubs.cs:31`.
   - No failure implicated `LanguageTool` or the new MCP tests.
+
+
+# ISO 4217 refresh workflow conversion
+
+**Date:** 2026-05-09
+**Merged from:** `kramer-iso4217-task.md`, `soup-nazi-iso4217-sync-test.md`
+
+## Decision
+- Keep ISO 4217 refresh out of the VS Code extension command surface; expose it as the workspace task `iso4217: refresh` backed by `tools/scripts/refresh-iso4217.js`.
+- Download the XML into `src/Precept/Data/Iso4217/list-one.xml` using the live SIX endpoint at `iso-currrency/lists/list-one.xml`; the older `iso-4217/lists/list-one.xml` path currently returns 404.
+- Treat `src/Precept/Data/` as developer-downloaded reference data, not committed source.
+- Guard currency-parity validation with a discovery-time-skipped xUnit test so CI stays green until a developer intentionally refreshes the XML locally.
+
+## Rationale
+- This is a repo-local maintenance workflow, not an always-on editor feature.
+- The live upstream URL has drifted, so the refresh path must follow the currently published SIX source rather than a stale historical endpoint.
+- Optional local reference data should strengthen developer validation without turning absent downloads into red CI.
+
+
+# Qualifier completion honesty and Tier 1 UOM breadth
+
+**Date:** 2026-05-09
+**Merged from:** `elaine-completion-suppression-uom.md`
+
+## Decision
+- When a type/preposition pair is structurally invalid, show no qualifier-value completions; guide the user back to the correct preposition instead of suggesting misleading values.
+- Expand UOM completions to the ~150 canonical Tier 1 set now rather than shipping an underpowered shortlist.
+
+## Rationale
+- Completions are a truth surface: invalid structure should feel invalid, not productive.
+- Missing legitimate units damages trust faster than a somewhat longer filtered completion list.
+
+
+# UCUM / ISO 4217 implementation gap remediation shape
+
+**Date:** 2026-05-09
+**Merged from:** `frank-ucum-iso-gap.md`
+**Status:** Draft — pending Shane sign-off
+
+## Decisions
+1. Replace the flat currency-code set with a structured `CurrencyCatalog` entry shape (`AlphaCode`, `NumericCode`, `Name`, `MinorUnit`) so money fields can derive implicit precision correctly.
+2. Defer the full UCUM grammar parser, but expand the interim UOM registry to the canonical Tier 1 atom set and rename the registry to match the catalog target architecture.
+3. Keep the current `ClosedSetValidation` DU shape until the grammar parser ships; add the future grammar-aware validation as a new subtype instead of churning the existing surface now.
+4. Audit the dimension registry back to the curated v1 spec set and remove premature entries; `time` and `count` stay open questions for Shane.
+5. Keep ISO 4217 sync as a manual PR workflow driven by published XML updates, roughly 1–2 times per year.
+
+## Rationale
+- The spec already locked `CurrencyCatalog`, `UnitCatalog`, and `DimensionCatalog`; the code is behind the design, not vice versa.
+- `FrozenSet<string>` cannot carry the metadata required for money semantics or future catalog-driven tooling.
+
+
+# Field and arg semantic colors
+
+**Date:** 2026-05-09
+**Merged from:** `elaine-field-arg-colors.md`
+**Status:** Draft — pending Shane sign-off
+
+## Decision
+- Formalize field names as semantic token `--field` using `#A5B4FC`, the lifted structure-family identifier tone.
+- Formalize arg names as semantic token `--arg` using `#9AD8E8`, a lifted cyan companion to event color.
+- Narrow the Data construct back to types and values; field and arg identifiers no longer inherit the generic data slate treatment.
+
+## Rationale
+- Fields belong on the structure axis (what a precept is), while args belong on the behaviour axis (what a precept does).
+- The companion-token pattern is an axis relationship, not a change to the existing 1–3 shade paradigm.

@@ -17,8 +17,16 @@
 - `ModifierMeta.DesugarsToRule` now wires into `Precept.GrammarGen` through a derived `ruleDesugaringModifiers` repository entry built from `Modifiers.All.Where(m => m.DesugarsToRule)` rather than a hand-maintained modifier list.
 - The gold keyword scope for rule-desugaring modifier highlights is `keyword.other.grammar.precept`; it must stay ahead of `#constraintKeywords` anywhere modifier patterns are composed so first-match TextMate ordering preserves the gold scope.
 - ProofEngine presence diagnostics were missing because `docs/compiler/proof-engine.md` §9 assigned codes 112–115 for four proof requirement families but omitted `PresenceProofRequirement`; fixing the spec gap required adding `UnprovedPresenceRequirement = 116`, wiring the diagnostics catalog and `ProofEngine.cs`, and updating `test/Precept.Tests/DiagnosticsTests.cs` plus `test/Precept.Tests/ProofEngineTests.cs`.
+- Workspace maintenance commands in the VS Code extension can stay dependency-free: built-in `https` plus `withProgress` is enough to fetch official source artifacts into repo-relative paths with clear success/error UX.
+- ISO 4217 refresh belongs in `.vscode/tasks.json`, not the extension command surface; keep one-off workspace maintenance flows as explicit tasks backed by repo-local scripts.
+- The historical SIX Group `iso-4217/lists/list-one.xml` URL now returns 404; the live XML currently resolves under SIX's `iso-currrency/lists/list-one.xml` path, so repo-local refresh tooling should handle source drift explicitly rather than baking brittle editor commands into the extension.
 
 ## Recent Updates
+
+### 2026-05-09T14:41:11Z — ISO 4217 refresh converted to task workflow
+- `kramer-2` removed the `precept.refreshIso4217` extension command path, added `tools/scripts/refresh-iso4217.js`, and wired the workspace task label `iso4217: refresh`.
+- The refresh now follows SIX's live `iso-currrency/lists/list-one.xml` endpoint because the older `iso-4217/lists/list-one.xml` URL returns 404.
+- Downloaded XML stays under gitignored `src/Precept/Data/`, with parity validation handled by an optional discovery-time-skipped xUnit test rather than committed fixtures.
 
 ### 2026-05-09T09:49:38Z — Token/action parser cleanup batch recorded
 - `kramer-3` closed the `TokenKind.Set` dual-category bug: token metadata is now action-only, language-server type completions derive vocabulary from `Types.All`, and the language spec reflects the `Set`/`SetType` split.
