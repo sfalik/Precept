@@ -41,6 +41,9 @@ Committed 6 logical groups from a large multi-session working tree:
 6. **`chore: update soup nazi agent history`** (`dbfac08e`).
 
 **Grouping observation:** The natural split was: (A) catalog-level metadata DU changes, (B) pipeline consumers of that metadata, (C) analyzers that enforce catalog DU discipline, (D) docs, (E) tooling/scripts, (F) squad state. The CI diagnostic metadata on `BinaryOperationMeta`/`FunctionMeta` and the TypeChecker validation collapse belonged together in A+B respectively — they are producer/consumer pairs across the catalog/pipeline boundary.
+- `precept_language` authoring completeness is not just “which catalogs are exposed”; the DTO layer must also preserve catalog-carried hover text, usage examples, snippet templates, proof requirements/proof satisfactions, and typed-constant `ContentValidation` DU metadata in the same additive pass.
+- `SyntaxReference.CommonPatterns` must be compile-verified examples, not illustrative pseudocode: computed-field modifiers belong before `<-`, and pattern snippets should be validated through `CompileTool`/MCP wrappers before treating them as canonical authoring guidance.
+- When manually probing the local Precept MCP server through a TTY (`node tools/scripts/start-precept-mcp.js 2>$null`), the transport accepts newline-delimited JSON-RPC messages directly; `Content-Length` framing is not suitable in that interactive shell path.
 
 ## Recent Updates
 
@@ -76,6 +79,11 @@ Committed 6 logical groups from a large multi-session working tree:
 - Validation closed green at `dotnet build src\\Precept\\Precept.csproj` plus `dotnet test test\\Precept.Tests\\Precept.Tests.csproj` with 3721 passing tests after the TypeChecker migrated fully to `TypedConstantValidation.Validate(...)`.
 - Durable follow-up boundary: runtime measure types in `src/Precept/Runtime/Measures/` remain explicit stubs; compile-time parsing/validation is complete, while runtime arithmetic integration is future work.
 
+### 2026-05-09T23:02:39Z — Catalog authoring pass complete
+- George-15 finished the catalog authoring pass: `DiagnosticMeta` now carries `TriggerCondition`, `RecoverySteps`, `ExampleBefore`, and `ExampleAfter` across all 116 diagnostics; `SyntaxReference` gained `AntiPattern` plus 8 common patterns / 3 anti-patterns; and `src/Precept/Language/Quickstart.cs` added `QuickstartCatalog`.
+- Validation closed green at 3733/3733 `Precept.Tests`, 26/26 `Precept.Mcp.Tests`, and zero build warnings.
+
+
 ## Historical Summary
 
 - 2026-05-08 GraphAnalyzer work locked the dead-end/terminal diagnostic model, emitted the missing structural diagnostics, and synchronized the graph/proof docs back to live behavior.
@@ -86,3 +94,12 @@ Committed 6 logical groups from a large multi-session working tree:
 ### 2026-05-09T15:21:46Z — Scribe merged the CurrencyCatalog exclusion policy
 - `.squad/decisions.md` now records the ISO-sync reconciliation: transactional currencies stay in `CurrencyCatalog`, while fund/accounting-unit codes and other intentional XML-only codes belong in `CurrencyCatalogSyncTests.IntentionalExclusions`.
 - Treat the current exclusion set (`BOV`, `CHE`, `CHW`, `CLF`, `COU`, `MXV`, `USN`, `UYI`, `UYW`, `VED`, `XAD`, `XCG`, `ZWG`, plus metals/placeholders) as the durable runtime boundary until Shane changes policy.
+
+## Learnings — Catalog Authoring Pass (george-15, 2026-05-09)
+
+- DiagnosticMeta extended with TriggerCondition, RecoverySteps, ExampleBefore, ExampleAfter — all 116 entries authored.
+- ExampleAfter snippets must use verified DSL syntax: types are `string`, `number`, `integer`, `decimal`, `boolean`, `money`, `quantity`, `price`, `~string`, `date`, `time`, `instant`, `timezone`, `duration`, `period`. `text` is NOT a valid type keyword.
+- The MCP compile tool uses newline-delimited JSON (not LSP Content-Length framing). Use inline node.js scripts for spot-checking.
+- InputTooLarge (PRE0001) is the only diagnostic where ExampleBefore/ExampleAfter are intentionally null.
+- MinimalExamples and AntiPatterns.GoodSnippet must be compile-verified before marking the task done.
+- QuickstartCatalog is the new entry-point catalog for AI agents — thin and focused, not a dump of all catalogs.

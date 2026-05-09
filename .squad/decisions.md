@@ -12,6 +12,103 @@
 
 ---
 
+### 2026-05-09T21:29:00Z: AI authoring MCP discovery now centers on focused named tools, not `precept_language`
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (5 files -> 1 canonical entry).
+
+**Merged sources:** `copilot-directive-mcp-tool-arch.md`, `copilot-directive-tool-suite-decisions.md`, `frank-ai-authoring-tool-suite.md`, `frank-mcp-language-audit.md`, `newman-mcp-tool-audit.md`.
+
+- The AI authoring surface is a focused named-tool suite: `precept_quickstart`, `precept_syntax`, `precept_types`, `precept_operations`, `precept_proofs`, `precept_patterns`, `precept_domains`, `precept_diagnostic`, plus `precept_compile`; tool names are the discoverability surface, not section parameters.
+- Owner answers closed Frank's open questions: `precept_operations()` returns all 198 operations by default (with an optional category nicety), `precept_diagnostic` must cover all 116 codes, and v1 pattern scope is 8 compile-verified patterns plus 3 anti-patterns.
+- `precept_language` may remain as an internal/testing fallback, but it is removed from MCP discovery and from skill/agent guidance because the focused suite is the public authoring contract.
+
+---
+
+### 2026-05-09T19:55:00Z: Typed business-domain qualifiers are first-class semantic data, and count classification stays unit-aware
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (4 files -> 1 canonical entry).
+
+**Merged sources:** `frank-design-gap-audit.md`, `george-p0-fix.md`, `frank-count-dimensionless-gap.md`, `george-q6b-qualifier-fix.md`.
+
+- The architectural P0 was qualifier loss between parser and semantic model; `QualifiedTypeReference`, `ParsedQualifier`, and type-checker extraction now thread `in`/`of` data into fields and event args instead of dropping it at parse time.
+- Qualifier validation belongs in the type checker against the authoritative registries (`CurrencyCatalog`, UCUM parsing, `DimensionCatalog`), with `in`/`of` exclusivity enforced on the qualified type reference span.
+- Counting-unit safety did not require a proof-engine redesign: quantity arithmetic already compares unit-code-bearing qualifier records. The real gap was reverse-aliasing every `DimensionVector.None` unit to `count`, which is now fixed in unit-aware qualifier derivation so angles and solid angles no longer masquerade as counts.
+
+---
+
+### 2026-05-09T18:53:05-04:00: Language server implementation is locked to the stub contract with no remaining plan deferrals
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `frank-language-server-design.md`, `frank-ls-plan-no-deferrals.md`.
+
+- The 173 ported tests in `LanguageServerStubs.cs` remain the public contract; OmniSharp handlers and stub classes may coexist as thin entry points over shared logic.
+- Fuzzy matching stays in the language server, preview/inspect may ship as a handler shell while the runtime evaluator remains stubbed, and `Token != null` is the permanent user-facing type filter.
+- The temporary `ConstructKind` outline switch is superseded by concrete Slice 0a: `ConstructMeta` gains `IsOutlineNode` plus string `OutlineSymbolTag`, and the LS projects that tag to `SymbolKind` without introducing LSP types into `src/Precept/`.
+
+---
+
+### 2026-05-09T17:47: AI authoring content belongs in catalogs, and proof guidance owns runtime fault consequences
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (4 files -> 1 canonical entry).
+
+**Merged sources:** `copilot-directive-faults-placement.md`, `copilot-directive-mcp-thin-layer-catalogs.md`, `george-15-catalog-authoring.md`, `george-precept-language-content-expansion.md`.
+
+- All authored guidance for the new MCP tools must live in core metadata; tool implementations stay thin projections and do not embed separate prose, legality tables, or pattern content.
+- `DiagnosticMeta` is now the recovery/example home for all 116 diagnostics, `SyntaxReference` is the compile-verified home for 8 common patterns plus 3 anti-patterns, and `QuickstartCatalog` is the first-contact orientation/tool-guide surface for AI agents.
+- Runtime `Faults.All` belongs under `precept_proofs()` as `runtimeFaults`, because proofs and guards are the authoring lane that explains how those runtime consequences are avoided.
+
+---
+
+### 2026-05-09T17:43: User directive — the spike branch allows no deferrals, phased punts, or open-question handoffs
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `copilot-directive-no-deferrals-final.md`.
+
+- On this branch there are no issue-tracking deferrals, "top N now / rest later" partial authoring passes, or open-question lists handed back to Shane when the team can make the call and proceed.
+- This directive applies immediately to MCP tool design, catalog authoring, and language-server planning; durable records should capture the final decision, not a deferred question list.
+
+---
+
+### 2026-05-09T16:06:55-04:00: UCUM and domain registries stay curated registry surfaces with XML-anchored drift tests
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (5 files -> 1 canonical entry).
+
+**Merged sources:** `frank-q2-q3-analysis.md`, `george-q1-tier1-codes.md`, `george-q4-catalog-registry.md`, `george-ucum-catalog-collapse.md`, `soup-nazi-q8-ucum-drift.md`.
+
+- Named dimension categories are curated Precept editorial metadata, not something UCUM XML can derive mechanically; registry-shaped APIs should expose canonical `All` maps and keep alias resolution in explicit helper paths.
+- `UcumAtomCatalog` is the single UCUM source of truth: `All` is the embedded XML-backed atom universe, `BrowseTier1()` is the curated 150-entry business-facing surface, and parse-only Tier 1 forms are synthesized through `UcumParser` rather than duplicated in a second catalog.
+- Drift tests anchor against the embedded XML universe plus the approved Tier 1 curation rules, including the exclusion of time atoms (`s`, `min`, `h`, `d`) and `mol`, instead of relying on aspirational atom-count floors.
+
+---
+
+### 2026-05-09T00:00:00Z: Runtime business-domain CLR shapes are pure data records, not executor logic containers
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `george-clr-value-types-done.md`.
+
+- The public runtime shapes for `currency`, `unitofmeasure`, `dimension`, `money`, `quantity`, `price`, and `exchangerate` live under `src/Precept/Runtime/BusinessValues/` as record / record-struct data carriers.
+- `Currency` stays a sealed record rather than bespoke alpha-code equality, and the public API surface uses `Dimension` to avoid colliding with the internal dimensional-analysis type `Measures.MeasureDimension`.
+- Parsing, formatting, interning, arithmetic helpers, and `PreceptValue` wrappers are explicitly separate follow-on runtime concerns rather than responsibilities of these CLR shape types.
+
+---
+
 ### 2026-05-09T15:33:49Z: User-defined string format validation is a future constraint feature, not typed-literal extensibility
 
 **By:** Scribe
@@ -25,6 +122,7 @@
 - The recommended future language surface is a string constraint modifier such as `matches /pattern/ because ...`, implemented through the existing modifier/constraint pipeline rather than the typed-literal framework.
 
 ---
+
 ### 2026-05-09T15:33:49Z: Runtime typed-literal arg parsing stays on `TypeRuntimeMeta`, not compile-time literal validation
 
 **By:** Scribe
@@ -38,6 +136,7 @@
 - Each typed-literal type therefore keeps three distinct catalog registrations on `TypeMeta`: `TypeRuntime<T>`, `TypeRuntimeMeta`, and `ContentValidation`, while sharing the same domain parsers underneath.
 
 ---
+
 ### 2026-05-09T15:26:09Z: MCP discovery is correct at three implemented tools, and stdout log pollution is fixed at the host boundary
 
 **By:** Scribe

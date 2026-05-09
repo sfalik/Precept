@@ -20,6 +20,7 @@
 - The 5 non-ping MCP tools have zero implementation — no stubs, no DTOs, no handlers. "Stubbed" in the doc was inaccurate; corrected.
 - `ConstraintKind` enum names in the runtime docs were stale aliases that never matched the actual Language catalog names (`Invariant/StateResident/StateEntry/StateExit/EventPrecondition`).
 - Descriptor types (`FieldDescriptor`, `ArgDescriptor`, etc.) are fully implemented in `Descriptors.cs` — the doc was still saying "Planned". Also, `ClrType` and `SlotIndex` on `ArgDescriptor` described in the doc never made it into the implementation.
+- `precept_language` is structurally correct but expensive as a first-call AI contract: the compact payload is ~196.9 KB (~50k tokens), and `domains` + `tokens` + `diagnostics` + `types` consume ~82% of it. If the goal is AI authoring, explicit companion tools (especially a tiny syntax-first reference) are cleaner than a single giant catalog dump.
 
 ## Recent Updates
 
@@ -93,3 +94,7 @@
 ### 2026-05-09T15:21:46Z — MCP tool discovery diagnosis remains in flight
 - `newman-2` is still investigating the MCP discovery regression (3 tools found instead of 5) plus stdout pollution causing `Failed to parse message` warnings.
 - Current durable breadcrumb: `docs/working/newman-mcp-tool-discovery-diagnosis.md`. Scribe logged the in-progress state in `.squad/orchestration-log/2026-05-09T15-21-46Z-newman-2.md`.
+
+### 2026-05-09T23:02:39Z — Catalog prerequisites cleared for new MCP authoring tools
+- George-15's catalog authoring pass completed the thin-layer prerequisites for the 8 new MCP tools: authored diagnostic recovery/examples, compile-verified patterns + anti-patterns, and `QuickstartCatalog` now live in core metadata.
+- Newman is unblocked to implement `precept_quickstart`, `precept_syntax`, `precept_types`, `precept_operations`, `precept_proofs`, `precept_patterns`, `precept_domains`, and `precept_diagnostic` as catalog projections.
