@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Stub — not yet implemented |
+| Implementation state | Implemented |
 | Source | `src/Precept/Pipeline/ProofEngine.cs`, `src/Precept/Pipeline/ProofLedger.cs` |
 | Upstream | SemanticIndex + StateGraph, catalog metadata (Operations, Functions, Types, Modifiers, Actions, Diagnostics, Faults) |
 | Downstream | Compilation (proof ledger), Precept Builder (fault backstops, constraint influence map) |
@@ -1890,9 +1890,7 @@ The proof engine produces a `ConstraintInfluenceMap` that enables AI agents to r
 
 ### Implementation Status
 
-1. **`ProofEngine.Prove` throws `NotImplementedException`** — catalog-side proof vocabulary exists (`ProofRequirements` catalog, `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`), but `ProofObligation` instantiation and strategy evaluation are not implemented.
-
-2. **`ProofLedger` is minimal** — currently only holds `Diagnostics`. The full shape designed in this document needs to be implemented.
+Items 1 and 2 are resolved — the full ProofEngine body is implemented with all five strategies, obligation collection, diagnostic emission, constraint influence analysis, initial-state satisfiability, and ProofForwardingFact consumption.
 
 ### Validation Required
 
