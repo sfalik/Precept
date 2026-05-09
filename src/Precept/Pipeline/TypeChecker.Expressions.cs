@@ -211,6 +211,7 @@ internal static partial class TypeChecker
         NodaTimeValidation noda => ValidateNodaTime(noda, rawText, displayName),
         ClosedSetValidation closed => ValidateClosedSet(closed, rawText),
         RegexValidation regex => ValidateRegex(regex, rawText, displayName),
+        UcumValidation => ValidateUcum(rawText),
         _ => (true, rawText, null),
     };
 
@@ -270,6 +271,14 @@ internal static partial class TypeChecker
             return (true, rawText, null);
 
         return (false, null, $"{displayName} ({regex.FormatDescription})");
+    }
+
+    private static (bool, object?, string?) ValidateUcum(string rawText)
+    {
+        var result = UcumCatalog.Parse(rawText);
+        return result.IsValid
+            ? (true, result.Unit, null)
+            : (false, null, "UCUM expression");
     }
 
     // ════════════════════════════════════════════════════════════════════════

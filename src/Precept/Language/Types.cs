@@ -55,40 +55,6 @@ public static class Types
 
     // ── ContentValidation instances ─────────────────────────────────────────────
 
-    /// <summary>Recognized unit-of-measure identifiers.</summary>
-    private static readonly FrozenSet<string> RecognizedUnits = new[]
-    {
-        // Mass
-        "kg","g","mg","lb","oz","ton","tonne",
-        // Length
-        "m","km","cm","mm","mi","miles","yd","ft","in",
-        // Volume
-        "l","ml","gal","qt","pt","floz",
-        // Area
-        "sqm","sqft","sqmi","acre","hectare",
-        // Time
-        "s","ms","min","hr","h",
-        // Temperature
-        "C","F","K",
-        // Count / generic
-        "each","unit","piece","pair","dozen","gross",
-        // Speed / rate
-        "mph","kph","mps",
-        // Energy
-        "J","kJ","cal","kcal","Wh","kWh",
-        // Pressure
-        "Pa","kPa","bar","psi","atm",
-        // Force
-        "N","kN","lbf",
-    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Recognized dimension family identifiers.</summary>
-    private static readonly FrozenSet<string> RecognizedDimensions = new[]
-    {
-        "length","mass","time","temperature","volume","area",
-        "speed","energy","pressure","force","count",
-    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
-
     private static readonly NodaTimeValidation DateValidation = new(
         TemporalLiteralKind.Date,
         "uuuu'-'MM'-'dd",
@@ -107,11 +73,35 @@ public static class Types
         "ISO 8601 date-time (YYYY-MM-DDThh:mm:ss)",
         ["2026-04-13T09:00:00", "2024-12-31T23:59:59"]);
 
+    private static readonly NodaTimeValidation InstantValidation = new(
+        TemporalLiteralKind.Instant,
+        "uuuu'-'MM'-'dd'T'HH':'mm':'ss'Z'",
+        "ISO 8601 instant (YYYY-MM-DDThh:mm:ssZ)",
+        ["2026-04-15T14:30:00Z"]);
+
+    private static readonly NodaTimeValidation TimezoneValidation = new(
+        TemporalLiteralKind.Timezone,
+        "IANA timezone",
+        "IANA timezone identifier",
+        ["America/New_York", "UTC"]);
+
+    private static readonly NodaTimeValidation ZonedDateTimeValidation = new(
+        TemporalLiteralKind.ZonedDateTime,
+        "uuuu'-'MM'-'dd'T'HH':'mm':'ss'['timezone']'",
+        "Zoned date-time: YYYY-MM-DDThh:mm:ss[Area/Location]",
+        ["2026-04-15T14:30:00[America/New_York]"]);
+
+    private static readonly NodaTimeValidation DurationValidation = new(
+        TemporalLiteralKind.TemporalQuantity,
+        "quantity",
+        "Temporal quantity: <integer> <unit> [+ <integer> <unit>]*",
+        ["72 hours", "2 hours + 30 minutes", "3600 seconds"]);
+
     private static readonly NodaTimeValidation PeriodValidation = new(
         TemporalLiteralKind.TemporalQuantity,
         "NormalizingIso",
-        "ISO 8601 period (PnYnMnDTnHnMnS)",
-        ["P30D", "P1Y6M", "PT2H30M"]);
+        "Temporal quantity: <integer> <unit> [+ <integer> <unit>]*",
+        ["30 days", "2 years + 6 months", "P30D"]);
 
     private static readonly ClosedSetValidation CurrencyValidation = new(
         "ISO 4217",
@@ -119,17 +109,31 @@ public static class Types
         "ISO 4217 currency code",
         ["USD", "EUR", "GBP"]);
 
-    private static readonly ClosedSetValidation UnitOfMeasureValidation = new(
-        "recognized units",
-        RecognizedUnits,
-        "Unit of measure identifier",
-        ["kg", "miles", "each"]);
+    private static readonly UcumValidation UnitOfMeasureValidation = new(
+        "UCUM expression",
+        ["kg", "m/s^2", "mg/dL"]);
 
     private static readonly ClosedSetValidation DimensionValidation = new(
         "recognized dimensions",
-        RecognizedDimensions,
+        DimensionCatalog.AllNames,
         "Dimension family identifier",
-        ["length", "mass", "time"]);
+        ["length", "mass", "count"]);
+
+    private static readonly MoneyValidation MoneyLiteralValidation = new(
+        "Monetary amount: <decimal> <ISO-4217>",
+        ["100 USD", "50.25 EUR"]);
+
+    private static readonly QuantityValidation QuantityLiteralValidation = new(
+        "Physical quantity: <decimal> <UCUM-unit>",
+        ["5 kg", "2.5 mg/dL"]);
+
+    private static readonly PriceValidation PriceLiteralValidation = new(
+        "Price: <decimal> <ISO-4217>/<UCUM-unit>",
+        ["4.17 USD/each", "10.00 EUR/kg"]);
+
+    private static readonly ExchangeRateValidation ExchangeRateLiteralValidation = new(
+        "Exchange rate: <decimal> <ISO-4217>/<ISO-4217>",
+        ["1.08 USD/EUR"]);
 
     // ── Collection accessor helpers ─────────────────────────────────────────────
 
@@ -387,7 +391,8 @@ public static class Types
             ],
             DisplayName: "instant",
             HoverDescription: "An exact UTC point in time. Use .inZone(timezone) to convert to a zoned date-time for local display.",
-            UsageExample: "field FiledAt as instant optional"
+            UsageExample: "field FiledAt as instant optional",
+            ContentValidation: InstantValidation
         ),
 
         TypeKind.Duration => new(
@@ -404,7 +409,8 @@ public static class Types
             ],
             DisplayName: "duration",
             HoverDescription: "An exact elapsed time measured in hours, minutes, and seconds. Use when the length of a gap needs to be precise.",
-            UsageExample: "field SlaLimit as duration default '72 hours'"
+            UsageExample: "field SlaLimit as duration default '72 hours'",
+            ContentValidation: DurationValidation
         ),
 
         TypeKind.Period => new(
@@ -441,7 +447,8 @@ public static class Types
             ImpliedModifiers: [ModifierKind.Notempty],
             DisplayName: "timezone",
             HoverDescription: "An IANA timezone identifier such as 'America/New_York'. Carries notempty implicitly — empty timezone is not meaningful.",
-            UsageExample: "field ClinicTimezone as timezone default 'America/New_York'"
+            UsageExample: "field ClinicTimezone as timezone default 'America/New_York'",
+            ContentValidation: TimezoneValidation
         ),
 
         TypeKind.ZonedDateTime => new(
@@ -461,7 +468,8 @@ public static class Types
             ],
             DisplayName: "zoned date-time",
             HoverDescription: "A date and time pinned to a specific timezone. Exposes .instant, .date, .time, and all calendar component accessors.",
-            UsageExample: "field IncidentContext as zoneddatetime"
+            UsageExample: "field IncidentContext as zoneddatetime",
+            ContentValidation: ZonedDateTimeValidation
         ),
 
         TypeKind.DateTime => new(
@@ -497,7 +505,8 @@ public static class Types
             ],
             DisplayName: "money",
             HoverDescription: "A monetary amount bound to a currency. Use 'in USD' to pin currency. Arithmetic enforces same-currency rules.",
-            UsageExample: "field TotalCost as money in 'USD'"
+            UsageExample: "field TotalCost as money in 'USD'",
+            ContentValidation: MoneyLiteralValidation
         ),
 
         TypeKind.Currency => new(
@@ -526,7 +535,8 @@ public static class Types
             ],
             DisplayName: "quantity",
             HoverDescription: "A measured amount bound to a unit of measure. Use 'in kg' to pin units or 'of length' to constrain by dimension. Arithmetic enforces same-dimension rules.",
-            UsageExample: "field Weight as quantity in 'kg'"
+            UsageExample: "field Weight as quantity in 'kg'",
+            ContentValidation: QuantityLiteralValidation
         ),
 
         TypeKind.UnitOfMeasure => new(
@@ -572,7 +582,8 @@ public static class Types
             ],
             DisplayName: "price",
             HoverDescription: "A monetary amount per unit — combines currency and dimension qualifiers. Use 'in USD/kg' for a specific price, or 'in USD of mass' for currency-pinned with dimension category.",
-            UsageExample: "field UnitPrice as price in 'USD/each'"
+            UsageExample: "field UnitPrice as price in 'USD/each'",
+            ContentValidation: PriceLiteralValidation
         ),
 
         TypeKind.ExchangeRate => new(
@@ -589,7 +600,8 @@ public static class Types
             ],
             DisplayName: "exchange rate",
             HoverDescription: "A currency exchange rate from one currency to another. Use 'in USD to EUR' to declare the conversion direction.",
-            UsageExample: "field FxRate as exchangerate in 'USD' to 'EUR'"
+            UsageExample: "field FxRate as exchangerate in 'USD' to 'EUR'",
+            ContentValidation: ExchangeRateLiteralValidation
         ),
 
         // ── Collection ─────────────────────────────────────────────────

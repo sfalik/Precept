@@ -91,13 +91,13 @@ public class TypeCheckerTypedConstantTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  2. ClosedSetValidation — UnitOfMeasure
+    //  2. UcumValidation — UnitOfMeasure
     // ════════════════════════════════════════════════════════════════════════
 
     [Theory]
     [InlineData("kg")]
-    [InlineData("miles")]
     [InlineData("each")]
+    [InlineData("mg/dL")]
     public void ValidUnitCode_ResolvedAsTypedConstant(string unit)
     {
         var ctx = MinimalContext();
