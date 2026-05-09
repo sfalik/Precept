@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Partial (`precept_ping`, `precept_compile` implemented; `precept_language`, `precept_inspect`, `precept_fire`, `precept_update` not yet implemented) |
+| Implementation state | Partial (`precept_ping`, `precept_compile`, `precept_language` implemented; `precept_inspect`, `precept_fire`, `precept_update` not yet implemented) |
 | Source | `tools/Precept.Mcp/` |
 | Upstream | Compiler (`Compilation`), Runtime (`Precept` + `Version`), Catalogs |
 | Downstream | AI agents, Copilot, developer workflow |
@@ -19,7 +19,7 @@ The MCP server exposes five tools that project Precept's compiler and runtime to
 | Tool | Purpose | Core API |
 |------|---------|----------|
 | `precept_ping` | Connectivity check | — |
-| `precept_language` | DSL vocabulary from catalogs | Reads 11 language-definition catalogs |
+| `precept_language` | DSL vocabulary from catalogs | Reads language + diagnostic catalogs directly |
 | `precept_compile(text)` | Parse/type-check/analyze | `Compiler.Compile` → `Compilation` |
 | `precept_inspect(text, state, data, args?)` | Read-only transition preview | `Version.InspectFire` + `Version.InspectUpdate` |
 | `precept_fire(text, state, event, data?, args?)` | Execute single event | `Precept.From` + `Version.Fire` |
@@ -182,187 +182,27 @@ JSON response to agent
 
 **Arguments:** None
 
-**Core API:** Direct read of 11 language-definition catalogs
+**Core API:** Direct read of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All`
 
 **Returns:** Complete DSL vocabulary in structured JSON:
 
 ```json
 {
-  "tokens": [
-    {
-      "kind": "Precept",
-      "text": "precept",
-      "categories": ["Declaration"],
-      "description": "Precept header declaration",
-      "textMateScope": "keyword.declaration.precept",
-      "semanticTokenType": "keyword"
-    },
-    // ... all 90+ tokens
-  ],
-  "types": [
-    {
-      "kind": "String",
-      "keyword": "string",
-      "description": "UTF-8 text",
-      "accessors": [
-        { "name": "length", "returnType": "Integer", "description": "Character count" }
-      ],
-      "widensTo": []
-    },
-    {
-      "kind": "Money",
-      "keyword": "money",
-      "description": "Monetary amount with currency",
-      "accessors": [
-        { "name": "amount", "returnType": "Decimal", "description": "Numeric amount" },
-        { "name": "currency", "returnType": "Currency", "description": "Currency code" }
-      ],
-      "qualifierShape": {
-        "axes": [{ "preposition": "in", "axis": "Currency" }]
-      },
-      "widensTo": []
-    },
-    // ... all types
-  ],
+  "tokens": [ ... ],
+  "types": [ ... ],
   "modifiers": {
-    "field": [
-      {
-        "kind": "Optional",
-        "keyword": "optional",
-        "description": "Field may be absent",
-        "isPresence": true,
-        "isAccessMode": false
-      },
-      {
-        "kind": "Nonnegative",
-        "keyword": "nonnegative",
-        "description": "Value >= 0",
-        "isPresence": false,
-        "isAccessMode": false,
-        "applicableTo": ["Integer", "Decimal", "Number", "Money", "Quantity", "Duration"]
-      },
-      // ... all field modifiers
-    ],
-    "state": [
-      {
-        "kind": "Initial",
-        "keyword": "initial",
-        "description": "Entry state for new entities"
-      },
-      {
-        "kind": "Terminal",
-        "keyword": "terminal",
-        "description": "No outgoing transitions allowed"
-      },
-      // ... all state modifiers
-    ],
-    "access": [
-      {
-        "kind": "Writable",
-        "keyword": "writable",
-        "description": "Field can be modified via Update",
-        "isPresent": true,
-        "isWritable": true
-      },
-      // ... all access modes
-    ],
-    "anchor": [
-      {
-        "kind": "Entry",
-        "keyword": "entry",
-        "description": "Constraint checked on state entry",
-        "appliesTo": "ensures"
-      },
-      // ... all anchors
-    ]
+    "field": [ ... ],
+    "state": [ ... ],
+    "event": [ ... ],
+    "access": [ ... ],
+    "anchor": [ ... ]
   },
-
-> **✅ Resolved in Source — ModifierMeta.ModifierCategory:** `Modifier.cs` already carries a `Category` property of type `ModifierCategory`. The grouping keys here should be derived from that catalog field rather than hardcoded. Update the MCP serialization to read `ModifierMeta.Category` and use its string representation as the grouping key.
-
-  "actions": [
-    {
-      "kind": "TransitionTo",
-      "keyword": "transition",
-      "description": "State machine transition",
-      "applicableTo": ["Event"],
-      "syntaxShape": "transition to <state>"
-    },
-    {
-      "kind": "Set",
-      "keyword": "set",
-      "description": "Field assignment",
-      "applicableTo": ["Event", "Edit"],
-      "syntaxShape": "set <field> to <expr>"
-    },
-    // ... all actions
-  ],
-
-> **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property of type `ActionSyntaxShape`. The MCP output should read this field from the catalog rather than hardcoding it.
-
-  "constructs": [
-    {
-      "kind": "PreceptDecl",
-      "leaderToken": "precept",
-      "description": "Top-level precept definition",
-      "slots": ["name", "body"]
-    },
-    {
-      "kind": "FieldDecl",
-      "leaderToken": "field",
-      "description": "Field declaration",
-      "slots": ["name", "type", "modifiers", "defaultValue"]
-    },
-    // ... all constructs
-  ],
-  "constraints": [
-    {
-      "kind": "Invariant",
-      "keyword": "rule",
-      "description": "Always-true assertion",
-      "scope": "definition"
-    },
-    {
-      "kind": "StateResident",
-      "keyword": "ensures",
-      "description": "State-anchored constraint",
-      "scope": "state",
-      "anchors": ["entry", "exit", "resident"]
-    },
-    // ... all constraint kinds
-  ],
-  "operators": [
-    {
-      "kind": "Plus",
-      "text": "+",
-      "arity": "Binary",
-      "precedence": 6,
-      "associativity": "Left",
-      "description": "Addition"
-    },
-    {
-      "kind": "And",
-      "text": "and",
-      "arity": "Binary",
-      "precedence": 3,
-      "associativity": "Left",
-      "description": "Logical conjunction"
-    },
-    // ... all operators
-  ],
-  "functions": [
-    {
-      "kind": "Abs",
-      "name": "abs",
-      "category": "Math",
-      "overloads": [
-        { "parameters": [{ "name": "value", "type": "Integer" }], "returnType": "Integer" },
-        { "parameters": [{ "name": "value", "type": "Decimal" }], "returnType": "Decimal" },
-        { "parameters": [{ "name": "value", "type": "Number" }], "returnType": "Number" }
-      ],
-      "description": "Absolute value"
-    },
-    // ... all functions
-  ],
+  "actions": [ ... ],
+  "constructs": [ ... ],
+  "constraints": [ ... ],
+  "operators": [ ... ],
+  "functions": [ ... ],
+  "diagnostics": [ ... ],
   "firePipeline": [
     "RowMatching",
     "GuardEvaluation",
@@ -375,7 +215,9 @@ JSON response to agent
 }
 ```
 
-**Catalog derivation:** The MCP tool reads `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, etc. No parallel vocabulary is maintained — the tool iterates catalog metadata directly. The `firePipeline` array is a static implementation note and is out of scope for catalog modeling (catalog-gap #25).
+**Behavior:** Read-only. No compilation occurs. The tool serializes catalog metadata directly, groups modifiers by modifier subtype (`field`, `state`, `event`, `access`, `anchor`), includes the diagnostic catalog for AI grounding, and exposes the static `firePipeline` execution order used by `precept_fire`.
+
+**Catalog derivation:** No parallel vocabulary is maintained. The tool iterates the catalogs named above in declaration order, so newly added catalog members flow into MCP output automatically.
 
 ---
 
@@ -972,7 +814,7 @@ This ensures the MCP protocol remains intact even when the underlying runtime ha
 
 ### Vocabulary Guarantee
 
-`precept_language` output exactly matches the 11 language-definition catalogs. Every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, `Operations.All`, `ExpressionForms.All`, and `ProofRequirements.All` appears in the output. No filtering, no omission.
+`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All` appears in the output. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
 
 ### JSON Stability
 
@@ -1118,10 +960,10 @@ This transparency helps agents predict and debug event execution.
 - `Precept.From`, `Precept.Restore` implementations
 
 **[OQ-2] `precept_language` catalog coverage:**
-Verify all 11 language-definition catalogs are serialized. Current expected list:
-- Tokens, Types, Functions, Operators, Operations
-- Modifiers (4 subtypes: Field, State, Access, Anchor)
-- Actions, Constructs, ExpressionForms, Constraints, ProofRequirements
+Implemented catalog surface:
+- Tokens, Types, Functions, Operators, Diagnostics
+- Modifiers (5 subtypes: Field, State, Event, Access, Anchor)
+- Actions, Constructs, Constraints
 
 **[OQ-3] FirePipeline array maintenance:**
 The `firePipeline` array in `precept_language` output must stay synchronized with actual pipeline stages as they are implemented. Consider deriving this from a catalog or pipeline metadata rather than a static array.
@@ -1210,7 +1052,7 @@ The MCP server trusts its caller. No API keys, no user identity, no permission c
 |------|---------|
 | `tools/Precept.Mcp/Program.cs` | MCP server bootstrap — hosting configuration |
 | `tools/Precept.Mcp/Tools/PingTool.cs` | `precept_ping` implementation |
-| `tools/Precept.Mcp/Tools/LanguageTool.cs` | `precept_language` implementation (planned) |
+| `tools/Precept.Mcp/Tools/LanguageTool.cs` | `precept_language` implementation |
 | `tools/Precept.Mcp/Tools/CompileTool.cs` | `precept_compile` implementation |
 | `tools/Precept.Mcp/Tools/InspectTool.cs` | `precept_inspect` implementation (planned) |
 | `tools/Precept.Mcp/Tools/FireTool.cs` | `precept_fire` implementation (planned) |
@@ -1218,3 +1060,5 @@ The MCP server trusts its caller. No API keys, no user identity, no permission c
 | `tools/scripts/start-precept-mcp.js` | Launch script for VS Code / Copilot CLI |
 | `.mcp.json` | Copilot CLI MCP server configuration |
 | `.vscode/mcp.json` | VS Code MCP server configuration |
+
+
