@@ -7,6 +7,14 @@ namespace Precept.Tests.Language.Time;
 public class TemporalUnitsTests
 {
     [Fact]
+    public void All_UsesCanonicalSingularKeys()
+    {
+        TemporalUnits.All.Should().ContainKeys("year", "month", "week", "day", "hour", "minute", "second");
+        TemporalUnits.All.Should().NotContainKey("years");
+        TemporalUnits.All["year"].Plural.Should().Be("years");
+    }
+
+    [Fact]
     public void AllEntries_ContainExpectedUnitWords()
     {
         TemporalUnits.TryGet("years", out var years).Should().BeTrue();

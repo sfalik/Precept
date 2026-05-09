@@ -28,7 +28,10 @@ public static class TemporalUnits
         new("second", "seconds", false, null, value => Duration.FromSeconds(value)),
     ];
 
-    private static readonly FrozenDictionary<string, TemporalUnitEntry> All =
+    public static FrozenDictionary<string, TemporalUnitEntry> All { get; } =
+        Entries.ToFrozenDictionary(entry => entry.Singular, StringComparer.OrdinalIgnoreCase);
+
+    private static readonly FrozenDictionary<string, TemporalUnitEntry> ByName =
         Entries
             .SelectMany(entry => entry.Names.Select(name => new KeyValuePair<string, TemporalUnitEntry>(name, entry)))
             .ToFrozenDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
@@ -36,5 +39,5 @@ public static class TemporalUnits
     public static IReadOnlyList<TemporalUnitEntry> AllEntries => Entries;
 
     public static bool TryGet(string unitName, out TemporalUnitEntry entry) =>
-        All.TryGetValue(unitName, out entry!);
+        ByName.TryGetValue(unitName, out entry!);
 }
