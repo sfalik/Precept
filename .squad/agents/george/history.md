@@ -20,6 +20,10 @@
 - `ParsedConstruct.LeadingTokenKind` is the minimal durable surface for recovering anchor keywords the parser consumed but downstream normalization still needs.
 - `count` is a type accessor on collection types, not a `FunctionKind`; guard extraction for `count(X) > 0` should match typed member access, not a synthetic function call.
 - `IsMessagePosition` now lives on both `TokenMeta` and `FunctionMeta`; generator/tooling consumers should read the catalog flag instead of maintaining their own token lists.
+- Typed-literal validation is now catalog-driven end to end: `TypeMeta.ContentValidation` is the registry, `TypedConstantValidation.Validate(...)` is the sole dispatcher, and domain-specific validators return `TypedConstantParseResult` instead of checker-local tuples.
+- `unitofmeasure` is no longer a mirrored closed set; it validates through the UCUM subsystem (`UcumParser`, `UcumAtomCatalog`, `UcumPrefixCatalog`) and returns structured parsed units that can be reused by future runtime measure work.
+- Temporal typed constants now share one canonical parser stack under `src/Precept/Language/Time/`; `TemporalParser` owns the formatted temporal forms, `TemporalQuantityParser` owns quantity phrases, and `TemporalValidator` bridges both into typed-constant validation.
+- External standards data belongs in embedded XML + lazy loaders, not in Precept catalogs: ISO 4217 and UCUM are authoritative reference data consumed by validators, while `TypeMeta` remains the language-owned metadata boundary.
 
 ### 2026-05-09T11:33:49Z — Commit batching: catalog DU + pipeline + analyzers
 
@@ -62,6 +66,11 @@ Committed 6 logical groups from a large multi-session working tree:
 ### 2026-05-08T23:45:00Z — ProofEngine Phase 2 closeout recorded
 - George landed the full ProofEngine body, then closed the last post-commit failures; proof strategies, forwarding-fact handling, and bounded constant folding are now operational.
 - Branch validation stabilized with green builds and only the previously-known non-runtime test gaps remaining at that time.
+
+### 2026-05-09T17:41:32.9988470Z — Typed-literal system plan completed
+- George completed all 12 slices of `typed-literal-system-plan`: embedded ISO/UCUM sources, XML-backed currency + UCUM loaders, temporal and UCUM parsers, typed-literal validator framework, `TypeMeta.ContentValidation` wiring, TypeChecker migration, canonical doc sync, and retirement of the superseded working docs.
+- Validation closed green at `dotnet build src\\Precept\\Precept.csproj` plus `dotnet test test\\Precept.Tests\\Precept.Tests.csproj` with 3721 passing tests after the TypeChecker migrated fully to `TypedConstantValidation.Validate(...)`.
+- Durable follow-up boundary: runtime measure types in `src/Precept/Runtime/Measures/` remain explicit stubs; compile-time parsing/validation is complete, while runtime arithmetic integration is future work.
 
 ## Historical Summary
 
