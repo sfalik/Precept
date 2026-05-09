@@ -2,7 +2,13 @@
 
 - Owns the squad's durable record: `.squad/decisions.md`, `.squad/decisions-archive.md`, `.squad/orchestration-log/`, `.squad/log/`, agent histories, and PR-body stewardship.
 - Historical summary: closed the major language-research, vision/spec, PRECEPT0018, and parser-gap bookkeeping batches while treating inbox merge, archive, and checkbox maintenance as first-class deliverables.
-- Summarization rule: when detailed batch history outgrows the working-memory threshold, collapse old detail into Core Context and keep only live batch state in `## Recent Updates`.
+- Summarization rule: when detailed batch history outgrows the working-memory threshold, collapse old detail into Core Context and keep only live batch state in `## Recent Updates
+
+### 2026-05-09T14:04:05Z — LanguageTool closeout recorded
+- Pre-check measured `decisions.md` at 175232 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran before merge.
+- Merged the Newman completion note plus Frank's timing verdict into one canonical `precept_language` decision entry, cleared the inbox, and wrote the Newman/Soup-Nazi orchestration records plus the session log.
+- Health report: decisions/history follow-up captured in the batch log; no history file crossed the 15 KB summarization gate after propagation.
+`.
 - Verification rule: if a requested inbox pass is already reflected in canonical records, log the verification/no-op rather than rewriting decisions.
 
 ## Learnings
@@ -14,6 +20,11 @@
 - Oversized histories must be summarized back into durable context instead of carrying every batch forward verbatim.
 
 ## Recent Updates
+
+### 2026-05-09T14:04:05Z — LanguageTool closeout recorded
+- Pre-check measured `decisions.md` at 175232 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran before merge and found 0 active entries older than 2026-05-02T14:04:05Z.
+- Merged the Newman completion note plus Frank's timing verdict into one canonical `precept_language` decision entry, cleared the inbox, and wrote the Newman/Soup-Nazi orchestration records plus the session log.
+- Health report: `decisions.md` 175232B -> 175923B; `decisions-archive.md` stayed 809100B; history files summarized = 0.
 
 ### 2026-05-08T22:36:50Z — Message-position gap batch recorded
 - Pre-check measured `decisions.md` at 929818 bytes with 2 inbox files, so the hard-gate archive moved all dated pre-2026-05-08 top-level entries into `decisions-archive.md` before merge.

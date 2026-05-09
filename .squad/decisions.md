@@ -12,6 +12,20 @@
 
 ---
 
+### 2026-05-09T14:04:05Z: `precept_language` ships now as the canonical MCP language-vocabulary baseline
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `newman-language-tool-done.md`, `frank-language-tool-timing.md`.
+
+- Newman implemented `LanguageTool.cs`, added 12 `LanguageToolTests.cs` coverage points, synced `docs/tooling/mcp.md`, and handed off green validation at 12 MCP tests plus 3646 core tests passing on commit `bd4e6e30`.
+- Durable contract baseline: ship `precept_language` now off the current catalog-backed language/diagnostic surface (`tokens`, `types`, grouped `modifiers`, `actions`, `constructs`, `constraints`, `operators`, `functions`, `diagnostics`, and static `firePipeline`) instead of holding for builder/evaluator work.
+- The older 11-catalog draft is superseded by the implemented/docs-synced surface; future evaluator metadata stays additive unless it changes the agent-facing vocabulary itself.
+
+---
+
 ### 2026-05-08T05:27:37Z: Grammar generator design doc locks the generator contract and exposes the unreachable message-string path
 
 **By:** Scribe
@@ -25,7 +39,6 @@
 - Catalog gap locked: add `TokenMeta.IsMessagePosition` on `Because` and `Reject` so the generator can derive the gold message-string rule catalog-first before inserting `#messageStrings` ahead of `#strings`.
 
 ---
-
 ### 2026-05-08T05:27:37Z: Grammar generator implementation closes the spec must-fix inventory while leaving the catalog-blocked message-position gap explicit
 
 **By:** Scribe
@@ -39,7 +52,6 @@
 - Validation at handoff stayed clean: the generator build passed, the emitted grammar JSON was valid, and promotion to the canonical grammar remains gated on full parity plus the message-position catalog gap.
 
 ---
-
 ### 2026-05-08T04:55:35Z: ProofEngine implementation is blocked on unresolved spec and contract gaps
 
 **By:** Scribe
@@ -53,7 +65,6 @@
 - Durable implementation gate: close the discharge-model, catalog-shape, and output-type mismatches before any ProofEngine slice starts; source-alignment gaps like `SemanticIndex.AllTypedExpressions` and the `ConstraintIdentity` shapes remain follow-up work.
 
 ---
-
 ### 2026-05-08T04:55:17Z: TextMate grammar replacement must be catalog-complete and parity-or-better before the generator becomes canonical
 
 **By:** Scribe
@@ -67,7 +78,6 @@
 - Resolution baseline: catalog `TextMateScope` assignments win over conflicting brand-doc keyword lists, and the generator must reach hand-authored parity-or-better before it can replace the shipped grammar.
 
 ---
-
 ### 2026-05-08T00:36:25Z: Full GraphAnalyzer advisory inventory reconstructed and locked for durable follow-up tracking
 
 **By:** Scribe
@@ -81,7 +91,6 @@
 - Gap1 remains the deliberate future-touch item: GraphAnalyzer still must consume `EventModifierMeta.RequiredAnalysis` when richer event modifiers ship.
 
 ---
-
 ### 2026-05-08T00:49:00Z: GraphAnalyzer advisory fix batch closed on-branch except the deferred event-modifier gap
 
 **By:** Scribe
@@ -95,7 +104,6 @@
 - Validation at handoff closed green at 3385/3385 `Precept.Tests` passing.
 
 ---
-
 ### 2026-05-08T00:22:50Z: R4 hard gate expanded to every remaining conditional GraphAnalyzer item
 
 **By:** Shane (via Copilot)
@@ -108,7 +116,6 @@
 - Scribe merged the directive immediately without waiting for the still-running `soup-nazi-8` batch so the team ledger reflects the hard gate now, not after the remaining follow-up lands.
 
 ---
-
 ### 2026-05-08T04:26:28Z: Exhaustive GraphAnalyzer review approves the current implementation and narrows the remaining follow-up to future event-modifier work
 
 **By:** Scribe
@@ -122,7 +129,6 @@
 - Durable future-touch follow-up: when richer event modifiers land, GraphAnalyzer must consume `EventModifierMeta.RequiredAnalysis`; the next touch is also the right time to consider an event-per-state index for the O(events × edges) scans and `RelatedSpans` on structural-violation diagnostics.
 
 ---
-
 ### 2026-05-08T04:26:28Z: GraphAnalyzer structural blockers and both R4 test batches are durably recorded
 
 **By:** Scribe
@@ -139,7 +145,6 @@
 - The locked 2026-05-08 directive is therefore preserved together with the evidence that its remaining conditional GraphAnalyzer test items have now landed in the ledger.
 
 ---
-
 ### 2026-05-07: R4 gate stays separate from the comprehensive audit, and the grammar generator cannot replace the hand-authored grammar until parity exists
 
 **By:** Shane
@@ -153,7 +158,6 @@
 - Durable implication: the catalog-driven architecture still demands a single generated source of truth, but the current generator output remains scaffold-quality and must not overwrite production grammar assets yet.
 
 ---
-
 ### 2026-05-07T23:22:15Z: TypeChecker Slice 1 test inventory recorded ahead of symbol population
 
 **By:** Scribe
@@ -167,7 +171,6 @@
 - Durable gate: treat the test matrix as ready for R1 once George's Slice 1 commit arrives; `LogBy` / `QueueBy` key-type coverage remains explicitly deferred beyond this batch.
 
 ---
-
 ### 2026-05-07T23:22:15Z: TypeChecker Slice 0 R0 closed after `TransitionRowOutcome` rename
 
 **By:** Scribe
@@ -181,7 +184,6 @@
 - George resolved B1 in `350f386` by renaming `TypedOutcomeKind` to `TransitionRowOutcome` in `SemanticIndex.cs`; all other D# decisions remained compliant and the 2974-test branch baseline stayed intact.
 
 ---
-
 ### 2026-05-08: Parser remediation design decisions Q5–Q8 locked (OutcomesCatalog, NameBinder, quantifier scoping, forward references)
 
 **By:** Coordinator (Shane decisions)
@@ -197,7 +199,6 @@
 - **Q8 — NameBinder diagnostic code range:** Implementation detail; the implementer assigns the next available codes from `DiagnosticCatalog.cs` at implementation time. Reserve codes for: `DuplicateFieldName`, `DuplicateStateName`, `DuplicateEventName`, `UndeclaredField`, `UndeclaredState`, `UndeclaredEvent`, `UndeclaredArg`, `BindingShadowsField`.
 
 ---
-
 ### 2026-05-07T22:51:59Z: H1 housekeeping closeout recorded; Frank C2 catalog doc sync deduplicated into the same batch
 
 **By:** Scribe
@@ -211,7 +212,6 @@
 - Validation at handoff: 2974 tests passing; no history files crossed the 15 KB summarization gate in this pass.
 
 ---
-
 ### 2026-05-07: OQ1 anti-mirroring enforcement locks to a Roslyn analyzer
 
 **By:** Shane Falik (via Copilot)
@@ -225,7 +225,6 @@
 - Tradeoff accepted: analyzer maintenance is heavier than a reflection/xUnit guard, but the guarantee is automatic and structurally stronger.
 
 ---
-
 ### 2026-05-07: OQ2 ContentValidation DU must land before Slice 4
 
 **By:** Shane Falik (via Copilot)
@@ -239,7 +238,6 @@
 - Durable rule: avoid knowingly shipping short-lived metadata debt when the final catalog shape is already designed and small enough to land cleanly first.
 
 ---
-
 ### 2026-05-07: OQ3 CI enforcement remains TypeChecker logic until the rule surface grows
 
 **By:** Shane Falik (via Copilot)
@@ -253,7 +251,6 @@
 - Revisit cataloging only if the rule surface expands again (explicitly, if a sixth CI rule appears).
 
 ---
-
 ### 2026-05-07: Diagnostic multi-location payload lands as `RelatedSpans` on `Diagnostic`
 
 **By:** George
@@ -268,7 +265,6 @@
 - Validation closed green for `src\Precept\Precept.csproj` plus `test\Precept.Tests\Precept.Tests.csproj` (2931 tests at handoff).
 
 ---
-
 ### 2026-05-07: Parser metadata promotion lands `ExpressionFormMeta.BindingPower` and `ConstructSlot.TerminationTokens`
 
 **By:** George
@@ -283,7 +279,6 @@
 - Regression coverage plus `docs/language/catalog-system.md` now document both metadata additions; validation closed green at 2949 tests.
 
 ---
-
 ### 2026-05-07: OutcomesCatalog coverage closes and missing required outcomes now emit `ExpectedOutcome`
 
 **By:** Soup-Nazi
@@ -298,7 +293,6 @@
 - The manifest baseline supersedes the inbox note about excluded files: coordinator confirmed `ExpressionFormCatalogTests.cs` and `ParserExpressionTests.cs` both passed inside the 2949-test run.
 
 ---
-
 ### 2026-05-07T08:40:33Z: BackArrow (`<-`) syntax batch closed; parser exhaustiveness stays on `ParserState`
 
 **By:** Scribe
@@ -318,7 +312,6 @@
 - PRECEPT0019 scope is now explicitly narrow: `ExpressionFormKind` exhaustiveness belongs on `ParserState` and the expression-form handlers it owns, not as a wider parser-wide promotion.
 
 ---
-
 ### 2026-05-07T08:05:00Z: ParsedOutcome / ParsedExpression parser refactor recorded as the durable parse-time payload baseline
 
 **By:** Scribe
@@ -336,7 +329,6 @@
 - George's GAP-062 investigation remains preserved as the catalog-pressure signal that outcome syntax needed a first-class lane instead of ad hoc per-member parser branching.
 
 ---
-
 ### 2026-05-07T08:05:00Z: Catalog-driven parser slices 1-4 recorded with review corrections and status-quo rulings
 
 **By:** Scribe
@@ -354,7 +346,6 @@
 - Carry-forward constraint: parser helpers may dispatch on metadata shape, but they should not reintroduce duplicated per-member language knowledge outside the catalogs.
 
 ---
-
 ### 2026-05-07T01:26:35Z: Implementation-note discipline locked for active parser work
 
 **By:** Scribe
@@ -368,7 +359,6 @@
 - Treat George, Frank, and Soup-Nazi note-taking as an execution requirement, not optional cleanup, so end-of-batch review can inspect the real reasoning trail.
 
 ---
-
 ### 2026-05-07T04:02:01Z: Parser prerequisite decisions locked; `peek(2)` kept as a structural invariant
 
 **By:** Scribe
@@ -390,7 +380,6 @@
 - George is unblocked to implement `ParsedExpression.cs` (B1) and the paired `AccessModeSlot` fix against the approved slot-value contracts and invariant disambiguation rule.
 
 ---
-
 ### 2026-05-07T03:00:00Z: Wave 3 Round 2 canonical doc sweep recorded
 
 **By:** Scribe
@@ -414,7 +403,6 @@
 - Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
 
 ---
-
 ### 2026-05-07T02:24:36Z: Wave 5 archive and cleanup recorded
 
 **By:** Scribe
@@ -436,7 +424,6 @@
 - Frank's cleanup landed in commit `421605a`.
 
 ---
-
 ### 2026-05-07T02:20:00Z: Wave 3 Round 1 canonical doc sweep recorded
 
 **By:** Scribe
@@ -454,7 +441,6 @@
 - Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
 
 ---
-
 ### 2026-05-07T02:13:50Z: Wave 4 final consistency pass recorded; 6 gaps closed and terminology sweep completed
 
 **By:** Scribe
@@ -478,7 +464,6 @@
 - Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
 
 ---
-
 ### 2026-05-07T01:26:52Z: Wave 2 cross-cutting decisions all closed; Wave 1 checkbox drift corrected
 
 **By:** Scribe
@@ -496,7 +481,6 @@
 - Durable architecture takeaways: `GraphState` stays a derived-facts output record, `SlotContext` and `ConstructSlotKind` stay distinct, catalog metadata owns per-member language knowledge, and default-valued `readonly record struct` additions remain backward-compatible.
 
 ---
-
 ### 2026-05-06T10:41:33Z: Event-interaction UX baseline established under current-architecture rules
 
 **By:** Scribe
@@ -514,7 +498,6 @@
 - Same-day review follow-through superseded the original inline-expansion and five-state assumptions; the corrected durable state is captured by the later 18:25, 18:41, and 19:11 entries.
 
 ---
-
 ### 2026-05-06T18:25:02Z: Event-interaction personas, surface model, and create/edit/fire mental model corrected
 
 **By:** Scribe
@@ -536,7 +519,6 @@
 - `InspectUpdate` must return the hypothetical post-patch access modes on its existing response so conditional field unlock UX stays on one runtime surface.
 
 ---
-
 ### 2026-05-06T18:41:27Z: Event card taxonomy locks to four visible states and dialog-based arg firing
 
 **By:** Scribe
@@ -558,7 +540,6 @@
 - Frank and George's review pass is preserved as a durable warning that proposal-only inspection fields and names must be called out as CC#8 dependencies until the implementation ships.
 
 ---
-
 ### 2026-05-06T19:11:15Z: CC#8 EventInspection shape resolved; `ArgErrorKind` rejected and `RowEffect` DU adopted
 
 **By:** Scribe
@@ -578,7 +559,6 @@
 - `event-inspection-proposal.md` was updated, CC#8 is resolved in the cross-cutting register, and CC#12 is now unblocked.
 
 ---
-
 ### 2026-05-06T23:45:58Z: Event-interaction UXR closes OQ-1, OQ-3, and OQ-5; rule-failure descriptions are universal
 
 **By:** Scribe
@@ -600,7 +580,6 @@
 - Elaine-33's API accuracy pass is folded forward: `InspectUpdate` references `ConstraintResult`, fire-outcome prose uses `EventOutcome.ConstraintsFailed`, `TransitionInspection` references align to the `RowEffect` DU, and `datetime` remains a valid Precept type.
 
 ---
-
 ### 2026-05-06T23:51:33Z: Event-interaction UXR closes OQ-8 and OQ-9; document is now complete
 
 **By:** Scribe
@@ -620,7 +599,6 @@
 - With OQ-6 already closed in the prior merged entry, all event-interaction UXR open questions are now resolved and `docs/working/elaine-ux-requirements-event-interaction.md` is complete.
 
 ---
-
 ### 2026-05-06: Wave 1 cross-cutting facilitation started with CC#7 first
 
 **By:** Frank
@@ -636,7 +614,6 @@
 - Once Shane rules on CC#7, the CC#9 follow-through and the catalog-system example cleanup are mechanically unblocked.
 
 ---
-
 ### 2026-05-05T15:32:50Z: Value-types investigation reconciled to authoritative docs; `DateRange` deferred and `date` stays `NodaTime.LocalDate`
 
 **By:** Frank
@@ -654,7 +631,6 @@
 - All remaining sections were verified as consistent; the only follow-up tensions left for Shane are the DX-layer well-known-constants surface and the authoritative `currency` accessor doc lag.
 
 ---
-
 ### 2026-05-04T17:00:09Z: Business value type coverage narrowed: Price stays semantic-only; ExchangeRate, Percentage, and DateRange advance as candidates
 
 **By:** Frank
@@ -672,7 +648,6 @@
 - The investigation scope should expand from unit types to the broader Precept value-type surface; six open questions remain for Shane on built-in status, invariants, interval semantics, and a future `DateTimeRange` companion.
 
 ---
-
 ### 2026-05-04T05:45:56Z: Audit-gap P2 clarifications recorded; compiler/runtime innovation callouts confirmed clean
 
 **By:** Scribe
@@ -688,7 +663,6 @@
 - `docs/compiler-and-runtime-design.md` required no edit for Item 14; all `Precept Innovations` callouts already match the single-interpreter, catalog-dispatch architecture.
 
 ---
-
 ### 2026-05-04T05:45:56Z: Decision ledger summary created as a non-canonical navigation aid
 
 **By:** Scribe
@@ -702,7 +676,6 @@
 - The durable source of truth remains `.squad/decisions.md`; the summary is reference-only and does not supersede the ledger.
 
 ---
-
 ### 2026-05-04T05:44:10Z: `ConstraintViolation` public contract promoted to the 5-field rich shape
 
 **By:** Scribe
@@ -718,7 +691,6 @@
 - `docs/runtime/runtime-api.md` now documents the public 5-field shape, and the evaluator docs frame the remaining work as implementation follow-through rather than as an unresolved contract question.
 
 ---
-
 ### 2026-05-04T05:31:45Z: Evaluator pseudocode and §8 integration contract aligned to `FiredArgs` / `PreceptValue` lanes
 
 **By:** Scribe
@@ -734,7 +706,6 @@
 - §8 now documents the durable dual-lane public contract: both JSON ingress and CLR-builder ingress materialize `FiredArgs`, and the evaluator never consumes raw dictionaries or raw JSON.
 
 ---
-
 ### 2026-05-04T01:45:56Z: ConstructManifest name confirmed as the working-doc parser artifact label
 
 **By:** Scribe
@@ -748,7 +719,6 @@
 - Scope remains documentation only; any source-code rename is a separate implementation task.
 
 ---
-
 ### 2026-05-04T01:08:14Z: Dual-interpreter model rejected; trace stays inside the single A+G interpreter
 
 **By:** Shane (via Copilot)
@@ -764,7 +734,6 @@
 - Trace record shape and LS/MCP consumption remain open implementation seams, but the architecture no longer permits a second semantic engine.
 
 ---
-
 ### 2026-05-04T04:36:09Z: Deep content audit filled seven specificity gaps in canonical docs
 
 **By:** Scribe
@@ -784,7 +753,6 @@
 - Open design questions stay explicit in the canonical docs: `PreceptValue` FieldOffset layout, `ArgDescriptor.SlotIndex`, and the executor registration / assembly mechanism.
 
 ---
-
 ### 2026-05-04T04:30:00Z: Full CC#25 / CC#2 decisions audit closed the remaining five canonical doc gaps
 
 **By:** Scribe
@@ -802,7 +770,6 @@
 - Open flags stay explicit: `TypeRuntime<T>` documentation reconciliation and the non-expression `SlotValue` shape conflicts still need owner direction.
 
 ---
-
 ### 2026-05-04T04:02:05Z: Catalog gap register migration completed and archived
 
 **By:** Scribe
@@ -818,7 +785,6 @@
 - The working register was retired: `docs/working/catalog-gap-register.md` now lives at `docs/working/Archived/catalog-gap-register-migrated.md`, preserving the original content plus a migration notice.
 
 ---
-
 ### 2026-05-04T03:26:10Z: CC#25 Q7 acceptance revision locked
 
 **By:** Scribe
@@ -840,7 +806,6 @@
 - This supersedes the earlier provisional note that `IReadOnlyDictionary<string, object?>` would survive as a convenience extension lane.
 
 ---
-
 ### 2026-05-04T03:26:10Z: CC#25 Q7 dictionary convenience lane closed
 
 **By:** Shane (via Copilot)
@@ -854,7 +819,6 @@
 - Wire-format callers use `JsonElement`; in-process typed callers use the fluent builders. No third ingress lane remains.
 
 ---
-
 ### 2026-05-03: CC#25 Q2 — Event Args + JSON-First Public API (LOCKED)
 
 **By:** Scribe
@@ -890,7 +854,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 **Accepted by:** Shane Falik
 
 ---
-
 ### 2026-05-04T00:56:54Z: CC#25 construct-slot vs field-slot vocabulary boundary locked
 
 **By:** Scribe
@@ -906,7 +869,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable wording rule: when discussion crosses parser and runtime layers, explicitly say **construct slots** vs **field slots** because the two concepts do not share lifecycle, representation, or owner.
 
 ---
-
 ### 2026-05-04T00:56:54Z: CC#25 event args convert to `PreceptValue` at the Fire boundary
 
 **By:** Scribe
@@ -922,7 +884,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The remaining open seam is allocation strategy for that arg slot array; it is not a design question about whether args become `PreceptValue`.
 
 ---
-
 ### 2026-05-03T23:00:32Z: CC#25 TypeRuntimeMeta JSON flow locks to symmetric `ReadJson`/`WriteJson` API
 
 **By:** Scribe
@@ -938,7 +899,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Ownership rules are durable: the call site advances to the value token and handles `null`, collection runtimes own structural array/object loops, and the active `TypeRuntimeMeta` surface is `ReadJson`, `WriteJson`, `ParseString`, `FormatString`, `BinaryExecutors`, and `UnaryExecutors`, with `ExtractValue` / `StoreValue` / `ParseValue` excluded from Fire, Inspect, and Update hot paths.
 
 ---
-
 ### 2026-05-03T22:22:27Z: CC#25 runtime baseline is `PreceptValue` plus catalog-owned delegate dispatch
 
 **By:** Scribe
@@ -956,7 +916,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Same-process deployment matters: catalog delegate arrays are JIT-warm and fixed for the process lifetime, so there is no plugin-style indirection penalty that would justify reopening dispatch around slower but more complex alternatives.
 
 ---
-
 ### 2026-05-03T22:22:27Z: CC#25 TypeBuilder-generated CLR types are rejected for the SaaS runtime baseline
 
 **By:** Scribe
@@ -974,7 +933,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable boundary: do not treat TypeBuilder or build-time codegen as the implicit v2 path unless the deployment model or inspectability requirement changes first.
 
 ---
-
 ### 2026-05-03T22:22:27Z: CC#25 type-per-lane storage loses to unified `PreceptValue`
 
 **By:** Scribe
@@ -990,7 +948,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The NodaTime/date-time correction changes details but not the verdict: the lane split still adds routing complexity for no meaningful reduction in cross-lane operations.
 
 ---
-
 ### 2026-05-03T22:22:27Z: CC#25 interactive tooling keeps traced tree-walk evaluation while production stays typed-opcode based
 
 **By:** Scribe
@@ -1008,7 +965,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Good ideas harvested from the rejected variants stay additive: explicit TypeKind→CLR mapping metadata and string-stack / JSON-friendly techniques remain valid **only as inspiration, not as a separate interpreter path**.
 
 ---
-
 ### 2026-05-03T22:22:27Z: CC#25 extends the Types catalog with owned JSON serialization delegates
 
 **By:** Scribe
@@ -1024,7 +980,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable architecture rule: persistence behavior belongs on catalog metadata; do not reintroduce per-`TypeKind` consumer switches in serializer code.
 
 ---
-
 ### 2026-05-03T22:22:27Z: CC#25 changes runtime storage and literal loading, not the compiler pipeline shape
 
 **By:** Scribe
@@ -1040,7 +995,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable boundary: execution plans keep serializable catalog indices and never embed delegate instances.
 
 ---
-
 ### 2026-05-03T22:22:27Z: CC#25 Fire-call lifecycle is now quantified as the A+G implementation baseline
 
 **By:** Scribe
@@ -1056,7 +1010,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The walkthrough also locks the next implementation questions to six concrete seams: slot-array ownership transfer, eval-stack allocation strategy, JSON ingress/egress ownership, event-args representation, trace-path data structures, and multi-row working-copy pooling.
 
 ---
-
 ### 2026-05-03T14:59:24Z: Per-stage pipeline topology boxes stay ASCII-safe in compiler-and-runtime docs
 
 **By:** Scribe
@@ -1070,7 +1023,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable diagram rule: when box geometry depends on character columns, prefer ASCII arrowheads over ambiguous-width Unicode glyphs even if the Unicode form looks nicer in rich editors.
 
 ---
-
 ### 2026-05-03T14:59:24Z: ConstructManifest cleanup closed both tree-variable drift and stale doc type names
 
 **By:** Scribe
@@ -1086,7 +1038,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The requested docs (`docs/compiler/type-checker.md`, `docs/compiler/README.md`) plus adjacent active surfaces were swept clean, and the earlier doc-follow-up from the variable-rename pass is no longer an open item for that targeted set.
 
 ---
-
 ### 2026-05-03T14:59:24Z: EnsureClause reason text stays in its own BecauseClause slot
 
 **By:** Scribe
@@ -1102,7 +1053,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable modeling rule: when ensure syntax carries explanatory reason text, that reason is represented by its own named slot.
 
 ---
-
 ### 2026-05-03T14:59:24Z: Event modifiers remain individually slotted as InitialMarker
 
 **By:** Scribe
@@ -1118,7 +1068,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable catalog rule: only group event modifiers behind a collective slot when multiple real event-modifier members exist and share metadata-driven behavior.
 
 ---
-
 ### 2026-05-03T14:37:24Z: Grammar anatomy section stays representative and now covers the missing slot/routing archetypes
 
 **By:** Scribe
@@ -1134,7 +1083,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Durable framing rule: describe §3 as coverage of distinct slot/routing archetypes.
 
 ---
-
 ### 2026-05-03T14:18:15Z: SyntaxTree rename target preference locked to ConstructManifest
 
 **By:** Scribe
@@ -1150,7 +1098,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `ParsedSource` remains recorded as the superseded advisory alternative rather than the current preferred target.
 
 ---
-
 ### 2026-05-03T14:18:15Z: Compiler overview confirmation notes deduplicated into existing sync decisions
 
 **By:** Scribe
@@ -1166,7 +1113,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - No new architecture divergence was introduced beyond the already-recorded follow-up: the grammar generator remains future-tense, and the separate “Precept Innovations” callout wording cleanup is still outstanding.
 
 ---
-
 ### 2026-05-03T14:02:40Z: Grammar design reference established as the canonical language-design guide
 
 **By:** Scribe
@@ -1182,7 +1128,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Presentation rule: syntax-rich grammar references should prefer ASCII hierarchy/anatomy diagrams over Mermaid-style node graphs.
 
 ---
-
 ### 2026-05-03T14:02:40Z: Catalog-driven thesis deviations remain explicit tooling gaps only
 
 **By:** Scribe
@@ -1198,7 +1143,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Carry-forward follow-up: modifier grouping in MCP should derive from metadata shape instead of hardcoded grouping keys, and the grammar generator remains the highest-leverage cleanup.
 
 ---
-
 ### 2026-05-03T14:02:40Z: compiler-and-runtime overview synced to the canonical stage docs
 
 **By:** Scribe
@@ -1214,7 +1158,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Open questions are inherited rather than silently resolved here, including the expression-tree shape and the remaining SlotValue/catalog reconciliation items.
 
 ---
-
 ### 2026-05-03T14:02:40Z: Catalog-first wording corrected in compiler-and-runtime-design.md
 
 **By:** Scribe
@@ -1230,7 +1173,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Explicit follow-up remains open: the “Precept Innovations” callout box in the same document still carries similar stale wording and needs a separate cleanup pass.
 
 ---
-
 ### 2026-05-04T15:15:33Z: Philosophy v6 locked with prevention framing and developer-commitment POV
 
 **By:** Scribe
@@ -1248,7 +1190,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Review status is durably recorded: Frank, Steinbrenner, and Peterman all approved Elaine v4 with notes, Elaine-24 performed the final POV shift in v6, and Elaine-25 applied the locked two-bullet edit to docs/philosophy.md.
 
 ---
-
 ### 2026-05-04T15:32:34Z: Runtime API public-surface mini-spec OQs 1-5 resolved; UCUM quantity and lazy collection surfaces selected
 
 **By:** Scribe
@@ -1266,7 +1207,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - OQ-5 collection surface adopts the lazy adapter shape: `PreceptList<T> : IReadOnlyList<T>`, projecting from internal `PreceptValue[]` on demand with structural immutability and no read-path allocation.
 
 ---
-
 ### 2026-05-04T16:51:56Z: QuantityValue hotpath evaluation confirms `readonly record struct`
 
 **By:** Scribe
@@ -1282,7 +1222,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The dual-shape model is explicitly confirmed: `QuantityValue` remains a `readonly record struct` for API-boundary materialization, while `Unit` remains an interned `sealed class` entity and internal slot storage continues to belong to `PreceptValue`.
 
 ---
-
 ### 2026-05-04T23:22Z: `UnitOfMeasureCode` and `DimensionCode` CLR identity-type designs
 
 **By:** Frank
@@ -1302,7 +1241,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The governing principle: expose the catalog entity at the API boundary only when all its properties are consumer-facing; use a proxy struct when the entity carries evaluator-internal metadata (tiers, conversion factors, SI exponent vectors).
 
 ---
-
 ### 2026-05-04T23:31Z: API boundary consistency — `Currency` vs. `UnitOfMeasure`/`MeasureDimension` shapes justified
 
 **By:** Frank
@@ -1322,7 +1260,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Governing principle: *expose the catalog entity at the API boundary only when all its properties are consumer-facing; use a proxy struct otherwise.*
 
 ---
-
 ### 2026-05-04T23:44Z: `Precept.Types` — separate type library assembly decision
 
 **By:** Frank
@@ -1342,7 +1279,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The NodaTime analogy taken seriously implies a separate package, not just separate files.
 
 ---
-
 ### 2026-05-04T23:58Z: Computation locality — Option A analysis (superseded by frank-evaluator-vs-clr-computation)
 
 **By:** Frank
@@ -1360,7 +1296,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - **This analysis was superseded.** The evaluator-only computation model (Option B) was accepted. CLR types are now pure data records; computation lives in named executor modules registered on `TypeRuntimeMeta`.
 
 ---
-
 ### 2026-05-05T00:14Z: Operator overload surface analysis for business-domain types
 
 **By:** Frank
@@ -1380,7 +1315,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - **This analysis was superseded by Option B.** Under the evaluator-only model, CLR types carry no operators; all arithmetic is in named executor modules. Operator overloads on `Precept.Types` types were explicitly not adopted.
 
 ---
-
 ### 2026-05-05T00:32Z: LOCKED — Evaluator-only computation (Option B); CLR types are pure data records
 
 **By:** Frank
@@ -1406,7 +1340,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Open items: OQ-DISP-1 (Runtime-layer aggregation class name), OQ-DISP-2 (update evaluator.md dispatch code to use qualified name), OQ-DISP-3 (update catalog-system.md open question).
 
 ---
-
 ### 2026-05-05T00:37Z: User directive — `Code` suffix on CLR identity type names disliked
 
 **By:** Shane (via Copilot)
@@ -1418,7 +1351,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `UnitOfMeasureCode` and `DimensionCode` should not carry a `Code` suffix. User preference captured for team memory and naming decisions.
 
 ---
-
 ### 2026-05-05T00:39Z: Rename recommendations — `Code` suffix removal analysis
 
 **By:** Frank
@@ -1436,7 +1368,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `CurrencyCode` is not relevant here; the accepted direction already uses `Currency` (sealed class).
 
 ---
-
 ### 2026-05-05T01:00Z: User directive — `DimensionCode` property named `MeasureDimension`
 
 **By:** Shane (via Copilot)
@@ -1450,7 +1381,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Rationale: `Dimension` is already a first-class Precept language type (`TypeKind.Dimension`, keyword `dimension`). Using it as a property name creates a scope collision. `MeasureDimension` is distinct, unambiguous, and future-proof against a planned algebraic `Dimension` type for dimensional analysis.
 
 ---
-
 ### 2026-05-05T01:13Z: User directive — HOLD on inbox merge until CLR type design finalized (SUPERSEDED)
 
 **By:** Shane (via Copilot)
@@ -1464,7 +1394,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - This hold has been lifted by the current batch spawn manifest, which explicitly instructs the inbox merge. Recording the hold for historical completeness.
 
 ---
-
 ### 2026-05-05T01:15Z: Executor delegates do not belong on `OperationMeta` records
 
 **By:** Frank
@@ -1484,7 +1413,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Named executor modules (`MoneyOperations`, `QuantityOperations`, etc.) in `src/Precept/Runtime/Operations/` are independently testable, named, and debuggable without catalog infrastructure.
 
 ---
-
 ### 2026-05-05T01:27Z: LOCKED — CC#25 registration mechanism: `TypeRuntimeMeta` instance arrays; Runtime-layer `OperationRegistry` aggregation
 
 **By:** Frank
@@ -1508,7 +1436,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Open items: OQ-DISP-1 (final class name — Shane decides), OQ-DISP-2 (evaluator.md doc correction), OQ-DISP-3 (catalog-system.md open question struck).
 
 ---
-
 ### 2026-05-05T02:15Z: Operations registry analysis — global flat array defense and rebuttal (superseded by verdict)
 
 **By:** Frank
@@ -1522,7 +1449,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Shane dismantled all four. This file records the defense; the subsequent verdict records the reversal.
 
 ---
-
 ### 2026-05-05T02:45Z: LOCKED — Global `Operations.BinaryExecutors[]` eliminated; delegates embedded in opcodes
 
 **By:** Frank
@@ -1544,7 +1470,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - **Global aggregation array eliminated** — not yet implemented in source, so no removal needed.
 
 ---
-
 ### 2026-05-05T03:03Z: `record struct` opcodes do not change the embedded-delegate verdict
 
 **By:** Frank
@@ -1560,7 +1485,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - The prior verdict's conclusion (embedded delegates, eliminate global registry) holds for the deeper architectural reason: simplicity — one fewer indirection, one fewer global mutable structure, one fewer initialization ceremony, self-contained evaluator. These benefits are independent of value-type vs. reference-type.
 
 ---
-
 ### 2026-05-05T03:07Z: `static readonly Func<>` delegates — not `unsafe delegate*` — for opcode executor storage
 
 **By:** Frank
@@ -1580,7 +1504,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - JIT devirtualizes and inlines static delegate calls in hot paths — the most optimizable delegate pattern.
 
 ---
-
 ### 2026-05-05T03:45Z: Doc closure status for collection and value-types investigation docs
 
 **By:** Frank
@@ -1596,7 +1519,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - **`runtime-api.md`:** Current. No changes needed. Optional: add `Money` registration example alongside `decimal` example.
 
 ---
-
 ### 2026-05-05T03:59Z: User directive — `IReadOnlyLog<T>` dedicated interface is stale/superseded
 
 **By:** Shane (via Copilot)
@@ -1610,7 +1532,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `log` maps to `IReadOnlyList<TElement>`, consistent with §5's locked mapping table.
 
 ---
-
 ### 2026-05-05T04:05Z: Collection types investigation — stale fixes applied
 
 **By:** Frank
@@ -1628,7 +1549,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Post-edit grep confirmed zero remaining `IReadOnlyLog`, `JsonElement`, or `Precept.Runtime` references in the document.
 
 ---
-
 ### 2026-05-05T04:11Z: User directive — Raw lane = JSON lane; `PreceptValue` never leaks public API
 
 **By:** Shane (via Copilot)
@@ -1644,7 +1564,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - This overrides any prior inbox reference to `PreceptValue` as the raw lane return type (including the stale Fix 3a applied to the collection types investigation).
 
 ---
-
 ### 2026-05-05T04:12Z: Raw lane = JsonElement — Frank's restatement (duplicate of Shane directive)
 
 **By:** Frank
@@ -1656,7 +1575,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Restatement of Shane's ruling: raw lane indexer returns `JsonElement`; `PreceptValue` is internal only.
 
 ---
-
 ### 2026-05-05T04:25Z: User directive — CLR typed collection projections stay in v1 (overrules frank-138 deferral)
 
 **By:** Shane (via Copilot)
@@ -1672,7 +1590,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - `FieldDescriptor.ClrType` for collection fields must use constructed generics.
 
 ---
-
 ### 2026-05-05T04:27Z: Collection types investigation finalized and archived
 
 **By:** Frank
@@ -1690,7 +1607,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - File ready for coordinator to move to `docs/working/Archived/`.
 
 ---
-
 ### 2026-05-05T04:32Z: Collection types investigation — section-by-section surface spec coverage audit
 
 **By:** Frank
@@ -1706,7 +1622,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - §3 `PreceptValue` leakage conflict noted: canonical `docs/runtime/runtime-api.md` still shows `PreceptValue` in several public signatures. These are stale given the raw lane = JsonElement ruling. Stale locations: `Version` indexer (line 234), `FieldAccessInfo.CurrentValue` (line 428), `ConstraintViolation.FailingValue` (line 390), `FiredArgs` indexer (line 543), overview paragraph (line 37).
 
 ---
-
 ### 2026-05-05T04:37Z: Surface spec §13.2–13.6 corrected to eager-on-first-read adapter semantics
 
 **By:** Frank
@@ -1724,7 +1639,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Sections touched: §13.2 Option A, §13.3 evaluation table, §13.4 recommendation, §13.5 resolved note, §13.6 adapter inventory.
 
 ---
-
 ### 2026-05-05T04:45Z: `PreceptValue` Axiom 1 rationale added to surface spec
 
 **By:** Frank
@@ -1740,7 +1654,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Axiom 1 governs every collection return type decision and any future surface extension; the rationale must be inline so future engineers encounter it before deciding to violate it.
 
 ---
-
 ### 2026-05-05T05:12Z: Collection internal implementation disseminated to `docs/runtime/evaluator.md`
 
 **By:** Frank
@@ -1772,7 +1685,6 @@ Dictionary overloads (IReadOnlyDictionary<string, object?>) are demoted to conve
 - Source: `docs/working/precept-collection-types-investigation.md` §§8, 11–14. The investigation doc conclusions are now captured in evaluator.md; the investigation doc may be archived.
 
 ---
-
 ### 2026-05-07T22:00:00-04:00: R1 Gate Review — TypeChecker Slices 1–4
 
 **By:** Unknown
@@ -1796,7 +1708,6 @@ George may proceed to Slice 5.
 ## What Was Verified
 
 ---
-
 ### SemanticIndex shape (D1–D5)
 
 - **D1:** `SemanticIndex` is a `sealed record` — ✓
@@ -1806,7 +1717,6 @@ George may proceed to Slice 5.
 - **D5:** `ActionSecondaryRole?` on `TypedInputAction` with XML-documented invariant `SecondaryRole.HasValue == (SecondaryExpression != null)` — ✓
 
 ---
-
 ### Resolution behavior (D6–D10)
 
 - **D6:** `FieldScopeMode` enum (`AllFields`, `PriorFieldsOnly`) in `CheckContext.cs` — ✓
@@ -1816,7 +1726,6 @@ George may proceed to Slice 5.
 - **D10:** `TypedTransitionRow.FromState` is `string?` with `null` = any-state wildcard. XML doc present on the parameter with explicit semantics — ✓
 
 ---
-
 ### Expression resolution (D11–D18)
 
 - **D11:** `TypedBinaryOp` carries `OperationKind ResolvedOp` — the catalog-resolved operation identity, not just the operator token — ✓
@@ -1829,7 +1738,6 @@ George may proceed to Slice 5.
 - **D18:** `TypedMemberAccess` carries `TypeAccessor ResolvedAccessor` — ✓
 
 ---
-
 ### Typed constants (D19–D23)
 
 - **D19:** `TypedTypedConstant` carries `TypeKind ResultType`, `string RawText`, `object? ParsedValue` — ✓
@@ -1839,14 +1747,12 @@ George may proceed to Slice 5.
 - **D23:** `RegexValidation` — `ValidateRegex` uses `Regex.IsMatch` against the pattern — ✓
 
 ---
-
 ### Structural (D24–D26)
 
 - **D24:** `TypedEditDeclaration` is a placeholder record with no logic — ✓
 - **D26:** `Debug.Assert` for ErrorGuaranteed invariant correctly deferred to Slice 10 per plan — ✓
 
 ---
-
 ### Catalog-driven compliance
 
 **No blockers found.** Smell check results:
@@ -1857,7 +1763,6 @@ George may proceed to Slice 5.
 - **No stub arm emits a diagnostic.** All 4 expression stub arms (`ConditionalExpression`, `QuantifierExpression`, `ListLiteralExpression`, `PostfixOperationExpression`) return `TypedErrorExpression` silently — ✓
 
 ---
-
 ### Test quality
 
 - **196 tests across 4 files** (55 + 46 + 51 + 44). All exercise named behaviors, not just "no crash."
@@ -1879,7 +1784,6 @@ George may proceed to Slice 5.
 4. **Field reference recording:** `ResolveIdentifier` records `FieldReference` sites (line 645) for LS navigation. Ensure that Slices 5+ also record `StateReference` and `EventReference` sites when resolving state/event names in transition rows, ensures, etc. The `CheckContext` accumulators are already in place.
 
 ---
-
 ### 2026-05-08: R2 Gate Verdict — Slices 5–7
 
 **By:** Unknown
@@ -1935,7 +1839,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 3. **D5 positive-case test gap:** No end-to-end test exercises `SecondaryRole.HasValue == true` with `SecondaryExpression != null` (insert-at, append-by, put). The Debug.Assert covers correctness; expand test coverage when collection actions get dedicated integration tests.
 
 ---
-
 ### 2026-05-08: george-ci-fix-done
 
 **By:** Unknown
@@ -1945,7 +1848,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Merged source:** `george-ci-fix-done.md`.
 
 ---
-
 ### CI Enforcement Bug Fixes
 **Commit:** 7424785
 **Bug 1 fix:** `EnforceCIInExpression` in `src/Precept/Pipeline/TypeChecker.cs` — all 5 `Diagnostics.Create` call sites for CI codes 66, 95–98 now pass the CI field name as the `{0}` template argument. Added `GetCIFieldName` helper (line ~2197) that extracts the field name from whichever binary operand is the `~string` `TypedFieldRef`. For function calls (codes 97, 98), extracts directly from `func.Arguments[0]`.
@@ -1954,7 +1856,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **R3-ready:** YES
 
 ---
-
 ### 2026-05-08: george-parser-fix-done
 
 **By:** Unknown
@@ -1964,7 +1865,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Merged source:** `george-parser-fix-done.md`.
 
 ---
-
 ### 2026-05-07: Parser gap fixes complete
 **Commit:** 514f82f
 **Bug 1 (Token collision):** `src/Precept/Language/Types.cs` line 644 — changed `dict[meta.Token.Kind] = meta` to `dict.TryAdd(meta.Token.Kind, meta)` in `BuildByToken()`. Base types (Log/Queue) now win over By-variants (LogBy/QueueBy) since they appear first in enum iteration order.
@@ -1973,7 +1873,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Any issues:** Two existing parser tests (`TypeExpression_QueueOfNumber_ProducesCollectionTypeReference`, `QueueOfNumber_TypeExpressionSlot_PreservesCollectionAndElementTypes`) were asserting the buggy `QueueBy` behavior — updated them to assert `Queue`. No other regressions.
 
 ---
-
 ### 2026-05-08: george-slice-1-done
 
 **By:** Unknown
@@ -1983,7 +1882,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Merged source:** `george-slice-1-done.md`.
 
 ---
-
 ### 2026-05-07: Slice 1 — Typed Symbol Population Complete
 **By:** George (for Soup Nazi)
 **Commit:** e882396
@@ -2007,7 +1905,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **SemanticIndex fields populated by Slice 1:** Fields ✓, States ✓, Events ✓, FieldsByName ✓, StatesByName ✓, EventsByName ✓, Diagnostics ✓ (type-checker diagnostics only; does not include parser/binder diagnostics). All other arrays are ImmutableArray.Empty / FrozenDictionary.Empty.
 
 ---
-
 ### 2026-05-08: george-slice-10-done
 
 **By:** Unknown
@@ -2017,7 +1914,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Merged source:** `george-slice-10-done.md`.
 
 ---
-
 ### Slice 10 Complete — Ready for R3
 **Commit:** 844f00e
 **BuildSemanticIndex:** All 16 ImmutableArray primaries + 4 FrozenDictionary secondaries confirmed — populated from CheckContext, no empty stubs remaining.
@@ -2029,7 +1925,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **NotImplementedException stubs remaining:** None
 
 ---
-
 ### 2026-05-08: george-slice-2-done
 
 **By:** Unknown
@@ -2039,7 +1934,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Merged source:** `george-slice-2-done.md`.
 
 ---
-
 ### 2026-05-07: Slice 2 — Scalar Expression Resolution Complete
 **By:** George (for Soup Nazi)
 **Commit:** 1111da4
@@ -2075,7 +1969,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 **Test results:** 3021 passed, 8 failed (same 8 pre-existing DeclaredArg/qualified-type parser gaps from Slice 1). All 2974 baseline tests pass.
 
 ---
-
 ### 2026-05-08: george-slice-3-done
 
 **By:** Unknown
@@ -2085,7 +1978,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 **Merged source:** `george-slice-3-done.md`.
 
 ---
-
 ### 2026-05-07: Slice 3 Complete
 **By:** George (for Soup Nazi)
 **Commit:** fa87df9
@@ -2145,7 +2037,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 - ProofRequirements from overloads/accessors are propagated to TypedFunctionCall/TypedMemberAccess.
 
 ---
-
 ### 2026-05-08: george-slice-4-done
 
 **By:** Unknown
@@ -2155,7 +2046,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 **Merged source:** `george-slice-4-done.md`.
 
 ---
-
 ### 2026-05-07: Slice 4 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `ac95de2`
@@ -2202,7 +2092,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 - Period → `PeriodPattern.NormalizingIso.Parse()` (normalizing ISO 8601)
 
 ---
-
 ### 2026-05-08: george-slice-5-done
 
 **By:** Unknown
@@ -2212,7 +2101,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Merged source:** `george-slice-5-done.md`.
 
 ---
-
 ### 2026-05-07: Slice 5 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `687d364`
@@ -2257,7 +2145,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 - `ContainsErrorExpression` / `ContainsErrorExpressionInAction` are intentionally shallow checks for D26 — they don't walk nested expression trees. Full deep traversal is Slice 10's responsibility.
 
 ---
-
 ### 2026-05-08: george-slice-6-done
 
 **By:** Unknown
@@ -2267,7 +2154,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Merged source:** `george-slice-6-done.md`.
 
 ---
-
 ### 2026-05-07: Slice 6 Complete
 **By:** George (for Soup Nazi)
 **Commit:** fe358ef
@@ -2282,7 +2168,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Test delta:** 3177 passing (up from 3170 baseline). 19 pre-existing TypeCheckerTransitionTests failures from Slice 5 revert — not introduced by this slice.
 
 ---
-
 ### 2026-05-08: george-slice-7-done
 
 **By:** Unknown
@@ -2292,7 +2177,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Merged source:** `george-slice-7-done.md`.
 
 ---
-
 ### 2026-05-07: Slice 7 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `687d364` (co-committed with Slice 5 due to parallel file edits)
@@ -2305,7 +2189,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Notes for Soup Nazi:** `IsTypeApplicable` handles both simple `TypeTarget` (kind match) and `ModifiedTypeTarget` (kind + required modifiers). Empty `ApplicableTo` array means "any type" — no validation needed. Writable checks are the only non-catalog-driven dispatch (`kind == ModifierKind.Writable`) — these are structural constraints on the modifier's semantics, not type applicability. 7 pre-existing test failures from Slice 5 transition row processing (UndeclaredField on event arg member access); no new failures from Slice 7.
 
 ---
-
 ### 2026-05-08: george-slice-8-done
 
 **By:** Unknown
@@ -2315,7 +2198,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Merged source:** `george-slice-8-done.md`.
 
 ---
-
 ### Slice 8 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `00ef822`
@@ -2370,7 +2252,6 @@ when "admin@example.com" == Email
 - `TypedFieldRef.IsCaseInsensitive` was previously always `false` — now correctly populated from `CIFields` set. This is a semantic change visible in `SemanticIndex` output.
 
 ---
-
 ### 2026-05-08: george-slice-9-done
 
 **By:** Unknown
@@ -2380,7 +2261,6 @@ when "admin@example.com" == Email
 **Merged source:** `george-slice-9-done.md`.
 
 ---
-
 ### Slice 9 Complete
 **By:** George (for Soup Nazi)
 **Commit:** 54fa59b
@@ -2409,7 +2289,6 @@ when "admin@example.com" == Email
 **Notes for Soup Nazi:** Quantifier bindings shadow both event args and fields (tested in `QuantifierBindingShadowsEventArg`). The `GetElementType` helper only resolves `TypedFieldRef` receivers via `FieldLookup` — chained collection access (e.g., `each x in obj.Items(...)`) returns null and emits InvalidQuantifierTarget. Empty list literals `[]` are valid but produce Error element type (no inference possible). ConditionalExpression arm remains a stub (Slice TBD).
 
 ---
-
 ### 2026-05-08: george-slice5-restored
 
 **By:** Unknown
@@ -2419,7 +2298,6 @@ when "admin@example.com" == Email
 **Merged source:** `george-slice5-restored.md`.
 
 ---
-
 ### Slice 5 Restoration Complete
 **Commit:** 4e1efd8
 **Methods restored:**
@@ -2452,7 +2330,6 @@ when "admin@example.com" == Email
 **Test result:** 3196/3196 passing (26/26 TypeCheckerTransitionTests, 0 regressions)
 
 ---
-
 ### 2026-05-07: Decision: PRECEPT0024 Anti-Mirroring Enforcement Implemented
 
 **By:** Newman (MCP/AI Dev)
@@ -2488,7 +2365,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - No MCP surface changes required — this is a compile-time enforcement mechanism only.
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-1-triage
 
 **By:** Unknown
@@ -2498,7 +2374,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 **Merged source:** `soup-nazi-slice-1-triage.md`.
 
 ---
-
 ### Slice 1 Test Failure Triage — 2026-05-07
 
 | Test | Failure Type | Root Cause | Action Taken |
@@ -2513,7 +2388,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 | EventWithOptionalArg_ArgIsOptional | TYPE B | Same root cause as above — `ParseArgumentList` does not support `optional` modifier on event args. | Documented — parser gap |
 
 ---
-
 ### TYPE A — Test Bugs Fixed (4 tests)
 
 All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'kg'`, `in 'USD/each'`, `in 'USD' to 'EUR'`) that the parser does not yet support. The tests were testing **TypeKind resolution**, not qualifier parsing, so the qualifiers were unnecessary. Removed qualifiers; all four now pass.
@@ -2524,7 +2398,6 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 - `ExchangeRateType_ResolvesToExchangeRateTypeKind` — `field FxRate as exchangerate in 'USD' to 'EUR'` → `field FxRate as exchangerate`
 
 ---
-
 ### TYPE B — Real Upstream Gaps (4 tests)
 
 #### Gap 1: `Types.ByToken` dictionary overwrites Log/Queue with LogBy/QueueBy
@@ -2546,7 +2419,6 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 **Fix approach:** After consuming the type token in `ParseArgumentList`, loop over modifier tokens (check against `Modifiers.ByToken` or the modifier catalog) and collect them into a modifiers list. The `(string Name, TypeMeta Type)` tuple in the arg list should be expanded to include modifiers.
 
 ---
-
 ### Recommended next action
 
 George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken overwrite is a data-integrity issue that affects any code path using `Types.ByToken` for these types. The event arg modifier gap blocks testing of a feature that's already used in samples. Both are contained fixes in Parser.cs and Types.cs — no TypeChecker changes needed.
@@ -2554,7 +2426,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Current score: 51/55 passing (was 47/55).**
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-10-done
 
 **By:** Unknown
@@ -2564,7 +2435,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-10-done.md`.
 
 ---
-
 ### Slice 10 Tests Complete — R3-Ready
 **Commit:** 703000a
 **Total written:** 32
@@ -2610,7 +2480,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **R3-readiness:** YES
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-2-done
 
 **By:** Unknown
@@ -2620,7 +2489,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-2-done.md`.
 
 ---
-
 ### Slice 2 Tests Complete — 2026-05-07
 **Commit:** d4053c1
 **Total tests written:** 46
@@ -2634,7 +2502,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 - Full suite: 3075 passed, 0 failed
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-3-done
 
 **By:** Unknown
@@ -2644,7 +2511,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-3-done.md`.
 
 ---
-
 ### Slice 3 Tests Complete — 2026-05-07
 **Commit:** 23edd54
 **Total tests written:** 51
@@ -2662,7 +2528,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 - Full suite: 3126/3126 passing (no regressions).
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-4-done
 
 **By:** Unknown
@@ -2672,7 +2537,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-4-done.md`.
 
 ---
-
 ### Slice 4 Tests Complete — 2026-05-07
 **Commit:** `1c29fe6`
 **Total tests written:** 44
@@ -2688,7 +2552,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Ready for R1:** YES
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-5-done
 
 **By:** Unknown
@@ -2698,7 +2561,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-5-done.md`.
 
 ---
-
 ### Slice 5 Tests Complete — 2026-05-07
 **Commit:** (see below)
 **Total tests written:** 26
@@ -2721,7 +2583,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Additionally:** Even the original Slice 5 code (`687d364`) has a bug where `EventName.ArgName` accessors emit `UndeclaredField`. This is a secondary issue — restore first, fix second.
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-6-done
 
 **By:** Unknown
@@ -2731,7 +2592,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-6-done.md`.
 
 ---
-
 ### Slice 6 Tests Complete
 **Commit:** 78d1774
 **Total written:** 17
@@ -2740,7 +2600,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **R2-readiness for Slice 6:** YES
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-7-done
 
 **By:** Unknown
@@ -2750,7 +2609,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-7-done.md`.
 
 ---
-
 ### Slice 7 Tests Complete
 **Commit:** 26208fe
 **Total written:** 29
@@ -2772,7 +2630,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 - Full suite: 3242/3242 passing — zero regressions.
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-8-done
 
 **By:** Unknown
@@ -2782,7 +2639,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-8-done.md`.
 
 ---
-
 ### Slice 8 Tests Complete
 **Commit:** 9472824
 **Total written:** 30
@@ -2800,7 +2656,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **R3-readiness for Slice 8:** NO — blocked by the two TYPE B bugs above (FormatException crash on violation, rules not enforced).
 
 ---
-
 ### 2026-05-08: soup-nazi-slice-9-done
 
 **By:** Unknown
@@ -2810,7 +2665,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-9-done.md`.
 
 ---
-
 ### Slice 9 Tests Complete
 **Commit:** f14a664
 **Total written:** 22
@@ -2819,18 +2673,15 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **R3-readiness for Slice 9:** YES
 
 ---
-
 ### 2026-05-07: GraphAnalyzer OQ1 — DeadEndStateFact is a separate fact from TerminalCompletenessFact
 **By:** Frank (frank-graphanalyzer-oqs)
 **What:** Dead-end states get a new, separate `DeadEndStateFact` rather than being an expansion of `TerminalCompletenessFact`. New `DiagnosticCode.DeadEndState = 108` (Warning) added. Detection uses reverse-reachability BFS from terminal states in Phase 2.
 **Why:** Clean separation of concerns — TerminalCompletenessFact assesses reachability of terminal states; DeadEndStateFact identifies states with no outbound transitions to terminals. Mixing them would conflate two distinct structural properties.
 
 ---
-
 ### 2026-05-07: GraphAnalyzer OQ2 — EventHandlers structurally excluded from EventCoverage
 **By:** Frank (frank-graphanalyzer-oqs)
 **What:** TypedEventHandler entries do NOT count toward event coverage and cannot coexist with the graph analyzer in any valid precept. EventHandlers are only valid in stateless precepts (PRECEPT0092 `EventHandlerInStatefulPrecept` blocks them in stateful precepts). The graph analyzer only runs on stateful precepts. The coexistence scenario is structurally impossible. Corrected graph-analyzer.md §4 which incorrectly claimed event handlers were consumed for coverage.
 **Why:** This was a doc error, not a policy question. The language semantics make it impossible.
 
 ---
-

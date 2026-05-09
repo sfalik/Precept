@@ -6,6 +6,17 @@
 
 ## Learnings
 
+- 2026-05-09T09:02:31.415-04:00 — Filled the 12 requested ProofEngine gaps, raising the filtered `ProofEngineTests` run to 173 passing: added the Strategy 4 positive proof path, real pipeline emission for codes 112/113/114/116, transition-row and state-hook presence proof coverage, real `.count > 0` guard coverage for collection member access, a TypedPostfixOp `is set` regression anchor, the same-type `number / number` RHS-resolution anchor, vacuous-proof diagnostic absence, and a multi-obligation same-site assertion. Two surprise findings: the audit's `count(collection)` branch does not exist in current source because the catalog models count as `.count` member access, and shared-parameter qualifier requirements on same-type binary ops collapse both subjects to the RHS under `ResolveParamInBinaryOp`, so the end-to-end Code 114 test had to use a distinct-parameter binary site to reach the real unresolved path.
+- 2026-05-09 ProofEngine exhaustive audit: the 158-test suite has zero positive proof-success tests for Strategy 4 (FlowNarrowing). Every Strategy 4 test asserts the strategy cannot fire. The implementation exists but is untested for the success path.
+- Strategy 5 (QualifierCompatibility) tests are entirely metadata-level record equality checks — no test exercises `QualifierCompatibilityProofRequirement` through the full `ProofEngine.Prove(index, graph)` pipeline with actual DSL source.
+- Diagnostic codes 112 (UnprovedModifierRequirement), 113 (UnprovedDimensionRequirement), and 114 (UnprovedQualifierCompatibility) are verified only by enum value assertions — no test causes those diagnostics to actually fire.
+- `PresenceProofRequirement` end-to-end path (from DSL source through strategy dispatch to diagnostic) is never exercised; all presence tests are metadata-shape assertions on `DeclaredPresenceMeta`.
+- The `count(collection) > 0` and `collection.count > 0` guard patterns in `ExtractGuardConstraintsCore` are implemented but entirely untested; `Strategy3_CountGuard_DischargesCollectionNonEmpty` actually tests plain `D > 0`, not a collection count guard.
+- The "field is set" `TypedPostfixOp` guard pattern in `ExtractGuardConstraintsCore` is implemented but no test exercises it with an actual `is set` guard expression.
+- StateHookContext + guard (Strategy 3) code path is implemented but untested — only TransitionRowContext guards are tested for Strategy 3.
+- The RHS-before-LHS fix in `ResolveParamInBinaryOp` has no same-type regression anchor; all division tests use `integer / number` to avoid the ambiguity. A `number / number` test would be the correct anchor.
+- Forwarding facts tests verify `obligation.Disposition == Proved` but do not assert `ledger.Diagnostics` is empty for those vacuously proved obligations.
+
 - Sample-file integration tests catch parser and language-surface gaps that isolated unit tests miss.
 - Hardcoded enum/count assertions are acceptable only when they are intentionally updated alongside catalog growth.
 - Expression diagnostics often need a full parser host (rule/transition row), not the bare expression helper.
@@ -15,6 +26,11 @@
 - 2026-05-08T23:45:00.367-04:00 — ProofEngine test authoring exposed three easy-to-miss proof-surface traps: operand-metadata identity can change subject resolution (`integer / number` behaves differently from `number / number`), missing boolean catalog entries can turn `and` / `or` guard tests red for type-check reasons instead of proof reasons, and forwarding-fact suppression only holds if later discharge passes preserve already-proved obligations.
 
 ## Recent Updates
+
+### 2026-05-09T14:04:05Z — LanguageTool coverage review opened
+- Started reviewing `LanguageToolTests.cs` against `McpServerDesign.md` after Newman's `precept_language` implementation landed.
+- This batch closed with the review still in flight, so no new durable pass/fail verdict is recorded yet.
+
 
 ### 2026-05-09T04:35:00Z — ProofEngine Phase 2 suite validated
 - Soup-Nazi's 158-test `ProofEngineTests.cs` matrix for S1-S13 is now fully green after George's follow-up fixes.

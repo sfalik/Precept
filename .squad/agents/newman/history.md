@@ -23,6 +23,11 @@
 
 ## Recent Updates
 
+### 2026-05-09T14:04:05Z — `precept_language` shipped
+- Implemented `LanguageTool.cs`, added 12 `LanguageToolTests.cs` cases, and synced `docs/tooling/mcp.md` on commit `bd4e6e30`.
+- The shipped MCP vocabulary baseline is now durably recorded as tokens/types/grouped modifiers/actions/constructs/constraints/operators/functions/diagnostics plus static `firePipeline`.
+
+
 
 
 ### 2026-05-08T03:08:18Z — Comprehensive runtime/MCP doc review recorded
