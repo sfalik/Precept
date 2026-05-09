@@ -145,7 +145,7 @@ public class NameBinderTests
         evt.Name.Should().Be("SetPrice");
         evt.Args.Should().ContainSingle();
         evt.Args[0].Name.Should().Be("newPrice");
-        evt.Args[0].Type.Kind.Should().Be(TypeKind.Decimal);
+        evt.Args[0].Type.ResolvedKind.Should().Be(TypeKind.Decimal);
         evt.Args[0].EventName.Should().Be("SetPrice");
     }
 
@@ -162,7 +162,7 @@ public class NameBinderTests
         var evt = symbols.Events.Single();
         evt.Args.Should().HaveCount(2);
         evt.Args.Select(a => a.Name).Should().BeEquivalentTo(["approver", "amount"]);
-        evt.Args.Select(a => a.Type.Kind).Should().BeEquivalentTo([TypeKind.String, TypeKind.Number]);
+        evt.Args.Select(a => a.Type.ResolvedKind).Should().BeEquivalentTo([TypeKind.String, TypeKind.Number]);
     }
 
     [Fact]

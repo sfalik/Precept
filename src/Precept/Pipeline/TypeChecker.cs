@@ -74,7 +74,8 @@ internal static partial class TypeChecker
     private static (TypeKind Type, TypeKind? ElementType, TypeKind? KeyType) ResolveTypeKind(ParsedTypeReference typeRef) =>
         typeRef switch
         {
-            SimpleTypeReference simple => (simple.Type.Kind, null, null),
+            SimpleTypeReference simple       => (simple.Type.Kind, null, null),
+            QualifiedTypeReference qualified => ResolveTypeKind(qualified.InnerType),
             CollectionTypeReference coll => (
                 coll.CollectionType.Kind,
                 ResolveTypeKind(coll.ElementType).Type,
@@ -84,6 +85,85 @@ internal static partial class TypeChecker
             MissingTypeReference => (TypeKind.Error, null, null),
             _ => (TypeKind.Error, null, null),
         };
+
+    /// <summary>
+    /// Extracts <see cref="DeclaredQualifierMeta"/> values from a <see cref="QualifiedTypeReference"/>,
+    /// validating each qualifier value against its catalog and emitting diagnostics for invalid values.
+    /// Enforces <c>in</c>/<c>of</c> mutual exclusion for types with <see cref="QualifierShape.InOfExclusive"/>.
+    /// Returns empty if <paramref name="typeRef"/> is not a <see cref="QualifiedTypeReference"/>.
+    /// </summary>
+    private static ImmutableArray<DeclaredQualifierMeta> ExtractQualifiers(
+        ParsedTypeReference typeRef, CheckContext ctx)
+    {
+        if (typeRef is not QualifiedTypeReference qualified)
+            return ImmutableArray<DeclaredQualifierMeta>.Empty;
+
+        // Enforce in/of mutual exclusion for types that declare it
+        if (qualified.InnerType is SimpleTypeReference simpleInner &&
+            simpleInner.Type.QualifierShape?.InOfExclusive == true)
+        {
+            bool hasIn = qualified.Qualifiers.Any(q => q.Preposition == TokenKind.In);
+            bool hasOf = qualified.Qualifiers.Any(q => q.Preposition == TokenKind.Of);
+            if (hasIn && hasOf)
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.MutuallyExclusiveQualifiers, qualified.Span));
+        }
+
+        var builder = ImmutableArray.CreateBuilder<DeclaredQualifierMeta>(qualified.Qualifiers.Length);
+        foreach (var qualifier in qualified.Qualifiers)
+        {
+            DeclaredQualifierMeta? meta = qualifier.Axis switch
+            {
+                QualifierAxis.Currency     => MapCurrencyQualifier(qualifier, ctx),
+                QualifierAxis.Unit         => MapUnitQualifier(qualifier, ctx),
+                QualifierAxis.Dimension    => MapDimensionQualifier(qualifier, ctx),
+                QualifierAxis.FromCurrency => MapFromCurrencyQualifier(qualifier, ctx),
+                QualifierAxis.ToCurrency   => MapToCurrencyQualifier(qualifier, ctx),
+                _                          => null,
+            };
+            if (meta is not null)
+                builder.Add(meta);
+        }
+        return builder.ToImmutable();
+    }
+
+    private static DeclaredQualifierMeta.Currency MapCurrencyQualifier(ParsedQualifier q, CheckContext ctx)
+    {
+        if (!CurrencyCatalog.All.ContainsKey(q.Value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, q.ValueSpan, q.Value));
+        return new DeclaredQualifierMeta.Currency(q.Value);
+    }
+
+    private static DeclaredQualifierMeta.Unit MapUnitQualifier(ParsedQualifier q, CheckContext ctx)
+    {
+        var result = UcumCatalog.Parse(q.Value);
+        if (!result.IsValid)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidUnitString, q.ValueSpan, q.Value));
+            return new DeclaredQualifierMeta.Unit(q.Value, "");
+        }
+        return new DeclaredQualifierMeta.Unit(q.Value, result.Unit!.PreferredDimensionAlias ?? "");
+    }
+
+    private static DeclaredQualifierMeta.Dimension MapDimensionQualifier(ParsedQualifier q, CheckContext ctx)
+    {
+        if (!DimensionCatalog.All.ContainsKey(q.Value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidDimensionString, q.ValueSpan, q.Value));
+        return new DeclaredQualifierMeta.Dimension(q.Value);
+    }
+
+    private static DeclaredQualifierMeta.FromCurrency MapFromCurrencyQualifier(ParsedQualifier q, CheckContext ctx)
+    {
+        if (!CurrencyCatalog.All.ContainsKey(q.Value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, q.ValueSpan, q.Value));
+        return new DeclaredQualifierMeta.FromCurrency(q.Value);
+    }
+
+    private static DeclaredQualifierMeta.ToCurrency MapToCurrencyQualifier(ParsedQualifier q, CheckContext ctx)
+    {
+        if (!CurrencyCatalog.All.ContainsKey(q.Value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, q.ValueSpan, q.Value));
+        return new DeclaredQualifierMeta.ToCurrency(q.Value);
+    }
 
     /// <summary>
     /// Populate <see cref="CheckContext.Fields"/> from <see cref="SymbolTable.Fields"/>.
@@ -125,7 +205,7 @@ internal static partial class TypeChecker
                 Presence: isOptional
                     ? new DeclaredPresenceMeta.Optional()
                     : new DeclaredPresenceMeta.Guaranteed(),
-                DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
+                DeclaredQualifiers: ExtractQualifiers(declared.Type, ctx),
                 Syntax: declared.Syntax);
 
             ctx.Fields.Add(typedField);
@@ -225,11 +305,14 @@ internal static partial class TypeChecker
     {
         foreach (var declared in symbols.Events)
         {
-            var typedArgs = declared.Args
-                .Select(arg => new TypedArg(
+            var argsBuilder = ImmutableArray.CreateBuilder<TypedArg>(declared.Args.Length);
+            foreach (var arg in declared.Args)
+            {
+                var (resolvedType, _, _) = ResolveTypeKind(arg.Type);
+                argsBuilder.Add(new TypedArg(
                     Name: arg.Name,
                     EventName: arg.EventName,
-                    ResolvedType: arg.Type.Kind,
+                    ResolvedType: resolvedType,
                     ElementType: null, // event arg element types deferred until arg type parsing is richer
                     Modifiers: arg.Modifiers,
                     DefaultExpression: null, // Slice 2+
@@ -237,13 +320,13 @@ internal static partial class TypeChecker
                     Presence: arg.Modifiers.Contains(ModifierKind.Optional)
                         ? new DeclaredPresenceMeta.Optional()
                         : new DeclaredPresenceMeta.Guaranteed(),
-                    DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
-                    Span: arg.NameSpan))
-                .ToImmutableArray();
+                    DeclaredQualifiers: ExtractQualifiers(arg.Type, ctx),
+                    Span: arg.NameSpan));
+            }
 
             var typedEvent = new TypedEvent(
                 Name: declared.Name,
-                Args: typedArgs,
+                Args: argsBuilder.ToImmutable(),
                 IsInitial: declared.IsInitial,
                 NameSpan: declared.NameSpan,
                 Syntax: declared.Syntax);

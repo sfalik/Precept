@@ -307,7 +307,7 @@ public static partial class Parser
             ConstructSlotKind.TypeExpression    => new TypeExpressionSlot(new MissingTypeReference(SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ModifierList      => new ModifierListSlot(ImmutableArray<ParsedModifier>.Empty, SourceSpan.Missing),
             ConstructSlotKind.StateEntryList    => new StateEntryListSlot(ImmutableArray<(string, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
-            ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<(string, TypeMeta, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<(string, ParsedTypeReference, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
             ConstructSlotKind.InitialMarker     => new InitialMarkerSlot(false, SourceSpan.Missing),
             ConstructSlotKind.BecauseClause     => new BecauseClauseSlot("", SourceSpan.Missing),
             ConstructSlotKind.GuardClause       => new GuardClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
@@ -430,8 +430,9 @@ public static partial class Parser
                 return ParseCollectionType(typeMeta, typeToken.Span);
             }
 
-            // Simple type
-            return new SimpleTypeReference(typeMeta, typeToken.Span);
+            // Simple type — try qualifier extensions ('in', 'of', 'to')
+            var simpleRef = new SimpleTypeReference(typeMeta, typeToken.Span);
+            return TryParseQualifiers(simpleRef, typeMeta);
         }
 
         private ParsedTypeReference ParseChoiceType(TypeMeta choiceMeta, SourceSpan typeSpan)
@@ -572,6 +573,51 @@ public static partial class Parser
             return new MissingTypeReference(peekToken.Span);
         }
 
+        /// <summary>
+        /// Attempts to parse qualifier slots that follow a simple type reference.
+        /// Iterates over <see cref="QualifierShape.Slots"/> from the catalog — no hardcoded token sets.
+        /// Returns the original <paramref name="typeRef"/> unchanged if the type has no qualifier shape
+        /// or if no preposition tokens are found.
+        /// </summary>
+        private ParsedTypeReference TryParseQualifiers(
+            ParsedTypeReference typeRef, TypeMeta typeMeta)
+        {
+            if (typeMeta.QualifierShape is null)
+                return typeRef;
+
+            var qualifiers = ImmutableArray.CreateBuilder<ParsedQualifier>();
+            var lastSpan = typeRef.Span;
+
+            foreach (var slot in typeMeta.QualifierShape.Slots)
+            {
+                if (Peek().Kind != slot.Preposition)
+                    continue;
+
+                Advance(); // consume preposition ('in' / 'of' / 'to')
+
+                if (Peek().Kind != TokenKind.TypedConstant)
+                {
+                    _diagnostics.Add(DiagnosticsCatalog.Create(
+                        DiagnosticCode.ExpectedToken, Peek().Span,
+                        "typed constant", Peek().Text));
+                    continue;
+                }
+
+                var valueToken = Advance();
+                qualifiers.Add(new ParsedQualifier(
+                    slot.Preposition, slot.Axis,
+                    valueToken.Text, valueToken.Span));
+                lastSpan = valueToken.Span;
+            }
+
+            if (qualifiers.Count == 0)
+                return typeRef;
+
+            return new QualifiedTypeReference(
+                typeRef, qualifiers.ToImmutable(),
+                SourceSpan.Covering(typeRef.Span, lastSpan));
+        }
+
         // ── ModifierList: field modifiers from catalog ──────────────────────────
 
         private SlotValue ParseModifierList(ConstructSlot slot, ConstructMeta constructMeta)
@@ -680,7 +726,7 @@ public static partial class Parser
                 return MakeSentinel(slot);
 
             var startToken = Advance(); // consume '('
-            var args = new List<(string Name, TypeMeta Type, ImmutableArray<ModifierKind> Modifiers)>();
+            var args = new List<(string Name, ParsedTypeReference Type, ImmutableArray<ModifierKind> Modifiers)>();
 
             while (Peek().Kind != TokenKind.RightParen && !IsAtEnd
                    && !ConstructsCatalog.LeadingTokens.Contains(Peek().Kind))
@@ -690,12 +736,16 @@ public static partial class Parser
                     var nameToken = Advance();
                     Expect(TokenKind.As);
 
-                    var typeToken = Peek();
-                    var lookupKind = typeToken.Kind == TokenKind.Set ? TokenKind.SetType : typeToken.Kind;
+                    var typeTokenPeek = Peek();
+                    var lookupKind = typeTokenPeek.Kind == TokenKind.Set ? TokenKind.SetType : typeTokenPeek.Kind;
 
                     if (Types.ByToken.TryGetValue(lookupKind, out var typeMeta))
                     {
-                        Advance();
+                        var typeToken = Advance();
+
+                        // Apply qualifier extensions ('in', 'of', 'to') if the type has a QualifierShape
+                        ParsedTypeReference parsedType = new SimpleTypeReference(typeMeta, typeToken.Span);
+                        parsedType = TryParseQualifiers(parsedType, typeMeta);
 
                         // Consume any trailing field modifiers (e.g. optional, notempty)
                         var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
@@ -705,12 +755,12 @@ public static partial class Parser
                             Advance();
                         }
 
-                        args.Add((nameToken.Text, typeMeta, modifiers.ToImmutable()));
+                        args.Add((nameToken.Text, parsedType, modifiers.ToImmutable()));
                     }
                     else
                     {
                         _diagnostics.Add(DiagnosticsCatalog.Create(
-                            DiagnosticCode.ExpectedToken, typeToken.Span, "type keyword", typeToken.Text));
+                            DiagnosticCode.ExpectedToken, typeTokenPeek.Span, "type keyword", typeTokenPeek.Text));
                         break;
                     }
                 }

@@ -150,7 +150,7 @@ public static class NameBinder
             if (idSlot is null) return;
 
             bool isInitial = initialSlot?.IsPresent ?? false;
-            var argTuples = argSlot?.Args ?? ImmutableArray<(string Name, TypeMeta Type, ImmutableArray<ModifierKind> Modifiers)>.Empty;
+            var argTuples = argSlot?.Args ?? ImmutableArray<(string Name, ParsedTypeReference Type, ImmutableArray<ModifierKind> Modifiers)>.Empty;
 
             foreach (var eventName in idSlot.Names)
             {

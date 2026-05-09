@@ -87,7 +87,7 @@ public sealed record DeclaredEvent(
 /// </summary>
 public sealed record DeclaredArg(
     string Name,
-    TypeMeta Type,
+    ParsedTypeReference Type,
     string EventName,
     ImmutableArray<ModifierKind> Modifiers,
     SourceSpan NameSpan

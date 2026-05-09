@@ -564,7 +564,7 @@ public class ParserDirectConstructTests
         var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
 
         argSlot.Args.Select(a => a.Name).Should().Equal("amount", "note");
-        argSlot.Args.Select(a => a.Type.Kind).Should().Equal(TypeKind.Number, TypeKind.String);
+        argSlot.Args.Select(a => a.Type.ResolvedKind).Should().Equal(TypeKind.Number, TypeKind.String);
     }
 
     [Fact]
@@ -580,7 +580,7 @@ public class ParserDirectConstructTests
 
         argSlot.Args.Should().HaveCount(3);
         argSlot.Args.Select(a => a.Name).Should().Equal("amount", "note", "approved");
-        argSlot.Args.Select(a => a.Type.Kind).Should().Equal(TypeKind.Number, TypeKind.String, TypeKind.Boolean);
+        argSlot.Args.Select(a => a.Type.ResolvedKind).Should().Equal(TypeKind.Number, TypeKind.String, TypeKind.Boolean);
     }
 
     [Fact]

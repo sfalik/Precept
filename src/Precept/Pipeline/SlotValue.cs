@@ -35,7 +35,7 @@ public sealed record StateEntryListSlot(ImmutableArray<(string Name, ImmutableAr
     : SlotValue(ConstructSlotKind.StateEntryList, Span);
 
 /// <summary>Event parameter list "(name as type, ...)".</summary>
-public sealed record ArgumentListSlot(ImmutableArray<(string Name, TypeMeta Type, ImmutableArray<ModifierKind> Modifiers)> Args, SourceSpan Span)
+public sealed record ArgumentListSlot(ImmutableArray<(string Name, ParsedTypeReference Type, ImmutableArray<ModifierKind> Modifiers)> Args, SourceSpan Span)
     : SlotValue(ConstructSlotKind.ArgumentList, Span);
 
 /// <summary>"-> expression" computed value.</summary>

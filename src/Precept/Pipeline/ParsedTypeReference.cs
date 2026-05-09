@@ -14,7 +14,22 @@ namespace Precept.Pipeline;
 /// Captures the full type structure as written in source, preserving collection
 /// wrappers, choice domains, and CI qualifiers that would be lost with a bare TypeMeta.
 /// </summary>
-public abstract record ParsedTypeReference(SourceSpan Span);
+public abstract record ParsedTypeReference(SourceSpan Span)
+{
+    /// <summary>
+    /// Resolves the outermost <see cref="TypeKind"/> — unwraps qualifier wrappers,
+    /// delegates to inner type for collections and CI references.
+    /// </summary>
+    public TypeKind ResolvedKind => this switch
+    {
+        SimpleTypeReference s      => s.Type.Kind,
+        QualifiedTypeReference q   => q.InnerType.ResolvedKind,
+        CollectionTypeReference c  => c.CollectionType.Kind,
+        ChoiceTypeReference ch     => ch.Type.Kind,
+        CITypeReference ci         => ci.Type.Kind,
+        _                          => TypeKind.Error,
+    };
+}
 
 /// <summary>
 /// A simple (non-parameterized) type reference: string, integer, money, etc.
@@ -60,3 +75,23 @@ public sealed record CITypeReference(TypeMeta Type, SourceSpan Span)
 /// </summary>
 public sealed record MissingTypeReference(SourceSpan Span)
     : ParsedTypeReference(Span);
+
+/// <summary>
+/// A type reference with one or more qualifier slots filled.
+/// Wraps a <see cref="SimpleTypeReference"/> with the parsed qualifier values.
+/// </summary>
+public sealed record QualifiedTypeReference(
+    ParsedTypeReference InnerType,
+    ImmutableArray<ParsedQualifier> Qualifiers,
+    SourceSpan Span)
+    : ParsedTypeReference(Span);
+
+/// <summary>
+/// A single parsed qualifier: the preposition keyword, the axis it fills, the literal
+/// value (text inside the typed-constant delimiters), and the span of the value token.
+/// </summary>
+public sealed record ParsedQualifier(
+    TokenKind Preposition,
+    QualifierAxis Axis,
+    string Value,
+    SourceSpan ValueSpan);
