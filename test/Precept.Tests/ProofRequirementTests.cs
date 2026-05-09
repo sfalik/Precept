@@ -309,4 +309,21 @@ public class ProofRequirementTests
 
         source.Should().NotBeOfType<DimensionSource.Constant>();
     }
+
+    [Fact]
+    public void DeclaredPresenceMeta_Guaranteed_CarriesPresenceSatisfaction()
+    {
+        var presence = new DeclaredPresenceMeta.Guaranteed();
+
+        presence.ProofSatisfactions.Should().ContainSingle()
+            .Which.Should().BeOfType<ProofSatisfaction.Presence>();
+    }
+
+    [Fact]
+    public void DeclaredPresenceMeta_Optional_HasNoSatisfactions()
+    {
+        var presence = new DeclaredPresenceMeta.Optional();
+
+        presence.ProofSatisfactions.Should().BeEmpty();
+    }
 }
