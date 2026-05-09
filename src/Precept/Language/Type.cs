@@ -128,11 +128,40 @@ public sealed record RegexValidation(
 ) : ContentValidation(FormatDescription, Examples);
 
 /// <summary>
-/// Validates typed constant content by parsing as a NodaTime temporal type.
-/// <see cref="NodaTimePattern"/> is the NodaTime pattern string used for parsing.
+/// Validates typed constant content by parsing as a temporal literal.
+/// <see cref="LiteralKind"/> identifies the temporal parse path while <see cref="NodaTimePattern"/>
+/// retains the pattern metadata surfaced to users.
 /// </summary>
 public sealed record NodaTimeValidation(
-    string NodaTimePattern, string FormatDescription, string[] Examples
+    TemporalLiteralKind LiteralKind,
+    string NodaTimePattern,
+    string FormatDescription,
+    string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
+public sealed record UcumValidation(
+    string FormatDescription,
+    string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
+public sealed record MoneyValidation(
+    string FormatDescription,
+    string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
+public sealed record QuantityValidation(
+    string FormatDescription,
+    string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
+public sealed record PriceValidation(
+    string FormatDescription,
+    string[] Examples
+) : ContentValidation(FormatDescription, Examples);
+
+public sealed record ExchangeRateValidation(
+    string FormatDescription,
+    string[] Examples
 ) : ContentValidation(FormatDescription, Examples);
 
 /// <summary>

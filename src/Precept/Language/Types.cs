@@ -90,21 +90,25 @@ public static class Types
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     private static readonly NodaTimeValidation DateValidation = new(
+        TemporalLiteralKind.Date,
         "uuuu'-'MM'-'dd",
         "ISO 8601 date (YYYY-MM-DD)",
         ["2026-01-15", "2024-12-31"]);
 
     private static readonly NodaTimeValidation TimeValidation = new(
+        TemporalLiteralKind.Time,
         "HH':'mm':'ss",
         "ISO 8601 extended time (HH:mm:ss)",
         ["09:00:00", "14:30:00"]);
 
     private static readonly NodaTimeValidation DateTimeValidation = new(
+        TemporalLiteralKind.DateTime,
         "uuuu'-'MM'-'dd'T'HH':'mm':'ss",
         "ISO 8601 date-time (YYYY-MM-DDThh:mm:ss)",
         ["2026-04-13T09:00:00", "2024-12-31T23:59:59"]);
 
     private static readonly NodaTimeValidation PeriodValidation = new(
+        TemporalLiteralKind.TemporalQuantity,
         "NormalizingIso",
         "ISO 8601 period (PnYnMnDTnHnMnS)",
         ["P30D", "P1Y6M", "PT2H30M"]);
