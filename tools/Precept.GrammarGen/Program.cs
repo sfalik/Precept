@@ -245,7 +245,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 ["captures"] = new JsonObject
                 {
                     ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
-                    ["4"] = new JsonObject { ["name"] = "entity.name.precept.message.precept" }
+                    ["4"] = new JsonObject { ["name"] = "entity.name.type.precept.precept" }
                 }
             }
         }
@@ -317,6 +317,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                                 ["captures"] = new JsonObject { ["1"] = new JsonObject { ["name"] = "variable.parameter.precept" } }
                             },
                             new JsonObject { ["include"] = "#declarationKeywords" },
+                            new JsonObject { ["include"] = "#connectiveKeywords" },
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
                             new JsonObject { ["include"] = "#constraintKeywords" },
                             new JsonObject { ["include"] = "#typeKeywords" },
@@ -324,7 +325,8 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                             new JsonObject { ["include"] = "#strings" },
                             new JsonObject { ["include"] = "#booleanLiterals" },
                             new JsonObject { ["name"] = "punctuation.precept", ["match"] = "[()]" },
-                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
+                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," },
+                            new JsonObject { ["include"] = "#identifierReference" }
                         }
                     }
                 }
@@ -369,8 +371,10 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
                             new JsonObject { ["include"] = "#constraintKeywords" },
                             new JsonObject { ["include"] = "#declarationKeywords" },
+                            new JsonObject { ["include"] = "#connectiveKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
-                            new JsonObject { ["include"] = "#strings" }
+                            new JsonObject { ["include"] = "#strings" },
+                            new JsonObject { ["include"] = "#identifierReference" }
                         }
                     }
                 }
@@ -406,16 +410,19 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                         ["patterns"] = new JsonArray
                         {
                             new JsonObject { ["include"] = "#arrowOperators" },
+                            new JsonObject { ["include"] = "#symbolOperators" },
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
                             new JsonObject { ["include"] = "#constraintKeywords" },
                             new JsonObject { ["include"] = "#declarationKeywords" },
+                            new JsonObject { ["include"] = "#connectiveKeywords" },
                             new JsonObject { ["include"] = "#typeKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
                             new JsonObject { ["include"] = "#strings" },
                             new JsonObject { ["include"] = "#typedConstants" },
                             new JsonObject { ["include"] = "#booleanLiterals" },
                             new JsonObject { ["name"] = "punctuation.precept", ["match"] = "[()\\[\\]]" },
-                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
+                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," },
+                            new JsonObject { ["include"] = "#identifierReference" }
                         }
                     }
                 }
@@ -487,7 +494,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                             new JsonObject { ["name"] = "entity.name.type.state.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" }
                         }
                     },
-                    ["6"] = new JsonObject { ["name"] = "keyword.declaration.precept" }
+                    ["6"] = new JsonObject { ["name"] = "keyword.other.assertion.precept" }
                 }
             }
         }
@@ -526,7 +533,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 {
                     ["2"] = new JsonObject { ["name"] = "keyword.control.precept" },
                     ["4"] = new JsonObject { ["name"] = "entity.name.function.event.precept" },
-                    ["6"] = new JsonObject { ["name"] = "keyword.declaration.precept" }
+                    ["6"] = new JsonObject { ["name"] = "keyword.other.assertion.precept" }
                 }
             }
         }
@@ -562,7 +569,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                             new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
                         }
                     },
-                    ["10"] = new JsonObject { ["name"] = "keyword.other.access-mode.precept" }
+                    ["10"] = new JsonObject { ["name"] = "keyword.other.connective.precept" }
                 }
             }
         }
@@ -625,6 +632,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
 
     // ── noTransition — `no transition` compound keyword ───────────────────
     // Must precede transitionTarget to prevent `no` from consuming `transition`.
+    // Both words are non-bold connective — only standalone `transition` is bold.
     repo["noTransition"] = new JsonObject
     {
         ["patterns"] = new JsonArray
@@ -634,8 +642,38 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 ["match"] = "\\b(no)(\\s+)(transition)\\b",
                 ["captures"] = new JsonObject
                 {
-                    ["1"] = new JsonObject { ["name"] = "keyword.other.outcome.precept" },
-                    ["3"] = new JsonObject { ["name"] = "keyword.other.outcome.precept" }
+                    ["1"] = new JsonObject { ["name"] = "keyword.other.connective.precept" },
+                    ["3"] = new JsonObject { ["name"] = "keyword.other.connective.precept" }
+                }
+            }
+        }
+    };
+
+    // ── isSetOperator — `is set` / `is not set` null-check ────────────────
+    // Must precede actionKeywords to prevent `set` from taking the bold action color.
+    // `set` here is a membership operator suffix, not an action verb.
+    // `is not set` listed first so it consumes before `is set` can partial-match.
+    repo["isSetOperator"] = new JsonObject
+    {
+        ["patterns"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["match"] = "\\b(is)(\\s+)(not)(\\s+)(set)\\b",
+                ["captures"] = new JsonObject
+                {
+                    ["1"] = new JsonObject { ["name"] = "keyword.operator.membership.precept" },
+                    ["3"] = new JsonObject { ["name"] = "keyword.operator.membership.precept" },
+                    ["5"] = new JsonObject { ["name"] = "keyword.operator.membership.precept" }
+                }
+            },
+            new JsonObject
+            {
+                ["match"] = "\\b(is)(\\s+)(set)\\b",
+                ["captures"] = new JsonObject
+                {
+                    ["1"] = new JsonObject { ["name"] = "keyword.operator.membership.precept" },
+                    ["3"] = new JsonObject { ["name"] = "keyword.operator.membership.precept" }
                 }
             }
         }
@@ -832,6 +870,7 @@ static JsonArray BuildTopLevelPatterns()
         "#arrowOperators",
         "#symbolOperators",
         "#logicalOperators",
+        "#isSetOperator",          // before membershipOperators/actionKeywords — compound null-check
         "#membershipOperators",
         "#stateModifiers",
         "#ruleDesugaringModifiers",
@@ -839,6 +878,8 @@ static JsonArray BuildTopLevelPatterns()
         "#typeKeywords",
         "#declarationKeywords",
         "#controlKeywords",
+        "#assertionKeywords",
+        "#connectiveKeywords",
         "#actionKeywords",
         "#outcomeKeywords",
         "#accessModeKeywords",
@@ -860,6 +901,8 @@ static string ScopeToRepositoryKey(string scope) => scope switch
 {
     "keyword.declaration.precept"       => "declarationKeywords",
     "keyword.control.precept"           => "controlKeywords",
+    "keyword.other.assertion.precept"   => "assertionKeywords",
+    "keyword.other.connective.precept"  => "connectiveKeywords",
     "keyword.other.action.precept"      => "actionKeywords",
     "keyword.other.outcome.precept"     => "outcomeKeywords",
     "keyword.other.access-mode.precept" => "accessModeKeywords",

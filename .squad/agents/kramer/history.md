@@ -7,6 +7,7 @@
 ## Learnings
 
 - Tooling trust depends on accurate status language: metadata readiness is not the same thing as implemented handlers.
+- VS Code extension packaging can bundle `src/extension.ts` into `out/extension.js` with esbuild while keeping `npm run compile` as the dev/type-check path; using `vscode:prepublish` makes every VSIX build pick up the bundle without touching the shipped `server/` payload.
 - Grammar and completion changes are safest when specific patterns land before generic catch-alls and are backed by regression tests.
 - Proof diagnostics become brittle when they depend on prose instead of structured metadata; keep publication paths but prefer durable data contracts.
 - For custom DSL documentation, truthful code-fence labels and accurate path/build guidance matter more than cosmetic approximations.

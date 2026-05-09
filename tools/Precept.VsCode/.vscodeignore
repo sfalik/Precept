@@ -5,5 +5,4 @@
 !out/**
 !syntaxes/**
 !webview/**
-!node_modules/**
 !server/**

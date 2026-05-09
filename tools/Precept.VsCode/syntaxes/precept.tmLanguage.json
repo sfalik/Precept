@@ -82,6 +82,9 @@
       "include": "#logicalOperators"
     },
     {
+      "include": "#isSetOperator"
+    },
+    {
       "include": "#membershipOperators"
     },
     {
@@ -101,6 +104,12 @@
     },
     {
       "include": "#controlKeywords"
+    },
+    {
+      "include": "#assertionKeywords"
+    },
+    {
+      "include": "#connectiveKeywords"
     },
     {
       "include": "#actionKeywords"
@@ -141,7 +150,7 @@
     },
     "declarationKeywords": {
       "name": "keyword.declaration.precept",
-      "match": "\\b(descending|ascending|optional|writable|because|default|initial|precept|ensure|event|field|state|rule|as)\\b"
+      "match": "\\b(descending|ascending|because|initial|precept|event|field|state|rule)\\b"
     },
     "logicalOperators": {
       "name": "keyword.operator.logical.precept",
@@ -153,11 +162,19 @@
     },
     "accessModeKeywords": {
       "name": "keyword.other.access-mode.precept",
-      "match": "\\b(editable|readonly|modify|omit)\\b"
+      "match": "\\b(modify|omit)\\b"
     },
     "actionKeywords": {
       "name": "keyword.other.action.precept",
-      "match": "\\b(dequeue|enqueue|append|insert|remove|clear|push|add|pop|put)\\b"
+      "match": "\\b(dequeue|enqueue|append|insert|remove|clear|push|add|pop|put|set)\\b"
+    },
+    "assertionKeywords": {
+      "name": "keyword.other.assertion.precept",
+      "match": "\\b(ensure)\\b"
+    },
+    "connectiveKeywords": {
+      "name": "keyword.other.connective.precept",
+      "match": "\\b(editable|optional|readonly|writable|default|as)\\b"
     },
     "constraintKeywords": {
       "name": "keyword.other.constraint.precept",
@@ -181,7 +198,7 @@
     },
     "typeKeywords": {
       "name": "storage.type.precept",
-      "match": "\\b(unitofmeasure|zoneddatetime|exchangerate|dimension|currency|datetime|duration|quantity|timezone|boolean|decimal|instant|integer|choice|lookup|number|period|string|money|price|queue|stack|date|list|time|bag|log|set)\\b"
+      "match": "\\b(unitofmeasure|zoneddatetime|exchangerate|dimension|currency|datetime|duration|quantity|timezone|boolean|decimal|instant|integer|choice|lookup|number|period|string|money|price|queue|stack|date|list|time|bag|log)\\b"
     },
     "arrowOperators": {
       "name": "keyword.operator.arrow.precept",
@@ -289,7 +306,7 @@
               "name": "keyword.declaration.precept"
             },
             "4": {
-              "name": "entity.name.precept.message.precept"
+              "name": "entity.name.type.precept.precept"
             }
           }
         }
@@ -364,6 +381,9 @@
                   "include": "#declarationKeywords"
                 },
                 {
+                  "include": "#connectiveKeywords"
+                },
+                {
                   "include": "#ruleDesugaringModifiers"
                 },
                 {
@@ -388,6 +408,9 @@
                 {
                   "name": "punctuation.separator.comma.precept",
                   "match": ","
+                },
+                {
+                  "include": "#identifierReference"
                 }
               ]
             }
@@ -441,10 +464,16 @@
                   "include": "#declarationKeywords"
                 },
                 {
+                  "include": "#connectiveKeywords"
+                },
+                {
                   "include": "#numbers"
                 },
                 {
                   "include": "#strings"
+                },
+                {
+                  "include": "#identifierReference"
                 }
               ]
             }
@@ -457,7 +486,7 @@
       "patterns": [
         {
           "name": "meta.field-declaration.precept",
-          "match": "^(\\s*)(field)(\\s\u002B)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s\u002B)(as)(\\s\u002B)(unitofmeasure|zoneddatetime|exchangerate|dimension|currency|datetime|duration|quantity|timezone|boolean|decimal|instant|integer|choice|lookup|number|period|string|money|price|queue|stack|date|list|time|bag|log|set)(.*)",
+          "match": "^(\\s*)(field)(\\s\u002B)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s\u002B)(as)(\\s\u002B)(unitofmeasure|zoneddatetime|exchangerate|dimension|currency|datetime|duration|quantity|timezone|boolean|decimal|instant|integer|choice|lookup|number|period|string|money|price|queue|stack|date|list|time|bag|log)(.*)",
           "captures": {
             "2": {
               "name": "keyword.declaration.precept"
@@ -486,6 +515,9 @@
                   "include": "#arrowOperators"
                 },
                 {
+                  "include": "#symbolOperators"
+                },
+                {
                   "include": "#ruleDesugaringModifiers"
                 },
                 {
@@ -493,6 +525,9 @@
                 },
                 {
                   "include": "#declarationKeywords"
+                },
+                {
+                  "include": "#connectiveKeywords"
                 },
                 {
                   "include": "#typeKeywords"
@@ -516,6 +551,9 @@
                 {
                   "name": "punctuation.separator.comma.precept",
                   "match": ","
+                },
+                {
+                  "include": "#identifierReference"
                 }
               ]
             }
@@ -586,7 +624,7 @@
               ]
             },
             "6": {
-              "name": "keyword.declaration.precept"
+              "name": "keyword.other.assertion.precept"
             }
           }
         }
@@ -624,7 +662,7 @@
               "name": "entity.name.function.event.precept"
             },
             "6": {
-              "name": "keyword.declaration.precept"
+              "name": "keyword.other.assertion.precept"
             }
           }
         }
@@ -671,7 +709,7 @@
               ]
             },
             "10": {
-              "name": "keyword.other.access-mode.precept"
+              "name": "keyword.other.connective.precept"
             }
           }
         }
@@ -749,10 +787,39 @@
           "match": "\\b(no)(\\s\u002B)(transition)\\b",
           "captures": {
             "1": {
-              "name": "keyword.other.outcome.precept"
+              "name": "keyword.other.connective.precept"
             },
             "3": {
-              "name": "keyword.other.outcome.precept"
+              "name": "keyword.other.connective.precept"
+            }
+          }
+        }
+      ]
+    },
+    "isSetOperator": {
+      "patterns": [
+        {
+          "match": "\\b(is)(\\s\u002B)(not)(\\s\u002B)(set)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.membership.precept"
+            },
+            "3": {
+              "name": "keyword.operator.membership.precept"
+            },
+            "5": {
+              "name": "keyword.operator.membership.precept"
+            }
+          }
+        },
+        {
+          "match": "\\b(is)(\\s\u002B)(set)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.membership.precept"
+            },
+            "3": {
+              "name": "keyword.operator.membership.precept"
             }
           }
         }
