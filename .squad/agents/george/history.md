@@ -25,6 +25,7 @@
 - Temporal typed constants now share one canonical parser stack under `src/Precept/Language/Time/`; `TemporalParser` owns the formatted temporal forms, `TemporalQuantityParser` owns quantity phrases, and `TemporalValidator` bridges both into typed-constant validation.
 - External standards data belongs in embedded XML + lazy loaders, not in Precept catalogs: ISO 4217 and UCUM are authoritative reference data consumed by validators, while `TypeMeta` remains the language-owned metadata boundary.
 - `UcumCatalog` Tier 1 browsing cannot assume every curated code is a direct `UcumAtomCatalog.All` key: prefixed units and compact exponent forms like `m2` need synthesized tier entries built from UCUM parsing/normalization while `LookupAtom` continues to expose the full atom catalog.
+- Q4 registry alignment should expose canonical `All` registries and keep alias lookups separate: `TemporalUnits.All` is singular-keyed while `TryGet(...)` stays backed by an alias map, and `precept_language` should surface business-domain registries under a dedicated `domains` object instead of scattering ad hoc fields.
 
 ### 2026-05-09T11:33:49Z — Commit batching: catalog DU + pipeline + analyzers
 
