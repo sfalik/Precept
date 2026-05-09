@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Partial (`precept_ping`, `precept_compile`, `precept_language` implemented; `precept_inspect`, `precept_fire`, `precept_update` not yet implemented) |
+| Implementation state | Partial — all 9 discoverable tools plus `precept_ping` are implemented; `precept_inspect`, `precept_fire`, `precept_update` are not yet implemented (runtime build work) |
 | Source | `tools/Precept.Mcp/` |
 | Upstream | Compiler (`Compilation`), Runtime (`Precept` + `Version`), Catalogs |
 | Downstream | AI agents, Copilot, developer workflow |
@@ -14,16 +14,32 @@
 
 ## 2. Overview
 
-The MCP server exposes five tools that project Precept's compiler and runtime to AI agents. It is a **primary distribution surface** — designed alongside the core API, not retrofitted.
+The MCP server exposes 12 tools that project Precept's compiler, runtime, and language catalogs to AI agents. It is a **primary distribution surface** — designed alongside the core API, not retrofitted.
+
+### Discoverable AI-Authoring Tools (catalog projections)
+
+| Tool | Purpose | Core API |
+|------|---------|----------|
+| `precept_quickstart` | Orientation: product description, core concepts, tool guide, minimal examples | `QuickstartCatalog` |
+| `precept_syntax` | Constructs, actions, outcomes, operators, grammar meta-rules | `Constructs`, `Actions`, `Outcomes`, `Operators`, `SyntaxReference` |
+| `precept_types` | Types, modifiers, functions | `Types`, `Modifiers`, `Functions` |
+| `precept_operations(category?)` | All 198 typed operator combinations, optional LHS-type filter | `Operations.All` |
+| `precept_proofs` | Proof obligation catalog + runtime fault catalog | `ProofRequirements.All`, `Faults.All` |
+| `precept_patterns` | 8 common patterns + 3 anti-patterns, all verified to compile | `SyntaxReference.CommonPatterns`, `.AntiPatterns` |
+| `precept_diagnostic(code)` | Single diagnostic lookup by name or PRE-number | `Diagnostics.All` / `Diagnostics.GetMeta` |
+| `precept_domains` | Currencies, UCUM tier-1 units, SI prefixes, dimensions | `CurrencyCatalog`, `UcumAtomCatalog.BrowseTier1()`, `UcumPrefixCatalog`, `DimensionCatalog` |
+
+### Runtime Tools
 
 | Tool | Purpose | Core API |
 |------|---------|----------|
 | `precept_ping` | Connectivity check | — |
-| `precept_language` | DSL vocabulary from catalogs | Reads language + diagnostic catalogs directly |
 | `precept_compile(text)` | Parse/type-check/analyze | `Compiler.Compile` → `Compilation` |
 | `precept_inspect(text, state, data, args?)` | Read-only transition preview | `Version.InspectFire` + `Version.InspectUpdate` |
 | `precept_fire(text, state, event, data?, args?)` | Execute single event | `Precept.From` + `Version.Fire` |
 | `precept_update(text, state, data, patch)` | Apply field patch | `Precept.From` + `Version.Update` |
+
+> **Note — `precept_language` deregistered:** The `LanguageTool.Language()` implementation is retained in `tools/Precept.Mcp/Tools/LanguageTool.cs` for internal use by the focused catalog tools above (they call it and project subsets). It is **not registered** as a discoverable MCP tool — the `[McpServerTool]` attribute has been removed from `Language()`. The full 200KB catalog dump is replaced by focused per-domain tools that return only what an AI agent needs for a given task.
 
 All tools are **thin wrappers**: deserialize arguments → call one core API → serialize result. Domain logic lives in `src/Precept/`, never in the MCP layer. If a tool method exceeds ~30 lines of non-serialization code, the excess belongs in core as a new API surface.
 
@@ -78,7 +94,14 @@ If a tool needs to orchestrate multiple core calls, filter results, or apply dom
 | Tool | Arguments | Returns |
 |------|-----------|---------|
 | `precept_ping` | (none) | `"ok"` |
-| `precept_language` | (none) | Complete DSL vocabulary JSON |
+| `precept_quickstart` | (none) | `QuickstartDto` |
+| `precept_syntax` | (none) | `SyntaxDto` |
+| `precept_types` | (none) | `TypesDto` |
+| `precept_operations` | `category?: string` | `OperationsResultDto` |
+| `precept_proofs` | (none) | `ProofsDto` |
+| `precept_patterns` | (none) | `PatternsDto` |
+| `precept_diagnostic` | `code: string` | `DiagnosticLookupResultDto` |
+| `precept_domains` | (none) | `DomainsDto` |
 | `precept_compile` | `text: string` | `CompileResult` |
 | `precept_inspect` | `text: string`, `currentState: string?`, `data: object`, `eventArgs?: object` | `InspectResult` |
 | `precept_fire` | `text: string`, `currentState: string?`, `event: string`, `data?: object`, `args?: object` | `FireResult` |
@@ -178,52 +201,9 @@ JSON response to agent
 
 ---
 
-### `precept_language`
+### `precept_language` (internal — not registered)
 
-**Arguments:** None
-
-**Core API:** Direct read of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, `Diagnostics.All`, plus `CurrencyCatalog.All`, `UcumAtomCatalog.BrowseTier1()`, `DimensionCatalog.All`, and `TemporalUnits.AllEntries`
-
-**Returns:** Complete DSL vocabulary in structured JSON:
-
-```json
-{
-  "tokens": [ ... ],
-  "types": [ ... ],
-  "modifiers": {
-    "field": [ ... ],
-    "state": [ ... ],
-    "event": [ ... ],
-    "access": [ ... ],
-    "anchor": [ ... ]
-  },
-  "actions": [ ... ],
-  "constructs": [ ... ],
-  "constraints": [ ... ],
-  "operators": [ ... ],
-  "functions": [ ... ],
-  "diagnostics": [ ... ],
-  "domains": {
-    "currencies": [ ... ],
-    "ucumTier1Units": [ ... ],
-    "dimensions": [ ... ],
-    "temporalUnits": [ ... ]
-  },
-  "firePipeline": [
-    "RowMatching",
-    "GuardEvaluation",
-    "PreconditionCheck",
-    "MutationApplication",
-    "InvariantCheck",
-    "StateEnsuresCheck",
-    "EventEnsuresCheck"
-  ]
-}
-```
-
-**Behavior:** Read-only. No compilation occurs. The tool serializes catalog metadata directly, groups modifiers by modifier subtype (`field`, `state`, `event`, `access`, `anchor`), includes the diagnostic catalog for AI grounding, surfaces currency / UCUM Tier 1 / dimension / temporal registries for typed-literal reasoning, and exposes the static `firePipeline` execution order used by `precept_fire`.
-
-**Catalog derivation:** No parallel vocabulary is maintained. The tool iterates the catalogs and domain registries named above, so newly added catalog members and surfaced business-domain entries flow into MCP output automatically.
+> **Not discoverable.** The `[McpServerTool]` attribute has been removed from `LanguageTool.Language()`. The implementation is retained and called internally by the focused catalog tools (`precept_syntax`, `precept_types`, etc.) as a convenience projection entry-point. AI agents should use the focused tools instead — they return only the catalog subset relevant to the task at hand, keeping token usage manageable.
 
 ---
 
@@ -820,7 +800,7 @@ This ensures the MCP protocol remains intact even when the underlying runtime ha
 
 ### Vocabulary Guarantee
 
-`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All` appears in the output. It also surfaces the current `CurrencyCatalog.All`, `UcumAtomCatalog.BrowseTier1()`, `DimensionCatalog.All`, and `TemporalUnits.AllEntries` surfaces. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
+`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Operations.All`, `Functions.All`, `Outcomes.All`, and `Diagnostics.All` appears in the output. It also projects `SyntaxReference` and surfaces the current `CurrencyCatalog.All`, `UcumAtomCatalog.BrowseTier1()`, `DimensionCatalog.All`, and `TemporalUnits.AllEntries` surfaces. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
 
 ### JSON Stability
 
@@ -967,10 +947,10 @@ This transparency helps agents predict and debug event execution.
 - `Precept.From`, `Precept.Restore` implementations
 
 **[OQ-2] `precept_language` catalog coverage:**
-Implemented catalog surface:
-- Tokens, Types, Functions, Operators, Diagnostics
+Implemented language surface:
+- Tokens, Types, Functions, Operators, Operations, Outcomes, Diagnostics
 - Modifiers (5 subtypes: Field, State, Event, Access, Anchor)
-- Actions, Constructs, Constraints
+- Actions, Constructs, Constraints, SyntaxReference
 - Domain registries: currencies, UCUM Tier 1 units, dimensions, temporal units
 
 **[OQ-3] FirePipeline array maintenance:**

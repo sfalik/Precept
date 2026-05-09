@@ -7,8 +7,11 @@
 
 ## Learnings
 
-- Language Server design at `docs/tooling/language-server.md` is implementation-ready across all 10 feature areas (diagnostics, two-pass semantic tokens, catalog-driven completions, hover, go-to-definition, preview/inspect, document outline, folding, diagnostic enrichment, code actions). Finalized implementation plan at `docs/Working/language-server-implementation-plan.md` — 12 vertical slices with method-level specificity, 173 existing red tests as the acceptance contract.
-- Key catalog gap for LS: `ConstructMeta.IsOutlineNode` and `LspSymbolKind` resolved in design (CC#18) but not yet added to code. Temporary `ConstructKind` switch in Slice 6 is acceptable — isolated to one private method, trivially replaceable when catalog fields land.
+- Language Server design at `docs/tooling/language-server.md` is implementation-ready across all 10 feature areas (diagnostics, two-pass semantic tokens, catalog-driven completions, hover, go-to-definition, preview/inspect, document outline, folding, diagnostic enrichment, code actions). Finalized implementation plan at `docs/Working/language-server-implementation-plan.md` — 13 slices (0a + 0–11) with method-level specificity, 173 existing red tests as the acceptance contract.
+- `ConstructMeta.IsOutlineNode` + `OutlineSymbolTag` resolved as concrete Slice 0a (no longer deferred). Architectural decision: catalog stores `string? OutlineSymbolTag` (plain tag), LS projects via `Enum.Parse<SymbolKind>(tag)` — follows the `TokenMeta.SemanticTokenType` pattern. No LSP protocol dependency in `src/Precept/`. Field named `OutlineSymbolTag` not `LspSymbolKind` to avoid protocol coupling in catalog vocabulary.
+- George-15's `DiagnosticMeta` enrichments (`TriggerCondition`, `RecoverySteps`, `ExampleBefore`, `ExampleAfter`) have landed in `src/Precept/Language/Diagnostics.cs` — no longer a prerequisite, Slices 5 and 8 consume immediately.
+- `TypeMeta.IsUserFacing` gap resolved permanently: `Token != null` is structurally equivalent and is the permanent filter — no catalog change needed. Reframed from "workaround" to "permanent solution."
+- No deferrals remain in the LS implementation plan. All "future work", "temporary", "may need", "when…land" language eliminated or resolved with concrete decisions (2026-05-09).
 - The stub API in `LanguageServerStubs.cs` defines the test-facing contract for 173 ported tests. Implementations must satisfy these exact signatures — the OmniSharp handler layer delegates to the same classes. Two parallel API surfaces (OmniSharp handlers + stub classes) are acceptable for a component this thin (~500-700 LOC).
 - `SemanticIndex` already carries `FieldReferences`, `StateReferences`, `EventReferences` (CC#3) — the reference site records needed for Pass 2 semantic tokens and go-to-definition. No reconstruction from typed expression trees needed; the type checker populates them at resolution time.
 - `TypeMeta.IsUserFacing` is not on the record but `Token != null` is a structural equivalent for filtering internal types from completions. No catalog change required.
@@ -26,6 +29,12 @@
 - Typical cold-start authoring session with the new suite costs ~57 KB (quickstart + syntax + patterns + types) vs. ~192 KB for `precept_language` alone — every byte is authoring-relevant.
 
 ## Recent Updates
+
+### 2026-05-09T18:53:05-04:00 — LS plan no-deferrals amendment
+- Converted `ConstructMeta.IsOutlineNode` + `OutlineSymbolTag` from catalog gap to concrete Slice 0a with method-level specificity, entry-by-entry values, and 8 named tests.
+- Resolved architectural question: catalog stores `string? OutlineSymbolTag`, LS projects to `SymbolKind` — no LSP dependency in core.
+- Confirmed George-15's `DiagnosticMeta` enrichments already landed — upgraded from "prerequisite" to "available now" in Slices 5 and 8.
+- Eliminated all deferred/temporary/may-need language from the plan. Decision record at `.squad/decisions/inbox/frank-ls-plan-no-deferrals.md`.
 
 ### 2026-05-09T19:55:00Z — Full design gap audit for typed literal / business domain types
 - Completed comprehensive audit against `docs/language/business-domain-types.md` (D1–D18), research doc, language spec, catalog system doc, and runtime API doc.

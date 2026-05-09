@@ -224,7 +224,7 @@ field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
 ```
 
 ```
-field  LineTotal  as  number  <-  TaxableAmount + TaxAmount  nonnegative
+field  LineTotal  as  number  nonnegative  <-  TaxableAmount + TaxAmount
   │       │         ↑    │      ↑              │               │
  [1]     [2]      slot  [3]   slot            [4]             [5]
                   marker      marker

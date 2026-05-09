@@ -25,6 +25,9 @@ public class LanguageToolTests
             "operators",
             "functions",
             "diagnostics",
+            "operations",
+            "outcomes",
+            "syntaxReference",
             "domains",
             "firePipeline");
 
@@ -93,6 +96,37 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void Language_TypesIncludeAuthoringMetadataAndContentValidation()
+    {
+        var result = LanguageTool.Language();
+
+        var dateMeta = Types.GetMeta(TypeKind.Date);
+        var date = result.Types.Should().ContainSingle(type => type.Kind == TypeKind.Date.ToString()).Subject;
+        date.HoverDescription.Should().Be(dateMeta.HoverDescription);
+        date.UsageExample.Should().Be(dateMeta.UsageExample);
+        date.NotemptyApplicable.Should().Be(dateMeta.NotemptyApplicable);
+        date.ContentValidation.Should().NotBeNull();
+        date.ContentValidation!.Kind.Should().Be("NodaTime");
+        date.ContentValidation.FormatDescription.Should().Be(dateMeta.ContentValidation!.FormatDescription);
+        date.ContentValidation.Examples.Should().Equal(dateMeta.ContentValidation.Examples);
+        date.ContentValidation.NodaTimePattern.Should().Be(((NodaTimeValidation)dateMeta.ContentValidation).NodaTimePattern);
+        date.ContentValidation.LiteralKind.Should().Be(((NodaTimeValidation)dateMeta.ContentValidation).LiteralKind.ToString());
+
+        var currency = result.Types.Should().ContainSingle(type => type.Kind == TypeKind.Currency.ToString()).Subject;
+        currency.ContentValidation.Should().NotBeNull();
+        currency.ContentValidation!.Kind.Should().Be("ClosedSet");
+        currency.ContentValidation.SetName.Should().Be("ISO 4217");
+        currency.ContentValidation.AllowedValues.Should().Contain(new[] { "USD", "EUR" });
+
+        var lookup = result.Types.Should().ContainSingle(type => type.Kind == TypeKind.Lookup.ToString()).Subject;
+        lookup.NotemptyApplicable.Should().BeFalse();
+
+        var set = result.Types.Should().ContainSingle(type => type.Kind == TypeKind.Set.ToString()).Subject;
+        var minAccessor = set.Accessors.Should().ContainSingle(accessor => accessor.Name == "min").Subject;
+        minAccessor.ProofRequirements.Should().Equal("self.count > 0 — Collection must be non-empty");
+    }
+
+    [Fact]
     public void Language_ModifiersMirrorModifierCatalogBySubtype()
     {
         var result = LanguageTool.Language();
@@ -136,6 +170,19 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void Language_FieldModifiersIncludeAuthoringMetadataAndProofSatisfactions()
+    {
+        var result = LanguageTool.Language();
+
+        var notemptyMeta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Notempty);
+        var notempty = result.Modifiers.Field.Should().ContainSingle(modifier => modifier.Kind == ModifierKind.Notempty.ToString()).Subject;
+        notempty.ProofSatisfactions.Should().Equal("self.length > 0", "self.count > 0");
+        notempty.HoverDescription.Should().Be(notemptyMeta.HoverDescription);
+        notempty.UsageExample.Should().Be(notemptyMeta.UsageExample);
+        notempty.SnippetTemplate.Should().Be(notemptyMeta.SnippetTemplate);
+    }
+
+    [Fact]
     public void Language_ActionsMirrorActionCatalogInDeclarationOrderAndRepresentativeFields()
     {
         var result = LanguageTool.Language();
@@ -151,7 +198,22 @@ public class LanguageToolTests
         action.ValueRequired.Should().Be(actionMeta.ValueRequired);
         action.IntoSupported.Should().Be(actionMeta.IntoSupported);
         action.PrimaryActionKind.Should().Be(actionMeta.PrimaryActionKind?.ToString());
+        action.ProofRequirements.Should().BeNull();
+        action.HoverDescription.Should().Be(actionMeta.HoverDescription);
+        action.UsageExample.Should().Be(actionMeta.UsageExample);
+        action.SnippetTemplate.Should().Be(actionMeta.SnippetTemplate);
         action.ApplicableTo.Should().HaveCount(actionMeta.ApplicableTo.Length == 0 ? 1 : actionMeta.ApplicableTo.Length);
+    }
+
+    [Fact]
+    public void Language_ActionsIncludeProofRequirements()
+    {
+        var result = LanguageTool.Language();
+
+        var dequeueMeta = Actions.GetMeta(ActionKind.Dequeue);
+        var dequeue = result.Actions.Should().ContainSingle(action => action.Kind == ActionKind.Dequeue.ToString()).Subject;
+        dequeue.ProofRequirements.Should().Equal("self.count > 0 — Queue must be non-empty");
+        dequeue.HoverDescription.Should().Be(dequeueMeta.HoverDescription);
     }
 
     [Fact]
@@ -222,6 +284,86 @@ public class LanguageToolTests
         isSet.Family.Should().Be(isSetMeta.Family.ToString());
         isSet.IsKeywordOperator.Should().Be(isSetMeta.IsKeywordOperator);
         isSet.Description.Should().Be(isSetMeta.Description);
+        isSet.HoverDescription.Should().Be(isSetMeta.HoverDescription);
+        isSet.UsageExample.Should().Be(isSetMeta.UsageExample);
+    }
+
+    [Fact]
+    public void Language_OperationsMirrorOperationCatalogInDeclarationOrderAndRepresentativeFields()
+    {
+        var result = LanguageTool.Language();
+
+        result.Operations.Select(operation => operation.Kind).Should().Equal(Operations.All.Select(operation => operation.Kind.ToString()));
+
+        var negateInteger = result.Operations.Should().ContainSingle(operation => operation.Kind == OperationKind.NegateInteger.ToString()).Subject;
+        negateInteger.Operator.Should().Be(OperatorKind.Negate.ToString());
+        negateInteger.LhsType.Should().Be(TypeKind.Integer.ToString());
+        negateInteger.RhsType.Should().BeEmpty();
+        negateInteger.ResultType.Should().Be(TypeKind.Integer.ToString());
+        negateInteger.ProofRequirements.Should().BeNull();
+
+        var stringEquals = result.Operations.Should().ContainSingle(operation => operation.Kind == OperationKind.StringEqualsString.ToString()).Subject;
+        stringEquals.HasCIVariant.Should().BeTrue();
+        stringEquals.CIDiagnosticCode.Should().Be(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals.ToString());
+
+        var quantityDivide = result.Operations.Should().ContainSingle(operation => operation.Kind == OperationKind.QuantityDivideQuantityCrossDimension.ToString()).Subject;
+        quantityDivide.QualifierMatch.Should().Be(QualifierMatch.Different.ToString());
+        ((string[]?)quantityDivide.ProofRequirements).Should().Equal("quantity != 0 — Divisor must be non-zero");
+
+        var pricePlus = result.Operations.Should().ContainSingle(operation => operation.Kind == OperationKind.PricePlusPrice.ToString()).Subject;
+        ((string[]?)pricePlus.ProofRequirements).Should().Equal(
+            "operands share unit qualifiers — Operands must have matching unit qualifiers",
+            "operands share currency qualifiers — Operands must have matching currency qualifiers");
+    }
+
+    [Fact]
+    public void Language_OutcomesMirrorOutcomeCatalog()
+    {
+        var result = LanguageTool.Language();
+
+        result.Outcomes.Select(outcome => outcome.Kind).Should().Equal(Outcomes.All.Select(outcome => outcome.Kind.ToString()));
+
+        var rejectMeta = Outcomes.GetMeta(OutcomeKind.Reject);
+        var reject = result.Outcomes.Should().ContainSingle(outcome => outcome.Kind == OutcomeKind.Reject.ToString()).Subject;
+        reject.LeadingToken.Should().Be(RenderToken(rejectMeta.LeadingToken));
+        reject.ArgumentKind.Should().Be(rejectMeta.ArgumentKind.ToString());
+        reject.Description.Should().Be(rejectMeta.Description);
+        reject.Example.Should().Be(rejectMeta.Example);
+    }
+
+    [Fact]
+    public void Language_SyntaxReferenceMirrorsSourceAndExamplesCompile()
+    {
+        var result = LanguageTool.Language();
+
+        result.SyntaxReference.GrammarModel.Should().Be(SyntaxReference.GrammarModel);
+        result.SyntaxReference.CommentSyntax.Should().Be(SyntaxReference.CommentSyntax);
+        result.SyntaxReference.IdentifierRules.Should().Be(SyntaxReference.IdentifierRules);
+        result.SyntaxReference.StringLiteralRules.Should().Be(SyntaxReference.StringLiteralRules);
+        result.SyntaxReference.NumberLiteralRules.Should().Be(SyntaxReference.NumberLiteralRules);
+        result.SyntaxReference.WhitespaceRules.Should().Be(SyntaxReference.WhitespaceRules);
+        result.SyntaxReference.NullNarrowing.Should().Be(SyntaxReference.NullNarrowing);
+        result.SyntaxReference.TypedConstantRules.Should().Be(SyntaxReference.TypedConstantRules);
+        result.SyntaxReference.ExpressionRules.Should().Be(SyntaxReference.ExpressionRules);
+        result.SyntaxReference.PrecedenceTable.Should().Equal(SyntaxReference.PrecedenceTable);
+        result.SyntaxReference.ConventionalOrder.Should().Equal(SyntaxReference.ConventionalOrder);
+        result.SyntaxReference.CommonPatterns.Select(pattern => pattern.Name).Should().Equal(SyntaxReference.CommonPatterns.Select(pattern => pattern.Name));
+        result.SyntaxReference.AntiPatterns.Select(pattern => pattern.Name).Should().Equal(SyntaxReference.AntiPatterns.Select(pattern => pattern.Name));
+        result.SyntaxReference.CommonPatterns.Should().Contain(pattern => pattern.Name == "Computed field" && pattern.DslSnippet.Contains("<-"));
+
+        foreach (var pattern in result.SyntaxReference.CommonPatterns)
+        {
+            var source = BuildPatternDocument(pattern.Name, pattern.DslSnippet);
+            var compilation = CompileTool.Compile(source);
+            compilation.HasErrors.Should().BeFalse($"syntaxReference pattern '{pattern.Name}' should compile cleanly");
+        }
+
+        foreach (var pattern in result.SyntaxReference.AntiPatterns)
+        {
+            var source = BuildPatternDocument(pattern.Name, pattern.GoodSnippet);
+            var compilation = CompileTool.Compile(source);
+            compilation.HasErrors.Should().BeFalse($"syntaxReference anti-pattern fix '{pattern.Name}' should compile cleanly");
+        }
     }
 
     [Fact]
@@ -239,7 +381,16 @@ public class LanguageToolTests
         function.HasCaseInsensitiveVariant.Should().Be(functionMeta.HasCIVariant);
         function.CaseInsensitiveVariantOf.Should().Be(functionMeta.CIVariantOf?.ToString());
         function.CaseInsensitiveDiagnosticCode.Should().Be(functionMeta.CIDiagnosticCode?.ToString());
-        function.Overloads.Select(overload => new { Parameters = overload.Parameters.Select(parameter => parameter.Type).ToArray(), overload.ReturnType, overload.QualifierMatch })
+        function.UsageExample.Should().Be(functionMeta.UsageExample);
+        function.SnippetTemplate.Should().Be(functionMeta.SnippetTemplate);
+        function.HoverDescription.Should().Be(functionMeta.HoverDescription);
+        function.IsMessagePosition.Should().Be(functionMeta.IsMessagePosition);
+        function.Overloads.Select(overload => new
+            {
+                Parameters = overload.Parameters.Select(parameter => parameter.Type).ToArray(),
+                overload.ReturnType,
+                overload.QualifierMatch,
+            })
             .Should()
             .BeEquivalentTo(
                 functionMeta.Overloads.Select(overload => new
@@ -249,6 +400,10 @@ public class LanguageToolTests
                     QualifierMatch = overload.Match?.ToString() ?? QualifierMatch.Any.ToString(),
                 }),
                 options => options.WithStrictOrdering());
+
+        var sqrt = result.Functions.Should().ContainSingle(entry => entry.Kind == FunctionKind.Sqrt.ToString()).Subject;
+        sqrt.Overloads.Should().ContainSingle();
+        sqrt.Overloads[0].ProofRequirements.Should().Equal("value >= 0 — Argument must be non-negative");
     }
 
     [Fact]
@@ -272,6 +427,10 @@ public class LanguageToolTests
         diagnostic.FixHint.Should().Be(diagnosticMeta.FixHint);
         diagnostic.PreventsFault.Should().Be(diagnosticMeta.PreventsFault?.ToString());
         diagnostic.SuggestionSources.Should().Equal(diagnosticMeta.SuggestionSources?.Select(source => source.ToString()) ?? []);
+        diagnostic.TriggerCondition.Should().Be(diagnosticMeta.TriggerCondition);
+        diagnostic.RecoverySteps.Should().Equal(diagnosticMeta.RecoverySteps ?? []);
+        diagnostic.ExampleBefore.Should().Be(diagnosticMeta.ExampleBefore);
+        diagnostic.ExampleAfter.Should().Be(diagnosticMeta.ExampleAfter);
     }
 
     [Fact]
@@ -360,6 +519,54 @@ public class LanguageToolTests
             ConstraintMeta.EventPrecondition => [RenderToken(TokenKind.On), RenderToken(TokenKind.Ensure)],
             _ => throw new ArgumentOutOfRangeException(nameof(constraint), constraint, null),
         };
+
+    private static string BuildPatternDocument(string patternName, string snippet)
+    {
+        if (snippet.TrimStart().StartsWith("precept "))
+            return snippet;
+
+        return patternName switch
+        {
+            "Guarded transition" => $"""
+                precept LoanApplication
+                field DocumentsVerified as boolean default true
+                field CreditScore as number default 700
+                field ApprovedAmount as number default 0
+                state UnderReview initial
+                state Approved terminal
+                event Approve(Amount as number)
+                {snippet}
+                """,
+            "Computed field" => $"""
+                precept InvoiceLineItem
+                field UnitPrice as number default 0 nonnegative writable
+                field Quantity as number default 1 min 1 writable
+                field DiscountPercent as number default 0 nonnegative max 100 writable
+                {snippet}
+                """,
+            "Conditional action" => $"""
+                precept LoanDecision
+                field CreditScore as number default 700
+                field DecisionNote as string optional
+                state UnderReview initial
+                state Approved terminal
+                event Approve
+                {snippet}
+                """,
+            "Collection state gate" => $"""
+                precept HiringPipeline
+                field PendingInterviewers as set of string
+                field CurrentInterviewer as string
+                field FeedbackCount as integer default 0 nonnegative
+                state InterviewLoop initial
+                state Decision terminal
+                event RecordFeedback
+                {snippet}
+                """,
+            "Stateless write-only precept" => snippet,
+            _ => throw new ArgumentOutOfRangeException(nameof(patternName), patternName, null),
+        };
+    }
 
     private static string RenderModifier(ModifierKind kind)
         => Modifiers.GetMeta(kind).Token.Text ?? kind.ToString();

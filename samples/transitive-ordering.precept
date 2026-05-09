@@ -22,4 +22,4 @@ rule High > Mid because "High must exceed Mid"
 rule Mid > Low because "Mid must exceed Low"
 
 # Spread is provably positive: the proof engine derives High > Low transitively.
-field Spread as number <- High - Low positive
+field Spread as number positive <- High - Low

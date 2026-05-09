@@ -10,6 +10,9 @@ public sealed record LanguageReferenceDto(
     OperatorCatalogEntryDto[] Operators,
     FunctionCatalogEntryDto[] Functions,
     DiagnosticCatalogEntryDto[] Diagnostics,
+    OperationDto[] Operations,
+    OutcomeDto[] Outcomes,
+    SyntaxReferenceDto SyntaxReference,
     DomainCatalogDto Domains,
     string[] FirePipeline
 );
@@ -93,7 +96,11 @@ public sealed record TypeCatalogEntryDto(
     string[] ImpliedModifiers,
     QualifierShapeDto? QualifierShape,
     TypeAccessorDto[] Accessors,
-    string[] ChoiceLiteralTokens
+    string[] ChoiceLiteralTokens,
+    string? HoverDescription,
+    string? UsageExample,
+    bool NotemptyApplicable,
+    ContentValidationDto? ContentValidation
 );
 
 public sealed record QualifierShapeDto(
@@ -114,7 +121,18 @@ public sealed record TypeAccessorDto(
     string? ParameterType,
     bool UsesElementParameter,
     string[] RequiredTraits,
-    string? ReturnsQualifier
+    string? ReturnsQualifier,
+    string[]? ProofRequirements
+);
+
+public sealed record ContentValidationDto(
+    string Kind,
+    string FormatDescription,
+    string[] Examples,
+    string? NodaTimePattern,
+    string? LiteralKind,
+    string? SetName,
+    string[]? AllowedValues
 );
 
 public sealed record ModifierCatalogDto(
@@ -140,7 +158,11 @@ public sealed record FieldModifierCatalogEntryDto(
     bool HasValue,
     string[] Subsumes,
     bool DesugarsToRule,
-    string[] MutuallyExclusiveWith
+    string[] MutuallyExclusiveWith,
+    string[]? ProofSatisfactions,
+    string? HoverDescription,
+    string? UsageExample,
+    string? SnippetTemplate
 );
 
 public sealed record StateModifierCatalogEntryDto(
@@ -194,7 +216,11 @@ public sealed record ActionCatalogEntryDto(
     string SyntaxShape,
     bool ValueRequired,
     bool IntoSupported,
-    string? PrimaryActionKind
+    string? PrimaryActionKind,
+    string[]? ProofRequirements,
+    string? HoverDescription,
+    string? UsageExample,
+    string? SnippetTemplate
 );
 
 public sealed record ConstructCatalogEntryDto(
@@ -240,7 +266,61 @@ public sealed record OperatorCatalogEntryDto(
     int Precedence,
     string Family,
     bool IsKeywordOperator,
-    string Description
+    string Description,
+    string? HoverDescription,
+    string? UsageExample
+);
+
+public sealed record OperationDto(
+    string Kind,
+    string Operator,
+    string LhsType,
+    string RhsType,
+    string ResultType,
+    string Description,
+    string QualifierMatch,
+    object? ProofRequirements,
+    bool HasCIVariant,
+    string? CIDiagnosticCode,
+    bool BidirectionalLookup
+);
+
+public sealed record OutcomeDto(
+    string Kind,
+    string LeadingToken,
+    string ArgumentKind,
+    string Description,
+    string Example
+);
+
+public sealed record SyntaxReferenceDto(
+    string GrammarModel,
+    string CommentSyntax,
+    string IdentifierRules,
+    string StringLiteralRules,
+    string NumberLiteralRules,
+    string WhitespaceRules,
+    string NullNarrowing,
+    string TypedConstantRules,
+    string ExpressionRules,
+    string[] PrecedenceTable,
+    CommonPatternDto[] CommonPatterns,
+    AntiPatternDto[] AntiPatterns,
+    string[] ConventionalOrder
+);
+
+public sealed record CommonPatternDto(
+    string Name,
+    string Description,
+    string DslSnippet
+);
+
+public sealed record AntiPatternDto(
+    string Name,
+    string Description,
+    string BadSnippet,
+    string GoodSnippet,
+    string WhyItFails
 );
 
 public sealed record FunctionCatalogEntryDto(
@@ -251,13 +331,18 @@ public sealed record FunctionCatalogEntryDto(
     FunctionOverloadDto[] Overloads,
     bool HasCaseInsensitiveVariant,
     string? CaseInsensitiveVariantOf,
-    string? CaseInsensitiveDiagnosticCode
+    string? CaseInsensitiveDiagnosticCode,
+    string? UsageExample,
+    string? SnippetTemplate,
+    string? HoverDescription,
+    bool IsMessagePosition
 );
 
 public sealed record FunctionOverloadDto(
     FunctionParameterDto[] Parameters,
     string ReturnType,
-    string QualifierMatch
+    string QualifierMatch,
+    string[]? ProofRequirements
 );
 
 public sealed record FunctionParameterDto(
@@ -274,5 +359,9 @@ public sealed record DiagnosticCatalogEntryDto(
     string[] RelatedCodes,
     string? FixHint,
     string? PreventsFault,
-    string[] SuggestionSources
+    string[] SuggestionSources,
+    string? TriggerCondition,
+    string[] RecoverySteps,
+    string? ExampleBefore,
+    string? ExampleAfter
 );

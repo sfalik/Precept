@@ -17,6 +17,6 @@ field Subtotal as number <- UnitPrice * Quantity
 field DiscountAmount as number <- Subtotal * DiscountPercent / 100
 field TaxableAmount as number <- Subtotal - DiscountAmount
 field TaxAmount as number <- TaxableAmount * TaxRate / 100
-field LineTotal as number <- TaxableAmount + TaxAmount nonnegative
+field LineTotal as number nonnegative <- TaxableAmount + TaxAmount
 
 # Only source fields are editable; derived totals are locked.

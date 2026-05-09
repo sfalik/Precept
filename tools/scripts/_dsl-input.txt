@@ -1,64 +1,9 @@
-precept VehicleServiceAppointment
+precept Order
 
-field CustomerName as string optional
-field VehiclePlate as string optional
-field AdvisorName as string optional
-field ApprovedWorkCount as number default 0 nonnegative
-field InvoiceTotal as number default 0 nonnegative
-field PickupContacted as boolean default false
-field RecommendedServices as set of string
+state Draft initial
+state Complete terminal
 
-state Scheduled initial
-state CheckedIn
-state AwaitingApproval
-state InService
-state ReadyForPickup
-state Closed
+event Submit
 
-in CheckedIn modify AdvisorName editable
-in ReadyForPickup ensure PickupContacted because "Customers must be notified before pickup"
-
-from AwaitingApproval ensure RecommendedServices.count > 0 because "Approval cannot finish with an empty recommendation list"
-
-to ReadyForPickup -> set PickupContacted = true
-
-event CheckIn(Customer as string notempty, Plate as string notempty, Advisor as string notempty)
-event RecommendService(ServiceName as string notempty)
-event RemoveServiceRecommendation(ServiceName as string notempty)
-event ApproveEstimate(ApprovedCount as number, EstimateTotal as number)
-on ApproveEstimate ensure ApproveEstimate.ApprovedCount > 0 because "At least one service must be approved"
-on ApproveEstimate ensure ApproveEstimate.EstimateTotal >= 0 because "Estimate totals cannot be negative"
-
-event FinishService
-event PickUpVehicle
-
-from Scheduled on CheckIn
-    -> set CustomerName = CheckIn.Customer
-    -> set VehiclePlate = CheckIn.Plate
-    -> set AdvisorName = CheckIn.Advisor
-    -> transition CheckedIn
-
-from CheckedIn on RecommendService
-    -> add RecommendedServices RecommendService.ServiceName
-    -> transition AwaitingApproval
-
-from AwaitingApproval on RecommendService
-    -> add RecommendedServices RecommendService.ServiceName
-    -> no transition
-from AwaitingApproval on RemoveServiceRecommendation when RecommendedServices contains RemoveServiceRecommendation.ServiceName
-    -> remove RecommendedServices RemoveServiceRecommendation.ServiceName
-    -> no transition
-from AwaitingApproval on RemoveServiceRecommendation
-    -> reject "That recommendation is not on the estimate"
-
-from AwaitingApproval on ApproveEstimate when RecommendedServices.count == ApproveEstimate.ApprovedCount
-    -> set ApprovedWorkCount = ApproveEstimate.ApprovedCount
-    -> set InvoiceTotal = ApproveEstimate.EstimateTotal
-    -> transition InService
-from AwaitingApproval on ApproveEstimate
-    -> reject "The approved count must match the recommended services still on the estimate"
-
-from InService on FinishService
-    -> transition ReadyForPickup
-from ReadyForPickup on PickUpVehicle
-    -> transition Closed
+from Draft on Submit
+    -> transition Complete

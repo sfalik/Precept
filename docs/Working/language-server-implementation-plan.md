@@ -29,22 +29,22 @@ The design at `docs/tooling/language-server.md` is **comprehensive and implement
 |---|---|---|---|
 | **7.1 Diagnostics Push** | ✅ Complete | Stub only | None — design is implementation-ready |
 | **7.2 Semantic Tokens (Two-Pass)** | ✅ Complete | Stub only | None — `TokenMeta.SemanticTokenType` exists, `SemanticIndex` reference sites exist |
-| **7.3 Catalog-Driven Completions** | ✅ Complete | Stub only | Catalog gap: `IsUserFacing` not on `TypeMeta` (CC#16 resolved in design, not in code) |
+| **7.3 Catalog-Driven Completions** | ✅ Complete | Stub only | `IsUserFacing` not on `TypeMeta` — resolved: `Token != null` is the permanent filter (no catalog change needed) |
 | **7.4 Hover** | ✅ Complete | Stub only | None — `HoverDescription` exists on Types, Functions, Operators, Modifiers |
 | **7.5 Go-to-Definition** | ✅ Complete | Stub only | None — `Syntax` back-pointers and `NameSpan` exist on `TypedField`, `TypedState`, `TypedEvent` |
 | **7.6 Preview/Inspect** | ✅ Complete | Stub only | Blocked on runtime evaluator (Phase 3 — entire layer stubbed) |
-| **7.7 Document Outline** | ✅ Complete with gap | Stub only | **Catalog gap:** `IsOutlineNode` and `LspSymbolKind` not on `ConstructMeta` |
+| **7.7 Document Outline** | ✅ Complete | Stub only | **Resolved:** `IsOutlineNode` and `OutlineSymbolTag` added as Slice 0a |
 | **7.8 Folding Ranges** | ✅ Complete | Stub only | None — uses `ConstructManifest.Constructs` spans only |
 | **7.9 Diagnostic Enrichment** | ✅ Complete | Stub only | None — `SuggestionSource` already on `DiagnosticMeta` |
-| **7.10 Code Actions** | ✅ Complete | Stub only | George-15's `TriggerCondition`/`RecoverySteps`/`ExampleBefore`/`ExampleAfter` enriches hover on diagnostics; not yet in `DiagnosticMeta` |
+| **7.10 Code Actions** | ✅ Complete | Stub only | None — George-15's `TriggerCondition`/`RecoverySteps`/`ExampleBefore`/`ExampleAfter` have landed on `DiagnosticMeta` |
 
 ### 2.2 Catalog Dependencies
 
 | Gap | Catalog | Required Change | Blocking? |
 |---|---|---|---|
-| `IsOutlineNode` | `ConstructMeta` | Add `bool IsOutlineNode = false` and `string? LspSymbolKind = null` parameters | **Yes** — Document Outline slice depends on this |
-| `IsUserFacing` | `TypeMeta` | Add `bool IsUserFacing = true` parameter; set `false` for `Error` and `StateRef` | **No** — can filter by `Token != null` as workaround |
-| `TriggerCondition` / `RecoverySteps` / `ExampleBefore` / `ExampleAfter` | `DiagnosticMeta` | George-15 is adding these | **No** — hover on diagnostics can launch without them; enriched content added when available |
+| `IsOutlineNode` | `ConstructMeta` | Add `bool IsOutlineNode = false` and `string? OutlineSymbolTag = null` parameters | **Yes** — Document Outline slice depends on this. **Resolved:** Slice 0a adds these fields. |
+| `IsUserFacing` | `TypeMeta` | Add `bool IsUserFacing = true` parameter; set `false` for `Error` and `StateRef` | **No** — filter by `Token != null` is structurally equivalent; no catalog change required |
+| `TriggerCondition` / `RecoverySteps` / `ExampleBefore` / `ExampleAfter` | `DiagnosticMeta` | George-15 added these | **No** — ✅ **LANDED** (as of 2026-05-09). Fields are present on `DiagnosticMeta` in `src/Precept/Language/Diagnostics.cs` and populated on diagnostic entries. Slices 5 (Hover) and 8 (Code Actions) can consume them immediately. |
 
 ### 2.3 Stub Compatibility Assessment
 
@@ -68,6 +68,81 @@ The design doc (§16) envisions a handler-per-file structure (`Handlers/Diagnost
 ---
 
 ## 3. Implementation Slices
+
+### Slice 0a: Catalog Prerequisite — `ConstructMeta.IsOutlineNode` + `OutlineSymbolTag`
+
+**What:** Add two fields to `ConstructMeta` so the document outline (Slice 6) reads catalog metadata instead of maintaining a `ConstructKind` switch.
+
+**Architectural resolution (2026-05-09):** The core catalog does NOT import LSP protocol types. `ConstructMeta` stores a `string? OutlineSymbolTag` — a plain string tag (e.g., `"Module"`, `"Property"`, `"Enum"`, `"Function"`). The LS projects this to `OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind` via `Enum.Parse<SymbolKind>(tag)`. This follows the same pattern as `TokenMeta.SemanticTokenType` — the catalog stores a string, the consumer projects to a wire type. No LSP dependency in `src/Precept/`.
+
+**Modifies:**
+- `src/Precept/Language/Construct.cs` — add two parameters to `ConstructMeta`:
+  ```csharp
+  public sealed record ConstructMeta(
+      ConstructKind                        Kind,
+      string                               Name,
+      string                               Description,
+      string                               UsageExample,
+      ConstructKind[]                      AllowedIn,
+      IReadOnlyList<ConstructSlot>         Slots,
+      ImmutableArray<DisambiguationEntry>  Entries,
+      RoutingFamily                        RoutingFamily,
+      string?                              SnippetTemplate  = null,
+      ModifierDomain                       ModifierDomain   = ModifierDomain.None,
+      bool                                 IsOutlineNode    = false,
+      string?                              OutlineSymbolTag = null);
+  ```
+
+- `src/Precept/Language/Constructs.cs` — set `IsOutlineNode: true` and `OutlineSymbolTag` on the following entries in `GetMeta`:
+
+| ConstructKind | IsOutlineNode | OutlineSymbolTag | Rationale |
+|---|---|---|---|
+| `PreceptHeader` | `true` | `"Module"` | Top-level container — LSP `SymbolKind.Module` |
+| `FieldDeclaration` | `true` | `"Property"` | Data member — LSP `SymbolKind.Property` |
+| `StateDeclaration` | `true` | `"Enum"` | Finite set of named values — LSP `SymbolKind.Enum` |
+| `EventDeclaration` | `true` | `"Function"` | Named action with arguments — LSP `SymbolKind.Function` |
+| `RuleDeclaration` | `true` | `"Boolean"` | Constraint/invariant — LSP `SymbolKind.Boolean` |
+| `TransitionRow` | `false` | — | Detail row, not an outline node |
+| `StateEnsure` | `false` | — | Constraint detail, nested under state |
+| `AccessMode` | `false` | — | Access detail, not an outline node |
+| `OmitDeclaration` | `false` | — | Structural detail |
+| `StateAction` | `false` | — | Hook detail |
+| `EventEnsure` | `false` | — | Constraint detail, nested under event |
+| `EventHandler` | `false` | — | Detail row in stateless precepts |
+
+**Example code change in `Constructs.cs`:**
+
+```csharp
+ConstructKind.PreceptHeader => new(
+    kind,
+    "precept header",
+    "File-level header that names the precept",
+    "precept LoanApplication",
+    [],
+    [SlotIdentifierList],
+    [new(TokenKind.Precept)],
+    RoutingFamily.Header,
+    IsOutlineNode: true,
+    OutlineSymbolTag: "Module"),
+```
+
+**Tests:**
+- `test/Precept.Tests/Language/ConstructCatalogTests.cs` (or existing catalog test file):
+  - `[Fact] IsOutlineNode_TrueForOutlineConstructs` — verify `PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration` return `IsOutlineNode == true`
+  - `[Fact] IsOutlineNode_FalseByDefault` — verify all other `ConstructKind` values return `IsOutlineNode == false`
+  - `[Fact] OutlineSymbolTag_NonNullWhenIsOutlineNode` — every entry with `IsOutlineNode == true` has a non-null `OutlineSymbolTag`
+  - `[Fact] OutlineSymbolTag_NullWhenNotOutlineNode` — every entry with `IsOutlineNode == false` has `OutlineSymbolTag == null`
+- `test/Precept.LanguageServer.Tests/`:
+  - `[Fact] DocumentSymbolHandler_ReturnsModuleForPreceptHeader` — `SymbolKind.Module` for precept header
+  - `[Fact] DocumentSymbolHandler_ReturnsPropertyForFieldDeclaration` — `SymbolKind.Property` for fields
+  - `[Fact] DocumentSymbolHandler_ReturnsEnumForStateDeclaration` — `SymbolKind.Enum` for states
+  - `[Fact] DocumentSymbolHandler_ReturnsFunctionForEventDeclaration` — `SymbolKind.Function` for events
+
+**UNBLOCKS:** Slice 6 (Go-to-Definition + Document Symbols). With this catalog prerequisite complete, Slice 6 reads `c.Meta.IsOutlineNode` / `c.Meta.OutlineSymbolTag` directly — no temporary `ConstructKind` switch.
+
+**Dependency ordering:** Must complete before Slice 6. Independent of Slices 0–5, 7–11.
+
+---
 
 ### Slice 0: Infrastructure — DocumentState + Compile Loop
 
@@ -336,7 +411,7 @@ public static Hover? CreateHover(PreceptDocumentInfo info, Position position)
     //    - Format per design §7.4: field type + modifiers, state modifiers, event args
     //    - For fields with proof obligations, include proven-safe section
     // 4. If token is a diagnostic code → lookup DiagnosticMeta, show description
-    //    (enriched with TriggerCondition/RecoverySteps when George-15's additions land)
+    //    (enriched with TriggerCondition/RecoverySteps — George-15's additions have landed in DiagnosticMeta)
 }
 ```
 
@@ -382,21 +457,21 @@ public static IEnumerable<LocationOrDocumentSymbol> CreateDefinition(
 public static IEnumerable<LocationOrDocumentSymbol> CreateDocumentSymbols(PreceptDocumentInfo info)
 {
     // Walk ConstructManifest.Constructs
-    // For each construct: map to DocumentSymbol using name extraction + SymbolKind mapping
-    // NOTE: Until IsOutlineNode/LspSymbolKind are added to ConstructMeta, use a minimal
-    //       ConstructKind → SymbolKind mapping for: PreceptHeader, FieldDeclaration,
-    //       StateDeclaration, EventDeclaration
+    // Filter: c.Meta.IsOutlineNode == true
+    // Map: Enum.Parse<SymbolKind>(c.Meta.OutlineSymbolTag) — catalog-driven, no ConstructKind switch
+    // Extract name from construct tokens (first identifier token)
+    // Return DocumentSymbol with Name, Kind, Range, SelectionRange
 }
 ```
 
-**Catalog dependency:** `ConstructMeta.IsOutlineNode` and `LspSymbolKind` are not yet on the record. Document outline will use a **temporary** `ConstructKind` → `SymbolKind` mapping for the four primary construct kinds. This is a deliberate catalog gap — when the catalog fields are added, the mapping switch is replaced with `c.Meta.IsOutlineNode` / `c.Meta.LspSymbolKind`. The temporary mapping is isolated in one private method for easy replacement.
+**Catalog dependency:** ✅ Resolved by Slice 0a. `ConstructMeta.IsOutlineNode` and `OutlineSymbolTag` are added as catalog fields. Document outline reads `c.Meta.IsOutlineNode` / `c.Meta.OutlineSymbolTag` directly — no `ConstructKind` switches.
 
 **Tests turned green:**
 - `PreceptIntellisenseNavigationTests` — go-to-definition tests
 
 **Regression anchors:** All prior slice tests.
 
-**Dependency ordering:** Depends on Slice 0 and Slice 5 (`PreceptDocumentInfo` infrastructure). Independent of Slices 1–4.
+**Dependency ordering:** Depends on Slice 0 (infrastructure), Slice 0a (catalog prerequisite), and Slice 5 (`PreceptDocumentInfo` infrastructure). Independent of Slices 1–4.
 
 ---
 
@@ -453,6 +528,9 @@ static class DiagnosticEnricher
 
 **Creates:**
 - `tools/Precept.LanguageServer/Handlers/CodeActionHandler.cs` — OmniSharp `ICodeActionHandler`
+- `tools/Precept.VsCode/package.json` — register `precept.showFixHint` command for tooltip-only code actions
+
+**DiagnosticMeta enrichment (George-15 fields — landed):** Code actions read `DiagnosticMeta.ExampleBefore` and `DiagnosticMeta.ExampleAfter` to populate fix-hint panels with before/after DSL snippets. These fields are already present on `DiagnosticMeta` — no prerequisite wait.
 
 **Method-level specificity:**
 
@@ -514,41 +592,9 @@ FoldingRange[] GetFoldingRanges(Compilation compilation) =>
 
 ---
 
-### Slice 10: Preview/Inspect (Custom LSP Method)
+### Slice 10: Preview/Inspect — DEFERRED
 
-**What:** Custom `precept/inspect` handler for the VS Code preview webview.
-
-**Modifies:**
-- `tools/Precept.LanguageServer/LanguageServerStubs.cs`:
-  - Implement `PreceptPreviewHandler.HandleAsync`
-
-**Creates:**
-- `tools/Precept.LanguageServer/Handlers/InspectHandler.cs` — OmniSharp custom method handler via `[Method("precept/inspect")]`
-
-**Method-level specificity:**
-
-```csharp
-// PreceptPreviewHandler.HandleAsync:
-public async Task<PreceptPreviewResponse> HandleAsync(PreceptPreviewRequest request, CancellationToken ct)
-{
-    // 1. Retrieve document text from analyzer
-    // 2. Compile and check for errors
-    // 3. Build Precept from Compilation (if no errors)
-    // 4. Switch on request.Action:
-    //    "snapshot" → serialize initial state
-    //    "fire" → version.Fire(eventName, args)
-    //    "inspect" → version.InspectFire(eventName, args) or version.InspectUpdate(null)
-    //    "update" → version.UpdateFields(fieldUpdates)
-    // 5. Map result to PreceptPreviewResponse
-}
-```
-
-**Blocked:** Runtime evaluator (Phase 3) is entirely stubbed. This slice cannot produce passing tests until the evaluator is implemented. **Ship the handler shell** with the correct routing; tests remain red until the runtime is available.
-
-**Tests turned green (when runtime available):**
-- `PreceptPreviewRulesTests` — preview rules integration
-
-**Dependency ordering:** Depends on Slice 0. Blocked on runtime evaluator (external dependency).
+> **Deferred until the runtime evaluator is implemented.** `PreceptPreviewHandler` remains a stub. `PreceptPreviewRulesTests` remains red. This slice will be planned and executed as a follow-on once the runtime evaluator (Phase 3) ships.
 
 ---
 
@@ -571,7 +617,7 @@ public async Task<PreceptPreviewResponse> HandleAsync(PreceptPreviewRequest requ
 - `PreceptSemanticTokensConstraintTests` — tests that use `PreceptParser.ParseWithDiagnostics` + `ExtractConstraintSets`
 - Remaining compatibility tests
 
-**Dependency ordering:** Depends on all handler slices (1–10). This is the integration/wiring slice.
+**Dependency ordering:** Depends on all handler slices (1–9). This is the integration/wiring slice.
 
 ---
 
@@ -580,7 +626,7 @@ public async Task<PreceptPreviewResponse> HandleAsync(PreceptPreviewRequest requ
 | File | Slices | Action |
 |---|---|---|
 | `tools/Precept.LanguageServer/Program.cs` | 0, 11 | Modify — add handler registration + capability declaration |
-| `tools/Precept.LanguageServer/LanguageServerStubs.cs` | 1–8, 10–11 | Modify — replace `throw NotImplementedException` with real implementations, slice by slice |
+| `tools/Precept.LanguageServer/LanguageServerStubs.cs` | 1–8, 11 | Modify — replace `throw NotImplementedException` with real implementations, slice by slice |
 | `tools/Precept.LanguageServer/DocumentState.cs` | 0 | Create |
 | `tools/Precept.LanguageServer/SlotContext.cs` | 4 | Create |
 | `tools/Precept.LanguageServer/LevenshteinDistance.cs` | 7 | Create |
@@ -594,9 +640,11 @@ public async Task<PreceptPreviewResponse> HandleAsync(PreceptPreviewRequest requ
 | `tools/Precept.LanguageServer/Handlers/DocumentSymbolHandler.cs` | 6 | Create |
 | `tools/Precept.LanguageServer/Handlers/CodeActionHandler.cs` | 8 | Create |
 | `tools/Precept.LanguageServer/Handlers/FoldingRangeHandler.cs` | 9 | Create |
-| `tools/Precept.LanguageServer/Handlers/InspectHandler.cs` | 10 | Create |
+| `tools/Precept.LanguageServer/Handlers/InspectHandler.cs` | 10 (deferred) | Not created in this phase |
 | `test/Precept.LanguageServer.Tests/*` | 1–8 | Existing — tests transition from red to green |
-| `src/Precept/Language/Construct.cs` | 6 (deferred) | Future modify — add `IsOutlineNode`, `LspSymbolKind` to `ConstructMeta` |
+| `src/Precept/Language/Construct.cs` | 0a | Modify — add `IsOutlineNode` and `OutlineSymbolTag` parameters to `ConstructMeta` |
+| `src/Precept/Language/Constructs.cs` | 0a | Modify — set `IsOutlineNode: true` and `OutlineSymbolTag` on 5 construct entries |
+| `tools/Precept.VsCode/package.json` | 8 | Modify — register `precept.showFixHint` command |
 
 ---
 
@@ -607,18 +655,23 @@ Slice 0 (Infrastructure)
 ├── Slice 1 (Diagnostics) → Slice 7 (Enrichment) → Slice 8 (Code Actions)
 ├── Slice 2 (Semantic Tokens Pass 1) → Slice 3 (Semantic Tokens Pass 2)
 ├── Slice 4 (Completions)
-├── Slice 5 (Hover) → Slice 6 (Go-to-Def + Outline)
+├── Slice 5 (Hover) → Slice 6 (Go-to-Def + Outline) ← Slice 0a (Catalog: IsOutlineNode)
 ├── Slice 9 (Folding)
-├── Slice 10 (Preview — blocked on runtime)
 └── Slice 11 (Wiring + v1 Shims — depends on all)
+
+Slice 10 (Preview/Inspect): DEFERRED — implement after runtime evaluator ships
+
+Slice 0a (Catalog Prerequisite)
+└── Slice 6 (Go-to-Def + Outline)
 ```
 
 **Parallelizable groups after Slice 0:**
 - Group A: Slices 1 → 7 → 8 (diagnostics chain)
 - Group B: Slices 2 → 3 (semantic tokens)
 - Group C: Slice 4 (completions)
-- Group D: Slices 5 → 6 (hover + navigation)
+- Group D: Slices 5 → 6 (hover + navigation); Slice 6 also requires Slice 0a
 - Group E: Slice 9 (folding)
+- Slice 0a: Independent — can run in parallel with Slice 0 or any other group
 
 Groups A–E can proceed in parallel. Slice 11 is the final integration.
 
@@ -632,42 +685,39 @@ Groups A–E can proceed in parallel. Slice 11 is the final integration.
 | **Completions** | Catalog-driven — no LS-side hardcoding | When catalog entries gain `SnippetTemplate` or `HoverDescription`, completions automatically pick them up |
 | **Semantic tokens** | No grammar changes | LS Pass 1 reads `TokenMeta.SemanticTokenType` already present; Pass 2 reads `SemanticIndex` references already present |
 | **MCP tools** | No changes needed | MCP and LS both consume the same catalogs; they are independent consumers |
-| **VS Code extension** | Minor | Extension already expects an LS process on stdio; handler registration completes the contract. `precept.showFixHint` command may need registration in `package.json` for tooltip-only code actions (Slice 8). |
+| **VS Code extension** | Minor | Extension already expects an LS process on stdio; handler registration completes the contract. `precept.showFixHint` command registration in `package.json` is required for tooltip-only code actions (Slice 8) — add it in Slice 8's creates list. |
 
 ---
 
-## 7. Catalog Prerequisites (Call-Outs)
+## 7. Catalog Prerequisites (Resolved)
 
-### Required but missing: `ConstructMeta.IsOutlineNode` + `LspSymbolKind`
+### ✅ Resolved: `ConstructMeta.IsOutlineNode` + `OutlineSymbolTag`
 
-The design doc (CC#18) resolved that outline eligibility and LSP symbol kind should be `ConstructMeta` fields. These are **not yet on the record** (`src/Precept/Language/Construct.cs`). 
+**Status:** Concrete implementation task — Slice 0a in §3.
 
-**Impact:** Slice 6 (Document Outline) will use a temporary `ConstructKind` switch until these fields are added. The switch is isolated in one private method. When the catalog fields land, the method body is replaced with `c.Meta.IsOutlineNode` / `c.Meta.LspSymbolKind`.
+The design doc (CC#18) resolved that outline eligibility and LSP symbol kind should be `ConstructMeta` fields. Slice 0a adds `bool IsOutlineNode = false` and `string? OutlineSymbolTag = null` to `ConstructMeta` in `src/Precept/Language/Construct.cs`, sets them on entries in `src/Precept/Language/Constructs.cs`, and includes catalog-level tests. This unblocks Slice 6.
 
-**Recommended values when added:**
+**Architectural resolution:** The catalog stores a plain `string?` tag (e.g., `"Module"`, `"Property"`). The LS projects it to `SymbolKind` via `Enum.Parse<SymbolKind>(tag)`. No LSP protocol dependency in `src/Precept/`. This follows the `TokenMeta.SemanticTokenType` pattern.
 
-| ConstructKind | IsOutlineNode | LspSymbolKind |
-|---|---|---|
-| PreceptHeader | true | "Module" |
-| FieldDeclaration | true | "Property" |
-| StateDeclaration | true | "Enum" |
-| EventDeclaration | true | "Function" |
-| TransitionRow | false | — |
-| EnsureDeclaration | false | — |
-| RuleDeclaration | false | — |
-| AccessModeDeclaration | false | — |
-| All others | false | — |
+See Slice 0a for the complete field map, entry-by-entry values, and test specifications.
 
-### Optional enrichment: `DiagnosticMeta.TriggerCondition` / `RecoverySteps` / `ExampleBefore` / `ExampleAfter`
+### ✅ Landed: `DiagnosticMeta.TriggerCondition` / `RecoverySteps` / `ExampleBefore` / `ExampleAfter`
 
-George-15 is adding these fields. When they land:
-- **Hover on diagnostic codes** (Slice 5) can show `TriggerCondition` and `RecoverySteps` in the hover popup
-- **Tooltip-only code actions** (Slice 8) can show `ExampleBefore` / `ExampleAfter` in the fix hint panel
-- **No blocking dependency** — hover and code actions work without these fields; they add richness
+**Status:** ✅ LANDED (as of 2026-05-09). George-15's catalog authoring pass is complete. Fields are present on `DiagnosticMeta` in `src/Precept/Language/Diagnostics.cs` and populated on diagnostic entries (e.g., `InputTooLarge`, `UnterminatedStringLiteral`, `UnterminatedTypedConstant`).
 
-### Optional: `TypeMeta.IsUserFacing`
+**Fields available for immediate use:**
+- `DiagnosticMeta.TriggerCondition` — human-readable description of when the diagnostic fires
+- `DiagnosticMeta.RecoverySteps` — ordered list of recovery actions
+- `DiagnosticMeta.ExampleBefore` — DSL snippet showing the error state
+- `DiagnosticMeta.ExampleAfter` — DSL snippet showing the corrected state
 
-CC#16 resolved that `Error` and `StateRef` types should not appear in completions. The field isn't on `TypeMeta` yet. **Workaround:** filter by `t.Token != null` (internal types have `Token = null`). Equivalent behavior, no catalog change required.
+**Consumer slices:**
+- **Slice 5 (Hover):** `CreateHover` reads `TriggerCondition` and `RecoverySteps` for diagnostic code hover popups. No prerequisite wait — implement immediately.
+- **Slice 8 (Code Actions):** `GetCodeActions` reads `ExampleBefore` / `ExampleAfter` for enriched fix-hint panels. No prerequisite wait — implement immediately.
+
+### Resolved: `TypeMeta.IsUserFacing`
+
+CC#16 resolved that `Error` and `StateRef` types should not appear in completions. The field isn't on `TypeMeta`, but `Token != null` is a structural equivalent for filtering internal types (internal types have `Token = null`). No catalog change required — this is the permanent solution.
 
 ---
 
@@ -679,24 +729,25 @@ CC#16 resolved that `Error` and `StateRef` types should not appear in completion
 | 173 ported tests expect v1 API shapes | High | Stub classes preserve the API contract; implementations satisfy the same signatures |
 | OmniSharp.Extensions.LanguageServer API surprises | Low | Version 0.19.9 is stable; handler patterns are well-documented |
 | Preview/Inspect blocked indefinitely | Medium | Slice 10 ships the handler shell; tests remain red. No downstream dependency. |
-| `ConstructMeta.IsOutlineNode` never lands | Low | Temporary `ConstructKind` switch is isolated and functional |
+| `ConstructMeta.IsOutlineNode` implementation | Low | Slice 0a is a concrete task with method-level specificity; blocks only Slice 6 |
 
 ---
 
 ## 9. Implementation Order (Recommended)
 
-1. **Slice 0** — Infrastructure (must be first)
-2. **Slice 1** — Diagnostics (highest user-visible value, unlocks most test files)
-3. **Slice 2** — Semantic Tokens Pass 1 (visual value, no SemanticIndex dependency)
-4. **Slice 5** — Hover (high user value)
-5. **Slice 4** — Completions (complex but high value)
-6. **Slice 3** — Semantic Tokens Pass 2 (enriches Pass 1)
-7. **Slice 6** — Go-to-Definition + Outline
-8. **Slice 7** — Diagnostic Enrichment
-9. **Slice 8** — Code Actions
-10. **Slice 9** — Folding Ranges
-11. **Slice 10** — Preview (when runtime is available)
-12. **Slice 11** — Final wiring + v1 shims
+1. **Slice 0a** — Catalog Prerequisite: `IsOutlineNode` + `OutlineSymbolTag` (independent, unblocks Slice 6)
+2. **Slice 0** — Infrastructure (must be first for all LS slices)
+3. **Slice 1** — Diagnostics (highest user-visible value, unlocks most test files)
+4. **Slice 2** — Semantic Tokens Pass 1 (visual value, no SemanticIndex dependency)
+5. **Slice 5** — Hover (high user value; includes `DiagnosticMeta.TriggerCondition`/`RecoverySteps` enrichment)
+6. **Slice 4** — Completions (complex but high value)
+7. **Slice 3** — Semantic Tokens Pass 2 (enriches Pass 1)
+8. **Slice 6** — Go-to-Definition + Outline (reads `IsOutlineNode`/`OutlineSymbolTag` from Slice 0a)
+9. **Slice 7** — Diagnostic Enrichment
+10. **Slice 8** — Code Actions (includes `DiagnosticMeta.ExampleBefore`/`ExampleAfter` enrichment; registers `precept.showFixHint` in `package.json`)
+11. **Slice 9** — Folding Ranges
+12. **Slice 10** — Preview (when runtime is available)
+13. **Slice 11** — Final wiring + v1 shims
 
 ---
 
@@ -705,7 +756,7 @@ CC#16 resolved that `Error` and `StateRef` types should not appear in completion
 | Metric | Estimate |
 |---|---|
 | New files | ~14 |
-| Modified files | 2–3 (stubs, Program.cs) |
+| Modified files | 5 (stubs, Program.cs, Construct.cs, Constructs.cs, package.json) |
 | Estimated LOC (production) | 500–700 |
 | Estimated LOC (tests — new) | ~200 (Slice 7 enrichment tests) |
 | Existing tests turned green | 173 (across 13 test files) |

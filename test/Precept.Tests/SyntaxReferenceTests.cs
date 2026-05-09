@@ -142,4 +142,13 @@ public class SyntaxReferenceTests
         SyntaxReference.NullNarrowing.Should().Contain("is set",
             "v2 null narrowing uses 'is set' / 'is not set', not '!= null'");
     }
+
+    [Fact]
+    public void CommonPatterns_ComputedField_UsesBackArrowSyntax()
+    {
+        var computedField = SyntaxReference.CommonPatterns.Single(pattern => pattern.Name == "Computed field");
+
+        computedField.DslSnippet.Should().Contain("<-");
+        computedField.DslSnippet.Should().NotContain("->");
+    }
 }
