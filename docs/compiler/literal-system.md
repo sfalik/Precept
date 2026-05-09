@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Draft |
-| Implementation state | Partially implemented — lexer and parser literal handling complete; type checker typed-constant validation infrastructure (`ITypedConstantValidator`) not yet implemented |
+| Implementation state | Implemented for typed-constant validation via `TypeMeta.ContentValidation` and `TypedConstantValidation.Validate(...)`; runtime materialization remains broader evaluator work |
 | Source | `src/Precept/` — lexer, parser, type checker, evaluator |
 | Upstream | Language source text; field type declarations; expression context for type inference |
 | Downstream | All pipeline stages (Lexer, Parser, Type Checker, Evaluator); runtime evaluator; diagnostics engine |
@@ -26,7 +26,7 @@ This document is organized by the contract each pipeline stage needs. Stages ref
 
 ## Responsibilities and Boundaries
 
-**OWNS:** Token segmentation for string and typed constant literals (lexer); lexer mode stack for interpolation nesting; AST node shapes for all literal forms (parser); context-born type resolution for typed constants (type checker); content validation dispatch via `ITypedConstantValidator` (type checker); interpolation reassembly mechanics across both `"..."` and `'...'` forms; string coercion rules for interpolation expressions (evaluator); value materialization for typed constants (evaluator); quantity type resolution tables (duration vs. period by expression context).
+**OWNS:** Token segmentation for string and typed constant literals (lexer); lexer mode stack for interpolation nesting; AST node shapes for all literal forms (parser); context-born type resolution for typed constants (type checker); content validation registration on `TypeMeta.ContentValidation` and dispatch via `TypedConstantValidation.Validate(...)` (type checker); interpolation reassembly mechanics across both `"..."` and `'...'` forms; string coercion rules for interpolation expressions (evaluator); value materialization for typed constants (evaluator); quantity type resolution tables (duration vs. period by expression context).
 
 **Does NOT OWN:** Business rules on field values — those are constraint modifiers on field declarations; unit restriction enforcement (e.g., "grace period must be in whole days") — constraint system handles it; domain-specific quantity validators — registered by domain modules, not defined here; null semantics — the language has no null, presence is tested with `is set` / `is not set`; non-literal arithmetic and comparison semantics — owned by the type system and evaluator broadly.
 
@@ -147,7 +147,7 @@ Typed constants produce non-primitive values. Like numeric literals, typed const
 Typed constant resolution follows the same two-step model as numeric literals:
 
 1. **Context determines the type.** The type checker propagates an expected type inward from the enclosing expression — field declaration, assignment target, operator peer, function parameter, or comparison operand. This is the same top-down inference that resolves `42` to `integer`, `decimal`, or `number`.
-2. **Content is validated against the expected type.** Once the expected type is known, the content is parsed and validated by the type's registered `ITypedConstantValidator`. If the content doesn't parse as the expected type, it is a compile error. If no validator is registered (domain module not yet shipped), structural validation only.
+2. **Content is validated against the expected type.** Once the expected type is known, the checker reads the type's `TypeMeta.ContentValidation` entry and dispatches through `TypedConstantValidation.Validate(...)`. The DU subtype is the registry. Adding a new typed-literal type means adding a new `ContentValidation` subtype and a switch arm in the dispatcher. If the content doesn't parse as the expected type, it is a compile error.
 3. **No context → compile error.** A typed constant in a position with no type expectation is a compile error, just as `42` in a contextless position is a compile error.
 
 This replaces the previous "shape-first" model where content determined the type. Shape is no longer the resolution mechanism — context is.
@@ -156,26 +156,28 @@ This replaces the previous "shape-first" model where content determined the type
 
 Given the context-determined type, the content must parse as a valid value of that type:
 
-| Expected type | Valid content patterns | Examples |
-|---|---|---|
-| `date` | `YYYY-MM-DD` | `'2026-04-15'` |
-| `time` | `HH:MM:SS` or `HH:MM` | `'14:30:00'`, `'14:30'` |
-| `instant` | ISO 8601 with `T`, trailing `Z` | `'2026-04-15T14:30:00Z'` |
-| `datetime` | ISO 8601 with `T`, no zone | `'2026-04-15T14:30:00'` |
-| `zoneddatetime` | ISO 8601 with `T`, bracket-enclosed timezone | `'2026-04-15T14:30:00[America/New_York]'` |
-| `timezone` | `Word/Word` IANA identifier | `'America/New_York'` |
-| `duration` | `<integer> <temporal-unit>` (with optional `+ <integer> <unit>`) | `'72 hours'`, `'2 hours + 30 minutes'` |
-| `period` | `<integer> <temporal-unit>` (with optional `+ <integer> <unit>`) | `'30 days'`, `'2 years + 6 months'` |
-| `money` | `<number> <ISO-4217-code>` | `'100 USD'`, `'50.25 EUR'` |
-| `quantity` | `<number> <unit-name>` | `'5 kg'`, `'24 each'` |
-| `price` | `<number> <currency>/<unit>` | `'4.17 USD/each'` |
-| `exchangerate` | `<number> <currency>/<currency>` | `'1.08 USD/EUR'` |
-| `currency` | `<ISO-4217-code>` (3-letter) | `'USD'`, `'EUR'` |
-| `unitofmeasure` | Unit name (lowercase/mixed) | `'kg'`, `'each'` |
-| `dimension` | Dimension name (UCUM registry) | `'mass'`, `'length'` |
-| state ref | Plain identifier | `'Open'`, `'UnderReview'` |
+| Precept type | `ContentValidation` subtype | Format description | Examples |
+|---|---|---|---|
+| `date` | `NodaTimeValidation` | `YYYY-MM-DD` | `'2026-04-15'` |
+| `time` | `NodaTimeValidation` | `HH:MM[:SS]` | `'14:30:00'`, `'14:30'` |
+| `datetime` | `NodaTimeValidation` | ISO local datetime (`YYYY-MM-DDTHH:MM:SS`) | `'2026-04-15T14:30:00'` |
+| `instant` | `NodaTimeValidation` | ISO instant with trailing `Z` | `'2026-04-15T14:30:00Z'` |
+| `zoneddatetime` | `NodaTimeValidation` | ISO local datetime plus bracketed IANA zone | `'2026-04-15T14:30:00[America/New_York]'` |
+| `timezone` | `NodaTimeValidation` | IANA timezone identifier | `'America/New_York'` |
+| `duration` | `NodaTimeValidation` | Temporal quantity or ISO duration | `'72 hours'`, `'PT72H'` |
+| `period` | `NodaTimeValidation` | Temporal quantity or ISO period | `'30 days'`, `'P30D'` |
+| `currency` | `ClosedSetValidation` | ISO 4217 alpha code | `'USD'`, `'EUR'` |
+| `unitofmeasure` | `UcumValidation` | UCUM expression | `'kg'`, `'mg/dL'`, `'each'` |
+| `dimension` | `ClosedSetValidation` | Curated dimension name | `'mass'`, `'length'` |
+| `money` | `MoneyValidation` | `<amount> <currency>` | `'100 USD'`, `'50.25 EUR'` |
+| `quantity` | `QuantityValidation` | `<magnitude> <unit>` | `'5 kg'`, `'24 each'` |
+| `price` | `PriceValidation` | `<amount> <currency>/<unit>` | `'4.17 USD/each'` |
+| `exchangerate` | `ExchangeRateValidation` | `<rate> <from>/<to>` | `'1.08 USD/EUR'` |
+| `stateref` | none — name binding | Plain identifier validated against declared state names | `'Open'`, `'UnderReview'` |
 
-**Content validation is compile-time.** When a validator is registered for the expected type, malformed content is a compile error — e.g., `'2026-02-30'` fails date validation, `'XYZ 100.00'` fails money validation (XYZ is not a recognized ISO 4217 code). The `ITypedConstantValidator` registry is layered: the checker defines the hook, each domain type family registers its validator. If no validator is registered, structural validation is accepted.
+**Content validation is compile-time first.** Static typed constants are validated during checking. Interpolated typed constants are typed at compile time, then re-parsed after substitution using the same domain parsers when the interpolated value is materialized.
+
+**Structural fallback:** if `TypeMeta.ContentValidation` is null, the typed constant is accepted as raw text for that type. `stateref` is the deliberate exception: it is validated by the name binder against declared state names, not by a domain parser.
 
 ### Context sources
 
@@ -222,15 +224,15 @@ Interpolation inside `'...'` uses the same `{expr}` syntax as strings. The expre
 
 The following unit names are recognized inside typed constants:
 
-| Unit | Calendar/Timeline | Always-period | Always-duration | Context-dependent |
+| Unit names | Calendar/Timeline | Always-period | Always-duration | Context-dependent |
 |------|-------------------|---------------|-----------------|-------------------|
-| `years` | Calendar | ✓ | | |
-| `months` | Calendar | ✓ | | |
-| `weeks` | Both | | | ✓ |
-| `days` | Both | | | ✓ |
-| `hours` | Timeline | | | ✓ |
-| `minutes` | Timeline | | | ✓ |
-| `seconds` | Timeline | | | ✓ |
+| `year`, `years` | Calendar | ✓ | | |
+| `month`, `months` | Calendar | ✓ | | |
+| `week`, `weeks` | Both | | | ✓ |
+| `day`, `days` | Both | | | ✓ |
+| `hour`, `hours` | Timeline | | | ✓ |
+| `minute`, `minutes` | Timeline | | | ✓ |
+| `second`, `seconds` | Timeline | | | ✓ |
 
 **These are NOT language keywords.** They are validated strings inside `'...'`. Field names, event names, and event arg names can use these words without collision. Future quantity domains add new validated strings, not new keywords.
 
@@ -371,7 +373,7 @@ The parser reassembles segmented tokens into AST nodes. Its contracts:
 The type checker's contracts:
 
 1. **String interpolation expressions** — type-check each `{expr}`, verify coercion to string is defined for the expression type. Collections are a compile error.
-2. **Typed constant resolution** — determine the expected type from context (field type, operator peer, function signature), then validate the content against that type using the registered `ITypedConstantValidator`. No context → compile error.
+2. **Typed constant resolution** — determine the expected type from context (field type, operator peer, function signature), then validate the content against that type using `TypeMeta.ContentValidation` and `TypedConstantValidation.Validate(...)`. No context → compile error.
 3. **Interpolated typed constants** — after substituting interpolation results, validate the full content against the context-determined type.
 4. **Quantity unit resolution** — for `duration` and `period`, validate the unit words against the temporal unit closed set.
 
@@ -415,6 +417,13 @@ The evaluator's contracts:
 1. **String interpolation** — evaluate each expression, coerce to string using deterministic locale-invariant rules, concatenate segments.
 2. **Typed constant interpolation** — evaluate expressions, substitute into content, then materialize the typed value using the resolved type.
 3. **String coercion** is deterministic and invariant-culture. `{Amount}` always produces `"1234.56"`, never `"1.234,56"`.
+
+### Runtime consumer matrix
+
+| Concern | Fire | Update | Restore |
+|---|---|---|---|
+| JSON ingress | Event args are parsed through `TypeRuntimeMeta.ReadJson` for the target arg type. | Patched field values are parsed through `TypeRuntimeMeta.ReadJson` for the target field type. | Stored field values are read through `TypeRuntimeMeta.ReadJson`; Restore shares the same delegates as the Fire and Update JSON lanes. |
+| String authoring path | Typed constants use `TypeMeta.ContentValidation` via `TypedConstantValidation.Validate(...)`. | N/A | N/A |
 
 ---
 
@@ -491,21 +500,12 @@ String coercion during interpolation always uses invariant-culture formatting. `
 
 ---
 
-## Open Questions / Implementation Notes
+## Implementation Notes
 
-> **Open Question:** `ITypedConstantValidator` registration API
-> The literal system defines `ITypedConstantValidator` as the extension hook for typed-constant validation, but the registration surface is still undecided. Consumers need one canonical registration model before domain validators can be wired into compilation predictably.
-> *Flagged: 2026-05-04*
-
-> **Open Question:** Interpolated typed-constant validation timing
-> The doc says typed-constant content is validated after interpolation substitution, but it does not settle whether that happens entirely at compile time, at runtime, or in a split model. That timing decision changes diagnostics behavior and how much the evaluator must still validate after type checking.
-> *Flagged: 2026-05-04*
-
-> **Open Question:** Structural validation fallback for `'...'`
-> The fallback rule for "structural validation is accepted" remains undefined when no validator is registered for the expected type. The literal-system contract needs an explicit minimum-check story so deferred or partially shipped domains behave deterministically.
-> *Flagged: 2026-05-04*
+1. **Typed-constant validator registration is closed.** The registration surface is `TypeMeta.ContentValidation`; dispatch is `TypedConstantValidation.Validate(...)`; there is no `ITypedConstantValidator` interface. The `ContentValidation` DU is the registry.
+2. **Interpolated validation timing is closed.** Type resolution and structural diagnostics happen during checking; the final interpolated text is re-parsed with the same validator after substitution when the value is materialized.
+3. **Structural fallback is closed.** Types without a `ContentValidation` entry accept raw text unchanged. `stateref` is not part of this fallback — it is validated against declared state names by binding/type resolution.
 4. **Percentage domain:** Listed in Future Extensibility as `'10 percent'`. The type name, validator shape, and arithmetic semantics are TBD.
-5. **State reference literals:** The content validation table lists `state ref` as a typed constant kind using plain identifiers (`'Open'`, `'UnderReview'`). The mechanics of state reference validation (which state machine provides the context?) are not yet documented here.
 
 ---
 
@@ -533,7 +533,7 @@ String coercion during interpolation always uses invariant-culture formatting. `
 | Prototype with full design exploration (PR #114) | `docs/LiteralSystemDesign.md` on `research/nodatime-type-alignment` branch |
 | Mode stack implementation, complete token kind catalog | `docs/compiler/lexer.md` |
 | AST node shapes for all literal forms | `docs/compiler/parser.md` |
-| `ITypedConstantValidator` registration, context propagation mechanics | `docs/compiler/type-checker.md` |
+| `TypeMeta.ContentValidation`, `TypedConstantValidation.Validate(...)`, context propagation mechanics | `docs/compiler/type-checker.md` |
 | Pipeline stage ordering, artifact types | `docs/compiler-and-runtime-design.md` |
 
 ---

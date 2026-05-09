@@ -1372,7 +1372,7 @@ public sealed record Version
 
 ### Business-Domain Internal Types
 
-These are the evaluator-internal types that back the public business-domain API boundary. They are never exposed to callers — `UnitOfMeasure` and `MeasureDimension` are the lightweight proxy structs that cross the boundary (see Decision 13 in §11).
+These are the evaluator-internal types that back the public business-domain API boundary. They live under `src/Precept/Runtime/Measures/` and are never exposed to callers — `UnitOfMeasure` and `MeasureDimension` are the lightweight proxy structs that cross the boundary (see Decision 13 in §11). `Unit`, `MeasureDimension`, and `UnitFactory` are evaluator-internal wrappers around the shared UCUM parsed-unit model used for runtime arithmetic.
 
 #### `Unit` — evaluator-internal unit entity
 

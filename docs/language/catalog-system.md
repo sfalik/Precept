@@ -99,6 +99,8 @@ This inverts the traditional compiler model:
 
 The thirteen catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
 
+**External reference data is distinct from catalogs.** ISO 4217 and UCUM are authoritative third-party data sources that Precept validates against, but they are not themselves part of the Precept language specification. They ship as embedded XML resources with lazy loaders because the data belongs to the outside world. The test is: *is this part of a complete description of Precept?* `TypeMeta` for `currency` is Precept. The 159 currently admitted currency codes are not.
+
 ### Vision precedes consumers
 
 The catalog-driven architecture means: **describe the language completely in metadata, then consumers derive from it.** The vision precedes the consumers — not the other way around.
@@ -866,19 +868,20 @@ The type system's family taxonomy. Each member represents a type *family*.
 ```csharp
 public record TypeMeta(
     TypeKind                     Kind,
-    TokenMeta?                   Token,           // object reference to Tokens catalog entry; null for special types (Error, StateRef)
+    TokenMeta?                   Token,              // object reference to Tokens catalog entry; null for special types (Error, StateRef)
     string                       Description,
     TypeCategory                 Category,
-    string                       DisplayName,     // required — human-readable type name (e.g., "zoned date-time", "money")
-    QualifierShape?              QualifierShape   = null,
-    TypeTrait                    Traits           = TypeTrait.None,
-    IReadOnlyList<TypeKind>?     WidensTo         = null,
-    ModifierKind[]?              ImpliedModifiers = null,
-    IReadOnlyList<TypeAccessor>? Accessors        = null,
-    string?                      HoverDescription = null,
-    string?                      UsageExample     = null,
-    TypeRuntime?                 Runtime          = null,   // optional zero-boxing typed-lane registration
-    bool                         IsUserFacing     = true    // CC#16: false for Error and StateRef; used by LS completions and MCP vocabulary filtering
+    string                       DisplayName,        // required — human-readable type name (e.g., "zoned date-time", "money")
+    QualifierShape?              QualifierShape      = null,
+    TypeTrait                    Traits              = TypeTrait.None,
+    IReadOnlyList<TypeKind>?     WidensTo            = null,
+    ModifierKind[]?              ImpliedModifiers    = null,
+    IReadOnlyList<TypeAccessor>? Accessors           = null,
+    string?                      HoverDescription    = null,
+    string?                      UsageExample        = null,
+    bool                         NotemptyApplicable  = true,
+    IReadOnlyList<TokenKind>?    ChoiceLiteralTokens = null,
+    ContentValidation?           ContentValidation   = null
 );
 ```
 
@@ -889,9 +892,13 @@ The `Token` fieldholds a direct reference to the `TokenMeta` instance from the T
 
 `DisplayName` is required — every type must have a human-readable name. Single-word types use their keyword (e.g., `"money"`); multi-word types use the human form (e.g., `"zoned date-time"`, `"unit of measure"`). Omitting it is a compile error.
 
-##### TypeRuntime — typed-lane registration
+##### ContentValidation — typed-literal registration hook
 
-`TypeMeta.Runtime` carries the optional **typed-lane registration** for the type. When a caller supplies `Action<IArgBuilder>?` or `Action<IFieldBuilder>?`, the runtime resolves the registered `TypeRuntime<T>` for each named arg or field, calling `FromClr(value)` to convert the CLR value to `PreceptValue` with zero boxing. `Version.Get<T>()` and `FiredArgs.Get<T>()` call the registered `ToClr` on the reverse path.
+`TypeMeta.ContentValidation` is the compile-time typed-literal registration hook. The DU subtype declares how `'...'` content is validated for the type, and `TypedConstantValidation.Validate(...)` is the single dispatcher. The DU is the registry — there is no parallel validator interface.
+
+##### TypeRuntime — typed-lane registration (target runtime shape)
+
+The runtime design also uses per-type registration metadata for JSON ingress/egress and typed CLR lanes. That runtime registration shape is documented in `docs/runtime/runtime-api.md`; it is target-state documentation rather than a direct description of today's `TypeMeta` record.
 
 The property uses the abstract base:
 
@@ -921,7 +928,7 @@ public sealed class TypeRuntime<T> : TypeRuntime
 }
 ```
 
-Registration is process-global via `PreceptRuntime.Register<T>(fromClr, toClr)`. The runtime stores the resulting `TypeRuntime<T>` instance in the corresponding `TypeMeta` entry. Types with no registration default to JSON-lane-only access (`TypeMeta.Runtime == null`).
+Registration is process-global via `PreceptRuntime.Register<T>(fromClr, toClr)`. The runtime-side metadata described here is target-state design documentation for the typed lane. Types without a typed registration remain JSON-lane-only at the runtime boundary.
 
 **Naming context:** The abstract base methods (`ReadJson`, `WriteJson`, `ParseString`, `FormatString`) are the internal hot-path streaming API. These are distinct from the public-facing `PreceptValue` static methods (`PreceptValue.FromJson(JsonElement)` / `PreceptValue.ToJson()`) which are higher-level convenience conversions over `JsonElement`. The internal `TypeRuntime` delegates use `Utf8JsonReader`/`Utf8JsonWriter` for streaming efficiency; the public `PreceptValue` methods wrap `JsonElement`.
 
@@ -1896,10 +1903,10 @@ Currency codes and measurement units are validated at type-check time, but they 
 
 | Registry | Shape | Size | Source |
 |----------|-------|------|--------|
-| ISO 4217 currencies | `FrozenSet<string>` | ~180 codes | Static list of active currency codes |
-| UCUM units | Compositional grammar | Unbounded | UCUM defines a compositional syntax for unit expressions |
+| ISO 4217 currencies | Embedded XML + lazy-loaded frozen set/dictionary | 159 admitted codes after Precept exclusions | ISO 4217 `list-one.xml` |
+| UCUM units | Embedded XML + lazy-loaded atom/prefix catalogs plus compositional parser | Open compositional space over seeded atoms/prefixes | UCUM `ucum-essence.xml` |
 
-**Why not catalogs:** These are not aspects of the *language* — they are aspects of the *data domain*. Adding a new currency code doesn't change the language; adding a new type keyword does. Currency codes don't have per-member metadata that consumers need; they have a single validation predicate ("is this a valid code?"). Catalogs describe the language surface; registries validate domain values.
+**Why not catalogs:** These are not aspects of the *language* — they are aspects of the *data domain*. Adding a new currency code doesn't change the language; adding a new type keyword does. Currency codes don't have per-member metadata that consumers need; they have a single validation predicate ("is this a valid code?"). Catalogs describe the language surface; registries validate domain values. External reference data uses embedded XML plus lazy loading, not the catalog pattern.
 
 ---
 
@@ -1947,11 +1954,12 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
 | **LS hover** | Types + Functions + Operators + Operations + Constraints | Per-member descriptions from catalog metadata. `ConstraintMeta.Description` populates hover for `rule`/`ensure` declarations. |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |
-| **Type checker validation** | Types + Functions + Operations + Modifiers + Actions + ProofRequirements | Catalog lookups replace hand-coded validation logic: modifier applicability → `Modifiers.GetMeta().ApplicableTo`; function signatures → `Functions.GetMeta()`; operation legality → `Operations.Resolve()`; type keyword resolution → `Types.All` frozen dictionary keyed by `Token.Kind`; proof obligation kinds → `ProofRequirements.GetMeta()` |
+| **Type checker validation** | Types + Functions + Operations + Modifiers + Actions + ProofRequirements | Catalog lookups replace hand-coded validation logic: modifier applicability → `Modifiers.GetMeta().ApplicableTo`; function signatures → `Functions.GetMeta()`; operation legality → `Operations.Resolve()`; type keyword resolution → `Types.All` frozen dictionary keyed by `Token.Kind`; typed-constant validation registration → `TypeMeta.ContentValidation`; proof obligation kinds → `ProofRequirements.GetMeta()` |
 | **Parser vocabulary** | Operators + Types + Modifiers + Actions + Constructs | Frozen dictionaries derived from catalogs at startup: `Operators.All` → precedence table; `Types.All` → type keyword mapping; `Modifiers.All` → recognition sets; `Actions.All` → action keywords. No hand-maintained vocabulary tables. |
 | **Plan router / Precept Builder** | Constraints | `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket (`always`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`). `ConstraintMeta.StateAnchored` groups all state-scoped kinds without per-member checks. |
 | **Proof engine** | ProofRequirements | `ProofRequirements.GetMeta(kind)` dispatches proof obligation instances by kind. `ProofRequirementMeta.QualifierCompatibility` identifies dual-subject obligations without per-kind conditionals. |
 | **Evaluator dispatch** | Functions + Operations + Constraints | Binary/unary dispatch: builder embeds `static readonly` executor delegates (from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`) directly in `BinaryOp`/`UnaryOp` opcodes at compile time; evaluator calls `opcode.Executor(l, r)` — no lookup, no switch. `Constraints.GetMeta()` drives constraint activation timing — no hardcoded per-kind activation logic. Function execution dispatch delegate design is pending. |
+| **Typed constant dispatcher** | Types | `TypedConstantValidation.Validate(...)` reads `TypeMeta.ContentValidation` and dispatches on the DU subtype. No parallel validator registry. |
 | **Runtime boundary validation** | Modifiers | `FieldModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
 | **Reference documentation** | All 11 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
 | **AI grounding** | All 13 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |

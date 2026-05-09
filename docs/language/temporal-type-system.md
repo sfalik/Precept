@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Draft |
-| Implementation state | Proposal — not yet implemented |
+| Implementation state | Implemented in `src/Precept/Language/Time/` and wired into typed-constant validation |
 | Grounding | `docs/language/precept-language-spec.md`; vision archived at `docs/archive/language-design/precept-language-vision.md` § Type System |
 | Prototype | `docs/TemporalTypeSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114) |
 | Related | [Issue #107](https://github.com/sfalik/Precept/issues/107) · [Primitive Types](primitive-types.md) · [Business-Domain Types](business-domain-types.md) · [Literal System](../compiler/literal-system.md) |
@@ -25,6 +25,21 @@ Add eight temporal types to the Precept DSL — `date`, `time`, `instant`, `dura
 
 **Formatted temporal constants** use the single-quoted `'...'` delimiter — the typed constant delimiter — with type determined by expression context. Temporal types are the first inhabitants of this mechanism; the delimiter is not temporal-specific:
 - `'2026-06-01'` (date), `'14:30:00'` (time), `'2026-04-13T14:30:00Z'` (instant), `'2026-04-13T09:00:00'` (datetime), `'2026-04-13T14:30:00[America/New_York]'` (zoneddatetime), `'America/New_York'` (timezone)
+
+### Canonical temporal parser
+
+The shared temporal parsing subsystem lives in `src/Precept/Language/Time/`. `TemporalParser` and `TemporalQuantityParser` are the canonical entry points for all seven temporal literal forms plus temporal quantities, and `TemporalValidator` is the compile-time typed-constant adapter used by `TypedConstantValidation.Validate(...)`.
+
+| Surface form | Backing type | Canonical parse shape | Canonical serialization |
+|---|---|---|---|
+| `date` | `LocalDate` | `YYYY-MM-DD` | `2026-04-15` |
+| `time` | `LocalTime` | `HH:MM[:SS]` | `14:30:00` |
+| `datetime` | `LocalDateTime` | `YYYY-MM-DDTHH:MM:SS` | `2026-04-15T14:30:00` |
+| `instant` | `Instant` | ISO instant with trailing `Z` | `2026-04-15T14:30:00Z` |
+| `zoneddatetime` | `ZonedDateTime` | Local datetime plus bracketed IANA zone | `2026-04-15T14:30:00[America/New_York]` |
+| `timezone` | `DateTimeZone` | IANA timezone identifier | `America/New_York` |
+| `duration` | `Duration` | Temporal quantity or ISO duration | `PT72H` |
+| `period` | `Period` | Temporal quantity or ISO period | `P30D` |
 
 **Timezone mediation** uses a single dot-accessor operation — `.inZone(tz)` — that produces a `zoneddatetime`, with navigation to local types via dot chains:
 - `myInstant.inZone(tz)` → `zoneddatetime`
@@ -232,9 +247,9 @@ The second form satisfies the philosophy's "one file, complete rules" guarantee.
 
 ## NodaTime as Backing Library
 
-### Why NodaTime, not System.DateOnly / TimeOnly / DateTime
+### Why NodaTime, not the BCL temporal primitives
 
-NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as date` is the surface, `NodaTime.LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it.
+NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as date` is the surface, `LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it. The runtime API maps the temporal surface to `LocalDate`, `LocalTime`, `LocalDateTime`, `Instant`, `ZonedDateTime`, `DateTimeZone`, `Duration`, and `Period`.
 
 **Rationale:**
 
@@ -242,7 +257,7 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 
 2. **Type separation enables compile-time safety.** NodaTime makes it structurally impossible to mix a calendar date with a global timestamp, or a calendar period with a timeline duration. Precept's type checker inherits this separation: `date + instant` is a type error. `instant + period` is a type error. No custom dispatch needed.
 
-3. **Battle-tested arithmetic.** `LocalDate.PlusDays(int)`, `LocalDate.Plus(Period.FromMonths(n))`, month-end truncation, leap-year handling, `Period.Between(d1, d2)` — all rigorously tested since 2012. Building the same guarantees on `System.DateOnly` would require Precept to own temporal arithmetic correctness, a domain Precept has no expertise in.
+3. **Battle-tested arithmetic.** `LocalDate.PlusDays(int)`, `LocalDate.Plus(Period.FromMonths(n))`, month-end truncation, leap-year handling, `Period.Between(d1, d2)` — all rigorously tested since 2012. Building the same guarantees on the BCL's primitive date/time types would require Precept to own temporal arithmetic correctness, a domain Precept has no expertise in.
 
 4. **The `Period`/`Duration` split is the decisive factor.** The v1 proposal collapsed `Period` into `Duration` and had to build custom unit-compatibility dispatch. This was re-inventing enforcement logic that NodaTime already provides through type separation. The v2+ proposal exposes the separation directly: calendar units resolve to `period`, timeline units resolve to `duration`, and the type checker simply checks `date + period ✓`, `instant + duration ✓`, `instant + period ✗`. Zero custom dispatch.
 
@@ -254,7 +269,7 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 
 **Decision format:**
 - **Why:** NodaTime's type model matches Precept's philosophy; the `Period`/`Duration` split eliminates custom dispatch logic; battle-tested arithmetic avoids reimplementing solved problems.
-- **Alternatives rejected:** `System.DateOnly`/`TimeOnly` — cheaper for v1 but no `Period` equivalent; month/year arithmetic requires `DateTime` conversion. Raw `System.DateTime` — conflates concepts; the exact problem NodaTime solved. Collapsed `Period`/`Duration` surface (v1 approach) — requires custom dispatch, re-invents enforcement NodaTime provides for free, contradicts the "expose NodaTime faithfully" directive.
+- **Alternatives rejected:** The BCL's primitive date/time types — cheaper for v1 but no `Period` equivalent; month/year arithmetic requires broader datetime conversion and custom discipline. Raw platform datetime values — conflates concepts; the exact problem NodaTime solved. Collapsed `Period`/`Duration` surface (v1 approach) — requires custom dispatch, re-invents enforcement NodaTime provides for free, contradicts the "expose NodaTime faithfully" directive.
 - **Precedent:** NRules inherits `System.Decimal` from .NET for exact arithmetic; Precept inherits NodaTime's temporal model for the same reason.
 - **Tradeoff accepted:** Additional NuGet dependency (~1.1 MB). Acceptable — NodaTime is authored by Jon Skeet, stable since 2012, SemVer-compliant, used in production at Google and across the .NET ecosystem.
 
@@ -1467,7 +1482,7 @@ All temporal types support `optional`. All follow existing null propagation rule
 - **Syntax:** `of 'date'` and `of 'time'` as category qualifiers using the same `of` mechanism as `quantity of 'mass'` (see the currency/quantity design doc for the full `in`/`of` qualification system). Three forms: `period of 'time'` (hours/minutes/seconds only), `period of 'date'` (years/months/weeks/days only), `period` (unconstrained — any components, but `time ± period` and `date ± period` are compile errors). Applicable to field declarations and event arg declarations.
 - **Semantic rules:** `time ± period of 'time'` → OK. `time ± period` (unconstrained) → compile error. `date ± period of 'date'` → OK. `date ± period` (unconstrained) → compile error. `datetime ± period` (any) → always OK (`LocalDateTime.Plus/Minus(Period)` accepts all components). Component categories are closed under arithmetic: `of 'time' + of 'time' = of 'time'`, `of 'date' + of 'date' = of 'date'`, `of 'time' + of 'date' = mixed (unconstrained)`.
 - **Alternatives rejected:** (1) Ban `time ± period` entirely — overly restrictive, prevents `time + GracePeriod` when GracePeriod is known time-only. (2) Runtime strip of date components — silently changes behavior, diverges from NodaTime, violates "expose NodaTime faithfully" directive. (3) Runtime rejection mid-evaluation — violates Principle #1 (deterministic model). (4) Period subtypes `period<time>` / `period<date>` — angle brackets aren't in the grammar; parameterized types add language complexity disproportionate to the problem. (5) Single-word constraint suffixes `timeonly` / `dateonly` — replaced by `of 'time'` / `of 'date'` for consistency with the unified `in`/`of` qualification system across all types.
-- **Precedent:** NodaTime `PeriodUnits.DateOnly` / `PeriodUnits.TimeOnly` masks. `Period.HasDateComponent` / `Period.HasTimeComponent` introspection (used for runtime boundary validation). The `of` keyword mirrors `quantity of 'mass'` — category constraint on a type.
+- **Precedent:** NodaTime date-component and time-component unit masks, plus `Period.HasDateComponent` / `Period.HasTimeComponent` introspection (used for runtime boundary validation). The `of` keyword mirrors `quantity of 'mass'` — category constraint on a type.
 - **Tradeoff:** Authors must annotate period fields and args when used with `time` or `date` arithmetic. The annotation is the proof — without it, the compiler cannot guarantee safety. This is consistent with Precept's philosophy: explicit over implicit.
 - **v6 update:** Syntax changed from `period timeonly` / `period dateonly` (single-word constraint suffixes) to `period of 'time'` / `period of 'date'` (category qualifiers). This aligns period's component constraint mechanism with the unified `in`/`of` qualification system designed for the business-domain types. `of` means "constrains to a category" everywhere: `quantity of 'mass'`, `period of 'date'`, `period of 'time'`. The semantics, proof mechanism, and NodaTime backing are unchanged — only the surface syntax changed.
 

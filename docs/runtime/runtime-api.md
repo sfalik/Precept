@@ -17,7 +17,7 @@
 The runtime API is the boundary between Precept and host applications. It has four concerns:
 
 1. **Construction** — compile source → build executable model → create initial entity via `Create` / `InspectCreate`
-2. **Restoration** — reconstitute an entity from persisted data via `FromJson` (hydration from storage, not validated business input)
+2. **Restoration** — reconstitute an entity from persisted data via `Restore` (hydration from storage, not validated business input)
 3. **Operations** — commit changes via `Fire` and `Update`
 4. **Inspection** — progressive evaluation via `InspectFire` and `InspectUpdate`
 
@@ -32,7 +32,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 **There are no `IReadOnlyDictionary<string, object?>` overloads anywhere.** That provisional convenience lane is fully obsolete and superseded by these two lanes.
 
-**Restoration is JSON-only.** `FromJson(JsonElement document)` has no typed overload. Restoration is a hydration path from persisted storage — storage always provides serialized data. Invalid inputs (mismatched precept name, malformed JSON, unknown fields) are programmer errors and throw `ArgumentException`.
+**Restoration is JSON-only.** `Restore(string? state, JsonElement fields)` has no typed overload. Restoration is a hydration path from persisted storage — storage always provides serialized data. Invalid inputs are reported through `RestoreInvalidInput` / `ArgumentException`-style boundary failures, not a typed-lane overload.
 
 **Dual-lane output.** The raw-lane indexer (`version["fieldName"]`) returns `JsonElement` — no Precept type dependency required. The typed lane uses `Get<T>()`, which materializes a CLR value via the registered `TypeRuntime<T>.ToClr`. `FiredArgs` carries submitted arg values for egress using the same `Get<T>()` pattern.
 
@@ -40,7 +40,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 ## Responsibilities and Boundaries
 
-**OWNS:** Public API surface (`Precept` and `Version`); executable model lifecycle (construction from `Compilation`, validation); entity construction (`Create`, `InspectCreate`); entity restoration (`FromJson`); operation dispatch (`Fire`, `Update`); inspection surface (`InspectFire`, `InspectUpdate`); definition-level structural queries (`States`, `Fields`, `Events`, `Constraints`); constraint exposure model (all three tiers); field access surface (`FieldAccess`, `AvailableEvents`, `RequiredArgs`, `ApplicableConstraints`).
+**OWNS:** Public API surface (`Precept` and `Version`); executable model lifecycle (construction from `Compilation`, validation); entity construction (`Create`, `InspectCreate`); entity restoration (`Restore`); operation dispatch (`Fire`, `Update`); inspection surface (`InspectFire`, `InspectUpdate`); definition-level structural queries (`States`, `Fields`, `Events`, `Constraints`); constraint exposure model (all three tiers); field access surface (`FieldAccess`, `AvailableEvents`, `RequiredArgs`, `ApplicableConstraints`).
 
 **Does NOT OWN:** Compilation (owned by the compiler pipeline); evaluation logic (owned by the `Evaluator`); executable model internals / dispatch table layouts (pending D8/R4); result type definitions (`EventOutcome.cs`, `UpdateOutcome.cs`); descriptor type definitions (`Descriptors.cs`); fault system (`FaultException` and fault site taxonomy).
 
@@ -48,7 +48,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 ## Right-Sizing
 
-The runtime API surface is deliberately minimal: two types (`Precept` and `Version`), four operations (`Create`, `FromJson`, `Fire`, `Update`), and parallel inspection variants (`InspectCreate`, `InspectFire`, `InspectUpdate`). Definition-level queries are precomputed structural reads — zero evaluation cost. The boundary between `Precept` and `Version` is clean: `Precept` carries everything definition-scoped; `Version` carries everything instance-scoped. Internal evaluation complexity lives entirely in the `Evaluator` behind `Version`'s thin facade.
+The runtime API surface is deliberately minimal: two types (`Precept` and `Version`), four operations (`Create`, `Restore`, `Fire`, `Update`), and parallel inspection variants (`InspectCreate`, `InspectFire`, `InspectUpdate`). Definition-level queries are precomputed structural reads — zero evaluation cost. The boundary between `Precept` and `Version` is clean: `Precept` carries everything definition-scoped; `Version` carries everything instance-scoped. Internal evaluation complexity lives entirely in the `Evaluator` behind `Version`'s thin facade.
 
 ---
 
@@ -56,7 +56,7 @@ The runtime API surface is deliberately minimal: two types (`Precept` and `Versi
 
 **Inputs:**
 - `Compilation` → `Precept.From()` — the compiled artifact; must be error-free
-- `document` → `Precept.FromJson()` — full persistence envelope for entity hydration (`JsonElement` only)
+- `state`, `fields` → `Precept.Restore()` — persisted state name plus stored field values (`JsonElement` only)
 - `args` → `Precept.Create()` / `Version.Fire()` — event arguments; `JsonElement?` (JSON lane) or `Action<IArgBuilder>?` (typed lane)
 - `fields` → `Version.Update()` — field patch; `JsonElement?` (JSON lane) or `Action<IFieldBuilder>?` (typed lane), applied atomically
 - `eventName`, `args?` → `Version.InspectFire()` — event name with optional arg refinement; both lanes
@@ -64,7 +64,7 @@ The runtime API surface is deliberately minimal: two types (`Precept` and `Versi
 
 **Outputs:**
 - `Precept` — the executable model; returned from `Precept.From()`
-- `Version` — the hydrated entity snapshot; returned from `Precept.FromJson()`
+- `Version` — the hydrated entity snapshot; returned from `Precept.Restore()` on `Restored`
 - `EventOutcome` (7 variants) — returned from `Create`, `Fire`; see `result-types.md`
 - `UpdateOutcome` (4 variants) — returned from `Update`; see `result-types.md`
 - `EventInspection` — returned from `InspectCreate`, `InspectFire`; full annotated landscape
@@ -192,7 +192,7 @@ Version version = outcome switch
 
 `Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately, recomputes computed fields, and evaluates constraints against the restored state.
 
-> ⚠️ **Design note:** The implementation diverges from the original `FromJson` design in two ways: (1) the method is `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — rather than a single `FromJson(JsonElement document)` accepting an envelope object; (2) it returns a structured `RestoreOutcome` (including `RestoreConstraintsFailed` for schema drift) rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
+> ⚠️ **Design note:** The implementation uses `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — and returns a structured `RestoreOutcome` (including `RestoreConstraintsFailed` for schema drift) rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
 
 **Access modes are bypassed.** Fields that are `readonly` in the restored state were `editable` when previously written. `Restore` accepts all stored fields regardless of the current state's access declarations.
 
@@ -269,7 +269,7 @@ EventOutcome outcome = version.Fire("submit",
 // Typed lane (in-process callers)
 EventOutcome outcome = version.Fire("submit",
     args => args.Set<string>("approver", "Jane")
-               .Set<DateTimeOffset>("timestamp", DateTimeOffset.UtcNow));
+               .Set<Instant>("timestamp", SystemClock.Instance.GetCurrentInstant()));
 
 Version next = outcome switch
 {
@@ -497,7 +497,7 @@ Registrations are process-global. `IArgBuilder.Set<T>` and `IFieldBuilder.Set<T>
 
 #### TypeRuntimeMeta
 
-Catalog-owned metadata record that holds the hot-path serialization delegates for each Precept type. Every `TypeMeta` entry in the Types catalog carries a `TypeRuntimeMeta` instance.
+Catalog-owned metadata record that holds the hot-path serialization delegates for each Precept type. This is the target registration shape for the runtime boundary; it is documented here even though `TypeRuntimeMeta` is not yet carried directly on the `TypeMeta` record in code.
 
 ```csharp
 public sealed record TypeRuntimeMeta(
@@ -509,9 +509,38 @@ public sealed record TypeRuntimeMeta(
     UnaryExecutorDelegate[]  UnaryExecutors);   // indexed by OperationKind — builder embeds delegates in opcodes at compile time
 ```
 
-Active surface for Fire/Inspect/Update hot paths: `ReadJson`, `WriteJson`. `BinaryExecutors` and `UnaryExecutors` are consumed at build time — the builder embeds executor delegates directly in `BinaryOp`/`UnaryOp` opcodes; the evaluator never indexes these arrays at evaluation time. `ParseString` and `FormatString` are used by the language server and authoring tools. `ExtractValue`, `StoreValue`, and `ParseValue` are excluded from hot paths.
+Active surface for Fire/Inspect/Update/Restore hot paths: `ReadJson`, `WriteJson`. `BinaryExecutors` and `UnaryExecutors` are consumed at build time — the builder embeds executor delegates directly in `BinaryOp`/`UnaryOp` opcodes; the evaluator never indexes these arrays at evaluation time. `ParseString` and `FormatString` are used by the language server and authoring tools. `ParseString` shares the same underlying domain parsers as compile-time `ContentValidation`; `FormatString` produces the canonical string form for that type.
 
 Ownership rules (locked per CC#25): the call site advances to the value token and handles `null`; collection runtimes own structural array/object loops; scalar fields read and write the inline value region directly without boxing intermediaries.
+
+##### JSON wire formats
+
+| Precept type | JSON wire format | Example |
+|---|---|---|
+| `date` | ISO 8601 string | `"2026-04-15"` |
+| `time` | ISO 8601 string | `"14:30:00"` |
+| `datetime` | ISO 8601 string | `"2026-04-15T14:30:00"` |
+| `instant` | ISO 8601 UTC string | `"2026-04-15T14:30:00Z"` |
+| `zoneddatetime` | Object: `{datetime, timezone}` | `{"datetime":"2026-04-15T14:30:00","timezone":"America/New_York"}` |
+| `timezone` | IANA string | `"America/New_York"` |
+| `duration` | ISO 8601 duration string | `"PT72H"` |
+| `period` | ISO 8601 period string | `"P30D"` |
+| `money` | Object: `{amount, currency}` | `{"amount":100.00,"currency":"USD"}` |
+| `quantity` | Object: `{magnitude, unit}` | `{"magnitude":5.0,"unit":"kg"}` |
+| `price` | Object: `{amount, currency, unit}` | `{"amount":4.17,"currency":"USD","unit":"each"}` |
+| `exchangerate` | Object: `{rate, from, to}` | `{"rate":1.08,"from":"USD","to":"EUR"}` |
+| `currency` | ISO 4217 string | `"USD"` |
+| `unitofmeasure` | UCUM string | `"kg"` |
+| `dimension` | Dimension name string | `"mass"` |
+
+##### Delegate roles by ingress/egress path
+
+| Delegate | Role |
+|---|---|
+| `ReadJson` | Shared JSON ingress delegate for Fire, Update, and Restore. Reads the wire format above into the runtime value lane. |
+| `WriteJson` | Shared JSON egress delegate for version snapshots, outcomes, and inspection surfaces. |
+| `ParseString` | Authoring/LS parse path. Uses the same underlying domain parsers as compile-time `ContentValidation`, but returns runtime values instead of `TypedConstantParseResult`. |
+| `FormatString` | Canonical string formatter for authoring and display. Produces the same canonical text shape the compile-time validator reports. |
 
 #### FiredArgs
 
@@ -637,10 +666,14 @@ Resolution uses the registered `TypeRuntime<T>` for the field's type — zero bo
 | `number` | `double` |
 | `string`, `text` | `string` |
 | `boolean` | `bool` |
-| `date` | `DateOnly` |
-| `time` | `TimeOnly` |
-| `instant` | `DateTimeOffset` |
+| `date` | `LocalDate` |
+| `time` | `LocalTime` |
+| `datetime` | `LocalDateTime` |
+| `instant` | `Instant` |
+| `zoneddatetime` | `ZonedDateTime` |
+| `timezone` | `DateTimeZone` |
 | `duration` | `Duration` (NodaTime) |
+| `period` | `Period` (NodaTime) |
 | `choice` | `string` |
 | `money` | `Money` |
 | `currency` | `Currency` |
@@ -766,7 +799,7 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 - **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.
 - **No build-time analysis.** Graph analysis, type checking, and compilation are owned by the compiler pipeline. `Precept.From()` accepts only an error-free `Compilation` — it does not re-analyze.
-- **No migration logic.** Future work. `FromJson` bypasses constraint validation; if the definition changed since data was stored, migration is the caller's responsibility until the migration pipeline is designed.
+- **No migration logic.** If the definition changed since data was stored, migration is the caller's responsibility. Restore evaluates constraints against the restored state — schema drift is detected via `RestoreConstraintsFailed`, not silently accepted.
 
 ---
 
@@ -787,5 +820,5 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 
 | File | Purpose |
 |---|---|
-| `src/Precept/Runtime/Precept.cs` | Executable model — `Precept.From()`, `Create`, `InspectCreate`, `FromJson`, definition-level queries |
+| `src/Precept/Runtime/Precept.cs` | Executable model — `Precept.From()`, `Create`, `InspectCreate`, `Restore`, definition-level queries |
 | `src/Precept/Runtime/Version.cs` | Entity snapshot — `Fire`, `Update`, `InspectFire`, `InspectUpdate`, field access, structural queries |
