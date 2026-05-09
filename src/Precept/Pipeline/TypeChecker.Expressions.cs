@@ -1,8 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using NodaTime;
-using NodaTime.Text;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -188,97 +186,19 @@ internal static partial class TypeChecker
         if (cv is null)
             return new TypedTypedConstant(targetType, rawText, rawText, lit.Span);
 
-        // Validate content against the ContentValidation DU
-        var (isValid, parsedValue, errorMessage) = ValidateContent(cv, rawText, meta.DisplayName);
+        var result = TypedConstantValidation.Validate(cv, rawText, targetType);
 
-        if (isValid)
-            return new TypedTypedConstant(targetType, rawText, parsedValue, lit.Span);
+        if (result.IsValid)
+            return new TypedTypedConstant(targetType, rawText, result.Value, lit.Span);
 
-        ctx.Diagnostics.Add(
-            Diagnostics.Create(DiagnosticCode.InvalidTypedConstantContent, lit.Span,
-                rawText, errorMessage ?? meta.DisplayName));
+        foreach (var diagnostic in result.Diagnostics)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.InvalidTypedConstantContent, lit.Span,
+                    rawText, diagnostic.Message));
+        }
+
         return new TypedErrorExpression(lit.Span);
-    }
-
-    /// <summary>
-    /// Validate a typed constant's raw text against a <see cref="ContentValidation"/> strategy.
-    /// Returns (isValid, parsedValue, errorMessage). On success, parsedValue is the parsed
-    /// NodaTime object or the raw string. On failure, errorMessage describes the issue.
-    /// </summary>
-    private static (bool IsValid, object? ParsedValue, string? ErrorMessage) ValidateContent(
-        ContentValidation cv, string rawText, string displayName) => cv switch
-    {
-        NodaTimeValidation noda => ValidateNodaTime(noda, rawText, displayName),
-        ClosedSetValidation closed => ValidateClosedSet(closed, rawText),
-        RegexValidation regex => ValidateRegex(regex, rawText, displayName),
-        UcumValidation => ValidateUcum(rawText),
-        _ => (true, rawText, null),
-    };
-
-    private static (bool, object?, string?) ValidateNodaTime(
-        NodaTimeValidation noda, string rawText, string displayName)
-    {
-        // Dispatch to the appropriate NodaTime parser based on the pattern string.
-        // The NodaTimePattern field identifies which parser to use.
-        if (noda.NodaTimePattern == "uuuu'-'MM'-'dd")
-        {
-            var result = LocalDatePattern.Iso.Parse(rawText);
-            return result.Success
-                ? (true, result.Value, null)
-                : (false, null, $"{displayName} ({noda.FormatDescription})");
-        }
-
-        if (noda.NodaTimePattern == "HH':'mm':'ss")
-        {
-            var result = LocalTimePattern.ExtendedIso.Parse(rawText);
-            return result.Success
-                ? (true, result.Value, null)
-                : (false, null, $"{displayName} ({noda.FormatDescription})");
-        }
-
-        if (noda.NodaTimePattern == "uuuu'-'MM'-'dd'T'HH':'mm':'ss")
-        {
-            var result = LocalDateTimePattern.ExtendedIso.Parse(rawText);
-            return result.Success
-                ? (true, result.Value, null)
-                : (false, null, $"{displayName} ({noda.FormatDescription})");
-        }
-
-        if (noda.NodaTimePattern == "NormalizingIso")
-        {
-            var result = PeriodPattern.NormalizingIso.Parse(rawText);
-            return result.Success
-                ? (true, result.Value, null)
-                : (false, null, $"{displayName} ({noda.FormatDescription})");
-        }
-
-        // Unknown NodaTime pattern — accept without validation
-        return (true, rawText, null);
-    }
-
-    private static (bool, object?, string?) ValidateClosedSet(ClosedSetValidation closed, string rawText)
-    {
-        if (closed.AllowedValues.Contains(rawText))
-            return (true, rawText, null);
-
-        return (false, null, $"{closed.SetName} value");
-    }
-
-    private static (bool, object?, string?) ValidateRegex(
-        RegexValidation regex, string rawText, string displayName)
-    {
-        if (System.Text.RegularExpressions.Regex.IsMatch(rawText, regex.Pattern))
-            return (true, rawText, null);
-
-        return (false, null, $"{displayName} ({regex.FormatDescription})");
-    }
-
-    private static (bool, object?, string?) ValidateUcum(string rawText)
-    {
-        var result = UcumCatalog.Parse(rawText);
-        return result.IsValid
-            ? (true, result.Unit, null)
-            : (false, null, "UCUM expression");
     }
 
     // ════════════════════════════════════════════════════════════════════════
