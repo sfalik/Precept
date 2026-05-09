@@ -72,6 +72,7 @@ public static class UcumAtomCatalog
         atoms["g"] = new UcumAtom("g", "gram", new DimensionVector(0, 1, 0, 0, 0, 0, 0), UcumExactFactor.Parse("1e-3"), true, null);
         atoms["C"] = new UcumAtom("C", "coulomb", new DimensionVector(0, 0, 1, 1, 0, 0, 0), UcumExactFactor.One, false, null);
         atoms["rad"] = new UcumAtom("rad", "radian", DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["each"] = new UcumAtom("each", "each", DimensionVector.None, UcumExactFactor.One, false, null);
     }
 
     private static bool IsAtomElement(XElement element)
