@@ -55,6 +55,10 @@ public static class ProofEngine
         {
             var obligation = obligations[i];
 
+            // Skip obligations already proved by forwarding facts (unreachable/dead-end suppression)
+            if (obligation.Disposition == ProofDisposition.Proved)
+                continue;
+
             // PE-G13: Error-tainted obligation suppression
             if (ContainsErrorExpression(obligation.Site))
             {
@@ -260,8 +264,11 @@ public static class ProofEngine
         var opMeta = Operations.GetMeta(bin.ResolvedOp);
         if (opMeta is BinaryOperationMeta bom)
         {
-            if (ReferenceEquals(param, bom.Lhs)) return bin.Left;
+            // Check Rhs before Lhs: proof requirements (e.g., divisor ≠ 0) target the
+            // right operand, and shared ParameterMeta instances make ReferenceEquals
+            // match both sides — checking Rhs first resolves the correct operand.
             if (ReferenceEquals(param, bom.Rhs)) return bin.Right;
+            if (ReferenceEquals(param, bom.Lhs)) return bin.Left;
         }
         return null;
     }
