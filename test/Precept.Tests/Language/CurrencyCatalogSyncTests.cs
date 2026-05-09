@@ -14,6 +14,14 @@ public class CurrencyCatalogSyncTests
 {
     private static readonly StringComparer CodeComparer = StringComparer.OrdinalIgnoreCase;
 
+    // Codes present in ISO 4217 XML but intentionally excluded from CurrencyCatalog.
+    // XAU/XAG/XPT/XPD: precious metals — commodities, not currencies in business workflows.
+    // XTS: reserved for testing purposes.
+    // XXX: "no currency" placeholder.
+    private static readonly FrozenSet<string> IntentionalExclusions =
+        new[] { "XAU", "XAG", "XPT", "XPD", "XTS", "XXX" }
+        .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
     // Committed snapshot at src/Precept/Data/Iso4217/list-one.xml. Refresh with VS Code task 'iso4217: refresh'.
     internal static string Iso4217XmlPath =>
         Path.GetFullPath(
@@ -27,6 +35,7 @@ public class CurrencyCatalogSyncTests
 
         var xmlCodesNotInCatalog = xmlCodes
             .Except(catalogCodes, CodeComparer)
+            .Except(IntentionalExclusions, CodeComparer)
             .OrderBy(code => code, StringComparer.Ordinal)
             .ToArray();
 

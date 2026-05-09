@@ -8,7 +8,8 @@
 
 - `CurrencyCatalog` is now the durable ISO 4217 surface: a `FrozenDictionary<string, CurrencyEntry>` keyed case-insensitively by alpha code, with `CurrencyEntry` carrying `AlphaCode`, `NumericCode`, `Name`, and `MinorUnit`.
 - Currency validation should derive from `CurrencyCatalog.All.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase)` so runtime/type surfaces consume the catalog instead of a mirrored hardcoded set.
-- Current catalog scope is 162 ISO 4217 active national + fund/supranational codes; HRK is removed, precious metals (`XAU`, `XAG`, `XPT`, `XPD`) plus `XTS` and `XXX` stay excluded, and `MinorUnit = -1` represents ISO `N/A` fund units.
+- Current catalog scope is 172 ISO 4217 active national + fund/supranational codes; withdrawn `ANG`, `BGN`, and `ZWL` are removed, `BOV`, `CHE`, `CHW`, `CLF`, `COU`, `MXV`, `USN`, `UYI`, `UYW`, `VED`, `XAD`, `XCG`, and `ZWG` are added, precious metals (`XAU`, `XAG`, `XPT`, `XPD`) plus `XTS` and `XXX` stay excluded, and `MinorUnit = -1` represents ISO `N/A` fund units.
+- `CurrencyCatalogSyncTests` should encode XML-only exclusions with a case-insensitive `IntentionalExclusions` `FrozenSet<string>` and apply it only to `xmlCodesNotInCatalog`; `catalogCodesNotInXml` stays unfiltered so withdrawn catalog entries still fail fast.
 - ISO refresh posture is manual and tooling-backed: the workspace task `iso4217: refresh` pulls current XML, while `CurrencyCatalogSyncTests` validates catalog drift when the XML fixture is present.
 - `CurrencyCatalog.All.Keys` returns `IEnumerable<string>` (not `FrozenSet<string>`); calling `.ToFrozenSet(StringComparer.OrdinalIgnoreCase)` on it produces the correct case-insensitive set for `ClosedSetValidation.AllowedValues`.
 - ProofEngine binary-op subject resolution must check RHS before LHS when shared `ParameterMeta` instances are reused, otherwise divisor/nonzero requirements can bind to the wrong operand.
