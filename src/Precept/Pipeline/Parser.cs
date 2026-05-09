@@ -45,6 +45,7 @@ public static partial class Parser
     // ═══════════════════════════════════════════════════════════════════════════════
 
     [global::Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
+    [global::Precept.HandlesCatalogExhaustively(typeof(ActionSyntaxShape))]
     private sealed partial class ParserState
     {
         private readonly ImmutableArray<Token> _tokens;
@@ -887,123 +888,150 @@ public static partial class Parser
             switch (meta.SyntaxShape)
             {
                 case ActionSyntaxShape.AssignValue:
-                {
-                    // verb field = expression
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    Expect(TokenKind.Assign);
-                    var value = ParseExpression(0, isAtActionBoundary);
-                    var span = SourceSpan.Covering(actionStartSpan, value.Span);
-                    return new AssignAction(kind, target, value, span);
-                }
-
+                    return ParseAssignValueAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.CollectionValue:
-                {
-                    // verb field expression
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    var value = ParseExpression(0, isAtActionBoundary);
-                    var span = SourceSpan.Covering(actionStartSpan, value.Span);
-                    return new CollectionValueAction(kind, target, value, span);
-                }
-
+                    return ParseCollectionValueAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.CollectionInto:
-                {
-                    // verb field [into field]
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    var lastSpan = target.Span;
-                    ParsedExpression? intoTarget = null;
-                    if (Peek().Kind == TokenKind.Into)
-                    {
-                        Advance(); // consume 'into'
-                        intoTarget = ParseActionTarget(isAtActionBoundary);
-                        lastSpan = intoTarget.Span;
-                    }
-                    var span = SourceSpan.Covering(actionStartSpan, lastSpan);
-                    return new CollectionIntoAction(kind, target, intoTarget, span);
-                }
-
+                    return ParseCollectionIntoAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.FieldOnly:
-                {
-                    // verb field
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    var span = SourceSpan.Covering(actionStartSpan, target.Span);
-                    return new FieldOnlyAction(kind, target, span);
-                }
-
+                    return ParseFieldOnlyAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.CollectionValueBy:
-                {
-                    // verb field expr by expr
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    var value = ParseExpression(0, () => Peek().Kind == TokenKind.By || isAtActionBoundary());
-                    Expect(TokenKind.By);
-                    var orderingKey = ParseExpression(0, isAtActionBoundary);
-                    var span = SourceSpan.Covering(actionStartSpan, orderingKey.Span);
-                    return new CollectionValueByAction(kind, target, value, orderingKey, span);
-                }
-
+                    return ParseCollectionValueByAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.InsertAt:
-                {
-                    // verb field expr at expr
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    var value = ParseExpression(0, () => Peek().Kind == TokenKind.At || isAtActionBoundary());
-                    Expect(TokenKind.At);
-                    var index = ParseExpression(0, isAtActionBoundary);
-                    var span = SourceSpan.Covering(actionStartSpan, index.Span);
-                    return new InsertAtAction(kind, target, value, index, span);
-                }
-
+                    return ParseInsertAtAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.RemoveAtIndex:
-                {
-                    // verb field at expr
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    Expect(TokenKind.At);
-                    var index = ParseExpression(0, isAtActionBoundary);
-                    var span = SourceSpan.Covering(actionStartSpan, index.Span);
-                    return new RemoveAtAction(kind, target, index, span);
-                }
-
+                    return ParseRemoveAtIndexAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.PutKeyValue:
-                {
-                    // verb field key = value
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    var key = ParseExpression(0, () => Peek().Kind == TokenKind.Assign || isAtActionBoundary());
-                    Expect(TokenKind.Assign);
-                    var value = ParseExpression(0, isAtActionBoundary);
-                    var span = SourceSpan.Covering(actionStartSpan, value.Span);
-                    return new PutKeyValueAction(kind, target, key, value, span);
-                }
-
+                    return ParsePutKeyValueAction(kind, actionStartSpan, isAtActionBoundary);
                 case ActionSyntaxShape.CollectionIntoBy:
-                {
-                    // verb field [into field] [by key]
-                    var target = ParseActionTarget(isAtActionBoundary);
-                    var lastSpan = target.Span;
-                    ParsedExpression? intoTarget = null;
-                    ParsedExpression? orderingCapture = null;
-
-                    if (Peek().Kind == TokenKind.Into)
-                    {
-                        Advance(); // consume 'into'
-                        intoTarget = ParseActionTarget(isAtActionBoundary);
-                        lastSpan = intoTarget.Span;
-                    }
-
-                    if (Peek().Kind == TokenKind.By)
-                    {
-                        Advance(); // consume 'by'
-                        orderingCapture = ParseActionTarget(isAtActionBoundary);
-                        lastSpan = orderingCapture.Span;
-                    }
-
-                    var span = SourceSpan.Covering(actionStartSpan, lastSpan);
-                    return new CollectionIntoByAction(kind, target, intoTarget, orderingCapture, span);
-                }
-
+                    return ParseCollectionIntoByAction(kind, actionStartSpan, isAtActionBoundary);
                 default:
                 {
                     // Unknown shape — produce malformed action
                     return new MalformedAction(kind, actionStartSpan);
                 }
             }
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.AssignValue)]
+        private ParsedAction ParseAssignValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field = expression
+            var target = ParseActionTarget(isAtActionBoundary);
+            Expect(TokenKind.Assign);
+            var value = ParseExpression(0, isAtActionBoundary);
+            var span = SourceSpan.Covering(actionStartSpan, value.Span);
+            return new AssignAction(kind, target, value, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.CollectionValue)]
+        private ParsedAction ParseCollectionValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field expression
+            var target = ParseActionTarget(isAtActionBoundary);
+            var value = ParseExpression(0, isAtActionBoundary);
+            var span = SourceSpan.Covering(actionStartSpan, value.Span);
+            return new CollectionValueAction(kind, target, value, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.CollectionInto)]
+        private ParsedAction ParseCollectionIntoAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field [into field]
+            var target = ParseActionTarget(isAtActionBoundary);
+            var lastSpan = target.Span;
+            ParsedExpression? intoTarget = null;
+            if (Peek().Kind == TokenKind.Into)
+            {
+                Advance(); // consume 'into'
+                intoTarget = ParseActionTarget(isAtActionBoundary);
+                lastSpan = intoTarget.Span;
+            }
+            var span = SourceSpan.Covering(actionStartSpan, lastSpan);
+            return new CollectionIntoAction(kind, target, intoTarget, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.FieldOnly)]
+        private ParsedAction ParseFieldOnlyAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field
+            var target = ParseActionTarget(isAtActionBoundary);
+            var span = SourceSpan.Covering(actionStartSpan, target.Span);
+            return new FieldOnlyAction(kind, target, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.CollectionValueBy)]
+        private ParsedAction ParseCollectionValueByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field expr by expr
+            var target = ParseActionTarget(isAtActionBoundary);
+            var value = ParseExpression(0, () => Peek().Kind == TokenKind.By || isAtActionBoundary());
+            Expect(TokenKind.By);
+            var orderingKey = ParseExpression(0, isAtActionBoundary);
+            var span = SourceSpan.Covering(actionStartSpan, orderingKey.Span);
+            return new CollectionValueByAction(kind, target, value, orderingKey, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.InsertAt)]
+        private ParsedAction ParseInsertAtAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field expr at expr
+            var target = ParseActionTarget(isAtActionBoundary);
+            var value = ParseExpression(0, () => Peek().Kind == TokenKind.At || isAtActionBoundary());
+            Expect(TokenKind.At);
+            var index = ParseExpression(0, isAtActionBoundary);
+            var span = SourceSpan.Covering(actionStartSpan, index.Span);
+            return new InsertAtAction(kind, target, value, index, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.RemoveAtIndex)]
+        private ParsedAction ParseRemoveAtIndexAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field at expr
+            var target = ParseActionTarget(isAtActionBoundary);
+            Expect(TokenKind.At);
+            var index = ParseExpression(0, isAtActionBoundary);
+            var span = SourceSpan.Covering(actionStartSpan, index.Span);
+            return new RemoveAtAction(kind, target, index, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.PutKeyValue)]
+        private ParsedAction ParsePutKeyValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field key = value
+            var target = ParseActionTarget(isAtActionBoundary);
+            var key = ParseExpression(0, () => Peek().Kind == TokenKind.Assign || isAtActionBoundary());
+            Expect(TokenKind.Assign);
+            var value = ParseExpression(0, isAtActionBoundary);
+            var span = SourceSpan.Covering(actionStartSpan, value.Span);
+            return new PutKeyValueAction(kind, target, key, value, span);
+        }
+
+        [HandlesCatalogMember(ActionSyntaxShape.CollectionIntoBy)]
+        private ParsedAction ParseCollectionIntoByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        {
+            // verb field [into field] [by key]
+            var target = ParseActionTarget(isAtActionBoundary);
+            var lastSpan = target.Span;
+            ParsedExpression? intoTarget = null;
+            ParsedExpression? orderingCapture = null;
+
+            if (Peek().Kind == TokenKind.Into)
+            {
+                Advance(); // consume 'into'
+                intoTarget = ParseActionTarget(isAtActionBoundary);
+                lastSpan = intoTarget.Span;
+            }
+
+            if (Peek().Kind == TokenKind.By)
+            {
+                Advance(); // consume 'by'
+                orderingCapture = ParseActionTarget(isAtActionBoundary);
+                lastSpan = orderingCapture.Span;
+            }
+
+            var span = SourceSpan.Covering(actionStartSpan, lastSpan);
+            return new CollectionIntoByAction(kind, target, intoTarget, orderingCapture, span);
         }
 
         /// <summary>
