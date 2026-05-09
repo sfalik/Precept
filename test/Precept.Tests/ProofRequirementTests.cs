@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -11,6 +12,18 @@ public class ProofRequirementTests
 
     private static readonly ParameterMeta TestParam = new(TypeKind.Integer);
     private static readonly TypeAccessor TestAccessor = new("count", "Element count");
+
+    public static IEnumerable<object[]> DeclaredQualifierMetaCases()
+    {
+        yield return [new DeclaredQualifierMeta.Currency("USD"), QualifierAxis.Currency];
+        yield return [new DeclaredQualifierMeta.Unit("kg", "mass"), QualifierAxis.Unit];
+        yield return [new DeclaredQualifierMeta.Dimension("mass"), QualifierAxis.Dimension];
+        yield return [new DeclaredQualifierMeta.FromCurrency("USD"), QualifierAxis.FromCurrency];
+        yield return [new DeclaredQualifierMeta.ToCurrency("EUR"), QualifierAxis.ToCurrency];
+        yield return [new DeclaredQualifierMeta.Timezone("America/New_York"), QualifierAxis.Timezone];
+        yield return [new DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Any), QualifierAxis.TemporalDimension];
+        yield return [new DeclaredQualifierMeta.TemporalUnit("days", PeriodDimension.Date), QualifierAxis.TemporalUnit];
+    }
 
     // ── ProofSubject DU ─────────────────────────────────────────────────────────
 
@@ -325,5 +338,43 @@ public class ProofRequirementTests
         var presence = new DeclaredPresenceMeta.Optional();
 
         presence.ProofSatisfactions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DeclaredQualifierMeta_Currency_HasCorrectAxis()
+    {
+        var qualifier = new DeclaredQualifierMeta.Currency("USD");
+
+        qualifier.Axis.Should().Be(QualifierAxis.Currency);
+    }
+
+    [Fact]
+    public void DeclaredQualifierMeta_TemporalDimension_Any_HasBaselineOrigin()
+    {
+        var qualifier = new DeclaredQualifierMeta.TemporalDimension(
+            PeriodDimension.Any,
+            Origin: QualifierOrigin.Baseline,
+            Preposition: null);
+
+        qualifier.Axis.Should().Be(QualifierAxis.TemporalDimension);
+        qualifier.Origin.Should().Be(QualifierOrigin.Baseline);
+        qualifier.Preposition.Should().BeNull();
+        qualifier.Value.Should().Be(PeriodDimension.Any);
+    }
+
+    [Fact]
+    public void DeclaredQualifierMeta_TemporalUnit_CarriesDerivedDimension()
+    {
+        var qualifier = new DeclaredQualifierMeta.TemporalUnit("days", PeriodDimension.Date);
+
+        qualifier.Axis.Should().Be(QualifierAxis.TemporalUnit);
+        qualifier.DerivedDimension.Should().Be(PeriodDimension.Date);
+    }
+
+    [Theory]
+    [MemberData(nameof(DeclaredQualifierMetaCases))]
+    public void DeclaredQualifierMeta_AllSubtypes_HaveCorrectAxis(DeclaredQualifierMeta qualifier, QualifierAxis expectedAxis)
+    {
+        qualifier.Axis.Should().Be(expectedAxis);
     }
 }
