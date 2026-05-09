@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Frozen;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Xml.Linq;
 using FluentAssertions;
 using Precept.Language;
@@ -12,6 +10,7 @@ namespace Precept.Tests.Language;
 
 public class CurrencyCatalogSyncTests
 {
+    private const string ResourceName = "Precept.Data.Iso4217.list-one.xml";
     private static readonly StringComparer CodeComparer = StringComparer.OrdinalIgnoreCase;
 
     // Codes present in ISO 4217 XML but intentionally excluded from CurrencyCatalog.
@@ -29,16 +28,11 @@ public class CurrencyCatalogSyncTests
         }
         .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    // Committed snapshot at src/Precept/Data/Iso4217/list-one.xml. Refresh with VS Code task 'iso4217: refresh'.
-    internal static string Iso4217XmlPath =>
-        Path.GetFullPath(
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Precept", "Data", "Iso4217", "list-one.xml"));
-
     [Fact]
-    public void CurrencyCatalog_MatchesIso4217Xml()
+    public void CurrencyCatalog_MatchesEmbeddedIso4217Xml()
     {
-        var xmlCodes = LoadXmlCurrencyCodes(Iso4217XmlPath);
-        var catalogCodes = GetCatalogCurrencyCodes();
+        var xmlCodes = LoadXmlCurrencyCodes();
+        var catalogCodes = CurrencyCatalog.All.Keys.ToFrozenSet(CodeComparer);
 
         var xmlCodesNotInCatalog = xmlCodes
             .Except(catalogCodes, CodeComparer)
@@ -52,32 +46,20 @@ public class CurrencyCatalogSyncTests
             .ToArray();
 
         xmlCodesNotInCatalog.Should().BeEmpty(
-            "these ISO 4217 codes are in the XML but missing from the catalog: {0}",
+            "these ISO 4217 codes are in the embedded XML but missing from the catalog: {0}",
             string.Join(", ", xmlCodesNotInCatalog));
 
         catalogCodesNotInXml.Should().BeEmpty(
-            "these catalog codes are not in the current ISO 4217 XML: {0}",
+            "these catalog codes are not in the embedded ISO 4217 XML: {0}",
             string.Join(", ", catalogCodesNotInXml));
     }
 
-    private static FrozenSet<string> GetCatalogCurrencyCodes()
+    private static FrozenSet<string> LoadXmlCurrencyCodes()
     {
-        if (Types.GetMeta(TypeKind.Currency).ContentValidation is ClosedSetValidation validation)
-            return validation.AllowedValues;
+        using var stream = typeof(CurrencyCatalog).Assembly.GetManifestResourceStream(ResourceName);
+        stream.Should().NotBeNull($"embedded resource '{ResourceName}' should exist");
 
-        var field = typeof(Types).GetField("Iso4217CurrencyCodes", BindingFlags.Static | BindingFlags.NonPublic);
-        var codes = field?.GetValue(null) as FrozenSet<string>;
-
-        if (codes is not null)
-            return codes;
-
-        throw new InvalidOperationException(
-            "Unable to locate the currency catalog through TypeKind.Currency metadata or Types.Iso4217CurrencyCodes.");
-    }
-
-    private static FrozenSet<string> LoadXmlCurrencyCodes(string xmlPath)
-    {
-        var document = XDocument.Load(xmlPath);
+        var document = XDocument.Load(stream!);
 
         return document
             .Descendants()
