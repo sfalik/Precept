@@ -157,3 +157,43 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
         : ProofRequirementMeta(ProofRequirementKind.QualifierCompatibility,
             "Qualifier compatibility — two operands must share a qualifier value on the specified axis");
 }
+
+// ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement
+public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
+{
+    public sealed record Numeric(
+        SatisfactionProjection Projection,
+        OperatorKind Comparison,
+        NumericBoundSource Bound)
+        : ProofSatisfaction(ProofRequirementKind.Numeric);
+
+    public sealed record Presence()
+        : ProofSatisfaction(ProofRequirementKind.Presence);
+
+    public sealed record Dimension(DimensionSource Source)
+        : ProofSatisfaction(ProofRequirementKind.Dimension);
+
+    public sealed record Modifier(ModifierKind RequiredModifier)
+        : ProofSatisfaction(ProofRequirementKind.Modifier);
+
+    public sealed record QualifierCompatibility(QualifierAxis Axis)
+        : ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
+}
+
+public abstract record SatisfactionProjection
+{
+    public sealed record SelfValue() : SatisfactionProjection;
+    public sealed record Accessor(string Name) : SatisfactionProjection;
+}
+
+public abstract record NumericBoundSource
+{
+    public sealed record Constant(decimal Value) : NumericBoundSource;
+    public sealed record DeclarationValue() : NumericBoundSource;
+}
+
+public abstract record DimensionSource
+{
+    public sealed record Constant(PeriodDimension Value) : DimensionSource;
+    public sealed record DeclaredTemporalDimension() : DimensionSource;
+}

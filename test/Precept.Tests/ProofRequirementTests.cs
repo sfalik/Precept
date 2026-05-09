@@ -212,4 +212,101 @@ public class ProofRequirementTests
             OperatorKind.LessThan, OperatorKind.LessThanOrEqual,
             OperatorKind.GreaterThan, OperatorKind.GreaterThanOrEqual);
     }
+
+    [Fact]
+    public void ProofSatisfaction_Numeric_HoldsProjectionComparisonBound()
+    {
+        var projection = new SatisfactionProjection.Accessor("length");
+        var bound = new NumericBoundSource.Constant(0m);
+        var satisfaction = new ProofSatisfaction.Numeric(projection, OperatorKind.GreaterThan, bound);
+
+        satisfaction.RequirementKind.Should().Be(ProofRequirementKind.Numeric);
+        satisfaction.Projection.Should().BeSameAs(projection);
+        satisfaction.Comparison.Should().Be(OperatorKind.GreaterThan);
+        satisfaction.Bound.Should().BeSameAs(bound);
+    }
+
+    [Fact]
+    public void ProofSatisfaction_Presence_HasPresenceRequirementKind()
+    {
+        var satisfaction = new ProofSatisfaction.Presence();
+
+        satisfaction.RequirementKind.Should().Be(ProofRequirementKind.Presence);
+    }
+
+    [Fact]
+    public void ProofSatisfaction_Dimension_HoldsSource()
+    {
+        var source = new DimensionSource.Constant(PeriodDimension.Date);
+        var satisfaction = new ProofSatisfaction.Dimension(source);
+
+        satisfaction.RequirementKind.Should().Be(ProofRequirementKind.Dimension);
+        satisfaction.Source.Should().BeSameAs(source);
+    }
+
+    [Fact]
+    public void ProofSatisfaction_Modifier_HoldsRequiredModifier()
+    {
+        var satisfaction = new ProofSatisfaction.Modifier(ModifierKind.Ordered);
+
+        satisfaction.RequirementKind.Should().Be(ProofRequirementKind.Modifier);
+        satisfaction.RequiredModifier.Should().Be(ModifierKind.Ordered);
+    }
+
+    [Fact]
+    public void ProofSatisfaction_QualifierCompatibility_HoldsAxis()
+    {
+        var satisfaction = new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Currency);
+
+        satisfaction.RequirementKind.Should().Be(ProofRequirementKind.QualifierCompatibility);
+        satisfaction.Axis.Should().Be(QualifierAxis.Currency);
+    }
+
+    [Fact]
+    public void SatisfactionProjection_SelfValue_IsDistinctFromAccessor()
+    {
+        SatisfactionProjection projection = new SatisfactionProjection.SelfValue();
+
+        projection.Should().NotBeOfType<SatisfactionProjection.Accessor>();
+    }
+
+    [Fact]
+    public void SatisfactionProjection_Accessor_HoldsName()
+    {
+        var projection = new SatisfactionProjection.Accessor("count");
+
+        projection.Name.Should().Be("count");
+    }
+
+    [Fact]
+    public void NumericBoundSource_Constant_HoldsValue()
+    {
+        var bound = new NumericBoundSource.Constant(12.5m);
+
+        bound.Value.Should().Be(12.5m);
+    }
+
+    [Fact]
+    public void NumericBoundSource_DeclarationValue_IsDistinct()
+    {
+        NumericBoundSource bound = new NumericBoundSource.DeclarationValue();
+
+        bound.Should().NotBeOfType<NumericBoundSource.Constant>();
+    }
+
+    [Fact]
+    public void DimensionSource_Constant_HoldsValue()
+    {
+        var source = new DimensionSource.Constant(PeriodDimension.Time);
+
+        source.Value.Should().Be(PeriodDimension.Time);
+    }
+
+    [Fact]
+    public void DimensionSource_DeclaredTemporalDimension_IsDistinct()
+    {
+        DimensionSource source = new DimensionSource.DeclaredTemporalDimension();
+
+        source.Should().NotBeOfType<DimensionSource.Constant>();
+    }
 }
