@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Data\Iso4217\list-one.xml" />
+    <EmbeddedResource Include="Data\Ucum\ucum-essence.xml" />
   </ItemGroup>
 
   <ItemGroup>
