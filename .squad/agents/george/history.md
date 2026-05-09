@@ -20,6 +20,14 @@
 - Graph wildcard expansion should stay structural: expand `FromState == null` rows per declared state, but suppress the expanded edge when that state already has an explicit row for the same event.
 - `IsMessagePosition` now exists on both `TokenMeta` and `FunctionMeta`; populated token entries are `TokenKind.Because` and `TokenKind.Reject`.
 - No current built-in `FunctionMeta` entries set `IsMessagePosition`; Kramer needs to wire the grammar generator to consume the new catalog flag next.
+- `ModifierMeta` now lives at `src/Precept/Language/Modifier.cs` and carries `DesugarsToRule`; current true entries are `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, and `maxplaces`.
+- PE-G3's approved output shape is collocated in `src/Precept/Pipeline/ProofLedger.cs` — the nine proof-ledger support types live beside `ProofLedger` itself instead of being split into separate files.
+- `ProofDisposition` must use explicit 1-based enum values in source (`Proved = 1`, `Unresolved = 2`) or PRECEPT0018 blocks the build, even for placeholder pipeline output enums.
+- `docs/compiler/proof-engine.md` had to be realigned to source for `ConstraintIdentity` (`RuleIdentity(int RuleIndex)`, `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)`) and the strategy names `DeclarationAttribute` / `QualifierCompatibility`.
+- Phase 1 proof prework stayed purely structural: `ProofEngine.cs` remains behaviorally inert while carrier DUs, catalog metadata, semantic-index fields, obligation context, and proof-stage diagnostic metadata now exist for Phase 2 to consume.
+- `TypedField` / `TypedArg` are high-friction positional records: adding `Presence` and `DeclaredQualifiers` required touching every constructor site, including manual test scaffolds in `TypeCheckerExpressionTests` and `TypeCheckerQuantifierTests`, so named arguments are the safest future edit pattern.
+- Doc-only ordinal fixes can still have large blast radius when a long-lived design doc already carries unrelated branch edits; validate staged hunks before committing `docs/compiler/proof-engine.md` changes.
+- Current validation baseline after Phase 1 is stable: full-solution build is green, while full-solution tests still fail only in pre-existing areas (`Precept.LanguageServer.Tests` stubs and the two `TokensTests` keyword-classification assertions).
 
 ## Recent Updates
 
