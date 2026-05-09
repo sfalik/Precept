@@ -25,9 +25,10 @@
   --structure-h: #A5B4FC;
   --state: #A898F5;
   --event: #30B8E8;
-  --data: #B0BEC5;
   --data-t: #9AA8B5;
   --data-v: #84929F;
+  --field: #A5B4FC;
+  --arg: #9AD8E8;
   --rule: #FBBF24;
   --comment: #9096A6;
   --valid: #34D399;
@@ -169,7 +170,7 @@ pre {
   .sg { color: var(--structure); font-weight: 400; }
 .st { color: var(--state); }
 .ev { color: var(--event); }
-.da { color: var(--data); }
+.da { color: var(--field); }
 .dt { color: var(--data-t); }
 .dv { color: var(--data-v); }
 .ru { color: var(--rule); }
@@ -720,8 +721,8 @@ pre {
   --modifier-bg: transparent;
 }
 .cg-modifier-token--data {
-  --modifier-border: rgba(176,190,197,0.25);
-  --modifier-text: var(--data);
+  --modifier-border: rgba(165,180,252,0.25);
+  --modifier-text: var(--field);
 }
 .cg-modifier-token--structure {
   --modifier-border: rgba(99,102,241,0.35);
@@ -1421,7 +1422,7 @@ pre {
     line-height: 1;
   }
   .cg-mini-data-name {
-    color: var(--data);
+    color: var(--field);
   }
   .cg-mini-data-type {
     color: var(--data-t);
@@ -1570,7 +1571,7 @@ pre {
 .form-row:last-child { border-bottom: none; }
 .form-lbl { color: var(--soft); font-size: 11px; letter-spacing: 0.10em; }
 .form-row--editable { align-items: center; }
-.form-row--editable .form-lbl { color: var(--data); }
+.form-row--editable .form-lbl { color: var(--field); }
 .form-row--constrained .form-lbl { font-style: italic; }
 .form-row--required .form-lbl { color: var(--warn); }
 .form-required-badge { font-size: 9px; font-family: var(--mono); letter-spacing: 0.10em; color: var(--warn); margin-left: 6px; opacity: 0.8; }
@@ -1604,11 +1605,11 @@ pre {
 }
 .form-btn:hover { border-color: rgba(255,255,255,0.28); color: var(--text); }
 .form-btn--save {
-  border-color: rgba(176,190,197,0.35);
-  background: rgba(176,190,197,0.08);
-  color: var(--data);
+  border-color: rgba(165,180,252,0.35);
+  background: rgba(165,180,252,0.08);
+  color: var(--field);
 }
-.form-btn--save:hover { border-color: rgba(176,190,197,0.6); background: rgba(176,190,197,0.14); color: var(--text); }
+.form-btn--save:hover { border-color: rgba(165,180,252,0.6); background: rgba(165,180,252,0.14); color: var(--text); }
 .form-state-specimen {
   display: grid;
   gap: 6px;
@@ -1628,9 +1629,9 @@ pre {
 .form-state-lbl { color: var(--soft); font-size: 10px; letter-spacing: 0.08em; }
 .form-state-actions { display: flex; gap: 5px; margin-top: 4px; }
 .form-btn--dirty {
-  border-color: rgba(176,190,197,0.5);
-  background: rgba(176,190,197,0.12);
-  color: var(--data);
+  border-color: rgba(165,180,252,0.5);
+  background: rgba(165,180,252,0.12);
+  color: var(--field);
 }
 .form-btn--pristine {
   border-color: var(--line);
@@ -1658,9 +1659,9 @@ pre {
 .form-state-lbl { color: var(--soft); font-size: 10px; letter-spacing: 0.08em; }
 .form-state-actions { display: flex; gap: 5px; margin-top: 4px; }
 .form-btn--dirty {
-  border-color: rgba(176,190,197,0.5);
-  background: rgba(176,190,197,0.12);
-  color: var(--data);
+  border-color: rgba(165,180,252,0.5);
+  background: rgba(165,180,252,0.12);
+  color: var(--field);
 }
 .form-btn--pristine {
   border-color: var(--line);
@@ -1880,7 +1881,7 @@ pre {
   font-weight: 500;
 }
 .timeline-row-entry--edit {
-  color: var(--data);
+  color: var(--field);
 }
 .timeline-row-arrow {
   color: var(--soft);
@@ -2424,7 +2425,7 @@ pre {
             </div>
             <div class="arch-card-role">What happens — triggers and transitions</div>
           </div>
-          <div class="arch-card" style="--card-color: var(--data)">
+          <div class="arch-card" style="--card-color: var(--field)">
             <div class="arch-card-title">
               <div class="arch-card-swatch"></div>
               <div class="arch-card-name da">Data</div>
@@ -2783,7 +2784,7 @@ pre {
 }
 .typography-token--data {
   font-style: italic;
-  color: var(--data);
+  color: var(--field);
 }
 .typography-token--annotation {
   font-style: italic;
@@ -3430,6 +3431,9 @@ pre {
 .semantic-family-variants--double {
   grid-template-columns: repeat(2, minmax(0,1fr));
 }
+.semantic-family-variants--quad {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
 .semantic-family-note {
   padding: 12px;
   border: 1px dashed rgba(255,255,255,0.12);
@@ -3624,6 +3628,7 @@ pre {
   .color-system-summary,
   .color-stage-grid,
   .semantic-family-variants--double,
+  .semantic-family-variants--quad,
   .verdict-register {
     grid-template-columns: 1fr;
   }
@@ -3636,14 +3641,14 @@ pre {
 <section class="section" id="colors">
   <div class="section-head">
     <h2>Color</h2>
-    <p>Color defines how authored meaning stays grouped into five semantic colors. Structure and Data keep their tonal variants nested inside the parent color. Comments, verdicts, and scaffolding sit beside those semantic colors. Chrome/support scaffolds the surface around them without becoming a sixth semantic color.</p>
+    <p>Color defines how authored meaning stays grouped into five semantic colors. Families may contain tonal variants of a single hue or semantically related members with distinct hues — the family name defines the semantic category, not a hue constraint. Comments, verdicts, and scaffolding sit beside those semantic colors. Chrome/support scaffolds the surface around them without becoming a sixth semantic color.</p>
   </div>
 
   <div class="section-subgroup toc-anchor" id="color-families">
     <div class="section-subgroup-sidebar">
       <div class="section-subgroup-index">01</div>
       <div class="section-subgroup-name">Semantic Colors</div>
-      <p class="section-subgroup-desc">Authored meaning should read as five grouped semantic colors, not a pile of unrelated swatches. Tonal nuance stays nested under the color that owns it.</p>
+      <p class="section-subgroup-desc">Authored meaning should read as five grouped semantic colors, not a pile of unrelated swatches. Members stay nested under the family that owns them — whether they share its hue or carry a distinct hue justified by their semantic role.</p>
     </div>
     <div class="section-subgroup-body">
       <div class="color-system-band color-system-band--semantic">
@@ -3651,7 +3656,7 @@ pre {
         <div class="color-system-header">
           <div>
             <h3>Semantic colors are the first read.</h3>
-            <p>Lead with five grouped semantic colors, not a run of eight peers. Secondary tones stay physically nested inside Structure and Data so the model reads as construct meaning first, tonal nuance second.</p>
+            <p>Lead with five grouped semantic colors, not a run of unrelated peers. Members within a family share a semantic category — they may be tonal variants of one hue or distinct hues that each represent a role within the category. Hue proximity to neighboring families signals conceptual relationships.</p>
           </div>
           <div class="color-system-summary" aria-label="Color system summary">
             <div class="color-system-summary-item">
@@ -3661,8 +3666,8 @@ pre {
             </div>
             <div class="color-system-summary-item">
               <span>Authored shades</span>
-              <strong>8 tones</strong>
-              <small>Five anchors plus three nested within-family variants</small>
+              <strong>10 tones</strong>
+              <small>Five anchors plus five within-family members</small>
             </div>
             <div class="color-system-summary-item">
               <span>Supporting colors</span>
@@ -3751,31 +3756,36 @@ pre {
         <div class="semantic-family-card__head">
           <div>
             <div class="semantic-family-card__name">Data</div>
-            <div class="semantic-family-card__meta">Bright slate · 215°</div>
+            <div class="semantic-family-card__meta">Slate · Indigo · Cyan — semantically-grouped data tokens</div>
           </div>
-          <div class="semantic-family-card__count">3 tones</div>
+          <div class="semantic-family-card__count">4 tokens</div>
         </div>
-        <div class="semantic-family-swatch" style="background:#B0BEC5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.5)">
-          <div>Primary anchor</div>
-          <strong>#B0BEC5</strong>
-          <div>field and argument names</div>
-        </div>
-        <div class="semantic-family-variants semantic-family-variants--double">
+        <div class="semantic-family-variants semantic-family-variants--quad">
           <div class="semantic-family-variant" style="background:#9AA8B5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.42)">
-            <div>Within family</div>
+            <div>--data-t</div>
             <strong>#9AA8B5</strong>
-            <div>type tone</div>
+            <div>type names</div>
           </div>
           <div class="semantic-family-variant" style="background:#84929F;--tone-fg:rgba(255,255,255,0.82);--tone-soft:rgba(255,255,255,0.38)">
-            <div>Within family</div>
+            <div>--data-v</div>
             <strong>#84929F</strong>
-            <div>value tone</div>
+            <div>literal values</div>
+          </div>
+          <div class="semantic-family-variant" style="background:#A5B4FC;--tone-fg:rgba(15,8,40,0.9);--tone-soft:rgba(15,8,40,0.42)">
+            <div>--field</div>
+            <strong>#A5B4FC</strong>
+            <div>field names — hue proximity to structure signals entity shape</div>
+          </div>
+          <div class="semantic-family-variant" style="background:#9AD8E8;--tone-fg:rgba(0,18,28,0.9);--tone-soft:rgba(0,18,28,0.42)">
+            <div>--arg</div>
+            <strong>#9AD8E8</strong>
+            <div>arg names — hue proximity to event signals behaviour</div>
           </div>
         </div>
         <div class="semantic-family-usage">
           <span class="semantic-family-usage-label">Carries</span>
-          Amount · PolicyHolder · number · 0
-          <span class="semantic-family-usage-subtle">name anchor first, type/value tones nested underneath</span>
+          Amount · PolicyHolder · number · 0 · tenureMonths · applicantName
+          <span class="semantic-family-usage-subtle">Fields and args are data tokens — they carry data values bound to entity states and event parameters. Distinct hues signal their structural and behavioural relationships while belonging to the data category.</span>
         </div>
       </div>
 
@@ -3901,7 +3911,7 @@ pre {
         <div class="channel">
           <span class="channel-name">Guideline</span>
           <h3>Every color has a fixed meaning.</h3>
-          <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic color. Local tonal variants may clarify hierarchy inside a color, but they do not create new construct colors. Decorative use of any palette color corrupts the signal.</p>
+          <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic color. Family members may clarify hierarchy or semantic role within a category — through tonal variants or distinct hues — but they do not create new construct colors. Decorative use of any palette color corrupts the signal.</p>
         </div>
         <div class="channel">
           <span class="channel-name">Guideline</span>
@@ -4481,7 +4491,7 @@ pre {
   </div>
 
   <!-- DATA ──────────────────────────────────────── -->
-  <div class="construct-gallery" id="data-c" style="--fc: var(--data)">
+  <div class="construct-gallery" id="data-c" style="--fc: var(--field)">
     <div class="construct-sidebar">
       <div class="construct-section-head">
         <h3 class="construct-section-heading">Data</h3>
@@ -4498,8 +4508,8 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Colour</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--data)"></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-t)"></span><span>Type</span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-v)"></span><span>Value</span></span></div>
-              <p class="cg-channel-caption">Slate marks field and argument names, with separate tones for type and value.</p>
+              <div class="cg-channel-signal"><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-t)"></span><span>Type</span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-v)"></span><span>Value</span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--field)"></span><span>Field</span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--arg)"></span><span>Arg</span></span></div>
+              <p class="cg-channel-caption">Data family: 4 tokens — slate type/value, indigo field names, cyan arg names. No single anchor hue; the family is a semantic grouping.</p>
             </div>
           </div>
           <div class="cg-channel">
@@ -5241,7 +5251,7 @@ pre {
 .doc-ref.s  { color: var(--structure); }
 .doc-ref.st { color: var(--state); }
 .doc-ref.ev { color: var(--event); }
-.doc-ref.da { color: var(--data); }
+.doc-ref.da { color: var(--field); }
 .doc-ref.ru { color: var(--rule); }
 .doc-ref.tool {
   color: var(--text);
@@ -5274,7 +5284,7 @@ pre {
 .doc-pill.s  { color: var(--structure); }
 .doc-pill.st { color: var(--state); }
 .doc-pill.ev { color: var(--event); }
-.doc-pill.da { color: var(--data); }
+.doc-pill.da { color: var(--field); }
 .doc-pill.ru { color: var(--rule); }
 
 /* ─ reference table ─ */
@@ -5895,16 +5905,16 @@ pre.doc-code-body {
       <span class="doc-code-lang">precept</span>
     </div>
     <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure-h);font-weight:500">LoanApplication</span>
-  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>         <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span> <span style="color:var(--structure)">default</span> <span style="color:var(--data-v)">0</span>
-  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">ApplicantName</span>  <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span> <span style="color:var(--structure)">nullable</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--field)">Amount</span>         <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span> <span style="color:var(--structure)">default</span> <span style="color:var(--data-v)">0</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--field)">ApplicantName</span>  <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span> <span style="color:var(--structure)">nullable</span>
 
   <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>      <span style="color:var(--structure);font-weight:bold">initial</span>
   <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Submitted</span>
 
   <span style="color:var(--structure);font-weight:bold">event</span>  <span style="color:var(--event)">Submit</span>
 
-  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--data)">ApplicantName</span> == <span style="color:var(--data-v)">null</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include applicant name&quot;</span>
-  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--data)">Amount</span> &lt;= <span style="color:var(--data-v)">0</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include positive amount&quot;</span>
+  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--field)">ApplicantName</span> == <span style="color:var(--data-v)">null</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include applicant name&quot;</span>
+  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--field)">Amount</span> &lt;= <span style="color:var(--data-v)">0</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include positive amount&quot;</span>
   <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> -> <span style="color:var(--structure);font-weight:bold">transition</span> <span style="color:var(--state)">Submitted</span></pre>
   </div>
   <div style="padding:12px 18px;background:var(--panel);border:1px solid var(--line-strong);border-top:none">
@@ -6146,8 +6156,8 @@ pre.doc-code-body {
           <div class="doc-code-block">
             <div class="doc-code-header"><span class="doc-code-lang">precept</span></div>
             <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure-h);font-weight:500">LoanApplication</span>
-  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>         <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span> <span style="color:var(--structure)">default</span> <span style="color:var(--data-v)">0</span>
-  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">ApplicantName</span>  <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span> <span style="color:var(--structure)">nullable</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--field)">Amount</span>         <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span> <span style="color:var(--structure)">default</span> <span style="color:var(--data-v)">0</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--field)">ApplicantName</span>  <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span> <span style="color:var(--structure)">nullable</span>
 
   <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>      <span style="color:var(--structure);font-weight:bold">initial</span>
   <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Submitted</span>
@@ -6158,8 +6168,8 @@ pre.doc-code-body {
   <span style="color:var(--structure);font-weight:bold">event</span>  <span style="color:var(--event)">Approve</span>
   <span style="color:var(--structure);font-weight:bold">event</span>  <span style="color:var(--event)">Decline</span>
 
-  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--data)">ApplicantName</span> == <span style="color:var(--data-v)">null</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include applicant name&quot;</span>
-  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--data)">Amount</span> &lt;= <span style="color:var(--data-v)">0</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include positive amount&quot;</span>
+  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--field)">ApplicantName</span> == <span style="color:var(--data-v)">null</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include applicant name&quot;</span>
+  <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> <span style="color:var(--structure);font-weight:bold">when</span> <span style="color:var(--field)">Amount</span> &lt;= <span style="color:var(--data-v)">0</span> -> <span style="color:var(--structure);font-weight:bold">reject</span> <span style="color:var(--rule)">&quot;Application must include positive amount&quot;</span>
   <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Draft</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Submit</span> -> <span style="color:var(--structure);font-weight:bold">transition</span> <span style="color:var(--state)">Submitted</span>
   <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Submitted</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Approve</span> -> <span style="color:var(--structure);font-weight:bold">transition</span> <span style="color:var(--state)">Approved</span>
   <span style="color:var(--structure);font-weight:bold">from</span>  <span style="color:var(--state)">Submitted</span>  <span style="color:var(--structure);font-weight:bold">on</span> <span style="color:var(--event)">Decline</span> -> <span style="color:var(--structure);font-weight:bold">transition</span> <span style="color:var(--state)">Declined</span></pre>
