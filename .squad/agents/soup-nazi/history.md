@@ -26,6 +26,8 @@
 - `reject` / `no transition` rows can matter structurally as self-edges even when they do not change state.
 - 2026-05-08T23:45:00.367-04:00 — ProofEngine test authoring exposed three easy-to-miss proof-surface traps: operand-metadata identity can change subject resolution (`integer / number` behaves differently from `number / number`), missing boolean catalog entries can turn `and` / `or` guard tests red for type-check reasons instead of proof reasons, and forwarding-fact suppression only holds if later discharge passes preserve already-proved obligations.
 
+- 2026-05-09T17:01:02.062-04:00 — Q8 UCUM drift coverage is now anchored on the embedded `ucum-essence.xml` source of truth plus the curated Tier 1 contract: new tests lock XML-backed universe coverage, SI base/vector invariants, dimensionless `rad`/`each`, Tier 1's exact 150-code curation and exclusions, shim forwarding, and parse-synthesized Tier 1 vectors (`m2`, `km2`, `m/s`, `km/h`, `kW.h`). Important finding: the requested `All >= 500` floor was a false-positive threshold for the current implementation because the shipped UCUM essence snapshot exposes roughly 300 distinct atom codes, so drift coverage must anchor to the embedded XML universe rather than an aspirational atom-count narrative.
+
 ## Recent Updates
 
 ### 2026-05-09T14:14:17Z — LanguageTool coverage review closed
