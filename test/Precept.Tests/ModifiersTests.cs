@@ -195,6 +195,97 @@ public class ModifiersTests
         meta.Token.Kind.Should().Be(TokenKind.Writable);
     }
 
+    [Fact]
+    public void Positive_HasProofSatisfaction_Numeric_GreaterThan_Zero()
+    {
+        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Positive)).ProofSatisfactions.Single()
+            .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
+
+        proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
+        proof.Comparison.Should().Be(OperatorKind.GreaterThan);
+        proof.Bound.Should().BeEquivalentTo(new NumericBoundSource.Constant(0m));
+    }
+
+    [Fact]
+    public void Nonnegative_HasProofSatisfaction_Numeric_GreaterThanOrEqual_Zero()
+    {
+        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Nonnegative)).ProofSatisfactions.Single()
+            .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
+
+        proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
+        proof.Comparison.Should().Be(OperatorKind.GreaterThanOrEqual);
+        proof.Bound.Should().BeEquivalentTo(new NumericBoundSource.Constant(0m));
+    }
+
+    [Fact]
+    public void Nonzero_HasProofSatisfaction_Numeric_NotEquals_Zero()
+    {
+        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Nonzero)).ProofSatisfactions.Single()
+            .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
+
+        proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
+        proof.Comparison.Should().Be(OperatorKind.NotEquals);
+        proof.Bound.Should().BeEquivalentTo(new NumericBoundSource.Constant(0m));
+    }
+
+    [Fact]
+    public void Notempty_HasTwoProofSatisfactions_LengthAndCount()
+    {
+        var proofs = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Notempty)).ProofSatisfactions
+            .Select(p => p.Should().BeOfType<ProofSatisfaction.Numeric>().Subject)
+            .ToList();
+
+        proofs.Should().HaveCount(2);
+        proofs.Select(p => ((SatisfactionProjection.Accessor)p.Projection).Name)
+            .Should().BeEquivalentTo(["length", "count"]);
+        proofs.Should().OnlyContain(p => p.Comparison == OperatorKind.GreaterThan);
+        proofs.Should().OnlyContain(p => p.Bound.Equals(new NumericBoundSource.Constant(0m)));
+    }
+
+    [Fact]
+    public void Min_HasProofSatisfaction_Numeric_DeclarationValue()
+    {
+        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Min)).ProofSatisfactions.Single()
+            .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
+
+        proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
+        proof.Comparison.Should().Be(OperatorKind.GreaterThanOrEqual);
+        proof.Bound.Should().BeOfType<NumericBoundSource.DeclarationValue>();
+    }
+
+    [Fact]
+    public void Max_HasProofSatisfaction_Numeric_DeclarationValue()
+    {
+        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Max)).ProofSatisfactions.Single()
+            .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
+
+        proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
+        proof.Comparison.Should().Be(OperatorKind.LessThanOrEqual);
+        proof.Bound.Should().BeOfType<NumericBoundSource.DeclarationValue>();
+    }
+
+    [Theory]
+    [InlineData(ModifierKind.Optional)]
+    [InlineData(ModifierKind.Ordered)]
+    [InlineData(ModifierKind.Default)]
+    [InlineData(ModifierKind.Writable)]
+    [InlineData(ModifierKind.Maxplaces)]
+    public void ModifiersWithoutProofSatisfactions_HaveEmptyArray(ModifierKind kind)
+    {
+        var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
+
+        meta.ProofSatisfactions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AllFieldModifiers_HaveValidProofSatisfactions()
+    {
+        foreach (var meta in Modifiers.All.OfType<FieldModifierMeta>())
+        {
+            meta.ProofSatisfactions.Should().NotBeNull();
+        }
+    }
+
     // ── HasValue flag ───────────────────────────────────────────────────────────
 
     [Theory]

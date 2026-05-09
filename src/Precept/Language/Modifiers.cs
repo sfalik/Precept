@@ -62,6 +62,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Nonnegative),
             "Value ≥ 0",
             ModifierCategory.Structural, NumericTypes,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.SelfValue(),
+                    OperatorKind.GreaterThanOrEqual,
+                    new NumericBoundSource.Constant(0m)),
+            ],
             HoverDescription: "The field's value must be zero or greater. Enforced on every assignment.",
             DesugarsToRule: true,
             MutuallyExclusiveWith: [ModifierKind.Positive]),
@@ -71,6 +78,13 @@ public static class Modifiers
             "Value > 0",
             ModifierCategory.Structural, NumericTypes,
             Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero],
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.SelfValue(),
+                    OperatorKind.GreaterThan,
+                    new NumericBoundSource.Constant(0m)),
+            ],
             HoverDescription: "The field's value must be strictly greater than zero. Implies nonnegative and nonzero.",
             DesugarsToRule: true,
             MutuallyExclusiveWith: [ModifierKind.Nonnegative]),
@@ -79,6 +93,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Nonzero),
             "Value ≠ 0",
             ModifierCategory.Structural, NumericTypes,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.SelfValue(),
+                    OperatorKind.NotEquals,
+                    new NumericBoundSource.Constant(0m)),
+            ],
             HoverDescription: "The field's value must not be zero. Allows negative values.",
             DesugarsToRule: true),
 
@@ -86,6 +107,17 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Notempty),
             "String or collection is non-empty",
             ModifierCategory.Structural, StringAndCollectionTypes,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.Accessor("length"),
+                    OperatorKind.GreaterThan,
+                    new NumericBoundSource.Constant(0m)),
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.Accessor("count"),
+                    OperatorKind.GreaterThan,
+                    new NumericBoundSource.Constant(0m)),
+            ],
             HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time.",
             DesugarsToRule: true),
 
@@ -99,6 +131,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Min),
             "Minimum value",
             ModifierCategory.Structural, NumericTypes, HasValue: true,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.SelfValue(),
+                    OperatorKind.GreaterThanOrEqual,
+                    new NumericBoundSource.DeclarationValue()),
+            ],
             HoverDescription: "The field's value must be at least this minimum. Enforced on every assignment.",
             DesugarsToRule: true),
 
@@ -106,6 +145,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Max),
             "Maximum value",
             ModifierCategory.Structural, NumericTypes, HasValue: true,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.SelfValue(),
+                    OperatorKind.LessThanOrEqual,
+                    new NumericBoundSource.DeclarationValue()),
+            ],
             HoverDescription: "The field's value must be at most this maximum. Enforced on every assignment.",
             DesugarsToRule: true),
 
@@ -113,6 +159,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Minlength),
             "Minimum string length",
             ModifierCategory.Structural, StringOnly, HasValue: true,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.Accessor("length"),
+                    OperatorKind.GreaterThanOrEqual,
+                    new NumericBoundSource.DeclarationValue()),
+            ],
             HoverDescription: "The text field must have at least this many characters.",
             DesugarsToRule: true),
 
@@ -120,6 +173,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Maxlength),
             "Maximum string length",
             ModifierCategory.Structural, StringOnly, HasValue: true,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.Accessor("length"),
+                    OperatorKind.LessThanOrEqual,
+                    new NumericBoundSource.DeclarationValue()),
+            ],
             HoverDescription: "The text field must have at most this many characters.",
             DesugarsToRule: true),
 
@@ -127,6 +187,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Mincount),
             "Minimum collection count",
             ModifierCategory.Structural, CollectionTypes, HasValue: true,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.Accessor("count"),
+                    OperatorKind.GreaterThanOrEqual,
+                    new NumericBoundSource.DeclarationValue()),
+            ],
             HoverDescription: "The collection must have at least this many elements.",
             DesugarsToRule: true),
 
@@ -134,6 +201,13 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Maxcount),
             "Maximum collection count",
             ModifierCategory.Structural, CollectionTypes, HasValue: true,
+            ProofSatisfactions:
+            [
+                new ProofSatisfaction.Numeric(
+                    new SatisfactionProjection.Accessor("count"),
+                    OperatorKind.LessThanOrEqual,
+                    new NumericBoundSource.DeclarationValue()),
+            ],
             HoverDescription: "The collection must have at most this many elements.",
             DesugarsToRule: true),
 

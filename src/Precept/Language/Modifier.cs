@@ -121,6 +121,7 @@ public sealed record FieldModifierMeta(
     TypeTarget[] ApplicableTo,
     bool HasValue = false,
     ModifierKind[] Subsumes = default!,
+    ProofSatisfaction[]? ProofSatisfactions = null,
     string? HoverDescription = null,
     string? UsageExample = null,
     string? SnippetTemplate = null,
@@ -130,6 +131,7 @@ public sealed record FieldModifierMeta(
 {
     /// <summary>Modifiers this one makes redundant. Empty for most.</summary>
     public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+    public ProofSatisfaction[] ProofSatisfactions { get; init; } = ProofSatisfactions ?? [];
 }
 
 /// <summary>State lifecycle modifiers (7 members: initial, terminal, required, irreversible, success, warning, error).</summary>
