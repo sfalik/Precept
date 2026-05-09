@@ -25,6 +25,7 @@ public class LanguageToolTests
             "operators",
             "functions",
             "diagnostics",
+            "domains",
             "firePipeline");
 
         document.RootElement.GetProperty("modifiers").EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(
@@ -33,6 +34,12 @@ public class LanguageToolTests
             "event",
             "access",
             "anchor");
+
+        document.RootElement.GetProperty("domains").EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(
+            "currencies",
+            "ucumTier1Units",
+            "dimensions",
+            "temporalUnits");
     }
 
     [Fact]
@@ -265,6 +272,52 @@ public class LanguageToolTests
         diagnostic.FixHint.Should().Be(diagnosticMeta.FixHint);
         diagnostic.PreventsFault.Should().Be(diagnosticMeta.PreventsFault?.ToString());
         diagnostic.SuggestionSources.Should().Equal(diagnosticMeta.SuggestionSources?.Select(source => source.ToString()) ?? []);
+    }
+
+    [Fact]
+    public void Language_DomainsMirrorRuntimeRegistries()
+    {
+        var result = LanguageTool.Language();
+
+        result.Domains.Currencies.Select(entry => entry.AlphaCode)
+            .Should()
+            .Equal(CurrencyCatalog.All.Values.OrderBy(entry => entry.AlphaCode).Select(entry => entry.AlphaCode));
+        var usd = result.Domains.Currencies.Should().ContainSingle(entry => entry.AlphaCode == "USD").Subject;
+        usd.NumericCode.Should().Be(CurrencyCatalog.All["USD"].NumericCode);
+        usd.Name.Should().Be(CurrencyCatalog.All["USD"].Name);
+        usd.MinorUnit.Should().Be(CurrencyCatalog.All["USD"].MinorUnit);
+        usd.Symbol.Should().Be(CurrencyCatalog.All["USD"].Symbol);
+
+        result.Domains.UcumTier1Units.Select(entry => entry.Code)
+            .Should()
+            .Equal(UcumCatalog.All.Values.OrderBy(entry => entry.Code).Select(entry => entry.Code));
+        var newton = result.Domains.UcumTier1Units.Should().ContainSingle(entry => entry.Code == "N").Subject;
+        newton.Name.Should().Be(UcumCatalog.All["N"].Name);
+        newton.DimensionName.Should().Be("force");
+        newton.Dimension.Length.Should().Be(UcumCatalog.All["N"].Vector.Length);
+        newton.Dimension.Mass.Should().Be(UcumCatalog.All["N"].Vector.Mass);
+        newton.Dimension.Time.Should().Be(UcumCatalog.All["N"].Vector.Time);
+        newton.Scale.Numerator.Should().Be(UcumCatalog.All["N"].Scale.Numerator.ToString());
+        newton.Scale.Denominator.Should().Be(UcumCatalog.All["N"].Scale.Denominator.ToString());
+        newton.Scale.Base10Exponent.Should().Be(UcumCatalog.All["N"].Scale.Base10Exponent);
+
+        result.Domains.Dimensions.Select(entry => entry.Name)
+            .Should()
+            .Equal(DimensionCatalog.All.Values.OrderBy(entry => entry.Name).Select(entry => entry.Name));
+        var force = result.Domains.Dimensions.Should().ContainSingle(entry => entry.Name == "force").Subject;
+        force.Description.Should().Be(DimensionCatalog.All["force"].Description);
+        force.Dimension.Length.Should().Be(DimensionCatalog.All["force"].Vector.Length);
+        force.Dimension.Mass.Should().Be(DimensionCatalog.All["force"].Vector.Mass);
+        force.Dimension.Time.Should().Be(DimensionCatalog.All["force"].Vector.Time);
+
+        result.Domains.TemporalUnits.Select(entry => entry.Singular)
+            .Should()
+            .Equal(TemporalUnits.AllEntries.Select(entry => entry.Singular));
+        var year = result.Domains.TemporalUnits.Should().ContainSingle(entry => entry.Singular == "year").Subject;
+        year.Plural.Should().Be(TemporalUnits.All["year"].Plural);
+        year.IsCalendarBased.Should().BeTrue();
+        year.IsPeriod.Should().BeTrue();
+        year.IsDuration.Should().BeFalse();
     }
 
     [Fact]

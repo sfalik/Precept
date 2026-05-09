@@ -37,6 +37,11 @@ public static class LanguageTool
             Operators.All.Select(MapOperator).ToArray(),
             Functions.All.Select(MapFunction).ToArray(),
             Diagnostics.All.Select(MapDiagnostic).ToArray(),
+            new DomainCatalogDto(
+                CurrencyCatalog.All.Values.OrderBy(entry => entry.AlphaCode).Select(MapCurrency).ToArray(),
+                UcumCatalog.All.Values.OrderBy(entry => entry.Code).Select(MapUcumTier1Unit).ToArray(),
+                DimensionCatalog.All.Values.OrderBy(entry => entry.Name).Select(MapDimension).ToArray(),
+                TemporalUnits.AllEntries.Select(MapTemporalUnit).ToArray()),
             FirePipeline);
 
     private static TokenCatalogEntryDto MapToken(TokenMeta token)
@@ -268,6 +273,41 @@ public static class LanguageTool
             diagnostic.FixHint,
             diagnostic.PreventsFault?.ToString(),
             diagnostic.SuggestionSources?.Select(source => source.ToString()).ToArray() ?? []);
+
+    private static CurrencyDomainEntryDto MapCurrency(CurrencyEntry currency)
+        => new(currency.AlphaCode, currency.NumericCode, currency.Name, currency.MinorUnit, currency.Symbol);
+
+    private static UcumTier1UnitDto MapUcumTier1Unit(UcumAtom atom)
+        => new(
+            atom.Code,
+            atom.Name,
+            MapDimensionVector(atom.Vector),
+            ResolveDimensionName(atom.Vector),
+            MapScale(atom.Scale),
+            atom.Prefixable,
+            atom.AnnotationClass);
+
+    private static DimensionDomainEntryDto MapDimension(DimensionCatalog.DimensionAlias alias)
+        => new(alias.Name, MapDimensionVector(alias.Vector), alias.Description);
+
+    private static TemporalUnitDomainEntryDto MapTemporalUnit(TemporalUnits.TemporalUnitEntry entry)
+        => new(entry.Singular, entry.Plural, entry.IsCalendarBased, entry.IsPeriod, entry.IsDuration);
+
+    private static DimensionVectorDto MapDimensionVector(DimensionVector vector)
+        => new(
+            vector.Length,
+            vector.Mass,
+            vector.Time,
+            vector.ElectricCurrent,
+            vector.Temperature,
+            vector.AmountOfSubstance,
+            vector.LuminousIntensity);
+
+    private static UcumExactFactorDto MapScale(UcumExactFactor factor)
+        => new(factor.Numerator.ToString(), factor.Denominator.ToString(), factor.Base10Exponent);
+
+    private static string? ResolveDimensionName(DimensionVector vector)
+        => DimensionCatalog.TryGetAlias(vector, out var alias) && alias is not null ? alias.Name : null;
 
     private static ModifierTargetDto[] MapTargets(TypeTarget[] targets)
     {

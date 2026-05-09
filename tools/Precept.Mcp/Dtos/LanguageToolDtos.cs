@@ -10,7 +10,63 @@ public sealed record LanguageReferenceDto(
     OperatorCatalogEntryDto[] Operators,
     FunctionCatalogEntryDto[] Functions,
     DiagnosticCatalogEntryDto[] Diagnostics,
+    DomainCatalogDto Domains,
     string[] FirePipeline
+);
+
+public sealed record DomainCatalogDto(
+    CurrencyDomainEntryDto[] Currencies,
+    UcumTier1UnitDto[] UcumTier1Units,
+    DimensionDomainEntryDto[] Dimensions,
+    TemporalUnitDomainEntryDto[] TemporalUnits
+);
+
+public sealed record CurrencyDomainEntryDto(
+    string AlphaCode,
+    int NumericCode,
+    string Name,
+    int MinorUnit,
+    string Symbol
+);
+
+public sealed record UcumTier1UnitDto(
+    string Code,
+    string Name,
+    DimensionVectorDto Dimension,
+    string? DimensionName,
+    UcumExactFactorDto Scale,
+    bool Prefixable,
+    string? AnnotationClass
+);
+
+public sealed record DimensionDomainEntryDto(
+    string Name,
+    DimensionVectorDto Dimension,
+    string Description
+);
+
+public sealed record TemporalUnitDomainEntryDto(
+    string Singular,
+    string Plural,
+    bool IsCalendarBased,
+    bool IsPeriod,
+    bool IsDuration
+);
+
+public sealed record DimensionVectorDto(
+    int Length,
+    int Mass,
+    int Time,
+    int ElectricCurrent,
+    int Temperature,
+    int AmountOfSubstance,
+    int LuminousIntensity
+);
+
+public sealed record UcumExactFactorDto(
+    string Numerator,
+    string Denominator,
+    int Base10Exponent
 );
 
 public sealed record TokenCatalogEntryDto(

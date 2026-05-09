@@ -67,7 +67,7 @@ If a tool needs to orchestrate multiple core calls, filter results, or apply dom
 
 **30-line budget:** If a tool method body exceeds ~30 lines of non-serialization code, refactor. The code either (a) belongs in core, or (b) is over-engineering serialization.
 
-**No vocabulary duplication:** `precept_language` reads catalogs directly — it does not maintain a parallel vocabulary list. When a catalog member is added, the MCP output includes it automatically. No MCP-side propagation required.
+**No vocabulary duplication:** `precept_language` reads catalogs and domain registries directly — it does not maintain a parallel vocabulary list. When a catalog member or surfaced business-domain entry is added, the MCP output includes it automatically. No MCP-side propagation required.
 
 ---
 
@@ -182,7 +182,7 @@ JSON response to agent
 
 **Arguments:** None
 
-**Core API:** Direct read of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All`
+**Core API:** Direct read of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, `Diagnostics.All`, plus `CurrencyCatalog.All`, `UcumCatalog.All`, `DimensionCatalog.All`, and `TemporalUnits.All`
 
 **Returns:** Complete DSL vocabulary in structured JSON:
 
@@ -203,6 +203,12 @@ JSON response to agent
   "operators": [ ... ],
   "functions": [ ... ],
   "diagnostics": [ ... ],
+  "domains": {
+    "currencies": [ ... ],
+    "ucumTier1Units": [ ... ],
+    "dimensions": [ ... ],
+    "temporalUnits": [ ... ]
+  },
   "firePipeline": [
     "RowMatching",
     "GuardEvaluation",
@@ -215,9 +221,9 @@ JSON response to agent
 }
 ```
 
-**Behavior:** Read-only. No compilation occurs. The tool serializes catalog metadata directly, groups modifiers by modifier subtype (`field`, `state`, `event`, `access`, `anchor`), includes the diagnostic catalog for AI grounding, and exposes the static `firePipeline` execution order used by `precept_fire`.
+**Behavior:** Read-only. No compilation occurs. The tool serializes catalog metadata directly, groups modifiers by modifier subtype (`field`, `state`, `event`, `access`, `anchor`), includes the diagnostic catalog for AI grounding, surfaces currency / UCUM Tier 1 / dimension / temporal registries for typed-literal reasoning, and exposes the static `firePipeline` execution order used by `precept_fire`.
 
-**Catalog derivation:** No parallel vocabulary is maintained. The tool iterates the catalogs named above in declaration order, so newly added catalog members flow into MCP output automatically.
+**Catalog derivation:** No parallel vocabulary is maintained. The tool iterates the catalogs and domain registries named above, so newly added catalog members and surfaced business-domain entries flow into MCP output automatically.
 
 ---
 
@@ -814,7 +820,7 @@ This ensures the MCP protocol remains intact even when the underlying runtime ha
 
 ### Vocabulary Guarantee
 
-`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All` appears in the output. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
+`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All` appears in the output. It also surfaces the current `CurrencyCatalog.All`, `UcumCatalog.All`, `DimensionCatalog.All`, and `TemporalUnits.All` registries. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
 
 ### JSON Stability
 
@@ -934,6 +940,7 @@ The vocabulary includes:
 - **Constraints:** Invariants, state-anchored, event preconditions with scopes
 - **Operators:** Precedence, associativity, arity for expression parsing
 - **Functions:** Built-in library with overloads and parameter types
+- **Domain registries:** Currencies, UCUM Tier 1 units, dimensions, and temporal units for typed-literal grounding
 
 ### Fire Pipeline Transparency
 
@@ -964,6 +971,7 @@ Implemented catalog surface:
 - Tokens, Types, Functions, Operators, Diagnostics
 - Modifiers (5 subtypes: Field, State, Event, Access, Anchor)
 - Actions, Constructs, Constraints
+- Domain registries: currencies, UCUM Tier 1 units, dimensions, temporal units
 
 **[OQ-3] FirePipeline array maintenance:**
 The `firePipeline` array in `precept_language` output must stay synchronized with actual pipeline stages as they are implemented. Consider deriving this from a catalog or pipeline metadata rather than a static array.
