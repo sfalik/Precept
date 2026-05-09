@@ -330,32 +330,12 @@ internal static partial class TypeChecker
         switch (expr)
         {
             case TypedBinaryOp bin:
-                // Rule 1: == with ~string operand
-                if (bin.ResolvedOp == OperationKind.StringEqualsString &&
+                if (Operations.GetMeta(bin.ResolvedOp) is BinaryOperationMeta
+                        { HasCIVariant: true, CIDiagnosticCode: { } binaryDiagCode } &&
                     (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
                 {
                     var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals, bin.Span, ciFieldName));
-                }
-                // Rule 2: != with ~string operand
-                else if (bin.ResolvedOp == OperationKind.StringNotEqualsString &&
-                         (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
-                {
-                    var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals, bin.Span, ciFieldName));
-                }
-                // Rule 3: contains with ~string value in case-sensitive collection
-                // (fires when contains OperationKind entries land — currently no-op)
-                else if (IsContainsOperation(bin.ResolvedOp) &&
-                         IsCIExpression(bin.Right) &&
-                         bin.Left is TypedFieldRef collRef &&
-                         !ctx.CIElementCollections.Contains(collRef.FieldName))
-                {
-                    var ciFieldName = ((TypedFieldRef)bin.Right).FieldName;
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains, bin.Span, ciFieldName, collRef.FieldName));
+                    ctx.Diagnostics.Add(Diagnostics.Create(binaryDiagCode, bin.Span, ciFieldName));
                 }
 
                 EnforceCIInExpression(bin.Left, ctx);
@@ -363,21 +343,12 @@ internal static partial class TypeChecker
                 break;
 
             case TypedFunctionCall func:
-                // Rule 4: startsWith with ~string first arg
-                if (func.ResolvedFunction == FunctionKind.StartsWith &&
+                var funcMeta = Functions.GetMeta(func.ResolvedFunction);
+                if (funcMeta is { HasCIVariant: true, CIDiagnosticCode: { } functionDiagCode } &&
                     func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
                 {
                     var ciFieldName = ((TypedFieldRef)func.Arguments[0]).FieldName;
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith, func.Span, ciFieldName));
-                }
-                // Rule 5: endsWith with ~string first arg
-                else if (func.ResolvedFunction == FunctionKind.EndsWith &&
-                         func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
-                {
-                    var ciFieldName = ((TypedFieldRef)func.Arguments[0]).FieldName;
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith, func.Span, ciFieldName));
+                    ctx.Diagnostics.Add(Diagnostics.Create(functionDiagCode, func.Span, ciFieldName));
                 }
 
                 foreach (var arg in func.Arguments)
@@ -429,11 +400,4 @@ internal static partial class TypeChecker
     private static string GetCIFieldName(TypedExpression left, TypedExpression right) =>
         IsCIExpression(left) ? ((TypedFieldRef)left).FieldName : ((TypedFieldRef)right).FieldName;
 
-    /// <summary>
-    /// Returns true if the operation is a <c>contains</c> membership test.
-    /// Currently no <see cref="OperationKind"/> entries exist for <c>contains</c> —
-    /// this predicate will match them when they land.
-    /// </summary>
-    private static bool IsContainsOperation(OperationKind op) =>
-        false; // Placeholder: no contains OperationKind values exist yet
 }

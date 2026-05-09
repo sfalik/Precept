@@ -5,6 +5,7 @@ using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Precept;
+using Precept.Language;
 using Precept.LanguageServer;
 using Xunit;
 
@@ -1267,16 +1268,15 @@ public class PreceptAnalyzerCompletionTests
     // ════════════════════════════════════════════════════════════════════
     //
     // These tests enforce that the static completion lists in PreceptAnalyzer
-    // stay in sync with the PreceptToken enum. When someone adds a new token
-    // with [TokenCategory(Type)] or [TokenCategory(Constraint)] etc., these
-    // tests fail until the corresponding completion list is updated.
+    // stay in sync with the language catalogs. Type completions derive from
+    // Types; token-oriented completion lists still derive from token categories.
 
     [Fact]
     public void AllTypeTokens_AppearInTypeItems()
     {
-        var typeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Type)
-            .Select(t => PreceptTokenMeta.GetSymbol(t))
-            .Where(s => s is not null)
+        var typeSymbols = Types.All
+            .Where(type => type.Token?.Text is not null)
+            .Select(type => type.Token!.Text!)
             .ToHashSet(StringComparer.Ordinal);
 
         var completionLabels = PreceptAnalyzer.TypeItems
@@ -1286,12 +1286,12 @@ public class PreceptAnalyzerCompletionTests
         // Snippet labels like "choice(...)" won't match the raw symbol "choice",
         // so also check whether the label starts with the symbol.
         var missing = typeSymbols
-            .Where(sym => !completionLabels.Contains(sym!)
-                && !completionLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .Where(sym => !completionLabels.Contains(sym)
+                && !completionLabels.Any(label => label.StartsWith(sym, StringComparison.Ordinal)))
             .ToList();
 
         missing.Should().BeEmpty(
-            "every token with [TokenCategory(Type)] must appear in PreceptAnalyzer.TypeItems — "
+            "every surface type keyword in the Types catalog must appear in PreceptAnalyzer.TypeItems — "
             + "add new type keywords there when extending the language");
     }
 
@@ -1420,9 +1420,10 @@ public class PreceptAnalyzerCompletionTests
         // (set, queue, stack) which are not valid as event arg types or collection inner types.
         var collectionOnlySymbols = new HashSet<string>(StringComparer.Ordinal) { "set", "queue", "stack" };
 
-        var scalarTypeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Type)
-            .Select(t => PreceptTokenMeta.GetSymbol(t))
-            .Where(s => s is not null && !collectionOnlySymbols.Contains(s))
+        var scalarTypeSymbols = Types.All
+            .Where(type => type.Token?.Text is not null)
+            .Select(type => type.Token!.Text!)
+            .Where(symbol => !collectionOnlySymbols.Contains(symbol))
             .ToHashSet(StringComparer.Ordinal);
 
         var scalarLabels = PreceptAnalyzer.ScalarTypeItems
@@ -1432,12 +1433,12 @@ public class PreceptAnalyzerCompletionTests
         // Snippet labels like "choice(...)" won't match the raw symbol "choice",
         // so also check whether the label starts with the symbol.
         var missing = scalarTypeSymbols
-            .Where(sym => !scalarLabels.Contains(sym!)
-                && !scalarLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .Where(sym => !scalarLabels.Contains(sym)
+                && !scalarLabels.Any(label => label.StartsWith(sym, StringComparison.Ordinal)))
             .ToList();
 
         missing.Should().BeEmpty(
-            "every scalar type token must appear in PreceptAnalyzer.ScalarTypeItems — "
+            "every scalar surface type keyword must appear in PreceptAnalyzer.ScalarTypeItems — "
             + "this list is used for event arg types and collection inner types. "
             + "Add new scalar type keywords there when extending the language");
     }

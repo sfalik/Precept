@@ -75,6 +75,7 @@ public class ProofEngineTests
         ImmutableArray<TypedRule>? rules = null,
         ImmutableArray<TypedEnsure>? ensures = null,
         ImmutableArray<TypedEventHandler>? eventHandlers = null,
+        ImmutableArray<TypedStateHook>? stateHooks = null,
         ImmutableArray<TypedState>? states = null)
     {
         var fieldArr = fields ?? ImmutableArray<TypedField>.Empty;
@@ -89,8 +90,61 @@ public class ProofEngineTests
             Rules = rules ?? ImmutableArray<TypedRule>.Empty,
             Ensures = ensures ?? ImmutableArray<TypedEnsure>.Empty,
             EventHandlers = eventHandlers ?? ImmutableArray<TypedEventHandler>.Empty,
+            StateHooks = stateHooks ?? ImmutableArray<TypedStateHook>.Empty,
         };
     }
+
+    private static BinaryOperationMeta GetBinaryMeta(OperationKind kind)
+        => (BinaryOperationMeta)Operations.GetMeta(kind);
+
+    private static TypeAccessor GetAccessor(TypeKind type, string name)
+        => Types.GetMeta(type).Accessors.Single(a => a.Name == name);
+
+    private static TypedFieldRef MakeFieldRef(string name, TypeKind type)
+        => new(type, name, false, SourceSpan.Missing);
+
+    private static TypedLiteral MakeLiteral(TypeKind type, object? value)
+        => new(type, value, SourceSpan.Missing);
+
+    private static TypedBinaryOp MakeBinary(
+        TypeKind resultType,
+        OperationKind operation,
+        TypedExpression left,
+        TypedExpression right,
+        params ProofRequirement[] proofRequirements)
+        => new(resultType, operation, left, right, null, proofRequirements.ToImmutableArray(), SourceSpan.Missing);
+
+    private static TypedMemberAccess MakeMemberAccess(
+        TypeKind resultType,
+        TypedExpression @object,
+        TypeAccessor accessor,
+        params ProofRequirement[] proofRequirements)
+        => new(resultType, @object, accessor, proofRequirements.ToImmutableArray(), SourceSpan.Missing);
+
+    private static TypedPostfixOp MakeIsSetGuard(string fieldName, TypeKind type)
+        => new(MakeFieldRef(fieldName, type), false, SourceSpan.Missing);
+
+    private static TypedInputAction MakeSetAction(string fieldName, TypeKind fieldType, TypedExpression inputExpression)
+        => new(ActionKind.Set, fieldName, fieldType, inputExpression, null, null, ImmutableArray<ProofRequirement>.Empty, SourceSpan.Missing);
+
+    private static TypedTransitionRow MakeTransitionRow(
+        string? fromState,
+        string eventName,
+        TypedExpression? guard,
+        params TypedAction[] actions)
+        => new(
+            fromState,
+            eventName,
+            null,
+            guard,
+            actions.ToImmutableArray(),
+            TransitionRowOutcome.NoTransition,
+            null,
+            null,
+            MakeSyntax(ConstructKind.TransitionRow));
+
+    private static TypedStateHook MakeStateHook(string stateName, TypedExpression? guard, params TypedAction[] actions)
+        => new(AnchorScope.OnEntry, stateName, guard, actions.ToImmutableArray(), MakeSyntax(ConstructKind.StateAction));
 
     // ════════════════════════════════════════════════════════════════════════
     //  Slice 1 — Pass 1: Obligation Collection
@@ -616,6 +670,27 @@ public class ProofEngineTests
         }
 
         [Fact]
+        public void Strategy2_SameTypeNumberDivisor_NonzeroDeclaration_Proves()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field X as number default 0 writable
+                field Y as number default 1 writable
+                field D as number nonzero default 1 writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set X = Y / D -> no transition
+                """);
+
+            var obligation = ledger.Obligations.Single(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+
+            obligation.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.DeclarationAttribute,
+                because: "same-type number/number division must still resolve the RHS divisor subject");
+        }
+
+        [Fact]
         public void Strategy2_Presence_GuaranteedField_DeclaredPresenceIsGuaranteed()
         {
             // Non-optional field has DeclaredPresenceMeta.Guaranteed; verify shape
@@ -864,6 +939,161 @@ public class ProofEngineTests
                 obligation.Strategy.Should().NotBe(ProofStrategy.GuardInPath,
                     because: "event handlers have no guard for strategy 3 to use");
         }
+
+        [Fact]
+        public void Strategy3_PresenceGuard_IsSet_DischargesPresenceObligation()
+        {
+            var optionalLength = MakeMemberAccess(
+                TypeKind.Integer,
+                MakeFieldRef("OptionalText", TypeKind.String),
+                GetAccessor(TypeKind.String, "length"),
+                new PresenceProofRequirement(new SelfSubject(), "OptionalText must be present"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("OptionalText", TypeKind.String, isOptional: true),
+                        MakeField("Length", TypeKind.Integer)),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            MakeIsSetGuard("OptionalText", TypeKind.String),
+                            MakeSetAction("Length", TypeKind.Integer, optionalLength)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single(o => o.Requirement is PresenceProofRequirement);
+
+            obligation.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath);
+        }
+
+        [Fact]
+        public void Presence_NoGuard_RemainsUnresolved_Code116Emitted()
+        {
+            var optionalLength = MakeMemberAccess(
+                TypeKind.Integer,
+                MakeFieldRef("OptionalText", TypeKind.String),
+                GetAccessor(TypeKind.String, "length"),
+                new PresenceProofRequirement(new SelfSubject(), "OptionalText must be present"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("OptionalText", TypeKind.String, isOptional: true),
+                        MakeField("Length", TypeKind.Integer)),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            null,
+                            MakeSetAction("Length", TypeKind.Integer, optionalLength)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single(o => o.Requirement is PresenceProofRequirement);
+
+            obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
+            obligation.Strategy.Should().BeNull();
+            ledger.Diagnostics.Should().Contain(d =>
+                d.Code == nameof(DiagnosticCode.UnprovedPresenceRequirement));
+        }
+
+        [Fact]
+        public void Strategy3_CountFunctionGuard_DischargesObligation()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Head as string default "" writable
+                field Items as queue of string
+                state Draft initial
+                event Assign
+                from Draft on Assign when Items.count > 0 -> set Head = Items.peek -> no transition
+                """);
+
+            var obligation = ledger.Obligations.Single(o =>
+                o.Site is TypedMemberAccess { ResolvedAccessor.Name: "peek" } &&
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.GreaterThan, Threshold: 0m });
+
+            obligation.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath,
+                because: "collection count guards are modeled with the canonical '.count' member-access surface");
+        }
+
+        [Fact]
+        public void Strategy3_MemberAccessCountGuard_DischargesObligation()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Lowest as number default 0 writable
+                field RequestedFloors as set of number
+                state Draft initial
+                event Submit
+                from Draft on Submit when RequestedFloors.count > 0 -> set Lowest = RequestedFloors.min -> no transition
+                """);
+
+            var obligation = ledger.Obligations.Single(o =>
+                o.Site is TypedMemberAccess { ResolvedAccessor.Name: "min" } &&
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.GreaterThan, Threshold: 0m });
+
+            obligation.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath);
+        }
+
+        [Fact]
+        public void Strategy3_IsSetPostfixGuard_ExtractsConstraint()
+        {
+            var guard = MakeIsSetGuard("OptionalText", TypeKind.String);
+            var optionalLength = MakeMemberAccess(
+                TypeKind.Integer,
+                MakeFieldRef("OptionalText", TypeKind.String),
+                GetAccessor(TypeKind.String, "length"),
+                new PresenceProofRequirement(new SelfSubject(), "OptionalText must be present"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("OptionalText", TypeKind.String, isOptional: true),
+                        MakeField("Length", TypeKind.Integer)),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            guard,
+                            MakeSetAction("Length", TypeKind.Integer, optionalLength)))),
+                StateGraph.Empty);
+
+            guard.Should().BeOfType<TypedPostfixOp>();
+            ledger.Obligations.Single(o => o.Requirement is PresenceProofRequirement).Strategy
+                .Should().Be(ProofStrategy.GuardInPath);
+        }
+
+        [Fact]
+        public void Strategy3_StateHookContext_GuardedHook_DischargesObligation()
+        {
+            var optionalLength = MakeMemberAccess(
+                TypeKind.Integer,
+                MakeFieldRef("OptionalText", TypeKind.String),
+                GetAccessor(TypeKind.String, "length"),
+                new PresenceProofRequirement(new SelfSubject(), "OptionalText must be present"));
+
+            var hook = MakeStateHook(
+                "Approved",
+                MakeIsSetGuard("OptionalText", TypeKind.String),
+                MakeSetAction("Length", TypeKind.Integer, optionalLength));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("OptionalText", TypeKind.String, isOptional: true),
+                        MakeField("Length", TypeKind.Integer)),
+                    stateHooks: ImmutableArray.Create(hook)),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single(o => o.Context is StateHookContext);
+
+            obligation.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath);
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -872,6 +1102,45 @@ public class ProofEngineTests
 
     public class Slice6_FlowNarrowing
     {
+        [Fact]
+        public void Strategy4_GuardImpliesSubtractionNonNegative_FlowNarrowingProves()
+        {
+            var subtractionMeta = GetBinaryMeta(OperationKind.NumberMinusNumber);
+            var subtraction = MakeBinary(
+                TypeKind.Number,
+                OperationKind.NumberMinusNumber,
+                MakeFieldRef("A", TypeKind.Number),
+                MakeFieldRef("B", TypeKind.Number),
+                new NumericProofRequirement(
+                    new ParamSubject(subtractionMeta.Rhs),
+                    OperatorKind.GreaterThan,
+                    0m,
+                    "Difference must stay positive"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("A"),
+                        MakeField("B"),
+                        MakeField("X")),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            MakeBinary(
+                                TypeKind.Boolean,
+                                OperationKind.NumberGreaterThanNumber,
+                                MakeFieldRef("A", TypeKind.Number),
+                                MakeFieldRef("B", TypeKind.Number)),
+                            MakeSetAction("X", TypeKind.Number, subtraction)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single();
+
+            obligation.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
+        }
+
         [Fact]
         public void Strategy4_AGreaterThanB_SubtractionSqrtProved()
         {
@@ -1183,6 +1452,49 @@ public class ProofEngineTests
                 obligation.Strategy.Should().NotBe(ProofStrategy.QualifierCompatibility,
                     because: "numeric obligations are never resolved by qualifier compatibility");
         }
+
+        [Fact]
+        public void Code114_UnprovedQualifierCompatibility_PipelineEmitsDiagnostic()
+        {
+            var datePlusPeriod = GetBinaryMeta(OperationKind.DatePlusPeriod);
+            var qualifiedBinary = MakeBinary(
+                TypeKind.Date,
+                OperationKind.DatePlusPeriod,
+                MakeFieldRef("Left", TypeKind.Date),
+                MakeFieldRef("Right", TypeKind.Period),
+                new QualifierCompatibilityProofRequirement(
+                    new ParamSubject(datePlusPeriod.Lhs),
+                    new ParamSubject(datePlusPeriod.Rhs),
+                    QualifierAxis.Currency,
+                    "Operands must carry the same currency qualifier"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField(
+                            "Left",
+                            TypeKind.Date,
+                            qualifiers: ImmutableArray.Create<DeclaredQualifierMeta>(new DeclaredQualifierMeta.Currency("USD"))),
+                        MakeField(
+                            "Right",
+                            TypeKind.Period,
+                            qualifiers: ImmutableArray.Create<DeclaredQualifierMeta>(new DeclaredQualifierMeta.Currency("GBP"))),
+                        MakeField("Result", TypeKind.Date)),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            null,
+                            MakeSetAction("Result", TypeKind.Date, qualifiedBinary)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single(o => o.Requirement is QualifierCompatibilityProofRequirement);
+
+            obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
+            obligation.Strategy.Should().BeNull();
+            ledger.Diagnostics.Should().Contain(d =>
+                d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1435,6 +1747,119 @@ public class ProofEngineTests
         }
 
         [Fact]
+        public void Code112_UnprovedModifierRequirement_EmitsDiagnostic()
+        {
+            var datePlusPeriod = GetBinaryMeta(OperationKind.DatePlusPeriod);
+            var shiftedDate = MakeBinary(
+                TypeKind.Date,
+                OperationKind.DatePlusPeriod,
+                MakeFieldRef("Start", TypeKind.Date),
+                MakeFieldRef("Offset", TypeKind.Period),
+                new ModifierRequirement(
+                    new ParamSubject(datePlusPeriod.Rhs),
+                    ModifierKind.Nonzero,
+                    "Offset must declare nonzero"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("Start", TypeKind.Date),
+                        MakeField("Offset", TypeKind.Period),
+                        MakeField("Result", TypeKind.Date)),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Advance",
+                            null,
+                            MakeSetAction("Result", TypeKind.Date, shiftedDate)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single(o => o.Requirement is ModifierRequirement);
+
+            obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
+            obligation.Strategy.Should().BeNull();
+            ledger.Diagnostics.Should().Contain(d =>
+                d.Code == nameof(DiagnosticCode.UnprovedModifierRequirement));
+        }
+
+        [Fact]
+        public void Code113_UnprovedDimensionRequirement_EmitsDiagnostic()
+        {
+            var datePlusPeriod = GetBinaryMeta(OperationKind.DatePlusPeriod);
+            var shiftedDate = MakeBinary(
+                TypeKind.Date,
+                OperationKind.DatePlusPeriod,
+                MakeFieldRef("Start", TypeKind.Date),
+                MakeFieldRef("Offset", TypeKind.Period),
+                datePlusPeriod.ProofRequirements);
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("Start", TypeKind.Date),
+                        MakeField("Offset", TypeKind.Period),
+                        MakeField("Result", TypeKind.Date)),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Advance",
+                            null,
+                            MakeSetAction("Result", TypeKind.Date, shiftedDate)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single(o => o.Requirement is DimensionProofRequirement);
+
+            obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
+            obligation.Strategy.Should().BeNull();
+            ledger.Diagnostics.Should().Contain(d =>
+                d.Code == nameof(DiagnosticCode.UnprovedDimensionRequirement));
+        }
+
+        [Fact]
+        public void MultipleObligations_SameField_BothTrackedIndependently()
+        {
+            var datePlusPeriod = GetBinaryMeta(OperationKind.DatePlusPeriod);
+            var shiftedDate = MakeBinary(
+                TypeKind.Date,
+                OperationKind.DatePlusPeriod,
+                MakeFieldRef("Start", TypeKind.Date),
+                MakeFieldRef("Offset", TypeKind.Period),
+                new ModifierRequirement(
+                    new ParamSubject(datePlusPeriod.Rhs),
+                    ModifierKind.Nonzero,
+                    "Offset must declare nonzero"),
+                new DimensionProofRequirement(
+                    new ParamSubject(datePlusPeriod.Rhs),
+                    PeriodDimension.Date,
+                    "Offset must be date-dimensioned"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("Start", TypeKind.Date),
+                        MakeField("Offset", TypeKind.Period),
+                        MakeField("Result", TypeKind.Date)),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Advance",
+                            null,
+                            MakeSetAction("Result", TypeKind.Date, shiftedDate)))),
+                StateGraph.Empty);
+
+            var obligations = ledger.Obligations
+                .Where(o => ReferenceEquals(o.Site, shiftedDate))
+                .ToList();
+
+            obligations.Should().HaveCount(2);
+            obligations.Should().Contain(o => o.Requirement is ModifierRequirement);
+            obligations.Should().Contain(o => o.Requirement is DimensionProofRequirement);
+            obligations.Should().OnlyContain(o => o.Disposition == ProofDisposition.Unresolved);
+            ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedModifierRequirement));
+            ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedDimensionRequirement));
+        }
+
+        [Fact]
         public void Diagnostic_UnprovedModifierRequirement_HasCode112()
         {
             // Verify the diagnostic code value is as documented
@@ -1457,6 +1882,12 @@ public class ProofEngineTests
         public void Diagnostic_UnsatisfiableInitialState_HasCode115()
         {
             ((int)DiagnosticCode.UnsatisfiableInitialState).Should().Be(115);
+        }
+
+        [Fact]
+        public void Diagnostic_UnprovedPresenceRequirement_HasCode116()
+        {
+            ((int)DiagnosticCode.UnprovedPresenceRequirement).Should().Be(116);
         }
     }
 
@@ -1730,6 +2161,37 @@ public class ProofEngineTests
             if (archivedObligation is not null)
                 archivedObligation.Disposition.Should().Be(ProofDisposition.Proved,
                     because: "obligations in unreachable states are vacuously proved");
+        }
+
+        [Fact]
+        public void ForwardingFacts_VacuouslyProved_NoDiagnosticEmitted()
+        {
+            var source = """
+                precept Widget
+                field X as number default 0 writable
+                field Y as number default 1 writable
+                field D as number default 1 writable
+                state Draft initial
+                state Archived
+                event Submit
+                event Archive
+                from Draft on Submit -> no transition
+                from Archived on Archive -> set X = Y / D -> no transition
+                """;
+
+            var (index, _) = TypeCheckerTestHelpers.Check(source);
+            var graph = GraphAnalyzer.Analyze(index);
+            var ledger = ProofEngine.Prove(index, graph);
+
+            var archivedObligation = ledger.Obligations.Single(o =>
+                o.Context is TransitionRowContext trc &&
+                trc.Row.FromState == "Archived" &&
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+
+            archivedObligation.Disposition.Should().Be(ProofDisposition.Proved);
+            ledger.Diagnostics.Should().NotContain(d =>
+                d.Code == nameof(DiagnosticCode.DivisionByZero) &&
+                d.Span == archivedObligation.Site.Span);
         }
 
         [Fact]
@@ -2897,6 +3359,12 @@ public class ProofEngineTests
         public void Diagnostic_UnprovedQualifier_EmittedForUnresolvedQualifierCompatibility()
         {
             ((int)DiagnosticCode.UnprovedQualifierCompatibility).Should().Be(114);
+        }
+
+        [Fact]
+        public void Diagnostic_UnprovedPresence_EmittedForUnresolvedPresenceRequirement()
+        {
+            ((int)DiagnosticCode.UnprovedPresenceRequirement).Should().Be(116);
         }
 
         [Fact]

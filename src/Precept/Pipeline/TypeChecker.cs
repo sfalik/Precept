@@ -446,14 +446,11 @@ internal static partial class TypeChecker
                     }
                 }
 
-                // Determine constraint kind from leading token (in/to/from)
-                var constraintKind = construct.LeadingTokenKind switch
-                {
-                    TokenKind.In   => ConstraintKind.StateResident,
-                    TokenKind.To   => ConstraintKind.StateEntry,
-                    TokenKind.From => ConstraintKind.StateExit,
-                    _              => ConstraintKind.StateResident, // fallback
-                };
+                // Determine constraint kind from leading token (catalog-driven; fallback stays resident)
+                var constraintKind = construct.LeadingTokenKind is { } leadingToken
+                                     && Constraints.ByToken.TryGetValue(leadingToken, out var ck)
+                    ? ck
+                    : ConstraintKind.StateResident;
 
                 var ensureSlot = construct.GetSlot<EnsureClauseSlot>(ConstructSlotKind.EnsureClause);
                 if (ensureSlot is null) continue;
@@ -585,13 +582,12 @@ internal static partial class TypeChecker
                 }
             }
 
-            // —— Mode (readonly / editable → Read / Write) ——
+            // —— Mode (readonly / editable / omit → modifier kind) ——
             var modeSlot = construct.GetSlot<AccessModeSlot>(ConstructSlotKind.AccessModeKeyword);
-            ModifierKind mode = modeSlot?.AccessMode switch
-            {
-                TokenKind.Editable => ModifierKind.Write,
-                _                  => ModifierKind.Read,
-            };
+            ModifierKind mode = modeSlot?.AccessMode is { } accessToken
+                                && Modifiers.ByAccessToken.TryGetValue(accessToken, out var accessMeta)
+                ? accessMeta.Kind
+                : ModifierKind.Read;
 
             // —— Optional guard ——
             TypedExpression? guard = null;
@@ -648,12 +644,11 @@ internal static partial class TypeChecker
                 }
             }
 
-            // —— Hook scope from leading token (to → OnEntry, from → OnExit) ——
-            var scope = construct.LeadingTokenKind switch
-            {
-                TokenKind.From => AnchorScope.OnExit,
-                _              => AnchorScope.OnEntry, // 'to' and fallback
-            };
+            // —— Hook scope from leading token (catalog-driven; fallback stays OnEntry) ——
+            var scope = construct.LeadingTokenKind is { } leadingToken
+                        && Modifiers.ByAnchorToken.TryGetValue(leadingToken, out var anchorMeta)
+                ? anchorMeta.Scope
+                : AnchorScope.OnEntry;
 
             // —— Guard (state hooks may support guards in future; currently none in slot list) ——
             TypedExpression? guard = null;

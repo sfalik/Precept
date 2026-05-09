@@ -591,18 +591,27 @@ public static partial class Parser
             // Dispatch on argument shape — exhaustive switch (CS8509)
             ParsedOutcome outcome = meta.ArgumentKind switch
             {
+                OutcomeArgumentKind.None => ParseOutcomeNoArg(arrowToken, leadingToken),
                 OutcomeArgumentKind.RequiredIdentifier => ParseOutcomeIdentifierArg(arrowToken, leadingToken),
                 OutcomeArgumentKind.RequiredStringLiteral => ParseOutcomeStringLiteralArg(arrowToken, leadingToken),
                 OutcomeArgumentKind.SecondaryToken => ParseOutcomeSecondaryToken(arrowToken, leadingToken),
-                OutcomeArgumentKind.None => throw new InvalidOperationException(
-                    $"OutcomeArgumentKind.None is not yet used — add handling if a no-arg outcome form is introduced"),
-                _ => throw new ArgumentOutOfRangeException(nameof(meta.ArgumentKind), meta.ArgumentKind,
-                    $"Unknown OutcomeArgumentKind: {meta.ArgumentKind}"),
+                < OutcomeArgumentKind.None or > OutcomeArgumentKind.SecondaryToken =>
+                    throw new InvalidOperationException($"Unknown OutcomeArgumentKind: {meta.ArgumentKind}"),
             };
 
             return new OutcomeSlot(outcome, outcome.Span);
         }
 
+        [HandlesCatalogMember(OutcomeArgumentKind.None)]
+        private ParsedOutcome ParseOutcomeNoArg(Token arrowToken, Token leadingToken)
+        {
+            // No cataloged outcome currently uses the no-argument shape; keep recovery diagnostic-based.
+            _diagnostics.Add(Language.Diagnostics.Create(
+                DiagnosticCode.ExpectedOutcome, leadingToken.Span));
+            return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span));
+        }
+
+        [HandlesCatalogMember(OutcomeArgumentKind.RequiredIdentifier)]
         private ParsedOutcome ParseOutcomeIdentifierArg(Token arrowToken, Token leadingToken)
         {
             // Expects: identifier (state name)
@@ -619,6 +628,7 @@ public static partial class Parser
             return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span));
         }
 
+        [HandlesCatalogMember(OutcomeArgumentKind.RequiredStringLiteral)]
         private ParsedOutcome ParseOutcomeStringLiteralArg(Token arrowToken, Token leadingToken)
         {
             // Expects: string literal (reason)
@@ -635,6 +645,7 @@ public static partial class Parser
             return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span));
         }
 
+        [HandlesCatalogMember(OutcomeArgumentKind.SecondaryToken)]
         private ParsedOutcome ParseOutcomeSecondaryToken(Token arrowToken, Token leadingToken)
         {
             // Expects: secondary token (e.g., `transition` after `no`)

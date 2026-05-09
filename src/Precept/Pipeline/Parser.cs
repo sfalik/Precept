@@ -45,6 +45,7 @@ public static partial class Parser
     // ═══════════════════════════════════════════════════════════════════════════════
 
     [global::Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
+    [global::Precept.HandlesCatalogExhaustively(typeof(OutcomeArgumentKind))]
     [global::Precept.HandlesCatalogExhaustively(typeof(ActionSyntaxShape))]
     private sealed partial class ParserState
     {

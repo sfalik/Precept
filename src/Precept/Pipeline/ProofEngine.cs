@@ -383,12 +383,11 @@ public static class ProofEngine
         }
 
         // Numeric/Presence arm — walk effective modifiers
-        ProofSubject? reqSubject = obligation.Requirement switch
-        {
-            NumericProofRequirement numericReq => numericReq.Subject,
-            PresenceProofRequirement presenceReq => presenceReq.Subject,
-            _ => null
-        };
+        ProofSubject? reqSubject = obligation.Requirement is NumericProofRequirement numericReq
+            ? numericReq.Subject
+            : obligation.Requirement is PresenceProofRequirement presenceReq
+                ? presenceReq.Subject
+                : null;
         if (reqSubject is null) return false;
 
         var attributeFieldName = GetFieldName(reqSubject, obligation.Site);
@@ -772,8 +771,7 @@ public static class ProofEngine
 
     private static bool IsSubtractionOp(OperationKind op)
     {
-        var name = op.ToString();
-        return name.Contains("Minus", StringComparison.Ordinal);
+        return Operations.GetMeta(op).Op == OperatorKind.Minus;
     }
 
     // ── Strategy 5: Qualifier Compatibility Proof ─────────────────────────────
@@ -843,52 +841,46 @@ public static class ProofEngine
     {
         var contextDesc = FormatContextDescription(obligation.Context);
 
-        return obligation.Requirement switch
+        switch (obligation.Requirement)
         {
-            NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m } numeric =>
-                Diagnostics.Create(DiagnosticCode.DivisionByZero, obligation.Site.Span,
+            case NumericProofRequirement numeric:
+                return Diagnostics.Create(GetNumericRequirementDiagnosticCode(numeric), obligation.Site.Span,
                     GetFieldName(numeric.Subject, obligation.Site) ?? "<unknown>",
-                    contextDesc),
+                    contextDesc);
 
-            NumericProofRequirement { Comparison: OperatorKind.GreaterThanOrEqual, Threshold: 0m } numeric =>
-                Diagnostics.Create(DiagnosticCode.SqrtOfNegative, obligation.Site.Span,
-                    GetFieldName(numeric.Subject, obligation.Site) ?? "<unknown>",
-                    contextDesc),
-
-            ModifierRequirement modReq =>
-                Diagnostics.Create(DiagnosticCode.UnprovedModifierRequirement, obligation.Site.Span,
+            case ModifierRequirement modReq:
+                return Diagnostics.Create(DiagnosticCode.UnprovedModifierRequirement, obligation.Site.Span,
                     GetFieldName(modReq.Subject, obligation.Site) ?? "<unknown>",
                     modReq.Required.ToString(),
-                    $" in {contextDesc}"),
+                    $" in {contextDesc}");
 
-            DimensionProofRequirement dimReq =>
-                Diagnostics.Create(DiagnosticCode.UnprovedDimensionRequirement, obligation.Site.Span,
+            case DimensionProofRequirement dimReq:
+                return Diagnostics.Create(DiagnosticCode.UnprovedDimensionRequirement, obligation.Site.Span,
                     GetFieldName(dimReq.Subject, obligation.Site) ?? "<unknown>",
                     dimReq.RequiredDimension.ToString(),
                     "unknown",
-                    $" in {contextDesc}"),
+                    $" in {contextDesc}");
 
-            QualifierCompatibilityProofRequirement qcReq =>
-                Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
+            case QualifierCompatibilityProofRequirement qcReq:
+                return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
                     GetFieldName(qcReq.LeftSubject, obligation.Site) ?? "<unknown>",
                     GetFieldName(qcReq.RightSubject, obligation.Site) ?? "<unknown>",
                     qcReq.Axis.ToString(),
-                    $" in {contextDesc}"),
+                    $" in {contextDesc}");
 
-            NumericProofRequirement numeric =>
-                Diagnostics.Create(DiagnosticCode.DivisionByZero, obligation.Site.Span,
-                    GetFieldName(numeric.Subject, obligation.Site) ?? "<unknown>",
-                    contextDesc),
-
-            PresenceProofRequirement presence =>
-                Diagnostics.Create(DiagnosticCode.DivisionByZero, obligation.Site.Span,
+            case PresenceProofRequirement presence:
+                return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,
                     GetFieldName(presence.Subject, obligation.Site) ?? "<unknown>",
-                    contextDesc),
+                    $" in {contextDesc}");
+        }
 
-            _ => Diagnostics.Create(DiagnosticCode.DivisionByZero, obligation.Site.Span,
-                "<unknown>", contextDesc)
-        };
+        throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
     }
+
+    private static DiagnosticCode GetNumericRequirementDiagnosticCode(NumericProofRequirement requirement) =>
+        requirement.Comparison == OperatorKind.GreaterThanOrEqual && requirement.Threshold == 0m
+            ? DiagnosticCode.SqrtOfNegative
+            : DiagnosticCode.DivisionByZero;
 
     private static string FormatContextDescription(ObligationContext context) => context switch
     {
@@ -907,23 +899,30 @@ public static class ProofEngine
 
     private static FaultSiteLink CreateFaultSiteLink(ProofObligation obligation)
     {
-        var diagnosticCode = obligation.Requirement switch
+        switch (obligation.Requirement)
         {
-            NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m } =>
-                DiagnosticCode.DivisionByZero,
-            NumericProofRequirement { Comparison: OperatorKind.GreaterThanOrEqual, Threshold: 0m } =>
-                DiagnosticCode.SqrtOfNegative,
-            ModifierRequirement => DiagnosticCode.UnprovedModifierRequirement,
-            DimensionProofRequirement => DiagnosticCode.UnprovedDimensionRequirement,
-            QualifierCompatibilityProofRequirement => DiagnosticCode.UnprovedQualifierCompatibility,
-            _ => DiagnosticCode.DivisionByZero
-        };
+            case NumericProofRequirement numeric:
+                return CreateFaultSiteLink(obligation, GetNumericRequirementDiagnosticCode(numeric));
+            case ModifierRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedModifierRequirement);
+            case DimensionProofRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedDimensionRequirement);
+            case QualifierCompatibilityProofRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedQualifierCompatibility);
+            case PresenceProofRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedPresenceRequirement);
+        }
 
+        throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
+    }
+
+    private static FaultSiteLink CreateFaultSiteLink(ProofObligation obligation, DiagnosticCode diagnosticCode)
+    {
         var faultCode = diagnosticCode switch
         {
             DiagnosticCode.DivisionByZero => FaultCode.DivisionByZero,
             DiagnosticCode.SqrtOfNegative => FaultCode.SqrtOfNegative,
-            _ => FaultCode.DivisionByZero // conservative fallback
+            _ => FaultCode.DivisionByZero // Proof-only obligation families still share the existing conservative runtime backstop.
         };
 
         return new FaultSiteLink(obligation, faultCode, diagnosticCode, obligation.Site.Span);
