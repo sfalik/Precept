@@ -57,6 +57,15 @@
             "problemMatcher": []
         },
         {
+            "label": "iso4217: refresh",
+            "type": "shell",
+            "command": "node",
+            "args": [
+                "${workspaceFolder}/tools/scripts/refresh-iso4217.js"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "grammar: regenerate",
             "type": "shell",
             "command": "dotnet",

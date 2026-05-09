@@ -188,8 +188,8 @@ public sealed record RuleViolation(string Message);
 /// <summary>Preview handler — processes snapshot/fire/inspect/update requests.</summary>
 public sealed class PreceptPreviewHandler
 {
-    public Task<PreceptPreviewResponse> Handle(PreceptPreviewRequest request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException("PreceptPreviewHandler.Handle not yet implemented");
+    public Task<PreceptPreviewResponse> HandleAsync(PreceptPreviewRequest request, CancellationToken cancellationToken) =>
+        throw new NotImplementedException("PreceptPreviewHandler.HandleAsync not yet implemented");
 }
 
 // ── PreceptTextDocumentSyncHandler ──────────────────────────────────────────
@@ -234,8 +234,8 @@ public sealed class LocationOrDocumentSymbol
 /// <summary>Code action handler — computes quick fixes for diagnostics.</summary>
 public sealed class PreceptCodeActionHandler
 {
-    public Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException("PreceptCodeActionHandler.Handle not yet implemented");
+    public Task<CommandOrCodeActionContainer?> HandleAsync(CodeActionParams request, CancellationToken cancellationToken) =>
+        throw new NotImplementedException("PreceptCodeActionHandler.HandleAsync not yet implemented");
 }
 
 // ── PreceptTokenMeta ─────────────────────────────────────────────────────────
