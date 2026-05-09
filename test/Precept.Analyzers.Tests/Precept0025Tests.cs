@@ -1,10 +1,5 @@
-using System.Collections.Immutable;
-using System.IO;
-using System.Linq;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Xunit;
 
 namespace Precept.Analyzers.Tests;
@@ -12,9 +7,9 @@ namespace Precept.Analyzers.Tests;
 /// <summary>
 /// Tests for PRECEPT0025 — CatalogDU Wildcard Prohibition.
 ///
-/// Verifies that wildcard/discard arms in type-pattern switch expressions over
-/// abstract records marked with [CatalogDU] emit PRECEPT0025 at Error severity,
-/// while exhaustive switches and non-[CatalogDU] types stay silent.
+/// Verifies that wildcard/discard arms and <c>default:</c> cases in type-pattern
+/// switches over abstract records marked with [CatalogDU] emit PRECEPT0025 at
+/// Error severity, while exhaustive switches and non-[CatalogDU] types stay silent.
 /// </summary>
 public class Precept0025Tests
 {
@@ -156,6 +151,82 @@ public class Consumer
         d.GetMessage().Should().Contain("Shape");
     }
 
+    /// <summary>
+    /// TP5: Switch statements with <c>default:</c> over a [CatalogDU] hierarchy now fire.
+    /// Mirrors ProofEngine's must-be-exhaustive families by checking both CreateDiagnostic
+    /// and CreateFaultSiteLink in the same compilation.
+    /// </summary>
+    private const string TP5_SwitchStatementDefaultArm = @"
+using System;
+
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class CatalogDUAttribute : Attribute { }
+
+[CatalogDU]
+public abstract record ProofRequirement;
+public sealed record NumericProofRequirement : ProofRequirement;
+public sealed record ModifierRequirement : ProofRequirement;
+public sealed record DimensionProofRequirement : ProofRequirement;
+public sealed record QualifierCompatibilityProofRequirement : ProofRequirement;
+public sealed record PresenceProofRequirement : ProofRequirement;
+
+public class Consumer
+{
+    public string CreateDiagnostic(ProofRequirement requirement)
+    {
+        switch (requirement)
+        {
+            case NumericProofRequirement numeric:
+                return nameof(numeric);
+            case ModifierRequirement modifier:
+                return nameof(modifier);
+            case DimensionProofRequirement dimension:
+                return nameof(dimension);
+            case QualifierCompatibilityProofRequirement qualifier:
+                return nameof(qualifier);
+            case PresenceProofRequirement presence:
+                return nameof(presence);
+            default:
+                return ""other"";
+        }
+    }
+
+    public string CreateFaultSiteLink(ProofRequirement requirement)
+    {
+        switch (requirement)
+        {
+            case NumericProofRequirement numeric:
+                return nameof(numeric);
+            case ModifierRequirement modifier:
+                return nameof(modifier);
+            case DimensionProofRequirement dimension:
+                return nameof(dimension);
+            case QualifierCompatibilityProofRequirement qualifier:
+                return nameof(qualifier);
+            case PresenceProofRequirement presence:
+                return nameof(presence);
+            default:
+                return ""other"";
+        }
+    }
+}
+";
+
+    [Fact]
+    public async Task TP5_SwitchStatementDefaultArm_ReportsForBothProofEngineFamilies()
+    {
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Precept0025CatalogDUWildcard>(
+            TP5_SwitchStatementDefaultArm);
+
+        diagnostics.Should().HaveCount(2);
+        diagnostics.Should().AllSatisfy(d =>
+        {
+            d.Id.Should().Be("PRECEPT0025");
+            d.Severity.Should().Be(DiagnosticSeverity.Error);
+            d.GetMessage().Should().Contain("ProofRequirement");
+        });
+    }
+
     // ── True negatives ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -184,10 +255,60 @@ public class Consumer
     }
 
     /// <summary>
-    /// TN2: Switch with _ arm over a type that does NOT have [CatalogDU] → no diagnostic.
+    /// TN2: Switch statements without <c>default:</c> stay silent when all subtype arms are explicit.
+    /// Mirrors the real ProofEngine switch statements without introducing wildcard fallback.
+    /// </summary>
+    private const string TN2_SwitchStatementWithoutDefault = @"
+using System;
+
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class CatalogDUAttribute : Attribute { }
+
+[CatalogDU]
+public abstract record ProofRequirement;
+public sealed record NumericProofRequirement : ProofRequirement;
+public sealed record ModifierRequirement : ProofRequirement;
+public sealed record DimensionProofRequirement : ProofRequirement;
+public sealed record QualifierCompatibilityProofRequirement : ProofRequirement;
+public sealed record PresenceProofRequirement : ProofRequirement;
+
+public class Consumer
+{
+    public string CreateDiagnostic(ProofRequirement requirement)
+    {
+        switch (requirement)
+        {
+            case NumericProofRequirement numeric:
+                return nameof(numeric);
+            case ModifierRequirement modifier:
+                return nameof(modifier);
+            case DimensionProofRequirement dimension:
+                return nameof(dimension);
+            case QualifierCompatibilityProofRequirement qualifier:
+                return nameof(qualifier);
+            case PresenceProofRequirement presence:
+                return nameof(presence);
+        }
+
+        throw new InvalidOperationException();
+    }
+}
+";
+
+    [Fact]
+    public async Task TN2_SwitchStatementWithoutDefault_NoDiagnostic()
+    {
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Precept0025CatalogDUWildcard>(
+            TN2_SwitchStatementWithoutDefault);
+
+        diagnostics.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// TN3: Switch with _ arm over a type that does NOT have [CatalogDU] → no diagnostic.
     /// PRECEPT0025 is scoped to [CatalogDU]-marked hierarchies only.
     /// </summary>
-    private const string TN2_NonCatalogDUType = @"
+    private const string TN3_NonCatalogDUType = @"
 using System;
 
 // No [CatalogDU] attribute — plain abstract record
@@ -206,20 +327,20 @@ public class Consumer
 ";
 
     [Fact]
-    public async Task TN2_DiscardArm_OverNonCatalogDUType_NoDiagnostic()
+    public async Task TN3_DiscardArm_OverNonCatalogDUType_NoDiagnostic()
     {
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Precept0025CatalogDUWildcard>(
-            TN2_NonCatalogDUType);
+            TN3_NonCatalogDUType);
 
         diagnostics.Should().BeEmpty();
     }
 
     /// <summary>
-    /// TN3: Specific subtype patterns are not wildcards; a discard arm on a concrete
+    /// TN4: Specific subtype patterns are not wildcards; a discard arm on a concrete
     /// subtype switch (Circle c when c != null =>) does not fire. Only the _ arm fires.
     /// Verifies the analyzer doesn't over-report.
     /// </summary>
-    private const string TN3_GuardedPatternNotWildcard = @"
+    private const string TN4_GuardedPatternNotWildcard = @"
 public class Consumer
 {
     public string Describe(Shape shape) => shape switch
@@ -232,19 +353,19 @@ public class Consumer
 ";
 
     [Fact]
-    public async Task TN3_GuardedAndConcretePatterns_NoDiagnostic()
+    public async Task TN4_GuardedAndConcretePatterns_NoDiagnostic()
     {
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Precept0025CatalogDUWildcard>(
-            CommonStubs, TN3_GuardedPatternNotWildcard);
+            CommonStubs, TN4_GuardedPatternNotWildcard);
 
         diagnostics.Should().BeEmpty();
     }
 
     /// <summary>
-    /// TN4: _ arm in a switch over a non-record type (plain enum) → no diagnostic.
+    /// TN5: _ arm in a switch over a non-record type (plain enum) → no diagnostic.
     /// PRECEPT0025 only guards [CatalogDU]-marked types.
     /// </summary>
-    private const string TN4_DiscardOnEnum = @"
+    private const string TN5_DiscardOnEnum = @"
 using System;
 
 public enum Color { Red, Green, Blue }
@@ -261,20 +382,20 @@ public class Consumer
 ";
 
     [Fact]
-    public async Task TN4_DiscardArm_OnEnum_NoDiagnostic()
+    public async Task TN5_DiscardArm_OnEnum_NoDiagnostic()
     {
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Precept0025CatalogDUWildcard>(
-            TN4_DiscardOnEnum);
+            TN5_DiscardOnEnum);
 
         diagnostics.Should().BeEmpty();
     }
 
     /// <summary>
-    /// TN5: _ arm in a file whose path contains ".Tests" → suppressed.
+    /// TN6: _ arm in a file whose path contains ".Tests" → suppressed.
     /// PRECEPT0025 is suppressed in test files to permit scaffolded partial switches.
     /// </summary>
     [Fact]
-    public async Task TN5_DiscardArm_InTestFile_Suppressed()
+    public async Task TN6_DiscardArm_InTestFile_Suppressed()
     {
         const string source = @"
 using System;
@@ -297,55 +418,10 @@ public class WidgetTests
 }
 ";
         // Compile with a file path that contains ".Tests" to trigger suppression.
-        var diagnostics = await AnalyzeWithFilePathAsync(source, "Widget.Tests.cs");
+        var diagnostics = await AnalyzerTestHelper.AnalyzeWithFilePathAsync<Precept0025CatalogDUWildcard>(
+            source,
+            "Widget.Tests.cs");
 
         diagnostics.Should().BeEmpty();
-    }
-
-    // ── Helper for file-path-based tests ─────────────────────────────────────
-
-    /// <summary>
-    /// Runs <see cref="Precept0025CatalogDUWildcard"/> against <paramref name="source"/>
-    /// compiled under the specified <paramref name="filePath"/>. Used to test suppression
-    /// behavior that depends on the file's path containing ".Tests".
-    /// </summary>
-    private static async Task<IReadOnlyList<Diagnostic>> AnalyzeWithFilePathAsync(
-        string source, string filePath)
-    {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, path: filePath);
-
-        var dotnetDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
-        var references = new List<MetadataReference>
-        {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-        };
-        var systemRuntime = Path.Combine(dotnetDir, "System.Runtime.dll");
-        if (File.Exists(systemRuntime))
-            references.Add(MetadataReference.CreateFromFile(systemRuntime));
-
-        var compilation = CSharpCompilation.Create(
-            "TestAssembly",
-            new[] { syntaxTree },
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        var compilerErrors = compilation.GetDiagnostics()
-            .Where(d => d.Severity == DiagnosticSeverity.Error)
-            .ToList();
-
-        if (compilerErrors.Count > 0)
-        {
-            var messages = string.Join("\n", compilerErrors.Select(d => $"  {d.Id}: {d.GetMessage()}"));
-            throw new InvalidOperationException(
-                $"Test source has {compilerErrors.Count} compiler error(s):\n{messages}");
-        }
-
-        var withAnalyzers = compilation.WithAnalyzers(
-            ImmutableArray.Create<DiagnosticAnalyzer>(new Precept0025CatalogDUWildcard()));
-
-        return (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
-            .Where(d => d.Severity != DiagnosticSeverity.Hidden)
-            .OrderBy(d => d.Location.SourceSpan.Start)
-            .ToList();
     }
 }

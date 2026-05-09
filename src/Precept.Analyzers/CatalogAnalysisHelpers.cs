@@ -350,4 +350,100 @@ internal static class CatalogAnalysisHelpers
         var unwrapped = UnwrapConversions(op);
         return unwrapped.ConstantValue.HasValue ? unwrapped.ConstantValue.Value as string : null;
     }
+
+    // ── Catalog DU helpers ──────────────────────────────────────────────────────
+
+    private const string CatalogDUAttributeName = "CatalogDUAttribute";
+
+    /// <summary>
+    /// Returns true when the source file path contains <c>.Tests</c>.
+    /// Shared by PRECEPT0025 and PRECEPT0026 to suppress diagnostics in test files.
+    /// </summary>
+    internal static bool IsTestFile(IOperation op)
+    {
+        var filePath = op.Syntax.SyntaxTree.FilePath ?? string.Empty;
+        return filePath.IndexOf(".Tests", System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    /// <summary>
+    /// Walks the type hierarchy of <paramref name="type"/> and returns the first type that
+    /// carries <c>[CatalogDU]</c>, or null if none is found.
+    /// </summary>
+    internal static INamedTypeSymbol? FindCatalogDUBase(ITypeSymbol? type)
+    {
+        var current = type;
+        while (current != null)
+        {
+            if (current is INamedTypeSymbol named && HasCatalogDUAttribute(named))
+                return named;
+            current = current.BaseType;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="type"/> inherits from <paramref name="baseType"/>.
+    /// </summary>
+    internal static bool InheritsFrom(INamedTypeSymbol type, INamedTypeSymbol baseType)
+    {
+        for (var current = type.BaseType; current != null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, baseType))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Enumerates all sealed subtypes of <paramref name="catalogDUBase"/> in the current compilation.
+    /// </summary>
+    internal static IReadOnlyList<INamedTypeSymbol> FindSealedCatalogDUSubtypes(
+        Compilation compilation,
+        INamedTypeSymbol catalogDUBase)
+    {
+        var result = new List<INamedTypeSymbol>();
+        CollectSealedCatalogDUSubtypes(compilation.GlobalNamespace, catalogDUBase, result);
+        result.Sort((left, right) => string.Compare(
+            left.ToDisplayString(),
+            right.ToDisplayString(),
+            System.StringComparison.Ordinal));
+        return result;
+    }
+
+    private static bool HasCatalogDUAttribute(INamedTypeSymbol type)
+    {
+        foreach (var attr in type.GetAttributes())
+        {
+            if (attr.AttributeClass?.Name == CatalogDUAttributeName)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void CollectSealedCatalogDUSubtypes(
+        INamespaceSymbol ns,
+        INamedTypeSymbol catalogDUBase,
+        ICollection<INamedTypeSymbol> result)
+    {
+        foreach (var nestedNamespace in ns.GetNamespaceMembers())
+            CollectSealedCatalogDUSubtypes(nestedNamespace, catalogDUBase, result);
+
+        foreach (var type in ns.GetTypeMembers())
+            CollectSealedCatalogDUSubtypes(type, catalogDUBase, result);
+    }
+
+    private static void CollectSealedCatalogDUSubtypes(
+        INamedTypeSymbol type,
+        INamedTypeSymbol catalogDUBase,
+        ICollection<INamedTypeSymbol> result)
+    {
+        if (type.IsSealed && InheritsFrom(type, catalogDUBase))
+            result.Add(type);
+
+        foreach (var nestedType in type.GetTypeMembers())
+            CollectSealedCatalogDUSubtypes(nestedType, catalogDUBase, result);
+    }
 }
