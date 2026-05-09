@@ -6123,7 +6123,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
   - Failures are pre-existing language-server completion tests throwing `NotImplementedException` from `tools/Precept.LanguageServer/LanguageServerStubs.cs:31`.
   - No failure implicated `LanguageTool` or the new MCP tests.
 
-
 # ISO 4217 refresh workflow conversion
 
 **Date:** 2026-05-09
@@ -6140,7 +6139,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 - The live upstream URL has drifted, so the refresh path must follow the currently published SIX source rather than a stale historical endpoint.
 - Optional local reference data should strengthen developer validation without turning absent downloads into red CI.
 
-
 # Qualifier completion honesty and Tier 1 UOM breadth
 
 **Date:** 2026-05-09
@@ -6153,7 +6151,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 ## Rationale
 - Completions are a truth surface: invalid structure should feel invalid, not productive.
 - Missing legitimate units damages trust faster than a somewhat longer filtered completion list.
-
 
 # UCUM / ISO 4217 implementation gap remediation shape
 
@@ -6172,7 +6169,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 - The spec already locked `CurrencyCatalog`, `UnitCatalog`, and `DimensionCatalog`; the code is behind the design, not vice versa.
 - `FrozenSet<string>` cannot carry the metadata required for money semantics or future catalog-driven tooling.
 
-
 # Field and arg semantic colors
 
 **Date:** 2026-05-09
@@ -6188,3 +6184,518 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 - Fields belong on the structure axis (what a precept is), while args belong on the behaviour axis (what a precept does).
 - The companion-token pattern is an axis relationship, not a change to the existing 1–3 shade paradigm.
 
+### 2026-05-09T12:55:27-04:00: User directive
+**By:** Shane (via Copilot)
+**What:** Do not do anything beyond the plan scope. The implementation plan is `docs/Working/typed-literal-system-plan.md` (12 slices). All work must stay within this plan — no additional features, no speculative improvements, no expanding scope beyond what the plan specifies.
+**Why:** User request — captured for team memory
+
+# Decision: Currency Symbol Data Strategy
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-09T12:44:09-04:00  
+**Status:** RULING  
+**Scope:** CurrencyEntry symbol field, data ownership, maintenance strategy  
+**Affects:** Slice 1c (CurrencyCatalog loader migration)
+
+---
+
+## Verdict: Option 2 — Hardcoded Static Dictionary in CurrencyCatalog.cs
+
+Add a `Symbol` property to `CurrencyEntry` and populate it from a private static dictionary in `CurrencyCatalog.cs`, merged at load time when the XML loader constructs entries.
+
+---
+
+## Rationale
+
+The data layer decision established a clear first-party / third-party boundary:
+
+- **Third-party (ISO 4217):** AlphaCode, NumericCode, Name, MinorUnit → lives in `list-one.xml`, loaded at runtime
+- **First-party (Precept-owned):** Symbol → lives in C# source code
+
+Currency symbols are Precept augmentation data. They are not in the ISO 4217 standard. They are not in `list-one.xml`. They will never appear in `list-one.xml`. Putting them in an XML file would misclassify first-party data as if it were an external authoritative source. Putting them in the refresh script would mix Precept editorial decisions into a tool whose job is downloading a third-party file.
+
+The practical case is equally clear:
+
+- ~40 currencies have widely-recognized Unicode symbols. The remaining ~120 use their alpha code as the display form.
+- Currency symbols are among the most stable data in existence. The dollar sign has been `$` for 232 years.
+- A static dictionary of ~40 entries is trivially reviewable, trivially maintainable, and adds zero infrastructure.
+
+### Options Rejected
+
+**Option 1 (Separate XML file):** Over-engineers a ~40-entry lookup. Introduces a new embedded resource, a new XML schema, a new parser path, and a maintenance surface — all for data that changes less than once per decade. Also misclassifies first-party data by putting it in the `Data/` directory alongside third-party reference data.
+
+**Option 3 (Augmented refresh script):** Violates separation of concerns. The refresh script's job is "download ISO 4217 from SIX Group." Making it also synthesize Precept-owned symbol data couples a third-party sync tool to first-party editorial decisions. When the script runs, it should be idempotent on Precept-owned data — it should never overwrite our symbols with whatever SIX Group publishes (which is nothing, for symbols).
+
+---
+
+## Updated CurrencyEntry Record
+
+```csharp
+public sealed record CurrencyEntry(
+    string AlphaCode,    // e.g. "USD"         — from ISO 4217
+    int    NumericCode,  // e.g. 840           — from ISO 4217
+    string Name,         // e.g. "US Dollar"   — from ISO 4217
+    int    MinorUnit,    // e.g. 2             — from ISO 4217
+    string Symbol        // e.g. "$"           — Precept-owned augmentation; defaults to AlphaCode
+);
+```
+
+`Symbol` defaults to `AlphaCode` when no dedicated symbol exists. This means every `CurrencyEntry` has a usable display symbol — no null checks, no `Symbol ?? AlphaCode` at every call site.
+
+---
+
+## Implementation Shape
+
+In `CurrencyCatalog.cs`, after the XML loader parses `list-one.xml`:
+
+```csharp
+// Precept-owned augmentation: currency display symbols.
+// ISO 4217 does not define symbols. These are curated from Unicode CLDR
+// and common financial usage. Currencies without an entry here use their
+// alpha code as the display symbol.
+private static readonly FrozenDictionary<string, string> Symbols =
+    new Dictionary<string, string>
+    {
+        ["AED"] = "د.إ",  ["AFN"] = "؋",    ["ALL"] = "L",
+        ["AMD"] = "֏",    ["ARS"] = "$",    ["AUD"] = "A$",
+        ["AZN"] = "₼",    ["BAM"] = "KM",   ["BBD"] = "Bds$",
+        ["BDT"] = "৳",    ["BGN"] = "лв",   ["BHD"] = ".د.ب",
+        ["BMD"] = "$",    ["BND"] = "B$",   ["BOB"] = "Bs.",
+        ["BRL"] = "R$",   ["BSD"] = "B$",   ["BTN"] = "Nu.",
+        ["BWP"] = "P",    ["BYN"] = "Br",   ["BZD"] = "BZ$",
+        ["CAD"] = "C$",   ["CDF"] = "FC",   ["CHF"] = "CHF",
+        ["CLP"] = "$",    ["CNY"] = "¥",    ["COP"] = "$",
+        ["CRC"] = "₡",    ["CUP"] = "₱",    ["CZK"] = "Kč",
+        ["DKK"] = "kr",   ["DOP"] = "RD$",  ["DZD"] = "د.ج",
+        ["EGP"] = "E£",   ["ERN"] = "Nfk",  ["ETB"] = "Br",
+        ["EUR"] = "€",    ["FJD"] = "FJ$",  ["FKP"] = "£",
+        ["GBP"] = "£",    ["GEL"] = "₾",    ["GHS"] = "GH₵",
+        ["GIP"] = "£",    ["GTQ"] = "Q",    ["GYD"] = "G$",
+        ["HKD"] = "HK$",  ["HNL"] = "L",    ["HUF"] = "Ft",
+        ["IDR"] = "Rp",   ["ILS"] = "₪",    ["INR"] = "₹",
+        ["IQD"] = "ع.د",  ["IRR"] = "﷼",    ["ISK"] = "kr",
+        ["JMD"] = "J$",   ["JOD"] = "JD",   ["JPY"] = "¥",
+        ["KES"] = "KSh",  ["KGS"] = "сом",  ["KHR"] = "៛",
+        ["KPW"] = "₩",    ["KRW"] = "₩",    ["KWD"] = "د.ك",
+        ["KYD"] = "CI$",  ["KZT"] = "₸",    ["LAK"] = "₭",
+        ["LBP"] = "L£",   ["LKR"] = "Rs",   ["LRD"] = "L$",
+        ["MAD"] = "MAD",  ["MDL"] = "L",    ["MGA"] = "Ar",
+        ["MKD"] = "ден",  ["MMK"] = "K",    ["MNT"] = "₮",
+        ["MOP"] = "MOP$", ["MRU"] = "UM",   ["MUR"] = "₨",
+        ["MVR"] = "Rf",   ["MWK"] = "MK",   ["MXN"] = "Mex$",
+        ["MYR"] = "RM",   ["MZN"] = "MT",   ["NAD"] = "N$",
+        ["NGN"] = "₦",    ["NIO"] = "C$",   ["NOK"] = "kr",
+        ["NPR"] = "Rs",   ["NZD"] = "NZ$",  ["OMR"] = "ر.ع.",
+        ["PAB"] = "B/.",  ["PEN"] = "S/.",   ["PGK"] = "K",
+        ["PHP"] = "₱",    ["PKR"] = "₨",    ["PLN"] = "zł",
+        ["PYG"] = "₲",    ["QAR"] = "ر.ق",  ["RON"] = "lei",
+        ["RSD"] = "din.", ["RUB"] = "₽",    ["RWF"] = "FRw",
+        ["SAR"] = "ر.س",  ["SBD"] = "SI$",  ["SCR"] = "SRe",
+        ["SDG"] = "ج.س.", ["SEK"] = "kr",   ["SGD"] = "S$",
+        ["SHP"] = "£",    ["SLE"] = "Le",   ["SOS"] = "Sh",
+        ["SRD"] = "SRD",  ["SSP"] = "SS£",  ["STN"] = "Db",
+        ["SVC"] = "₡",    ["SYP"] = "S£",   ["SZL"] = "E",
+        ["THB"] = "฿",    ["TJS"] = "SM",   ["TMT"] = "T",
+        ["TND"] = "د.ت",  ["TOP"] = "T$",   ["TRY"] = "₺",
+        ["TTD"] = "TT$",  ["TWD"] = "NT$",  ["TZS"] = "TSh",
+        ["UAH"] = "₴",    ["UGX"] = "USh",  ["USD"] = "$",
+        ["UYU"] = "$U",   ["UZS"] = "сўм",  ["VES"] = "Bs.S",
+        ["VND"] = "₫",    ["VUV"] = "VT",   ["WST"] = "WS$",
+        ["XAF"] = "FCFA", ["XCD"] = "EC$",  ["XOF"] = "CFA",
+        ["XPF"] = "₣",    ["YER"] = "﷼",    ["ZAR"] = "R",
+        ["ZMW"] = "ZK",
+    }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+```
+
+The XML loader merges at construction time:
+
+```csharp
+var symbol = Symbols.GetValueOrDefault(alphaCode, alphaCode);
+return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
+```
+
+---
+
+## Maintenance Going Forward
+
+- **Who updates symbols:** Any developer, via a normal PR editing the `Symbols` dictionary.
+- **When:** When a new currency is added to ISO 4217 (rare — a few per decade) and someone wants a display symbol for it. Or if a symbol mapping is corrected.
+- **Review:** Trivially reviewable — it's a string-to-string dictionary in C#.
+- **The refresh script does NOT change.** It downloads `list-one.xml`. Symbols are not its concern.
+
+---
+
+## Changes from Current Plan (Slice 1c)
+
+1. **`CurrencyEntry` gains a `Symbol` property.** The plan said "record shape unchanged" — this is now a 5-field record instead of 4.
+2. **The loader must merge symbol data.** After parsing XML entries, look up `Symbols[alphaCode]` and default to `alphaCode` if absent.
+3. **Tests add symbol coverage:** verify `USD.Symbol == "$"`, `EUR.Symbol == "€"`, `JPY.Symbol == "¥"`, and that currencies without explicit symbols use their alpha code (e.g., `XDR.Symbol == "XDR"`).
+4. **No new files, no new embedded resources, no script changes.**
+
+---
+
+## The Catalog-System Test
+
+> "Is this part of a complete description of Precept?"
+
+Currency symbols are NOT part of the language specification. They are display/formatting augmentation consumed by the evaluator's `FormatString` and the language server's hover/completion. They are first-party *editorial* data — Precept decides which symbols to use — but they are not catalog metadata in the `catalog-system.md` sense. A hardcoded dictionary is the right weight for this: visible in source, trivially maintainable, no infrastructure.
+
+# Decision: ISO 4217 / UCUM Data Layer — Embedded XML, Lazy Load
+
+| Property | Value |
+|---|---|
+| Author | Frank |
+| Date | 2026-05-09T12:45:00-04:00 |
+| Status | Proposed (supersedes `frank-ucum-data-layer.md`) |
+| Scope | How ISO 4217 and UCUM reference data reaches typed C# consumers |
+
+## Recommendation
+
+**Option A — Embedded XML with lazy runtime load, consistent for both ISO 4217 and UCUM.** Ship authoritative XML as embedded resources. Parse once on first access into the same frozen typed records consumers already expect. No codegen step. No generated C# files.
+
+## What IS Catalog Metadata vs. What Is Reference Data
+
+Shane's question cuts to the bone and the answer is clear.
+
+The catalog system doc defines the test: *"if I enumerated every catalog's `All` property, would I have a complete description of Precept?"* Enumerating ISO 4217 codes does not describe Precept — it describes ISO 4217. Enumerating UCUM atoms does not describe Precept — it describes UCUM.
+
+What IS catalog metadata:
+- `TypeMeta` for `currency` (the Precept type — its traits, qualifiers, accessors, content validation shape)
+- `TypeMeta` for `unitofmeasure` (the Precept type)
+- `TypeMeta` for `quantity`, `price`, `exchangerate` (Precept types that consume currency/unit data)
+- The `ContentValidation` DU subtype that says "validate currency constants against ISO 4217"
+- The `UcumValidation` DU subtype that says "validate unit constants through the UCUM parser"
+
+What is NOT catalog metadata:
+- The 159 ISO 4217 currency entries (AlphaCode, NumericCode, Name, MinorUnit)
+- The ~300 UCUM atoms (code, dimension vector, scale factor, prefixability)
+- The ~24 UCUM SI prefixes
+
+These are **external, authoritative, versioned reference databases** that Precept *consumes*. They are not part of a complete description of the Precept language. They are data that Precept's type system validates against. The distinction is the same one that separates a SQL engine's catalog (table schemas, column types, constraints) from the data in the tables.
+
+My earlier decision conflated "consumers need typed C# records" with "those records must be source-level generated C#." Both statements are not equivalent. Consumers need `FrozenDictionary<string, CurrencyEntry>` and `FrozenDictionary<string, UcumAtom>`. They do not care whether those collections were populated from a generated `.g.cs` file or from an embedded XML resource parsed once at process startup.
+
+### Why my NodaTime dismissal was wrong
+
+I argued that NodaTime's embedded-resource pattern "solves a distribution problem Precept doesn't have." That framing was too narrow. The embedded-resource pattern solves a *classification* problem: it keeps external reference data out of source-level language definition code. NodaTime doesn't generate C# arrays of timezone rules — not because of distribution, but because timezone rules aren't NodaTime's language. They're external data NodaTime consumes. The same principle applies here.
+
+## Specific Answer for ISO 4217
+
+**Embedded XML, lazy load.**
+
+- `src/Precept/Data/Iso4217/list-one.xml` already exists as the provenance artifact. It stays.
+- `CurrencyCatalog.cs` becomes a loader, not a data file. It exposes the same `FrozenDictionary<string, CurrencyEntry> All` property, but populates it by parsing the embedded `list-one.xml` on first access via `Lazy<T>`.
+- The 213-line hand-maintained (or codegen-maintained) array of `new CurrencyEntry(...)` calls disappears.
+- `refresh-iso4217.js` simplifies: it downloads the XML and writes it to `src/Precept/Data/Iso4217/list-one.xml`. Done. No codegen step.
+- The exclusion logic (precious metals, fund codes, test codes) moves into the loader's XML-parsing filter — same rules, same result, declarative in one place.
+
+159 entries parsed from XML once per process lifetime is sub-millisecond. This is not a performance concern.
+
+## Specific Answer for UCUM
+
+**Embedded XML, lazy load — same pattern.**
+
+- `ucum-essence.xml` ships as an embedded resource in `src/Precept/Data/Ucum/`.
+- `UcumAtomCatalog.cs` (not `.g.cs`) exposes `FrozenDictionary<string, UcumAtom> All` and `FrozenDictionary<string, UcumPrefix> Prefixes`, populated from the embedded XML on first access.
+- The UCUM parser (`UcumParser.cs`) consumes these typed records at parse time — the consumer API is identical to what the codegen approach would have provided.
+- Tier 1 classification (for LS completions/MCP discovery) is a property on the `UcumAtom` record, applied during the load pass. The tier assignment logic is Precept's own curation — that IS Precept-specific knowledge, applied as the atoms are loaded.
+- `refresh-ucum.js` downloads `ucum-essence.xml` to `src/Precept/Data/Ucum/`. Done.
+
+"UCUM is huge" is addressed cleanly: the XML is ~300 atoms. Parsing it once into frozen typed records is trivial. The concern about UCUM's size was about *generated C# source code* — hundreds of constructor calls with dimension vectors and exact scale factors as C# literals would be ugly, hard to review, and pointless. As embedded XML, the size is irrelevant. The XML IS the data format; we're not transcoding it into a worse one.
+
+## Consistency Ruling
+
+**Both use the same pattern. No exceptions.**
+
+1. Authoritative XML in `src/Precept/Data/{Standard}/` as an embedded resource.
+2. A typed loader class in `src/Precept/Language/` (or `src/Precept/Language/Ucum/` for UCUM) that parses the XML once, lazily, into frozen typed records.
+3. A refresh script in `tools/scripts/` that downloads the latest upstream XML. No codegen. No generated files.
+4. Consumers see `FrozenDictionary<string, T>` — they never know or care that it came from XML.
+
+The consumer API is identical under both approaches. The difference is entirely in how the data enters the binary: source-level C# literals vs. embedded resource parsed once. The latter is architecturally correct because it preserves the distinction between language definition (catalog metadata) and external reference data.
+
+## Tradeoff Accepted
+
+**What we give up:**
+
+- **No reviewable C# diff on data updates.** When ISO 4217 or UCUM publishes a new version, the commit diff shows XML changes, not C# changes. XML diffs are less readable than C# record-array diffs. This is a real cost — but it is the correct cost. The alternative (codegen) purchases readable diffs by misclassifying reference data as source code.
+- **First-access latency.** There is a one-time XML parsing cost on first use. For 159 currencies: negligible. For ~300 UCUM atoms with dimension vectors: still negligible (sub-millisecond for in-memory XML parsing of a small embedded resource). If this ever becomes measurable — it won't — the `Lazy<T>` can be replaced with eager initialization in a static constructor. The consumer API doesn't change.
+- **No compile-time schema enforcement on the XML.** A malformed XML resource won't fail the C# build — it will fail on first access. Mitigation: the existing test suites (`CurrencyCatalogSyncTests`, future UCUM catalog tests) validate the embedded resource at test time. A broken XML will fail CI before it ships.
+
+## Impact on the Plan
+
+### What changes
+
+1. **`CurrencyCatalog.cs` becomes a loader.** Delete the 159-entry array. Add embedded-resource XML parsing into `CurrencyEntry` records with a `Lazy<FrozenDictionary<string, CurrencyEntry>>` backing field. Same public API.
+2. **`refresh-iso4217.js` simplifies.** Remove any codegen logic (currently it just downloads XML, so minimal change — but the architecture explicitly forecloses future codegen for this path).
+3. **UCUM data layer builds the same way.** `UcumAtomCatalog.cs` is a loader over embedded `ucum-essence.xml`, not a generated file. No `generate-ucum-catalog.js` script needed. Only `refresh-ucum.js` (XML download).
+4. **Tier 1 curation logic lives in the loader.** The `UcumAtom.Tier` property is set during the load pass based on Precept's curation rules — that logic is Precept-owned, not UCUM-owned.
+5. **Test coverage must validate the embedded resources.** Catalog sync tests parse the embedded XML and verify record counts, required fields, and known entries.
+
+### What does NOT change
+
+- The typed record shapes (`CurrencyEntry`, `UcumAtom`, `UcumPrefix`, `DimensionVector`) — identical.
+- The consumer API (`CurrencyCatalog.All`, `UcumAtomCatalog.All`) — identical.
+- The UCUM parser architecture — unchanged, it still reads from `UcumAtomCatalog.All`.
+- The `ContentValidation` / `UcumValidation` DU on `TypeMeta` — unchanged.
+- The refresh scripts' download logic — unchanged.
+
+# Decision: Typed Literal Framework — Q5 Deserialization + Exhaustive Gap Review
+
+| Property | Value |
+|---|---|
+| Author | Frank (Lead/Architect) |
+| Date | 2026-05-09T11:51:45-04:00 |
+| Scope | `docs/Working/frank-typed-literal-framework.md` — Q5 addition and gap audit |
+| Grounding | `docs/runtime/runtime-api.md`, `docs/compiler/literal-system.md`, `docs/language/catalog-system.md`, `src/Precept/Language/Types.cs`, `src/Precept/Language/Type.cs` |
+
+## Decisions
+
+### D1: Restore reuses `TypeRuntimeMeta.ReadJson` — no separate deserialization contract
+
+The `Precept.Restore(string?, JsonElement)` path uses the same `TypeRuntimeMeta.ReadJson` delegates as Fire and Update JSON lanes. No distinct deserialization contract is needed. `ReadJson` IS the deserialization contract.
+
+**Rationale:** All three runtime JSON ingress paths (Fire, Update, Restore) convert `JsonElement` → `PreceptValue` for the same type registry. Creating a separate delegate would duplicate the parser registrations without adding value.
+
+**Alternatives rejected:**
+- Separate `RestoreJson` delegate on `TypeRuntimeMeta` — rejected because the parsing logic is identical; only the caller context differs.
+- Reusing `TypedConstantValidation.Validate` at Restore time — rejected for the same reasons it was rejected for Fire in Q4 (wrong input format, wrong error model, DSL syntax vs JSON wire format).
+
+**Tradeoff accepted:** If a future need arises where stored format diverges from wire format (e.g., a compact binary representation), a separate delegate would be needed. For now, JSON is the only storage format and `ReadJson` covers it.
+
+### D2: Round-trip fidelity is the only forward-compatibility guarantee
+
+`ReadJson(WriteJson(v)) == v` for any valid `PreceptValue`. Leniency beyond the canonical format is type-by-type. Schema evolution (type changes, new constraints) is the caller's migration responsibility, detected via `RestoreOutcome` variants.
+
+### D3: 15 gaps identified — 2 Blockers, 13 Advisory
+
+Full gap review completed against all canonical docs. Two blockers require resolution before the proposal can be approved:
+
+1. **G1 — CLR type mapping contradiction:** `runtime-api.md` maps temporal types to System types (DateOnly, TimeOnly, DateTimeOffset); the proposal maps them to NodaTime types. Requires a locked decision on the public CLR mapping.
+2. **G2 — Restore absent from consumer matrices:** Q1/Q2 consumer matrices don't mention the Restore path. Q5 covers the architecture but the matrices need cross-references.
+
+13 advisory gaps documented for resolution during implementation.
+
+## Cross-References
+
+- Proposal: `docs/Working/frank-typed-literal-framework.md`
+- Runtime API (Restore design): `docs/runtime/runtime-api.md` § Restoration
+- Literal system (ITypedConstantValidator open question): `docs/compiler/literal-system.md` line 496
+- Catalog system (metadata-driven principle): `docs/language/catalog-system.md` § Architectural Identity
+- UCUM gap analysis: `docs/Working/frank-ucum-iso-gap.md`
+
+# Decision: Typed Literal System — Implementation Plan Produced
+
+| Property | Value |
+|---|---|
+| Author | Frank (Lead/Architect) |
+| Date | 2026-05-09T12:33:31-04:00 |
+| Scope | Plan synthesis from 4 Working docs into a single executable implementation plan |
+
+## Plan Structure
+
+- **12 slices** ordered by dependency
+- Slices 1–4 are foundational (data layer, parsers) and partially parallelizable
+- Slices 5–9 are the framework core (DU update, framework types, validators, TypeMeta entries, TypeChecker migration)
+- Slice 10 is runtime stubs (independent)
+- Slices 11–12 are doc updates and Working doc deletion
+
+Key ordering decisions:
+- Data layer (embedded XML loaders) before parsers — the UCUM parser depends on atom data
+- Temporal parser is fully independent of UCUM — they can execute in parallel
+- ContentValidation DU update comes before the framework types and validators, because the DU subtypes define the dispatch contract
+- TypeChecker migration is the last code slice — it proves everything works end-to-end before doc updates
+
+## Gaps the Working Docs Didn't Fully Resolve
+
+1. **G15 resolution:** The Working docs proposed a `QuantityDomain` enum on a single `QuantityValidation` subtype. The plan resolves this with four separate DU subtypes (`MoneyValidation`, `QuantityValidation`, `PriceValidation`, `ExchangeRateValidation`) — more catalog-idiomatic.
+
+2. **Period dual-format acceptance:** The Working docs proposed `TemporalLiteralKind.TemporalQuantity` for duration but didn't explicitly state that period must accept BOTH ISO 8601 (`P30D`) and quantity form (`30 days`). The plan makes this explicit — the temporal validator tries quantity parse first, falls back to `PeriodPattern.NormalizingIso`.
+
+3. **`stateref` disposition:** The Working docs flagged this as advisory gap G8 but didn't resolve it. The plan adds a disposition note in `literal-system.md`: stateref validation is a name-binder concern, not a domain parser. It does not use ContentValidation.
+
+4. **JSON wire format documentation:** The Working docs identified (G12) that MCP consumers need to know JSON wire formats for each type, but didn't produce the table. The plan adds a complete JSON wire format table to `runtime-api.md`.
+
+## Canonical Docs Requiring More Updates Than Expected
+
+- **`runtime-api.md`** has the most updates: CLR type table fix, Fire example code fix, Deliberate Exclusions inconsistency, JSON wire format table addition, `FromJson` → `Restore` rename, `TypeRuntimeMeta` delegate shapes, `ParseString`/`FormatString` clarification. Seven distinct changes.
+
+- **`literal-system.md`** has three open questions to close, a content validation table to add, and the Restore consumer matrix entry. More than a simple sync.
+
+- **`catalog-system.md`** needs the external reference data distinction — this is an architectural principle that was decided in `frank-data-layer-decision.md` but never flowed back to the canonical catalog doc.
+
+# Decision: UCUM Data Layer Strategy — Build-Time Codegen
+
+| Property | Value |
+|---|---|
+| Author | Frank |
+| Date | 2026-05-09T12:12:35-04:00 |
+| Status | Locked |
+| Scope | How UCUM atom/prefix data reaches the runtime catalog |
+
+## Recommendation
+
+**Option B — Build-time codegen.** A Node.js script reads `ucum-essence.xml` from `src/Precept/Data/Ucum/` and generates `UcumAtomCatalog.g.cs` (and `UcumPrefixCatalog.g.cs` if warranted) as frozen C# collections. The binary ships only C# types. No XML parsing at runtime.
+
+## Rationale
+
+### 1. Precept is a compile-time system
+
+The UCUM atom table is consumed at **compile time** — by the type checker, the language server, and MCP vocabulary projection — not just at runtime. Every one of these consumers needs:
+
+- atom lookup by canonical code (for parser resolution),
+- prefixability flags (for longest-match prefix parsing),
+- dimension vectors (for commensurability checks and alias classification),
+- scale factors (for exact conversion metadata),
+- tier classification (for LS completions and MCP discovery).
+
+This data must be available as typed, frozen, statically-analyzable C# structures. A `FrozenDictionary<string, UcumAtom>` is the correct shape — exactly what `CurrencyCatalog` already provides for ISO 4217. XML parsing at first access adds latency, allocation, and a failure mode to the compile path for zero benefit.
+
+### 2. Catalog-driven architecture demands typed metadata records
+
+The non-negotiable architectural principle is: **catalogs are the language specification in machine-readable form.** Pipeline stages derive behavior from catalog metadata — they never maintain parallel copies.
+
+A `UcumAtom` record with `DimensionVector`, `ExactScale`, `IsPrefixable`, `Tier`, and `DisplayName` properties is catalog metadata. An XML element is a serialization format. The catalog architecture requires the former. The XML is a provenance artifact — the upstream source from which the catalog is refreshed — not the runtime truth.
+
+### 3. The ISO 4217 pattern already works and is proven
+
+`CurrencyCatalog.cs` + `refresh-iso4217.js` + `src/Precept/Data/Iso4217/list-one.xml` is the established pattern:
+
+1. Authoritative XML lives in `src/Precept/Data/` as a provenance artifact.
+2. A refresh script downloads the latest upstream source.
+3. A C# catalog file materializes the data as frozen collections.
+4. Consumers reference the C# catalog directly — no file I/O, no parsing, no lazy initialization.
+
+UCUM should follow the identical pattern. The only difference is scale: UCUM has ~300 atoms and ~24 prefixes vs. ISO 4217's ~160 currencies, which means a codegen script is more justified (not less) because hand-maintaining 300+ entries with dimension vectors and exact scale factors would be error-prone.
+
+### 4. NodaTime's TZDB pattern is wrong for this use case
+
+NodaTime embeds `Noda.TimeZoneData.nzd` and parses it lazily because:
+
+- The IANA timezone database changes frequently (multiple releases per year).
+- NodaTime is a **library** distributed as a NuGet package — it cannot run codegen scripts in consuming projects.
+- Timezone data is enormous and used selectively at runtime.
+
+None of these conditions hold for UCUM in Precept:
+
+- UCUM `ucum-essence.xml` is versioned and stable — the atom table changes on the order of years, not months.
+- Precept is **not a library** — it is an application that controls its own build pipeline.
+- The atom table is small (~300 entries) and used exhaustively at compile time.
+- Lazy initialization introduces a failure mode (malformed XML, missing resource) that would surface as a compiler crash rather than a build error.
+
+The NodaTime pattern solves a distribution problem Precept does not have.
+
+## Key Tradeoff
+
+**What we give up:** When UCUM publishes a new `ucum-essence.xml` version, updating requires running the refresh + codegen script and rebuilding — not just dropping in a new resource file. This is the correct tradeoff because:
+
+- UCUM updates are rare and deliberate.
+- A codegen step gives us a chance to validate the new data against our schema expectations before it enters the catalog.
+- The checked-in `.g.cs` file makes diffs reviewable — you can see exactly which atoms changed.
+
+## Impact on the Plan
+
+### Build NOW (in the typed-literal spike)
+
+- `tools/scripts/refresh-ucum.js` — downloads `ucum-essence.xml` to `src/Precept/Data/Ucum/`.
+- `tools/scripts/generate-ucum-catalog.js` — reads the XML, emits `UcumAtomCatalog.g.cs` and `UcumPrefixCatalog.g.cs` into `src/Precept/Language/Ucum/`.
+- The generated files contain `FrozenDictionary<string, UcumAtom>` and `FrozenDictionary<string, UcumPrefix>` with all metadata properties needed by the parser.
+- The `UcumParser` consumes the generated catalog directly — no XML, no lazy init, no embedded resources.
+
+### Embed in canonical docs for later
+
+- `docs/language/business-domain-types.md` should document the refresh/codegen workflow once it ships.
+- The data pipeline pattern (XML provenance → codegen script → frozen C# catalog) should be recorded as the canonical pattern for any future external-standard integration.
+
+# UCUM Data Layer → Evaluator Gap Analysis
+
+**Date:** 2026-05-09T12:51:10-04:00  
+**Author:** Frank (Lead/Architect)  
+**Requested by:** Shane  
+**Scope:** Does the UCUM data layer as designed (Slices 1d, 2, 3, 10) provide sufficient grammar/data for ALL required evaluator unit-math behavior?
+
+---
+
+## Ruling: 8-Point Assessment
+
+### 1. Dimensional Analysis — SUFFICIENT
+
+`DimensionVector` is a 7-dimensional SI record struct with `Equals`. Two quantities are dimensionally compatible iff their `DimensionVector` values are equal. The evaluator compares `UcumParsedUnit.Vector` from each operand. No gap.
+
+### 2. Unit Conversion — SUFFICIENT
+
+`UcumExactFactor` on each `UcumAtom` carries the exact rational scale to the SI base. `UcumParsedUnit.Scale` is the composed factor for the full expression (parser's semantic reducer computes this). To convert `5 kg + 3 g`: evaluator converts both to SI base via their respective `Scale`, performs addition, then converts back to the target unit by dividing by target `Scale`. `UcumExactFactor` is exact rational (numerator/denominator + base-10 exponent) — no floating-point drift. No gap.
+
+### 3. Unit Multiplication/Division — SUFFICIENT
+
+`DimensionVector` has `Multiply` (adds exponents) and `Divide` (subtracts exponents). `UcumExactFactor` composes multiplicatively. The parser produces correct vectors for compound expressions like `m/s` → speed vector (1,0,-1,...). The evaluator receives the result dimension from `UcumParsedUnit.Vector` directly. No gap.
+
+### 4. Canonical Form — SUFFICIENT
+
+`UcumParsedUnit.CanonicalCode` is computed by the semantic reducer and provides a normalized string form. `DimensionVector` equality gives dimension-level canonical comparison. `UcumExactFactor` equality gives scale-level comparison. Together these are sufficient for the evaluator to determine if two unit expressions represent the same physical unit. No gap.
+
+### 5. Prefixed Unit Handling — SUFFICIENT
+
+`UcumPrefixCatalog` carries `UcumExactFactor` per prefix (e.g., milli = 0.001). The parser's `UcumPrefixedAtomNode` resolves via `LongestPrefixMatch`. The semantic reducer composes `prefix.Factor × atom.Scale` into the final `UcumParsedUnit.Scale`. So `mg` = milli(0.001) × g(0.001 relative to kg) = 0.000001 kg. The plan explicitly tests this in `UcumParserTests.cs` (prefixed atoms: `mg`, `cm`, `mmol`). No gap.
+
+### 6. Annotation Handling — GAP
+
+**Status:** Partial — needs clarification in the plan.
+
+`UcumAtom` carries `string? AnnotationClass`, and the parser AST includes `UcumAnnotatedNode`. The `DimensionCatalog` entry for `count` says "(0,0,0,0,0,0,0) — dimensionless with approved count annotations." But the plan does not specify:
+
+- **What happens to annotations in `UcumParsedUnit`?** The `UcumParsedUnit` record has no `Annotation` or `Annotations` field. If a user writes `{RBC}/uL`, the annotation `{RBC}` is parsed but has no place to land in the consumer-facing output. The evaluator needs to know whether two annotated units are the same annotation for identity/display purposes.
+- **Annotation equality semantics.** UCUM says annotations are for display only and do not affect dimensional analysis. The plan should explicitly state this: annotations are preserved for display but ignored in `DimensionVector` comparison and `UcumExactFactor` computation.
+
+**Fix required in:** `docs/Working/typed-literal-system-plan.md`, Slice 3 — add an `IReadOnlyList<string>? Annotations` field (or `string? Annotation`) to `UcumParsedUnit` for display preservation, and document that annotations are excluded from equality/dimension/scale computation.
+
+### 7. Derived Unit Chains — GAP
+
+**Status:** Implicit but unspecified — needs explicit callout.
+
+UCUM `ucum-essence.xml` defines units in two categories:
+- **Base units** (7 SI): `m`, `s`, `kg`, `A`, `K`, `mol`, `cd` — these have intrinsic dimension vectors.
+- **Defined units** (everything else): `N`, `J`, `Pa`, `Hz`, `L`, `[degF]`, etc. — these are defined as expressions of other units. E.g., `N` = `kg.m/s^2`, `J` = `N.m` = `kg.m^2/s^2`, `L` = `dm^3`.
+
+The plan says `UcumAtom` has `DimensionVector Vector` and `UcumExactFactor Scale`, but does **not** say how these are populated for defined units. There are two options:
+
+1. **Loader resolves at load time** — the XML loader recursively resolves each defined unit's expression down to fundamental SI components and stores the fully resolved `Vector` and `Scale` on `UcumAtom`. This means `N` gets Vector=(1,1,-2,0,0,0,0) and Scale=1 (already in SI). This is the correct approach.
+2. **Store definition expression and resolve later** — stores `N`'s definition as `kg.m/s^2` and resolves on demand.
+
+The plan implicitly assumes option 1 (since `UcumAtom.Vector` and `UcumAtom.Scale` are populated), but this is a significant implementation detail that must be explicit. The UCUM XML has chains: `J` is defined in terms of `N`, which is defined in terms of `kg`, `m`, `s`. The loader must resolve transitively.
+
+**Fix required in:** `docs/Working/typed-literal-system-plan.md`, Slice 1d — add explicit note: "The XML loader resolves each defined unit's `<value>` expression transitively into fundamental SI components. `UcumAtom.Vector` and `UcumAtom.Scale` represent the fully resolved SI-relative values, not the raw definition expression. This requires the loader to parse unit definition expressions using the same grammar as the UCUM parser (Slice 3), which creates a bootstrap dependency: the loader must either (a) include a minimal expression resolver for the `<value Unit="..." UNIT="...">` attributes, or (b) depend on the full `UcumParser` from Slice 3."
+
+**Dependency implication:** If the loader needs the parser to resolve defined units, Slice 1d has a dependency on Slice 3, or the loader must contain a bootstrapping mini-resolver. The plan currently shows Slice 3 depending on Slice 1d (correct for atom lookup), but not the reverse. This circular dependency must be resolved — the recommended approach is a **two-phase load**: Phase 1 loads base units with intrinsic vectors; Phase 2 resolves defined units using a minimal expression evaluator that references Phase 1 results. This mini-resolver is simpler than the full parser because `<value>` expressions in the XML use a restricted subset of the UCUM grammar.
+
+### 8. Interning and Identity — GAP
+
+**Status:** Insufficient — the plan does not address the interning key design.
+
+`UcumParsedUnit` has `SourceText`, `CanonicalCode`, `Vector`, `Scale`, and `UsedAtoms`. The runtime stubs (Slice 10) include `UnitFactory` which "converts parsed units into interned runtime `Unit` instances." But the plan does not specify:
+
+- **What is the interning key?** `CanonicalCode` alone is insufficient because `kg.m/s^2` and `N` have different canonical codes but the same physical unit. If the interning key is `(Vector, Scale)` then `N` and `kg.m/s^2` collapse to the same `Unit` — which may or may not be desired. If display form matters (user wrote `N`, not `kg.m/s^2`), the intern must preserve the source form while still allowing equality comparison.
+- **The plan explicitly asked George to implement `Unit` as a stub.** That's correct for pre-work scope, but the `UcumParsedUnit` record shape must be confirmed sufficient to produce a stable interning key later. Currently it is — `(Vector, Scale)` is a mathematically complete identity for physical units — but this needs to be documented as the intended key, with `SourceText`/`CanonicalCode` as display properties only.
+
+**Fix required in:** `docs/Working/typed-literal-system-plan.md`, Slice 10 — add a design note: "The interning key for `Unit` is `(DimensionVector, UcumExactFactor)` — two units with the same dimension and scale are the same physical unit regardless of source expression. `CanonicalCode` and `SourceText` are display-only properties preserved for user-facing output. `N` and `kg.m/s^2` are the same `Unit` instance. `UcumParsedUnit` provides all fields needed for this interning strategy."
+
+---
+
+## Overall Verdict
+
+**The data layer is architecturally sufficient but has 3 gaps that need plan amendments before implementation begins.**
+
+None of the gaps are architectural blockers — they are specification omissions that would cause George to make ad-hoc design decisions during implementation. Specifically:
+
+| # | Area | Verdict | Severity |
+|---|------|---------|----------|
+| 1 | Dimensional analysis | SUFFICIENT | — |
+| 2 | Unit conversion | SUFFICIENT | — |
+| 3 | Unit multiplication/division | SUFFICIENT | — |
+| 4 | Canonical form | SUFFICIENT | — |
+| 5 | Prefixed unit handling | SUFFICIENT | — |
+| 6 | Annotation handling | GAP | Low — add `Annotation` field to `UcumParsedUnit`, document display-only semantics |
+| 7 | Derived unit chains | GAP | **Medium** — loader must transitively resolve defined units; creates bootstrap dependency between Slice 1d and Slice 3 that needs resolution |
+| 8 | Interning and identity | GAP | Low — document `(Vector, Scale)` as interning key in Slice 10 |
+
+**Recommendation:** Amend the plan with the 3 fixes above before George begins Slice 1d. The derived unit chain gap (#7) is the most important — it affects loader design and slice dependency ordering.

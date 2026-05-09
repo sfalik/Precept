@@ -36,6 +36,11 @@ Committed 6 logical groups from a large multi-session working tree:
 
 ## Recent Updates
 
+### 2026-05-09T16:55:27Z — Typed-literal plan execution started on amended scope
+- George-7 is now executing the full 12-slice `docs/Working/typed-literal-system-plan.md` plan in background mode.
+- Coordinator amendments are part of the execution baseline: `UcumParsedUnit.Annotations`, the Slice 1d two-phase/transitive UCUM loader, and the Slice 10 `(DimensionVector, UcumExactFactor)` interning key note.
+- The user directive to stay within plan scope is now durable squad memory for this implementation thread.
+
 ### 2026-05-09T15:33:49Z - Six-slice commit batch recorded
 - Scribe recorded George-6's six logical commits as one durable implementation batch spanning catalog metadata, pipeline consumers, analyzers, docs, tooling, and squad-state follow-up.
 - Commit sequence preserved for future traceability: `b1c95512`, `d27fae6b`, `a1956961`, `9c608dc2`, `b9009a2a`, `dbfac08e`.
@@ -68,4 +73,3 @@ Committed 6 logical groups from a large multi-session working tree:
 ### 2026-05-09T15:21:46Z — Scribe merged the CurrencyCatalog exclusion policy
 - `.squad/decisions.md` now records the ISO-sync reconciliation: transactional currencies stay in `CurrencyCatalog`, while fund/accounting-unit codes and other intentional XML-only codes belong in `CurrencyCatalogSyncTests.IntentionalExclusions`.
 - Treat the current exclusion set (`BOV`, `CHE`, `CHW`, `CLF`, `COU`, `MXV`, `USN`, `UYI`, `UYW`, `VED`, `XAD`, `XCG`, `ZWG`, plus metals/placeholders) as the durable runtime boundary until Shane changes policy.
-

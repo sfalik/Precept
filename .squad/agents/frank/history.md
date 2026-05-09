@@ -7,19 +7,16 @@
 
 ## Learnings
 
-- User-defined format validation extensibility analysis on 2026-05-09T11:33:49.422-04:00: the typed literal framework does NOT accommodate user-defined format validation (email, phone, document numbers), by design. The framework is for semantically-typed values (Money, DateTime, Quantity) that decompose into structured CLR objects. Format validation on strings is a constraint concern, not a typed literal concern. Recommendation: add a `matches /pattern/` constraint modifier to the existing `ModifierKind` catalog — same syntactic position as `min`, `max`, `notempty`. No changes needed to the typed literal framework or Frank-21's runtime arg parsing work. Full analysis in `.squad/decisions/inbox/frank-22-user-defined-validation-extensibility.md`.
-- Typed literal framework architecture locked on 2026-05-09T11:11:01-04:00: unified framework APPROVED. `ContentValidation` DU on `TypeMeta` is the catalog hook; `TypedConstantValidation.Validate(...)` is the single static dispatcher replacing the inline `ValidateContent`/`ValidateNodaTime`/`ValidateClosedSet` methods in `TypeChecker.Expressions.cs`. No `ITypedConstantValidator` interface — static methods per domain validator. Temporal parser lives in `src/Precept/Language/Time/`, architecturally parallel to UCUM. Seven temporal literal forms (date, time, datetime, instant, zoneddatetime, timezone, temporal quantity). Three missing temporal types get `ContentValidation` entries (instant, timezone, zoneddatetime). Duration/period quantity syntax (`'30 days'`, `'72 hours'`) gets a dedicated `TemporalQuantityParser`. New DU subtypes: `UcumValidation`, `QuantityValidation`. `NodaTimeValidation` gains `TemporalLiteralKind` discriminator. Full architecture in `docs/working/frank-typed-literal-framework.md`.
-- Runtime arg parsing for typed literals locked on 2026-05-09T11:33:49.422-04:00: runtime arg parsing uses `TypeRuntime<T>` / `TypeRuntimeMeta` (the existing catalog-owned runtime coercion infrastructure), NOT `TypedConstantValidation.Validate`. Compile-time and runtime share underlying domain parsers (NodaTime, UCUM, ISO 4217) but differ in entry point, input format (DSL literal text vs. JSON wire format / CLR values), and error model (diagnostics with spans vs. `EventOutcome.InvalidArgs`). No separate "arg coercion" contract is needed. Each new typed-literal type requires three registrations on `TypeMeta`: `TypeRuntime<T>`, `TypeRuntimeMeta`, and `ContentValidation`. Corrects the Q2 MCP text that previously claimed `precept_fire` arg validation goes through `TypedConstantValidation.Validate`.
-- UCUM / ISO 4217 gap analysis on 2026-05-09T10:56:10.942-04:00:current `Types.cs` still trails the locked catalog architecture. Currency needs a structured `CurrencyCatalog` with `MinorUnit`; the decisive correction on the spike branch is to replace the UOM closed set with the real UCUM parser architecture rather than extending the placeholder set.
-- UCUM parser architecture locked on 2026-05-09T10:56:10.942-04:00: the spike branch does not defer grammar work. Build the real parser in `src/Precept/Language/Ucum/`, keep authoritative source data in `src/Precept/Data/Ucum/`, treat Tier 1 as discovery only, replace `ClosedSetValidation` for `unitofmeasure` with a shared UCUM-backed validation path, remove `time` from the UCUM dimension partition, keep `count` as an annotated dimensionless business alias, and promote `speed`/`force` into the curated `DimensionCatalog` as first-class vector aliases.
-- ProofEngine architecture is now understood as catalog-driven and mechanically sound; the remaining meaningful risks were miswired diagnostics, fallback semantics, and missing end-to-end coverage rather than missing strategy families.
-- Large implementation plans must be sourced from live code, not only the spec. Search constructor sites exhaustively before estimating record-shape changes such as `TypedField` / `TypedArg` metadata additions.
-- `ProofSatisfaction` / declaration-carrier metadata and the proof-ledger output contract are independent axes: both must exist before proof execution work can begin.
-- Closed-vocabulary syntax belongs in parser-time recognition; open-ended expressions stay as trees for later semantic work. Symbol binding remains distinct from type inference.
-- Tooling consumption is layered: TokenStream for lexical work, ConstructManifest for syntax, SymbolTable for name-aware features, SemanticIndex for semantic features.
-- Grammar-generator and tooling docs must track the catalog-driven architecture faithfully; speculative or stale wording becomes harmful quickly.
+- Typed-literal pre-work is governed by `docs/Working/typed-literal-system-plan.md`, a 12-slice execution plan covering data loaders, parsers, validation framework updates, runtime stubs, and canonical doc sync. Work should not expand beyond that plan.
+- Durable typed-literal boundaries are locked: `ContentValidation` remains the catalog hook; compile-time literal validation goes through `TypedConstantValidation.Validate(...)`; runtime Fire/Update/Restore JSON lanes go through `TypeRuntime<T>` / `TypeRuntimeMeta`; format-only validation stays in constraints, not typed literals.
+- ISO 4217 and UCUM are external reference datasets, not Precept catalog metadata. They ship as embedded XML resources loaded into typed records, while Precept-owned augmentations like currency symbols stay in source.
+- The UCUM evaluator-facing plan fixes are now explicit: `UcumParsedUnit` preserves annotations for display only, Slice 1d uses a two-phase/transitive loader for defined units, and Slice 10 interns runtime `Unit` instances by `(DimensionVector, UcumExactFactor)`.
 
 ## Recent Updates
+
+### 2026-05-09T16:55:27Z — UCUM evaluator gap analysis durably merged
+- Scribe merged Frank's eight-area UCUM evaluator review into `.squad/decisions.md` and deleted the inbox copy.
+- The coordinator-amended plan plus the user directive to stay within the 12-slice plan are now durable squad state.
 
 ### 2026-05-09T15:33:49Z - Typed-literal runtime boundary and format-validation scope recorded
 - Scribe merged Frank's runtime-arg parsing decision: typed-literal args are parsed through `TypeRuntime<T>` / `TypeRuntimeMeta`, while `TypedConstantValidation.Validate(...)` remains compile-time-only.
@@ -29,29 +26,9 @@
 - Scribe merged Frank's typed-literal framework and UCUM parser architecture into `.squad/decisions.md` as the canonical implementation direction.
 - Durable boundary: `ContentValidation` stays the metadata hook, `TypedConstantValidation.Validate(...)` stays the static dispatcher, and both temporal + UCUM parsing now have one approved shared-language architecture.
 
-
-### 2026-05-09T11:17:00-04:00 — Event-arg member reference scope decision locked
-- Chose `variable.parameter.property.precept` as the dedicated TextMate scope for event-arg member references (e.g., `LoadParcel.Recipient`). Replaces `variable.other.property.precept` which incorrectly placed arg members on the field axis.
-- Rationale: event-arg members are on the **parameter axis** — they access properties on event parameters, aligning with `variable.parameter.precept` (the arg name scope). The `.property` segment distinguishes member access from the arg name itself.
-- Single-site change in `tools/Precept.GrammarGen/Program.cs` (capture group 3 of `eventArgReference` pattern). No catalog change — this is a structural pattern scope.
-- Kramer-7's compound selector workaround (`meta.event-arg-ref.precept variable.other.property.precept → #9AD8E8`) should be reverted when the proper scope is implemented — it becomes dead code.
-- Full spec in `docs/Working/frank-arg-member-scope.md`; inbox decision in `.squad/decisions/inbox/frank-arg-member-scope.md`.
-
-### 2026-05-09T09:49:38Z — TypeChecker catalog-fix spec recorded
-- `frank-13` locked the four-site TypeChecker catalog-driven design: CI enforcement metadata, `Constraints.ByToken`, `Modifiers.ByAccessToken`, and `Modifiers.ByAnchorToken`, with explicit file slices and regression anchors for implementation.
-
-### 2026-05-08T22:54:50Z — ProofEngine spec closeout recorded
-- All 18 ProofEngine gaps were resolved in the canonical spec. The durable direction is bounded constant folding for initial-state satisfiability, explicit `ObligationContext` capture at instantiation time, and generic proof reading from catalog/declaration metadata rather than per-kind folklore.
-
-### 2026-05-08T21:22:17-04:00 — PE-G1 / PE-G2 / PE-G3 decisions locked
-- Strategy 2 is now `Declaration Attribute Proof`, qualifier compatibility is Strategy 5, and the output contract is the `ProofLedger` family collocated beside the pipeline output type.
-
 ## Historical Summary
 
-- 2026-05-08 graph/proof work locked the GraphAnalyzer baseline, consumed the remaining proof-engine design questions, and synchronized the compiler design docs back to the real implementation direction.
-- Earlier May work established the canonical parser and TypeChecker trajectory: `TransitionRowOutcome` naming, parse-time handling for closed vocabularies, NameBinder ownership of forward references, and the requirement that working proposals flow back into canonical docs and the decision ledger.
-- Use `.squad/decisions.md` for the full per-batch chronology and `research/` / `docs/` for the surviving rationale behind each locked design.
-
-### 2026-05-09T15:21:46Z — Scribe merged Frank's 2026-05-09 design notes
-- `.squad/decisions.md` now carries Frank's durable rulings for the event-arg member scope, the typed-literal validation framework, and the UCUM parser architecture.
-- The recorded throughline stays catalog-first: structural grammar scopes stay out of `TokenMeta`, typed-literal validation stays anchored on `ContentValidation`, and UCUM ships as a shared language subsystem rather than a closed-set placeholder.
+- Earlier 2026-05-09 work established the typed-literal direction: runtime JSON ingress reuses `TypeRuntimeMeta.ReadJson`, the unified content-validation framework replaced ad-hoc checker validation, user-defined format validation was explicitly kept out of typed literals, and the comprehensive 12-slice plan became the execution hub.
+- The same day also clarified the external-data boundary: ISO 4217 and UCUM are consumed reference datasets rather than language catalogs, `CurrencyCatalog` owns Precept-specific symbol augmentation, and the UCUM parser/data-layer direction moved from placeholder closed sets to a real parser + loader architecture.
+- Prior May work locked the catalog-first parser/checker/proof trajectory, required durable rationale capture in research + decisions, and reinforced that canonical docs must track live implementation direction.
+- Use `.squad/decisions.md` for the exact per-batch chronology and `docs/` / `research/` for the surviving canonical rationale.

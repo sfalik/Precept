@@ -1,0 +1,3 @@
+# Session Log - 2026-05-09T16:55:27Z - typed-literal-plan-execution
+
+Hard gate executed first: `decisions.md` started at 404098 bytes with 7 inbox files, so the 7-day archive pass ran before merge and moved 0 entries older than 2026-05-02T16:55:27Z. This pass merged 7 inbox files into the canonical ledger, deleted the processed inbox files, wrote orchestration logs for `frank-26`, `george-7`, and `coordinator`, refreshed Frank and George history, and summarized Frank history to clear the 15 KB gate. Health report: `decisions.md` before = 404098B; after = 442406B; `decisions-archive.md` after = 1376473B; inbox processed = 7; history files summarized = 1 (`frank`).
