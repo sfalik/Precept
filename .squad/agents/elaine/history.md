@@ -176,3 +176,9 @@ Task: Revised the paradigm recommendation after Shane's feedback that the axis l
 - Elaine-43 replaced the rejected axis-layer recommendation with standalone companion tokens for `--field` and `--arg`.
 - The fallback idea of absorbing field/arg into the Data family was rejected because Data's hue-coherent slate family cannot stretch to indigo/cyan without breaking the visual rule.
 - Durable direction: keep the five family cards intact, narrow Data to type + value, and document companion tokens in a short sub-section after the family cards.
+
+### 2026-05-09T14:56:26Z — Shane final color-family ruling
+- A late decision-inbox directive superseded the standalone companion-token recommendation.
+- Final durable direction: the Data family expands to include field (`#A5B4FC`) and arg (`#9AD8E8`), and family definitions may group semantically related hues rather than only tonal variants.
+- Treat the companion-token write-up as a rejected intermediate recommendation; the Shane ruling is now the canonical color-system direction.
+

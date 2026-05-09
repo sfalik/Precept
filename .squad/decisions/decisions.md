@@ -1,3 +1,8 @@
+### 2026-05-09: Data family expanded — field + arg added
+**By:** Shane
+**What:** Field (#A5B4FC) and arg (#9AD8E8) added to Data color family. Spec updated to allow semantically-grouped families with distinct hues (not tonal-variants-only). Fields and args are data tokens in the DSL — they belong in Data.
+**Why:** Moving them to a standalone layer would hollow out what "Data" means. The family definition was too restrictive.
+
 # Decision: Field and Arg as Standalone Companion Tokens
 
 **By:** Elaine (UX Design)
@@ -6182,3 +6187,4 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 ## Rationale
 - Fields belong on the structure axis (what a precept is), while args belong on the behaviour axis (what a precept does).
 - The companion-token pattern is an axis relationship, not a change to the existing 1–3 shade paradigm.
+
