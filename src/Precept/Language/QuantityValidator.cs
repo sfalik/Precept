@@ -21,7 +21,7 @@ public static class QuantityValidator
                 new TypedConstantDiagnostic("TC012", "Quantity must be '<decimal> <UCUM-unit>'."));
 
         var amount = decimal.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-        var unitResult = UcumCatalog.Parse(match.Groups[2].Value);
+        var unitResult = UcumParser.Parse(match.Groups[2].Value);
         if (!unitResult.IsValid)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,

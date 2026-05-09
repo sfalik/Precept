@@ -21,7 +21,7 @@ public static class PriceValidator
         if (!currencyResult.IsValid)
             return TypedConstantParseResult.Failed(validation.FormatDescription, currencyResult.Diagnostics.ToArray());
 
-        var unitResult = UcumCatalog.Parse(match.Groups[3].Value);
+        var unitResult = UcumParser.Parse(match.Groups[3].Value);
         if (!unitResult.IsValid)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,

@@ -39,7 +39,7 @@ public static class LanguageTool
             Diagnostics.All.Select(MapDiagnostic).ToArray(),
             new DomainCatalogDto(
                 CurrencyCatalog.All.Values.OrderBy(entry => entry.AlphaCode).Select(MapCurrency).ToArray(),
-                UcumCatalog.All.Values.OrderBy(entry => entry.Code).Select(MapUcumTier1Unit).ToArray(),
+                UcumAtomCatalog.BrowseTier1().Select(MapUcumTier1Unit).ToArray(),
                 DimensionCatalog.All.Values.OrderBy(entry => entry.Name).Select(MapDimension).ToArray(),
                 TemporalUnits.AllEntries.Select(MapTemporalUnit).ToArray()),
             FirePipeline);

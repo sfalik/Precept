@@ -8,7 +8,7 @@ public static class UcumValidator
         UcumValidation validation,
         TypedConstantContext? context = null)
     {
-        var result = UcumCatalog.Parse(rawText);
+        var result = UcumParser.Parse(rawText);
         return result.IsValid
             ? new TypedConstantParseResult(true, result.Unit, result.Unit?.CanonicalCode, validation.FormatDescription, [])
             : TypedConstantParseResult.Failed(

@@ -182,7 +182,7 @@ JSON response to agent
 
 **Arguments:** None
 
-**Core API:** Direct read of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, `Diagnostics.All`, plus `CurrencyCatalog.All`, `UcumCatalog.All`, `DimensionCatalog.All`, and `TemporalUnits.All`
+**Core API:** Direct read of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, `Diagnostics.All`, plus `CurrencyCatalog.All`, `UcumAtomCatalog.BrowseTier1()`, `DimensionCatalog.All`, and `TemporalUnits.AllEntries`
 
 **Returns:** Complete DSL vocabulary in structured JSON:
 
@@ -820,7 +820,7 @@ This ensures the MCP protocol remains intact even when the underlying runtime ha
 
 ### Vocabulary Guarantee
 
-`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All` appears in the output. It also surfaces the current `CurrencyCatalog.All`, `UcumCatalog.All`, `DimensionCatalog.All`, and `TemporalUnits.All` registries. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
+`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Functions.All`, and `Diagnostics.All` appears in the output. It also surfaces the current `CurrencyCatalog.All`, `UcumAtomCatalog.BrowseTier1()`, `DimensionCatalog.All`, and `TemporalUnits.AllEntries` surfaces. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
 
 ### JSON Stability
 

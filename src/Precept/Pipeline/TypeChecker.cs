@@ -135,7 +135,7 @@ internal static partial class TypeChecker
 
     private static DeclaredQualifierMeta.Unit MapUnitQualifier(ParsedQualifier q, CheckContext ctx)
     {
-        var result = UcumCatalog.Parse(q.Value);
+        var result = UcumParser.Parse(q.Value);
         if (!result.IsValid)
         {
             ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidUnitString, q.ValueSpan, q.Value));

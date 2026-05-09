@@ -290,16 +290,16 @@ public class LanguageToolTests
 
         result.Domains.UcumTier1Units.Select(entry => entry.Code)
             .Should()
-            .Equal(UcumCatalog.All.Values.OrderBy(entry => entry.Code).Select(entry => entry.Code));
+            .Equal(UcumAtomCatalog.BrowseTier1().Select(entry => entry.Code));
         var newton = result.Domains.UcumTier1Units.Should().ContainSingle(entry => entry.Code == "N").Subject;
-        newton.Name.Should().Be(UcumCatalog.All["N"].Name);
+        newton.Name.Should().Be(UcumAtomCatalog.All["N"].Name);
         newton.DimensionName.Should().Be("force");
-        newton.Dimension.Length.Should().Be(UcumCatalog.All["N"].Vector.Length);
-        newton.Dimension.Mass.Should().Be(UcumCatalog.All["N"].Vector.Mass);
-        newton.Dimension.Time.Should().Be(UcumCatalog.All["N"].Vector.Time);
-        newton.Scale.Numerator.Should().Be(UcumCatalog.All["N"].Scale.Numerator.ToString());
-        newton.Scale.Denominator.Should().Be(UcumCatalog.All["N"].Scale.Denominator.ToString());
-        newton.Scale.Base10Exponent.Should().Be(UcumCatalog.All["N"].Scale.Base10Exponent);
+        newton.Dimension.Length.Should().Be(UcumAtomCatalog.All["N"].Vector.Length);
+        newton.Dimension.Mass.Should().Be(UcumAtomCatalog.All["N"].Vector.Mass);
+        newton.Dimension.Time.Should().Be(UcumAtomCatalog.All["N"].Vector.Time);
+        newton.Scale.Numerator.Should().Be(UcumAtomCatalog.All["N"].Scale.Numerator.ToString());
+        newton.Scale.Denominator.Should().Be(UcumAtomCatalog.All["N"].Scale.Denominator.ToString());
+        newton.Scale.Base10Exponent.Should().Be(UcumAtomCatalog.All["N"].Scale.Base10Exponent);
 
         result.Domains.Dimensions.Select(entry => entry.Name)
             .Should()
