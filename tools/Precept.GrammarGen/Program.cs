@@ -777,7 +777,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                 {
                     ["1"] = new JsonObject { ["name"] = "entity.name.function.event.precept" },
                     ["2"] = new JsonObject { ["name"] = "punctuation.accessor.precept" },
-                    ["3"] = new JsonObject { ["name"] = "variable.other.property.precept" }
+                    ["3"] = new JsonObject { ["name"] = "variable.parameter.property.precept" }
                 }
             }
         }

@@ -907,7 +907,7 @@
               "name": "punctuation.accessor.precept"
             },
             "3": {
-              "name": "variable.other.property.precept"
+              "name": "variable.parameter.property.precept"
             }
           }
         }

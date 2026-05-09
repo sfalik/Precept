@@ -287,12 +287,6 @@
               }
             },
             {
-              "scope": "meta.event-arg-ref.precept variable.other.property.precept",
-              "settings": {
-                "foreground": "#9AD8E8"
-              }
-            },
-            {
               "scope": "variable.other.property.precept",
               "settings": {
                 "foreground": "#A5B4FC"
@@ -306,6 +300,12 @@
             },
             {
               "scope": "variable.parameter.precept",
+              "settings": {
+                "foreground": "#9AD8E8"
+              }
+            },
+            {
+              "scope": "variable.parameter.property.precept",
               "settings": {
                 "foreground": "#9AD8E8"
               }
