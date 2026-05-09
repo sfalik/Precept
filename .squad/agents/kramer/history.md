@@ -26,6 +26,21 @@
 
 ## Recent Updates
 
+### 2026-05-09T15:26:09Z — Color/scope tooling closeout recorded
+- Scribe merged Kramer's field/arg color wiring, retired-anchor cleanup, and event-arg member scope implementation into the canonical ledger.
+- Durable tooling state: `variable.parameter.property.precept` supersedes the compound-selector workaround, and the VS Code theme no longer relies on the retired `#B0BEC5` anchor for field/arg highlighting.
+
+
+### 2026-05-09T11:20:45Z — Event-arg member ref scope promoted to dedicated scope (Frank's design)
+- Replaced compound-selector workaround (`meta.event-arg-ref.precept variable.other.property.precept`) with proper dedicated scope `variable.parameter.property.precept` on the parameter axis.
+- Generator change: `eventArgReference` capture group 3 in `tools/Precept.GrammarGen/Program.cs` (line ~780) changed from `variable.other.property.precept` to `variable.parameter.property.precept`. The `collectionMemberAccess` pattern was intentionally left unchanged — both patterns used the old scope, only `eventArgReference` gets the new one.
+- `precept.tmLanguage.json` regenerated; `eventArgReference` pattern now emits `variable.parameter.property.precept` at line 910.
+- `package.json` theme: removed dead compound selector; added simple `variable.parameter.property.precept → #9AD8E8` rule immediately after the `variable.parameter.precept` rule.
+- Lesson: structural pattern scopes (like `meta.*` wrappers and capture group scopes in `eventArgReference`) live in the generator's hardcoded structural section — not in `TokenMeta.TextMateScope`. When Frank says "no catalog change required," believe it; the generator already has a clear structural section to target.
+- Lesson: compound selectors in themes are always temporary hacks. The grammar scope is the right permanent home for semantic distinctions.
+
+
+
 ### 2026-05-09T14:41:11Z — ISO 4217 refresh converted to task workflow
 - `kramer-2` removed the `precept.refreshIso4217` extension command path, added `tools/scripts/refresh-iso4217.js`, and wired the workspace task label `iso4217: refresh`.
 - The refresh now follows SIX's live `iso-currrency/lists/list-one.xml` endpoint because the older `iso-4217/lists/list-one.xml` URL returns 404.

@@ -1,0 +1,3 @@
+# Session Log — 2026-05-09T15:26:09Z — mcp-and-literal-batch
+
+Hard gate executed first: `decisions.md` started at 181475 bytes, so the 7-day archive pass ran before merge and moved 0 active entries. By the time this pass wrote records, a concurrent Scribe batch had already cleared the inbox and merged the color/literal/currency decisions, so inbox processing here was a verification no-op; this pass recorded the remaining Newman MCP diagnosis/fix decision, wrote orchestration logs for `newman-2`, `newman-3`, and `scribe-6`, refreshed the affected agent histories, and re-checked the 15 KB history gate. Health report: `decisions.md` 181475B -> 182387B; inbox processed = 0; history files summarized = 0.

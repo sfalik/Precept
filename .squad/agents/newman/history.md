@@ -23,6 +23,24 @@
 
 ## Recent Updates
 
+### 2026-05-09T15:26:09Z — MCP diagnosis/fix closeout recorded
+- Scribe merged Newman's diagnosis and stderr redirect fix into `.squad/decisions.md` as the canonical MCP status note.
+- Durable split: three tools are implemented today, stdout pollution is fixed at commit `9de87699`, and the missing inspect/fire/update surfaces remain deferred runtime-build work.
+
+
+### 2026-05-09 — MCP stderr redirect fix
+- **File changed:** `tools/Precept.Mcp/Program.cs`
+- **Fix:** Added `builder.Logging.AddConsole(options => { options.LogToStandardErrorThreshold = LogLevel.Trace; })` after `Host.CreateApplicationBuilder`. This routes all console log output to stderr, leaving stdout clean for JSON-RPC. Also added `using Microsoft.Extensions.Logging;`.
+- Commit: `9de87699` — "fix: redirect MCP console logger to stderr (stdout is JSON-RPC channel)"
+- VS Code "Failed to parse message" warnings should no longer appear. Diagnostic logs are still visible on stderr (VS Code MCP debug panel).
+
+### 2026-05-09 — MCP tool discovery + stdout log pollution diagnosis
+- VS Code reported 3 tools discovered. Root cause: `precept_inspect`, `precept_fire`, and `precept_update` have never been implemented. `tools/Precept.Mcp/Tools/` contains exactly 3 files (PingTool, LanguageTool, CompileTool). Discovery via `WithToolsFromAssembly()` is correct — it finds everything that exists.
+- VS Code "Failed to parse message" warnings caused by default console logger (from `Host.CreateApplicationBuilder`) routing log output to stdout. MCP stdio requires stdout to be JSON-RPC only. Fix: set `LogToStandardErrorThreshold = LogLevel.Trace` on the console logger options — one line in `Program.cs`, trivial, no design gate.
+- Full diagnosis: `docs/working/newman-mcp-tool-discovery-diagnosis.md`.
+
+
+
 ### 2026-05-09T14:14:17Z — `precept_language` tests expanded post-review
 - Soup Nazi's review found 7 concrete `LanguageToolTests.cs` gaps after the initial `precept_language` shipment: missing schema coverage, missing top-level completeness/order assertions, missing modifier subgroup checks, weak operator/function validation, representative mapping gaps, and an overly strict token-floor assertion.
 - The remediation expanded the suite from 12 total project tests to 19, locking catalog completeness/order coverage and the documented `>= 80` token-floor contract without changing the shipped `LanguageTool` surface.

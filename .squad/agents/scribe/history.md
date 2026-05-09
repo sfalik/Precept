@@ -4,6 +4,11 @@
 - Historical summary: closed the major language-research, vision/spec, PRECEPT0018, and parser-gap bookkeeping batches while treating inbox merge, archive, and checkbox maintenance as first-class deliverables.
 - Summarization rule: when detailed batch history outgrows the working-memory threshold, collapse old detail into Core Context and keep only live batch state in `## Recent Updates
 
+### 2026-05-09T15:26:09Z — MCP/literal batch recorded
+- Pre-check measured `decisions.md` at 181475 bytes with 0 inbox files, so the 7-day archive gate ran before merge and moved 0 entries.
+- Verified a concurrent Scribe pass had already cleared the inbox and merged the color/literal/currency decisions, then recorded the remaining Newman MCP decision, wrote orchestration logs for `newman-2`, `newman-3`, and `scribe-6`, and logged the health report (`decisions.md` 181475B -> 182387B; inbox processed = 0; history files summarized = 0).
+
+
 ### 2026-05-09T14:04:05Z — LanguageTool closeout recorded
 - Pre-check measured `decisions.md` at 175232 bytes with 2 inbox files, so the hard-gate 7-day archive pass ran before merge.
 - Merged the Newman completion note plus Frank's timing verdict into one canonical `precept_language` decision entry, cleared the inbox, and wrote the Newman/Soup-Nazi orchestration records plus the session log.

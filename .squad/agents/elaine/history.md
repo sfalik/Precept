@@ -32,6 +32,10 @@
 
 - Shane's override: families are semantic categories, not hue bands. When tokens share a semantic category (fields and args ARE data), they belong in that family even if their hues differ. The family name defines the grouping; distinct hues within a family signal relationships to neighboring families' concepts (field→structure, arg→event). The spec's family definition was the bottleneck, not the organizational placement.
 
+- Slate hue audit (2026-05-09): all 3 Data-family slates are wired into the VS Code TextMate theme. But `--data` (#B0BEC5) only colors field-name and arg-param scopes — both of which should migrate to `--field`/`--arg`. After migration, the anchor has zero consumers. `--data-t` (types, 2 scopes) and `--data-v` (values, 6 scopes) are genuinely active. Recommendation: drop the anchor, simplify to 2 slates + field + arg = 4-token family.
+
+- Literal safety check (2026-05-09): confirmed that all 6 literal/value TextMate scopes are hardcoded to `#84929F` (`--data-v`). No literal scope references the anchor `--data` (#B0BEC5). The `--data-v` CSS custom property is defined as a standalone hex value, not derived from `--data` — no CSS fallback chain exists. Dropping the anchor is safe; literals will not lose color. The ~25 `var(--data)` references in the spec HTML are all for field names and UI elements, not for literals — they need a follow-on cleanup pass to `var(--field)`.
+
 - Failure-point vocabulary matters most; result names and explanations must stay in the caller's mental model.
 
 - The `because` clause is usually the primary user explanation; raw constraint or guard syntax is secondary detail.
@@ -49,6 +53,11 @@
 
 
 ## Recent Updates
+
+### 2026-05-09T15:26:09Z — Data-family anchor removal recorded
+- Scribe merged Elaine's slate audit, literal-safety check, and final anchor-drop implementation into the canonical ledger.
+- Durable outcome: the Data family is now the four-token semantic grouping `--data-t` / `--data-v` / `--field` / `--arg`, with no surviving `--data` anchor dependency.
+
 
 
 
@@ -182,6 +191,7 @@ Task: Revised the paradigm recommendation after Shane's feedback that the axis l
 - Final durable direction: the Data family expands to include field (`#A5B4FC`) and arg (`#9AD8E8`), and family definitions may group semantically related hues rather than only tonal variants.
 - Treat the companion-token write-up as a rejected intermediate recommendation; the Shane ruling is now the canonical color-system direction.
 
+- Data family anchor (`--data`, #B0BEC5) dropped from the visual system spec (2026-05-09). The anchor had zero remaining consumers after field names migrated to `--field` (#A5B4FC) and arg params to `--arg` (#9AD8E8). The Data family is now 4 named tokens: `--data-t` (type names, #9AA8B5), `--data-v` (literal values, #84929F), `--field` (field names, #A5B4FC), `--arg` (arg names, #9AD8E8). The family card no longer shows a "primary anchor" swatch; members are peers. All ~25 `var(--data)` references in the spec HTML migrated to `var(--field)`. The family definition is now "semantically-grouped data tokens" — not "anchor + tonal variants."
 
 ### 2026-05-09T15:21:46Z — Scribe merged the Data-family anchor-drop batch
 - `.squad/decisions.md` now records Elaine's slate audit, literal-safety confirmation, and anchor-removal outcome as one canonical decision.

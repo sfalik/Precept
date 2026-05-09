@@ -23,6 +23,11 @@
 
 ## Recent Updates
 
+### 2026-05-09T15:26:09Z — CurrencyCatalog transactional-surface policy recorded
+- Scribe merged the XML mismatch inventory plus George's currency-catalog follow-up into the canonical ledger.
+- Durable policy: fund/accounting codes remain out of `CurrencyCatalog` and live in sync-test `IntentionalExclusions`; withdrawn `ANG`, `BGN`, and `ZWL` are the catalog-side drift to remove.
+
+
 ### 2026-05-09T14:47:06Z — CurrencyCatalog implementation recorded
 - George-3 shipped `src/Precept/Language/CurrencyCatalog.cs` with 162 ISO 4217 entries and removed the mirrored `Iso4217CurrencyCodes` set from `Types.cs`.
 - `CurrencyValidation` now derives allowed values from `CurrencyCatalog.All.Keys`; build stayed green and `test/Precept.Tests` closed at 3646 passed, 1 skipped (`CurrencyCatalogSyncTests` awaiting XML).
@@ -43,7 +48,7 @@
 - 2026-05-07 and earlier groundwork established the catalog-driven parser/checker trajectory: `TransitionRowOutcome` naming, metadata-driven parser lookups, grammar/message-position metadata, and the principle that durable design decisions belong in catalogs and the squad ledger rather than scattered switches.
 - Use `.squad\decisions\decisions.md` for full chronology when a future task needs exact per-batch provenance.
 
-
 ### 2026-05-09T15:21:46Z — Scribe merged the CurrencyCatalog exclusion policy
 - `.squad/decisions.md` now records the ISO-sync reconciliation: transactional currencies stay in `CurrencyCatalog`, while fund/accounting-unit codes and other intentional XML-only codes belong in `CurrencyCatalogSyncTests.IntentionalExclusions`.
 - Treat the current exclusion set (`BOV`, `CHE`, `CHW`, `CLF`, `COU`, `MXV`, `USN`, `UYI`, `UYW`, `VED`, `XAD`, `XCG`, `ZWG`, plus metals/placeholders) as the durable runtime boundary until Shane changes policy.
+
