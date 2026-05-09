@@ -133,6 +133,16 @@ public enum DiagnosticCode
     /// </summary>
     RequiredStateDoesNotDominateTerminal = 111,
 
+    // ── Proof (new codes) ───────────────────────────────────
+    /// <summary>A field referenced in a proof obligation does not declare the required modifier.</summary>
+    UnprovedModifierRequirement            = 112,
+    /// <summary>An operand requires a specific temporal dimension but the resolved dimension does not match.</summary>
+    UnprovedDimensionRequirement           = 113,
+    /// <summary>Two operands require matching qualifiers on an axis but their qualifier values differ or are unresolved.</summary>
+    UnprovedQualifierCompatibility         = 114,
+    /// <summary>An initial state's constraints cannot be satisfied with default field values.</summary>
+    UnsatisfiableInitialState              = 115,
+
     // ── Proof ────────────────────────────────────────────
     UnsatisfiableGuard                 =  82,
     DivisionByZero                     =  83,

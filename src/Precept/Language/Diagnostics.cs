@@ -305,6 +305,30 @@ public static class Diagnostics
             RelatedCodes: [DiagnosticCode.DivisionByZero, DiagnosticCode.UnsatisfiableGuard],
             FixHint: "Add a guard that ensures the value is nonnegative, e.g., 'when Value >= 0'",
             PreventsFault: FaultCode.SqrtOfNegative),
+        DiagnosticCode.UnprovedModifierRequirement => new(
+            nameof(DiagnosticCode.UnprovedModifierRequirement),
+            DiagnosticStage.Proof, Severity.Error,
+            "Field '{0}' must have modifier '{1}' but it is not declared{2}",
+            DiagnosticCategory.Proof,
+            FixHint: "Add the required modifier to the field declaration"),
+        DiagnosticCode.UnprovedDimensionRequirement => new(
+            nameof(DiagnosticCode.UnprovedDimensionRequirement),
+            DiagnosticStage.Proof, Severity.Error,
+            "Operand '{0}' requires {1} dimension but has {2}{3}",
+            DiagnosticCategory.Proof,
+            FixHint: "Qualify the field with the correct temporal dimension, e.g., 'period of date'"),
+        DiagnosticCode.UnprovedQualifierCompatibility => new(
+            nameof(DiagnosticCode.UnprovedQualifierCompatibility),
+            DiagnosticStage.Proof, Severity.Error,
+            "Operands '{0}' and '{1}' have incompatible {2} qualifiers{3}",
+            DiagnosticCategory.Proof,
+            FixHint: "Ensure both operands have matching qualifier values"),
+        DiagnosticCode.UnsatisfiableInitialState => new(
+            nameof(DiagnosticCode.UnsatisfiableInitialState),
+            DiagnosticStage.Proof, Severity.Error,
+            "Initial state '{0}' cannot be satisfied: constraint '{1}' fails with default values",
+            DiagnosticCategory.Proof,
+            FixHint: "Adjust field defaults or constraint conditions so the initial state is satisfiable"),
 
         // ── Type (lifecycle validation) ──────────────────────────────────────────
         DiagnosticCode.AmbiguousTypedConstant         => new(nameof(DiagnosticCode.AmbiguousTypedConstant),         DiagnosticStage.Type,  Severity.Error,   "Typed constant '{0}' is ambiguous between {1} and {2}",                                                                                DiagnosticCategory.TypeSystem,

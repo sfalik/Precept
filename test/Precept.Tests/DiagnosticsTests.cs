@@ -154,6 +154,30 @@ public class DiagnosticsTests
         Diagnostics.GetMeta(DiagnosticCode.WritableOnEventArg).Severity.Should().Be(Severity.Error);
     }
 
+    [Fact]
+    public void UnprovedModifierRequirement_HasProofStage()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.UnprovedModifierRequirement).Stage.Should().Be(DiagnosticStage.Proof);
+    }
+
+    [Fact]
+    public void UnprovedDimensionRequirement_HasProofStage()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.UnprovedDimensionRequirement).Stage.Should().Be(DiagnosticStage.Proof);
+    }
+
+    [Fact]
+    public void UnprovedQualifierCompatibility_HasProofStage()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.UnprovedQualifierCompatibility).Stage.Should().Be(DiagnosticStage.Proof);
+    }
+
+    [Fact]
+    public void UnsatisfiableInitialState_HasProofStage()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.UnsatisfiableInitialState).Stage.Should().Be(DiagnosticStage.Proof);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     public static TheoryData<DiagnosticCode> AllDiagnosticCodes()
@@ -285,5 +309,9 @@ public class DiagnosticsTests
         DiagnosticCode.UnsatisfiableGuard,
         DiagnosticCode.DivisionByZero,
         DiagnosticCode.SqrtOfNegative,
+        DiagnosticCode.UnprovedModifierRequirement,
+        DiagnosticCode.UnprovedDimensionRequirement,
+        DiagnosticCode.UnprovedQualifierCompatibility,
+        DiagnosticCode.UnsatisfiableInitialState,
     };
 }
