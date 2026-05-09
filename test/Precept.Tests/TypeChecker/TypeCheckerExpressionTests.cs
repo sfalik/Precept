@@ -243,8 +243,17 @@ public class TypeCheckerExpressionTests
             """);
 
         // Manually set up event arg context (bypasses pre-existing parser gap with event arg syntax)
-        var arg = new TypedArg("Reason", "Submit", TypeKind.String, null,
-            ImmutableArray<ModifierKind>.Empty, null, false, TestSpan);
+        var arg = new TypedArg(
+            Name: "Reason",
+            EventName: "Submit",
+            ResolvedType: TypeKind.String,
+            ElementType: null,
+            Modifiers: ImmutableArray<ModifierKind>.Empty,
+            DefaultExpression: null,
+            IsOptional: false,
+            Presence: new DeclaredPresenceMeta.Guaranteed(),
+            DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
+            Span: TestSpan);
         ctx.CurrentEventArgs = new Dictionary<string, TypedArg> { ["Reason"] = arg };
 
         var expr = new IdentifierExpression("Reason", TestSpan);
@@ -267,8 +276,17 @@ public class TypeCheckerExpressionTests
             """);
 
         // Manually set up event arg with same name as field (bypasses parser gap)
-        var arg = new TypedArg("Reason", "Submit", TypeKind.String, null,
-            ImmutableArray<ModifierKind>.Empty, null, false, TestSpan);
+        var arg = new TypedArg(
+            Name: "Reason",
+            EventName: "Submit",
+            ResolvedType: TypeKind.String,
+            ElementType: null,
+            Modifiers: ImmutableArray<ModifierKind>.Empty,
+            DefaultExpression: null,
+            IsOptional: false,
+            Presence: new DeclaredPresenceMeta.Guaranteed(),
+            DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
+            Span: TestSpan);
         ctx.CurrentEventArgs = new Dictionary<string, TypedArg> { ["Reason"] = arg };
 
         var expr = new IdentifierExpression("Reason", TestSpan);
@@ -289,8 +307,17 @@ public class TypeCheckerExpressionTests
             """);
 
         // Manually set up event arg context
-        var arg = new TypedArg("Reason", "Submit", TypeKind.String, null,
-            ImmutableArray<ModifierKind>.Empty, null, false, TestSpan);
+        var arg = new TypedArg(
+            Name: "Reason",
+            EventName: "Submit",
+            ResolvedType: TypeKind.String,
+            ElementType: null,
+            Modifiers: ImmutableArray<ModifierKind>.Empty,
+            DefaultExpression: null,
+            IsOptional: false,
+            Presence: new DeclaredPresenceMeta.Guaranteed(),
+            DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
+            Span: TestSpan);
         ctx.CurrentEventArgs = new Dictionary<string, TypedArg> { ["Reason"] = arg };
 
         // Push a quantifier binding that shadows the event arg

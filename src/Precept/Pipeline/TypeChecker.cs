@@ -122,6 +122,10 @@ internal static partial class TypeChecker
                 IsComputed: declared.IsComputed,
                 IsOptional: isOptional,
                 IsWritable: isWritable,
+                Presence: isOptional
+                    ? new DeclaredPresenceMeta.Optional()
+                    : new DeclaredPresenceMeta.Guaranteed(),
+                DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
                 Syntax: declared.Syntax);
 
             ctx.Fields.Add(typedField);
@@ -230,6 +234,10 @@ internal static partial class TypeChecker
                     Modifiers: arg.Modifiers,
                     DefaultExpression: null, // Slice 2+
                     IsOptional: arg.Modifiers.Contains(ModifierKind.Optional),
+                    Presence: arg.Modifiers.Contains(ModifierKind.Optional)
+                        ? new DeclaredPresenceMeta.Optional()
+                        : new DeclaredPresenceMeta.Guaranteed(),
+                    DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
                     Span: arg.NameSpan))
                 .ToImmutableArray();
 

@@ -274,6 +274,51 @@ public class TypeCheckerSymbolTests
             .IsOptional.Should().BeFalse();
     }
 
+    [Fact]
+    public void TypedField_Presence_GuaranteedWhenNotOptional()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.Fields.Single(f => f.Name == "Name")
+            .Presence.Should().BeOfType<DeclaredPresenceMeta.Guaranteed>();
+    }
+
+    [Fact]
+    public void TypedField_Presence_OptionalWhenOptional()
+    {
+        var precept = """
+            precept Widget
+            field Notes as string optional
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.Fields.Single(f => f.Name == "Notes")
+            .Presence.Should().BeOfType<DeclaredPresenceMeta.Optional>();
+    }
+
+    [Fact]
+    public void TypedField_DeclaredQualifiers_EmptyByDefault()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.Fields.Single(f => f.Name == "Name")
+            .DeclaredQualifiers.Should().BeEmpty();
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  4. Modifier preservation
     // ════════════════════════════════════════════════════════════════════════
@@ -541,6 +586,26 @@ public class TypeCheckerSymbolTests
 
         arg.IsOptional.Should().BeTrue();
         arg.ResolvedType.Should().Be(TypeKind.String);
+    }
+
+    [Fact]
+    public void TypedArg_Presence_MatchesIsOptional()
+    {
+        var precept = """
+            precept Widget
+            field Name as string optional
+            state Open initial
+            event Submit(Label as string, Note as string optional)
+            from Open on Submit -> set Name = Submit.Note -> no transition
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var args = index.Events.Single(e => e.Name == "Submit").Args;
+
+        args[0].IsOptional.Should().BeFalse();
+        args[0].Presence.Should().BeOfType<DeclaredPresenceMeta.Guaranteed>();
+        args[1].IsOptional.Should().BeTrue();
+        args[1].Presence.Should().BeOfType<DeclaredPresenceMeta.Optional>();
     }
 
     [Fact]

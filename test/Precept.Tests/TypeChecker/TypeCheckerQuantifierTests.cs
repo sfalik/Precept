@@ -180,8 +180,17 @@ public class TypeCheckerQuantifierTests
     {
         var ctx = CollectionContext();
         // Manually set up event arg named "x" with Integer type
-        var arg = new TypedArg("x", "Submit", TypeKind.Integer, null,
-            ImmutableArray<ModifierKind>.Empty, null, false, TestSpan);
+        var arg = new TypedArg(
+            Name: "x",
+            EventName: "Submit",
+            ResolvedType: TypeKind.Integer,
+            ElementType: null,
+            Modifiers: ImmutableArray<ModifierKind>.Empty,
+            DefaultExpression: null,
+            IsOptional: false,
+            Presence: new DeclaredPresenceMeta.Guaranteed(),
+            DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
+            Span: TestSpan);
         ctx.CurrentEventArgs = new Dictionary<string, TypedArg> { ["x"] = arg };
 
         var collection = new IdentifierExpression("Tags", TestSpan);

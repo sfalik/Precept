@@ -249,6 +249,8 @@ public sealed record TypedField(
     bool IsComputed,
     bool IsOptional,
     bool IsWritable,
+    DeclaredPresenceMeta Presence,
+    ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers,
     ParsedConstruct Syntax
 );
 
@@ -281,6 +283,8 @@ public sealed record TypedArg(
     ImmutableArray<ModifierKind> Modifiers,
     TypedExpression? DefaultExpression,
     bool IsOptional,
+    DeclaredPresenceMeta Presence,
+    ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers,
     SourceSpan Span
 );
 
