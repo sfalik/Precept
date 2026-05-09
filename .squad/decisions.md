@@ -12,6 +12,32 @@
 
 ---
 
+### 2026-05-09T15:33:49Z: User-defined string format validation is a future constraint feature, not typed-literal extensibility
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `frank-22-user-defined-validation-extensibility.md`.
+
+- The typed-literal validation framework stays intentionally closed and catalog-defined; there is no user-pluggable validator model for email, phone, or document-format parsing.
+- Format validation is a different concern from semantically structured typed literals like money, datetime, and quantity: email/phone/document numbers remain strings with pattern rules, not new `TypeKind` values.
+- The recommended future language surface is a string constraint modifier such as `matches /pattern/ because ...`, implemented through the existing modifier/constraint pipeline rather than the typed-literal framework.
+
+---
+### 2026-05-09T15:33:49Z: Runtime typed-literal arg parsing stays on `TypeRuntimeMeta`, not compile-time literal validation
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `frank-typed-literal-runtime-args.md`.
+
+- Runtime arg parsing for typed-literal event args stays on the existing catalog-owned runtime coercion lane: `TypeRuntime<T>` / `TypeRuntimeMeta.ReadJson` for JSON callers and `TypeRuntime<T>.FromClr` for typed callers.
+- `TypedConstantValidation.Validate(...)` remains compile-time-only for DSL literal text, with diagnostic spans and suggestions; runtime failures surface as `EventOutcome.InvalidArgs`, not compiler diagnostics.
+- Each typed-literal type therefore keeps three distinct catalog registrations on `TypeMeta`: `TypeRuntime<T>`, `TypeRuntimeMeta`, and `ContentValidation`, while sharing the same domain parsers underneath.
+
+---
 ### 2026-05-09T15:26:09Z: MCP discovery is correct at three implemented tools, and stdout log pollution is fixed at the host boundary
 
 **By:** Scribe

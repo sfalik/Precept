@@ -21,7 +21,24 @@
 - `count` is a type accessor on collection types, not a `FunctionKind`; guard extraction for `count(X) > 0` should match typed member access, not a synthetic function call.
 - `IsMessagePosition` now lives on both `TokenMeta` and `FunctionMeta`; generator/tooling consumers should read the catalog flag instead of maintaining their own token lists.
 
+### 2026-05-09T11:33:49Z — Commit batching: catalog DU + pipeline + analyzers
+
+Committed 6 logical groups from a large multi-session working tree:
+
+1. **`feat: catalog DU metadata enhancements and currency catalog wire-up`** (`b1c95512`) — Added `LeadingToken` to `ConstraintMeta.StateAnchored`, `Constraints.ByToken`, `Modifiers.ByAccessToken`/`ByAnchorToken`, `HasCIVariant`/`CIDiagnosticCode` on `BinaryOperationMeta` and `FunctionMeta`, `[CatalogDU]` on `ProofRequirement`, new `UnprovedPresenceRequirement` (116), removed dual-use `Cat_ActType` from Tokens, wired `Types` to `CurrencyCatalog`.
+2. **`feat: catalog-driven pipeline — parser, type checker, proof engine`** (`d27fae6b`) — Parser handles `OutcomeArgumentKind.None` with recovery; TypeChecker uses catalog lookups for constraint/access/anchor resolution; TypeChecker.Validation collapses CI rules to catalog-driven single branch; ProofEngine covers `PresenceProofRequirement` exhaustively and uses `GetNumericRequirementDiagnosticCode` helper.
+3. **`feat: PRECEPT0025 hardening + PRECEPT0026 CatalogDU completeness analyzer`** (`a1956961`) — Extracted shared DU helpers to `CatalogAnalysisHelpers`; new PRECEPT0026 analyzer verifies exhaustive switch coverage of `[CatalogDU]` hierarchies.
+4. **`docs: sync compiler and spec docs; add working docs batch`** (`9c608dc2`) — diagnostic-system.md, proof-engine.md, precept-language-spec.md updated; 5 new working docs added.
+5. **`chore: add iso4217 refresh task, fix LS stub method names, ship refresh script`** (`b9009a2a`) — VS Code task + `refresh-iso4217.js` script; `Handle` → `HandleAsync` in LS stubs.
+6. **`chore: update soup nazi agent history`** (`dbfac08e`).
+
+**Grouping observation:** The natural split was: (A) catalog-level metadata DU changes, (B) pipeline consumers of that metadata, (C) analyzers that enforce catalog DU discipline, (D) docs, (E) tooling/scripts, (F) squad state. The CI diagnostic metadata on `BinaryOperationMeta`/`FunctionMeta` and the TypeChecker validation collapse belonged together in A+B respectively — they are producer/consumer pairs across the catalog/pipeline boundary.
+
 ## Recent Updates
+
+### 2026-05-09T15:33:49Z - Six-slice commit batch recorded
+- Scribe recorded George-6's six logical commits as one durable implementation batch spanning catalog metadata, pipeline consumers, analyzers, docs, tooling, and squad-state follow-up.
+- Commit sequence preserved for future traceability: `b1c95512`, `d27fae6b`, `a1956961`, `9c608dc2`, `b9009a2a`, `dbfac08e`.
 
 ### 2026-05-09T15:26:09Z — CurrencyCatalog transactional-surface policy recorded
 - Scribe merged the XML mismatch inventory plus George's currency-catalog follow-up into the canonical ledger.

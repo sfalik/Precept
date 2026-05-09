@@ -1,0 +1,3 @@
+# Session Log - 2026-05-09T15:33:49Z - typed-literal-runtime-and-commit-batch
+
+Hard gate executed first: `decisions.md` started at 182387 bytes with 2 inbox files, so the 7-day archive pass ran before merge and moved 0 active entries older than 2026-05-02T15:33:49Z. This pass then merged 2 inbox files into the canonical ledger, deleted the processed inbox files, wrote orchestration logs for `frank-21` and `george-6`, refreshed the affected agent histories, and re-checked the 15 KB history gate. Health report: `decisions.md` 182387B -> 184153B; `decisions-archive.md` = 809100B; inbox processed = 2; history files summarized = 0.
