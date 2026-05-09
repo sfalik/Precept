@@ -115,7 +115,7 @@ public static class Types
 
     private static readonly ClosedSetValidation DimensionValidation = new(
         "recognized dimensions",
-        DimensionCatalog.AllNames,
+        DimensionCatalog.All.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase),
         "Dimension family identifier",
         ["length", "mass", "count"]);
 

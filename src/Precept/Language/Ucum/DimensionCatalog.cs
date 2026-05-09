@@ -20,13 +20,12 @@ public static class DimensionCatalog
         new("count", DimensionVector.None, "Dimensionless count"),
     ];
 
-    private static readonly FrozenDictionary<string, DimensionAlias> ByName =
+    /// <summary>
+    /// All registered dimension aliases keyed case-insensitively by name.
+    /// Mirrors <see cref="CurrencyCatalog.All"/> in shape.
+    /// </summary>
+    public static FrozenDictionary<string, DimensionAlias> All { get; } =
         Aliases.ToFrozenDictionary(alias => alias.Name, StringComparer.OrdinalIgnoreCase);
-
-    public static IReadOnlyList<DimensionAlias> AllAliases => Aliases;
-
-    public static FrozenSet<string> AllNames { get; } =
-        Aliases.Select(alias => alias.Name).ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     public static bool TryGetAlias(DimensionVector vector, out DimensionAlias? alias)
     {
@@ -34,5 +33,5 @@ public static class DimensionCatalog
         return alias is not null;
     }
 
-    public static DimensionAlias GetByName(string name) => ByName[name];
+    public static DimensionAlias GetByName(string name) => All[name];
 }

@@ -9,8 +9,8 @@ public class DimensionCatalogTests
     [Fact]
     public void AllAliases_ContainExpectedEntries()
     {
-        DimensionCatalog.AllNames.Should().Contain(["length", "mass", "temperature", "volume", "area", "speed", "energy", "pressure", "force", "count"]);
-        DimensionCatalog.AllNames.Should().NotContain("time");
+        DimensionCatalog.All.Keys.Should().Contain(["length", "mass", "temperature", "volume", "area", "speed", "energy", "pressure", "force", "count"]);
+        DimensionCatalog.All.Keys.Should().NotContain("time");
     }
 
     [Fact]
