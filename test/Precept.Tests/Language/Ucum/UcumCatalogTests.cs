@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -15,15 +17,26 @@ public class UcumCatalogTests
     }
 
     [Fact]
-    public void BrowseTier1_ReturnsRepresentativeAtoms()
+    public void BrowseTier1_ReturnsCuratedTier1Entries()
     {
-        UcumCatalog.BrowseTier1().Should().Contain(atom => atom.Code == "kg");
-        UcumCatalog.BrowseTier1().Should().Contain(atom => atom.Code == "[degF]");
+        var tier1 = UcumCatalog.BrowseTier1();
+
+        UcumCatalog.All.Should().ContainKeys("kg", "[degF]");
+        tier1.Should().OnlyContain(atom => UcumCatalog.All.ContainsKey(atom.Code));
+        tier1.Should().HaveCount(150);
+        tier1.Should().Contain(atom => atom.Code == "kg");
+        tier1.Should().Contain(atom => atom.Code == "dm");
+        tier1.Should().Contain(atom => atom.Code == "km/h");
+        tier1.Should().Contain(atom => atom.Code == "[degF]");
+        tier1.Should().NotContain(atom => atom.Code == "s");
+        tier1.Should().NotContain(atom => atom.Code == "mol");
     }
 
     [Fact]
-    public void LookupAtom_ReturnsKnownAtom()
+    public void LookupAtom_RemainsBackedByFullAtomCatalog()
     {
-        UcumCatalog.LookupAtom("N")!.Vector.Should().Be(new DimensionVector(1, 1, -2, 0, 0, 0, 0));
+        var nonTier1Code = UcumAtomCatalog.All.Keys.First(code => !UcumCatalog.All.ContainsKey(code));
+
+        UcumCatalog.LookupAtom(nonTier1Code).Should().Be(UcumAtomCatalog.All[nonTier1Code]);
     }
 }
