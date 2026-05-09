@@ -16,6 +16,7 @@
 - StateHookContext + guard (Strategy 3) code path is implemented but untested — only TransitionRowContext guards are tested for Strategy 3.
 - The RHS-before-LHS fix in `ResolveParamInBinaryOp` has no same-type regression anchor; all division tests use `integer / number` to avoid the ambiguity. A `number / number` test would be the correct anchor.
 - Forwarding facts tests verify `obligation.Disposition == Proved` but do not assert `ledger.Diagnostics` is empty for those vacuously proved obligations.
+- 2026-05-09T10:34:23.923-04:00 — For xUnit 2.9.3 under the current VSTest adapter, discovery-time skip via a custom `FactAttribute` setting `Skip` is reliable for optional developer-downloaded files; runtime `SkipException` surfaced as a failed test. Resolve the repo root from `AppContext.BaseDirectory`, and keep the download target (`src/Precept/Data/`) gitignored so CI only validates parity after a local refresh has produced the XML.
 
 - Sample-file integration tests catch parser and language-surface gaps that isolated unit tests miss.
 - Hardcoded enum/count assertions are acceptable only when they are intentionally updated alongside catalog growth.
