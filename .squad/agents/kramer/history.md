@@ -26,6 +26,11 @@
 
 ## Recent Updates
 
+### 2026-05-09T23:46:43Z — Tooling-lens LS review reconciled
+- Kramer corrected the objective handler-registration, capability, semantic-token, and extension-wiring mismatches in the LS docs, and confirmed `TypedField.NameSpan` is the right projection-only fix for field declaration spans.
+- The only unresolved tooling decision left from the batch is how `precept/inspect` should surface restore failures (`RestoreInvalidInput` / `RestoreConstraintsFailed`).
+
+
 ### 2026-05-09T15:26:09Z — Color/scope tooling closeout recorded
 - Scribe merged Kramer's field/arg color wiring, retired-anchor cleanup, and event-arg member scope implementation into the canonical ledger.
 - Durable tooling state: `variable.parameter.property.precept` supersedes the compound-selector workaround, and the VS Code theme no longer relies on the retired `#B0BEC5` anchor for field/arg highlighting.

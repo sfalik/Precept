@@ -12,6 +12,20 @@
 
 ---
 
+### 2026-05-09T23:46:43Z: Language-server review batch reconciled docs, landed `TypedField.NameSpan`, and left only the preview restore-failure contract open
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (3 files -> 1 canonical entry).
+
+**Merged sources:** `frank-comprehensive-review.md`, `george-typedfield-namespan.md`, and `kramer-ls-review.md`.
+
+- Frank and Kramer both completed first-principles reviews of `docs/tooling/language-server.md` and `docs/Working/language-server-implementation-plan.md`; the objective artifact-reference and tooling-wiring drift they found was fixed inline, leaving the LS architecture and slice structure intact.
+- Shane approved the thin core field-span fix and George landed it: `TypedField` now carries `SourceSpan NameSpan`, `TypeChecker` populates it from `DeclaredField.NameSpan`, runtime tests cover the symmetry change, and George validated the change with 3733 passing tests.
+- One design decision remains open from the batch: `precept/inspect` preview restore failures (`RestoreInvalidInput` / `RestoreConstraintsFailed`) still need an explicit language-server contract, either as a structured failure payload or as a defined JSON-RPC error shape.
+
+---
+
 ### 2026-05-09T23:21:36Z: Language-server clean pass front-loads shim deletion and leaves Slice 11 as final wiring only
 
 **By:** Scribe

@@ -30,6 +30,11 @@
 
 ## Recent Updates
 
+### 2026-05-09T23:46:43Z — LS doc review batch reconciled and field-span gap closed
+- Frank-5 completed the first-principles source audit of the LS design doc and implementation plan, fixed artifact-reference drift inline, and confirmed the overall architecture/slice structure still stands.
+- George has now landed `TypedField.NameSpan`, so Frank's remaining thin-core gap is closed; the only open LS question from the batch is the `precept/inspect` restore-failure contract.
+
+
 ### 2026-05-09T23:21:36Z — LS plan clean pass and early shim deletion locked
 - Scribe recorded that Slice 0b now deletes `LanguageServerStubs.cs` and the 13 legacy compiler-level LS tests before handler implementation, with `dotnet build` plus `dotnet test test/Precept.Tests/` as the cleanup gate.
 - The clean pass also removed shim-shaped helper APIs, kept diagnostics on the text-sync publish path, added `ArgReferences` as the thin core prerequisite, and reduced Slice 11 to final `Program.cs` wiring plus capability declaration.

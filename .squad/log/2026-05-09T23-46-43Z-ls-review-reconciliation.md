@@ -1,0 +1,1 @@
+Pre-check: `.squad/decisions.md` was 192579 bytes and the inbox held 3 files. Health report: archived 0 entries older than 2026-05-02T23:46:43Z, merged all 3 inbox files into one canonical language-server decision, updated Frank/Kramer/George history, summarized `.squad/agents/george/history.md`, and left `.squad/decisions.md` at 193810 bytes before commit staging.
