@@ -1583,6 +1583,7 @@ Template parameter population for proof-stage diagnostics:
 | `UnprovedDimensionRequirement` (113) | `"Operand '{0}' requires {1} dimension but has {2}{3}"` | Operand field name | Required dimension | Actual dimension | Context |
 | `UnprovedQualifierCompatibility` (114) | `"Operands '{0}' and '{1}' have incompatible {2} qualifiers{3}"` | Left operand | Right operand | Qualifier axis | Context |
 | `UnsatisfiableInitialState` (115) | `"Initial state '{0}' cannot be satisfied: constraint '{1}' fails with default values"` | Initial state name | Constraint description | — | — |
+| `UnprovedPresenceRequirement` (116) | `"Field '{0}' must be present but its presence cannot be guaranteed{1}"` | Field name | Context description | — | — |
 
 **Context description format:** `"event '{EventName}' in state '{FromState}'"` for transition rows. `"state hook '{Scope}' on '{StateName}'"` for state hooks. `"event handler '{EventName}'"` for event handlers. `"rule at index {RuleIndex}"` for rules. `"ensure in {AnchorName}"` for ensures.
 

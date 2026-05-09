@@ -227,7 +227,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `Set` | `set` | Field assignment action / set collection type (dual-use) |
+| `Set` | `set` | Field assignment action keyword; in type position the parser reinterprets the surface word as `SetType` |
 | `Add` | `add` | Set add action |
 | `Remove` | `remove` | Set remove action |
 | `Enqueue` | `enqueue` | Queue enqueue action |
@@ -320,7 +320,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `DecimalType` | `decimal` | Scalar type (v2: exact base-10) |
 | `NumberType` | `number` | Scalar type (general numeric) |
 | `ChoiceType` | `choice` | Enumerated value set type — requires explicit element type (`choice of T(...)`) |
-| `SetType` | `set` | Set collection type (dual-use with action keyword) |
+| `SetType` | `set` | Set collection type; parser-synthesized type-position alias for the surface word `set` |
 | `QueueType` | `queue` | Queue collection type |
 | `StackType` | `stack` | Stack collection type |
 | `BagType` | `bag` | Bag collection type (v3) |
@@ -571,7 +571,7 @@ Operators and punctuation are scanned after attempting keyword/identifier matche
 
 ### 1.6 Dual-Use Token Disambiguation
 
-Three tokens serve double duty. The lexer emits a single token kind for each; the parser disambiguates by syntactic context.
+Three surface forms serve double duty. For `set`, the lexer emits `Set` and the parser may reinterpret it as `SetType` in type position; for the others, the lexer emits a single token kind and the parser disambiguates by syntactic context.
 
 #### `set` — Collection Type and Action Keyword
 
@@ -582,7 +582,7 @@ Three tokens serve double duty. The lexer emits a single token kind for each; th
 
 A third use exists: `set` as an adjective in the presence operators `is set` / `is not set` (for `optional` fields). This is not a lexer disambiguation concern — the lexer emits separate `Is`, `Not`, and `Set` tokens, and the parser composes the multi-token operator.
 
-**Lexer strategy (locked):** The lexer always emits `TokenKind.Set` for the word `set`. `TokenKind.SetType` is never produced by the lexer — it is a parser-synthesized token kind used in the AST to represent `set` in a type position. The `Tokens.Keywords` dictionary maps `"set"` to `TokenKind.Set` only. The parser reinterprets the `Set` token as `SetType` when the preceding token is `As` or `Of`.
+**Lexer strategy (locked):** The lexer always emits `TokenKind.Set` for the word `set`. `TokenKind.SetType` is never produced by the lexer — it is a parser-synthesized token kind used in the AST to represent `set` in a type position. The `Tokens.Keywords` dictionary maps `"set"` to `TokenKind.Set` only. The parser reinterprets the `Set` token as `SetType` when the preceding token is `As` or `Of`. The token model is therefore `Set` (lexer) plus `SetType` (parser-synthesized type alias), not one dual-category token.
 
 #### `min` / `max` — Constraint Keyword and Built-in Function
 
@@ -962,7 +962,7 @@ Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit o
 
 **`ChoiceType` delimiter note:** The `(...)` enclosing choice values is a type-level constraint parameter — those values define the allowed domain and are part of the type itself, not a value being assigned. This is intentionally distinct from the `[...]` list literal syntax used in `default` clauses, which is a value expression. Using `(...)` here signals type parameterization; using `[...]` would create a visual collision in compound forms like `set of choice of string(...) ... default [...]` where both delimiters would appear in the same declaration for different purposes.
 
-**`set` disambiguation:** The lexer always emits `TokenKind.Set`. In `ParseTypeRef()`, when followed by `of`, the parser treats it as the collection type. Outside type position, `set` is the action keyword.
+**`set` disambiguation:** The lexer always emits `TokenKind.Set`. In `ParseTypeRef()`, type-position `set` is reinterpreted as parser-synthesized `TokenKind.SetType` (for example, `field Tags as set of string`). Outside type position, `TokenKind.Set` remains the action keyword. This is a `Set` + `SetType` split model, not one dual-category token.
 
 ### 2.4 Field Modifiers
 
