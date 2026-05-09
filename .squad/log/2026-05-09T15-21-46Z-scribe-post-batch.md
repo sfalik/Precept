@@ -1,0 +1,3 @@
+# Session Log — 2026-05-09T15:21:46Z — scribe-post-batch
+
+Hard gate executed first: `decisions.md` started at 175923 bytes, so entries older than 7 days were archived to `decisions-archive.md` before any inbox merge. Then 13 inbox files were merged into 5 canonical decisions covering the Data-family color consolidation, event-arg member scoping, typed-literal and UCUM architecture, and CurrencyCatalog exclusion policy; inbox count is now 0. Wrote orchestration logs for `kramer-8` and `newman-2`, updated the affected agent histories, and checked the 15 KB history gate after the append. Health report: decisions.md 175923 -> 181475 bytes; inbox processed 13; history files summarized none.

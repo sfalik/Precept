@@ -182,3 +182,7 @@ Task: Revised the paradigm recommendation after Shane's feedback that the axis l
 - Final durable direction: the Data family expands to include field (`#A5B4FC`) and arg (`#9AD8E8`), and family definitions may group semantically related hues rather than only tonal variants.
 - Treat the companion-token write-up as a rejected intermediate recommendation; the Shane ruling is now the canonical color-system direction.
 
+
+### 2026-05-09T15:21:46Z — Scribe merged the Data-family anchor-drop batch
+- `.squad/decisions.md` now records Elaine's slate audit, literal-safety confirmation, and anchor-removal outcome as one canonical decision.
+- Durable direction: the Data family stays `--data-t`, `--data-v`, `--field`, and `--arg`; the retired `--data` anchor no longer has standing consumers.

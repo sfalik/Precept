@@ -31,3 +31,7 @@
 - 2026-05-08 graph/proof work locked the GraphAnalyzer baseline, consumed the remaining proof-engine design questions, and synchronized the compiler design docs back to the real implementation direction.
 - Earlier May work established the canonical parser and TypeChecker trajectory: `TransitionRowOutcome` naming, parse-time handling for closed vocabularies, NameBinder ownership of forward references, and the requirement that working proposals flow back into canonical docs and the decision ledger.
 - Use `.squad/decisions.md` for the full per-batch chronology and `research/` / `docs/` for the surviving rationale behind each locked design.
+
+### 2026-05-09T15:21:46Z — Scribe merged Frank's 2026-05-09 design notes
+- `.squad/decisions.md` now carries Frank's durable rulings for the event-arg member scope, the typed-literal validation framework, and the UCUM parser architecture.
+- The recorded throughline stays catalog-first: structural grammar scopes stay out of `TokenMeta`, typed-literal validation stays anchored on `ContentValidation`, and UCUM ships as a shared language subsystem rather than a closed-set placeholder.

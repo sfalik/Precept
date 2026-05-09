@@ -43,3 +43,7 @@
 - 2026-05-07 and earlier groundwork established the catalog-driven parser/checker trajectory: `TransitionRowOutcome` naming, metadata-driven parser lookups, grammar/message-position metadata, and the principle that durable design decisions belong in catalogs and the squad ledger rather than scattered switches.
 - Use `.squad\decisions\decisions.md` for full chronology when a future task needs exact per-batch provenance.
 
+
+### 2026-05-09T15:21:46Z — Scribe merged the CurrencyCatalog exclusion policy
+- `.squad/decisions.md` now records the ISO-sync reconciliation: transactional currencies stay in `CurrencyCatalog`, while fund/accounting-unit codes and other intentional XML-only codes belong in `CurrencyCatalogSyncTests.IntentionalExclusions`.
+- Treat the current exclusion set (`BOV`, `CHE`, `CHW`, `CLF`, `COU`, `MXV`, `USN`, `UYI`, `UYW`, `VED`, `XAD`, `XCG`, `ZWG`, plus metals/placeholders) as the durable runtime boundary until Shane changes policy.

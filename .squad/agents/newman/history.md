@@ -71,3 +71,7 @@
 - Added the compile DTO hierarchy in `tools/Precept.Mcp/Dtos/CompileToolDtos.cs`, including top-level result, diagnostics, states, events, rows, rules, and the expanded field shape (`Modifiers`, `IsWritable`).
 - Added the missing `ProjectReference` from `tools/Precept.Mcp/Precept.Mcp.csproj` to `src/Precept/Precept.csproj`.
 - Locked the expression/action rendering strategy to source-text slicing via `SourceSpan.Offset`/`Length`, with qualifier text reconstructed from explicit `DeclaredQualifiers` metadata.
+
+### 2026-05-09T15:21:46Z — MCP tool discovery diagnosis remains in flight
+- `newman-2` is still investigating the MCP discovery regression (3 tools found instead of 5) plus stdout pollution causing `Failed to parse message` warnings.
+- Current durable breadcrumb: `docs/working/newman-mcp-tool-discovery-diagnosis.md`. Scribe logged the in-progress state in `.squad/orchestration-log/2026-05-09T15-21-46Z-newman-2.md`.

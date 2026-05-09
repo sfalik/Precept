@@ -60,3 +60,7 @@
 - Added a TextMate compound selector override in `tools/Precept.VsCode/package.json`: `meta.event-arg-ref.precept variable.other.property.precept` now maps to `#9AD8E8` before the general `variable.other.property.precept` field-color rule.
 - This closes the precision gap where `LoadParcel.Recipient`-style event arg member references inherited the field color `#A5B4FC` even though they semantically belong to the arg color family.
 - Lesson: `variable.other.property.precept` is reused across both field references and event-arg member references, so context-sensitive color intent must be expressed with compound selectors rather than assuming the base scope is unique.
+
+### 2026-05-09T15:21:46Z — Scribe merged the event-arg scope batch
+- `.squad/decisions.md` now records the durable outcome from `kramer-8`: the grammar emits `variable.parameter.property.precept`, so the earlier compound-selector workaround is officially superseded rather than left as the permanent fix.
+- The merged ledger entry also preserves the related field/arg color cleanup as part of the same semantic-token realignment.
