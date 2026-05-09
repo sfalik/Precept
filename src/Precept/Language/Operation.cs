@@ -47,7 +47,9 @@ public sealed record BinaryOperationMeta(
     string Description,
     bool BidirectionalLookup = false,
     QualifierMatch Match = QualifierMatch.Any,
-    ProofRequirement[]? ProofRequirements = null)
+    ProofRequirement[]? ProofRequirements = null,
+    bool HasCIVariant = false,
+    DiagnosticCode? CIDiagnosticCode = null)
     : OperationMeta(Kind, Op, Result, Description)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>

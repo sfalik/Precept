@@ -329,6 +329,12 @@ public static class Diagnostics
             "Initial state '{0}' cannot be satisfied: constraint '{1}' fails with default values",
             DiagnosticCategory.Proof,
             FixHint: "Adjust field defaults or constraint conditions so the initial state is satisfiable"),
+        DiagnosticCode.UnprovedPresenceRequirement => new(
+            nameof(DiagnosticCode.UnprovedPresenceRequirement),
+            DiagnosticStage.Proof, Severity.Error,
+            "Field '{0}' must be present but its presence cannot be guaranteed{1}",
+            DiagnosticCategory.Proof,
+            FixHint: "Guard the access with 'when Field is set', or make the field structurally guaranteed to be present"),
 
         // ── Type (lifecycle validation) ──────────────────────────────────────────
         DiagnosticCode.AmbiguousTypedConstant         => new(nameof(DiagnosticCode.AmbiguousTypedConstant),         DiagnosticStage.Type,  Severity.Error,   "Typed constant '{0}' is ambiguous between {1} and {2}",                                                                                DiagnosticCategory.TypeSystem,

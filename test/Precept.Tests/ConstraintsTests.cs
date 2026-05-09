@@ -88,6 +88,22 @@ public class ConstraintsTests
     }
 
     [Fact]
+    public void ByToken_ContainsExactlyInToAndFrom()
+    {
+        Constraints.ByToken.Keys.Should().BeEquivalentTo(
+            [TokenKind.In, TokenKind.To, TokenKind.From]);
+    }
+
+    [Fact]
+    public void ByToken_RoundTripsStateAnchoredLeadingTokens()
+    {
+        foreach (var meta in Constraints.All.OfType<ConstraintMeta.StateAnchored>())
+        {
+            Constraints.ByToken[meta.LeadingToken].Should().Be(meta.Kind);
+        }
+    }
+
+    [Fact]
     public void Invariant_IsNotStateAnchored()
     {
         Constraints.GetMeta(ConstraintKind.Invariant)
@@ -122,6 +138,16 @@ public class ConstraintsTests
     {
         Constraints.GetMeta(ConstraintKind.StateExit)
             .Should().BeOfType<ConstraintMeta.StateExit>();
+    }
+
+    [Theory]
+    [InlineData(ConstraintKind.StateResident, TokenKind.In)]
+    [InlineData(ConstraintKind.StateEntry, TokenKind.To)]
+    [InlineData(ConstraintKind.StateExit, TokenKind.From)]
+    public void StateAnchoredKinds_CarryExpectedLeadingToken(ConstraintKind kind, TokenKind expected)
+    {
+        var meta = (ConstraintMeta.StateAnchored)Constraints.GetMeta(kind);
+        meta.LeadingToken.Should().Be(expected);
     }
 
     // ── Pattern-match switch coverage ──────────────────────────────────────────

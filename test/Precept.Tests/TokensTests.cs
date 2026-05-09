@@ -96,11 +96,19 @@ public class TokensTests
     }
 
     [Fact]
-    public void GetMeta_SetToken_HasBothActionAndTypeCategories()
+    public void GetMeta_SetToken_HasActionCategory_NotTypeCategory()
     {
         var meta = Tokens.GetMeta(TokenKind.Set);
         meta.Categories.Should().Contain(TokenCategory.Action);
+        meta.Categories.Should().NotContain(TokenCategory.Type);
+    }
+
+    [Fact]
+    public void GetMeta_SetTypeToken_HasTypeCategory_NotActionCategory()
+    {
+        var meta = Tokens.GetMeta(TokenKind.SetType);
         meta.Categories.Should().Contain(TokenCategory.Type);
+        meta.Categories.Should().NotContain(TokenCategory.Action);
     }
 
     [Theory]

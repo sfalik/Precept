@@ -142,6 +142,8 @@ public enum DiagnosticCode
     UnprovedQualifierCompatibility         = 114,
     /// <summary>An initial state's constraints cannot be satisfied with default field values.</summary>
     UnsatisfiableInitialState              = 115,
+    /// <summary>An optional field must be present for a proof obligation, but no strategy can guarantee it is set.</summary>
+    UnprovedPresenceRequirement            = 116,
 
     // ── Proof ────────────────────────────────────────────
     UnsatisfiableGuard                 =  82,

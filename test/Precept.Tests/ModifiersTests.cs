@@ -425,6 +425,21 @@ public class ModifiersTests
         meta.IsWritable.Should().BeFalse();
     }
 
+    [Fact]
+    public void ByAccessToken_ContainsExactlyEditableReadonlyAndOmit()
+    {
+        Modifiers.ByAccessToken.Keys.Should().BeEquivalentTo(
+            [TokenKind.Editable, TokenKind.Readonly, TokenKind.Omit]);
+    }
+
+    [Fact]
+    public void ByAccessToken_ResolvesExpectedModifierKinds()
+    {
+        Modifiers.ByAccessToken[TokenKind.Editable].Kind.Should().Be(ModifierKind.Write);
+        Modifiers.ByAccessToken[TokenKind.Readonly].Kind.Should().Be(ModifierKind.Read);
+        Modifiers.ByAccessToken[TokenKind.Omit].Kind.Should().Be(ModifierKind.Omit);
+    }
+
     // ── Anchor modifiers ────────────────────────────────────────────────────────
 
     [Theory]
@@ -435,6 +450,21 @@ public class ModifiersTests
     {
         var meta = (AnchorModifierMeta)Modifiers.GetMeta(kind);
         meta.Scope.Should().Be(expectedScope);
+    }
+
+    [Fact]
+    public void ByAnchorToken_ContainsExactlyInToAndFrom()
+    {
+        Modifiers.ByAnchorToken.Keys.Should().BeEquivalentTo(
+            [TokenKind.In, TokenKind.To, TokenKind.From]);
+    }
+
+    [Fact]
+    public void ByAnchorToken_ResolvesExpectedScopes()
+    {
+        Modifiers.ByAnchorToken[TokenKind.In].Scope.Should().Be(AnchorScope.InState);
+        Modifiers.ByAnchorToken[TokenKind.To].Scope.Should().Be(AnchorScope.OnEntry);
+        Modifiers.ByAnchorToken[TokenKind.From].Scope.Should().Be(AnchorScope.OnExit);
     }
 
     // ── initial keyword resolution ──────────────────────────────────────────────

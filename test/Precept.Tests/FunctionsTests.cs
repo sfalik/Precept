@@ -584,6 +584,20 @@ public class FunctionsTests
     }
 
     [Fact]
+    public void StartsWith_UsesExpectedCaseInsensitiveDiagnostic()
+    {
+        Functions.GetMeta(FunctionKind.StartsWith).CIDiagnosticCode
+            .Should().Be(DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith);
+    }
+
+    [Fact]
+    public void EndsWith_UsesExpectedCaseInsensitiveDiagnostic()
+    {
+        Functions.GetMeta(FunctionKind.EndsWith).CIDiagnosticCode
+            .Should().Be(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith);
+    }
+
+    [Fact]
     public void AllOtherFunctions_HasCIVariant_False()
     {
         var ciVariants = Functions.All
@@ -594,6 +608,8 @@ public class FunctionsTests
         {
             meta.HasCIVariant.Should().BeFalse(
                 $"{meta.Kind} does not have a CI variant");
+            meta.CIDiagnosticCode.Should().BeNull(
+                $"{meta.Kind} does not advertise a CI diagnostic");
         }
     }
 }

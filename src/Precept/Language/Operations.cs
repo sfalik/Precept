@@ -740,10 +740,14 @@ public static class Operations
         // ── Orderable same-type: string ─────────────────────────────
         OperationKind.StringEqualsString => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PString, PString, TypeKind.Boolean,
-            "String equality"),
+            "String equality",
+            HasCIVariant: true,
+            CIDiagnosticCode: DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals),
         OperationKind.StringNotEqualsString => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PString, PString, TypeKind.Boolean,
-            "String inequality"),
+            "String inequality",
+            HasCIVariant: true,
+            CIDiagnosticCode: DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals),
 
         // ── Orderable same-type: choice ─────────────────────────────
         OperationKind.ChoiceEqualsChoice => new BinaryOperationMeta(

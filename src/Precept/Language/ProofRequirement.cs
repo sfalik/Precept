@@ -38,6 +38,7 @@ public sealed record SelfSubject(TypeAccessor? Accessor = null) : ProofSubject;
 /// expose <c>LeftSubject</c> and <c>RightSubject</c>. Use <see cref="ProofRequirements.GetMeta"/>
 /// to look up static kind metadata.
 /// </summary>
+[CatalogDU]
 public abstract record ProofRequirement(ProofRequirementKind Kind, string Description);
 
 /// <summary>

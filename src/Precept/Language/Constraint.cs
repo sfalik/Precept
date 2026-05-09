@@ -20,20 +20,20 @@ public abstract record ConstraintMeta(ConstraintKind Kind, string Description)
     /// Consumers can check <c>meta is StateAnchored</c> to test for any state-scoped constraint
     /// without switching on individual kinds.
     /// </summary>
-    public abstract record StateAnchored(ConstraintKind Kind, string Description)
+    public abstract record StateAnchored(ConstraintKind Kind, string Description, TokenKind LeadingToken)
         : ConstraintMeta(Kind, Description);
 
     /// <summary>State residency — <c>in &lt;State&gt; ensure</c> — enforced while in state.</summary>
     public sealed record StateResident()
-        : StateAnchored(ConstraintKind.StateResident, "State residency — enforced while in state");
+        : StateAnchored(ConstraintKind.StateResident, "State residency — enforced while in state", TokenKind.In);
 
     /// <summary>State entry — <c>to &lt;State&gt; ensure</c> — enforced on transition into state.</summary>
     public sealed record StateEntry()
-        : StateAnchored(ConstraintKind.StateEntry, "State entry — enforced on transition into state");
+        : StateAnchored(ConstraintKind.StateEntry, "State entry — enforced on transition into state", TokenKind.To);
 
     /// <summary>State exit — <c>from &lt;State&gt; ensure</c> — enforced on transition out of state.</summary>
     public sealed record StateExit()
-        : StateAnchored(ConstraintKind.StateExit, "State exit — enforced on transition out of state");
+        : StateAnchored(ConstraintKind.StateExit, "State exit — enforced on transition out of state", TokenKind.From);
 
     /// <summary>Event precondition — <c>on &lt;Event&gt; ensure</c> — enforced before event fires.</summary>
     public sealed record EventPrecondition()

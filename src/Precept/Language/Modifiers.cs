@@ -342,4 +342,26 @@ public static class Modifiers
     public static FrozenDictionary<TokenKind, StateModifierMeta> ByStateToken { get; } =
         All.OfType<StateModifierMeta>()
            .ToFrozenDictionary(m => m.Token.Kind);
+
+    /// <summary>
+    /// O(1) lookup from token kind to access modifier metadata.
+    /// Used by the type checker to resolve an access-mode token to its
+    /// <see cref="AccessModifierMeta"/> without a hardcoded switch.
+    /// Mirrors <see cref="ByFieldToken"/> and <see cref="ByStateToken"/>.
+    /// </summary>
+    public static FrozenDictionary<TokenKind, AccessModifierMeta> ByAccessToken { get; } =
+        All.OfType<AccessModifierMeta>()
+           .ToFrozenDictionary(m => m.Token.Kind);
+
+    /// <summary>
+    /// O(1) lookup from token kind to anchor modifier metadata.
+    /// Used by the type checker to resolve a leading anchor token to its
+    /// <see cref="AnchorModifierMeta"/> (which carries <see cref="AnchorScope"/>)
+    /// without a hardcoded switch.
+    /// Mirrors <see cref="ByFieldToken"/>, <see cref="ByStateToken"/>, and
+    /// <see cref="ByAccessToken"/>.
+    /// </summary>
+    public static FrozenDictionary<TokenKind, AnchorModifierMeta> ByAnchorToken { get; } =
+        All.OfType<AnchorModifierMeta>()
+           .ToFrozenDictionary(m => m.Token.Kind);
 }

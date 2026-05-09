@@ -178,6 +178,12 @@ public class DiagnosticsTests
         Diagnostics.GetMeta(DiagnosticCode.UnsatisfiableInitialState).Stage.Should().Be(DiagnosticStage.Proof);
     }
 
+    [Fact]
+    public void UnprovedPresenceRequirement_HasProofStage()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.UnprovedPresenceRequirement).Stage.Should().Be(DiagnosticStage.Proof);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     public static TheoryData<DiagnosticCode> AllDiagnosticCodes()
@@ -313,5 +319,6 @@ public class DiagnosticsTests
         DiagnosticCode.UnprovedDimensionRequirement,
         DiagnosticCode.UnprovedQualifierCompatibility,
         DiagnosticCode.UnsatisfiableInitialState,
+        DiagnosticCode.UnprovedPresenceRequirement,
     };
 }

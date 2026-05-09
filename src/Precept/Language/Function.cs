@@ -45,4 +45,5 @@ public sealed record FunctionMeta(
     /// The grammar generator uses this flag to emit the gold
     /// <c>string.quoted.double.message.precept</c> scope at that argument position.
     /// </summary>
-    bool IsMessagePosition = false);
+    bool IsMessagePosition = false,
+    DiagnosticCode? CIDiagnosticCode = null);

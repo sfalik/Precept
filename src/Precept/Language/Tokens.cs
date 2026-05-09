@@ -22,9 +22,6 @@ public static class Tokens
     private static readonly TokenCategory[] Cat_Id   = [TokenCategory.Identifier];
     private static readonly TokenCategory[] Cat_Str  = [TokenCategory.Structural];
 
-    // Dual-use tokens
-    private static readonly TokenCategory[] Cat_ActType = [TokenCategory.Action, TokenCategory.Type];
-
     // ── ValidAfter predecessor sets ─────────────────────────────────────────────
     // Shared arrays for common predecessor token sets used by ValidAfter.
     // These encode "which tokens can immediately precede this token in a valid program."
@@ -145,7 +142,7 @@ public static class Tokens
             TextMateScope: "keyword.control.precept", SemanticTokenType: "keyword"),
 
         // ── Keywords: Actions ──────────────────────────────────────
-        TokenKind.Set         => new(kind, "set",         Cat_ActType, "Field assignment / set collection type",
+        TokenKind.Set         => new(kind, "set",         Cat_Act, "Field assignment / set collection type",
             TextMateScope: "keyword.other.action.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),
         TokenKind.Add         => new(kind, "add",         Cat_Act,     "Set add action",
             TextMateScope: "keyword.other.action.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),

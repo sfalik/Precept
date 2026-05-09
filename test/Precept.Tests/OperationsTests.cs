@@ -157,6 +157,31 @@ public class OperationsTests
         meta.BidirectionalLookup.Should().BeFalse("string concatenation is order-dependent");
     }
 
+    [Fact]
+    public void StringEqualsString_HasCaseInsensitiveVariantMetadata()
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.StringEqualsString);
+        meta.HasCIVariant.Should().BeTrue();
+        meta.CIDiagnosticCode.Should().Be(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals);
+    }
+
+    [Fact]
+    public void StringNotEqualsString_HasCaseInsensitiveVariantMetadata()
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.StringNotEqualsString);
+        meta.HasCIVariant.Should().BeTrue();
+        meta.CIDiagnosticCode.Should().Be(DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals);
+    }
+
+    [Fact]
+    public void BinaryOperationsWithoutCaseInsensitiveVariants_HaveNullDiagnosticCode()
+    {
+        foreach (var meta in Operations.All.OfType<BinaryOperationMeta>().Where(m => !m.HasCIVariant))
+        {
+            meta.CIDiagnosticCode.Should().BeNull($"{meta.Kind} does not advertise a CI variant");
+        }
+    }
+
     // ── Binary: temporal spot checks ────────────────────────────────────────────
 
     [Theory]

@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace Precept.Language;
 
 /// <summary>
@@ -27,4 +29,14 @@ public static class Constraints
 
     public static IReadOnlyList<ConstraintMeta> All { get; } =
         Enum.GetValues<ConstraintKind>().Select(GetMeta).ToArray();
+
+    /// <summary>
+    /// O(1) lookup from leading token kind to state-anchored constraint kind.
+    /// Used by the type checker to resolve the constraint form from the
+    /// construct's leading token without an inline switch.
+    /// Mirrors <see cref="Modifiers.ByFieldToken"/> and <see cref="Types.ByToken"/>.
+    /// </summary>
+    public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
+        All.OfType<ConstraintMeta.StateAnchored>()
+           .ToFrozenDictionary(m => m.LeadingToken, m => m.Kind);
 }
