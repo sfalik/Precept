@@ -1,1 +1,0 @@
-{"text":"precept TransitiveOrdering\n\nfield High as number default 100 positive writable\nfield Mid as number default 50 positive writable\nfield Low as number default 10 positive writable\n\nrule High > Mid because \"High must exceed Mid\"\nrule Mid > Low because \"Mid must exceed Low\"\n\nfield Spread as number -> High - Low positive"}

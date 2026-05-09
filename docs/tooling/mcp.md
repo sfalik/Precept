@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Partial (`precept_ping` implemented; `precept_language`, `precept_compile`, `precept_inspect`, `precept_fire`, `precept_update` not yet implemented — awaiting compiler pipeline and evaluator) |
+| Implementation state | Partial (`precept_ping`, `precept_compile` implemented; `precept_language`, `precept_inspect`, `precept_fire`, `precept_update` not yet implemented) |
 | Source | `tools/Precept.Mcp/` |
 | Upstream | Compiler (`Compilation`), Runtime (`Precept` + `Version`), Catalogs |
 | Downstream | AI agents, Copilot, developer workflow |
@@ -1211,7 +1211,7 @@ The MCP server trusts its caller. No API keys, no user identity, no permission c
 | `tools/Precept.Mcp/Program.cs` | MCP server bootstrap — hosting configuration |
 | `tools/Precept.Mcp/Tools/PingTool.cs` | `precept_ping` implementation |
 | `tools/Precept.Mcp/Tools/LanguageTool.cs` | `precept_language` implementation (planned) |
-| `tools/Precept.Mcp/Tools/CompileTool.cs` | `precept_compile` implementation (planned) |
+| `tools/Precept.Mcp/Tools/CompileTool.cs` | `precept_compile` implementation |
 | `tools/Precept.Mcp/Tools/InspectTool.cs` | `precept_inspect` implementation (planned) |
 | `tools/Precept.Mcp/Tools/FireTool.cs` | `precept_fire` implementation (planned) |
 | `tools/Precept.Mcp/Tools/UpdateTool.cs` | `precept_update` implementation (planned) |

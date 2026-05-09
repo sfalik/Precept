@@ -56,3 +56,9 @@
 ### 2026-05-08T02:26:13Z — PRECEPT0024 batch recorded
 - Scribe recorded the shipped anti-mirroring analyzer batch and durable OQ1 closeout after the committed work validated green.
 - Guarded surface remains the 10 `Typed*` records with `.Syntax` access allowed only inside `TypeChecker`; no MCP contract changes were required.
+
+### 2026-05-09T01:31:51-04:00 — `precept_compile` implementation landed
+- Implemented `precept_compile` in `tools/Precept.Mcp/Tools/CompileTool.cs` as a thin `Compiler.Compile` wrapper returning diagnostics plus a structured definition only when `Compilation.HasErrors` is false.
+- Added the compile DTO hierarchy in `tools/Precept.Mcp/Dtos/CompileToolDtos.cs`, including top-level result, diagnostics, states, events, rows, rules, and the expanded field shape (`Modifiers`, `IsWritable`).
+- Added the missing `ProjectReference` from `tools/Precept.Mcp/Precept.Mcp.csproj` to `src/Precept/Precept.csproj`.
+- Locked the expression/action rendering strategy to source-text slicing via `SourceSpan.Offset`/`Length`, with qualifier text reconstructed from explicit `DeclaredQualifiers` metadata.
