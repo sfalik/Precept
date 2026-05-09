@@ -26,6 +26,9 @@
 
 ## Recent Updates
 
+### 2026-05-09T23:21:36Z — Focused MCP tool implementation pattern durably merged
+- Scribe merged Newman's 8-tool implementation note into `.squad/decisions.md`: focused tools project from `LanguageTool.Language()`, `precept_language` stays internal-only for discovery, `precept_operations(category?)` filters on `LhsType`, and `precept_domains` includes `UcumPrefixCatalog`.
+
 ### 2026-05-09T15:26:09Z — MCP diagnosis/fix closeout recorded
 - Scribe merged Newman's diagnosis and stderr redirect fix into `.squad/decisions.md` as the canonical MCP status note.
 - Durable split: three tools are implemented today, stdout pollution is fixed at commit `9de87699`, and the missing inspect/fire/update surfaces remain deferred runtime-build work.

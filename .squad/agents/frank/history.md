@@ -30,6 +30,10 @@
 
 ## Recent Updates
 
+### 2026-05-09T23:21:36Z — LS plan clean pass and early shim deletion locked
+- Scribe recorded that Slice 0b now deletes `LanguageServerStubs.cs` and the 13 legacy compiler-level LS tests before handler implementation, with `dotnet build` plus `dotnet test test/Precept.Tests/` as the cleanup gate.
+- The clean pass also removed shim-shaped helper APIs, kept diagnostics on the text-sync publish path, added `ArgReferences` as the thin core prerequisite, and reduced Slice 11 to final `Program.cs` wiring plus capability declaration.
+
 ### 2026-05-09T18:53:05-04:00 — LS plan no-deferrals amendment
 - Converted `ConstructMeta.IsOutlineNode` + `OutlineSymbolTag` from catalog gap to concrete Slice 0a with method-level specificity, entry-by-entry values, and 8 named tests.
 - Resolved architectural question: catalog stores `string? OutlineSymbolTag`, LS projects to `SymbolKind` — no LSP dependency in core.

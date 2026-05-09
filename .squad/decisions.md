@@ -12,17 +12,32 @@
 
 ---
 
+### 2026-05-09T23:21:36Z: Language-server clean pass front-loads shim deletion and leaves Slice 11 as final wiring only
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (4 files -> 1 canonical entry).
+
+**Merged sources:** `copilot-ls-test-deletion-decision.md`, `frank-clean-pass.md`, `frank-slice0b-early-deletion.md`, `frank-slice11-update.md`.
+
+- Slice 0b is now the immediate cleanup gate: delete `LanguageServerStubs.cs` and the 13 compiler-level language-server test files before any new handler code, then validate with `dotnet build` and `dotnet test test/Precept.Tests/`.
+- The clean pass removes shim-shaped production helpers, keeps diagnostics on the text-sync compile/publish path, and adds `ArgReferences` as the thin core prerequisite so semantic tokens and go-to-definition stay projection-only.
+- `precept/inspect` now ships as a real handler shell, `PreceptPreviewProtocol.cs` is slated for deletion, and Slice 11 is reduced to final `Program.cs` wiring plus capability declaration.
+
+---
+
 ### 2026-05-09T21:29:00Z: AI authoring MCP discovery now centers on focused named tools, not `precept_language`
 
 **By:** Scribe
 
-**Status:** Merged, reconciled, inbox cleared (5 files -> 1 canonical entry).
+**Status:** Merged, reconciled, inbox cleared (6 files -> 1 canonical entry).
 
-**Merged sources:** `copilot-directive-mcp-tool-arch.md`, `copilot-directive-tool-suite-decisions.md`, `frank-ai-authoring-tool-suite.md`, `frank-mcp-language-audit.md`, `newman-mcp-tool-audit.md`.
+**Merged sources:** `copilot-directive-mcp-tool-arch.md`, `copilot-directive-tool-suite-decisions.md`, `frank-ai-authoring-tool-suite.md`, `frank-mcp-language-audit.md`, `newman-8-mcp-tools-implementation.md`, `newman-mcp-tool-audit.md`.
 
 - The AI authoring surface is a focused named-tool suite: `precept_quickstart`, `precept_syntax`, `precept_types`, `precept_operations`, `precept_proofs`, `precept_patterns`, `precept_domains`, `precept_diagnostic`, plus `precept_compile`; tool names are the discoverability surface, not section parameters.
 - Owner answers closed Frank's open questions: `precept_operations()` returns all 198 operations by default (with an optional category nicety), `precept_diagnostic` must cover all 116 codes, and v1 pattern scope is 8 compile-verified patterns plus 3 anti-patterns.
 - `precept_language` may remain as an internal/testing fallback, but it is removed from MCP discovery and from skill/agent guidance because the focused suite is the public authoring contract.
+- The focused tool implementations stay thin by projecting from `LanguageTool.Language()` internally; `precept_language` remains an internal fallback with its discoverable attribute removed, `precept_operations(category?)` filters on case-insensitive `LhsType`, and `precept_domains` layers in `UcumPrefixCatalog`.
 
 ---
 
@@ -2019,6 +2034,7 @@ George may proceed to Slice 5.
 ## What Was Verified
 
 ---
+
 ### SemanticIndex shape (D1–D5)
 
 - **D1:** `SemanticIndex` is a `sealed record` — ✓
@@ -2028,6 +2044,7 @@ George may proceed to Slice 5.
 - **D5:** `ActionSecondaryRole?` on `TypedInputAction` with XML-documented invariant `SecondaryRole.HasValue == (SecondaryExpression != null)` — ✓
 
 ---
+
 ### Resolution behavior (D6–D10)
 
 - **D6:** `FieldScopeMode` enum (`AllFields`, `PriorFieldsOnly`) in `CheckContext.cs` — ✓
@@ -2037,6 +2054,7 @@ George may proceed to Slice 5.
 - **D10:** `TypedTransitionRow.FromState` is `string?` with `null` = any-state wildcard. XML doc present on the parameter with explicit semantics — ✓
 
 ---
+
 ### Expression resolution (D11–D18)
 
 - **D11:** `TypedBinaryOp` carries `OperationKind ResolvedOp` — the catalog-resolved operation identity, not just the operator token — ✓
@@ -2049,6 +2067,7 @@ George may proceed to Slice 5.
 - **D18:** `TypedMemberAccess` carries `TypeAccessor ResolvedAccessor` — ✓
 
 ---
+
 ### Typed constants (D19–D23)
 
 - **D19:** `TypedTypedConstant` carries `TypeKind ResultType`, `string RawText`, `object? ParsedValue` — ✓
@@ -2058,12 +2077,14 @@ George may proceed to Slice 5.
 - **D23:** `RegexValidation` — `ValidateRegex` uses `Regex.IsMatch` against the pattern — ✓
 
 ---
+
 ### Structural (D24–D26)
 
 - **D24:** `TypedEditDeclaration` is a placeholder record with no logic — ✓
 - **D26:** `Debug.Assert` for ErrorGuaranteed invariant correctly deferred to Slice 10 per plan — ✓
 
 ---
+
 ### Catalog-driven compliance
 
 **No blockers found.** Smell check results:
@@ -2074,6 +2095,7 @@ George may proceed to Slice 5.
 - **No stub arm emits a diagnostic.** All 4 expression stub arms (`ConditionalExpression`, `QuantifierExpression`, `ListLiteralExpression`, `PostfixOperationExpression`) return `TypedErrorExpression` silently — ✓
 
 ---
+
 ### Test quality
 
 - **196 tests across 4 files** (55 + 46 + 51 + 44). All exercise named behaviors, not just "no crash."
@@ -2161,6 +2183,7 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Merged source:** `george-ci-fix-done.md`.
 
 ---
+
 ### CI Enforcement Bug Fixes
 **Commit:** 7424785
 **Bug 1 fix:** `EnforceCIInExpression` in `src/Precept/Pipeline/TypeChecker.cs` — all 5 `Diagnostics.Create` call sites for CI codes 66, 95–98 now pass the CI field name as the `{0}` template argument. Added `GetCIFieldName` helper (line ~2197) that extracts the field name from whichever binary operand is the `~string` `TypedFieldRef`. For function calls (codes 97, 98), extracts directly from `func.Arguments[0]`.
@@ -2232,6 +2255,7 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 **Merged source:** `george-slice-10-done.md`.
 
 ---
+
 ### Slice 10 Complete — Ready for R3
 **Commit:** 844f00e
 **BuildSemanticIndex:** All 16 ImmutableArray primaries + 4 FrozenDictionary secondaries confirmed — populated from CheckContext, no empty stubs remaining.
@@ -2529,6 +2553,7 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Merged source:** `george-slice-8-done.md`.
 
 ---
+
 ### Slice 8 Complete
 **By:** George (for Soup Nazi)
 **Commit:** `00ef822`
@@ -2593,6 +2618,7 @@ when "admin@example.com" == Email
 **Merged source:** `george-slice-9-done.md`.
 
 ---
+
 ### Slice 9 Complete
 **By:** George (for Soup Nazi)
 **Commit:** 54fa59b
@@ -2631,6 +2657,7 @@ when "admin@example.com" == Email
 **Merged source:** `george-slice5-restored.md`.
 
 ---
+
 ### Slice 5 Restoration Complete
 **Commit:** 4e1efd8
 **Methods restored:**
@@ -2709,6 +2736,7 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 **Merged source:** `soup-nazi-slice-1-triage.md`.
 
 ---
+
 ### Slice 1 Test Failure Triage — 2026-05-07
 
 | Test | Failure Type | Root Cause | Action Taken |
@@ -2723,6 +2751,7 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 | EventWithOptionalArg_ArgIsOptional | TYPE B | Same root cause as above — `ParseArgumentList` does not support `optional` modifier on event args. | Documented — parser gap |
 
 ---
+
 ### TYPE A — Test Bugs Fixed (4 tests)
 
 All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'kg'`, `in 'USD/each'`, `in 'USD' to 'EUR'`) that the parser does not yet support. The tests were testing **TypeKind resolution**, not qualifier parsing, so the qualifiers were unnecessary. Removed qualifiers; all four now pass.
@@ -2733,6 +2762,7 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 - `ExchangeRateType_ResolvesToExchangeRateTypeKind` — `field FxRate as exchangerate in 'USD' to 'EUR'` → `field FxRate as exchangerate`
 
 ---
+
 ### TYPE B — Real Upstream Gaps (4 tests)
 
 #### Gap 1: `Types.ByToken` dictionary overwrites Log/Queue with LogBy/QueueBy
@@ -2754,6 +2784,7 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 **Fix approach:** After consuming the type token in `ParseArgumentList`, loop over modifier tokens (check against `Modifiers.ByToken` or the modifier catalog) and collect them into a modifiers list. The `(string Name, TypeMeta Type)` tuple in the arg list should be expanded to include modifiers.
 
 ---
+
 ### Recommended next action
 
 George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken overwrite is a data-integrity issue that affects any code path using `Types.ByToken` for these types. The event arg modifier gap blocks testing of a feature that's already used in samples. Both are contained fixes in Parser.cs and Types.cs — no TypeChecker changes needed.
@@ -2771,6 +2802,7 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-10-done.md`.
 
 ---
+
 ### Slice 10 Tests Complete — R3-Ready
 **Commit:** 703000a
 **Total written:** 32
@@ -2826,6 +2858,7 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-2-done.md`.
 
 ---
+
 ### Slice 2 Tests Complete — 2026-05-07
 **Commit:** d4053c1
 **Total tests written:** 46
@@ -2849,6 +2882,7 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-3-done.md`.
 
 ---
+
 ### Slice 3 Tests Complete — 2026-05-07
 **Commit:** 23edd54
 **Total tests written:** 51
@@ -2876,6 +2910,7 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-4-done.md`.
 
 ---
+
 ### Slice 4 Tests Complete — 2026-05-07
 **Commit:** `1c29fe6`
 **Total tests written:** 44
@@ -2901,6 +2936,7 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 **Merged source:** `soup-nazi-slice-5-done.md`.
 
 ---
+
 ### Slice 5 Tests Complete — 2026-05-07
 **Commit:** (see below)
 **Total tests written:** 26
@@ -2933,6 +2969,7 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-6-done.md`.
 
 ---
+
 ### Slice 6 Tests Complete
 **Commit:** 78d1774
 **Total written:** 17
@@ -2951,6 +2988,7 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-7-done.md`.
 
 ---
+
 ### Slice 7 Tests Complete
 **Commit:** 26208fe
 **Total written:** 29
@@ -2982,6 +3020,7 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-8-done.md`.
 
 ---
+
 ### Slice 8 Tests Complete
 **Commit:** 9472824
 **Total written:** 30
@@ -3009,6 +3048,7 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Merged source:** `soup-nazi-slice-9-done.md`.
 
 ---
+
 ### Slice 9 Tests Complete
 **Commit:** f14a664
 **Total written:** 22
