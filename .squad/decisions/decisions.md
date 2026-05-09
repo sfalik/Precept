@@ -1,3 +1,93 @@
+# Decision: Field and Arg as Standalone Companion Tokens
+
+**By:** Elaine (UX Design)
+**Date:** 2026-05-09
+**Status:** Proposed — pending Shane sign-off
+
+## Context
+
+The field/arg color proposal needed a paradigm answer: where do `--field` (#A5B4FC, 239° indigo) and `--arg` (#9AD8E8, 195° cyan) live in the five-family model?
+
+Three options evaluated:
+
+1. **Axis layer** (Elaine-42) — named Structure/Behaviour/Grounding axes grouping families. Shane rejected: states are already structural, so the grouping is circular.
+2. **Add to Data family** (Shane's suggestion) — keep field/arg in Data, let color do the alignment. Problem: Data is hue-coherent at ~215° slate. Adding 239° indigo and 195° cyan creates a 3-hue family that contradicts its visual identity.
+3. **Standalone companion tokens** (revised recommendation) — field and arg get their own CSS properties and a brief spec sub-section, not nested inside any family card. Hue proximity communicates the structural/behavioural alignment without a named grouping.
+
+## Decision
+
+Option 3: standalone companion tokens.
+
+- Five families stay unchanged (Structure 3 tones, State 1, Event 1, Data **2** tones, Rule 1).
+- Data narrows: `#B0BEC5` drops (no remaining role); Data becomes type (`#9AA8B5`) + value (`#84929F`).
+- New spec sub-section "Companion Tokens" after the five family cards, before supporting colors.
+- `--field: #A5B4FC` and `--arg: #9AD8E8` documented with a one-line note: hue alignment to structural/behavioural neighbours is the relationship signal.
+- No axis layer. No family stretching. Colors unchanged from the original proposal.
+
+## Why
+
+- Families are hue-coherent by design principle. Adding foreign hues breaks the visual contract.
+- Hue proximity is self-documenting. A named grouping on top adds overhead without new information.
+- The companion concept is extensible if future tokens need the same pattern (e.g., a guard-name color near Rule).
+
+# george-currencycatalog-implemented
+
+**Agent:** George (Runtime Dev)  
+**Date:** 2026-05-09T10:41:11Z  
+**Action:** Implement `CurrencyEntry` + `CurrencyCatalog` (Action 1 from Frank's gap analysis)
+
+---
+
+## What Was Created / Modified
+
+### New: `src/Precept/Language/CurrencyCatalog.cs`
+- `CurrencyEntry` — sealed record with 4 fields: `AlphaCode (string)`, `NumericCode (int)`, `Name (string)`, `MinorUnit (int)`
+- `CurrencyCatalog` — public static class with `All: FrozenDictionary<string, CurrencyEntry>` keyed by alpha code, `StringComparer.OrdinalIgnoreCase`
+- 162 entries: all ISO 4217 List One active national currencies + supranational/fund X-codes (minus precious metals, XTS, XXX)
+
+### Modified: `src/Precept/Language/Types.cs`
+- Removed: `Iso4217CurrencyCodes` `FrozenSet<string>` declaration (lines 59–77 in original)
+- Updated: `CurrencyValidation` now derives `AllowedValues` from `CurrencyCatalog.All.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase)`
+- `ClosedSetValidation` wrapper shape unchanged; case-insensitive behavior preserved
+
+---
+
+## Final Code Count
+
+- **162 currency entries** in `CurrencyCatalog.All`
+- Starting point: 156 codes from `Iso4217CurrencyCodes`
+- Removed: HRK (Croatian Kuna — withdrawn from List One when Croatia adopted EUR, Jan 2023)
+- Added (7 new X-codes): XBA (955), XBB (956), XBC (957), XBD (958), XDR (960), XSU (994), XUA (965)
+- Net: 156 − 1 + 7 = 162
+
+---
+
+## Decisions Made During Implementation
+
+### Fund code MinorUnit = -1 for N/A
+ISO 4217 lists certain codes with `N/A` for minor units. Convention: `MinorUnit = -1`. Applies to:  
+XBA, XBB, XBC, XBD (bond market units), XDR (SDR/Special Drawing Right), XSU (Sucre), XUA (ADB Unit of Account).
+
+### Supranational codes with real minor units use their published values
+XAF (0), XOF (0), XPF (0) — zero decimal places. XCD (2) — two decimal places. These are NOT fund codes; they're real currencies used by member countries.
+
+### HRK removed (not just noted)
+Croatia's ISO withdrawal is permanent. Keeping a withdrawn code in the catalog would cause the sync test to fail when XML is present. Hard-removed, not commented out.
+
+### Precious metals excluded (XAU, XAG, XPT, XPD)
+Per Shane's resolved Q1 decision: commodities, not currencies. One-line addition if needed post-v1.
+
+### XTS (testing), XXX (no currency) excluded
+Per gap analysis. Standard practice.
+
+---
+
+## Validation
+
+- `dotnet build src/Precept/` — green, 0 warnings, 0 errors
+- `dotnet test test/Precept.Tests/` — 3646 passed, 1 skipped (`CurrencyCatalogSyncTests` — skipped correctly as ISO 4217 XML is not present)
+- No pre-existing test failures introduced
+
 ### 2026-05-09T09:34:41: User directive
 **By:** Shane (via Copilot)
 **What:** Always include a running tally of in-flight agent threads when multiple work streams are active. Format: emoji + agent name + one-line status (running/done/blocked). Keep it updated every response.

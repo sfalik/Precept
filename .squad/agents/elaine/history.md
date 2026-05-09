@@ -16,7 +16,21 @@
 
 ## Learnings
 
+- The five-construct color model (Structure, State, Event, Data, Rule) has an implicit two-axis substructure: structural identity (indigo–violet) vs. behavioural identity (cyan). Fields and args are the named companions that complete each axis.
 
+- Fields sitting under Data-slate (#B0BEC5) buries structural declarations in the same tone as types and values. Promoting fields to the hero identifier color (#A5B4FC) is semantically correct: field names define entity shape, not incidental data.
+
+- The tonal relationship "anchor → lifted companion" (e.g., #6366F1 → #A5B4FC for structure) can be mirrored on other axes. For events, #30B8E8 → #9AD8E8 gives args the same subordinate-but-related read.
+
+- Moving field and arg names out of the Data construct narrows Data to types and values only. This has cross-surface implications (Data Form, Event Timeline) that need explicit scoping.
+
+- The 1–3 shade paradigm governs intra-construct tonal gradients. Companion tokens (field, arg) are inter-construct axis relationships — orthogonal to the shade model. No paradigm change needed; just name the pattern.
+
+- When a family is defined by hue coherence (all tones in the same hue band), adding tokens from a different hue breaks the family's visual identity — even if the semantic grouping makes sense. Organizational home must not contradict visual signal.
+
+- When the hue proximity between two tokens already communicates their relationship, naming the grouping adds overhead without new information. Let the color do the work; document the intent with a brief note, not a structural layer.
+
+- Shane's override: families are semantic categories, not hue bands. When tokens share a semantic category (fields and args ARE data), they belong in that family even if their hues differ. The family name defines the grouping; distinct hues within a family signal relationships to neighboring families' concepts (field→structure, arg→event). The spec's family definition was the bottleneck, not the organizational placement.
 
 - Failure-point vocabulary matters most; result names and explanations must stay in the caller's mental model.
 
@@ -27,6 +41,10 @@
 - Construct colors and runtime verdict colors are different systems and must not be mixed.
 
 - Disabled UI uses the semantic disabled token set, not faded versions of construct colors.
+
+- Completion UX must stay semantically honest: if a qualifier axis is invalid for the selected type, suppress value completions and guide the user back to the correct preposition instead.
+
+- For closed-set qualifier vocabularies, omission hurts trust faster than list length; a filtered ~150-item UOM list is acceptable if it means expected real-world units are present.
 
 
 
@@ -134,3 +152,27 @@ Task: Proposed three candidate names for the new graph-analyzer diagnostic for e
 
 
 
+## Elaine-41 — Field and Arg Semantic Color Proposal
+
+[2026-05-09]
+
+Task: Proposed field color (`#A5B4FC`, hero identifier reused as `--field`) and arg color (`#9AD8E8`, new lifted cyan as `--arg`) based on Shane's structure/behaviour axis model. Full proposal at `docs/working/elaine-field-arg-colors.md`. Pending Shane sign-off.
+
+
+## Elaine-42 — Color Family Paradigm Recommendation
+
+[2026-05-09]
+
+Task: Answered Shane's question on whether the 1–3 shade paradigm needs to change for field/arg companion tokens. Recommendation: no paradigm change — companion tokens are an inter-construct axis relationship, orthogonal to the intra-construct shade model. Formalize a thin axis layer (Structure Axis, Behaviour Axis) naming cross-family groupings. Arg is the only net new tone (8→9). Appended to `docs/working/elaine-field-arg-colors.md`.
+
+
+## Elaine-43 — Paradigm Recommendation Revised (Standalone Companions)
+
+[2026-05-09]
+
+Task: Revised the paradigm recommendation after Shane's feedback that the axis layer was circular (states are already structural). Evaluated Shane's alternative (add field/arg to Data family) — rejected because Data is hue-coherent at ~215° slate and absorbing 239° indigo + 195° cyan would break that coherence. Landed on a third option: field and arg as standalone companion tokens, documented alongside families but not inside any family card. Data narrows to 2 tones (type + value), #B0BEC5 drops. Five families stay clean. Colors unchanged. Updated `docs/working/elaine-field-arg-colors.md`.
+
+### 2026-05-09T14:47:06Z — Companion tokens recommendation revised
+- Elaine-43 replaced the rejected axis-layer recommendation with standalone companion tokens for `--field` and `--arg`.
+- The fallback idea of absorbing field/arg into the Data family was rejected because Data's hue-coherent slate family cannot stretch to indigo/cyan without breaking the visual rule.
+- Durable direction: keep the five family cards intact, narrow Data to type + value, and document companion tokens in a short sub-section after the family cards.

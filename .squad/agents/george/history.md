@@ -6,120 +6,38 @@
 
 ## Learnings
 
-- When shared `ParameterMeta` instances are used for both Lhs and Rhs of a binary operation (e.g., `PNumber` in `NumberDivideNumber`), `ReferenceEquals` in `ResolveParamInBinaryOp` matches both sides — checking Rhs before Lhs ensures proof requirements (divisor ≠ 0) resolve to the correct operand.
-- Forwarding-fact suppression (Pass 1.5) must be followed by a skip guard in the discharge loop (Pass 2): without `if (obligation.Disposition == ProofDisposition.Proved) continue;`, `TryDischarge` unconditionally overwrites already-proved obligations with `Unresolved`.
-
-- Self-edges (`ToState == FromState`) from `Reject` and `NoTransition` outcomes must be filtered out of terminal-violation analysis — a terminal state that only rejects events is honoring its contract, not violating it.
-- When the spec says "Emit Diagnostic(X)" in pseudocode, verify the actual `Diagnostics.Create()` call exists in the code — violation data structures can be populated correctly while diagnostic emission is entirely missing.
-- ProofEngine Phase 2: Spec pseudocode can diverge from source names (`opMeta.Left`/`Right` vs actual `Lhs`/`Rhs`, `SourceSpan.Empty` vs `SourceSpan.Missing`, `ModifierKind.Initial` vs `ModifierKind.InitialState`). Always verify enum/property names against the live source before writing implementation code.
-- `count` is a TypeAccessor on collection types, not a FunctionKind — guard extraction for `count(X) > 0` should match `TypedMemberAccess` patterns, not `TypedFunctionCall` with a nonexistent function kind.
-- The UnknownSentinel pattern (private object instance for tristate fold results) avoids boxing bool? and keeps constant folding type-safe without allocating nullable wrappers.
-- ProofForwardingFact consumption must happen BEFORE the discharge loop — unreachable/dead-end suppression is a Pass 1.5 step, not Pass 2.
-- Doc appendix code numbers can drift from the actual `DiagnosticCode` enum when codes are added out-of-sequence (e.g., `DeadEndState = 108` was added after the Proof block at 82–84, but the appendix assumed contiguous Graph-stage numbering).
-
-- `Types.GetMeta(...).ImpliedModifiers` is the durable source of truth for implied field modifiers.
-- Error propagation in the TypeChecker should return `TypedErrorExpression` without layering extra diagnostics on parent nodes — but the error SOURCE must emit a TC-level diagnostic to satisfy D26 self-containment.
-- `ParsedConstruct.LeadingTokenKind` is the minimal surface for recovering the anchor scope keyword (in/to/from/on) consumed by the parser but not previously stored.
-- Context-sensitive literal retry is valuable when catalogs make typed constants or overload resolution depend on expected type.
-- Parser metadata should expose the lookup axes the parser actually queries (`BindingPower`, termination tokens, closed vocabularies) instead of duplicating parser-local tables.
-- Multi-location diagnostics can grow additively through payload fields like `RelatedSpans` without destabilizing constructor-heavy call sites.
-- When PRECEPT0024 blocks downstream `.Syntax` access, hoist declaration `SourceSpan` data (for example `TypedState.NameSpan` / `TypedEvent.NameSpan`) into the typed artifact instead of reaching back to parse constructs.
-- Graph wildcard expansion should stay structural: expand `FromState == null` rows per declared state, but suppress the expanded edge when that state already has an explicit row for the same event.
-- `IsMessagePosition` now exists on both `TokenMeta` and `FunctionMeta`; populated token entries are `TokenKind.Because` and `TokenKind.Reject`.
-- No current built-in `FunctionMeta` entries set `IsMessagePosition`; Kramer needs to wire the grammar generator to consume the new catalog flag next.
-- `ModifierMeta` now lives at `src/Precept/Language/Modifier.cs` and carries `DesugarsToRule`; current true entries are `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, and `maxplaces`.
-- PE-G3's approved output shape is collocated in `src/Precept/Pipeline/ProofLedger.cs` — the nine proof-ledger support types live beside `ProofLedger` itself instead of being split into separate files.
-- `ProofDisposition` must use explicit 1-based enum values in source (`Proved = 1`, `Unresolved = 2`) or PRECEPT0018 blocks the build, even for placeholder pipeline output enums.
-- `docs/compiler/proof-engine.md` had to be realigned to source for `ConstraintIdentity` (`RuleIdentity(int RuleIndex)`, `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)`) and the strategy names `DeclarationAttribute` / `QualifierCompatibility`.
-- Phase 1 proof prework stayed purely structural: `ProofEngine.cs` remains behaviorally inert while carrier DUs, catalog metadata, semantic-index fields, obligation context, and proof-stage diagnostic metadata now exist for Phase 2 to consume.
-- `TypedField` / `TypedArg` are high-friction positional records: adding `Presence` and `DeclaredQualifiers` required touching every constructor site, including manual test scaffolds in `TypeCheckerExpressionTests` and `TypeCheckerQuantifierTests`, so named arguments are the safest future edit pattern.
-- Doc-only ordinal fixes can still have large blast radius when a long-lived design doc already carries unrelated branch edits; validate staged hunks before committing `docs/compiler/proof-engine.md` changes.
-- Current validation baseline after Phase 1 is stable: full-solution build is green, while full-solution tests still fail only in pre-existing areas (`Precept.LanguageServer.Tests` stubs and the two `TokensTests` keyword-classification assertions).
+- `CurrencyCatalog` is now the durable ISO 4217 surface: a `FrozenDictionary<string, CurrencyEntry>` keyed case-insensitively by alpha code, with `CurrencyEntry` carrying `AlphaCode`, `NumericCode`, `Name`, and `MinorUnit`.
+- Currency validation should derive from `CurrencyCatalog.All.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase)` so runtime/type surfaces consume the catalog instead of a mirrored hardcoded set.
+- Current catalog scope is 162 ISO 4217 active national + fund/supranational codes; HRK is removed, precious metals (`XAU`, `XAG`, `XPT`, `XPD`) plus `XTS` and `XXX` stay excluded, and `MinorUnit = -1` represents ISO `N/A` fund units.
+- ISO refresh posture is manual and tooling-backed: the workspace task `iso4217: refresh` pulls current XML, while `CurrencyCatalogSyncTests` validates catalog drift when the XML fixture is present.
+- `CurrencyCatalog.All.Keys` returns `IEnumerable<string>` (not `FrozenSet<string>`); calling `.ToFrozenSet(StringComparer.OrdinalIgnoreCase)` on it produces the correct case-insensitive set for `ClosedSetValidation.AllowedValues`.
+- ProofEngine binary-op subject resolution must check RHS before LHS when shared `ParameterMeta` instances are reused, otherwise divisor/nonzero requirements can bind to the wrong operand.
+- Proof forwarding facts must be consumed before the discharge loop, and discharge must skip already-proved obligations to avoid overwriting proved facts with `Unresolved`.
+- Graph terminal-state analysis must ignore `Reject` / `NoTransition` self-edges; a terminal state that only rejects events is honoring the contract, not violating it.
+- Error propagation in the TypeChecker should return `TypedErrorExpression` without layering extra parent diagnostics, but the original error source must emit the TC diagnostic so D26 self-containment holds.
+- `ParsedConstruct.LeadingTokenKind` is the minimal durable surface for recovering anchor keywords the parser consumed but downstream normalization still needs.
+- `count` is a type accessor on collection types, not a `FunctionKind`; guard extraction for `count(X) > 0` should match typed member access, not a synthetic function call.
+- `IsMessagePosition` now lives on both `TokenMeta` and `FunctionMeta`; generator/tooling consumers should read the catalog flag instead of maintaining their own token lists.
 
 ## Recent Updates
 
-### 2026-05-09T09:49:38Z — Analyzer and TypeChecker catalog batch recorded
-- `george-4` shipped `PRECEPT0026` and extended `PRECEPT0025` to switch statements, with analyzer coverage closing green at 280/280.
-- `george-5` removed four hardcoded TypeChecker dispatch sites by adding CI diagnostic metadata plus `Constraints.ByToken`, `Modifiers.ByAccessToken`, and `Modifiers.ByAnchorToken`; targeted runtime tests closed green at 3646/3646.
+### 2026-05-09T14:47:06Z — CurrencyCatalog implementation recorded
+- George-3 shipped `src/Precept/Language/CurrencyCatalog.cs` with 162 ISO 4217 entries and removed the mirrored `Iso4217CurrencyCodes` set from `Types.cs`.
+- `CurrencyValidation` now derives allowed values from `CurrencyCatalog.All.Keys`; build stayed green and `test/Precept.Tests` closed at 3646 passed, 1 skipped (`CurrencyCatalogSyncTests` awaiting XML).
+- Frank's follow-up doc sync locked the operational sync story: use the VS Code `iso4217: refresh` task, then let the optional sync test verify catalog drift.
 
-### 2026-05-09T04:35:00Z — ProofEngine Phase 2 fixes closed
-- George landed ProofEngine Phase 2 across commits `46c9a4d4` and `36618ef9`, then fixed the last 5 red tests in `d3657b70`.
-- Branch validation now closes at 158/158 `ProofEngineTests` and 3609/3611 full-suite tests, with only the 2 pre-existing `TokensTests` failures remaining.
+### 2026-05-09T09:49:38Z — TypeChecker catalog-fix batch recorded
+- `george-5` removed four hardcoded TypeChecker dispatch sites by adding CI diagnostic metadata plus `Constraints.ByToken`, `Modifiers.ByAccessToken`, and `Modifiers.ByAnchorToken`.
+- Validation closed green at 3646/3646 targeted runtime tests.
 
-### 2026-05-08T23:45:00Z — ProofEngine Phase 2 complete
-- Full ProofEngine body implemented across S1–S13 in `src/Precept/Pipeline/ProofEngine.cs`.
-- Commits: `46c9a4d4` (S1–S12 engine implementation), `36618ef9` (S13 documentation sync).
-- All five strategies operational: Literal, DeclarationAttribute, GuardInPath, FlowNarrowing, QualifierCompatibility.
-- Error-tainted obligation suppression (PE-G13), ProofForwardingFact consumption, constraint influence analysis, initial-state satisfiability with bounded constant folding — all implemented.
-- Validation: 3451 passed, 2 pre-existing TokensTests failures unchanged. Build green, 0 warnings.
-- Documentation synced: `docs/compiler/proof-engine.md` §1 status → Implemented, §13 items 1–2 removed.
+### 2026-05-08T23:45:00Z — ProofEngine Phase 2 closeout recorded
+- George landed the full ProofEngine body, then closed the last post-commit failures; proof strategies, forwarding-fact handling, and bounded constant folding are now operational.
+- Branch validation stabilized with green builds and only the previously-known non-runtime test gaps remaining at that time.
 
-### 2026-05-08T22:36:50Z — Message-position metadata recorded
-- `IsMessagePosition` now lives on both `TokenMeta` and `FunctionMeta`; active token flags are `because` and `reject` only.
-- George validated the metadata pass with clean build/test results and closed it in commits `105a42a7` and `315b00c9`.
-- Downstream generator wiring is complete too, so the catalog gap for message-position strings is now closed end-to-end.
+## Historical Summary
 
-### 2026-05-08T00:49:00Z — GraphAnalyzer advisory fix batch closed
-- Commit `79c3403` closed all 8 addressable GraphAnalyzer advisory items: structural diagnostics gained `RelatedSpans`, graph codes gained `RelatedCodes`, the docs now state zero-terminal semantics and the real analyzer input set, `HasDiagnostic()` replaced fragile string dedup, and the coverage / initial-event scans now share a precomputed edge index.
-- Gap1 remains deliberately deferred: GraphAnalyzer still does not consume `EventModifierMeta.RequiredAnalysis` until richer event modifiers exist.
-- Validation closed green at 3385/3385 `Precept.Tests`.
+- 2026-05-08 GraphAnalyzer work locked the dead-end/terminal diagnostic model, emitted the missing structural diagnostics, and synchronized the graph/proof docs back to live behavior.
+- Earlier 2026-05-08 TypeChecker work restored computed/default field resolution, normalization for ensures/access/state hooks, quantifier + list literal handling, and the full semantic-index assembly pipeline.
+- 2026-05-07 and earlier groundwork established the catalog-driven parser/checker trajectory: `TransitionRowOutcome` naming, metadata-driven parser lookups, grammar/message-position metadata, and the principle that durable design decisions belong in catalogs and the squad ledger rather than scattered switches.
+- Use `.squad\decisions\decisions.md` for full chronology when a future task needs exact per-batch provenance.
 
-
-### 2026-05-08T03:29:02Z — Wave 2 closeout recorded
-- George's Wave 2 slices are durably closed: compiler-stage doc corrections, runtime stub alignment, the `TypeChecker` partial split, MCP compile DTO shapes, and the `FieldSnapshot.ClrType` + outcome-hierarchy updates.
-- All six Wave 2 design gates D1–D6 were closed through the merged decision inbox, giving downstream graph/proof/tooling work a settled runtime and compiler baseline.
-
-
-
-
-### 2026-05-08T03:08:18Z — R3 blockers B1/B2/B3 closed
-- George-16 resolved the TypeChecker consumer blockers: MissingExpression now emits a TC-level diagnostic, field default/computed expressions and computed deps are populated, and ensures/access modes/state hooks/edit declarations are normalized.
-- `docs/compiler/type-checker.md` was synchronized in the same batch, and validation closed green at 3342 `Precept.Tests` + 263 `Precept.Analyzers.Tests`.
-
-### 2026-05-08T07:00:00Z — R3 blockers B1/B2/B3 fixed
-- Fixed B3 (MissingExpression D26 gap), B1 (field default/computed expression resolution + ComputedFieldDep extraction), B2 (ensures, access modes, state hooks, edit declaration normalization).
-- Added `ParsedConstruct.LeadingTokenKind` for anchor scope determination.
-- Updated docs §1/§4/§13. Updated 17 tests to match new behavior.
-- Validation closed green at 3342/3342 + 263/263 tests.
-
-### 2026-05-08T05:30:00Z — Slice 8: CI Enforcement shipped
-- Commit: `00ef822`.
-- Added CI enforcement passes over resolved expression trees with catalog-backed tracking for CI fields and element collections.
-- Validation closed green at 3242/3242 tests.
-
-### 2026-05-08T04:30:00Z — Slice 10: Final assembly + D26 global assert
-- Commit: `844f00e`.
-- Replaced `BuildPartialSemanticIndex` with full `BuildSemanticIndex`, wired the full checker pipeline order, and added the global `Debug.Assert` walk for error-expression containment.
-- Validation closed green at 3294/3294 tests with 118 integration tests passing; TypeChecker implementation marked done.
-
-### 2026-05-08T03:45:00Z — Slice 5+7 restoration + event arg ref fix
-- Commit: `4e1efd8`.
-- Restored Slice 5 transition/event-handler wiring and Slice 7 modifier validation after a concurrent-write overwrite, and fixed qualified event-arg references to resolve as `TypedArgRef`.
-- Validation closed green at 3196/3196 tests.
-
-### 2026-05-08T01:30:00Z — Slice 9: Quantifiers + List Literals shipped
-- Commit: `54fa59b`.
-- Implemented `ResolveQuantifier` and `ResolveListLiteral`, including boolean-predicate enforcement and list element unification.
-- Validation closed green at 3242/3242 tests.
-
-### Historical summary through 2026-05-07T23:22:15Z
-- TypeChecker core line shipped across Slice 1 (`e882396`), Slice 2 (`1111da4`), Slice 3 (`fa87df9`), Slice 4 (`ac95de2`), and Slice 6 (`fe358ef`), with the R0 naming blocker closed by renaming `TypedOutcomeKind` to `TransitionRowOutcome` in `350f386`.
-- Parser baseline before the checker push locked in `ParsedOutcome` (`94dec3b`), the `<-` computed-field delimiter (`266ee5a`), the bare-`<-` recovery fix plus `PRECEPT0019` exhaustiveness guard, and metadata moves for member-access precedence / expression-slot termination.
-- George's housekeeping closeout committed OutcomesCatalog, parsed action/type-reference DU nodes, NameBinder wiring, diagnostic `RelatedSpans`, and related doc/squad sync across the nine-commit batch ending at `2337fd0`.
-- Use `.squad/decisions.md` for full per-batch provenance and branch-level decision chronology.
-- R3 self-review (2026-05-07): expression resolution core is correct across all 15 ParsedExpression forms. Widening, qualifier disambiguation, ErrorType propagation, QuantifierBindings symmetry, and D26 invariant all verified. Key gaps: field default/computed expression resolution never fires (always null), and 5 of 8 construct kinds (StateEnsure, EventEnsure, AccessMode, OmitDeclaration, StateAction) lack normalization — their CheckContext accumulators are always empty. These are the next implementation frontier. No stubs or TODOs remain in TypeChecker.cs.
-
-### 2026-05-08T03:35:00Z — GraphAnalyzer OQ1/OQ2 decisions recorded
-- Frank-19 resolved the active GraphAnalyzer open questions: model dead-end states as a separate `DeadEndStateFact` (not an expansion of `TerminalCompletenessFact`) and emit `DiagnosticCode.DeadEndState = 108` using reverse-reachability BFS from terminal states in Phase 2.
-- Event handlers are outside GraphAnalyzer event coverage by construction: PRECEPT0092 (`EventHandlerInStatefulPrecept`) forbids handlers in stateful precepts, and the graph analyzer only runs on stateful precepts.
-- Frank also corrected `docs/compiler/graph-analyzer.md` §4 and `docs/compiler/proof-engine.md`; treat these as the durable analyzer/proof-engine contract for downstream GraphAnalyzer work.
-
-### 2026-05-08T04:26:28Z — GraphAnalyzer R4 blocker fix batch closed
-- Commit `5398435` closed the real GraphAnalyzer R4 blockers: structural diagnostics 109/110/111 now exist, emit at analysis time, and the graph doc appendix matches the live enum again.
-- `Reject` / `NoTransition` self-loops are now filtered out of terminal outgoing-edge violations, preserving the rule that a terminal state may reject without violating its contract.
-- Validation at George handoff closed green at 3370 `Precept.Tests` passing before Soup-Nazi-7's follow-on test batch extended the branch baseline.
-
-### 2026-05-08T04:26:28Z — Exhaustive GraphAnalyzer review approved
-- Frank's exhaustive review approved the current GraphAnalyzer implementation as spec-complete for the live language surface and catalog-driven where it needs to be.
-- The only future-risk note is deferred deliberately: when richer event modifiers ship, GraphAnalyzer must start consuming `EventModifierMeta.RequiredAnalysis` the same way it already consumes state-modifier metadata.
-- Next-touch polish items are now explicit: consider an event-per-state index for event coverage / `GraphEvent.IsInitial`, and add `RelatedSpans` to structural-violation diagnostics.
