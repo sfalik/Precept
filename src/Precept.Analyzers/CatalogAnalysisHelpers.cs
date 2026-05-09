@@ -54,17 +54,16 @@ internal static class CatalogAnalysisHelpers
     /// <summary>
     /// Known catalog enum type names that appear as <c>GetMeta</c> switch discriminants.
     /// </summary>
-    // Phase 3: Add ConstraintKind and ProofRequirementKind once their GetMeta switches
-    // drop the discard arm (_ =>). Currently excluded to avoid PRECEPT0007 violations
-    // on the existing fallback arms. See frank-full-review-spike-v2.md G2.
+    // Phase 3 (enabled): ConstraintKind and ProofRequirementKind GetMeta switches are now
+    // exhaustive — all members have explicit arms (the _ => throw fallback is present but
+    // PRECEPT0007 only reports missing members, so it does not fire on these switches).
     private static readonly HashSet<string> CatalogEnumNames = new()
     {
         "TypeKind", "TokenKind", "OperatorKind", "OperationKind",
         "ModifierKind", "FunctionKind", "ActionKind", "ConstructKind",
         "DiagnosticCode", "FaultCode", "ExpressionFormKind",
-        // TODO Phase 3: uncomment once GetMeta switches drop the discard arm (_ =>)
-        // TODO: "ConstraintKind",
-        // TODO: "ProofRequirementKind",
+        "ConstraintKind",
+        "ProofRequirementKind",
     };
 
     /// <summary>
