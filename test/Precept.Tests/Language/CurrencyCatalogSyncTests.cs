@@ -16,10 +16,17 @@ public class CurrencyCatalogSyncTests
 
     // Codes present in ISO 4217 XML but intentionally excluded from CurrencyCatalog.
     // XAU/XAG/XPT/XPD: precious metals — commodities, not currencies in business workflows.
-    // XTS: reserved for testing purposes.
+    // XTS: reserved for testing purposes by ISO 4217.
     // XXX: "no currency" placeholder.
+    // BOV/CHE/CHW/CLF/COU/MXV/USN/UYI/UYW/VED/XAD/XCG/ZWG: fund codes and supranational
+    //   accounting units — not transactional currencies used in business workflows.
     private static readonly FrozenSet<string> IntentionalExclusions =
-        new[] { "XAU", "XAG", "XPT", "XPD", "XTS", "XXX" }
+        new[]
+        {
+            "XAU", "XAG", "XPT", "XPD", "XTS", "XXX",
+            "BOV", "CHE", "CHW", "CLF", "COU", "MXV",
+            "USN", "UYI", "UYW", "VED", "XAD", "XCG", "ZWG"
+        }
         .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     // Committed snapshot at src/Precept/Data/Iso4217/list-one.xml. Refresh with VS Code task 'iso4217: refresh'.

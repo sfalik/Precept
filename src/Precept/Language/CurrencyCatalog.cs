@@ -2,8 +2,9 @@
 // Last synced: 2026-05-09. Sync process: run VS Code task "iso4217: refresh",
 // then verify with dotnet test --filter CurrencyCatalogSyncTests.
 // Excludes: precious metals (XAU/XAG/XPT/XPD — commodities, not currencies),
+//           fund codes and accounting units (BOV/CHE/CHW/CLF/COU/MXV/USN/UYI/UYW/VED/XAD/XCG/ZWG),
 //           XTS (testing), XXX (no currency).
-// Tier 1 working set: 172 active national + supranational/fund codes.
+// Tier 1 working set: 159 ISO 4217 codes after intentional exclusions.
 
 using System.Collections.Frozen;
 
@@ -13,7 +14,7 @@ public sealed record CurrencyEntry(
     string AlphaCode,    // e.g. "USD"
     int    NumericCode,  // e.g. 840
     string Name,         // e.g. "US Dollar"
-    int    MinorUnit     // e.g. 2 (decimal places; 0 for JPY; -1 for fund codes where N/A)
+    int    MinorUnit     // e.g. 2 (decimal places; 0 for JPY; -1 where ISO 4217 lists N/A)
 );
 
 public static class CurrencyCatalog
@@ -40,7 +41,6 @@ public static class CurrencyCatalog
             new("BMD",  60, "Bermudian Dollar",                    2),
             new("BND",  96, "Brunei Dollar",                       2),
             new("BOB",  68, "Boliviano",                           2),
-            new("BOV", 984, "Mvdol",                               2),
             new("BRL", 986, "Brazilian Real",                      2),
             new("BSD",  44, "Bahamian Dollar",                     2),
             new("BTN",  64, "Ngultrum",                            2),
@@ -51,13 +51,9 @@ public static class CurrencyCatalog
             new("CAD", 124, "Canadian Dollar",                     2),
             new("CDF", 976, "Congolese Franc",                     2),
             new("CHF", 756, "Swiss Franc",                         2),
-            new("CHE", 947, "WIR Euro",                            2),
-            new("CHW", 948, "WIR Franc",                           2),
-            new("CLF", 990, "Unidad de Fomento",                   4),
             new("CLP", 152, "Chilean Peso",                        0),
             new("CNY", 156, "Yuan Renminbi",                       2),
             new("COP", 170, "Colombian Peso",                      2),
-            new("COU", 970, "Unidad de Valor Real",                2),
             new("CRC", 188, "Costa Rican Col\u00f3n",              2),
             new("CUP", 192, "Cuban Peso",                          2),
             new("CVE", 132, "Cabo Verde Escudo",                   2),
@@ -130,7 +126,6 @@ public static class CurrencyCatalog
             new("MVR", 462, "Rufiyaa",                             2),
             new("MWK", 454, "Malawi Kwacha",                       2),
             new("MXN", 484, "Mexican Peso",                        2),
-            new("MXV", 979, "Mexican Unidad de Inversion (UDI)",   2),
             new("MYR", 458, "Malaysian Ringgit",                   2),
             new("MZN", 943, "Mozambique Metical",                  2),
             // N
@@ -187,27 +182,21 @@ public static class CurrencyCatalog
             new("UAH", 980, "Hryvnia",                             2),
             new("UGX", 800, "Uganda Shilling",                     0),
             new("USD", 840, "US Dollar",                           2),
-            new("USN", 997, "US Dollar (Next day)",                2),
-            new("UYI", 940, "Uruguay Peso en Unidades Indexadas (UI)", 0),
             new("UYU", 858, "Peso Uruguayo",                       2),
-            new("UYW", 927, "Unidad Previsional",                  4),
             new("UZS", 860, "Uzbekistan Sum",                      2),
             // V
-            new("VED", 926, "Bol\u00edvar Soberano",               2),
             new("VES", 928, "Bol\u00edvar Soberano",               2),
             new("VND", 704, "Dong",                                0),
             new("VUV", 548, "Vatu",                                0),
             // W
             new("WST", 882, "Tala",                                2),
-            // X — supranational and fund codes (MinorUnit = -1 where ISO 4217 lists N/A)
-            new("XAD", 396, "Arab Accounting Dinar",               2),
+            // X — remaining X-series codes in the catalog (MinorUnit = -1 where ISO 4217 lists N/A)
             new("XAF", 950, "CFA Franc BEAC",                      0),
             new("XBA", 955, "Bond Markets Unit European Composite Unit (EURCO)",      -1),
             new("XBB", 956, "Bond Markets Unit European Monetary Unit (E.M.U.-6)",    -1),
             new("XBC", 957, "Bond Markets Unit European Unit of Account 9 (EUA-9)",   -1),
             new("XBD", 958, "Bond Markets Unit European Unit of Account 17 (EUA-17)", -1),
             new("XCD", 951, "East Caribbean Dollar",               2),
-            new("XCG", 532, "Caribbean Guilder",                   2),
             new("XDR", 960, "SDR (Special Drawing Right)",         -1),
             new("XOF", 952, "CFA Franc BCEAO",                     0),
             new("XPF", 953, "CFP Franc",                           0),
@@ -218,7 +207,6 @@ public static class CurrencyCatalog
             // Z
             new("ZAR", 710, "Rand",                                2),
             new("ZMW", 967, "Zambian Kwacha",                      2),
-            new("ZWG", 924, "Zimbabwe Gold",                       2),
         }
         .ToFrozenDictionary(e => e.AlphaCode, StringComparer.OrdinalIgnoreCase);
 }
