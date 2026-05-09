@@ -20,6 +20,7 @@
 - Workspace maintenance commands in the VS Code extension can stay dependency-free: built-in `https` plus `withProgress` is enough to fetch official source artifacts into repo-relative paths with clear success/error UX.
 - ISO 4217 refresh belongs in `.vscode/tasks.json`, not the extension command surface; keep one-off workspace maintenance flows as explicit tasks backed by repo-local scripts.
 - The historical SIX Group `iso-4217/lists/list-one.xml` URL now returns 404; the live XML currently resolves under SIX's `iso-currrency/lists/list-one.xml` path, so repo-local refresh tooling should handle source drift explicitly rather than baking brittle editor commands into the extension.
+- ISO 4217 reference data now lives in source control at `src/Precept/Data/Iso4217/list-one.xml`, and `CurrencyCatalogSyncTests` now always executes with plain `[Fact]` so catalog drift surfaces as a real failure instead of a discovery-time skip.
 
 ## Recent Updates
 
