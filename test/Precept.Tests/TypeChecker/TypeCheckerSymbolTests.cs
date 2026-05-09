@@ -319,6 +319,76 @@ public class TypeCheckerSymbolTests
             .DeclaredQualifiers.Should().BeEmpty();
     }
 
+    [Fact]
+    public void QuantityInRad_DoesNotDeriveCountQualifierCategory()
+    {
+        var qualifier = GetUnitQualifier("Angle", "quantity in 'rad'");
+
+        qualifier.UnitCode.Should().Be("rad");
+        qualifier.DimensionName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void QuantityInDeg_DoesNotDeriveCountQualifierCategory()
+    {
+        var qualifier = GetUnitQualifier("AngleDegrees", "quantity in 'deg'");
+
+        qualifier.UnitCode.Should().Be("deg");
+        qualifier.DimensionName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void QuantityInSteradian_DoesNotDeriveCountQualifierCategory()
+    {
+        var qualifier = GetUnitQualifier("SolidAngle", "quantity in 'sr'");
+
+        qualifier.UnitCode.Should().Be("sr");
+        qualifier.DimensionName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void QuantityInUnity_DerivesCountQualifierCategory()
+    {
+        var qualifier = GetUnitQualifier("Ratio", "quantity in '1'");
+
+        qualifier.UnitCode.Should().Be("1");
+        qualifier.DimensionName.Should().Be("count");
+    }
+
+    [Fact]
+    public void QuantityInPercent_DerivesCountQualifierCategory()
+    {
+        var qualifier = GetUnitQualifier("Percent", "quantity in '%'");
+
+        qualifier.UnitCode.Should().Be("%");
+        qualifier.DimensionName.Should().Be("count");
+    }
+
+    [Fact]
+    public void QuantityInKilogram_DerivesMassQualifierCategory()
+    {
+        var qualifier = GetUnitQualifier("Weight", "quantity in 'kg'");
+
+        qualifier.UnitCode.Should().Be("kg");
+        qualifier.DimensionName.Should().Be("mass");
+    }
+
+    private static DeclaredQualifierMeta.Unit GetUnitQualifier(string fieldName, string typeReference)
+    {
+        var precept = $"""
+            precept Widget
+            field {fieldName} as {typeReference}
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        var qualifier = index.Fields.Single(f => f.Name == fieldName)
+            .DeclaredQualifiers.Should().ContainSingle().Which;
+
+        return qualifier.Should().BeOfType<DeclaredQualifierMeta.Unit>().Which;
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  4. Modifier preservation
     // ════════════════════════════════════════════════════════════════════════

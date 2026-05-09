@@ -27,6 +27,7 @@
 - `UcumCatalog` Tier 1 browsing cannot assume every curated code is a direct `UcumAtomCatalog.All` key: prefixed units and compact exponent forms like `m2` need synthesized tier entries built from UCUM parsing/normalization while `LookupAtom` continues to expose the full atom catalog.
 - `UcumAtomCatalog` is now the sole UCUM catalog source of truth: `All` remains the full XML-backed universe, `BrowseTier1()` caches the curated completion list in declared order, derived Tier 1 forms still synthesize via `UcumParser`, and `UcumCatalog` is reduced to a thin compatibility shim.
 - Q4 registry alignment should expose canonical `All` registries and keep alias lookups separate: `TemporalUnits.All` is singular-keyed while `TryGet(...)` stays backed by an alias map, and `precept_language` should surface business-domain registries under a dedicated `domains` object instead of scattering ad hoc fields.
+- Unit qualifier derivation in `TypeChecker` must treat dimensionless UCUM codes as a code-aware classification problem: known count units (`1`, `%`, ppm-family, `each`, arbitrary-unit forms, `dB`, `[pH]`) map to `count`, while angle and solid-angle units (`rad`, `deg`, `'`, `''`, `gon`, `sr`, plus derived forms using those atoms) must bypass the `DimensionVector.None -> count` fallback.
 
 ### 2026-05-09T11:33:49Z — Commit batching: catalog DU + pipeline + analyzers
 
