@@ -104,7 +104,7 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     private static IEnumerable<Precept.Language.ModifierMeta> GetModifiers(Precept.Language.ModifierDomain domain) => domain switch
     {
-        Precept.Language.ModifierDomain.Field => Precept.Language.Modifiers.All.OfType<Precept.Language.FieldModifierMeta>(),
+        Precept.Language.ModifierDomain.Field => Precept.Language.Modifiers.All.OfType<Precept.Language.ValueModifierMeta>(),
         Precept.Language.ModifierDomain.State => Precept.Language.Modifiers.All.OfType<Precept.Language.StateModifierMeta>(),
         Precept.Language.ModifierDomain.Event => Precept.Language.Modifiers.All.OfType<Precept.Language.EventModifierMeta>(),
         Precept.Language.ModifierDomain.Access => Precept.Language.Modifiers.All.OfType<Precept.Language.AccessModifierMeta>(),
