@@ -59,4 +59,46 @@ public sealed class ActionSecondaryDispatchRegressionTests
         compilation.HasErrors.Should().BeFalse();
         compilation.Diagnostics.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Insert_PlainListField_NoModifiers_CompilesClean()
+    {
+        var compilation = Compiler.Compile("""
+            precept TaskQueue
+            field Steps as list of string
+            field Position as number default 0 nonnegative
+            state Active initial
+            state Done terminal
+            event Add(NewStep as string, Position as number)
+            event Finish
+            from Active on Add
+                -> insert Steps Add.NewStep at Add.Position
+                -> no transition
+            from Active on Finish -> transition Done
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+        compilation.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Insert_WithNotemptyField_CompilesClean()
+    {
+        var compilation = Compiler.Compile("""
+            precept TaskQueue
+            field Steps as list of string notempty
+            field Position as number default 0 nonnegative
+            state Active initial
+            state Done terminal
+            event Add(NewStep as string, Position as number)
+            event Finish
+            from Active on Add
+                -> insert Steps Add.NewStep at Add.Position
+                -> no transition
+            from Active on Finish -> transition Done
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+        compilation.Diagnostics.Should().BeEmpty();
+    }
 }

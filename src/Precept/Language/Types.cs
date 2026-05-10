@@ -137,8 +137,8 @@ public static class Types
 
     // ── Collection accessor helpers ─────────────────────────────────────────────
 
-    private static readonly FixedReturnAccessor CollectionCountAccessor =
-        new("count", TypeKind.Integer, "Number of elements");
+    internal static readonly FixedReturnAccessor CollectionCountAccessor =
+        new("count", TypeKind.Integer, "Number of elements", ReturnNonnegative: true);
 
     private static readonly TypeAccessor[] SetAccessors =
     [

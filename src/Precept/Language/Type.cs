@@ -89,12 +89,14 @@ public record TypeAccessor(
 /// <summary>
 /// An accessor with a fixed return type (e.g., <c>.count → integer</c>,
 /// <c>.currency → currency</c>). <see cref="ReturnsQualifier"/> indicates
-/// the accessor returns the qualifier value on the named axis.
+/// the accessor returns the qualifier value on the named axis. <see cref="ReturnNonnegative"/>
+/// marks accessors whose numeric result is structurally guaranteed to be ≥ 0.
 /// </summary>
 public sealed record FixedReturnAccessor(
     string        Name,
     TypeKind      Returns,
     string        Description,
+    bool          ReturnNonnegative = false,
     TypeKind?     ParameterType    = null,
     TypeTrait     RequiredTraits   = TypeTrait.None,
     ProofRequirement[]? ProofRequirements = null,

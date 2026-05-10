@@ -14,9 +14,6 @@ public static class Actions
 
     private static readonly TypeTarget[] AnyType = []; // empty = caller validates
 
-    private static readonly FixedReturnAccessor CollectionCount =
-        new FixedReturnAccessor("count", TypeKind.Integer, "Number of elements");
-
     private static readonly TypeTarget[] SetOnly = [new(TypeKind.Set)];
     private static readonly TypeTarget[] QueueOnly = [new(TypeKind.Queue)];
     private static readonly TypeTarget[] StackOnly = [new(TypeKind.Stack)];
@@ -99,7 +96,7 @@ public static class Actions
             [new(TypeKind.Queue), new(TypeKind.QueueBy)], ActionSyntaxShape.CollectionInto,
             ProofRequirements:
             [
-                new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
+                new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
                     "Queue must be non-empty"),
             ],
             AllowedIn: AllActionContexts,
@@ -119,7 +116,7 @@ public static class Actions
             StackOnly, ActionSyntaxShape.CollectionInto,
             ProofRequirements:
             [
-                new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
+                new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
                     "Stack must be non-empty"),
             ],
             AllowedIn: AllActionContexts,
@@ -158,7 +155,7 @@ public static class Actions
             ActionSyntaxShape.InsertAt, ValueRequired: true,
             ProofRequirements:
             [
-                new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThanOrEqual, 0m,
+                new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThanOrEqual, 0m,
                     "Index must be within bounds (0 to count)"),
             ],
             AllowedIn: AllActionContexts,
@@ -172,7 +169,7 @@ public static class Actions
             ActionSyntaxShape.RemoveAtIndex,
             ProofRequirements:
             [
-                new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
+                new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
                     "Index must be within bounds"),
             ],
             AllowedIn: AllActionContexts,
@@ -204,7 +201,7 @@ public static class Actions
             ActionSyntaxShape.CollectionIntoBy,
             ProofRequirements:
             [
-                new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
+                new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
                     "Queue must be non-empty"),
             ],
             AllowedIn: AllActionContexts,

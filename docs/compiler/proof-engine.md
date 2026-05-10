@@ -597,9 +597,14 @@ bool TryLiteralProof(ProofObligation obligation)
 
 #### Strategy 2: Declaration Attribute Proof
 
-**When it applies:** The obligation can be discharged from declaration-site attributes of the subject — field modifiers, modifier-implied metadata, or resolved period dimension.
+**When it applies:** The obligation can be discharged from declaration-site attributes of the subject — field modifiers, modifier-implied metadata, resolved period dimension, or resolved result metadata on the subject expression/accessor.
 
-**How it works:** Resolve the subject, read the relevant declaration attribute, then either check the requirement directly (dimension, required modifier) or consult modifier-declared `ProofSatisfactions` metadata for bound-establishing modifiers.
+**How it works:** Resolve the subject, read the relevant declaration attribute, then either check the requirement directly (dimension, required modifier, known non-negative return metadata) or consult modifier-declared `ProofSatisfactions` metadata for bound-establishing modifiers.
+
+**Non-negative result metadata (two discharge paths):**
+
+- **`FunctionReturnSatisfies`** — when the proof site resolves to a `TypedFunctionCall` and the resolved `FunctionOverload` has `ReturnNonnegative = true`, Strategy 2 discharges `NumericProofRequirement(>=, 0)` directly from the catalog metadata. Example: `abs(X)` is non-negative regardless of `X`, so `sqrt(abs(X))` does not require a user-declared `nonnegative` modifier on an intermediate field.
+- **`FixedReturnAccessor.ReturnNonnegative`** — when the obligation subject is `SelfSubject` with a `FixedReturnAccessor` whose `ReturnNonnegative = true`, Strategy 2 discharges `NumericProofRequirement(>=, 0)` trivially. `CollectionCountAccessor` uses this path because collection counts can never be negative. This handles `insert` / `insert-at` proof requirements on plain collection fields without requiring user-declared `notempty`.
 
 **Modifier → ProofSatisfaction Mapping:**
 
@@ -722,15 +727,32 @@ bool TryDeclarationAttributeProof(ProofObligation obligation, SemanticIndex sema
     };
     if (subject is null) return false;
 
-    var attributeFieldName = GetFieldName(subject, obligation.Site);
+    var resolvedSubject = ResolveSubject(subject, obligation.Site);
+
+    if (resolvedSubject is TypedFunctionCall functionCall
+        && FunctionReturnSatisfies(functionCall, obligation.Requirement))
+    {
+        return true;
+    }
+
+    var attributeFieldName = GetFieldName(resolvedSubject);
     if (attributeFieldName is null) return false;
 
     if (!semantics.FieldsByName.TryGetValue(attributeFieldName, out var attributeField))
         return false;
 
-    foreach (var modifier in attributeField.Modifiers)
+    if (subject is SelfSubject { Accessor: FixedReturnAccessor { ReturnNonnegative: true } }
+        && obligation.Requirement is NumericProofRequirement {
+            Comparison: OperatorKind.GreaterThanOrEqual,
+            Threshold: 0m
+        })
     {
-        var meta = Modifiers.GetMeta(modifier.Kind);
+        return true;
+    }
+
+    foreach (var modifier in attributeField.Modifiers.Concat(attributeField.ImpliedModifiers))
+    {
+        var meta = Modifiers.GetMeta(modifier);
 
         foreach (var satisfaction in meta.ProofSatisfactions)
         {
@@ -752,6 +774,10 @@ bool TryDeclarationAttributeProof(ProofObligation obligation, SemanticIndex sema
     return false;
 }
 
+// FunctionReturnSatisfies: for NumericProofRequirement(>=, 0), resolve the matched
+// overload and return overload.ReturnNonnegative.
+// FixedReturnAccessor.ReturnNonnegative: for SelfSubject(accessor) obligations,
+// a true flag discharges NumericProofRequirement(>=, 0) before modifier lookup.
 // SatisfactionCovers: checks whether a ProofSatisfaction entry covers a requirement.
 // For NumericProofRequirement: satisfaction.RequirementKind == Numeric
 //   AND satisfaction.Comparison subsumes requirement.Comparison at satisfaction.Bound.
@@ -833,7 +859,9 @@ Strategy 2 dispatches across three carrier surfaces by requirement kind:
 
 | Requirement Kind | Carrier | Read Path |
 |---|---|---|
-| `NumericProofRequirement` | `ValueModifierMeta.ProofSatisfactions` | Walk field's effective modifiers, check each satisfaction entry |
+| `NumericProofRequirement` | `FunctionOverload.ReturnNonnegative` | If the resolved subject is a `TypedFunctionCall`, check the matched overload's `ReturnNonnegative` flag |
+| `NumericProofRequirement` | `FixedReturnAccessor.ReturnNonnegative` | If the requirement subject is `SelfSubject(accessor)` and the accessor flag is true, discharge `>= 0` trivially |
+| `NumericProofRequirement` | `ValueModifierMeta.ProofSatisfactions` | Otherwise walk the field's effective modifiers and check each satisfaction entry |
 | `PresenceProofRequirement` | `DeclaredPresenceMeta` | Read `field.Presence`, check for `Guaranteed` subtype |
 | `DimensionProofRequirement` | `DeclaredQualifierMeta` | Read `field.DeclaredQualifiers`, find `TemporalDimension` entry |
 | `ModifierRequirement` | Direct membership | `field.Modifiers.Contains(required)` — no carrier metadata |
@@ -1435,7 +1463,7 @@ Collection non-empty obligations arise from several sources:
 | `dequeue Collection` action | Queue must be non-empty |
 | `pop Collection` action | Stack must be non-empty |
 
-**Ownership (PE-G9):** The type checker owns collection safety diagnostics (`UnguardedCollectionAccess` code 63, `UnguardedCollectionMutation` code 64). Collection non-empty requirements are encoded as `NumericProofRequirement(SelfSubject(CollectionCount), GreaterThan, 0)` in the catalog. The proof engine processes them as ordinary numeric obligations through Strategies 1/2/3 — no special collection-specific logic or diagnostic codes are needed.
+**Ownership (PE-G9):** The type checker owns collection safety diagnostics (`UnguardedCollectionAccess` code 63, `UnguardedCollectionMutation` code 64). Collection non-empty requirements are encoded as `NumericProofRequirement(SelfSubject(CollectionCountAccessor), GreaterThan, 0)` in the catalog. The proof engine processes them as ordinary numeric obligations through Strategies 1/2/3 — no special collection-specific logic or diagnostic codes are needed.
 
 If the obligation is unresolved after all strategies, the `FaultSiteLink` maps to `FaultCode.CollectionEmptyOnAccess` or `CollectionEmptyOnMutation`, which are already linked to the type checker's diagnostics via `[StaticallyPreventable]`.
 

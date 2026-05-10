@@ -414,6 +414,18 @@ public static class ProofEngine
         if (attributeFieldName is null) return false;
         if (!semantics.FieldsByName.TryGetValue(attributeFieldName, out var attributeField)) return false;
 
+        // Accessor-level nonnegative guarantee: collection count can never be negative,
+        // so discharge >= 0 trivially without requiring user-declared modifiers.
+        if (reqSubject is SelfSubject { Accessor: FixedReturnAccessor { ReturnNonnegative: true } }
+            && obligation.Requirement is NumericProofRequirement
+            {
+                Comparison: OperatorKind.GreaterThanOrEqual,
+                Threshold: 0m,
+            })
+        {
+            return true;
+        }
+
         // Walk declared + implied modifiers
         foreach (var modifier in attributeField.Modifiers.Concat(attributeField.ImpliedModifiers))
         {

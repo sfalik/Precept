@@ -484,6 +484,24 @@ public class TypesTests
         }
     }
 
+    [Theory]
+    [InlineData(TypeKind.Set)]
+    [InlineData(TypeKind.Queue)]
+    [InlineData(TypeKind.Stack)]
+    [InlineData(TypeKind.Bag)]
+    [InlineData(TypeKind.List)]
+    [InlineData(TypeKind.Log)]
+    [InlineData(TypeKind.LogBy)]
+    [InlineData(TypeKind.QueueBy)]
+    [InlineData(TypeKind.Lookup)]
+    public void CollectionCountAccessor_ReturnNonnegative_IsTrue(TypeKind kind)
+    {
+        var accessor = Types.GetMeta(kind).Accessors.Single(a => a.Name == "count");
+
+        accessor.Should().BeOfType<FixedReturnAccessor>()
+            .Which.ReturnNonnegative.Should().BeTrue();
+    }
+
     // M6 ── ImpliedModifiers ─────────────────────────────────────────────────
 
     [Theory]
