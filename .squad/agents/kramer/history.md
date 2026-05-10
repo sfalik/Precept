@@ -44,3 +44,8 @@
 ### 2026-05-10T05:25:00Z — Slice 20 shared symbol navigation landed
 - `SymbolNavigation` now centralizes declaration/reference lookup for fields, states, events, and event args, and the server capability surface registers references plus document highlights through the shared composition path.
 - The durable event-arg rule is still explicit: qualified arg references can share the broad semantic site for navigation/highlights, but rename must trim edits back to the identifier token.
+
+### 2026-05-10T08:25:21.928-04:00 — Status bar activation gap closed
+- The VS Code extension manifest now activates on onLanguage:precept as well as workspaceContains:**/*.precept, so the language-server status item appears in single-file and no-workspace editor sessions instead of only in workspaces that already contain .precept files.
+- Added manifest coverage in ExtensionManifestTests to lock both activation paths, and updated docs\tooling\extension.md to document the single-file activation behavior.
+
