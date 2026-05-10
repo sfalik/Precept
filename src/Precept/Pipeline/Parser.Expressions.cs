@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -477,6 +478,36 @@ public static partial class Parser
             return args.ToImmutable();
         }
 
+        private bool TryParseStringExpression(out string message, out SourceSpan span)
+        {
+            if (Peek().Kind == TokenKind.StringLiteral)
+            {
+                var literal = Advance();
+                message = literal.Text;
+                span = literal.Span;
+                return true;
+            }
+
+            if (Peek().Kind == TokenKind.StringStart)
+            {
+                var interpolation = ParseInterpolatedString();
+                message = interpolation is InterpolatedStringExpression interpolated
+                    ? string.Concat(interpolated.Segments.Select(segment => segment switch
+                    {
+                        TextSegment text => text.Text,
+                        HoleSegment => "{}",
+                        _ => string.Empty,
+                    }))
+                    : string.Empty;
+                span = interpolation.Span;
+                return true;
+            }
+
+            message = string.Empty;
+            span = SourceSpan.Missing;
+            return false;
+        }
+
         // ═══════════════════════════════════════════════════════════════════════════════
         //  Slot-level entry points — called from Parser.cs slot dispatch
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -647,13 +678,10 @@ public static partial class Parser
         [HandlesCatalogMember(OutcomeArgumentKind.RequiredStringLiteral)]
         private ParsedOutcome ParseOutcomeStringLiteralArg(Token arrowToken, Token leadingToken)
         {
-            // Expects: string literal (reason)
-            var token = Peek();
-            if (token.Kind == TokenKind.StringLiteral)
+            if (TryParseStringExpression(out var message, out var messageSpan))
             {
-                Advance();
-                var span = SourceSpan.Covering(arrowToken.Span, token.Span);
-                return new RejectOutcome(token.Text, span);
+                var span = SourceSpan.Covering(arrowToken.Span, messageSpan);
+                return new RejectOutcome(message, span);
             }
             // Missing reason — malformed
             _diagnostics.Add(Language.Diagnostics.Create(

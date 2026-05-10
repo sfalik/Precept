@@ -617,7 +617,8 @@ internal static partial class TypeChecker
             case AssignAction assign:
             {
                 (fieldName, fieldType) = ResolveActionTarget(assign.Target, ctx);
-                var value = Resolve(assign.Value, ctx);
+                var value = Resolve(assign.Value, ctx,
+                    fieldType != TypeKind.Error ? fieldType : null);
                 return new TypedInputAction(
                     assign.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -630,7 +631,10 @@ internal static partial class TypeChecker
             case CollectionValueAction colVal:
             {
                 (fieldName, fieldType) = ResolveActionTarget(colVal.Target, ctx);
-                var value = Resolve(colVal.Value, ctx);
+                var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
+                    ? fieldMeta.ElementType
+                    : null;
+                var value = Resolve(colVal.Value, ctx, valueExpectedType);
                 return new TypedInputAction(
                     colVal.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -665,8 +669,14 @@ internal static partial class TypeChecker
             case CollectionValueByAction colBy:
             {
                 (fieldName, fieldType) = ResolveActionTarget(colBy.Target, ctx);
-                var value = Resolve(colBy.Value, ctx);
-                var key = Resolve(colBy.OrderingKey, ctx);
+                var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
+                    ? fieldMeta.ElementType
+                    : null;
+                var keyExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var keyFieldMeta)
+                    ? keyFieldMeta.KeyType
+                    : null;
+                var value = Resolve(colBy.Value, ctx, valueExpectedType);
+                var key = Resolve(colBy.OrderingKey, ctx, keyExpectedType);
                 // D5: SecondaryRole = Key, SecondaryExpression = key
                 Debug.Assert(key is not null, "D5: SecondaryExpression for CollectionValueBy must not be null");
                 return new TypedInputAction(
@@ -681,8 +691,11 @@ internal static partial class TypeChecker
             case InsertAtAction insertAt:
             {
                 (fieldName, fieldType) = ResolveActionTarget(insertAt.Target, ctx);
-                var value = Resolve(insertAt.Value, ctx);
-                var index = Resolve(insertAt.Index, ctx);
+                var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
+                    ? fieldMeta.ElementType
+                    : null;
+                var value = Resolve(insertAt.Value, ctx, valueExpectedType);
+                var index = Resolve(insertAt.Index, ctx, TypeKind.Integer);
                 // D5: SecondaryRole = Index, SecondaryExpression = index
                 Debug.Assert(index is not null, "D5: SecondaryExpression for InsertAt must not be null");
                 return new TypedInputAction(
@@ -697,7 +710,7 @@ internal static partial class TypeChecker
             case RemoveAtAction removeAt:
             {
                 (fieldName, fieldType) = ResolveActionTarget(removeAt.Target, ctx);
-                var index = Resolve(removeAt.Index, ctx);
+                var index = Resolve(removeAt.Index, ctx, TypeKind.Integer);
                 // RemoveAt has an index but no value — use TypedInputAction with index as primary
                 return new TypedInputAction(
                     removeAt.Kind, fieldName, fieldType,
@@ -711,8 +724,14 @@ internal static partial class TypeChecker
             case PutKeyValueAction put:
             {
                 (fieldName, fieldType) = ResolveActionTarget(put.Target, ctx);
-                var value = Resolve(put.Value, ctx);
-                var key = Resolve(put.Key, ctx);
+                var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
+                    ? fieldMeta.ElementType
+                    : null;
+                var keyExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var keyFieldMeta)
+                    ? keyFieldMeta.KeyType
+                    : null;
+                var value = Resolve(put.Value, ctx, valueExpectedType);
+                var key = Resolve(put.Key, ctx, keyExpectedType);
                 // D5: SecondaryRole = Key, SecondaryExpression = key
                 Debug.Assert(key is not null, "D5: SecondaryExpression for PutKeyValue must not be null");
                 return new TypedInputAction(

@@ -237,8 +237,7 @@ internal static partial class TypeChecker
     }
 
     /// <summary>
-    /// Structural validation sub-pass: computed-field cycle detection and
-    /// forward-reference belt-and-suspenders validation.
+    /// Structural validation sub-pass: computed-field cycle detection.
     /// Reads <see cref="CheckContext.ComputedDeps"/> (populated during computed expression
     /// resolution) and <see cref="CheckContext.Fields"/>.
     /// </summary>
@@ -272,33 +271,6 @@ internal static partial class TypeChecker
             }
         }
 
-        // ── Forward-reference belt-and-suspenders ─────────────────────────
-        // Verify computed field deps don't reference fields declared after the computed field.
-        // This is a redundant check — ResolveIdentifier already enforces D8 at expression
-        // resolution time. This pass catches any gap if expression resolution was bypassed.
-        if (ctx.ComputedDeps.Count > 0)
-        {
-            var fieldIndex = new Dictionary<string, int>(ctx.Fields.Count);
-            for (int i = 0; i < ctx.Fields.Count; i++)
-                fieldIndex[ctx.Fields[i].Name] = i;
-
-            foreach (var dep in ctx.ComputedDeps)
-            {
-                if (!fieldIndex.TryGetValue(dep.FieldName, out var sourceIdx)) continue;
-
-                foreach (var target in dep.DependsOn)
-                {
-                    if (fieldIndex.TryGetValue(target, out var targetIdx) && targetIdx >= sourceIdx)
-                    {
-                        // Find the field's syntax span for the diagnostic
-                        var field = ctx.FieldLookup[dep.FieldName];
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(DiagnosticCode.DefaultForwardReference, field.Syntax.Span,
-                                dep.FieldName, target));
-                    }
-                }
-            }
-        }
     }
 
     /// <summary>

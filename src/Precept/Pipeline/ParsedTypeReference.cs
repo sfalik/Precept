@@ -48,6 +48,7 @@ public sealed record CollectionTypeReference(
     TypeMeta CollectionType,
     ParsedTypeReference ElementType,
     ParsedTypeReference? KeyType,
+    TokenKind? OrderingModifier,
     SourceSpan Span)
     : ParsedTypeReference(Span);
 

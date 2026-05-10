@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -30,11 +31,8 @@ public static class NameBinder
         // Build lookup dictionaries after Pass 1
         binder.BuildDictionaries();
 
-        // Pass 2: Resolve references
-        foreach (var construct in manifest.Constructs)
-        {
-            binder.ResolveReferences(construct);
-        }
+        // Pass 2: Resolve references (computed fields in dependency order)
+        binder.ResolveAllReferences(manifest.Constructs);
 
         return binder.ToSymbolTable();
     }
@@ -190,6 +188,165 @@ public static class NameBinder
         public void BuildDictionaries()
         {
             // Already built during Pass 1 into working dictionaries
+        }
+
+        public void ResolveAllReferences(ImmutableArray<ParsedConstruct> constructs)
+        {
+            var computedConstructs = new List<ParsedConstruct>();
+
+            foreach (var construct in constructs)
+            {
+                if (construct.Meta.Kind == ConstructKind.FieldDeclaration
+                    && construct.GetSlot<ComputeExpressionSlot>(ConstructSlotKind.ComputeExpression) is not null)
+                {
+                    computedConstructs.Add(construct);
+                    continue;
+                }
+
+                ResolveReferences(construct);
+            }
+
+            foreach (var construct in OrderComputedConstructsByDependency(computedConstructs))
+                ResolveReferences(construct);
+        }
+
+        private IReadOnlyList<ParsedConstruct> OrderComputedConstructsByDependency(
+            IReadOnlyList<ParsedConstruct> computedConstructs)
+        {
+            if (computedConstructs.Count == 0)
+                return [];
+
+            var constructByField = new Dictionary<string, ParsedConstruct>(StringComparer.Ordinal);
+            var dependencies = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            var dependents = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+            foreach (var construct in computedConstructs)
+            {
+                var idSlot = construct.GetSlot<IdentifierListSlot>(ConstructSlotKind.IdentifierList);
+                if (idSlot is null)
+                    continue;
+
+                foreach (var fieldName in idSlot.Names)
+                {
+                    constructByField[fieldName] = construct;
+                    dependencies[fieldName] = [];
+                    dependents[fieldName] = [];
+                }
+            }
+
+            foreach (var (fieldName, construct) in constructByField)
+            {
+                var computeSlot = construct.GetSlot<ComputeExpressionSlot>(ConstructSlotKind.ComputeExpression);
+                if (computeSlot is null)
+                    continue;
+
+                var refs = new HashSet<string>(StringComparer.Ordinal);
+                CollectFieldDependencies(computeSlot.Expression, refs, ImmutableHashSet<string>.Empty);
+
+                foreach (var dep in refs.Where(constructByField.ContainsKey))
+                {
+                    if (dep == fieldName)
+                        continue;
+
+                    dependencies[fieldName].Add(dep);
+                    dependents[dep].Add(fieldName);
+                }
+            }
+
+            var queue = new Queue<string>(dependencies.Where(kvp => kvp.Value.Count == 0).Select(kvp => kvp.Key));
+            var orderedFields = new List<string>(dependencies.Count);
+
+            while (queue.Count > 0)
+            {
+                var next = queue.Dequeue();
+                orderedFields.Add(next);
+
+                foreach (var dependent in dependents[next].ToArray())
+                {
+                    dependencies[dependent].Remove(next);
+                    if (dependencies[dependent].Count == 0)
+                        queue.Enqueue(dependent);
+                }
+            }
+
+            var cyclic = dependencies.Where(kvp => kvp.Value.Count > 0).Select(kvp => kvp.Key).ToHashSet(StringComparer.Ordinal);
+            foreach (var fieldName in cyclic)
+            {
+                var cycle = string.Join(" → ", dependencies[fieldName].Where(cyclic.Contains).Prepend(fieldName));
+                _diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.CircularComputedField,
+                    constructByField[fieldName].Span,
+                    fieldName,
+                    cycle));
+            }
+
+            foreach (var field in cyclic)
+                orderedFields.Add(field);
+
+            return orderedFields
+                .Select(field => constructByField[field])
+                .Distinct()
+                .ToArray();
+        }
+
+        private static void CollectFieldDependencies(
+            ParsedExpression expression,
+            ISet<string> refs,
+            ImmutableHashSet<string> bindings)
+        {
+            switch (expression)
+            {
+                case IdentifierExpression id:
+                    if (!bindings.Contains(id.Name))
+                        refs.Add(id.Name);
+                    break;
+                case GroupedExpression grouped:
+                    CollectFieldDependencies(grouped.Inner, refs, bindings);
+                    break;
+                case BinaryOperationExpression binary:
+                    CollectFieldDependencies(binary.Left, refs, bindings);
+                    CollectFieldDependencies(binary.Right, refs, bindings);
+                    break;
+                case UnaryOperationExpression unary:
+                    CollectFieldDependencies(unary.Operand, refs, bindings);
+                    break;
+                case MemberAccessExpression member:
+                    CollectFieldDependencies(member.Target, refs, bindings);
+                    break;
+                case ConditionalExpression conditional:
+                    CollectFieldDependencies(conditional.Condition, refs, bindings);
+                    CollectFieldDependencies(conditional.ThenBranch, refs, bindings);
+                    CollectFieldDependencies(conditional.ElseBranch, refs, bindings);
+                    break;
+                case FunctionCallExpression functionCall:
+                    foreach (var argument in functionCall.Arguments)
+                        CollectFieldDependencies(argument, refs, bindings);
+                    break;
+                case MethodCallExpression methodCall:
+                    CollectFieldDependencies(methodCall.Target, refs, bindings);
+                    foreach (var argument in methodCall.Arguments)
+                        CollectFieldDependencies(argument, refs, bindings);
+                    break;
+                case ListLiteralExpression list:
+                    foreach (var element in list.Elements)
+                        CollectFieldDependencies(element, refs, bindings);
+                    break;
+                case PostfixOperationExpression postfix:
+                    CollectFieldDependencies(postfix.Operand, refs, bindings);
+                    break;
+                case QuantifierExpression quantifier:
+                    CollectFieldDependencies(quantifier.Collection, refs, bindings);
+                    CollectFieldDependencies(quantifier.Predicate, refs, bindings.Add(quantifier.BindingName));
+                    break;
+                case CIFunctionCallExpression ciFunction:
+                    foreach (var argument in ciFunction.Arguments)
+                        CollectFieldDependencies(argument, refs, bindings);
+                    break;
+                case InterpolatedStringExpression interpolated:
+                    foreach (var segment in interpolated.Segments.OfType<HoleSegment>())
+                        CollectFieldDependencies(segment.Expression, refs, bindings);
+                    break;
+            }
         }
 
         public void ResolveReferences(ParsedConstruct construct)
@@ -495,17 +652,6 @@ public static class NameBinder
             // 3. Field check
             if (_fieldsByName.TryGetValue(name, out var field))
             {
-                // Q7: Forward-reference detection in computed field expressions
-                if (declaringField is not null && field.DeclarationOrder > declaringField.DeclarationOrder)
-                {
-                    _diagnostics.Add(Diagnostics.Create(
-                        DiagnosticCode.UndeclaredField,
-                        span,
-                        name));
-                    _references.Add(new SymbolReference(span, name, new UnresolvedTarget(name, SymbolCategory.Field)));
-                    return;
-                }
-
                 _references.Add(new SymbolReference(span, name, new FieldTarget(field)));
                 return;
             }

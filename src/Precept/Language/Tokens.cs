@@ -497,4 +497,18 @@ public static class Tokens
     /// </summary>
     public static FrozenSet<TokenKind> AccessModeKeywords { get; } =
         All.Where(m => m.IsAccessModeAdjective).Select(m => m.Kind).ToFrozenSet();
+
+    /// <summary>
+    /// Keywords that are valid as member/method names after '.'.
+    /// Derived from type accessor metadata.
+    /// </summary>
+    public static FrozenSet<TokenKind> KeywordsValidAsMemberName { get; } =
+        Types.All
+            .SelectMany(meta => meta.Accessors)
+            .Select(accessor => accessor.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Select(name => Keywords.TryGetValue(name, out var kind) ? kind : (TokenKind?)null)
+            .Where(kind => kind is not null)
+            .Select(kind => kind!.Value)
+            .ToFrozenSet();
 }

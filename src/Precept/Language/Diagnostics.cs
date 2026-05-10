@@ -427,7 +427,7 @@ public static class Diagnostics
             RecoverySteps: ["Use the correct format for this type's constants", "For durations use values like '4 hours' or '30 minutes'"],
             ExampleBefore: "precept Example\nfield D as duration default 'invalid-value'",
             ExampleAfter: "precept Example\nfield D as duration default '4 hours'"),
-        DiagnosticCode.DefaultForwardReference        => new(nameof(DiagnosticCode.DefaultForwardReference),        DiagnosticStage.Type,  Severity.Error,   "Default value for '{0}' cannot reference '{1}', which is declared later",                                                              DiagnosticCategory.Structure,
+        DiagnosticCode.DefaultForwardReference        => new(nameof(DiagnosticCode.DefaultForwardReference),        DiagnosticStage.Type,  Severity.Error,   "Computed expression for '{0}' cannot reference '{1}', which is declared later",                                                         DiagnosticCategory.Structure,
             FixHint: "Reorder field declarations so the referenced field appears before the one with the default",
             TriggerCondition: "A field's default value expression references another field that is declared later in the precept.",
             RecoverySteps: ["Reorder field declarations so referenced fields appear first"],

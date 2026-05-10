@@ -335,7 +335,7 @@ public class TypeCheckerModifierTests
     }
 
     [Fact]
-    public void EventArg_WithWritableModifier_EmitsWritableOnEventArg()
+    public void EventArg_WithWritableModifier_EmitsExpectedToken()
     {
         var precept = """
             precept Widget
@@ -346,7 +346,7 @@ public class TypeCheckerModifierTests
             from Open on Close -> set Status = "done" -> Closed
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.WritableOnEventArg);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ExpectedToken);
     }
 
     [Fact]

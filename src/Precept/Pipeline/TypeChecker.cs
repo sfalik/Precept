@@ -395,8 +395,8 @@ internal static partial class TypeChecker
     /// <summary>
     /// Resolve default and computed expressions on fields. Populates
     /// <see cref="TypedField.DefaultExpression"/>, <see cref="TypedField.ComputedExpression"/>,
-    /// and <see cref="CheckContext.ComputedDeps"/> entries. Uses <see cref="FieldScopeMode.PriorFieldsOnly"/>
-    /// to enforce forward-reference prohibition (D8).
+    /// and <see cref="CheckContext.ComputedDeps"/> entries. Default expressions remain
+    /// prior-field only; computed expressions resolve against all declared fields.
     /// </summary>
     private static void ResolveFieldExpressions(SymbolTable symbols, CheckContext ctx)
     {
@@ -424,7 +424,7 @@ internal static partial class TypeChecker
                 ConstructSlotKind.ComputeExpression);
             if (computeSlot is not null && computeSlot.Expression is not MissingExpression)
             {
-                ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
+                ctx.CurrentScope = FieldScopeMode.AllFields;
                 ctx.CurrentFieldIndex = i;
                 var resolved = Resolve(computeSlot.Expression, ctx, typedField.ResolvedType);
                 ctx.Fields[i] = ctx.Fields[i] with { ComputedExpression = resolved };

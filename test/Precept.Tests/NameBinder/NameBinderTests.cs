@@ -568,7 +568,7 @@ public class NameBinderTests
     #region §7: Forward References
 
     [Fact]
-    public void Bind_ForwardFieldReference_EmitsDiagnostic()
+    public void Bind_ForwardFieldReference_DoesNotEmitDiagnostic()
     {
         var source = """
             precept Order
@@ -579,8 +579,7 @@ public class NameBinderTests
 
         var symbols = CompileAndBind(source);
 
-        // Forward references to Quantity and Price should be flagged
-        symbols.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UndeclaredField));
+        symbols.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UndeclaredField));
     }
 
     [Fact]

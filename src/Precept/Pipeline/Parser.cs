@@ -28,13 +28,9 @@ public static partial class Parser
             .ToFrozenSet();
 
     public static FrozenSet<TokenKind> KeywordsValidAsMemberName { get; } =
-        Types.All
-            .SelectMany(meta => meta.Accessors)
-            .Select(accessor => accessor.Name)
-            .Distinct(StringComparer.Ordinal)
-            .Select(name => Tokens.Keywords.TryGetValue(name, out var kind) ? kind : (TokenKind?)null)
-            .Where(kind => kind is not null)
-            .Select(kind => kind!.Value)
+        Tokens.All
+            .Where(meta => meta.IsValidAsMemberName)
+            .Select(meta => meta.Kind)
             .ToFrozenSet();
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -160,8 +156,10 @@ public static partial class Parser
                     }
                     else
                     {
-                        // B3 disambiguation: peek(2) is the disambiguation token
-                        var disambToken = Peek(2).Kind;
+                        // B3 disambiguation: peek(2) is the disambiguation token.
+                        // For constructs with optional pre-verb guards, the disambiguation
+                        // token can appear after "when <expr>".
+                        var disambToken = ResolveDisambiguationToken(candidates);
                         ConstructKind? resolved = null;
 
                         foreach (var (kind, entry) in candidates)
@@ -197,6 +195,34 @@ public static partial class Parser
                         DiagnosticCode.ExpectedToken, current.Span, "declaration keyword", current.Text));
                     SkipToConstructBoundary();
                 }
+            }
+        }
+
+        private TokenKind ResolveDisambiguationToken(
+            ImmutableArray<(ConstructKind Kind, DisambiguationEntry Entry)> candidates)
+        {
+            var disambToken = Peek(2).Kind;
+            if (disambToken != TokenKind.When)
+                return disambToken;
+
+            var disambCandidates = candidates
+                .SelectMany(candidate => candidate.Entry.DisambiguationTokens ?? [])
+                .Distinct()
+                .ToArray();
+            if (disambCandidates.Length == 0)
+                return disambToken;
+
+            var offset = 3;
+            while (true)
+            {
+                var token = Peek(offset).Kind;
+                if (token == TokenKind.EndOfSource)
+                    return disambToken;
+                if (disambCandidates.Contains(token))
+                    return token;
+                if (ConstructsCatalog.LeadingTokens.Contains(token) && token != TokenKind.When)
+                    return disambToken;
+                offset++;
             }
         }
 
@@ -251,6 +277,20 @@ public static partial class Parser
                     slots.Add(anchorValue);
             }
 
+            if (meta.SupportsPreVerbWhenGuard && Peek().Kind == TokenKind.When)
+            {
+                var guardSlot = ParseGuardClause(new ConstructSlot(
+                    ConstructSlotKind.GuardClause,
+                    IsRequired: false,
+                    TerminationTokens: meta.Entries
+                        .SelectMany(entry => entry.DisambiguationTokens ?? [])
+                        .Distinct()
+                        .ToArray()));
+
+                if (guardSlot.Span != SourceSpan.Missing)
+                    slots.Add(guardSlot);
+            }
+
             // Consume disambiguation keyword (not a slot) — but only if it won't
             // be consumed by the next slot's sub-parser. Arrow serves as both
             // disambiguation token AND ActionChain entry trigger, so we leave it.
@@ -274,6 +314,24 @@ public static partial class Parser
                 var value = ParseSlotValue(slot, meta);
                 if (slot.IsRequired || value.Span != SourceSpan.Missing)
                     slots.Add(value);
+            }
+
+            if (meta.SupportsPostActionEnsure)
+            {
+                var ensureSlot = ParseEnsureClause(new ConstructSlot(
+                    ConstructSlotKind.EnsureClause,
+                    IsRequired: false,
+                    TerminationTokens: [TokenKind.Because]));
+                if (ensureSlot.Span != SourceSpan.Missing)
+                {
+                    slots.Add(ensureSlot);
+
+                    var becauseSlot = ParseBecauseClause(new ConstructSlot(
+                        ConstructSlotKind.BecauseClause,
+                        IsRequired: false));
+                    if (becauseSlot.Span != SourceSpan.Missing)
+                        slots.Add(becauseSlot);
+                }
             }
 
             var endSpan = _position > 0 && !IsTrivia(_tokens[_position - 1].Kind)
@@ -542,13 +600,20 @@ public static partial class Parser
                 lastSpan = keyType.Span;
             }
 
+            TokenKind? orderingModifier = null;
+            if (Peek().Kind is TokenKind.Ascending or TokenKind.Descending)
+            {
+                orderingModifier = Advance().Kind;
+                lastSpan = _tokens[_position - 1].Span;
+            }
+
             if (elementType == null)
             {
                 elementType = new MissingTypeReference(typeSpan);
             }
 
             var span = SourceSpan.Covering(typeSpan, lastSpan);
-            return new CollectionTypeReference(collectionMeta, elementType, keyType, span);
+            return new CollectionTypeReference(collectionMeta, elementType, keyType, orderingModifier, span);
         }
 
         /// <summary>
@@ -648,11 +713,7 @@ public static partial class Parser
                     // Valued modifiers parse an expression for their value
                     if (modMeta.HasValue)
                     {
-                        // Check if next token starts a value expression
-                        if (Peek().Kind is TokenKind.NumberLiteral
-                            or TokenKind.StringLiteral or TokenKind.True or TokenKind.False
-                            or TokenKind.Identifier or TokenKind.Minus or TokenKind.LeftParen
-                            or TokenKind.LeftBracket or TokenKind.StringStart)
+                        if (ExpressionStartTokens.Contains(Peek().Kind))
                         {
                             valueExpr = ParseExpression(0, () =>
                                 ValueModifierTokens.Contains(Peek().Kind)
@@ -737,6 +798,7 @@ public static partial class Parser
 
             var startToken = Advance(); // consume '('
             var args = new List<(string Name, ParsedTypeReference Type, ImmutableArray<ModifierKind> Modifiers)>();
+            const ValueModifierDeclarationSite argSite = ValueModifierDeclarationSite.EventArgDeclaration;
 
             while (Peek().Kind != TokenKind.RightParen && !IsAtEnd
                    && !ConstructsCatalog.LeadingTokens.Contains(Peek().Kind))
@@ -744,35 +806,34 @@ public static partial class Parser
                 if (Peek().Kind == TokenKind.Identifier)
                 {
                     var nameToken = Advance();
-                    Expect(TokenKind.As);
+                    var asToken = Expect(TokenKind.As);
+                    var parsedType = ParseTypeReference(asToken.Span);
 
-                    var typeTokenPeek = Peek();
-                    var lookupKind = typeTokenPeek.Kind == TokenKind.Set ? TokenKind.SetType : typeTokenPeek.Kind;
-
-                    if (Types.ByToken.TryGetValue(lookupKind, out var typeMeta))
+                    var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
+                    while (Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var modMeta)
+                           && modMeta.ApplicableDeclarationSites.HasFlag(argSite))
                     {
-                        var typeToken = Advance();
+                        modifiers.Add(modMeta.Kind);
+                        Advance();
 
-                        // Apply qualifier extensions ('in', 'of', 'to') if the type has a QualifierShape
-                        ParsedTypeReference parsedType = new SimpleTypeReference(typeMeta, typeToken.Span);
-                        parsedType = TryParseQualifiers(parsedType, typeMeta);
+                        if (!modMeta.HasValue)
+                            continue;
 
-                        // Consume any trailing value modifiers (e.g. optional, notempty)
-                        var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
-                        while (Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var modMeta))
+                        if (!ExpressionStartTokens.Contains(Peek().Kind))
                         {
-                            modifiers.Add(modMeta.Kind);
-                            Advance();
+                            _diagnostics.Add(DiagnosticsCatalog.Create(
+                                DiagnosticCode.ExpectedToken, Peek().Span, "expression", Peek().Text));
+                            continue;
                         }
 
-                        args.Add((nameToken.Text, parsedType, modifiers.ToImmutable()));
+                        ParseExpression(0, () =>
+                            Peek().Kind is TokenKind.Comma or TokenKind.RightParen
+                            || IsAtConstructBoundary()
+                            || (Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var nextMod)
+                                && nextMod.ApplicableDeclarationSites.HasFlag(argSite)));
                     }
-                    else
-                    {
-                        _diagnostics.Add(DiagnosticsCatalog.Create(
-                            DiagnosticCode.ExpectedToken, typeTokenPeek.Span, "type keyword", typeTokenPeek.Text));
-                        break;
-                    }
+
+                    args.Add((nameToken.Text, parsedType, modifiers.ToImmutable()));
                 }
 
                 if (Peek().Kind == TokenKind.Comma)
@@ -819,16 +880,14 @@ public static partial class Parser
             }
 
             var becauseToken = Advance(); // consume 'because'
-            if (Peek().Kind == TokenKind.StringLiteral)
+            if (TryParseStringExpression(out var message, out var messageSpan))
             {
-                var strToken = Advance();
-                // Lexer emits string content without surrounding quotes
-                return new BecauseClauseSlot(strToken.Text,
-                    SourceSpan.Covering(becauseToken.Span, strToken.Span));
+                return new BecauseClauseSlot(message,
+                    SourceSpan.Covering(becauseToken.Span, messageSpan));
             }
 
             _diagnostics.Add(DiagnosticsCatalog.Create(
-                DiagnosticCode.ExpectedToken, Peek().Span, "string literal", Peek().Text));
+                DiagnosticCode.ExpectedToken, Peek().Span, "string expression", Peek().Text));
             return new BecauseClauseSlot("", becauseToken.Span);
         }
 
@@ -888,11 +947,34 @@ public static partial class Parser
         {
             var current = Peek();
             var meta = Tokens.GetMeta(current.Kind);
-            if (current.Kind == TokenKind.Identifier || meta.IsFieldBroadcast)
+            if (meta.IsFieldBroadcast)
             {
                 var tok = Advance();
                 return new FieldTargetSlot(tok.Text, tok.Span);
             }
+
+            if (current.Kind == TokenKind.Identifier)
+            {
+                var first = Advance();
+                var lastSpan = first.Span;
+
+                while (Peek().Kind == TokenKind.Comma)
+                {
+                    Advance(); // consume comma
+                    if (Peek().Kind == TokenKind.Identifier)
+                    {
+                        lastSpan = Advance().Span;
+                        continue;
+                    }
+
+                    _diagnostics.Add(DiagnosticsCatalog.Create(
+                        DiagnosticCode.ExpectedToken, Peek().Span, "identifier", Peek().Text));
+                    break;
+                }
+
+                return new FieldTargetSlot(first.Text, SourceSpan.Covering(first.Span, lastSpan));
+            }
+
             if (!slot.IsRequired)
                 return MakeSentinel(slot);
             _diagnostics.Add(DiagnosticsCatalog.Create(

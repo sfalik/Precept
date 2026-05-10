@@ -43,7 +43,7 @@ public class Track2PhaseAModifierValidationTests
     }
 
     [Fact]
-    public void WritableOnEventArg_StillEmitsDiagnosticFromCatalogRule()
+    public void WritableOnEventArg_RejectedByParserWithExpectedToken()
     {
         var precept = """
             precept Widget
@@ -53,6 +53,6 @@ public class Track2PhaseAModifierValidationTests
             from Draft on Update -> set Name = Update.NewName -> no transition
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.WritableOnEventArg);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ExpectedToken);
     }
 }

@@ -65,7 +65,7 @@ public sealed record TokenMeta(
     bool                           IsMessagePosition = false
 )
 {
-    public bool IsValidAsMemberName => Parser.KeywordsValidAsMemberName.Contains(Kind);
+    public bool IsValidAsMemberName => Tokens.KeywordsValidAsMemberName.Contains(Kind);
 }
 
 /// <summary>
