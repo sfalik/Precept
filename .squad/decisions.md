@@ -39,6 +39,20 @@
 
 ---
 
+### 2026-05-10T12:25:21Z: Status-log triage isolates protocol bugs from the missing status-bar surface
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's inbox note.
+
+**Merged source:** `kramer-status-log-triage.md`.
+
+- Shane's logs exposed two real shipped protocol bugs: the custom semantic-token color notification crossed the client boundary as a raw array, and the outline projector could emit `selectionRange` values that were not contained by `range`.
+- Those bugs are real and worth landing, but Kramer did not find a code path where either one removes the VS Code status-bar item; the strongest direct clue for that missing surface remained extension activation and client lifecycle.
+- Durable conclusion: keep the protocol fixes and treat the missing status-bar surface as a separate activation/lifecycle issue unless later logs show the extension deactivating or the status item never being created.
+
+---
+
 ### 2026-05-10T12:15:36Z: Track 1 autonomous execution proceeds without per-slice approval pauses
 
 **By:** Scribe
@@ -1384,8 +1398,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `george-ci-fix-done.md`.
 
-
-
 ---
 
 ### CI Enforcement Bug Fixes
@@ -1447,8 +1459,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-10-done.md`.
-
-
 
 ---
 
@@ -1582,8 +1592,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `george-slice-8-done.md`.
 
-
-
 ---
 
 ### Slice 8 Complete
@@ -1706,8 +1714,6 @@ when "admin@example.com" == Email
 
 **Merged source:** `george-slice-9-done.md`.
 
-
-
 ---
 
 ### Slice 9 Complete
@@ -1777,8 +1783,6 @@ when "admin@example.com" == Email
 
 
 **Merged source:** `george-slice5-restored.md`.
-
-
 
 ---
 
@@ -1858,8 +1862,6 @@ when "admin@example.com" == Email
 
 **Merged source:** `soup-nazi-slice-1-triage.md`.
 
-
-
 ---
 
 ### Slice 1 Test Failure Triage — 2026-05-07
@@ -1886,8 +1888,6 @@ when "admin@example.com" == Email
 
 | EventWithOptionalArg_ArgIsOptional | TYPE B | Same root cause as above — `ParseArgumentList` does not support `optional` modifier on event args. | Documented — parser gap |
 
-
-
 ---
 
 ### TYPE A — Test Bugs Fixed (4 tests)
@@ -1905,8 +1905,6 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 - `PriceType_ResolvesToPriceTypeKind` — `field UnitPrice as price in 'USD/each'` → `field UnitPrice as price`
 
 - `ExchangeRateType_ResolvesToExchangeRateTypeKind` — `field FxRate as exchangerate in 'USD' to 'EUR'` → `field FxRate as exchangerate`
-
-
 
 ---
 
@@ -1948,8 +1946,6 @@ All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'k
 
 **Fix approach:** After consuming the type token in `ParseArgumentList`, loop over modifier tokens (check against `Modifiers.ByToken` or the modifier catalog) and collect them into a modifiers list. The `(string Name, TypeMeta Type)` tuple in the arg list should be expanded to include modifiers.
 
-
-
 ---
 
 ### Recommended next action
@@ -1977,8 +1973,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 
 **Merged source:** `soup-nazi-slice-10-done.md`.
-
-
 
 ---
 
@@ -2084,8 +2078,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 **Merged source:** `soup-nazi-slice-2-done.md`.
 
-
-
 ---
 
 ### Slice 2 Tests Complete — 2026-05-07
@@ -2125,8 +2117,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 
 **Merged source:** `soup-nazi-slice-3-done.md`.
-
-
 
 ---
 
@@ -2176,8 +2166,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 **Merged source:** `soup-nazi-slice-4-done.md`.
 
-
-
 ---
 
 ### Slice 4 Tests Complete — 2026-05-07
@@ -2221,8 +2209,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 
 **Merged source:** `soup-nazi-slice-5-done.md`.
-
-
 
 ---
 
@@ -2282,8 +2268,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 **Merged source:** `soup-nazi-slice-6-done.md`.
 
-
-
 ---
 
 ### Slice 6 Tests Complete
@@ -2313,8 +2297,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 
 **Merged source:** `soup-nazi-slice-7-done.md`.
-
-
 
 ---
 
@@ -2372,8 +2354,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 **Merged source:** `soup-nazi-slice-8-done.md`.
 
-
-
 ---
 
 ### Slice 8 Tests Complete
@@ -2421,8 +2401,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 
 **Merged source:** `soup-nazi-slice-9-done.md`.
-
-
 
 ---
 
