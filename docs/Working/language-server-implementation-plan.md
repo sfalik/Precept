@@ -38,7 +38,7 @@ The Precept Language Server is a **thin routing and protocol layer** over `src/P
 | 8 | Code actions | ✅ Done | `c752af08` |
 | 9 | Folding ranges | ✅ Done | `453e690a` |
 | 10 | SemanticTokenTypes Catalog — 14th catalog + one-field TokenMeta architecture | ✅ Done | `65a93fc7` |
-| 11 | Program.cs final wiring | 🔄 In progress | — |
+| 11 | Program.cs final wiring | ✅ Done | `33d71e0f` |
 | 12 | Trigger characters + dual-use `set` type context | ✅ Done | `d962d0cb` |
 | 16 | Snippet metadata for constructs and actions | ✅ Done | `6bcf4b34` |
 
@@ -69,11 +69,11 @@ The design at `docs/tooling/language-server.md` is **comprehensive and implement
 |---|---|---|---|
 | `IsOutlineNode` | `ConstructMeta` | Add `bool IsOutlineNode = false` and `string? OutlineSymbolTag = null` parameters | **Yes** — Document Outline slice depends on this. **Resolved:** Slice 0a adds these fields. |
 | `IsUserFacing` | `TypeMeta` | Add `bool IsUserFacing = true` parameter; set `false` for `Error` and `StateRef` | **No** — filter by `Token != null` is structurally equivalent; no catalog change required |
-| `TriggerCondition` / `RecoverySteps` / `ExampleBefore` / `ExampleAfter` | `DiagnosticMeta` | George-15 added these | **No** — ✅ **LANDED** (as of 2026-05-09). Fields are present on `DiagnosticMeta` in `src/Precept/Language/Diagnostics.cs` and populated on diagnostic entries. Slice 8 consumes `ExampleBefore` / `ExampleAfter` immediately; the other fields remain available for richer extension UX without forcing LS-local hover scaffolding. |
+| `TriggerCondition` / `RecoverySteps` / `ExampleBefore` / `ExampleAfter` | `DiagnosticMeta` | George-15 added these | **No** — ✅ **LANDED** (as of 2026-05-09). Fields are present on `DiagnosticMeta` in `src/Precept/Language/Diagnostics.cs` and populated on diagnostic entries. Slice 8 consumes `ExampleBefore` / `ExampleAfter`; this plan does not add a diagnostic-code hover lane, so `TriggerCondition` / `RecoverySteps` stay outside the LS surface defined here. |
 
 ### 2.3 Clean-Pass Findings
 
-The broad direction is right: the shim layer should not survive. But a clean read from the canonical LS design exposed several places where later slices quietly reintroduced scaffold-shaped APIs.
+The broad direction is right: the shim layer should not survive. A clean read from the canonical LS design exposed several places where Slices 1–10 quietly reintroduced scaffold-shaped APIs.
 
 1. `LanguageServerStubs.cs` and `PreceptPreviewProtocol.cs` are both legacy compatibility surfaces and should be deleted rather than replaced with new LS-local façade types.
 2. Diagnostics are publish-only and belong in the compile/update coordinator, not in a standalone request-handler slice.
@@ -220,7 +220,7 @@ public Task<Unit> Handle(DidCloseTextDocumentParams p, CancellationToken ct)
 ```
 
 **Tests:**
-- No feature assertions yet, but land the reusable protocol test harness in this slice so later feature slices can exercise real LSP requests/responses instead of direct helper calls
+- Land the reusable protocol test harness in this slice. Feature assertions begin in Slice 1 and run through the real LSP request/response surface rather than direct helper calls.
 
 **Regression anchors:** None — this is greenfield infrastructure.
 
@@ -575,7 +575,7 @@ static class DiagnosticEnricher
 - `tools/Precept.VsCode/package.json` — register `precept.showFixHint` command for tooltip-only code actions
 - `tools/Precept.VsCode/src/extension.ts` — implement `precept.showFixHint` so LS command invocations actually surface the informational payload
 
-**DiagnosticMeta enrichment (George-15 fields — landed):** Code actions read `DiagnosticMeta.ExampleBefore` and `DiagnosticMeta.ExampleAfter` to populate the tooltip-command payload with before/after DSL snippets. These fields are already present on `DiagnosticMeta` — no prerequisite wait.
+**DiagnosticMeta enrichment (George-15 fields — landed):** Code actions read `DiagnosticMeta.ExampleBefore` and `DiagnosticMeta.ExampleAfter` to populate the tooltip-command payload with before/after DSL snippets. These fields are already present on `DiagnosticMeta` and are consumed directly in this slice.
 
 **Method-level specificity:**
 
@@ -638,6 +638,166 @@ FoldingRange[] GetFoldingRanges(Compilation compilation) =>
 
 ---
 
+### Slice 10: SemanticTokenTypes Catalog — 14th catalog + one-field TokenMeta architecture
+
+**Goal:** Create the `SemanticTokenTypes` catalog (the 14th catalog) and collapse `TokenMeta`'s two semantic-coloring fields (`TextMateScope` and `SemanticTokenType`) into a single field (`VisualCategory: SemanticTokenTypeKind?`). Update all consumers — `SemanticTokensHandler`, `GrammarGen`, and `package.json` — to derive color and LSP type information from the catalog rather than from ad-hoc parallel fields on `TokenMeta`.
+
+**Motivation:** The existing two-field design on `TokenMeta` is the root cause of the language server overriding TextMate colors with wrong or generic LSP type strings. `TextMateScope` and `SemanticTokenType` duplicate information that belongs in one authoritative place: a catalog entry that owns the full visual identity (LSP custom type, TextMate scope, hex color, weight, style) of each semantic token kind. Collapsing to `VisualCategory: SemanticTokenTypeKind?` makes the `TokenMeta` record a pure grammar artifact and moves all visual knowledge into the catalog, consistent with the metadata-driven architecture principle.
+
+**Files modified:**
+- `src/Precept/Language/SemanticTokenTypes.cs` — **Create** — the 14th catalog; defines `SemanticTokenTypeKind` enum, `SemanticTokenTypeMeta` record, static `GetMeta(SemanticTokenTypeKind)` method, and `All` collection
+- `src/Precept/Language/Tokens.cs` — **Modify** — remove `string? TextMateScope` and `string? SemanticTokenType` from `TokenMeta`; add `SemanticTokenTypeKind? VisualCategory`; update all ~430 token entries
+- `tools/Precept.GrammarGen/Program.cs` — **Modify** — replace reads of `meta.TextMateScope` with `SemanticTokenTypes.GetMeta(meta.VisualCategory!.Value).TextMateScope`
+- `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs` — **Modify** — update Pass 1 and Pass 2 projections, `BuildLegend()`, and modifier emission to derive from the catalog
+- `tools/Precept.VsCode/package.json` — **Modify** — regenerate `semanticTokenTypes`, `semanticTokenModifiers`, `semanticTokenScopes`, and color-rule sections from the catalog
+
+**Implementation steps:**
+
+1. **Create `src/Precept/Language/SemanticTokenTypes.cs`**
+
+   Define the enum and metadata record:
+
+   ```csharp
+   public enum SemanticTokenTypeKind
+   {
+       Name, KeywordSemantic, KeywordGrammar, Operator,
+       State, Event, Type, Value, FieldName, ArgName,
+       Message, Comment
+   }
+
+   public sealed record SemanticTokenTypeMeta(
+       SemanticTokenTypeKind Kind,
+       string CustomType,
+       string TextMateScope,
+       string Description,
+       string ForegroundHex,
+       bool Bold = false,
+       bool Italic = false,
+       bool SupportsConstrainedModifier = false);
+   ```
+
+   Populate the catalog with the approved visual taxonomy — one entry per `SemanticTokenTypeKind`:
+
+   | Kind | CustomType | TextMateScope | ForegroundHex | Bold | Italic | SupportsConstrained |
+   |---|---|---|---|---|---|---|
+   | Name | preceptName | entity.name.precept | #A5B4FC | false | false | false |
+   | KeywordSemantic | preceptKeywordSemantic | keyword.other.semantic.precept | #4338CA | true | false | false |
+   | KeywordGrammar | preceptKeywordGrammar | keyword.other.grammar.precept | #6366F1 | false | false | false |
+   | Operator | preceptOperator | keyword.operator.precept | #6366F1 | false | false | false |
+   | State | preceptState | entity.name.state.precept | #A898F5 | false | false | true |
+   | Event | preceptEvent | entity.name.event.precept | #30B8E8 | false | false | true |
+   | Type | preceptType | entity.name.type.precept | #9AA8B5 | false | false | false |
+   | Value | preceptValue | constant.language.precept | #84929F | false | false | false |
+   | FieldName | preceptFieldName | variable.other.field.precept | #A5B4FC | false | false | true |
+   | ArgName | preceptArgName | variable.parameter.arg.precept | #9AD8E8 | false | false | true |
+   | Message | preceptMessage | string.other.message.precept | #FBBF24 | false | false | false |
+   | Comment | preceptComment | comment.line.precept | #9096A6 | false | true | false |
+
+   Expose a `FrozenDictionary<SemanticTokenTypeKind, SemanticTokenTypeMeta>` backing store, a `GetMeta(SemanticTokenTypeKind kind)` static method, and an `All` static property (`IReadOnlyList<SemanticTokenTypeMeta>`) that enumerates entries in enum-declaration order. Pattern follows existing catalogs (`Tokens`, `Operators`, etc.).
+
+2. **Modify `src/Precept/Language/Tokens.cs` — `TokenMeta` record**
+
+   - Remove parameters: `string? TextMateScope` and `string? SemanticTokenType`
+   - Add parameter: `SemanticTokenTypeKind? VisualCategory = null`
+   - Update all ~430 entries in `GetMeta(TokenKind kind)`:
+     - Where both old fields were non-null, set `VisualCategory` to the matching `SemanticTokenTypeKind` (the mapping is mechanical — `SemanticTokenType` strings like `"keyword"`, `"type"`, `"operator"`, `"string"`, etc. each map to exactly one `SemanticTokenTypeKind` value).
+     - Where both old fields were null, omit `VisualCategory` (defaults to null).
+   - After updating all entries, verify the build compiles with zero errors — the old field names must not remain on the record or be referenced anywhere.
+
+3. **Modify `tools/Precept.GrammarGen/Program.cs`**
+
+   - Locate every read of `meta.TextMateScope` and `meta.SemanticTokenType`.
+   - Replace `meta.TextMateScope` with `SemanticTokenTypes.GetMeta(meta.VisualCategory!.Value).TextMateScope` (guard with `meta.VisualCategory.HasValue` before dereferencing).
+   - Remove any fallback that constructed a TextMate scope from `meta.SemanticTokenType`.
+   - Run GrammarGen to regenerate `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` and confirm the output is byte-equivalent to the committed file (apart from any color corrections the new catalog encodes).
+
+4. **Modify `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs`**
+
+   a. **Pass 1 (`ProjectLexicalTokens`):** Replace every use of `meta.SemanticTokenType` (used to look up the LSP token type string) with:
+      ```csharp
+      SemanticTokenTypes.GetMeta(meta.VisualCategory!.Value).CustomType
+      ```
+      Guard the call with `meta.VisualCategory.HasValue` — tokens without a `VisualCategory` are not emitted as semantic tokens (same behavior as the old null-check on `SemanticTokenType`).
+
+   b. **Pass 2 (`ProjectIdentifierTokens`):** Replace the four hardcoded LSP type strings with catalog-derived `CustomType` values:
+      - State name tokens → `SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.State).CustomType` (= `"preceptState"`)
+      - Event name tokens → `SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Event).CustomType` (= `"preceptEvent"`)
+      - Field name tokens → `SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType` (= `"preceptFieldName"`)
+      - Arg name tokens → `SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType` (= `"preceptArgName"`)
+
+   c. **`BuildLegend()`:**
+      - Token types: `SemanticTokenTypes.All.Select(m => m.CustomType).ToArray()` — no hand-maintained list.
+      - Modifiers: register `new SemanticTokenModifier("preceptConstrained")` as the sole custom modifier alongside any OmniSharp-defined built-ins.
+
+   d. **`preceptConstrained` modifier emission:** For tokens where the semantic index indicates constraint pressure — constrained states (states that appear only as guard targets) and guarded fields — emit the `preceptConstrained` modifier bit. Query available constraint information from the `Compilation`/`SemanticIndex` (the specific query point depends on how constraint annotations surface in the index; derive from catalog rather than hardcoding field/state names). Tokens for types whose `SemanticTokenTypeMeta.SupportsConstrainedModifier` is `false` must never have the bit set.
+
+5. **Modify `tools/Precept.VsCode/package.json` — regenerate semantic token sections**
+
+   Either run GrammarGen (if it already emits into `package.json`) or update the following sections manually to match the approved catalog:
+
+   - **`semanticTokenTypes`** — one entry per `SemanticTokenTypeMeta.CustomType` (12 entries total).
+   - **`semanticTokenModifiers`** — include `"preceptConstrained"`.
+   - **`semanticTokenScopes`** — maps each `CustomType` → `TextMateScope` (provides the TextMate fallback bridge so theme colors still apply when semantic highlighting is off).
+   - **Color rules** (e.g. `semanticHighlightingColors.rules` or the equivalent VS Code contribution) — `ForegroundHex`, `Bold`, `Italic` per type; add `*.preceptConstrained` → `{ italic: true }`.
+   - **Known bug fix:** `preceptKeywordGrammar` is currently mapped to gold/amber — correct it to `#6366F1` per the approved taxonomy.
+
+**Tests:**
+
+- `test/Precept.Tests/Language/SemanticTokenTypesCatalogTests.cs` — **Create**
+  - `[Fact] All_ContainsTwelveEntries` — `SemanticTokenTypes.All.Should().HaveCount(12)`
+  - `[Fact] GetMeta_EachKind_ReturnsNonNullEntry` — iterate all `SemanticTokenTypeKind` values and assert `GetMeta` returns a non-null entry with non-empty `CustomType` and `TextMateScope`
+  - `[Fact] CustomTypes_AreUnique` — `All.Select(m => m.CustomType).Should().OnlyHaveUniqueItems()`
+  - `[Fact] TextMateScopes_AreUnique` — same for `TextMateScope`
+  - `[Fact] SupportsConstrainedModifier_SetOnlyForCorrectKinds` — assert `State`, `Event`, `FieldName`, `ArgName` have `SupportsConstrainedModifier = true`; all others `false`
+  - `[Fact] Comment_IsItalic` — `GetMeta(SemanticTokenTypeKind.Comment).Italic.Should().BeTrue()`
+  - `[Fact] KeywordSemantic_IsBold` — `GetMeta(SemanticTokenTypeKind.KeywordSemantic).Bold.Should().BeTrue()`
+
+- `test/Precept.Tests/Language/TokenCatalogTests.cs` — **Modify** (add to existing file)
+  - `[Fact] TokenMeta_HasNoTextMateScopeField` — compile-time guard via reflection: `typeof(TokenMeta).GetProperty("TextMateScope").Should().BeNull()`
+  - `[Fact] TokenMeta_HasNoSemanticTokenTypeField` — same for `SemanticTokenType`
+  - `[Fact] TokenMeta_VisualCategory_WhenSet_MapsToValidKind` — for all tokens where `VisualCategory.HasValue`, assert the kind exists in `SemanticTokenTypes.All`
+
+- `test/Precept.LanguageServer.Tests/SemanticTokensHandlerTests.cs` — **Modify** (add to existing file)
+  - `[Fact] BuildLegend_TokenTypes_MatchCatalogCustomTypes` — legend token-type list equals `SemanticTokenTypes.All.Select(m => m.CustomType)`
+  - `[Fact] BuildLegend_IncludesPreceptConstrainedModifier`
+  - `[Fact] Pass1_TokenWithVisualCategory_EmitsCorrectCustomType`
+  - `[Fact] Pass2_StateName_EmitsPreceptState`
+  - `[Fact] Pass2_EventName_EmitsPreceptEvent`
+  - `[Fact] Pass2_FieldName_EmitsPreceptFieldName`
+  - `[Fact] Pass2_ArgName_EmitsPreceptArgName`
+
+**Regression anchors:** Slices 2 and 3 (existing semantic-token tests) must continue to pass after this change. The only observable behavioral change is that LSP token type strings shift from generic values (`"keyword"`, `"property"`, `"enum"`, `"parameter"`) to catalog-owned custom types (`"preceptKeywordSemantic"`, `"preceptFieldName"`, etc.). Update any existing test assertions that hard-code the old strings.
+
+**Dependency ordering:** Catalog-level change — independent of Slices 4–9, 11–18. Slice 12's `set`-in-type-position reclassification references `TokenMeta.SemanticTokenType` in its spec; after Slice 10 lands, Slice 12 must use `VisualCategory` instead. Must complete before Phase 2 semantic token expression overlays (Slice 19), which references `TokenMeta.SemanticTokenType` — that reference must be replaced with the catalog lookup as part of this slice.
+
+---
+
+### Slice 10-color [Kramer]: LS-Driven Semantic Token Color Injection
+
+**What:** Add an LS-to-extension color publication path so semantic token color rules are emitted at runtime from `SemanticTokenTypes.All`. On server startup or extension activation, the LS sends a custom `precept/semanticTokenColors` notification whose payload contains one entry per catalog member with `tokenType`, `hexColor`, `bold`, and `italic`; `tools/Precept.VsCode/src/extension.ts` listens for the notification and updates `editor.semanticTokenColorCustomizations` through the VS Code workspace configuration API so the extension consumes catalog-owned color metadata instead of static manifest-authored rules.
+
+**Why:** Eliminates the maintenance gap where colors in `package.json` can drift from the `SemanticTokenTypeMeta.HexColor` field in the catalog.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs` — add `SendColorNotification(ILanguageServer server)` that serializes `SemanticTokenTypes.All` into the notification payload and sends `precept/semanticTokenColors`
+- `tools/Precept.LanguageServer/Program.cs` — call `SendColorNotification` after handler registration so the initial catalog colors publish when the LS comes up
+- `tools/Precept.VsCode/src/extension.ts` — register `client.onNotification("precept/semanticTokenColors", handler)` and apply colors via `vscode.workspace.getConfiguration().update("editor.semanticTokenColorCustomizations", ..., vscode.ConfigurationTarget.Workspace)`
+- `tools/Precept.VsCode/package.json` — remove static color rules from `contributes.semanticTokenScopes` and `editor.semanticTokenColorCustomizations`; the notification handler replaces them
+
+**Catalog / artifacts driving it:**
+- `SemanticTokenTypes.All`
+- `SemanticTokenTypeMeta.HexColor`
+- `SemanticTokenTypeMeta.Bold`
+- `SemanticTokenTypeMeta.Italic`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/SemanticTokensHandlerTests.cs` — `[Fact] SendColorNotification_EmitsOneEntryPerCatalogMember`
+- `test/Precept.LanguageServer.Tests/SemanticTokensHandlerTests.cs` — `[Fact] SendColorNotification_EntryHexColorsMatchCatalog`
+
+**Dependency ordering:** Depends on Slice 10 (must be done). Independent of all Phase 2 slices. Should be done before final LS packaging.
+
+**Regression anchors:** Existing semantic token color tests in `SemanticTokensHandlerTests.cs` must continue to pass. After this slice, color values are authoritative from the catalog — any test that hard-codes `#6366F1` or similar must reference `SemanticTokenTypes.GetMeta(kind).HexColor` instead.
+
 ### Slice 11: Program.cs Wiring
 
 **Goal:** Wire `Program.cs` to the completed handler surface.
@@ -661,7 +821,7 @@ Capabilities are advertised by each handler's registration options (`TextDocumen
 
 | File | Slices | Action |
 |---|---|---|
-| `tools/Precept.LanguageServer/Program.cs` | 0, 11 | Modify — add shared document-state services in Slice 0; wire remaining handlers/services in Slice 11 |
+| `tools/Precept.LanguageServer/Program.cs` | 0, 10-color, 11 | Modify — add shared document-state services in Slice 0; call `SendColorNotification` after handler registration in Slice 10-color; wire remaining handlers/services in Slice 11 |
 | `tools/Precept.LanguageServer/LanguageServerStubs.cs` | 0b | Delete — legacy shim surface removed before handler implementation begins |
 | `tools/Precept.LanguageServer/PreceptPreviewProtocol.cs` | 0b | Delete — legacy preview DTO graph; no replacement (inspect/restore belong in MCP, not LS) |
 | `tools/Precept.LanguageServer/DocumentState.cs` | 0 | Create |
@@ -671,7 +831,10 @@ Capabilities are advertised by each handler's registration options (`TextDocumen
 | `tools/Precept.LanguageServer/LevenshteinDistance.cs` | 7 | Create |
 | `tools/Precept.LanguageServer/DiagnosticEnricher.cs` | 7 | Create |
 | `tools/Precept.LanguageServer/Handlers/TextDocumentSyncHandler.cs` | 0–1 | Create |
-| `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs` | 2–3 | Create |
+| `src/Precept/Language/SemanticTokenTypes.cs` | 10 | Create — 14th catalog; `SemanticTokenTypeKind` enum + `SemanticTokenTypeMeta` record + `GetMeta()`/`All` |
+| `src/Precept/Language/Tokens.cs` | 10 | Modify — remove `TextMateScope` + `SemanticTokenType` from `TokenMeta`; add `VisualCategory: SemanticTokenTypeKind?`; update all ~430 entries |
+| `tools/Precept.GrammarGen/Program.cs` | 10 | Modify — replace `meta.TextMateScope` reads with `SemanticTokenTypes.GetMeta(meta.VisualCategory!.Value).TextMateScope` |
+| `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs` | 2–3, 10, 10-color | Create (Slices 2–3); Modify (Slice 10) — update Pass 1/Pass 2, `BuildLegend()`, and `preceptConstrained` modifier emission; Modify (Slice 10-color) — add `SendColorNotification(ILanguageServer server)` and notification payload projection |
 | `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs` | 4 | Create |
 | `tools/Precept.LanguageServer/Handlers/HoverHandler.cs` | 5 | Create |
 | `tools/Precept.LanguageServer/Handlers/DefinitionHandler.cs` | 6 | Create |
@@ -680,14 +843,15 @@ Capabilities are advertised by each handler's registration options (`TextDocumen
 | `tools/Precept.LanguageServer/Handlers/FoldingRangeHandler.cs` | 9 | Create |
 | `test/Precept.LanguageServer.Tests/LspTestHost.cs` | 0 | Create — reusable in-process protocol test harness |
 | `test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj` | 0 | Modify — add test-only client/harness package for protocol tests |
-| `test/Precept.LanguageServer.Tests/*` | 0b, 1–10 | Delete 13 legacy compiler-redundant files (173 tests) in Slice 0b; add protocol-layer LS tests per slice in Slices 1–10 |
+| `test/Precept.LanguageServer.Tests/*` | 0b, 1–10, 10-color | Delete 13 legacy compiler-redundant files (173 tests) in Slice 0b; add protocol-layer LS tests per slice in Slices 1–10 and 10-color |
 | `src/Precept/Language/Construct.cs` | 0a | Modify — add `IsOutlineNode` and `OutlineSymbolTag` parameters to `ConstructMeta` |
 | `src/Precept/Language/Constructs.cs` | 0a | Modify — set `IsOutlineNode: true` and `OutlineSymbolTag` on 5 construct entries |
 | `src/Precept/Pipeline/CheckContext.cs` | 3 | Modify — accumulate event-arg reference sites |
 | `src/Precept/Pipeline/SemanticIndex.cs` | 3 | Modify — add `ArgReference` + `ArgReferences` |
 | `src/Precept/Pipeline/TypeChecker.Expressions.cs` | 3 | Modify — record arg reference sites when resolving `TypedArgRef` |
-| `tools/Precept.VsCode/package.json` | 8 | Modify — register `precept.showFixHint` command |
-| `tools/Precept.VsCode/src/extension.ts` | 8 | Modify — implement `precept.showFixHint` command handler |
+| `tools/Precept.VsCode/package.json` | 8, 10, 10-color | Modify — register `precept.showFixHint` command (Slice 8); regenerate `semanticTokenTypes`, `semanticTokenModifiers`, `semanticTokenScopes`, and color rules (Slice 10); remove static semantic-token color rules once LS-driven injection lands in Slice 10-color |
+| `test/Precept.Tests/Language/SemanticTokenTypesCatalogTests.cs` | 10 | Create — catalog correctness tests (12 entries, unique types/scopes, constrained-modifier membership, italic/bold assertions) |
+| `tools/Precept.VsCode/src/extension.ts` | 8, 10-color | Modify — implement `precept.showFixHint` command handler (Slice 8); register `precept/semanticTokenColors` notification handling and workspace semantic-token color updates in Slice 10-color |
 
 ---
 
@@ -705,6 +869,9 @@ Slice 0 (Infrastructure)
 
 Slice 0a (Catalog Prerequisite)
 └── Slice 6 (Go-to-Def + Outline)
+
+Slice 10 (SemanticTokenTypes Catalog — 14th catalog + one-field TokenMeta)
+└── Slice 19 (Semantic Token Expression Overlays)
 ```
 
 **Parallelizable groups after Slice 0b:**
@@ -713,9 +880,10 @@ Slice 0a (Catalog Prerequisite)
 - Group C: Slice 4 (completions)
 - Group D: Slice 5 (hover)
 - Group E: Slice 9 (folding)
+- Group F: Slice 10 (catalog prerequisite) → Slice 19 (expression overlays); independent of Slices 0–9, 11–18
 - Slice 0a: Independent — can run in parallel with Slice 0, Slice 0b, or any other group
 
-Groups A–E can proceed in parallel after Slice 0b. Slice 11 is the final wiring slice.
+Groups A–F can proceed in parallel after Slice 0b. Slice 11 is the final wiring slice. Slice 10 must complete before Slice 19; Slice 12's `set`-in-type-position reclassification must be updated to use `VisualCategory` after Slice 10 lands.
 
 ---
 
@@ -762,7 +930,7 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
 **Catalog / artifacts driving it:**
 - `ConstructSlotKind.TypeExpression`
 - `Types.ByToken` (`TokenKind.SetType` alias)
-- `TokenMeta.SemanticTokenType`
+- `TokenMeta.VisualCategory` (replaces `TokenMeta.SemanticTokenType` after Slice 10)
 
 **Tests:**
 - `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`
@@ -943,7 +1111,7 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
   - `[Fact] Completions_Documentation_UsesHoverDescriptionAndUsageExample`
   - `[Fact] Completions_SortsSemanticSymbolsBeforeCatalogItems`
 
-**Dependency ordering:** Depends on Slices 14 and 16. Slice 15 enriches the typed-constant branch but is not a hard blocker.
+**Dependency ordering:** Depends on Slices 14 and 16. Slice 15 can land before or after this slice; when it lands, this richer completion factory must format the typed-constant items it adds.
 
 ---
 
@@ -1003,7 +1171,7 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
 **Catalog / artifacts driving it:**
 - `TypedFunctionCall.ResolvedFunction`
 - `Functions.GetMeta(...)`
-- `TokenMeta.SemanticTokenType`
+- `SemanticTokenTypes` catalog (via `GetMeta(kind).CustomType` — `TokenMeta.SemanticTokenType` is removed by Slice 10)
 
 **Tests:**
 - `test/Precept.LanguageServer.Tests/SemanticTokensHandlerTests.cs`
@@ -1013,7 +1181,7 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
   - `[Fact] LexicalTokens_ActionVerb_EmitKeywordToken`
   - `[Fact] LexicalTokens_BooleanLiteral_KeepKeywordTokenType`
 
-**Dependency ordering:** Depends on Slice 12. Independent of Slices 20–29.
+**Dependency ordering:** Depends on Slices 10 and 12. Independent of Slices 20–29.
 
 ---
 
@@ -1224,7 +1392,7 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
 
 ### Slice 28 [Kramer]: Documentation Sync
 
-**What:** When Phase 2 lands, the docs must describe the real LS surface — and must not reintroduce preview as if it shipped.
+**What:** Document the implemented LS surface and keep preview out of the shipped description.
 
 **Modifies:**
 - `docs/language/precept-language-spec.md`
@@ -1236,7 +1404,7 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
 
 **Tests:** None — documentation sync only.
 
-**Dependency ordering:** Must land after the behavior slices it documents (12–27) and before final closeout.
+**Dependency ordering:** Must land after the behavior slices it documents (12–27) and before Slice 29.
 
 ---
 
@@ -1282,7 +1450,7 @@ Slice 29 depends on all Phase 1 handler slices plus Slices 12–28
 | Category | Impact | Detail |
 |---|---|---|
 | **TextMate grammar** | No changes needed | Grammar is generated from catalogs; LS does not affect it |
-| **Completions** | Catalog-driven — no LS-side hardcoding | Existing catalog metadata already drives labels/docs; future `SnippetTemplate` additions flow through automatically |
+| **Completions** | Catalog-driven — no LS-side hardcoding | Existing catalog metadata already drives labels/docs; snippet-template work in Slices 16–17 flows through without new LS-local lists |
 | **Semantic tokens** | No grammar changes | Pass 1 reads `TokenMeta.SemanticTokenType`; Pass 2 reads `SemanticIndex` reference collections, including the new arg-reference prerequisite from Slice 3 |
 | **MCP tools** | No changes needed | MCP and LS both consume the same catalogs; they are independent consumers |
 | **VS Code extension** | Minor | Extension already expects an LS process on stdio. Slice 8 must update both `package.json` and `src/extension.ts` so `precept.showFixHint` is registered **and** implemented. Preview/inspect is out of scope for the LS — the VS Code preview surface should call the MCP tools directly. |
@@ -1312,8 +1480,8 @@ See Slice 0a for the complete field map, entry-by-entry values, and test specifi
 - `DiagnosticMeta.ExampleAfter` — DSL snippet showing the corrected state
 
 **Consumer slices:**
-- **Slice 8 (Code Actions):** `GetCodeActions` reads `ExampleBefore` / `ExampleAfter` for enriched fix-hint panels. No prerequisite wait — implement immediately.
-- `TriggerCondition` / `RecoverySteps` remain useful extension-facing metadata, but they are not a prerequisite for the clean LSP hover surface and should not force a diagnostic-code hover path into Slice 5.
+- **Slice 8 (Code Actions):** `GetCodeActions` reads `ExampleBefore` / `ExampleAfter` for enriched fix-hint panels.
+- This plan does not add a diagnostic-code hover path. Slice 5 stays source-token/symbol hover only, so `TriggerCondition` / `RecoverySteps` are intentionally unused in the LS implementation described here.
 
 ### Resolved: `TypeMeta.IsUserFacing`
 
