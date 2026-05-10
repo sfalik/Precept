@@ -61,10 +61,14 @@ interface SemanticTokenColorRule {
   italic?: boolean;
 }
 
-interface SemanticTokenColorCustomizations {
+interface SemanticTokenColorCustomizationRuleset {
   enabled?: boolean | "configuredByTheme";
   rules?: Record<string, SemanticTokenColorRule>;
   [key: string]: unknown;
+}
+
+interface SemanticTokenColorCustomizations extends SemanticTokenColorCustomizationRuleset {
+  "[precept]"?: SemanticTokenColorCustomizationRuleset;
 }
 
 
@@ -345,9 +349,18 @@ async function applySemanticTokenColorCustomizations(
 ): Promise<void> {
   const configuration = vscode.workspace.getConfiguration();
   const existingCustomizations = configuration.get<SemanticTokenColorCustomizations>("editor.semanticTokenColorCustomizations") ?? {};
-  const existingRules = isRecord(existingCustomizations.rules)
+  const existingGlobalRules = isRecord(existingCustomizations.rules)
     ? existingCustomizations.rules as Record<string, SemanticTokenColorRule>
     : {};
+  const existingPreceptCustomizations = isRecord(existingCustomizations["[precept]"])
+    ? existingCustomizations["[precept]"] as SemanticTokenColorCustomizationRuleset
+    : {};
+  const existingPreceptRules = isRecord(existingPreceptCustomizations.rules)
+    ? existingPreceptCustomizations.rules as Record<string, SemanticTokenColorRule>
+    : {};
+  const migratedLegacyRules = Object.fromEntries(
+    Object.entries(existingGlobalRules).filter(([ruleKey]) => isPreceptSemanticTokenRuleKey(ruleKey))
+  ) as Record<string, SemanticTokenColorRule>;
 
   const generatedRules = Object.fromEntries(
     entries.map((entry) => [
@@ -362,11 +375,21 @@ async function applySemanticTokenColorCustomizations(
 
   generatedRules["*.preceptConstrained"] = { italic: true };
 
+  const remainingGlobalRules = Object.fromEntries(
+    Object.entries(existingGlobalRules).filter(([ruleKey]) => !isPreceptSemanticTokenRuleKey(ruleKey))
+  ) as Record<string, SemanticTokenColorRule>;
+
+  const { rules: _existingRules, ...customizationsWithoutGlobalRules } = existingCustomizations;
   const nextCustomizations: SemanticTokenColorCustomizations = {
-    ...existingCustomizations,
-    rules: {
-      ...existingRules,
-      ...generatedRules
+    ...customizationsWithoutGlobalRules,
+    ...(Object.keys(remainingGlobalRules).length > 0 ? { rules: remainingGlobalRules } : {}),
+    "[precept]": {
+      ...existingPreceptCustomizations,
+      rules: {
+        ...migratedLegacyRules,
+        ...existingPreceptRules,
+        ...generatedRules
+      }
     }
   };
 
@@ -414,6 +437,10 @@ function isSemanticTokenColorNotification(value: unknown): value is SemanticToke
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPreceptSemanticTokenRuleKey(ruleKey: string): boolean {
+  return ruleKey === "*.preceptConstrained" || ruleKey.startsWith("precept");
 }
 
 function createDevLanguageServerWatcher(
