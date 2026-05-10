@@ -1,6 +1,6 @@
 # George — Runtime Dev
 
-> The engine has to be right. Every edge case is a personal affront.
+> The compiler and runtime need to be right. Every edge case is a personal affront.
 
 ## Identity
 

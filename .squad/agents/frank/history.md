@@ -77,6 +77,28 @@
 - Your Track 2 master-plan/Phase A guardrail notes and the pipeline audit findings are now merged into `.squad/decisions.md` as the durable architecture record.
 - Execution priority changed immediately afterward: Track 2 is paused until Shane explicitly reopens it.
 
+### 2026-05-10T11:52:58Z — Track 2 Phase A doc sync D1-D8 + T1 test gap closed
+
+- Fixed all 8 doc gaps in `docs/language/catalog-system.md` identified in the Phase A audit.
+- `TokenMeta`: Added `IsStateWildcard`, `IsFieldBroadcast`, `IsFunctionCallLeader`; moved `IsValidAsMemberName` to computed property note.
+- `OperatorMeta`: Added `StaticResultType`/`ResultTypePolicy` fields; documented `ResultTypePolicy` enum with assignment rules.
+- `ConstructMeta`: Fixed stale `LspSymbolKind` → `OutlineSymbolTag`; added `SupportsPreVerbWhenGuard`/`SupportsPostActionEnsure`; updated to show `Entries`/`RoutingFamily`.
+- `OutcomeMeta`: Added `SerializedKind: string`; updated summary table with values.
+- `FunctionOverload`: Added `ReturnNonnegative: bool = false` with usage note.
+- `FixedReturnAccessor`: Added `ReturnNonnegative: bool = false` with proof-engine Strategy 2 note.
+- `ValueModifierMeta`: Renamed `ProofDischarges` → `ProofSatisfactions`; replaced `ProofDischarge` flat record with `ProofSatisfaction` DU; added `BoundCounterpart`/`DesugarsToRule`; documented `ApplicableDeclarationSites` rules.
+- `ActionMeta`: Removed `IntoSupported`; added `HoverDescription`/`SnippetTemplate`/`PrimaryActionKind`; updated `ActionKind` count 8→15; added `ActionShapeMeta`/`ActionSyntaxSlot`/`ActionSlotRole` section with 9-shape slot table.
+- T1: Added `Writable_ExcludesEventArgumentDeclarations` and `Default_IncludesEventArgumentDeclarations` named tests to `ModifierCatalogCapabilityTests.cs`. 3871/3871 green.
+- Structural observation: `catalog-system.md` had drifted from the Open Questions pattern — the ProofDischarges section still carried implementation checklist items (including unchecked ones) after the work shipped. Moving forward, completed catalog work should close its checklist items in the same commit that lands the source changes.
+
+- Full audit of all 7 Phase A slices against the toolchain plan, catalog-system.md, proof-engine.md, and source code.
+- Source code verdict: **APPROVED** — all fields correctly implemented, all members correctly assigned, test coverage meets or exceeds plan for all slices.
+- Doc verdict: **NEEDS FIXES** — 8 doc gaps in `catalog-system.md` where new catalog fields are absent from schema sections. Additionally, stale field names (`ProofDischarges` → `ProofSatisfactions`, `LspSymbolKind` → `OutlineSymbolTag`, `IntoSupported` removed) and outdated ActionKind member count (doc says 8, source has 15).
+- `ActionShapeMeta`/`ActionSyntaxSlot`/`ActionSlotRole` are entirely undocumented in catalog-system.md.
+- Phase B (Slice 8+) can proceed on source code; doc sync should be batched before Track 2 closes.
+- One minor test gap: two explicitly named per-modifier tests for `ApplicableDeclarationSites` are missing (shape test exists but doesn't assert specific modifier values).
+- Findings written to `.squad/decisions/inbox/frank-slice-1-7-audit.md`.
+
 ### 2026-05-10T13:53:14Z — t2-2 Slice A scope ruling executed
 - Shane's directive is now durable: no deferrals inside the slice; Frank owns defer-vs-now scope calls, and typed operand roles plus `IntoSupported` removal were both approved for immediate inclusion in t2-2.
 - George completed Slice A accordingly: `ActionShapeMeta`/`ActionSyntaxSlot` landed, roles are now typed via 1-based `ActionSlotRole`, `CollectionIntoBy` distinguishes `OrderingCapture`, and validation closed green at 4322 tests.
