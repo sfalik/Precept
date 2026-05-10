@@ -69,25 +69,29 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Set),
             "Assign a value to a scalar field",
             AnyType, ActionSyntaxShape.AssignValue, ValueRequired: true, AllowedIn: AllActionContexts,
-            HoverDescription: "Assigns a value to a field. Works on any scalar, temporal, or business-domain field."),
+            HoverDescription: "Assigns a value to a field. Works on any scalar, temporal, or business-domain field.",
+            SnippetTemplate: "set ${1:Field} = ${2:value}"),
 
         ActionKind.Add => new(
             kind, Tokens.GetMeta(TokenKind.Add),
             "Add an element to a set",
             [new(TypeKind.Set), new(TypeKind.Bag)], ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
-            HoverDescription: "Adds an element to a set or bag field. Has no effect if the element is already present (for sets)."),
+            HoverDescription: "Adds an element to a set or bag field. Has no effect if the element is already present (for sets).",
+            SnippetTemplate: "add ${1:Field} ${2:value}"),
 
         ActionKind.Remove => new(
             kind, Tokens.GetMeta(TokenKind.Remove),
             "Remove an element from a set",
             [new(TypeKind.Set), new(TypeKind.Bag), new(TypeKind.List), new(TypeKind.Lookup)], ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
-            HoverDescription: "Removes an element from a set, bag, list, or lookup field. Has no effect if the element is not present."),
+            HoverDescription: "Removes an element from a set, bag, list, or lookup field. Has no effect if the element is not present.",
+            SnippetTemplate: "remove ${1:Field} ${2:value}"),
 
         ActionKind.Enqueue => new(
             kind, Tokens.GetMeta(TokenKind.Enqueue),
             "Enqueue an element onto a queue",
             QueueOnly, ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
-            HoverDescription: "Appends an element to the back of a queue field."),
+            HoverDescription: "Appends an element to the back of a queue field.",
+            SnippetTemplate: "enqueue ${1:Field} ${2:value}"),
 
         ActionKind.Dequeue => new(
             kind, Tokens.GetMeta(TokenKind.Dequeue),
@@ -99,13 +103,15 @@ public static class Actions
                     "Queue must be non-empty"),
             ],
             AllowedIn: AllActionContexts,
-            HoverDescription: "Removes the front element from a queue. Optionally captures it with 'into'. Requires a non-empty guard."),
+            HoverDescription: "Removes the front element from a queue. Optionally captures it with 'into'. Requires a non-empty guard.",
+            SnippetTemplate: "dequeue ${1:Field}"),
 
         ActionKind.Push => new(
             kind, Tokens.GetMeta(TokenKind.Push),
             "Push an element onto a stack",
             StackOnly, ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
-            HoverDescription: "Pushes an element onto the top of a stack field."),
+            HoverDescription: "Pushes an element onto the top of a stack field.",
+            SnippetTemplate: "push ${1:Field} ${2:value}"),
 
         ActionKind.Pop => new(
             kind, Tokens.GetMeta(TokenKind.Pop),
@@ -117,13 +123,15 @@ public static class Actions
                     "Stack must be non-empty"),
             ],
             AllowedIn: AllActionContexts,
-            HoverDescription: "Removes the top element from a stack. Optionally captures it with 'into'. Requires a non-empty guard."),
+            HoverDescription: "Removes the top element from a stack. Optionally captures it with 'into'. Requires a non-empty guard.",
+            SnippetTemplate: "pop ${1:Field}"),
 
         ActionKind.Clear => new(
             kind, Tokens.GetMeta(TokenKind.Clear),
             "Clear all elements from a collection or reset an optional field",
             ClearApplicable, ActionSyntaxShape.FieldOnly, AllowedIn: AllActionContexts,
-            HoverDescription: "Removes all elements from a collection, or resets an optional field to null."),
+            HoverDescription: "Removes all elements from a collection, or resets an optional field to null.",
+            SnippetTemplate: "clear ${1:Field}"),
 
         ActionKind.Append => new(
             kind, Tokens.GetMeta(TokenKind.Append),
@@ -131,7 +139,8 @@ public static class Actions
             [new(TypeKind.Log), new(TypeKind.List)],
             ActionSyntaxShape.CollectionValue, ValueRequired: true,
             AllowedIn: AllActionContexts,
-            HoverDescription: "Appends an element to the end of a log or list field."),
+            HoverDescription: "Appends an element to the end of a log or list field.",
+            SnippetTemplate: "append ${1:Field} ${2:value}"),
 
         ActionKind.AppendBy => new(
             kind, Tokens.GetMeta(TokenKind.Append),
@@ -153,7 +162,8 @@ public static class Actions
                     "Index must be within bounds (0 to count)"),
             ],
             AllowedIn: AllActionContexts,
-            HoverDescription: "Inserts an element at a zero-based index in a list field. Requires an index-bounds guard."),
+            HoverDescription: "Inserts an element at a zero-based index in a list field. Requires an index-bounds guard.",
+            SnippetTemplate: "insert ${1:Field} ${2:value} at ${3:index}"),
 
         ActionKind.RemoveAt => new(
             kind, Tokens.GetMeta(TokenKind.Remove),
@@ -175,7 +185,8 @@ public static class Actions
             [new(TypeKind.Lookup)],
             ActionSyntaxShape.PutKeyValue, ValueRequired: true,
             AllowedIn: AllActionContexts,
-            HoverDescription: "Inserts or updates a key-value pair in a lookup field."),
+            HoverDescription: "Inserts or updates a key-value pair in a lookup field.",
+            SnippetTemplate: "put ${1:Field} ${2:key} = ${3:value}"),
 
         ActionKind.EnqueueBy => new(
             kind, Tokens.GetMeta(TokenKind.Enqueue),
