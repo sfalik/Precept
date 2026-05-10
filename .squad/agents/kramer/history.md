@@ -21,6 +21,18 @@
 
 ## Recent Updates
 
+### 2026-05-10T12:25:21Z — Log triage isolated protocol bugs from the status item
+- Kramer used VS Code logs to isolate two real protocol bugs: semantic-token color rules now cross the client boundary in a stable `rules` envelope and the VS Code client tolerates that payload safely; document symbols also normalize `selectionRange` inside `range` before publishing.
+- The log evidence showed those failures were separate from the missing language-server status item, which remains an activation-surface issue rather than an extension-host crash path. Validation stayed green: `npm run compile` succeeded and `test\Precept.LanguageServer.Tests` passed 156/156.
+
+### 2026-05-10T12:25:21Z — Status-bar regression contract gained dedicated extension coverage
+- Soup Nazi added `test\Precept.VsCode.Tests` coverage that now locks the status item's creation/show lifecycle, click-command wiring, and visibility across server-state updates, so the activation-path fix is guarded end to end.
+- `docs\tooling\language-server.md` now states the durable status-bar contract, while the remaining full language-server rebuild blocker stays isolated to the unrelated `DocumentSymbolHandlerTests.cs` `SourceSpan(offset: ...)` compile issue.
+
+### 2026-05-10T12:25:21Z — Activation regression fixed for standalone editor sessions
+- Kramer traced the missing VS Code language-server status item to extension activation scope: `workspaceContains:**/*.precept` alone skipped single-file and no-workspace `.precept` sessions, so the extension never started there.
+- Durable rule: keep both activation paths, `workspaceContains:**/*.precept` and `onLanguage:precept`, with manifest coverage and docs sync so the status item stays visible wherever Precept authoring happens.
+
 ### 2026-05-10T12:25:21Z — Status-bar activation contract recorded
 - Kept both shipped VS Code activation paths, `workspaceContains:**/*.precept` and `onLanguage:precept`, so the status bar and language server still activate in single-file and no-workspace sessions.
 - Durable tooling rule: activation coverage is part of the user-visible tooling surface; repo-workspace activation alone is too narrow for Precept authoring.
@@ -58,3 +70,8 @@
 - The VS Code extension manifest now activates on onLanguage:precept as well as workspaceContains:**/*.precept, so the language-server status item appears in single-file and no-workspace editor sessions instead of only in workspaces that already contain .precept files.
 - Added manifest coverage in ExtensionManifestTests to lock both activation paths, and updated docs\tooling\extension.md to document the single-file activation behavior.
 
+
+### 2026-05-10T08:25:21-04:00 — Log-driven status follow-up
+- The semantic-token color notification must cross the VS Code client boundary as an object envelope (`rules`) or the extension can receive a non-array payload and throw `map is not a function` while applying theme rules.
+- Outline/document symbols need a defensive full-range normalization step even when semantic name spans are preferred, because VS Code enforces `selectionRange ⊆ range` at the protocol boundary.
+- The missing status-bar surface was **not** explained by either of those protocol bugs in the current code: the status item is created independently and survives a client stop by rendering the stopped state.

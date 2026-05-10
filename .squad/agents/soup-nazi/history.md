@@ -25,10 +25,14 @@
 
 ## Recent Updates
 
+### 2026-05-10T12:25:21Z — VS Code status item regression contract closed
+- Added `test\Precept.VsCode.Tests` coverage that fails if extension activation stops creating/showing the language-server status item, if the click command wiring disappears, or if state updates stop keeping the item visible across starting/ready/restarting/error/stopped surfaces.
+- Clarified `docs\tooling\language-server.md` and recorded the mixed validation seam: the batch closed, but a full `test\Precept.LanguageServer.Tests` rebuild is still blocked by the unrelated `DocumentSymbolHandlerTests.cs` `SourceSpan(offset: ...)` compile error.
+
 ### 2026-05-10T08:25:21.928-04:00 — VS Code status bar regression anchor closed
 - Extended `ExtensionManifestTests.cs` to lock the shipped VS Code language-server status item contract: activation must create, wire, and show the item, and `updateLanguageServerStatusItem` must keep it visible across starting/ready/restarting/error/stopped surfaces.
 - Clarified `docs/tooling/extension.md` so the status bar contract is explicit: the left-aligned `Precept` item is always visible after activation begins and opens launch-mode details on click.
-- Validation: `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore` and `npm run compile` from `tools\Precept.VsCode` green.
+- Validation: direct source/manifest contract checks and `npm run compile` from `tools\Precept.VsCode` stayed green; full `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore` remains blocked by pre-existing `DocumentSymbolHandlerTests.cs` `SourceSpan(offset: ...)` compile errors unrelated to this status-bar coverage.
 
 ### 2026-05-10T12:15:36Z — Grammar keyword regression coverage closed
 - Locked `as` and field-level `default` against the shipped TextMate grammar surface so fallback highlighting cannot silently repaint those grammar keywords gold.
