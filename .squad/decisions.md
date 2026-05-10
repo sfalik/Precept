@@ -24,6 +24,62 @@
 
 ---
 
+### 2026-05-10T20:56:45Z: Track 2 Slice 11 makes proof obligations derive from catalog proof-site metadata
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-t2-11-complete.md`
+
+- Collection non-empty obligations now project by proof-site shape: member access keeps `UnguardedCollectionAccess`, while `pop` / `dequeue` action sites emit `UnguardedCollectionMutation` and map to `CollectionEmptyOnMutation`.
+- Unguarded mutation diagnostics now bind the real collection field name, and regression coverage now locks guarded plus `notempty` collection mutations alongside the catalog-driven `sqrt(abs(x))` proof path with 5 new proof tests.
+- Implementation commits `004e68be`, `e48c0071`, and `599206b6` closed BUG-008, BUG-013, and BUG-050. The two transient shared-tree NameBinder failures during George-9's concurrent full-run attempt are superseded by George-7's clean 3,925-test run.
+
+---
+
+### 2026-05-10T20:56:44Z: Track 2 Slice 10 finishes catalog-derived name resolution and computed-field binding
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-t2-10-complete.md`
+
+- `NameBinder` now treats `TokenMeta.IsStateWildcard` and `IsFieldBroadcast` as non-name lookup routes, so `any` and `all` no longer fall through to undeclared-state or undeclared-field diagnostics.
+- Computed fields now bind after a declaration-order-stable topological sort: non-cyclic forward references resolve regardless of declaration order, while cyclic groups emit `CircularComputedField`; the coupled TypeChecker state-target normalization pass also now honors wildcard anchors after binder success.
+- Implementation commits `def91dbb` and `b08b1fc4` closed BUG-001, BUG-026, BUG-030, and BUG-037 with 3,911 / 3,911 tests passing.
+
+---
+
+### 2026-05-10T20:56:43Z: Track 2 Slice 9 makes operator typing fully catalog-derived in TypeChecker
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-t2-9-complete.md`
+
+- `TypeChecker.Expressions` now resolves operator result types from `OperatorMeta.ResultType` / `ResultTypePolicy`, including boolean operators, lookup `for`, `contains`, and arithmetic result projection from the operations catalog.
+- The same batch tightened adjacent typing surfaces: comparison-position choice literals now contextual-type against `choice` operands, quantifier bindings preserve case-insensitive qualifiers, modifier validation emits `RedundantModifier` for subsumed constraints, and keyed `queue` / `log` field types now resolve to `QueueBy` / `LogBy` so `.peekby` binds correctly.
+- Implementation commits `b7868d60` and `2f75c829` closed BUG-002, BUG-003, BUG-007, BUG-009, BUG-010, BUG-028, BUG-029, BUG-038, BUG-040, BUG-046, BUG-052, and BUG-053; validation finished clean at 3,925 / 3,925 tests.
+
+---
+
+### 2026-05-10T20:56:42Z: Track 2 Slice 4 locks operator result typing to catalog metadata
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-t2-4-operator-meta.md`
+
+- `OperatorMeta.StaticResultType` is now `ResultType`, and the durable policy surface is `ResultTypePolicy { Fixed, LhsType, ElementType, BothOperands, OperationResult }`.
+- Catalog assignments are explicit: comparisons/presence/contains stay `Fixed` boolean, `and` / `or` use `BothOperands` with boolean agreement, unary negate uses `LhsType`, lookup `for` uses `ElementType`, and arithmetic operators point at `OperationResult`.
+- Durable rule for t2-9: arithmetic result typing must read `OperationMeta.Result` instead of reviving a per-operator promotion switch. George shipped the catalog-only foundation in commit `df874e15` with 3,899 passing tests.
+
+---
+
 ### 2026-05-10T17:10:00Z: When-guard redesign rejects slot-index magic and requires explicit guard-policy metadata
 
 **By:** Scribe

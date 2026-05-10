@@ -49,6 +49,12 @@
 
 ## Recent Updates
 
+### 2026-05-10T20:56:42Z — Track 2 slices 4/9/10/11 durably recorded
+- George-6's commit `df874e15` established `OperatorMeta.ResultType` / `ResultTypePolicy` as the catalog authority for operator result typing, including the `OperationResult` handoff to `OperationMeta.Result` for arithmetic.
+- George-7 finished t2-9 in `b7868d60` and `2f75c829`: TypeChecker now consumes operator typing metadata directly, tightened adjacent choice/quantifier/modifier typing, and closed BUG-002,003,007,009,010,028,029,038,040,046,052,053 at 3,925 / 3,925.
+- George-8 finished t2-10 in `def91dbb` and `b08b1fc4`: wildcard/broadcast name resolution is catalog-derived, computed fields bind via stable topological ordering with cycle diagnostics, and BUG-001,026,030,037 closed at 3,911 / 3,911.
+- George-9 finished t2-11 in `004e68be`, `e48c0071`, and `599206b6`: proof obligations now project by proof-site metadata, collection mutation diagnostics bind real field names, 5 new proof tests landed, and the transient shared-tree binder failures were superseded by George-7's clean full run.
+
 ### 2026-05-10T19:47:35Z — Grammar doc-fix commits and validation recorded
 - George-5 durably closed the grammar/spec/catalog documentation batch in commits 9b8e8384 and b8e7df94, covering the precept-grammar.md correction pass plus the removal of illegal trailing-ensure EventHandler grammar and obsolete SupportsPostActionEnsure documentation.
 - The squad ledger, orchestration log, and this history now agree on the batch boundary, so follow-up doc work should cite the committed artifacts rather than the deleted inbox notes.
