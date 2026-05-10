@@ -1,130 +1,42 @@
 ## Core Context
 
-
-
 - Owns tooling surfaces: language server, VS Code extension, grammar sync, plugin wiring, MCP ergonomics, and executable developer workflows.
-
 - Keeps grammar, completions, semantic tokens, tests, and tooling docs synchronized with the actual DSL and server surface.
-
-- The durable tooling rule: prefer precise, runnable guidance and avoid claims the extension, language server, or generators cannot currently support.
-
-
+- Favors catalog-driven and semantic-model-driven editor behavior over LS-local keyword lists or parser-span guesses.
 
 ## Learnings
 
-
-
-- Tooling trust depends on accurate status language: metadata readiness is not the same thing as implemented handlers.
-
-- VS Code extension packaging can bundle `src/extension.ts` into `out/extension.js` with esbuild while keeping `npm run compile` as the dev/type-check path; using `vscode:prepublish` makes every VSIX build pick up the bundle without touching the shipped `server/` payload.
-
-- Grammar and completion changes are safest when specific patterns land before generic catch-alls and are backed by regression tests.
-
-- Proof diagnostics become brittle when they depend on prose instead of structured metadata; keep publication paths but prefer durable data contracts.
-
-- For custom DSL documentation, truthful code-fence labels and accurate path/build guidance matter more than cosmetic approximations.
-
-- `IsMessagePosition` now drives `messageStrings` generation in `Precept.GrammarGen`: token flags emit keyword-plus-gold-string patterns, and function flags reserve the future trailing-argument path.
-
-- No built-in functions currently opt into `IsMessagePosition`; the generator intentionally emits only token-derived message patterns today while keeping the function wiring live.
-
-- Added the VS Code task label `grammar: regenerate`, which runs `dotnet run --project tools/Precept.GrammarGen -- --output tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` so developers can refresh the generated TextMate grammar after catalog changes.
-
-- `ModifierMeta.DesugarsToRule` now wires into `Precept.GrammarGen` through a derived `ruleDesugaringModifiers` repository entry built from `Modifiers.All.Where(m => m.DesugarsToRule)` rather than a hand-maintained modifier list.
-
-- The gold keyword scope for rule-desugaring modifier highlights is `keyword.other.grammar.precept`; it must stay ahead of `#constraintKeywords` anywhere modifier patterns are composed so first-match TextMate ordering preserves the gold scope.
-
-- ProofEngine presence diagnostics were missing because `docs/compiler/proof-engine.md` §9 assigned codes 112–115 for four proof requirement families but omitted `PresenceProofRequirement`; fixing the spec gap required adding `UnprovedPresenceRequirement = 116`, wiring the diagnostics catalog and `ProofEngine.cs`, and updating `test/Precept.Tests/DiagnosticsTests.cs` plus `test/Precept.Tests/ProofEngineTests.cs`.
-
-- Workspace maintenance commands in the VS Code extension can stay dependency-free: built-in `https` plus `withProgress` is enough to fetch official source artifacts into repo-relative paths with clear success/error UX.
-
-- ISO 4217 refresh belongs in `.vscode/tasks.json`, not the extension command surface; keep one-off workspace maintenance flows as explicit tasks backed by repo-local scripts.
-
-- The historical SIX Group `iso-4217/lists/list-one.xml` URL now returns 404; the live XML currently resolves under SIX's `iso-currrency/lists/list-one.xml` path, so repo-local refresh tooling should handle source drift explicitly rather than baking brittle editor commands into the extension.
-
-- ISO 4217 reference data now lives in source control at `src/Precept/Data/Iso4217/list-one.xml`, and `CurrencyCatalogSyncTests` now always executes with plain `[Fact]` so catalog drift surfaces as a real failure instead of a discovery-time skip.
-
-- The current VS Code highlighting split is TextMate-first for field/arg differentiation: fields already land on `variable.other.field.precept` plus generic `variable.other.precept` with `#A5B4FC`, while event arg declarations use `variable.parameter.precept` and now take `#9AD8E8`; the language-server semantic surface still only exposes the shared `preceptFieldName` token type for field/argument names.
-
-- 2026-05-09T11:07:24.986-04:00 color audit locked the current VS Code mapping: `#4338CA` → `keyword.other.semantic.precept`, `keyword.control.precept`, `keyword.other.precept`, `keyword.declaration.precept`, `keyword.other.action.precept`, `keyword.other.assertion.precept`, `keyword.other.outcome.precept`, `keyword.other.access-mode.precept`, `keyword.other.quantifier.precept`; `#6366F1` → `keyword.other.constraint.precept`, `keyword.other.connective.precept`, `keyword.operator.comparison.precept`, `keyword.operator.logical.precept`, `keyword.operator.arithmetic.precept`, `keyword.operator.assignment.precept`, `keyword.operator.arrow.precept`, `keyword.operator.membership.precept`, `keyword.operator.precept`, `punctuation.separator.arrow.precept`, `punctuation.separator.comma.precept`, `punctuation.accessor.precept`, `punctuation.section.group.begin.precept`, `punctuation.section.group.end.precept`, `punctuation.precept`; `#A898F5` → `entity.name.type.state.precept`, `entity.name.type.state.constrained.precept`; `#30B8E8` → `entity.name.function.event.precept`, `entity.name.function.event.constrained.precept`; `#A5B4FC` → `variable.other.field.precept`, `variable.other.field.constrained.precept`, `variable.other.property.precept`, `variable.other.precept`, `entity.name.type.precept.precept`; `#9AD8E8` → `variable.parameter.precept`; `#9AA8B5` → `storage.type.precept`, `storage.modifier.state.precept`; `#84929F` → `constant.other.value.precept`, `constant.language.precept`, `constant.numeric.precept`, `constant.language.boolean.precept`, `string.quoted.double.precept`, `string.quoted.single.precept`; `#FBBF24` → `string.quoted.double.message.precept`, `keyword.other.grammar.precept`; `#9096A6` → `comment.line.number-sign.precept`. Semantic-token customizations remain `preceptComment`/`comment:precept` → `#9096A6`, `operator:precept` → `#6366F1`, `preceptFieldName`/`preceptFieldName.preceptConstrained`/`preceptName` → `#A5B4FC`, and `preceptMessage`/`preceptKeywordGrammar` → `#FBBF24`.
-
-- LS-driven semantic-token colors work cleanly when the server publishes `SemanticTokenTypes.All` once at startup and the extension merges the generated rules into workspace `editor.semanticTokenColorCustomizations`; the only non-catalog rule that still needs a generic hook is the modifier-wide `*.preceptConstrained` italic overlay.
-
-- Recommendations for the catalog-compliance audit should be written from the canonical decision ledger, with Frank's bug-cluster findings translated into root-cause remediation and Soup-Nazi's verdict translated into real-catalog, non-mocked test layers plus concrete first tests.
-
-
+- Incomplete-code routing is safest when it reuses semantic spans plus neighboring significant tokens instead of trusting parser recovery spans alone.
+- Cursor positions parked at the next token boundary belong to the preceding separator for member-access and default-value completions.
+- Shared helpers (`LanguageServerComposition`, `SemanticExpressionLocator`, `SymbolNavigation`, `OutlineSymbolProjector`) are the durable way to keep the shipped host and test harness aligned.
+- Versioned document updates must reject stale recompiles while preserving the unversioned fallback path for clients that omit version data.
+- Modifier completions should derive from `ValueModifierMeta.ApplicableTo` and declaration-site legality so the completion surface stays catalog-truthful.
+- Visible editor-color drift can come from VS Code fallback/theme ordering even when catalog metadata and semantic tokens are already correct.
 
 ## Historical Summary
 
-
-
-- Earlier May 2026 tooling work established the standing rules that tooling docs must stay truthful, grammar/scope/semantic-token behavior must remain catalog-driven, and one-off maintenance flows like ISO refreshes belong in explicit workspace tasks rather than extension commands.
-
-- The 2026-05-09 closeout wave already recorded the event-arg parameter-property scope promotion, the tooling-lens LS review reconciliation, Slice 0 infrastructure plus 0b shim deletion, and the first handler batch for diagnostics, semantic tokens, completions, hover, and folding.
-
-- Use `.squad/decisions.md` for the canonical per-batch detail; this history now keeps only the live tooling baseline and the most recent active updates.
-
-
+- Early May 2026 tooling work established the catalog-driven language-server baseline: Phase 1 handler wiring, semantic-token color publication, trigger-character and `set` context fixes, and Slice 13/14 completion routing over semantic context instead of LS-local lists.
+- Later 2026-05-10 slices closed the shared navigation and symbol stack (`SymbolNavigation`, rename, document/workspace symbols), document version ordering, completion item quality, hover completion, and typed-constant editor polish, all backed by language-server regression coverage.
+- The canonical decision ledger in `.squad/decisions.md` carries the batch-level detail; this history keeps only the durable tooling baseline and newest live updates.
 
 ## Recent Updates
 
+### 2026-05-10T12:15:36Z — Boolean field modifier completion filtering landed
+- `CompletionHandler` now filters field modifiers through modifier metadata and declaration-site legality, so boolean fields offer only `default`, `optional`, and `writable` instead of leaking numeric-only items like `max` and `maxplaces`.
+- `CompletionHandlerTests.cs` now locks the exact boolean-valid surface, and the full language-server test project passed 150/150 after the fix.
 
+### 2026-05-10T07:15:00Z — Slice 18 hover surface completion landed
+- `HoverHandler` now reuses `SemanticExpressionLocator` so hover can project catalog-driven details for function calls, typed constants, accessors, and semantic expression sites without LS-local symbol mirrors.
+- Validation stayed green: targeted hover coverage passed 15/15, then the full language-server test project passed 141/141.
 
-### 2026-05-10T04:20:44Z — Slice 11 final wiring recorded
+### 2026-05-10T06:55:00Z — Slice 17 completion item quality landed
+- Completion items now carry snippet insert text, markdown documentation, and stable sort grouping while keeping semantic symbols ahead of catalog entries.
+- Validation stayed green: `CompletionHandlerTests` passed 23/23, then the full language-server test project passed 135/135.
 
-- `Program.cs` now registers the full Phase 1 handler surface over shared `DocumentStore` and publishes semantic-token color rules at startup through `SemanticTokensHandler.SendColorNotification(server)`.
+### 2026-05-10T06:33:00Z — Slice 26 document version ordering landed
+- `DocumentState` now stores versioned snapshots and rejects stale `TryUpdate(...)` calls; `TextDocumentSyncHandler` suppresses stale diagnostic publishes while retaining the unversioned fallback path.
+- Targeted Slice 26 coverage passed 7/7, then the full language-server test project passed 115/115.
 
-- Durable boundaries from the slice are now locked: capabilities stay registration-driven, tests keep the delegate color-notification seam, `CompletionHandler` must read `ValueModifierMeta`, and `LspTestHost` remains intentionally partial until Slice 29.
-
-
-
-### 2026-05-10T03:13:51Z — Bug register operationalized for Track 2
-
-- Added the status tracker table to `docs/Working/precept-toolchain-bugs.md`, giving the 52 confirmed bugs durable status/assignee/notes columns for implementation triage.
-
-- Frank's stage analysis and Soup-Nazi's test-strategy verdict are now merged into the canonical decision ledger, so the tracker can point follow-up slices at the highest-value parser/MCP/type-checker gaps and the matching regression layers.
-
-
-
-### 2026-05-10T02:50:04Z — Team update: visual taxonomy and LS prerequisites locked
-
-- 📌 Team update (2026-05-10T02:50:04Z): `SemanticTokenTypes` is now the approved 14th catalog, `TokenMeta` keeps one `VisualCategory`, and token-surface projections (custom type, TextMate scope, base styles, constrained-modifier support) now belong to catalog metadata instead of parallel token fields or manifest copies — decided by Frank and Shane Falik.
-
-- 📌 Team update (2026-05-10T02:50:04Z): George's outline metadata plus snippet-template catalog work are now durably recorded as the completion/outline prerequisite surface that your LS slices consume on top of Slice 0's protocol foundation — decided by George and captured by Scribe.
-
-
-
-### 2026-05-10T01:55:00Z — Slice 12 committed: trigger characters + dual-use `set` type context
-
-- Commit `d962d0cb` fixed `CompletionHandler` trigger characters to `[" ", "'", ".", ">", "~"]`, added `SlotContextResolver.IsSetInTypePosition`, and wired the dual-use `set` reclassification into hover and semantic-token projection.
-
-- Durable lessons from the slice stay locked: token-stream lookups should use `StartLine` + `StartColumn` rather than `SourceSpan.Offset`, and type-position `set` must project the type semantic token path rather than the action keyword path.
-
-
-
-### 2026-05-10T00:41:09Z — Slices 1/2/4/5/9 handler batch recorded
-
-- The LS now has concrete diagnostics, semantic-token, completion, hover, and folding handlers, with the matching tests that locked the publication, projection, and projection-only semantic contracts.
-
-- Validation stayed green except for the pre-existing `SemanticTokensHandler.CreateRegistrationOptions` access-modifier mismatch in the shared LS baseline.
-
-
-
-### 2026-05-10T00:23:31Z — Slice 0b legacy LS cleanup committed
-
-- Commit `51d93dc2` deleted the stub layer (`LanguageServerStubs.cs`, `PreceptPreviewProtocol.cs`, `LegacyHandlerCompat.cs`) and removed 173 legacy shim-facing tests so the LS project keeps only the real harness surface.
-
-- The cleanup gate remained `dotnet build` for the LS projects plus `dotnet test test/Precept.Tests/`, all green in the validated slice run.
-
-
-
-### 2026-05-10T03:39:49Z — Slice 10-color follow-up spec recorded
-
-- Slice 10-color spec authored and inserted into `docs/Working/language-server-implementation-plan.md`.
-
-- Approach: custom LSP notification `precept/semanticTokenColors` → extension.ts handler → `editor.semanticTokenColorCustomizations` workspace config API.
-
-### 2026-05-10T04:33:18Z — Shared LS composition follow-up closed and Track 1 stays exclusive
-- The Slice 11 no-deferral audit closed the Phase 1 mirroring gap: `Program.cs` and `LspTestHost` now share `LanguageServerComposition.ConfigurePreceptLanguageServer(...)`, and `ServerCapabilityTests` lock the shipped Phase 1 capability surface.
-- The old "leave host mirroring to Slice 29" note is no longer valid; Slice 29 is back to future Phase 2 protocol growth only.
-- Shane's latest directive pauses Track 2 execution, so the active tooling lane remains Track 1 and the next ready slice is still 13 unless focus changes again.
+### 2026-05-10T05:25:00Z — Slice 20 shared symbol navigation landed
+- `SymbolNavigation` now centralizes declaration/reference lookup for fields, states, events, and event args, and the server capability surface registers references plus document highlights through the shared composition path.
+- The durable event-arg rule is still explicit: qualified arg references can share the broad semantic site for navigation/highlights, but rename must trim edits back to the identifier token.
