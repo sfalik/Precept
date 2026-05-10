@@ -863,10 +863,9 @@ The optional `when` guard is pre-verb: it appears after the state/event target a
 ```
 on Identifier
 ("->" ActionStatement)*
-("ensure" BoolExpr)?
 ```
 
-Event hooks without a `when`/`ensure` continuation are parsed as stateless event hooks with an arrow-prefixed action chain. The optional `ensure` clause at the end of the action chain declares a post-condition guard — a boolean expression that must hold after all mutations in the handler are applied.
+Event handlers are the stateless `on Event -> ...` form. Once `->` appears after the event target, the declaration is an event handler with an arrow-prefixed action chain. Handlers do not support `when` guards or a trailing `ensure`; `on Event ensure ...` is the separate event ensure form.
 
 #### State action
 
@@ -1042,7 +1041,7 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 | Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error | "Comparisons like == and < cannot be chained — {0}" |
 | Non-callable expression followed by `(` | `InvalidCallTarget` | Error | "'{0}' is not callable — only function names and member access expressions can be called (e.g., 'foo.method(args)')" |
 | `omit` access mode with `when` guard | `OmitDoesNotSupportGuard` | Error | "'omit' is an unconditional structural exclusion — 'when' guards are not allowed" |
-| `on Event ->` handler with `when` guard | `EventHandlerDoesNotSupportGuard` | Error | "Event handlers ('on Event -> action') do not support 'when' guards — guards are only valid on event ensures and transition rows" |
+| `on Event ->` handler with `when` guard | `EventHandlerDoesNotSupportGuard` | Error | "Event handlers ('on Event -> action') do not support 'when' guards — guards are only valid on transition rows, state ensures, access modes, state actions, event ensures, and rule declarations" |
 | `when` guard placed before `on Event` on a transition row | `PreEventGuardNotAllowed` | Error | "A 'when' guard before the event target is not supported on transition rows — place the guard after 'on Event'" |
 | Transition row has no outcome | `ExpectedOutcome` | Error | "Expected a transition outcome ('-> transition State', '-> no transition', or '-> reject Message') but none was found" |
 | `choice of T()` with empty argument list | `EmptyChoice` | Error | "A choice type must have at least one value" |

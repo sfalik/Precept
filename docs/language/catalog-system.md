@@ -1595,7 +1595,7 @@ Grammar forms / declaration shapes.
 | Part | Type |
 |------|------|
 | Kind enum | `ConstructKind` (12 members) |
-| Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], Entries, RoutingFamily, SnippetTemplate?, ModifierDomain, SupportsPostActionEnsure, IsOutlineNode, OutlineSymbolTag?)` — see full shape below |
+| Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], Entries, RoutingFamily, SnippetTemplate?, ModifierDomain, IsOutlineNode, OutlineSymbolTag?)` — see full shape below |
 | Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (17-member enum) |
 
 | Catalog class | `Constructs` — `GetMeta()`, `All` |
@@ -1623,7 +1623,6 @@ public sealed record ConstructMeta(
     RoutingFamily                        RoutingFamily,
     string?                              SnippetTemplate          = null,
     ModifierDomain                       ModifierDomain           = ModifierDomain.None,
-    bool                                 SupportsPostActionEnsure = false,  // EventHandler
     bool                                 IsOutlineNode            = false,
     string?                              OutlineSymbolTag         = null   // e.g. "Module", "Property"; non-null when IsOutlineNode = true
 );
