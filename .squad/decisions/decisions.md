@@ -13554,3 +13554,16 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 - Added `ActionSyntaxSlot` and `ActionShapeMeta`, including pre-computed `SeparatorTokens`, plus exhaustive `Actions.GetShapeMeta()` coverage for all 9 `ActionSyntaxShape` values.
 - Removed `IntoSupported` from `ActionMeta`; consumers now derive into support from slot metadata, and `CollectionIntoBy`'s final slot is correctly modeled as `OrderingCapture` rather than `OrderingKey`.
 - Coverage was added or updated in `ActionCatalogTests`, `ActionsTests`, `LanguageToolTests`, and the MCP mapping/tests. Validation closed green at 4322 total tests (3827 + 59 + 156 + 280).
+
+### 2026-05-10T13:53:14Z: t2-2 Slice B ParseActionTarget separators are catalog-driven
+
+**By:** George
+
+**Status:** Complete
+
+**Source:** `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\george-t2-2-sliceB-done.md`
+
+- `ParseActionTarget` now accepts shape-specific `FrozenSet<TokenKind>` separators from `Actions.GetShapeMeta(meta.SyntaxShape).SeparatorTokens`; the shared hardcoded `{=, into, by, at}` union is gone.
+- `ParseActionByShape` computes separators once and threads them through all 9 action-shape parse methods so target termination stays catalog-driven.
+- Added `ParseActionTargetTests.cs` with 8 tests (4 catalog property + 4 behavioral parser coverage), while preserving the known `CollectionValueBy`/`RemoveAtIndex` parser-unreachable boundary as catalog-level coverage.
+- Validation closed green at 4050/4050 tests. Commit: `fb525df0`.
