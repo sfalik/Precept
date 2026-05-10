@@ -1463,9 +1463,9 @@ Collection non-empty obligations arise from several sources:
 | `dequeue Collection` action | Queue must be non-empty |
 | `pop Collection` action | Stack must be non-empty |
 
-**Ownership (PE-G9):** The type checker owns collection safety diagnostics (`UnguardedCollectionAccess` code 63, `UnguardedCollectionMutation` code 64). Collection non-empty requirements are encoded as `NumericProofRequirement(SelfSubject(CollectionCountAccessor), GreaterThan, 0)` in the catalog. The proof engine processes them as ordinary numeric obligations through Strategies 1/2/3 — no special collection-specific logic or diagnostic codes are needed.
+**Ownership (PE-G9):** Collection non-empty requirements are encoded as `NumericProofRequirement(SelfSubject(CollectionCountAccessor), GreaterThan, 0)` in the catalog. The proof engine discharges them through the same bounded Strategies 1/2/3 it uses for other numeric obligations; the only collection-specific branch is final diagnostic/fault projection.
 
-If the obligation is unresolved after all strategies, the `FaultSiteLink` maps to `FaultCode.CollectionEmptyOnAccess` or `CollectionEmptyOnMutation`, which are already linked to the type checker's diagnostics via `[StaticallyPreventable]`.
+If the obligation is unresolved after all strategies, the proof-site shape determines the projected failure surface: `TypedMemberAccess` sites emit `UnguardedCollectionAccess` and map to `FaultCode.CollectionEmptyOnAccess`; field-target action sites (`dequeue`, `pop`) emit `UnguardedCollectionMutation` and map to `FaultCode.CollectionEmptyOnMutation`.
 
 **Modifier-proof strategy:** The `notempty` modifier discharges collection non-empty requirements.
 

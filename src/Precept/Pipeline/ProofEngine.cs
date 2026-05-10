@@ -940,7 +940,7 @@ public static class ProofEngine
 
         switch (obligation.Requirement)
         {
-            case NumericProofRequirement numeric when TryCreateCollectionAccessDiagnostic(obligation, out var collectionDiagnostic):
+            case NumericProofRequirement numeric when TryCreateCollectionSafetyDiagnostic(obligation, out var collectionDiagnostic):
                 return collectionDiagnostic;
 
             case NumericProofRequirement numeric:
@@ -977,35 +977,63 @@ public static class ProofEngine
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
     }
 
-    private static bool TryCreateCollectionAccessDiagnostic(ProofObligation obligation, out Diagnostic diagnostic)
+    private static bool TryCreateCollectionSafetyDiagnostic(ProofObligation obligation, out Diagnostic diagnostic)
     {
         diagnostic = default!;
 
-        if (obligation.Requirement is not NumericProofRequirement numeric
-            || obligation.Site is not TypedMemberAccess access
-            || numeric.Subject is not SelfSubject { Accessor: { Name: "count" } }
-            || numeric.Comparison != OperatorKind.GreaterThan
-            || numeric.Threshold != 0m)
-        {
+        if (!IsCollectionCountRequirement(obligation.Requirement, out _))
             return false;
+
+        switch (obligation.Site)
+        {
+            case TypedMemberAccess access:
+                diagnostic = Diagnostics.Create(
+                    DiagnosticCode.UnguardedCollectionAccess,
+                    obligation.Site.Span,
+                    GetFieldName(access.Object) ?? "<unknown>",
+                    access.ResolvedAccessor.Name);
+                return true;
+
+            case TypedFieldRef fieldRef:
+                diagnostic = Diagnostics.Create(
+                    DiagnosticCode.UnguardedCollectionMutation,
+                    obligation.Site.Span,
+                    fieldRef.FieldName,
+                    "this mutation action");
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsCollectionCountRequirement(
+        ProofRequirement requirement,
+        out NumericProofRequirement? numericRequirement)
+    {
+        if (requirement is NumericProofRequirement numeric
+            && numeric.Subject is SelfSubject { Accessor: { Name: "count" } }
+            && numeric.Comparison == OperatorKind.GreaterThan
+            && numeric.Threshold == 0m)
+        {
+            numericRequirement = numeric;
+            return true;
         }
 
-        diagnostic = Diagnostics.Create(
-            DiagnosticCode.UnguardedCollectionAccess,
-            obligation.Site.Span,
-            GetFieldName(access.Object) ?? "<unknown>",
-            access.ResolvedAccessor.Name);
-        return true;
+        numericRequirement = null;
+        return false;
     }
 
     private static DiagnosticCode GetNumericRequirementDiagnosticCode(ProofObligation obligation, NumericProofRequirement requirement)
     {
-        if (obligation.Site is TypedMemberAccess access
-            && requirement.Subject is SelfSubject { Accessor: { Name: "count" } }
-            && requirement.Comparison == OperatorKind.GreaterThan
-            && requirement.Threshold == 0m)
+        if (IsCollectionCountRequirement(requirement, out _))
         {
-            return DiagnosticCode.UnguardedCollectionAccess;
+            return obligation.Site switch
+            {
+                TypedMemberAccess => DiagnosticCode.UnguardedCollectionAccess,
+                TypedFieldRef => DiagnosticCode.UnguardedCollectionMutation,
+                _ => DiagnosticCode.DivisionByZero,
+            };
         }
 
         return requirement.Comparison == OperatorKind.GreaterThanOrEqual && requirement.Threshold == 0m
@@ -1054,6 +1082,7 @@ public static class ProofEngine
             DiagnosticCode.DivisionByZero => FaultCode.DivisionByZero,
             DiagnosticCode.SqrtOfNegative => FaultCode.SqrtOfNegative,
             DiagnosticCode.UnguardedCollectionAccess => FaultCode.CollectionEmptyOnAccess,
+            DiagnosticCode.UnguardedCollectionMutation => FaultCode.CollectionEmptyOnMutation,
             _ => FaultCode.DivisionByZero // Proof-only obligation families still share the existing conservative runtime backstop.
         };
 
