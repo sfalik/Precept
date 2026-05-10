@@ -28,7 +28,8 @@ in Confirmed ensure TicketsIssued == SeatsReserved because "Confirmed registrati
 in CheckedIn ensure CheckInDesk is set because "Checked-in registrations must record the desk"
 
 # Every transition into Confirmed finishes the same bookkeeping.
-to Confirmed -> set PaymentReceived = true -> set AmountDue = 0
+to Confirmed -> set PaymentReceived = true
+to Confirmed when AmountDue > 0 -> set AmountDue = 0
 
 event StartRegistration(
     Name as string notempty,

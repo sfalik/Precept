@@ -23,16 +23,16 @@ state Denied
 state Paid
 
 in UnderReview modify FraudFlag editable
-in UnderReview modify AdjusterName editable when not FraudFlag
+in UnderReview when not FraudFlag modify AdjusterName editable
 in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
-in Approved ensure DecisionNote is set when FraudFlag because "Fraud-flagged approvals require a decision note"
+in Approved when FraudFlag ensure DecisionNote is set because "Fraud-flagged approvals require a decision note"
 
 event Submit(
     Claimant as string notempty,
     Amount as decimal,
     RequiresPoliceReport as boolean default false)
 on Submit ensure Submit.Amount > 0 because "Claim amounts must be positive"
-on Submit ensure Submit.Amount <= 100000 when Submit.RequiresPoliceReport because "Police-report claims are capped at $100,000"
+on Submit when Submit.RequiresPoliceReport ensure Submit.Amount <= 100000 because "Police-report claims are capped at $100,000"
 
 event RequestDocument(Name as string notempty)
 event ReceiveDocument(Name as string notempty)

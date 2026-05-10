@@ -22,10 +22,10 @@ state Funded
 state Declined
 
 in Approved ensure DocumentsVerified because "Approved loans must have verified documents"
-in UnderReview ensure CreditScore >= 300 when DocumentsVerified because "Verified applicants must have a minimum credit score of 300"
+in UnderReview when DocumentsVerified ensure CreditScore >= 300 because "Verified applicants must have a minimum credit score of 300"
 in Funded ensure ApprovedAmount > 0 because "Funded loans must have a positive approved amount"
 
-in UnderReview modify DecisionNote editable when DocumentsVerified
+in UnderReview when DocumentsVerified modify DecisionNote editable
 
 event Submit(
     Applicant as string notempty,
