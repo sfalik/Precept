@@ -24,6 +24,63 @@
 
 ---
 
+### 2026-05-10T17:10:00Z: When-guard redesign rejects slot-index magic and requires explicit guard-policy metadata
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `copilot-directive-when-slots.md`, `frank-when-guard-design.md`.
+
+- Shane's directive argued that the slot list itself should encode guard position, with `SlotGuardClause` always preceding the verb slot and no separate guard flag or enum.
+- Frank rejected that `Slots[1] is GuardClause` convention as positional magic masquerading as metadata; slot order describes post-disambiguation content, not the parser's guard-placement protocol.
+- The recommended replacement is an explicit `GuardPolicy` enum on `ConstructMeta` (`None`, `SlotWalk`, `PreVerb`, `PostVerb`) so each construct names where guards parse and whether guards are prohibited.
+- AccessMode should move to pre-verb syntax (`in Draft when IsOwner modify Amount editable`), and the follow-through must update spec grammar, catalog/docs/tests, and MCP projections. `SupportsPostActionEnsure` was flagged as the parallel architectural smell, but kept out of this fix's scope.
+
+---
+
+### 2026-05-10T16:15:12Z: When-guard audit locks pre-verb state/event ensures and exposes the remaining spec-sample drift
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-when-guard-audit.md`.
+
+- The full audit found one real grammar inconsistency: state/event ensures are intended and implemented as pre-verb guards, but spec grammar lines 855–856 and three sample lines still show post-expression `when`.
+- Parser, catalog, spec prose, spec examples, toolchain-plan notes, and tests all agree on the pre-verb form; the broken sample lines now stand as durable evidence that `ParserIntegrationTests` must start asserting zero diagnostics, not just "no crash."
+- Other guard positions remain structurally consistent: rule stays the deliberate post-expression exception, transition rows keep post-event guards, state actions stay pre-verb, access mode remains post-adjective today, and omit/event-handler constructs still reject `when`.
+
+---
+
+### 2026-05-10T16:02:38Z: Slice 8 parser rewires are approved, but BUG-019 remains partial until binary-comparison typed constants are fixed
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `frank-slice8-review.md`, `george-slice8-done.md`.
+
+- George's Slice 8 batch landed the parser/catalog rewires for guarded scoped constructs, post-action ensure, event-arg type/default parsing, comma-separated field targets, log ordering modifiers, interpolated strings, computed-field topological ordering, and typed-constant context propagation; build plus `Precept.Tests` closed green at 3869/3869.
+- Frank's review approved the implemented Slice 8 items as architecturally sound and catalog-derived, with no merge-blocking issues.
+- Durable follow-up: BUG-019 is only partially fixed because typed constants in binary comparison context still hit PRE0052 until `ResolveBinaryOp` retries context before the D13 bailout; stale MCP triage and `FieldTargetSlot`'s single-name data-model limitation remain explicitly tracked as non-blocking follow-ups.
+
+---
+
+### 2026-05-10T15:52:58Z: Track 2 Phase A source audit and D1-D8 doc-sync closeout are now one canonical record
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `frank-slice-1-7-audit.md`, `frank-catalog-doc-sync.md`.
+
+- Frank's Phase A audit approved the shipped source/catalog work across slices 1–7 and isolated the only remaining closeout debt to eight `catalog-system.md` drift points plus two explicit modifier-test anchors.
+- The follow-up doc-sync batch closed all D1–D8 gaps, added the named modifier capability tests, and re-aligned `catalog-system.md` with the live catalog field names, counts, and metadata shapes.
+- Durable process rule: when catalog work ships, the owning commit must also close or remove any lingering open-question checklist items so documentation does not trail the metadata-driven source of truth.
+
+---
+
 ### 2026-05-10T13:50:12Z: BUG-021 / BUG-048 / BUG-049 share one parser root cause: action shapes need slot/separator metadata
 
 **By:** Scribe
