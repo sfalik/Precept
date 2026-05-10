@@ -231,7 +231,7 @@ JSON response to agent
         "name": "Amount",
         "type": "money",
         "qualifier": "in 'USD'",
-        "modifiers": ["nonnegative"],
+        "modifiers": ["nonnegative", "min 0"],
         "isOptional": false,
         "isWritable": false,
         "defaultValue": null
@@ -239,18 +239,27 @@ JSON response to agent
       {
         "name": "Status",
         "type": "choice",
-        "options": ["Pending", "Approved", "Rejected"],
-        "modifiers": [],
+        "choiceElementType": "string",
+        "choiceValues": ["Pending", "Approved", "Rejected"],
+        "modifiers": ["default"],
         "isOptional": false,
-        "isWritable": false,
-        "defaultValue": null
+        "isWritable": true,
+        "defaultValue": "Pending"
       }
     ],
     "states": [
       {
         "name": "Pending",
         "modifiers": ["initial"],
-        "constraints": []
+        "constraints": [],
+        "omittedFields": null,
+        "accessModes": [
+          {
+            "stateName": "Pending",
+            "fieldName": "Amount",
+            "mode": "editable"
+          }
+        ]
       },
       {
         "name": "Approved",
@@ -258,26 +267,51 @@ JSON response to agent
         "constraints": [
           {
             "kind": "StateResident",
-            "anchor": "entry",
+            "anchor": "Approved",
             "expression": "Amount <= 100000",
-            "because": "Approval limit"
+            "because": "Approval limit",
+            "guard": null
           }
-        ]
+        ],
+        "omittedFields": ["InternalNotes"],
+        "accessModes": null
       }
     ],
-
-`SemanticIndex.EnsuresByState` is a first-class grouping on `SemanticIndex`: `FrozenDictionary<string, ImmutableArray<TypedEnsure>>` — resolved by CC#22. MCP nests constraints under their anchor state by reading this pre-grouped index directly, eliminating the re-correlation step.
-
     "events": [
       {
         "name": "Approve",
-        "args": [],
+        "args": [
+          {
+            "name": "Comment",
+            "type": "string",
+            "isOptional": true
+          }
+        ],
         "rows": [
           {
             "fromStates": ["Pending"],
             "guard": "Amount <= 100000",
-            "actions": ["transition to Approved"],
-            "toState": "Approved"
+            "actions": ["set Status = \"Approved\""],
+            "toState": "Approved",
+            "outcome": "transition",
+            "rejectMessage": null
+          },
+          {
+            "fromStates": ["Pending"],
+            "guard": null,
+            "actions": [],
+            "toState": null,
+            "outcome": "reject",
+            "rejectMessage": "Approval requires verified documents"
+          }
+        ],
+        "constraints": [
+          {
+            "kind": "EventPrecondition",
+            "anchor": "Approve",
+            "expression": "Approve.Comment is set",
+            "because": "Approval comment is required",
+            "guard": null
           }
         ]
       }
@@ -285,12 +319,24 @@ JSON response to agent
     "rules": [
       {
         "expression": "Amount > 0",
-        "because": "Loan amount must be positive"
+        "because": "Loan amount must be positive",
+        "when": "IsSubmitted"
+      }
+    ],
+    "stateHooks": [
+      {
+        "stateName": "Approved",
+        "kind": "entry",
+        "actions": ["set Status = \"Approved\""]
       }
     ]
   }
 }
 ```
+
+`SemanticIndex.EnsuresByState` is a first-class grouping on `SemanticIndex`: `FrozenDictionary<string, ImmutableArray<TypedEnsure>>` — resolved by CC#22. MCP nests constraints under their anchor state by reading this pre-grouped index directly, eliminating the re-correlation step.
+
+The compile projection now preserves structural type detail (`~string`, `set of string`, `lookup of K to V`), choice domains (`choiceElementType` / `choiceValues`), per-state omissions and access overrides, event-scoped ensures, explicit row outcomes (`transition` / `no transition` / `reject`), guarded rules (`when`), and top-level `stateHooks`.
 
 **Returns on compilation errors:**
 

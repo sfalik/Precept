@@ -33,7 +33,8 @@ public sealed record PreceptDefinitionDto(
     PreceptFieldDto[] Fields,
     PreceptStateDto[] States,
     PreceptEventDto[] Events,
-    PreceptRuleDto[] Rules
+    PreceptRuleDto[] Rules,
+    StateHookDto[] StateHooks
 );
 
 /// <summary>
@@ -48,36 +49,45 @@ public sealed record PreceptFieldDto(
     string[] Modifiers,
     [property: JsonPropertyName("defaultValue")] string? DefaultExpression,
     string? ComputedExpression,
-    string? Qualifier
+    string? Qualifier,
+    string? ChoiceElementType,
+    string[]? ChoiceValues
 );
 
 public sealed record PreceptStateDto(
     string Name,
     string[] Modifiers,
-    EnsureDto[] Constraints
+    EnsureDto[] Constraints,
+    string[]? OmittedFields,
+    AccessModeDto[]? AccessModes
 );
 
 public sealed record PreceptEventDto(
     string Name,
     EventArgDto[] Args,
-    TransitionRowDto[] Rows
+    TransitionRowDto[] Rows,
+    EnsureDto[]? Constraints
 );
 
 public sealed record EventArgDto(
     string Name,
-    string Type
+    string Type,
+    bool IsOptional
 );
 
 public sealed record TransitionRowDto(
     string[] FromStates,
     string? Guard,
     string[] Actions,
-    string? ToState
+    string? ToState,
+    string? Outcome,
+    string? RejectMessage
 );
 
 public sealed record PreceptRuleDto(
     string Expression,
-    string? Because
+    string? Because,
+    string? When
 );
 
 /// <summary>
