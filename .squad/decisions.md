@@ -12,6 +12,60 @@
 
 ---
 
+### 2026-05-10T02:50:04Z: SemanticTokenTypes is the single visual-category source of truth, and constrained events stay in the italic system
+
+**By:** Scribe
+
+**Status:** Merged, consolidated, inbox cleared (5 files -> 1 canonical entry).
+
+**Merged sources:** `frank-semantic-token-field-consolidation.md` (withdrawn), `frank-semantic-token-field-revision.md`, `frank-visual-catalog-design.md`, `frank-event-italic-clarification.md`, `frank-event-italic-resolved.md`.
+
+- The approved direction is now singular: `SemanticTokenTypes` is the 14th catalog, `TokenMeta` keeps one `VisualCategory` field, and token-surface projections (custom semantic-token type, TextMate scope, base style metadata, and constrained-modifier capability) derive from that catalog instead of parallel token fields or hand-maintained manifest copies.
+- Frank's earlier single-field rejection is superseded by the revised analysis: TextMate scopes and custom semantic-token types are two format projections of the same visual-category concept, so the catalog owns both projections and downstream tooling reads metadata rather than maintaining duplicate mappings.
+- Shane resolved the event-italic conflict in the visual-system HTML: constrained events keep `SupportsConstrainedModifier = true`, italic is the universal constraint-pressure signal for states/fields/args/events, and constraint-blocked events stack italic plus dim rather than choosing one signal over the other.
+- The visual taxonomy also stays explicit at the token level: args remain their own `ArgName` category, message strings remain the only gold token lane, comments keep base italic outside the five construct colors, and generated `package.json` semantic-token sections are the deployment projection of the catalog metadata rather than an independent source of truth.
+---
+
+### 2026-05-10T02:50:04Z: Language-server Phase 2 is now the production gap-closure plan
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-ls-phase2-gap-analysis.md`.
+
+- The live LS is beyond bootstrap but still missing production-complete authoring support in five areas: expression/default-position completions, catalog-complete hover projection, navigation handlers, document-symbol selection ranges, and document-version ordering.
+- `TokenKind.Set` remains the sharpest cross-surface bug: in type position the LS must contextually reclassify `set` as the type token path so completion routing, hover text, and semantic tokens stop projecting the action keyword shape.
+- Phase 2 is now the durable implementation plan for Slices 12-29: trigger/context fixes, deeper completion coverage, typed-constant completions, snippet metadata consumption, hover completion, semantic-token cleanup, references/highlights, rename, signature help, workspace/document symbols, selection ranges, version ordering, VS Code quote pairing, and doc sync.
+- Non-gaps are locked too: keep push diagnostics on OmniSharp 0.19.9, keep full-sync/no-save hooks, do not add workspace diagnostics for closed files, do not add inlay hints or code lens, and do not encode routing-policy heuristics in completion filtering.
+---
+
+### 2026-05-10T02:50:04Z: Outline metadata and LS Slice 0 foundation are durably recorded as the protocol baseline
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `george-slice0a-complete.md`, `kramer-slice0-complete.md`.
+
+- `ConstructMeta` now carries `IsOutlineNode` and `OutlineSymbolTag` with safe defaults, and the catalog explicitly marks `PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, and `RuleDeclaration` as outline nodes with `Module`, `Property`, `Enum`, `Function`, and `Boolean` tags.
+- The first LS protocol spine is now durably captured too: `TextDocumentSyncHandler` uses `ILanguageServerFacade`, registration runs through `WithHandler<TextDocumentSyncHandler>()`, the reusable in-process harness is built on `LanguageServer.PreInit(...)` / `LanguageClient.PreInit(...)`, and the test project depends on the separate `OmniSharp.Extensions.LanguageClient` package.
+- The temporary `LegacyHandlerCompat` bridge is explicitly part of this baseline record so later slices can treat Slice 0b removal as the planned cleanup, not an accidental regression.
+---
+
+### 2026-05-10T02:50:04Z: Snippet templates are the minimal valid authoring form for constructs and primary actions
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-slice16-done.md`.
+
+- Construct snippet templates are intentionally the smallest valid declaration forms: keyword plus the required authoring slots only (`precept`, `field`, `state`, `event`, `rule`) so VS Code tab stops guide required input instead of pre-populating optional modifiers.
+- Primary action verb snippets are derived from `ActionSyntaxShape` and sample `.precept` files rather than invented ad hoc; shapes like `AssignValue`, `CollectionValue`, `CollectionInto`, `FieldOnly`, `InsertAt`, and `PutKeyValue` each map to a canonical snippet pattern.
+- Secondary action variants (`AppendBy`, `EnqueueBy`, `DequeueBy`, `RemoveAt`) stay out of snippet metadata because they are checker-resolved secondary forms, not independent primary author-facing completion items.
+---
+
 ### 2026-05-10T00:47:45Z: Slice 3 core landed ArgReference recording as the semantic-index arg provenance surface
 
 **By:** Scribe

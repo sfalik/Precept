@@ -24,6 +24,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T02:50:04Z — Team update: visual taxonomy now has a canonical catalog surface
+- Frank's token-surface decision is now durable: `SemanticTokenTypes` is the approved 14th catalog, `TokenMeta` collapses to a single `VisualCategory`, and token-surface projections (custom type, TextMate scope, base styles, constrained-modifier support) derive from that catalog rather than parallel token fields.
+- Shane's event-italic ruling is also locked: constrained events keep `SupportsConstrainedModifier = true`, with italic as the universal constraint-pressure signal and blocked events stacking italic plus dim.
+
 ### 2026-05-10T00:47:45Z — Slice 3 core ArgReference recording committed
 - Commit `cba898b7` added `ArgReference(TypedArg Arg, SourceSpan Site)` plus `SemanticIndex.ArgReferences`, extended `SemanticIndex.Empty` and `CheckContext`, and kept arg provenance symmetric with the existing field/state/event reference surfaces.
 - `TypeChecker.Expressions.cs` now records `ArgReference` at both `TypedArgRef` resolution sites (identifier scope lookup and member-access resolution), and `TypeChecker.cs` persists `ctx.ArgReferences.ToImmutableArray()` into the final semantic index.

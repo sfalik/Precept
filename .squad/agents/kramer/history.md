@@ -24,91 +24,27 @@
 - The current VS Code highlighting split is TextMate-first for field/arg differentiation: fields already land on `variable.other.field.precept` plus generic `variable.other.precept` with `#A5B4FC`, while event arg declarations use `variable.parameter.precept` and now take `#9AD8E8`; the language-server semantic surface still only exposes the shared `preceptFieldName` token type for field/argument names.
 - 2026-05-09T11:07:24.986-04:00 color audit locked the current VS Code mapping: `#4338CA` → `keyword.other.semantic.precept`, `keyword.control.precept`, `keyword.other.precept`, `keyword.declaration.precept`, `keyword.other.action.precept`, `keyword.other.assertion.precept`, `keyword.other.outcome.precept`, `keyword.other.access-mode.precept`, `keyword.other.quantifier.precept`; `#6366F1` → `keyword.other.constraint.precept`, `keyword.other.connective.precept`, `keyword.operator.comparison.precept`, `keyword.operator.logical.precept`, `keyword.operator.arithmetic.precept`, `keyword.operator.assignment.precept`, `keyword.operator.arrow.precept`, `keyword.operator.membership.precept`, `keyword.operator.precept`, `punctuation.separator.arrow.precept`, `punctuation.separator.comma.precept`, `punctuation.accessor.precept`, `punctuation.section.group.begin.precept`, `punctuation.section.group.end.precept`, `punctuation.precept`; `#A898F5` → `entity.name.type.state.precept`, `entity.name.type.state.constrained.precept`; `#30B8E8` → `entity.name.function.event.precept`, `entity.name.function.event.constrained.precept`; `#A5B4FC` → `variable.other.field.precept`, `variable.other.field.constrained.precept`, `variable.other.property.precept`, `variable.other.precept`, `entity.name.type.precept.precept`; `#9AD8E8` → `variable.parameter.precept`; `#9AA8B5` → `storage.type.precept`, `storage.modifier.state.precept`; `#84929F` → `constant.other.value.precept`, `constant.language.precept`, `constant.numeric.precept`, `constant.language.boolean.precept`, `string.quoted.double.precept`, `string.quoted.single.precept`; `#FBBF24` → `string.quoted.double.message.precept`, `keyword.other.grammar.precept`; `#9096A6` → `comment.line.number-sign.precept`. Semantic-token customizations remain `preceptComment`/`comment:precept` → `#9096A6`, `operator:precept` → `#6366F1`, `preceptFieldName`/`preceptFieldName.preceptConstrained`/`preceptName` → `#A5B4FC`, and `preceptMessage`/`preceptKeywordGrammar` → `#FBBF24`.
 
+## Historical Summary
+
+- Earlier May 2026 tooling work established the standing rules that tooling docs must stay truthful, grammar/scope/semantic-token behavior must remain catalog-driven, and one-off maintenance flows like ISO refreshes belong in explicit workspace tasks rather than extension commands.
+- The 2026-05-09 closeout wave already recorded the event-arg parameter-property scope promotion, the tooling-lens LS review reconciliation, Slice 0 infrastructure plus 0b shim deletion, and the first handler batch for diagnostics, semantic tokens, completions, hover, and folding.
+- Use `.squad/decisions.md` for the canonical per-batch detail; this history now keeps only the live tooling baseline and the most recent active updates.
+
 ## Recent Updates
 
+### 2026-05-10T02:50:04Z — Team update: visual taxonomy and LS prerequisites locked
+- 📌 Team update (2026-05-10T02:50:04Z): `SemanticTokenTypes` is now the approved 14th catalog, `TokenMeta` keeps one `VisualCategory`, and token-surface projections (custom type, TextMate scope, base styles, constrained-modifier support) now belong to catalog metadata instead of parallel token fields or manifest copies — decided by Frank and Shane Falik.
+- 📌 Team update (2026-05-10T02:50:04Z): George's outline metadata plus snippet-template catalog work are now durably recorded as the completion/outline prerequisite surface that your LS slices consume on top of Slice 0's protocol foundation — decided by George and captured by Scribe.
+
 ### 2026-05-10T01:55:00Z — Slice 12 committed: trigger characters + dual-use `set` type context
-- Commit `d962d0cb`: fixed `CompletionHandler` trigger characters from `":"` to `[" ", "'", ".", ">", "~"]`; added `SlotContextResolver.IsSetInTypePosition` (backward token scan using `StartLine`/`StartColumn`); wired reclassification into `HoverHandler` and `SemanticTokensHandler.ProjectLexicalTokens`.
-- Three new tests across `CompletionHandlerTests`, `HoverHandlerTests`, and `SemanticTokensHandlerTests`; all 66 LS tests pass and all 3750 core tests pass.
-- **Key lesson — `SourceSpan.Offset` is unreliable as a token-stream search key.** It appears to not be populated by the lexer. When locating a specific token in `compilation.Tokens.Tokens`, always match on `StartLine` AND `StartColumn`, both of which ARE reliably populated.
-- **Key lesson — `TokenKind.SetType` has `SemanticTokenType: null` in the catalog** (intentional: SetType is parser-synthesized and should never appear in the lexer output). Any code path that wants the "type" semantic token for `set` in type position must use the literal `"type"` string, not `TokensCatalog.GetMeta(TokenKind.SetType).SemanticTokenType`, which null-coalesces to the wrong fallback.
-- **Key lesson — type position detection via previous token.** `set` in a `TypeExpression` slot is always preceded (in the non-structural token stream) by either `As` (direct type annotation) or `Of` (inner collection type). Walking backward and checking for these two preceding tokens is the correct catalog-driven heuristic.
+- Commit `d962d0cb` fixed `CompletionHandler` trigger characters to `[" ", "'", ".", ">", "~"]`, added `SlotContextResolver.IsSetInTypePosition`, and wired the dual-use `set` reclassification into hover and semantic-token projection.
+- Durable lessons from the slice stay locked: token-stream lookups should use `StartLine` + `StartColumn` rather than `SourceSpan.Offset`, and type-position `set` must project the type semantic token path rather than the action keyword path.
 
 ### 2026-05-10T00:41:09Z — Slices 1/2/4/5/9 handler batch recorded
-- Scribe merged Kramer's completed handler batch: `568ab5cc` added diagnostic projection/publication tests plus `LspTestHost.WhenPublishDiagnosticsAsync(...)`; `9e679ceb` added `SemanticTokensHandler`; `1ec3c7d5` added `SlotContext` plus `CompletionHandler`; `1fbecf36` added `HoverHandler`; and `453e690a` added `FoldingRangeHandler`, each with matching language-server tests.
-- Durable language-server contracts from the batch are now explicit: diagnostics publish with 0-based spans/severity/source mapping, semantic tokens remain lexical/catalog-driven, completions are slot-context plus `SemanticIndex` driven, hover content comes from `TokenMeta.Description` plus semantic lookup, and folding stays construct-span based only.
-- Validation summary: Slice 1 and the Slice 2/4 work passed LS build/tests at 20/20, Slice 5 passed isolated-worktree LS build/tests at 7/7 plus `test\Precept.Tests\Precept.Tests.csproj` (3737/3737), and Slice 9 remained blocked only by the pre-existing `SemanticTokensHandler.CreateRegistrationOptions` access-modifier mismatch in the shared LS baseline.
+- The LS now has concrete diagnostics, semantic-token, completion, hover, and folding handlers, with the matching tests that locked the publication, projection, and projection-only semantic contracts.
+- Validation stayed green except for the pre-existing `SemanticTokensHandler.CreateRegistrationOptions` access-modifier mismatch in the shared LS baseline.
 
 ### 2026-05-10T00:23:31Z — Slice 0b legacy LS cleanup committed
-- Commit `51d93dc2` deleted `tools/Precept.LanguageServer/LanguageServerStubs.cs`, `PreceptPreviewProtocol.cs`, and `LegacyHandlerCompat.cs`; the compat shim had to go because it still referenced the removed stub types.
-- Deleted 13 legacy shim-facing files from `test/Precept.LanguageServer.Tests/`, removing 173 compiler-redundant tests; only `LspTestHost.cs` and `GlobalUsings.cs` remain, and the LS test project now discovers 0 tests while still building cleanly.
-- Validation for the cleanup gate: `dotnet build` succeeds for the language-server and LS test projects, and `dotnet test test/Precept.Tests/` stays green at 3737/3737.
+- Commit `51d93dc2` deleted the stub layer (`LanguageServerStubs.cs`, `PreceptPreviewProtocol.cs`, `LegacyHandlerCompat.cs`) and removed 173 legacy shim-facing tests so the LS project keeps only the real harness surface.
+- The cleanup gate remained `dotnet build` for the LS projects plus `dotnet test test/Precept.Tests/`, all green in the validated slice run.
 
-### 2026-05-10T00:11:05Z — Slice 0 language-server infrastructure committed
-- Commit `9f6b1fd7` added `tools/Precept.LanguageServer/DocumentState.cs`, `DocumentStore.cs`, `DiagnosticProjector.cs`, `Handlers/TextDocumentSyncHandler.cs`, and `test/Precept.LanguageServer.Tests/LspTestHost.cs`, with `DocumentState` using a volatile `Compilation` field plus `Interlocked.Exchange` and `DocumentStore` using `ConcurrentDictionary<DocumentUri, DocumentState>`.
-- `tools/Precept.LanguageServer/Program.cs` now registers `DocumentStore` and `TextDocumentSyncHandler`; the language server builds, and the remaining legacy stub test failures stay expected until Slice 0b deletes the old stub layer.
-
-### 2026-05-09T23:46:43Z — Tooling-lens LS review reconciled
-- Kramer corrected the objective handler-registration, capability, semantic-token, and extension-wiring mismatches in the LS docs, and confirmed `TypedField.NameSpan` is the right projection-only fix for field declaration spans.
-- The only unresolved tooling decision left from the batch is how `precept/inspect` should surface restore failures (`RestoreInvalidInput` / `RestoreConstraintsFailed`).
-
-
-### 2026-05-09T15:26:09Z — Color/scope tooling closeout recorded
-- Scribe merged Kramer's field/arg color wiring, retired-anchor cleanup, and event-arg member scope implementation into the canonical ledger.
-- Durable tooling state: `variable.parameter.property.precept` supersedes the compound-selector workaround, and the VS Code theme no longer relies on the retired `#B0BEC5` anchor for field/arg highlighting.
-
-
-### 2026-05-09T11:20:45Z — Event-arg member ref scope promoted to dedicated scope (Frank's design)
-- Replaced compound-selector workaround (`meta.event-arg-ref.precept variable.other.property.precept`) with proper dedicated scope `variable.parameter.property.precept` on the parameter axis.
-- Generator change: `eventArgReference` capture group 3 in `tools/Precept.GrammarGen/Program.cs` (line ~780) changed from `variable.other.property.precept` to `variable.parameter.property.precept`. The `collectionMemberAccess` pattern was intentionally left unchanged — both patterns used the old scope, only `eventArgReference` gets the new one.
-- `precept.tmLanguage.json` regenerated; `eventArgReference` pattern now emits `variable.parameter.property.precept` at line 910.
-- `package.json` theme: removed dead compound selector; added simple `variable.parameter.property.precept → #9AD8E8` rule immediately after the `variable.parameter.precept` rule.
-- Lesson: structural pattern scopes (like `meta.*` wrappers and capture group scopes in `eventArgReference`) live in the generator's hardcoded structural section — not in `TokenMeta.TextMateScope`. When Frank says "no catalog change required," believe it; the generator already has a clear structural section to target.
-- Lesson: compound selectors in themes are always temporary hacks. The grammar scope is the right permanent home for semantic distinctions.
-
-
-
-### 2026-05-09T14:41:11Z — ISO 4217 refresh converted to task workflow
-- `kramer-2` removed the `precept.refreshIso4217` extension command path, added `tools/scripts/refresh-iso4217.js`, and wired the workspace task label `iso4217: refresh`.
-- The refresh now follows SIX's live `iso-currrency/lists/list-one.xml` endpoint because the older `iso-4217/lists/list-one.xml` URL returns 404.
-- Downloaded XML stays under gitignored `src/Precept/Data/`, with parity validation handled by an optional discovery-time-skipped xUnit test rather than committed fixtures.
-
-### 2026-05-09T09:49:38Z — Token/action parser cleanup batch recorded
-- `kramer-3` closed the `TokenKind.Set` dual-category bug: token metadata is now action-only, language-server type completions derive vocabulary from `Types.All`, and the language spec reflects the `Set`/`SetType` split.
-- `kramer-4` split `ParseActionByShape` into nine named handlers and enrolled `ActionSyntaxShape` in PRECEPT0019 while preserving malformed-action recovery; targeted analyzer/parser validation stayed green aside from the pre-existing 2 `TokensTests` baseline failures.
-
-### 2026-05-08T22:36:50Z — Message-position generator gap closed
-- The grammar generator now derives `messageStrings` patterns from `Tokens.All.Where(m => m.IsMessagePosition)` and the parallel `FunctionMeta` path.
-- Current output stays token-only because no built-ins opt in yet; `precept.tmLanguage.json` regenerated with zero diff on commit `7f3842fd`.
-- Future trailing message-string built-ins now have catalog support with no new hardcoded grammar logic required.
-
-### 2026-05-08T05:27:37Z — Grammar generator implementation durably recorded
-- Scribe merged Kramer's PR #139 implementation note into `.squad/decisions.md`, capturing the 16 must-fix closures, 42 repository patterns, stale pattern and keyword removals, and the remaining function-argument message-string metadata block.
-- Active follow-up stays narrow: the generator cannot gold-scope function-argument message strings until message-position metadata exists, so promotion to the canonical grammar remains gated.
-
-### 2026-05-08T03:29:02Z — Wave 2 tooling closeout recorded
-- `kramer-invest` confirmed the Precept Language Server test corpus still exists on `main`; the v2 branch is intentionally stubbed rather than accidentally regressed.
-- All six Wave 2 design gates D1–D6 are now closed in `.squad/decisions.md`, and Kramer's active continuation work remains the grammar-generator scaffold plus LS test-port follow-through.
-
-### 2026-05-08T03:08:18Z — Comprehensive tooling doc review recorded
-- Kramer corrected `docs/tooling/extension.md`, `docs/tooling/language-server.md`, and `docs/compiler/tooling-surface.md` to match the branch's actual tooling state.
-- Durable follow-ups now logged in `.squad/decisions.md`: clarify design-spec vs. implementation-status docs, recover the missing LS test corpus, and decide the grammar-generator ownership path.
-
-### Historical summary through 2026-05-07
-- Prior active work covered grammar and completion sync for guards, conditional expressions, `and` / `or` / `not`, stateless edit forms, semantic-token metadata propagation, README/tooling accuracy passes, and the C93 divisor-safety tooling fixes.
-- The standing tooling baseline is unchanged: docs must reflect reality, tests are the safest spec anchor for language-server behavior, and future tooling derivation should come from catalog metadata rather than hand-maintained lists.
-
-### 2026-05-09T11:15:46.104-04:00 — Event-arg member ref color override fixed
-- Added a TextMate compound selector override in `tools/Precept.VsCode/package.json`: `meta.event-arg-ref.precept variable.other.property.precept` now maps to `#9AD8E8` before the general `variable.other.property.precept` field-color rule.
-- This closes the precision gap where `LoadParcel.Recipient`-style event arg member references inherited the field color `#A5B4FC` even though they semantically belong to the arg color family.
-- Lesson: `variable.other.property.precept` is reused across both field references and event-arg member references, so context-sensitive color intent must be expressed with compound selectors rather than assuming the base scope is unique.
-
-### 2026-05-09T15:21:46Z — Scribe merged the event-arg scope batch
-- `.squad/decisions.md` now records the durable outcome from `kramer-8`: the grammar emits `variable.parameter.property.precept`, so the earlier compound-selector workaround is officially superseded rather than left as the permanent fix.
-- The merged ledger entry also preserves the related field/arg color cleanup as part of the same semantic-token realignment.
-
-### 2026-05-09T20:00:24.839-04:00 — Slice 0 LS infrastructure landed
-- Slice 0 complete: `DocumentState`, `DocumentStore`, `DiagnosticProjector`, and `Handlers/TextDocumentSyncHandler` created.
-- `test/Precept.LanguageServer.Tests/LspTestHost.cs` created as the reusable in-process LSP harness for later protocol-layer slices.
-- `tools/Precept.LanguageServer/Program.cs` now registers `DocumentStore` and `TextDocumentSyncHandler` through OmniSharp DI.
-- OmniSharp 0.19.9 quirks observed: text-sync registration uses `TextSynchronizationCapability` in `CreateRegistrationOptions`, server/client in-process startup uses `LanguageServer.PreInit(...)` + `LanguageClient.PreInit(...)`, and the test harness needs the separate `OmniSharp.Extensions.LanguageClient` package.
-- Added a temporary `LegacyHandlerCompat` shim so the legacy LS test project compiles without touching `LanguageServerStubs.cs`; Slice 0b should delete the whole shim layer.
