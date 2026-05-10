@@ -1,0 +1,3 @@
+# Session Log — 2026-05-10T03:13:51Z — toolchain-bug-record-sync
+
+Pre-check measured `decisions.md` at 204405 bytes with 3 inbox file(s); the hard-gate 7-day archive pass ran first and moved 1 decision block(s) older than 2026-05-02T23:13:51.149000-04:00. Scribe then merged the 2 inbox files into 1 canonical decision entry, deleted the processed inbox files, wrote orchestration logs for `frank-10`, `soup-nazi`, and `kramer-4`, updated the affected agent histories, summarized Frank's oversized history, and recorded the health report: `decisions.md` 204405B -> 145950B; inbox processed = 3; history files summarized = 1 (`.squad/agents/frank/history.md`).

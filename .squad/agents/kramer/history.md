@@ -32,6 +32,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T03:13:51Z — Bug register operationalized for Track 2
+- Added the status tracker table to `docs/Working/precept-toolchain-bugs.md`, giving the 52 confirmed bugs durable status/assignee/notes columns for implementation triage.
+- Frank's stage analysis and Soup-Nazi's test-strategy verdict are now merged into the canonical decision ledger, so the tracker can point follow-up slices at the highest-value parser/MCP/type-checker gaps and the matching regression layers.
+
 ### 2026-05-10T02:50:04Z — Team update: visual taxonomy and LS prerequisites locked
 - 📌 Team update (2026-05-10T02:50:04Z): `SemanticTokenTypes` is now the approved 14th catalog, `TokenMeta` keeps one `VisualCategory`, and token-surface projections (custom type, TextMate scope, base styles, constrained-modifier support) now belong to catalog metadata instead of parallel token fields or manifest copies — decided by Frank and Shane Falik.
 - 📌 Team update (2026-05-10T02:50:04Z): George's outline metadata plus snippet-template catalog work are now durably recorded as the completion/outline prerequisite surface that your LS slices consume on top of Slice 0's protocol foundation — decided by George and captured by Scribe.

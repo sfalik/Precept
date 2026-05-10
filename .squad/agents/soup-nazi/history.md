@@ -27,8 +27,14 @@
 - 2026-05-08T23:45:00.367-04:00 — ProofEngine test authoring exposed three easy-to-miss proof-surface traps: operand-metadata identity can change subject resolution (`integer / number` behaves differently from `number / number`), missing boolean catalog entries can turn `and` / `or` guard tests red for type-check reasons instead of proof reasons, and forwarding-fact suppression only holds if later discharge passes preserve already-proved obligations.
 
 - 2026-05-09T17:01:02.062-04:00 — Q8 UCUM drift coverage is now anchored on the embedded `ucum-essence.xml` source of truth plus the curated Tier 1 contract: new tests lock XML-backed universe coverage, SI base/vector invariants, dimensionless `rad`/`each`, Tier 1's exact 150-code curation and exclusions, shim forwarding, and parse-synthesized Tier 1 vectors (`m2`, `km2`, `m/s`, `km/h`, `kW.h`). Important finding: the requested `All >= 500` floor was a false-positive threshold for the current implementation because the shipped UCUM essence snapshot exposes roughly 300 distinct atom codes, so drift coverage must anchor to the embedded XML universe rather than an aspirational atom-count narrative.
+- 2026-05-09T23:11:32.953-04:00 — Test-strategy gap audit across `test/` showed the biggest remaining weakness is boundary choice, not raw test count: catalog suites mostly assert structure, parser/type-checker suites mostly assert hand-picked DSL scenarios, and MCP coverage is thin on definition/docs contracts. Recommendation recorded in `.squad/decisions/inbox/soup-nazi-test-strategy.md`: do not mock the static catalogs; use the real catalogs with synthetic AST/semantic fixtures, starting with an MCP definition-surface matrix plus parser/type-checker catalog-consumer tests for routing, keyword collisions, and hook branches.
 
 ## Recent Updates
+
+### 2026-05-10T03:13:51Z — Toolchain bug test-strategy verdict merged
+- The 52-bug gap audit is now a durable team decision: keep the real static catalogs as the executable language contract and build small synthetic stage fixtures around them instead of mocking metadata.
+- Priority coverage layers are now explicit — MCP definition-surface matrices, parser routing/disambiguation tests from `Constructs.Entries`, keyword-collision/accessor tests from real catalog names, TypeChecker catalog-consumer tests, and hook-specific pipeline tests.
+- Kramer also added a Track 2 status table to `docs/Working/precept-toolchain-bugs.md`, so the bug register now has an execution surface for the follow-up fixes this strategy is meant to guard.
 
 ### 2026-05-09T14:14:17Z — LanguageTool coverage review closed
 - Reviewed Newman's `precept_language` batch against `docs/tooling/mcp.md` and found 7 concrete test gaps in `LanguageToolTests.cs`.

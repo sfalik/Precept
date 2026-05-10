@@ -19,6 +19,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T03:13:51Z — Toolchain bug batch recorded
+- Pre-check measured `.squad/decisions.md` at 204405 bytes with 3 inbox file(s); the hard-gate 7-day archive pass ran first and found 1 eligible decision entry block(s).
+- Merged Frank's bug-cluster analysis and Soup-Nazi's test-strategy audit into one canonical decision entry, cleared the inbox, wrote orchestration logs for `frank-10`, `soup-nazi`, and `kramer-4`, and propagated the resulting team updates into the affected agent histories.
+- Health report is recorded in the session log, and Frank's oversized history was summarized back under the 15 KB gate during this pass.
+
 ### 2026-05-10T02:50:04Z — Event-italic and LS inbox batch recorded
 - Pre-check measured `.squad/decisions.md` at 199037 bytes with 9 inbox files, so the hard-gate archive ran first and found 0 active entries older than 2026-04-10T02:50:04Z or 2026-05-03T02:50:04Z.
 - Merged 9 inbox files into 4 canonical decision entries, wrote orchestration logs for `frank-7` and `frank-8`, recorded the batch session log, and propagated the catalog/LS prerequisite updates into George and Kramer history.
