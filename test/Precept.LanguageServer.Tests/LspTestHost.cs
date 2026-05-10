@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using Precept.LanguageServer.Handlers;
 
@@ -18,19 +21,48 @@ public sealed class LspTestHost : IAsyncDisposable
 {
     private readonly ILanguageServer _server;
     private readonly ILanguageClient _client;
+    private readonly ConcurrentDictionary<DocumentUri, TaskCompletionSource<PublishDiagnosticsParams>> _diagWaiters;
 
-    private LspTestHost(ILanguageServer server, ILanguageClient client)
+    private LspTestHost(
+        ILanguageServer server,
+        ILanguageClient client,
+        ConcurrentDictionary<DocumentUri, TaskCompletionSource<PublishDiagnosticsParams>> diagWaiters)
     {
         _server = server;
         _client = client;
+        _diagWaiters = diagWaiters;
     }
 
     public ILanguageClient Client => _client;
+
+    public Task<PublishDiagnosticsParams> WhenPublishDiagnosticsAsync(DocumentUri uri, CancellationToken cancellationToken = default)
+    {
+        var tcs = _diagWaiters.GetOrAdd(
+            uri,
+            static _ => new TaskCompletionSource<PublishDiagnosticsParams>(TaskCreationOptions.RunContinuationsAsynchronously));
+
+        if (cancellationToken.CanBeCanceled)
+        {
+            cancellationToken.Register(() =>
+            {
+                if (_diagWaiters.TryRemove(uri, out var waiter))
+                {
+                    waiter.TrySetCanceled(cancellationToken);
+                    return;
+                }
+
+                tcs.TrySetCanceled(cancellationToken);
+            });
+        }
+
+        return tcs.Task;
+    }
 
     public static async Task<LspTestHost> CreateAsync(CancellationToken cancellationToken = default)
     {
         var (serverInput, clientOutput) = CreatePipePair();
         var (clientInput, serverOutput) = CreatePipePair();
+        var diagWaiters = new ConcurrentDictionary<DocumentUri, TaskCompletionSource<PublishDiagnosticsParams>>();
 
         var server = OmniSharp.Extensions.LanguageServer.Server.LanguageServer.PreInit(options =>
         {
@@ -46,14 +78,21 @@ public sealed class LspTestHost : IAsyncDisposable
             options
                 .WithInput(clientInput)
                 .WithOutput(clientOutput)
-                .WithRootPath(AppContext.BaseDirectory);
+                .WithRootPath(AppContext.BaseDirectory)
+                .OnPublishDiagnostics(@params =>
+                {
+                    if (diagWaiters.TryRemove(@params.Uri, out var waiter))
+                    {
+                        waiter.TrySetResult(@params);
+                    }
+                });
         });
 
         await Task.WhenAll(
             server.Initialize(cancellationToken),
             client.Initialize(cancellationToken));
 
-        return new LspTestHost(server, client);
+        return new LspTestHost(server, client, diagWaiters);
     }
 
     private static (PipeReader reader, PipeWriter writer) CreatePipePair()
