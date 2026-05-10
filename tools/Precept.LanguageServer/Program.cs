@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using OmniSharp.Extensions.LanguageServer.Server;
 using Precept.LanguageServer.Handlers;
 
 namespace Precept.LanguageServer;
@@ -27,6 +26,7 @@ internal static class Program
                 .WithHandler<CodeActionHandler>();
         });
 
+        SemanticTokensHandler.SendColorNotification(server);
         await server.WaitForExit;
     }
 }

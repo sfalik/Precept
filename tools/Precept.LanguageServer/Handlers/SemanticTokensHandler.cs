@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -19,6 +20,7 @@ namespace Precept.LanguageServer.Handlers;
 internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 {
     private static readonly SemanticTokensLegend Legend = BuildLegend();
+    internal const string SemanticTokenColorsNotificationName = "precept/semanticTokenColors";
 
     private readonly ConcurrentDictionary<DocumentUri, SemanticTokensDocument> _documents = new();
     private readonly DocumentStore _store;
@@ -219,10 +221,31 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         };
     }
 
+    internal static ImmutableArray<SemanticTokenColorRule> BuildColorNotificationPayload() =>
+        SemanticTokenTypesCatalog.All
+            .Select(static meta => new SemanticTokenColorRule(
+                meta.CustomType,
+                meta.ForegroundHex,
+                meta.Bold,
+                meta.Italic))
+            .ToImmutableArray();
+
+    internal static void SendColorNotification(OmniSharp.Extensions.LanguageServer.Server.LanguageServer server) =>
+        SendColorNotification((method, payload) => server.SendNotification(method, payload));
+
+    internal static void SendColorNotification(Action<string, SemanticTokenColorRule[]> sendNotification) =>
+        sendNotification(SemanticTokenColorsNotificationName, BuildColorNotificationPayload().ToArray());
+
     internal readonly record struct LexicalSemanticToken(
         TokenKind Kind,
         int Line,
         int Character,
         int Length,
         string TokenType);
+
+    internal readonly record struct SemanticTokenColorRule(
+        [property: JsonPropertyName("tokenType")] string TokenType,
+        [property: JsonPropertyName("hexColor")] string HexColor,
+        [property: JsonPropertyName("bold")] bool Bold,
+        [property: JsonPropertyName("italic")] bool Italic);
 }

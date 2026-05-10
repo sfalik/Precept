@@ -267,6 +267,40 @@ public sealed class SemanticTokensHandlerTests
         tokens.Should().NotContain(token => token.Kind == TokenKind.Set && token.TokenType == keywordSemantic,
             because: "set in type position must not be classified as an action keyword");
     }
+
+    [Fact]
+    public void SendColorNotification_EmitsOneEntryPerCatalogMember()
+    {
+        string? method = null;
+        SemanticTokensHandler.SemanticTokenColorRule[]? payload = null;
+
+        SemanticTokensHandler.SendColorNotification((notificationMethod, rules) =>
+        {
+            method = notificationMethod;
+            payload = rules;
+        });
+
+        method.Should().Be(SemanticTokensHandler.SemanticTokenColorsNotificationName);
+        payload.Should().NotBeNull();
+        payload!.Should().HaveCount(SemanticTokenTypes.All.Count);
+        payload.Select(entry => entry.TokenType)
+            .Should()
+            .Equal(SemanticTokenTypes.All.Select(meta => meta.CustomType));
+    }
+
+    [Fact]
+    public void SendColorNotification_EntryHexColorsMatchCatalog()
+    {
+        SemanticTokensHandler.SemanticTokenColorRule[]? payload = null;
+
+        SemanticTokensHandler.SendColorNotification((_, rules) => payload = rules);
+
+        payload.Should().NotBeNull();
+        payload!
+            .Select(entry => (entry.TokenType, entry.HexColor, entry.Bold, entry.Italic))
+            .Should()
+            .Equal(SemanticTokenTypes.All.Select(meta => (meta.CustomType, meta.ForegroundHex, meta.Bold, meta.Italic)));
+    }
 }
 
 internal static class OmniSharpCompatibilityExtensions
