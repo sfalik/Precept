@@ -52,6 +52,10 @@
         "command": "precept.showLanguageServerMode",
         "title": "Show Language Server Mode",
         "icon": "$(server-process)"
+      },
+      {
+        "command": "precept.showFixHint",
+        "title": "Precept: Show Fix Hint"
       }
     ],
     "menus": {

@@ -17,7 +17,8 @@ internal static class Program
                 {
                     services.AddSingleton<DocumentStore>();
                 })
-                .WithHandler<TextDocumentSyncHandler>();
+                .WithHandler<TextDocumentSyncHandler>()
+                .WithHandler<CodeActionHandler>();
         });
 
         await server.WaitForExit;

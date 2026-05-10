@@ -60,8 +60,9 @@ internal sealed class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     private void RecompileAndPublish(DocumentUri uri, string text)
     {
         var compilation = Precept.Compiler.Compile(text);
-        _store.GetOrAdd(uri).Update(compilation);
-        PublishDiagnostics(uri, DiagnosticProjector.Project(compilation));
+        var (enrichedDiagnostics, suggestions) = DiagnosticEnricher.Enrich(compilation);
+        _store.GetOrAdd(uri).Update(compilation, suggestions);
+        PublishDiagnostics(uri, enrichedDiagnostics);
     }
 
     private void PublishDiagnostics(DocumentUri uri, IReadOnlyList<Diagnostic> diagnostics)

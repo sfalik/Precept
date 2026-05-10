@@ -70,7 +70,8 @@ public sealed class LspTestHost : IAsyncDisposable
                 .WithInput(serverInput)
                 .WithOutput(serverOutput)
                 .WithServices(services => services.AddSingleton<DocumentStore>())
-                .WithHandler<TextDocumentSyncHandler>();
+                .WithHandler<TextDocumentSyncHandler>()
+                .WithHandler<CodeActionHandler>();
         });
 
         var client = LanguageClient.PreInit(options =>

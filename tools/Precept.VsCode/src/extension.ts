@@ -81,6 +81,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(showLanguageServerModeDisposable);
 
+  const showFixHintDisposable = vscode.commands.registerCommand("precept.showFixHint", (hint: string, before: string, after: string) => {
+    const parts: string[] = [hint];
+    if (before) parts.push(`\nBefore: ${before}`);
+    if (after) parts.push(`\nAfter:  ${after}`);
+    void vscode.window.showInformationMessage(parts.join(""));
+  });
+  context.subscriptions.push(showFixHintDisposable);
+
   const launchInfo = resolveLanguageServerLaunchInfo(context, outputChannel);
 
   if (!launchInfo) {
