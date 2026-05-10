@@ -985,8 +985,9 @@ public static partial class Parser
         private ParsedAction ParseAssignValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field = expression
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.AssignValue).Slots;
             var target = ParseActionTarget(separators, isAtActionBoundary);
-            Expect(TokenKind.Assign);
+            Expect(slots[1].PrecedingSeparator!.Value); // '='
             var value = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, value.Span);
             return new AssignAction(kind, target, value, span);
@@ -1006,10 +1007,12 @@ public static partial class Parser
         private ParsedAction ParseCollectionIntoAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field [into field]
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.CollectionInto).Slots;
+            var intoSlot = slots[1]; // IntoTarget: optional, 'into'
             var target = ParseActionTarget(separators, isAtActionBoundary);
             var lastSpan = target.Span;
             ParsedExpression? intoTarget = null;
-            if (Peek().Kind == TokenKind.Into)
+            if (Peek().Kind == intoSlot.PrecedingSeparator)
             {
                 Advance(); // consume 'into'
                 intoTarget = ParseActionTarget(separators, isAtActionBoundary);
@@ -1032,9 +1035,11 @@ public static partial class Parser
         private ParsedAction ParseCollectionValueByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field expr by expr
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.CollectionValueBy).Slots;
+            var orderingKeySlot = slots[2]; // OrderingKey: required, 'by'
             var target = ParseActionTarget(separators, isAtActionBoundary);
-            var value = ParseExpression(0, () => Peek().Kind == TokenKind.By || isAtActionBoundary());
-            Expect(TokenKind.By);
+            var value = ParseExpression(0, () => Peek().Kind == orderingKeySlot.PrecedingSeparator || isAtActionBoundary());
+            Expect(orderingKeySlot.PrecedingSeparator!.Value); // 'by'
             var orderingKey = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, orderingKey.Span);
             return new CollectionValueByAction(kind, target, value, orderingKey, span);
@@ -1044,9 +1049,11 @@ public static partial class Parser
         private ParsedAction ParseInsertAtAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field expr at expr
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.InsertAt).Slots;
+            var indexSlot = slots[2]; // Index: required, 'at'
             var target = ParseActionTarget(separators, isAtActionBoundary);
-            var value = ParseExpression(0, () => Peek().Kind == TokenKind.At || isAtActionBoundary());
-            Expect(TokenKind.At);
+            var value = ParseExpression(0, () => Peek().Kind == indexSlot.PrecedingSeparator || isAtActionBoundary());
+            Expect(indexSlot.PrecedingSeparator!.Value); // 'at'
             var index = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, index.Span);
             return new InsertAtAction(kind, target, value, index, span);
@@ -1056,8 +1063,10 @@ public static partial class Parser
         private ParsedAction ParseRemoveAtIndexAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field at expr
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.RemoveAtIndex).Slots;
+            var indexSlot = slots[1]; // Index: required, 'at'
             var target = ParseActionTarget(separators, isAtActionBoundary);
-            Expect(TokenKind.At);
+            Expect(indexSlot.PrecedingSeparator!.Value); // 'at'
             var index = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, index.Span);
             return new RemoveAtAction(kind, target, index, span);
@@ -1067,9 +1076,11 @@ public static partial class Parser
         private ParsedAction ParsePutKeyValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field key = value
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.PutKeyValue).Slots;
+            var valueSlot = slots[2]; // Value: required, '='
             var target = ParseActionTarget(separators, isAtActionBoundary);
-            var key = ParseExpression(0, () => Peek().Kind == TokenKind.Assign || isAtActionBoundary());
-            Expect(TokenKind.Assign);
+            var key = ParseExpression(0, () => Peek().Kind == valueSlot.PrecedingSeparator || isAtActionBoundary());
+            Expect(valueSlot.PrecedingSeparator!.Value); // '='
             var value = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, value.Span);
             return new PutKeyValueAction(kind, target, key, value, span);
@@ -1079,19 +1090,22 @@ public static partial class Parser
         private ParsedAction ParseCollectionIntoByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field [into field] [by key]
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.CollectionIntoBy).Slots;
+            var intoSlot = slots[1];            // IntoTarget: optional, 'into'
+            var orderingCaptureSlot = slots[2]; // OrderingCapture: optional, 'by'
             var target = ParseActionTarget(separators, isAtActionBoundary);
             var lastSpan = target.Span;
             ParsedExpression? intoTarget = null;
             ParsedExpression? orderingCapture = null;
 
-            if (Peek().Kind == TokenKind.Into)
+            if (Peek().Kind == intoSlot.PrecedingSeparator)
             {
                 Advance(); // consume 'into'
                 intoTarget = ParseActionTarget(separators, isAtActionBoundary);
                 lastSpan = intoTarget.Span;
             }
 
-            if (Peek().Kind == TokenKind.By)
+            if (Peek().Kind == orderingCaptureSlot.PrecedingSeparator)
             {
                 Advance(); // consume 'by'
                 orderingCapture = ParseActionTarget(separators, isAtActionBoundary);
