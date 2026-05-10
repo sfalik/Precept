@@ -220,11 +220,7 @@ public static class ProofEngine
         foreach (var action in actions)
         {
             foreach (var req in action.ProofRequirements)
-                obligations.Add(new ProofObligation(req, action switch
-                {
-                    TypedInputAction ia => ia.InputExpression,
-                    _ => new TypedLiteral(action.FieldType, null, action.Span)
-                }, ctx, ProofDisposition.Unresolved, null, null));
+                obligations.Add(new ProofObligation(req, CreateActionProofSite(action, req), ctx, ProofDisposition.Unresolved, null, null));
 
             if (action is TypedInputAction inputAction)
             {
@@ -238,6 +234,22 @@ public static class ProofEngine
     // ════════════════════════════════════════════════════════════════════════════
     //  S2 — Subject Resolution Utilities
     // ════════════════════════════════════════════════════════════════════════════
+
+    private static TypedExpression CreateActionProofSite(TypedAction action, ProofRequirement requirement)
+    {
+        if (requirement is NumericProofRequirement { Subject: SelfSubject }
+            || requirement is ModifierRequirement { Subject: SelfSubject }
+            || requirement is PresenceProofRequirement { Subject: SelfSubject })
+        {
+            return new TypedFieldRef(action.FieldType, action.FieldName, false, action.Span);
+        }
+
+        return action switch
+        {
+            TypedInputAction ia => ia.InputExpression,
+            _ => new TypedLiteral(action.FieldType, null, action.Span)
+        };
+    }
 
     private static TypedExpression? ResolveSubject(ProofSubject subject, TypedExpression site)
     {
@@ -253,6 +265,7 @@ public static class ProofEngine
             SelfSubject self => site switch
             {
                 TypedMemberAccess access => access.Object,
+                TypedFieldRef fieldRef => fieldRef,
                 _ => null
             },
             _ => null

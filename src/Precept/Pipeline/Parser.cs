@@ -981,6 +981,39 @@ public static partial class Parser
             }
         }
 
+        private static FrozenSet<TokenKind> GetSecondarySeparators(ActionKind primaryKind, int slotIndex)
+        {
+            if (!Actions.SecondaryByPrimaryActionKind.TryGetValue(primaryKind, out var secondaries))
+                return Enumerable.Empty<TokenKind>().ToFrozenSet();
+
+            return secondaries
+                .Select(secondary => Actions.GetShapeMeta(secondary.SyntaxShape))
+                .Where(shape => shape.Slots.Length > slotIndex && shape.Slots[slotIndex].PrecedingSeparator is not null)
+                .Select(shape => shape.Slots[slotIndex].PrecedingSeparator!.Value)
+                .Distinct()
+                .ToFrozenSet();
+        }
+
+        private static bool TryGetSecondaryAction(ActionKind primaryKind, int slotIndex, TokenKind separator, out ActionMeta secondary)
+        {
+            secondary = null!;
+
+            if (!Actions.SecondaryByPrimaryActionKind.TryGetValue(primaryKind, out var secondaries))
+                return false;
+
+            foreach (var candidate in secondaries)
+            {
+                var slots = Actions.GetShapeMeta(candidate.SyntaxShape).Slots;
+                if (slots.Length > slotIndex && slots[slotIndex].PrecedingSeparator == separator)
+                {
+                    secondary = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         [HandlesCatalogMember(ActionSyntaxShape.AssignValue)]
         private ParsedAction ParseAssignValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
@@ -998,7 +1031,37 @@ public static partial class Parser
         {
             // verb field expression
             var target = ParseActionTarget(separators, isAtActionBoundary);
-            var value = ParseExpression(0, isAtActionBoundary);
+
+            if (TryGetSecondaryAction(kind, 1, Peek().Kind, out var secondaryAfterTarget))
+            {
+                return secondaryAfterTarget.SyntaxShape switch
+                {
+                    ActionSyntaxShape.RemoveAtIndex => ParseRemoveAtIndexAction(
+                        secondaryAfterTarget.Kind,
+                        actionStartSpan,
+                        target,
+                        isAtActionBoundary),
+                    _ => new MalformedAction(secondaryAfterTarget.Kind, actionStartSpan),
+                };
+            }
+
+            var secondaryValueSeparators = GetSecondarySeparators(kind, 2);
+            var value = ParseExpression(0, () => secondaryValueSeparators.Contains(Peek().Kind) || isAtActionBoundary());
+
+            if (TryGetSecondaryAction(kind, 2, Peek().Kind, out var secondaryAfterValue))
+            {
+                return secondaryAfterValue.SyntaxShape switch
+                {
+                    ActionSyntaxShape.CollectionValueBy => ParseCollectionValueByAction(
+                        secondaryAfterValue.Kind,
+                        actionStartSpan,
+                        target,
+                        value,
+                        isAtActionBoundary),
+                    _ => new MalformedAction(secondaryAfterValue.Kind, actionStartSpan),
+                };
+            }
+
             var span = SourceSpan.Covering(actionStartSpan, value.Span);
             return new CollectionValueAction(kind, target, value, span);
         }
@@ -1018,6 +1081,21 @@ public static partial class Parser
                 intoTarget = ParseActionTarget(separators, isAtActionBoundary);
                 lastSpan = intoTarget.Span;
             }
+
+            if (TryGetSecondaryAction(kind, 2, Peek().Kind, out var secondaryAfterInto))
+            {
+                return secondaryAfterInto.SyntaxShape switch
+                {
+                    ActionSyntaxShape.CollectionIntoBy => ParseCollectionIntoByAction(
+                        secondaryAfterInto.Kind,
+                        actionStartSpan,
+                        target,
+                        intoTarget,
+                        isAtActionBoundary),
+                    _ => new MalformedAction(secondaryAfterInto.Kind, actionStartSpan),
+                };
+            }
+
             var span = SourceSpan.Covering(actionStartSpan, lastSpan);
             return new CollectionIntoAction(kind, target, intoTarget, span);
         }
@@ -1039,6 +1117,13 @@ public static partial class Parser
             var orderingKeySlot = slots[2]; // OrderingKey: required, 'by'
             var target = ParseActionTarget(separators, isAtActionBoundary);
             var value = ParseExpression(0, () => Peek().Kind == orderingKeySlot.PrecedingSeparator || isAtActionBoundary());
+            return ParseCollectionValueByAction(kind, actionStartSpan, target, value, isAtActionBoundary);
+        }
+
+        private ParsedAction ParseCollectionValueByAction(ActionKind kind, SourceSpan actionStartSpan, ParsedExpression target, ParsedExpression value, Func<bool> isAtActionBoundary)
+        {
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.CollectionValueBy).Slots;
+            var orderingKeySlot = slots[2]; // OrderingKey: required, 'by'
             Expect(orderingKeySlot.PrecedingSeparator!.Value); // 'by'
             var orderingKey = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, orderingKey.Span);
@@ -1063,9 +1148,14 @@ public static partial class Parser
         private ParsedAction ParseRemoveAtIndexAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field at expr
+            var target = ParseActionTarget(separators, isAtActionBoundary);
+            return ParseRemoveAtIndexAction(kind, actionStartSpan, target, isAtActionBoundary);
+        }
+
+        private ParsedAction ParseRemoveAtIndexAction(ActionKind kind, SourceSpan actionStartSpan, ParsedExpression target, Func<bool> isAtActionBoundary)
+        {
             var slots = Actions.GetShapeMeta(ActionSyntaxShape.RemoveAtIndex).Slots;
             var indexSlot = slots[1]; // Index: required, 'at'
-            var target = ParseActionTarget(separators, isAtActionBoundary);
             Expect(indexSlot.PrecedingSeparator!.Value); // 'at'
             var index = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, index.Span);
@@ -1091,24 +1181,30 @@ public static partial class Parser
         {
             // verb field [into field] [by key]
             var slots = Actions.GetShapeMeta(ActionSyntaxShape.CollectionIntoBy).Slots;
-            var intoSlot = slots[1];            // IntoTarget: optional, 'into'
-            var orderingCaptureSlot = slots[2]; // OrderingCapture: optional, 'by'
+            var intoSlot = slots[1]; // IntoTarget: optional, 'into'
             var target = ParseActionTarget(separators, isAtActionBoundary);
-            var lastSpan = target.Span;
             ParsedExpression? intoTarget = null;
-            ParsedExpression? orderingCapture = null;
 
             if (Peek().Kind == intoSlot.PrecedingSeparator)
             {
                 Advance(); // consume 'into'
                 intoTarget = ParseActionTarget(separators, isAtActionBoundary);
-                lastSpan = intoTarget.Span;
             }
+
+            return ParseCollectionIntoByAction(kind, actionStartSpan, target, intoTarget, isAtActionBoundary);
+        }
+
+        private ParsedAction ParseCollectionIntoByAction(ActionKind kind, SourceSpan actionStartSpan, ParsedExpression target, ParsedExpression? intoTarget, Func<bool> isAtActionBoundary)
+        {
+            var slots = Actions.GetShapeMeta(ActionSyntaxShape.CollectionIntoBy).Slots;
+            var orderingCaptureSlot = slots[2]; // OrderingCapture: optional, 'by'
+            var lastSpan = intoTarget?.Span ?? target.Span;
+            ParsedExpression? orderingCapture = null;
 
             if (Peek().Kind == orderingCaptureSlot.PrecedingSeparator)
             {
                 Advance(); // consume 'by'
-                orderingCapture = ParseActionTarget(separators, isAtActionBoundary);
+                orderingCapture = ParseActionTarget(Actions.GetShapeMeta(ActionSyntaxShape.CollectionIntoBy).SeparatorTokens, isAtActionBoundary);
                 lastSpan = orderingCapture.Span;
             }
 

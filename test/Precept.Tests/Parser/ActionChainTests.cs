@@ -123,25 +123,31 @@ public class ActionChainTests
     }
 
     /// <summary>
-    /// CollectionValueBy (AppendBy/EnqueueBy) shape: slot metadata carries 'by' as a required separator.
-    /// BUG-048: CollectionValueBy reads 'by' from slot metadata, not hardcoded TokenKind.By.
-    /// AppendBy is a secondary action (unreachable via direct dispatch); this test verifies
-    /// the catalog slot structure that ParseCollectionValueByAction now reads from.
+    /// CollectionValueBy (AppendBy) should be reachable from the primary 'append' token
+    /// when the catalog-driven secondary separator follows the value expression.
     /// </summary>
     [Fact]
     public void Append_Field_Value_By_Key_ParsesCorrectly()
     {
-        var shapeMeta = Actions.GetShapeMeta(ActionSyntaxShape.CollectionValueBy);
+        var action = GetOnlyAction("from Draft on LogStep -> append Steps LogStep.Value by LogStep.Key -> transition Approved");
 
-        shapeMeta.Slots.Should().HaveCount(3,
-            because: "CollectionValueBy has Target, Value, and OrderingKey slots");
-        var orderingKeySlot = shapeMeta.Slots[2];
-        orderingKeySlot.Role.Should().Be(ActionSlotRole.OrderingKey,
-            because: "third slot is the ordering key introduced by 'by'");
-        orderingKeySlot.PrecedingSeparator.Should().Be(TokenKind.By,
-            because: "ParseCollectionValueByAction reads 'by' from slot metadata, not from a hardcoded TokenKind.By");
-        orderingKeySlot.IsOptional.Should().BeFalse(
-            because: "the 'by key' slot is required in CollectionValueBy");
+        var append = action.Should().BeOfType<CollectionValueByAction>().Subject;
+        append.Kind.Should().Be(ActionKind.AppendBy);
+        append.Target.Should().BeOfType<IdentifierExpression>().Which.Name.Should().Be("Steps");
+        append.Value.Should().BeOfType<MemberAccessExpression>().Which.MemberName.Should().Be("Value");
+        append.OrderingKey.Should().BeOfType<MemberAccessExpression>().Which.MemberName.Should().Be("Key");
+    }
+
+    [Fact]
+    public void Enqueue_Field_Value_By_Key_ParsesCorrectly()
+    {
+        var action = GetOnlyAction("from Draft on RankTask -> enqueue Queue RankTask.Value by RankTask.Priority -> transition Approved");
+
+        var enqueue = action.Should().BeOfType<CollectionValueByAction>().Subject;
+        enqueue.Kind.Should().Be(ActionKind.EnqueueBy);
+        enqueue.Target.Should().BeOfType<IdentifierExpression>().Which.Name.Should().Be("Queue");
+        enqueue.Value.Should().BeOfType<MemberAccessExpression>().Which.MemberName.Should().Be("Value");
+        enqueue.OrderingKey.Should().BeOfType<MemberAccessExpression>().Which.MemberName.Should().Be("Priority");
     }
 
     /// <summary>
@@ -181,31 +187,30 @@ public class ActionChainTests
     }
 
     /// <summary>
-    /// CollectionIntoBy (DequeueBy) shape: both 'into' and 'by' optional slots come from slot metadata.
-    /// BUG-021: 'by' consumed correctly from catalog — slot-driven optional check.
-    /// DequeueBy is a secondary action (unreachable via direct dispatch); this test verifies
-    /// the catalog slot structure that ParseCollectionIntoByAction now reads from.
+    /// CollectionIntoBy (DequeueBy) should remain reachable from the primary 'dequeue' token
+    /// when an optional trailing separator from the secondary shape follows the shared prefix.
     /// </summary>
     [Fact]
     public void Dequeue_Field_Into_Target_By_Key_ParsesCorrectly()
     {
-        var shapeMeta = Actions.GetShapeMeta(ActionSyntaxShape.CollectionIntoBy);
+        var action = GetOnlyAction("from Draft on Promote -> dequeue Queue into Captured by Priority -> transition Approved");
 
-        shapeMeta.Slots.Should().HaveCount(3,
-            because: "CollectionIntoBy has Target, IntoTarget, and OrderingCapture slots");
+        var dequeue = action.Should().BeOfType<CollectionIntoByAction>().Subject;
+        dequeue.Kind.Should().Be(ActionKind.DequeueBy);
+        dequeue.Target.Should().BeOfType<IdentifierExpression>().Which.Name.Should().Be("Queue");
+        dequeue.IntoTarget.Should().BeOfType<IdentifierExpression>().Which.Name.Should().Be("Captured");
+        dequeue.OrderingCapture.Should().BeOfType<IdentifierExpression>().Which.Name.Should().Be("Priority");
+    }
 
-        var intoSlot = shapeMeta.Slots[1];
-        intoSlot.Role.Should().Be(ActionSlotRole.IntoTarget);
-        intoSlot.PrecedingSeparator.Should().Be(TokenKind.Into,
-            because: "ParseCollectionIntoByAction reads 'into' from slot metadata, not hardcoded");
-        intoSlot.IsOptional.Should().BeTrue();
+    [Fact]
+    public void Remove_Field_At_Index_ParsesCorrectly()
+    {
+        var action = GetOnlyAction("from Draft on RemoveStep -> remove Steps at RemoveStep.Index -> transition Approved");
 
-        var orderingCaptureSlot = shapeMeta.Slots[2];
-        orderingCaptureSlot.Role.Should().Be(ActionSlotRole.OrderingCapture);
-        orderingCaptureSlot.PrecedingSeparator.Should().Be(TokenKind.By,
-            because: "ParseCollectionIntoByAction reads 'by' from slot metadata, not hardcoded TokenKind.By");
-        orderingCaptureSlot.IsOptional.Should().BeTrue(
-            because: "both 'into' and 'by' are optional slots in CollectionIntoBy");
+        var remove = action.Should().BeOfType<RemoveAtAction>().Subject;
+        remove.Kind.Should().Be(ActionKind.RemoveAt);
+        remove.Target.Should().BeOfType<IdentifierExpression>().Which.Name.Should().Be("Steps");
+        remove.Index.Should().BeOfType<MemberAccessExpression>().Which.MemberName.Should().Be("Index");
     }
 
     /// <summary>

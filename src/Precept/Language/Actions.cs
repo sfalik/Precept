@@ -310,4 +310,9 @@ public static class Actions
     public static FrozenDictionary<TokenKind, ActionMeta> ByTokenKind { get; } =
         All.Where(m => m.PrimaryActionKind == null)
            .ToFrozenDictionary(m => m.Token.Kind);
+
+    public static FrozenDictionary<ActionKind, ActionMeta[]> SecondaryByPrimaryActionKind { get; } =
+        All.Where(m => m.PrimaryActionKind is not null)
+           .GroupBy(m => m.PrimaryActionKind!.Value)
+           .ToFrozenDictionary(g => g.Key, g => g.ToArray());
 }
