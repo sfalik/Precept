@@ -12,6 +12,20 @@
 
 ---
 
+### 2026-05-10T00:47:45Z: Slice 3 core landed ArgReference recording as the semantic-index arg provenance surface
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox batch.
+
+**Merged source:** `.squad/agents/george/inbox.md`.
+
+- George commit `cba898b7` added `ArgReference(TypedArg Arg, SourceSpan Site)` plus `ImmutableArray<ArgReference> ArgReferences` to `SemanticIndex`, with matching `SemanticIndex.Empty` and `CheckContext` support so arg tracking is symmetric with field/state/event references.
+- `TypeChecker.Expressions.cs` now records arg references at both `TypedArgRef` resolution sites (identifier-scope lookup and member-access resolution), and `TypeChecker.cs` now seals `ctx.ArgReferences.ToImmutableArray()` into the final semantic index.
+- This closes the thin core prerequisite for projection-only arg tooling, and `test/Precept.Tests/ArgReferenceTests.cs` added three regression facts before George validated the slice at 3740/3740 passing tests.
+
+---
+
 ### 2026-05-10T00:41:09Z: Language-server handler batch established the first real post-sync editor surface
 
 **By:** Scribe

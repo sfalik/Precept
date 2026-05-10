@@ -23,6 +23,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T00:47:45Z — Slice 3 core ArgReference recording committed
+- Commit `cba898b7` added `ArgReference(TypedArg Arg, SourceSpan Site)` plus `SemanticIndex.ArgReferences`, extended `SemanticIndex.Empty` and `CheckContext`, and kept arg provenance symmetric with the existing field/state/event reference surfaces.
+- `TypeChecker.Expressions.cs` now records `ArgReference` at both `TypedArgRef` resolution sites (identifier scope lookup and member-access resolution), and `TypeChecker.cs` persists `ctx.ArgReferences.ToImmutableArray()` into the final semantic index.
+- Added `test/Precept.Tests/ArgReferenceTests.cs` with 3 tests; George validated the slice at 3740/3740 passing tests.
+
 ### 2026-05-10T00:11:05Z — Slice 0a outline metadata committed
 - Commit `d85449ea` extended `ConstructMeta` with `bool IsOutlineNode = false` and `string? OutlineSymbolTag = null`, then marked `PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, and `RuleDeclaration` as outline nodes with `Module`, `Property`, `Enum`, `Function`, and `Boolean` tags in `src/Precept/Language/Constructs.cs`.
 - George added four catalog tests under `test/Precept.Tests/` and validated the branch at 3737 passing tests.
@@ -51,6 +56,6 @@
 
 ## Latest Slice
 
-- Slice 0a complete: `IsOutlineNode` + `OutlineSymbolTag` added to `ConstructMeta`.
-- 5 outline constructs: `PreceptHeader` (`Module`), `FieldDeclaration` (`Property`), `StateDeclaration` (`Enum`), `EventDeclaration` (`Function`), `RuleDeclaration` (`Boolean`).
-- Tests: 4 catalog-level facts added in `test/Precept.Tests/ConstructsTests.cs`.
+- Slice 3 core complete: `ArgReference(TypedArg Arg, SourceSpan Site)` and `SemanticIndex.ArgReferences` landed as the semantic-index arg provenance surface.
+- `CheckContext`, `SemanticIndex.Empty`, and both `TypedArgRef` resolution paths now record arg references before `TypeChecker` seals them into the final semantic index.
+- Tests: 3 facts added in `test/Precept.Tests/ArgReferenceTests.cs`; George validated at 3740/3740 passing tests.
