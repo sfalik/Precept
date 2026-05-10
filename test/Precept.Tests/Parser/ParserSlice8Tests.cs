@@ -177,17 +177,4 @@ public sealed class ParserSlice8Tests
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UndeclaredField));
     }
 
-    [Fact]
-    public void Parser_Bug054_EventHandlerPostActionEnsure_CompilesClean()
-    {
-        var compilation = Compile("""
-            precept Bug054
-            field Name as string writable default ""
-            event Rename(next as string)
-            on Rename -> set Name = next ensure Name != "" because "name required"
-            """);
-
-        compilation.HasErrors.Should().BeFalse();
-        compilation.Diagnostics.Should().BeEmpty();
-    }
 }

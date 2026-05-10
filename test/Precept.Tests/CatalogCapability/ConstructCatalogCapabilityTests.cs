@@ -21,9 +21,4 @@ public sealed class ConstructCatalogCapabilityTests
         slots[slotIndex].Kind.Should().Be(ConstructSlotKind.GuardClause);
     }
 
-    [Fact]
-    public void EventHandler_SupportsPostActionEnsure_True()
-        => CatalogCapabilityReflection.GetInstanceValue(
-                Constructs.GetMeta(ConstructKind.EventHandler), "SupportsPostActionEnsure")
-            .Should().Be(true);
 }

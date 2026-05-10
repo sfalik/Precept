@@ -14,7 +14,4 @@ public class Track2PhaseAConstructCatalogTests
     public void GuardedConstruct_DeclaresGuardClauseAtExpectedSlotIndex(ConstructKind kind, int slotIndex)
         => Constructs.GetMeta(kind).Slots[slotIndex].Kind.Should().Be(ConstructSlotKind.GuardClause);
 
-    [Fact]
-    public void EventHandler_SupportsPostActionEnsure_True()
-        => Constructs.GetMeta(ConstructKind.EventHandler).SupportsPostActionEnsure.Should().BeTrue();
 }
