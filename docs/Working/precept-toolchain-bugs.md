@@ -28,8 +28,8 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-001 | `any` state wildcard not recognized in any position | Compiler | **Fixed** | — | Retested 2026-05-10: `from any on E` compiles cleanly; definition shows `fromStates:["*"]` ✅ |
 | BUG-002 | `contains` operator rejected in all expression positions | Compiler | Open | — | — |
 | BUG-003 | `and` / `or` / `not` compound boolean expressions rejected in... | Compiler | Open | — | — |
-| BUG-004 | `default` modifier rejected on event argument declarations | Compiler | Open | — | — |
-| BUG-005 | Comma-separated field list rejected in `in S modify` declarations | Compiler | Open | — | — |
+| BUG-004 | `default` modifier rejected on event argument declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `event E(arg as number default 1)` now parses and compiles cleanly ✅ |
+| BUG-005 | Comma-separated field list rejected in `in S modify` declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `in S modify A, B editable` compiles cleanly ✅ |
 | BUG-006 | `min(a, b)` and `max(a, b)` not recognized as function calls... | Compiler | **Fixed** | — | Retested 2026-05-10: `min(A, B)`, `max(A, B)`, and `min(max(X, 0), 100)` all compile cleanly ✅ |
 | BUG-007 | Arithmetic operators have lower precedence than comparison... | Compiler | Open | — | — |
 | BUG-008 | `pop` and `dequeue` proof obligations use unnamed internal... | Compiler | Open | — | — |
@@ -43,19 +43,19 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-016 | Guarded rule `when` clause not serialized in MCP definition... | MCP-definition | Open | — | — |
 | BUG-017 | `~string` (case-insensitive string) qualifier lost in MCP... | MCP-definition | Open | — | — |
 | BUG-018 | Collection element types lost in MCP definition output | MCP-definition | Open | — | — |
-| BUG-019 | Typed constants (single-quoted strings) not resolved from... | Compiler | Open | — | — |
-| BUG-020 | Guarded ensures (`when` guard) not parsed in any position | Compiler | Open | — | — |
+| BUG-019 | Typed constants (single-quoted strings) not resolved from... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: typed constants in default/action expression positions parse and compile cleanly ✅ |
+| BUG-020 | Guarded ensures (`when` guard) not parsed in any position | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `in State when G ensure ...` compiles cleanly ✅ |
 | BUG-021 | `append by P`, `enqueue by P` v3 action forms not parsed | Compiler | **Fixed** | — | Retested 2026-05-10: `append Tasks Label by Priority` and `enqueue Jobs Job by Rank` both compile cleanly ✅ |
 | BUG-022 | Event ensures (`on Event ensure`) not serialized in MCP... | MCP-definition | Open | — | — |
 | BUG-023 | `because` clause includes keyword in serialized value | MCP-definition | Open | — | — |
 | BUG-024 | `omit` declarations not reflected in MCP definition output | MCP-definition | Open | — | — |
 | BUG-025 | Keyword-named member accessors rejected by parser | Compiler | **Fixed** | — | Retested 2026-05-10: `.count`, `.peek` on list/queue/stack all compile ✅ |
 | BUG-026 | `in State modify all readonly` treats `all` as field name | Compiler | **Fixed** | — | Retested 2026-05-10: `in Draft modify all readonly` compiles cleanly ✅ |
-| BUG-027 | `choice of T(...)` type not valid in event arg declarations | Compiler | Open | — | — |
+| BUG-027 | `choice of T(...)` type not valid in event arg declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: event args accept `choice of T(...)` via full type parser ✅ |
 | BUG-028 | `RedundantModifier` fires wrong diagnostic code with garbled... | Compiler | Open | — | — |
 | BUG-029 | `InvalidModifierBounds` check not enforced | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 now fires correctly for `min > max` ✅ |
-| BUG-030 | Computed field forward references rejected; wrong error... | Compiler | Open | — | — |
-| BUG-031 | String interpolation not supported in `reject`, `because`,... | Compiler | Open | — | — |
+| BUG-030 | Computed field forward references rejected; wrong error... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: computed forward references compile; cycles emit `CircularComputedField` ✅ |
+| BUG-031 | String interpolation not supported in `reject`, `because`,... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: interpolated `because`/`reject` messages parse cleanly ✅ |
 | BUG-032 | `reject` outcomes not serialized in MCP definition rows | MCP-definition | Open | — | — |
 | BUG-033 | Event arg `optional` modifier not reflected in MCP definition | MCP-definition | Open | — | — |
 | BUG-034 | Per-state access mode overrides not in MCP definition output | MCP-definition | Open | — | — |
@@ -68,8 +68,8 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-041 | `UnexpectedNull` runtime fault recovery hint uses invalid... | MCP-docs | Open | — | — |
 | BUG-042 | Modifier bound values not serialized in MCP definition output | MCP-definition | Open | — | — |
 | BUG-043 | String default values include surrounding DSL quotes in... | MCP-definition | Open | — | — |
-| BUG-044 | Guarded state actions (`from State when G -> action`) not... | Compiler | Open | — | — |
-| BUG-045 | `ascending`/`descending` modifiers not recognized in log type... | Compiler | Open | — | — |
+| BUG-044 | Guarded state actions (`from State when G -> action`) not... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: guarded state hooks (`to/from State when ... ->`) compile cleanly ✅ |
+| BUG-045 | `ascending`/`descending` modifiers not recognized in log type... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `log of T by P ascending|descending` parses cleanly ✅ |
 | BUG-046 | CI enforcement not applied to quantifier binding variables | Compiler | Open | — | — |
 | BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | Open | — | — |
 | BUG-048 | `by` keyword not recognized in `append`/`enqueue` priority... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-021; `enqueue … by` compiles cleanly ✅ |
@@ -78,7 +78,7 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-051 | `min(a, b)` and `max(a, b)` function calls fail due to... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-006; `min()`, `max()`, and chained `min(max(...))` all compile cleanly ✅ |
 | BUG-052 | `contains` keyword unusable in expression position | Compiler | Open | — | — |
 | BUG-053 | `and`/`or` binary boolean operators fail in all expression positions | Compiler | Open | — | — |
-| BUG-054 | `ensure` clause not supported in stateless event hooks | Compiler | Open | — | — |
+| BUG-054 | `ensure` clause not supported in stateless event hooks | Compiler | **Fixed** | — | Retested 2026-05-10: `on Event ensure BoolExpr because "..."` compiles cleanly ✅ |
 | BUG-055 | PRE0097 `exampleAfter` shows wrong fix — removes `~string` instead of switching to `~startsWith` | MCP-docs | Open | — | — |
 | BUG-056 | PRE0081 false positive fires on stateless-hook-only events in stateful precepts | Compiler | Open | — | — |
 | BUG-057 | `date + period` and `date - period` arithmetic unusable — PRE0113 fires on all period field forms | Compiler | Open | — | — |

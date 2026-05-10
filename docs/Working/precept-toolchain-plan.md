@@ -106,7 +106,7 @@ Slices 1–2 bundle catalog + pipeline work and close bugs directly. Slices 3–
 | Slice 5 | ConstructMeta — Catalog fields (prereq for Slice 8) | ✅ Complete — `5251b7e7` | — |
 | Slice 6 | OutcomeMeta — Catalog fields (prereq for Slice 12) | ✅ Complete — `1536d0cb` (fields present; Slice 12 wires MCP consumer) | — |
 | Slice 7 | FunctionMeta — Catalog fields (prereq for Slice 11) | ✅ Complete — `b1c95512` | — |
-| Slice 8 | Parser — Replace Hardcoded Sets with Catalog Lookups | ⬜ Not started | BUG-004, BUG-005, BUG-019, BUG-020, BUG-027, BUG-031, BUG-044, BUG-045, BUG-054 |
+| Slice 8 | Parser — Replace Hardcoded Sets with Catalog Lookups | ✅ Complete — `e68008d0` | BUG-004, BUG-005, BUG-019, BUG-020, BUG-027, BUG-031, BUG-044, BUG-045, BUG-054 |
 | Slice 9 | Type Checker — Catalog-Derived Operator Typing | ⬜ Not started | BUG-002, BUG-003, BUG-007, BUG-009, BUG-010, BUG-028, BUG-029, BUG-038, BUG-040, BUG-046, BUG-052, BUG-053 |
 | Slice 10 | Name Binder — Catalog-Derived Name Resolution | ⬜ Not started | BUG-030 |
 | Slice 11 | Proof Engine — Catalog-Derived Proof Obligations | ⬜ Not started | BUG-008, BUG-013, BUG-050 |
