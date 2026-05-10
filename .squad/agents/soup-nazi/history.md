@@ -16,6 +16,7 @@
 - Slot-context routing for action chains cannot rely on parsed spans alone; `by`/`at` tail separators may need explicit token-aware coverage.
 - Language-server completion regressions that depend on trigger characters should use the real trigger in the test request; otherwise the suite can miss the user-visible fallback surface.
 - TextMate grammar regressions are honest when they assert the generated `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json` capture order directly; declaration overrides must appear before generic `#grammarKeywords` fallback or gold scope silently swallows field syntax like `default`.
+- Track 2 compiler regressions need full `Compiler.Compile` fixtures so parser, binder, and proof-stage misroutes surface together; expression-only helpers miss wrong-code failures like `Steps.at(2)` reporting `DivisionByZero` instead of collection access safety.
 
 ## Historical Summary
 
@@ -24,6 +25,11 @@
 - The canonical decision ledger in `.squad/decisions.md` carries the batch-level detail; this history now keeps only the active testing baseline and most recent durable updates.
 
 ## Recent Updates
+
+### 2026-05-10T12:45:39Z — Track 2 Slice 1 regression suite closed green
+- Added `Track2PhaseAToolchainRegressionTests` coverage for wildcard state targets, broadcast field targets, collection-access diagnostics, and dual-use `min` / `max` call leaders, plus `Track2PhaseATokenCatalogTests` that lock the new `TokenMeta` fields and their exact token sets.
+- The suite now fixes the intended BUG-039 red by proving `Steps.at(2)` reports `UnguardedCollectionAccess` instead of the arithmetic `DivisionByZero` family, while BUG-001, BUG-006, BUG-026, BUG-037, BUG-051, and token-shape drift all stay locked.
+- Final validation closed fully green at 3824/3824 `Precept.Tests` after George's production fix landed.
 
 ### 2026-05-10T12:25:21Z — VS Code status item regression contract closed
 - Added `test\Precept.VsCode.Tests` coverage that fails if extension activation stops creating/showing the language-server status item, if the click command wiring disappears, or if state updates stop keeping the item visible across starting/ready/restarting/error/stopped surfaces.

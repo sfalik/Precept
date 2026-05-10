@@ -24,6 +24,33 @@
 
 ---
 
+### 2026-05-10T12:45:39Z: Track 2 Slice 1 locks token metadata as the routing surface for wildcard, broadcast, and min/max leaders
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `george-t2-1-outcome.md`, `soup-nazi-t2-1-coverage.md`.
+
+- `TokenMeta` now carries the canonical Track 2 Slice 1 routing fields: `IsStateWildcard`, `IsFieldBroadcast`, and `IsFunctionCallLeader`.
+- Parser, binder/type-checker, transition normalization, and the tightly coupled proof-diagnostic mapping now read catalog metadata so `from any`, `modify all` / `omit all`, `.at(...)`, and `min(...)` / `max(...)` stop falling back to undeclared-name or arithmetic-only failure paths; keyword member-name derivation now comes from `Types.All[..].Accessors` instead of a parallel token list.
+- Compatibility bridges (`IsBroadcastFieldTarget`, `IsAlsoBuiltinFunction`, `IsValidAsMemberName`) remain only as downstream shims while the canonical truth moves to the new fields and the type-catalog-derived member vocabulary.
+- Regression coverage locks BUG-001, BUG-006, BUG-025, BUG-026, BUG-037, BUG-039, and BUG-051 through `Track2PhaseAToolchainRegressionTests` plus exact token-catalog shape/token assertions, and the slice closed green at 3824/3824 `Precept.Tests` after George's commit `6d360231`.
+
+---
+
+### 2026-05-10T12:34:54Z: Track 2 is the active execution lane again
+
+**By:** Scribe
+
+**Status:** Merged from inbox.
+
+**Merged source:** `copilot-directive-2026-05-10T08-34-54.md`.
+
+- Shane switched active execution focus from Track 1 back to Track 2 immediately.
+- This is an execution-priority change only; durable Track 1 decisions remain recorded, but new active batch work should route to Track 2 until another directive supersedes it.
+
+---
 ### 2026-05-10T12:25:21Z: Keep both VS Code activation paths for the Precept extension
 
 **By:** Scribe

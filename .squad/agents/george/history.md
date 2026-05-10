@@ -27,6 +27,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T12:45:39Z — Track 2 Slice 1 token-routing batch committed
+- George added the canonical `TokenMeta` routing fields (`IsStateWildcard`, `IsFieldBroadcast`, `IsFunctionCallLeader`) and then rewired parser, binder/type-checker, transition normalization, and tightly coupled proof-diagnostic mapping to read catalog truth instead of identifier-only or arithmetic-only fallbacks.
+- The slice closed BUG-001, BUG-006, BUG-025, BUG-026, BUG-037, BUG-039, and BUG-051: `from any`, `modify/omit all`, `.at(...)`, and `min(...)` / `max(...)` now route through metadata, while keyword member-name derivation comes from `Types.All[..].Accessors` instead of a parallel token list.
+- Commit `6d360231` is the durable code anchor; validation closed green at 3824/3824 `Precept.Tests` and full-solution `dotnet build` passed.
+
 ### 2026-05-10T04:20:44Z — Track 2 value modifier rename landed
 - George completed the Track 2 modifier-family rename and applicability-shape cleanup: the core subtype is now `ValueModifierMeta`, `ApplicableToEventArgs` is gone, and `ValueModifierDeclarationSite` carries the declaration-site truth with `writable` restricted to field declarations.
 - Parser, type checker, proof, and MCP-facing core surfaces now read the canonical value-modifier metadata directly, and George synced the core docs plus the durable decision handoff that Scribe merged into `.squad/decisions.md`.
