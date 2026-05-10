@@ -23,6 +23,8 @@
 - String literal `LiteralExpression.Text` is the raw lexed text WITHOUT surrounding quotes. `"Walk"` in source produces Text = `Walk`. Tests asserting on literal text must not include quote characters.
 - Shared-environment MSBuild cache-file locks (`MSB3492: Could not read existing file`) are reliably cleared by deleting the offending `.cache` file manually (`Remove-Item`) before the build invocation. The lock is always stale (held by the VS Code language server OmniSharp/Roslyn process); deleting the file unblocks the build without killing any process.
 - BUG-049a fix pattern: if a numeric accessor is structurally guaranteed non-negative, carry that fact on `FixedReturnAccessor.ReturnNonnegative` and let Strategy 2 discharge `>= 0` directly from accessor metadata. For collection counts, unify all action obligations on `Types.CollectionCountAccessor` (B1) instead of duplicating local accessor instances.
+- `SupportsPreVerbWhenGuard` was pure duplicate metadata. Scoped constructs can encode pre-verb `when` support entirely by placing an optional `GuardClause` slot in the ordered slot list with construct-specific termination tokens (`Ensure`, `Arrow`, `Modify`).
+- `ParseScopedConstruct` does not need phased anchor/guard/disambiguation handling. A single slot walk works if it checks for family disambiguation tokens before each post-anchor slot, preserves the `->` exception for `ActionChain`, and lets slot metadata drive everything else.
 
 ## Historical Summary
 

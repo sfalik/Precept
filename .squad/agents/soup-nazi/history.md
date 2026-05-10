@@ -17,6 +17,8 @@
 - Language-server completion regressions that depend on trigger characters should use the real trigger in the test request; otherwise the suite can miss the user-visible fallback surface.
 - TextMate grammar regressions are honest when they assert the generated `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json` capture order directly; declaration overrides must appear before generic `#grammarKeywords` fallback or gold scope silently swallows field syntax like `default`.
 - Track 2 compiler regressions need full `Compiler.Compile` fixtures so parser, binder, and proof-stage misroutes surface together; expression-only helpers miss wrong-code failures like `Steps.at(2)` reporting `DivisionByZero` instead of collection access safety.
+- Removing metadata flags must shift coverage from boolean capability checks to slot-list shape and real parse behavior; this batch deleted `SupportsPreVerbWhenGuard` assertions, rewired state/event ensure catalog expectations to 4-slot `[Target, Guard, Ensure, Because]` shapes, and added guarded/unguarded parser coverage for StateEnsure, StateAction, EventEnsure, TransitionRow, and AccessMode plus a regression anchor rejecting legacy post-verb access-mode guards.
+- Agent-facing follow-up for removed construct metadata needs both sides locked: MCP JSON must prove `supportsPreVerbWhenGuard` disappeared entirely, and LS parser-context tests must prove `in Draft when IsOwner modify Amount editable` still routes guard text as expression context before `modify` hands control to the field-target slot.
 
 ## Historical Summary
 

@@ -49,8 +49,9 @@
 - Completion UX must stay semantically honest: if a qualifier axis is invalid for the selected type, suppress value completions and guide the user back to the correct preposition instead.
 
 - For closed-set qualifier vocabularies, omission hurts trust faster than list length; a filtered ~150-item UOM list is acceptable if it means expected real-world units are present.
-
-
+- Sample accuracy matters at the grammar-slot level: a single stale `when` position teaches the wrong mental model even when the surrounding workflow is otherwise sound.
+- The 2026-05-10 sample audit found stale post-verb guard examples in `samples/insurance-claim.precept` and `samples/loan-application.precept`; I moved StateEnsure, EventEnsure, and AccessMode examples to pre-verb `when`, and added a minimal guarded StateAction example in `samples/event-registration.precept` so all four guard-bearing construct families now have at least one positive sample.
+- The current compile/diagnostic path on this branch still rejects the corrected pre-verb sample syntax, so the user-facing samples now match the design decision while parser/tooling parity still needs follow-through elsewhere.
 
 ## Recent Updates
 
