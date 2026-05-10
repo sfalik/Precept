@@ -7,6 +7,12 @@
 
 ## Learnings
 
+### 2026-05-10T15:38:30-04:00 — SupportsPostActionEnsure removed (BUG)
+- Code commit: `c1572613`; test commit: `5be86341`. Final suite: 4,388 total (3,891 Precept.Tests, 280 Analyzers.Tests, 157 LS.Tests, 60 Mcp.Tests). Zero failures.
+- `SupportsPostActionEnsure` was an out-of-band parser injection flag that grafted EventEnsure slot semantics (`ensure expr because reason`) onto EventHandler after the main slot-walk. This violated the `on`-family disambiguation contract: `ensure` and `->` are mutually exclusive routing tokens — the parser must never mix their semantics on a single construct.
+- Removal pattern: delete the flag from `ConstructMeta`, remove it from the `EventHandler` catalog entry, delete the conditional post-slot-walk block in `ParseScopedConstruct`. Three tests asserting the deleted behavior were removed. No replacement — the behavior was wrong, not merely misphrased.
+- This confirms the same principle as `SupportsPreVerbWhenGuard`: ad-hoc support flags on `ConstructMeta` are always wrong. If a construct needs extended parsing, that extension must be encoded as catalog-driven optional slots in the slot walk.
+
 ### 2026-05-10T15:32:08-04:00 — BUG-020 committed; full suite confirmed green
 - All 6 BUG-020 commits landed cleanly on `Precept-V2-Radical`: core implementation (`b5dc7c3e`), tests (`ec068569`), grammar/spec/catalog docs (`eb225f8a`), samples (`4a6cb93f`), working docs (`103c3be1`), squad history (`078dbe32`).
 - Final test count: 4,391 across Precept.Tests (3,894), Analyzers.Tests (280), LanguageServer.Tests (157), Mcp.Tests (60). Zero failures.
@@ -37,6 +43,11 @@
 - Durable chronology, rationale, and commit anchors live in `.squad/decisions.md`; this history keeps only the live implementation guidance George needs for the next slices.
 
 ## Recent Updates
+
+### 2026-05-10T19:47:35Z — Grammar doc-fix commits and validation recorded
+- George-5 durably closed the grammar/spec/catalog documentation batch in commits 9b8e8384 and b8e7df94, covering the precept-grammar.md correction pass plus the removal of illegal trailing-ensure EventHandler grammar and obsolete SupportsPostActionEnsure documentation.
+- The squad ledger, orchestration log, and this history now agree on the batch boundary, so follow-up doc work should cite the committed artifacts rather than the deleted inbox notes.
+- Final validation stayed green across all four test projects at 4,388 passing tests.
 
 ### 2026-05-10T15:34:08Z — Slice 2E and Slice C closeouts recorded
 - Scribe merged both your t2-2 Slice C note and your Slice 2E BUG-049a completion into `.squad/decisions.md`, with BUG-049a paired to Frank's approved design review as one canonical closeout entry.

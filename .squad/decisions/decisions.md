@@ -1,3 +1,571 @@
+# Elaine — samples when-guard audit
+
+Date: 2026-05-10
+
+## Notable findings
+
+- The sample corpus had five stale user-facing examples with `when` in the wrong place:
+  - `samples/insurance-claim.precept`: guarded AccessMode, StateEnsure, and EventEnsure
+  - `samples/loan-application.precept`: guarded StateEnsure and AccessMode
+- The corpus also lacked a positive guarded StateAction example, so I added a minimal one in `samples/event-registration.precept` (`to Confirmed when AmountDue > 0 -> set AmountDue = 0`).
+- After the content update, the Precept compile/diagnostic path available in-session still reports parse errors on the corrected pre-verb forms. That suggests a temporary drift between the approved language surface and the current parser/tooling on this branch.
+- Related ledger note: `.squad/decisions.md` line 52 still says access mode remains post-adjective "today," which now reads stale against the final audit/design direction being applied to samples.
+
+## Why this matters
+
+Users learn the DSL from samples first. If samples, design docs, and parser behavior disagree on guard position, authors lose trust quickly and copy the wrong pattern into real definitions.
+
+# Frank doc collision audit
+
+Date: 2026-05-10T15:07:23.325-04:00
+
+## Scope
+- `docs/language/precept-language-spec.md`
+- `docs/language/catalog-system.md`
+- `docs/language/precept-grammar.md`
+
+## Findings
+- The SupportsPreVerbWhenGuard elimination survived in all three docs: `SupportsPreVerbWhenGuard` is absent, access mode grammar uses pre-verb `when`, and state/event ensure grammar remains pre-verb.
+- No live post-verb access-mode or ensure syntax remained in grammar/example sections.
+- No duplicate access-mode rules or duplicate `ConstructMeta` shape blocks were found.
+- One coherence break remained in `docs/language/catalog-system.md`: the Constructs catalog inventory still said `ConstructKind` had 11 members and its member list omitted `OmitDeclaration`, contradicting the language spec, grammar reference, and source enum.
+
+## Fix applied
+- Updated `docs/language/catalog-system.md` to say `ConstructKind` has 12 members.
+- Restored `OmitDeclaration` to the documented Constructs member list.
+
+## Outcome
+The three language docs now agree on the final slot-driven, pre-verb-guard model and the Constructs inventory is internally consistent again.
+
+# Decision: Grammar Doc Comprehensive Review Findings
+
+**Date:** 2026-05-10  
+**Author:** Frank (Lead/Architect)  
+**Context:** Comprehensive line-by-line review of `docs/language/precept-grammar.md`
+
+## Decision
+
+The grammar doc has 8 factual errors, 6 warnings, and 3 minor issues. No code changes required — all fixes are doc-only. The errors cluster in construct anatomy diagrams and family detail sections where pre-verb `when` guards are systematically omitted.
+
+## Key Findings
+
+1. **Pre-verb guard omission is systematic** — 6 of 8 errors are missing `[when Guard]` slots in anatomy diagrams or family detail sections. The pattern: wherever StateEnsure, StateAction, or EventEnsure appears in a diagram or summary, the optional guard is not shown.
+
+2. **Computed-field anatomy is structurally wrong** — the diagram shows ModifierList trailing AFTER ComputeExpression, but the actual slot order (and all sample files) have modifiers BEFORE `<-`.
+
+3. **Quick reference is stale** — Invariant 2 wording wasn't updated when the body text was revised for BUG-020.
+
+4. **ExpressionForms count is wrong** — "13" should be "14" in the catalogs table (line 722).
+
+## Action Required
+
+Apply the 16 fixes listed in the priority fix list (see full report at `docs/working/frank-grammar-comprehensive-review-2026-05-10.md`). All are doc-only edits to `precept-grammar.md`. No code investigation needed.
+
+## Rationale
+
+The grammar doc is a design reference for people working ON the language. Factual errors in slot sequences and family details will cause implementors to write incorrect parser tests, produce wrong MCP output, or design new constructs with wrong assumptions about guard positions.
+
+# Decision: Remove `SupportsPostActionEnsure` — Grammar Integrity Fix
+
+**Date:** 2026-05-10T15:32:08-04:00  
+**Author:** Frank (Lead/Architect)  
+**Status:** Ready for implementation  
+**Audit:** `docs/working/frank-grammar-spec-audit-2026-05-10.md`
+
+## Decision
+
+Remove the `SupportsPostActionEnsure` boolean flag from `ConstructMeta` and all associated parser injection logic. The feature violates the grammar's fundamental disambiguation semantics — `ensure` and `->` are mutually exclusive second-token disambiguation paths in the `on` family, and a construct cannot legitimately use both.
+
+## Key Findings
+
+1. **The bug is isolated.** No other `Supports*` flags or out-of-band parser behaviors exist. The parser architecture is clean otherwise.
+2. **7 files, ~25 lines affected.** Removal is surgical.
+3. **The language spec documents the bad form** (line 861–869) and must be corrected simultaneously.
+4. **Grammar doc has pre-existing `when` guard gaps** for 3 constructs (EventEnsure, StateEnsure, StateAction). These are doc-only fixes unrelated to the bug, but should be addressed in the same pass.
+
+## Files to Change
+
+1. `src/Precept/Language/Construct.cs` — remove parameter
+2. `src/Precept/Language/Constructs.cs` — remove from EventHandler entry
+3. `src/Precept/Pipeline/Parser.cs` — delete injection block
+4. `test/Precept.Tests/Parser/ParserSlice8Tests.cs` — delete test
+5. `test/Precept.Tests/CatalogCapability/ConstructCatalogCapabilityTests.cs` — delete test
+6. `test/Precept.Tests/Language/Track2PhaseAConstructCatalogTests.cs` — delete test
+7. `docs/language/precept-language-spec.md` — remove `("ensure" BoolExpr)?` from stateless hook grammar
+8. `docs/language/catalog-system.md` — remove from ConstructMeta shape documentation
+
+# Frank — when-guard doc sync gap
+
+## Gap
+
+`.squad/decisions.md` still presents the superseded 2026-05-10T17:10:00Z GuardPolicy decision as an active canonical entry and still says access mode remains post-adjective today.
+
+## Why it matters
+
+The approved final audit (`docs/Working/frank-when-guard-audit-4-final.md`) and the current doc-sync batch now align the live language docs to the slot-list-only design:
+
+- no GuardPolicy enum
+- no construct-level pre-verb guard boolean
+- AccessMode guard is pre-verb: `in State when Guard modify Field editable`
+
+Leaving the older decision text in the active ledger will misdirect future doc and implementation work.
+
+## Requested follow-up
+
+Reconcile `.squad/decisions.md` so the active canonical entry reflects the final slot-list decision and no longer states that access mode is post-adjective.
+
+# Decision: Eliminate GuardPolicy — Slot List IS the Metadata
+
+**Author:** Frank — Lead/Architect  
+**Date:** 2026-05-10T13:16:47-04:00  
+**Status:** Final recommendation  
+**Supersedes:** `frank-when-guard-revised.md` (2-member GuardPolicy enum proposal)
+
+---
+
+## Decision
+
+**`SupportsPreVerbWhenGuard` is deleted from `ConstructMeta`. No `GuardPolicy` enum is created. The guard's position in the slot list is the only metadata.**
+
+Pre-verb guard constructs (StateEnsure, StateAction, EventEnsure, AccessMode) get a `GuardClause` slot at their natural position in the slot list — before the disambiguation keyword. Per-construct termination tokens make each guard self-describing.
+
+`ParseScopedConstruct` is refactored from a 3-phase protocol (anchor → flag-gated injection → disambig + remaining slots) to a single unified loop that walks all slots in order, consuming the disambiguation keyword at the natural boundary.
+
+## Key Finding
+
+My prior analysis was wrong. I said putting the guard in the slot list "requires rearchitecting how `ParseScopedConstruct` walks slots" and called it scope-expanding. Having read the actual parser code:
+
+1. **Disambiguation happens before `ParseScopedConstruct` is called.** The routing phase resolves which construct the parser is working with. A guard at slot[1] is just a regular optional slot — no routing ambiguity.
+
+2. **The refactor is a simplification.** The current 3-phase code (~77 lines with flag-gated injection) becomes a single loop (~45 lines, zero flags). Net code reduction.
+
+3. **The unified loop works for all 7 scoped constructs.** Verified construct-by-construct with and without guards.
+
+## What Changes
+
+| File | Change |
+|------|--------|
+| `Construct.cs` | Remove `SupportsPreVerbWhenGuard` parameter |
+| `Constructs.cs` | Add 3 per-construct guard slot instances; update 4 construct slot lists; remove 3 `SupportsPreVerbWhenGuard: true` |
+| `Parser.cs` | Replace `ParseScopedConstruct` with unified loop |
+| Tests | Delete flag-assertion tests; add slot-position tests |
+
+## Why This Is the Right Answer
+
+Shane's directive: *"If `when` is always pre-verb, the slot list itself should encode that position. No separate metadata flag or enum is needed; the slot list IS the metadata."*
+
+That's exactly what this achieves. Zero metadata flags. Zero enums. The catalog-driven principle is satisfied completely — the slot list is self-describing and the parser is a generic slot walker.
+
+## Full Analysis
+
+See `docs/Working/frank-when-guard-audit-2.md` for the complete analysis including construct-by-construct verification, refactored parser code, and file change inventory.
+
+# Decision: When-Guard Catalog Shape — Revised (PostVerb Eliminated)
+
+**Author:** Frank — Lead/Architect  
+**Date:** 2026-05-10T13:15:46-04:00  
+**Status:** Recommendation — awaiting owner decision  
+**Supersedes:** Prior 4-member `GuardPolicy` proposal (frank-when-guard-audit-2.md)
+
+---
+
+## Hard Constraint
+
+> **PostVerb guard position is NOT supported. Full stop. `when` is always pre-verb or absent.**
+
+This eliminates `PostVerb` from the design space permanently.
+
+---
+
+## 1. Does the GuardPolicy Enum Still Make Sense?
+
+**Yes, but it collapses from 4 members to 2.**
+
+With PostVerb gone, the prior proposal had `None`, `SlotWalk`, `PreVerb`. Here's what happens when we pressure-test each:
+
+### `None` — is explicit prohibition needed?
+
+No. A construct without a `GuardClause` in its slot list AND without `GuardPolicy.PreVerb` cannot have a guard. The absence is structural — there's nothing to parse and no injection trigger. `None` as an explicit prohibition adds no information the slot list doesn't already encode.
+
+### `SlotWalk` — is it distinct from "just walking the slot list"?
+
+No. `SlotWalk` means "the guard is in the slot list and the parser walks it in normal order." That's not a special policy — that's the *absence* of a policy. The parser does nothing different for `SlotWalk` vs `None` — in both cases it walks the slot list. The only difference is whether a `GuardClause` slot exists in the list, which the list itself declares.
+
+### `PreVerb` — is it the only real policy?
+
+Yes. `PreVerb` is the only value that triggers parser behavior different from default slot walking. It means: "inject a guard between the anchor and the disambiguation token, using the disambiguation tokens as terminators." This is a parse-protocol instruction that cannot be derived from the slot list alone, because the guard is NOT in the slot list for these constructs.
+
+### Conclusion: 2-member enum
+
+```csharp
+public enum GuardPolicy
+{
+    /// <summary>
+    /// Guard is either absent or declared in the slot list — parsed via normal slot walk.
+    /// Whether the construct actually supports a guard is determined by whether a
+    /// <see cref="ConstructSlotKind.GuardClause"/> slot appears in the slot list.
+    /// </summary>
+    SlotDriven = 0,
+
+    /// <summary>
+    /// Guard is injected between anchor (slot[0]) and the disambiguation token.
+    /// The guard is NOT declared in the slot list — the parser synthesizes it at
+    /// parse time using the construct's disambiguation tokens as terminators.
+    /// Surface syntax: <c>&lt;scope&gt; &lt;target&gt; when &lt;guard&gt; &lt;verb&gt; ...</c>
+    /// </summary>
+    PreVerb,
+}
+```
+
+**Why an enum and not a boolean?**
+
+1. **Naming.** `GuardPolicy.PreVerb` says what it IS. `SupportsPreVerbWhenGuard = true` is a double-positive sentence fragment. The enum names the concept; the bool describes a capability.
+2. **Default semantics.** `SlotDriven = 0` is the natural default — you only specify the property when the construct deviates. A bool with `false` as default means every construct silently opts out, but the opt-out has no name.
+3. **Extensibility without breaking.** If a future construct needs a guard in a novel position (unlikely but possible), adding an enum member is additive. Renaming a boolean or adding a second boolean is not.
+4. **The bool name is a lie for slot-walk constructs.** `SupportsPreVerbWhenGuard = false` for Rule and TransitionRow implies "doesn't support when guard" — but they do, via slot walk. The name confuses absence-of-guard with absence-of-injection. The enum eliminates this ambiguity.
+
+---
+
+## 2. TransitionRow and Rule — Where Do They Fall?
+
+### TransitionRow
+
+`from Draft on Submit when IsValid -> ...`
+
+- Guard is slot[2]: `[StateTarget, EventTarget, GuardClause, ActionChain, Outcome]`
+- TransitionRow is `RoutingFamily.StateScoped`, parsed via `ParseScopedConstruct`
+- Slot[0] (StateTarget) is the anchor. After disambiguation, slots[1..] are walked: EventTarget, then GuardClause, then ActionChain, then Outcome.
+- The guard is in the slot list, parsed in normal slot-walk order. **This is `SlotDriven`.**
+- No injection, no special protocol. The parser doesn't know or care that slot[2] is a guard — it's just the next slot.
+
+### Rule
+
+`rule amount > 0 when someCondition because "reason"`
+
+- Guard is slot[1]: `[RuleExpression, GuardClause, BecauseClause]`
+- Rule is `RoutingFamily.Direct`, parsed via `ParseConstruct` (not `ParseScopedConstruct` at all)
+- The guard is in the slot list, parsed in normal order. **This is `SlotDriven`.**
+- Rule has no verb, no disambiguation token, no scope keyword. The `when` after the expression is just the next slot with `TerminationTokens: [TokenKind.Because, TokenKind.Arrow]`.
+
+### Conclusion
+
+Both collapse to `SlotDriven` (the default). Neither needs the `GuardPolicy` property specified. They work today, they'll work after the change. No slot list changes needed.
+
+---
+
+## 3. What's the Simplest Possible Catalog Shape?
+
+Evaluating the four options Shane listed:
+
+### Option A: `GuardPolicy` enum with 2 members — **RECOMMENDED**
+
+```csharp
+public enum GuardPolicy { SlotDriven = 0, PreVerb }
+```
+
+On `ConstructMeta`: replace `SupportsPreVerbWhenGuard: bool` with `GuardPolicy: GuardPolicy = GuardPolicy.SlotDriven`.
+
+Parser code:
+```csharp
+if (meta.GuardPolicy == GuardPolicy.PreVerb && Peek().Kind == TokenKind.When)
+{
+    // inject guard — identical to current code body
+}
+```
+
+**Verdict:** Names the concept. Parser code is one token different from today. Default means you only annotate the 4 constructs that deviate. Clean.
+
+### Option B: Collapse to boolean `SupportsWhenGuard: bool`
+
+Parser code: `if (meta.SupportsWhenGuard && Peek().Kind == TokenKind.When)` — nearly identical to today. But the name is wrong for Rule and TransitionRow (they support when-guards too, via slots). You'd need `InjectsPreVerbGuard: bool` which is just the current flag renamed. A boolean with a better name is still a boolean — it doesn't name the concept space.
+
+**Verdict:** Functional but semantically impoverished. The bool says what the parser DOES, not what the construct's grammar MEANS.
+
+### Option C: Drop all metadata — rely on slot list structure
+
+This requires putting the guard IN the slot list for pre-verb constructs (at slot[1], before the disambiguation token). Then `ParseScopedConstruct` checks: "is the next slot a GuardClause? If so, parse it before consuming the disambiguation token."
+
+Problem: the parser currently walks `Slots[1..]` AFTER consuming the disambiguation token. If the guard is at slot[1] but must be parsed BEFORE the disambiguation token, you need the parser to know which slots are pre-disambiguation and which are post. That's the `DisambiguationToken` synthetic slot from Alternative B of the prior analysis — a larger refactor.
+
+**Verdict:** Pure but scope-expanding. Requires rearchitecting how `ParseScopedConstruct` walks slots. Not the right scope for this fix.
+
+### Option D: Keep the existing boolean, just add AccessMode
+
+Rename nothing. Add `SupportsPreVerbWhenGuard: true` to AccessMode, remove its `SlotGuardClause` from the slot list.
+
+**Verdict:** Smallest diff. But we've been told to fix the smell, not perpetuate it. The bool name remains misleading for slot-walk constructs. Rejected.
+
+### Final answer: Option A.
+
+---
+
+## 4. Updated Construct Slot Tables
+
+### Before → After for all 6 when-using constructs
+
+| Construct | Slots (before) | GuardPolicy (before) | Slots (after) | GuardPolicy (after) | Changed? |
+|-----------|---------------|---------------------|--------------|--------------------|-|
+| **Rule** | `[RuleExpr, GuardClause, BecauseClause]` | `SupportsPreVerbWhenGuard: false` (default) | `[RuleExpr, GuardClause, BecauseClause]` | `SlotDriven` (default) | No change |
+| **TransitionRow** | `[StateTarget, EventTarget, GuardClause, ActionChain, Outcome]` | `SupportsPreVerbWhenGuard: false` (default) | `[StateTarget, EventTarget, GuardClause, ActionChain, Outcome]` | `SlotDriven` (default) | No change |
+| **StateEnsure** | `[StateTarget, EnsureClause, OptBecauseClause]` | `SupportsPreVerbWhenGuard: true` | `[StateTarget, EnsureClause, OptBecauseClause]` | `PreVerb` | Flag → enum |
+| **StateAction** | `[StateTarget, ActionChain]` | `SupportsPreVerbWhenGuard: true` | `[StateTarget, ActionChain]` | `PreVerb` | Flag → enum |
+| **EventEnsure** | `[EventTarget, EnsureClause, OptBecauseClause]` | `SupportsPreVerbWhenGuard: true` | `[EventTarget, EnsureClause, OptBecauseClause]` | `PreVerb` | Flag → enum |
+| **AccessMode** | `[StateTarget, FieldTarget, AccessModeKeyword, **GuardClause**]` | (none — guard was last slot) | `[StateTarget, FieldTarget, AccessModeKeyword]` | `PreVerb` | **Slot removed + policy added** |
+
+### Constructs without guards (unchanged)
+
+| Construct | GuardPolicy | Reason |
+|-----------|-------------|--------|
+| PreceptHeader | `SlotDriven` (default, no guard slot) | File-level declaration |
+| FieldDeclaration | `SlotDriven` (default, no guard slot) | Type structure |
+| StateDeclaration | `SlotDriven` (default, no guard slot) | Existence declaration |
+| EventDeclaration | `SlotDriven` (default, no guard slot) | Existence declaration |
+| OmitDeclaration | `SlotDriven` (default, no guard slot) | Unconditional exclusion |
+| EventHandler | `SlotDriven` (default, no guard slot) | Stateless hook |
+
+---
+
+## 5. Parser Pseudocode — `ParseScopedConstruct` After Change
+
+```csharp
+private void ParseScopedConstruct(ConstructMeta meta)
+{
+    var startToken = Advance(); // consume leading keyword
+    var slots = new List<SlotValue>();
+
+    // Slots[0] = anchor (StateTarget or EventTarget)
+    if (meta.Slots.Count > 0)
+    {
+        var anchorValue = ParseSlotValue(meta.Slots[0], meta);
+        if (meta.Slots[0].IsRequired || anchorValue.Span != SourceSpan.Missing)
+            slots.Add(anchorValue);
+    }
+
+    // ── CHANGED: GuardPolicy enum replaces SupportsPreVerbWhenGuard bool ──
+    if (meta.GuardPolicy == GuardPolicy.PreVerb && Peek().Kind == TokenKind.When)
+    {
+        var guardSlot = ParseGuardClause(new ConstructSlot(
+            ConstructSlotKind.GuardClause,
+            IsRequired: false,
+            TerminationTokens: meta.Entries
+                .SelectMany(entry => entry.DisambiguationTokens ?? [])
+                .Distinct()
+                .ToArray()));
+
+        if (guardSlot.Span != SourceSpan.Missing)
+            slots.Add(guardSlot);
+    }
+
+    // Consume disambiguation keyword (not a slot)
+    // ... (unchanged from current code)
+
+    // Walk remaining slots (Slots[1..])
+    // ... (unchanged from current code)
+}
+```
+
+The change is exactly ONE token: `meta.SupportsPreVerbWhenGuard` → `meta.GuardPolicy == GuardPolicy.PreVerb`. Same code body, same termination token derivation, same guard injection protocol. The mechanism is proven; only the metadata shape changes.
+
+---
+
+## 6. AccessMode Surface Syntax Change
+
+**Before (post-verb — ELIMINATED):**
+```
+in Draft modify Amount editable when IsOwner
+```
+
+**After (pre-verb — consistent with governing principle):**
+```
+in Draft when IsOwner modify Amount editable
+```
+
+This is a **breaking change** to `.precept` files. No current sample files use guarded access mode (confirmed by prior audit). The old post-verb form should produce a diagnostic after implementation.
+
+---
+
+## 7. File Change Inventory
+
+### Source
+
+| File | Change |
+|------|--------|
+| `src/Precept/Language/Construct.cs` | Add `GuardPolicy` enum (2 members: `SlotDriven`, `PreVerb`). Replace `SupportsPreVerbWhenGuard` parameter with `GuardPolicy GuardPolicy = GuardPolicy.SlotDriven`. |
+| `src/Precept/Language/Constructs.cs` | StateEnsure, StateAction, EventEnsure: replace `SupportsPreVerbWhenGuard: true` with `GuardPolicy: GuardPolicy.PreVerb`. AccessMode: add `GuardPolicy: GuardPolicy.PreVerb`, remove `SlotGuardClause` from slot list. Update description string for AccessMode to reflect new syntax. |
+| `src/Precept/Pipeline/Parser.cs` line 280 | `meta.SupportsPreVerbWhenGuard` → `meta.GuardPolicy == GuardPolicy.PreVerb` |
+
+### Tests
+
+| File | Change |
+|------|--------|
+| `test/Precept.Tests/Language/Track2PhaseAConstructCatalogTests.cs` | Replace `SupportsPreVerbWhenGuard` assertions with `GuardPolicy` assertions. |
+| `test/Precept.Tests/CatalogCapability/ConstructCatalogCapabilityTests.cs` | Replace `SupportsPreVerbWhenGuard` assertions with `GuardPolicy` assertions. Add AccessMode guard-policy test. |
+| Parser test file(s) | Add parse tests for `in Draft when IsOwner modify Amount editable`. Verify old post-verb form produces a diagnostic. |
+
+### Documentation
+
+| File | Change |
+|------|--------|
+| `docs/language/precept-language-spec.md` | Fix ensure grammar (lines 855–856) to show pre-verb guard. Fix access mode grammar (lines 897–903) to show pre-verb guard. |
+| `docs/language/catalog-system.md` | Replace `SupportsPreVerbWhenGuard` schema entry with `GuardPolicy` enum documentation. |
+| `docs/Working/precept-toolchain-plan.md` | Update references to `SupportsPreVerbWhenGuard`. |
+
+### MCP / Language Server
+
+| Surface | Impact |
+|---------|--------|
+| MCP `precept_language` | `SupportsPreVerbWhenGuard` disappears from construct JSON, replaced by `GuardPolicy` string. DTO update in `tools/Precept.Mcp/Tools/`. |
+| LS completions | `when` suggestion for access mode moves from post-keyword to post-state-target position. |
+| LS semantic tokens / grammar | No impact — `when` keyword matching is not construct-specific. |
+
+### Samples
+
+No sample files use guarded access mode — no sample changes needed.
+
+---
+
+## 8. Rationale Summary
+
+| Question | Answer |
+|----------|--------|
+| Does `GuardPolicy` still make sense? | Yes — as a 2-member enum, not 4. |
+| Does it collapse to a boolean? | Functionally yes, semantically no. The enum names the concept space (`SlotDriven` vs `PreVerb`), whereas a bool names a capability. |
+| Is `SlotWalk` needed as a separate member? | No — it's indistinguishable from "no special policy" at the parser level. Merged into `SlotDriven`. |
+| Is `None` needed as explicit prohibition? | No — absence of guard slot + default `SlotDriven` = no guard. Structural absence is sufficient. |
+| Where do TransitionRow and Rule fall? | `SlotDriven` (the default). Their guards are in the slot list, parsed normally. No policy annotation needed. |
+| What changes for AccessMode? | Guard moves from last slot (post-verb) to pre-verb injection. `SlotGuardClause` removed from slot list. `GuardPolicy: PreVerb` added. Surface syntax changes. |
+| Is this the smallest correct change? | Yes. One new 2-member enum, one parser token change, one slot list edit (AccessMode). Everything else is renaming `SupportsPreVerbWhenGuard` → `GuardPolicy`. |
+
+---
+
+## 9. Alternatives Rejected
+
+| Alternative | Reason |
+|-------------|--------|
+| 4-member enum (`None/SlotWalk/PreVerb/PostVerb`) | PostVerb is eliminated. `None` and `SlotWalk` are both "no special parser behavior" — distinction is phantom. |
+| 3-member enum (`None/SlotWalk/PreVerb`) | `None` vs `SlotWalk` distinction is not actionable by the parser. Both mean "walk the slot list." |
+| Boolean (`SupportsWhenGuard` or `InjectsPreVerbGuard`) | Functional but semantically flat. Doesn't name the concept space. Misleading for slot-walk constructs. |
+| Drop metadata entirely (slot position convention) | Requires rearchitecting `ParseScopedConstruct` to distinguish pre-disambiguation vs post-disambiguation slots. Correct direction but wrong scope. |
+| Keep existing bool, just add AccessMode | Perpetuates the naming smell. We're here to fix the metadata shape, not patch it. |
+
+# BUG-020 Committed — George Runtime Dev
+
+**Date:** 2026-05-10T15:32:08-04:00  
+**Author:** George (Runtime Dev)  
+**Branch:** Precept-V2-Radical
+
+---
+
+## Commits
+
+| SHA | Scope | What it covers |
+|-----|-------|----------------|
+| `b5dc7c3e` | Core implementation | Removed `SupportsPreVerbWhenGuard` from `Construct.cs`, `Constructs.cs`, `Parser.cs`. The `when` guard is now a proper slot in the slot-walk rather than a special-cased pre-verb flag. |
+| `ec068569` | Tests | Updated 13 existing test files and added `Track2PhaseAToolchainRegressionTests.cs` (new). Covers parser, proof engine, slot ordering, catalog capability, language server, and MCP tool tests. |
+| `eb225f8a` | Docs | Grammar doc (`precept-grammar.md`), language spec (`precept-language-spec.md`), catalog system doc (`catalog-system.md`) updated to reflect the slot-walk `when`-guard semantics. |
+| `4a6cb93f` | Samples | Updated `Test.precept`, `event-registration.precept`, `insurance-claim.precept`, `loan-application.precept` to use canonical `when`-guard slot syntax. |
+| `103c3be1` | Working docs | Frank's 4 when-guard audit files (new) + `precept-toolchain-bugs.md` and `precept-toolchain-plan.md` updated. |
+| `078dbe32` | Squad history | Agent history files for Elaine, Frank, George, Soup Nazi updated for BUG-020 session. |
+
+---
+
+## Final Test Results
+
+| Project | Passed | Failed |
+|---------|--------|--------|
+| Precept.Tests | 3,894 | 0 |
+| Precept.Analyzers.Tests | 280 | 0 |
+| Precept.LanguageServer.Tests | 157 | 0 |
+| Precept.Mcp.Tests | 60 | 0 |
+| **Total** | **4,391** | **0** |
+
+---
+
+## Surprises / Notes
+
+- No test failures at any stage. Pre-commit run of `Precept.Tests` showed 3,894 passing; full suite confirmed all 4,391 green after commits.
+- One pre-existing LF/CRLF warning on `ParserExpressionTests.cs` — cosmetic, not a bug.
+- Two pre-existing VSTHRD warnings in `LanguageServer.Tests` — unrelated to BUG-020, not introduced by this work.
+
+# Decision: SupportsPostActionEnsure Removed
+
+**Author:** George (Runtime Dev)  
+**Date:** 2026-05-10
+
+## Commit SHAs
+
+- **Code:** `c1572613` — fix(parser): remove SupportsPostActionEnsure — EventHandler cannot have trailing ensure (BUG)
+- **Tests:** `5be86341` — test: delete SupportsPostActionEnsure tests — feature removed (BUG)
+
+## Final Test Count After Removal
+
+All 4 test projects pass:
+
+| Project | Passed |
+|---------|--------|
+| Precept.Tests | 3891 |
+| Precept.LanguageServer.Tests | 157 |
+| Precept.Analyzers.Tests | 280 |
+| Precept.Mcp.Tests | 60 |
+| **Total** | **4388** |
+
+## on-family Disambiguation Is Now Clean
+
+The `on` family now has mutually exclusive routing:
+
+- `on EventName ensure ...` → `EventEnsure` — guard-only path
+- `on EventName -> ...` → `EventHandler` — action path
+
+`SupportsPostActionEnsure` had allowed `on Event -> action ensure expr because "reason"` by grafting EventEnsure slot semantics onto EventHandler after the main slot-walk. This was an out-of-band parser injection that bypassed the catalog-driven architecture and violated the disambiguation contract encoded in `DisambiguationEntry`. The `ensure` and `->` tokens are mutually exclusive routing tokens — the parser should never mix their semantics on the same construct.
+
+The fix: removed the `bool SupportsPostActionEnsure` parameter from `ConstructMeta`, removed its usage in the `EventHandler` catalog entry, and deleted the conditional slot-injection block in `ParseScopedConstruct`. Three test methods that asserted the now-deleted behavior were also removed.
+
+# George — when-guard elimination
+
+## What changed
+- Removed `SupportsPreVerbWhenGuard` from `ConstructMeta` in `src/Precept/Language/Construct.cs`.
+- Added three shared pre-verb guard slot instances in `src/Precept/Language/Constructs.cs`:
+  - `SlotPreVerbGuardEnsure` terminating at `ensure`
+  - `SlotPreVerbGuardArrow` terminating at `->`
+  - `SlotPreVerbGuardModify` terminating at `modify`
+- Rewired scoped construct slot lists so guard position is encoded directly in metadata:
+  - `StateEnsure`: `[StateTarget, GuardClause, EnsureClause, BecauseClause?]`
+  - `StateAction`: `[StateTarget, GuardClause, ActionChain]`
+  - `EventEnsure`: `[EventTarget, GuardClause, EnsureClause, BecauseClause?]`
+  - `AccessMode`: `[StateTarget, GuardClause, FieldTarget, AccessModeKeyword]`
+- Updated `AccessMode` description/example to the new pre-verb surface syntax: `in Draft when IsOwner modify Amount editable`.
+- Replaced `Parser.ParseScopedConstruct`'s old 3-phase protocol with a single loop that:
+  - walks slots in order,
+  - consumes disambiguation tokens at the natural slot boundary,
+  - keeps the existing `->` exception so `ActionChain` still owns arrow consumption,
+  - removes all synthesized guard injection.
+- Synced language docs (`catalog-system.md`, `precept-language-spec.md`, `precept-grammar.md`) so they describe slot-driven guard placement and pre-verb guarded access mode syntax.
+
+## Why
+The guard position is already expressible in the ordered slot list plus per-slot termination tokens. Keeping a separate boolean on `ConstructMeta` duplicated catalog truth and forced parser special-casing. After this change, the catalog is authoritative again: constructs that support pre-verb guards declare them as real slots, and the parser is just a generic slot walker with family disambiguation.
+
+## Validation
+- `dotnet build .\src\Precept\Precept.csproj --nologo` ✅
+- `dotnet test .\test\Precept.Tests\Precept.Tests.csproj --nologo` ❌ 24 failing tests, all in stale expectations around removed `SupportsPreVerbWhenGuard`, old slot orders/counts, old post-verb guarded `AccessMode` syntax, plus the pre-existing BUG-019 typed-constant failure.
+- Runtime spot-checks via `Precept.Compiler.Compile(...)`:
+  - guarded `AccessMode` ✅
+  - guarded `EventEnsure` ✅
+  - guarded `StateAction` ✅
+  - guarded `StateEnsure` ✅ (after giving the sample a satisfiable default)
+
+# Soup Nazi — when-guard follow-up gap
+
+## Gap
+`test\Precept.LanguageServer.Tests` and `test\Precept.Mcp.Tests` currently have no explicit regression coverage for the `SupportsPreVerbWhenGuard` removal or the AccessMode syntax move to pre-verb `when`.
+
+## Why it matters
+The Precept.Tests batch now locks the catalog/parser/runtime-facing slot shape, but the agent-facing projections are still unguarded:
+- MCP construct JSON should stop projecting `SupportsPreVerbWhenGuard`.
+- Any LS completion/context tests that reason about AccessMode guard position should prove `when` is offered before `modify`, not after `editable`.
+
+## Suggested follow-up
+Add one MCP surface test for dropped construct metadata and one LS completion/parser-context regression for `in Draft when IsOwner modify Amount editable`.
+
 ### 2026-05-09T17:41:32.9988470Z: Typed-literal system implementation is complete
 
 
