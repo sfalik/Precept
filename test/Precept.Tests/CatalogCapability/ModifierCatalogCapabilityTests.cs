@@ -56,4 +56,20 @@ public sealed class ModifierCatalogCapabilityTests
         => CatalogCapabilityReflection.GetInstanceValue(
                 Modifiers.GetMeta(ModifierKind.Mincount), "BoundCounterpart")
             .Should().Be(ModifierKind.Maxcount);
+
+    [Fact]
+    public void Writable_ExcludesEventArgumentDeclarations()
+    {
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
+        ValueModifierTestAccess.HasDeclarationSiteFlag(meta, "FieldDeclaration").Should().BeTrue();
+        ValueModifierTestAccess.HasAnyDeclarationSiteFlag(meta, "EventArgument", "EventArgDeclaration").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Default_IncludesEventArgumentDeclarations()
+    {
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Default);
+        ValueModifierTestAccess.HasDeclarationSiteFlag(meta, "FieldDeclaration").Should().BeTrue();
+        ValueModifierTestAccess.HasAnyDeclarationSiteFlag(meta, "EventArgument", "EventArgDeclaration").Should().BeTrue();
+    }
 }

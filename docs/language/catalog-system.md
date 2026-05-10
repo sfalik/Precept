@@ -579,9 +579,15 @@ public sealed record TokenMeta(
     SemanticTokenTypeKind?         VisualCategory = null,
     TokenKind[]?                   ValidAfter = null,
     bool                           IsAccessModeAdjective = false,
-    bool                           IsValidAsMemberName = false,
+    bool                           IsStateWildcard = false,
+    bool                           IsFieldBroadcast = false,
+    bool                           IsFunctionCallLeader = false,
     bool                           IsMessagePosition = false
-);
+)
+{
+    // Computed — derived from Types.All accessor names; not a constructor parameter.
+    public bool IsValidAsMemberName { get; }
+}
 ```
 
 `TokenMeta` now carries one lightweight visual-catalog link: `VisualCategory` points to `SemanticTokenTypes` by enum kind. The bridge direction remains **unidirectional upward** for object references: downstream catalogs (Types, Operators, Modifiers, Actions) point up to Tokens via `TokenMeta Token` object references. Consumers that need reverse direction (token → catalog entry or token → visual metadata) use **derived frozen indexes** built at startup or the corresponding catalog lookup:
@@ -827,7 +833,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Part | Type |
 |------|------|
 | Kind enum | `TokenKind` |
-| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, VisualCategory?, ValidAfter[]?, IsAccessModeAdjective, IsValidAsMemberName, IsMessagePosition)` |
+| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, VisualCategory?, ValidAfter[]?, IsAccessModeAdjective, IsStateWildcard, IsFieldBroadcast, IsFunctionCallLeader, IsMessagePosition)` — `IsValidAsMemberName` is a computed property (derived from `Types.All` accessor names, not a constructor parameter) |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
@@ -1008,8 +1014,9 @@ public sealed record FixedReturnAccessor(
     string    Name,
     TypeKind  Returns,
     string    Description,
-    TypeKind? ParameterType    = null,
-    TypeTrait RequiredTraits   = TypeTrait.None,
+    bool      ReturnNonnegative  = false,
+    TypeKind? ParameterType      = null,
+    TypeTrait RequiredTraits     = TypeTrait.None,
     ProofRequirement[] ProofRequirements = [],
     QualifierAxis ReturnsQualifier = QualifierAxis.None
 ) : TypeAccessor(Name, Description, ParameterType, RequiredTraits, ProofRequirements);
@@ -1023,7 +1030,7 @@ public sealed record ElementParameterAccessor(
 ```
 
 - `TypeAccessor` base = inner-type return (`.peek`, `.min`, `.max`). No `Returns` field — absence of a subtype is the declaration.
-- `FixedReturnAccessor` = fixed return type (`.count`, `.currency`, `.amount`, `.inZone(tz)`). `Returns` declares the exact `TypeKind`.
+- `FixedReturnAccessor` = fixed return type (`.count`, `.currency`, `.amount`, `.inZone(tz)`). `Returns` declares the exact `TypeKind`. `ReturnNonnegative = true` marks accessors whose numeric result is structurally guaranteed ≥ 0 — the proof engine can discharge `accessor >= 0` obligations without a modifier proof. Currently set `true` on `Types.CollectionCountAccessor` (`.count`).
 - `ElementParameterAccessor` = parameter resolves to the bag's element type (`bag.countof(x)`). No fixed `ParameterType` — the type checker resolves the parameter type against the owning field's element type at the call site. Always returns `integer`.
 - `RequiredTraits` on base — checked against the collection's inner type for inner-type accessors, and against the owner type for fixed-return accessors.
 - `ReturnsQualifier != None` means the accessor returns the qualifier value itself on the named axis — the result type carries the same qualifier as the owner field's qualifier on that axis. Examples: `.currency` on `money` → `ReturnsQualifier: QualifierAxis.Currency`; `.amount` on `money` → `ReturnsQualifier: QualifierAxis.None`. LS hover uses this to display "returns the currency of this field."
@@ -1068,7 +1075,8 @@ public sealed record FunctionOverload(
     IReadOnlyList<ParameterMeta> Parameters,
     TypeKind                     ReturnType,
     QualifierMatch?              QualifierMatch    = null,
-    ProofRequirement[]           ProofRequirements = []
+    ProofRequirement[]           ProofRequirements = [],
+    bool                         ReturnNonnegative = false
 );
 
 public sealed record FunctionMeta(
@@ -1088,6 +1096,8 @@ public sealed record FunctionMeta(
 
 Parameters are declared as named statics so `ParamSubject` can reference them by object identity — see Proof Obligations.
 
+`FunctionOverload.ReturnNonnegative = true` tells the proof engine's Strategy 2 that this overload's return value is structurally guaranteed ≥ 0, allowing it to discharge `count >= 0` obligations without a modifier proof. Currently set `true` on all five `abs` overloads (integer, decimal, number, money, quantity).
+
 Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions. `FunctionCategory` groups functions by semantic domain (`Numeric`, `String`, `Temporal`) for completions and MCP vocabulary presentation. `HasCIVariant` marks the canonical case-sensitive function that has a CI-qualified partner, and `CIVariantOf` points from the CI-qualified function back to its canonical base. `IsMessagePosition` reserves a catalog-driven way to mark functions whose trailing argument is a user-facing message string; no built-in functions populate it yet. The type checker reads these fields when resolving CI-qualified function calls such as `~startsWith(...)`. 
 
 ##### Business-type overloads and QualifierMatch
@@ -1105,7 +1115,7 @@ Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operat
 | Part | Type |
 |------|------|
 | Kind enum | `OperatorKind` (18 members: `Or`, `And`, `Not`, `Equals`, `NotEquals`, `CaseInsensitiveEquals`, `CaseInsensitiveNotEquals`, `LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual`, `Contains`, `Plus`, `Minus`, `Times`, `Divide`, `Modulo`, `Negate`) |
-| Meta record | `OperatorMeta(Kind, Token, Description, Arity, Associativity, Precedence, Family, IsKeywordOperator, HoverDescription?, UsageExample?)` — `Token` is a `TokenMeta` object reference |
+| Meta record | `OperatorMeta(Kind, Token, Description, Arity, Associativity, Precedence, Family, IsKeywordOperator, StaticResultType: TypeKind?, ResultTypePolicy: ResultTypePolicy, HoverDescription?, UsageExample?)` — `Token` is a `TokenMeta` object reference; abstract base with `SingleTokenOp` (one token) and `MultiTokenOp` (keyword sequence) sealed subtypes |
 | Supporting enums | `Arity { Unary, Binary }`, `OperatorFamily { Arithmetic, Comparison, Logical, Membership }`, `Associativity { Left, Right, NonAssociative }` |
 | Catalog class | `Operators` — `GetMeta()`, `All` |
 | Output type | None |
@@ -1113,6 +1123,24 @@ Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operat
 **Consumers:** MCP vocabulary (operator symbols via `Token.Text` and descriptions), LS hover (operator documentation), TextMate grammar (operator alternations), parser (precedence and associativity).
 
 **Rationale:** `BinaryOp` and `UnaryOp` are currently bare parser-internal enums. The Operators catalog promotes them to first-class language surface with per-member metadata — symbol text, human-readable description, precedence, associativity. Consumers no longer need hardcoded operator lists.
+
+##### ResultTypePolicy
+
+```csharp
+public enum ResultTypePolicy
+{
+    Static              = 1,  // result type is StaticResultType (non-null)
+    LookupValueType     = 2,  // result type is the lookup's value TypeKind (resolved at call site)
+    ArithmeticPromotion = 3,  // result type is the wider of the two operand types (Operations catalog)
+}
+```
+
+Assignment rules:
+- Logical operators (`or`, `and`, `not`), all comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `~==`, `~!=`), `contains`, `is set`, `is not set` → `Static`, `StaticResultType: TypeKind.Boolean`
+- Arithmetic operators (`+`, `-`, `*`, `/`, `%`, unary `-`) → `ArithmeticPromotion`, `StaticResultType: null`
+- `for` (`LookupAccess`) → `LookupValueType`, `StaticResultType: null`
+
+The type checker reads `OperatorMeta.ResultTypePolicy` to choose its result-type resolution path — no per-operator switch in the type-checker.
 
 #### 5. Operations (✅ Implemented)
 
@@ -1310,26 +1338,33 @@ public sealed record ValueModifierMeta(
     bool             HasValue          = false,
     ValueModifierDeclarationSite ApplicableDeclarationSites =
         ValueModifierDeclarationSite.FieldDeclaration | ValueModifierDeclarationSite.EventArgDeclaration,
+    ModifierKind?    BoundCounterpart  = null,  // the opposing bound modifier: Min↔Max, Minlength↔Maxlength, Mincount↔Maxcount
     ModifierKind[]   Subsumes          = [],
+    ProofSatisfaction[] ProofSatisfactions = [],  // Strategy 2 proof discharge table for this modifier
     string?          HoverDescription  = null,
     string?          UsageExample      = null,
     string?          SnippetTemplate   = null,
-    ModifierKind[]?  MutuallyExclusiveWith = null,
-    ProofDischarge[] ProofDischarges   = []   // CC#5: proof Strategy 2 discharge table for this modifier
-) : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
+    bool             DesugarsToRule    = false,  // inherited from ModifierMeta base
+    ModifierKind[]?  MutuallyExclusiveWith = null
+) : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith);
 
 /// <summary>
-/// Describes how a value modifier discharges a numeric proof obligation.
-/// The proof engine reads ProofDischarges from ValueModifierMeta; no per-modifier switch in the engine.
+/// A positive carrier fact that can satisfy a <see cref="ProofRequirement"/>.
+/// DU: <see cref="Numeric"/> carries projection, comparison, and bound; other subtypes are
+/// presence/dimension/modifier/qualifier sentinels.
 /// </summary>
-/// <param name="RequirementKind">The kind of proof requirement this entry satisfies.</param>
-/// <param name="Comparison">The comparison operator (non-null for Numeric requirements).</param>
-/// <param name="Threshold">The numeric threshold (non-null for Numeric requirements).</param>
-public sealed record ProofDischarge(
-    ProofRequirementKind RequirementKind,
-    OperatorKind?        Comparison,
-    decimal?             Threshold
-);
+public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
+{
+    public sealed record Numeric(
+        SatisfactionProjection Projection,
+        OperatorKind           Comparison,
+        NumericBoundSource     Bound)
+        : ProofSatisfaction(ProofRequirementKind.Numeric);
+    public sealed record Presence()              : ProofSatisfaction(ProofRequirementKind.Presence);
+    public sealed record Dimension()             : ProofSatisfaction(ProofRequirementKind.Dimension);
+    public sealed record Modifier()              : ProofSatisfaction(ProofRequirementKind.Modifier);
+    public sealed record QualifierCompatibility(): ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
+}
 
 // ── State modifiers (7) ─────────────────────────────────
 public sealed record StateModifierMeta(
@@ -1376,7 +1411,7 @@ public sealed record AnchorModifierMeta(
 ) : ModifierMeta(Kind, Token, Description, Category);
 ```
 
-`Token` replaces the `string Keyword` field — consumers access keyword text via `modifier.Token.Text`. `MutuallyExclusiveWith` declares modifier exclusion groups on the base; consumers (type checker, LS) enforce the constraint without hardcoding group membership. Modifiers with no runtime validation (e.g., `ordered` is compile-time only) have no inline delegate — execution is handled by the evaluator's pass over `ValueModifierMeta.ApplicableTo` entries.
+`Token` replaces the `string Keyword` field — consumers access keyword text via `modifier.Token.Text`. `MutuallyExclusiveWith` declares modifier exclusion groups on the base; consumers (type checker, LS) enforce the constraint without hardcoding group membership. `DesugarsToRule = true` marks modifiers that desugar to rule constructs (numeric bound modifiers) and should be highlighted in the same gold color as message-position keywords. `BoundCounterpart` links the six min/max bound pairs: `Min ↔ Max`, `Minlength ↔ Maxlength`, `Mincount ↔ Maxcount`. `ApplicableDeclarationSites` restricts where the modifier may appear: `Writable` carries `FieldDeclaration` only; all other value modifiers default to `FieldDeclaration | EventArgDeclaration`. Modifiers with no runtime validation (e.g., `ordered` is compile-time only) have no inline delegate — execution is handled by the evaluator's pass over `ValueModifierMeta.ApplicableTo` entries.
 
 ##### ModifierCategory
 
@@ -1457,8 +1492,8 @@ State-machine action verbs — the keywords that appear after `->` in transition
 
 | Part | Type |
 |------|------|
-| Kind enum | `ActionKind` (8 members) |
-| Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], SyntaxShape ActionSyntaxShape, ValueRequired bool, IntoSupported bool, ProofRequirements[], AllowedIn ConstructKind[])` — `Token` is a `TokenMeta` object reference; see full shape below |
+| Kind enum | `ActionKind` (15 members) |
+| Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], SyntaxShape ActionSyntaxShape, ValueRequired bool, ProofRequirements[], AllowedIn ConstructKind[], HoverDescription?, SnippetTemplate?, PrimaryActionKind ActionKind?)` — `Token` is a `TokenMeta` object reference; see full shape below |
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
@@ -1496,13 +1531,60 @@ public sealed record ActionMeta(
     TypeTarget[]       ApplicableTo      = [],
     ActionSyntaxShape  SyntaxShape,
     bool               ValueRequired     = false,
-    bool               IntoSupported     = false,
     ProofRequirement[] ProofRequirements = [],
-    ConstructKind[]    AllowedIn         = []
+    ConstructKind[]    AllowedIn         = [],
+    string?            HoverDescription  = null,
+    string?            UsageExample      = null,
+    string?            SnippetTemplate   = null,
+    ActionKind?        PrimaryActionKind = null   // non-null for secondary-dispatch actions sharing a token
 );
 ```
 
-Consumers access the action keyword text via `action.Token.Text`. `ActionMeta.SyntaxShape` encodes the action's operand form (`= expr`, bare value, `into`, `by`, `at`, key/value, or field-only). The parser reads it to choose the correct parsed-action form, the type checker reads it to dispatch the corresponding `TypedAction` subtype, and PreceptBuilder reads it to choose the emitted action-plan opcode. Execution delegates on ActionMeta are deferred until the evaluator's working copy API is designed — the delegate signature depends on how mutation is represented.
+Consumers access the action keyword text via `action.Token.Text`. `ActionMeta.SyntaxShape` encodes the action's operand form — the parser reads `Actions.GetShapeMeta(SyntaxShape)` to get an `ActionShapeMeta` with the ordered slot list. `PrimaryActionKind` is non-null for secondary-dispatch actions that share a leading token with a primary action (e.g., `AppendBy` shares `append` with `Append`); the parser consults target type to disambiguate. The type checker reads `SyntaxShape` to dispatch the corresponding `TypedAction` subtype, and PreceptBuilder reads it to choose the emitted action-plan opcode.
+
+##### ActionShapeMeta, ActionSyntaxSlot, and ActionSlotRole
+
+```csharp
+public enum ActionSlotRole
+{
+    Target          = 1,  // always first, always present
+    Value           = 2,  // value being assigned or added
+    Key             = 3,  // key in PutKeyValue
+    Index           = 4,  // zero-based index (InsertAt, RemoveAtIndex)
+    IntoTarget      = 5,  // capture variable in dequeue-into (optional)
+    OrderingKey     = 6,  // ordering key in CollectionValueBy (by expr)
+    OrderingCapture = 7,  // capture variable in CollectionIntoBy (by expr, optional)
+}
+
+public sealed record ActionSyntaxSlot(
+    ActionSlotRole Role,
+    TokenKind?     PrecedingSeparator,  // null = positional (no preceding keyword)
+    bool           IsOptional);
+
+public sealed record ActionShapeMeta(
+    ActionSyntaxShape  Shape,
+    ActionSyntaxSlot[] Slots)
+{
+    // Pre-computed set of every distinct separator token in Slots.
+    public FrozenSet<TokenKind> SeparatorTokens { get; }
+}
+```
+
+`Actions.GetShapeMeta(shape)` returns the canonical `ActionShapeMeta` for a given `ActionSyntaxShape`. The parser reads `SeparatorTokens` to identify the end of an action's target expression (any separator token terminates target parsing), then reads each slot's `Role` and `PrecedingSeparator` to parse the remaining argument structure without per-action logic.
+
+**9 shapes and their slot structures:**
+
+| Shape | Slots (Role: PrecedingSeparator, optional?) |
+|-------|---------------------------------------------|
+| `AssignValue` | Target: null, Value: `=` |
+| `CollectionValue` | Target: null, Value: null |
+| `CollectionInto` | Target: null, IntoTarget: `into` (opt) |
+| `FieldOnly` | Target: null |
+| `CollectionValueBy` | Target: null, Value: null, OrderingKey: `by` |
+| `InsertAt` | Target: null, Value: null, Index: `at` |
+| `RemoveAtIndex` | Target: null, Index: `at` |
+| `PutKeyValue` | Target: null, Key: null, Value: `=` |
+| `CollectionIntoBy` | Target: null, IntoTarget: `into` (opt), OrderingCapture: `by` (opt) |
 
 **Consumers:** MCP vocabulary, LS completions (action verbs after `->` in event bodies), LS hover, parser validation, type checker (target type compatibility and `TypedAction` dispatch per `precept-language-spec.md` §3.8), PreceptBuilder (action-plan shape selection).
 
@@ -1513,7 +1595,7 @@ Grammar forms / declaration shapes.
 | Part | Type |
 |------|------|
 | Kind enum | `ConstructKind` (11 members) |
-| Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], LeadingToken, SnippetTemplate?)` — see full shape below |
+| Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], Entries, RoutingFamily, SnippetTemplate?, ModifierDomain, SupportsPreVerbWhenGuard, SupportsPostActionEnsure, IsOutlineNode, OutlineSymbolTag?)` — see full shape below |
 | Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (17-member enum) |
 
 | Catalog class | `Constructs` — `GetMeta()`, `All` |
@@ -1529,16 +1611,20 @@ Grammar forms / declaration shapes.
 
 ```csharp
 public sealed record ConstructMeta(
-    ConstructKind                Kind,
-    string                       Name,
-    string                       Description,
-    string                       UsageExample,
-    ConstructKind[]              AllowedIn,           // empty = valid at precept body level (top-level)
-    IReadOnlyList<ConstructSlot> Slots,
-    TokenKind                    LeadingToken,
-    string?                      SnippetTemplate = null,
-    bool                         IsOutlineNode   = false,  // CC#18: true if this construct appears in textDocument/documentSymbol
-    string?                      LspSymbolKind   = null    // CC#18: LSP SymbolKind value name (e.g. "Class", "Property"); non-null when IsOutlineNode = true
+    ConstructKind                        Kind,
+    string                               Name,
+    string                               Description,
+    string                               UsageExample,
+    ConstructKind[]                      AllowedIn,           // empty = valid at precept body level (top-level)
+    IReadOnlyList<ConstructSlot>         Slots,
+    ImmutableArray<DisambiguationEntry>  Entries,
+    RoutingFamily                        RoutingFamily,
+    string?                              SnippetTemplate          = null,
+    ModifierDomain                       ModifierDomain           = ModifierDomain.None,
+    bool                                 SupportsPreVerbWhenGuard = false,  // StateEnsure, StateAction, EventEnsure
+    bool                                 SupportsPostActionEnsure = false,  // EventHandler
+    bool                                 IsOutlineNode            = false,
+    string?                              OutlineSymbolTag         = null   // e.g. "Module", "Property"; non-null when IsOutlineNode = true
 );
 
 public sealed record ConstructSlot(
@@ -1645,18 +1731,18 @@ The three transition-row outcome forms — the ways a transition row can conclud
 | Part | Type |
 |------|------|
 | Kind enum | `OutcomeKind` (3 members: `Transition`, `NoTransition`, `Reject`) |
-| Meta record | `OutcomeMeta(Kind, LeadingToken, ArgumentKind, ParsedSubtype, Description, Example)` |
+| Meta record | `OutcomeMeta(Kind, LeadingToken, ArgumentKind, ParsedSubtype, Description, Example, SerializedKind: string)` |
 | Supporting enum | `OutcomeArgumentKind { None, RequiredIdentifier, RequiredStringLiteral, SecondaryToken }` |
 | Catalog class | `Outcomes` — `GetMeta()`, `All`, `ByLeadingToken`, `LeadingTokens`, `NoTransitionSecondaryToken` |
 | Output type | `ParsedOutcome` abstract record + 4 sealed subtypes: `TransitionOutcome(StateName, Span)`, `NoTransitionOutcome(Span)`, `RejectOutcome(Reason, Span)`, `MalformedOutcome(Span)` |
 
 **Outcome entry summary:**
 
-| OutcomeKind | LeadingToken | ArgumentKind | Produces |
-|-------------|--------------|--------------|----------|
-| `Transition` | `TokenKind.Transition` | `RequiredIdentifier` | `TransitionOutcome(stateName)` |
-| `NoTransition` | `TokenKind.No` | `SecondaryToken` | `NoTransitionOutcome()` |
-| `Reject` | `TokenKind.Reject` | `RequiredStringLiteral` | `RejectOutcome(reason)` |
+| OutcomeKind | LeadingToken | ArgumentKind | SerializedKind | Produces |
+|-------------|--------------|--------------|----------------|----------|
+| `Transition` | `TokenKind.Transition` | `RequiredIdentifier` | `"transition"` | `TransitionOutcome(stateName)` |
+| `NoTransition` | `TokenKind.No` | `SecondaryToken` | `"no transition"` | `NoTransitionOutcome()` |
+| `Reject` | `TokenKind.Reject` | `RequiredStringLiteral` | `"reject"` | `RejectOutcome(reason)` |
 
 **Derived indexes:**
 
@@ -2088,7 +2174,7 @@ Before writing any `switch` on modifier, type, function, operator, or action ide
 | Type qualifier shape | `TypeMeta.QualifierShape` |
 | Implied modifiers for a type | `TypeMeta.ImpliedModifiers` |
 | Field accessor signatures | `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `TypeAccessor.RequiredTraits` |
-| Action legality and shape | `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported` |
+| Action legality and shape | `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `PrimaryActionKind`; slot structure via `Actions.GetShapeMeta(SyntaxShape)` |
 | Proof obligations (all sources) | `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements` |
 
 **The failure mode:** `switch (modifierKind) { case ModifierKind.Nonnegative: /* check applies to number */ ... }` or `switch (typeKind) { case TypeKind.Integer: ... }`. These are catalog-known facts displaced into stage logic. Use `ValueModifierMeta.ApplicableTo` and `TypeMeta.Traits` instead.
@@ -2183,19 +2269,18 @@ The language server produces editor artifacts from catalog metadata and compiler
 
 The following catalog additions have been identified by pipeline stage design documents but are not yet implemented. Each entry specifies what's being added, the proposed shape, which consumer reads it, and implementation steps.
 
-### ValueModifierMeta.ProofDischarges
+### ValueModifierMeta.ProofSatisfactions
 
 **Source:** `docs/compiler/proof-engine.md` §7 Strategy 2: Modifier Proof
 
-**Status:** ✅ Resolved (CC#5, 2026-05-06)
+**Status:** ✅ Resolved (CC#5, 2026-05-06; renamed ProofDischarges → ProofSatisfactions in Phase A)
 
-`ProofDischarge[] ProofDischarges = []` added to `ValueModifierMeta` and `ProofDischarge` record defined in this file. The discharge table is locked — see the `ValueModifierMeta` shape definition above.
+`ProofSatisfaction[] ProofSatisfactions = []` on `ValueModifierMeta` carries the discharge table used by proof engine Strategy 2. The `ProofSatisfaction` abstract DU record (with `Numeric`, `Presence`, `Dimension`, `Modifier`, `QualifierCompatibility` subtypes) is defined in `ProofRequirement.cs`. See the `ValueModifierMeta` shape definition above for the canonical form.
 
 **Implementation checklist:**
-- [x] Add `ProofDischarge` record to `src/Precept/Language/Modifier.cs`
-- [x] Add `ProofDischarges` property to `ValueModifierMeta` (canonical shape above)
-- [ ] Update `Modifiers.GetMeta()` entries with discharge tables per modifier
-- [ ] Update MCP vocabulary if exposed to AI tooling
+- [x] Add `ProofSatisfaction` DU to `src/Precept/Language/ProofRequirement.cs`
+- [x] Add `ProofSatisfactions` property to `ValueModifierMeta` (canonical shape above)
+- [x] Update `Modifiers.GetMeta()` entries with satisfaction tables per modifier
 
 ---
 
