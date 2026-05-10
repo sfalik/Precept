@@ -21,8 +21,20 @@
 - AI authoring completeness depends on preserving catalog-carried guidance (examples, diagnostics, proof metadata, operation compatibility), not just exposing more top-level sections.
 - `SyntaxReference` examples and anti-patterns must be compile-verified before becoming canonical tooling or MCP guidance.
 - The local Precept MCP shell path uses newline-delimited JSON-RPC over stdio; LSP `Content-Length` framing is not the right probe format there.
+- Track 2 Phase A can land safely as a mixed catalog-first batch only when the consumer changes are tiny derivations from newly added metadata (`Parser.KeywordsValidAsMemberName`, modifier-bound validation, `abs()` proof discharge). Deeper plan items like valued event-arg modifiers and construct-slot rewiring still need later slices.
+- `OperatorMeta` can carry `StaticResultType` / `ResultTypePolicy` as catalog coverage without changing current typing behavior because live expression typing already flows through `Operations`; the metadata addition is still valuable for Phase A completeness and tests.
 
 ## Recent Updates
+
+### 2026-05-10T04:20:44Z — Track 2 value modifier rename landed
+- George completed the Track 2 modifier-family rename and applicability-shape cleanup: the core subtype is now `ValueModifierMeta`, `ApplicableToEventArgs` is gone, and `ValueModifierDeclarationSite` carries the declaration-site truth with `writable` restricted to field declarations.
+- Parser, type checker, proof, and MCP-facing core surfaces now read the canonical value-modifier metadata directly, and George synced the core docs plus the durable decision handoff that Scribe merged into `.squad/decisions.md`.
+- Validation closed green on the reported runtime lane: Precept build passed, `Precept.Tests` passed, and `Precept.Mcp.Tests` passed.
+
+### 2026-05-10T03:27:00Z — Track 2 Phase A safe batch landed
+- George landed the immediately safe Phase A batch across tokens, modifiers, operators, constructs, outcomes, and functions, plus minimal consumer derivations in parser, type-checker validation, and proof discharge.
+- New coverage includes keyword-member-name parsing, modifier-bound diagnostics, outcome/function/operator catalog assertions, and a proof regression showing `sqrt(abs(X)) >= 0` now discharges cleanly.
+- Validation closed green at 3830/3830 `Precept.Tests` plus a targeted `src\Precept\Precept.csproj` build using isolated artifact paths.
 
 ### 2026-05-10T02:50:04Z — Team update: visual taxonomy now has a canonical catalog surface
 - Frank's token-surface decision is now durable: `SemanticTokenTypes` is the approved 14th catalog, `TokenMeta` collapses to a single `VisualCategory`, and token-surface projections (custom type, TextMate scope, base styles, constrained-modifier support) derive from that catalog rather than parallel token fields.
@@ -61,7 +73,15 @@
 
 ## Latest Slice
 
+- Track 2 Phase A safe batch complete: `TokenMeta` gained wildcard/broadcast/function/member-name flags; `FieldModifierMeta` gained event-arg/bound metadata; `OperatorMeta` gained `StaticResultType` and `ResultTypePolicy`; `ConstructMeta`, `OutcomeMeta`, and `FunctionOverload` gained their Phase A fields.
+- Minimal consumer reads landed only where they were low-risk and already aligned with live code: parser derives keyword member names and `min`/`max` function-call eligibility from token metadata, type-checker validates explicit min/max-style bound pairs, and proof discharge recognizes nonnegative-return function overloads such as `abs`.
+- Deliberately deferred: valued modifier payloads on event args and any construct-slot grammar rewiring beyond metadata flags.
+
 - Slice 16 complete: `SnippetTemplate` populated on 5 top-level completion constructs (`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`) in `Constructs.cs`, and on 11 primary action verbs (`set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `append`, `insert`, `put`) in `Actions.cs`.
 - Templates use VS Code snippet format with `${N:placeholder}` tab stops, derived from sample `.precept` files. Each template leads with the keyword and includes one tab stop per required authoring slot.
 - 6 new tests in `test/Precept.Tests/Language/ConstructCatalogTests.cs` and `ActionCatalogTests.cs`; 3750 total tests passing.
 - Build validated with isolated `--artifacts-path temp/george-slice16-tests` to avoid shared-environment file lock collisions; language server build also green.
+
+### 2026-05-10T04:33:18Z — Track 2 plan merged, but execution is paused
+- Scribe merged the Track 2 master-plan, Phase A guardrail, and catalog-test gate notes into the canonical decision ledger: Track 2 stays metadata-first, Slice 2 is audit-only, and later consumer slices own parser/checker/proof/MCP rewires.
+- Shane then switched active execution back to Track 1 only. Do not start new Track 2 implementation work until he explicitly reopens the lane.

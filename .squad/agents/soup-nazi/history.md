@@ -6,6 +6,8 @@
 
 ## Learnings
 
+- 2026-05-09T23:49:11.879-04:00 — Track 2 Phase A wants red/green pressure on metadata shape before the consumer slices exist: reflection-based catalog-capability tests let the suite compile before new fields land, then go red until George wires the catalog entries. Also: most slice-level compiler integrations in the master plan are consumer-slice gates, not Phase A-only gates, so they should be recorded as follow-on coverage rather than guessed into false-green tests.
+
 - 2026-05-09T09:02:31.415-04:00 — Filled the 12 requested ProofEngine gaps, raising the filtered `ProofEngineTests` run to 173 passing: added the Strategy 4 positive proof path, real pipeline emission for codes 112/113/114/116, transition-row and state-hook presence proof coverage, real `.count > 0` guard coverage for collection member access, a TypedPostfixOp `is set` regression anchor, the same-type `number / number` RHS-resolution anchor, vacuous-proof diagnostic absence, and a multi-obligation same-site assertion. Two surprise findings: the audit's `count(collection)` branch does not exist in current source because the catalog models count as `.count` member access, and shared-parameter qualifier requirements on same-type binary ops collapse both subjects to the RHS under `ResolveParamInBinaryOp`, so the end-to-end Code 114 test had to use a distinct-parameter binary site to reach the real unresolved path.
 - 2026-05-09 ProofEngine exhaustive audit: the 158-test suite has zero positive proof-success tests for Strategy 4 (FlowNarrowing). Every Strategy 4 test asserts the strategy cannot fire. The implementation exists but is untested for the success path.
 - Strategy 5 (QualifierCompatibility) tests are entirely metadata-level record equality checks — no test exercises `QualifierCompatibilityProofRequirement` through the full `ProofEngine.Prove(index, graph)` pipeline with actual DSL source.
@@ -82,3 +84,8 @@
 - Slice 5 verdict: critical gap. Added whitespace, newline, end-of-source, and event-argument declaration hover coverage. While probing the requested declared-state/event hover path, I hit a real production bug in `HoverHandler.TryFindUniqueByName`: when the hovered identifier belongs to another symbol kind, `TryFindField`/`TryFindState`/`TryFindEvent` can return `true` with a null primary symbol, leading to `CreateFieldMarkdown(null)` and a `NullReferenceException`. I did **not** fix production; Kramer needs that dispatch before a positive declared-state hover assertion can ship.
 - Slice 9 verdict: gaps found. Added exact one-range-per-construct coverage for multiple multi-line construct spans with explicit 0-based line assertions.
 - Final counts: scoped LS validation excluding concurrent in-flight Slice 8 `CodeActionHandlerTests` passed at 56/56; `Precept.Tests` passed at 3740/3740. The exact unfiltered LS project run is currently contaminated by concurrent Slice 8 work (3 `CodeActionHandlerTests` failures outside this batch).
+
+### 2026-05-10T04:33:18Z — Phase A test gate is canonical, but Track 2 execution is paused
+- The canonical decision ledger now records your Phase A posture: catalog-capability tests close metadata slices first, while consumer/integration tests become mandatory in the later slices that actually wire behavior.
+- Outcome serialization is still the cross-surface proof point that must close end to end when the Track 2 MCP slice runs.
+- Do not spin new Track 2 validation work until Shane reopens that lane; Track 1 is the only active execution focus for now.

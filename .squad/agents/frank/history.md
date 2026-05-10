@@ -7,6 +7,10 @@
 
 ## Learnings
 
+- Track 2 master implementation plan written at `docs/Working/track2-implementation-plan.md`: 15 slices, all 54 bugs mapped, status tracker ready. Key structural findings: `OperatorMeta` has no `StaticResultType`/`ResultTypePolicy` (root cause of 5 operator-typing bugs at once); `TokenMeta.IsValidAsMemberName` exists but covers only `min`/`max` and must be extended to 9 type-keyword accessor tokens; `AccessModeDto` and `StateHookDto` are already defined in `CompileToolDtos.cs` but orphaned (not wired into `PreceptDefinitionDto`); `ActionSyntaxShape` has all correct shapes (`CollectionValueBy`, `InsertAt`, `RemoveAtIndex`) but the parser ignores them. Fix order is mandatory: catalog fields → pipeline fixes → MCP DTOs → docs → tests.
+- 2026-05-09T23:49:11.879-04:00 — Track 2 Phase A is not seven equal implementation slices. Slice 2 is an audit-only checkpoint because `Actions.cs` already carries the needed `ActionSyntaxShape` truth; the real Phase A work is metadata-only on slices 1, 3, 4, 5, 6, and 7, with consumer rewires and integration tests deferred to later slices.
+
+
 - `SemanticTokenTypes` is now the approved 14th catalog; `TokenMeta` should carry one `VisualCategory`, and token-surface projections must derive from catalog metadata rather than parallel token fields.
 - The production LS gap-closure plan is Phase 2 in `docs/Working/language-server-implementation-plan.md`: expression/default-position completions, catalog-complete hover, navigation, selection/document symbols, semantic-token cleanup, version ordering, and related VS Code polish.
 - Outline metadata is settled in catalog form: `ConstructMeta.IsOutlineNode` + `OutlineSymbolTag`, with the LS projecting the string tag to `SymbolKind` instead of pulling LSP protocol types into `src/Precept/`.
@@ -16,6 +20,9 @@
 - The focused AI-authoring MCP suite remains the durable authoring direction; `precept_language` is fallback/internal while named tools own discovery.
 - The 52-bug audit made the current highest-risk gaps explicit: parser routing/disambiguation still ignores catalog grammar in multiple places, MCP definition/docs DTOs still flatten or omit catalog-derived structure, and several type-checker result types still come from hardcoded operator dispatch instead of `Operations` metadata.
 - Highest-leverage prevention layer: catalog-reflection fixture tests plus real-catalog contract tests (especially MCP definition matrices, parser routing/disambiguation, keyword-collision accessors, and hook branches).
+- Tracker hygiene is now a durable operating rule: status changes at the same boundary as execution state, evidence level must be recorded immediately, and only one slice per track stays active unless an explicit parallel split is logged.
+
+- The pipeline audit found 27 catalog-compliance violations concentrated in Parser, TypeChecker, and ProofEngine: wildcards/broadcasts are still carried as raw names, parser grammar still depends on local token/separator branches, qualifier and modifier meaning still leaks through enum-identity checks, and proof discharge still embeds operator implication/diagnostic tables instead of reading metadata.
 
 ## Historical Summary
 
@@ -25,15 +32,28 @@
 
 ## Recent Updates
 
+
+### 2026-05-10T04:20:44Z — Status-hygiene protocol merged and tracker drift cleared
+- Scribe merged Frank's status-hygiene rule and the matching user directive into the canonical decision ledger.
+- Frank's reconciliation batch closed stale active rows: Track 1 already matched evidence, Track 2 now has only Slice 3 active, and the modifier-model rename remains the only other open edge called out at close.
+
+
 ### 2026-05-10T03:13:51Z — Bug cluster analysis merged and operationalized
 - The 52 confirmed toolchain bugs are now durably classified by stage: Parser 17, MCP serialization 15, Type Checker 10, Name Binder 4, Proof Engine 3, MCP docs 3.
 - Dominant causes are now locked: parser/catalog drift, MCP DTO projection drift, and hardcoded type-checker operator behavior where catalog metadata should drive the result.
 - Scribe merged the analysis with Soup-Nazi's testing verdict into one canonical decision entry, and Kramer's Track 2 status table makes the register executable for follow-up work.
 
+
 ### 2026-05-10T02:50:04Z — Visual taxonomy and LS Phase 2 direction recorded
 - `SemanticTokenTypes` is the approved catalog surface for token visual categories, and constrained events stay in the shared italic constraint system.
 - LS Phase 2 is the active production gap-closure plan, with `set` in type position called out as the sharpest cross-surface bug to fix contextually.
 
+
 ### 2026-05-09T23:46:43Z — LS docs reconciled and field-span prerequisite closed
 - The LS design/plan docs were reconciled to the live source, and `TypedField.NameSpan` landed as the thin-core prerequisite that unblocks name-based editor projections.
 - The remaining open LS contract question from that batch is still the `precept/inspect` restore-failure surface.
+
+### 2026-05-10T04:33:18Z — Track 2 plan language and pipeline audit are now canonical, but the lane is paused
+- The no-deferral rule now applies explicitly to implementation-plan wording and to plan-cleanup prompts: required work must sit in its owning slice with no "skip for now" language.
+- Your Track 2 master-plan/Phase A guardrail notes and the pipeline audit findings are now merged into `.squad/decisions.md` as the durable architecture record.
+- Execution priority changed immediately afterward: Track 2 is paused until Shane explicitly reopens it.
