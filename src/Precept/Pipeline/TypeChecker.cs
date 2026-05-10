@@ -674,6 +674,9 @@ internal static partial class TypeChecker
     /// Process <see cref="ConstructKind.AccessMode"/> constructs into
     /// <see cref="TypedAccessMode"/> records.
     /// </summary>
+    private static bool HasKeywordTokenMeta(string text, Func<TokenMeta, bool> predicate) =>
+        Tokens.Keywords.TryGetValue(text, out var kind) && predicate(Tokens.GetMeta(kind));
+
     private static void PopulateAccessModes(ConstructManifest manifest, CheckContext ctx)
     {
         if (!manifest.ByKind.Contains(ConstructKind.AccessMode))
@@ -704,7 +707,11 @@ internal static partial class TypeChecker
             string fieldName = "";
             if (fieldSlot?.FieldName is not null)
             {
-                if (ctx.FieldLookup.TryGetValue(fieldSlot.FieldName, out var typedField))
+                if (HasKeywordTokenMeta(fieldSlot.FieldName, meta => meta.IsFieldBroadcast))
+                {
+                    fieldName = fieldSlot.FieldName;
+                }
+                else if (ctx.FieldLookup.TryGetValue(fieldSlot.FieldName, out var typedField))
                 {
                     fieldName = typedField.Name;
                     ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.Span));
@@ -829,14 +836,15 @@ internal static partial class TypeChecker
 
             if (fieldSlot is not null)
             {
-                if (fieldSlot.FieldName is null)
+                var fieldName = fieldSlot.FieldName;
+                if (fieldName is null || HasKeywordTokenMeta(fieldName, meta => meta.IsFieldBroadcast))
                 {
                     isEditAll = true;
                 }
                 else
                 {
-                    fields = [fieldSlot.FieldName];
-                    if (ctx.FieldLookup.TryGetValue(fieldSlot.FieldName, out var typedField))
+                    fields = [fieldName];
+                    if (ctx.FieldLookup.TryGetValue(fieldName, out var typedField))
                         ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.Span));
                 }
             }
@@ -856,7 +864,11 @@ internal static partial class TypeChecker
         string? fromState = null;
         if (stateTargetSlot is not null && stateTargetSlot.StateName is not null)
         {
-            if (ctx.StateLookup.TryGetValue(stateTargetSlot.StateName, out var fromTypedState))
+            if (HasKeywordTokenMeta(stateTargetSlot.StateName, meta => meta.IsStateWildcard))
+            {
+                fromState = null;
+            }
+            else if (ctx.StateLookup.TryGetValue(stateTargetSlot.StateName, out var fromTypedState))
             {
                 fromState = fromTypedState.Name;
                 ctx.StateReferences.Add(new StateReference(fromTypedState, stateTargetSlot.Span));
@@ -867,7 +879,7 @@ internal static partial class TypeChecker
                     Diagnostics.Create(DiagnosticCode.UndeclaredState, stateTargetSlot.Span, stateTargetSlot.StateName));
             }
         }
-        // StateName == null → any-state wildcard (D10): FromState stays null, no error
+        // StateName == null or wildcard token text → any-state wildcard (D10): FromState stays null, no error
 
         // —— Event resolution ——
         var eventTargetSlot = construct.GetRequiredSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);

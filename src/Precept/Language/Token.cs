@@ -53,14 +53,8 @@ public sealed record TokenMeta(
     TokenKind[]?                   ValidAfter = null,
     bool                           IsAccessModeAdjective = false,
     bool                           IsStateWildcard = false,
-    bool                           IsBroadcastFieldTarget = false,
-    bool                           IsAlsoBuiltinFunction = false,
-    /// <summary>
-    /// True if this keyword token may appear as a member name after <c>.</c> (e.g., <c>min</c>
-    /// and <c>max</c> are DSL aggregation keywords but also idiomatic member-accessor names).
-    /// Drives <see cref="Pipeline.Parser.KeywordsValidAsMemberName"/>.
-    /// </summary>
-    bool                           IsValidAsMemberName = false,
+    bool                           IsFieldBroadcast = false,
+    bool                           IsFunctionCallLeader = false,
     /// <summary>
     /// True when this keyword introduces a position whose string argument is a user-facing
     /// message. The grammar generator uses this flag to emit the gold
@@ -69,7 +63,14 @@ public sealed record TokenMeta(
     /// Applies to: <c>because</c>, <c>reject</c>.
     /// </summary>
     bool                           IsMessagePosition = false
-);
+)
+{
+    public bool IsBroadcastFieldTarget => IsFieldBroadcast;
+
+    public bool IsAlsoBuiltinFunction => IsFunctionCallLeader;
+
+    public bool IsValidAsMemberName => Parser.KeywordsValidAsMemberName.Contains(Kind);
+}
 
 /// <summary>
 /// A single token produced by the lexer.

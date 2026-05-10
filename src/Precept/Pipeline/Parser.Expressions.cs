@@ -37,7 +37,8 @@ public static partial class Parser
         private ParsedExpression ParseNud(Func<bool> terminates)
         {
             var token = Peek();
-            if (Tokens.GetMeta(token.Kind).IsAlsoBuiltinFunction && Peek(1).Kind == TokenKind.LeftParen)
+            var tokenMeta = Tokens.GetMeta(token.Kind);
+            if (tokenMeta.IsFunctionCallLeader && Peek(1).Kind == TokenKind.LeftParen)
             {
                 return ParseNamedFunctionCall();
             }
@@ -192,9 +193,12 @@ public static partial class Parser
         private ParsedExpression ParseIdentifierOrFunctionCall(Func<bool> terminates)
         {
             var idToken = Advance();
+            var tokenMeta = Tokens.GetMeta(idToken.Kind);
             // Only promote to FunctionCall if '(' is not a termination signal in the outer
             // context (e.g. quantifier collection stops before the predicate parenthesis).
-            if (Peek().Kind == TokenKind.LeftParen && !terminates())
+            if ((idToken.Kind == TokenKind.Identifier || tokenMeta.IsFunctionCallLeader)
+                && Peek().Kind == TokenKind.LeftParen
+                && !terminates())
             {
                 return ParseNamedFunctionCall(idToken);
             }
@@ -305,7 +309,7 @@ public static partial class Parser
             Advance(); // consume '.'
             var memberToken = Peek();
 
-            // Accept Identifier or IsValidAsMemberName tokens (min, max, countof, peekby)
+            // Accept Identifier or keyword tokens whose text collides with a cataloged accessor name.
             if (memberToken.Kind == TokenKind.Identifier || IsMemberNameToken(memberToken.Kind))
             {
                 Advance();

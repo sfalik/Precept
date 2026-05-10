@@ -915,8 +915,11 @@ public static class ProofEngine
 
         switch (obligation.Requirement)
         {
+            case NumericProofRequirement numeric when TryCreateCollectionAccessDiagnostic(obligation, out var collectionDiagnostic):
+                return collectionDiagnostic;
+
             case NumericProofRequirement numeric:
-                return Diagnostics.Create(GetNumericRequirementDiagnosticCode(numeric), obligation.Site.Span,
+                return Diagnostics.Create(GetNumericRequirementDiagnosticCode(obligation, numeric), obligation.Site.Span,
                     GetFieldName(numeric.Subject, obligation.Site) ?? "<unknown>",
                     contextDesc);
 
@@ -949,10 +952,41 @@ public static class ProofEngine
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
     }
 
-    private static DiagnosticCode GetNumericRequirementDiagnosticCode(NumericProofRequirement requirement) =>
-        requirement.Comparison == OperatorKind.GreaterThanOrEqual && requirement.Threshold == 0m
+    private static bool TryCreateCollectionAccessDiagnostic(ProofObligation obligation, out Diagnostic diagnostic)
+    {
+        diagnostic = default!;
+
+        if (obligation.Requirement is not NumericProofRequirement numeric
+            || obligation.Site is not TypedMemberAccess access
+            || numeric.Subject is not SelfSubject { Accessor: { Name: "count" } }
+            || numeric.Comparison != OperatorKind.GreaterThan
+            || numeric.Threshold != 0m)
+        {
+            return false;
+        }
+
+        diagnostic = Diagnostics.Create(
+            DiagnosticCode.UnguardedCollectionAccess,
+            obligation.Site.Span,
+            GetFieldName(access.Object) ?? "<unknown>",
+            access.ResolvedAccessor.Name);
+        return true;
+    }
+
+    private static DiagnosticCode GetNumericRequirementDiagnosticCode(ProofObligation obligation, NumericProofRequirement requirement)
+    {
+        if (obligation.Site is TypedMemberAccess access
+            && requirement.Subject is SelfSubject { Accessor: { Name: "count" } }
+            && requirement.Comparison == OperatorKind.GreaterThan
+            && requirement.Threshold == 0m)
+        {
+            return DiagnosticCode.UnguardedCollectionAccess;
+        }
+
+        return requirement.Comparison == OperatorKind.GreaterThanOrEqual && requirement.Threshold == 0m
             ? DiagnosticCode.SqrtOfNegative
             : DiagnosticCode.DivisionByZero;
+    }
 
     private static string FormatContextDescription(ObligationContext context) => context switch
     {
@@ -974,7 +1008,7 @@ public static class ProofEngine
         switch (obligation.Requirement)
         {
             case NumericProofRequirement numeric:
-                return CreateFaultSiteLink(obligation, GetNumericRequirementDiagnosticCode(numeric));
+                return CreateFaultSiteLink(obligation, GetNumericRequirementDiagnosticCode(obligation, numeric));
             case ModifierRequirement:
                 return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedModifierRequirement);
             case DimensionProofRequirement:
@@ -994,6 +1028,7 @@ public static class ProofEngine
         {
             DiagnosticCode.DivisionByZero => FaultCode.DivisionByZero,
             DiagnosticCode.SqrtOfNegative => FaultCode.SqrtOfNegative,
+            DiagnosticCode.UnguardedCollectionAccess => FaultCode.CollectionEmptyOnAccess,
             _ => FaultCode.DivisionByZero // Proof-only obligation families still share the existing conservative runtime backstop.
         };
 

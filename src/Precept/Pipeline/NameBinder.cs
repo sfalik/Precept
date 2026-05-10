@@ -520,6 +520,12 @@ public static class NameBinder
 
         private void ResolveStateReference(string name, SourceSpan span)
         {
+            if (Tokens.Keywords.TryGetValue(name, out var keywordKind)
+                && Tokens.GetMeta(keywordKind).IsStateWildcard)
+            {
+                return;
+            }
+
             if (_statesByName.TryGetValue(name, out var state))
             {
                 _references.Add(new SymbolReference(span, name, new StateTarget(state)));
@@ -552,6 +558,12 @@ public static class NameBinder
 
         private void ResolveFieldReference(string name, SourceSpan span, DeclaredField? declaringField)
         {
+            if (Tokens.Keywords.TryGetValue(name, out var keywordKind)
+                && Tokens.GetMeta(keywordKind).IsFieldBroadcast)
+            {
+                return;
+            }
+
             if (_fieldsByName.TryGetValue(name, out var field))
             {
                 _references.Add(new SymbolReference(span, name, new FieldTarget(field)));

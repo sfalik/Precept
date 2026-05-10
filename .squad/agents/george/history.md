@@ -23,6 +23,7 @@
 - The local Precept MCP shell path uses newline-delimited JSON-RPC over stdio; LSP `Content-Length` framing is not the right probe format there.
 - Track 2 Phase A can land safely as a mixed catalog-first batch only when the consumer changes are tiny derivations from newly added metadata (`Parser.KeywordsValidAsMemberName`, modifier-bound validation, `abs()` proof discharge). Deeper plan items like valued event-arg modifiers and construct-slot rewiring still need later slices.
 - `OperatorMeta` can carry `StaticResultType` / `ResultTypePolicy` as catalog coverage without changing current typing behavior because live expression typing already flows through `Operations`; the metadata addition is still valuable for Phase A completeness and tests.
+- Token metadata only closes wildcard/broadcast regressions when binder/type-checker consumers also read the metadata; parser acceptance alone still lets `any` / `all` collapse back into undeclared-name diagnostics.
 
 ## Recent Updates
 

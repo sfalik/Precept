@@ -28,9 +28,13 @@ public static partial class Parser
             .ToFrozenSet();
 
     public static FrozenSet<TokenKind> KeywordsValidAsMemberName { get; } =
-        Tokens.All
-            .Where(meta => meta.IsValidAsMemberName)
-            .Select(meta => meta.Kind)
+        Types.All
+            .SelectMany(meta => meta.Accessors)
+            .Select(accessor => accessor.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Select(name => Tokens.Keywords.TryGetValue(name, out var kind) ? kind : (TokenKind?)null)
+            .Where(kind => kind is not null)
+            .Select(kind => kind!.Value)
             .ToFrozenSet();
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -833,7 +837,8 @@ public static partial class Parser
         private SlotValue ParseStateTarget(ConstructSlot slot)
         {
             var current = Peek();
-            if (current.Kind == TokenKind.Identifier || Tokens.GetMeta(current.Kind).IsStateWildcard)
+            var meta = Tokens.GetMeta(current.Kind);
+            if (current.Kind == TokenKind.Identifier || meta.IsStateWildcard)
             {
                 var tok = Advance();
                 return new StateTargetSlot(tok.Text, tok.Span);
@@ -882,7 +887,8 @@ public static partial class Parser
         private SlotValue ParseFieldTarget(ConstructSlot slot)
         {
             var current = Peek();
-            if (current.Kind == TokenKind.Identifier || Tokens.GetMeta(current.Kind).IsBroadcastFieldTarget)
+            var meta = Tokens.GetMeta(current.Kind);
+            if (current.Kind == TokenKind.Identifier || meta.IsFieldBroadcast)
             {
                 var tok = Advance();
                 return new FieldTargetSlot(tok.Text, tok.Span);
