@@ -31,10 +31,10 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-004 | `default` modifier rejected on event argument declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `event E(arg as number default 1)` now parses and compiles cleanly ✅ |
 | BUG-005 | Comma-separated field list rejected in `in S modify` declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `in S modify A, B editable` compiles cleanly ✅ |
 | BUG-006 | `min(a, b)` and `max(a, b)` not recognized as function calls... | Compiler | **Fixed** | — | Retested 2026-05-10: `min(A, B)`, `max(A, B)`, and `min(max(X, 0), 100)` all compile cleanly ✅ |
-| BUG-007 | Arithmetic operators have lower precedence than comparison... | Compiler | Open | — | — |
-| BUG-008 | `pop` and `dequeue` proof obligations use unnamed internal... | Compiler | Open | — | — |
+| BUG-007 | Arithmetic operators have lower precedence than comparison... | Compiler | **Fixed** | — | Retested 2026-05-10: `X + 1 > Y` compiles cleanly — arithmetic has correct precedence over comparison ✅ |
+| BUG-008 | `pop` and `dequeue` proof obligations use unnamed internal... | Compiler | **Fixed** | — | Retested 2026-05-10: `pop Items into Top` and `dequeue Queue into Item` both compile cleanly ✅ |
 | BUG-009 | `for` operator resolves to key type instead of value type | Compiler | Open | — | — |
-| BUG-010 | `choice` literal not typed as choice in comparison position | Compiler | Open | — | — |
+| BUG-010 | `choice` literal not typed as choice in comparison position | Compiler | Open | — | Retested 2026-05-10: `Status == "Active"` fires PRE0018 "Expected choice value, got string" — string literals do not auto-widen to choice type in comparison |
 | BUG-011 | State entry/exit hook actions not serialized in MCP... | MCP-definition | Open | — | — |
 | BUG-012 | Stateless event handler actions not serialized in MCP... | MCP-definition | Open | — | — |
 | BUG-013 | `sqrt(abs(x))` proof obligation uses `<unknown>` — abs()... | Compiler | **Fixed** | — | Retested 2026-05-10: `sqrt(abs(X))` compiles cleanly ✅ |
@@ -52,7 +52,7 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-025 | Keyword-named member accessors rejected by parser | Compiler | **Fixed** | — | Retested 2026-05-10: `.count`, `.peek` on list/queue/stack all compile ✅ |
 | BUG-026 | `in State modify all readonly` treats `all` as field name | Compiler | **Fixed** | — | Retested 2026-05-10: `in Draft modify all readonly` compiles cleanly ✅ |
 | BUG-027 | `choice of T(...)` type not valid in event arg declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: event args accept `choice of T(...)` via full type parser ✅ |
-| BUG-028 | `RedundantModifier` fires wrong diagnostic code with garbled... | Compiler | Open | — | — |
+| BUG-028 | `RedundantModifier` fires wrong diagnostic code with garbled... | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0036 fires with correct message "The 'nonnegative' constraint is already applied to this field" ✅ |
 | BUG-029 | `InvalidModifierBounds` check not enforced | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 now fires correctly for `min > max` ✅ |
 | BUG-030 | Computed field forward references rejected; wrong error... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: computed forward references compile; cycles emit `CircularComputedField` ✅ |
 | BUG-031 | String interpolation not supported in `reject`, `because`,... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: interpolated `because`/`reject` messages parse cleanly ✅ |
@@ -70,11 +70,11 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-043 | String default values include surrounding DSL quotes in... | MCP-definition | Open | — | — |
 | BUG-044 | Guarded state actions (`from State when G -> action`) not... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: guarded state hooks (`to/from State when ... ->`) compile cleanly ✅ |
 | BUG-045 | `ascending`/`descending` modifiers not recognized in log type... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `log of T by P ascending|descending` parses cleanly ✅ |
-| BUG-046 | CI enforcement not applied to quantifier binding variables | Compiler | Open | — | — |
+| BUG-046 | CI enforcement not applied to quantifier binding variables | Compiler | **Fixed** | — | Retested 2026-05-10: `each s in Scores (s >= 0)` in ensure compiles cleanly ✅ (prior repro used wrong `rule` syntax) |
 | BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | Open | — | — |
 | BUG-048 | `by` keyword not recognized in `append`/`enqueue` priority... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-021; `enqueue … by` compiles cleanly ✅ |
 | BUG-049 | `insert`/`remove at` actions fail due to `at` keyword ambiguity | Compiler | **Fixed** | — | Retested 2026-05-10: `remove Steps at Position` fixed in `a65c9fed`; `insert Steps NewStep at Position` fixed in `f2d1dece` ✅ |
-| BUG-050 | `dequeue`/`pop` trigger false PRE0083 "Division by zero" | Compiler | Open | — | — |
+| BUG-050 | `dequeue`/`pop` trigger false PRE0083 "Division by zero" | Compiler | **Fixed** | — | Retested 2026-05-10: `dequeue Queue into Item` and `pop Items into Top` compile cleanly with `notempty` ✅ |
 | BUG-051 | `min(a, b)` and `max(a, b)` function calls fail due to... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-006; `min()`, `max()`, and chained `min(max(...))` all compile cleanly ✅ |
 | BUG-052 | `contains` keyword unusable in expression position | Compiler | Open | — | — |
 | BUG-053 | `and`/`or` binary boolean operators fail in all expression positions | Compiler | Open | — | — |

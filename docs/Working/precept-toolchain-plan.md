@@ -600,52 +600,46 @@ BUG-002, BUG-003, BUG-009, BUG-052, BUG-053 (prerequisite only — Slice 9 compl
 
 ## Slice 5: Missing Catalog Fields — Constructs Catalog
 
-**Goal:** Add fields to `ConstructMeta` that capture whether a construct supports an optional
-`when` guard between the state/event target and the verb. The parser must read this field
-rather than hardcoding which constructs support guards.
+**Goal:** Encode optional pre-verb `when` guards directly in the ordered `ConstructMeta.Slots`
+list for each guarded scoped construct. The parser should walk the slot list in order; no
+separate guard-placement flag is needed.
 
 **Files:**
-- `src/Precept/Language/Constructs.cs` — `ConstructMeta` record; add new field; update entries
+- `src/Precept/Language/Construct.cs` — remove the obsolete guard-placement boolean from `ConstructMeta`
+- `src/Precept/Language/Constructs.cs` — add per-construct guard slots and update slot lists
 
-### Field to Add to `ConstructMeta`
+### Slot-list shape for guarded scoped constructs
 
-**`SupportsPreVerbWhenGuard: bool = false`**
-
-True for constructs where an optional `when BoolExpr` appears between the state/event target
-and the verb keyword (before `ensure`, `->`, `modify`, `omit`). Per spec line 813, the three
-constructs that support this are:
-- `StateEnsure` — `(in|to|from) StateTarget when BoolExpr ensure ...`
-- `StateAction` — `(to|from) StateTarget when BoolExpr -> ...`
-- `EventEnsure` — `on EventTarget when BoolExpr ensure ...`
+Use optional `GuardClause` slots at the natural pre-verb position:
+- `StateEnsure` — `[StateTarget, GuardClause(term: Ensure), EnsureClause, BecauseClause?]`
+- `StateAction` — `[StateTarget, GuardClause(term: Arrow), ActionChain]`
+- `EventEnsure` — `[EventTarget, GuardClause(term: Ensure), EnsureClause, BecauseClause?]`
+- `AccessMode` — `[StateTarget, GuardClause(term: Modify), FieldTarget, AccessModeKeyword]`
 
 Also: stateless `EventHandler` supports a post-action `ensure` clause per spec (BUG-054):
 - `EventHandler` — `on EventTarget -> actions... ensure BoolExpr because StringExpr`
 
-Set in `Constructs.GetMeta`:
-- `ConstructKind.StateEnsure` → `SupportsPreVerbWhenGuard = true`
-- `ConstructKind.StateAction` → `SupportsPreVerbWhenGuard = true`
-- `ConstructKind.EventEnsure` → `SupportsPreVerbWhenGuard = true`
-- `ConstructKind.EventHandler` → `SupportsPostActionEnsure = true` (new separate flag — see below)
-
 **`SupportsPostActionEnsure: bool = false`**
 
 True for `EventHandler` (stateless handler) which supports a trailing `ensure BoolExpr because StringExpr`
-after the action chain. This is separate from `SupportsPreVerbWhenGuard` because the grammar
-position is different. Fixes BUG-054.
+after the action chain. This remains separate because the grammar position is post-action rather
+than pre-verb. Fixes BUG-054.
 
 ### Consumed by
 
-- `src/Precept/Pipeline/Parser.cs` — in `ParseStateEnsure` and `ParseStateAction`, after parsing
-  the state target, check `constructMeta.SupportsPreVerbWhenGuard`; if `true`, optionally parse
-  `when BoolExpr` before the verb. In `ParseEventHandler`, after parsing the action chain, check
-  `constructMeta.SupportsPostActionEnsure`; if `true`, optionally parse `ensure BoolExpr because StringExpr`.
+- `src/Precept/Pipeline/Parser.cs` — `ParseScopedConstruct` should walk the slot list in order and
+  consume the disambiguation keyword at the natural boundary. Optional `when BoolExpr` parsing for
+  state ensures, state actions, event ensures, and access modes falls out of the slot list; in
+  `ParseEventHandler`, after parsing the action chain, check `constructMeta.SupportsPostActionEnsure`
+  and optionally parse `ensure BoolExpr because StringExpr`.
 
 ### Tests Required
 
 - `CatalogCapability/ConstructCatalogTests.cs`:
-  - `StateEnsure_SupportsPreVerbWhenGuard_True()`
-  - `StateAction_SupportsPreVerbWhenGuard_True()`
-  - `EventEnsure_SupportsPreVerbWhenGuard_True()`
+  - `StateEnsure_HasPreVerbGuardSlot()`
+  - `StateAction_HasPreVerbGuardSlot()`
+  - `EventEnsure_HasPreVerbGuardSlot()`
+  - `AccessMode_HasPreVerbGuardSlot()`
   - `EventHandler_SupportsPostActionEnsure_True()`
 - Parser integration coverage is executed in Slice 8:
   - `Parser_GuardedStateEnsure_CompilesClean()` — repro from BUG-020
@@ -826,9 +820,10 @@ subset that excludes collection/choice types, replace it with the full `ParseTyp
 
 **8. Guarded Ensures and State Actions (BUG-020, BUG-044)**
 
-In `ParseConstruct()` for `StateEnsure` and `StateAction`: after parsing the state target,
-check `constructMeta.SupportsPreVerbWhenGuard`; if `true`, optionally parse `when BoolExpr`
-before the verb keyword. Store the guard in the `SlotGuardClause` slot.
+In `ParseScopedConstruct()` for `StateEnsure`, `StateAction`, `EventEnsure`, and `AccessMode`,
+walk the declared slot list in order. The optional `GuardClause` slot appears before the
+verb-bearing slot, so `when BoolExpr` parses before `ensure`, `->`, or `modify` without a
+special-case flag. Store the guard in the declared `GuardClause` slot.
 
 **9. Action-Chain Suffix Grammar: Read `ActionSyntaxShape` (BUG-021, BUG-048, BUG-049)**
 
@@ -1450,7 +1445,7 @@ typed.ResolvedType.Should().Be(TypeKind.Boolean);
 | BUG-017 | `~string` qualifier lost in MCP output | MCP-definition | Type rendering ignores CI qualifier | Slice 12 |
 | BUG-018 | Collection element types lost in MCP | MCP-definition | `RenderTypeName(TypeKind)` ignores inner type | Slice 12 |
 | BUG-019 | Typed constants not context-resolved | Compiler | Parser doesn't accept `TypedConstant` in expression atoms | Slice 8 |
-| BUG-020 | Guarded ensures not parsed | Compiler | `SupportsPreVerbWhenGuard` missing; parser doesn't accept `when` before verb | Slice 5 + Slice 8 |
+| BUG-020 | Guarded ensures not parsed | Compiler | Pre-verb guard slot missing from construct metadata; parser doesn't accept `when` before verb | Slice 5 + Slice 8 |
 | BUG-021 | `append by P` not parsed | Compiler | Parser ignores `CollectionValueBy` shape; `by` not consumed | Slice 2 + Slice 8 |
 | BUG-022 | Event ensures not in MCP output | MCP-definition | `PreceptEventDto` has no `Constraints` field | Slice 12 |
 | BUG-023 | `because` keyword in serialized value | MCP-definition | `RenderExpression` span includes keyword | Slice 12 |
@@ -1474,7 +1469,7 @@ typed.ResolvedType.Should().Be(TypeKind.Boolean);
 | BUG-041 | `UnexpectedNull` hint uses `!= null` | MCP-docs | Recovery hint uses invalid v2 syntax; should use `is set` | Slice 13 |
 | BUG-042 | Modifier bound values not in MCP | MCP-definition | Modifiers rendered as bare names without values | Slice 12 |
 | BUG-043 | String defaults include surrounding quotes | MCP-definition | `RenderExpression` returns raw token span including `"` delimiters | Slice 12 |
-| BUG-044 | Guarded state actions not supported | Compiler | `SupportsPreVerbWhenGuard` missing on `StateAction` | Slice 5 + Slice 8 |
+| BUG-044 | Guarded state actions not supported | Compiler | Pre-verb guard slot missing from `StateAction` metadata | Slice 5 + Slice 8 |
 | BUG-045 | `ascending`/`descending` not recognized in log type | Compiler | Parser doesn't consume these tokens after `log of T by P` | Slice 8 |
 | BUG-046 | CI enforcement not in quantifier binding | Compiler | Binding variable doesn't inherit CI qualifier from collection element type | Slice 9 |
 | BUG-047 | Stateless hook actions not in MCP | MCP-definition | Same root as BUG-012; `rows` populated only from transition rows | Slice 12 |
