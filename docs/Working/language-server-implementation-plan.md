@@ -19,6 +19,28 @@ The Precept Language Server is a **thin routing and protocol layer** over `src/P
 
 ---
 
+## Status
+
+| Slice | Description | Status | Commit |
+|-------|-------------|--------|--------|
+| 0a | Catalog prereq — `IsOutlineNode` + `OutlineSymbolTag` | ✅ Done | `d85449ea` |
+| 0 | Infrastructure — DocumentState, DocumentStore, compile loop | ✅ Done | `9f6b1fd7` |
+| 0b | Delete shim files + 13 legacy tests | ✅ Done | `51d93dc2` |
+| 1 | Diagnostics push (tests only — production was in Slice 0) | ✅ Done | `568ab5cc` |
+| 2 | Semantic tokens Pass 1 (lexical) | ✅ Done | `9e679ceb` |
+| 3 core | `ArgReference` plumbing in core pipeline | ✅ Done | `cba898b7` |
+| 3 overlay | SemanticTokensHandler identifier overlays (Pass 2) | ✅ Done | `75b52baa` |
+| 4 | Completions — catalog-driven | ✅ Done | `1ec3c7d5` |
+| 5 | Hover — keyword + identifier docs | ✅ Done | `1fbecf36` |
+| 5 fix | HoverHandler null-ref (TryFindUniqueByName secondary match) | ✅ Done | `69b9517d` |
+| 6 | Go-to-definition + Document symbols | ✅ Done | `e144d92e` |
+| 7 | Diagnostic enrichment ("did you mean?") | ✅ Done | `3a7c8c6b` |
+| 8 | Code actions | ✅ Done | `c752af08` |
+| 9 | Folding ranges | ✅ Done | `453e690a` |
+| 11 | Program.cs final wiring | 🔄 In progress | — |
+
+---
+
 ## 2. Gap Analysis
 
 ### 2.1 Design Completeness Assessment
@@ -694,7 +716,565 @@ Groups A–E can proceed in parallel after Slice 0b. Slice 11 is the final wirin
 
 ---
 
-## 6. Tooling / MCP Sync Assessment
+## 6. Phase 2 — Production LS Gap Closure
+
+### 6.1 First-Principles Findings
+
+The current LS is no longer bootstrap-only, but it is still not production-complete. The blocking gaps are concentrated in four areas:
+
+1. **Expression authoring is still skeletal.** `CompletionHandler` stops at top-level/type/modifier/target names; action verbs, action-chain field targets, expression/default positions, typed constants, function names, and accessor names are still dark.
+2. **Hover and semantic projection stop short of catalog truth.** Functions, operators, action verbs, collection types, typed constants, and dual-use `set` are not projected from the richer catalogs that already exist.
+3. **Core navigation surface is incomplete.** There is no references, document-highlight, rename, signature help, workspace symbol, or selection-range support. `DocumentSymbolHandler` still selects whole constructs instead of declaration identifiers.
+4. **The document lifecycle is missing production hardening.** `TextDocumentSyncHandler` has no version ordering, so stale compiles can overwrite newer state under overlapping change delivery.
+
+### 6.2 Explicit Non-Gaps (Do Not Add Slices)
+
+| Evaluated item | Decision | Rationale |
+|---|---|---|
+| Pull diagnostics (`textDocument/diagnostic`) | **No Phase 2 slice** | OmniSharp `0.19.9` does not natively support LSP 3.17 pull diagnostics. Push `publishDiagnostics` remains the correct production path for the current toolchain. |
+| Workspace diagnostics for unopened files | **No Phase 2 slice** | Precept authoring is file-local. `DocumentStore` over open `.precept` files is sufficient; there is no multi-file semantic graph to keep in sync. |
+| `DidSave`, `WillSave`, `WillSaveWaitUntil` | **No Phase 2 slice** | Full-text sync already compiles the authoritative in-memory document on every open/change; save adds no new semantic signal. |
+| Incremental sync | **No Phase 2 slice** | `.precept` files are small, `Compiler.Compile(source)` is whole-document, and full-sync keeps the server thin. |
+| Inlay hints | **No Phase 2 slice** | Precept declarations are already explicit (`field X as Type`, `event E(Arg as Type)`). Inferred-type hints would just restate source text. |
+| CodeLens | **No Phase 2 slice** | Transition-count or proof-count lenses would add noisy summaries, not new compiler-owned facts. Outline/hover/references cover the needed navigation surface. |
+| State-target de-dup filtering | **No Phase 2 slice** | Hiding names because a row already exists would encode routing policy in the LS. Sort useful candidates, but do not suppress compiler-legal symbols. |
+| VS Code status bar | **No Phase 2 slice** | Already implemented in `tools/Precept.VsCode/src/extension.ts`. |
+| Grammar generation | **No Phase 2 slice** | The TextMate grammar is already catalog-generated. Phase 2 only needs editor-configuration polish, not grammar rewrites. |
+
+### Slice 12 [Kramer]: Trigger Characters + Dual-Use `set` Type Context
+
+**What:** Fix the registration and projection bug where type-position `set` still behaves like the action keyword, and advertise trigger characters that match actual Precept authoring.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`
+  - `GetRegistrationOptions(...)` — replace the bogus `":"`-only registration with `" "`, `"'"`, `"."`, `">"`, and `"~"`.
+  - **Important:** LSP trigger characters are character-based; the action-chain trigger is `">"` (the second character of `->`), not the literal two-character string `"->"`.
+- `tools/Precept.LanguageServer/SlotContext.cs`
+  - Add a small contextual reclassifier so `TokenKind.Set` is treated as the type keyword when the token sits inside `ConstructSlotKind.TypeExpression`.
+- `tools/Precept.LanguageServer/Handlers/HoverHandler.cs`
+  - Use the same contextual `set` reclassification before deciding between action/type hover.
+- `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs`
+  - `ProjectLexicalTokens(Compilation compilation)` — emit `type` for `set` in type position instead of `keyword`.
+
+**Catalog / artifacts driving it:**
+- `ConstructSlotKind.TypeExpression`
+- `Types.ByToken` (`TokenKind.SetType` alias)
+- `TokenMeta.SemanticTokenType`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`
+  - `[Fact] GetRegistrationOptions_AdvertisesSpaceQuoteDotArrowAndTildeTriggers`
+- `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs`
+  - `[Fact] Hover_OnSetInTypePosition_UsesTypeHover`
+- `test/Precept.LanguageServer.Tests/SemanticTokensHandlerTests.cs`
+  - `[Fact] LexicalTokens_SetInTypePosition_EmitsTypeToken`
+
+**Dependency ordering:** Must land before Slices 13, 15, 18, and 19.
+
+---
+
+### Slice 13 [Kramer]: SlotContext Coverage — Action Chains, Expressions, Defaults
+
+**What:** Finish `SlotContextResolver` so cursor routing covers the contexts the enum already promises and the action/default positions Phase 1 never wired.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/SlotContext.cs`
+  - `GetCursorContext(Compilation compilation, Position position)` — route:
+    - `ConstructSlotKind.ActionChain` + cursor after `->` → `InActionVerb`
+    - cursor after an action verb or `into` inside an action chain → `InFieldTarget`
+    - cursor after `=`, `by`, or `at` inside an action chain → `InExpression`
+    - `ConstructSlotKind.GuardClause`, `ConstructSlotKind.ComputeExpression`, `ConstructSlotKind.EnsureClause`, and `ConstructSlotKind.RuleExpression` → `InExpression`
+    - cursor after `default` in an event `ArgumentListSlot` → `InArgDefault`
+    - cursor after `of` inside `ConstructSlotKind.TypeExpression` → `InTypePosition`
+    - cursor after `default` in a field modifier value → `InExpression`
+  - Add helper methods that consult `Actions.ByTokenKind` + `ActionMeta.SyntaxShape` instead of LS-local verb lists.
+
+**Catalog / artifacts driving it:**
+- `ConstructSlotKind.ActionChain`, `GuardClause`, `ComputeExpression`, `EnsureClause`, `RuleExpression`, `TypeExpression`, `ArgumentList`
+- `Actions.ByTokenKind`
+- `ActionMeta.SyntaxShape`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/SlotContextResolverTests.cs`
+  - `[Fact] GetCursorContext_ActionChainAfterArrow_ReturnsInActionVerb`
+  - `[Fact] GetCursorContext_ActionChainAfterVerb_ReturnsInFieldTarget`
+  - `[Fact] GetCursorContext_Guard_ReturnsInExpression`
+  - `[Fact] GetCursorContext_EventArgDefault_ReturnsInArgDefault`
+  - `[Fact] GetCursorContext_CollectionInnerTypeAfterOf_ReturnsInTypePosition`
+
+**Dependency ordering:** Depends on Slice 12. Unblocks Slices 14, 15, and 18.
+
+---
+
+### Slice 14 [Kramer]: Expression / Action / Default Completion Surface
+
+**What:** Implement the production completion contexts Phase 1 left empty: action verbs, action-chain field targets, expression positions, member access, and argument defaults.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`
+  - `GetCompletions(...)` — handle `InActionVerb`, `InExpression`, and `InArgDefault`.
+  - Add `GetActionItems(Compilation compilation, Position position)` — project from `Actions.All`, filtering by the current field type when the target field is already known.
+  - Add `GetExpressionItems(Compilation compilation, Position position)` — project:
+    - fields from `compilation.Semantics.Fields`
+    - event args from the current event scope in `compilation.Semantics.Events`
+    - built-in functions from `Functions.All`
+    - member accessors from `Types.GetMeta(receiverType).Accessors` after `.`
+    - boolean literals from `Tokens.GetMeta(TokenKind.True/False)`
+  - `InArgDefault` reuses expression completions.
+- `tools/Precept.LanguageServer/SlotContext.cs`
+  - Add any helper needed to recover current event name / receiver symbol without LS-local keyword lists.
+
+**Catalog / artifacts driving it:**
+- `Actions.All`
+- `Functions.All`
+- `TypeMeta.Accessors`
+- `TokenMeta` for `true` / `false`
+- `SemanticIndex.Fields`, `SemanticIndex.Events`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`
+  - `[Fact] Completions_ActionVerb_UsesActionsCatalog`
+  - `[Fact] Completions_ActionFieldTarget_UsesDeclaredFields`
+  - `[Fact] Completions_Expression_IncludeFieldsArgsAndFunctions`
+  - `[Fact] Completions_MemberAccess_UsesTypeAccessors`
+  - `[Fact] Completions_ArgDefault_ReusesExpressionCompletions`
+
+**Dependency ordering:** Depends on Slice 13.
+
+---
+
+### Slice 15 [Kramer]: Typed-Constant Completions
+
+**What:** Add typed-literal authoring support so `'` is no longer a dead end.
+
+**Creates:**
+- `tools/Precept.LanguageServer/TypedConstantCollector.cs`
+  - `CollectByType(SemanticIndex index, TypeKind type)` — walk expression-bearing semantic nodes and collect distinct `TypedTypedConstant.RawText` values already present in the document.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`
+  - Add `GetTypedConstantItems(Compilation compilation, Position position)`.
+  - When an expected type can be determined, suggest:
+    - document-local typed constants from `TypedConstantCollector`
+    - `Types.GetMeta(expectedType).ContentValidation?.Examples`
+  - Route `'`-triggered requests in type/default/expression contexts to this provider.
+
+**Catalog / artifacts driving it:**
+- `TypeMeta.ContentValidation`
+- `ContentValidation.Examples`
+- `TypedTypedConstant`
+- `SemanticIndex` expression-bearing nodes (`TypedField.DefaultExpression`, `TypedField.ComputedExpression`, `TypedRule`, `TypedEnsure`, `TypedTransitionRow`, `TypedStateHook`, `TypedEventHandler`)
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`
+  - `[Fact] Completions_TypedConstant_UseTypeExamples`
+  - `[Fact] Completions_TypedConstant_SuggestPreviouslyUsedDocumentValues`
+  - `[Fact] Completions_TypedConstant_NoExpectedType_ReturnsEmpty`
+
+**Dependency ordering:** Depends on Slices 12 and 13.
+
+---
+
+### Slice 16 [George]: Snippet Metadata for Constructs and Actions
+
+**What:** Populate the snippet metadata that the LS should have been consuming from day one.
+
+**Modifies:**
+- `src/Precept/Language/Constructs.cs`
+  - Set `SnippetTemplate` on the top-level completion constructs:
+    - `PreceptHeader`
+    - `FieldDeclaration`
+    - `StateDeclaration`
+    - `EventDeclaration`
+    - `RuleDeclaration`
+- `src/Precept/Language/Actions.cs`
+  - Set `SnippetTemplate` on the primary author-facing action verbs in `GetMeta(...)`:
+    - `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `append`, `insert`, `put`
+
+**Catalog driving it:**
+- `ConstructMeta.SnippetTemplate`
+- `ActionMeta.SnippetTemplate`
+
+**Tests:**
+- `test/Precept.Tests/Language/ConstructCatalogTests.cs`
+  - `[Fact] SnippetTemplate_PresentForTopLevelCompletionConstructs`
+- `test/Precept.Tests/Language/ActionCatalogTests.cs`
+  - `[Fact] SnippetTemplate_PresentForPrimaryActionVerbs`
+
+**Dependency ordering:** Independent of Slices 12–15. Unblocks Slice 17.
+
+---
+
+### Slice 17 [Kramer]: Completion Item Quality — Snippets, Docs, Sort Order
+
+**What:** Make the completion items worth accepting.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`
+  - Replace the current `CreateItem(string label, string detail, CompletionItemKind kind)` helper with a richer factory that sets:
+    - `InsertText`
+    - `InsertTextFormat`
+    - `Documentation`
+    - `SortText`
+    - `Detail`
+  - Consume:
+    - `ConstructMeta.SnippetTemplate`
+    - `ActionMeta.SnippetTemplate`
+    - existing `FunctionMeta.SnippetTemplate`
+    - `HoverDescription ?? Description`
+    - `UsageExample`
+  - Sort semantic symbols before catalog keywords/functions/actions, but do not hide compiler-legal names.
+
+**Catalog / artifacts driving it:**
+- `ConstructMeta.SnippetTemplate`
+- `ActionMeta.SnippetTemplate`
+- `FunctionMeta.SnippetTemplate`
+- `HoverDescription`
+- `UsageExample`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`
+  - `[Fact] Completions_TopLevelConstruct_UsesSnippetInsertText`
+  - `[Fact] Completions_Action_UsesSnippetInsertText`
+  - `[Fact] Completions_Function_UsesSnippetInsertText`
+  - `[Fact] Completions_Documentation_UsesHoverDescriptionAndUsageExample`
+  - `[Fact] Completions_SortsSemanticSymbolsBeforeCatalogItems`
+
+**Dependency ordering:** Depends on Slices 14 and 16. Slice 15 enriches the typed-constant branch but is not a hard blocker.
+
+---
+
+### Slice 18 [Kramer]: Hover Surface Completion
+
+**What:** Finish hover so it projects the actual catalogs and semantic expression shapes, not the shallow token description fallback.
+
+**Creates:**
+- `tools/Precept.LanguageServer/SemanticExpressionLocator.cs`
+  - `TryFindExpressionAt(SemanticIndex index, Position position, out TypedExpression expression)`
+  - `TryFindFunctionAt(Compilation compilation, Position position, out IReadOnlyList<FunctionMeta> overloads)`
+  - `TryFindAccessorAt(Compilation compilation, Position position, out TypeMeta ownerType, out TypeAccessor accessor)`
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/HoverHandler.cs`
+  - `CreateHover(...)` — route to:
+    - type hover from `Types.ByToken` / `TypeMeta.HoverDescription`
+    - action hover from `Actions.ByTokenKind` / `ActionMeta.HoverDescription`
+    - operator hover from `Operators.ByToken` / `Operators.ByTokenSequence` / `OperatorMeta.HoverDescription`
+    - function hover from `Functions.All` / overload list
+    - typed-constant hover from `TypedTypedConstant` + `Types.GetMeta(resultType)` + `ContentValidation.FormatDescription`
+    - accessor hover from `TypeMeta.Accessors`
+  - Keep token-description fallback only for tokens with no richer catalog owner.
+
+**Catalog / artifacts driving it:**
+- `Types.All`
+- `Actions.All`
+- `Operators.All`
+- `Functions.All`
+- `TypeMeta.Accessors`
+- `TypeMeta.ContentValidation`
+- `TypedTypedConstant`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs`
+  - `[Fact] Hover_OnTypedConstant_ShowsDeclaredTypeAndFormat`
+  - `[Fact] Hover_OnFunctionCall_ShowsSignatureAndDescription`
+  - `[Fact] Hover_OnOperator_UsesOperatorHoverDescription`
+  - `[Fact] Hover_OnCollectionType_UsesTypeHoverDescription`
+  - `[Fact] Hover_OnActionVerb_UsesActionHoverDescription`
+  - `[Fact] Hover_OnAccessor_UsesAccessorDescription`
+
+**Dependency ordering:** Depends on Slices 12 and 13.
+
+---
+
+### Slice 19 [Kramer]: Semantic Token Expression Overlays
+
+**What:** Close the remaining semantic-highlighting gap by classifying built-in function call names and pinning the literal/operator/action behavior with explicit tests.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs`
+  - Rename or extend `ProjectIdentifierTokens(...)` so the overlay pass can also emit function-name tokens for `TypedFunctionCall` spans.
+  - Use `Functions.GetMeta(call.ResolvedFunction).Name.Length` with `TypedFunctionCall.Span.Start*` to project the call leader as token type `function`.
+  - Preserve the Slice 12 type-context reclassification for `set`.
+
+**Catalog / artifacts driving it:**
+- `TypedFunctionCall.ResolvedFunction`
+- `Functions.GetMeta(...)`
+- `TokenMeta.SemanticTokenType`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/SemanticTokensHandlerTests.cs`
+  - `[Fact] ExpressionTokens_BuiltInFunctionCall_EmitFunctionToken`
+  - `[Fact] LexicalTokens_TypedConstant_EmitStringToken`
+  - `[Fact] LexicalTokens_Operator_EmitOperatorToken`
+  - `[Fact] LexicalTokens_ActionVerb_EmitKeywordToken`
+  - `[Fact] LexicalTokens_BooleanLiteral_KeepKeywordTokenType`
+
+**Dependency ordering:** Depends on Slice 12. Independent of Slices 20–29.
+
+---
+
+### Slice 20 [Kramer]: Shared Symbol Navigation + References / Highlights
+
+**What:** Build the reusable symbol-location helper the LS now needs across definition, references, highlight, and rename.
+
+**Creates:**
+- `tools/Precept.LanguageServer/SymbolNavigation.cs`
+  - `TryFindOccurrence(Compilation compilation, Position position, out SymbolOccurrence occurrence)`
+  - `GetReferenceSpans(SemanticIndex index, SymbolOccurrence occurrence, bool includeDeclaration)`
+- `tools/Precept.LanguageServer/Handlers/ReferencesHandler.cs`
+- `tools/Precept.LanguageServer/Handlers/DocumentHighlightHandler.cs`
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/DefinitionHandler.cs`
+  - Replace the duplicated field/state/event/arg loops with `SymbolNavigation`.
+
+**Artifacts driving it:**
+- `SemanticIndex.Fields`, `States`, `Events`
+- `FieldReferences`, `StateReferences`, `EventReferences`, `ArgReferences`
+- exact declaration spans (`NameSpan`, `TypedArg.Span`)
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/ReferencesHandlerTests.cs`
+  - `[Fact] References_Field_ReturnDeclarationAndAllSites`
+  - `[Fact] References_State_ReturnDeclarationAndAllSites`
+  - `[Fact] References_Event_ReturnDeclarationAndAllSites`
+  - `[Fact] References_Argument_ReturnDeclarationAndAllSites`
+- `test/Precept.LanguageServer.Tests/DocumentHighlightHandlerTests.cs`
+  - `[Fact] DocumentHighlight_Field_ReturnsDeclarationAndReferences`
+  - `[Fact] DocumentHighlight_EventArgument_ReturnsDeclarationAndReferences`
+
+**Dependency ordering:** Independent of Slices 12–19. Unblocks Slice 21.
+
+---
+
+### Slice 21 [Kramer]: Rename
+
+**What:** Add production rename support for user-declared identifiers.
+
+**Creates:**
+- `tools/Precept.LanguageServer/Handlers/RenameHandler.cs`
+  - Implement both prepare-rename and rename handling on top of `SymbolNavigation`.
+
+**Method-level specificity:**
+- `Handle(PrepareRenameParams request, CancellationToken ct)` — allow only field/state/event/arg identifiers; reject keywords, functions, accessors, and typed constants.
+- `Handle(RenameParams request, CancellationToken ct)` — return a single-document `WorkspaceEdit` containing the declaration span plus every reference span from `SymbolNavigation.GetReferenceSpans(...)`.
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/RenameHandlerTests.cs`
+  - `[Fact] PrepareRename_FieldReference_ReturnsIdentifierRange`
+  - `[Fact] Rename_Field_UpdatesDeclarationAndAllReferences`
+  - `[Fact] Rename_State_UpdatesDeclarationAndTransitionSites`
+  - `[Fact] Rename_Event_UpdatesDeclarationAndEventSites`
+  - `[Fact] Rename_Argument_UpdatesDeclarationAndQualifiedArgumentSites`
+  - `[Fact] PrepareRename_OnKeyword_ReturnsNull`
+
+**Dependency ordering:** Depends on Slice 20.
+
+---
+
+### Slice 22 [Kramer]: Signature Help
+
+**What:** Add call-site guidance for built-in functions and parameterized type accessors.
+
+**Creates:**
+- `tools/Precept.LanguageServer/CallContextResolver.cs`
+  - `TryFindActiveCall(Compilation compilation, Position position, out ActiveCallContext call)` — token-based scan for the nearest unmatched `(` and active-parameter index.
+- `tools/Precept.LanguageServer/Handlers/SignatureHelpHandler.cs`
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`
+  - Ensure completion + signature help share function/accessor naming conventions.
+
+**Catalog / artifacts driving it:**
+- `Functions.All` / `FunctionMeta.Overloads`
+- `TypeMeta.Accessors` for method-like accessors (`at(...)`, etc.)
+- `ParameterMeta`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/SignatureHelpHandlerTests.cs`
+  - `[Fact] SignatureHelp_Round_ShowsBothOverloads`
+  - `[Fact] SignatureHelp_StartsWith_ShowsNamedParameters`
+  - `[Fact] SignatureHelp_AccessorCall_ShowsAccessorSignature`
+  - `[Fact] SignatureHelp_NoActiveCall_ReturnsNull`
+
+**Dependency ordering:** Independent of Slice 20. Can proceed in parallel with Slices 21, 23–27.
+
+---
+
+### Slice 23 [Kramer]: Document Symbol Selection Ranges
+
+**What:** Fix `DocumentSymbolHandler` so symbol selection lands on declaration identifiers, not full construct spans.
+
+**Creates:**
+- `tools/Precept.LanguageServer/OutlineSymbolProjector.cs`
+  - `BuildDocumentSymbols(Compilation compilation)`
+  - `GetSelectionSpan(Compilation compilation, ParsedConstruct construct)`
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Handlers/DocumentSymbolHandler.cs`
+  - Delegate to `OutlineSymbolProjector`.
+
+**Selection-span rules:**
+- Precept header → identifier span from `IdentifierListSlot`
+- Field / state / event → semantic `NameSpan`
+- Rule declaration → construct span (unnamed)
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/DocumentSymbolHandlerTests.cs`
+  - `[Fact] BuildDocumentSymbols_FieldSelectionRange_UsesNameSpan`
+  - `[Fact] BuildDocumentSymbols_StateSelectionRange_UsesNameSpan`
+  - `[Fact] BuildDocumentSymbols_EventSelectionRange_UsesNameSpan`
+  - `[Fact] BuildDocumentSymbols_PreceptSelectionRange_UsesHeaderIdentifierSpan`
+
+**Dependency ordering:** Independent. Unblocks Slice 24.
+
+---
+
+### Slice 24 [Kramer]: Workspace Symbols
+
+**What:** Add `Ctrl+T`/`workspace/symbol` support across all open `.precept` documents.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/DocumentStore.cs`
+  - Add `Snapshot()` / `EnumerateOpenDocuments()` so workspace-symbol queries can read all open document states safely.
+- `tools/Precept.LanguageServer/Handlers/WorkspaceSymbolHandler.cs`
+  - Project open-document outline symbols via `OutlineSymbolProjector` and filter by query.
+
+**Artifacts driving it:**
+- `DocumentStore`
+- `ConstructManifest.Constructs`
+- `ConstructMeta.IsOutlineNode` / `OutlineSymbolTag`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/WorkspaceSymbolHandlerTests.cs`
+  - `[Fact] WorkspaceSymbol_Query_ReturnsMatchingSymbolsAcrossOpenDocuments`
+  - `[Fact] WorkspaceSymbol_Result_CarriesDocumentUriAndSymbolKind`
+
+**Dependency ordering:** Depends on Slice 23.
+
+---
+
+### Slice 25 [Kramer]: Selection Ranges
+
+**What:** Add editor expand-selection support derived from Precept syntax structure.
+
+**Creates:**
+- `tools/Precept.LanguageServer/SyntaxSelectionBuilder.cs`
+  - Build parent chains token span → parsed expression span → slot span → construct span.
+- `tools/Precept.LanguageServer/Handlers/SelectionRangeHandler.cs`
+
+**Artifacts driving it:**
+- `Compilation.Tokens`
+- `SlotValue.Span`
+- nested `ParsedExpression` spans held by `ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `ActionChainSlot`
+- `ConstructManifest.Constructs`
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/SelectionRangeHandlerTests.cs`
+  - `[Fact] SelectionRange_Identifier_ExpandsToExpressionThenConstruct`
+  - `[Fact] SelectionRange_MultiplePositions_ReturnAlignedChains`
+
+**Dependency ordering:** Independent of Slices 20–24.
+
+---
+
+### Slice 26 [Kramer]: Document Version Ordering
+
+**What:** Prevent stale compile results from overwriting newer document state.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/DocumentState.cs`
+  - Add `Version` tracking and `TryUpdate(int version, Compilation compilation, IReadOnlyDictionary<DiagnosticKey, SuggestionInfo> suggestions)`.
+- `tools/Precept.LanguageServer/Handlers/TextDocumentSyncHandler.cs`
+  - Pass `request.TextDocument.Version` through open/change handling.
+  - Publish diagnostics only for accepted versions.
+  - Keep full-sync; do **not** add debounce timers.
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/DocumentStateVersioningTests.cs`
+  - `[Fact] TryUpdate_OlderVersion_DoesNotReplaceCurrentCompilation`
+  - `[Fact] TryUpdate_NewerVersion_ReplacesCurrentCompilationAndSuggestions`
+- `test/Precept.LanguageServer.Tests/DiagnosticPublishIntegrationTests.cs`
+  - `[Fact] DidChange_OutOfOrderVersions_PublishesNewestDiagnosticsOnly`
+
+**Dependency ordering:** Independent. Must land before Slice 29 so final wiring/protocol smoke tests reflect ordered updates.
+
+---
+
+### Slice 27 [Kramer]: VS Code Typed-Constant Editor Polish
+
+**What:** Finish the one missing editor-configuration piece for production typed-literal authoring.
+
+**Modifies:**
+- `tools/Precept.VsCode/language-configuration.json`
+  - Add single-quote auto-closing / surrounding pairs for typed constants.
+  - Keep `lineComment` as `#` — do **not** change this to `//`.
+
+**Tests:**
+- `test/Precept.LanguageServer.Tests/ExtensionManifestTests.cs`
+  - `[Fact] LanguageConfiguration_TypedConstantSingleQuote_AutoCloses`
+
+**Dependency ordering:** Independent.
+
+---
+
+### Slice 28 [Kramer]: Documentation Sync
+
+**What:** When Phase 2 lands, the docs must describe the real LS surface — and must not reintroduce preview as if it shipped.
+
+**Modifies:**
+- `docs/language/precept-language-spec.md`
+  - Add a concise LS/tooling subsection documenting completions, hover, semantic tokens, diagnostics, definition, references, rename, signature help, workspace symbols, outline, folding, selection ranges, and code actions.
+- `docs/tooling/language-server.md`
+  - Update the status block and feature sections so the implemented surface matches reality; keep preview explicitly out of this implementation track.
+- `README.md`
+  - Replace the current vague LS claims with the concrete Phase 2 capability list; do not describe the preview placeholder as shipped functionality.
+
+**Tests:** None — documentation sync only.
+
+**Dependency ordering:** Must land after the behavior slices it documents (12–27) and before final closeout.
+
+---
+
+### Slice 29 [Kramer]: Slice 11 Wiring Amendment — Final Handler Surface
+
+**What:** Expand the final wiring slice so `Program.cs` and the protocol test host register the entire completed surface, not just the original Phase 1 handlers.
+
+**Modifies:**
+- `tools/Precept.LanguageServer/Program.cs`
+  - Register all existing Phase 1 handlers **plus**:
+    - `ReferencesHandler`
+    - `DocumentHighlightHandler`
+    - `RenameHandler`
+    - `SignatureHelpHandler`
+    - `WorkspaceSymbolHandler`
+    - `SelectionRangeHandler`
+  - Register any shared helpers created above (`OutlineSymbolProjector`, `SymbolNavigation`, `CallContextResolver`, `SyntaxSelectionBuilder`, `SemanticExpressionLocator`, etc.) if they are not static.
+- `test/Precept.LanguageServer.Tests/LspTestHost.cs`
+  - Mirror the same handler registrations so protocol-layer tests exercise the real advertised capability set.
+- `test/Precept.LanguageServer.Tests/ServerCapabilityTests.cs`
+  - Add an initialize-result smoke test asserting the server advertises completion, hover, definition, references, document highlights, rename, signature help, workspace symbols, selection ranges, semantic tokens, folding, diagnostics sync, and code actions.
+
+**Dependency ordering:** Depends on every behavioral Phase 1 and Phase 2 slice. This is the new terminal slice.
+
+### 6.3 Phase 2 Dependency Ordering
+
+```
+Slice 12 → Slice 13 → Slices 14, 15, 18
+Slice 16 → Slice 17
+Slice 12 → Slice 19
+Slice 20 → Slice 21
+Slice 23 → Slice 24
+Slice 26 is independent but must finish before Slice 29
+Slice 27 is independent
+Slice 28 follows Slices 12–27
+Slice 29 depends on all Phase 1 handler slices plus Slices 12–28
+```
+
+---
+
+## 7. Tooling / MCP Sync Assessment
 
 | Category | Impact | Detail |
 |---|---|---|
@@ -706,7 +1286,7 @@ Groups A–E can proceed in parallel after Slice 0b. Slice 11 is the final wirin
 
 ---
 
-## 7. Catalog Prerequisites (Resolved)
+## 8. Catalog Prerequisites (Resolved)
 
 ### ✅ Resolved: `ConstructMeta.IsOutlineNode` + `OutlineSymbolTag`
 
@@ -738,7 +1318,7 @@ CC#16 resolved that `Error` and `StateRef` types should not appear in completion
 
 ---
 
-## 8. Risk Assessment
+## 9. Risk Assessment
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
@@ -749,7 +1329,7 @@ CC#16 resolved that `Error` and `StateRef` types should not appear in completion
 
 ---
 
-## 9. Implementation Order (Recommended)
+## 10. Implementation Order (Recommended)
 
 1. **Slice 0a** — Catalog prerequisite: `IsOutlineNode` + `OutlineSymbolTag` (independent, unblocks Slice 6)
 2. **Slice 0** — Infrastructure (`DocumentState`, `DocumentStore`, compile loop, full-text sync)
@@ -767,7 +1347,7 @@ CC#16 resolved that `Error` and `StateRef` types should not appear in completion
 
 ---
 
-## 10. Estimated Scope
+## 11. Estimated Scope
 
 | Metric | Estimate |
 |---|---|

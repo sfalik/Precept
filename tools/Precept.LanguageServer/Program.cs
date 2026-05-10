@@ -18,6 +18,12 @@ internal static class Program
                     services.AddSingleton<DocumentStore>();
                 })
                 .WithHandler<TextDocumentSyncHandler>()
+                .WithHandler<SemanticTokensHandler>()
+                .WithHandler<CompletionHandler>()
+                .WithHandler<HoverHandler>()
+                .WithHandler<DefinitionHandler>()
+                .WithHandler<DocumentSymbolHandler>()
+                .WithHandler<FoldingRangeHandler>()
                 .WithHandler<CodeActionHandler>();
         });
 
