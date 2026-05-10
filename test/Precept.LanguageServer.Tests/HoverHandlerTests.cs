@@ -112,6 +112,17 @@ from Draft on Approve -> transition Approved
     }
 
     [Fact]
+    public void Hover_OnDeclaredState_ReturnsIdentifierDoc()
+    {
+        var compilation = Precept.Compiler.Compile(Source);
+        // "state Draft initial" is line 3 (1-based) → Position(2, 6) = "Draft" (0-based col 6 = 1-based col 7)
+        var hover = HoverHandler.CreateHover(compilation, new Position(2, 6));
+
+        hover.Should().NotBeNull();
+        hover!.Contents.MarkupContent!.Value.Should().Contain("state `Draft`");
+    }
+
+    [Fact]
     public async Task Hover_NoDocument_ReturnsNull()
     {
         var store = new DocumentStore();

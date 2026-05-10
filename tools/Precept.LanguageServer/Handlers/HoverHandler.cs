@@ -241,7 +241,7 @@ internal sealed class HoverHandler : IHoverHandler
             matchCount++;
         }
 
-        return matchCount == 1;
+        return matchCount == 1 && value is not null;
     }
 
     private static Hover MakeHover(string markdown, SourceSpan span) => new()
