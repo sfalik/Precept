@@ -180,8 +180,7 @@ public static class Constructs
             [],
             [SlotEventTarget, SlotActionChain],
             [new(TokenKind.On, [TokenKind.Arrow])],
-            RoutingFamily.EventScoped,
-            SupportsPostActionEnsure: true),
+            RoutingFamily.EventScoped),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ConstructKind: {kind}"),

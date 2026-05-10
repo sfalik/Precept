@@ -22,7 +22,6 @@ public sealed record ConstructMeta(
     RoutingFamily                        RoutingFamily,
     string?                              SnippetTemplate  = null,
     ModifierDomain                       ModifierDomain   = ModifierDomain.None,
-    bool                                 SupportsPostActionEnsure = false,
     bool                                 IsOutlineNode    = false,
     string?                              OutlineSymbolTag = null)
 {

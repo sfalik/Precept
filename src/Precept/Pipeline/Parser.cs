@@ -289,25 +289,7 @@ public static partial class Parser
                     slots.Add(value);
             }
 
-            if (meta.SupportsPostActionEnsure)
-            {
-                var ensureSlot = ParseEnsureClause(new ConstructSlot(
-                    ConstructSlotKind.EnsureClause,
-                    IsRequired: false,
-                    TerminationTokens: [TokenKind.Because]));
-                if (ensureSlot.Span != SourceSpan.Missing)
-                {
-                    slots.Add(ensureSlot);
-
-                    var becauseSlot = ParseBecauseClause(new ConstructSlot(
-                        ConstructSlotKind.BecauseClause,
-                        IsRequired: false));
-                    if (becauseSlot.Span != SourceSpan.Missing)
-                        slots.Add(becauseSlot);
-                }
-            }
-
-            var endSpan = _position > 0 && !IsTrivia(_tokens[_position - 1].Kind)
+            var endSpan= _position > 0 && !IsTrivia(_tokens[_position - 1].Kind)
                 ? _tokens[_position - 1].Span
                 : startSpan;
             var span = SourceSpan.Covering(startSpan, endSpan);
