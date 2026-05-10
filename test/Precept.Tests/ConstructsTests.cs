@@ -282,25 +282,28 @@ public class ConstructsTests
         slots[2].IsRequired.Should().BeFalse("the initial marker is optional");
     }
 
-    [Fact]
-    public void AccessMode_HasGuardClauseAsOptional()
+    [Theory]
+    [InlineData(ConstructKind.StateEnsure, 1)]
+    [InlineData(ConstructKind.StateAction, 1)]
+    [InlineData(ConstructKind.EventEnsure, 1)]
+    [InlineData(ConstructKind.AccessMode, 1)]
+    public void PreVerbGuardConstruct_HasOptionalGuardClauseAtExpectedIndex(ConstructKind kind, int expectedIndex)
     {
-        var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots;
+        var slots = Constructs.GetMeta(kind).Slots;
 
-        var guardSlot = slots.Should().ContainSingle(s => s.Kind == ConstructSlotKind.GuardClause).Subject;
-        guardSlot.IsRequired.Should().BeFalse("guards are optional on access modes");
-        slots.Last().Kind.Should().Be(ConstructSlotKind.GuardClause,
-            "guard clause must be the final slot in the access mode sequence");
+        slots[expectedIndex].Kind.Should().Be(ConstructSlotKind.GuardClause,
+            $"{kind} should encode guard position directly in its slot list");
+        slots[expectedIndex].IsRequired.Should().BeFalse($"guards are optional on {kind}");
     }
 
     [Fact]
-    public void AccessMode_SlotOrder_StateTarget_FieldTarget_AccessModeKeyword_Guard()
+    public void AccessMode_SlotOrder_StateTarget_Guard_FieldTarget_AccessModeKeyword()
     {
         var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots.ToArray();
-        slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget,       "first slot is state target");
-        slots[1].Kind.Should().Be(ConstructSlotKind.FieldTarget,        "second slot is field target (after consumed 'modify' verb)");
-        slots[2].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword,  "third slot is the readonly|editable adjective");
-        slots[3].Kind.Should().Be(ConstructSlotKind.GuardClause,        "fourth slot is optional guard");
+        slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget,      "first slot is state target");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,      "second slot is the optional pre-verb guard");
+        slots[2].Kind.Should().Be(ConstructSlotKind.FieldTarget,      "third slot is field target after the consumed 'modify' disambiguation token");
+        slots[3].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword,"fourth slot is the readonly|editable adjective");
     }
 
     [Fact]
@@ -339,9 +342,21 @@ public class ConstructsTests
             .Single(s => s.Kind == ConstructSlotKind.RuleExpression);
         ruleSlot.TerminationTokens.Should().BeEquivalentTo([TokenKind.When, TokenKind.Because]);
 
-        var guardSlot = Constructs.GetMeta(ConstructKind.TransitionRow).Slots
+        var transitionGuard = Constructs.GetMeta(ConstructKind.TransitionRow).Slots
             .Single(s => s.Kind == ConstructSlotKind.GuardClause);
-        guardSlot.TerminationTokens.Should().BeEquivalentTo([TokenKind.Because, TokenKind.Arrow]);
+        transitionGuard.TerminationTokens.Should().BeEquivalentTo([TokenKind.Because, TokenKind.Arrow]);
+
+        var stateEnsureGuard = Constructs.GetMeta(ConstructKind.StateEnsure).Slots[1];
+        stateEnsureGuard.TerminationTokens.Should().BeEquivalentTo([TokenKind.Ensure]);
+
+        var stateActionGuard = Constructs.GetMeta(ConstructKind.StateAction).Slots[1];
+        stateActionGuard.TerminationTokens.Should().BeEquivalentTo([TokenKind.Arrow]);
+
+        var eventEnsureGuard = Constructs.GetMeta(ConstructKind.EventEnsure).Slots[1];
+        eventEnsureGuard.TerminationTokens.Should().BeEquivalentTo([TokenKind.Ensure]);
+
+        var accessModeGuard = Constructs.GetMeta(ConstructKind.AccessMode).Slots[1];
+        accessModeGuard.TerminationTokens.Should().BeEquivalentTo([TokenKind.Modify]);
 
         var ensureSlot = Constructs.GetMeta(ConstructKind.StateEnsure).Slots
             .Single(s => s.Kind == ConstructSlotKind.EnsureClause);
@@ -445,12 +460,12 @@ public class ConstructsTests
     public void AccessMode_HasCorrectSlotSequence()
     {
         var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots;
-        slots.Should().HaveCount(4, "AccessMode: [StateTarget, FieldTarget, AccessModeKeyword, GuardClause(opt)]");
+        slots.Should().HaveCount(4, "AccessMode: [StateTarget, GuardClause(opt), FieldTarget, AccessModeKeyword]");
         slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget);
-        slots[1].Kind.Should().Be(ConstructSlotKind.FieldTarget);
-        slots[2].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword);
-        slots[3].Kind.Should().Be(ConstructSlotKind.GuardClause);
-        slots[3].IsRequired.Should().BeFalse();
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause);
+        slots[1].IsRequired.Should().BeFalse();
+        slots[2].Kind.Should().Be(ConstructSlotKind.FieldTarget);
+        slots[3].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword);
     }
 
     [Fact]

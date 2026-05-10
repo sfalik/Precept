@@ -248,6 +248,22 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void Language_Constructs_DoNotSerializeSupportsPreVerbWhenGuard()
+    {
+        var result = LanguageTool.Language();
+        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement
+            .GetProperty("constructs")
+            .EnumerateArray()
+            .SelectMany(construct => construct.EnumerateObject().Select(property => property.Name))
+            .Should().NotContain("supportsPreVerbWhenGuard");
+
+        json.Should().NotContain("SupportsPreVerbWhenGuard");
+    }
+
+    [Fact]
     public void Language_ConstraintsMirrorConstraintCatalog()
     {
         var result = LanguageTool.Language();

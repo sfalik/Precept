@@ -8,14 +8,14 @@ using Xunit;
 namespace Precept.Tests;
 
 /// <summary>
-/// Regression and specification tests for the BecauseClause slot split fix:
+/// Regression and specification tests for the BecauseClause slot split fix.
 /// StateEnsure and EventEnsure must carry BecauseClause as a separate, optional
-/// slot at index [2] rather than embedding it inside EnsureClause.
+/// slot while the pre-verb guard now occupies catalog slot index [1].
 ///
-/// Reference design: RuleDeclaration already models this split correctly with
-/// [RuleExpression, GuardClause(opt), BecauseClause(req)].
-/// After the fix: StateEnsure = [StateTarget, EnsureClause, BecauseClause(opt)]
-///               EventEnsure  = [EventTarget, EnsureClause, BecauseClause(opt)]
+/// Reference design: RuleDeclaration already models a split expression/guard/reason
+/// shape with [RuleExpression, GuardClause(opt), BecauseClause(req)].
+/// After the fix: StateEnsure = [StateTarget, GuardClause(opt), EnsureClause, BecauseClause(opt)]
+///               EventEnsure  = [EventTarget, GuardClause(opt), EnsureClause, BecauseClause(opt)]
 ///
 /// Test categories (marked by expected status at time of writing):
 ///   GREEN  — passes before George's catalog fix (type DU shape, lexer, RuleDeclaration regression)
@@ -146,16 +146,16 @@ public class EnsureBecauseClauseSlotTests
     // ════════════════════════════════════════════════════════════════════════════
     //  StateEnsure catalog slot structure — RED-C (waiting on George's fix)
     //
-    //  Before fix: [SlotStateTarget, SlotEnsureClause]            (2 slots)
-    //  After fix:  [SlotStateTarget, SlotEnsureClause, SlotBecauseClause(opt)]  (3 slots)
+    //  Before fix: [SlotStateTarget, SlotEnsureClause, SlotBecauseClause(opt)]                (3 slots)
+    //  After fix:  [SlotStateTarget, SlotGuardClause(opt), SlotEnsureClause, SlotBecauseClause(opt)]  (4 slots)
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void StateEnsure_HasThreeSlots_AfterBecauseClauseSplit()
+    public void StateEnsure_HasFourSlots_AfterGuardAndBecauseSplit()
     {
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
-        slots.Should().HaveCount(3,
-            "StateEnsure must have 3 slots after the BecauseClause split: [StateTarget, EnsureClause, BecauseClause]");
+        slots.Should().HaveCount(4,
+            "StateEnsure must have 4 slots after the guard and BecauseClause split: [StateTarget, GuardClause, EnsureClause, BecauseClause]");
     }
 
     [Fact]
@@ -163,43 +163,48 @@ public class EnsureBecauseClauseSlotTests
     {
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
         slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget,
-            "StateEnsure.Slots[0] is the injected state name (pre-parsed injection anchor)");
+            "StateEnsure.Slots[0] is the scoped state target");
         slots[0].IsRequired.Should().BeTrue("the state target is always present");
     }
 
     [Fact]
-    public void StateEnsure_SlotAtIndex1_IsEnsureClause()
+    public void StateEnsure_SlotAtIndex1_IsGuardClause()
     {
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
-        slots[1].Kind.Should().Be(ConstructSlotKind.EnsureClause,
-            "StateEnsure.Slots[1] is the ensure expression — the 'because' content has been split out");
-        slots[1].IsRequired.Should().BeTrue("the ensure expression is always required");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,
+            "StateEnsure.Slots[1] is the optional pre-verb guard clause");
+        slots[1].IsRequired.Should().BeFalse("the guard clause is optional");
     }
 
     [Fact]
-    public void StateEnsure_SlotAtIndex2_IsBecauseClause()
+    public void StateEnsure_SlotAtIndex2_IsEnsureClause()
     {
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
-        slots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause,
-            "StateEnsure.Slots[2] is BecauseClause — the split slot carrying the reason string");
+        slots[2].Kind.Should().Be(ConstructSlotKind.EnsureClause,
+            "StateEnsure.Slots[2] is the ensure expression after the optional guard");
+        slots[2].IsRequired.Should().BeTrue("the ensure expression is always required");
+    }
+
+    [Fact]
+    public void StateEnsure_SlotAtIndex3_IsBecauseClause()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
+        slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause,
+            "StateEnsure.Slots[3] is BecauseClause — the split slot carrying the reason string");
     }
 
     [Fact]
     public void StateEnsure_BecauseClauseSlot_IsOptional()
     {
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
-        slots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause);
-        slots[2].IsRequired.Should().BeFalse(
+        slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause);
+        slots[3].IsRequired.Should().BeFalse(
             "StateEnsure allows ensures without a because clause — the slot is optional");
     }
 
     [Fact]
     public void StateEnsure_DoesNotEmbedBecauseInEnsureClause()
     {
-        // The EnsureClause description must not claim to carry the because content.
-        // This is the structural assertion of the defect fix: before the fix,
-        // EnsureClause's catalog description said "ensure expression because message".
-        // After the fix it describes only the expression.
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
         slots.Should().NotContain(
             s => s.Kind == ConstructSlotKind.EnsureClause && s.Description != null && s.Description.Contains("because"),
@@ -209,16 +214,16 @@ public class EnsureBecauseClauseSlotTests
     // ════════════════════════════════════════════════════════════════════════════
     //  EventEnsure catalog slot structure — RED-C (waiting on George's fix)
     //
-    //  Before fix: [SlotEventTarget, SlotEnsureClause]            (2 slots)
-    //  After fix:  [SlotEventTarget, SlotEnsureClause, SlotBecauseClause(opt)]  (3 slots)
+    //  Before fix: [SlotEventTarget, SlotEnsureClause, SlotBecauseClause(opt)]                (3 slots)
+    //  After fix:  [SlotEventTarget, SlotGuardClause(opt), SlotEnsureClause, SlotBecauseClause(opt)]  (4 slots)
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void EventEnsure_HasThreeSlots_AfterBecauseClauseSplit()
+    public void EventEnsure_HasFourSlots_AfterGuardAndBecauseSplit()
     {
         var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
-        slots.Should().HaveCount(3,
-            "EventEnsure must have 3 slots after the BecauseClause split: [EventTarget, EnsureClause, BecauseClause]");
+        slots.Should().HaveCount(4,
+            "EventEnsure must have 4 slots after the guard and BecauseClause split: [EventTarget, GuardClause, EnsureClause, BecauseClause]");
     }
 
     [Fact]
@@ -226,33 +231,42 @@ public class EnsureBecauseClauseSlotTests
     {
         var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
         slots[0].Kind.Should().Be(ConstructSlotKind.EventTarget,
-            "EventEnsure.Slots[0] is the injected event name (pre-parsed injection anchor)");
+            "EventEnsure.Slots[0] is the scoped event target");
         slots[0].IsRequired.Should().BeTrue("the event target is always present");
     }
 
     [Fact]
-    public void EventEnsure_SlotAtIndex1_IsEnsureClause()
+    public void EventEnsure_SlotAtIndex1_IsGuardClause()
     {
         var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
-        slots[1].Kind.Should().Be(ConstructSlotKind.EnsureClause,
-            "EventEnsure.Slots[1] is the ensure expression — the 'because' content has been split out");
-        slots[1].IsRequired.Should().BeTrue("the ensure expression is always required");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,
+            "EventEnsure.Slots[1] is the optional pre-verb guard clause");
+        slots[1].IsRequired.Should().BeFalse("the guard clause is optional");
     }
 
     [Fact]
-    public void EventEnsure_SlotAtIndex2_IsBecauseClause()
+    public void EventEnsure_SlotAtIndex2_IsEnsureClause()
     {
         var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
-        slots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause,
-            "EventEnsure.Slots[2] is BecauseClause — the split slot carrying the reason string");
+        slots[2].Kind.Should().Be(ConstructSlotKind.EnsureClause,
+            "EventEnsure.Slots[2] is the ensure expression after the optional guard");
+        slots[2].IsRequired.Should().BeTrue("the ensure expression is always required");
+    }
+
+    [Fact]
+    public void EventEnsure_SlotAtIndex3_IsBecauseClause()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
+        slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause,
+            "EventEnsure.Slots[3] is BecauseClause — the split slot carrying the reason string");
     }
 
     [Fact]
     public void EventEnsure_BecauseClauseSlot_IsOptional()
     {
         var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
-        slots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause);
-        slots[2].IsRequired.Should().BeFalse(
+        slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause);
+        slots[3].IsRequired.Should().BeFalse(
             "EventEnsure allows ensures without a because clause — the slot is optional");
     }
 
@@ -270,12 +284,12 @@ public class EnsureBecauseClauseSlotTests
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void StateEnsure_AndEventEnsure_BothHaveThreeSlots()
+    public void StateEnsure_AndEventEnsure_BothHaveFourSlots()
     {
         var seCount = Constructs.GetMeta(ConstructKind.StateEnsure).Slots.Count;
         var eeCount = Constructs.GetMeta(ConstructKind.EventEnsure).Slots.Count;
-        seCount.Should().Be(3, "StateEnsure must have 3 slots after fix");
-        eeCount.Should().Be(3, "EventEnsure must have 3 slots after fix");
+        seCount.Should().Be(4, "StateEnsure must have 4 slots after fix");
+        eeCount.Should().Be(4, "EventEnsure must have 4 slots after fix");
         seCount.Should().Be(eeCount, "StateEnsure and EventEnsure must have the same slot count (symmetric design)");
     }
 
@@ -285,10 +299,10 @@ public class EnsureBecauseClauseSlotTests
         var seSlots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
         var eeSlots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
 
-        seSlots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause,
-            "StateEnsure.Slots[2] is BecauseClause");
-        eeSlots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause,
-            "EventEnsure.Slots[2] is BecauseClause — same index as StateEnsure");
+        seSlots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause,
+            "StateEnsure.Slots[3] is BecauseClause");
+        eeSlots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause,
+            "EventEnsure.Slots[3] is BecauseClause — same index as StateEnsure");
     }
 
     // ════════════════════════════════════════════════════════════════════════════

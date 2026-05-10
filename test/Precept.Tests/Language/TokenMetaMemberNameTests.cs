@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using FluentAssertions;
 using Precept.Language;
@@ -8,40 +7,38 @@ namespace Precept.Tests.Language;
 
 public class TokenMetaMemberNameTests
 {
-    [Fact]
-    public void TokenMeta_Min_IsValidAsMemberName_True()
-        => Tokens.GetMeta(TokenKind.Min).IsValidAsMemberName.Should().BeTrue();
-
-    [Fact]
-    public void TokenMeta_Max_IsValidAsMemberName_True()
-        => Tokens.GetMeta(TokenKind.Max).IsValidAsMemberName.Should().BeTrue();
-
-    [Fact]
-    public void TokenMeta_Countof_IsValidAsMemberName_True()
-        => Tokens.GetMeta(TokenKind.Countof).IsValidAsMemberName.Should().BeTrue();
-
-    [Fact]
-    public void TokenMeta_Peekby_IsValidAsMemberName_True()
-        => Tokens.GetMeta(TokenKind.Peekby).IsValidAsMemberName.Should().BeTrue();
+    [Theory]
+    [InlineData(TokenKind.Min)]
+    [InlineData(TokenKind.Max)]
+    [InlineData(TokenKind.Countof)]
+    [InlineData(TokenKind.Peekby)]
+    [InlineData(TokenKind.CurrencyType)]
+    [InlineData(TokenKind.DateType)]
+    [InlineData(TokenKind.TimeType)]
+    [InlineData(TokenKind.InstantType)]
+    [InlineData(TokenKind.TimezoneType)]
+    [InlineData(TokenKind.DateTimeType)]
+    [InlineData(TokenKind.DimensionType)]
+    [InlineData(TokenKind.From)]
+    [InlineData(TokenKind.To)]
+    [InlineData(TokenKind.At)]
+    public void AccessorKeyword_AppearsInParserMemberNameVocabulary(TokenKind kind)
+        => Precept.Pipeline.Parser.KeywordsValidAsMemberName.Should().Contain(kind);
 
     [Theory]
-    [MemberData(nameof(AllKindsExceptValidMemberNames))]
-    public void TokenMeta_AllOtherKeywords_IsValidAsMemberName_False(TokenKind kind)
-        => Tokens.GetMeta(kind).IsValidAsMemberName.Should().BeFalse();
+    [MemberData(nameof(AllKeywordKindsExceptValidMemberNames))]
+    public void NonAccessorKeyword_DoesNotAppearInParserMemberNameVocabulary(TokenKind kind)
+        => Precept.Pipeline.Parser.KeywordsValidAsMemberName.Should().NotContain(kind);
 
-
-
-    public static TheoryData<TokenKind> AllKindsExceptValidMemberNames()
+    public static TheoryData<TokenKind> AllKeywordKindsExceptValidMemberNames()
     {
         var data = new TheoryData<TokenKind>();
-        var validMemberNames = Tokens.All
-            .Where(meta => meta.IsValidAsMemberName)
-            .Select(meta => meta.Kind)
-            .ToHashSet();
+        var validMemberNames = Precept.Pipeline.Parser.KeywordsValidAsMemberName.ToHashSet();
 
-        foreach (var kind in Enum.GetValues<TokenKind>())
+        foreach (var kind in Tokens.Keywords.Values.Distinct().Order())
             if (!validMemberNames.Contains(kind))
                 data.Add(kind);
+
         return data;
     }
 }

@@ -112,6 +112,29 @@ public class SlotContextResolverTests
         context.Should().Be(SlotContext.InExpression);
     }
 
+    [Fact]
+    public void GetCursorContext_AccessModePreVerbWhenGuard_RoutesGuardExpressionBeforeModifyFieldTarget()
+    {
+        var guardContext = GetCursorContext("""
+            precept LoanApplication
+            field Amount as number default 0 nonnegative
+            field IsOwner as boolean default false
+            state Draft initial
+            in Draft when¦ IsOwner modify Amount editable
+            """);
+
+        var fieldTargetContext = GetCursorContext("""
+            precept LoanApplication
+            field Amount as number default 0 nonnegative
+            field IsOwner as boolean default false
+            state Draft initial
+            in Draft when IsOwner modify¦ Amount editable
+            """);
+
+        guardContext.Should().Be(SlotContext.InExpression);
+        fieldTargetContext.Should().Be(SlotContext.InFieldTarget);
+    }
+
     public static TheoryData<string> ActionFieldTargetSources =>
     [
         """

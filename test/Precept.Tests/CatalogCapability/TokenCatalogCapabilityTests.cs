@@ -37,16 +37,23 @@ public sealed class TokenCatalogCapabilityTests
     [InlineData(TokenKind.DimensionType)]
     [InlineData(TokenKind.From)]
     [InlineData(TokenKind.To)]
-    public void TypeKeywords_IsValidAsMemberName_True(TokenKind kind)
-        => Tokens.GetMeta(kind).IsValidAsMemberName.Should().BeTrue(
-            $"{kind} should be available as a keyword member/accessor name");
+    [InlineData(TokenKind.At)]
+    public void AccessorKeywords_AppearInParserMemberNameVocabulary(TokenKind kind)
+        => CatalogCapabilityReflection.GetStaticSequence<TokenKind>(
+                typeof(Precept.Pipeline.Parser), "KeywordsValidAsMemberName")
+            .Should().Contain(kind,
+                $"{kind} should be available as a keyword member/accessor name");
 
     [Fact]
-    public void KeywordsValidAsMemberName_DerivedFromCatalog()
+    public void KeywordsValidAsMemberName_DerivedFromAccessorCatalog()
     {
-        var expected = Tokens.All
-            .Where(meta => meta.IsValidAsMemberName)
-            .Select(meta => meta.Kind);
+        var expected = Types.All
+            .SelectMany(meta => meta.Accessors)
+            .Select(accessor => accessor.Name)
+            .Distinct()
+            .Select(name => Tokens.Keywords.TryGetValue(name, out var kind) ? kind : (TokenKind?)null)
+            .Where(kind => kind is not null)
+            .Select(kind => kind!.Value);
 
         CatalogCapabilityReflection.GetStaticSequence<TokenKind>(
                 typeof(Precept.Pipeline.Parser), "KeywordsValidAsMemberName")

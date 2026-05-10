@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -6,23 +7,19 @@ namespace Precept.Tests.CatalogCapability;
 
 public sealed class ConstructCatalogCapabilityTests
 {
-    [Fact]
-    public void StateEnsure_SupportsPreVerbWhenGuard_True()
-        => CatalogCapabilityReflection.GetInstanceValue(
-                Constructs.GetMeta(ConstructKind.StateEnsure), "SupportsPreVerbWhenGuard")
-            .Should().Be(true);
+    [Theory]
+    [InlineData(ConstructKind.StateEnsure, 1)]
+    [InlineData(ConstructKind.StateAction, 1)]
+    [InlineData(ConstructKind.EventEnsure, 1)]
+    [InlineData(ConstructKind.AccessMode, 1)]
+    public void GuardedConstruct_DeclaresGuardClauseAtExpectedSlotIndex(ConstructKind kind, int slotIndex)
+    {
+        var slotsValue = CatalogCapabilityReflection.GetInstanceValue(Constructs.GetMeta(kind), nameof(ConstructMeta.Slots));
+        slotsValue.Should().BeAssignableTo<IReadOnlyList<ConstructSlot>>();
 
-    [Fact]
-    public void StateAction_SupportsPreVerbWhenGuard_True()
-        => CatalogCapabilityReflection.GetInstanceValue(
-                Constructs.GetMeta(ConstructKind.StateAction), "SupportsPreVerbWhenGuard")
-            .Should().Be(true);
-
-    [Fact]
-    public void EventEnsure_SupportsPreVerbWhenGuard_True()
-        => CatalogCapabilityReflection.GetInstanceValue(
-                Constructs.GetMeta(ConstructKind.EventEnsure), "SupportsPreVerbWhenGuard")
-            .Should().Be(true);
+        var slots = (IReadOnlyList<ConstructSlot>)slotsValue!;
+        slots[slotIndex].Kind.Should().Be(ConstructSlotKind.GuardClause);
+    }
 
     [Fact]
     public void EventHandler_SupportsPostActionEnsure_True()

@@ -6,17 +6,13 @@ namespace Precept.Tests.Language;
 
 public class Track2PhaseAConstructCatalogTests
 {
-    [Fact]
-    public void StateEnsure_SupportsPreVerbWhenGuard_True()
-        => Constructs.GetMeta(ConstructKind.StateEnsure).SupportsPreVerbWhenGuard.Should().BeTrue();
-
-    [Fact]
-    public void StateAction_SupportsPreVerbWhenGuard_True()
-        => Constructs.GetMeta(ConstructKind.StateAction).SupportsPreVerbWhenGuard.Should().BeTrue();
-
-    [Fact]
-    public void EventEnsure_SupportsPreVerbWhenGuard_True()
-        => Constructs.GetMeta(ConstructKind.EventEnsure).SupportsPreVerbWhenGuard.Should().BeTrue();
+    [Theory]
+    [InlineData(ConstructKind.StateEnsure, 1)]
+    [InlineData(ConstructKind.StateAction, 1)]
+    [InlineData(ConstructKind.EventEnsure, 1)]
+    [InlineData(ConstructKind.AccessMode, 1)]
+    public void GuardedConstruct_DeclaresGuardClauseAtExpectedSlotIndex(ConstructKind kind, int slotIndex)
+        => Constructs.GetMeta(kind).Slots[slotIndex].Kind.Should().Be(ConstructSlotKind.GuardClause);
 
     [Fact]
     public void EventHandler_SupportsPostActionEnsure_True()

@@ -34,11 +34,11 @@ public class ParserScopedConstructTests
 
     [Theory]
     [InlineData(ConstructKind.TransitionRow,    5)]
-    [InlineData(ConstructKind.StateEnsure,      3)]
+    [InlineData(ConstructKind.StateEnsure,      4)]
     [InlineData(ConstructKind.AccessMode,       4)]
     [InlineData(ConstructKind.OmitDeclaration,  2)]
-    [InlineData(ConstructKind.StateAction,      2)]
-    [InlineData(ConstructKind.EventEnsure,      3)]
+    [InlineData(ConstructKind.StateAction,      3)]
+    [InlineData(ConstructKind.EventEnsure,      4)]
     [InlineData(ConstructKind.EventHandler,     2)]
     public void ScopedConstruct_CatalogSlotCount_MatchesExpectedCount(
         ConstructKind kind, int expectedCount)
@@ -112,14 +112,14 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void AccessMode_CatalogSlotOrder_IsStateTarget_FieldTarget_AccessModeKeyword_Guard()
+    public void AccessMode_CatalogSlotOrder_IsStateTarget_Guard_FieldTarget_AccessModeKeyword()
     {
         // GREEN
         var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots;
         slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget,      "Slots[0]: state scope");
-        slots[1].Kind.Should().Be(ConstructSlotKind.FieldTarget,      "Slots[1]: target field");
-        slots[2].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword,"Slots[2]: readonly or editable");
-        slots[3].Kind.Should().Be(ConstructSlotKind.GuardClause,      "Slots[3]: optional when-guard");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,      "Slots[1]: optional pre-verb when-guard");
+        slots[2].Kind.Should().Be(ConstructSlotKind.FieldTarget,      "Slots[2]: target field");
+        slots[3].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword,"Slots[3]: readonly or editable");
     }
 
     [Fact]
@@ -128,9 +128,9 @@ public class ParserScopedConstructTests
         // GREEN
         var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots;
         slots[0].IsRequired.Should().BeTrue("StateTarget is required on AccessMode");
-        slots[1].IsRequired.Should().BeTrue("FieldTarget is required on AccessMode");
-        slots[2].IsRequired.Should().BeTrue("AccessModeKeyword is required on AccessMode");
-        slots[3].IsRequired.Should().BeFalse("GuardClause is optional on AccessMode");
+        slots[1].IsRequired.Should().BeFalse("GuardClause is optional on AccessMode");
+        slots[2].IsRequired.Should().BeTrue("FieldTarget is required on AccessMode");
+        slots[3].IsRequired.Should().BeTrue("AccessModeKeyword is required on AccessMode");
     }
 
     [Fact]
@@ -145,12 +145,13 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void StateAction_CatalogSlotOrder_IsStateTarget_ActionChain()
+    public void StateAction_CatalogSlotOrder_IsStateTarget_Guard_ActionChain()
     {
         // GREEN
         var slots = Constructs.GetMeta(ConstructKind.StateAction).Slots;
         slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget, "Slots[0]: entry/exit state");
-        slots[1].Kind.Should().Be(ConstructSlotKind.ActionChain, "Slots[1]: actions to fire");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause, "Slots[1]: optional pre-verb when-guard");
+        slots[2].Kind.Should().Be(ConstructSlotKind.ActionChain, "Slots[2]: actions to fire");
     }
 
     [Fact]
@@ -188,6 +189,28 @@ public class ParserScopedConstructTests
             entry.DisambiguationTokens!.Value.Should().Contain(TokenKind.Ensure,
                 $"StateEnsure entry with '{entry.LeadingToken}' is disambiguated by 'ensure'");
         }
+    }
+
+    [Fact]
+    public void StateEnsure_CatalogSlotOrder_IsStateTarget_Guard_Ensure_Because()
+    {
+        // GREEN
+        var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
+        slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget,   "Slots[0]: scoped state");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,   "Slots[1]: optional pre-verb when-guard");
+        slots[2].Kind.Should().Be(ConstructSlotKind.EnsureClause,  "Slots[2]: ensure expression");
+        slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause, "Slots[3]: optional reason");
+    }
+
+    [Fact]
+    public void EventEnsure_CatalogSlotOrder_IsEventTarget_Guard_Ensure_Because()
+    {
+        // GREEN
+        var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
+        slots[0].Kind.Should().Be(ConstructSlotKind.EventTarget,   "Slots[0]: scoped event");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,   "Slots[1]: optional pre-verb when-guard");
+        slots[2].Kind.Should().Be(ConstructSlotKind.EnsureClause,  "Slots[2]: ensure expression");
+        slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause, "Slots[3]: optional reason");
     }
 
     [Fact]
@@ -264,19 +287,22 @@ public class ParserScopedConstructTests
     // StateEnsure with different leading tokens (complementary; in-variant covered by EnsureBecauseClauseSlotTests)
     [InlineData("to Approved ensure amount > 0")]
     [InlineData("from Draft ensure amount > 0")]
+    [InlineData("in Approved when IsOwner ensure amount > 0")]
     [InlineData("to Approved ensure amount > 0 because \"Approved amount must be positive\"")]
     [InlineData("from Draft ensure amount > 0 because \"Draft amount must be positive\"")]
     // AccessMode
     [InlineData("in Draft modify Amount editable")]
     [InlineData("in Draft modify Amount readonly")]
-    [InlineData("in Draft modify Amount editable when DocumentsVerified")]
+    [InlineData("in Draft when DocumentsVerified modify Amount editable")]
     // OmitDeclaration
     [InlineData("in Draft omit InternalNotes")]
     // StateAction
     [InlineData("to Submitted -> set submittedAt = 1")]
     [InlineData("from Draft -> set amount = 0")]
+    [InlineData("to Submitted when IsOwner -> set submittedAt = 1")]
     // EventEnsure (without because — with-because covered by EnsureBecauseClauseSlotTests)
     [InlineData("on Submit ensure amount > 0")]
+    [InlineData("on Submit when IsOwner ensure amount > 0")]
     // EventHandler
     [InlineData("on UpdateName -> set name = newName")]
     public void ScopedConstruct_LexesWithoutErrors(string source)
@@ -463,6 +489,54 @@ public class ParserScopedConstructTests
             "TransitionRow span must cover real source positions");
     }
 
+    [Theory]
+    [InlineData("in Approved when IsOwner ensure Balance > 0", ConstructKind.StateEnsure, 1)]
+    [InlineData("to Submitted when IsOwner -> set Balance = Balance", ConstructKind.StateAction, 1)]
+    [InlineData("on Submit when IsOwner ensure Balance > 0", ConstructKind.EventEnsure, 1)]
+    [InlineData("from Draft on Submit when IsOwner -> transition Submitted", ConstructKind.TransitionRow, 2)]
+    [InlineData("in Draft when IsOwner modify Amount editable", ConstructKind.AccessMode, 1)]
+    public void GuardedScopedConstruct_WithWhenClause_MaterializesGuardSlotAtExpectedIndex(
+        string source, ConstructKind expectedKind, int expectedIndex)
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
+
+        manifest.Diagnostics.Should().BeEmpty($"'{source}' must parse without errors");
+
+        var construct = manifest.Constructs.Single(c => c.Meta.Kind == expectedKind);
+        construct.Slots[expectedIndex].Kind.Should().Be(ConstructSlotKind.GuardClause,
+            $"{expectedKind} should materialize its guard slot in slot index {expectedIndex} when 'when' is present");
+
+        var guard = (GuardClauseSlot)construct.Slots[expectedIndex];
+        guard.Expression.Should().NotBeOfType<MissingExpression>();
+    }
+
+    [Theory]
+    [InlineData("in Approved ensure Balance > 0", ConstructKind.StateEnsure)]
+    [InlineData("to Submitted -> set Balance = Balance", ConstructKind.StateAction)]
+    [InlineData("on Submit ensure Balance > 0", ConstructKind.EventEnsure)]
+    [InlineData("from Draft on Submit -> transition Submitted", ConstructKind.TransitionRow)]
+    [InlineData("in Draft modify Amount editable", ConstructKind.AccessMode)]
+    public void UnguardedScopedConstruct_WithoutWhenClause_DoesNotMaterializeGuardSlot(
+        string source, ConstructKind expectedKind)
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
+
+        manifest.Diagnostics.Should().BeEmpty($"'{source}' must parse without errors");
+
+        var construct = manifest.Constructs.Single(c => c.Meta.Kind == expectedKind);
+        construct.Slots.Should().NotContain(s => s.Kind == ConstructSlotKind.GuardClause,
+            $"{expectedKind} should omit its optional guard slot when no 'when' clause is present");
+    }
+
+    [Fact]
+    public void AccessMode_LegacyPostVerbGuardSyntax_ProducesParseDiagnostic()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("in Draft modify Amount editable when IsOwner"));
+
+        manifest.Diagnostics.Should().NotBeEmpty(
+            "legacy post-verb AccessMode guard syntax is no longer valid — guard must precede 'modify'");
+    }
+
     // ════════════════════════════════════════════════════════════════════════════
     //  §4. StateEnsure — RED-P (complementary)
     //  The EnsureBecauseClauseSlotTests already covers:
@@ -562,9 +636,9 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void StateEnsure_SlotOrdering_StateTarget_Before_EnsureClause()
+    public void StateEnsure_WithoutGuard_SlotOrdering_StateTarget_Before_EnsureClause()
     {
-        // RED-P: StateTarget (catalog Slots[0]) must precede EnsureClause (catalog Slots[1]).
+        // RED-P: With the optional guard omitted, StateTarget must still precede EnsureClause.
         var tokens = Lexer.Lex("to Approved ensure amount > 0");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -575,7 +649,7 @@ public class ParserScopedConstructTests
         var ensureIdx = ensure.Slots.IndexOf(ensure.Slots.First(s => s.Kind == ConstructSlotKind.EnsureClause));
 
         stateIdx.Should().BeLessThan(ensureIdx,
-            "StateTarget (catalog Slots[0]) must appear before EnsureClause (catalog Slots[1])");
+            "StateTarget must appear before EnsureClause when no guard slot is materialized");
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -693,8 +767,8 @@ public class ParserScopedConstructTests
     [Fact]
     public void AccessMode_WithGuard_GuardClauseSlot_IsPresent()
     {
-        // RED-P: Optional GuardClause is materialized when a 'when' clause is present.
-        var tokens = Lexer.Lex("in Draft modify Amount editable when DocumentsVerified");
+        // RED-P: Optional GuardClause is materialized when a pre-verb 'when' clause is present.
+        var tokens = Lexer.Lex("in Draft when DocumentsVerified modify Amount editable");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Diagnostics.Should().BeEmpty("AccessMode with guard must parse without errors");
@@ -723,9 +797,9 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void AccessMode_SlotOrdering_StateTarget_FieldTarget_AccessModeKeyword()
+    public void AccessMode_WithoutGuard_SlotOrdering_StateTarget_FieldTarget_AccessModeKeyword()
     {
-        // RED-P: Required slots appear in catalog-defined order.
+        // RED-P: With the optional guard omitted, the remaining required slots stay in source order.
         var tokens = Lexer.Lex("in Draft modify Amount editable");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -737,9 +811,9 @@ public class ParserScopedConstructTests
         var modeIdx   = access.Slots.IndexOf(access.Slots.First(s => s.Kind == ConstructSlotKind.AccessModeKeyword));
 
         stateIdx.Should().BeLessThan(fieldIdx,
-            "StateTarget (catalog Slots[0]) must precede FieldTarget (catalog Slots[1])");
+            "StateTarget must precede FieldTarget when no guard slot is materialized");
         fieldIdx.Should().BeLessThan(modeIdx,
-            "FieldTarget (catalog Slots[1]) must precede AccessModeKeyword (catalog Slots[2])");
+            "FieldTarget must precede AccessModeKeyword when no guard slot is materialized");
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -899,7 +973,7 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void StateAction_SlotOrdering_StateTarget_Before_ActionChain()
+    public void StateAction_WithoutGuard_SlotOrdering_StateTarget_Before_ActionChain()
     {
         // RED-P
         var tokens = Lexer.Lex("to Submitted -> set submittedAt = 1");
@@ -912,7 +986,7 @@ public class ParserScopedConstructTests
         var actionIdx = action.Slots.IndexOf(action.Slots.First(s => s.Kind == ConstructSlotKind.ActionChain));
 
         stateIdx.Should().BeLessThan(actionIdx,
-            "StateTarget (catalog Slots[0]) must appear before ActionChain (catalog Slots[1])");
+            "StateTarget must appear before ActionChain when no guard slot is materialized");
     }
 
     [Fact]
@@ -982,9 +1056,9 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void EventEnsure_SlotOrdering_EventTarget_Before_EnsureClause()
+    public void EventEnsure_WithoutGuard_SlotOrdering_EventTarget_Before_EnsureClause()
     {
-        // RED-P: Required slots must appear in catalog-defined order.
+        // RED-P: With the optional guard omitted, EventTarget must still precede EnsureClause.
         var tokens = Lexer.Lex("on Submit ensure amount > 0");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -995,7 +1069,7 @@ public class ParserScopedConstructTests
         var ensureIdx = ensure.Slots.IndexOf(ensure.Slots.First(s => s.Kind == ConstructSlotKind.EnsureClause));
 
         eventIdx.Should().BeLessThan(ensureIdx,
-            "EventTarget (catalog Slots[0]) must appear before EnsureClause (catalog Slots[1])");
+            "EventTarget must appear before EnsureClause when no guard slot is materialized");
     }
 
     [Fact]

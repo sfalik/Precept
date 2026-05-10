@@ -2045,11 +2045,10 @@ public class ProofEngineTests
         }
 
         [Fact]
-        public void InitialStateSatisfiability_GuardedEnsure_Skipped()
+        public void InitialStateSatisfiability_PlainEnsure_Succeeds()
         {
-            // NOTE: StateEnsure has no guard clause slot — `in X ensure E when Guard` is not
-            // valid Precept syntax. A satisfiable plain ensure with a passing condition is used
-            // to verify the satisfiability check works correctly for non-violating ensures.
+            // Guarded state ensures are now valid, but this assertion still targets the simpler
+            // satisfiable plain-ensure path so the proof expectation stays isolated to satisfiability.
             var ledger = Prove("""
                 precept Widget
                 field X as number default 0

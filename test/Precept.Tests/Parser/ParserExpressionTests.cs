@@ -129,7 +129,7 @@ public class ParserExpressionTests
     [InlineData("field dt as date <- '2026-01-01'")]
     [InlineData("from Draft on Submit when amount > 0 -> transition Approved")]
     [InlineData("in Draft ensure amount > 0 because \"msg\"")]
-    [InlineData("in Draft ensure amount > 0 when active because \"msg\"")]
+    [InlineData("in Draft when active ensure amount > 0 because \"msg\"")]
     public void ExpressionSource_LexesWithoutErrors(string source)
     {
         // GREEN — every source string used in RED-E tests must lex cleanly.
@@ -1008,18 +1008,20 @@ public class ParserExpressionTests
     }
 
     [Fact]
-    public void SlotPlumbing_StateEnsure_DoesNotHaveGuardClause_ByDesign()
+    public void SlotPlumbing_StateEnsure_WithGuard_MaterializesDistinctGuardAndEnsureSlots()
     {
-        // StateEnsure catalog slots: [StateTarget, EnsureClause, OptBecauseClause] — no GuardClause.
-        // This differs from AccessMode which does carry a GuardClause. Confirmed from Constructs.cs.
-        const string source = "in Draft ensure amount > 0 because \"msg\"";
+        const string source = "in Draft when active ensure amount > 0 because \"msg\"";
         var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
 
         var construct = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.StateEnsure);
+        construct.Slots.Should().Contain(s => s.Kind == ConstructSlotKind.GuardClause,
+            "StateEnsure now carries an explicit GuardClause slot in the catalog");
         construct.Slots.Should().Contain(s => s.Kind == ConstructSlotKind.EnsureClause,
-            "EnsureClause slot must be present");
-        construct.Slots.Should().NotContain(s => s.Kind == ConstructSlotKind.GuardClause,
-            "StateEnsure has no GuardClause slot in the catalog — only AccessMode carries a guard");
+            "EnsureClause slot must remain present after the guard slot is added");
+
+        var guard = (GuardClauseSlot)construct.Slots.Single(s => s.Kind == ConstructSlotKind.GuardClause);
+        guard.Expression.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Should().Be("active");
     }
 
     [Fact]
