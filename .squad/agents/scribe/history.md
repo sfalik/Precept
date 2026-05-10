@@ -2,13 +2,7 @@
 
 - Owns the squad's durable record: `.squad/decisions.md`, `.squad/decisions-archive.md`, `.squad/orchestration-log/`, `.squad/log/`, agent histories, and PR-body stewardship.
 - The standing Scribe loop is fixed: measure health first, run archive gates before merges, consolidate overlapping inbox notes into canonical decisions, propagate affected history updates, and stage only the exact allowed `.squad/` files written in-session.
-- When a history file grows past the 15 KB gate, summarize it immediately and keep only live batch state in `## Recent Updates
-
-### 2026-05-10T12:15:36Z — Post-batch archive and Soup Nazi closeout recorded
-- Pre-check measured `.squad/decisions.md` at 176494 bytes with 1 inbox file(s); the hard-gate 7-day archive pass moved 0 decision entries older than `2026-05-03T12:15:36Z` into `.squad/decisions-archive.md`.
-- No inbox files remained to merge in `.squad/decisions/inbox`, so the decision-merge step was a no-op on this pass.
-- Recorded Soup Nazi's completed grammar-regression batch in `.squad/orchestration-log/2026-05-10T12-15-36Z-soup-nazi-11.md`, appended the cross-agent update to `.squad/agents/soup-nazi/history.md`, and logged health as `decisions.md` 176494B -> 176494B; inbox processed = 1; history files summarized = 0.
-`.
+- When a history file grows past the 15 KB gate, summarize it immediately and keep only live batch state in `## Recent Updates`.
 
 ## Learnings
 
@@ -26,19 +20,21 @@
 
 ## Recent Updates
 
+### 2026-05-10T12:15:36Z — Post-batch archive, inbox merge, and Soup Nazi closeout recorded
+- Pre-check measured `.squad/decisions.md` at 169588 bytes with 1 inbox file; the hard-gate 7-day archive pass found 0 eligible active entries older than `2026-05-03T12:15:36Z`.
+- Merged `kramer-status-bar.md` into `.squad/decisions.md`, deleted the processed inbox file, appended the resulting activation-path update to `.squad/agents/kramer/history.md`, and recorded Soup Nazi's completed grammar-regression batch in `.squad/orchestration-log/2026-05-10T12-15-36Z-soup-nazi-11.md`.
+- Health report: `decisions.md` 169588B -> 170247B; `decisions-archive.md` 869467B -> 869467B; inbox processed = 1; history files summarized = 0.
+
 ### 2026-05-10T12:15:36Z — Kramer grammar-color batch recorded
 - Pre-check measured `.squad/decisions.md` at 444287 bytes with 13 inbox file(s); the 7-day archive hard gate ran before the inbox merge because the ledger was still over the 50 KB threshold.
 - Recorded the `kramer-26` orchestration result, merged the remaining inbox backlog into `decisions.md`, summarized `kramer/history.md`, and logged health: `decisions.md` 444287B -> 445246B; inbox processed = 13; history files summarized = 1 (`.squad/agents/kramer/history.md`).
 
 ### 2026-05-10T04:36:29Z — Slice 13 completion batch recorded
-- Pre-check measured `.squad/decisions.md` at 160862 bytes with 2 inbox file(s); the 7-day archive hard gate ran first and found 0 eligible active entries older than 2026-05-03T04:36:29Z.
+- Pre-check measured `.squad/decisions.md` at 160862 bytes with 2 inbox file(s); the 7-day archive hard gate ran first and found 0 eligible active entries older than `2026-05-03T04:36:29Z`.
 - This pass merged the Slice 13 inbox note into one canonical decision entry, deleted the processed inbox file, wrote orchestration records for `kramer-9`, `soup-nazi-3`, and the coordinator closeout batch, and propagated the resulting updates into the relevant agent histories.
 - Health report: `decisions.md` 160862B -> 161293B; `decisions-archive.md` 869467B -> 869467B; inbox processed = 1 (2 -> 1); history files summarized = 1 (`.squad/agents/soup-nazi/history.md`).
 
 ### 2026-05-10T04:33:18Z — Track 1 focus-switch batch recorded
-- Pre-check measured `.squad/decisions.md` at 152750 bytes with 14 inbox file(s); the 7-day archive hard gate ran first and found 0 eligible active entries older than 2026-05-03T04:33:18Z.
+- Pre-check measured `.squad/decisions.md` at 152750 bytes with 14 inbox file(s); the 7-day archive hard gate ran first and found 0 eligible active entries older than `2026-05-03T04:33:18Z`.
 - This pass merged 13 inbox notes into 6 canonical decisions, wrote the `kramer-8` and coordinator orchestration records, and kept Track 1 as the exclusive execution lane.
 
-### 2026-05-10T03:13:51Z — Toolchain bug batch recorded
-- Pre-check measured `.squad/decisions.md` at 204405 bytes with 3 inbox file(s); the hard-gate 7-day archive pass ran first and moved the eligible older decision block before the new bug-cluster decision landed.
-- Merged Frank's bug-cluster analysis and Soup-Nazi's test-strategy audit, wrote the matching orchestration records, and summarized Frank's history back under the size gate.
