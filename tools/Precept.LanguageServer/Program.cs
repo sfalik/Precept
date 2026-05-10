@@ -1,4 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Server;
+using Precept.LanguageServer.Handlers;
 
 namespace Precept.LanguageServer;
 
@@ -10,7 +12,12 @@ internal static class Program
         {
             options
                 .WithInput(Console.OpenStandardInput())
-                .WithOutput(Console.OpenStandardOutput());
+                .WithOutput(Console.OpenStandardOutput())
+                .WithServices(services =>
+                {
+                    services.AddSingleton<DocumentStore>();
+                })
+                .WithHandler<TextDocumentSyncHandler>();
         });
 
         await server.WaitForExit;

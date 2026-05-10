@@ -84,3 +84,10 @@
 ### 2026-05-09T15:21:46Z — Scribe merged the event-arg scope batch
 - `.squad/decisions.md` now records the durable outcome from `kramer-8`: the grammar emits `variable.parameter.property.precept`, so the earlier compound-selector workaround is officially superseded rather than left as the permanent fix.
 - The merged ledger entry also preserves the related field/arg color cleanup as part of the same semantic-token realignment.
+
+### 2026-05-09T20:00:24.839-04:00 — Slice 0 LS infrastructure landed
+- Slice 0 complete: `DocumentState`, `DocumentStore`, `DiagnosticProjector`, and `Handlers/TextDocumentSyncHandler` created.
+- `test/Precept.LanguageServer.Tests/LspTestHost.cs` created as the reusable in-process LSP harness for later protocol-layer slices.
+- `tools/Precept.LanguageServer/Program.cs` now registers `DocumentStore` and `TextDocumentSyncHandler` through OmniSharp DI.
+- OmniSharp 0.19.9 quirks observed: text-sync registration uses `TextSynchronizationCapability` in `CreateRegistrationOptions`, server/client in-process startup uses `LanguageServer.PreInit(...)` + `LanguageClient.PreInit(...)`, and the test harness needs the separate `OmniSharp.Extensions.LanguageClient` package.
+- Added a temporary `LegacyHandlerCompat` shim so the legacy LS test project compiles without touching `LanguageServerStubs.cs`; Slice 0b should delete the whole shim layer.
