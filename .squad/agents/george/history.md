@@ -11,7 +11,8 @@
 - Error propagation in the TypeChecker should preserve the original diagnostic source and return `TypedErrorExpression` without duplicating parent diagnostics.
 - `ParsedConstruct.LeadingTokenKind` is the minimal durable downstream recovery surface when parser-consumed anchor keywords still matter later in normalization or tooling.
 - `count` is a collection member/accessor, not a synthetic built-in function; proof and guard consumers should match typed member access.
-- Message-position support is catalog metadata on `TokenMeta`/`FunctionMeta`; generator and tooling consumers should derive from the flag instead of maintaining parallel lists.
+- Snippet templates are syntactically valid DSL strings: templates for constructs match top-level declaration forms; templates for actions match their respective `ActionSyntaxShape` grammars. Derived from sample files, not invented.
+
 - Typed-literal validation is catalog-driven end to end: `TypeMeta.ContentValidation` selects the validator, `TypedConstantValidation.Validate(...)` is the only dispatcher, and runtime JSON ingress still goes through `TypeRuntime<T>` / `TypeRuntimeMeta`.
 - Temporal and UCUM parsing now live under shared language/runtime parser stacks, while ISO 4217 and UCUM source data remain embedded external reference datasets rather than Precept catalogs.
 - `UcumAtomCatalog` is the sole UCUM source of truth; Tier 1 browse surfaces may synthesize normalized/prefixed forms, while full lookup stays XML-backed.
@@ -56,6 +57,7 @@
 
 ## Latest Slice
 
-- Slice 3 core complete: `ArgReference(TypedArg Arg, SourceSpan Site)` and `SemanticIndex.ArgReferences` landed as the semantic-index arg provenance surface.
-- `CheckContext`, `SemanticIndex.Empty`, and both `TypedArgRef` resolution paths now record arg references before `TypeChecker` seals them into the final semantic index.
-- Tests: 3 facts added in `test/Precept.Tests/ArgReferenceTests.cs`; George validated at 3740/3740 passing tests.
+- Slice 16 complete: `SnippetTemplate` populated on 5 top-level completion constructs (`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`) in `Constructs.cs`, and on 11 primary action verbs (`set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `append`, `insert`, `put`) in `Actions.cs`.
+- Templates use VS Code snippet format with `${N:placeholder}` tab stops, derived from sample `.precept` files. Each template leads with the keyword and includes one tab stop per required authoring slot.
+- 6 new tests in `test/Precept.Tests/Language/ConstructCatalogTests.cs` and `ActionCatalogTests.cs`; 3750 total tests passing.
+- Build validated with isolated `--artifacts-path temp/george-slice16-tests` to avoid shared-environment file lock collisions; language server build also green.
