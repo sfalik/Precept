@@ -251,6 +251,7 @@ public sealed record TypedField(
     bool IsWritable,
     DeclaredPresenceMeta Presence,
     ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers,
+    SourceSpan NameSpan,
     ParsedConstruct Syntax
 );
 
@@ -420,6 +421,9 @@ public sealed record StateReference(TypedState State, SourceSpan Site);
 /// <summary>A reference site where an event was referenced; recorded at resolution time for LS semantic tokens and navigation.</summary>
 public sealed record EventReference(TypedEvent Event, SourceSpan Site);
 
+/// <summary>A reference site where an event argument was referenced; recorded at resolution time for LS semantic tokens and navigation.</summary>
+public sealed record ArgReference(TypedArg Arg, SourceSpan Site);
+
 // ════════════════════════════════════════════════════════════════════════════
 //  SemanticIndex — flat semantic inventory (D4)
 // ════════════════════════════════════════════════════════════════════════════
@@ -469,6 +473,7 @@ public sealed record SemanticIndex(
     ImmutableArray<FieldReference>        FieldReferences,
     ImmutableArray<StateReference>        StateReferences,
     ImmutableArray<EventReference>        EventReferences,
+    ImmutableArray<ArgReference>          ArgReferences,
 
     // ── Diagnostics ───────────────────────────────────────────────────────
     ImmutableArray<Diagnostic>            Diagnostics
@@ -495,6 +500,7 @@ public sealed record SemanticIndex(
         FieldReferences:  ImmutableArray<FieldReference>.Empty,
         StateReferences:  ImmutableArray<StateReference>.Empty,
         EventReferences:  ImmutableArray<EventReference>.Empty,
+        ArgReferences:    ImmutableArray<ArgReference>.Empty,
         Diagnostics:      ImmutableArray<Diagnostic>.Empty
     );
 }

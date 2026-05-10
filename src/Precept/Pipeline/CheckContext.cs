@@ -119,6 +119,9 @@ internal sealed class CheckContext
     /// <summary>Event reference sites recorded at resolution time for LS semantic tokens.</summary>
     public List<EventReference> EventReferences { get; } = [];
 
+    /// <summary>Event-argument reference sites recorded at resolution time for LS semantic tokens.</summary>
+    public List<ArgReference> ArgReferences { get; } = [];
+
     // ── CI tracking ──────────────────────────────────────────────────────
 
     /// <summary>

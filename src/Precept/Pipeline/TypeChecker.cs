@@ -257,6 +257,7 @@ internal static partial class TypeChecker
                     ? new DeclaredPresenceMeta.Optional()
                     : new DeclaredPresenceMeta.Guaranteed(),
                 DeclaredQualifiers: ExtractQualifiers(declared.Type, ctx),
+                NameSpan: declared.NameSpan,
                 Syntax: declared.Syntax);
 
             ctx.Fields.Add(typedField);
@@ -1097,6 +1098,7 @@ internal static partial class TypeChecker
             FieldReferences:  ctx.FieldReferences.ToImmutableArray(),
             StateReferences:  ctx.StateReferences.ToImmutableArray(),
             EventReferences:  ctx.EventReferences.ToImmutableArray(),
+            ArgReferences:    ctx.ArgReferences.ToImmutableArray(),
             Diagnostics:      ctx.Diagnostics.ToImmutableArray());
 
         // D26: If any TypedErrorExpression exists, at least one Error diagnostic must be present

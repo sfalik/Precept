@@ -368,6 +368,7 @@ internal static partial class TypeChecker
         if (ctx.CurrentEventArgs is not null &&
             ctx.CurrentEventArgs.TryGetValue(name, out var arg))
         {
+            ctx.ArgReferences.Add(new ArgReference(arg, id.Span));
             return new TypedArgRef(arg.ResolvedType, arg.EventName, arg.Name, id.Span);
         }
 
@@ -1114,7 +1115,10 @@ internal static partial class TypeChecker
             var arg = ev.Args.FirstOrDefault(a =>
                 string.Equals(a.Name, expr.MemberName, StringComparison.Ordinal));
             if (arg is not null)
+            {
+                ctx.ArgReferences.Add(new ArgReference(arg, expr.Span));
                 return new TypedArgRef(arg.ResolvedType, ev.Name, arg.Name, expr.Span);
+            }
 
             ctx.Diagnostics.Add(
                 Diagnostics.Create(DiagnosticCode.UndeclaredField, expr.Span, expr.MemberName));
