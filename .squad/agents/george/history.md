@@ -7,6 +7,11 @@
 
 ## Learnings
 
+### 2026-05-10T15:32:08-04:00 — BUG-020 committed; full suite confirmed green
+- All 6 BUG-020 commits landed cleanly on `Precept-V2-Radical`: core implementation (`b5dc7c3e`), tests (`ec068569`), grammar/spec/catalog docs (`eb225f8a`), samples (`4a6cb93f`), working docs (`103c3be1`), squad history (`078dbe32`).
+- Final test count: 4,391 across Precept.Tests (3,894), Analyzers.Tests (280), LanguageServer.Tests (157), Mcp.Tests (60). Zero failures.
+- The `SupportsPreVerbWhenGuard` removal confirms the pattern: optional pre-verb clauses should be catalog-driven optional slots in the slot walk, not ad-hoc flags on the construct record. The parser stays metadata-first.
+
 - `CollectionValueBy` (AppendBy, EnqueueBy) and `RemoveAtIndex` (RemoveAt) are "secondary" action shapes: their `PrimaryActionKind` is non-null, so they are excluded from `Actions.ByTokenKind`. The parser NEVER directly dispatches to these shapes via `ByTokenKind`. Their parse methods exist in the switch but are unreachable from the normal action chain parse path. Tests for these shapes must be catalog property tests, not behavioral parser tests. Behavioral coverage requires the type-checker conversion path.
 - When propagating shape-specific context through shape-method signatures, the cleanest approach is to compute the FrozenSet once at the dispatch site (ParseActionByShape) and pass it as a parameter to every shape method. This avoids re-computing per call site and keeps the shape methods unaware of the catalog lookup.
 - `ParseExpression`'s `terminates()` lambda is checked in the WHILE loop (after ParseNud), not before ParseNud. ParseNud runs unconditionally on the current token. This means the termination set only matters for preventing led-loop continuation, not for gating the initial expression parse. For tokens with no binary-operator led binding power (=, into, by, at), the while loop breaks naturally via GetLedBindingPower = -1. The old hardcoded termination was redundant for the outer while loop but the design fix is still correct because it documents shape-specific intent and prevents future breakage if these tokens gain binary-operator roles.
