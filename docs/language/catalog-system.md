@@ -1594,8 +1594,8 @@ Grammar forms / declaration shapes.
 
 | Part | Type |
 |------|------|
-| Kind enum | `ConstructKind` (11 members) |
-| Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], Entries, RoutingFamily, SnippetTemplate?, ModifierDomain, SupportsPreVerbWhenGuard, SupportsPostActionEnsure, IsOutlineNode, OutlineSymbolTag?)` — see full shape below |
+| Kind enum | `ConstructKind` (12 members) |
+| Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], Entries, RoutingFamily, SnippetTemplate?, ModifierDomain, SupportsPostActionEnsure, IsOutlineNode, OutlineSymbolTag?)` — see full shape below |
 | Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (17-member enum) |
 
 | Catalog class | `Constructs` — `GetMeta()`, `All` |
@@ -1603,9 +1603,11 @@ Grammar forms / declaration shapes.
 
 **Members (from `precept-language-spec.md` §2.2 top-level dispatch):**
 
-`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`, `TransitionRow`, `StateEnsure`, `EventEnsure`, `AccessMode`, `StateAction`, `EventHandler`
+`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`, `TransitionRow`, `StateEnsure`, `EventEnsure`, `AccessMode`, `OmitDeclaration`, `StateAction`, `EventHandler`
 
 **Consumers:** MCP vocabulary (grammar reference), LS completions (context-sensitive construct suggestions), TextMate grammar (derivable from slot arrays), reference documentation, parser validation tests.
+
+Guard position is encoded directly in the ordered `Slots` array. Constructs with pre-verb guards place an optional `GuardClause` slot before the verb-bearing slot; there is no separate guard-placement boolean in `ConstructMeta`.
 
 ##### ConstructMeta — full shape
 
@@ -1621,7 +1623,6 @@ public sealed record ConstructMeta(
     RoutingFamily                        RoutingFamily,
     string?                              SnippetTemplate          = null,
     ModifierDomain                       ModifierDomain           = ModifierDomain.None,
-    bool                                 SupportsPreVerbWhenGuard = false,  // StateEnsure, StateAction, EventEnsure
     bool                                 SupportsPostActionEnsure = false,  // EventHandler
     bool                                 IsOutlineNode            = false,
     string?                              OutlineSymbolTag         = null   // e.g. "Module", "Property"; non-null when IsOutlineNode = true

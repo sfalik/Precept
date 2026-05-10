@@ -259,9 +259,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `Modify` | `modify` | State-scoped access mode verb (`in <State> modify <Field> readonly\|editable …`) |
-| `Readonly` | `readonly` | Access mode adjective — constrain to read-only (`in <State> modify <Field> readonly …`) |
-| `Editable` | `editable` | Access mode adjective — declare editable (`in <State> modify <Field> editable …`) |
+| `Modify` | `modify` | State-scoped access mode verb (`in <State> [when <Guard>] modify <Field> readonly\|editable …`) |
+| `Readonly` | `readonly` | Access mode adjective — constrain to read-only (`in <State> [when <Guard>] modify <Field> readonly …`) |
+| `Editable` | `editable` | Access mode adjective — declare editable (`in <State> [when <Guard>] modify <Field> editable …`) |
 | `Omit` | `omit` | State-scoped structural exclusion (`in <State> omit …`) |
 
 #### Keywords: Logical Operators
@@ -818,7 +818,7 @@ These preposition keywords parse a state target, then look ahead to select the p
 | `from` | `ensure` | state ensure (scoped to `from`) |
 | `from` | `->` | state action (exit hook) |
 
-All three support an optional `when` guard between the state target and the verb (except `from ... on`, where the guard is inside the transition row after the event name).
+State ensures, state actions, and access modes support an optional pre-verb `when` guard between the state target and the construct verb. Transition rows keep their guard after the event name, and `omit` declarations do not support `when`.
 
 #### Transition row
 
@@ -852,9 +852,11 @@ Each action and the outcome are introduced by `->`. The `->` arrow is deliberate
 #### State/event ensure
 
 ```
-(in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? because StringExpr
-on Identifier ensure BoolExpr ("when" BoolExpr)? because StringExpr
+(in|to|from) StateTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr
+on Identifier ("when" BoolExpr)? ensure BoolExpr because StringExpr
 ```
+
+The optional `when` guard is pre-verb: it appears after the state/event target and before `ensure`.
 
 #### Stateless event hook
 
@@ -889,18 +891,18 @@ CollectionRef    :=  Identifier   (bare field name only in v1; member access is 
 
 #### Access mode and omit declaration
 
-Two separate constructs govern per-state field access: `AccessMode` (modify + adjective + optional guard) and `OmitDeclaration` (omit, no guard). They share the `in` preposition but are distinct `ConstructKind`s with different slot sequences.
+Two separate constructs govern per-state field access: `AccessMode` (optional pre-verb guard + `modify` + adjective) and `OmitDeclaration` (omit, no guard). They share the `in` preposition but are distinct `ConstructKind`s with different slot sequences.
 
 ```
 FieldTarget  :=  identifier ("," identifier)* | all
 
 ── AccessMode: modify (field present, access level declared) ───────────────────
-in StateTarget modify Field readonly ("when" BoolExpr)?              ← singular access constraint
-in StateTarget modify Field editable ("when" BoolExpr)?              ← singular access upgrade
-in StateTarget modify Field { "," Field }* readonly ("when" BoolExpr)?  ← comma-separated shorthand
-in StateTarget modify Field { "," Field }* editable ("when" BoolExpr)?  ← comma-separated shorthand
-in StateTarget modify all readonly ("when" BoolExpr)?                ← state-scoped all
-in StateTarget modify all editable ("when" BoolExpr)?                ← state-scoped all
+in StateTarget ("when" BoolExpr)? modify Field readonly                  ← singular access constraint
+in StateTarget ("when" BoolExpr)? modify Field editable                  ← singular access upgrade
+in StateTarget ("when" BoolExpr)? modify Field { "," Field }* readonly  ← comma-separated shorthand
+in StateTarget ("when" BoolExpr)? modify Field { "," Field }* editable  ← comma-separated shorthand
+in StateTarget ("when" BoolExpr)? modify all readonly                    ← state-scoped all
+in StateTarget ("when" BoolExpr)? modify all editable                    ← state-scoped all
 
 ── OmitDeclaration: omit (field structurally absent — no guard) ────────────────
 in StateTarget omit Field                                            ← singular structural exclusion
@@ -920,7 +922,7 @@ in StateTarget omit all                                              ← state-s
 
 Root-level access mode declarations are **not valid syntax** — use the `writable` modifier on the field declaration for field-level mutability. All access mode overrides are state-scoped.
 
-State-scoped access modes (`in StateTarget`) use `modify` for constraint declarations and `omit` for structural exclusion. The field target is either `all` or a comma-separated list of field names.
+State-scoped access modes (`in StateTarget`) use `modify` for constraint declarations and `omit` for structural exclusion. Guarded access modes read `in <State> when <Guard> modify <FieldTarget> readonly|editable`; the field target is either `all` or a comma-separated list of field names.
 
 **Composition rules:**
 1. **Field baseline** — `writable` modifier on a field declaration sets the field's default to editable across all states.
@@ -1549,7 +1551,7 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | `writable` on event arg | An event argument carries the `writable` modifier | `WritableOnEventArg` |
 | Conflicting access modes | Same field has both `modify` and `omit` in the same state | `ConflictingAccessModes` |
 | Redundant access mode (unguarded) | `in <State> modify F editable` where `F` has `writable` (baseline already editable), or `in <State> modify F readonly` where `F` lacks `writable` (baseline already read-only); named-field forms only | `RedundantAccessMode` (error) |
-| Redundant access mode (guarded) | `in <State> modify F readonly when Guard` where `F` lacks `writable` — guard-true branch = read-only, guard-false branch = read-only (D3 baseline); the guard changes nothing | `RedundantAccessMode` (error) |
+| Redundant access mode (guarded) | `in <State> when Guard modify F readonly` where `F` lacks `writable` — guard-true branch = read-only, guard-false branch = read-only (D3 baseline); the guard changes nothing | `RedundantAccessMode` (error) |
 
 #### Computed field validation
 

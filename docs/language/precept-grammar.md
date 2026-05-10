@@ -30,7 +30,7 @@ Before explaining what the grammar is, it helps to rule out what it deliberately
 |---------|-------------|------------------|
 | **Expression-based** | Code is a tree of expressions; statements are expressions | ✗ Not this. Expressions exist only *inside* slots. A `.precept` file is a list of constructs, not a tree of expressions. |
 | **Indentation-sensitive** | Layout defines scope (Python, YAML, Haskell) | ✗ Not this. Whitespace is cosmetic. Block scope is declared by keywords, not indentation. |
-| **Context-dependent** | A token's meaning depends on surrounding text | ✗ Not this. Every construct opens with a keyword that unambiguously identifies its kind (with at most one additional lookahead token for disambiguation). |
+| **Context-dependent** | A token's meaning depends on surrounding text | ✗ Not this. Every construct opens with a keyword that unambiguously identifies its kind (or a shared-family disambiguation token reached after an optional pre-verb guard). |
 | **Recursive descent** | Productions nest recursively; grammar is a tree | ✗ Not this. Constructs are flat. Nesting occurs only inside *slot* expressions, not at construct level. |
 | **General-purpose** | Designed for programmers with PL background | ✗ Not this. Designed for domain experts and AI agents who think in business terms. |
 
@@ -59,17 +59,17 @@ Flatness also makes the language mechanically tractable: the parser dispatches o
 
 #### 2. Keyword anchoring
 
-Every construct begins with a distinguishing keyword (its *leading token*). The first token of any line tells you — with at most one additional peek — exactly what kind of construct follows.
+Every construct begins with a distinguishing keyword (its *leading token*). The first token of any line tells you which construct family follows; shared families then resolve at the family verb, optionally after a pre-verb `when` guard.
 
 ```
 field  →  FieldDeclaration
 state  →  StateDeclaration
 event  →  EventDeclaration
 rule   →  RuleDeclaration
-from   →  TransitionRow | StateEnsure | StateAction   (disambiguated by 2nd keyword: on | ensure | ->)
-in     →  StateEnsure | AccessMode | OmitDeclaration  (disambiguated by 2nd keyword: ensure | modify | omit)
-on     →  EventEnsure | EventHandler                  (disambiguated by 2nd keyword: ensure | ->)
-to     →  StateEnsure | StateAction                   (disambiguated by 2nd keyword: ensure | ->)
+from   →  TransitionRow | StateEnsure | StateAction   (disambiguated by family verb: on | ensure | ->)
+in     →  StateEnsure | AccessMode | OmitDeclaration  (disambiguated by family verb: ensure | modify | omit)
+on     →  EventEnsure | EventHandler                  (disambiguated by family verb: ensure | ->)
+to     →  StateEnsure | StateAction                   (disambiguated by family verb: ensure | ->)
 ```
 
 **Why keyword anchoring?** Three reasons:
@@ -266,14 +266,15 @@ in  Approved  ensure  ApprovedAmount > 0  because  "…"
 ```
 
 ```
-on  Submit  ensure  Amount > 0  because  "…"
- │    │       ↑          │          ↑        │
-[1]  [2]  disambig.     [3]        slot     [4]
-          token                     marker
+on  Submit  [when  IsHighValue]  ensure  Amount > 0  because  "…"
+ │    │       ↑         │          ↑          │         ↑        │
+[1]  [2]    slot       [3]     disambig.     [4]       slot     [5]
+            marker                token                marker
 [1] Leading token: `on`   ← shared with EventHandler
 [2] EventTarget slot — the anchor event name
-[3] EnsureClause slot — the expression condition (`ensure <expression>`)
-[4] BecauseClause slot — the mandatory explanatory reason
+[3] GuardClause slot (optional) — `when` expression; scopes which invocations this ensure governs
+[4] EnsureClause slot — the expression condition (`ensure <expression>`)
+[5] BecauseClause slot — optional explanatory reason
 ```
 
 ```
@@ -309,15 +310,15 @@ rule  ApprovedAmount >= 0  when  IsActive  because  "Approved amount cannot be n
 ```
 
 ```
-in  Draft  modify  ClaimAmount  editable  when  DocumentsVerified
- │    │       ↑         │           │       ↑            │
-[1]  [2]  disambig.    [3]         [4]    slot         [5]
-            token                             marker
+in  Draft  when  DocumentsVerified  modify  ClaimAmount  editable
+ │    │      ↑            │           ↑         │           │
+[1]  [2]   slot         [3]      disambig.    [4]         [5]
+           marker                    token
 [1] Leading token: `in`   ← shared with StateEnsure, OmitDeclaration
 [2] StateTarget slot — the anchor state name
-[3] FieldTarget slot — the field affected in that state
-[4] AccessModeKeyword slot — `editable` or `readonly`
-[5] GuardClause slot — optional `when` expression
+[3] GuardClause slot — optional `when` expression
+[4] FieldTarget slot — the field affected in that state
+[5] AccessModeKeyword slot — `editable` or `readonly`
 ```
 
 ```
@@ -346,30 +347,30 @@ on  Submit  ->  set ClaimAmount = Submit.Amount
 
 ### What a family is
 
-A **construct family** is a group of constructs that share the same leading keyword. Because the leading keyword alone doesn't distinguish them, the parser peeks at the next one or two tokens to select the correct `ConstructMeta`.
+A **construct family** is a group of constructs that share the same leading keyword. Because the leading keyword alone doesn't distinguish them, the parser scans forward to the family's disambiguation token, skipping an optional pre-verb `when` guard when present, to select the correct `ConstructMeta`.
 
 Four routing families exist, organized by how the parser identifies them:
 
 ```
 ROUTING FAMILIES
 ────────────────────────────────────────────────────────────────────────────────────
-FAMILY       LEADING TOKEN    DISAMBIGUATION     CONSTRUCTS
+FAMILY       LEADING TOKEN    DISAMBIGUATION       CONSTRUCTS
 ────────────────────────────────────────────────────────────────────────────────────
-Header       precept          none (unique)      PreceptHeader
-Direct       field            none               FieldDeclaration
-             state            none               StateDeclaration
-             event            none               EventDeclaration
-             rule             none               RuleDeclaration
-StateScoped  in               peek at next kwd   StateEnsure (ensure)
-                                                 AccessMode  (modify)
-                                                 OmitDeclaration (omit)
-             from             peek at next kwd   TransitionRow (on)
-                                                  StateEnsure (ensure)
-                                                  StateAction (->)
-             to               peek at next kwd   StateEnsure (ensure)
-                                                  StateAction (->)
-EventScoped  on               peek at next kwd   EventEnsure (ensure)
-                                                 EventHandler (→)
+Header       precept          none (unique)        PreceptHeader
+Direct       field            none                 FieldDeclaration
+             state            none                 StateDeclaration
+             event            none                 EventDeclaration
+             rule             none                 RuleDeclaration
+StateScoped  in               scan to family verb  StateEnsure (ensure)
+                                                   AccessMode (modify)
+                                                   OmitDeclaration (omit)
+             from             scan to family verb  TransitionRow (on)
+                                                   StateEnsure (ensure)
+                                                   StateAction (->)
+             to               scan to family verb  StateEnsure (ensure)
+                                                   StateAction (->)
+EventScoped  on               scan to family verb  EventEnsure (ensure)
+                                                   EventHandler (→)
 ────────────────────────────────────────────────────────────────────────────────────
 ```
 
@@ -387,17 +388,17 @@ Constructs.ByLeadingToken[T]
   │ one candidate              │ multiple candidates
   │ (Header or Direct)         │ (StateScoped/EventScoped family)
   ↓                            ↓
-parse immediately         peek(offset) → disambiguationToken
-                                    │
-                          ┌─────────┴──────────────────┐
-                          │ matches candidate A          │ matches candidate B
-                          ↓                              ↓
-                    parse construct A              parse construct B
+parse immediately         scan forward → disambiguationToken
+                                         │
+                           ┌─────────────┴────────────────┐
+                           │ matches candidate A           │ matches candidate B
+                           ↓                               ↓
+                     parse construct A               parse construct B
 ```
 
-Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the construct's catalog entry. The offset and token set are metadata — the parser carries no hardcoded disambiguation logic.
+Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the construct's catalog entry. For scoped constructs with optional pre-verb guards, the parser skips `when <BoolExpr>` and then consumes the first matching family disambiguation token. The token set comes from metadata; the parser does not switch on construct kind.
 
-**The one-lookahead guarantee:** Disambiguation requires at most one additional token beyond the leading token. A grammar requiring two or more additional tokens to disambiguate breaks the invariant that completion tools can predict the next valid token at every position.
+**Scoped-family invariant:** The disambiguation keyword must appear before any new construct leader. Optional pre-verb guards may intervene, but they terminate at the construct-family verb (`ensure`, `modify`, `on`, `->`, etc.), keeping routing deterministic.
 
 ### Key families in detail
 
@@ -405,8 +406,8 @@ Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the constru
 
 ```
 in  [AnchorState]  ensure  Expr  because  "..."                    → StateEnsure
-in  [AnchorState]  modify  Field  [readonly|editable]  [when Guard] → AccessMode
-in  [AnchorState]  omit  Field                                     → OmitDeclaration
+in  [AnchorState]  [when Guard]  modify  Field  [readonly|editable] → AccessMode
+in  [AnchorState]  omit  Field                                      → OmitDeclaration
 ```
 
 The second keyword (`ensure`, `modify`, `omit`) is the disambiguation token. `readonly` and `editable` are access-mode adjectives inside the `AccessModeKeyword` slot, not family-level disambiguation tokens.
@@ -640,7 +641,7 @@ These are the rules any future language enhancement MUST respect. They are not s
 
 ### Invariant 1: Every construct has a unique keyword anchor (or a unique disambiguation path)
 
-**The rule:** Every construct begins with a leading token that identifies it (or a leading token plus at most two additional lookahead tokens in a construct family).
+**The rule:** Every construct begins with a leading token that identifies it, or with a shared family leader whose disambiguation token appears later on the same construct line (optionally after a pre-verb `when` guard).
 
 **Why it exists:** The parser dispatches via `Constructs.ByLeadingToken`. Adding a construct with no distinguishing leading token would require semantic context to parse — breaking the catalog-driven dispatch model and destroying error recovery.
 
@@ -648,13 +649,13 @@ These are the rules any future language enhancement MUST respect. They are not s
 
 ---
 
-### Invariant 2: Disambiguation requires at most 2 lookahead tokens
+### Invariant 2: Family disambiguation must remain linear and guard-bounded
 
-**The rule:** When a leading token is shared by multiple constructs (a `ConstructFamily`), the disambiguation token must be identifiable by peeking at most 2 tokens ahead (offset 1 or 2 from the leading token).
+**The rule:** When a leading token is shared by multiple constructs (a `ConstructFamily`), the parser must be able to scan forward to a unique disambiguation token without backtracking. Optional pre-verb guards are allowed only when their slot termination metadata bounds the scan at the family verb.
 
-**Why it exists:** Completion tools predict valid tokens at position N by knowing tokens 0..N-1. If disambiguation requires more than 2 tokens of lookahead, the completion tool cannot suggest the right tokens at the disambiguation position — it can't know which construct the author is writing until too late.
+**Why it exists:** Completion and parsing stay deterministic when the construct family still converges on one verb token (`ensure`, `modify`, `omit`, `on`, `->`, etc.) and the optional guard cannot consume past it.
 
-**What breaks if violated:** Intellisense completions become wrong or absent at the disambiguation position. The parser may require backtracking. Error recovery becomes unpredictable.
+**What breaks if violated:** Family routing becomes ambiguous, optional guards can swallow the verb boundary, and both parser recovery and tooling predictions degrade.
 
 ---
 
