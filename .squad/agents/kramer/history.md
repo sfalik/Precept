@@ -26,6 +26,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T00:23:31Z — Slice 0b legacy LS cleanup committed
+- Commit `51d93dc2` deleted `tools/Precept.LanguageServer/LanguageServerStubs.cs`, `PreceptPreviewProtocol.cs`, and `LegacyHandlerCompat.cs`; the compat shim had to go because it still referenced the removed stub types.
+- Deleted 13 legacy shim-facing files from `test/Precept.LanguageServer.Tests/`, removing 173 compiler-redundant tests; only `LspTestHost.cs` and `GlobalUsings.cs` remain, and the LS test project now discovers 0 tests while still building cleanly.
+- Validation for the cleanup gate: `dotnet build` succeeds for the language-server and LS test projects, and `dotnet test test/Precept.Tests/` stays green at 3737/3737.
+
 ### 2026-05-10T00:11:05Z — Slice 0 language-server infrastructure committed
 - Commit `9f6b1fd7` added `tools/Precept.LanguageServer/DocumentState.cs`, `DocumentStore.cs`, `DiagnosticProjector.cs`, `Handlers/TextDocumentSyncHandler.cs`, and `test/Precept.LanguageServer.Tests/LspTestHost.cs`, with `DocumentState` using a volatile `Compilation` field plus `Interlocked.Exchange` and `DocumentStore` using `ConcurrentDictionary<DocumentUri, DocumentState>`.
 - `tools/Precept.LanguageServer/Program.cs` now registers `DocumentStore` and `TextDocumentSyncHandler`; the language server builds, and the remaining legacy stub test failures stay expected until Slice 0b deletes the old stub layer.

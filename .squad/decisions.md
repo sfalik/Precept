@@ -12,6 +12,20 @@
 
 ---
 
+### 2026-05-10T00:23:31Z: Slice 0b removed the legacy language-server stub layer and zeroed the LS test project
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file -> 1 canonical entry).
+
+**Merged source:** `.squad/agents/kramer/inbox.md`.
+
+- Kramer commit `51d93dc2` deleted `tools/Precept.LanguageServer/LanguageServerStubs.cs`, `PreceptPreviewProtocol.cs`, and `LegacyHandlerCompat.cs`; the compat file also had to go because it still referenced the removed stub types and otherwise kept the language-server build red.
+- Slice 0b also deleted 13 legacy shim-facing files under `test/Precept.LanguageServer.Tests/`, removing 173 compiler-redundant tests; the project now retains only `LspTestHost.cs` and `GlobalUsings.cs`, discovers 0 tests, and still builds cleanly.
+- Validation closed the cleanup gate: `dotnet build` succeeds for the language-server and LS test projects, and `dotnet test test/Precept.Tests/` stays green at 3737/3737.
+
+---
+
 ### 2026-05-10T00:11:05Z: Slice 0a outline metadata and Slice 0 language-server infrastructure are now the durable baseline
 
 **By:** Scribe
