@@ -950,26 +950,29 @@ public static partial class Parser
             // Terminator for action expressions: next arrow or construct boundary
             Func<bool> isAtActionBoundary = () => Peek().Kind == TokenKind.Arrow || IsAtConstructBoundary();
 
+            // Shape-specific separator tokens from catalog — only this shape's separators terminate the target.
+            var separators = Actions.GetShapeMeta(meta.SyntaxShape).SeparatorTokens;
+
             switch (meta.SyntaxShape)
             {
                 case ActionSyntaxShape.AssignValue:
-                    return ParseAssignValueAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseAssignValueAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.CollectionValue:
-                    return ParseCollectionValueAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseCollectionValueAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.CollectionInto:
-                    return ParseCollectionIntoAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseCollectionIntoAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.FieldOnly:
-                    return ParseFieldOnlyAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseFieldOnlyAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.CollectionValueBy:
-                    return ParseCollectionValueByAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseCollectionValueByAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.InsertAt:
-                    return ParseInsertAtAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseInsertAtAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.RemoveAtIndex:
-                    return ParseRemoveAtIndexAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseRemoveAtIndexAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.PutKeyValue:
-                    return ParsePutKeyValueAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParsePutKeyValueAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 case ActionSyntaxShape.CollectionIntoBy:
-                    return ParseCollectionIntoByAction(kind, actionStartSpan, isAtActionBoundary);
+                    return ParseCollectionIntoByAction(kind, actionStartSpan, isAtActionBoundary, separators);
                 default:
                 {
                     // Unknown shape — produce malformed action
@@ -979,10 +982,10 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.AssignValue)]
-        private ParsedAction ParseAssignValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseAssignValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field = expression
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             Expect(TokenKind.Assign);
             var value = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, value.Span);
@@ -990,26 +993,26 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.CollectionValue)]
-        private ParsedAction ParseCollectionValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseCollectionValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field expression
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             var value = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, value.Span);
             return new CollectionValueAction(kind, target, value, span);
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.CollectionInto)]
-        private ParsedAction ParseCollectionIntoAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseCollectionIntoAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field [into field]
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             var lastSpan = target.Span;
             ParsedExpression? intoTarget = null;
             if (Peek().Kind == TokenKind.Into)
             {
                 Advance(); // consume 'into'
-                intoTarget = ParseActionTarget(isAtActionBoundary);
+                intoTarget = ParseActionTarget(separators, isAtActionBoundary);
                 lastSpan = intoTarget.Span;
             }
             var span = SourceSpan.Covering(actionStartSpan, lastSpan);
@@ -1017,19 +1020,19 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.FieldOnly)]
-        private ParsedAction ParseFieldOnlyAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseFieldOnlyAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, target.Span);
             return new FieldOnlyAction(kind, target, span);
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.CollectionValueBy)]
-        private ParsedAction ParseCollectionValueByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseCollectionValueByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field expr by expr
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             var value = ParseExpression(0, () => Peek().Kind == TokenKind.By || isAtActionBoundary());
             Expect(TokenKind.By);
             var orderingKey = ParseExpression(0, isAtActionBoundary);
@@ -1038,10 +1041,10 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.InsertAt)]
-        private ParsedAction ParseInsertAtAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseInsertAtAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field expr at expr
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             var value = ParseExpression(0, () => Peek().Kind == TokenKind.At || isAtActionBoundary());
             Expect(TokenKind.At);
             var index = ParseExpression(0, isAtActionBoundary);
@@ -1050,10 +1053,10 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.RemoveAtIndex)]
-        private ParsedAction ParseRemoveAtIndexAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseRemoveAtIndexAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field at expr
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             Expect(TokenKind.At);
             var index = ParseExpression(0, isAtActionBoundary);
             var span = SourceSpan.Covering(actionStartSpan, index.Span);
@@ -1061,10 +1064,10 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.PutKeyValue)]
-        private ParsedAction ParsePutKeyValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParsePutKeyValueAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field key = value
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             var key = ParseExpression(0, () => Peek().Kind == TokenKind.Assign || isAtActionBoundary());
             Expect(TokenKind.Assign);
             var value = ParseExpression(0, isAtActionBoundary);
@@ -1073,10 +1076,10 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ActionSyntaxShape.CollectionIntoBy)]
-        private ParsedAction ParseCollectionIntoByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary)
+        private ParsedAction ParseCollectionIntoByAction(ActionKind kind, SourceSpan actionStartSpan, Func<bool> isAtActionBoundary, FrozenSet<TokenKind> separators)
         {
             // verb field [into field] [by key]
-            var target = ParseActionTarget(isAtActionBoundary);
+            var target = ParseActionTarget(separators, isAtActionBoundary);
             var lastSpan = target.Span;
             ParsedExpression? intoTarget = null;
             ParsedExpression? orderingCapture = null;
@@ -1084,14 +1087,14 @@ public static partial class Parser
             if (Peek().Kind == TokenKind.Into)
             {
                 Advance(); // consume 'into'
-                intoTarget = ParseActionTarget(isAtActionBoundary);
+                intoTarget = ParseActionTarget(separators, isAtActionBoundary);
                 lastSpan = intoTarget.Span;
             }
 
             if (Peek().Kind == TokenKind.By)
             {
                 Advance(); // consume 'by'
-                orderingCapture = ParseActionTarget(isAtActionBoundary);
+                orderingCapture = ParseActionTarget(separators, isAtActionBoundary);
                 lastSpan = orderingCapture.Span;
             }
 
@@ -1101,17 +1104,12 @@ public static partial class Parser
 
         /// <summary>
         /// Parses the target (field reference) of an action.
-        /// This is typically an identifier or member access expression.
+        /// Terminates on the shape-specific <paramref name="separators"/> derived from
+        /// <see cref="Actions.GetShapeMeta"/> — never on the union of all separator tokens.
         /// </summary>
-        private ParsedExpression ParseActionTarget(Func<bool> terminates)
+        private ParsedExpression ParseActionTarget(FrozenSet<TokenKind> separators, Func<bool> terminates)
         {
-            // Parse a simple expression that stops at action boundaries
-            return ParseExpression(0, () =>
-                Peek().Kind == TokenKind.Assign
-                || Peek().Kind == TokenKind.Into
-                || Peek().Kind == TokenKind.By
-                || Peek().Kind == TokenKind.At
-                || terminates());
+            return ParseExpression(0, () => separators.Contains(Peek().Kind) || terminates());
         }
 
         // ── Boundary detection ──────────────────────────────────────────────────
