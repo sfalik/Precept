@@ -25,6 +25,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T08:25:21.928-04:00 — VS Code status bar regression anchor closed
+- Extended `ExtensionManifestTests.cs` to lock the shipped VS Code language-server status item contract: activation must create, wire, and show the item, and `updateLanguageServerStatusItem` must keep it visible across starting/ready/restarting/error/stopped surfaces.
+- Clarified `docs/tooling/extension.md` so the status bar contract is explicit: the left-aligned `Precept` item is always visible after activation begins and opens launch-mode details on click.
+- Validation: `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore` and `npm run compile` from `tools\Precept.VsCode` green.
+
 ### 2026-05-10T12:15:36Z — Grammar keyword regression coverage closed
 - Locked `as` and field-level `default` against the shipped TextMate grammar surface so fallback highlighting cannot silently repaint those grammar keywords gold.
 - Added honest regression coverage in the language-server/TextMate grammar test layer, updated the grammar-generator override, regenerated `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json`, and kept the shipped grammar as the asserted surface.

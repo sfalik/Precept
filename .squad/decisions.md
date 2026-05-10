@@ -30,11 +30,12 @@
 
 **Status:** Merged from Kramer's inbox note.
 
-**Merged source:** `kramer-status-bar.md`.
+**Merged sources:** `kramer-status-bar.md`, `soup-nazi-status-bar.md`.
 
 - Keep both VS Code activation paths for the Precept extension: `workspaceContains:**/*.precept` and `onLanguage:precept`.
 - The status bar item and language server are created during extension activation, so repo-style workspaces alone are not enough; single-file and no-workspace sessions also need activation coverage.
 - `onLanguage:precept` restores the expected editor tooling surface without changing any catalog-driven language behavior.
+- The durable regression anchor stays in `test\Precept.LanguageServer.Tests\ExtensionManifestTests.cs` until the repo grows a dedicated `test\Precept.VsCode.Tests` harness; spike mode should not invent a new test project just for this guard.
 
 ---
 
