@@ -107,4 +107,86 @@ public class DiagnosticPublishIntegrationTests
         compilations.Should().Contain(state.Current!);
         state.Current!.Tokens.Should().NotBeNull();
     }
+
+    [Fact]
+    public async Task DidChange_OutOfOrderVersions_PublishesNewestDiagnosticsOnly()
+    {
+        await using var host = await LspTestHost.CreateAsync();
+        var uri = DocumentUri.FromFileSystemPath(@"C:\Users\Shane.Falik\source\repos\precept-architecture\test\Precept.LanguageServer.Tests\out-of-order-diagnostics.precept");
+        using var publishTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var initialDiagnosticsTask = host.WhenPublishDiagnosticsAsync(uri, publishTimeout.Token);
+        host.Client.TextDocument.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+            {
+                Uri = uri,
+                LanguageId = "precept",
+                Version = 1,
+                Text = """
+                    precept Order
+                    field Quantity as number
+                    state Draft initial terminal
+                    """,
+            },
+        });
+
+        (await initialDiagnosticsTask).Diagnostics.Should().BeEmpty();
+
+        var newestDiagnosticsTask = host.WhenPublishDiagnosticsAsync(uri, publishTimeout.Token);
+        host.Client.TextDocument.DidChangeTextDocument(CreateDidChangeParams(
+            uri,
+            version: 3,
+            """
+            precept Order
+            field Quantity as UnknownType
+            state Draft initial terminal
+            """));
+
+        var newestDiagnostics = await newestDiagnosticsTask;
+        newestDiagnostics.Uri.Should().Be(uri);
+        newestDiagnostics.Diagnostics.Should().NotBeEmpty();
+        newestDiagnostics.Diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("UnknownType", StringComparison.Ordinal));
+
+        using var stalePublishTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var stalePublishTask = host.WhenPublishDiagnosticsAsync(uri, stalePublishTimeout.Token);
+        host.Client.TextDocument.DidChangeTextDocument(CreateDidChangeParams(
+            uri,
+            version: 2,
+            """
+            precept Order
+            field Quantity as number
+            state Draft initial terminal
+            """));
+
+        Func<Task> awaitStalePublish = async () => await stalePublishTask;
+        await awaitStalePublish.Should().ThrowAsync<TaskCanceledException>();
+
+        var finalDiagnosticsTask = host.WhenPublishDiagnosticsAsync(uri, publishTimeout.Token);
+        host.Client.TextDocument.DidChangeTextDocument(CreateDidChangeParams(
+            uri,
+            version: 4,
+            """
+            precept Order
+            field Quantity as number
+            state Draft initial terminal
+            """));
+
+        (await finalDiagnosticsTask).Diagnostics.Should().BeEmpty();
+    }
+
+    private static DidChangeTextDocumentParams CreateDidChangeParams(DocumentUri uri, int version, string text) =>
+        new()
+        {
+            TextDocument = new OptionalVersionedTextDocumentIdentifier
+            {
+                Uri = uri,
+                Version = version,
+            },
+            ContentChanges = new Container<TextDocumentContentChangeEvent>(
+                new TextDocumentContentChangeEvent
+                {
+                    Text = text,
+                }),
+        };
 }

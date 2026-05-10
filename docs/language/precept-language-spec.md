@@ -13,6 +13,14 @@
 
 ---
 
+## Tooling Surface Snapshot
+
+The shipped editor surface for `.precept` authoring currently includes diagnostics, semantic tokens, completions, hover, definition, references, document highlights, rename, signature help, document symbols, workspace symbols across open documents, folding ranges, selection ranges, and quick-fix code actions.
+
+This tooling surface is intentionally authoring-focused. Preview / inspect remains a separate tooling track and is not part of the shipped language-server surface described here.
+
+---
+
 ## 0. Preamble
 
 This section captures the language's foundational identity: the design principles, conceptual model, governance philosophy, execution model properties, and pre-implementation contracts for pipeline stages not yet built. It is authoritative — any redesign that contradicts material here has departed from Precept's identity.

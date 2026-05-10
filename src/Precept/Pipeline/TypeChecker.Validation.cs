@@ -18,8 +18,15 @@ internal static partial class TypeChecker
         foreach (var field in ctx.Fields)
         {
             if (field.ResolvedType == TypeKind.Error) continue;
-            ValidateFieldModifiers(field.Modifiers, field.ResolvedType, field.ImpliedModifiers,
-                field.IsComputed, field.Syntax.Span, field.Name, isEventArg: false, ctx);
+            ValidateValueModifiers(
+                field.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)?.Modifiers ?? ImmutableArray<ParsedModifier>.Empty,
+                field.ResolvedType,
+                field.ImpliedModifiers,
+                field.IsComputed,
+                field.Syntax.Span,
+                field.Name,
+                isEventArg: false,
+                ctx);
         }
 
         foreach (var evt in ctx.Events)
@@ -27,8 +34,15 @@ internal static partial class TypeChecker
             foreach (var arg in evt.Args)
             {
                 if (arg.ResolvedType == TypeKind.Error) continue;
-                ValidateFieldModifiers(arg.Modifiers, arg.ResolvedType, ImmutableArray<ModifierKind>.Empty,
-                    isComputed: false, arg.Span, arg.Name, isEventArg: true, ctx);
+                ValidateValueModifiers(
+                    arg.Modifiers.Select(kind => new ParsedModifier(kind, null)).ToImmutableArray(),
+                    arg.ResolvedType,
+                    ImmutableArray<ModifierKind>.Empty,
+                    isComputed: false,
+                    arg.Span,
+                    arg.Name,
+                    isEventArg: true,
+                    ctx);
             }
         }
     }
@@ -38,8 +52,8 @@ internal static partial class TypeChecker
     /// Checks applicability, duplicates, mutual exclusivity, subsumption, redundancy with
     /// implied modifiers, and writable restrictions.
     /// </summary>
-    private static void ValidateFieldModifiers(
-        ImmutableArray<ModifierKind> modifiers,
+    private static void ValidateValueModifiers(
+        ImmutableArray<ParsedModifier> modifiers,
         TypeKind resolvedType,
         ImmutableArray<ModifierKind> impliedModifiers,
         bool isComputed,
@@ -52,7 +66,8 @@ internal static partial class TypeChecker
 
         for (int i = 0; i < modifiers.Length; i++)
         {
-            var kind = modifiers[i];
+            var modifier = modifiers[i];
+            var kind = modifier.Kind;
             var meta = Modifiers.GetMeta(kind);
 
             // Duplicate check
@@ -63,13 +78,13 @@ internal static partial class TypeChecker
                 continue;
             }
 
-            // Only FieldModifierMeta modifiers are valid on fields/args
-            if (meta is not FieldModifierMeta fieldMeta)
+            // Only ValueModifierMeta modifiers are valid on fields/args
+            if (meta is not ValueModifierMeta valueMeta)
                 continue;
 
             // Applicability: empty ApplicableTo = any type; otherwise check membership
-            if (fieldMeta.ApplicableTo.Length > 0 &&
-                !IsTypeApplicable(fieldMeta.ApplicableTo, resolvedType, modifiers))
+            if (valueMeta.ApplicableTo.Length > 0 &&
+                !IsTypeApplicable(valueMeta.ApplicableTo, resolvedType, modifiers.Select(m => m.Kind).ToImmutableArray()))
             {
                 var typeName = Types.GetMeta(resolvedType).DisplayName;
                 ctx.Diagnostics.Add(
@@ -93,7 +108,7 @@ internal static partial class TypeChecker
             {
                 if (other == kind) continue;
                 var otherMeta = Modifiers.GetMeta(other);
-                if (otherMeta is FieldModifierMeta otherField && otherField.Subsumes.Contains(kind))
+                if (otherMeta is ValueModifierMeta otherValue && otherValue.Subsumes.Contains(kind))
                 {
                     ctx.Diagnostics.Add(
                         Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
@@ -111,10 +126,16 @@ internal static partial class TypeChecker
             }
 
             // Writable on event arg
-            if (kind == ModifierKind.Writable && isEventArg)
+            var declarationSite = isEventArg
+                ? ValueModifierDeclarationSite.EventArgDeclaration
+                : ValueModifierDeclarationSite.FieldDeclaration;
+            if (!valueMeta.ApplicableDeclarationSites.HasFlag(declarationSite))
             {
-                ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.WritableOnEventArg, span, declarationName));
+                if (isEventArg && kind == ModifierKind.Writable)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.WritableOnEventArg, span, declarationName));
+                }
             }
 
             // Writable on computed field
@@ -124,7 +145,70 @@ internal static partial class TypeChecker
                     Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, span, declarationName));
             }
         }
+
+        ValidateModifierBounds(modifiers, span, ctx);
     }
+
+    private static void ValidateModifierBounds(
+        ImmutableArray<ParsedModifier> modifiers,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        if (modifiers.IsDefaultOrEmpty)
+            return;
+
+        var byKind = modifiers
+            .GroupBy(modifier => modifier.Kind)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        foreach (var modifier in modifiers)
+        {
+            var meta = Modifiers.GetMeta(modifier.Kind) as ValueModifierMeta;
+            if (meta?.BoundCounterpart is null || !IsLowerBound(meta))
+                continue;
+
+            if (!byKind.TryGetValue(meta.BoundCounterpart.Value, out var counterpart))
+                continue;
+
+            var lowerValue = TryGetComparableModifierValue(modifier.Value);
+            var upperValue = TryGetComparableModifierValue(counterpart.Value);
+            if (lowerValue is null || upperValue is null || lowerValue <= upperValue)
+                continue;
+
+            var counterpartMeta = (ValueModifierMeta)Modifiers.GetMeta(meta.BoundCounterpart.Value);
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(
+                    DiagnosticCode.InvalidModifierBounds,
+                    span,
+                    meta.Token.Text ?? modifier.Kind.ToString(),
+                    lowerValue.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    counterpartMeta.Token.Text ?? counterpart.Kind.ToString(),
+                    upperValue.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+    }
+
+    private static bool IsLowerBound(ValueModifierMeta meta)
+        => meta.ProofSatisfactions
+            .OfType<ProofSatisfaction.Numeric>()
+            .Select(proof => proof.Comparison)
+            .FirstOrDefault() is OperatorKind.GreaterThan or OperatorKind.GreaterThanOrEqual;
+
+    private static decimal? TryGetComparableModifierValue(ParsedExpression? expr) => expr switch
+    {
+        LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var text }
+            when decimal.TryParse(text, System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture, out var value)
+            => value,
+        UnaryOperationExpression
+        {
+            Operator: TokenKind.Minus,
+            Operand: LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var text }
+        }
+            when decimal.TryParse(text, System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture, out var value)
+            => -value,
+        _ => null,
+    };
 
     /// <summary>
     /// Check whether a resolved type matches any entry in a modifier's ApplicableTo array.

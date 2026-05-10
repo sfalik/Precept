@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace Precept.LanguageServer;
@@ -15,6 +16,16 @@ internal sealed class DocumentStore
 
     public bool TryGet(DocumentUri uri, out DocumentState state) =>
         _states.TryGetValue(uri, out state!);
+
+    public KeyValuePair<DocumentUri, DocumentState>[] Snapshot() => _states.ToArray();
+
+    public IEnumerable<(DocumentUri Uri, DocumentState State)> EnumerateOpenDocuments()
+    {
+        foreach (var pair in Snapshot())
+        {
+            yield return (pair.Key, pair.Value);
+        }
+    }
 
     public void Remove(DocumentUri uri) =>
         _states.TryRemove(uri, out _);

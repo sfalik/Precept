@@ -6,7 +6,7 @@ namespace Precept.Language;
 /// </summary>
 public enum ModifierKind
 {
-    // ── Field modifiers (15) — FieldModifierMeta ────────────────────────────────
+    // ── Value modifiers (15) — ValueModifierMeta ────────────────────────────────
 
     /// <summary>Flag: field is nullable (presence tested via is set / is not set).</summary>
     Optional    =  1,

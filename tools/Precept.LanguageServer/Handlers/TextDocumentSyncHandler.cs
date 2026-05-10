@@ -37,14 +37,14 @@ internal sealed class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
     public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
-        RecompileAndPublish(request.TextDocument.Uri, request.TextDocument.Text);
+        RecompileAndPublish(request.TextDocument.Uri, request.TextDocument.Version, request.TextDocument.Text);
         return Unit.Task;
     }
 
     public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
     {
         var text = request.ContentChanges.FirstOrDefault()?.Text ?? string.Empty;
-        RecompileAndPublish(request.TextDocument.Uri, text);
+        RecompileAndPublish(request.TextDocument.Uri, request.TextDocument.Version, text);
         return Unit.Task;
     }
 
@@ -57,12 +57,23 @@ internal sealed class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken) => Unit.Task;
 
-    private void RecompileAndPublish(DocumentUri uri, string text)
+    private void RecompileAndPublish(DocumentUri uri, int? version, string text)
     {
         var compilation = Precept.Compiler.Compile(text);
         var (enrichedDiagnostics, suggestions) = DiagnosticEnricher.Enrich(compilation);
-        _store.GetOrAdd(uri).Update(compilation, suggestions);
-        PublishDiagnostics(uri, enrichedDiagnostics);
+
+        var state = _store.GetOrAdd(uri);
+        if (version is null)
+        {
+            state.Update(compilation, suggestions);
+            PublishDiagnostics(uri, enrichedDiagnostics);
+            return;
+        }
+
+        if (state.TryUpdate(version.Value, compilation, suggestions))
+        {
+            PublishDiagnostics(uri, enrichedDiagnostics);
+        }
     }
 
     private void PublishDiagnostics(DocumentUri uri, IReadOnlyList<Diagnostic> diagnostics)

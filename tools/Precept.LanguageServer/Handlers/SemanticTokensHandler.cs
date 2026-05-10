@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -10,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using Precept.Language;
+using Precept.Pipeline;
 using Compilation = Precept.Pipeline.Compilation;
 using SemanticTokenTypesCatalog = Precept.Language.SemanticTokenTypes;
 using TokenKind = Precept.Language.TokenKind;
@@ -21,6 +23,8 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 {
     private static readonly SemanticTokensLegend Legend = BuildLegend();
     internal const string SemanticTokenColorsNotificationName = "precept/semanticTokenColors";
+    internal const string BuiltInFunctionTokenType = "function";
+    internal const string BuiltInStringTokenType = "string";
 
     private readonly ConcurrentDictionary<DocumentUri, SemanticTokensDocument> _documents = new();
     private readonly DocumentStore _store;
@@ -87,17 +91,28 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         foreach (var token in compilation.Tokens.Tokens)
         {
             var meta = TokensCatalog.GetMeta(token.Kind);
-            if (!meta.VisualCategory.HasValue)
-            {
-                continue;
-            }
+            string? effectiveTokenType = null;
 
             // Contextual reclassification: 'set' emits the type custom token in type-expression position.
             // SetType.VisualCategory is intentionally null (parser-synthesized; never in the lexer stream),
             // so we derive the type token from the catalog rather than the synthetic token kind.
-            var effectiveTokenType = token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token)
-                ? SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.Type).CustomType
-                : SemanticTokenTypesCatalog.GetMeta(meta.VisualCategory.Value).CustomType;
+            if (token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token))
+            {
+                effectiveTokenType = SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.Type).CustomType;
+            }
+            else if (meta.VisualCategory.HasValue)
+            {
+                effectiveTokenType = SemanticTokenTypesCatalog.GetMeta(meta.VisualCategory.Value).CustomType;
+            }
+            else if (IsTypedConstantToken(token.Kind))
+            {
+                effectiveTokenType = BuiltInStringTokenType;
+            }
+
+            if (effectiveTokenType is null)
+            {
+                continue;
+            }
 
             projected.Add(new LexicalSemanticToken(
                 token.Kind,
@@ -110,7 +125,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         return projected.ToImmutable();
     }
 
-    internal static ImmutableArray<LexicalSemanticToken> ProjectIdentifierTokens(Precept.Pipeline.SemanticIndex index)
+    internal static ImmutableArray<LexicalSemanticToken> ProjectIdentifierTokens(SemanticIndex index)
     {
         var projected = ImmutableArray.CreateBuilder<LexicalSemanticToken>();
 
@@ -197,10 +212,21 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.ArgName).CustomType));
         }
 
+        foreach (var expression in EnumerateTypedExpressions(index).OfType<TypedFunctionCall>())
+        {
+            var functionName = Functions.GetMeta(expression.ResolvedFunction).Name;
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                expression.Span.StartLine - 1,
+                expression.Span.StartColumn - 1,
+                functionName.Length,
+                BuiltInFunctionTokenType));
+        }
+
         return projected.ToImmutable();
     }
 
-    internal static void AddIdentifierTokens(SemanticTokensBuilder builder, Precept.Pipeline.SemanticIndex index)
+    internal static void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
     {
         foreach (var token in ProjectIdentifierTokens(index))
         {
@@ -214,7 +240,10 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         {
             TokenTypes = new Container<SemanticTokenType>(
                 SemanticTokenTypesCatalog.All
-                    .Select(static m => new SemanticTokenType(m.CustomType))
+                    .Select(static m => m.CustomType)
+                    .Concat([BuiltInFunctionTokenType, BuiltInStringTokenType])
+                    .Distinct()
+                    .Select(static tokenType => new SemanticTokenType(tokenType))
                     .ToArray()),
             TokenModifiers = new Container<SemanticTokenModifier>(
                 new SemanticTokenModifier("preceptConstrained")),
@@ -233,8 +262,275 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
     internal static void SendColorNotification(OmniSharp.Extensions.LanguageServer.Server.LanguageServer server) =>
         SendColorNotification((method, payload) => server.SendNotification(method, payload));
 
-    internal static void SendColorNotification(Action<string, SemanticTokenColorRule[]> sendNotification) =>
-        sendNotification(SemanticTokenColorsNotificationName, BuildColorNotificationPayload().ToArray());
+    internal static void SendColorNotification(Action<string, SemanticTokenColorNotificationPayload> sendNotification) =>
+        sendNotification(
+            SemanticTokenColorsNotificationName,
+            new SemanticTokenColorNotificationPayload(BuildColorNotificationPayload().ToArray()));
+
+    private static bool IsTypedConstantToken(TokenKind kind) =>
+        kind is TokenKind.TypedConstant
+            or TokenKind.TypedConstantStart
+            or TokenKind.TypedConstantMiddle
+            or TokenKind.TypedConstantEnd;
+
+    private static IEnumerable<TypedExpression> EnumerateTypedExpressions(SemanticIndex semantics)
+    {
+        foreach (var field in semantics.Fields)
+        {
+            if (field.DefaultExpression is not null)
+            {
+                foreach (var expression in EnumerateExpressionTree(field.DefaultExpression))
+                {
+                    yield return expression;
+                }
+            }
+
+            if (field.ComputedExpression is not null)
+            {
+                foreach (var expression in EnumerateExpressionTree(field.ComputedExpression))
+                {
+                    yield return expression;
+                }
+            }
+        }
+
+        foreach (var evt in semantics.Events)
+        {
+            foreach (var arg in evt.Args)
+            {
+                if (arg.DefaultExpression is null)
+                {
+                    continue;
+                }
+
+                foreach (var expression in EnumerateExpressionTree(arg.DefaultExpression))
+                {
+                    yield return expression;
+                }
+            }
+        }
+
+        foreach (var row in semantics.TransitionRows)
+        {
+            if (row.Guard is not null)
+            {
+                foreach (var expression in EnumerateExpressionTree(row.Guard))
+                {
+                    yield return expression;
+                }
+            }
+
+            foreach (var expression in EnumerateActionExpressions(row.Actions))
+            {
+                yield return expression;
+            }
+        }
+
+        foreach (var rule in semantics.Rules)
+        {
+            foreach (var expression in EnumerateExpressionTree(rule.Condition))
+            {
+                yield return expression;
+            }
+
+            if (rule.Guard is not null)
+            {
+                foreach (var expression in EnumerateExpressionTree(rule.Guard))
+                {
+                    yield return expression;
+                }
+            }
+
+            foreach (var expression in EnumerateExpressionTree(rule.Message))
+            {
+                yield return expression;
+            }
+        }
+
+        foreach (var ensure in semantics.Ensures)
+        {
+            foreach (var expression in EnumerateExpressionTree(ensure.Condition))
+            {
+                yield return expression;
+            }
+
+            if (ensure.Guard is not null)
+            {
+                foreach (var expression in EnumerateExpressionTree(ensure.Guard))
+                {
+                    yield return expression;
+                }
+            }
+
+            foreach (var expression in EnumerateExpressionTree(ensure.Message))
+            {
+                yield return expression;
+            }
+        }
+
+        foreach (var accessMode in semantics.AccessModes)
+        {
+            if (accessMode.Guard is null)
+            {
+                continue;
+            }
+
+            foreach (var expression in EnumerateExpressionTree(accessMode.Guard))
+            {
+                yield return expression;
+            }
+        }
+
+        foreach (var hook in semantics.StateHooks)
+        {
+            if (hook.Guard is not null)
+            {
+                foreach (var expression in EnumerateExpressionTree(hook.Guard))
+                {
+                    yield return expression;
+                }
+            }
+
+            foreach (var expression in EnumerateActionExpressions(hook.Actions))
+            {
+                yield return expression;
+            }
+        }
+
+        foreach (var handler in semantics.EventHandlers)
+        {
+            foreach (var expression in EnumerateActionExpressions(handler.Actions))
+            {
+                yield return expression;
+            }
+        }
+    }
+
+    private static IEnumerable<TypedExpression> EnumerateActionExpressions(ImmutableArray<TypedAction> actions)
+    {
+        foreach (var action in actions)
+        {
+            if (action is not TypedInputAction input)
+            {
+                continue;
+            }
+
+            foreach (var expression in EnumerateExpressionTree(input.InputExpression))
+            {
+                yield return expression;
+            }
+
+            if (input.SecondaryExpression is null)
+            {
+                continue;
+            }
+
+            foreach (var expression in EnumerateExpressionTree(input.SecondaryExpression))
+            {
+                yield return expression;
+            }
+        }
+    }
+
+    private static IEnumerable<TypedExpression> EnumerateExpressionTree(TypedExpression expression)
+    {
+        yield return expression;
+
+        switch (expression)
+        {
+            case TypedBinaryOp binary:
+                foreach (var nested in EnumerateExpressionTree(binary.Left))
+                {
+                    yield return nested;
+                }
+
+                foreach (var nested in EnumerateExpressionTree(binary.Right))
+                {
+                    yield return nested;
+                }
+                break;
+
+            case TypedUnaryOp unary:
+                foreach (var nested in EnumerateExpressionTree(unary.Operand))
+                {
+                    yield return nested;
+                }
+                break;
+
+            case TypedFunctionCall functionCall:
+                foreach (var argument in functionCall.Arguments)
+                {
+                    foreach (var nested in EnumerateExpressionTree(argument))
+                    {
+                        yield return nested;
+                    }
+                }
+                break;
+
+            case TypedMemberAccess memberAccess:
+                foreach (var nested in EnumerateExpressionTree(memberAccess.Object))
+                {
+                    yield return nested;
+                }
+                break;
+
+            case TypedConditional conditional:
+                foreach (var nested in EnumerateExpressionTree(conditional.Condition))
+                {
+                    yield return nested;
+                }
+
+                foreach (var nested in EnumerateExpressionTree(conditional.ThenBranch))
+                {
+                    yield return nested;
+                }
+
+                foreach (var nested in EnumerateExpressionTree(conditional.ElseBranch))
+                {
+                    yield return nested;
+                }
+                break;
+
+            case TypedQuantifier quantifier:
+                foreach (var nested in EnumerateExpressionTree(quantifier.Collection))
+                {
+                    yield return nested;
+                }
+
+                foreach (var nested in EnumerateExpressionTree(quantifier.Predicate))
+                {
+                    yield return nested;
+                }
+                break;
+
+            case TypedInterpolatedString interpolatedString:
+                foreach (var hole in interpolatedString.Segments.OfType<TypedHoleSegment>())
+                {
+                    foreach (var nested in EnumerateExpressionTree(hole.Expression))
+                    {
+                        yield return nested;
+                    }
+                }
+                break;
+
+            case TypedListLiteral listLiteral:
+                foreach (var element in listLiteral.Elements)
+                {
+                    foreach (var nested in EnumerateExpressionTree(element))
+                    {
+                        yield return nested;
+                    }
+                }
+                break;
+
+            case TypedPostfixOp postfix:
+                foreach (var nested in EnumerateExpressionTree(postfix.Operand))
+                {
+                    yield return nested;
+                }
+                break;
+        }
+    }
 
     internal readonly record struct LexicalSemanticToken(
         TokenKind Kind,
@@ -242,6 +538,9 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         int Character,
         int Length,
         string TokenType);
+
+    internal readonly record struct SemanticTokenColorNotificationPayload(
+        [property: JsonPropertyName("rules")] SemanticTokenColorRule[] Rules);
 
     internal readonly record struct SemanticTokenColorRule(
         [property: JsonPropertyName("tokenType")] string TokenType,

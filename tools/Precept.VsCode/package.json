@@ -11,6 +11,7 @@
     "Programming Languages"
   ],
   "activationEvents": [
+    "onLanguage:precept",
     "workspaceContains:**/*.precept"
   ],
   "main": "./out/extension.js",
@@ -202,107 +203,6 @@
       "[precept]": {
         "editor.semanticHighlighting.enabled": true,
         "editor.wordBasedSuggestions": "off"
-      },
-      "editor.semanticTokenColorCustomizations": {
-        "rules": {
-          "preceptComment": {
-            "foreground": "#9096A6",
-            "italic": true
-          },
-          "comment:precept": {
-            "foreground": "#9096A6",
-            "italic": true
-          },
-          "keyword:precept": {
-            "foreground": "#4338CA"
-          },
-          "type:precept": {
-            "foreground": "#9AA8B5"
-          },
-          "modifier:precept": {
-            "foreground": "#4338CA"
-          },
-          "decorator:precept": {
-            "foreground": "#6366F1"
-          },
-          "number:precept": {
-            "foreground": "#84929F"
-          },
-          "string:precept": {
-            "foreground": "#84929F"
-          },
-          "variable:precept": {
-            "foreground": "#A5B4FC"
-          },
-          "property:precept": {
-            "foreground": "#A5B4FC"
-          },
-          "enum:precept": {
-            "foreground": "#A898F5"
-          },
-          "function:precept": {
-            "foreground": "#30B8E8"
-          },
-          "parameter:precept": {
-            "foreground": "#9AD8E8"
-          },
-          "operator:precept": {
-            "foreground": "#6366F1"
-          },
-          "preceptFieldName": {
-            "foreground": "#A5B4FC"
-          },
-          "preceptFieldName.preceptConstrained": {
-            "foreground": "#A5B4FC",
-            "italic": true
-          },
-          "preceptName": {
-            "foreground": "#A5B4FC"
-          },
-          "preceptMessage": {
-            "foreground": "#FBBF24"
-          },
-          "preceptKeywordGrammar": {
-            "foreground": "#6366F1"
-          },
-          "preceptKeywordSemantic": {
-            "foreground": "#4338CA",
-            "bold": true
-          },
-          "preceptOperator": {
-            "foreground": "#6366F1"
-          },
-          "preceptState": {
-            "foreground": "#A898F5"
-          },
-          "preceptState.preceptConstrained": {
-            "foreground": "#A898F5",
-            "italic": true
-          },
-          "preceptEvent": {
-            "foreground": "#30B8E8"
-          },
-          "preceptEvent.preceptConstrained": {
-            "foreground": "#30B8E8",
-            "italic": true
-          },
-          "preceptType": {
-            "foreground": "#9AA8B5"
-          },
-          "preceptValue": {
-            "foreground": "#84929F"
-          },
-          "preceptArgName": {
-            "foreground": "#9AD8E8"
-          },
-          "preceptArgName.preceptConstrained": {
-            "foreground": "#9AD8E8",
-            "italic": true
-          },
-          "*.preceptConstrained": {
-            "italic": true
-          }
-        }
       },
       "editor.tokenColorCustomizations": {
         "[*]": {
@@ -513,7 +413,7 @@
             {
               "scope": "keyword.other.grammar.precept",
               "settings": {
-                "foreground": "#FBBF24"
+                "foreground": "#6366F1"
               }
             },
             {

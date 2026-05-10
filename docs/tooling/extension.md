@@ -16,6 +16,8 @@
 
 The VS Code extension hosts the language server, launches the MCP server, provides the TextMate grammar for syntax highlighting, and surfaces Precept-specific commands and the preview webview panel. It is the thin host shell — all intelligence comes from the language server and compiler.
 
+The extension activates when a workspace already contains `.precept` files and when you open a `.precept` document directly. That keeps the language-server status item available in single-file and no-workspace editor sessions instead of only in repo-style workspaces.
+
 ---
 
 ## Responsibilities and Boundaries
@@ -59,6 +61,10 @@ Declared in `package.json` as a `grammars` contribution. VS Code reads `precept.
 ### LS Client Lifecycle
 
 The extension creates a `LanguageClient` pointing at the LS executable. The client handles reconnection on server crashes. All LSP requests/responses are forwarded transparently — the extension does not intercept or modify protocol messages.
+
+### Language Server Status Bar
+
+The extension shows a left-aligned `Precept` status bar item as soon as activation begins. The item stays visible while the language server is starting, ready, restarting, stopped, or in an error state, and clicking it runs `precept.showLanguageServerMode` so the user can inspect the current launch mode in the Precept output channel.
 
 ### MCP Server Launch
 

@@ -54,7 +54,7 @@ Tokens.All
     Serialize the complete grammar object as indented JSON to stdout or --output path.
 ```
 
-The generator's main catalog inputs are `Tokens.All` (keyword/operator scope groups and token-position message strings), `Functions.All` (function-call and future function-position message-string patterns), and `Modifiers.All` (rule-desugaring modifier highlights). It does not read `Constructs`, `Types`, or `Actions` directly — those catalogs' keywords are already present in `Tokens.All` via their respective `TokenKind` entries.
+The generator's main catalog inputs are `Tokens.All` (keyword/operator scope groups and token-position message strings), `Functions.All` (function-call and future function-position message-string patterns), and `Modifiers.All` (rule-desugaring modifier subset patterns). It does not read `Constructs`, `Types`, or `Actions` directly — those catalogs' keywords are already present in `Tokens.All` via their respective `TokenKind` entries.
 
 ---
 
@@ -115,7 +115,7 @@ Not all grammar patterns can be derived from individual token metadata. Patterns
 |---|---|
 | `comment` | `#` to end-of-line |
 | `messageStrings` | Catalog-derived message-position strings — currently `because "..."` and `reject "..."`; function wiring exists for future flagged built-ins |
-| `ruleDesugaringModifiers` | Catalog-derived modifiers where `ModifierMeta.DesugarsToRule == true`; emitted as `keyword.other.grammar.precept` so they keep the legacy gold rule color |
+| `ruleDesugaringModifiers` | Catalog-derived modifiers where `ModifierMeta.DesugarsToRule == true`; emitted as `keyword.other.grammar.precept` so they share the normal grammar-keyword lane while still getting a dedicated first-match repository hook |
 | `strings` | Double-quoted string literal with escape sequences |
 | `typedConstants` | Single-quoted typed constants (`'USD'`, `'kg'`) |
 | `numbers` | Integer and decimal literals |
@@ -144,6 +144,8 @@ TextMate applies the first match in the top-level `patterns` array. The ordering
 
 `#messageStrings` remains ahead of `#strings` even though its contents are catalog-derived. That ordering preserves the gold message scope for any token or function marked `IsMessagePosition`. 
 
+Field declaration patterns also carry their own declaration-scope overrides for `as` and the `default` modifier before they fall back to generic grammar-keyword includes. That structural ordering keeps declaration syntax off the gold grammar lane while leaving truly generic grammar keywords in the shared fallback.
+
 ### begin/end pairs
 
 The `strings` and `typedConstants` patterns use TextMate `begin`/`end` pairs rather than `match`. This is the required mechanism for constructs that can span positions and contain nested patterns (escape sequences inside strings). Begin/end pairs in TextMate must always specify both `begin` and `end`; the generator honors this constraint. All other patterns in the current output use `match` only.
@@ -170,9 +172,9 @@ No built-in functions currently set `IsMessagePosition`, so today's generated `m
 
 ## Rule-Desugaring Modifier Context
 
-Some field modifiers are surface sugar for rule semantics and must render in the same gold keyword scope as rule grammar. `ModifierMeta.DesugarsToRule` is the catalog flag for that contract.
+Some field modifiers are surface sugar for rule semantics and still need a dedicated repository subset so the generated grammar can keep their first-match position explicit without inventing a second keyword taxonomy. `ModifierMeta.DesugarsToRule` is the catalog flag for that subset.
 
-With this flag in place, `AddStructuralPatterns()` emits `ruleDesugaringModifiers` from `Modifiers.All.Where(m => m.DesugarsToRule)`, assigns `keyword.other.grammar.precept`, and includes that repository entry before `#constraintKeywords` anywhere modifier patterns are composed. That ordering keeps the gold rule-desugaring scope from being swallowed by the generic constraint keyword alternation.
+With this flag in place, `AddStructuralPatterns()` emits `ruleDesugaringModifiers` from `Modifiers.All.Where(m => m.DesugarsToRule)`, assigns `keyword.other.grammar.precept`, and includes that repository entry before `#constraintKeywords` anywhere modifier patterns are composed. That ordering preserves the catalog-derived subset hook without giving those modifiers a separate gold lane; message strings remain the only gold syntax surface.
 
 ---
 
@@ -234,7 +236,7 @@ The following are intentionally outside the generator's scope:
 | Catalog schema and metadata-driven architecture | `docs/language/catalog-system.md` |
 | Generator's place in the tooling ecosystem | `docs/compiler/tooling-surface.md` |
 
-The generator does not handle `Constructs` or `Actions` catalogs directly. Most keyword surface still comes through `Tokens.All` via `TokenKind` entries; the explicit exceptions are `Functions.All` for function/message-string structural patterns and `Modifiers.All` for `DesugarsToRule` gold-keyword derivation.
+The generator does not handle `Constructs` or `Actions` catalogs directly. Most keyword surface still comes through `Tokens.All` via `TokenKind` entries; the explicit exceptions are `Functions.All` for function/message-string structural patterns and `Modifiers.All` for `DesugarsToRule` subset derivation.
 
 The generator does not produce begin/end patterns for multi-token construct bodies (e.g., a `begin: "from"` / `end: "$"` block for the full transition row body). Construct-level nesting is handled by the structural patterns in `AddStructuralPatterns()`. Automating construct-body patterns from `Constructs.All` would require the generator to read slot sequences and termination tokens — possible in principle but not implemented and not required for the current feature set.
 

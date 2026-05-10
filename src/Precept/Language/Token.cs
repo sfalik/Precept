@@ -52,6 +52,9 @@ public sealed record TokenMeta(
     /// </summary>
     TokenKind[]?                   ValidAfter = null,
     bool                           IsAccessModeAdjective = false,
+    bool                           IsStateWildcard = false,
+    bool                           IsBroadcastFieldTarget = false,
+    bool                           IsAlsoBuiltinFunction = false,
     /// <summary>
     /// True if this keyword token may appear as a member name after <c>.</c> (e.g., <c>min</c>
     /// and <c>max</c> are DSL aggregation keywords but also idiomatic member-accessor names).

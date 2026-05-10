@@ -1,6 +1,5 @@
----
-updated_at: 2026-04-28T23:04:41Z
-focus_area: spike/Precept-V2 — catalog extensibility + PRECEPT0018 analyzer
+updated_at: 2026-05-10T08:34:54.266-04:00
+focus_area: Track 2 resumed — reopen bug-fix execution and drive slices from the tracker
 active_issues: []
 spike_mode: true
 ---
@@ -15,27 +14,22 @@ Commits go directly to `precept-architecture`. If you feel the urge to open a PR
 
 # What We're Focused On
 
-**Branch:** `spike/Precept-V2` — catalog extensibility spike + PRECEPT0018 analyzer.
+**Branch:** `spike/Precept-V2` — Track 2 bug-fix work is active now.
 
-**Status (2026-04-25):** All C, M, I, and O items resolved. Two commits landed this session:
-- `db9961d` — I-items bulk (39 files, 2116 tests)
-- `572c40b` — O1, I23, I32 + stale test corrections (1624 tests)
+**Current lane:** Track 2 bug-fix slices, resumed for execution.
 
-**O-item outcomes:**
-- ✅ O1: `ZonedDateTimePlusPeriod` / `ZonedDateTimeMinusPeriod` — implemented
-- ❌ O2: `DurationTimesDecimal` — **explicitly excluded** by docs (line 511, 1144): *"Durations can only be multiplied by whole numbers or `number`."* NodaTime has no `Duration * decimal` operator.
-- ❌ O3: `PeriodTimesInteger` / `PeriodDivideInteger` — **explicitly excluded** by docs (lines 600, 663, 1139, 1569): *"Periods can't be multiplied. Write the value directly."*
+**Fresh status (2026-05-10):**
+- ✅ Track 1 language-server work is complete.
+- ▶️ Track 2 is now active again by Shane's direction.
+- 🔄 First ready Track 2 slice: `t2-1` — TokenMeta missing catalog fields.
+- ⏸️ Track 1 stays complete unless Shane explicitly reopens it.
 
-**Remaining work in priority order:**
+**Track 2 slice summary:**
+- Done: `t2-7`
+- Pending: `t2-1`, `t2-2`, `t2-3`, `t2-4`, `t2-5`, `t2-6`, `t2-8`, `t2-9`, `t2-10`, `t2-11`, `t2-12`, `t2-13`, `t2-14`, `t2-15`
 
-1. **X2–X22 (test gaps):** Soup Nazi's full test gap list. Snapshot tests, exhaustive matrix tests, cross-catalog validity tests.
+**Current active Track 2 slice:** `t2-1` — TokenMeta missing catalog fields.
 
-2. **T1–T13 (tooling/grammar):** TextMate grammar sync, LS completions, semantic tokens — depends on catalog metadata now in place.
+**Execution mode:** Resume Track 2 from the tracker and drive the next ready slice(s) with matching regression coverage.
 
-3. **N1–N5 (nits):** Cosmetic/naming cleanup.
-
-4. **I33 (modifier requirement for choice ordering):** Metadata for choice ordering operations — minor, not started.
-
-**Design specs in inbox (completed, not yet purged):**
-- `frank-i23-any-type-target.md` — ✅ done
-- `frank-i32-dimension-proof.md` — ✅ done
+**Track 1 note:** complete for now; do not resume unless Shane explicitly switches back.

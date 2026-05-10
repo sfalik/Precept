@@ -633,16 +633,18 @@ on Calculate
     set Result = Total / Divisor   // ← Divisor has 'positive' modifier → discharge
 ```
 
-**Catalog metadata design:** The `FieldModifierMeta` record carries a `ProofSatisfactions` property:
+**Catalog metadata design:** The `ValueModifierMeta` record carries a `ProofSatisfactions` property:
 
 ```csharp
-public sealed record FieldModifierMeta(
+public sealed record ValueModifierMeta(
     ModifierKind Kind,
     TokenMeta Token,
     string Description,
     ModifierCategory Category,
     TypeTarget[] ApplicableTo,
     bool HasValue = false,
+    ValueModifierDeclarationSite ApplicableDeclarationSites =
+        ValueModifierDeclarationSite.FieldDeclaration | ValueModifierDeclarationSite.EventArgDeclaration,
     ModifierKind[] Subsumes = default!,
     ProofSatisfaction[]? ProofSatisfactions = null,  // ← carries proof metadata
     // ... other properties
@@ -683,7 +685,7 @@ abstract record DimensionSource
 // Strategy 2: Declaration Attribute Proof — Discharge Predicate
 // Input: ProofObligation (from Pass 1)
 // Reads: SemanticIndex.FieldsByName (to get TypedField modifiers and declaration carriers),
-//        FieldModifierMeta.ProofSatisfactions (from Modifiers catalog),
+//        ValueModifierMeta.ProofSatisfactions (from Modifiers catalog),
 //        TypedField.Presence (DeclaredPresenceMeta carrier),
 //        TypedField.DeclaredQualifiers (DeclaredQualifierMeta carrier),
 //        resolved period dimension metadata for period-typed subjects
@@ -759,8 +761,8 @@ bool TryDeclarationAttributeProof(ProofObligation obligation, SemanticIndex sema
 // metadata rather than from a guard expression.
 ```
 
-> **✅ Resolved (CC#5 → PE-G2) — FieldModifierMeta.ProofSatisfactions is now canonical**
-> `ProofDischarge` has been renamed to `ProofSatisfaction` — a full DU with 5 subtypes (Numeric, Presence, Dimension, Modifier, QualifierCompatibility) plus 3 supporting DUs (SatisfactionProjection, NumericBoundSource, DimensionSource). `ProofSatisfaction[]` is carried on `FieldModifierMeta` for numeric modifiers. Presence proof reads `TypedField.Presence` (new `DeclaredPresenceMeta` carrier). Dimension and qualifier-compatibility proof read `TypedField.DeclaredQualifiers` (new `DeclaredQualifierMeta` carrier). Strategy 2 consumes all three carrier surfaces.
+> **✅ Resolved (CC#5 → PE-G2) — ValueModifierMeta.ProofSatisfactions is now canonical**
+> `ProofDischarge` has been renamed to `ProofSatisfaction` — a full DU with 5 subtypes (Numeric, Presence, Dimension, Modifier, QualifierCompatibility) plus 3 supporting DUs (SatisfactionProjection, NumericBoundSource, DimensionSource). `ProofSatisfaction[]` is carried on `ValueModifierMeta` for numeric modifiers. Presence proof reads `TypedField.Presence` (new `DeclaredPresenceMeta` carrier). Dimension and qualifier-compatibility proof read `TypedField.DeclaredQualifiers` (new `DeclaredQualifierMeta` carrier). Strategy 2 consumes all three carrier surfaces.
 > *Resolved: 2026-05-06 (CC#5), redesigned 2026-05-08 (PE-G2 locked)*
 
 ### Carrier Types
@@ -804,9 +806,9 @@ A DU with 8 subtypes representing all qualifier axes:
 - Strategy 2 reads `field.DeclaredQualifiers` for `DimensionProofRequirement` — finds a `TemporalDimension` entry and checks dimension compatibility.
 - Strategy 5 reads `field.DeclaredQualifiers` for `QualifierCompatibilityProofRequirement` — compares two fields' qualifier entries on the requested axis.
 
-#### FieldModifierMeta.ProofSatisfactions
+#### ValueModifierMeta.ProofSatisfactions
 
-**Location:** `src/Precept/Language/Modifier.cs` (property on `FieldModifierMeta`)
+**Location:** `src/Precept/Language/Modifier.cs` (property on `ValueModifierMeta`)
 
 `ProofSatisfaction[]` array populated on 10 modifier catalog entries:
 
@@ -831,7 +833,7 @@ Strategy 2 dispatches across three carrier surfaces by requirement kind:
 
 | Requirement Kind | Carrier | Read Path |
 |---|---|---|
-| `NumericProofRequirement` | `FieldModifierMeta.ProofSatisfactions` | Walk field's effective modifiers, check each satisfaction entry |
+| `NumericProofRequirement` | `ValueModifierMeta.ProofSatisfactions` | Walk field's effective modifiers, check each satisfaction entry |
 | `PresenceProofRequirement` | `DeclaredPresenceMeta` | Read `field.Presence`, check for `Guaranteed` subtype |
 | `DimensionProofRequirement` | `DeclaredQualifierMeta` | Read `field.DeclaredQualifiers`, find `TemporalDimension` entry |
 | `ModifierRequirement` | Direct membership | `field.Modifiers.Contains(required)` — no carrier metadata |
@@ -1498,7 +1500,7 @@ The proof engine runs for ALL precepts, including stateless ones.
 | **Catalog: Functions** | `FunctionOverload.ProofRequirements` — `sqrt()` non-negativity, `pow()` exponent constraints |
 | **Catalog: Types** | `TypeAccessor.ProofRequirements` — collection `.first`, `.last`, `.peek` non-empty requirements |
 | **Catalog: Actions** | `ActionMeta.ProofRequirements` — `dequeue`, `pop` non-empty requirements |
-| **Catalog: Modifiers** | `FieldModifierMeta.ProofSatisfactions` — which modifiers satisfy which proof requirements |
+| **Catalog: Modifiers** | `ValueModifierMeta.ProofSatisfactions` — which modifiers satisfy which proof requirements |
 | **Catalog: Faults** | `FaultCode` ↔ `DiagnosticCode` correspondence via `[StaticallyPreventable]` attribute |
 
 ### Downstream Consumers
@@ -1784,7 +1786,7 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 ### Decision 5: Modifier-Proof via Catalog Metadata
 
-**Decision:** Modifier proof satisfaction mappings are declared in `FieldModifierMeta.ProofSatisfactions`, not hardcoded in the proof engine.
+**Decision:** Modifier proof satisfaction mappings are declared in `ValueModifierMeta.ProofSatisfactions`, not hardcoded in the proof engine.
 
 **Rationale:**
 - **Catalog-driven architecture consistency:** Precept's modifiers are catalog-declared. Their proof implications should be too.
@@ -1909,7 +1911,7 @@ Items 1 and 2 are resolved — the full ProofEngine body is implemented with all
 
 ### Catalog Metadata Needed
 
-7. **`FieldModifierMeta.ProofSatisfactions`** — ✅ resolved (CC#5 → PE-G2). `ProofSatisfaction[]` replaces the original `ProofDischarge[]` with a full DU covering all five requirement kinds. Strategy 2 reads `modifier.ProofSatisfactions` for numeric obligations; presence and qualifier-compatibility obligations read their respective declaration carriers (`DeclaredPresenceMeta`, `DeclaredQualifierMeta`). See §7 Strategy 2 for the catalog-driven dispatch pattern.
+7. **`ValueModifierMeta.ProofSatisfactions`** — ✅ resolved (CC#5 → PE-G2). `ProofSatisfaction[]` replaces the original `ProofDischarge[]` with a full DU covering all five requirement kinds. Strategy 2 reads `modifier.ProofSatisfactions` for numeric obligations; presence and qualifier-compatibility obligations read their respective declaration carriers (`DeclaredPresenceMeta`, `DeclaredQualifierMeta`). See §7 Strategy 2 for the catalog-driven dispatch pattern.
 
 ### Future Considerations
 
@@ -1979,7 +1981,7 @@ Unlike SPARK Ada's `pragma Annotate` or Dafny's `assert`/`assume`, Precept does 
 | StateGraph output, ProofForwardingFact shapes | `docs/compiler/graph-analyzer.md §4` |
 | FaultSiteDescriptor planting | `docs/runtime/precept-builder.md` |
 | ProofRequirement catalog and DU structure | `docs/language/catalog-system.md` |
-| Modifier catalog (FieldModifierMeta) | `docs/language/catalog-system.md` |
+| Modifier catalog (ValueModifierMeta) | `docs/language/catalog-system.md` |
 | Diagnostic infrastructure and error-accumulation contract | `docs/compiler/diagnostic-system.md` |
 | FaultCode → DiagnosticCode chain, `[StaticallyPreventable]` | `docs/compiler/diagnostic-system.md § FaultCode → DiagnosticCode Chain` |
 | FaultCode ↔ DiagnosticCode correspondence | `src/Precept/Language/FaultCode.cs` |
@@ -1998,6 +2000,7 @@ Unlike SPARK Ada's `pragma Annotate` or Dafny's `assert`/`assume`, Precept does 
 | `src/Precept/Language/ProofRequirements.cs` | `ProofRequirements` catalog with `GetMeta()` and `All` |
 | `src/Precept/Language/FaultCode.cs` | `FaultCode` enum with `[StaticallyPreventable]` attributes |
 | `src/Precept/Language/Faults.cs` | `Faults` catalog with `GetMeta()` and fault message templates |
-| `src/Precept/Language/Modifier.cs` | `ModifierMeta` DU including `FieldModifierMeta` with `ProofSatisfactions[]` (PE-G2 locked) |
+| `src/Precept/Language/Modifier.cs` | `ModifierMeta` DU including `ValueModifierMeta` with `ProofSatisfactions[]` (PE-G2 locked) |
 | `src/Precept/Language/Modifiers.cs` | `Modifiers` catalog |
 | `src/Precept/Language/DiagnosticCode.cs` | `DiagnosticCode` enum including proof-related codes (graph analyzer uses codes 80–85; proof engine codes start at 86) |
+

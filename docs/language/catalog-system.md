@@ -340,7 +340,7 @@ classDiagram
         Category : ModifierCategory
         MutuallyExclusiveWith : ModifierKind[]
     }
-    class FieldModifierMeta {
+    class ValueModifierMeta {
         ApplicableTo : TypeTarget[]
         HasValue : bool
         Subsumes : ModifierKind[]
@@ -364,7 +364,7 @@ classDiagram
         Scope : AnchorScope
         Target : AnchorTarget
     }
-    ModifierMeta <|-- FieldModifierMeta : 15 members
+    ModifierMeta <|-- ValueModifierMeta : 15 members
     ModifierMeta <|-- StateModifierMeta : 7 members
     ModifierMeta <|-- EventModifierMeta : 1 member
     ModifierMeta <|-- AccessModifierMeta : 3 members
@@ -375,7 +375,7 @@ classDiagram
 
 | Subtype | Count | Representative members |
 |---------|------:|------------------------|
-| `FieldModifierMeta` | 15 | `optional`, `writable`, `nonnegative`, `positive`, `notempty`, `min`, `max`, `ordered` |
+| `ValueModifierMeta` | 15 | `optional`, `writable`, `nonnegative`, `positive`, `notempty`, `min`, `max`, `ordered` |
 | `StateModifierMeta` | 7 | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` |
 | `EventModifierMeta` | 1 | `initial` (event) |
 | `AccessModifierMeta` | 3 | `editable` (Write), `readonly` (Read), `omit` (Omit) |
@@ -613,9 +613,9 @@ When all catalog members share the same metadata shape, the meta type is a **fla
 **DU with different fields** — the subtype carries fields that only make sense for that group. `ModifierMeta` and `OperationMeta` use this pattern:
 
 ```csharp
-// FieldModifierMeta carries ApplicableTo, Subsumes — inapplicable to StateModifierMeta
-public sealed record FieldModifierMeta(..., TypeTarget[] ApplicableTo, ...) : ModifierMeta(...);
-// StateModifierMeta carries AllowsOutgoing, RequiresDominator — inapplicable to FieldModifierMeta
+// ValueModifierMeta carries ApplicableTo, Subsumes — inapplicable to StateModifierMeta
+public sealed record ValueModifierMeta(..., TypeTarget[] ApplicableTo, ...) : ModifierMeta(...);
+// StateModifierMeta carries AllowsOutgoing, RequiresDominator — inapplicable to ValueModifierMeta
 public sealed record StateModifierMeta(..., bool AllowsOutgoing, ...) : ModifierMeta(...);
 ```
 
@@ -1267,7 +1267,7 @@ All declaration-attached modifiers across the language surface — field constra
 | Part | Type |
 |------|------|
 | Kind enum | `ModifierKind` (29 members across 5 subtypes) |
-| Meta record | `ModifierMeta` — abstract DU base with `FieldModifierMeta`, `StateModifierMeta`, `EventModifierMeta`, `AccessModifierMeta`, `AnchorModifierMeta` sealed subtypes (see below) |
+| Meta record | `ModifierMeta` — abstract DU base with `ValueModifierMeta`, `StateModifierMeta`, `EventModifierMeta`, `AccessModifierMeta`, `AnchorModifierMeta` sealed subtypes (see below) |
 | Supporting enums | `ModifierCategory`, `GraphAnalysisKind`, `AnchorScope`, `AnchorTarget` |
 | Catalog class | `Modifiers` — `GetMeta()`, `All` |
 | Output type | None |
@@ -1276,7 +1276,7 @@ All declaration-attached modifiers across the language surface — field constra
 
 | Subtype | Members | Count |
 |---------|---------|-------|
-| `FieldModifierMeta` | `optional`, `writable`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 15 |
+| `ValueModifierMeta` | `optional`, `writable`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 15 |
 | `StateModifierMeta` | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` | 7 |
 | `EventModifierMeta` | `initial` (event) | 1 |
 | `AccessModifierMeta` | `editable` (Write), `readonly` (Read), `omit` (Omit) | 3 |
@@ -1300,14 +1300,16 @@ public abstract record ModifierMeta(
     ModifierKind[]?   MutuallyExclusiveWith = null // at most one of the group may appear on a declaration
 );
 
-// ── Field modifiers (15) ─────────────────────────────────
-public sealed record FieldModifierMeta(
+// ── Value modifiers (15) ─────────────────────────────────
+public sealed record ValueModifierMeta(
     ModifierKind     Kind,
     TokenMeta        Token,
     string           Description,
     ModifierCategory Category,
     TypeTarget[]     ApplicableTo,
     bool             HasValue          = false,
+    ValueModifierDeclarationSite ApplicableDeclarationSites =
+        ValueModifierDeclarationSite.FieldDeclaration | ValueModifierDeclarationSite.EventArgDeclaration,
     ModifierKind[]   Subsumes          = [],
     string?          HoverDescription  = null,
     string?          UsageExample      = null,
@@ -1317,8 +1319,8 @@ public sealed record FieldModifierMeta(
 ) : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
 
 /// <summary>
-/// Describes how a field modifier discharges a numeric proof obligation.
-/// The proof engine reads ProofDischarges from FieldModifierMeta; no per-modifier switch in the engine.
+/// Describes how a value modifier discharges a numeric proof obligation.
+/// The proof engine reads ProofDischarges from ValueModifierMeta; no per-modifier switch in the engine.
 /// </summary>
 /// <param name="RequirementKind">The kind of proof requirement this entry satisfies.</param>
 /// <param name="Comparison">The comparison operator (non-null for Numeric requirements).</param>
@@ -1374,7 +1376,7 @@ public sealed record AnchorModifierMeta(
 ) : ModifierMeta(Kind, Token, Description, Category);
 ```
 
-`Token` replaces the `string Keyword` field — consumers access keyword text via `modifier.Token.Text`. `MutuallyExclusiveWith` declares modifier exclusion groups on the base; consumers (type checker, LS) enforce the constraint without hardcoding group membership. Modifiers with no runtime validation (e.g., `ordered` is compile-time only) have no inline delegate — execution is handled by the evaluator's pass over `FieldModifierMeta.ApplicableTo` entries.
+`Token` replaces the `string Keyword` field — consumers access keyword text via `modifier.Token.Text`. `MutuallyExclusiveWith` declares modifier exclusion groups on the base; consumers (type checker, LS) enforce the constraint without hardcoding group membership. Modifiers with no runtime validation (e.g., `ordered` is compile-time only) have no inline delegate — execution is handled by the evaluator's pass over `ValueModifierMeta.ApplicableTo` entries.
 
 ##### ModifierCategory
 
@@ -1959,7 +1961,7 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | **Proof engine** | ProofRequirements | `ProofRequirements.GetMeta(kind)` dispatches proof obligation instances by kind. `ProofRequirementMeta.QualifierCompatibility` identifies dual-subject obligations without per-kind conditionals. |
 | **Evaluator dispatch** | Functions + Operations + Constraints | Binary/unary dispatch: builder embeds `static readonly` executor delegates (from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`) directly in `BinaryOp`/`UnaryOp` opcodes at compile time; evaluator calls `opcode.Executor(l, r)` — no lookup, no switch. `Constraints.GetMeta()` drives constraint activation timing — no hardcoded per-kind activation logic. Function execution dispatch delegate design is pending. |
 | **Typed constant dispatcher** | Types | `TypedConstantValidation.Validate(...)` reads `TypeMeta.ContentValidation` and dispatches on the DU subtype. No parallel validator registry. |
-| **Runtime boundary validation** | Modifiers | `FieldModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
+| **Runtime boundary validation** | Modifiers | `ValueModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
 | **Reference documentation** | All 11 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
 | **AI grounding** | All 13 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
 
@@ -2007,7 +2009,7 @@ Catalogs are the language specification in machine-readable form. Tests verify t
 | Every operator has a valid token | `Operators.All.All(o => o.Token.Categories.Contains(TokenCategory.Operator))` |
 | Token→Type index is complete | `Types.All.Select(t => t.Token.Kind).Distinct().Count() == Types.All.Count` (no two types share a token) |
 | Widening acyclicity | No circular chains in `TypeMeta.WidensTo` |
-| Subsumption acyclicity | No circular chains in `FieldModifierMeta.Subsumes` |
+| Subsumption acyclicity | No circular chains in `ValueModifierMeta.Subsumes` |
 | `ParamSubject` referential integrity | Every `ParamSubject.Parameter` is reference-equal to a `ParameterMeta` in the containing overload/operation |
 | Proof requirement type validity | `DimensionProofRequirement` only on `BinaryOperationMeta`, etc. (per PRECEPT0006 rules) |
 
@@ -2021,11 +2023,11 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 |-------|--------------|----------------|
 | **Lexer** | Already uses `Tokens.Keywords` for keyword classification | Minimal further impact. Operator scan priority derivable from `Operators.All` sorted by `Token.Text.Length` descending. |
 | **Parser** | Hand-coded vocabulary tables + recursive descent grammar | Vocabulary tables — operator precedence, type keyword mappings, modifier/action recognition sets (~40–50% of language knowledge decisions) — migrate to catalog-derived frozen dictionaries at startup. Grammar productions stay hand-written. Construct slots enable test generation and LS completions. When a new type, modifier, operator, or action is added to a catalog, the parser adapts automatically — no parser edit needed. |
-| **TypeChecker** | Catalog-driven validation | Full design documented in `docs/compiler/type-checker.md`. Modifier applicability/exclusivity → `FieldModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `FieldModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`, `FunctionMeta.HasCIVariant`, `FunctionMeta.CIVariantOf`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. |
+| **TypeChecker** | Catalog-driven validation | Full design documented in `docs/compiler/type-checker.md`. Modifier applicability/exclusivity → `ValueModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `ValueModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`, `FunctionMeta.HasCIVariant`, `FunctionMeta.CIVariantOf`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. |
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Event modifier graph requirements → `EventModifierMeta.RequiredAnalysis`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
-| **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `FieldModifierMeta.ProofDischarges` enables catalog-driven modifier-proof strategy (CC#5 resolved). |
+| **ProofEngine** | Catalog-declared obligations | Full design documented in `docs/compiler/proof-engine.md`. `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances. `ValueModifierMeta.ProofDischarges` enables catalog-driven modifier-proof strategy (CC#5 resolved). |
 | **PreceptBuilder** | Catalog-driven routing | Full design documented in `docs/runtime/precept-builder.md`. `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. `ActionMeta.SyntaxShape` drives action plan opcode emission. |
-| **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `FieldModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Binary/unary operation dispatch: executor delegates are embedded in `BinaryOp`/`UnaryOp` opcodes at build time (fetched from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`); evaluator calls `opcode.Executor(l, r)` — no per-`OperationKind` switch, no catalog lookup at evaluation time. Function and action execution dispatch delegate design is pending. |
+| **Evaluator** | Stub — full design in `docs/runtime/evaluator.md` | Constraint activation timing → `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype; modifier boundary validation → `ValueModifierMeta.ApplicableTo`, `HasValue`; accessor metadata → `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits`; access mode enforcement → `FieldDescriptor.AccessModes` (pending — see Open Questions). Binary/unary operation dispatch: executor delegates are embedded in `BinaryOp`/`UnaryOp` opcodes at build time (fetched from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`); evaluator calls `opcode.Executor(l, r)` — no per-`OperationKind` switch, no catalog lookup at evaluation time. Function and action execution dispatch delegate design is pending. |
 
 Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
 
@@ -2037,7 +2039,7 @@ The parser is the most common site for accidentally re-encoding catalog knowledg
 |---|---|
 | Which tokens lead a construct | `Constructs.ByLeadingToken.Keys` |
 | Which tokens disambiguate constructs with the same leader | `DisambiguationEntry.DisambiguationTokens` (via `ConstructMeta.Entries`) |
-| Which tokens are valid modifier keywords | `Modifiers.All.OfType<FieldModifierMeta>().Select(m => m.Token.Kind)` |
+| Which tokens are valid modifier keywords | `Modifiers.All.OfType<ValueModifierMeta>().Select(m => m.Token.Kind)` |
 | Which tokens are type keywords | `Types.ByToken.Keys` |
 | Which tokens are action keywords | `Actions.All.Select(a => a.Token.Kind)` |
 | Operator precedence and associativity | `Operators.All` |
@@ -2074,9 +2076,9 @@ Before writing any `switch` on modifier, type, function, operator, or action ide
 
 | TypeChecker need | Catalog source |
 |---|---|
-| Modifier applicability to a type | `FieldModifierMeta.ApplicableTo` |
+| Modifier applicability to a type | `ValueModifierMeta.ApplicableTo` |
 | Modifier mutual exclusion | `ModifierMeta.MutuallyExclusiveWith` |
-| Modifier subsumption | `FieldModifierMeta.Subsumes` |
+| Modifier subsumption | `ValueModifierMeta.Subsumes` |
 | Access-mode semantics | `AccessModifierMeta.IsPresent`, `IsWritable` |
 | Anchor scope and target | `AnchorModifierMeta.Scope`, `Target` |
 | Function name resolution | `Functions.FindByName(name)` → `FunctionMeta.Overloads` → `FunctionOverload.Match`; CI-qualified lookup additionally uses `FunctionMeta.HasCIVariant` / `CIVariantOf` |
@@ -2089,7 +2091,7 @@ Before writing any `switch` on modifier, type, function, operator, or action ide
 | Action legality and shape | `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported` |
 | Proof obligations (all sources) | `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements` |
 
-**The failure mode:** `switch (modifierKind) { case ModifierKind.Nonnegative: /* check applies to number */ ... }` or `switch (typeKind) { case TypeKind.Integer: ... }`. These are catalog-known facts displaced into stage logic. Use `FieldModifierMeta.ApplicableTo` and `TypeMeta.Traits` instead.
+**The failure mode:** `switch (modifierKind) { case ModifierKind.Nonnegative: /* check applies to number */ ... }` or `switch (typeKind) { case TypeKind.Integer: ... }`. These are catalog-known facts displaced into stage logic. Use `ValueModifierMeta.ApplicableTo` and `TypeMeta.Traits` instead.
 
 ---
 
@@ -2130,7 +2132,7 @@ Subject shape (what the obligation applies to) is encoded in the requirement ins
 | Evaluator need | Catalog source | Status |
 |---|---|---|
 | Constraint activation timing | `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype | Available |
-| Modifier boundary validation | `FieldModifierMeta.ApplicableTo`, `HasValue` | Available |
+| Modifier boundary validation | `ValueModifierMeta.ApplicableTo`, `HasValue` | Available |
 | Accessor signatures | `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits` | Available |
 | Access mode enforcement | `FieldDescriptor.AccessModes` | Pending (see Open Questions) |
 | Operation dispatch | `Operations.FindUnary` / `FindCandidates` | Delegate design pending |
@@ -2181,17 +2183,17 @@ The language server produces editor artifacts from catalog metadata and compiler
 
 The following catalog additions have been identified by pipeline stage design documents but are not yet implemented. Each entry specifies what's being added, the proposed shape, which consumer reads it, and implementation steps.
 
-### FieldModifierMeta.ProofDischarges
+### ValueModifierMeta.ProofDischarges
 
 **Source:** `docs/compiler/proof-engine.md` §7 Strategy 2: Modifier Proof
 
 **Status:** ✅ Resolved (CC#5, 2026-05-06)
 
-`ProofDischarge[] ProofDischarges = []` added to `FieldModifierMeta` and `ProofDischarge` record defined in this file. The discharge table is locked — see the `FieldModifierMeta` shape definition above.
+`ProofDischarge[] ProofDischarges = []` added to `ValueModifierMeta` and `ProofDischarge` record defined in this file. The discharge table is locked — see the `ValueModifierMeta` shape definition above.
 
 **Implementation checklist:**
 - [x] Add `ProofDischarge` record to `src/Precept/Language/Modifier.cs`
-- [x] Add `ProofDischarges` property to `FieldModifierMeta` (canonical shape above)
+- [x] Add `ProofDischarges` property to `ValueModifierMeta` (canonical shape above)
 - [ ] Update `Modifiers.GetMeta()` entries with discharge tables per modifier
 - [ ] Update MCP vocabulary if exposed to AI tooling
 
@@ -2284,11 +2286,11 @@ IReadOnlyDictionary<StateDescriptor?, AccessMode> AccessModes
 
 **Status:** ✅ Partially resolved — CC#19 closed `TokenMeta.HoverDescription` (2026-05-06)
 
-`string? HoverDescription` added to `TokenMeta` as a first-class catalog field (see `TokenMeta` shape definition above). `FieldModifierMeta.HoverDescription` already existed. `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, `OperatorMeta.HoverDescription` already existed. The field is consistent across all meta types that feed LS completions and hover.
+`string? HoverDescription` added to `TokenMeta` as a first-class catalog field (see `TokenMeta` shape definition above). `ValueModifierMeta.HoverDescription` already existed. `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, `OperatorMeta.HoverDescription` already existed. The field is consistent across all meta types that feed LS completions and hover.
 
 **Implementation checklist:**
 - [x] `TokenMeta.HoverDescription` added (CC#19)
-- [x] `FieldModifierMeta.HoverDescription` exists
+- [x] `ValueModifierMeta.HoverDescription` exists
 - [x] `TypeMeta.HoverDescription` exists
 - [ ] Update catalog entries with documentation strings (incremental — implementation task)
 - [ ] Update MCP vocabulary if exposed to AI tooling
@@ -2304,3 +2306,4 @@ IReadOnlyDictionary<StateDescriptor?, AccessMode> AccessModes
 | [Fault System](../runtime/fault-system.md) | Catalog 13 — `FaultCode` + `FaultMeta` shapes; StaticallyPreventable chain |
 | [Language Spec](precept-language-spec.md) | Consumers of catalog metadata for each pipeline stage |
 | [Primitive Types](primitive-types.md) | `Types` catalog is the machine-readable version of primitive type rules |
+

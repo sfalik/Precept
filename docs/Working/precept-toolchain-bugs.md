@@ -5,10 +5,10 @@ Bugs discovered during exploratory testing using the MCP tools (`precept_compile
 `precept_patterns`, `precept_diagnostic`, `precept_quickstart`, `precept_domains`)
 and by cross-checking results against `docs/language/precept-language-spec.md`.
 
-**Total confirmed bugs: 43 (BUG-001 through BUG-043)**
-- Compiler bugs: ~25
+**Total confirmed bugs: 57 (BUG-001 through BUG-057)**
+- Compiler bugs: ~27
 - MCP-definition bugs: ~15
-- MCP-docs bugs: ~3
+- MCP-docs bugs: ~4
 
 **Bug classes:**
 - **Compiler** — parser, type checker, or proof engine rejects valid spec-documented syntax/behaviour
@@ -16,6 +16,72 @@ and by cross-checking results against `docs/language/precept-language-spec.md`.
 - **MCP-docs** — language reference tool (`precept_proofs`, `precept_diagnostic`, etc.) gives incorrect or incomplete information
 
 Each entry includes: what the spec says, what the tool reports, and a minimal repro.
+
+---
+
+## Status Tracker
+
+> **Track 2 — Bug Fixes.** Updated as fixes land. Statuses: `Open` · `In Progress` · `Fixed` · `Skipped`
+
+| Bug | Title | Category | Status | Assignee | Notes |
+|-----|-------|----------|--------|----------|-------|
+| BUG-001 | `any` state wildcard not recognized in any position | Compiler | Open | — | — |
+| BUG-002 | `contains` operator rejected in all expression positions | Compiler | Open | — | — |
+| BUG-003 | `and` / `or` / `not` compound boolean expressions rejected in... | Compiler | Open | — | — |
+| BUG-004 | `default` modifier rejected on event argument declarations | Compiler | Open | — | — |
+| BUG-005 | Comma-separated field list rejected in `in S modify` declarations | Compiler | Open | — | — |
+| BUG-006 | `min(a, b)` and `max(a, b)` not recognized as function calls... | Compiler | Open | — | — |
+| BUG-007 | Arithmetic operators have lower precedence than comparison... | Compiler | Open | — | — |
+| BUG-008 | `pop` and `dequeue` proof obligations use unnamed internal... | Compiler | Open | — | — |
+| BUG-009 | `for` operator resolves to key type instead of value type | Compiler | Open | — | — |
+| BUG-010 | `choice` literal not typed as choice in comparison position | Compiler | Open | — | — |
+| BUG-011 | State entry/exit hook actions not serialized in MCP... | MCP-definition | Open | — | — |
+| BUG-012 | Stateless event handler actions not serialized in MCP... | MCP-definition | Open | — | — |
+| BUG-013 | `sqrt(abs(x))` proof obligation uses `<unknown>` — abs()... | Compiler | **Fixed** | — | Retested 2026-05-10: `sqrt(abs(X))` compiles cleanly ✅ |
+| BUG-014 | `precept_proofs` CollectionEmptyOnMutation recovery hint is... | MCP-docs | Open | — | — |
+| BUG-015 | `precept_diagnostic` PRE0083 description covers only... | MCP-docs | Open | — | — |
+| BUG-016 | Guarded rule `when` clause not serialized in MCP definition... | MCP-definition | Open | — | — |
+| BUG-017 | `~string` (case-insensitive string) qualifier lost in MCP... | MCP-definition | Open | — | — |
+| BUG-018 | Collection element types lost in MCP definition output | MCP-definition | Open | — | — |
+| BUG-019 | Typed constants (single-quoted strings) not resolved from... | Compiler | Open | — | — |
+| BUG-020 | Guarded ensures (`when` guard) not parsed in any position | Compiler | Open | — | — |
+| BUG-021 | `append by P`, `enqueue by P` v3 action forms not parsed | Compiler | Open | — | — |
+| BUG-022 | Event ensures (`on Event ensure`) not serialized in MCP... | MCP-definition | Open | — | — |
+| BUG-023 | `because` clause includes keyword in serialized value | MCP-definition | Open | — | — |
+| BUG-024 | `omit` declarations not reflected in MCP definition output | MCP-definition | Open | — | — |
+| BUG-025 | Keyword-named member accessors rejected by parser | Compiler | **Fixed** | — | Retested 2026-05-10: `.count`, `.peek` on list/queue/stack all compile ✅ |
+| BUG-026 | `in State modify all readonly` treats `all` as field name | Compiler | Open | — | — |
+| BUG-027 | `choice of T(...)` type not valid in event arg declarations | Compiler | Open | — | — |
+| BUG-028 | `RedundantModifier` fires wrong diagnostic code with garbled... | Compiler | Open | — | — |
+| BUG-029 | `InvalidModifierBounds` check not enforced | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 now fires correctly for `min > max` ✅ |
+| BUG-030 | Computed field forward references rejected; wrong error... | Compiler | Open | — | — |
+| BUG-031 | String interpolation not supported in `reject`, `because`,... | Compiler | Open | — | — |
+| BUG-032 | `reject` outcomes not serialized in MCP definition rows | MCP-definition | Open | — | — |
+| BUG-033 | Event arg `optional` modifier not reflected in MCP definition | MCP-definition | Open | — | — |
+| BUG-034 | Per-state access mode overrides not in MCP definition output | MCP-definition | Open | — | — |
+| BUG-035 | Choice element type and member values lost in MCP definition... | MCP-definition | Open | — | — |
+| BUG-036 | `no transition` and `reject` outcomes indistinguishable in... | MCP-definition | Open | — | — |
+| BUG-037 | `in State modify all` and `in State omit all` both reject... | Compiler | Open | — | — |
+| BUG-038 | `InvalidModifierBounds` not enforced for... | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 fires for `minlength > maxlength` and `mincount > maxcount` ✅ |
+| BUG-039 | `list.at(N)` method call rejected due to `at` keyword collision | Compiler | **Partial** | — | Retested 2026-05-10: parsing fixed ✅; with `notempty` compiles clean ✅; without `notempty` PRE0083 fires (wrong code — should be EmptyCollectionAccess) |
+| BUG-040 | `queue.peekby(P)` not implemented | Compiler | Open | — | — |
+| BUG-041 | `UnexpectedNull` runtime fault recovery hint uses invalid... | MCP-docs | Open | — | — |
+| BUG-042 | Modifier bound values not serialized in MCP definition output | MCP-definition | Open | — | — |
+| BUG-043 | String default values include surrounding DSL quotes in... | MCP-definition | Open | — | — |
+| BUG-044 | Guarded state actions (`from State when G -> action`) not... | Compiler | Open | — | — |
+| BUG-045 | `ascending`/`descending` modifiers not recognized in log type... | Compiler | Open | — | — |
+| BUG-046 | CI enforcement not applied to quantifier binding variables | Compiler | Open | — | — |
+| BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | Open | — | — |
+| BUG-048 | `by` keyword not recognized in `append`/`enqueue` priority... | Compiler | Open | — | — |
+| BUG-049 | `insert`/`remove at` actions fail due to `at` keyword ambiguity | Compiler | Open | — | — |
+| BUG-050 | `dequeue`/`pop` trigger false PRE0083 "Division by zero" | Compiler | Open | — | — |
+| BUG-051 | `min(a, b)` and `max(a, b)` function calls fail due to... | Compiler | Open | — | — |
+| BUG-052 | `contains` keyword unusable in expression position | Compiler | Open | — | — |
+| BUG-053 | `and`/`or` binary boolean operators fail in all expression positions | Compiler | Open | — | — |
+| BUG-054 | `ensure` clause not supported in stateless event hooks | Compiler | Open | — | — |
+| BUG-055 | PRE0097 `exampleAfter` shows wrong fix — removes `~string` instead of switching to `~startsWith` | MCP-docs | Open | — | — |
+| BUG-056 | PRE0081 false positive fires on stateless-hook-only events in stateful precepts | Compiler | Open | — | — |
+| BUG-057 | `date + period` and `date - period` arithmetic unusable — PRE0113 fires on all period field forms | Compiler | Open | — | — |
 
 ---
 
@@ -244,8 +310,10 @@ Open
 
 ### Description
 The spec grammar defines `ArgDecl := Identifier as TypeRef FieldModifier*`, meaning
-event arguments accept the same modifier set as field declarations. `default` is a
-`FieldModifier`. The only modifier explicitly excluded from event args is `writable`
+event arguments accept the same value-modifier set as field declarations. `default` is a
+value modifier. The current grammar still spells that family `FieldModifier`, but the
+canonical rename target for the metadata surface is `ValueModifier`. The only modifier
+explicitly excluded from event args is `writable`
 (which produces `WritableOnEventArg`). The compiler rejects `default` on event args
 with a generic parse error, indicating the `ArgDecl` parser is not wired up to handle
 `default` in that position.
@@ -276,7 +344,7 @@ state Done terminal
 event Submit(Days as number default 14)
 from Draft on Submit -> transition Done
 ```
-Expected: compiles cleanly — `default 14` is a valid `FieldModifier` on an event arg.
+Expected: compiles cleanly — `default 14` is a valid value modifier on an event arg.
 Actual:
 ```
 PRE0009  Error  Expected declaration keyword here, but found '14'
@@ -1107,6 +1175,7 @@ The compiler rejects `when` in every tested position for ensures:
 - `in State when Guard ensure Expr because "..."` (guard before verb) → PRE0009
 - `in State ensure Expr when Guard because "..."` (guard after expression) → PRE0009
 - `on Event when Guard ensure Expr because "..."` (event ensure, guard before verb) → PRE0009
+- `on Event ensure Expr when Guard because "..."` (event ensure, guard after expression) → PRE0009
 
 All three produce "Expected disambiguation keyword here, but found 'when'" — the parser
 does not handle the `when` guard in ensures at all.
@@ -2297,3 +2366,553 @@ field Last as string default "unknown" writable
 state Active initial
 -> First shows defaultValue:"\"\"" instead of ""
 -> Last shows defaultValue:"\"unknown\"" instead of "unknown"
+
+---
+
+## BUG-044 -- Guarded state actions (`from State when G -> action`) not supported [Compiler]
+
+### Status
+Open
+
+### Description
+The spec defines that state action declarations (`to State -> action`, `from State -> action`)
+support an optional `when` guard: "All three support an optional `when` guard between the
+state target and the verb." The compiler rejects the guard with PRE0009 "Expected
+disambiguation keyword here, but found 'when'" and double-fires the error (same double-firing
+pattern as BUG-001, BUG-037).
+
+Unguarded state actions (`to State -> action`, `from State -> action`) compile correctly.
+Only the guarded form (`from State when G -> action`) fails.
+
+### Spec reference
+- `precept-language-spec.md` line 813: "All three [state action forms] support an optional
+  `when` guard between the state target and the verb."
+
+### Errors reported
+PRE0009 Expected disambiguation keyword here, but found 'when'  (fires twice)
+
+### Minimal repro
+```
+precept BugRepro044
+field Balance as number default 0 nonnegative writable
+state Active initial
+state Closed terminal
+from Active when Balance > 100 -> set Balance = 0
+event Close
+from Active on Close -> transition Closed
+```
+
+---
+
+## BUG-045 -- `ascending`/`descending` modifiers not recognized in log type declarations [Compiler]
+
+### Status
+Open
+
+### Description
+`log of T by P ascending` and `log of T by P descending` are documented as valid field
+type declarations. The `ascending` and `descending` keywords appear in the reserved keyword
+list and are documented as log ordering modifiers. The parser rejects them with PRE0009
+"Expected declaration keyword here, but found 'ascending'/'descending'".
+
+### Spec reference
+- `precept-language-spec.md` keywords table: `ascending descending` listed as reserved keywords
+- `precept_types` reference confirms `log` type with ordering modifiers
+
+### Errors reported
+PRE0009  Expected declaration keyword here, but found 'ascending'
+PRE0009  Expected declaration keyword here, but found 'descending'
+
+### Minimal repro
+```
+precept BugRepro045
+field AscLog as log of string by integer ascending
+field DescLog as log of string by integer descending
+state Active initial
+```
+
+---
+
+## BUG-046 -- CI enforcement not applied to quantifier binding variables [Compiler]
+
+### Status
+Open
+
+### Description
+When iterating over a `set of ~string` (CI collection) with a quantifier (`each`/`any`/`no`),
+the binding variable inherits the `~string` type from the element type. The compiler should
+require `~=` for comparisons on the binding variable and reject `==` with
+`CaseInsensitiveFieldRequiresTildeEquals`. Instead, `each T in CISet (T == "value")` silently
+compiles without any warning or error. The `~=` form also compiles (correctly), meaning the
+fix does not produce false positives -- the compiler just does not enforce CI in this position.
+
+### Spec reference
+- `precept-language-spec.md` CI enforcement: when a `~string` value is compared with `==`
+  instead of `~=`, `CaseInsensitiveFieldRequiresTildeEquals` must fire.
+
+### Evidence
+```
+field Tags as set of ~string notempty
+rule each T in Tags (T == "required") because "..."   -- should fail, silently passes
+rule each T in Tags (T ~= "required") because "..."   -- correct form, also passes
+```
+
+---
+
+## BUG-047 -- Stateless event hook actions not serialized in MCP definition output [MCP-definition]
+
+### Status
+Open
+
+### Description
+Stateless event hooks (`on EventName -> ActionChain`) compile correctly and `"isStateless":true`
+is correctly set in the definition. However, the event's `rows` array is always empty (`[]`)
+even when the hook declares mutations. The actions in stateless hooks are silently absent.
+
+State-scoped transition rows (`from State on Event -> actions`) are correctly serialized.
+
+### Evidence
+```
+event UpdateScore(Points as integer)
+on UpdateScore -> set Score = Points
+```
+Definition output:
+```json
+{"name":"UpdateScore","args":[{"name":"Points","type":"integer"}],"rows":[]}
+```
+The `set Score = Points` action is absent. `rows` should contain a row with `"actions":["set Score = Points"]`.
+
+---
+
+## BUG-048 -- `by` keyword not recognized in `append`/`enqueue` priority actions [Compiler]
+
+### Status
+Open
+
+### Description
+The `by` keyword used to specify the sort key in priority collection actions is not recognized
+by the parser. Both `append Collection Value by Key` (sorted log) and `enqueue Collection Value
+by Key` (priority queue) fail with PRE0016 and PRE0009 "Expected declaration keyword here,
+but found 'by'". The parser treats `by` as the start of the next declaration rather than a
+continuation of the action.
+
+The non-keyed forms (`append Collection Value`, `enqueue Collection Value`) compile correctly.
+This affects all log and priority-queue fields that require a sort key.
+
+Note: `dequeue` failures are covered by BUG-008. This bug covers the write-side `by` forms.
+
+### Spec reference
+- `precept-language-spec.md` line 833: `append Identifier Expr "by" Expr`
+- `precept-language-spec.md` line 827: `enqueue Identifier Expr "by" Expr`
+
+### Errors reported
+PRE0016  Expected a transition outcome but none was found
+PRE0009  Expected declaration keyword here, but found 'by'
+
+### Minimal repro
+```
+precept BugRepro048
+field Notes as log of string by integer
+field PriQ as queue of string by integer
+state Active initial
+state Done terminal
+event AddNote(Note as string, Seq as integer)
+from Active on AddNote -> append Notes Note by Seq -> no transition
+event Enq(Item as string, Pri as integer)
+from Active on Enq -> enqueue PriQ Item by Pri -> no transition
+event Finish
+from Active on Finish -> transition Done
+```
+
+---
+
+## BUG-049 -- `insert`/`remove at` actions fail due to `at` keyword ambiguity [Compiler]
+
+### Status
+Open
+
+### Description
+`insert Collection Value at Index` and `remove Collection at Index` both fail because the `at`
+keyword used as an action delimiter is consumed by the expression parser as the list-element
+accessor infix operator (`list.at(N)`). The parser sees `Value at Index` as a single expression
+(list access on Value), leaving no `at` keyword for the action grammar.
+
+The result is a cascade of spurious errors including PRE0084 "sqrt() requires a non-negative
+value, but '<unknown>'" from the proof engine operating on the malformed expression.
+
+The non-indexed forms (`remove Collection Value` by value for sets/bags) compile correctly.
+
+### Spec reference
+- `precept-language-spec.md` line 834: `insert Identifier Expr "at" Expr`
+- `precept-language-spec.md` line 825: `remove Identifier "at" Expr`
+
+### Errors reported
+PRE0009  Expected expression here, but found 'at'  (for remove)
+PRE0084  sqrt() requires a non-negative value, but '<unknown>'  (for insert -- spurious)
+
+### Minimal repro
+```
+precept BugRepro049
+field Items as list of string
+state Active initial
+state Done terminal
+event Insert(Item as string, Pos as integer)
+from Active on Insert -> insert Items Item at Pos -> no transition
+event RemoveAt(Pos as integer)
+from Active on RemoveAt -> remove Items at Pos -> no transition
+event Finish
+from Active on Finish -> transition Done
+```
+
+---
+
+## BUG-050 -- `dequeue`/`pop` trigger false PRE0083 "Division by zero" [Compiler]
+
+### Status
+Open
+
+### Description
+`dequeue Collection` and `pop Collection` trigger PRE0083 "Division by zero: '<unknown>'
+can be zero" even when the collection has a `notempty` constraint. The proof engine appears
+to be generating a spurious division-by-zero proof obligation for collection removal actions.
+These operations are not arithmetic -- they do not divide. The `notempty` modifier (which
+should discharge the non-empty proof obligation for access/removal) does not help.
+
+`push`, `enqueue` (without `by`), `add`, `remove`, and `clear` all compile without this
+false positive.
+
+### Spec reference
+- `precept-language-spec.md` §5 (proof obligations): collection access is a proof obligation
+  (`EmptyCollectionAccess`), not division. PRE0083 is `DivisionByZero` -- wrong diagnostic.
+
+### Errors reported
+PRE0083  Division by zero: '<unknown>' can be zero when event '...' in state '...'
+
+### Evidence
+| Action | `notempty`? | Result |
+|--------|-------------|--------|
+| `dequeue Q` | no | PRE0083 ❌ |
+| `dequeue Q` | yes | PRE0083 ❌ |
+| `pop Stack` | no | PRE0083 ❌ |
+| `pop Stack` | yes | PRE0083 ❌ |
+| `push Stack Item` | n/a | ✅ no error |
+| `enqueue Q Item` | n/a | ✅ no error |
+
+### Minimal repro
+```
+precept BugRepro050
+field Q as queue of string notempty
+state Active initial
+state Done terminal
+event Deq
+from Active on Deq -> dequeue Q -> no transition
+event Finish
+from Active on Finish -> transition Done
+```
+
+---
+
+## BUG-051 -- `min(a, b)` and `max(a, b)` function calls fail due to reserved keyword conflict [Compiler]
+
+### Status
+Open
+
+### Description
+`min` and `max` are documented as built-in numeric functions in the `precept_types` catalog
+(with usage examples `min(score, 100)` and `max(score, 0)`). However, they are also reserved
+keywords (used in `min 0` and `max 100` field modifiers). The expression parser treats `min`
+and `max` as keywords and cannot dispatch them to function calls, resulting in PRE0009
+"Expected expression here, but found 'min'/'max'".
+
+`clamp(value, lo, hi)` works and provides similar functionality, but min/max are unusable.
+
+### Spec reference
+- `precept_types` functions catalog: `min(a, b)` documented with overloads for Integer/Decimal/Number/Money/Quantity
+- Reserved keyword list includes `min max` (field modifier position)
+- `precept-language-spec.md` §1.6: "The `(` disambiguates: constraint keywords are never followed by `(`,
+  function calls always are." — this disambiguation is NOT implemented.
+
+### Errors reported
+PRE0009  Expected expression here, but found 'min'
+PRE0009  Expected expression here, but found 'max'
+
+### Cross-impact
+The `precept_diagnostic PRE0030` (UndeclaredFunction) `exampleAfter` uses `min(max(X, 0), 100)` —
+which is broken code because of this bug. The recovery hint for PRE0030 guides users to write
+code that itself has a compile error.
+
+### Minimal repro
+```
+precept BugRepro051
+field A as number default 5 nonnegative writable
+field B as number default 10 nonnegative writable
+field Smaller as number <- min(A, B)
+field Larger as number <- max(A, B)
+state Active initial
+```
+
+---
+
+## BUG-052 -- `contains` keyword unusable in expression position [Compiler]
+
+### Status
+Open
+
+### Description
+`contains` is a reserved keyword documented as a collection membership and string substring
+operator. It fails in ALL expression positions:
+- Infix form `Tags contains "required"` (set membership) -- PRE0018 wrong type errors
+- Infix form `Name contains "Corp"` (string substring) -- PRE0018 "Expected a string, got 'string'"
+- Function-call form `contains(Tags, "required")` -- PRE0009 "Expected expression here, but found 'contains'"
+
+The string-vs-string case is especially confusing: `Name contains "Corp"` where both operands
+are `string` type fails with "Expected a string value here, but got 'string'" -- both the
+expected and actual types are 'string' but the compiler still rejects it.
+
+`startsWith(str, prefix)` and `endsWith(str, suffix)` work correctly as alternatives for
+prefix/suffix checks. There is no working alternative for contains-check or set-membership.
+
+### Errors reported
+PRE0018  Expected a set value here, but got 'string'     (set contains element)
+PRE0018  Expected a string value here, but got 'string'  (string contains substring -- self-contradictory)
+PRE0009  Expected expression here, but found 'contains'  (function-call form)
+
+### Minimal repro
+```
+precept BugRepro052
+field Name as string default "" writable
+field Tags as set of string
+rule Name contains "Corp" because "Name must contain Corp"
+rule Tags contains "required" because "required tag required"
+state Active initial
+```
+
+---
+
+## BUG-053 -- `and`/`or` binary boolean operators fail in all expression positions [Compiler]
+
+### Status
+Open
+
+### Description
+`and` and `or` binary boolean operators fail in EVERY expression position with PRE0018
+"Expected a boolean value here, but got 'boolean'" -- both the expected and actual types
+are 'boolean' but the type checker still rejects the compound expression. Affected positions:
+
+- Computed field: `field Both as boolean <- A and B`
+- When guard: `when Score > 0 and Score < 100`
+- Rule: `rule A and B because "..."`
+- Ensure: `in Active ensure X > 0 and X <= 100 because "..."`
+- If condition: `if A and B then 1 else 0`
+
+`not` (unary negation) works correctly in all these positions.
+Simple binary comparisons (`Score > 0`, `Flag == true`) work correctly.
+Quantifiers (`each`, `any`, `no`) work correctly.
+The error occurs for both `and` AND `or` -- both binary connectives are broken.
+
+The self-contradictory error message ("Expected boolean, got boolean") suggests the type
+checker computes the correct result type but fails an internal check on the compound
+expression node itself.
+
+### Spec reference
+- Reserved keyword list: `and or not` listed as expression-level operators
+- `precept-language-spec.md` §3.5: BoolExpr grammar includes `and`/`or`/`not` connectives
+
+### Errors reported
+PRE0018  Expected a boolean value here, but got 'boolean'  (for both `and` and `or`)
+
+### Minimal repro
+```
+precept BugRepro053
+field A as boolean default false writable
+field B as boolean default false writable
+field Both as boolean <- A and B
+field Either as boolean <- A or B
+state Active initial
+state Done terminal
+event Check
+from Active on Check when A and B -> no transition
+rule A and B because "Both must be true"
+event Finish
+from Active on Finish -> transition Done
+```
+
+---
+
+## BUG-054 -- `ensure` clause not supported in stateless event hooks [Compiler]
+
+### Status
+Open
+
+### Description
+The spec documents that stateless event hooks support an `ensure` post-condition clause:
+"The optional `ensure` clause at the end of the action chain declares a post-condition guard
+-- a boolean expression that must hold after all mutations in the handler are applied."
+
+The compiler rejects `ensure` in this position with PRE0009 "Expected declaration keyword
+here, but found 'ensure'". The `ensure` keyword IS supported in state-scoped ensures
+(`in State ensure ...`, `to State ensure ...`, `from State ensure ...`) and in transition
+row ensure clauses (`-> ensure E because "..."` after actions). Only the stateless
+hook form (`on Event -> actions ensure E because "..."`) fails.
+
+### Spec reference
+- `precept-language-spec.md` (stateless precepts section): "Event hooks without a when/ensure
+  continuation... The optional ensure clause at the end of the action chain..."
+
+### Errors reported
+PRE0009  Expected declaration keyword here, but found 'ensure'
+
+### Minimal repro
+```
+precept BugRepro054
+field Balance as number default 100 positive writable
+event Debit(Amount as number)
+on Debit
+    -> set Balance = Balance - Amount
+    ensure Balance >= 0
+```
+Expected: compiles cleanly — the stateless hook fires and the post-condition is checked.
+Actual: PRE0009 "Expected declaration keyword here, but found 'ensure'".
+
+Note: The spec grammar for stateless hooks (`("ensure" BoolExpr)?`) has no `because` clause.
+The form with `because` also fails, so the rejection is of the `ensure` keyword itself regardless
+of what follows it.
+
+---
+
+## BUG-055 — PRE0097 `exampleAfter` shows wrong fix **[MCP-docs]**
+
+### Status
+Open
+
+### Description
+The `precept_diagnostic` tool's PRE0097 (`CaseInsensitiveFieldRequiresTildeStartsWith`) entry
+includes an `exampleAfter` that corrects the issue by **removing the `~string` qualifier**
+instead of **replacing `startsWith` with `~startsWith`**. This is the wrong fix: it discards
+the intentional case-insensitive semantics of the field.
+
+The `fixHint` correctly says: "Replace startsWith with ~startsWith for case-insensitive prefix
+matching." But the `exampleAfter` shows a plain `string` field with unmodified `startsWith` —
+not a `~string` field with `~startsWith`. The hint and the example contradict each other.
+
+### Spec reference
+- PRE0097 trigger: "`startsWith` used on a `~string` field — use `~startsWith` instead"
+- The correct repair is: keep `~string`, change `startsWith` → `~startsWith`
+- The documented repair is: change `~string` → `string` (wrong — removes CI semantics)
+
+### Incorrect output (from `precept_diagnostic PRE0097`)
+```json
+{
+  "fixHint": "Replace startsWith with ~startsWith for case-insensitive prefix matching",
+  "exampleBefore": "field Name as ~string default \"\"\nrule startsWith(Name, \"Admin\") because \"must start with Admin\"",
+  "exampleAfter":  "field Name as string default \"\"\nrule startsWith(Name, \"Admin\") because \"must start with Admin\""
+}
+```
+`exampleAfter` changes `~string` → `string` and leaves `startsWith` unchanged.
+
+### Correct `exampleAfter`
+```
+field Name as ~string default ""
+rule ~startsWith(Name, "Admin") because "must start with Admin"
+```
+
+---
+
+## BUG-056 — PRE0081 false positive on stateless-hook-only events **[Compiler]**
+
+### Status
+Open
+
+### Description
+When a stateful precept declares an event that has **only** a stateless hook (`on EventName ->
+actions`) and no state-scoped transition rows (`from State on EventName ...`), the graph
+analyzer emits PRE0081 "Event '...' has no transition rows in any state — it can never be
+fired successfully." This is a false positive.
+
+Stateless hooks on a stateful precept fire outside the state-transition pipeline — they are
+explicitly designed to fire in any state (or in a stateless context). The absence of state-
+scoped transition rows does not make the event unfirable: it just means the event is fired
+globally, not from a specific state.
+
+PRE0081 does NOT fire if the event also has at least one state-scoped transition row.
+
+### Spec reference
+- `precept-language-spec.md` (stateless event hooks): "on a stateful precept, stateless hooks
+  can fire in any state"
+- PRE0081 trigger condition: "Event fires from no state" — incorrect for stateless hook events
+
+### Errors reported
+```
+PRE0081  Warning  Event 'Init' has no transition rows in any state — it can never be fired successfully
+```
+
+### Minimal repro
+```
+precept BugRepro056
+
+field Tags as list of string writable
+
+state Active initial
+
+event Init
+on Init
+    -> set Tags = ["hello", "world"]
+```
+Expected: no PRE0081 — `Init` is a stateless hook and is fireable.
+Actual: PRE0081 warns that `Init` can never be fired.
+
+---
+
+## BUG-057 — `date + period` and `date - period` arithmetic unusable — PRE0113 fires on all forms **[Compiler]**
+
+### Status
+Open
+
+### Description
+The `date + period → date` and `date - period → date` operations exist in the operations
+catalog with a proof requirement: "period has date temporal dimension". However, no declaration
+form for `period` fields can satisfy this proof requirement — the proof engine always reports
+PRE0113 "Operand requires Date dimension but has unknown" regardless of qualifiers used.
+
+The `precept_types` catalog documents `period` as supporting `in` (TemporalUnit) and `of`
+(TemporalDimension) qualifiers. Neither form satisfies PRE0113:
+- `field P as period writable` → PRE0113 (no qualifier)
+- `field P as period in 'month' writable` → PRE0113 (TemporalUnit qualifier not sufficient)
+- `field P as period of 'date' writable` → PRE0113 (TemporalDimension qualifier not sufficient)
+
+Typed constant period literals (`'30 days'`) also fail as expression arguments due to BUG-019
+(PRE0052 "Cannot determine the type").
+
+The inverse operation `date - date → period` ✅ works correctly (no proof requirement).
+
+### Operations catalog
+- `DatePlusPeriod`: `date + period → date` — proofRequirements: `["period has date temporal dimension"]`
+- `DateMinusPeriod`: `date − period → date` — proofRequirements: `["period has date temporal dimension"]`
+- `DateMinusDate`: `date − date → period` — no proof requirements ✅
+
+### Spec reference
+- `precept_types` for `period`: qualifierShape lists `in` (TemporalUnit) and `of` (TemporalDimension)
+- `precept_types` usageExample: `field GracePeriod as period default '30 days'` — this example is
+  broken due to both this bug and BUG-019
+
+### Errors reported
+```
+PRE0113  Error  Operand 'P' requires Date dimension but has unknown in field '...' computed expression
+```
+
+### Minimal repro
+```
+precept BugRepro057
+
+field StartDate as date writable
+field DatePeriod as period of 'date' writable   # qualifier matches required dimension
+field ExtendedDate as date <- StartDate + DatePeriod
+```
+Expected: compiles cleanly — `period of 'date'` has the Date temporal dimension.
+Actual: PRE0113 "Operand 'DatePeriod' requires Date dimension but has unknown".
+
+### Workaround
+None known. Date calendar arithmetic with variable periods is entirely blocked. Only
+`date - date → period` (distance, no proof obligation) works.
+
+

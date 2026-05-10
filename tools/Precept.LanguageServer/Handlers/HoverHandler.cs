@@ -47,22 +47,50 @@ internal sealed class HoverHandler : IHoverHandler
             return null;
         }
 
-        // Contextual reclassification: 'set' is the type keyword in type-expression position.
-        if (token.Value.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token.Value))
+        if (TryCreateTypeHover(compilation, token.Value, out var typeHover))
         {
-            var typeMeta = Types.ByToken[TokenKind.Set];
-            return MakeHover($"**{typeMeta.DisplayName}**\n\n{typeMeta.HoverDescription ?? typeMeta.Description}", token.Value.Span);
+            return typeHover;
+        }
+
+        if (TryCreateActionHover(token.Value, out var actionHover))
+        {
+            return actionHover;
+        }
+
+        if (TryCreateOperatorHover(compilation, position, token.Value, out var operatorHover))
+        {
+            return operatorHover;
+        }
+
+        if (TryCreateFunctionHover(compilation, position, token.Value, out var functionHover))
+        {
+            return functionHover;
+        }
+
+        if (TryCreateTypedConstantHover(compilation.Semantics, position, out var constantHover))
+        {
+            return constantHover;
+        }
+
+        if (TryCreateAccessorHover(compilation, position, token.Value, out var accessorHover))
+        {
+            return accessorHover;
+        }
+
+        if (token.Value.Kind == TokenKind.Identifier)
+        {
+            return TryIdentifierHover(compilation.Semantics, token.Value, position);
+        }
+
+        if (HasRicherCatalogOwner(compilation, position, token.Value))
+        {
+            return null;
         }
 
         var meta = Tokens.GetMeta(token.Value.Kind);
         if (meta.Text is not null)
         {
             return MakeHover($"**{meta.Text}**\n\n{meta.Description}", token.Value.Span);
-        }
-
-        if (token.Value.Kind == TokenKind.Identifier)
-        {
-            return TryIdentifierHover(compilation.Semantics, token.Value, position);
         }
 
         return null;
@@ -109,6 +137,230 @@ internal sealed class HoverHandler : IHoverHandler
         }
 
         return null;
+    }
+
+    private static bool TryCreateTypeHover(Compilation compilation, Token token, out Hover hover)
+    {
+        hover = null!;
+
+        if (token.Kind == TokenKind.Set && !SlotContextResolver.IsSetInTypePosition(compilation, token))
+        {
+            return false;
+        }
+
+        if (!Types.ByToken.TryGetValue(token.Kind, out var typeMeta))
+        {
+            return false;
+        }
+
+        hover = MakeHover(CreateTypeMarkdown(typeMeta), token.Span);
+        return true;
+    }
+
+    private static bool TryCreateActionHover(Token token, out Hover hover)
+    {
+        hover = null!;
+
+        if (!Actions.ByTokenKind.TryGetValue(token.Kind, out var actionMeta))
+        {
+            return false;
+        }
+
+        hover = MakeHover(CreateActionMarkdown(actionMeta), token.Span);
+        return true;
+    }
+
+    private static bool TryCreateOperatorHover(Compilation compilation, Position position, Token token, out Hover hover)
+    {
+        hover = null!;
+
+        if (!TryGetOperatorMeta(compilation, position, token, out var operatorMeta))
+        {
+            return false;
+        }
+
+        hover = MakeHover(CreateOperatorMarkdown(operatorMeta), token.Span);
+        return true;
+    }
+
+    private static bool TryCreateFunctionHover(Compilation compilation, Position position, Token token, out Hover hover)
+    {
+        hover = null!;
+
+        if (!SemanticExpressionLocator.TryFindFunctionAt(compilation, position, out var overloads))
+        {
+            return false;
+        }
+
+        hover = MakeHover(CreateFunctionMarkdown(overloads), token.Span);
+        return true;
+    }
+
+    private static bool TryCreateTypedConstantHover(SemanticIndex semantics, Position position, out Hover hover)
+    {
+        hover = null!;
+
+        var constant = TypedConstantCollector.FindAtPosition(semantics, position);
+        if (constant is null)
+        {
+            return false;
+        }
+
+        hover = MakeHover(CreateTypedConstantMarkdown(constant), constant.Span);
+        return true;
+    }
+
+    private static bool TryCreateAccessorHover(Compilation compilation, Position position, Token token, out Hover hover)
+    {
+        hover = null!;
+
+        if (!SemanticExpressionLocator.TryFindAccessorAt(compilation, position, out var ownerType, out var accessor))
+        {
+            return false;
+        }
+
+        TypeKind? resultType = null;
+        if (SemanticExpressionLocator.TryFindExpressionAt(compilation.Semantics, position, out var expression)
+            && expression is TypedMemberAccess memberAccess)
+        {
+            resultType = memberAccess.ResultType;
+        }
+
+        hover = MakeHover(CreateAccessorMarkdown(ownerType, accessor, resultType), token.Span);
+        return true;
+    }
+
+    private static bool TryGetOperatorMeta(Compilation compilation, Position position, Token token, out OperatorMeta operatorMeta)
+    {
+        operatorMeta = null!;
+
+        if (SemanticExpressionLocator.TryFindExpressionAt(compilation.Semantics, position, out var expression))
+        {
+            if (expression is TypedPostfixOp && TryGetMultiTokenOperatorMeta(compilation.Tokens.Tokens, position, out operatorMeta))
+            {
+                return true;
+            }
+
+            var arity = expression switch
+            {
+                TypedUnaryOp => Arity.Unary,
+                TypedBinaryOp => Arity.Binary,
+                _ => (Arity?)null,
+            };
+
+            if (arity is { } resolvedArity
+                && Operators.ByToken.TryGetValue((token.Kind, resolvedArity), out var resolvedOperator))
+            {
+                operatorMeta = resolvedOperator;
+                return true;
+            }
+        }
+
+        if (TryGetMultiTokenOperatorMeta(compilation.Tokens.Tokens, position, out operatorMeta))
+        {
+            return true;
+        }
+
+        return TryGetUniqueSingleTokenOperatorMeta(token.Kind, out operatorMeta);
+    }
+
+    private static bool TryGetMultiTokenOperatorMeta(
+        ImmutableArray<Token> tokens,
+        Position position,
+        out OperatorMeta operatorMeta)
+    {
+        operatorMeta = null!;
+
+        var tokenIndex = FindTokenIndexAt(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        for (var start = tokenIndex - 2; start <= tokenIndex; start++)
+        {
+            if (start < 0)
+            {
+                continue;
+            }
+
+            var significant = new List<(int Index, TokenKind Kind)>(3);
+            for (var index = start; index < tokens.Length && significant.Count < 3; index++)
+            {
+                if (tokens[index].Kind is TokenKind.NewLine or TokenKind.EndOfSource)
+                {
+                    continue;
+                }
+
+                significant.Add((index, tokens[index].Kind));
+            }
+
+            for (var length = Math.Min(significant.Count, 3); length >= 2; length--)
+            {
+                if (!significant.Take(length).Any(candidate => candidate.Index == tokenIndex))
+                {
+                    continue;
+                }
+
+                var candidate = Operators.ByTokenSequence(significant.Take(length).Select(value => value.Kind).ToArray());
+                if (candidate is not null)
+                {
+                    operatorMeta = candidate;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetUniqueSingleTokenOperatorMeta(TokenKind tokenKind, out OperatorMeta operatorMeta)
+    {
+        operatorMeta = null!;
+
+        var matches = new[]
+        {
+            TryGetOperatorMeta(tokenKind, Arity.Unary),
+            TryGetOperatorMeta(tokenKind, Arity.Binary),
+            TryGetOperatorMeta(tokenKind, Arity.Postfix),
+        }
+        .Where(meta => meta is not null)
+        .Cast<OperatorMeta>()
+        .Distinct()
+        .ToArray();
+
+        if (matches.Length != 1)
+        {
+            return false;
+        }
+
+        operatorMeta = matches[0];
+        return true;
+    }
+
+    private static OperatorMeta? TryGetOperatorMeta(TokenKind tokenKind, Arity arity) =>
+        Operators.ByToken.TryGetValue((tokenKind, arity), out var operatorMeta)
+            ? operatorMeta
+            : null;
+
+    private static bool HasRicherCatalogOwner(Compilation compilation, Position position, Token token)
+    {
+        if (token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token))
+        {
+            return true;
+        }
+
+        if (token.Kind != TokenKind.Set && Types.ByToken.ContainsKey(token.Kind))
+        {
+            return true;
+        }
+
+        if (Actions.ByTokenKind.ContainsKey(token.Kind))
+        {
+            return true;
+        }
+
+        return TryGetOperatorMeta(compilation, position, token, out _);
     }
 
     private static bool TryFindArgument(SemanticIndex semantics, string name, Position position, out TypedArg arg)
@@ -325,6 +577,105 @@ internal sealed class HoverHandler : IHoverHandler
         $"Type: `{FormatType(arg.ResolvedType, arg.ElementType)}`",
     });
 
+    private static string CreateTypeMarkdown(TypeMeta typeMeta) =>
+        string.Join("\n\n", new[]
+        {
+            $"**{typeMeta.DisplayName}**",
+            typeMeta.HoverDescription ?? typeMeta.Description,
+        });
+
+    private static string CreateActionMarkdown(ActionMeta actionMeta) =>
+        string.Join("\n\n", new[]
+        {
+            $"**{actionMeta.Token.Text ?? actionMeta.Kind.ToString().ToLowerInvariant()}**",
+            actionMeta.HoverDescription ?? actionMeta.Description,
+        });
+
+    private static string CreateOperatorMarkdown(OperatorMeta operatorMeta) =>
+        string.Join("\n\n", new[]
+        {
+            $"**{FormatOperatorLabel(operatorMeta)}**",
+            operatorMeta.HoverDescription ?? operatorMeta.Description,
+        });
+
+    private static string CreateFunctionMarkdown(IReadOnlyList<FunctionMeta> overloads)
+    {
+        var name = overloads[0].Name;
+        var signatures = overloads
+            .SelectMany(meta => meta.Overloads.Select(overload => $"`{FormatFunctionSignature(meta, overload)}`"))
+            .Distinct()
+            .ToArray();
+        var descriptions = overloads
+            .Select(meta => meta.HoverDescription ?? meta.Description)
+            .Distinct()
+            .ToArray();
+
+        var sections = new List<string>
+        {
+            $"**function `{name}`**",
+            string.Join("\n", signatures),
+            string.Join("\n", descriptions),
+        };
+
+        return string.Join("\n\n", sections);
+    }
+
+    private static string CreateTypedConstantMarkdown(TypedTypedConstant constant)
+    {
+        var typeMeta = Types.GetMeta(constant.ResultType);
+        var sections = new List<string>
+        {
+            $"**{typeMeta.DisplayName} typed constant**",
+        };
+
+        if (typeMeta.ContentValidation is { } validation)
+        {
+            sections.Add($"Format: {validation.FormatDescription}");
+        }
+
+        return string.Join("\n\n", sections);
+    }
+
+    private static string CreateAccessorMarkdown(TypeMeta ownerType, TypeAccessor accessor, TypeKind? resultType)
+    {
+        var sections = new List<string>
+        {
+            $"**{FormatAccessorLabel(ownerType, accessor)}**",
+            accessor.Description,
+        };
+
+        if (resultType is { } resolvedResultType)
+        {
+            sections.Add($"Returns: `{Types.GetMeta(resolvedResultType).DisplayName}`");
+        }
+
+        return string.Join("\n\n", sections);
+    }
+
+    private static string FormatOperatorLabel(OperatorMeta operatorMeta) => operatorMeta switch
+    {
+        SingleTokenOp single => single.Token.Text ?? single.Kind.ToString(),
+        MultiTokenOp multi => string.Join(" ", multi.Tokens.Select(token => token.Text ?? token.Kind.ToString())),
+        _ => operatorMeta.Kind.ToString(),
+    };
+
+    private static string FormatFunctionSignature(FunctionMeta meta, FunctionOverload overload) =>
+        $"{meta.Name}({string.Join(", ", overload.Parameters.Select(FormatParameter))}) -> {Types.GetMeta(overload.ReturnType).DisplayName}";
+
+    private static string FormatParameter(ParameterMeta parameter) =>
+        $"{parameter.Name ?? "value"} as {Types.GetMeta(parameter.Kind).DisplayName}";
+
+    private static string FormatAccessorLabel(TypeMeta ownerType, TypeAccessor accessor) => accessor switch
+    {
+        FixedReturnAccessor fixedReturn when fixedReturn.ParameterType is { } parameterType =>
+            $"{ownerType.DisplayName}.{accessor.Name}({Types.GetMeta(parameterType).DisplayName})",
+        ElementParameterAccessor =>
+            $"{ownerType.DisplayName}.{accessor.Name}(value)",
+        _ when accessor.ParameterType is { } parameterType =>
+            $"{ownerType.DisplayName}.{accessor.Name}({Types.GetMeta(parameterType).DisplayName})",
+        _ => $"{ownerType.DisplayName}.{accessor.Name}",
+    };
+
     private static string FormatModifiers(ImmutableArray<ModifierKind> modifiers) =>
         string.Join(", ", modifiers.Select(modifier => $"`{modifier.ToString().ToLowerInvariant()}`"));
 
@@ -376,5 +727,18 @@ internal sealed class HoverHandler : IHoverHandler
         }
 
         return true;
+    }
+
+    private static int FindTokenIndexAt(ImmutableArray<Token> tokens, Position position)
+    {
+        for (var index = 0; index < tokens.Length; index++)
+        {
+            if (Contains(tokens[index].Span, position))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 }

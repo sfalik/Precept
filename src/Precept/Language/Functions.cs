@@ -67,11 +67,11 @@ public static class Functions
         // ── Numeric: abs ────────────────────────────────────────────────────────
         FunctionKind.Abs => new(kind, "abs", "Absolute value (same type as input)",
         [
-            new([new(TypeKind.Integer, "value")], TypeKind.Integer),
-            new([new(TypeKind.Decimal, "value")], TypeKind.Decimal),
-            new([new(TypeKind.Number,  "value")], TypeKind.Number),
-            new([new(TypeKind.Money,   "value")], TypeKind.Money, QualifierMatch.Same),
-            new([new(TypeKind.Quantity,"value")], TypeKind.Quantity, QualifierMatch.Same),
+            new([new(TypeKind.Integer, "value")], TypeKind.Integer, ReturnNonnegative: true),
+            new([new(TypeKind.Decimal, "value")], TypeKind.Decimal, ReturnNonnegative: true),
+            new([new(TypeKind.Number,  "value")], TypeKind.Number, ReturnNonnegative: true),
+            new([new(TypeKind.Money,   "value")], TypeKind.Money, QualifierMatch.Same, ReturnNonnegative: true),
+            new([new(TypeKind.Quantity,"value")], TypeKind.Quantity, QualifierMatch.Same, ReturnNonnegative: true),
         ],
         FunctionCategory.Numeric,
         UsageExample: "abs(balance)",

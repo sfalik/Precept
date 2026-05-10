@@ -19,7 +19,8 @@ public sealed record FunctionOverload(
     IReadOnlyList<ParameterMeta> Parameters,
     TypeKind ReturnType,
     QualifierMatch? Match = null,
-    ProofRequirement[]? ProofRequirements = null)
+    ProofRequirement[]? ProofRequirements = null,
+    bool ReturnNonnegative = false)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];

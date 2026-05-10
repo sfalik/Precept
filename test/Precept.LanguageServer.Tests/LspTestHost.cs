@@ -3,13 +3,12 @@ using System.Collections.Concurrent;
 using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using Precept.LanguageServer.Handlers;
 
 namespace Precept.LanguageServer.Tests;
 
@@ -20,12 +19,12 @@ namespace Precept.LanguageServer.Tests;
 public sealed class LspTestHost : IAsyncDisposable
 {
     private readonly ILanguageServer _server;
-    private readonly ILanguageClient _client;
+    private readonly LanguageClient _client;
     private readonly ConcurrentDictionary<DocumentUri, TaskCompletionSource<PublishDiagnosticsParams>> _diagWaiters;
 
     private LspTestHost(
         ILanguageServer server,
-        ILanguageClient client,
+        LanguageClient client,
         ConcurrentDictionary<DocumentUri, TaskCompletionSource<PublishDiagnosticsParams>> diagWaiters)
     {
         _server = server;
@@ -34,6 +33,8 @@ public sealed class LspTestHost : IAsyncDisposable
     }
 
     public ILanguageClient Client => _client;
+
+    public ServerCapabilities ServerCapabilities => _client.ServerSettings.Capabilities;
 
     public Task<PublishDiagnosticsParams> WhenPublishDiagnosticsAsync(DocumentUri uri, CancellationToken cancellationToken = default)
     {
@@ -69,9 +70,7 @@ public sealed class LspTestHost : IAsyncDisposable
             options
                 .WithInput(serverInput)
                 .WithOutput(serverOutput)
-                .WithServices(services => services.AddSingleton<DocumentStore>())
-                .WithHandler<TextDocumentSyncHandler>()
-                .WithHandler<CodeActionHandler>();
+                .ConfigurePreceptLanguageServer();
         });
 
         var client = LanguageClient.PreInit(options =>

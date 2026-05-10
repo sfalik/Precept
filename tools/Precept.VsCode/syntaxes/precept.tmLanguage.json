@@ -370,6 +370,10 @@
                   "include": "#ruleDesugaringModifiers"
                 },
                 {
+                  "name": "keyword.declaration.precept",
+                  "match": "\\bdefault\\b"
+                },
+                {
                   "include": "#grammarKeywords"
                 },
                 {
@@ -428,6 +432,10 @@
                 },
                 {
                   "include": "#ruleDesugaringModifiers"
+                },
+                {
+                  "name": "keyword.declaration.precept",
+                  "match": "\\bdefault\\b"
                 },
                 {
                   "include": "#grammarKeywords"

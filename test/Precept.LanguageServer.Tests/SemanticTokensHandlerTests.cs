@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Precept.Language;
 using Precept.LanguageServer.Handlers;
+using Precept.Pipeline;
 using Xunit;
 using TokenKind = Precept.Language.TokenKind;
 using TokensCatalog = Precept.Language.Tokens;
@@ -70,7 +71,11 @@ public sealed class SemanticTokensHandlerTests
     [Fact]
     public void BuildLegend_TokenTypes_MatchCatalogCustomTypes()
     {
-        var expected = SemanticTokenTypes.All.Select(m => m.CustomType).ToArray();
+        var expected = SemanticTokenTypes.All
+            .Select(m => m.CustomType)
+            .Concat([SemanticTokensHandler.BuiltInFunctionTokenType, SemanticTokensHandler.BuiltInStringTokenType])
+            .Distinct()
+            .ToArray();
         var legend = SemanticTokensHandler.BuildLegend();
 
         legend.TokenTypes.Select(t => t.ToString()).Should().Equal(expected);
@@ -269,10 +274,121 @@ public sealed class SemanticTokensHandlerTests
     }
 
     [Fact]
+    public void ExpressionTokens_BuiltInFunctionCall_EmitFunctionToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Input as decimal default 1
+            field Rounded as integer <- round(Input)
+            """);
+        var call = (TypedFunctionCall)compilation.Semantics.Fields.Single(field => field.Name == "Rounded").ComputedExpression!;
+        var expectedLength = Functions.GetMeta(call.ResolvedFunction).Name.Length;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var tokens = SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics);
+
+        tokens.Should().Contain(token =>
+            token.Line == call.Span.StartLine - 1 &&
+            token.Character == call.Span.StartColumn - 1 &&
+            token.Length == expectedLength &&
+            token.TokenType == SemanticTokensHandler.BuiltInFunctionTokenType);
+    }
+
+    [Fact]
+    public void LexicalTokens_TypedConstant_EmitStringToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Due as date <- '2026-01-01'
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+
+        tokens.Should().Contain(token =>
+            token.Kind == TokenKind.TypedConstant &&
+            token.TokenType == SemanticTokensHandler.BuiltInStringTokenType);
+    }
+
+    [Fact]
+    public void LexicalTokens_Operator_EmitOperatorToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Total as number <- 1 + 2
+            """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Operator).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+
+        tokens.Should().Contain(token => token.Kind == TokenKind.Plus && token.TokenType == expected);
+    }
+
+    [Fact]
+    public void LexicalTokens_ActionVerb_EmitKeywordToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Value as number default 0
+            state Draft initial
+            event Submit
+            from Draft on Submit -> set Value = 1 -> no transition
+            """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.KeywordSemantic).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+
+        tokens.Should().Contain(token => token.Kind == TokenKind.Set && token.TokenType == expected);
+    }
+
+    [Fact]
+    public void LexicalTokens_AsAndDefault_StayInGrammarKeywordLane()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Name as string default "Kramer"
+            """);
+        var grammarKeyword = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.KeywordGrammar).CustomType;
+        var message = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Message).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+
+        tokens.Should().Contain(token => token.Kind == TokenKind.As && token.TokenType == grammarKeyword);
+        tokens.Should().Contain(token => token.Kind == TokenKind.Default && token.TokenType == grammarKeyword);
+        tokens.Should().NotContain(token =>
+            (token.Kind == TokenKind.As || token.Kind == TokenKind.Default) &&
+            token.TokenType == message);
+    }
+
+    [Fact]
+    public void LexicalTokens_BooleanLiteral_KeepKeywordTokenType()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Enabled as boolean default true
+            """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Value).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+
+        tokens.Should().Contain(token => token.Kind == TokenKind.True && token.TokenType == expected);
+    }
+
+    [Fact]
     public void SendColorNotification_EmitsOneEntryPerCatalogMember()
     {
         string? method = null;
-        SemanticTokensHandler.SemanticTokenColorRule[]? payload = null;
+        SemanticTokensHandler.SemanticTokenColorNotificationPayload? payload = null;
 
         SemanticTokensHandler.SendColorNotification((notificationMethod, rules) =>
         {
@@ -282,8 +398,8 @@ public sealed class SemanticTokensHandlerTests
 
         method.Should().Be(SemanticTokensHandler.SemanticTokenColorsNotificationName);
         payload.Should().NotBeNull();
-        payload!.Should().HaveCount(SemanticTokenTypes.All.Count);
-        payload.Select(entry => entry.TokenType)
+        payload!.Value.Rules.Should().HaveCount(SemanticTokenTypes.All.Count);
+        payload.Value.Rules.Select(entry => entry.TokenType)
             .Should()
             .Equal(SemanticTokenTypes.All.Select(meta => meta.CustomType));
     }
@@ -291,12 +407,12 @@ public sealed class SemanticTokensHandlerTests
     [Fact]
     public void SendColorNotification_EntryHexColorsMatchCatalog()
     {
-        SemanticTokensHandler.SemanticTokenColorRule[]? payload = null;
+        SemanticTokensHandler.SemanticTokenColorNotificationPayload? payload = null;
 
         SemanticTokensHandler.SendColorNotification((_, rules) => payload = rules);
 
         payload.Should().NotBeNull();
-        payload!
+        payload!.Value.Rules
             .Select(entry => (entry.TokenType, entry.HexColor, entry.Bold, entry.Italic))
             .Should()
             .Equal(SemanticTokenTypes.All.Select(meta => (meta.CustomType, meta.ForegroundHex, meta.Bold, meta.Italic)));

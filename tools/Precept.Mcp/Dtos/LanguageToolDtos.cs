@@ -136,7 +136,7 @@ public sealed record ContentValidationDto(
 );
 
 public sealed record ModifierCatalogDto(
-    FieldModifierCatalogEntryDto[] Field,
+    ValueModifierCatalogEntryDto[] Value,
     StateModifierCatalogEntryDto[] State,
     EventModifierCatalogEntryDto[] Event,
     AccessModifierCatalogEntryDto[] Access,
@@ -149,12 +149,13 @@ public sealed record ModifierTargetDto(
     string[] RequiredModifiers
 );
 
-public sealed record FieldModifierCatalogEntryDto(
+public sealed record ValueModifierCatalogEntryDto(
     string Kind,
     string Keyword,
     string Description,
     string Category,
-    ModifierTargetDto[] ApplicableTo,
+    ModifierTargetDto[] ApplicableTypes,
+    string[] ApplicableDeclarationSites,
     bool HasValue,
     string[] Subsumes,
     bool DesugarsToRule,

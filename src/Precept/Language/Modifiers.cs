@@ -45,20 +45,20 @@ public static class Modifiers
 
     public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
     {
-        // ── Field modifiers ─────────────────────────────────────────────────────
-        ModifierKind.Optional => new FieldModifierMeta(
+        // ── Value modifiers ─────────────────────────────────────────────────────
+        ModifierKind.Optional => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Optional),
             "Field is nullable; use is set / is not set for presence",
             ModifierCategory.Structural, AnyType,
             HoverDescription: "The field may have no value. Use 'is set' and 'is not set' to test for presence. Absent values appear as null in the API."),
 
-        ModifierKind.Ordered => new FieldModifierMeta(
+        ModifierKind.Ordered => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Ordered),
             "Choice field supports ordinal comparison",
             ModifierCategory.Structural, ChoiceOnly,
             HoverDescription: "Enables comparison operators (< > <= >=) on a choice field, ordered by declaration sequence."),
 
-        ModifierKind.Nonnegative => new FieldModifierMeta(
+        ModifierKind.Nonnegative => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonnegative),
             "Value ≥ 0",
             ModifierCategory.Structural, NumericTypes,
@@ -73,7 +73,7 @@ public static class Modifiers
             DesugarsToRule: true,
             MutuallyExclusiveWith: [ModifierKind.Positive]),
 
-        ModifierKind.Positive => new FieldModifierMeta(
+        ModifierKind.Positive => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Positive),
             "Value > 0",
             ModifierCategory.Structural, NumericTypes,
@@ -89,7 +89,7 @@ public static class Modifiers
             DesugarsToRule: true,
             MutuallyExclusiveWith: [ModifierKind.Nonnegative]),
 
-        ModifierKind.Nonzero => new FieldModifierMeta(
+        ModifierKind.Nonzero => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonzero),
             "Value ≠ 0",
             ModifierCategory.Structural, NumericTypes,
@@ -103,7 +103,7 @@ public static class Modifiers
             HoverDescription: "The field's value must not be zero. Allows negative values.",
             DesugarsToRule: true),
 
-        ModifierKind.Notempty => new FieldModifierMeta(
+        ModifierKind.Notempty => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Notempty),
             "String or collection is non-empty",
             ModifierCategory.Structural, StringAndCollectionTypes,
@@ -121,16 +121,17 @@ public static class Modifiers
             HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time.",
             DesugarsToRule: true),
 
-        ModifierKind.Default => new FieldModifierMeta(
+        ModifierKind.Default => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Default),
             "Default value expression",
             ModifierCategory.Structural, AnyType, HasValue: true,
             HoverDescription: "Provides the initial value for the field when the precept is first created."),
 
-        ModifierKind.Min => new FieldModifierMeta(
+        ModifierKind.Min => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Min),
             "Minimum value",
             ModifierCategory.Structural, NumericTypes, HasValue: true,
+            BoundCounterpart: ModifierKind.Max,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -141,10 +142,11 @@ public static class Modifiers
             HoverDescription: "The field's value must be at least this minimum. Enforced on every assignment.",
             DesugarsToRule: true),
 
-        ModifierKind.Max => new FieldModifierMeta(
+        ModifierKind.Max => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Max),
             "Maximum value",
             ModifierCategory.Structural, NumericTypes, HasValue: true,
+            BoundCounterpart: ModifierKind.Min,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -155,10 +157,11 @@ public static class Modifiers
             HoverDescription: "The field's value must be at most this maximum. Enforced on every assignment.",
             DesugarsToRule: true),
 
-        ModifierKind.Minlength => new FieldModifierMeta(
+        ModifierKind.Minlength => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Minlength),
             "Minimum string length",
             ModifierCategory.Structural, StringOnly, HasValue: true,
+            BoundCounterpart: ModifierKind.Maxlength,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -169,10 +172,11 @@ public static class Modifiers
             HoverDescription: "The text field must have at least this many characters.",
             DesugarsToRule: true),
 
-        ModifierKind.Maxlength => new FieldModifierMeta(
+        ModifierKind.Maxlength => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxlength),
             "Maximum string length",
             ModifierCategory.Structural, StringOnly, HasValue: true,
+            BoundCounterpart: ModifierKind.Minlength,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -183,10 +187,11 @@ public static class Modifiers
             HoverDescription: "The text field must have at most this many characters.",
             DesugarsToRule: true),
 
-        ModifierKind.Mincount => new FieldModifierMeta(
+        ModifierKind.Mincount => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Mincount),
             "Minimum collection count",
             ModifierCategory.Structural, CollectionTypes, HasValue: true,
+            BoundCounterpart: ModifierKind.Maxcount,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -197,10 +202,11 @@ public static class Modifiers
             HoverDescription: "The collection must have at least this many elements.",
             DesugarsToRule: true),
 
-        ModifierKind.Maxcount => new FieldModifierMeta(
+        ModifierKind.Maxcount => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxcount),
             "Maximum collection count",
             ModifierCategory.Structural, CollectionTypes, HasValue: true,
+            BoundCounterpart: ModifierKind.Mincount,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -211,17 +217,17 @@ public static class Modifiers
             HoverDescription: "The collection must have at most this many elements.",
             DesugarsToRule: true),
 
-        ModifierKind.Maxplaces => new FieldModifierMeta(
+        ModifierKind.Maxplaces => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxplaces),
             "Maximum decimal places",
             ModifierCategory.Structural, DecimalOnly, HasValue: true,
             HoverDescription: "The decimal field must have at most this many digits after the decimal point.",
             DesugarsToRule: true),
 
-        ModifierKind.Writable => new FieldModifierMeta(
+        ModifierKind.Writable => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Writable),
             "Field is directly editable; read-only by default without this modifier",
-            ModifierCategory.Structural, AnyType,
+            ModifierCategory.Structural, AnyType, ApplicableDeclarationSites: ValueModifierDeclarationSite.FieldDeclaration,
             HoverDescription: "The field is directly editable. Without this modifier, the field is read-only by default. Use 'in State modify Field editable/readonly' to override per state."),
 
         // ── State modifiers ─────────────────────────────────────────────────────
@@ -316,28 +322,28 @@ public static class Modifiers
         Enum.GetValues<ModifierKind>().Select(GetMeta).ToArray();
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  ByFieldToken — O(1) lookup: TokenKind → FieldModifierMeta
+    //  ByValueToken — O(1) lookup: TokenKind → ValueModifierMeta
     //
     //  Mirrors Actions.ByTokenKind and Types.ByToken for parser-facing dispatch.
-    //  Only FieldModifierMeta entries appear here — state, event, access, and
+    //  Only ValueModifierMeta entries appear here — state, event, access, and
     //  anchor modifiers are never looked up by token kind in ParseFieldModifierNodes.
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// O(1) lookup from token kind to field modifier metadata.
+    /// O(1) lookup from token kind to value modifier metadata.
     /// Used by <c>ParseFieldModifierNodes</c> to resolve a modifier token to its
-    /// <see cref="FieldModifierMeta"/> without a linear scan. Mirrors
+    /// <see cref="ValueModifierMeta"/> without a linear scan. Mirrors
     /// <see cref="Language.Actions.ByTokenKind"/> for the modifier domain.
     /// </summary>
-    public static FrozenDictionary<TokenKind, FieldModifierMeta> ByFieldToken { get; } =
-        All.OfType<FieldModifierMeta>()
+    public static FrozenDictionary<TokenKind, ValueModifierMeta> ByValueToken { get; } =
+        All.OfType<ValueModifierMeta>()
            .ToFrozenDictionary(m => m.Token.Kind);
 
     /// <summary>
     /// O(1) lookup from token kind to state modifier metadata.
     /// Used by <c>ParseStateEntryList</c> to resolve a modifier token to its
     /// <see cref="StateModifierMeta"/> without a linear scan. Mirrors
-    /// <see cref="ByFieldToken"/> for the state modifier domain.
+    /// <see cref="ByValueToken"/> for the state modifier domain.
     /// </summary>
     public static FrozenDictionary<TokenKind, StateModifierMeta> ByStateToken { get; } =
         All.OfType<StateModifierMeta>()
@@ -347,7 +353,7 @@ public static class Modifiers
     /// O(1) lookup from token kind to access modifier metadata.
     /// Used by the type checker to resolve an access-mode token to its
     /// <see cref="AccessModifierMeta"/> without a hardcoded switch.
-    /// Mirrors <see cref="ByFieldToken"/> and <see cref="ByStateToken"/>.
+    /// Mirrors <see cref="ByValueToken"/> and <see cref="ByStateToken"/>.
     /// </summary>
     public static FrozenDictionary<TokenKind, AccessModifierMeta> ByAccessToken { get; } =
         All.OfType<AccessModifierMeta>()
@@ -358,7 +364,7 @@ public static class Modifiers
     /// Used by the type checker to resolve a leading anchor token to its
     /// <see cref="AnchorModifierMeta"/> (which carries <see cref="AnchorScope"/>)
     /// without a hardcoded switch.
-    /// Mirrors <see cref="ByFieldToken"/>, <see cref="ByStateToken"/>, and
+    /// Mirrors <see cref="ByValueToken"/>, <see cref="ByStateToken"/>, and
     /// <see cref="ByAccessToken"/>.
     /// </summary>
     public static FrozenDictionary<TokenKind, AnchorModifierMeta> ByAnchorToken { get; } =

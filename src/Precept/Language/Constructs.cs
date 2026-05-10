@@ -126,7 +126,8 @@ public static class Constructs
             [ConstructKind.StateDeclaration],
             [SlotStateTarget, SlotEnsureClause, SlotOptBecauseClause],
             [new(TokenKind.In, [TokenKind.Ensure]), new(TokenKind.To, [TokenKind.Ensure]), new(TokenKind.From, [TokenKind.Ensure])],
-            RoutingFamily.StateScoped),
+            RoutingFamily.StateScoped,
+            SupportsPreVerbWhenGuard: true),
 
         ConstructKind.AccessMode => new(
             kind,
@@ -157,7 +158,8 @@ public static class Constructs
             [ConstructKind.StateDeclaration],
             [SlotStateTarget, SlotActionChain],
             [new(TokenKind.To, [TokenKind.Arrow]), new(TokenKind.From, [TokenKind.Arrow])],
-            RoutingFamily.StateScoped),
+            RoutingFamily.StateScoped,
+            SupportsPreVerbWhenGuard: true),
 
         ConstructKind.EventEnsure => new(
             kind,
@@ -167,7 +169,8 @@ public static class Constructs
             [ConstructKind.EventDeclaration],
             [SlotEventTarget, SlotEnsureClause, SlotOptBecauseClause],
             [new(TokenKind.On, [TokenKind.Ensure])],
-            RoutingFamily.EventScoped),
+            RoutingFamily.EventScoped,
+            SupportsPreVerbWhenGuard: true),
 
         ConstructKind.EventHandler => new(
             kind,
@@ -177,7 +180,8 @@ public static class Constructs
             [],
             [SlotEventTarget, SlotActionChain],
             [new(TokenKind.On, [TokenKind.Arrow])],
-            RoutingFamily.EventScoped),
+            RoutingFamily.EventScoped,
+            SupportsPostActionEnsure: true),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ConstructKind: {kind}"),

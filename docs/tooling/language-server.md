@@ -5,28 +5,28 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Bootstrap only (server boots and waits for exit; no LSP features implemented) |
+| Implementation state | Phase 2 surface shipped: diagnostics, semantic tokens, completions, hover, definition, references, document highlights, rename, signature help, document symbols, workspace symbols across open documents, folding, selection ranges, and code actions. Preview/inspect remains design-only in this document. |
 | Source | `tools/Precept.LanguageServer/` |
-| Upstream | Compiler (Compilation artifact), Runtime (Precept artifact for preview) |
+| Upstream | Compiler (`Compilation` artifact); runtime preview remains planned |
 | Downstream | VS Code extension (via LSP protocol) |
 
 ---
 
 ## 2. Overview
 
-The language server is designed to implement the LSP protocol for Precept `.precept` files. When fully implemented it will provide diagnostics, completions, hover, go-to-definition, semantic tokens, preview (inspect), document outline, and folding capabilities to editors. It consumes pipeline artifacts by responsibility — each feature reads from exactly the artifact that owns the information it needs.
+The language server implements the LSP protocol for Precept `.precept` files. The shipped surface includes diagnostics, semantic tokens, completions, hover, go-to-definition, references, document highlights, rename, signature help, document outline, workspace symbols across open documents, folding, selection ranges, and code actions. It consumes pipeline artifacts by responsibility — each feature reads from exactly the artifact that owns the information it needs.
 
-> **Current state:** Bootstrap only — the server process boots and waits for exit (`Program.cs`). No LSP feature handlers are implemented yet. Sections 7.1–7.10 of this document are the design specification for each feature, not descriptions of current behavior.
+> **Current state:** The OmniSharp host and protocol test host share the same handler registration surface through `LanguageServerComposition`. Preview/inspect is intentionally not part of the shipped language-server track yet; the rest of this document remains the design contract for the implemented and planned feature surfaces.
 
-The LS is NOT a pipeline stage. It's a hosting layer that runs the pipeline on demand and projects results to the editor. The compiler and runtime do all semantic work; the LS routes requests, manages document state, and translates between LSP protocol types and Precept artifacts.
+The LS is NOT a pipeline stage. It's a hosting layer that runs the pipeline on demand and projects results to the editor. The compiler does all semantic work; the LS routes requests, manages document state, and translates between LSP protocol types and Precept artifacts.
 
 ---
 
 ## 3. Responsibilities and Boundaries
 
-**OWNS:** LSP message handling, per-feature artifact routing, `Compilation` lifecycle (recompile on change via `Interlocked.Exchange`), `Precept` lifecycle (rebuild when error-free), preview/inspect dispatch, document state management.
+**OWNS:** LSP message handling, per-feature artifact routing, `Compilation` lifecycle, version-ordered document state management, and translation between compiler artifacts and LSP protocol shapes.
 
-**Does NOT OWN:** Compilation logic (`src/Precept/`), grammar (generated from catalogs), MCP tooling, diagnostic production (compiler), semantic analysis (type checker), inspection logic (evaluator).
+**Does NOT OWN:** Compilation logic (`src/Precept/`), grammar (generated from catalogs), MCP tooling, diagnostic production (compiler), semantic analysis (type checker), or preview/inspection runtime behavior.
 
 ---
 
@@ -39,7 +39,7 @@ The LS is thin — a routing and protocol layer over the compiler and runtime. A
 | Estimated LOC | 400–600 | Routing + translation, not semantic logic |
 | Semantic logic | 0% | All semantic knowledge lives in compiler artifacts |
 | Catalog access | Read-only | For completion suggestions and hover text only |
-| Custom LSP methods | 1 | `precept/inspect` for preview webview |
+| Custom LSP methods | 0 shipped (1 planned) | `precept/inspect` remains preview-design work, not part of the current LS surface |
 
 ---
 
@@ -47,26 +47,21 @@ The LS is thin — a routing and protocol layer over the compiler and runtime. A
 
 **Input:** LSP requests from editor (document open/change, completion request, hover request, etc.)
 
-**Output:** LSP responses (diagnostics, completion items, hover markup, semantic tokens, go-to-definition locations, document symbols, folding ranges)
+**Output:** LSP responses (diagnostics, completion items, hover markup, semantic tokens, go-to-definition locations, references, document highlights, rename edits, signature help, document/workspace symbols, folding ranges, selection ranges, and code actions)
 
 **Internal:** Holds one `DocumentState` per open document:
 
 ```csharp
 sealed class DocumentState
 {
-    private volatile Compilation? _current;
-    private volatile Precept? _precept;  // non-null only when !HasErrors
-    
-    public Compilation? Current => _current;
-    public Precept? Precept => _precept;
-    
-    public void Update(Compilation compilation)
-    {
-        // Atomic swap — no locks needed
-        Interlocked.Exchange(ref _current, compilation);
-        Interlocked.Exchange(ref _precept, 
-            compilation.HasErrors ? null : Precept.From(compilation));
-    }
+    public Compilation? Current => Volatile.Read(ref _snapshot).Current;
+    public IReadOnlyDictionary<DiagnosticKey, SuggestionInfo>? Suggestions => Volatile.Read(ref _snapshot).Suggestions;
+    public int Version => Volatile.Read(ref _snapshot).Version;
+
+    public bool TryUpdate(
+        int version,
+        Compilation compilation,
+        IReadOnlyDictionary<DiagnosticKey, SuggestionInfo> suggestions);
 }
 ```
 
@@ -128,7 +123,7 @@ When `!HasErrors`, the LS also holds a `Precept` (built from `Compilation`) for 
 | LS Feature | Correct Artifact | Pipeline Stage |
 |---|---|---|
 | Diagnostics | `Compilation.Diagnostics` | All stages (accumulated) |
-| Lexical semantic tokens (Pass 1) | `TokenStream` + `TokenMeta.SemanticTokenType` | Lexer |
+| Lexical semantic tokens (Pass 1) | `TokenStream` + `TokenMeta.VisualCategory` → `SemanticTokenTypes` | Lexer |
 | Identifier semantic tokens (Pass 2) | `SemanticIndex` reference bindings | TypeChecker |
 | Completions | Catalogs + `ConstructManifest` context + `SymbolTable` + `SemanticIndex` | Parser + NameBinder + TypeChecker |
 | Hover | `SemanticIndex` + catalog documentation | TypeChecker + Catalogs |
@@ -220,13 +215,13 @@ Semantic tokens enable rich syntax highlighting beyond what TextMate grammars ca
 
 **Trigger:** `textDocument/semanticTokens/full`
 
-**Artifact:** `Compilation.Tokens` + `TokenMeta.SemanticTokenType`
+**Artifact:** `Compilation.Tokens` + `TokenMeta.VisualCategory` + `SemanticTokenTypes`
 
 `Compilation.Tokens` carries the `TokenStream` from the lexer pass — added to the `Compilation` record (CC#4). Lexical semantic tokens have no semantic-index dependency and work even when type checking fails.
 
 **Mechanics:**
 
-Pass 1 walks the token stream and emits semantic tokens based on `TokenMeta.SemanticTokenType`. This pass requires only the lexer — it works even when the type checker fails. The OmniSharp handler still must advertise a semantic-token legend and full-document registration options; `SemanticTokensBuilder` handles the LSP wire-format delta encoding against that legend.
+Pass 1 walks the token stream and emits semantic tokens by projecting each token's `VisualCategory` through the `SemanticTokenTypes` catalog. This pass requires only the lexer — it works even when the type checker fails. The OmniSharp handler still must advertise a semantic-token legend and full-document registration options; `SemanticTokensBuilder` handles the LSP wire-format delta encoding against that legend.
 
 ```csharp
 SemanticTokens BuildLexicalTokens(Compilation compilation)
@@ -236,13 +231,13 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
     foreach (var token in compilation.Tokens)
     {
         var meta = Tokens.GetMeta(token.Kind);
-        if (meta.SemanticTokenType is null) continue;
+        if (!meta.VisualCategory.HasValue) continue;
         
         builder.Push(
             line: token.Span.StartLine - 1,
             character: token.Span.StartColumn - 1,
             length: token.Span.Length,
-            tokenType: meta.SemanticTokenType,
+            tokenType: SemanticTokenTypes.GetMeta(meta.VisualCategory.Value).CustomType,
             tokenModifiers: 0);  // No SemanticTokenModifiers on TokenMeta — lexical tokens carry zero modifier bits
     }
     
@@ -250,17 +245,7 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
 }
 ```
 
-**TokenMeta.SemanticTokenType values** (already exists in `src/Precept/Language/Token.cs`):
-
-| TokenKind Category | SemanticTokenType |
-|---|---|
-| Keywords (`precept`, `state`, `event`, `field`, etc.) | `keyword` |
-| Type keywords (`int`, `decimal`, `money`, `string`, etc.) | `type` |
-| Operators (`+`, `-`, `*`, `/`, `==`, etc.) | `operator` |
-| Modifiers (`optional`, `required`, `positive`, etc.) | `modifier` |
-| Literals (`123`, `"hello"`, `true`, `false`) | `number`, `string`, `keyword` |
-| Comments (`# ...`) | `comment` |
-| Identifiers | *(deferred to Pass 2)* |
+`SemanticTokenTypes.All` in `src/Precept/Language/SemanticTokenTypes.cs` is the semantic-token legend source. The same catalog also drives the startup `precept/semanticTokenColors` notification, so custom token types plus runtime color/bold/italic styling stay in one catalog-owned metadata surface.
 
 #### Pass 2: Identifier Semantic Tokens
 
@@ -385,7 +370,7 @@ IEnumerable<CompletionItem> GetCompletions(SlotContext context, SemanticIndex? i
     {
         SlotContext.TopLevel => GetConstructLeaderCompletions(),
         SlotContext.InTypePosition => GetTypeCompletions(),
-        SlotContext.InModifierPosition => GetModifierCompletions(GetCurrentConstructKind()),
+        SlotContext.InModifierPosition => GetModifierCompletions(GetCurrentConstructKind(), GetCurrentValueType()),
         SlotContext.InStateTarget => GetStateCompletions(index),
         SlotContext.InEventTarget => GetEventCompletions(index),
         SlotContext.InFieldTarget => GetFieldCompletions(index),
@@ -449,7 +434,7 @@ Each catalog entry that appears in completions needs:
 | `Token.Text` | Completion label |
 | `HoverDescription` | Completion documentation popup |
 | `SnippetTemplate` | Insert text with placeholders (optional) |
-| `ApplicableTo` | Filter by context (actions → field types, modifiers → construct kinds) |
+| `ApplicableTo` | Filter by context (actions and value modifiers → current field/argument type) |
 
 ### 7.4 Hover
 
@@ -682,7 +667,7 @@ DocumentSymbol[] GetDocumentSymbols(Compilation compilation)
 }
 
 > **✅ Resolved (CC#18) — ConstructMeta.IsOutlineNode and OutlineSymbolTag**
-> Outline eligibility and LSP symbol kind are first-class `ConstructMeta` fields. `IsOutlineNode = false` by default; outline constructs set `IsOutlineNode = true` and `OutlineSymbolTag = "Module"` etc. This matches the `TokenMeta.SemanticTokenType` pattern — the LS reads catalog metadata rather than maintaining a per-`ConstructKind` switch. Adding a new outline-able construct only requires updating its catalog entry.
+> Outline eligibility and LSP symbol kind are first-class `ConstructMeta` fields. `IsOutlineNode = false` by default; outline constructs set `IsOutlineNode = true` and `OutlineSymbolTag = "Module"` etc. This matches the semantic-token catalog pattern — the LS reads catalog metadata rather than maintaining a per-`ConstructKind` switch. Adding a new outline-able construct only requires updating its catalog entry.
 > *Resolved: 2026-05-06 — CC#18*
 
 DocumentSymbol ToDocumentSymbol(ParsedConstruct construct) => new()
@@ -1278,7 +1263,7 @@ void Update(Compilation compilation)
 
 ### Decision 5: Two-Pass Semantic Tokens
 
-**Choice:** Pass 1 (lexical) uses `TokenStream` + `TokenMeta.SemanticTokenType`. Pass 2 (semantic) uses `SemanticIndex` reference bindings.
+**Choice:** Pass 1 (lexical) uses `TokenStream` + `TokenMeta.VisualCategory` projected through `SemanticTokenTypes`. Pass 2 (semantic) uses `SemanticIndex` reference bindings.
 
 **Rationale:** Lexical tokens are available even when the type checker fails — users get keyword/operator highlighting regardless of errors. Semantic tokens (identifier classification) degrade gracefully when type checking is incomplete.
 
@@ -1318,21 +1303,17 @@ void Update(Compilation compilation)
 
 ### Implementation Status
 
-1. Only server boot is implemented — all LSP feature handlers are not yet written.
-2. Implement diagnostics push first (simplest feature, most visible value to users).
-3. Implement lexical semantic tokens second (uses `TokenStream`, no `SemanticIndex` dependency).
-4. Completions and hover depend on `SemanticIndex` — blocked on TypeChecker implementation.
-5. Preview/inspect depends on `Precept` runtime — blocked on Precept Builder and Evaluator implementation.
-6. Two-pass semantic token design confirmed: Pass 1 uses `TokenStream` + `TokenMeta.SemanticTokenType`; Pass 2 uses `SemanticIndex` bindings.
+1. Text sync, diagnostics push, semantic tokens, completions, hover, go-to-definition, references, document highlights, rename, signature help, document symbols, workspace symbols, folding, selection ranges, and code actions are implemented in the current OmniSharp host.
+2. Preview/inspect remains pending and is intentionally outside the shipped LS track described by Slice 28.
+3. Semantic-token colors now publish at startup through the custom `precept/semanticTokenColors` notification, and the VS Code extension applies the catalog-projected rules into workspace `editor.semanticTokenColorCustomizations`.
+4. Two-pass semantic token design remains the contract: Pass 1 uses `TokenStream` + `TokenMeta.VisualCategory` projected through `SemanticTokenTypes`; Pass 2 uses `SemanticIndex` bindings.
 
 ### Open Questions
 
 > **Documentation strings across catalog entries — pattern settled:**
 > `TokenMeta` uses `Description` (not `HoverDescription`) for token-level docs. `FieldModifierMeta.HoverDescription`, `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, and `OperatorMeta.HoverDescription` already exist. `ActionMeta.Description` / `HoverDescription` are the action-doc sources, and `ActionMeta.SnippetTemplate` already exists for insertion text. LS/MCP alignment for `ActionMeta`: documentation comes from catalog metadata; `SyntaxShape` is internal routing only. The design pattern is settled; remaining items are implementation milestones, not design questions.
 
-> **Workspace/symbol (`workspace/symbol`):** Deferred. Precepts are single-file by design. Revisit only if the language surface expands to multi-file.
-
-> **Rename refactoring (`textDocument/rename`):** Implement after core features. `SemanticIndex` provides all reference sites needed; implementation is straightforward once Pass 2 reconstruction is in place.
+> **Preview / inspect:** `precept/inspect` remains a design surface. The shipped language server stops at standard authoring/navigation/editor features; preview work is intentionally excluded from the current implementation track.
 
 ### Implementation Notes
 
@@ -1349,10 +1330,9 @@ void Update(Compilation compilation)
 | **No semantic logic in LS code** | All language knowledge lives in compiler artifacts and catalogs. The LS routes and translates; it doesn't analyze. |
 | **No separate compiler process** | In-process compilation is the right model at DSL scale. No benefit from process isolation. |
 | **No incremental compilation** | Full recompile is fast enough (<5ms). Incremental adds invalidation complexity with no user-visible benefit. |
-| **No workspace-wide operations** | Precepts are single-file. No cross-file references, no workspace symbol search. |
+| **No project-wide symbol index** | `workspace/symbol` is limited to open `.precept` documents; the LS does not build a repository-wide index. |
 | **No formatter / formatting-on-type** | Formatting remains out of scope. Quick fixes and code actions are covered by §7.10. |
-| **No rename refactoring (yet)** | `textDocument/rename` is deferred until the core navigation/reference surfaces ship. |
-| **No signature help** | Event args are simple. Signature help adds complexity for marginal benefit. |
+| **No preview/inspect handler in the shipped host** | Preview remains a separate design track and is explicitly excluded from the current LS implementation surface. |
 | **No inlay hints** | Type inference is explicit. No hidden types to reveal. |
 
 ---
@@ -1371,7 +1351,7 @@ void Update(Compilation compilation)
 | Precept Builder | `docs/runtime/precept-builder.md` |
 | VS Code extension that hosts the LS | `docs/tooling/extension.md` |
 | Catalog system architecture | `docs/language/catalog-system.md` |
-| TokenMeta.SemanticTokenType | `src/Precept/Language/Token.cs` |
+| Semantic token catalog | `src/Precept/Language/SemanticTokenTypes.cs` |
 
 ---
 
@@ -1380,14 +1360,22 @@ void Update(Compilation compilation)
 | File | Purpose |
 |---|---|
 | `tools/Precept.LanguageServer/Program.cs` | Server bootstrap (OmniSharp initialization) |
-| `tools/Precept.LanguageServer/DocumentState.cs` | Per-document compilation/precept state (pending) |
-| `tools/Precept.LanguageServer/Handlers/DiagnosticsHandler.cs` | Diagnostics push (pending) |
-| `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs` | Two-pass semantic tokens (pending) |
-| `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs` | Catalog-driven completions (pending) |
-| `tools/Precept.LanguageServer/Handlers/HoverHandler.cs` | Symbol/keyword hover (pending) |
-| `tools/Precept.LanguageServer/Handlers/DefinitionHandler.cs` | Go-to-definition (pending) |
-| `tools/Precept.LanguageServer/Handlers/DocumentSymbolHandler.cs` | Outline (pending) |
-| `tools/Precept.LanguageServer/Handlers/FoldingRangeHandler.cs` | Folding ranges (pending) |
-| `tools/Precept.LanguageServer/Handlers/InspectHandler.cs` | Custom preview command (pending) |
-| `src/Precept/Language/Token.cs` | `TokenMeta.SemanticTokenType` definition |
+| `tools/Precept.LanguageServer/LanguageServerComposition.cs` | Shared handler registration for `Program.cs` and `LspTestHost` |
+| `tools/Precept.LanguageServer/DocumentState.cs` | Per-document versioned compilation snapshot + suggestion state |
+| `tools/Precept.LanguageServer/DocumentStore.cs` | Open-document registry + workspace-symbol snapshot support |
+| `tools/Precept.LanguageServer/Handlers/TextDocumentSyncHandler.cs` | Compile-on-open/change, diagnostics push, version ordering |
+| `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs` | Two-pass semantic tokens + runtime semantic-token color notification |
+| `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs` | Catalog-driven completions + typed-constant suggestions |
+| `tools/Precept.LanguageServer/Handlers/SignatureHelpHandler.cs` | Function/accessor signature help |
+| `tools/Precept.LanguageServer/Handlers/HoverHandler.cs` | Catalog-driven hover + semantic symbol hover |
+| `tools/Precept.LanguageServer/Handlers/DefinitionHandler.cs` | Go-to-definition |
+| `tools/Precept.LanguageServer/Handlers/ReferencesHandler.cs` | Symbol references |
+| `tools/Precept.LanguageServer/Handlers/DocumentHighlightHandler.cs` | In-document symbol highlighting |
+| `tools/Precept.LanguageServer/Handlers/RenameHandler.cs` | Single-document rename |
+| `tools/Precept.LanguageServer/Handlers/DocumentSymbolHandler.cs` | Outline/document symbols |
+| `tools/Precept.LanguageServer/Handlers/WorkspaceSymbolHandler.cs` | Workspace symbols across open documents |
+| `tools/Precept.LanguageServer/Handlers/SelectionRangeHandler.cs` | Syntax-driven selection ranges |
+| `tools/Precept.LanguageServer/Handlers/FoldingRangeHandler.cs` | Folding ranges |
+| `tools/Precept.LanguageServer/Handlers/CodeActionHandler.cs` | Quick-fix code actions |
+| `src/Precept/Language/SemanticTokenTypes.cs` | Semantic-token custom types plus runtime color/style metadata |
 | `src/Precept/Pipeline/SemanticIndex.cs` | `SemanticIndex` shape consumed by LS |

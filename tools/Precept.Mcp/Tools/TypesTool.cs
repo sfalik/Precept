@@ -8,7 +8,7 @@ namespace Precept.Mcp.Tools;
 public static class TypesTool
 {
     [McpServerTool(Name = "precept_types")]
-    [Description("Return the Precept type system reference: all types with traits, widening rules, qualifier shapes, and accessors; all field, state, event, access, and anchor modifiers; and the built-in function catalog. Call when you need to declare field types or apply modifiers.")]
+    [Description("Return the Precept type system reference: all types with traits, widening rules, qualifier shapes, and accessors; all value, state, event, access, and anchor modifiers; and the built-in function catalog. Call when you need to declare field types or apply modifiers.")]
     public static TypesDto Types()
     {
         var lang = LanguageTool.Language();

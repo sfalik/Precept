@@ -83,6 +83,18 @@ When a new language feature ships:
 2. Write tests using patterns from those samples — not synthetic DSL
 3. Note the sample file in the test's documentation or naming
 
+### Trigger-character completion regressions
+
+- For language-server completion bugs, reproduce the exact trigger path the user hits (`" "`, `"'"`, `"."`, etc.), not just a manual completion request without trigger context.
+- Prefer handler-level tests when the bug is a wrong suggestion surface, because slot-context-only tests can stay green while the user still gets the wrong completion list.
+- Assert the honest next-token contract when the grammar only allows one follow-up token. Example: after `field Amount `, the completion surface should be exactly `as`, not a broad top-level fallback list.
+
+### TextMate structural override regressions
+
+- When a syntax-color bug is context-sensitive, test the shipped `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` directly instead of only the token catalog.
+- Parse the structural capture for the affected construct and assert the specific override pattern appears **before** the generic include that would otherwise win first-match order.
+- Use this for field/event declaration seams where a token is usually generic grammar but must classify differently in one structural slot (for example, `default` inside field declarations).
+
 ## Maintaining Existing Research
 
 - **When samples change:** Re-check verbosity counts; update the analysis if counts shift

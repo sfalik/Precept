@@ -39,66 +39,9 @@ internal sealed class DefinitionHandler : IDefinitionHandler
 
     internal static LocationOrLocationLinks HandleDefinition(DocumentUri uri, Compilation compilation, Position position)
     {
-        var semantics = compilation.Semantics;
-
-        foreach (var fieldReference in semantics.FieldReferences)
-        {
-            if (Covers(fieldReference.Site, position))
-            {
-                return ToLocationLinks(uri, fieldReference.Field.NameSpan);
-            }
-        }
-
-        foreach (var stateReference in semantics.StateReferences)
-        {
-            if (Covers(stateReference.Site, position))
-            {
-                return ToLocationLinks(uri, stateReference.State.NameSpan);
-            }
-        }
-
-        foreach (var eventReference in semantics.EventReferences)
-        {
-            if (Covers(eventReference.Site, position))
-            {
-                return ToLocationLinks(uri, eventReference.Event.NameSpan);
-            }
-        }
-
-        foreach (var argReference in semantics.ArgReferences)
-        {
-            if (Covers(argReference.Site, position))
-            {
-                return ToLocationLinks(uri, argReference.Arg.Span);
-            }
-        }
-
-        return new LocationOrLocationLinks();
-    }
-
-    private static bool Covers(SourceSpan span, Position pos)
-    {
-        var startLine = span.StartLine - 1;
-        var startChar = span.StartColumn - 1;
-        var endLine = span.EndLine - 1;
-        var endChar = span.EndColumn - 1;
-
-        if (pos.Line < startLine || pos.Line > endLine)
-        {
-            return false;
-        }
-
-        if (pos.Line == startLine && pos.Character < startChar)
-        {
-            return false;
-        }
-
-        if (pos.Line == endLine && pos.Character >= endChar)
-        {
-            return false;
-        }
-
-        return true;
+        return SymbolNavigation.TryFindOccurrence(compilation, position, out var occurrence)
+            ? ToLocationLinks(uri, occurrence.DeclarationSpan)
+            : new LocationOrLocationLinks();
     }
 
     private static LocationOrLocationLinks ToLocationLinks(DocumentUri uri, SourceSpan span) =>

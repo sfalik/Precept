@@ -23,6 +23,7 @@ let currentLanguageServerLaunchInfo: LanguageServerLaunchInfo | undefined;
 const languageServerDllName = "Precept.LanguageServer.dll";
 const bundledServerRelativePath = path.join("server", languageServerDllName);
 const devLanguageServerRootRelativePath = path.join("temp", "dev-language-server");
+const semanticTokenColorsNotification = "precept/semanticTokenColors";
 const devLanguageServerBuildDllRelativePath = path.join(
   devLanguageServerRootRelativePath,
   "bin",
@@ -41,6 +42,29 @@ interface LanguageServerLaunchInfo {
   cwd: string;
   projectPath?: string;
   runtimeDllPath?: string;
+}
+
+interface SemanticTokenColorNotification {
+  tokenType: string;
+  hexColor: string;
+  bold: boolean;
+  italic: boolean;
+}
+
+interface SemanticTokenColorNotificationPayload {
+  rules?: unknown;
+}
+
+interface SemanticTokenColorRule {
+  foreground?: string;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+interface SemanticTokenColorCustomizations {
+  enabled?: boolean | "configuredByTheme";
+  rules?: Record<string, SemanticTokenColorRule>;
+  [key: string]: unknown;
 }
 
 
@@ -264,6 +288,7 @@ async function startLanguageClient(
     serverOptions,
     clientOptions
   );
+  registerSemanticTokenColorNotifications(nextClient, output);
 
   nextClient.onDidChangeState((state) => {
     output.appendLine(`Language client state: ${state.oldState} -> ${state.newState}`);
@@ -303,6 +328,92 @@ function createServerOptions(launchConfiguration: LanguageServerLaunchInfo): Ser
       }
     }
   };
+}
+
+function registerSemanticTokenColorNotifications(nextClient: LanguageClient, output: vscode.OutputChannel): void {
+  nextClient.onNotification(semanticTokenColorsNotification, (payload: unknown) => {
+    const entries = normalizeSemanticTokenColorNotifications(payload);
+    void applySemanticTokenColorCustomizations(entries, output).catch((error) => {
+      output.appendLine(`Failed to apply semantic token colors: ${String(error)}`);
+    });
+  });
+}
+
+async function applySemanticTokenColorCustomizations(
+  entries: SemanticTokenColorNotification[],
+  output: vscode.OutputChannel
+): Promise<void> {
+  const configuration = vscode.workspace.getConfiguration();
+  const existingCustomizations = configuration.get<SemanticTokenColorCustomizations>("editor.semanticTokenColorCustomizations") ?? {};
+  const existingRules = isRecord(existingCustomizations.rules)
+    ? existingCustomizations.rules as Record<string, SemanticTokenColorRule>
+    : {};
+
+  const generatedRules = Object.fromEntries(
+    entries.map((entry) => [
+      entry.tokenType,
+      {
+        foreground: entry.hexColor,
+        ...(entry.bold ? { bold: true } : {}),
+        ...(entry.italic ? { italic: true } : {})
+      } satisfies SemanticTokenColorRule
+    ])
+  ) as Record<string, SemanticTokenColorRule>;
+
+  generatedRules["*.preceptConstrained"] = { italic: true };
+
+  const nextCustomizations: SemanticTokenColorCustomizations = {
+    ...existingCustomizations,
+    rules: {
+      ...existingRules,
+      ...generatedRules
+    }
+  };
+
+  if (JSON.stringify(existingCustomizations) === JSON.stringify(nextCustomizations)) {
+    return;
+  }
+
+  await configuration.update(
+    "editor.semanticTokenColorCustomizations",
+    nextCustomizations,
+    vscode.ConfigurationTarget.Workspace
+  );
+  output.appendLine(`Applied ${entries.length} semantic token color rules from the language server.`);
+}
+
+function normalizeSemanticTokenColorNotifications(payload: unknown): SemanticTokenColorNotification[] {
+  if (Array.isArray(payload)) {
+    return payload.filter(isSemanticTokenColorNotification);
+  }
+
+  if (isSemanticTokenColorNotification(payload)) {
+    return [payload];
+  }
+
+  if (isRecord(payload)) {
+    const rules = (payload as SemanticTokenColorNotificationPayload).rules;
+    if (Array.isArray(rules)) {
+      return rules.filter(isSemanticTokenColorNotification);
+    }
+  }
+
+  return [];
+}
+
+function isSemanticTokenColorNotification(value: unknown): value is SemanticTokenColorNotification {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return typeof value.tokenType === "string"
+    && typeof value.hexColor === "string"
+    && typeof value.bold === "boolean"
+    && typeof value.italic === "boolean";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function createDevLanguageServerWatcher(

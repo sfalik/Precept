@@ -50,7 +50,8 @@ public sealed record OutcomeMeta(
     OutcomeArgumentKind ArgumentKind,
     Type                ParsedSubtype,
     string              Description,
-    string              Example);
+    string              Example,
+    string              SerializedKind);
 
 /// <summary>
 /// Catalog of outcome forms — the three ways a transition row can conclude.
@@ -70,7 +71,8 @@ public static class Outcomes
             OutcomeArgumentKind.RequiredIdentifier,
             typeof(TransitionOutcome),
             "Transition to a named target state",
-            "-> transition Approved"),
+            "-> transition Approved",
+            "transition"),
 
         OutcomeKind.NoTransition => new(
             kind,
@@ -78,7 +80,8 @@ public static class Outcomes
             OutcomeArgumentKind.SecondaryToken,  // expects `transition` after `no`
             typeof(NoTransitionOutcome),
             "Explicitly remain in the current state with no transition",
-            "-> no transition"),
+            "-> no transition",
+            "no transition"),
 
         OutcomeKind.Reject => new(
             kind,
@@ -86,7 +89,8 @@ public static class Outcomes
             OutcomeArgumentKind.RequiredStringLiteral,
             typeof(RejectOutcome),
             "Reject the event with an explanation message",
-            "-> reject \"Approval requires verified documents\""),
+            "-> reject \"Approval requires verified documents\"",
+            "reject"),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown OutcomeKind: {kind}"),

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -33,9 +34,13 @@ public class TokenMetaMemberNameTests
     public static TheoryData<TokenKind> AllKindsExceptValidMemberNames()
     {
         var data = new TheoryData<TokenKind>();
+        var validMemberNames = Tokens.All
+            .Where(meta => meta.IsValidAsMemberName)
+            .Select(meta => meta.Kind)
+            .ToHashSet();
+
         foreach (var kind in Enum.GetValues<TokenKind>())
-            if (kind != TokenKind.Min && kind != TokenKind.Max &&
-                kind != TokenKind.Countof && kind != TokenKind.Peekby)
+            if (!validMemberNames.Contains(kind))
                 data.Add(kind);
         return data;
     }

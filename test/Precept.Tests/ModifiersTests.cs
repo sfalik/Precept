@@ -47,9 +47,9 @@ public class ModifiersTests
     }
 
     [Fact]
-    public void FieldModifier_Count()
+    public void ValueModifier_Count()
     {
-        Modifiers.All.OfType<FieldModifierMeta>().Should().HaveCount(15);
+        ValueModifierTestAccess.All().Should().HaveCount(15);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class ModifiersTests
     [InlineData(ModifierKind.Max)]
     public void NumericModifiers_ApplyToIntegerDecimalNumber(ModifierKind kind)
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
+        var meta = ValueModifierTestAccess.GetMeta(kind);
         meta.ApplicableTo.Select(t => t.Kind).Should()
             .BeEquivalentTo([TypeKind.Integer, TypeKind.Decimal, TypeKind.Number]);
     }
@@ -108,7 +108,7 @@ public class ModifiersTests
     [InlineData(ModifierKind.Maxlength)]
     public void StringModifiers_ApplyToStringOnly(ModifierKind kind)
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
+        var meta = ValueModifierTestAccess.GetMeta(kind);
         meta.ApplicableTo.Should().HaveCount(1);
         meta.ApplicableTo[0].Kind.Should().Be(TypeKind.String);
     }
@@ -116,7 +116,7 @@ public class ModifiersTests
     [Fact]
     public void Notempty_AppliesToStringAndCollectionTypes()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Notempty);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Notempty);
         meta.ApplicableTo.Select(t => t.Kind).Should().BeEquivalentTo(
         [
             TypeKind.String,
@@ -133,7 +133,7 @@ public class ModifiersTests
     [InlineData(ModifierKind.Maxcount)]
     public void CollectionModifiers_ApplyToAllNineCollectionTypes(ModifierKind kind)
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
+        var meta = ValueModifierTestAccess.GetMeta(kind);
         meta.ApplicableTo.Select(t => t.Kind).Should().BeEquivalentTo(
         [
             TypeKind.Set, TypeKind.Queue, TypeKind.Stack,
@@ -145,7 +145,7 @@ public class ModifiersTests
     [Fact]
     public void Maxplaces_ApplyToDecimalOnly()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Maxplaces);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Maxplaces);
         meta.ApplicableTo.Should().HaveCount(1);
         meta.ApplicableTo[0].Kind.Should().Be(TypeKind.Decimal);
     }
@@ -153,7 +153,7 @@ public class ModifiersTests
     [Fact]
     public void Ordered_ApplyToChoiceOnly()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Ordered);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Ordered);
         meta.ApplicableTo.Should().HaveCount(1);
         meta.ApplicableTo[0].Kind.Should().Be(TypeKind.Choice);
     }
@@ -161,28 +161,28 @@ public class ModifiersTests
     [Fact]
     public void Optional_AppliesToAnyType()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Optional);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Optional);
         meta.ApplicableTo.Should().BeEmpty("empty = applies to all types");
     }
 
     [Fact]
     public void Default_AppliesToAnyType()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Default);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Default);
         meta.ApplicableTo.Should().BeEmpty("empty = applies to all types");
     }
 
     [Fact]
     public void Writable_AppliesToAnyType()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Writable);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
         meta.ApplicableTo.Should().BeEmpty("empty = applies to all types; computed-field restriction is enforced by the type checker, not the modifier catalog");
     }
 
     [Fact]
     public void Writable_IsStructuralFlag()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Writable);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
         meta.Category.Should().Be(ModifierCategory.Structural);
         meta.HasValue.Should().BeFalse("writable is a bare flag");
     }
@@ -190,7 +190,7 @@ public class ModifiersTests
     [Fact]
     public void Writable_TokenTextIsWritable()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Writable);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
         meta.Token.Text.Should().Be("writable");
         meta.Token.Kind.Should().Be(TokenKind.Writable);
     }
@@ -198,7 +198,7 @@ public class ModifiersTests
     [Fact]
     public void Positive_HasProofSatisfaction_Numeric_GreaterThan_Zero()
     {
-        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Positive)).ProofSatisfactions.Single()
+        var proof = ValueModifierTestAccess.GetMeta(ModifierKind.Positive).ProofSatisfactions.Single()
             .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
 
         proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
@@ -209,7 +209,7 @@ public class ModifiersTests
     [Fact]
     public void Nonnegative_HasProofSatisfaction_Numeric_GreaterThanOrEqual_Zero()
     {
-        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Nonnegative)).ProofSatisfactions.Single()
+        var proof = ValueModifierTestAccess.GetMeta(ModifierKind.Nonnegative).ProofSatisfactions.Single()
             .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
 
         proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
@@ -220,7 +220,7 @@ public class ModifiersTests
     [Fact]
     public void Nonzero_HasProofSatisfaction_Numeric_NotEquals_Zero()
     {
-        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Nonzero)).ProofSatisfactions.Single()
+        var proof = ValueModifierTestAccess.GetMeta(ModifierKind.Nonzero).ProofSatisfactions.Single()
             .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
 
         proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
@@ -231,7 +231,7 @@ public class ModifiersTests
     [Fact]
     public void Notempty_HasTwoProofSatisfactions_LengthAndCount()
     {
-        var proofs = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Notempty)).ProofSatisfactions
+        var proofs = ValueModifierTestAccess.GetMeta(ModifierKind.Notempty).ProofSatisfactions
             .Select(p => p.Should().BeOfType<ProofSatisfaction.Numeric>().Subject)
             .ToList();
 
@@ -245,7 +245,7 @@ public class ModifiersTests
     [Fact]
     public void Min_HasProofSatisfaction_Numeric_DeclarationValue()
     {
-        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Min)).ProofSatisfactions.Single()
+        var proof = ValueModifierTestAccess.GetMeta(ModifierKind.Min).ProofSatisfactions.Single()
             .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
 
         proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
@@ -256,7 +256,7 @@ public class ModifiersTests
     [Fact]
     public void Max_HasProofSatisfaction_Numeric_DeclarationValue()
     {
-        var proof = ((FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Max)).ProofSatisfactions.Single()
+        var proof = ValueModifierTestAccess.GetMeta(ModifierKind.Max).ProofSatisfactions.Single()
             .Should().BeOfType<ProofSatisfaction.Numeric>().Subject;
 
         proof.Projection.Should().BeOfType<SatisfactionProjection.SelfValue>();
@@ -272,15 +272,15 @@ public class ModifiersTests
     [InlineData(ModifierKind.Maxplaces)]
     public void ModifiersWithoutProofSatisfactions_HaveEmptyArray(ModifierKind kind)
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
+        var meta = ValueModifierTestAccess.GetMeta(kind);
 
         meta.ProofSatisfactions.Should().BeEmpty();
     }
 
     [Fact]
-    public void AllFieldModifiers_HaveValidProofSatisfactions()
+    public void AllValueModifiers_HaveValidProofSatisfactions()
     {
-        foreach (var meta in Modifiers.All.OfType<FieldModifierMeta>())
+        foreach (var meta in ValueModifierTestAccess.All())
         {
             meta.ProofSatisfactions.Should().NotBeNull();
         }
@@ -299,7 +299,7 @@ public class ModifiersTests
     [InlineData(ModifierKind.Maxplaces)]
     public void ValueCarrying_HasValueIsTrue(ModifierKind kind)
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
+        var meta = ValueModifierTestAccess.GetMeta(kind);
         meta.HasValue.Should().BeTrue($"{kind} carries a value argument");
     }
 
@@ -313,7 +313,7 @@ public class ModifiersTests
     [InlineData(ModifierKind.Writable)]
     public void FlagModifiers_HasValueIsFalse(ModifierKind kind)
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
+        var meta = ValueModifierTestAccess.GetMeta(kind);
         meta.HasValue.Should().BeFalse($"{kind} is a bare flag");
     }
 
@@ -322,7 +322,7 @@ public class ModifiersTests
     [Fact]
     public void Positive_SubsumesNonnegativeAndNonzero()
     {
-        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Positive);
+        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Positive);
         meta.Subsumes.Should().BeEquivalentTo(
             [ModifierKind.Nonnegative, ModifierKind.Nonzero]);
     }
@@ -330,8 +330,7 @@ public class ModifiersTests
     [Fact]
     public void OnlyPositive_HasSubsumptions()
     {
-        var withSubsumption = Modifiers.All
-            .OfType<FieldModifierMeta>()
+        var withSubsumption = ValueModifierTestAccess.All()
             .Where(m => m.Subsumes.Length > 0)
             .ToList();
 
@@ -519,11 +518,11 @@ public class ModifiersTests
     // ── All field modifiers are structural ──────────────────────────────────────
 
     [Fact]
-    public void AllFieldModifiers_AreStructural()
+    public void AllValueModifiers_AreStructural()
     {
-        Modifiers.All.OfType<FieldModifierMeta>()
+        ValueModifierTestAccess.All()
             .All(m => m.Category == ModifierCategory.Structural)
-            .Should().BeTrue("all field modifiers are compile-time structural constraints");
+            .Should().BeTrue("all value modifiers are compile-time structural constraints");
     }
 
     // ── Token is object reference to Tokens catalog ─────────────────────────────
@@ -560,11 +559,11 @@ public class ModifiersTests
     // X15 ── Cross-catalog: ApplicableTo references valid TypeKinds ────────────
 
     [Fact]
-    public void FieldModifiers_ApplicableTo_ReferencesOnlyValidTypeKinds()
+    public void ValueModifiers_ApplicableTo_ReferencesOnlyValidTypeKinds()
     {
         // Empty ApplicableTo means "applies to all types" — skip cross-check for those.
         // Every non-empty TypeTarget.Kind must be findable via Types.GetMeta without throwing.
-        foreach (var meta in Modifiers.All.OfType<FieldModifierMeta>())
+        foreach (var meta in ValueModifierTestAccess.All())
         {
             foreach (var target in meta.ApplicableTo)
             {

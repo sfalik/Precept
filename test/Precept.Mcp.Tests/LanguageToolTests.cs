@@ -32,7 +32,7 @@ public class LanguageToolTests
             "firePipeline");
 
         document.RootElement.GetProperty("modifiers").EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(
-            "field",
+            "value",
             "state",
             "event",
             "access",
@@ -131,19 +131,23 @@ public class LanguageToolTests
     public void Language_ModifiersMirrorModifierCatalogBySubtype()
     {
         var result = LanguageTool.Language();
+        var valueModifiers = ValueModifierDtoTestAccess.GetEntries(result.Modifiers);
+        var valueModifierMetas = ValueModifierDtoTestAccess.GetCatalogMetas();
 
-        result.Modifiers.Field.Select(modifier => modifier.Kind).Should().Equal(Modifiers.All.OfType<FieldModifierMeta>().Select(modifier => modifier.Kind.ToString()));
+        ValueModifierDtoTestAccess.GetKinds(result.Modifiers).Should().Equal(ValueModifierDtoTestAccess.GetCatalogKinds());
         result.Modifiers.State.Select(modifier => modifier.Kind).Should().Equal(Modifiers.All.OfType<StateModifierMeta>().Select(modifier => modifier.Kind.ToString()));
         result.Modifiers.Event.Select(modifier => modifier.Kind).Should().Equal(Modifiers.All.OfType<EventModifierMeta>().Select(modifier => modifier.Kind.ToString()));
         result.Modifiers.Access.Select(modifier => modifier.Kind).Should().Equal(Modifiers.All.OfType<AccessModifierMeta>().Select(modifier => modifier.Kind.ToString()));
         result.Modifiers.Anchor.Select(modifier => modifier.Kind).Should().Equal(Modifiers.All.OfType<AnchorModifierMeta>().Select(modifier => modifier.Kind.ToString()));
 
-        var anyTypeFieldMeta = Modifiers.All.OfType<FieldModifierMeta>().First(modifier => modifier.ApplicableTo.Length == 0);
-        var anyTypeField = result.Modifiers.Field.Should().ContainSingle(modifier => modifier.Kind == anyTypeFieldMeta.Kind.ToString()).Subject;
-        anyTypeField.ApplicableTo.Should().ContainSingle();
-        anyTypeField.ApplicableTo[0].Type.Should().BeNull();
-        anyTypeField.ApplicableTo[0].AnyType.Should().BeTrue();
-        anyTypeField.ApplicableTo[0].RequiredModifiers.Should().BeEmpty();
+        var anyTypeFieldMeta = valueModifierMetas.First(modifier => modifier.ApplicableTo.Length == 0);
+        var anyTypeField = valueModifiers.Single(modifier => (string)modifier.Kind == anyTypeFieldMeta.Kind.ToString());
+        var anyTypeTargets = ValueModifierDtoTestAccess.GetApplicableTypes((object)anyTypeField);
+        anyTypeTargets.Should().ContainSingle();
+        ValueModifierDtoTestAccess.GetProperty<string?>(anyTypeTargets[0], "Type").Should().BeNull();
+        ValueModifierDtoTestAccess.GetProperty<bool>(anyTypeTargets[0], "AnyType").Should().BeTrue();
+        ValueModifierDtoTestAccess.GetProperty<string[]>(anyTypeTargets[0], "RequiredModifiers").Should().BeEmpty();
+        ValueModifierDtoTestAccess.GetApplicableDeclarationSites((object)anyTypeField).Should().Equal("FieldDeclaration", "EventArgDeclaration");
 
         var stateMeta = Modifiers.All.OfType<StateModifierMeta>().First(modifier => !modifier.AllowsOutgoing || modifier.RequiresDominator || modifier.PreventsBackEdge);
         var state = result.Modifiers.State.Should().ContainSingle(modifier => modifier.Kind == stateMeta.Kind.ToString()).Subject;
@@ -171,16 +175,21 @@ public class LanguageToolTests
     }
 
     [Fact]
-    public void Language_FieldModifiersIncludeAuthoringMetadataAndProofSatisfactions()
+    public void Language_ValueModifiersIncludeAuthoringMetadataAndDeclarationSiteApplicabilityAndProofSatisfactions()
     {
         var result = LanguageTool.Language();
+        var valueModifiers = ValueModifierDtoTestAccess.GetEntries(result.Modifiers);
 
-        var notemptyMeta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Notempty);
-        var notempty = result.Modifiers.Field.Should().ContainSingle(modifier => modifier.Kind == ModifierKind.Notempty.ToString()).Subject;
-        notempty.ProofSatisfactions.Should().Equal("self.length > 0", "self.count > 0");
-        notempty.HoverDescription.Should().Be(notemptyMeta.HoverDescription);
-        notempty.UsageExample.Should().Be(notemptyMeta.UsageExample);
-        notempty.SnippetTemplate.Should().Be(notemptyMeta.SnippetTemplate);
+        var notemptyMeta = ValueModifierDtoTestAccess.GetCatalogMeta(ModifierKind.Notempty);
+        var notempty = valueModifiers.Single(modifier => (string)modifier.Kind == ModifierKind.Notempty.ToString());
+        ValueModifierDtoTestAccess.GetApplicableDeclarationSites((object)notempty).Should().Equal("FieldDeclaration", "EventArgDeclaration");
+        ValueModifierDtoTestAccess.GetProofSatisfactions((object)notempty).Should().Equal("self.length > 0", "self.count > 0");
+        ValueModifierDtoTestAccess.GetProperty<string?>((object)notempty, "HoverDescription").Should().Be(notemptyMeta.HoverDescription);
+        ValueModifierDtoTestAccess.GetProperty<string?>((object)notempty, "UsageExample").Should().Be(notemptyMeta.UsageExample);
+        ValueModifierDtoTestAccess.GetProperty<string?>((object)notempty, "SnippetTemplate").Should().Be(notemptyMeta.SnippetTemplate);
+
+        var writable = valueModifiers.Single(modifier => (string)modifier.Kind == ModifierKind.Writable.ToString());
+        ValueModifierDtoTestAccess.GetApplicableDeclarationSites((object)writable).Should().Equal("FieldDeclaration");
     }
 
     [Fact]

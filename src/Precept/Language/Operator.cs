@@ -19,6 +19,14 @@ public enum OperatorFamily
 /// <summary>Binding direction for the Pratt parser.</summary>
 public enum Associativity { Left = 1, Right = 2, NonAssociative = 3 }
 
+/// <summary>How an operator's result type is derived when it is not fixed.</summary>
+public enum ResultTypePolicy
+{
+    Static = 1,
+    LookupValueType = 2,
+    ArithmeticPromotion = 3,
+}
+
 /// <summary>
 /// Base metadata for a single operator. Subtypes carry the token structure:
 /// <see cref="SingleTokenOp"/> for operators triggered by one token,
@@ -32,6 +40,8 @@ public abstract record OperatorMeta(
     int            Precedence,
     OperatorFamily Family,
     bool           IsKeywordOperator = false,
+    TypeKind?      StaticResultType  = null,
+    ResultTypePolicy ResultTypePolicy = ResultTypePolicy.Static,
     string?        HoverDescription  = null,
     string?        UsageExample      = null);
 
@@ -49,10 +59,12 @@ public sealed record SingleTokenOp(
     int            Precedence,
     OperatorFamily Family,
     bool           IsKeywordOperator = false,
+    TypeKind?      StaticResultType  = null,
+    ResultTypePolicy ResultTypePolicy = ResultTypePolicy.Static,
     string?        HoverDescription  = null,
     string?        UsageExample      = null)
     : OperatorMeta(Kind, Description, Arity, Associativity, Precedence, Family,
-                   IsKeywordOperator, HoverDescription, UsageExample);
+                   IsKeywordOperator, StaticResultType, ResultTypePolicy, HoverDescription, UsageExample);
 
 /// <summary>
 /// Operator produced by a sequence of two or three keyword tokens (e.g. <c>is set</c>,
@@ -68,10 +80,12 @@ public sealed record MultiTokenOp(
     int                       Precedence,
     OperatorFamily            Family,
     bool                      IsKeywordOperator = false,
+    TypeKind?                 StaticResultType  = null,
+    ResultTypePolicy          ResultTypePolicy = ResultTypePolicy.Static,
     string?                   HoverDescription  = null,
     string?                   UsageExample      = null)
     : OperatorMeta(Kind, Description, Arity, Associativity, Precedence, Family,
-                   IsKeywordOperator, HoverDescription, UsageExample)
+                   IsKeywordOperator, StaticResultType, ResultTypePolicy, HoverDescription, UsageExample)
 {
     public TokenMeta LeadToken => Tokens[0];
 }

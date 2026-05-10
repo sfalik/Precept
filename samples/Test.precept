@@ -1,3 +1,5 @@
 precept test
 
-field a as string default "hello" writable
+field testfield as boolean optional
+
+rule testfield is set because "blah"

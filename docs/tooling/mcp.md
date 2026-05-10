@@ -22,7 +22,7 @@ The MCP server exposes 12 tools that project Precept's compiler, runtime, and la
 |------|---------|----------|
 | `precept_quickstart` | Orientation: product description, core concepts, tool guide, minimal examples | `QuickstartCatalog` |
 | `precept_syntax` | Constructs, actions, outcomes, operators, grammar meta-rules | `Constructs`, `Actions`, `Outcomes`, `Operators`, `SyntaxReference` |
-| `precept_types` | Types, modifiers, functions | `Types`, `Modifiers`, `Functions` |
+| `precept_types` | Types, value modifiers, functions | `Types`, `Modifiers`, `Functions` |
 | `precept_operations(category?)` | All 198 typed operator combinations, optional LHS-type filter | `Operations.All` |
 | `precept_proofs` | Proof obligation catalog + runtime fault catalog | `ProofRequirements.All`, `Faults.All` |
 | `precept_patterns` | 8 common patterns + 3 anti-patterns, all verified to compile | `SyntaxReference.CommonPatterns`, `.AntiPatterns` |
@@ -800,7 +800,7 @@ This ensures the MCP protocol remains intact even when the underlying runtime ha
 
 ### Vocabulary Guarantee
 
-`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Operations.All`, `Functions.All`, `Outcomes.All`, and `Diagnostics.All` appears in the output. It also projects `SyntaxReference` and surfaces the current `CurrencyCatalog.All`, `UcumAtomCatalog.BrowseTier1()`, `DimensionCatalog.All`, and `TemporalUnits.AllEntries` surfaces. Modifiers are grouped by catalog subtype (`field`, `state`, `event`, `access`, `anchor`). No parallel vocabulary is maintained.
+`precept_language` output exactly matches the implemented catalog surface: every member of `Tokens.All`, `Types.All`, `Modifiers.All`, `Actions.All`, `Constructs.All`, `Constraints.All`, `Operators.All`, `Operations.All`, `Functions.All`, `Outcomes.All`, and `Diagnostics.All` appears in the output. It also projects `SyntaxReference` and surfaces the current `CurrencyCatalog.All`, `UcumAtomCatalog.BrowseTier1()`, `DimensionCatalog.All`, and `TemporalUnits.AllEntries` surfaces. Modifiers are grouped by catalog subtype (`value`, `state`, `event`, `access`, `anchor`). Value modifiers expose both `applicableTypes` and `applicableDeclarationSites` so AI clients can distinguish type applicability from declaration-site applicability. No parallel vocabulary is maintained.
 
 ### JSON Stability
 
@@ -914,7 +914,7 @@ The vocabulary includes:
 
 - **Tokens:** 90+ keywords, operators, punctuation with categories and descriptions
 - **Types:** 25+ types with accessors, qualifiers, widening rules
-- **Modifiers:** Field, state, access, and anchor modifiers with applicability
+- **Modifiers:** Value, state, event, access, and anchor modifiers with applicability
 - **Actions:** Mutation verbs with syntax shapes and applicability
 - **Constructs:** Grammar forms with slots and leader tokens
 - **Constraints:** Invariants, state-anchored, event preconditions with scopes
@@ -949,7 +949,7 @@ This transparency helps agents predict and debug event execution.
 **[OQ-2] `precept_language` catalog coverage:**
 Implemented language surface:
 - Tokens, Types, Functions, Operators, Operations, Outcomes, Diagnostics
-- Modifiers (5 subtypes: Field, State, Event, Access, Anchor)
+- Modifiers (5 subtypes: Value, State, Event, Access, Anchor)
 - Actions, Constructs, Constraints, SyntaxReference
 - Domain registries: currencies, UCUM Tier 1 units, dimensions, temporal units
 

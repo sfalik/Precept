@@ -166,8 +166,9 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         ["patterns"] = messageStringPatterns
     };
 
-    // ── ruleDesugaringModifiers — GOLD highlight for rule-desugaring modifiers ──
-    // MUST precede generic constraint keyword patterns so catalog-flagged modifiers win first-match ordering.
+    // ── ruleDesugaringModifiers — catalog-derived rule-desugaring subset ──
+    // MUST precede generic constraint keyword patterns so catalog-flagged modifiers keep their
+    // dedicated first-match hook without changing the shared grammar-keyword color lane.
     var ruleDesugaringModifierAlt = string.Join("|", Modifiers.All
         .Where(m => m.DesugarsToRule && m.Token.Text is not null)
         .Select(m => Regex.Escape(m.Token.Text!))
@@ -371,6 +372,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                         ["patterns"] = new JsonArray
                         {
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
+                            new JsonObject { ["name"] = "keyword.declaration.precept", ["match"] = "\\bdefault\\b" },
                             new JsonObject { ["include"] = "#grammarKeywords" },
                             new JsonObject { ["include"] = "#semanticKeywords" },
                             new JsonObject { ["include"] = "#grammarKeywords" },
@@ -413,6 +415,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                         {
                             new JsonObject { ["include"] = "#symbolOperators" },
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
+                            new JsonObject { ["name"] = "keyword.declaration.precept", ["match"] = "\\bdefault\\b" },
                             new JsonObject { ["include"] = "#grammarKeywords" },
                             new JsonObject { ["include"] = "#semanticKeywords" },
                             new JsonObject { ["include"] = "#grammarKeywords" },

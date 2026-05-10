@@ -30,7 +30,7 @@ public static class LanguageTool
             Tokens.All.Select(MapToken).ToArray(),
             Types.All.Select(MapType).ToArray(),
             new ModifierCatalogDto(
-                Modifiers.All.OfType<FieldModifierMeta>().Select(MapFieldModifier).ToArray(),
+                Modifiers.All.OfType<ValueModifierMeta>().Select(MapValueModifier).ToArray(),
                 Modifiers.All.OfType<StateModifierMeta>().Select(MapStateModifier).ToArray(),
                 Modifiers.All.OfType<EventModifierMeta>().Select(MapEventModifier).ToArray(),
                 Modifiers.All.OfType<AccessModifierMeta>().Select(MapAccessModifier).ToArray(),
@@ -200,13 +200,14 @@ public static class LanguageTool
             _ => throw new ArgumentOutOfRangeException(nameof(validation), validation, null),
         };
 
-    private static FieldModifierCatalogEntryDto MapFieldModifier(FieldModifierMeta modifier)
+    private static ValueModifierCatalogEntryDto MapValueModifier(ValueModifierMeta modifier)
         => new(
             modifier.Kind.ToString(),
             modifier.Token.Text ?? modifier.Kind.ToString(),
             modifier.Description,
             modifier.Category.ToString(),
             MapTargets(modifier.ApplicableTo),
+            MapApplicableDeclarationSites(modifier.ApplicableDeclarationSites),
             modifier.HasValue,
             modifier.Subsumes.Select(RenderModifier).ToArray(),
             modifier.DesugarsToRule,
@@ -215,6 +216,12 @@ public static class LanguageTool
             modifier.HoverDescription,
             modifier.UsageExample,
             modifier.SnippetTemplate);
+
+    private static string[] MapApplicableDeclarationSites(ValueModifierDeclarationSite declarationSites)
+        => Enum.GetValues<ValueModifierDeclarationSite>()
+            .Where(site => site is not ValueModifierDeclarationSite.None && declarationSites.HasFlag(site))
+            .Select(site => site.ToString())
+            .ToArray();
 
     private static StateModifierCatalogEntryDto MapStateModifier(StateModifierMeta modifier)
         => new(

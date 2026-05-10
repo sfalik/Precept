@@ -116,7 +116,7 @@ public class NewToolTests
     public void Types_ModifiersContainAllSubgroups()
     {
         var result = TypesTool.Types();
-        result.Modifiers.Field.Should().NotBeEmpty();
+        result.Modifiers.Value.Should().NotBeEmpty();
         result.Modifiers.State.Should().NotBeEmpty();
         result.Modifiers.Event.Should().NotBeEmpty();
         result.Modifiers.Access.Should().NotBeEmpty();

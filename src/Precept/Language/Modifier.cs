@@ -51,6 +51,15 @@ public enum AnchorTarget
     StateAction = 2,
 }
 
+/// <summary>Declaration sites where a value modifier may appear.</summary>
+[global::System.Flags]
+public enum ValueModifierDeclarationSite
+{
+    None                = 0,
+    FieldDeclaration    = 1 << 0,
+    EventArgDeclaration = 1 << 1,
+}
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  TypeTarget — shared supporting type for applicability declarations
 // ════════════════════════════════════════════════════════════════════════════════
@@ -82,7 +91,7 @@ public sealed record ModifiedTypeTarget : TypeTarget
 
 /// <summary>
 /// Base metadata for a declaration-attached modifier. Discriminated union:
-/// <see cref="FieldModifierMeta"/>, <see cref="StateModifierMeta"/>,
+/// <see cref="ValueModifierMeta"/>, <see cref="StateModifierMeta"/>,
 /// <see cref="EventModifierMeta"/>, <see cref="AccessModifierMeta"/>,
 /// <see cref="AnchorModifierMeta"/>.
 /// </summary>
@@ -112,14 +121,17 @@ public abstract record ModifierMeta(
     public ModifierKind[] MutuallyExclusiveWith { get; } = MutuallyExclusiveWith ?? [];
 }
 
-/// <summary>Field constraint modifiers (14 members: optional, ordered, nonnegative, …, maxplaces).</summary>
-public sealed record FieldModifierMeta(
+/// <summary>Value modifiers (15 members: optional, ordered, nonnegative, …, writable).</summary>
+public sealed record ValueModifierMeta(
     ModifierKind Kind,
     TokenMeta Token,
     string Description,
     ModifierCategory Category,
     TypeTarget[] ApplicableTo,
     bool HasValue = false,
+    ValueModifierDeclarationSite ApplicableDeclarationSites =
+        ValueModifierDeclarationSite.FieldDeclaration | ValueModifierDeclarationSite.EventArgDeclaration,
+    ModifierKind? BoundCounterpart = null,
     ModifierKind[] Subsumes = default!,
     ProofSatisfaction[]? ProofSatisfactions = null,
     string? HoverDescription = null,

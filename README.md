@@ -7,7 +7,7 @@
 
 **Precept is a domain integrity engine for .NET.** Most systems scatter business rules across validators, handlers, and state checks — independent, forgettable, gaps waiting to happen. Precept compiles them into unbreakable precepts, a single contract where invalid configurations are structurally impossible and every operation enforces the complete logic.
 
-Precept treats AI as a first-class author. A dedicated MCP server exposes five typed tools — compile, inspect, fire, update, and language reference — so AI agents operate on definitions with the same precision as the runtime itself. A Copilot agent and purpose-built skills complete the AI authoring loop. Humans get a VS Code extension with live preview, syntax highlighting, and IntelliSense. Compile the definition, enforce the contract, produce the same outcome every time. AI is unpredictable. Precept is not.
+Precept treats AI as a first-class author. A dedicated MCP server exposes five typed tools — compile, inspect, fire, update, and language reference — so AI agents operate on definitions with the same precision as the runtime itself. A Copilot agent and purpose-built skills complete the AI authoring loop. Humans get a VS Code extension with diagnostics, semantic highlighting, completions, hover, navigation, rename, signature help, symbols, selection ranges, and quick fixes. Compile the definition, enforce the contract, produce the same outcome every time. AI is unpredictable. Precept is not.
 
 ---
 
@@ -69,7 +69,7 @@ var result = eng.Fire(inst, "Activate", args);
 code --install-extension sfalik.precept-vscode
 ```
 
-Syntax highlighting, live diagnostics, and AI tooling are active immediately.
+Diagnostics, semantic highlighting, completions, hover, navigation, rename, signature help, symbols, selection ranges, quick fixes, and AI tooling are active immediately.
 
 ### 2. Add the Copilot Plugin
 
@@ -77,7 +77,7 @@ Install the Precept plugin from the GitHub Copilot or Claude marketplace. It add
 
 ### 3. Create Your First Precept File
 
-Create `Subscription.precept` and type along with the example above. The language server provides completions, hover docs, and error detection in real time. The Copilot plugin gives AI agents the same structured access.
+Create `Subscription.precept` and type along with the example above. The language server provides completions, hover docs, diagnostics, references, rename, signature help, symbols, and code actions in real time. The Copilot plugin gives AI agents the same structured access.
 
 ### 4. Integrate the Runtime
 
@@ -91,7 +91,7 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 
 ## What Makes Precept Different
 
-**AI-First Authoring** — The Copilot plugin gives AI agents five MCP tools to compile, inspect, fire events, and validate `.precept` definitions — no guessing at syntax or semantics. The VS Code extension provides completions, semantic highlighting, inline diagnostics, and a live state diagram that updates as you edit. AI brings the fluency; the engine brings the guarantee.
+**AI-First Authoring** — The Copilot plugin gives AI agents five MCP tools to compile, inspect, fire events, and validate `.precept` definitions — no guessing at syntax or semantics. The VS Code extension provides completions, semantic highlighting, inline diagnostics, hover, definition/references/rename, signature help, outline, workspace symbols across open files, selection ranges, and quick fixes. AI brings the fluency; the engine brings the guarantee.
 
 **Unified Domain Integrity** — In most codebases, entity governance is scattered: validators in one layer, state checks in another, editability rules in a third, conditional logic in service handlers that bypass everything else. Each layer exists because the one before it wasn't enough. Precept consolidates all of it into a single `.precept` declaration that the runtime compiles and enforces structurally — no code path outside the contract, no window where an invalid configuration can exist.
 

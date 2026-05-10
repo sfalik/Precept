@@ -40,7 +40,7 @@ namespace Precept.Language
         ModifierKind Kind, TokenMeta Token, string Description,
         ModifierCategory Category, ModifierKind[] MutuallyExclusiveWith = null);
 
-    public sealed record FieldModifierMeta(
+    public sealed record ValueModifierMeta(
         ModifierKind Kind, TokenMeta Token, string Description,
         ModifierCategory Category, TypeTarget[] ApplicableTo,
         bool HasValue = false, ModifierKind[] Subsumes = null,
@@ -68,11 +68,11 @@ namespace Precept.Language
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.Positive => new FieldModifierMeta(
+            ModifierKind.Positive => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Positive), ""positive"",
                 ModifierCategory.Structural, new TypeTarget[] { },
                 Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero]),
-            ModifierKind.Nonnegative => new FieldModifierMeta(
+            ModifierKind.Nonnegative => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Nonnegative), ""nonneg"",
                 ModifierCategory.Structural, new TypeTarget[] { }),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
@@ -92,7 +92,7 @@ namespace Precept.Language
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.Positive => new FieldModifierMeta(
+            ModifierKind.Positive => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Positive), ""positive"",
                 ModifierCategory.Structural, new TypeTarget[] { },
                 Subsumes: [ModifierKind.Positive]),
@@ -233,11 +233,11 @@ namespace Precept.Language
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.Positive => new FieldModifierMeta(
+            ModifierKind.Positive => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Positive), ""positive"",
                 ModifierCategory.Structural, new TypeTarget[] { },
                 Subsumes: [ModifierKind.Nonnegative]),
-            ModifierKind.Nonnegative => new FieldModifierMeta(
+            ModifierKind.Nonnegative => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Nonnegative), ""nonneg"",
                 ModifierCategory.Structural, new TypeTarget[] { },
                 Subsumes: [ModifierKind.Positive]),
@@ -260,11 +260,11 @@ namespace Precept.Language
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.Positive => new FieldModifierMeta(
+            ModifierKind.Positive => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Positive), ""positive"",
                 ModifierCategory.Structural, new TypeTarget[] { },
                 Subsumes: [ModifierKind.Nonnegative]),
-            ModifierKind.Nonnegative => new FieldModifierMeta(
+            ModifierKind.Nonnegative => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Nonnegative), ""nonneg"",
                 ModifierCategory.Structural, new TypeTarget[] { }),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
@@ -288,7 +288,7 @@ namespace Precept.Language
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.Nonnegative => new FieldModifierMeta(
+            ModifierKind.Nonnegative => new ValueModifierMeta(
                 kind, Tokens.GetMeta(TokenKind.Nonnegative), ""nonneg"",
                 ModifierCategory.Structural, new TypeTarget[] { }),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
@@ -308,7 +308,7 @@ namespace Precept.Language
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.Nonnegative => new FieldModifierMeta(
+            ModifierKind.Nonnegative => new ValueModifierMeta(
                 kind, new TokenMeta(TokenKind.Nonnegative, ""nonnegative""), ""nonneg"",
                 ModifierCategory.Structural, new TypeTarget[] { }),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
@@ -361,7 +361,7 @@ namespace Other
     public abstract record ModifierMeta(
         ModifierKind Kind, TokenMeta Token, string Description,
         ModifierCategory Category, ModifierKind[] MutuallyExclusiveWith = null);
-    public sealed record FieldModifierMeta(
+    public sealed record ValueModifierMeta(
         ModifierKind Kind, TokenMeta Token, string Description,
         ModifierCategory Category, bool HasValue = false,
         ModifierKind[] Subsumes = null, ModifierKind[] MutuallyExclusiveWith = null)
@@ -371,7 +371,7 @@ namespace Other
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.A => new FieldModifierMeta(kind, new TokenMeta(TokenKind.X, ""x""), ""a"", ModifierCategory.Structural,
+            ModifierKind.A => new ValueModifierMeta(kind, new TokenMeta(TokenKind.X, ""x""), ""a"", ModifierCategory.Structural,
                 Subsumes: [ModifierKind.A]),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
         };
@@ -393,7 +393,7 @@ namespace Other
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            _ => new FieldModifierMeta(kind, Tokens.GetMeta(TokenKind.Nonnegative), ""fallback"",
+            _ => new ValueModifierMeta(kind, Tokens.GetMeta(TokenKind.Nonnegative), ""fallback"",
                 ModifierCategory.Structural, new TypeTarget[] { }),
         };
     }" + CloseBrace;
@@ -402,3 +402,4 @@ namespace Other
         diagnostics.Should().BeEmpty();
     }
 }
+

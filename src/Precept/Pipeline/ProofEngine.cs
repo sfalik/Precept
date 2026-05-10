@@ -367,8 +367,8 @@ public static class ProofEngine
         // Dimension arm
         if (obligation.Requirement is DimensionProofRequirement dimReq)
         {
-            var subject = ResolveSubject(dimReq.Subject, obligation.Site);
-            var dimension = ResolvePeriodDimension(subject, semantics);
+            var resolvedSubject = ResolveSubject(dimReq.Subject, obligation.Site);
+            var dimension = ResolvePeriodDimension(resolvedSubject, semantics);
             if (dimension is null) return false;
             return dimension == PeriodDimension.Any || dimension == dimReq.RequiredDimension;
         }
@@ -390,7 +390,14 @@ public static class ProofEngine
                 : null;
         if (reqSubject is null) return false;
 
-        var attributeFieldName = GetFieldName(reqSubject, obligation.Site);
+        var subject = ResolveSubject(reqSubject, obligation.Site);
+        if (subject is TypedFunctionCall functionCall &&
+            FunctionReturnSatisfies(functionCall, obligation.Requirement))
+        {
+            return true;
+        }
+
+        var attributeFieldName = GetFieldName(subject);
         if (attributeFieldName is null) return false;
         if (!semantics.FieldsByName.TryGetValue(attributeFieldName, out var attributeField)) return false;
 
@@ -398,7 +405,7 @@ public static class ProofEngine
         foreach (var modifier in attributeField.Modifiers.Concat(attributeField.ImpliedModifiers))
         {
             var meta = Modifiers.GetMeta(modifier);
-            if (meta is not FieldModifierMeta fmm) continue;
+            if (meta is not ValueModifierMeta fmm) continue;
 
             foreach (var satisfaction in fmm.ProofSatisfactions)
             {
@@ -418,6 +425,71 @@ public static class ProofEngine
         }
 
         return false;
+    }
+
+    private static bool FunctionReturnSatisfies(TypedFunctionCall call, ProofRequirement requirement)
+    {
+        if (requirement is not NumericProofRequirement
+            {
+                Comparison: OperatorKind.GreaterThanOrEqual,
+                Threshold: 0m,
+            })
+        {
+            return false;
+        }
+
+        var overload = ResolveFunctionOverload(call);
+        return overload?.ReturnNonnegative == true;
+    }
+
+    private static FunctionOverload? ResolveFunctionOverload(TypedFunctionCall call)
+    {
+        var meta = Functions.GetMeta(call.ResolvedFunction);
+        FunctionOverload? best = null;
+        var bestScore = int.MaxValue;
+
+        foreach (var overload in meta.Overloads)
+        {
+            if (overload.Parameters.Count != call.Arguments.Length || overload.ReturnType != call.ResultType)
+                continue;
+
+            var score = 0;
+            var valid = true;
+            for (var i = 0; i < call.Arguments.Length; i++)
+            {
+                var argType = call.Arguments[i].ResultType;
+                var paramType = overload.Parameters[i].Kind;
+                if (argType == paramType)
+                    continue;
+
+                if (IsAssignable(argType, paramType))
+                {
+                    score++;
+                    continue;
+                }
+
+                valid = false;
+                break;
+            }
+
+            if (!valid || score >= bestScore)
+                continue;
+
+            best = overload;
+            bestScore = score;
+            if (score == 0)
+                break;
+        }
+
+        return best;
+    }
+
+    private static bool IsAssignable(TypeKind source, TypeKind target)
+    {
+        if (source == target || source == TypeKind.Error || target == TypeKind.Error)
+            return true;
+
+        return Types.GetMeta(source).WidensTo.Contains(target);
     }
 
     private static PeriodDimension? ResolvePeriodDimension(TypedExpression? subject, SemanticIndex semantics)

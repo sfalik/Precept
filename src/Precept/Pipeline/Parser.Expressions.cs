@@ -37,6 +37,11 @@ public static partial class Parser
         private ParsedExpression ParseNud(Func<bool> terminates)
         {
             var token = Peek();
+            if (Tokens.GetMeta(token.Kind).IsAlsoBuiltinFunction && Peek(1).Kind == TokenKind.LeftParen)
+            {
+                return ParseNamedFunctionCall();
+            }
+
             switch (token.Kind)
             {
                 // ── Literals ────────────────────────────────────────────
@@ -191,15 +196,25 @@ public static partial class Parser
             // context (e.g. quantifier collection stops before the predicate parenthesis).
             if (Peek().Kind == TokenKind.LeftParen && !terminates())
             {
-                // Function call: name(args)
-                Advance(); // consume '('
-                var args = ParseArgumentExpressions();
-                var closeParen = Expect(TokenKind.RightParen);
-                return new FunctionCallExpression(
-                    idToken.Text, args,
-                    SourceSpan.Covering(idToken.Span, closeParen.Span));
+                return ParseNamedFunctionCall(idToken);
             }
             return new IdentifierExpression(idToken.Text, idToken.Span);
+        }
+
+        private ParsedExpression ParseNamedFunctionCall()
+        {
+            var nameToken = Advance();
+            return ParseNamedFunctionCall(nameToken);
+        }
+
+        private ParsedExpression ParseNamedFunctionCall(Token nameToken)
+        {
+            Advance(); // consume '('
+            var args = ParseArgumentExpressions();
+            var closeParen = Expect(TokenKind.RightParen);
+            return new FunctionCallExpression(
+                nameToken.Text, args,
+                SourceSpan.Covering(nameToken.Span, closeParen.Span));
         }
 
         [HandlesCatalogMember(ExpressionFormKind.Grouped)]
@@ -318,10 +333,7 @@ public static partial class Parser
         }
 
         private static bool IsMemberNameToken(TokenKind kind)
-        {
-            var meta = Tokens.GetMeta(kind);
-            return meta.IsValidAsMemberName;
-        }
+            => Parser.KeywordsValidAsMemberName.Contains(kind);
 
         [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
         private ParsedExpression ParsePostfixIs(ParsedExpression left)

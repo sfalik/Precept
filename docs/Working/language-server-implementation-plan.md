@@ -810,7 +810,7 @@ FoldingRange[] GetFoldingRanges(Compilation compilation) =>
 Capabilities are advertised by each handler's registration options (`TextDocumentSyncHandlerBase`, semantic-token registration options, completion registration options, and so on), not by a separate hand-authored capability object in `Program.cs`.
 
 **Tests:**
-- No new tests in Slice 11. Protocol-layer LS tests are authored in Slices 1–9.
+- Protocol-layer LS tests remain authored in the feature slices, but the Slice 11 follow-up now adds a capability smoke test so the shared `Program.cs`/`LspTestHost` composition cannot drift.
 - Run `dotnet test` to verify the final handler wiring and handler-advertised capabilities.
 
 **Dependency ordering:** Depends on Slice 0b and all handler slices (1–9). This is the final wiring slice.
@@ -841,7 +841,8 @@ Capabilities are advertised by each handler's registration options (`TextDocumen
 | `tools/Precept.LanguageServer/Handlers/DocumentSymbolHandler.cs` | 6 | Create |
 | `tools/Precept.LanguageServer/Handlers/CodeActionHandler.cs` | 8 | Create |
 | `tools/Precept.LanguageServer/Handlers/FoldingRangeHandler.cs` | 9 | Create |
-| `test/Precept.LanguageServer.Tests/LspTestHost.cs` | 0 | Create — reusable in-process protocol test harness |
+| `test/Precept.LanguageServer.Tests/LspTestHost.cs` | 0, 11 follow-up | Create in Slice 0 — reusable in-process protocol test harness; modify in Slice 11 follow-up so it shares the shipped server composition |
+| `test/Precept.LanguageServer.Tests/ServerCapabilityTests.cs` | 11 follow-up, 29 | Create in Slice 11 follow-up — current capability smoke test; extend in Slice 29 when Phase 2 handlers land |
 | `test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj` | 0 | Modify — add test-only client/harness package for protocol tests |
 | `test/Precept.LanguageServer.Tests/*` | 0b, 1–10, 10-color | Delete 13 legacy compiler-redundant files (173 tests) in Slice 0b; add protocol-layer LS tests per slice in Slices 1–10 and 10-color |
 | `src/Precept/Language/Construct.cs` | 0a | Modify — add `IsOutlineNode` and `OutlineSymbolTag` parameters to `ConstructMeta` |
@@ -1410,7 +1411,7 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
 
 ### Slice 29 [Kramer]: Slice 11 Wiring Amendment — Final Handler Surface
 
-**What:** Expand the final wiring slice so `Program.cs` and the protocol test host register the entire completed surface, not just the original Phase 1 handlers.
+**What:** Extend the already-shared `Program.cs` / protocol-test-host composition to the entire completed surface once Phase 2 handlers exist.
 
 **Modifies:**
 - `tools/Precept.LanguageServer/Program.cs`
@@ -1423,9 +1424,9 @@ The current LS is no longer bootstrap-only, but it is still not production-compl
     - `SelectionRangeHandler`
   - Register any shared helpers created above (`OutlineSymbolProjector`, `SymbolNavigation`, `CallContextResolver`, `SyntaxSelectionBuilder`, `SemanticExpressionLocator`, etc.) if they are not static.
 - `test/Precept.LanguageServer.Tests/LspTestHost.cs`
-  - Mirror the same handler registrations so protocol-layer tests exercise the real advertised capability set.
+  - Extend the existing shared composition so protocol-layer tests keep mirroring the real advertised capability set after Phase 2 handlers land.
 - `test/Precept.LanguageServer.Tests/ServerCapabilityTests.cs`
-  - Add an initialize-result smoke test asserting the server advertises completion, hover, definition, references, document highlights, rename, signature help, workspace symbols, selection ranges, semantic tokens, folding, diagnostics sync, and code actions.
+  - Expand the existing initialize-result smoke test from the current Phase 1 surface to the final Phase 1 + Phase 2 capability set: completion, hover, definition, references, document highlights, rename, signature help, workspace symbols, selection ranges, semantic tokens, folding, diagnostics sync, and code actions.
 
 **Dependency ordering:** Depends on every behavioral Phase 1 and Phase 2 slice. This is the new terminal slice.
 

@@ -34,7 +34,7 @@ public static class Constraints
     /// O(1) lookup from leading token kind to state-anchored constraint kind.
     /// Used by the type checker to resolve the constraint form from the
     /// construct's leading token without an inline switch.
-    /// Mirrors <see cref="Modifiers.ByFieldToken"/> and <see cref="Types.ByToken"/>.
+    /// Mirrors <see cref="Modifiers.ByValueToken"/> and <see cref="Types.ByToken"/>.
     /// </summary>
     public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
         All.OfType<ConstraintMeta.StateAnchored>()

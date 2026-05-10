@@ -28,7 +28,7 @@ namespace Precept.Runtime;
 //
 //   Today (catalog metadata available):
 //     Constraint activation timing → Constraints.GetMeta(kind) + ConstraintMeta DU subtypes
-//     Modifier boundary validation → FieldModifierMeta.ApplicableTo, HasValue
+//     Modifier boundary validation → ValueModifierMeta.ApplicableTo, HasValue
 //     Accessor signatures          → TypeMeta.Accessors, TypeAccessor.ParameterType, RequiredTraits
 //
 //   Future (pending executable model design D8/R4):

@@ -18,13 +18,19 @@ public static partial class Parser
     private static readonly FrozenSet<TokenKind> StateModifierTokens =
         Modifiers.ByStateToken.Keys.ToFrozenSet();
 
-    private static readonly FrozenSet<TokenKind> FieldModifierTokens =
-        Modifiers.ByFieldToken.Keys.ToFrozenSet();
+    private static readonly FrozenSet<TokenKind> ValueModifierTokens =
+        Modifiers.ByValueToken.Keys.ToFrozenSet();
 
     private static readonly FrozenSet<TokenKind> ExpressionStartTokens =
         ExpressionForms.All
             .Where(form => !form.IsLeftDenotation)
             .SelectMany(form => form.LeadTokens)
+            .ToFrozenSet();
+
+    public static FrozenSet<TokenKind> KeywordsValidAsMemberName { get; } =
+        Tokens.All
+            .Where(meta => meta.IsValidAsMemberName)
+            .Select(meta => meta.Kind)
             .ToFrozenSet();
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -618,7 +624,7 @@ public static partial class Parser
                 SourceSpan.Covering(typeRef.Span, lastSpan));
         }
 
-        // ── ModifierList: field modifiers from catalog ──────────────────────────
+        // ── ModifierList: value modifiers from catalog ──────────────────────────
 
         private SlotValue ParseModifierList(ConstructSlot slot, ConstructMeta constructMeta)
         {
@@ -626,10 +632,10 @@ public static partial class Parser
             var startSpan = Peek().Span;
             var lastSpan = startSpan;
 
-            while (FieldModifierTokens.Contains(Peek().Kind))
+            while (ValueModifierTokens.Contains(Peek().Kind))
             {
                 var modToken = Peek();
-                if (Modifiers.ByFieldToken.TryGetValue(modToken.Kind, out var modMeta))
+                if (Modifiers.ByValueToken.TryGetValue(modToken.Kind, out var modMeta))
                 {
                     Advance();
                     lastSpan = modToken.Span;
@@ -645,7 +651,7 @@ public static partial class Parser
                             or TokenKind.LeftBracket or TokenKind.StringStart)
                         {
                             valueExpr = ParseExpression(0, () =>
-                                FieldModifierTokens.Contains(Peek().Kind)
+                                ValueModifierTokens.Contains(Peek().Kind)
                                 || IsAtConstructBoundary());
                             lastSpan = valueExpr.Span;
                         }
@@ -747,9 +753,9 @@ public static partial class Parser
                         ParsedTypeReference parsedType = new SimpleTypeReference(typeMeta, typeToken.Span);
                         parsedType = TryParseQualifiers(parsedType, typeMeta);
 
-                        // Consume any trailing field modifiers (e.g. optional, notempty)
+                        // Consume any trailing value modifiers (e.g. optional, notempty)
                         var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
-                        while (Modifiers.ByFieldToken.TryGetValue(Peek().Kind, out var modMeta))
+                        while (Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var modMeta))
                         {
                             modifiers.Add(modMeta.Kind);
                             Advance();
@@ -826,7 +832,8 @@ public static partial class Parser
 
         private SlotValue ParseStateTarget(ConstructSlot slot)
         {
-            if (Peek().Kind == TokenKind.Identifier || Peek().Kind == TokenKind.Any)
+            var current = Peek();
+            if (current.Kind == TokenKind.Identifier || Tokens.GetMeta(current.Kind).IsStateWildcard)
             {
                 var tok = Advance();
                 return new StateTargetSlot(tok.Text, tok.Span);
@@ -874,7 +881,8 @@ public static partial class Parser
 
         private SlotValue ParseFieldTarget(ConstructSlot slot)
         {
-            if (Peek().Kind == TokenKind.Identifier || Peek().Kind == TokenKind.All)
+            var current = Peek();
+            if (current.Kind == TokenKind.Identifier || Tokens.GetMeta(current.Kind).IsBroadcastFieldTarget)
             {
                 var tok = Advance();
                 return new FieldTargetSlot(tok.Text, tok.Span);

@@ -2963,7 +2963,7 @@ pre {
               <div class="typography-card-kicker">Constraint signal</div>
               <h3>Italic — constraint emphasis only</h3>
             </div>
-            <p>Within the five construct colors, italic belongs to constrained states and invariant-guarded data names. The only editorial exception is comments, which stay outside the construct color model. It is never used for generic emphasis, decorative headings, or flourish. If a reader cannot trust italic inside a construct color to mean constraint emphasis, the second visual cue has been wasted.</p>
+            <p>Within the five construct colors, italic belongs to any construct under active constraint pressure: constrained states, invariant-guarded data names, and constraint-blocked events. The only editorial exception is comments, which stay outside the construct color model. It is never used for generic emphasis, decorative headings, or flourish. If a reader cannot trust italic inside a construct color to mean constraint emphasis, the second visual cue has been wasted.</p>
             <div class="typography-specimen">
               <div class="typography-specimen-bar">
                 <span>Pressure markers</span>
@@ -2998,11 +2998,11 @@ pre {
             <p>Typography only works as a visual cue if each move stays narrow and repeatable. These guidelines preserve the distinction between governing language, explanatory prose, and constrained states.</p>
           </div>
           <div class="typography-summary" aria-label="Typography guidance summary">
-            <p>Within the five construct colors, italic belongs to constrained states and invariant-guarded data names. The only editorial exception is comments, which stay outside the construct color model. It is never used for generic emphasis, decorative headings, or flourish. If a reader cannot trust italic inside a construct color to mean constraint emphasis, the second visual cue has been wasted.</p>
+            <p>Within the five construct colors, italic belongs to any construct under active constraint pressure: constrained states, invariant-guarded data names, and constraint-blocked events. The only editorial exception is comments, which stay outside the construct color model. It is never used for generic emphasis, decorative headings, or flourish. If a reader cannot trust italic inside a construct color to mean constraint emphasis, the second visual cue has been wasted.</p>
             <div class="typography-summary-item">
               <span>Do not mix</span>
               <strong>Mono / Sans</strong>
-              <small>Constraint emphasis is expressed through typography, not extra hues. Constrained states and guarded data names are italic within their own construct color — same hue, italic only.</small>
+              <small>Constraint emphasis is expressed through typography, not extra hues. Constrained states, guarded data names, and constraint-blocked events are italic within their own construct color — same hue, italic only.</small>
             </div>
             <div class="typography-summary-item">
               <span>Do not decorate</span>
@@ -4482,7 +4482,7 @@ pre {
           <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">No state change</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Refresh</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"></div></div></div><p class="cg-channel-caption">Muted mark shows a callable event that leaves the state unchanged.</p></div></div>
           <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Not callable from current state</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">ApproveRequest</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--not-callable-current"></span></div></div></div><p class="cg-channel-caption">Unboxed cyan mark and thinner path show an event that exists in the lifecycle but is outside the current state's callable set.</p></div></div>
           <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Rejected</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--violated cg-modifier-token--dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--blocked"></span></div></div></div><p class="cg-channel-caption">Blocked path marks a rejected event.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Blocked by constraint</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--disabled"></span></div></div></div><p class="cg-channel-caption">Softened neutral mark and a neutral path show an event that exists here but is not currently fireable because a constraint still fails.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Blocked by constraint</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text cg-modifier-token--italic">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--disabled"></span></div></div></div><p class="cg-channel-caption">Italic and softened mark, with a neutral path, show an event under active constraint pressure that is temporarily unfire-able. Italic signals constraint pressure (same as constrained states and guarded fields); dim signals the event is currently blocked. Both signals stack.</p></div></div>
           <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Unmatched</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text cg-modifier-token--outline-dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Softened neutral mark with a dashed outline and a dashed path show an unmatched event.</p></div></div>
         </div>
       </div>
@@ -4829,7 +4829,7 @@ pre {
           <span class="svs-edge-label svs-edge-label--not-callable-current" data-edge-label="approved-ready"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">PrintBadge</span></span>
           <span class="svs-edge-label svs-edge-label--not-callable-current" data-edge-label="approved-cancelled"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">Cancel</span></span>
           <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event">PickUp</span></span>
-          <span class="svs-edge-label svs-edge-label--constraint-blocked" data-edge-label="ready-expired"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text">Expire</span></span>
+          <span class="svs-edge-label svs-edge-label--constraint-blocked" data-edge-label="ready-expired"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text cg-modifier-token--italic">Expire</span></span>
         </div>
       </div>
     </div>
@@ -4934,7 +4934,7 @@ pre {
 
           <div class="timeline-history-row timeline-history-row--future timeline-history-row--constraint-blocked timeline-history-row--expire">
             <div class="timeline-row-copy timeline-row-copy--expire">
-              <span class="timeline-event-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text">Expire</span>
+              <span class="timeline-event-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text cg-modifier-token--italic">Expire</span>
               <span class="timeline-row-arrow">→</span>
             </div>
             <div class="timeline-row-rail">
