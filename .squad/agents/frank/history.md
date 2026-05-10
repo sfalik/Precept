@@ -28,6 +28,8 @@
 
 - 2026-05-10T09:41Z — BUG-006/BUG-051 triage: PRE0009 on `min(A,B)` in the live editor was caused by a stale extension build (DLL built 28 min before the fix commit). George's parser fix (`IsFunctionCallLeader` routing in `ParseNud`) and regression test are both correct. No code change needed — rebuilding the language server DLL resolves the editor symptom. Verdict written to `.squad/decisions/inbox/frank-bug006-051-triage.md`.
 
+- 2026-05-10T15:26Z — BUG-049a design review (PRE0084 spurious on `insert F V at I` with plain list): `ReturnNonnegative` on `FixedReturnAccessor` is the right abstraction — parallels `FunctionOverload.ReturnNonnegative` with same consumption pattern in Strategy 2. Key blocker: the duplicate `CollectionCount` (Actions.cs) / `CollectionCountAccessor` (Types.cs) must be unified in this PR, not deferred — two accessor instances with identical semantics violates catalog single-source-of-truth. Doc gap: `FunctionReturnSatisfies` is a pre-existing undocumented Strategy 2 discharge path; fix alongside accessor docs.
+
 ## Historical Summary
 
 - Earlier May 2026 work locked the typed-literal boundary, the external-data posture for ISO/UCUM, the catalog-driven parser/checker trajectory, and the requirement that durable rationale live in decisions/research instead of scattered implementation switches.
@@ -35,6 +37,11 @@
 - Use `.squad/decisions.md` for the exact batch chronology and `docs/` / `research/` for the surviving canonical rationale.
 
 ## Recent Updates
+
+### 2026-05-10T15:34:08Z — BUG-049a design review obligations closed
+- Scribe merged your BUG-049a design review with George's Slice 2E completion into one canonical `.squad/decisions.md` closeout entry.
+- Both required follow-through items are now durably recorded as shipped: `Actions.cs` reuses the shared `Types.CollectionCountAccessor`, and Strategy 2 docs now cover both `FunctionReturnSatisfies` and accessor `ReturnNonnegative` intrinsic-return discharge.
+- George's fix added the accessor metadata path plus 3 regression tests; targeted `dotnet build src\Precept\Precept.csproj` and `dotnet test test\Precept.Tests\Precept.Tests.csproj` closed green at 3857 tests.
 
 ### 2026-05-10T13:46:52Z — BUG-006 / BUG-051 stale-build verdict recorded
 - Scribe merged your BUG-006 / BUG-051 triage note into `.squad/decisions.md` as the durable ruling: PRE0009 on `min(A,B)` in the editor came from a stale language-server build, not a missing source fix.

@@ -28,6 +28,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T15:34:08Z — Slice 2E and Slice C closeouts recorded
+- Scribe merged both your t2-2 Slice C note and your Slice 2E BUG-049a completion into `.squad/decisions.md`, with BUG-049a paired to Frank's approved design review as one canonical closeout entry.
+- Durable implementation rules now recorded: shape-method separators come from `Actions.GetShapeMeta(...).Slots[n].PrecedingSeparator`, and intrinsic non-negative accessor returns discharge through `FixedReturnAccessor.ReturnNonnegative` while action cardinality obligations reuse the single shared `Types.CollectionCountAccessor`.
+- Validation anchors now captured in the ledger: Slice C stayed green at 4056/4056 on `ef6fedcb`; Slice 2E closed targeted build + tests at 3857 passing on `f2d1dece` and `e826e4bd`.
+
 ### 2026-05-10T09:53:14Z — t2-2 Slice C: shape method body rewire
 - George-6 completed Slice C by replacing hardcoded separator tokens in all 7 affected shape methods: `ParseAssignValueAction`, `ParseCollectionIntoAction`, `ParseCollectionValueByAction`, `ParseInsertAtAction`, `ParseRemoveAtIndexAction`, `ParsePutKeyValueAction`, `ParseCollectionIntoByAction`.
 - Each method calls `Actions.GetShapeMeta(ActionSyntaxShape.X).Slots[n]` and reads `PrecedingSeparator!.Value` for `Expect()` and `PrecedingSeparator` for optional `if (Peek().Kind == slot.PrecedingSeparator)` guards. No hardcoded `TokenKind.By`, `TokenKind.At`, `TokenKind.Into`, or `TokenKind.Assign` remain in any shape method body.

@@ -20,6 +20,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T15:34:08Z — Slice 2E record sync complete
+- Pre-check measured `.squad/decisions.md` at 473464 bytes with 3 inbox file(s); the 7-day archive gate found 0 eligible active decision date(s) older than `2026-05-03T15:34:08Z`, so `decisions-archive.md` stayed at 1431031 bytes.
+- Merged 3 inbox notes into 2 canonical decisions, deleted the processed inbox files, wrote `.squad/orchestration-log/2026-05-10T15-34-08Z-george.md`, and recorded the brief Slice 2E session log.
+- Health report: `decisions.md` 473464 B -> 475656 B; inbox processed = 3; history files summarized = 0.
+
 ### 2026-05-10T13:46:52Z — BUG-006 / BUG-051 stale-build triage recorded
 - Pre-check measured `.squad/decisions.md` at 173203 bytes with 1 inbox file(s); the hard-gate 7-day archive pass found 0 eligible active decision entries older than `2026-05-03T13:46:52Z`.
 - Merged `frank-bug006-051-triage.md` into `.squad/decisions.md`, deleted the processed inbox file, wrote the Frank orchestration record plus the brief BUG-006/051 session log, and propagated the no-code-fix verdict into Frank history.

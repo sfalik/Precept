@@ -13567,3 +13567,29 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 - `ParseActionByShape` computes separators once and threads them through all 9 action-shape parse methods so target termination stays catalog-driven.
 - Added `ParseActionTargetTests.cs` with 8 tests (4 catalog property + 4 behavioral parser coverage), while preserving the known `CollectionValueBy`/`RemoveAtIndex` parser-unreachable boundary as catalog-level coverage.
 - Validation closed green at 4050/4050 tests. Commit: `fb525df0`.
+
+### 2026-05-10T09:53:14Z: t2-2 Slice C shape-method separator rewires completed
+
+**By:** George
+
+**Status:** Complete
+
+**Source:** `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\george-t2-2-slice-c-done.md`
+
+- All 7 parser shape methods now derive required and optional separator tokens from `Actions.GetShapeMeta(ActionSyntaxShape.X).Slots[n].PrecedingSeparator` instead of hardcoded `TokenKind.By`, `TokenKind.At`, `TokenKind.Into`, or `TokenKind.Assign`.
+- Added 6 `ActionChainTests` cases covering insert/dequeue/put behavior plus catalog-property checks for the secondary shapes that remain parser-unreachable via `Actions.ByTokenKind`.
+- Validation stayed green at 4056/4056 tests (3841 `Precept.Tests` + 156 language-server + 59 MCP). Commit: `ef6fedcb`.
+- t2-2 is durably closed across BUG-021, BUG-048, and BUG-049.
+
+### 2026-05-10T15:34:08Z: BUG-049a fix completed with intrinsic accessor metadata
+
+**By:** Frank, George
+
+**Status:** Complete
+
+**Merged sources:** `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\frank-bug049a-design-review.md`, `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\george-slice2e-done.md`
+
+- Frank approved `FixedReturnAccessor.ReturnNonnegative` as the correct Strategy 2 abstraction and required both same-slice follow-through items: unify `CollectionCountAccessor` as the single shared accessor instance and document the pre-existing `FunctionReturnSatisfies` discharge path alongside the new accessor discharge.
+- George completed Slice 2E accordingly: `ReturnNonnegative` now lives on `FixedReturnAccessor`, action proof requirements reuse `Types.CollectionCountAccessor`, and `TryDeclarationAttributeProof` short-circuits `>= 0` obligations for intrinsically non-negative accessor returns.
+- `docs/compiler/proof-engine.md` Strategy 2 now documents both intrinsic return-value discharge paths, and 3 regression tests lock the BUG-049a fix.
+- Validation passed via `dotnet build src\Precept\Precept.csproj` and `dotnet test test\Precept.Tests\Precept.Tests.csproj`, closing at 3857 passing tests. Commits: `f2d1dece` (fix) and `e826e4bd` (tracking).
