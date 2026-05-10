@@ -12,6 +12,21 @@
 
 ---
 
+### 2026-05-10T00:41:09Z: Language-server handler batch established the first real post-sync editor surface
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's inbox batch.
+
+**Merged source:** `.squad/agents/kramer/inbox.md`.
+
+- Kramer commits `568ab5cc`, `9e679ceb`, `1ec3c7d5`, `1fbecf36`, and `453e690a` landed Slices 1, 2, 4, 5, and 9 respectively, moving the language server from text-sync-only infrastructure to concrete diagnostics, semantic tokens, completion, hover, and folding handlers.
+- Slice 1 locked the diagnostic publication contract in tests: `DiagnosticProjectorTests` and `DiagnosticPublishIntegrationTests` now verify 0-based range projection, severity mapping, `Source = "precept"`, and publish-on-open capture through `LspTestHost.WhenPublishDiagnosticsAsync(...)`.
+- The durable handler shapes are now explicit: semantic tokens stay a lexical projection from `Compilation.Tokens.Tokens` through `TokenMeta.SemanticTokenType`; completions are catalog-driven through `SlotContextResolver` plus `SemanticIndex` target lookup; hover composes markdown from `TokenMeta.Description` and semantic symbols; folding is construct-span-based only for multi-line regions.
+- Validation closed most of the batch cleanly: Slice 1 and the Slice 2/4 work passed LS build/test runs at 20/20, Slice 5 passed isolated-worktree LS build/tests at 7/7 plus 3737 core tests, and Slice 9 confirmed clean IDE diagnostics plus 3737 core tests. The only remaining repo-baseline blocker called out by Kramer is the pre-existing `SemanticTokensHandler.CreateRegistrationOptions` access-modifier mismatch that can stop shared-tree LS build/test execution before the new folding tests run.
+
+---
+
 ### 2026-05-10T00:23:31Z: Slice 0b removed the legacy language-server stub layer and zeroed the LS test project
 
 **By:** Scribe

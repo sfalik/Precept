@@ -26,6 +26,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T00:41:09Z — Slices 1/2/4/5/9 handler batch recorded
+- Scribe merged Kramer's completed handler batch: `568ab5cc` added diagnostic projection/publication tests plus `LspTestHost.WhenPublishDiagnosticsAsync(...)`; `9e679ceb` added `SemanticTokensHandler`; `1ec3c7d5` added `SlotContext` plus `CompletionHandler`; `1fbecf36` added `HoverHandler`; and `453e690a` added `FoldingRangeHandler`, each with matching language-server tests.
+- Durable language-server contracts from the batch are now explicit: diagnostics publish with 0-based spans/severity/source mapping, semantic tokens remain lexical/catalog-driven, completions are slot-context plus `SemanticIndex` driven, hover content comes from `TokenMeta.Description` plus semantic lookup, and folding stays construct-span based only.
+- Validation summary: Slice 1 and the Slice 2/4 work passed LS build/tests at 20/20, Slice 5 passed isolated-worktree LS build/tests at 7/7 plus `test\Precept.Tests\Precept.Tests.csproj` (3737/3737), and Slice 9 remained blocked only by the pre-existing `SemanticTokensHandler.CreateRegistrationOptions` access-modifier mismatch in the shared LS baseline.
+
 ### 2026-05-10T00:23:31Z — Slice 0b legacy LS cleanup committed
 - Commit `51d93dc2` deleted `tools/Precept.LanguageServer/LanguageServerStubs.cs`, `PreceptPreviewProtocol.cs`, and `LegacyHandlerCompat.cs`; the compat shim had to go because it still referenced the removed stub types.
 - Deleted 13 legacy shim-facing files from `test/Precept.LanguageServer.Tests/`, removing 173 compiler-redundant tests; only `LspTestHost.cs` and `GlobalUsings.cs` remain, and the LS test project now discovers 0 tests while still building cleanly.
