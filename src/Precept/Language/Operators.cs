@@ -19,21 +19,24 @@ public static class Operators
             kind, Tokens.GetMeta(TokenKind.Or),
             "Logical disjunction",
             Arity.Binary, Associativity.Left, Precedence: 10, OperatorFamily.Logical, IsKeywordOperator: true,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.BothOperands,
             HoverDescription: "Logical OR. Both operands must be boolean. True if either side is true."),
 
         OperatorKind.And => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.And),
             "Logical conjunction",
             Arity.Binary, Associativity.Left, Precedence: 20, OperatorFamily.Logical, IsKeywordOperator: true,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.BothOperands,
             HoverDescription: "Logical AND. Both operands must be boolean. True only if both sides are true."),
 
         OperatorKind.Not => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.Not),
             "Logical negation",
             Arity.Unary, Associativity.Right, Precedence: 25, OperatorFamily.Logical, IsKeywordOperator: true,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Logical NOT. Operand must be boolean. Inverts true to false and false to true."),
 
         // ── Comparison ─────────────────────────────────────────────
@@ -41,56 +44,64 @@ public static class Operators
             kind, Tokens.GetMeta(TokenKind.DoubleEquals),
             "Equality comparison",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Equality comparison. Returns true if both operands are equal. Cannot be chained."),
 
         OperatorKind.NotEquals => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.NotEquals),
             "Inequality comparison",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Inequality comparison. Returns true if operands differ. Cannot be chained."),
 
         OperatorKind.CaseInsensitiveEquals => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.CaseInsensitiveEquals),
             "Case-insensitive equality (string-only)",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Case-insensitive text equality. Compares strings ignoring upper/lower case differences."),
 
         OperatorKind.CaseInsensitiveNotEquals => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.CaseInsensitiveNotEquals),
             "Case-insensitive not-equals (string-only)",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Case-insensitive text inequality. Returns true if strings differ ignoring case."),
 
         OperatorKind.LessThan => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.LessThan),
             "Less-than comparison",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Less-than comparison. Requires orderable types. Cannot be chained."),
 
         OperatorKind.GreaterThan => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.GreaterThan),
             "Greater-than comparison",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Greater-than comparison. Requires orderable types. Cannot be chained."),
 
         OperatorKind.LessThanOrEqual => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.LessThanOrEqual),
             "Less-than-or-equal comparison",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Less-than-or-equal comparison. Requires orderable types. Cannot be chained."),
 
         OperatorKind.GreaterThanOrEqual => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.GreaterThanOrEqual),
             "Greater-than-or-equal comparison",
             Arity.Binary, Associativity.NonAssociative, Precedence: 30, OperatorFamily.Comparison,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Greater-than-or-equal comparison. Requires orderable types. Cannot be chained."),
 
         // ── Membership ─────────────────────────────────────────────
@@ -98,7 +109,8 @@ public static class Operators
             kind, Tokens.GetMeta(TokenKind.Contains),
             "Collection membership test",
             Arity.Binary, Associativity.NonAssociative, Precedence: 40, OperatorFamily.Membership, IsKeywordOperator: true,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Collection membership test. Left operand is the collection; right operand is the element to look for."),
 
         // ── Arithmetic (binary) ────────────────────────────────────
@@ -106,35 +118,35 @@ public static class Operators
             kind, Tokens.GetMeta(TokenKind.Plus),
             "Addition",
             Arity.Binary, Associativity.Left, Precedence: 50, OperatorFamily.Arithmetic,
-            ResultTypePolicy: ResultTypePolicy.ArithmeticPromotion,
+            ResultTypePolicy: ResultTypePolicy.OperationResult,
             HoverDescription: "Addition or string concatenation. For temporal types, adds periods and durations to dates."),
 
         OperatorKind.Minus => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.Minus),
             "Subtraction",
             Arity.Binary, Associativity.Left, Precedence: 50, OperatorFamily.Arithmetic,
-            ResultTypePolicy: ResultTypePolicy.ArithmeticPromotion,
+            ResultTypePolicy: ResultTypePolicy.OperationResult,
             HoverDescription: "Subtraction. For temporal types, subtracts periods and durations from dates."),
 
         OperatorKind.Times => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.Star),
             "Multiplication",
             Arity.Binary, Associativity.Left, Precedence: 60, OperatorFamily.Arithmetic,
-            ResultTypePolicy: ResultTypePolicy.ArithmeticPromotion,
+            ResultTypePolicy: ResultTypePolicy.OperationResult,
             HoverDescription: "Multiplication. Cross-lane multiplication (decimal × number) is not allowed — use approximate() to bridge types."),
 
         OperatorKind.Divide => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.Slash),
             "Division",
             Arity.Binary, Associativity.Left, Precedence: 60, OperatorFamily.Arithmetic,
-            ResultTypePolicy: ResultTypePolicy.ArithmeticPromotion,
+            ResultTypePolicy: ResultTypePolicy.OperationResult,
             HoverDescription: "Division. The proof engine checks for division-by-zero at design time."),
 
         OperatorKind.Modulo => new SingleTokenOp(
             kind, Tokens.GetMeta(TokenKind.Percent),
             "Modulo (remainder)",
             Arity.Binary, Associativity.Left, Precedence: 60, OperatorFamily.Arithmetic,
-            ResultTypePolicy: ResultTypePolicy.ArithmeticPromotion,
+            ResultTypePolicy: ResultTypePolicy.OperationResult,
             HoverDescription: "Modulo (remainder) after integer division."),
 
         // ── Arithmetic (unary) ─────────────────────────────────────
@@ -142,7 +154,7 @@ public static class Operators
             kind, Tokens.GetMeta(TokenKind.Minus),
             "Arithmetic negation",
             Arity.Unary, Associativity.Right, Precedence: 65, OperatorFamily.Arithmetic,
-            ResultTypePolicy: ResultTypePolicy.ArithmeticPromotion,
+            ResultTypePolicy: ResultTypePolicy.LhsType,
             HoverDescription: "Arithmetic negation (unary minus). Returns the negative of the operand."),
 
         // ── Presence (postfix) ─────────────────────────────────────
@@ -152,7 +164,8 @@ public static class Operators
             "Presence check — field is set",
             Arity.Postfix, Associativity.NonAssociative, Precedence: 60, OperatorFamily.Presence,
             IsKeywordOperator: true,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Tests whether an optional field has been assigned a value. True if the field is not absent.",
             UsageExample: "field is set"),
 
@@ -162,7 +175,8 @@ public static class Operators
             "Absence check — field is not set",
             Arity.Postfix, Associativity.NonAssociative, Precedence: 60, OperatorFamily.Presence,
             IsKeywordOperator: true,
-            StaticResultType: TypeKind.Boolean,
+            ResultType: TypeKind.Boolean,
+            ResultTypePolicy: ResultTypePolicy.Fixed,
             HoverDescription: "Tests whether an optional field has not been assigned a value. True if the field is absent.",
             UsageExample: "field is not set"),
 
@@ -171,7 +185,7 @@ public static class Operators
             "Lookup key access",
             Arity.Binary, Associativity.Left, Precedence: 40, OperatorFamily.Membership,
             IsKeywordOperator: true,
-            ResultTypePolicy: ResultTypePolicy.LookupValueType),
+            ResultTypePolicy: ResultTypePolicy.ElementType),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };

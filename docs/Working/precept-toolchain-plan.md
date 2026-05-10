@@ -526,50 +526,53 @@ catalog gap: the type checker currently has no catalog field to read for operato
 
 ### Fields to Add to `OperatorMeta`
 
-**`StaticResultType: TypeKind? = null`**
+**`ResultType: TypeKind? = null`**
 
-For operators whose result type is always the same regardless of operand types. Add to
-`OperatorMeta` base record.
+For operators whose result type is declared directly in the catalog.
 
 Set in `Operators.GetMeta`:
-- `OperatorKind.Or` → `StaticResultType = TypeKind.Boolean`
-- `OperatorKind.And` → `StaticResultType = TypeKind.Boolean`
-- `OperatorKind.Not` → `StaticResultType = TypeKind.Boolean`
-- `OperatorKind.Equals`, `NotEquals`, `CaseInsensitiveEquals`, `CaseInsensitiveNotEquals` → `StaticResultType = TypeKind.Boolean`
-- `OperatorKind.LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual` → `StaticResultType = TypeKind.Boolean`
-- `OperatorKind.Contains` → `StaticResultType = TypeKind.Boolean`
-- `OperatorKind.IsSet`, `IsNotSet` → `StaticResultType = TypeKind.Boolean`
-- All arithmetic operators, `LookupAccess` → `StaticResultType = null` (computed)
+- `OperatorKind.Or`, `OperatorKind.And` → `ResultType = TypeKind.Boolean`
+- `OperatorKind.Not` → `ResultType = TypeKind.Boolean`
+- `OperatorKind.Equals`, `NotEquals`, `CaseInsensitiveEquals`, `CaseInsensitiveNotEquals` → `ResultType = TypeKind.Boolean`
+- `OperatorKind.LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual` → `ResultType = TypeKind.Boolean`
+- `OperatorKind.Contains` → `ResultType = TypeKind.Boolean`
+- `OperatorKind.IsSet`, `IsNotSet` → `ResultType = TypeKind.Boolean`
+- Unary/binary arithmetic and `LookupAccess` → `ResultType = null` (derived)
 
 **`ResultTypePolicy: ResultTypePolicy`**
 
-Enum that tells the type checker how to derive the result type when `StaticResultType` is null.
+Enum that tells the type checker how to derive the result type.
 
 ```csharp
 public enum ResultTypePolicy
 {
-    Static,              // use StaticResultType — always that TypeKind
-    LookupValueType,     // LHS is lookup of K to V; result is V — for 'for' operator
-    ArithmeticPromotion, // result is the common numeric type of LHS and RHS
+    Fixed,           // use ResultType directly
+    LhsType,         // result is the resolved left/only operand type
+    ElementType,     // result is the left operand's element/value type
+    BothOperands,    // operands must agree on ResultType; result is that type
+    OperationResult, // result comes from the resolved Operations catalog entry
 }
 ```
 
 Set in `Operators.GetMeta`:
-- Logical, comparison, membership, presence operators → `ResultTypePolicy = ResultTypePolicy.Static`
-- `OperatorKind.LookupAccess` → `ResultTypePolicy = ResultTypePolicy.LookupValueType`
-- Arithmetic operators → `ResultTypePolicy = ResultTypePolicy.ArithmeticPromotion`
-- `OperatorKind.Negate` → `ResultTypePolicy = ResultTypePolicy.ArithmeticPromotion` (same as LHS)
+- `OperatorKind.Or`, `OperatorKind.And` → `ResultTypePolicy = ResultTypePolicy.BothOperands`
+- Logical unary `not`, comparison, membership, and presence operators → `ResultTypePolicy = ResultTypePolicy.Fixed`
+- `OperatorKind.LookupAccess` → `ResultTypePolicy = ResultTypePolicy.ElementType`
+- Binary arithmetic operators → `ResultTypePolicy = ResultTypePolicy.OperationResult`
+- `OperatorKind.Negate` → `ResultTypePolicy = ResultTypePolicy.LhsType`
 
 ### Consumed by
 
-- `src/Precept/Pipeline/TypeChecker.Expressions.cs` — `ResolveOperatorResultType(op, lhsType, rhsType)`:
+- `src/Precept/Pipeline/TypeChecker.Expressions.cs` — `ResolveOperatorResultType(op, lhsType, rhsType, resolvedOperation)`:
   ```csharp
   var meta = Operators.ByToken[(op.Kind, op.Arity)];
-  if (meta.StaticResultType.HasValue)
-      return meta.StaticResultType.Value;  // always boolean for logical/comparison
-  return meta.ResultTypePolicy switch {
-      ResultTypePolicy.LookupValueType => ResolveLookupValueType(lhsType),
-      ResultTypePolicy.ArithmeticPromotion => PromoteNumericTypes(lhsType, rhsType),
+  return meta.ResultTypePolicy switch
+  {
+      ResultTypePolicy.Fixed => meta.ResultType!.Value,
+      ResultTypePolicy.BothOperands => meta.ResultType!.Value,
+      ResultTypePolicy.LhsType => lhsType,
+      ResultTypePolicy.ElementType => ResolveElementType(lhsType),
+      ResultTypePolicy.OperationResult => resolvedOperation.Result,
       _ => TypeKind.Unknown,
   };
   ```
@@ -579,13 +582,12 @@ Set in `Operators.GetMeta`:
 ### Tests Required
 
 - `CatalogCapability/OperatorCatalogTests.cs`:
-  - `Or_StaticResultType_IsBoolean()`
-  - `And_StaticResultType_IsBoolean()`
-  - `Not_StaticResultType_IsBoolean()`
-  - `Contains_StaticResultType_IsBoolean()`
-  - `IsSet_StaticResultType_IsBoolean()`
-  - `LookupAccess_ResultTypePolicy_IsLookupValueType()`
-  - `Plus_StaticResultType_IsNull()`
+  - `BooleanOperators_DeclareBooleanResultTypes()`
+  - `LookupAccess_ResultTypePolicy_IsElementType()`
+  - `BinaryArithmeticOperators_UseOperationResultPolicy()`
+  - `Negate_ResultTypePolicy_IsLhsType()`
+  - `FixedAndBothOperandsPolicies_DeclareResultTypes()`
+  - `DerivedPolicies_LeaveResultTypeNull()`
 - Type-checker integration coverage is executed in Slice 9:
   - `TypeChecker_And_ResultType_IsBoolean()` — repro from BUG-003/053
   - `TypeChecker_Or_ResultType_IsBoolean()` — repro from BUG-003/053
@@ -889,7 +891,7 @@ BUG-037, BUG-039, BUG-044, BUG-045, BUG-048, BUG-049, BUG-051, BUG-054
 
 ## Slice 9: Type Checker — Catalog-Derived Operator Typing
 
-**Goal:** The type checker must derive operator result types from `OperatorMeta.StaticResultType`
+**Goal:** The type checker must derive operator result types from `OperatorMeta.ResultType`
 and `OperatorMeta.ResultTypePolicy` rather than a hardcoded switch. Fix all operator-related
 type-check errors and modifier-validation bugs.
 
@@ -910,15 +912,14 @@ case ParsedBinaryExpression binary:
     var rhs = ResolveExpression(binary.Right);
     var opMeta = Operators.ByToken[(binary.Operator, Arity.Binary)];
     TypeKind resultType;
-    if (opMeta.StaticResultType.HasValue)
-        resultType = opMeta.StaticResultType.Value;
-    else
-        resultType = opMeta.ResultTypePolicy switch {
-            ResultTypePolicy.LookupValueType => lhs.ResolvedType is TypeKind.Lookup
-                ? GetLookupValueType(lhs) : TypeKind.Unknown,
-            ResultTypePolicy.ArithmeticPromotion => PromoteNumericTypes(lhs, rhs),
-            _ => TypeKind.Unknown,
-        };
+    resultType = opMeta.ResultTypePolicy switch {
+        ResultTypePolicy.Fixed => opMeta.ResultType!.Value,
+        ResultTypePolicy.BothOperands => opMeta.ResultType!.Value,
+        ResultTypePolicy.LhsType => lhs.ResolvedType,
+        ResultTypePolicy.ElementType => ResolveElementType(lhs),
+        ResultTypePolicy.OperationResult => resolvedOperation.Result,
+        _ => TypeKind.Unknown,
+    };
     return new TypedBinaryExpression(binary.Span, lhs, binary.Operator, rhs, resultType);
 ```
 
@@ -1396,7 +1397,8 @@ var parsed = new ParsedBinaryExpression(
 
 // Real catalog metadata
 var opMeta = Operators.GetMeta(OperatorKind.And);
-opMeta.StaticResultType.Should().Be(TypeKind.Boolean);
+opMeta.ResultType.Should().Be(TypeKind.Boolean);
+opMeta.ResultTypePolicy.Should().Be(ResultTypePolicy.BothOperands);
 
 // Real type checker with synthetic input
 var ctx = CheckContext.ForTest(fieldTable: [("Score", TypeKind.Boolean), ("Active", TypeKind.Boolean)]);
@@ -1411,7 +1413,7 @@ typed.ResolvedType.Should().Be(TypeKind.Boolean);
 | `Parser.ActionChainTests.cs` | Parser | Shape-driven action parsing for all `ActionSyntaxShape` values |
 | `Parser.StateTargetTests.cs` | Parser | Wildcard and broadcast recognition |
 | `Parser.MemberAccessTests.cs` | Parser | Keyword member names from `IsValidAsMemberName` |
-| `TypeChecker.OperatorTypingTests.cs` | Type Checker | Result type from `StaticResultType` / `ResultTypePolicy` |
+| `TypeChecker.OperatorTypingTests.cs` | Type Checker | Result type from `ResultType` / `ResultTypePolicy` |
 | `TypeChecker.ModifierValidationTests.cs` | Type Checker | Bound pairs from `BoundCounterpart`, subsumption from `Subsumes` |
 | `NameBinder.WildcardTests.cs` | Name Binder | `IsStateWildcard`, `IsBroadcastFieldTarget` |
 | `NameBinder.ForwardReferenceTests.cs` | Name Binder | Topological sort, cycle detection |
@@ -1427,14 +1429,14 @@ typed.ResolvedType.Should().Be(TypeKind.Boolean);
 | Bug | Title (abbreviated) | Category | Root Cause | Slice(s) |
 |-----|---------------------|----------|------------|---------|
 | BUG-001 | `any` state wildcard not recognized | Compiler | `IsStateWildcard` missing; name binder does literal lookup | Slice 1 + Slice 8 + Slice 10 |
-| BUG-002 | `contains` operator rejected | Compiler | `OperatorMeta` has no `StaticResultType`; type checker uses wrong result | Slice 4 + Slice 9 |
-| BUG-003 | `and`/`or`/`not` rejected | Compiler | Same as BUG-002: `StaticResultType` missing for logical ops | Slice 4 + Slice 9 |
+| BUG-002 | `contains` operator rejected | Compiler | `OperatorMeta` lacked result-type metadata; type checker uses wrong result | Slice 4 + Slice 9 |
+| BUG-003 | `and`/`or`/`not` rejected | Compiler | Same as BUG-002: logical operators lacked catalog result-type metadata | Slice 4 + Slice 9 |
 | BUG-004 | `default` rejected on event args | Compiler | Declaration-site applicability metadata is modeled too narrowly and the arg parser doesn't invoke the value-modifier loop | Slice 3 + Slice 8 |
 | BUG-005 | Comma-separated field list rejected | Compiler | Parser doesn't parse `("," Field)*` in `FieldTarget` | Slice 8 |
 | BUG-006 | `min(a,b)` not recognized as function | Compiler | `IsAlsoBuiltinFunction` missing; no lookahead for `(` | Slice 1 + Slice 8 |
 | BUG-007 | Arithmetic < comparison precedence | Compiler | Pratt binding powers inverted — not reading `OperatorMeta.Precedence` | Slice 9 |
 | BUG-008 | pop/dequeue obligations use `<unknown>` | Compiler | Proof engine binds obligation to synthetic var, not field name | Slice 11 |
-| BUG-009 | `for` resolves to key type | Compiler | `ResultTypePolicy.LookupValueType` missing; type checker returns LHS type | Slice 4 + Slice 9 |
+| BUG-009 | `for` resolves to key type | Compiler | `ResultTypePolicy.ElementType` missing; type checker returns LHS type | Slice 4 + Slice 9 |
 | BUG-010 | `choice` literal not typed in comparison | Compiler | Context type not propagated to literal in comparison position | Slice 9 |
 | BUG-011 | State hook actions not in MCP output | MCP-definition | `StateHookDto` not wired into `PreceptDefinitionDto` | Slice 12 |
 | BUG-012 | Stateless handler actions not in MCP | MCP-definition | `MapEvent` reads only transition rows, not handler rows | Slice 12 |
@@ -1478,7 +1480,7 @@ typed.ResolvedType.Should().Be(TypeKind.Boolean);
 | BUG-050 | dequeue/pop trigger false PRE0083 | Compiler | Wrong proof obligation type — same `<unknown>` root as BUG-008 | Slice 11 |
 | BUG-051 | `min(a,b)` fails — reserved keyword | Compiler | Same root as BUG-006; `IsAlsoBuiltinFunction` missing | Slice 1 + Slice 8 |
 | BUG-052 | `contains` unusable in expression | Compiler | Same root as BUG-002; type checker result type wrong for `contains` | Slice 4 + Slice 9 |
-| BUG-053 | `and`/`or` fail in all positions | Compiler | Same root as BUG-003; `StaticResultType` missing for logical ops | Slice 4 + Slice 9 |
+| BUG-053 | `and`/`or` fail in all positions | Compiler | Same root as BUG-003; logical operators lacked catalog result-type metadata | Slice 4 + Slice 9 |
 | BUG-054 | `ensure` not supported in stateless hooks | Compiler | `SupportsPostActionEnsure` missing on `EventHandler` construct | Slice 5 + Slice 8 |
 
 ---

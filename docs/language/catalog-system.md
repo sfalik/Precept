@@ -1114,9 +1114,9 @@ Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operat
 
 | Part | Type |
 |------|------|
-| Kind enum | `OperatorKind` (18 members: `Or`, `And`, `Not`, `Equals`, `NotEquals`, `CaseInsensitiveEquals`, `CaseInsensitiveNotEquals`, `LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual`, `Contains`, `Plus`, `Minus`, `Times`, `Divide`, `Modulo`, `Negate`) |
-| Meta record | `OperatorMeta(Kind, Token, Description, Arity, Associativity, Precedence, Family, IsKeywordOperator, StaticResultType: TypeKind?, ResultTypePolicy: ResultTypePolicy, HoverDescription?, UsageExample?)` — `Token` is a `TokenMeta` object reference; abstract base with `SingleTokenOp` (one token) and `MultiTokenOp` (keyword sequence) sealed subtypes |
-| Supporting enums | `Arity { Unary, Binary }`, `OperatorFamily { Arithmetic, Comparison, Logical, Membership }`, `Associativity { Left, Right, NonAssociative }` |
+| Kind enum | `OperatorKind` (21 members: `Or`, `And`, `Not`, `Equals`, `NotEquals`, `CaseInsensitiveEquals`, `CaseInsensitiveNotEquals`, `LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual`, `Contains`, `Plus`, `Minus`, `Times`, `Divide`, `Modulo`, `Negate`, `IsSet`, `IsNotSet`, `LookupAccess`) |
+| Meta record | `OperatorMeta(Kind, Description, Arity, Associativity, Precedence, Family, IsKeywordOperator, ResultType: TypeKind?, ResultTypePolicy: ResultTypePolicy, HoverDescription?, UsageExample?)` — token shape lives on the `SingleTokenOp(Token, …)` and `MultiTokenOp(Tokens, …)` sealed subtypes |
+| Supporting enums | `Arity { Unary, Binary, Postfix }`, `OperatorFamily { Arithmetic, Comparison, Logical, Membership, Presence }`, `Associativity { Left, Right, NonAssociative }` |
 | Catalog class | `Operators` — `GetMeta()`, `All` |
 | Output type | None |
 
@@ -1129,18 +1129,22 @@ Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operat
 ```csharp
 public enum ResultTypePolicy
 {
-    Static              = 1,  // result type is StaticResultType (non-null)
-    LookupValueType     = 2,  // result type is the lookup's value TypeKind (resolved at call site)
-    ArithmeticPromotion = 3,  // result type is the wider of the two operand types (Operations catalog)
+    Fixed = 1,            // result type is OperatorMeta.ResultType
+    LhsType = 2,          // result type is the resolved left/only operand type
+    ElementType = 3,      // result type is the resolved element/value type of the left collection operand
+    BothOperands = 4,     // operands must agree on OperatorMeta.ResultType; result is that type
+    OperationResult = 5,  // result type comes from the resolved Operations catalog entry
 }
 ```
 
 Assignment rules:
-- Logical operators (`or`, `and`, `not`), all comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `~==`, `~!=`), `contains`, `is set`, `is not set` → `Static`, `StaticResultType: TypeKind.Boolean`
-- Arithmetic operators (`+`, `-`, `*`, `/`, `%`, unary `-`) → `ArithmeticPromotion`, `StaticResultType: null`
-- `for` (`LookupAccess`) → `LookupValueType`, `StaticResultType: null`
+- Logical binary operators (`or`, `and`) → `BothOperands`, `ResultType: TypeKind.Boolean`
+- Logical unary `not`, all comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `~==`, `~!=`), `contains`, `is set`, `is not set` → `Fixed`, `ResultType: TypeKind.Boolean`
+- Unary `-` (`Negate`) → `LhsType`, `ResultType: null`
+- Binary arithmetic operators (`+`, `-`, `*`, `/`, `%`) → `OperationResult`, `ResultType: null`
+- `for` (`LookupAccess`) → `ElementType`, `ResultType: null`
 
-The type checker reads `OperatorMeta.ResultTypePolicy` to choose its result-type resolution path — no per-operator switch in the type-checker.
+The type checker reads `OperatorMeta.ResultType` and `OperatorMeta.ResultTypePolicy` to choose its result-type resolution path — no per-operator switch in the type-checker.
 
 #### 5. Operations (✅ Implemented)
 

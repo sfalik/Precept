@@ -1461,6 +1461,8 @@ Functions are validated against a closed catalog. There are no user-defined func
 | Collection element type mismatch | `add Field Expr` where `Expr`'s type doesn't match the collection's element type | `TypeMismatch` |
 | Numeric literal incompatible | Fractional literal in `integer` context, or exponent literal in `integer`/`decimal` context | `TypeMismatch` |
 
+Operator result typing is catalog-derived: fixed-result operators declare `boolean` directly, `for` derives from the left operand's element/value type, unary `-` preserves its operand type, and binary arithmetic derives from the resolved typed operation.
+
 #### `~string` enforcement
 
 All three rules below ship together — the enforcement model is not separable. Checks fire at the comparison or call site, not at the declaration site. The CI flag is carried per field reference in the semantic index.

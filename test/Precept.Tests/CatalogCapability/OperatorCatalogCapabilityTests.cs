@@ -1,3 +1,4 @@
+using System.Linq;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -6,39 +7,69 @@ namespace Precept.Tests.CatalogCapability;
 
 public sealed class OperatorCatalogCapabilityTests
 {
-    [Fact]
-    public void Or_StaticResultType_IsBoolean()
-        => CatalogCapabilityReflection.GetInstanceValue(Operators.GetMeta(OperatorKind.Or), "StaticResultType")
-            .Should().Be(TypeKind.Boolean);
+    [Theory]
+    [InlineData(OperatorKind.Or, ResultTypePolicy.BothOperands)]
+    [InlineData(OperatorKind.And, ResultTypePolicy.BothOperands)]
+    [InlineData(OperatorKind.Not, ResultTypePolicy.Fixed)]
+    [InlineData(OperatorKind.Contains, ResultTypePolicy.Fixed)]
+    [InlineData(OperatorKind.IsSet, ResultTypePolicy.Fixed)]
+    [InlineData(OperatorKind.IsNotSet, ResultTypePolicy.Fixed)]
+    public void BooleanOperators_DeclareBooleanResultTypes(OperatorKind kind, ResultTypePolicy policy)
+    {
+        var meta = Operators.GetMeta(kind);
+
+        meta.ResultType.Should().Be(TypeKind.Boolean);
+        meta.ResultTypePolicy.Should().Be(policy);
+    }
 
     [Fact]
-    public void And_StaticResultType_IsBoolean()
-        => CatalogCapabilityReflection.GetInstanceValue(Operators.GetMeta(OperatorKind.And), "StaticResultType")
-            .Should().Be(TypeKind.Boolean);
+    public void LookupAccess_ResultTypePolicy_IsElementType()
+    {
+        var meta = Operators.GetMeta(OperatorKind.LookupAccess);
+
+        meta.ResultType.Should().BeNull();
+        meta.ResultTypePolicy.Should().Be(ResultTypePolicy.ElementType);
+    }
+
+    [Theory]
+    [InlineData(OperatorKind.Plus)]
+    [InlineData(OperatorKind.Minus)]
+    [InlineData(OperatorKind.Times)]
+    [InlineData(OperatorKind.Divide)]
+    [InlineData(OperatorKind.Modulo)]
+    public void BinaryArithmeticOperators_UseOperationResultPolicy(OperatorKind kind)
+    {
+        var meta = Operators.GetMeta(kind);
+
+        meta.ResultType.Should().BeNull();
+        meta.ResultTypePolicy.Should().Be(ResultTypePolicy.OperationResult);
+    }
 
     [Fact]
-    public void Not_StaticResultType_IsBoolean()
-        => CatalogCapabilityReflection.GetInstanceValue(Operators.GetMeta(OperatorKind.Not), "StaticResultType")
-            .Should().Be(TypeKind.Boolean);
+    public void Negate_ResultTypePolicy_IsLhsType()
+    {
+        var meta = Operators.GetMeta(OperatorKind.Negate);
+
+        meta.ResultType.Should().BeNull();
+        meta.ResultTypePolicy.Should().Be(ResultTypePolicy.LhsType);
+    }
 
     [Fact]
-    public void Contains_StaticResultType_IsBoolean()
-        => CatalogCapabilityReflection.GetInstanceValue(Operators.GetMeta(OperatorKind.Contains), "StaticResultType")
-            .Should().Be(TypeKind.Boolean);
+    public void FixedAndBothOperandsPolicies_DeclareResultTypes()
+    {
+        Operators.All
+            .Where(meta => meta.ResultTypePolicy == ResultTypePolicy.Fixed
+                || meta.ResultTypePolicy == ResultTypePolicy.BothOperands)
+            .Should().OnlyContain(meta => meta.ResultType != null);
+    }
 
     [Fact]
-    public void IsSet_StaticResultType_IsBoolean()
-        => CatalogCapabilityReflection.GetInstanceValue(Operators.GetMeta(OperatorKind.IsSet), "StaticResultType")
-            .Should().Be(TypeKind.Boolean);
-
-    [Fact]
-    public void LookupAccess_ResultTypePolicy_IsLookupValueType()
-        => CatalogCapabilityReflection.GetInstanceValue(Operators.GetMeta(OperatorKind.LookupAccess), "ResultTypePolicy")
-            .Should().NotBeNull()
-            .And.Subject.ToString().Should().Be("LookupValueType");
-
-    [Fact]
-    public void Plus_StaticResultType_IsNull()
-        => CatalogCapabilityReflection.GetInstanceValue(Operators.GetMeta(OperatorKind.Plus), "StaticResultType")
-            .Should().BeNull();
+    public void DerivedPolicies_LeaveResultTypeNull()
+    {
+        Operators.All
+            .Where(meta => meta.ResultTypePolicy == ResultTypePolicy.ElementType
+                || meta.ResultTypePolicy == ResultTypePolicy.LhsType
+                || meta.ResultTypePolicy == ResultTypePolicy.OperationResult)
+            .Should().OnlyContain(meta => meta.ResultType == null);
+    }
 }

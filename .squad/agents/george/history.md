@@ -37,6 +37,11 @@
 - `SupportsPreVerbWhenGuard` was pure duplicate metadata. Scoped constructs can encode pre-verb `when` support entirely by placing an optional `GuardClause` slot in the ordered slot list with construct-specific termination tokens (`Ensure`, `Arrow`, `Modify`).
 - `ParseScopedConstruct` does not need phased anchor/guard/disambiguation handling. A single slot walk works if it checks for family disambiguation tokens before each post-anchor slot, preserves the `->` exception for `ActionChain`, and lets slot metadata drive everything else.
 
+### 2026-05-10T16:59:02.8292215-04:00 — t2-4 OperatorMeta result typing landed
+- `OperatorMeta` now carries `ResultType` and `ResultTypePolicy`; the old `StaticResultType` / `LookupValueType` / `ArithmeticPromotion` naming is gone. The durable policy set is `Fixed`, `LhsType`, `ElementType`, `BothOperands`, and `OperationResult`.
+- Catalog assignments are now explicit: `or` / `and` declare `ResultType = boolean` with `BothOperands`; `not`, comparisons, `contains`, `is set`, and `is not set` declare `boolean` with `Fixed`; unary `-` uses `LhsType`; binary arithmetic uses `OperationResult`; `for` (`LookupAccess`) uses `ElementType` so t2-9 can read the lookup value type from the typed LHS metadata.
+- `OperationResult` is the important shape decision for t2-9: arithmetic cannot be modeled as simple promotion because temporal and business-domain operator results come from `Operations.GetMeta(...).Result`, not from a primitive widen rule. Final validation for this slice: `dotnet test test/Precept.Tests/` green at 3,899 passing.
+
 ## Historical Summary
 
 - Earlier 2026-05-09 and 2026-05-10 work completed the typed-literal system, enriched diagnostics/quickstart/syntax catalogs, added `TypedField.NameSpan` and `ArgReference`, landed outline/snippet/catalog metadata, shipped the Track 2 Phase A safe batch, renamed the value-modifier family, and closed the TokenMeta alias cleanup plus BUG-039 documentation follow-through.

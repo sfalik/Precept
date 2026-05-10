@@ -19,12 +19,14 @@ public enum OperatorFamily
 /// <summary>Binding direction for the Pratt parser.</summary>
 public enum Associativity { Left = 1, Right = 2, NonAssociative = 3 }
 
-/// <summary>How an operator's result type is derived when it is not fixed.</summary>
+/// <summary>How an operator's result type is derived.</summary>
 public enum ResultTypePolicy
 {
-    Static = 1,
-    LookupValueType = 2,
-    ArithmeticPromotion = 3,
+    Fixed = 1,
+    LhsType = 2,
+    ElementType = 3,
+    BothOperands = 4,
+    OperationResult = 5,
 }
 
 /// <summary>
@@ -33,17 +35,17 @@ public enum ResultTypePolicy
 /// <see cref="MultiTokenOp"/> for keyword sequences like <c>is set</c> / <c>is not set</c>.
 /// </summary>
 public abstract record OperatorMeta(
-    OperatorKind   Kind,
-    string         Description,
-    Arity          Arity,
-    Associativity  Associativity,
-    int            Precedence,
-    OperatorFamily Family,
-    bool           IsKeywordOperator = false,
-    TypeKind?      StaticResultType  = null,
-    ResultTypePolicy ResultTypePolicy = ResultTypePolicy.Static,
-    string?        HoverDescription  = null,
-    string?        UsageExample      = null);
+    OperatorKind     Kind,
+    string           Description,
+    Arity            Arity,
+    Associativity    Associativity,
+    int              Precedence,
+    OperatorFamily   Family,
+    bool             IsKeywordOperator = false,
+    TypeKind?        ResultType = null,
+    ResultTypePolicy ResultTypePolicy = ResultTypePolicy.Fixed,
+    string?          HoverDescription = null,
+    string?          UsageExample = null);
 
 /// <summary>
 /// Operator produced by a single lexer token.
@@ -51,20 +53,20 @@ public abstract record OperatorMeta(
 /// <see cref="TokenKind.Minus"/> token used by <see cref="OperatorKind.Minus"/>.
 /// </summary>
 public sealed record SingleTokenOp(
-    OperatorKind   Kind,
-    TokenMeta      Token,
-    string         Description,
-    Arity          Arity,
-    Associativity  Associativity,
-    int            Precedence,
-    OperatorFamily Family,
-    bool           IsKeywordOperator = false,
-    TypeKind?      StaticResultType  = null,
-    ResultTypePolicy ResultTypePolicy = ResultTypePolicy.Static,
-    string?        HoverDescription  = null,
-    string?        UsageExample      = null)
+    OperatorKind     Kind,
+    TokenMeta        Token,
+    string           Description,
+    Arity            Arity,
+    Associativity    Associativity,
+    int              Precedence,
+    OperatorFamily   Family,
+    bool             IsKeywordOperator = false,
+    TypeKind?        ResultType = null,
+    ResultTypePolicy ResultTypePolicy = ResultTypePolicy.Fixed,
+    string?          HoverDescription = null,
+    string?          UsageExample = null)
     : OperatorMeta(Kind, Description, Arity, Associativity, Precedence, Family,
-                   IsKeywordOperator, StaticResultType, ResultTypePolicy, HoverDescription, UsageExample);
+                   IsKeywordOperator, ResultType, ResultTypePolicy, HoverDescription, UsageExample);
 
 /// <summary>
 /// Operator produced by a sequence of two or three keyword tokens (e.g. <c>is set</c>,
@@ -80,12 +82,12 @@ public sealed record MultiTokenOp(
     int                       Precedence,
     OperatorFamily            Family,
     bool                      IsKeywordOperator = false,
-    TypeKind?                 StaticResultType  = null,
-    ResultTypePolicy          ResultTypePolicy = ResultTypePolicy.Static,
-    string?                   HoverDescription  = null,
-    string?                   UsageExample      = null)
+    TypeKind?                 ResultType = null,
+    ResultTypePolicy          ResultTypePolicy = ResultTypePolicy.Fixed,
+    string?                   HoverDescription = null,
+    string?                   UsageExample = null)
     : OperatorMeta(Kind, Description, Arity, Associativity, Precedence, Family,
-                   IsKeywordOperator, StaticResultType, ResultTypePolicy, HoverDescription, UsageExample)
+                   IsKeywordOperator, ResultType, ResultTypePolicy, HoverDescription, UsageExample)
 {
     public TokenMeta LeadToken => Tokens[0];
 }

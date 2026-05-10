@@ -1184,7 +1184,7 @@ Open questions from this section have been resolved. See `docs/compiler/grammar-
 | `src/Precept/Language/Modifiers.cs` | `Modifiers.All` — source of truth for modifiers |
 | `src/Precept/Language/Construct.cs` | `ConstructMeta` with `Slots`, `LeadingTokens` |
 | `src/Precept/Language/Constructs.cs` | `Constructs.All` — source of truth for grammar constructs |
-| `src/Precept/Language/Operator.cs` | `OperatorMeta` with precedence, associativity |
+| `src/Precept/Language/Operator.cs` | `OperatorMeta` with precedence, associativity, and result typing metadata |
 | `src/Precept/Language/Operators.cs` | `Operators.All` — source of truth for operators |
 
 ### Language Server (Request-Time Tooling)
