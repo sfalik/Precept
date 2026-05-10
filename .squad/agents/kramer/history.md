@@ -21,6 +21,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T12:15:36Z — Grammar keyword fallback color fix recorded
+- Kramer closed the `as`/`default` gold drift by fixing the VS Code fallback TextMate color rule in `tools\Precept.VsCode\package.json` instead of changing language-server semantic token classification.
+- Validation stayed green: `SemanticTokensHandlerTests` passed 150/150, and `npm run compile` succeeded in `tools\Precept.VsCode`.
+
 ### 2026-05-10T12:15:36Z — Boolean field modifier completion filtering landed
 - `CompletionHandler` now filters field modifiers through modifier metadata and declaration-site legality, so boolean fields offer only `default`, `optional`, and `writable` instead of leaking numeric-only items like `max` and `maxplaces`.
 - `CompletionHandlerTests.cs` now locks the exact boolean-valid surface, and the full language-server test project passed 150/150 after the fix.
