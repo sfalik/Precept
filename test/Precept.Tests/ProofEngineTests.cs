@@ -67,6 +67,7 @@ public class ProofEngineTests
             IsWritable: true,
             Presence: isOptional ? (DeclaredPresenceMeta)new DeclaredPresenceMeta.Optional() : new DeclaredPresenceMeta.Guaranteed(),
             DeclaredQualifiers: qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
+            NameSpan: SourceSpan.Missing,
             Syntax: MakeSyntax(ConstructKind.FieldDeclaration));
 
     private static SemanticIndex MakeSemantics(
@@ -1348,6 +1349,7 @@ public class ProofEngineTests
                 IsWritable: true,
                 Presence: new DeclaredPresenceMeta.Guaranteed(),
                 DeclaredQualifiers: qualifiers,
+                NameSpan: SourceSpan.Missing,
                 Syntax: new ParsedConstruct(
                     Constructs.GetMeta(ConstructKind.FieldDeclaration),
                     ImmutableArray<SlotValue>.Empty,

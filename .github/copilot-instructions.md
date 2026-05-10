@@ -86,15 +86,16 @@ For issue-based implementation work:
 
 ## Use the MCP Tools First
 
-This project ships a Precept MCP server with 5 tools. **Use them as your primary research tools** before reading source code or making assumptions about the DSL:
+This project ships a Precept MCP server. **Use its tools as your primary research tools** before reading source code or making assumptions about the DSL. The tool set grows over time — call `precept_ping` to confirm connectivity, then discover what's available from the tool list exposed in your session.
 
-| Tool | Purpose |
-|------|---------|
-| `precept_language` | Complete DSL vocabulary (keywords, operators, scopes, constraints, pipeline stages) |
-| `precept_compile(text)` | Parse, type-check, analyze; returns typed structure + diagnostics |
-| `precept_inspect(text, currentState, data, eventArgs?)` | Read-only preview of what each event would do |
-| `precept_fire(text, currentState, event, data?, args?)` | Single-event execution for step-by-step tracing |
-| `precept_update(text, currentState, data, fields)` | Direct field editing to test `edit` declarations and constraints |
+The tools cover areas including (but not limited to):
+
+- **Language vocabulary** — keywords, operators, scopes, constructs, constraints, pipeline stages
+- **Compilation & diagnostics** — parse, type-check, analyze a definition; look up diagnostic codes
+- **Type system & syntax** — types, modifiers, built-in functions, operator combinations, grammar rules
+- **Domain catalogs** — currencies, units, SI prefixes, physical dimensions
+- **Patterns & proofs** — common patterns, anti-patterns, proof obligations, runtime faults
+- **Runtime execution** — inspect, fire events, update fields for step-by-step tracing (when available)
 
 Start with MCP tools for authoritative data, then read source code only for implementation details the tools don't cover.
 

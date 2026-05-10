@@ -40,6 +40,7 @@ public class ProofLedgerTests
             IsWritable: false,
             Presence: new DeclaredPresenceMeta.Guaranteed(),
             DeclaredQualifiers: ImmutableArray<DeclaredQualifierMeta>.Empty,
+            NameSpan: SourceSpan.Missing,
             Syntax: SyntaxFor(ConstructKind.FieldDeclaration));
 
     private static TypedStateHook CreateStateHook()

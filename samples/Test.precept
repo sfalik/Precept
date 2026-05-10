@@ -1,0 +1,3 @@
+precept test
+
+field a as string default "hello" writable

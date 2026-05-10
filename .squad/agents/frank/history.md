@@ -67,6 +67,12 @@
 - Scribe merged Frank's typed-literal framework and UCUM parser architecture into `.squad/decisions.md` as the canonical implementation direction.
 - Durable boundary: `ContentValidation` stays the metadata hook, `TypedConstantValidation.Validate(...)` stays the static dispatcher, and both temporal + UCUM parsing now have one approved shared-language architecture.
 
+### 2026-05-10T00:58:00Z — LS Phase 2 gap closure plan authored
+- Completed the first-principles gap audit of the live language-server code against production LSP expectations (preview explicitly excluded).
+- Added Phase 2 to `docs/Working/language-server-implementation-plan.md` as Slices 12–29: trigger/context fixes, expression + typed-constant completions, snippet metadata, full hover projection, semantic-token cleanup, references/highlights, rename, signature help, workspace symbols, document-symbol selection ranges, selection ranges, document version ordering, VS Code typed-constant editor polish, doc sync, and the Slice 11 wiring amendment.
+- Locked the non-gaps: keep push diagnostics on OmniSharp `0.19.9`, keep full-sync/no-save hooks, no inlay hints, no code lens, no state-target suppression heuristics.
+- Durable findings recorded at `.squad/decisions/inbox/frank-ls-phase2-gap-analysis.md`.
+
 ## Historical Summary
 
 - Earlier 2026-05-09 work established the typed-literal direction: runtime JSON ingress reuses `TypeRuntimeMeta.ReadJson`, the unified content-validation framework replaced ad-hoc checker validation, user-defined format validation was explicitly kept out of typed literals, and the comprehensive 12-slice plan became the execution hub.

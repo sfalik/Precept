@@ -47,6 +47,13 @@ internal sealed class HoverHandler : IHoverHandler
             return null;
         }
 
+        // Contextual reclassification: 'set' is the type keyword in type-expression position.
+        if (token.Value.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token.Value))
+        {
+            var typeMeta = Types.ByToken[TokenKind.Set];
+            return MakeHover($"**{typeMeta.DisplayName}**\n\n{typeMeta.HoverDescription ?? typeMeta.Description}", token.Value.Span);
+        }
+
         var meta = Tokens.GetMeta(token.Value.Kind);
         if (meta.Text is not null)
         {

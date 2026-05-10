@@ -201,13 +201,12 @@ void OnCompilationComplete(Uri uri, Compilation compilation)
     });
 }
 
-DiagnosticSeverity MapSeverity(Precept.DiagnosticSeverity severity) => severity switch
+DiagnosticSeverity MapSeverity(Severity severity) => severity switch
 {
-    Precept.DiagnosticSeverity.Error => DiagnosticSeverity.Error,
-    Precept.DiagnosticSeverity.Warning => DiagnosticSeverity.Warning,
-    Precept.DiagnosticSeverity.Info => DiagnosticSeverity.Information,
-    Precept.DiagnosticSeverity.Hint => DiagnosticSeverity.Hint,
-    _ => DiagnosticSeverity.Error
+    Severity.Error   => DiagnosticSeverity.Error,
+    Severity.Warning => DiagnosticSeverity.Warning,
+    Severity.Info    => DiagnosticSeverity.Information,
+    _                => DiagnosticSeverity.Error
 };
 ```
 
@@ -227,7 +226,7 @@ Semantic tokens enable rich syntax highlighting beyond what TextMate grammars ca
 
 **Mechanics:**
 
-Pass 1 walks the token stream and emits semantic tokens based on `TokenMeta.SemanticTokenType`. This pass requires only the lexer — it works even when the type checker fails.
+Pass 1 walks the token stream and emits semantic tokens based on `TokenMeta.SemanticTokenType`. This pass requires only the lexer — it works even when the type checker fails. The OmniSharp handler still must advertise a semantic-token legend and full-document registration options; `SemanticTokensBuilder` handles the LSP wire-format delta encoding against that legend.
 
 ```csharp
 SemanticTokens BuildLexicalTokens(Compilation compilation)
@@ -240,11 +239,11 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
         if (meta.SemanticTokenType is null) continue;
         
         builder.Push(
-            line: token.Span.StartLine,
-            character: token.Span.StartColumn,
+            line: token.Span.StartLine - 1,
+            character: token.Span.StartColumn - 1,
             length: token.Span.Length,
             tokenType: meta.SemanticTokenType,
-            tokenModifiers: 0);  // No SemanticTokenModifiers on TokenMeta — Precept tokens carry zero modifier bits (resolved: Wave 4)
+            tokenModifiers: 0);  // No SemanticTokenModifiers on TokenMeta — lexical tokens carry zero modifier bits
     }
     
     return builder.Build();
@@ -260,14 +259,14 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
 | Operators (`+`, `-`, `*`, `/`, `==`, etc.) | `operator` |
 | Modifiers (`optional`, `required`, `positive`, etc.) | `modifier` |
 | Literals (`123`, `"hello"`, `true`, `false`) | `number`, `string`, `keyword` |
-| Comments (`//`, `/* */`) | `comment` |
+| Comments (`# ...`) | `comment` |
 | Identifiers | *(deferred to Pass 2)* |
 
 #### Pass 2: Identifier Semantic Tokens
 
 **Trigger:** `textDocument/semanticTokens/full` (merged with Pass 1)
 
-**Artifact:** `Compilation.SemanticIndex` reference bindings
+**Artifact:** `Compilation.Semantics` reference bindings
 
 **Mechanics:**
 
@@ -276,51 +275,45 @@ Pass 2 walks `SemanticIndex` symbol tables and classifies identifier tokens by t
 ```csharp
 void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
 {
-    // Fields
+    // Declaration spans
     foreach (var field in index.Fields)
     {
-        AddIdentifier(builder, field.Syntax.Span, "property");
+        // TypedField has Syntax but not NameSpan — extract name span from ParsedConstruct
+        var nameSpan = ExtractFieldNameSpan(field);
+        AddIdentifier(builder, nameSpan, "property");
     }
     
-    // States
     foreach (var state in index.States)
     {
-        AddIdentifier(builder, state.Syntax.Span, "enum");
+        AddIdentifier(builder, state.NameSpan, "enum");
     }
     
-    // Events
     foreach (var evt in index.Events)
     {
-        AddIdentifier(builder, evt.Syntax.Span, "function");
-    }
-    
-    // Event arguments
-    foreach (var evt in index.Events)
-    {
+        AddIdentifier(builder, evt.NameSpan, "function");
         foreach (var arg in evt.Args)
         {
             AddIdentifier(builder, arg.Span, "parameter");
         }
     }
     
-    // References (field reads, state refs, event refs in transition rows)
-    foreach (var reference in index.References)
-    {
-        var tokenType = reference.Target switch
-        {
-            FieldReference => "property",
-            StateReference => "enum",
-            EventReference => "function",
-            ArgReference => "parameter",
-            _ => null
-        };
-        if (tokenType is not null)
-            AddIdentifier(builder, reference.Span, tokenType);
-    }
+    // Reference sites (CC#3 — first-class collections on SemanticIndex)
+    foreach (var fr in index.FieldReferences)
+        AddIdentifier(builder, fr.Site, "property");
+    
+    foreach (var sr in index.StateReferences)
+        AddIdentifier(builder, sr.Site, "enum");
+    
+    foreach (var er in index.EventReferences)
+        AddIdentifier(builder, er.Site, "function");
+    
+    // ArgReferences — thin core prerequisite (Slice 3)
+    foreach (var ar in index.ArgReferences)
+        AddIdentifier(builder, ar.Site, "parameter");
 }
 ```
 
-**Pass 2 reference reconstruction:** `SemanticIndex` does not carry pre-built reference-site collections. Pass 2 reconstructs reference sites by walking the typed declaration tree and pattern-matching on `TypedFieldRef`, `TypedArgRef`, `TypedStateRef`, and `TypedEventRef` nodes. This keeps the type checker focused on declaration-level semantics; tooling-specific reference accumulation is a Pass 2 implementation concern. `SemanticIndex.EnsuresByState` (`FrozenDictionary<string, ImmutableArray<TypedEnsure>>`) is the exception — it was added as a first-class grouping because multiple consumers re-derive the same correlation independently (CC#22).
+**Pass 2 reference sites:** `SemanticIndex` carries first-class reference-site collections populated by the type checker at resolution time (CC#3): `FieldReferences` (`ImmutableArray<FieldReference>`), `StateReferences` (`ImmutableArray<StateReference>`), and `EventReferences` (`ImmutableArray<EventReference>`). Each reference record holds the resolved typed declaration and the reference `Site` span. Pass 2 projects these collections directly — no expression-tree walking needed. `ArgReferences` is not yet present; it must be added as a thin core prerequisite (see implementation plan Slice 3).
 
 **Graceful Degradation:**
 
@@ -405,35 +398,34 @@ IEnumerable<CompletionItem> GetCompletions(SlotContext context, SemanticIndex? i
 IEnumerable<CompletionItem> GetTypeCompletions()
 {
     return Types.All
-        .Where(t => t.IsUserFacing)  // CC#16: IsUserFacing = true by default; Error and StateRef = false
+        .Where(t => t.Token is not null)  // CC#16: Token != null is structurally equivalent to user-facing (internal types Error, StateRef have Token = null)
         .Select(t => new CompletionItem
         {
-            Label = t.Token.Text,
+            Label = t.Token!.Text,
             Kind = CompletionItemKind.TypeParameter,
             Documentation = t.HoverDescription,
-            InsertText = t.SnippetTemplate ?? t.Token.Text,  // SnippetTemplate: future catalog addition; falls back to token text
-            InsertTextFormat = t.SnippetTemplate is not null 
-                ? InsertTextFormat.Snippet 
-                : InsertTextFormat.PlainText
+            InsertText = t.Token!.Text,
+            InsertTextFormat = InsertTextFormat.PlainText
         });
 }
 
 IEnumerable<CompletionItem> GetActionCompletions(TypeKind? fieldType)
 {
     return Actions.All
-        .Where(a => fieldType is null || a.ApplicableTo.Contains(fieldType.Value))
+        .Where(a => fieldType is null || a.ApplicableTo.Any(t => t.Kind == fieldType))
         .Select(a => new CompletionItem
         {
             Label = a.Token.Text,
             Kind = CompletionItemKind.Method,
-            Documentation = a.Description,  // ActionMeta.Description serves the hover description role
-            InsertText = a.Token.Text,
-            InsertTextFormat = InsertTextFormat.PlainText
+            Documentation = a.HoverDescription ?? a.Description,
+            InsertText = a.SnippetTemplate ?? a.Token.Text,
+            InsertTextFormat = a.SnippetTemplate is not null
+                ? InsertTextFormat.Snippet
+                : InsertTextFormat.PlainText
         });
 }
 
-// ActionMeta.SnippetTemplate and HoverDescription are future catalog additions (catalog-gap #43);
-// the Description field is sufficient for current completion tooltips.
+// ActionMeta already carries HoverDescription, UsageExample, and SnippetTemplate.
 
 IEnumerable<CompletionItem> GetStateCompletions(SemanticIndex? index)
 {
@@ -472,28 +464,28 @@ Hover finds the symbol at the cursor position via `SemanticIndex`, then formats 
 ```csharp
 Hover? GetHover(Compilation compilation, Position position)
 {
-    var token = FindTokenAt(compilation.TokenStream, position);
+    var token = FindTokenAt(compilation.Tokens, position);
     if (token is null) return null;
     
-    // Keyword hover — catalog lookup
+    // Surface-token hover — catalog lookup
     var meta = Tokens.GetMeta(token.Kind);
-    if (meta.HoverDescription is not null)
+    if (token.Kind != TokenKind.Identifier && meta.Text is not null)
     {
         return new Hover
         {
             Contents = new MarkupContent
             {
                 Kind = MarkupKind.Markdown,
-                Value = meta.HoverDescription
+                Value = meta.Description
             },
             Range = ToLspRange(token.Span)
         };
     }
     
     // Identifier hover — semantic lookup
-    if (token.Kind == TokenKind.Identifier && compilation.SemanticIndex is { } index)
+    if (token.Kind == TokenKind.Identifier)
     {
-        var symbol = FindSymbolAt(index, position);
+        var symbol = FindSymbolAt(compilation.Semantics, position);
         if (symbol is not null)
         {
             return new Hover
@@ -560,29 +552,35 @@ Go-to-definition resolves the reference at the cursor to its declaration using `
 ```csharp
 Location? GetDefinition(Compilation compilation, Position position)
 {
-    if (compilation.SemanticIndex is not { } index) return null;
+    var index = compilation.Semantics;
     
-    // Find what the cursor is on
-    var reference = FindReferenceAt(index, position);
-    if (reference is null) return null;
+    // Find which reference site the cursor overlaps
+    // FieldReference, StateReference, EventReference each carry the resolved declaration
+    SourceSpan? declarationSpan = null;
     
-    // Resolve to declaration via back-pointer
-    var declaration = reference.Target switch
-    {
-        FieldReference fr => index.FieldsByName.GetValueOrDefault(fr.FieldName)?.Syntax,
-        StateReference sr => index.StatesByName.GetValueOrDefault(sr.StateName)?.Syntax,
-        EventReference er => index.EventsByName.GetValueOrDefault(er.EventName)?.Syntax,
-        ArgReference ar => index.EventsByName.GetValueOrDefault(ar.EventName)?
-            .Args.FirstOrDefault(a => a.Name == ar.ArgName)?.Span,
-        _ => null
-    };
+    foreach (var fr in index.FieldReferences)
+        if (Contains(fr.Site, position))
+        { declarationSpan = ExtractFieldNameSpan(fr.Field); break; }
     
-    if (declaration is null) return null;
+    foreach (var sr in index.StateReferences)
+        if (Contains(sr.Site, position))
+        { declarationSpan = sr.State.NameSpan; break; }
+    
+    foreach (var er in index.EventReferences)
+        if (Contains(er.Site, position))
+        { declarationSpan = er.Event.NameSpan; break; }
+    
+    // ArgReferences — thin core prerequisite (Slice 3)
+    foreach (var ar in index.ArgReferences)
+        if (Contains(ar.Site, position))
+        { declarationSpan = ar.Arg.Span; break; }
+    
+    if (declarationSpan is null) return null;
     
     return new Location
     {
-        Uri = compilation.Uri,
-        Range = ToLspRange(declaration.Span)
+        Uri = documentUri,  // tracked by DocumentStore, not on Compilation
+        Range = ToLspRange(declarationSpan.Value)
     };
 }
 ```
@@ -628,29 +626,26 @@ The LS is a thin wrapper: it serializes the runtime result directly. It does not
 // Custom request type
 [Method("precept/inspect")]
 record InspectParams(
-    Uri Uri,
-    string CurrentState,
-    Dictionary<string, object?> Data,
+    DocumentUri Uri,
+    string? CurrentState,
+    JsonElement Data,
     string? Event,
-    Dictionary<string, object?>? EventArgs);
+    JsonElement? EventArgs);
 
 [Method("precept/inspect")]
-InspectResult? HandleInspect(InspectParams p)
+object? HandleInspect(InspectParams p)
 {
-    var state = _documents[p.Uri];
-    if (state.Precept is not { } precept) return null;
-    
-    var version = BuildVersion(precept, p.CurrentState, p.Data);
-    
-    if (p.Event is not null)
-    {
-        // Single event inspection — args optional
-        var args = BuildArgs(p.EventArgs);  // JSON lane; null if not provided
-        return Serialize(version.InspectFire(p.Event, args));
-    }
-    
-    // Full landscape — one call returns all EventInspection via UpdateInspection.Events
-    return Serialize(version.InspectUpdate(null));
+    if (!_documents.TryGetValue(p.Uri, out var state) || state.Precept is not { } precept)
+        return null;
+
+    if (precept.Restore(p.CurrentState, p.Data) is not Restored restored)
+        return null;
+
+    var version = restored.Result;
+
+    return p.Event is not null
+        ? version.InspectFire(p.Event, p.EventArgs)
+        : version.InspectUpdate(null);
 }
 ```
 
@@ -675,7 +670,7 @@ The extension calls `precept/inspect` whenever the user changes preview state, t
 
 **Mechanics:**
 
-Document outline provides hierarchical symbols for the document sidebar. The LS walks `ConstructManifest.Constructs` and maps each to a `DocumentSymbol` using `ConstructMeta.IsOutlineNode` and `ConstructMeta.LspSymbolKind` — no hardcoded `ConstructKind` switches.
+Document outline provides hierarchical symbols for the document sidebar. The LS walks `ConstructManifest.Constructs` and maps each to a `DocumentSymbol` using `ConstructMeta.IsOutlineNode` and `ConstructMeta.OutlineSymbolTag` — no hardcoded `ConstructKind` switches.
 
 ```csharp
 DocumentSymbol[] GetDocumentSymbols(Compilation compilation)
@@ -686,14 +681,14 @@ DocumentSymbol[] GetDocumentSymbols(Compilation compilation)
         .ToArray();
 }
 
-> **✅ Resolved (CC#18) — ConstructMeta.IsOutlineNode and LspSymbolKind**
-> Outline eligibility and LSP symbol kind are first-class `ConstructMeta` fields. `IsOutlineNode = false` by default; outline constructs set `IsOutlineNode = true` and `LspSymbolKind = "Class"` etc. This matches the `TokenMeta.SemanticTokenType` pattern — the LS reads catalog metadata rather than maintaining a per-`ConstructKind` switch. Adding a new outline-able construct only requires updating its catalog entry.
+> **✅ Resolved (CC#18) — ConstructMeta.IsOutlineNode and OutlineSymbolTag**
+> Outline eligibility and LSP symbol kind are first-class `ConstructMeta` fields. `IsOutlineNode = false` by default; outline constructs set `IsOutlineNode = true` and `OutlineSymbolTag = "Module"` etc. This matches the `TokenMeta.SemanticTokenType` pattern — the LS reads catalog metadata rather than maintaining a per-`ConstructKind` switch. Adding a new outline-able construct only requires updating its catalog entry.
 > *Resolved: 2026-05-06 — CC#18*
 
 DocumentSymbol ToDocumentSymbol(ParsedConstruct construct) => new()
 {
     Name = ExtractName(construct),
-    Kind = Enum.Parse<SymbolKind>(construct.Meta.LspSymbolKind ?? "Null"),  // catalog-driven
+    Kind = Enum.Parse<SymbolKind>(construct.Meta.OutlineSymbolTag ?? "Null"),  // catalog-driven
     Range = ToLspRange(construct.Span),
     SelectionRange = ToLspRange(ExtractNameSpan(construct))
 };
@@ -720,16 +715,10 @@ FoldingRange[] GetFoldingRanges(Compilation compilation)
             StartCharacter = c.Span.StartColumn,
             EndLine = c.Span.EndLine,
             EndCharacter = c.Span.EndColumn,
-            Kind = GetFoldingKind(c.Meta.Kind)
+            Kind = FoldingRangeKind.Region  // Precept has no comment constructs
         })
         .ToArray();
 }
-
-FoldingRangeKind? GetFoldingKind(ConstructKind kind) => kind switch
-{
-    ConstructKind.Comment => FoldingRangeKind.Comment,
-    _ => FoldingRangeKind.Region
-};
 ```
 
 ---
@@ -740,13 +729,15 @@ FoldingRangeKind? GetFoldingKind(ConstructKind kind) => kind switch
 
 The enrichment pass runs inside `OnCompilationComplete`, after the full pipeline has settled. It processes only the four diagnostic codes listed in §2.4. All other codes are ineligible.
 
-**SemanticIndex guard.** The enrichment pass must only run when `SemanticIndex` is non-null. A null `SemanticIndex` means compilation stopped before the type-check stage (lex or parse errors). The suggestion machinery depends on the symbol tables populated during type-checking; running it without them is undefined.
+**Suggestion-pool resolution.** `Compilation.Semantics` is non-nullable (always present), so enrichment is a per-diagnostic decision rather than a null-guarded pass. For each eligible diagnostic, resolve the candidate pool from `DiagnosticMeta.SuggestionSources`: fields from `Semantics.Fields`, states from `Semantics.States`, events from `Semantics.Events`, or built-ins from `Functions.All`. If the chosen pool is empty, publish the diagnostic unchanged.
 
 ```
 OnCompilationComplete:
-  if compilation.Semantics is null → skip enrichment entirely
   for each Diagnostic d in compilation.Diagnostics:
-    if d.Code matches a SuggestionSource entry → attempt enrichment
+    if d.Code has SuggestionSources metadata:
+      resolve candidate pool for that source
+      if pool is empty → publish unchanged
+      else → attempt fuzzy match
 ```
 
 Lex-stage diagnostics (`UnterminatedStringLiteral`, `InvalidCharacter`, etc.) and parse-stage diagnostics (`ExpectedToken`, `NonAssociativeComparison`, etc.) never receive "did you mean?" enrichment, even if their messages happen to contain an identifier.
@@ -838,9 +829,9 @@ Enrichment is driven by `SuggestionSources` catalog metadata. Only these four co
 
 | `DiagnosticCode` | Suggestion Pool | `Args[0]` Content |
 |---|---|---|
-| `UndeclaredField` | All field names declared in the precept (`SemanticIndex.UserFields`) | The failing field name as written in source |
-| `UndeclaredState` | All state names declared in the precept (`SemanticIndex.UserStates`) | The failing state name as written in source |
-| `UndeclaredEvent` | All event names declared in the precept (`SemanticIndex.UserEvents`) | The failing event name as written in source |
+| `UndeclaredField` | All field names declared in the precept (`SemanticIndex.Fields`) | The failing field name as written in source |
+| `UndeclaredState` | All state names declared in the precept (`SemanticIndex.States`) | The failing state name as written in source |
+| `UndeclaredEvent` | All event names declared in the precept (`SemanticIndex.Events`) | The failing event name as written in source |
 | `UndeclaredFunction` | All built-in function names (`Functions.All` — `min`, `max`, `abs`, `clamp`, `floor`, `ceil`, `truncate`, `round`, `roundPlaces`, `approximate`, `pow`, `sqrt`, `trim`, `startsWith`, `endsWith`, `toLower`, `toUpper`, `left`, `right`, `mid`, `tildeStartsWith`, `tildeEndsWith`, `now`) | The failing function name as written in source |
 
 **Why only these four?** These are the only `DiagnosticCategory.Naming` errors where a single candidate pool can be enumerated at compile time and where a close match reliably indicates a typo rather than a conceptual error. Other naming errors (`DuplicateFieldName`, `DuplicateStateName`, etc.) are declaration conflicts, not lookup failures; they do not benefit from suggestions. Type-system errors (`TypeMismatch`, `QualifierMismatch`) involve structural mismatches where no single "intended name" exists to suggest.
@@ -948,9 +939,9 @@ When a FixHint is present but no automatable text edit can be derived, the code 
 | Title | `Show fix hint` |
 | Kind | `quickfix` |
 | IsPreferred | `false` |
-| Command | `precept.showFixHint` with the FixHint text as argument |
+| Command | `precept.showFixHint` with a structured payload containing `fixHint` and optional `exampleBefore` / `exampleAfter` |
 
-The `precept.showFixHint` command displays the FixHint text in a VS Code information message (`vscode.window.showInformationMessage`). It does not modify the document.
+The `precept.showFixHint` command is implemented by the VS Code extension. It displays the `FixHint` text and may render richer before/after examples when `DiagnosticMeta.ExampleBefore` and `ExampleAfter` are available. It does not modify the document.
 
 **Appearance in VS Code:**
 
@@ -1008,7 +999,7 @@ The LS must declare code action support in its server capabilities:
 
 ##### 4.3 `textDocument/codeAction` Request Handling
 
-VS Code sends a `textDocument/codeAction` request when the cursor enters a diagnostic span. The request carries:
+VS Code sends a `textDocument/codeAction` request on demand for the current range (for example via the lightbulb or `Ctrl+.`). The request carries:
 
 ```json
 {
@@ -1024,7 +1015,7 @@ VS Code sends a `textDocument/codeAction` request when the cursor enters a diagn
 
 The handler must:
 
-1. For each diagnostic in `context.diagnostics`, look up the corresponding enriched diagnostic and code action set.
+1. For each diagnostic in `context.diagnostics`, match it back to the server-side enrichment/code-action metadata by a stable diagnostic identity (at minimum code + range; if needed include message-shape/original args to avoid collisions).
 2. Return an array of `CodeAction` objects. If no actions apply, return an empty array (not null, not an error).
 
 Code action object shape (mechanical):
@@ -1060,7 +1051,13 @@ Code action object shape (tooltip-only):
   "command": {
     "title": "Show fix hint",
     "command": "precept.showFixHint",
-    "arguments": ["Restructure the computed fields to break the circular dependency"]
+    "arguments": [
+      {
+        "fixHint": "Restructure the computed fields to break the circular dependency",
+        "exampleBefore": null,
+        "exampleAfter": null
+      }
+    ]
   }
 }
 ```
@@ -1069,7 +1066,7 @@ Code action object shape (tooltip-only):
 
 When multiple code actions apply to the same diagnostic span, they are returned in this order:
 
-1. `isPreferred: true` mechanical actions (rename, insert closing quote) — VS Code auto-applies these on `Fix All`
+1. `isPreferred: true` mechanical actions (rename, insert closing quote) — VS Code presents these as the primary quick fix for the diagnostic
 2. `isPreferred: false` tooltip-only actions
 3. Any additional non-preferred actions
 
@@ -1099,13 +1096,13 @@ Within each group, maintain declaration order from the diagnostic list.
 Field 'Approve' is not declared — did you mean 'Approved'?
 ```
 
-##### 5.3 SemanticIndex Is Null
+##### 5.3 SemanticIndex Has No Usable Symbols
 
-**Condition:** Compilation halted at lex or parse stage; `Compilation.Semantics` is null.
+**Condition:** Compilation halted at lex or parse stage; `Compilation.Semantics` contains empty symbol tables.
 
 **Behavior:** The enrichment pass is skipped entirely. No diagnostics receive suggestion suffixes. FixHint code actions may still be registered for lex/parse diagnostics (e.g., `UnterminatedStringLiteral`, `UnterminatedTypedConstant`) because those actions do not depend on the semantic index — they operate on the raw `Diagnostic.Span` from the lexer.
 
-**Rationale:** Lex errors precede type-checking. The symbol tables that back the suggestion pools (`UserFields`, `UserStates`, `UserEvents`, `Functions.All`) are not available. Attempting enrichment without them is not possible.
+**Rationale:** Lex errors precede type-checking. The symbol tables that back the suggestion pools (`Fields`, `States`, `Events`, `Functions.All`) are empty. Attempting enrichment against empty tables is harmless but produces no suggestions.
 
 ##### 5.4 Diagnostic Has No FixHint and No Suggestion
 
@@ -1121,7 +1118,7 @@ Field 'Approve' is not declared — did you mean 'Approved'?
 
 **Behavior:** The pool is empty; Levenshtein produces no candidates. Treat identically to §5.1 — no suggestion, no rename lightbulb.
 
-**Example:** A brand-new file with only `precept Draft` and one field reference in a rule before any fields are declared. The `UndeclaredField` diagnostic fires but `UserFields` is empty; no suggestion is possible.
+**Example:** A brand-new file with only `precept Draft` and one field reference in a rule before any fields are declared. The `UndeclaredField` diagnostic fires but `Fields` is empty; no suggestion is possible.
 
 ##### 5.6 Suggestion Identical to Failing Name
 
@@ -1155,7 +1152,7 @@ The following are explicitly not part of this spec. They are tracked separately 
 
 **MCP `args` field.** The addition of `args: string[]` to `precept_compile` diagnostic output (Q6) is a separate catalog change with its own implementation path. This spec covers only the language server surfaces.
 
-**`Fix All in File` behavior.** VS Code's built-in "Fix All" applies all `isPreferred` code actions in a file sequentially. No special handling is required from the LS; this falls out of `isPreferred: true` on rename actions. Multi-action ordering and conflict resolution are not specified here.
+**`Fix All in File` behavior.** Out of scope. `isPreferred` affects which quick fix VS Code highlights for a diagnostic; it does not define a `source.fixAll` surface. If Precept later ships file-wide fix-all behavior, it needs its own `source.fixAll` design.
 
 ---
 
@@ -1331,7 +1328,7 @@ void Update(Compilation compilation)
 ### Open Questions
 
 > **Documentation strings across catalog entries — pattern settled:**
-> `TokenMeta.HoverDescription` is confirmed (CC#19). `FieldModifierMeta.HoverDescription`, `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, and `OperatorMeta.HoverDescription` already exist. `ActionMeta.Description` is the hover/MCP source for action documentation (confirmed in Wave 3). `ActionMeta.SnippetTemplate` is a deferred catalog addition — not yet added, but follows the settled pattern when needed (catalog-gap #43). LS/MCP alignment for `ActionMeta`: `Description` surfaces in both LS hover and MCP vocabulary; `SyntaxShape` is internal routing only. The design pattern is settled; remaining items are implementation milestones, not design questions.
+> `TokenMeta` uses `Description` (not `HoverDescription`) for token-level docs. `FieldModifierMeta.HoverDescription`, `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, and `OperatorMeta.HoverDescription` already exist. `ActionMeta.Description` / `HoverDescription` are the action-doc sources, and `ActionMeta.SnippetTemplate` already exists for insertion text. LS/MCP alignment for `ActionMeta`: documentation comes from catalog metadata; `SyntaxShape` is internal routing only. The design pattern is settled; remaining items are implementation milestones, not design questions.
 
 > **Workspace/symbol (`workspace/symbol`):** Deferred. Precepts are single-file by design. Revisit only if the language surface expands to multi-file.
 
@@ -1353,8 +1350,8 @@ void Update(Compilation compilation)
 | **No separate compiler process** | In-process compilation is the right model at DSL scale. No benefit from process isolation. |
 | **No incremental compilation** | Full recompile is fast enough (<5ms). Incremental adds invalidation complexity with no user-visible benefit. |
 | **No workspace-wide operations** | Precepts are single-file. No cross-file references, no workspace symbol search. |
-| **No code actions / quick fixes** | Diagnostics are informational. Quick fixes would require understanding fixes, which is compiler domain. |
-| **No formatting** | Precept files are short. Users format manually. Defer until demand emerges. |
+| **No formatter / formatting-on-type** | Formatting remains out of scope. Quick fixes and code actions are covered by §7.10. |
+| **No rename refactoring (yet)** | `textDocument/rename` is deferred until the core navigation/reference surfaces ship. |
 | **No signature help** | Event args are simple. Signature help adds complexity for marginal benefit. |
 | **No inlay hints** | Type inference is explicit. No hidden types to reveal. |
 

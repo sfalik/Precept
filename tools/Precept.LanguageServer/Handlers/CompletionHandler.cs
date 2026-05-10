@@ -22,7 +22,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         new()
         {
             DocumentSelector = TextDocumentSelector.ForPattern("**/*.precept"),
-            TriggerCharacters = new Container<string>(":"),
+            TriggerCharacters = new Container<string>(" ", "'", ".", ">", "~"),
             ResolveProvider = false,
         };
 

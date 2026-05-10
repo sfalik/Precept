@@ -167,6 +167,25 @@ public sealed class SemanticTokensHandlerTests
                 token.Length == argReference.Site.Length &&
                 token.TokenType == "parameter");
     }
+
+    [Fact]
+    public void LexicalTokens_SetInTypePosition_EmitsTypeToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Tags as set of string
+            state Draft initial
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+
+        tokens.Should().Contain(token => token.Kind == TokenKind.Set && token.TokenType == "type",
+            because: "set in a type-expression slot must emit the type semantic token");
+        tokens.Should().NotContain(token => token.Kind == TokenKind.Set && token.TokenType == "keyword",
+            because: "set in type position must not be classified as an action keyword");
+    }
 }
 
 internal static class OmniSharpCompatibilityExtensions

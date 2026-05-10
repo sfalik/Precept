@@ -88,6 +88,54 @@ internal static class SlotContextResolver
         return SlotContext.TopLevel;
     }
 
+    /// <summary>
+    /// Returns true when a <see cref="Precept.Language.TokenKind.Set"/> token occupies a
+    /// <see cref="Precept.Language.ConstructSlotKind.TypeExpression"/> slot, meaning it is the
+    /// type keyword (set collection) rather than the action keyword.
+    /// Determined by checking whether the previous non-structural token is <c>as</c> or <c>of</c>,
+    /// the two prepositions that introduce type-expression positions in the grammar.
+    /// </summary>
+    internal static bool IsSetInTypePosition(Compilation compilation, Precept.Language.Token token)
+    {
+        if (token.Kind != Precept.Language.TokenKind.Set)
+        {
+            return false;
+        }
+
+        var tokens = compilation.Tokens.Tokens;
+
+        // Find index of this token by source position (line/column are always populated by the lexer)
+        var setIndex = -1;
+        for (var i = 0; i < tokens.Length; i++)
+        {
+            if (tokens[i].Span.StartLine == token.Span.StartLine && tokens[i].Span.StartColumn == token.Span.StartColumn)
+            {
+                setIndex = i;
+                break;
+            }
+        }
+
+        if (setIndex <= 0)
+        {
+            return false;
+        }
+
+        // Walk backward to find the preceding non-structural token.
+        // 'set' after 'as' or 'of' is in a ConstructSlotKind.TypeExpression position.
+        for (var i = setIndex - 1; i >= 0; i--)
+        {
+            var prevMeta = Precept.Language.Tokens.GetMeta(tokens[i].Kind);
+            if (prevMeta.Categories.Contains(Precept.Language.TokenCategory.Structural))
+            {
+                continue;
+            }
+
+            return tokens[i].Kind is Precept.Language.TokenKind.As or Precept.Language.TokenKind.Of;
+        }
+
+        return false;
+    }
+
     internal static Precept.Pipeline.ParsedConstruct? GetEnclosingConstruct(Compilation compilation, Position position)
     {
         var tokens = compilation.Tokens.Tokens;

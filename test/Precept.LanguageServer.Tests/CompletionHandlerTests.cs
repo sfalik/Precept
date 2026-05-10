@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Precept.LanguageServer.Handlers;
@@ -14,6 +15,15 @@ namespace Precept.LanguageServer.Tests;
 
 public class CompletionHandlerTests
 {
+    [Fact]
+    public void GetRegistrationOptions_AdvertisesSpaceQuoteDotArrowAndTildeTriggers()
+    {
+        var handler = new CompletionHandler(new DocumentStore());
+        var options = handler.GetRegistrationOptions(new CompletionCapability(), new ClientCapabilities());
+
+        options.TriggerCharacters.Should().BeEquivalentTo([" ", "'", ".", ">", "~"]);
+    }
+
     [Fact]
     public async Task Completions_TopLevel_IncludesConstructKeywords()
     {

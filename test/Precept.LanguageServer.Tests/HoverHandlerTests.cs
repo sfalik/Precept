@@ -137,4 +137,26 @@ from Draft on Approve -> transition Approved
 
         hover.Should().BeNull();
     }
+
+    [Fact]
+    public void Hover_OnSetInTypePosition_UsesTypeHover()
+    {
+        var source = """
+            precept LoanApplication
+            field Tags as set of string
+            state Draft initial
+            """;
+
+        var compilation = Precept.Compiler.Compile(source);
+        var setToken = compilation.Tokens.Tokens.Single(t => t.Kind == Precept.Language.TokenKind.Set);
+
+        var hover = HoverHandler.CreateHover(compilation, new Position(setToken.Span.StartLine - 1, setToken.Span.StartColumn - 1));
+
+        hover.Should().NotBeNull();
+        hover!.Contents.HasMarkupContent.Should().BeTrue();
+        var markup = hover.Contents.MarkupContent!;
+        markup.Value.Should().Contain("set");
+        markup.Value.Should().Contain("unordered collection", because: "set in type position should show type description");
+        markup.Value.Should().NotContain("Field assignment", because: "action description must not appear in type hover");
+    }
 }

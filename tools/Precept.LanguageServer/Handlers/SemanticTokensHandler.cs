@@ -88,12 +88,19 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 continue;
             }
 
+            // Contextual reclassification: 'set' emits "type" in type-expression position.
+            // SetType.SemanticTokenType is intentionally null (parser-synthesized; never in the lexer stream),
+            // so we use the literal "type" rather than delegating to the catalog entry.
+            var effectiveTokenType = token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token)
+                ? "type"
+                : meta.SemanticTokenType;
+
             projected.Add(new LexicalSemanticToken(
                 token.Kind,
                 token.Span.StartLine - 1,
                 token.Span.StartColumn - 1,
                 token.Span.Length,
-                meta.SemanticTokenType));
+                effectiveTokenType));
         }
 
         return projected.ToImmutable();

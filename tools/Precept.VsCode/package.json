@@ -196,6 +196,39 @@
             "foreground": "#9096A6",
             "italic": true
           },
+          "keyword:precept": {
+            "foreground": "#4338CA"
+          },
+          "type:precept": {
+            "foreground": "#9AA8B5"
+          },
+          "modifier:precept": {
+            "foreground": "#4338CA"
+          },
+          "decorator:precept": {
+            "foreground": "#6366F1"
+          },
+          "number:precept": {
+            "foreground": "#84929F"
+          },
+          "string:precept": {
+            "foreground": "#84929F"
+          },
+          "variable:precept": {
+            "foreground": "#A5B4FC"
+          },
+          "property:precept": {
+            "foreground": "#A5B4FC"
+          },
+          "enum:precept": {
+            "foreground": "#A898F5"
+          },
+          "function:precept": {
+            "foreground": "#30B8E8"
+          },
+          "parameter:precept": {
+            "foreground": "#9AD8E8"
+          },
           "operator:precept": {
             "foreground": "#6366F1"
           },
