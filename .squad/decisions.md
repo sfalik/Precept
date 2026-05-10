@@ -24,6 +24,20 @@
 
 ---
 
+### 2026-05-10T12:25:21Z: Keep both VS Code activation paths for the Precept extension
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's inbox note.
+
+**Merged source:** `kramer-status-bar.md`.
+
+- Keep both VS Code activation paths for the Precept extension: `workspaceContains:**/*.precept` and `onLanguage:precept`.
+- The status bar item and language server are created during extension activation, so repo-style workspaces alone are not enough; single-file and no-workspace sessions also need activation coverage.
+- `onLanguage:precept` restores the expected editor tooling surface without changing any catalog-driven language behavior.
+
+---
+
 ### 2026-05-10T12:15:36Z: Track 1 autonomous execution proceeds without per-slice approval pauses
 
 **By:** Scribe
@@ -35,20 +49,6 @@
 - Shane's directive is now durable team memory: Track 1 should run to completion without pausing for approval between slices.
 - Frank's runbook locks the remaining execution order: Wave A can launch Slices 15, 18, 19, 20, 22, 23, 25, 26, and 27 immediately; Slice 17 waits on 14, Slice 21 waits on 20, Slice 24 waits on 23, and terminal Slices 28 then 29 remain strictly serial.
 - Shared-infrastructure work (`20`, `23`, `26`) is the correct Wave A priority because those slices unblock later protocol work without reopening design questions.
-
----
-
-### 2026-05-10T12:15:36Z: Slice 14 completion routing uses semantic receiver spans and separator-adjacent cursor ownership
-
-**By:** Scribe
-
-**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
-
-**Merged sources:** `kramer-slice-14.md`, `soup-nazi-slice-14.md`.
-
-- Expression completions recover member-access receiver types from semantic expression spans plus token adjacency around `.` instead of LS-local accessor lists.
-- Event-argument completions resolve current event scope from semantic construct matches (`TypedEvent`, `TypedTransitionRow`, `TypedEventHandler`, event-anchored `TypedEnsure`) so incomplete code still gets the real arg surface.
-- Cursor positions parked at the start of the next token belong to the preceding separator for member-access and arg-default routing, or the user-visible surface falls back to generic/top-level completions.
 
 ---
 
@@ -91,104 +91,6 @@
 - The visible gold drift came from the extension's TextMate fallback/theme rule, not from `KeywordGrammar` metadata or the language-server semantic-token surface.
 - `as` must remain on `keyword.declaration.precept`, and field-declaration `default` needs an explicit declaration-site override before the generic `#grammarKeywords` fallback.
 - The honest regression layer is grammar/package coverage: verify the generated TextMate ordering and fallback colors instead of changing catalog truth that was already correct.
-
----
-
-### 2026-05-10T12:15:36Z: Slice 20 navigation acceptance locks full semantic-site spans and capability registration
-
-**By:** Scribe
-
-**Status:** Merged from Soup Nazi's inbox note.
-
-**Merged source:** `soup-nazi-slice-20.md`.
-
-- Slice 20 coverage is already staged in `ReferencesHandlerTests.cs` and `DocumentHighlightHandlerTests.cs`; the production handler work is not done until both handlers satisfy those tests from a populated `DocumentStore`.
-- Event-argument navigation must round-trip the full semantic site recorded in `ArgReference.Site` for qualified references like `JoinWaitlist.PartyName`, not only the trailing arg identifier.
-- References/document-highlight registration is part of the acceptance contract: if the handlers exist but the server capability surface omits them, the slice is still incomplete.
-
----
-
-### 2026-05-10T12:15:36Z: Slice 23 state document-symbol selection stays on semantic `NameSpan` until the pipeline contract changes
-
-**By:** Scribe
-
-**Status:** Merged from Soup Nazi's inbox note.
-
-**Merged source:** `soup-nazi-slice-23.md`.
-
-- The approved Slice 23 source-of-truth split is explicit: precept headers use `IdentifierListSlot.Span`, while field/state/event selections project semantic `NameSpan`.
-- For states, the current shipped contract is the existing `TypedState.NameSpan`, which still includes trailing state modifiers like `initial`; acceptance tests should lock that semantic output exactly as emitted today.
-- Narrowing state selection to the bare identifier would be a separate pipeline-contract change, not something the language-server slice should silently smuggle in.
-
----
-
-### 2026-05-10T12:15:36Z: Slice 25 selection-range acceptance derives spans from compilation artifacts and preserves request order
-
-**By:** Scribe
-
-**Status:** Merged from Soup Nazi's inbox note.
-
-**Merged source:** `soup-nazi-slice-25.md`.
-
-- Selection-range expectations should come from real compilation artifacts: token span from `Compilation.Tokens`, enclosing parsed-expression span, then slot span and construct span from `ConstructManifest`.
-- The multi-position acceptance case deliberately submits positions out of source order so the handler must preserve request order instead of sorting the results.
-- This keeps Slice 25 red on the actual runtime contract rather than on hand-counted columns or vague chain-length assertions.
-
----
-
-### 2026-05-10T12:15:36Z: Slice 26 version-ordering acceptance stays runtime-red through reflection until the versioned API ships
-
-**By:** Scribe
-
-**Status:** Merged from Soup Nazi's inbox note.
-
-**Merged source:** `soup-nazi-slice-26.md`.
-
-- `DocumentState` version-ordering acceptance tests should fail as runtime contract checks via reflection, not as compile breaks against APIs that do not exist yet.
-- The required contract is still explicit: `DocumentState.TryUpdate(int, Compilation, IReadOnlyDictionary<DiagnosticKey, SuggestionInfo>)` plus `Version`, with stale updates rejected and newer snapshots replacing both compilation and suggestions.
-- Reflection keeps the lane executable today and lets the same tests pivot directly into behavioral assertions the moment the production API lands.
-
----
-
-### 2026-05-10T12:15:36Z: Grammar-keyword gold drift is a VS Code fallback color bug, not a semantic-token metadata bug
-
-**By:** Scribe
-
-**Status:** Merged from Kramer's inbox note.
-
-**Merged source:** `kramer-modifier-coloring.md`.
-
-- The visible gold drift comes from `tools/Precept.VsCode/package.json`, where the fallback TextMate rule for `keyword.other.grammar.precept` painted grammar keywords gold before semantic tokens applied or when they were unavailable.
-- Catalog metadata and language-server semantic tokens stay correct: `as` and `default` still classify as `KeywordGrammar`, while message strings remain on `string.quoted.double.message.precept` with the gold color.
-- The durable fix belongs at the VS Code fallback-color layer, not in token catalogs or semantic-token classification logic.
-
----
-
-### 2026-05-10T12:15:36Z: Boolean modifier completions must stay catalog-filtered by declaration type
-
-**By:** Scribe
-
-**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
-
-**Merged sources:** `kramer-boolean-completions.md`, `soup-nazi-boolean-completions.md`.
-
-- Modifier completions should filter `ValueModifierMeta` by both `ApplicableTo` and `ApplicableDeclarationSites` using the resolved declaration type instead of offering the full field modifier catalog.
-- For boolean fields, the currently legal follow-on surface is `default`, `optional`, and `writable`, and that suggestion set should be derived from catalog metadata rather than frozen in LS-only lists.
-- Regression tests should name the current boolean-field surface while also deriving the expected set from catalog metadata so the suite fails on any future drift between the catalog and completion behavior.
-
----
-
-### 2026-05-10T12:13:17Z: Declaration-head completion after a value name must suggest `as`
-
-**By:** Scribe
-
-**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
-
-**Merged sources:** `kramer-field-name-completion.md`, `soup-nazi-field-name-completion.md`.
-
-- When the cursor sits after a field name or event-argument name and before the missing `as` token, the language server should infer declaration-head context from neighboring significant tokens plus `Constructs.LeadingTokens` and offer `as`.
-- The durable bug cause is parser recovery plus trivia absorption: `ParsedConstruct.Span` can collapse to the leading keyword while identifier-slot spans stretch through trailing space, so span-only routing falls back to top-level construct keywords.
-- The regression anchor belongs at the `CompletionHandler` surface with the real trailing-space trigger and an exact `["as"]` expectation so the user-visible bug cannot regress behind weaker context-only assertions.
 
 ---
 

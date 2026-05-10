@@ -2,90 +2,77 @@
 
 - Owns test discipline across parser, type checker, runtime, MCP, language server, and analyzer validation.
 - Treats behavioral claims as unproven until executable evidence exists and records gaps as actionable findings.
-- Pushes for full-surface coverage matrices, honest red tests when behavior is missing, and regression anchors that match the real AST/runtime shape.
+- Pushes for full-surface coverage matrices, honest red/green pressure, and regression anchors that match the real AST/runtime shape.
 
 ## Learnings
 
-- 2026-05-09T23:49:11.879-04:00 — Track 2 Phase A wants red/green pressure on metadata shape before the consumer slices exist: reflection-based catalog-capability tests let the suite compile before new fields land, then go red until George wires the catalog entries. Also: most slice-level compiler integrations in the master plan are consumer-slice gates, not Phase A-only gates, so they should be recorded as follow-on coverage rather than guessed into false-green tests.
-
-- 2026-05-09T09:02:31.415-04:00 — Filled the 12 requested ProofEngine gaps, raising the filtered `ProofEngineTests` run to 173 passing: added the Strategy 4 positive proof path, real pipeline emission for codes 112/113/114/116, transition-row and state-hook presence proof coverage, real `.count > 0` guard coverage for collection member access, a TypedPostfixOp `is set` regression anchor, the same-type `number / number` RHS-resolution anchor, vacuous-proof diagnostic absence, and a multi-obligation same-site assertion. Two surprise findings: the audit's `count(collection)` branch does not exist in current source because the catalog models count as `.count` member access, and shared-parameter qualifier requirements on same-type binary ops collapse both subjects to the RHS under `ResolveParamInBinaryOp`, so the end-to-end Code 114 test had to use a distinct-parameter binary site to reach the real unresolved path.
-- 2026-05-09 ProofEngine exhaustive audit: the 158-test suite has zero positive proof-success tests for Strategy 4 (FlowNarrowing). Every Strategy 4 test asserts the strategy cannot fire. The implementation exists but is untested for the success path.
-- Strategy 5 (QualifierCompatibility) tests are entirely metadata-level record equality checks — no test exercises `QualifierCompatibilityProofRequirement` through the full `ProofEngine.Prove(index, graph)` pipeline with actual DSL source.
-- Diagnostic codes 112 (UnprovedModifierRequirement), 113 (UnprovedDimensionRequirement), and 114 (UnprovedQualifierCompatibility) are verified only by enum value assertions — no test causes those diagnostics to actually fire.
-- `PresenceProofRequirement` end-to-end path (from DSL source through strategy dispatch to diagnostic) is never exercised; all presence tests are metadata-shape assertions on `DeclaredPresenceMeta`.
-- The `count(collection) > 0` and `collection.count > 0` guard patterns in `ExtractGuardConstraintsCore` are implemented but entirely untested; `Strategy3_CountGuard_DischargesCollectionNonEmpty` actually tests plain `D > 0`, not a collection count guard.
-- The "field is set" `TypedPostfixOp` guard pattern in `ExtractGuardConstraintsCore` is implemented but no test exercises it with an actual `is set` guard expression.
-- StateHookContext + guard (Strategy 3) code path is implemented but untested — only TransitionRowContext guards are tested for Strategy 3.
-- The RHS-before-LHS fix in `ResolveParamInBinaryOp` has no same-type regression anchor; all division tests use `integer / number` to avoid the ambiguity. A `number / number` test would be the correct anchor.
-- Forwarding facts tests verify `obligation.Disposition == Proved` but do not assert `ledger.Diagnostics` is empty for those vacuously proved obligations.
-- 2026-05-09T10:34:23.923-04:00 — For xUnit 2.9.3 under the current VSTest adapter, discovery-time skip via a custom `FactAttribute` setting `Skip` is reliable for optional developer-downloaded files; runtime `SkipException` surfaced as a failed test. Resolve the repo root from `AppContext.BaseDirectory`, and keep the download target (`src/Precept/Data/`) gitignored so CI only validates parity after a local refresh has produced the XML.
-
+- Real static catalogs are the executable language contract; prefer tiny synthetic fixtures around them over mocked metadata.
 - Sample-file integration tests catch parser and language-surface gaps that isolated unit tests miss.
-- Hardcoded enum/count assertions are acceptable only when they are intentionally updated alongside catalog growth.
-- Expression diagnostics often need a full parser host (rule/transition row), not the bare expression helper.
+- Expression diagnostics often need a full parser host (rule/transition row), not a bare expression helper.
 - DSL keywords are common identifier traps in tests; use non-keyword names unless the test is explicitly about keyword handling.
-- Analyzer suites need partition/exclusion assertions, diagnostic severities, and direct edge/topology checks — not just happy-path end-to-end outcomes.
-- `reject` / `no transition` rows can matter structurally as self-edges even when they do not change state.
-- 2026-05-08T23:45:00.367-04:00 — ProofEngine test authoring exposed three easy-to-miss proof-surface traps: operand-metadata identity can change subject resolution (`integer / number` behaves differently from `number / number`), missing boolean catalog entries can turn `and` / `or` guard tests red for type-check reasons instead of proof reasons, and forwarding-fact suppression only holds if later discharge passes preserve already-proved obligations.
+- Analyzer suites need partition/exclusion assertions, diagnostic severities, and direct topology checks — not just happy-path outcomes.
+- ProofEngine coverage needs end-to-end strategy exercise, not enum/count assertions alone.
+- Optional developer-downloaded artifacts should use discovery-time skips, not runtime exceptions.
+- Slot-context routing for action chains cannot rely on parsed spans alone; `by`/`at` tail separators may need explicit token-aware coverage.
+- Language-server completion regressions that depend on trigger characters should use the real trigger in the test request; otherwise the suite can miss the user-visible fallback surface.
+- TextMate grammar regressions are honest when they assert the generated `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json` capture order directly; declaration overrides must appear before generic `#grammarKeywords` fallback or gold scope silently swallows field syntax like `default`.
 
-- 2026-05-09T17:01:02.062-04:00 — Q8 UCUM drift coverage is now anchored on the embedded `ucum-essence.xml` source of truth plus the curated Tier 1 contract: new tests lock XML-backed universe coverage, SI base/vector invariants, dimensionless `rad`/`each`, Tier 1's exact 150-code curation and exclusions, shim forwarding, and parse-synthesized Tier 1 vectors (`m2`, `km2`, `m/s`, `km/h`, `kW.h`). Important finding: the requested `All >= 500` floor was a false-positive threshold for the current implementation because the shipped UCUM essence snapshot exposes roughly 300 distinct atom codes, so drift coverage must anchor to the embedded XML universe rather than an aspirational atom-count narrative.
-- 2026-05-09T23:11:32.953-04:00 — Test-strategy gap audit across `test/` showed the biggest remaining weakness is boundary choice, not raw test count: catalog suites mostly assert structure, parser/type-checker suites mostly assert hand-picked DSL scenarios, and MCP coverage is thin on definition/docs contracts. Recommendation recorded in `.squad/decisions/inbox/soup-nazi-test-strategy.md`: do not mock the static catalogs; use the real catalogs with synthetic AST/semantic fixtures, starting with an MCP definition-surface matrix plus parser/type-checker catalog-consumer tests for routing, keyword collisions, and hook branches.
+## Historical Summary
+
+- 2026-05-01 through 2026-05-08 test work established the durable posture: convert review findings `into` shipped tests, keep sample-file gates live, and use real-catalog fixtures for parser/type-checker/analyzer coverage.
+- 2026-05-09 locked the ProofEngine Phase 2 matrix, the LanguageTool coverage closeout, and the LS slice-audit pattern where missing behavioral coverage becomes concrete regression anchors instead of advisory notes.
+- The canonical decision ledger in `.squad/decisions.md` carries the batch-level detail; this history now keeps only the active testing baseline and most recent durable updates.
 
 ## Recent Updates
+
+### 2026-05-10T12:15:36Z — Grammar keyword regression coverage closed
+- Locked `as` and field-level `default` against the shipped TextMate grammar surface so fallback highlighting cannot silently repaint those grammar keywords gold.
+- Added honest regression coverage in the language-server/TextMate grammar test layer, updated the grammar-generator override, regenerated `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json`, and kept the shipped grammar as the asserted surface.
+- Validation closed fully green at 4325/4325 tests for the reported batch.
+
+
+### 2026-05-10T12:15:36Z — Boolean field modifier regression closed
+- Tightened `CompletionHandlerTests.cs` so the boolean-field modifier surface is derived from modifier metadata, asserted as exactly `default`, `optional`, and `writable`, and guarded against numeric leaks such as `max` and `maxplaces`.
+- Synced `docs\tooling\language-server.md`; targeted regression coverage and the full language-server test project both stayed green.
+
+### 2026-05-10T05:50:00Z — Slice 25 selection-range acceptance staged
+- Added `SelectionRangeHandlerTests.cs` with the two approved Slice 25 acceptance cases. The tests compile a real guard-clause fixture and derive the expected expansion chain from actual compilation artifacts: token span, enclosing guard expression span, guard-slot span, and construct span.
+- Locked the multi-position contract by requesting the literal before the identifier even though it appears later in the source, so any handler that sorts results instead of preserving request order will fail.
+- Validation: `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore --filter "FullyQualifiedName~SelectionRangeHandlerTests"` is intentionally red at 2/2 failures because `Precept.LanguageServer.Handlers.SelectionRangeHandler` does not exist yet.
+
+### 2026-05-10T05:16:00Z — Slice 26 version-ordering acceptance staged
+- Added `DocumentStateVersioningTests.cs` as compile-safe red coverage for the approved Slice 26 API contract: the tests reflect for `DocumentState.TryUpdate(int, Compilation, IReadOnlyDictionary<DiagnosticKey, SuggestionInfo>)` and `Version`, then assert older versions are rejected while newer versions replace both compilation and suggestions.
+- Added `DidChange_OutOfOrderVersions_PublishesNewestDiagnosticsOnly` to `DiagnosticPublishIntegrationTests.cs`, locking the protocol contract that a stale `didChange` version must not emit a second diagnostics publish after a newer invalid version already won.
+- Validation: targeted Slice 26 run is intentionally red at 3/7 failures — two reds for the missing `TryUpdate`/`Version` API surface and one red because `TextDocumentSyncHandler` still accepts and publishes the stale version-2 change.
+
+### 2026-05-10T04:36:29Z — Slice 13 slot-context acceptance closed
+- Expanded `SlotContextResolverTests.cs` to the full approved 13-case matrix: action-chain arrow/verb/``into``, `=`/`by`/`at`, guard/compute/ensure/rule expressions, event-arg `default`, field-modifier `default`, and inner collection type after `of`.
+- Locked the production seam: `enqueue ... by ...` still leaves `ActionChainSlot.Span` truncated before `by`, so LS slot-context routing must treat post-span `by`/`at` tokens as action-chain expression positions.
+- Validation stayed green at both levels: filtered slot-context coverage passed 13/13 and `test\Precept.LanguageServer.Tests` passed 88/88.
 
 ### 2026-05-10T03:13:51Z — Toolchain bug test-strategy verdict merged
 - The 52-bug gap audit is now a durable team decision: keep the real static catalogs as the executable language contract and build small synthetic stage fixtures around them instead of mocking metadata.
 - Priority coverage layers are now explicit — MCP definition-surface matrices, parser routing/disambiguation tests from `Constructs.Entries`, keyword-collision/accessor tests from real catalog names, TypeChecker catalog-consumer tests, and hook-specific pipeline tests.
-- Kramer also added a Track 2 status table to `docs/Working/precept-toolchain-bugs.md`, so the bug register now has an execution surface for the follow-up fixes this strategy is meant to guard.
 
 ### 2026-05-09T14:14:17Z — LanguageTool coverage review closed
-- Reviewed Newman's `precept_language` batch against `docs/tooling/mcp.md` and found 7 concrete test gaps in `LanguageToolTests.cs`.
-- The batch was blocked until remediation landed; after expanding the suite from 12 to 19 tests, `test/Precept.Mcp.Tests` passed clean at 19/19 and the review was recorded as remediated.
-- The remaining `dotnet test --no-build -q -m:1 /nr:false` failures stayed isolated to 194 pre-existing language-server stub failures and did not implicate `LanguageTool`.
-
-### 2026-05-09T14:04:05Z — LanguageTool coverage review opened
-- Started reviewing `LanguageToolTests.cs` against `McpServerDesign.md` after Newman's `precept_language` implementation landed.
-- This batch closed with the review still in flight, so no new durable pass/fail verdict is recorded yet.
-
+- Reviewed `LanguageToolTests.cs` against `McpServerDesign.md`, converted the gap list `into` shipped tests, and closed the batch green at 19/19 for `test/Precept.Mcp.Tests`.
+- Remaining `dotnet test --no-build -q -m:1 /nr:false` failures stayed isolated to the pre-existing language-server baseline and did not implicate `LanguageTool`.
 
 ### 2026-05-09T04:35:00Z — ProofEngine Phase 2 suite validated
-- Soup-Nazi's 158-test `ProofEngineTests.cs` matrix for S1-S13 is now fully green after George's follow-up fixes.
-- The recorded red cases successfully flushed out forwarding-fact suppression drift and the Strategy 2 null-guard bug before branch closeout.
+- The 158-test `ProofEngineTests.cs` matrix for S1-S13 stayed fully green after George's follow-up fixes.
+- The recorded red cases flushed out forwarding-fact suppression drift and the Strategy 2 null-guard bug before branch closeout.
 
-### 2026-05-08T00:56:00Z — A-series regression batch recorded
-- Added four A-series GraphAnalyzer regression tests (`RS-109`, `RS-110`, `RS-111`, and `DEDUP-NoInitialState`) in commit `c0ca3ae`.
-- The batch raised the recorded branch baseline to 3389 total tests and is durably logged even though no decision-inbox note was present for merge.
+### 2026-05-10T00:55:06.1578637-04:00 — Slice 14 completion coverage closed
+- Added five Slice 14 acceptance tests in `CompletionHandlerTests.cs`: action verbs from `Actions.All`, action-chain field-targets after both direct verbs and `into`, expression completions for fields/event args/functions/boolean literals, `TypeMeta.Accessors` member access, and argument-default parity with expression completions.
+- Coverage finding: completion routing at token boundaries must treat a cursor parked at the start of the next token as belonging to the preceding separator (`.` / `default`), or member-access and arg-default requests collapse to the wrong completion surface. The boundary fix is now locked by the new member-access + arg-default tests.
+- Validation: `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore` -> 94/94 green.
 
-### 2026-05-08T04:26:28Z — GraphAnalyzer R4 test surface closed across both Soup batches
-- Commit `7c674bd` added the required GraphAnalyzer R4 coverage for wildcard expansion/suppression, missing-initial recovery, stateless precepts, terminal/back-edge structural violations, positive terminal completeness, and single-state / cycle / diamond / multi-dead-end topologies.
-- The strengthened suite also pinned dead-end exclusion, reachability partitioning, warning severities, and the previously under-specified dominance/proof-forwarding boundary where applicable.
-- A late-arriving Round 2 inbox note then closed TQ1, EC5, EC6, and Gap 8 with isolated zero-handler / partial-coverage assertions plus explicit `reject` / `no transition` self-edge tests, bringing `GraphAnalyzerTests.cs` to 20 facts and the branch baseline to 3385 passing tests.
+### 2026-05-10T05:05:00Z — Slice 20 navigation coverage staged
+- Landed red Slice 20 acceptance tests in `ReferencesHandlerTests.cs` and `DocumentHighlightHandlerTests.cs`, plus `SymbolNavigationHandlerTestHelpers.cs` so the suite already asserts declaration + all-site coverage for fields, states, events, and arguments as soon as Kramer lands the handlers.
+- Locked the event-argument edge: qualified arg references must round-trip through the full `Event.Arg` semantic site span, not just the trailing arg identifier, because both references and highlights query that wider site in the new tests.
+- Validation: baseline full suite was green at 4265/4265; after staging Slice 20 coverage, `dotnet test` is intentionally red only on the six new Slice 20 tests (4271 total, 4265 green, 6 red pending handler implementation).
 
-### 2026-05-08T03:08:18Z — R3 G1-G4 test pass closed
-- Added the G1 determinism, G3 non-null `TypedInputAction.SecondaryRole`, and G4 non-optional event-arg `is set` regression anchors; all pass.
-- G2 is durably recorded as dead code at the TypeChecker level until qualifier-aware candidate disambiguation exists. Commit: `fcc9760`.
-
-### 2026-05-07T23:58:00Z — GraphAnalyzer R4 review opened
-- Reviewed George's 5-test `GraphAnalyzerTests.cs` against the ~600-line analyzer and the spec.
-- Found eight zero-coverage behavioral areas plus five test-quality gaps; that review directly drove the R4 test matrix George and Soup later closed.
-
-## Historical Summary
-
-- 2026-05-07 parser/testing work locked broad parser coverage discipline: sample integration, AST-shape assertions, diagnostic-identity anchors, and the rule that green parser runs can still be checker-hostile when payloads are under-tested.
-- 2026-05-03 through 2026-05-07, Soup-Nazi authored the canonical TypeChecker strategy review, ensure/because-clause coverage, NameBinder regression anchors, outcomes coverage, and the parser gap sweep that filled type-ref, action-chain, wildcard, interpolation, event-arg, and negative-expression holes.
-- 2026-05-01 review work established the pattern that full reviews must convert missing coverage into shipped tests, not advisory notes; that batch also locked the sample-file gate and multi-source analyzer harness expectations.
-
-### 2026-05-09T21:01:02.5602711-04:00 — LS slice audit gap fill (Slices 0–2, 4, 5, 9)
-- Added 14 tests across `DiagnosticProjectorTests`, `SemanticTokensHandlerTests`, `CompletionHandlerTests`, `HoverHandlerTests`, `FoldingRangeHandlerTests`, and `DiagnosticPublishIntegrationTests`.
-- Slice 0 verdict: gaps found. Added coverage for `DocumentStore.Remove`, concurrent `DocumentState.Update`, and `DidClose` publishing empty diagnostics for the closed URI.
-- Slice 1 verdict: gaps found. Added explicit `Severity.Info` -> LSP Information projection, mixed error+warning batch projection, multi-line `ToRange` zero-basing, and reinforced `Source == "precept"` across a mixed batch.
-- Slice 2 verdict: gaps found. Added legend coverage for all distinct non-null lexical semantic token types and same-line multi-keyword character-position coverage.
-- Slice 4 verdict: gaps found. Added field-target (`modify` / `omit`) and event-target (`on` / `when`) completion coverage. Existing top-level empty-source and no-document coverage was already present.
-- Slice 5 verdict: critical gap. Added whitespace, newline, end-of-source, and event-argument declaration hover coverage. While probing the requested declared-state/event hover path, I hit a real production bug in `HoverHandler.TryFindUniqueByName`: when the hovered identifier belongs to another symbol kind, `TryFindField`/`TryFindState`/`TryFindEvent` can return `true` with a null primary symbol, leading to `CreateFieldMarkdown(null)` and a `NullReferenceException`. I did **not** fix production; Kramer needs that dispatch before a positive declared-state hover assertion can ship.
-- Slice 9 verdict: gaps found. Added exact one-range-per-construct coverage for multiple multi-line construct spans with explicit 0-based line assertions.
-- Final counts: scoped LS validation excluding concurrent in-flight Slice 8 `CodeActionHandlerTests` passed at 56/56; `Precept.Tests` passed at 3740/3740. The exact unfiltered LS project run is currently contaminated by concurrent Slice 8 work (3 `CodeActionHandlerTests` failures outside this batch).
-
-### 2026-05-10T04:33:18Z — Phase A test gate is canonical, but Track 2 execution is paused
-- The canonical decision ledger now records your Phase A posture: catalog-capability tests close metadata slices first, while consumer/integration tests become mandatory in the later slices that actually wire behavior.
-- Outcome serialization is still the cross-surface proof point that must close end to end when the Track 2 MCP slice runs.
-- Do not spin new Track 2 validation work until Shane reopens that lane; Track 1 is the only active execution focus for now.
+### 2026-05-10T05:18:00Z — Slice 23 document-symbol acceptance staged
+- Added the four approved `DocumentSymbolHandlerTests` acceptance cases for field/state/event/precept selection ranges, all asserting the identifier-facing selection span instead of the handler's current construct-keyword span.
+- Important seam: for states, the approved Slice 23 contract is the current semantic `TypedState.NameSpan`, which today still includes trailing state modifiers (`initial`, etc.); the test locks that exact runtime contract rather than inventing a narrower token-only span.
+- Validation: targeted `DocumentSymbolHandlerTests` now run 8 total with 4 legacy greens and 4 intentional reds; full `test\Precept.LanguageServer.Tests` is red only on those four new Slice 23 tests (104 total, 100 green, 4 red pending handler work).

@@ -21,9 +21,18 @@
 
 ## Recent Updates
 
+### 2026-05-10T12:25:21Z — Status-bar activation contract recorded
+- Kept both shipped VS Code activation paths, `workspaceContains:**/*.precept` and `onLanguage:precept`, so the status bar and language server still activate in single-file and no-workspace sessions.
+- Durable tooling rule: activation coverage is part of the user-visible tooling surface; repo-workspace activation alone is too narrow for Precept authoring.
+
+
 ### 2026-05-10T12:15:36Z — Grammar keyword fallback color fix recorded
 - Kramer closed the `as`/`default` gold drift by fixing the VS Code fallback TextMate color rule in `tools\Precept.VsCode\package.json` instead of changing language-server semantic token classification.
 - Validation stayed green: `SemanticTokensHandlerTests` passed 150/150, and `npm run compile` succeeded in `tools\Precept.VsCode`.
+
+### 2026-05-10T12:25:21Z — Extension activation keeps status-bar support in single-file sessions
+- The VS Code extension must retain both `workspaceContains:**/*.precept` and `onLanguage:precept` activation events so the status bar item and language server still appear in no-workspace or single-file authoring sessions.
+- This is a tooling-activation durability rule, not a catalog or language-surface change.
 
 ### 2026-05-10T12:15:36Z — Boolean field modifier completion filtering landed
 - `CompletionHandler` now filters field modifiers through modifier metadata and declaration-site legality, so boolean fields offer only `default`, `optional`, and `writable` instead of leaking numeric-only items like `max` and `maxplaces`.
