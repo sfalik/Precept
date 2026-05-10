@@ -23,6 +23,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T00:11:05Z — Slice 0a outline metadata committed
+- Commit `d85449ea` extended `ConstructMeta` with `bool IsOutlineNode = false` and `string? OutlineSymbolTag = null`, then marked `PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, and `RuleDeclaration` as outline nodes with `Module`, `Property`, `Enum`, `Function`, and `Boolean` tags in `src/Precept/Language/Constructs.cs`.
+- George added four catalog tests under `test/Precept.Tests/` and validated the branch at 3737 passing tests.
+
 ### 2026-05-09T23:46:43Z — TypedField NameSpan landed for LS prerequisites
 - George added `TypedField.NameSpan` in `src/Precept/Pipeline/SemanticIndex.cs`, populated it from `DeclaredField.NameSpan` in `TypeChecker`, updated runtime tests, and validated at 3733 passing tests.
 - This closes the field-name span blocker raised by the language-server doc reviews; only the preview restore-failure contract remains open.

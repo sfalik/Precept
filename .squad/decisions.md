@@ -12,6 +12,21 @@
 
 ---
 
+### 2026-05-10T00:11:05Z: Slice 0a outline metadata and Slice 0 language-server infrastructure are now the durable baseline
+
+**By:** Scribe
+
+**Status:** Recorded from completed work summaries; both agent inbox files were absent, so no inbox merge was required.
+
+**Merged sources:** none — `.squad/agents/george/inbox.md` and `.squad/agents/kramer/inbox.md` were not present.
+
+- George commit `d85449ea` extended `ConstructMeta` with `bool IsOutlineNode = false` and `string? OutlineSymbolTag = null`, then marked `PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, and `RuleDeclaration` as outline nodes with `Module`, `Property`, `Enum`, `Function`, and `Boolean` tags in `src/Precept/Language/Constructs.cs`.
+- George also added four catalog tests under `test/Precept.Tests/` and validated the branch at 3737 passing tests, closing the planned outline-metadata prerequisite with concrete coverage.
+- Kramer commit `9f6b1fd7` landed the language-server text-sync/diagnostic spine: `DocumentState`, `DocumentStore`, `DiagnosticProjector`, `Handlers/TextDocumentSyncHandler`, `test/Precept.LanguageServer.Tests/LspTestHost.cs`, and `Program.cs` registration for `DocumentStore` plus `TextDocumentSyncHandler`.
+- Durable caveat: `DocumentState` uses a volatile `Compilation` field plus `Interlocked.Exchange`, `DocumentStore` is keyed by `ConcurrentDictionary<DocumentUri, DocumentState>`, the language server builds, and the remaining legacy stub test failures stay expected until Slice 0b deletes the old stub layer.
+
+---
+
 ### 2026-05-09T23:46:43Z: Language-server review batch reconciled docs, landed `TypedField.NameSpan`, and left only the preview restore-failure contract open
 
 **By:** Scribe

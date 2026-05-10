@@ -26,6 +26,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T00:11:05Z — Slice 0 language-server infrastructure committed
+- Commit `9f6b1fd7` added `tools/Precept.LanguageServer/DocumentState.cs`, `DocumentStore.cs`, `DiagnosticProjector.cs`, `Handlers/TextDocumentSyncHandler.cs`, and `test/Precept.LanguageServer.Tests/LspTestHost.cs`, with `DocumentState` using a volatile `Compilation` field plus `Interlocked.Exchange` and `DocumentStore` using `ConcurrentDictionary<DocumentUri, DocumentState>`.
+- `tools/Precept.LanguageServer/Program.cs` now registers `DocumentStore` and `TextDocumentSyncHandler`; the language server builds, and the remaining legacy stub test failures stay expected until Slice 0b deletes the old stub layer.
+
 ### 2026-05-09T23:46:43Z — Tooling-lens LS review reconciled
 - Kramer corrected the objective handler-registration, capability, semantic-token, and extension-wiring mismatches in the LS docs, and confirmed `TypedField.NameSpan` is the right projection-only fix for field declaration spans.
 - The only unresolved tooling decision left from the batch is how `precept/inspect` should surface restore failures (`RestoreInvalidInput` / `RestoreConstraintsFailed`).
