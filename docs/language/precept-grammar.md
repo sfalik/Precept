@@ -16,7 +16,7 @@
 | Doc purpose | Design reference — grammar principles, structure, and invariants |
 | Primary source | `docs/language/catalog-system.md` (constructs, slots, disambiguation) |
 | Related | `docs/compiler/parser.md` · `docs/language/precept-language-spec.md` |
-| Updated | 2026-05-03 |
+| Updated | 2026-05-10 |
 
 ---
 
@@ -30,7 +30,7 @@ Before explaining what the grammar is, it helps to rule out what it deliberately
 |---------|-------------|------------------|
 | **Expression-based** | Code is a tree of expressions; statements are expressions | ✗ Not this. Expressions exist only *inside* slots. A `.precept` file is a list of constructs, not a tree of expressions. |
 | **Indentation-sensitive** | Layout defines scope (Python, YAML, Haskell) | ✗ Not this. Whitespace is cosmetic. Block scope is declared by keywords, not indentation. |
-| **Context-dependent** | A token's meaning depends on surrounding text | ✗ Not this. Every construct opens with a keyword that unambiguously identifies its kind (or a shared-family disambiguation token reached after an optional pre-verb guard). |
+| **Context-dependent** | A token's meaning depends on surrounding text | ✗ Not this. Every construct opens with a keyword that identifies its family. Direct constructs route immediately; shared families resolve at a disambiguation token after the anchor target (and optional pre-verb guard). |
 | **Recursive descent** | Productions nest recursively; grammar is a tree | ✗ Not this. Constructs are flat. Nesting occurs only inside *slot* expressions, not at construct level. |
 | **General-purpose** | Designed for programmers with PL background | ✗ Not this. Designed for domain experts and AI agents who think in business terms. |
 
@@ -209,7 +209,7 @@ These examples are chosen to cover every distinct slot shape and routing pattern
 - an event-scoped action handler (`on ... ->`)
 - the richest routed declaration with guard, action chain, and terminal outcome (`from ... on`)
 
-`OmitDeclaration` is omitted — its slot shape is covered by `AccessMode`. `EventEnsure` is shown explicitly because its `EnsureClause` + `BecauseClause` split mirrors `StateEnsure`. See §4 for construct family routing and disambiguation details.
+`OmitDeclaration` is omitted — its slot shape (`StateTarget` + `FieldTarget`) is a strict subset of `AccessMode`'s shape, and its omit-specific disambiguation token adequately conveys the difference. `EventEnsure` is shown explicitly because its `EnsureClause` + `BecauseClause` split mirrors `StateEnsure`. See §4 for construct family routing and disambiguation details.
 
 ```
 field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
@@ -225,14 +225,14 @@ field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
 
 ```
 field  LineTotal  as  number  nonnegative  <-  TaxableAmount + TaxAmount
-  │       │         ↑    │      ↑              │               │
- [1]     [2]      slot  [3]   slot            [4]             [5]
-                  marker      marker
+  │       │         ↑    │        │          ↑              │
+ [1]     [2]      slot  [3]      [4]      slot             [5]
+                  marker                    marker
 [1] Leading token: `field`
 [2] IdentifierList slot — the field name
 [3] TypeExpression slot — `as` is the slot marker; `number` is the type
-[4] ComputeExpression slot — `<-` is the slot marker; the expression computes the field value
-[5] ModifierList slot — optional trailing modifiers still apply to computed fields
+[4] ModifierList slot (optional) — `nonnegative` is a modifier value in this slot
+[5] ComputeExpression slot — `<-` is the slot marker; the expression to its right computes the field value
 ```
 
 ```
@@ -255,14 +255,15 @@ event  Submit  (Amount as number, Note as string optional)
 ```
 
 ```
-in  Approved  ensure  ApprovedAmount > 0  because  "…"
- │     │        ↑           │               ↑        │
-[1]   [2]   disambig.      [3]             slot     [4]
-            token                          marker
+in  Approved  [when  IsEligible]  ensure  ApprovedAmount > 0  [because  "…"]
+ │     │          ↑        │         ↑           │                 ↑        │
+[1]   [2]       slot      [3]    disambig.      [4]              slot      [5]
+              marker                token                         marker
 [1] Leading token: `in`   ← shared with AccessMode, OmitDeclaration
 [2] StateTarget slot — the anchor state name
-[3] EnsureClause slot — the expression condition (`ensure <expression>`)
-[4] BecauseClause slot — the mandatory explanatory reason
+[3] GuardClause slot (optional) — `when` expression that scopes when this ensure applies
+[4] EnsureClause slot — the expression condition (`ensure <expression>`)
+[5] BecauseClause slot — optional explanatory reason
 ```
 
 ```
@@ -322,13 +323,14 @@ in  Draft  when  DocumentsVerified  modify  ClaimAmount  editable
 ```
 
 ```
-to  Approved  ->  set ApprovedAmount = ClaimAmount
- │     │       ↑                │
-[1]   [2]  disambig.           [3]
-            token
+to  Approved  [when  IsEligible]  ->  set ApprovedAmount = ClaimAmount
+ │     │          ↑        │         ↑                │
+[1]   [2]       slot      [3]    disambig.           [4]
+              marker                token
 [1] Leading token: `to`   ← shared with StateEnsure
 [2] StateTarget slot — the state whose entry hook is being declared
-[3] ActionChain slot — one or more `-> action` steps; `from` uses the same shape for exit hooks
+[3] GuardClause slot (optional) — `when` expression that scopes when the hook fires
+[4] ActionChain slot — one or more `-> action` steps; `from` uses the same shape for exit hooks
 ```
 
 ```
@@ -405,7 +407,7 @@ Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the constru
 #### The `in` family (StateScoped)
 
 ```
-in  [AnchorState]  ensure  Expr  because  "..."                    → StateEnsure
+in  [AnchorState]  [when Guard]  ensure  Expr  [because  "..."]   → StateEnsure
 in  [AnchorState]  [when Guard]  modify  Field  [readonly|editable] → AccessMode
 in  [AnchorState]  omit  Field                                      → OmitDeclaration
 ```
@@ -415,8 +417,8 @@ The second keyword (`ensure`, `modify`, `omit`) is the disambiguation token. `re
 #### The `on` family (EventScoped)
 
 ```
-on  EventName  ensure  Expr  because  "..."        → EventEnsure
-on  EventName  ->  actions                         → EventHandler
+on  EventName  [when Guard]  ensure  Expr  [because  "..."]  → EventEnsure
+on  EventName  ->  actions                                   → EventHandler
 ```
 
 The second keyword (`ensure` vs `->`) is the disambiguation token.
@@ -425,8 +427,8 @@ The second keyword (`ensure` vs `->`) is the disambiguation token.
 
 ```
 from  [AnchorState]  on  EventName  [when Guard]  -> ActionChain -> Outcome  → TransitionRow
-from  [AnchorState]  ensure  Expr  because  "..."                             → StateEnsure
-from  [AnchorState]  ->  actions                                              → StateAction
+from  [AnchorState]  [when Guard]  ensure  Expr  [because  "..."]             → StateEnsure
+from  [AnchorState]  [when Guard]  ->  actions                                → StateAction
 ```
 
 The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` leads `TransitionRow`; `ensure` leads `StateEnsure` (exit constraint); `->` leads `StateAction` (exit hook).
@@ -434,8 +436,8 @@ The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` l
 #### The `to` family (StateScoped)
 
 ```
-to  [AnchorState]  ensure  Expr  because  "..."    → StateEnsure
-to  [AnchorState]  ->  actions                     → StateAction
+to  [AnchorState]  [when Guard]  ensure  Expr  [because  "..."]  → StateEnsure
+to  [AnchorState]  [when Guard]  ->  actions                     → StateAction
 ```
 
 The second keyword (`ensure` vs `->`) is the disambiguation token. `ensure` leads `StateEnsure` (entry constraint); `->` leads `StateAction` (entry hook).
@@ -445,9 +447,9 @@ The second keyword (`ensure` vs `->`) is the disambiguation token. `ensure` lead
 While `field` is a single Direct construct, it has three surface forms distinguished by slot content:
 
 ```
-field  Name  as  Type  [modifiers]           → stored field
-field  Name  as  Type  <-  Expr              → computed field
-field  Name  as  Type  <-  Expr  [modifiers] → computed field with constraints
+field  Name  as  Type                     → stored field
+field  Name  as  Type  [modifiers]        → stored field with constraints/defaults
+field  Name  as  Type  [modifiers]  <- Expr → computed field
 ```
 
 These are all `FieldDeclaration`; the distinction is in slot values, not construct kind. The parser sees one `ConstructMeta`, walks all slots, and the type checker interprets the presence of a `ComputeExpression` slot to classify the field.
@@ -482,7 +484,7 @@ The 17 `ConstructSlotKind` values cover every distinct slot type in the language
 | `StateTarget` | A state name reference | `from Draft`, `to Approved` |
 | `EventTarget` | An event name reference | `on Submit` |
 | `EnsureClause` | Constraint expression | `ensure ApprovedAmount > 0` |
-| `BecauseClause` | Mandatory reason string literal | `because "Approved amount must be positive"` |
+| `BecauseClause` | Reason string literal | `because "Approved amount must be positive"` |
 | `AccessModeKeyword` | Access mode for a field | `editable`, `readonly` |
 | `FieldTarget` | A field name reference | `modify DecisionNote` |
 | `RuleExpression` | The rule's boolean expression | `rule amount > 0` |
@@ -501,7 +503,7 @@ Slot # │ Kind             │ Required │ Notes
 ───────┼──────────────────┼──────────┼────────────────────────────────────────
   [1]  │ (leading token)  │  yes     │ Structural marker, not a slot
   [2]  │ StateTarget      │  yes     │ Source state name (or `any`)
-  [3]  │ (slot marker)    │  yes     │ `on` keyword — slot delimiter
+  [3]  │ (disambiguation token) │  yes     │ `on` keyword — family verb / event slot boundary
   [4]  │ EventTarget      │  yes     │ Event name
   [5]  │ (slot marker)    │  no      │ `when` keyword — slot delimiter
   [6]  │ GuardClause      │  no      │ Guard expression
@@ -560,10 +562,12 @@ The 14 `ExpressionFormKind` values (from the ExpressionForms catalog) cover the 
 |----------|-------|---------|
 | **Atom** | `Literal`, `Identifier`, `Grouped` | `0`, `true`, `"text"`, `CreditScore`, `(a + b)` |
 | **Composite** | `BinaryOperation`, `UnaryOperation`, `MemberAccess`, `Conditional`, `PostfixOperation` | `a + b`, `-x`, `Submit.Amount`, `if x then y else z`, `x is set` |
-| **Invocation** | `FunctionCall`, `MethodCall`, `CIFunctionCall` | `min(a, b)`, `amount.currency`, `startswith~("val")` |
+| **Invocation** | `FunctionCall`, `MethodCall`, `CIFunctionCall` | `min(a, b)`, `amount.currency`, `~startsWith(Name, "val")` |
 | **Collection** | `ListLiteral` | `[1, 2, 3]` |
 | **Quantifier** | `Quantifier` | `each item in Items satisfies item > 0` |
 | **Interpolated** | `InterpolatedString` | `"Order {OrderId} total: {Amount}"` |
+
+Note: the table groups forms by surface structure for documentation purposes. The runtime uses 4 `ExpressionCategory` values (`Atom`, `Composite`, `Invocation`, `Collection`) which classify forms differently.
 
 The expression grammar is parsed by a Pratt parser (operator-precedence parsing) using the Operators catalog for precedence and associativity metadata.
 
@@ -719,7 +723,7 @@ Constructs              The construct inventory — 12 construct kinds with lead
                         tokens, slot sequences, and disambiguation entries.
                         Constructs.ByLeadingToken is the parser's dispatch table.
 
-ExpressionForms         The expression grammar — 13 node kinds covering atoms,
+ExpressionForms         The expression grammar — 14 node kinds covering atoms,
                         composites, invocations, and quantifiers.
 
 Types                   What type names are valid in TypeExpression slots.
@@ -809,6 +813,8 @@ EventScoped─► on  [event]   ensure     → EventEnsure
             ─► on  [event]   -> …       → EventHandler
 ```
 
+Note: `StateEnsure`, `StateAction`, `EventEnsure`, and `AccessMode` support optional `[when Guard]` before the disambiguation token. See §4 family details.
+
 ### Slot-kind to expression-type mapping
 
 ```
@@ -836,7 +842,7 @@ Outcome / ActionChain     YES — expressions within action assignments
 
 ```
 1. Every construct has a unique keyword anchor (or unique disambiguation path)
-2. Disambiguation ≤ 2 lookahead tokens
+2. Family disambiguation must remain linear and guard-bounded
 3. Slot order defined by ConstructMeta — never inferred positionally
 4. Expressions in expression-typed slots only — never standalone constructs
 5. Block bodies explicitly permitted by ConstructMeta — not implied by indentation
