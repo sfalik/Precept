@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -15,6 +16,16 @@ public class HoverHandlerTests
 precept LoanApplication
 field Amount as number
 state Draft initial
+""";
+
+    private const string SourceWithEventArgs = """
+precept LoanApplication
+field Amount as number
+state Draft initial
+state Approved terminal
+event Approve(Note as string optional notempty)
+on Approve ensure Approve.Note is set because "note required"
+from Draft on Approve -> transition Approved
 """;
 
     [Fact]
@@ -51,13 +62,53 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnUnknownPosition_ReturnsNull()
+    public void Hover_OnWhitespace_ReturnsNull()
     {
         var compilation = Precept.Compiler.Compile(Source);
 
         var hover = HoverHandler.CreateHover(compilation, new Position(1, 5));
 
         hover.Should().BeNull();
+    }
+
+    [Fact]
+    public void Hover_OnNewLineToken_ReturnsNull()
+    {
+        var compilation = Precept.Compiler.Compile(Source);
+        var newLineSpan = compilation.Tokens.Tokens.First(token => token.Kind == Precept.Language.TokenKind.NewLine).Span;
+
+        var hover = HoverHandler.CreateHover(compilation, new Position(newLineSpan.StartLine - 1, newLineSpan.StartColumn - 1));
+
+        hover.Should().BeNull();
+    }
+
+    [Fact]
+    public void Hover_OnEndOfSourceToken_ReturnsNull()
+    {
+        var compilation = Precept.Compiler.Compile(Source);
+        var endOfSourceSpan = compilation.Tokens.Tokens.First(token => token.Kind == Precept.Language.TokenKind.EndOfSource).Span;
+
+        var hover = HoverHandler.CreateHover(compilation, new Position(endOfSourceSpan.StartLine - 1, endOfSourceSpan.StartColumn - 1));
+
+        hover.Should().BeNull();
+    }
+
+    [Fact]
+    public void Hover_OnEventArgumentDeclaration_ReturnsIdentifierDoc()
+    {
+        var compilation = Precept.Compiler.Compile(SourceWithEventArgs);
+        var noteToken = compilation.Tokens.Tokens.Single(token =>
+            token.Kind == Precept.Language.TokenKind.Identifier
+            && token.Text == "Note"
+            && token.Span.StartLine == 5);
+
+        var hover = HoverHandler.CreateHover(
+            compilation,
+            new Position(noteToken.Span.StartLine - 1, noteToken.Span.StartColumn - 1));
+
+        hover.Should().NotBeNull();
+        hover!.Contents.MarkupContent!.Value.Should().Contain("argument `Note`");
+        hover.Contents.MarkupContent.Value.Should().Contain("Event: `Approve`");
     }
 
     [Fact]

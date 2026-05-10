@@ -67,6 +67,46 @@ public class CompletionHandlerTests
         labels.Should().Contain(["Draft", "UnderReview", "Approved"]);
     }
 
+    [Theory]
+    [InlineData("modify ")]
+    [InlineData("omit ")]
+    public async Task Completions_FieldTarget_IncludesDeclaredFields(string prefix)
+    {
+        var source = $$"""
+            precept LoanApplication
+            field Amount as number
+            field DecisionNote as string optional
+            state Draft initial
+            {{prefix}}
+            """;
+
+        var completions = await GetCompletionsAsync(source, new Position(4, prefix.Length));
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["Amount", "DecisionNote"]);
+    }
+
+    [Theory]
+    [InlineData("on ")]
+    [InlineData("when ")]
+    public async Task Completions_EventTarget_IncludesDeclaredEvents(string prefix)
+    {
+        var source = $$"""
+            precept LoanApplication
+            state Draft initial
+            event Submit
+            event Approve(Note as string optional notempty)
+            {{prefix}}
+            """;
+
+        var completions = await GetCompletionsAsync(source, new Position(4, prefix.Length));
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["Submit", "Approve"]);
+    }
+
     private static async Task<CompletionList> GetCompletionsAsync(string source, Position position)
     {
         var store = new DocumentStore();

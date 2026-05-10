@@ -64,6 +64,34 @@ public sealed class SemanticTokensHandlerTests
     }
 
     [Fact]
+    public void BuildLegend_ContainsAllDistinctNonNullLexicalSemanticTokenTypes()
+    {
+        var expected = TokensCatalog.All
+            .Select(meta => meta.SemanticTokenType)
+            .Where(type => type is not null)
+            .Distinct()
+            .ToArray();
+
+        var legend = SemanticTokensHandler.BuildLegend();
+
+        legend.TokenTypes.Select(type => type.ToString()).Should().Contain(expected);
+    }
+
+    [Fact]
+    public void LexicalTokens_MultipleKeywordsOnSameLine_EmitDistinctZeroBasedCharacters()
+    {
+        var compilation = Compiler.Compile("precept Sample\nstate Draft initial terminal");
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation)
+            .Where(token => token.Kind is TokenKind.State or TokenKind.Initial or TokenKind.Terminal)
+            .ToArray();
+
+        tokens.Should().HaveCount(3);
+        tokens.Select(token => token.Line).Should().Equal(1, 1, 1);
+        tokens.Select(token => token.Character).Should().Equal(0, 12, 20);
+    }
+
+    [Fact]
     public void Legend_IncludesIdentifierOverlayTypes()
     {
         var legend = SemanticTokensHandler.BuildLegend();
