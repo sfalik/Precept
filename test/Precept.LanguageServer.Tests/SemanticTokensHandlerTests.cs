@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Precept.LanguageServer.Handlers;
 using Xunit;
@@ -60,6 +61,83 @@ public sealed class SemanticTokensHandlerTests
         fieldToken.Character.Should().Be(2);
         fieldToken.Length.Should().Be(5);
         fieldToken.TokenType.Should().Be("keyword");
+    }
+
+    [Fact]
+    public void Legend_IncludesIdentifierOverlayTypes()
+    {
+        var legend = SemanticTokensHandler.BuildLegend();
+
+        legend.TokenTypes.Select(static type => type.ToString()).Should().Contain([
+            "property",
+            "enum",
+            "function",
+            "parameter",
+        ]);
+    }
+
+    [Fact]
+    public void IdentifierTokens_FieldDeclaration_EmitsPropertyToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Name as string
+            state Draft initial
+            """);
+        var field = compilation.Semantics.Fields.Single();
+
+        compilation.HasErrors.Should().BeFalse();
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == field.NameSpan.StartLine - 1 &&
+                token.Character == field.NameSpan.StartColumn - 1 &&
+                token.Length == field.Name.Length &&
+                token.TokenType == "property");
+    }
+
+    [Fact]
+    public void IdentifierTokens_EventArgDeclaration_EmitsParameterToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Stored as string optional
+            state Draft initial
+            event Submit(Amount as decimal)
+            """);
+        var arg = compilation.Semantics.Events.Single().Args.Single();
+
+        compilation.HasErrors.Should().BeFalse();
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == arg.Span.StartLine - 1 &&
+                token.Character == arg.Span.StartColumn - 1 &&
+                token.Length == arg.Name.Length &&
+                token.TokenType == "parameter");
+    }
+
+    [Fact]
+    public void IdentifierTokens_ArgReference_EmitsParameterToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept LoanWorkflow
+            field StoredAmount as decimal default 0
+            state Draft initial
+            state Approved
+            event Submit(Amount as decimal)
+            from Draft on Submit when Submit.Amount > 0 -> transition Approved
+            """);
+        var argReference = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
+
+        compilation.HasErrors.Should().BeFalse();
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == argReference.Site.StartLine - 1 &&
+                token.Character == argReference.Site.StartColumn - 1 &&
+                token.Length == argReference.Site.Length &&
+                token.TokenType == "parameter");
     }
 }
 

@@ -50,9 +50,22 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             return Task.CompletedTask;
         }
 
-        foreach (var token in ProjectLexicalTokens(compilation))
+        var lexicalTokens = ProjectLexicalTokens(compilation);
+        var identifierTokens = ProjectIdentifierTokens(compilation.Semantics);
+
+        foreach (var projected in lexicalTokens
+                     .Select(static token => (Token: token, OverlayOrder: 0))
+                     .Concat(identifierTokens.Select(static token => (Token: token, OverlayOrder: 1)))
+                     .OrderBy(static entry => entry.Token.Line)
+                     .ThenBy(static entry => entry.Token.Character)
+                     .ThenBy(static entry => entry.OverlayOrder)
+                     .ThenBy(static entry => entry.Token.Length))
         {
-            builder.Push(token.Line, token.Character, token.Length, token.TokenType);
+            builder.Push(
+                projected.Token.Line,
+                projected.Token.Character,
+                projected.Token.Length,
+                projected.Token.TokenType);
         }
 
         return Task.CompletedTask;
@@ -86,18 +99,124 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         return projected.ToImmutable();
     }
 
-    private static SemanticTokensLegend BuildLegend() =>
-        new()
+    internal static ImmutableArray<LexicalSemanticToken> ProjectIdentifierTokens(Precept.Pipeline.SemanticIndex index)
+    {
+        var projected = ImmutableArray.CreateBuilder<LexicalSemanticToken>();
+
+        foreach (var field in index.Fields)
+        {
+            var ns = field.NameSpan;
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                ns.StartLine - 1,
+                ns.StartColumn - 1,
+                field.Name.Length,
+                "property"));
+        }
+
+        foreach (var state in index.States)
+        {
+            var ns = state.NameSpan;
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                ns.StartLine - 1,
+                ns.StartColumn - 1,
+                state.Name.Length,
+                "enum"));
+        }
+
+        foreach (var evt in index.Events)
+        {
+            var ns = evt.NameSpan;
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                ns.StartLine - 1,
+                ns.StartColumn - 1,
+                evt.Name.Length,
+                "function"));
+
+            foreach (var arg in evt.Args)
+            {
+                projected.Add(new LexicalSemanticToken(
+                    TokenKind.Identifier,
+                    arg.Span.StartLine - 1,
+                    arg.Span.StartColumn - 1,
+                    arg.Name.Length,
+                    "parameter"));
+            }
+        }
+
+        foreach (var fr in index.FieldReferences)
+        {
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                fr.Site.StartLine - 1,
+                fr.Site.StartColumn - 1,
+                fr.Site.Length,
+                "property"));
+        }
+
+        foreach (var sr in index.StateReferences)
+        {
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                sr.Site.StartLine - 1,
+                sr.Site.StartColumn - 1,
+                sr.Site.Length,
+                "enum"));
+        }
+
+        foreach (var er in index.EventReferences)
+        {
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                er.Site.StartLine - 1,
+                er.Site.StartColumn - 1,
+                er.Site.Length,
+                "function"));
+        }
+
+        foreach (var ar in index.ArgReferences)
+        {
+            projected.Add(new LexicalSemanticToken(
+                TokenKind.Identifier,
+                ar.Site.StartLine - 1,
+                ar.Site.StartColumn - 1,
+                ar.Site.Length,
+                "parameter"));
+        }
+
+        return projected.ToImmutable();
+    }
+
+    internal static void AddIdentifierTokens(SemanticTokensBuilder builder, Precept.Pipeline.SemanticIndex index)
+    {
+        foreach (var token in ProjectIdentifierTokens(index))
+        {
+            builder.Push(token.Line, token.Character, token.Length, token.TokenType);
+        }
+    }
+
+    internal static SemanticTokensLegend BuildLegend()
+    {
+        var lexicalTypes = TokensCatalog.All
+            .Select(static meta => meta.SemanticTokenType)
+            .Where(static type => type is not null)
+            .Distinct();
+
+        var identifierTypes = new[] { "property", "enum", "function", "parameter" };
+
+        return new SemanticTokensLegend
         {
             TokenTypes = new Container<SemanticTokenType>(
-                TokensCatalog.All
-                    .Select(static meta => meta.SemanticTokenType)
-                    .Where(static type => type is not null)
+                lexicalTypes
+                    .Concat(identifierTypes)
                     .Distinct()
                     .Select(static type => new SemanticTokenType(type!))
                     .ToArray()),
             TokenModifiers = new Container<SemanticTokenModifier>(),
         };
+    }
 
     internal readonly record struct LexicalSemanticToken(
         TokenKind Kind,
