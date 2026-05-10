@@ -569,7 +569,11 @@ internal static partial class TypeChecker
                 string? anchorState = null;
                 if (stateSlot?.StateName is not null)
                 {
-                    if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
+                    if (HasKeywordTokenMeta(stateSlot.StateName, meta => meta.IsStateWildcard))
+                    {
+                        anchorState = null;
+                    }
+                    else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
                     {
                         anchorState = typedState.Name;
                         ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
@@ -689,7 +693,11 @@ internal static partial class TypeChecker
             string stateName = "";
             if (stateSlot?.StateName is not null)
             {
-                if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
+                if (HasKeywordTokenMeta(stateSlot.StateName, meta => meta.IsStateWildcard))
+                {
+                    stateName = stateSlot.StateName;
+                }
+                else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
                 {
                     stateName = typedState.Name;
                     ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
@@ -773,7 +781,11 @@ internal static partial class TypeChecker
             string stateName = "";
             if (stateSlot?.StateName is not null)
             {
-                if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
+                if (HasKeywordTokenMeta(stateSlot.StateName, meta => meta.IsStateWildcard))
+                {
+                    stateName = stateSlot.StateName;
+                }
+                else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
                 {
                     stateName = typedState.Name;
                     ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));

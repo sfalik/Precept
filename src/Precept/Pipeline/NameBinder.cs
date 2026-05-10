@@ -196,8 +196,7 @@ public static class NameBinder
 
             foreach (var construct in constructs)
             {
-                if (construct.Meta.Kind == ConstructKind.FieldDeclaration
-                    && construct.GetSlot<ComputeExpressionSlot>(ConstructSlotKind.ComputeExpression) is not null)
+                if (IsComputedFieldConstruct(construct))
                 {
                     computedConstructs.Add(construct);
                     continue;
@@ -207,14 +206,22 @@ public static class NameBinder
             }
 
             foreach (var construct in OrderComputedConstructsByDependency(computedConstructs))
+            {
                 ResolveReferences(construct);
+            }
         }
+
+        private static bool IsComputedFieldConstruct(ParsedConstruct construct) =>
+            construct.Meta.Kind == ConstructKind.FieldDeclaration
+            && construct.GetSlot<ComputeExpressionSlot>(ConstructSlotKind.ComputeExpression) is not null;
 
         private IReadOnlyList<ParsedConstruct> OrderComputedConstructsByDependency(
             IReadOnlyList<ParsedConstruct> computedConstructs)
         {
             if (computedConstructs.Count == 0)
+            {
                 return [];
+            }
 
             var constructByField = new Dictionary<string, ParsedConstruct>(StringComparer.Ordinal);
             var dependencies = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
@@ -222,72 +229,100 @@ public static class NameBinder
 
             foreach (var construct in computedConstructs)
             {
-                var idSlot = construct.GetSlot<IdentifierListSlot>(ConstructSlotKind.IdentifierList);
-                if (idSlot is null)
-                    continue;
-
-                foreach (var fieldName in idSlot.Names)
+                var fieldName = GetPrimaryFieldName(construct);
+                if (fieldName is null)
                 {
-                    constructByField[fieldName] = construct;
-                    dependencies[fieldName] = [];
-                    dependents[fieldName] = [];
+                    continue;
                 }
+
+                constructByField[fieldName] = construct;
+                dependencies[fieldName] = [];
+                dependents[fieldName] = [];
             }
 
-            foreach (var (fieldName, construct) in constructByField)
+            foreach (var (fieldName, construct) in constructByField.OrderBy(static kvp => kvp.Key, StringComparer.Ordinal))
             {
                 var computeSlot = construct.GetSlot<ComputeExpressionSlot>(ConstructSlotKind.ComputeExpression);
                 if (computeSlot is null)
+                {
                     continue;
+                }
 
                 var refs = new HashSet<string>(StringComparer.Ordinal);
                 CollectFieldDependencies(computeSlot.Expression, refs, ImmutableHashSet<string>.Empty);
 
                 foreach (var dep in refs.Where(constructByField.ContainsKey))
                 {
-                    if (dep == fieldName)
-                        continue;
-
                     dependencies[fieldName].Add(dep);
                     dependents[dep].Add(fieldName);
                 }
             }
 
-            var queue = new Queue<string>(dependencies.Where(kvp => kvp.Value.Count == 0).Select(kvp => kvp.Key));
+            var ready = new SortedSet<(int Order, string Name)>(
+                dependencies
+                    .Where(static kvp => kvp.Value.Count == 0)
+                    .Select(kvp => (GetFieldDeclarationOrder(kvp.Key), kvp.Key)));
             var orderedFields = new List<string>(dependencies.Count);
 
-            while (queue.Count > 0)
+            while (ready.Count > 0)
             {
-                var next = queue.Dequeue();
-                orderedFields.Add(next);
+                var next = ready.Min;
+                ready.Remove(next);
+                orderedFields.Add(next.Name);
 
-                foreach (var dependent in dependents[next].ToArray())
+                foreach (var dependent in dependents[next.Name]
+                             .OrderBy(GetFieldDeclarationOrder)
+                             .ThenBy(static name => name, StringComparer.Ordinal))
                 {
-                    dependencies[dependent].Remove(next);
-                    if (dependencies[dependent].Count == 0)
-                        queue.Enqueue(dependent);
+                    if (!dependencies[dependent].Remove(next.Name) || dependencies[dependent].Count != 0)
+                    {
+                        continue;
+                    }
+
+                    ready.Add((GetFieldDeclarationOrder(dependent), dependent));
                 }
             }
 
-            var cyclic = dependencies.Where(kvp => kvp.Value.Count > 0).Select(kvp => kvp.Key).ToHashSet(StringComparer.Ordinal);
-            foreach (var fieldName in cyclic)
+            var cyclicFields = dependencies
+                .Where(static kvp => kvp.Value.Count > 0)
+                .Select(static kvp => kvp.Key)
+                .OrderBy(GetFieldDeclarationOrder)
+                .ThenBy(static name => name, StringComparer.Ordinal)
+                .ToArray();
+            var cyclicSet = cyclicFields.ToHashSet(StringComparer.Ordinal);
+
+            foreach (var fieldName in cyclicFields)
             {
-                var cycle = string.Join(" → ", dependencies[fieldName].Where(cyclic.Contains).Prepend(fieldName));
+                var field = _fieldsByName[fieldName];
+                var cycleMembers = dependencies[fieldName]
+                    .Where(cyclicSet.Contains)
+                    .OrderBy(GetFieldDeclarationOrder)
+                    .ThenBy(static name => name, StringComparer.Ordinal)
+                    .ToArray();
+                var cycle = string.Join(" → ", cycleMembers.Prepend(fieldName).Append(fieldName));
+
                 _diagnostics.Add(Diagnostics.Create(
                     DiagnosticCode.CircularComputedField,
-                    constructByField[fieldName].Span,
+                    field.NameSpan,
                     fieldName,
                     cycle));
             }
 
-            foreach (var field in cyclic)
-                orderedFields.Add(field);
+            orderedFields.AddRange(cyclicFields);
 
             return orderedFields
                 .Select(field => constructByField[field])
                 .Distinct()
                 .ToArray();
         }
+
+        private static string? GetPrimaryFieldName(ParsedConstruct construct) =>
+            construct.GetSlot<IdentifierListSlot>(ConstructSlotKind.IdentifierList)?.Names.FirstOrDefault();
+
+        private int GetFieldDeclarationOrder(string fieldName) =>
+            _fieldsByName.TryGetValue(fieldName, out var field)
+                ? field.DeclarationOrder
+                : int.MaxValue;
 
         private static void CollectFieldDependencies(
             ParsedExpression expression,
@@ -666,8 +701,7 @@ public static class NameBinder
 
         private void ResolveStateReference(string name, SourceSpan span)
         {
-            if (Tokens.Keywords.TryGetValue(name, out var keywordKind)
-                && Tokens.GetMeta(keywordKind).IsStateWildcard)
+            if (IsStateWildcardKeyword(name))
             {
                 return;
             }
@@ -685,6 +719,10 @@ public static class NameBinder
                 _references.Add(new SymbolReference(span, name, new UnresolvedTarget(name, SymbolCategory.State)));
             }
         }
+
+        private static bool IsStateWildcardKeyword(string name) =>
+            Tokens.Keywords.TryGetValue(name, out var keywordKind)
+            && Tokens.GetMeta(keywordKind).IsStateWildcard;
 
         private void ResolveEventReference(string name, SourceSpan span)
         {
@@ -704,8 +742,7 @@ public static class NameBinder
 
         private void ResolveFieldReference(string name, SourceSpan span, DeclaredField? declaringField)
         {
-            if (Tokens.Keywords.TryGetValue(name, out var keywordKind)
-                && Tokens.GetMeta(keywordKind).IsFieldBroadcast)
+            if (IsFieldBroadcastKeyword(name))
             {
                 return;
             }
@@ -723,6 +760,10 @@ public static class NameBinder
                 _references.Add(new SymbolReference(span, name, new UnresolvedTarget(name, SymbolCategory.Field)));
             }
         }
+
+        private static bool IsFieldBroadcastKeyword(string name) =>
+            Tokens.Keywords.TryGetValue(name, out var keywordKind)
+            && Tokens.GetMeta(keywordKind).IsFieldBroadcast;
 
         public SymbolTable ToSymbolTable()
         {
