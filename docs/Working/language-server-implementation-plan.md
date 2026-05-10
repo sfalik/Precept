@@ -38,6 +38,7 @@ The Precept Language Server is a **thin routing and protocol layer** over `src/P
 | 8 | Code actions | ✅ Done | `c752af08` |
 | 9 | Folding ranges | ✅ Done | `453e690a` |
 | 11 | Program.cs final wiring | 🔄 In progress | — |
+| 12 | Trigger characters + dual-use `set` type context | ✅ Done | `d962d0cb` |
 | 16 | Snippet metadata for constructs and actions | ✅ Done | `6bcf4b34` |
 
 ---

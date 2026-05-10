@@ -26,6 +26,13 @@
 
 ## Recent Updates
 
+### 2026-05-10T01:55:00Z — Slice 12 committed: trigger characters + dual-use `set` type context
+- Commit `d962d0cb`: fixed `CompletionHandler` trigger characters from `":"` to `[" ", "'", ".", ">", "~"]`; added `SlotContextResolver.IsSetInTypePosition` (backward token scan using `StartLine`/`StartColumn`); wired reclassification into `HoverHandler` and `SemanticTokensHandler.ProjectLexicalTokens`.
+- Three new tests across `CompletionHandlerTests`, `HoverHandlerTests`, and `SemanticTokensHandlerTests`; all 66 LS tests pass and all 3750 core tests pass.
+- **Key lesson — `SourceSpan.Offset` is unreliable as a token-stream search key.** It appears to not be populated by the lexer. When locating a specific token in `compilation.Tokens.Tokens`, always match on `StartLine` AND `StartColumn`, both of which ARE reliably populated.
+- **Key lesson — `TokenKind.SetType` has `SemanticTokenType: null` in the catalog** (intentional: SetType is parser-synthesized and should never appear in the lexer output). Any code path that wants the "type" semantic token for `set` in type position must use the literal `"type"` string, not `TokensCatalog.GetMeta(TokenKind.SetType).SemanticTokenType`, which null-coalesces to the wrong fallback.
+- **Key lesson — type position detection via previous token.** `set` in a `TypeExpression` slot is always preceded (in the non-structural token stream) by either `As` (direct type annotation) or `Of` (inner collection type). Walking backward and checking for these two preceding tokens is the correct catalog-driven heuristic.
+
 ### 2026-05-10T00:41:09Z — Slices 1/2/4/5/9 handler batch recorded
 - Scribe merged Kramer's completed handler batch: `568ab5cc` added diagnostic projection/publication tests plus `LspTestHost.WhenPublishDiagnosticsAsync(...)`; `9e679ceb` added `SemanticTokensHandler`; `1ec3c7d5` added `SlotContext` plus `CompletionHandler`; `1fbecf36` added `HoverHandler`; and `453e690a` added `FoldingRangeHandler`, each with matching language-server tests.
 - Durable language-server contracts from the batch are now explicit: diagnostics publish with 0-based spans/severity/source mapping, semantic tokens remain lexical/catalog-driven, completions are slot-context plus `SemanticIndex` driven, hover content comes from `TokenMeta.Description` plus semantic lookup, and folding stays construct-span based only.
