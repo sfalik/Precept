@@ -48,7 +48,9 @@ public static class Constructs
             [],
             [SlotIdentifierList],
             [new(TokenKind.Precept)],
-            RoutingFamily.Header),
+            RoutingFamily.Header,
+            IsOutlineNode: true,
+            OutlineSymbolTag: "Module"),
 
         ConstructKind.FieldDeclaration => new(
             kind,
@@ -59,7 +61,9 @@ public static class Constructs
             [SlotIdentifierList, SlotTypeExpression, SlotModifierList, SlotComputeExpression],
             [new(TokenKind.Field)],
             RoutingFamily.Direct,
-            ModifierDomain: ModifierDomain.Field),
+            ModifierDomain: ModifierDomain.Field,
+            IsOutlineNode: true,
+            OutlineSymbolTag: "Property"),
 
         ConstructKind.StateDeclaration => new(
             kind,
@@ -70,7 +74,9 @@ public static class Constructs
             [SlotStateEntryList],
             [new(TokenKind.State)],
             RoutingFamily.Direct,
-            ModifierDomain: ModifierDomain.State),
+            ModifierDomain: ModifierDomain.State,
+            IsOutlineNode: true,
+            OutlineSymbolTag: "Enum"),
 
         ConstructKind.EventDeclaration => new(
             kind,
@@ -81,7 +87,9 @@ public static class Constructs
             [SlotIdentifierList, SlotArgumentList, SlotInitialMarker],
             [new(TokenKind.Event)],
             RoutingFamily.Direct,
-            ModifierDomain: ModifierDomain.Event),
+            ModifierDomain: ModifierDomain.Event,
+            IsOutlineNode: true,
+            OutlineSymbolTag: "Function"),
 
         ConstructKind.RuleDeclaration => new(
             kind,
@@ -91,7 +99,9 @@ public static class Constructs
             [],
             [SlotRuleExpression, SlotGuardClause, SlotBecauseClause],
             [new(TokenKind.Rule)],
-            RoutingFamily.Direct),
+            RoutingFamily.Direct,
+            IsOutlineNode: true,
+            OutlineSymbolTag: "Boolean"),
 
         ConstructKind.TransitionRow => new(
             kind,

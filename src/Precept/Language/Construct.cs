@@ -21,7 +21,9 @@ public sealed record ConstructMeta(
     ImmutableArray<DisambiguationEntry>  Entries,
     RoutingFamily                        RoutingFamily,
     string?                              SnippetTemplate  = null,
-    ModifierDomain                       ModifierDomain   = ModifierDomain.None)
+    ModifierDomain                       ModifierDomain   = ModifierDomain.None,
+    bool                                 IsOutlineNode    = false,
+    string?                              OutlineSymbolTag = null)
 {
     /// <summary>Slot sequence for this construct's declaration shape.</summary>
     public IReadOnlyList<ConstructSlot> Slots { get; } = Slots;

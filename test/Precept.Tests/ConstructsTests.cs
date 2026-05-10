@@ -48,6 +48,71 @@ public class ConstructsTests
         Constructs.All.Should().HaveCount(12);
     }
 
+    [Fact]
+    public void IsOutlineNode_TrueForOutlineConstructs()
+    {
+        var outlineKinds = new[]
+        {
+            ConstructKind.PreceptHeader,
+            ConstructKind.FieldDeclaration,
+            ConstructKind.StateDeclaration,
+            ConstructKind.EventDeclaration,
+            ConstructKind.RuleDeclaration,
+        };
+
+        foreach (var kind in outlineKinds)
+        {
+            Constructs.GetMeta(kind).IsOutlineNode.Should().BeTrue(
+                because: $"{kind} should be an outline node");
+        }
+    }
+
+    [Fact]
+    public void IsOutlineNode_FalseByDefault()
+    {
+        var nonOutlineKinds = Enum.GetValues<ConstructKind>()
+            .Except(
+            [
+                ConstructKind.PreceptHeader,
+                ConstructKind.FieldDeclaration,
+                ConstructKind.StateDeclaration,
+                ConstructKind.EventDeclaration,
+                ConstructKind.RuleDeclaration,
+            ]);
+
+        foreach (var kind in nonOutlineKinds)
+        {
+            Constructs.GetMeta(kind).IsOutlineNode.Should().BeFalse(
+                because: $"{kind} should NOT be an outline node");
+        }
+    }
+
+    [Fact]
+    public void OutlineSymbolTag_NonNullWhenIsOutlineNode()
+    {
+        var outlineEntries = Constructs.All.Where(m => m.IsOutlineNode);
+
+        outlineEntries.Should().NotBeEmpty();
+
+        foreach (var meta in outlineEntries)
+        {
+            meta.OutlineSymbolTag.Should().NotBeNull(
+                because: $"{meta.Kind} has IsOutlineNode=true so OutlineSymbolTag must be non-null");
+        }
+    }
+
+    [Fact]
+    public void OutlineSymbolTag_NullWhenNotOutlineNode()
+    {
+        var nonOutlineEntries = Constructs.All.Where(m => !m.IsOutlineNode);
+
+        foreach (var meta in nonOutlineEntries)
+        {
+            meta.OutlineSymbolTag.Should().BeNull(
+                because: $"{meta.Kind} has IsOutlineNode=false so OutlineSymbolTag must be null");
+        }
+    }
+
     // ── Top-level constructs (AllowedIn is empty) ───────────────────────────────
 
     [Theory]

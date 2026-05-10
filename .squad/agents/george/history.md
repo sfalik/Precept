@@ -44,3 +44,9 @@
 - Earlier 2026-05-09 work locked the transactional `CurrencyCatalog` boundary, the XML drift-test posture, and the targeted tooling workflow for ISO refreshes.
 - 2026-05-08 work restored GraphAnalyzer/ProofEngine behavior, structural diagnostics, and the broader semantic-index assembly pipeline.
 - 2026-05-07 and earlier groundwork established the catalog-driven parser/checker trajectory and the rule that durable design decisions belong in catalogs, canonical docs, and the squad ledger rather than in scattered switches.
+
+## Latest Slice
+
+- Slice 0a complete: `IsOutlineNode` + `OutlineSymbolTag` added to `ConstructMeta`.
+- 5 outline constructs: `PreceptHeader` (`Module`), `FieldDeclaration` (`Property`), `StateDeclaration` (`Enum`), `EventDeclaration` (`Function`), `RuleDeclaration` (`Boolean`).
+- Tests: 4 catalog-level facts added in `test/Precept.Tests/ConstructsTests.cs`.
