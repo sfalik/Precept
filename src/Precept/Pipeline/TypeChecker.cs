@@ -104,13 +104,21 @@ internal static partial class TypeChecker
             SimpleTypeReference simple       => (simple.Type.Kind, null, null),
             QualifiedTypeReference qualified => ResolveTypeKind(qualified.InnerType),
             CollectionTypeReference coll => (
-                coll.CollectionType.Kind,
+                ResolveCollectionTypeKind(coll),
                 ResolveTypeKind(coll.ElementType).Type,
                 coll.KeyType is not null ? ResolveTypeKind(coll.KeyType).Type : null),
             ChoiceTypeReference choice => (choice.Type.Kind, null, null),
             CITypeReference ci => (ci.Type.Kind, null, null),
             MissingTypeReference => (TypeKind.Error, null, null),
             _ => (TypeKind.Error, null, null),
+        };
+
+    private static TypeKind ResolveCollectionTypeKind(CollectionTypeReference collection) =>
+        collection switch
+        {
+            { CollectionType.Kind: TypeKind.Queue, KeyType: not null } => TypeKind.QueueBy,
+            { CollectionType.Kind: TypeKind.Log, KeyType: not null } => TypeKind.LogBy,
+            _ => collection.CollectionType.Kind,
         };
 
     /// <summary>

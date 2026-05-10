@@ -116,17 +116,40 @@ internal static partial class TypeChecker
     /// and the target type has <see cref="TypeMeta.ContentValidation"/>, numeric literals are
     /// re-interpreted as the expected type and typed constants are validated.
     /// </summary>
-    private static TypedExpression ResolveLiteral(LiteralExpression lit, CheckContext ctx, TypeKind? expectedType) => lit.LiteralKind switch
+    private static TypedExpression ResolveLiteral(LiteralExpression lit, CheckContext ctx, TypeKind? expectedType)
     {
-        TokenKind.StringLiteral => new TypedLiteral(TypeKind.String, lit.Text, lit.Span),
-        TokenKind.True          => new TypedLiteral(TypeKind.Boolean, true, lit.Span),
-        TokenKind.False         => new TypedLiteral(TypeKind.Boolean, false, lit.Span),
-        TokenKind.NumberLiteral => ResolveNumericLiteral(lit, expectedType),
+        if (expectedType == TypeKind.Choice && IsChoiceLiteralToken(lit.LiteralKind))
+            return ResolveChoiceLiteral(lit);
 
-        // Typed constants: resolve with content validation from expectedType context
-        TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType),
-        TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span), // Interpolated typed constants deferred
+        return lit.LiteralKind switch
+        {
+            TokenKind.StringLiteral => new TypedLiteral(TypeKind.String, lit.Text, lit.Span),
+            TokenKind.True          => new TypedLiteral(TypeKind.Boolean, true, lit.Span),
+            TokenKind.False         => new TypedLiteral(TypeKind.Boolean, false, lit.Span),
+            TokenKind.NumberLiteral => ResolveNumericLiteral(lit, expectedType),
 
+            // Typed constants: resolve with content validation from expectedType context
+            TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType),
+            TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span), // Interpolated typed constants deferred
+
+            _ => new TypedErrorExpression(lit.Span),
+        };
+    }
+
+    private static bool IsChoiceLiteralToken(TokenKind kind) =>
+        Types.All.Any(meta => meta.ChoiceLiteralTokens?.Contains(kind) == true);
+
+    private static TypedExpression ResolveChoiceLiteral(LiteralExpression lit) => lit.LiteralKind switch
+    {
+        TokenKind.StringLiteral => new TypedLiteral(TypeKind.Choice, lit.Text, lit.Span),
+        TokenKind.True          => new TypedLiteral(TypeKind.Choice, true, lit.Span),
+        TokenKind.False         => new TypedLiteral(TypeKind.Choice, false, lit.Span),
+        TokenKind.NumberLiteral when lit.Text.Contains('.')
+            && decimal.TryParse(lit.Text, System.Globalization.NumberStyles.AllowDecimalPoint,
+                System.Globalization.CultureInfo.InvariantCulture, out var decVal)
+            => new TypedLiteral(TypeKind.Choice, decVal, lit.Span),
+        TokenKind.NumberLiteral when long.TryParse(lit.Text, System.Globalization.CultureInfo.InvariantCulture, out var intVal)
+            => new TypedLiteral(TypeKind.Choice, intVal, lit.Span),
         _ => new TypedErrorExpression(lit.Span),
     };
 
@@ -211,8 +234,11 @@ internal static partial class TypeChecker
     /// <c>amount &gt; 100</c> where <c>amount: money</c> and <c>100</c> needs to be re-resolved as money.
     /// </summary>
     private static TypedExpression? TryContextRetryBinaryOp(
-        BinaryOperationExpression bin, TypedExpression left, TypedExpression right,
-        OperatorKind opKind, CheckContext ctx)
+        BinaryOperationExpression bin,
+        TypedExpression left,
+        TypedExpression right,
+        OperatorMeta opMeta,
+        CheckContext ctx)
     {
         // Only retry if exactly one operand is a bare literal
         bool leftIsLiteral = bin.Left is LiteralExpression;
@@ -227,14 +253,10 @@ internal static partial class TypeChecker
             var retried = Resolve(bin.Right, ctx, left.ResultType);
             if (retried is not TypedErrorExpression && retried.ResultType != right.ResultType)
             {
-                var result = TryResolveBinaryWithWidening(opKind, left.ResultType, retried.ResultType);
+                var result = TryResolveBinaryWithWidening(opMeta.Kind, left.ResultType, retried.ResultType);
                 if (result is not null)
                 {
-                    return new TypedBinaryOp(
-                        result.Result, result.Kind, left, retried,
-                        ResultQualifier: MapQualifierBinding(result),
-                        ProofRequirements: result.ProofRequirements.ToImmutableArray(),
-                        Span: bin.Span);
+                    return CreateResolvedBinaryOp(bin.Span, opMeta, result, left, retried, ctx);
                 }
             }
         }
@@ -244,19 +266,174 @@ internal static partial class TypeChecker
             var retried = Resolve(bin.Left, ctx, right.ResultType);
             if (retried is not TypedErrorExpression && retried.ResultType != left.ResultType)
             {
-                var result = TryResolveBinaryWithWidening(opKind, retried.ResultType, right.ResultType);
+                var result = TryResolveBinaryWithWidening(opMeta.Kind, retried.ResultType, right.ResultType);
                 if (result is not null)
                 {
-                    return new TypedBinaryOp(
-                        result.Result, result.Kind, retried, right,
-                        ResultQualifier: MapQualifierBinding(result),
-                        ProofRequirements: result.ProofRequirements.ToImmutableArray(),
-                        Span: bin.Span);
+                    return CreateResolvedBinaryOp(bin.Span, opMeta, result, retried, right, ctx);
                 }
             }
         }
 
         return null;
+    }
+
+    private static TypedBinaryOp CreateResolvedBinaryOp(
+        SourceSpan span,
+        OperatorMeta opMeta,
+        BinaryOperationMeta resolvedOperation,
+        TypedExpression left,
+        TypedExpression right,
+        CheckContext ctx) =>
+        new(
+            ResolveBinaryResultType(opMeta, resolvedOperation, left, ctx),
+            resolvedOperation.Kind,
+            left,
+            right,
+            ResultQualifier: MapQualifierBinding(resolvedOperation),
+            ProofRequirements: resolvedOperation.ProofRequirements.ToImmutableArray(),
+            Span: span);
+
+    private static TypedBinaryOp CreateSyntheticBinaryOp(
+        SourceSpan span,
+        OperatorMeta opMeta,
+        OperationKind operationKind,
+        TypedExpression left,
+        TypedExpression right,
+        CheckContext ctx,
+        ImmutableArray<ProofRequirement>? proofRequirements = null) =>
+        new(
+            ResolveBinaryResultType(opMeta, resolvedOperation: null, left, ctx),
+            operationKind,
+            left,
+            right,
+            ResultQualifier: null,
+            ProofRequirements: proofRequirements ?? ImmutableArray<ProofRequirement>.Empty,
+            Span: span);
+
+    private static TypeKind ResolveBinaryResultType(
+        OperatorMeta opMeta,
+        BinaryOperationMeta? resolvedOperation,
+        TypedExpression left,
+        CheckContext ctx) =>
+        opMeta.ResultTypePolicy switch
+        {
+            ResultTypePolicy.Fixed => opMeta.ResultType ?? resolvedOperation?.Result ?? TypeKind.Error,
+            ResultTypePolicy.BothOperands => opMeta.ResultType ?? resolvedOperation?.Result ?? left.ResultType,
+            ResultTypePolicy.LhsType => left.ResultType,
+            ResultTypePolicy.ElementType => GetElementType(left, ctx) ?? TypeKind.Error,
+            ResultTypePolicy.OperationResult => resolvedOperation?.Result ?? TypeKind.Error,
+            _ => TypeKind.Error,
+        };
+
+    private static TypeKind ResolveUnaryResultType(
+        OperatorMeta opMeta,
+        UnaryOperationMeta? resolvedOperation,
+        TypedExpression operand) =>
+        opMeta.ResultTypePolicy switch
+        {
+            ResultTypePolicy.Fixed => opMeta.ResultType ?? resolvedOperation?.Result ?? TypeKind.Error,
+            ResultTypePolicy.LhsType => operand.ResultType,
+            ResultTypePolicy.OperationResult => resolvedOperation?.Result ?? TypeKind.Error,
+            _ => resolvedOperation?.Result ?? TypeKind.Error,
+        };
+
+    private static (TypedExpression Left, TypedExpression Right) RetryChoiceComparisonLiterals(
+        BinaryOperationExpression bin,
+        OperatorMeta opMeta,
+        TypedExpression left,
+        TypedExpression right,
+        CheckContext ctx)
+    {
+        if (opMeta.Family != OperatorFamily.Comparison)
+            return (left, right);
+
+        if (left.ResultType == TypeKind.Choice && bin.Right is LiteralExpression)
+            right = Resolve(bin.Right, ctx, TypeKind.Choice);
+
+        if (right.ResultType == TypeKind.Choice && bin.Left is LiteralExpression)
+            left = Resolve(bin.Left, ctx, TypeKind.Choice);
+
+        return (left, right);
+    }
+
+    private static TypedExpression? TryResolveCatalogBinaryWithoutOperation(
+        BinaryOperationExpression bin,
+        OperatorMeta opMeta,
+        TypedExpression left,
+        TypedExpression right,
+        CheckContext ctx)
+    {
+        if (opMeta is { Family: OperatorFamily.Membership, ResultTypePolicy: ResultTypePolicy.Fixed } &&
+            TryResolveContainsOperandTypes(left, right, ctx))
+        {
+            return CreateSyntheticBinaryOp(bin.Span, opMeta, OperationKind.CollectionContains, left, right, ctx);
+        }
+
+        if (opMeta is { Family: OperatorFamily.Membership, ResultTypePolicy: ResultTypePolicy.ElementType } &&
+            TryResolveLookupOperandTypes(left, right, ctx))
+        {
+            return CreateSyntheticBinaryOp(bin.Span, opMeta, OperationKind.LookupAccess, left, right, ctx);
+        }
+
+        return null;
+    }
+
+    private static bool TryResolveContainsOperandTypes(TypedExpression collection, TypedExpression candidate, CheckContext ctx)
+    {
+        if (!TryGetContainsCandidateTypes(collection, ctx, out var primaryType, out var alternateType))
+            return false;
+
+        return IsAssignable(candidate.ResultType, primaryType)
+            || (alternateType is { } alt && IsAssignable(candidate.ResultType, alt));
+    }
+
+    private static bool TryResolveLookupOperandTypes(TypedExpression lookup, TypedExpression key, CheckContext ctx)
+    {
+        var keyType = GetKeyType(lookup, ctx);
+        return lookup.ResultType == TypeKind.Lookup
+            && keyType is { } resolvedKeyType
+            && IsAssignable(key.ResultType, resolvedKeyType);
+    }
+
+    private static bool TryGetContainsCandidateTypes(
+        TypedExpression collection,
+        CheckContext ctx,
+        out TypeKind primaryType,
+        out TypeKind? alternateType)
+    {
+        primaryType = TypeKind.Error;
+        alternateType = null;
+
+        if (collection is TypedListLiteral list)
+        {
+            primaryType = list.ElementType;
+            return true;
+        }
+
+        if (collection is not TypedFieldRef fieldRef || !ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field))
+            return false;
+
+        switch (field.ResolvedType)
+        {
+            case TypeKind.Set:
+            case TypeKind.Queue:
+            case TypeKind.Stack:
+            case TypeKind.Log:
+            case TypeKind.Bag:
+            case TypeKind.List:
+            case TypeKind.QueueBy:
+                primaryType = field.ElementType ?? TypeKind.Error;
+                return field.ElementType is not null;
+            case TypeKind.LogBy:
+                primaryType = field.ElementType ?? TypeKind.Error;
+                alternateType = field.KeyType;
+                return field.ElementType is not null || field.KeyType is not null;
+            case TypeKind.Lookup:
+                primaryType = field.KeyType ?? TypeKind.Error;
+                return field.KeyType is not null;
+            default:
+                return false;
+        }
     }
 
     /// <summary>
@@ -361,7 +538,7 @@ internal static partial class TypeChecker
         foreach (var binding in ctx.QuantifierBindings)
         {
             if (string.Equals(binding.Name, name, StringComparison.Ordinal))
-                return new TypedFieldRef(binding.Type, name, false, id.Span);
+                return new TypedFieldRef(binding.Type, name, binding.IsCaseInsensitive, id.Span);
         }
 
         // 2. Event args (second priority)
@@ -408,6 +585,10 @@ internal static partial class TypeChecker
     /// </summary>
     private static TypedExpression ResolveBinaryOp(BinaryOperationExpression bin, CheckContext ctx)
     {
+        // Map TokenKind → OperatorKind via the Operators catalog
+        if (!Operators.ByToken.TryGetValue((bin.Operator, Arity.Binary), out var opMeta))
+            return new TypedErrorExpression(bin.Span);
+
         var left = Resolve(bin.Left, ctx);
         var right = Resolve(bin.Right, ctx);
 
@@ -415,28 +596,21 @@ internal static partial class TypeChecker
         if (left is TypedErrorExpression || right is TypedErrorExpression)
             return new TypedErrorExpression(bin.Span);
 
-        // Map TokenKind → OperatorKind via the Operators catalog
-        if (!Operators.ByToken.TryGetValue((bin.Operator, Arity.Binary), out var opMeta))
+        (left, right) = RetryChoiceComparisonLiterals(bin, opMeta, left, right, ctx);
+        if (left is TypedErrorExpression || right is TypedErrorExpression)
             return new TypedErrorExpression(bin.Span);
 
-        var opKind = opMeta.Kind;
-
         // Attempt resolution: exact → left widen → right widen → both widen
-        var result = TryResolveBinaryWithWidening(opKind, left.ResultType, right.ResultType);
-
+        var result = TryResolveBinaryWithWidening(opMeta.Kind, left.ResultType, right.ResultType);
         if (result is not null)
-        {
-            return new TypedBinaryOp(
-                result.Result,
-                result.Kind,
-                left, right,
-                ResultQualifier: MapQualifierBinding(result),
-                ProofRequirements: result.ProofRequirements.ToImmutableArray(),
-                Span: bin.Span);
-        }
+            return CreateResolvedBinaryOp(bin.Span, opMeta, result, left, right, ctx);
+
+        var catalogResolved = TryResolveCatalogBinaryWithoutOperation(bin, opMeta, left, right, ctx);
+        if (catalogResolved is not null)
+            return catalogResolved;
 
         // Slice 4: context retry — re-resolve literal operands with the other side's type as context
-        var retried = TryContextRetryBinaryOp(bin, left, right, opKind, ctx);
+        var retried = TryContextRetryBinaryOp(bin, left, right, opMeta, ctx);
         if (retried is not null)
             return retried;
 
@@ -541,7 +715,7 @@ internal static partial class TypeChecker
         if (resolved is not null)
         {
             return new TypedUnaryOp(
-                resolved.Result,
+                ResolveUnaryResultType(opMeta, resolved, operand),
                 resolved.Kind,
                 operand,
                 un.Span);
@@ -820,7 +994,8 @@ internal static partial class TypeChecker
         }
 
         // 3. Push binding variable into scope (shadows event args and fields)
-        ctx.QuantifierBindings.Push((expr.BindingName, elementType.Value));
+        var isCaseInsensitiveBinding = IsCaseInsensitiveCollectionElement(collection, ctx);
+        ctx.QuantifierBindings.Push((expr.BindingName, elementType.Value, isCaseInsensitiveBinding));
 
         // 4. Resolve predicate with binding in scope
         var predicate = Resolve(expr.Predicate, ctx);
@@ -1255,13 +1430,18 @@ internal static partial class TypeChecker
     /// <see cref="FixedReturnAccessor"/>: returns <see cref="FixedReturnAccessor.Returns"/>.
     /// <see cref="ElementParameterAccessor"/>: returns <see cref="TypeKind.Integer"/>.
     /// </summary>
-    private static TypeKind ResolveAccessorReturnType(TypeAccessor accessor, TypedExpression receiver, CheckContext ctx) =>
-        accessor switch
+    private static TypeKind ResolveAccessorReturnType(TypeAccessor accessor, TypedExpression receiver, CheckContext ctx)
+    {
+        if (receiver.ResultType == TypeKind.QueueBy && string.Equals(accessor.Name, "peekby", StringComparison.Ordinal))
+            return GetKeyType(receiver, ctx) ?? TypeKind.Error;
+
+        return accessor switch
         {
             FixedReturnAccessor f     => f.Returns,
             ElementParameterAccessor  => TypeKind.Integer,
             _                         => GetElementType(receiver, ctx) ?? TypeKind.Error,
         };
+    }
 
     /// <summary>
     /// Extract the element type from a receiver expression. For <see cref="TypedFieldRef"/>,
@@ -1270,11 +1450,27 @@ internal static partial class TypeChecker
     /// </summary>
     private static TypeKind? GetElementType(TypedExpression receiver, CheckContext ctx)
     {
+        if (receiver is TypedListLiteral listLiteral)
+            return listLiteral.ElementType;
+
         if (receiver is TypedFieldRef fieldRef &&
             ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field))
             return field.ElementType;
+
         return null;
     }
+
+    private static TypeKind? GetKeyType(TypedExpression receiver, CheckContext ctx)
+    {
+        if (receiver is TypedFieldRef fieldRef &&
+            ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field))
+            return field.KeyType;
+
+        return null;
+    }
+
+    private static bool IsCaseInsensitiveCollectionElement(TypedExpression collection, CheckContext ctx) =>
+        collection is TypedFieldRef fieldRef && ctx.CIElementCollections.Contains(fieldRef.FieldName);
 
     /// <summary>
     /// Resolve an interpolated string expression. Resolves each hole segment's expression.

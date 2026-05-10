@@ -91,22 +91,41 @@ internal static partial class TypeChecker
                     Diagnostics.Create(DiagnosticCode.InvalidModifierForType, span, meta.Token.Text, typeName));
             }
 
-            // Mutual exclusivity
+            // Mutual exclusivity / subsumption
             foreach (var conflict in meta.MutuallyExclusiveWith)
             {
-                if (seen.Contains(conflict))
+                if (!seen.Contains(conflict))
+                    continue;
+
+                var conflictMeta = Modifiers.GetMeta(conflict);
+                if (conflictMeta is ValueModifierMeta conflictValue)
                 {
-                    var conflictMeta = Modifiers.GetMeta(conflict);
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.InvalidModifierForType, span,
-                            meta.Token.Text, $"it conflicts with '{conflictMeta.Token.Text}'"));
+                    if (conflictValue.Subsumes.Contains(kind))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                                meta.Token.Text, conflictMeta.Token.Text));
+                        continue;
+                    }
+
+                    if (valueMeta.Subsumes.Contains(conflict))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                                conflictMeta.Token.Text, meta.Token.Text));
+                        continue;
+                    }
                 }
+
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.InvalidModifierForType, span,
+                        meta.Token.Text, $"it conflicts with '{conflictMeta.Token.Text}'"));
             }
 
             // Subsumption: if another explicit modifier already subsumes this one
             foreach (var other in seen)
             {
-                if (other == kind) continue;
+                if (other == kind || meta.MutuallyExclusiveWith.Contains(other)) continue;
                 var otherMeta = Modifiers.GetMeta(other);
                 if (otherMeta is ValueModifierMeta otherValue && otherValue.Subsumes.Contains(kind))
                 {
@@ -387,11 +406,17 @@ internal static partial class TypeChecker
         {
             case TypedBinaryOp bin:
                 if (Operations.GetMeta(bin.ResolvedOp) is BinaryOperationMeta
-                        { HasCIVariant: true, CIDiagnosticCode: { } binaryDiagCode } &&
-                    (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
+                        { HasCIVariant: true, CIDiagnosticCode: { } binaryDiagCode } binaryMeta)
                 {
-                    var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
-                    ctx.Diagnostics.Add(Diagnostics.Create(binaryDiagCode, bin.Span, ciFieldName));
+                    if (binaryMeta.Op == OperatorKind.Contains)
+                    {
+                        TryEmitContainsCIDiagnostic(bin, binaryDiagCode, ctx);
+                    }
+                    else if (IsCIExpression(bin.Left) || IsCIExpression(bin.Right))
+                    {
+                        var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
+                        ctx.Diagnostics.Add(Diagnostics.Create(binaryDiagCode, bin.Span, ciFieldName));
+                    }
                 }
 
                 EnforceCIInExpression(bin.Left, ctx);
@@ -455,5 +480,39 @@ internal static partial class TypeChecker
     /// <summary>Returns the field name from whichever operand is a <c>~string</c> field reference.</summary>
     private static string GetCIFieldName(TypedExpression left, TypedExpression right) =>
         IsCIExpression(left) ? ((TypedFieldRef)left).FieldName : ((TypedFieldRef)right).FieldName;
+
+    private static void TryEmitContainsCIDiagnostic(TypedBinaryOp bin, DiagnosticCode diagnosticCode, CheckContext ctx)
+    {
+        if (bin.Left is not TypedFieldRef collectionField ||
+            bin.Right is not TypedFieldRef valueField ||
+            !valueField.IsCaseInsensitive ||
+            ctx.CIElementCollections.Contains(collectionField.FieldName) ||
+            !ctx.FieldLookup.TryGetValue(collectionField.FieldName, out var field))
+        {
+            return;
+        }
+
+        var collectionType = Types.GetMeta(field.ResolvedType).DisplayName;
+        var suggestedType = field.ResolvedType switch
+        {
+            TypeKind.Set => "set of ~string",
+            TypeKind.Queue => "queue of ~string",
+            TypeKind.Stack => "stack of ~string",
+            TypeKind.Log => "log of ~string",
+            TypeKind.LogBy when field.KeyType is not null => $"log of ~string by {Types.GetMeta(field.KeyType.Value).DisplayName}",
+            TypeKind.Bag => "bag of ~string",
+            TypeKind.List => "list of ~string",
+            TypeKind.QueueBy when field.KeyType is not null => $"queue of ~string by {Types.GetMeta(field.KeyType.Value).DisplayName}",
+            _ => "collection of ~string",
+        };
+
+        ctx.Diagnostics.Add(Diagnostics.Create(
+            diagnosticCode,
+            bin.Span,
+            valueField.FieldName,
+            collectionField.FieldName,
+            collectionType,
+            suggestedType));
+    }
 
 }

@@ -214,22 +214,22 @@ public class TypeCheckerModifierTests
     }
 
     [Fact]
-    public void NonnegativeAndPositive_MutuallyExclusive_EmitsConflict()
+    public void NonnegativeAndPositive_MutuallyExclusive_EmitsRedundantModifier()
     {
-        // nonnegative has MutuallyExclusiveWith: [Positive]
-        // positive has MutuallyExclusiveWith: [Nonnegative]
         var precept = """
             precept Widget
             field Count as integer nonnegative positive
             state Open initial
             """;
 
-        // Mutual exclusivity emits InvalidModifierForType with conflict description
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.RedundantModifier));
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.InvalidModifierForType));
     }
 
     [Fact]
-    public void PositiveAndNonnegative_ReversedOrder_EmitsConflict()
+    public void PositiveAndNonnegative_ReversedOrder_EmitsRedundantModifier()
     {
         var precept = """
             precept Widget
@@ -237,7 +237,10 @@ public class TypeCheckerModifierTests
             state Open initial
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.RedundantModifier));
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.InvalidModifierForType));
     }
 
     // ════════════════════════════════════════════════════════════════════════

@@ -79,6 +79,27 @@ public static class Operations
             kind, OperatorKind.Not, PBoolean, TypeKind.Boolean,
             "Logical negation"),
 
+        OperationKind.BooleanAndBoolean => new BinaryOperationMeta(
+            kind, OperatorKind.And, PBoolean, PBoolean, TypeKind.Boolean,
+            "Logical conjunction"),
+        OperationKind.BooleanOrBoolean => new BinaryOperationMeta(
+            kind, OperatorKind.Or, PBoolean, PBoolean, TypeKind.Boolean,
+            "Logical disjunction"),
+        OperationKind.CollectionContains => new BinaryOperationMeta(
+            kind, OperatorKind.Contains,
+            new ParameterMeta(TypeKind.Error, "collection"),
+            new ParameterMeta(TypeKind.Error, "value"),
+            TypeKind.Boolean,
+            "Collection membership",
+            HasCIVariant: true,
+            CIDiagnosticCode: DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains),
+        OperationKind.LookupAccess => new BinaryOperationMeta(
+            kind, OperatorKind.LookupAccess,
+            new ParameterMeta(TypeKind.Lookup, "lookup"),
+            new ParameterMeta(TypeKind.Error, "key"),
+            TypeKind.Error,
+            "Lookup value access"),
+
         // ── Scalar: integer ────────────────────────────────────────
         OperationKind.IntegerPlusInteger => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PInteger, PInteger, TypeKind.Integer,

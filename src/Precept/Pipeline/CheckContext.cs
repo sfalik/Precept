@@ -72,10 +72,11 @@ internal sealed class CheckContext
     // ── Quantifier binding stack ──────────────────────────────────────────
 
     /// <summary>
-    /// Stack of active quantifier bindings. Each frame records the binding name and its
-    /// resolved type. Innermost binding is on top — shadows event args and fields.
+    /// Stack of active quantifier bindings. Each frame records the binding name, its
+    /// resolved type, and whether the binding carries the case-insensitive string qualifier.
+    /// Innermost binding is on top — shadows event args and fields.
     /// </summary>
-    public Stack<(string Name, TypeKind Type)> QuantifierBindings { get; } = new();
+    public Stack<(string Name, TypeKind Type, bool IsCaseInsensitive)> QuantifierBindings { get; } = new();
 
     // ── Normalized declaration accumulators (Pass 2 output) ───────────────
 

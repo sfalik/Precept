@@ -33,22 +33,22 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-006 | `min(a, b)` and `max(a, b)` not recognized as function calls... | Compiler | **Fixed** | — | Retested 2026-05-10: `min(A, B)`, `max(A, B)`, and `min(max(X, 0), 100)` all compile cleanly ✅ |
 | BUG-007 | Arithmetic operators have lower precedence than comparison... | Compiler | **Fixed** | — | Retested 2026-05-10: `X + 1 > Y` compiles cleanly — arithmetic has correct precedence over comparison ✅ |
 | BUG-008 | `pop` and `dequeue` proof obligations use unnamed internal... | Compiler | **Fixed** | — | Retested 2026-05-10: `pop Items into Top` and `dequeue Queue into Item` both compile cleanly ✅ |
-| BUG-009 | `for` operator resolves to key type instead of value type | Compiler | Open | — | — |
-| BUG-010 | `choice` literal not typed as choice in comparison position | Compiler | Open | — | Retested 2026-05-10: `Status == "Active"` fires PRE0018 "Expected choice value, got string" — string literals do not auto-widen to choice type in comparison |
-| BUG-011 | State entry/exit hook actions not serialized in MCP... | MCP-definition | Open | — | — |
-| BUG-012 | Stateless event handler actions not serialized in MCP... | MCP-definition | Open | — | — |
-| BUG-013 | `sqrt(abs(x))` proof obligation uses `<unknown>` — abs()... | Compiler | **Fixed** | — | Retested 2026-05-10: `sqrt(abs(X))` compiles cleanly ✅ |
-| BUG-014 | `precept_proofs` CollectionEmptyOnMutation recovery hint is... | MCP-docs | Open | — | — |
-| BUG-015 | `precept_diagnostic` PRE0083 description covers only... | MCP-docs | Open | — | — |
-| BUG-016 | Guarded rule `when` clause not serialized in MCP definition... | MCP-definition | Open | — | — |
-| BUG-017 | `~string` (case-insensitive string) qualifier lost in MCP... | MCP-definition | Open | — | — |
-| BUG-018 | Collection element types lost in MCP definition output | MCP-definition | Open | — | — |
+| BUG-009 | `for` operator resolves to key type instead of value type | Compiler | **Fixed** | — | Retested 2026-05-10: `Prices for "standard"` now resolves to the lookup value type (`number`) ✅ |
+| BUG-010 | `choice` literal not typed as choice in comparison position | Compiler | **Fixed** | — | Retested 2026-05-10: `Status == "Active"` now contextual-types the literal as a choice value and compiles cleanly ✅ |
+| BUG-011 | State entry/exit hook actions not serialized in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `to Active -> set Note = "..."` not in definition ❌ |
+| BUG-012 | Stateless event handler actions not serialized in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `on Tick -> set Counter = Counter + 1` — rows empty in definition ❌ |
+| BUG-013 | `sqrt(abs(x))` proof obligation uses `<unknown>` — abs()... | Compiler | **Regression** | — | Retested 2026-05-10: `sqrt(X)` now PRE0018 "Expected a sqrt value here, but got 'decimal'" — was Fixed, now broken again ❌ |
+| BUG-014 | `precept_proofs` CollectionEmptyOnMutation recovery hint is... | MCP-docs | **Fixed** | — | Retested 2026-05-10: hint now reads valid "Guard the mutation action with 'when CollectionField.count > 0'" ✅ |
+| BUG-015 | `precept_diagnostic` PRE0083 description covers only... | MCP-docs | Open | — | Retested 2026-05-10: sqrt now has separate SqrtOfNegative fault; PRE0083=DivisionByZero only — verify if PRE0083 still misfires for sqrt |
+| BUG-016 | Guarded rule `when` clause not serialized in MCP definition... | MCP-definition | Open | — | Retested 2026-05-10: `rule Score >= 0 when IsActive because "..."` compiles ✅; `when` guard missing from definition ❌ |
+| BUG-017 | `~string` (case-insensitive string) qualifier lost in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `field Email as ~string` shows as `"type":"string"` — qualifier lost ❌ |
+| BUG-018 | Collection element types lost in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `set of string` shows as `"type":"set"` only — element type lost ❌ |
 | BUG-019 | Typed constants (single-quoted strings) not resolved from... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: typed constants in default/action expression positions parse and compile cleanly ✅ |
 | BUG-020 | Guarded ensures (`when` guard) not parsed in any position | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `in State when G ensure ...` compiles cleanly ✅ |
 | BUG-021 | `append by P`, `enqueue by P` v3 action forms not parsed | Compiler | **Fixed** | — | Retested 2026-05-10: `append Tasks Label by Priority` and `enqueue Jobs Job by Rank` both compile cleanly ✅ |
-| BUG-022 | Event ensures (`on Event ensure`) not serialized in MCP... | MCP-definition | Open | — | — |
-| BUG-023 | `because` clause includes keyword in serialized value | MCP-definition | Open | — | — |
-| BUG-024 | `omit` declarations not reflected in MCP definition output | MCP-definition | Open | — | — |
+| BUG-022 | Event ensures (`on Event ensure`) not serialized in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `on Updated ensure Amount > 0 because "..."` not in definition rules or events ❌ |
+| BUG-023 | `because` clause includes keyword in serialized value | MCP-definition | Open | — | Retested 2026-05-10: `"because":"because \"active requires positive\""` — includes `because` keyword word ❌ |
+| BUG-024 | `omit` declarations not reflected in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `in Active omit Email` not in definition ❌ |
 | BUG-025 | Keyword-named member accessors rejected by parser | Compiler | **Fixed** | — | Retested 2026-05-10: `.count`, `.peek` on list/queue/stack all compile ✅ |
 | BUG-026 | `in State modify all readonly` treats `all` as field name | Compiler | **Fixed** | — | Retested 2026-05-10: `in Draft modify all readonly` compiles cleanly ✅ |
 | BUG-027 | `choice of T(...)` type not valid in event arg declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: event args accept `choice of T(...)` via full type parser ✅ |
@@ -56,32 +56,32 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-029 | `InvalidModifierBounds` check not enforced | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 now fires correctly for `min > max` ✅ |
 | BUG-030 | Computed field forward references rejected; wrong error... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: computed forward references compile; cycles emit `CircularComputedField` ✅ |
 | BUG-031 | String interpolation not supported in `reject`, `because`,... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: interpolated `because`/`reject` messages parse cleanly ✅ |
-| BUG-032 | `reject` outcomes not serialized in MCP definition rows | MCP-definition | Open | — | — |
-| BUG-033 | Event arg `optional` modifier not reflected in MCP definition | MCP-definition | Open | — | — |
-| BUG-034 | Per-state access mode overrides not in MCP definition output | MCP-definition | Open | — | — |
-| BUG-035 | Choice element type and member values lost in MCP definition... | MCP-definition | Open | — | — |
-| BUG-036 | `no transition` and `reject` outcomes indistinguishable in... | MCP-definition | Open | — | — |
+| BUG-032 | `reject` outcomes not serialized in MCP definition rows | MCP-definition | Open | — | Retested 2026-05-10: `-> reject "msg"` row shows as `{"fromStates":[...],"actions":[]}` — no reject outcome ❌ |
+| BUG-033 | Event arg `optional` modifier not reflected in MCP definition | MCP-definition | Open | — | Retested 2026-05-10: `Submit(Tag as string optional)` shows `{"name":"Tag","type":"string"}` — no isOptional ❌ |
+| BUG-034 | Per-state access mode overrides not in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `in Active modify Score readonly` not in definition ❌ |
+| BUG-035 | Choice element type and member values lost in MCP definition... | MCP-definition | Open | — | Retested 2026-05-10: `choice of string("Low","Medium","High")` shows as `"type":"choice"` only ❌ |
+| BUG-036 | `no transition` and `reject` outcomes indistinguishable in... | MCP-definition | Open | — | Retested 2026-05-10: both show as `{"fromStates":[...],"actions":[]}` with no outcome indicator ❌ |
 | BUG-037 | `in State modify all` and `in State omit all` both reject... | Compiler | **Fixed** | — | Retested 2026-05-10: `modify all editable` and `omit all` both compile cleanly ✅ |
 | BUG-038 | `InvalidModifierBounds` not enforced for... | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 fires for `minlength > maxlength` and `mincount > maxcount` ✅ |
 | BUG-039 | `list.at(N)` method call rejected due to `at` keyword collision | Compiler | **Fixed** | — | Retested 2026-05-10 (round 5): spec updated — `count > 0` proof now documented for `at(N)`; without `notempty` correctly emits PRE0063 ✅; with `notempty` compiles clean ✅ |
-| BUG-040 | `queue.peekby(P)` not implemented | Compiler | Open | — | — |
-| BUG-041 | `UnexpectedNull` runtime fault recovery hint uses invalid... | MCP-docs | Open | — | — |
-| BUG-042 | Modifier bound values not serialized in MCP definition output | MCP-definition | Open | — | — |
-| BUG-043 | String default values include surrounding DSL quotes in... | MCP-definition | Open | — | — |
+| BUG-040 | `queue.peekby(P)` not implemented | Compiler | **Fixed** | — | Retested 2026-05-10: `Tasks.peekby` on `queue of string by integer` now resolves to the queue key type (`integer`) ✅ |
+| BUG-041 | `UnexpectedNull` runtime fault recovery hint uses invalid... | MCP-docs | **Fixed** | — | Retested 2026-05-10: hint now reads "Add the 'optional' modifier to allow null values, or guard with 'when Field != null' before use" — valid syntax ✅ |
+| BUG-042 | Modifier bound values not serialized in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `integer min 0 max 100` shows `"modifiers":["min","max","default"]` — no values ❌ |
+| BUG-043 | String default values include surrounding DSL quotes in... | MCP-definition | Open | — | Retested 2026-05-10: `default "hello"` shows `"defaultValue":"\"hello\""` — includes quotes ❌ |
 | BUG-044 | Guarded state actions (`from State when G -> action`) not... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: guarded state hooks (`to/from State when ... ->`) compile cleanly ✅ |
 | BUG-045 | `ascending`/`descending` modifiers not recognized in log type... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `log of T by P ascending|descending` parses cleanly ✅ |
 | BUG-046 | CI enforcement not applied to quantifier binding variables | Compiler | **Fixed** | — | Retested 2026-05-10: `each s in Scores (s >= 0)` in ensure compiles cleanly ✅ (prior repro used wrong `rule` syntax) |
-| BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | Open | — | — |
+| BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | Open | — | Retested 2026-05-10: `on Tick -> set Counter = Counter + 1` shows `"rows":[]` — actions lost ❌ |
 | BUG-048 | `by` keyword not recognized in `append`/`enqueue` priority... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-021; `enqueue … by` compiles cleanly ✅ |
 | BUG-049 | `insert`/`remove at` actions fail due to `at` keyword ambiguity | Compiler | **Fixed** | — | Retested 2026-05-10: `remove Steps at Position` fixed in `a65c9fed`; `insert Steps NewStep at Position` fixed in `f2d1dece` ✅ |
 | BUG-050 | `dequeue`/`pop` trigger false PRE0083 "Division by zero" | Compiler | **Fixed** | — | Retested 2026-05-10: `dequeue Queue into Item` and `pop Items into Top` compile cleanly with `notempty` ✅ |
 | BUG-051 | `min(a, b)` and `max(a, b)` function calls fail due to... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-006; `min()`, `max()`, and chained `min(max(...))` all compile cleanly ✅ |
-| BUG-052 | `contains` keyword unusable in expression position | Compiler | Open | — | — |
-| BUG-053 | `and`/`or` binary boolean operators fail in all expression positions | Compiler | Open | — | — |
+| BUG-052 | `contains` keyword unusable in expression position | Compiler | **Fixed** | — | Retested 2026-05-10: `Tags contains SearchTag` and string `contains` expressions now type-check cleanly ✅ |
+| BUG-053 | `and`/`or` binary boolean operators fail in all expression positions | Compiler | **Fixed** | — | Retested 2026-05-10: `A and B` / `A or B` now type-check in computed fields and guards ✅ |
 | BUG-054 | `ensure` clause not supported in stateless event hooks | Compiler | **Fixed** | — | Retested 2026-05-10: `on Event ensure BoolExpr because "..."` compiles cleanly ✅ |
-| BUG-055 | PRE0097 `exampleAfter` shows wrong fix — removes `~string` instead of switching to `~startsWith` | MCP-docs | Open | — | — |
-| BUG-056 | PRE0081 false positive fires on stateless-hook-only events in stateful precepts | Compiler | Open | — | — |
-| BUG-057 | `date + period` and `date - period` arithmetic unusable — PRE0113 fires on all period field forms | Compiler | Open | — | — |
+| BUG-055 | PRE0097 `exampleAfter` shows wrong fix — removes `~string` instead of switching to `~startsWith` | MCP-docs | Open | — | Retested 2026-05-10: exampleAfter still changes `~string` → `string` instead of `startsWith` → `~startsWith` ❌ |
+| BUG-056 | PRE0081 false positive fires on stateless-hook-only events in stateful precepts | Compiler | Open | — | Retested 2026-05-10: PRE0081 warning still fires on `Updated` event despite stateless hook ❌ |
+| BUG-057 | `date + period` and `date - period` arithmetic unusable — PRE0113 fires on all period field forms | Compiler | Open | — | Retested 2026-05-10: `StartDate + Offset` (period field) → PRE0113 "requires Date dimension but has unknown" ❌ |
 
 ---
 
@@ -656,7 +656,7 @@ Same result even with `field Steps as stack of string notempty`.
 ## BUG-009 — `for` operator resolves to key type instead of value type **[Compiler]**
 
 ### Status
-Open
+Fixed
 
 ### Description
 The `for` infix operator retrieves a value from a `lookup of K to V` field: `F for K`
@@ -714,7 +714,7 @@ Same error with a field key (`Prices for Category`) and an event arg key (`Price
 ## BUG-010 — `choice` literal not typed as choice in comparison position **[Compiler]**
 
 ### Status
-Open
+Fixed
 
 ### Description
 Literals are accepted in assignment position for choice fields
@@ -2228,7 +2228,7 @@ Actual (before fix): PRE0009 × 2 + PRE0020.
 ## BUG-040 — `queue.peekby(P)` not implemented **[Compiler]**
 
 ### Status
-Open
+Fixed
 
 ### Description
 `queue.peekby(P)` is a v3 accessor that peeks at the highest-priority entry in a
@@ -2671,7 +2671,7 @@ state Active initial
 ## BUG-052 -- `contains` keyword unusable in expression position [Compiler]
 
 ### Status
-Open
+Fixed
 
 ### Description
 `contains` is a reserved keyword documented as a collection membership and string substring
@@ -2707,7 +2707,7 @@ state Active initial
 ## BUG-053 -- `and`/`or` binary boolean operators fail in all expression positions [Compiler]
 
 ### Status
-Open
+Fixed
 
 ### Description
 `and` and `or` binary boolean operators fail in EVERY expression position with PRE0018

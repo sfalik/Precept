@@ -271,4 +271,10 @@ public enum OperationKind
     // ── Comparison: case-insensitive (string only) ──────────────────
     StringCaseInsensitiveEqualsString        = 197,
     StringCaseInsensitiveNotEqualsString     = 198,
+
+    // ── Logical + membership pseudo-operations used by the type checker ─
+    BooleanAndBoolean                        = 199,
+    BooleanOrBoolean                         = 200,
+    CollectionContains                       = 201,
+    LookupAccess                             = 202,
 }

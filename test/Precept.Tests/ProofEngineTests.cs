@@ -832,9 +832,8 @@ public class ProofEngineTests
         [Fact]
         public void Strategy3_AndGuard_DecomposesConjuncts()
         {
-            // NOTE: `and` in guards currently produces a TypeMismatch diagnostic — BooleanAndBoolean
-            // is not in the Operations catalog. The and-guard fails type-checking so guard constraints
-            // cannot be extracted; the obligation is unresolved.
+            // `and` now resolves as a boolean operator, so Strategy 3 can extract the
+            // left conjunct D != 0 and discharge the divisor obligation from the guard.
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
@@ -849,10 +848,9 @@ public class ProofEngineTests
             var obligation = ledger.Obligations.SingleOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
 
-            // `and` guard fails TC; no strategy can prove the obligation via this guard
             if (obligation is not null)
-                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
-                    because: "and in guards produces TypeMismatch; guard constraints cannot be extracted");
+                obligation.Disposition.Should().Be(ProofDisposition.Proved,
+                    because: "and-connected guard constraints are now extracted from the typed boolean expression");
         }
 
         [Fact]
