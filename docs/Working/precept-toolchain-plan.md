@@ -110,7 +110,7 @@ Slices 1–2 bundle catalog + pipeline work and close bugs directly. Slices 3–
 | Slice 9 | Type Checker — Catalog-Derived Operator Typing | ✅ Complete — `b7868d60` | BUG-002, BUG-003, BUG-007, BUG-009, BUG-010, BUG-028, BUG-029, BUG-038, BUG-040, BUG-046, BUG-052, BUG-053 |
 | Slice 10 | Name Binder — Catalog-Derived Name Resolution | ✅ Complete — `def91dbb` | BUG-001, BUG-026, BUG-030, BUG-037 |
 | Slice 11 | Proof Engine — Catalog-Derived Proof Obligations | ✅ Complete — `004e68be` | BUG-008, BUG-013, BUG-050 |
-| Slice 12 | MCP DTO Audit — Sync DTOs to Catalog Growth | ⬜ Not started | BUG-011, BUG-012, BUG-016, BUG-017, BUG-018, BUG-022, BUG-023, BUG-024, BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047 |
+| Slice 12 | MCP DTO Audit — Sync DTOs to Catalog Growth | ✅ Complete — 5f79fc7a | BUG-011, BUG-012, BUG-016, BUG-017, BUG-018, BUG-022, BUG-023, BUG-024, BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047 |
 | Slice 13 | MCP-Docs — Fix Incorrect Recovery Hints | ⬜ Not started | BUG-014, BUG-015, BUG-041 |
 | Slice 14 | Test Layer — Catalog Capability Tests | ⬜ Not started | (regression coverage for all 54) |
 | Slice 15 | Test Layer — Pipeline Stage Unit Tests | ⬜ Not started | (regression coverage for all 54) |
