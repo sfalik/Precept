@@ -20,8 +20,6 @@
 
 - Known boundary left explicit by the plan: `src/Precept/Runtime/Measures/Unit.cs`, `MeasureDimension.cs`, and `UnitFactory.cs` are intentional runtime stubs for future measure arithmetic work.
 
-
-
 ### 2026-05-09: Data family expanded — field + arg added
 
 **By:** Shane
@@ -29,8 +27,6 @@
 **What:** Field (#A5B4FC) and arg (#9AD8E8) added to Data color family. Spec updated to allow semantically-grouped families with distinct hues (not tonal-variants-only). Fields and args are data tokens in the DSL — they belong in Data.
 
 **Why:** Moving them to a standalone layer would hollow out what "Data" means. The family definition was too restrictive.
-
-
 
 # Decision: Field and Arg as Standalone Companion Tokens
 
@@ -93,8 +89,6 @@ Option 3: standalone companion tokens.
 - Hue proximity is self-documenting. A named grouping on top adds overhead without new information.
 
 - The companion concept is extensible if future tokens need the same pattern (e.g., a guard-name color near Rule).
-
-
 
 # george-currencycatalog-implemented
 
@@ -210,8 +204,6 @@ Per gap analysis. Standard practice.
 
 - No pre-existing test failures introduced
 
-
-
 ### 2026-05-09T09:34:41: User directive
 
 **By:** Shane (via Copilot)
@@ -219,8 +211,6 @@ Per gap analysis. Standard practice.
 **What:** Always include a running tally of in-flight agent threads when multiple work streams are active. Format: emoji + agent name + one-line status (running/done/blocked). Keep it updated every response.
 
 **Why:** User request — captured for team memory
-
-
 
 # PRECEPT0019 Exhaustiveness Audit
 
@@ -520,8 +510,6 @@ These are exactly the places where the catalog already is the source of truth an
 
 **Verdict:** add both names to `CatalogAnalysisHelpers.CatalogEnumNames` now. There are no remaining `_ =>` discard-arm blockers in the catalog `GetMeta` switches. The current blocker is only the stale TODO comment, not the code.
 
-
-
 # ProofEngine Architecture Audit — Findings
 
 
@@ -671,8 +659,6 @@ Implementation signature: `GuardRelationImpliesObligation(guard, expr, exprLeftF
 
 
 The implementation pre-resolves field names and passes them as arguments. Functionally equivalent, slightly different shape. Spec should be updated if a spec-update pass occurs.
-
-
 
 # Design Ruling: ProofEngine × ProofRequirementKind Exhaustiveness Mechanism
 
@@ -1038,8 +1024,6 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 This is the right solution because it enforces the actual safety property (every switch is complete) at the actual enforcement boundary (each switch independently) without distorting the engine's natural decomposition (strategies by technique, not by kind).
 
-
-
 # Frank ruling — `set` / `SetType` token metadata
 
 
@@ -1373,8 +1357,6 @@ The fix is not to carve out an exception and not to repaint `Set` as a type.
 
 
 The fix is to stop claiming that the lexer token `Set` is a type token when the architecture already has `SetType` for that job.
-
-
 
 # TypeChecker Catalog-Driven Metadata Design
 
@@ -2350,8 +2332,6 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 | `src/Precept/Pipeline/TypeChecker.cs` | Refactor (×3) | Lines 449–456, 589–594, 652–656 become catalog lookups |
 
-
-
 # OutcomeArgumentKind enrollment
 
 
@@ -2367,8 +2347,6 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
   - `dotnet build src\Precept\Precept.csproj` is currently blocked by a pre-existing `PRECEPT0025` in `src\Precept\Pipeline\ProofEngine.cs` (left untouched per instruction).
 
   - Targeted binary test run after compiling `Precept.dll` with analyzers disabled: `Precept.Tests` = 3629 passed / 2 failed (`TokensTests` only), `Precept.Analyzers.Tests` = 272 passed / 0 failed.
-
-
 
 # George — PRECEPT0025 Done
 
@@ -2574,8 +2552,6 @@ The analyzer uses type hierarchy walking (`FindCatalogDUBase`) rather than check
 
 The catch-all declaration pattern check (`IDeclarationPatternOperation where MatchedType == catalogDUBase`) ensures that `ProofRequirement r =>` — a named binding over the abstract base — is treated the same as `_`. Both are structurally equivalent catch-alls.
 
-
-
 # George — PRECEPT0025 / PRECEPT0026 closeout
 
 
@@ -2652,8 +2628,6 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
   - Still blocked by pre-existing `Precept.LanguageServer.Tests` compile errors unrelated to PRECEPT0025 / PRECEPT0026.
 
-
-
 # George — TypeChecker catalog fixes
 
 
@@ -2728,8 +2702,6 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
   - `dotnet test --no-build -q` reports a missing `Precept.Analyzers.Tests.dll` and 194 pre-existing `Precept.LanguageServer.Tests` failures.
 
-
-
 # Kramer — ActionSyntaxShape enrollment in PRECEPT0019
 
 
@@ -2792,8 +2764,6 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
   - Root `dotnet build` is blocked by unrelated in-progress changes outside this slice (LanguageServer and analyzer compile failures already present in the working tree), so the requested clean 0-warning/0-error root validation could not be reproduced safely without disturbing other users' work.
 
-
-
 # Kramer — ProofEngine fixes
 
 
@@ -2824,8 +2794,6 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 - `test/Precept.Tests/ProofEngineTests.cs`
 
-
-
 # Kramer — ProofEngine dead arms removed
 
 
@@ -2849,8 +2817,6 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
     - `Precept.Mcp.Tests`: 7 passed
 
     - `Precept.LanguageServer.Tests`: 194 failed (existing `LanguageServerStubs` / completion stub failures)
-
-
 
 # Kramer note — `set` token catalog fix
 
@@ -2930,8 +2896,6 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 `Cat_ActType` was removed.
 
-
-
 # Newman — `precept_compile` implementation complete
 
 
@@ -2998,8 +2962,6 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` ⚠️ unrelated existing failures in `TokensTests` (`TypeKeywords_HaveStorageTypeScope`, `TypeKeywords_HaveTypeSemanticTokenType`)
 
-
-
 # Soup-Nazi — ProofEngine gap closeout
 
 
@@ -3011,8 +2973,6 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 - Test count: before 158 (per the audit request); after 173 passing in the filtered `ProofEngineTests` run.
 
 - Validation: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~ProofEngineTests"` passed 173/173. Full `dotnet test test/Precept.Tests/` still has the pre-existing two `TokensTests` failures about `Set` keyword type scoping/token type.
-
-
 
 # ProofEngine Test Coverage Gap Report
 
@@ -3368,8 +3328,6 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 10. **`PresenceProofRequirement` → `DivisionByZero` mapping in CreateDiagnostic** (Gap 12) — Potential bug, no test catches it.
 
-
-
 # Message-position catalog metadata closed
 
 
@@ -3411,8 +3369,6 @@ No test verifies correct obligation tracking when the same field is used as a di
 - George added the metadata fields plus token flags; build and tests passed; commits `105a42a7` and `315b00c9`.
 
 - Kramer wired the generator, removed the stale TODO, regenerated `precept.tmLanguage.json`, and verified a zero-diff output; commit `7f3842fd`.
-
-
 
 # ProofEngine Design Decisions — PE-G1, PE-G2, PE-G3
 
@@ -4244,8 +4200,6 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 - **SIG-5 initial-state satisfiability deferral**: This is marked as blocked pending TypeChecker expression evaluation. Should it be deferred entirely from the proof engine's initial implementation scope, or should a minimal version (literals-only default values against simple comparison constraints) be included in the first implementation?
 
-
-
 # Shane Sign-Off — ProofEngine Design Decisions
 
 
@@ -4301,8 +4255,6 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 **Status:** Blocked on Frank deep dive. No implementation decision authorized yet.
-
-
 
 # Readability Review: combined-design-v2.md (2026-07-17)
 
@@ -4361,8 +4313,6 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 ---
-
-
 
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
 
@@ -4541,8 +4491,6 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 ---
-
-
 
 # Decision: Combined Design v2 Comprehensive Revision Pass
 
@@ -4941,8 +4889,6 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 ---
-
-
 
 # Full Architecture Review — spike/Precept-V2
 
@@ -5466,15 +5412,11 @@ This branch is ready to merge to main.
 
 ---
 
-
-
 # **CRITICAL GAPS**
 
 
 
 The parser suite is green, but it is **not** comprehensive enough to support type-checker development safely. The biggest holes are the full type-reference surface, full action syntax surface, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), event-arg richness, interpolation, and specific parser diagnostic-code assertions. Right now, too many tests stop at “a slot exists” or “the parser did not crash.” That is not enough. No soup for unanchored parser behavior.
-
-
 
 # TypeChecker B1/B2/B3 Blockers — Fixed
 
@@ -5583,8 +5525,6 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 - **Event arg default expressions** — DeclaredArg only carries ModifierKind array, not values (future work)
 
 - **DiagnosticCode.TypeMismatch reuse** for MissingExpression — Frank may want a dedicated code in the future
-
-
 
 # Precept TextMate Grammar — Authoritative Specification
 
@@ -7730,8 +7670,6 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 *End of specification.*
 
-
-
 # ProofEngine Spec — Pre-Implementation Gap Analysis
 
 
@@ -8568,8 +8506,6 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 **Why:** User directive — G1/G2 prework is in the same category as G3 (structural definitions, not engine logic). Prework can proceed immediately after design is finalized; engine implementation is a separate phase.
 
-
-
 # PE-G1 Detailed Analysis — Frank
 
 
@@ -9062,8 +8998,6 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 **Gap analysis updated:** docs/Working/frank-proof-engine-gap-analysis.md — PE-G1 marked RESOLVED
 
-
-
 # PE-G2 Analysis — ProofDischarge + FieldModifierMeta.ProofDischarges
 
 
@@ -9318,8 +9252,6 @@ public sealed record FieldModifierMeta(
 
 | 3. Population entries | Populate all bound-establishing field modifiers now: live rows for `positive`, `nonnegative`, `nonzero`, `notempty`, `min`, `mincount`; semantically complete dormant rows for `max`, `maxcount`, `minlength`, and `maxlength`. | This keeps modifier meaning catalog-declared instead of consumer-hardcoded and prevents the next proof-engine feature from reopening the same metadata gap. |
 
-
-
 # PE-G2 Broader Design Review — Should `ProofDischarge` cover all requirement kinds?
 
 
@@ -9507,8 +9439,6 @@ The proof engine switches on **requirement subtype** (`is DimensionProofRequirem
 
 
 Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior PE-G2 analysis. The broader DU is architecturally weaker, not stronger — it would catalog non-knowledge (tautologies and empty sets) in pursuit of a false uniformity. The current three-arm Strategy 2 design is the correct metadata-driven architecture because each arm reads from the *right* metadata source for its proof obligation kind.
-
-
 
 # PE-G2 Full Design — `ProofSatisfaction` and all five requirement kinds
 
@@ -10878,8 +10808,6 @@ There is nothing here that requires another deferral ceremony.
 
 **Why:** ProofEngine requires positive carrier facts for all 5 requirement kinds. Absence-checking is fragile and non-canonical.
 
-
-
 # PE-G2 Rename Analysis — `ProofDischarge` → `ProofSatisfaction`
 
 
@@ -11432,8 +11360,6 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 That is the decision. `ProofDischarge` is the wrong name. The right name is `ProofSatisfaction`, and the right shape is a proof-kind DU that is broad in **type design** but disciplined in **property placement**.
 
-
-
 # Decision: PE-G4 through PE-G18 — All ProofEngine Gaps Resolved
 
 
@@ -11681,8 +11607,6 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 **Ready for:** George to execute once Shane approves.
-
-
 
 # Decision: ProofEngine Spec Complete — All 18 Gaps Resolved
 
@@ -11932,8 +11856,6 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 - `ProofEngine.cs` remains the behavioral frontier; Phase 2 should implement runtime-neutral proof analysis against the new carriers rather than reshaping these types again.
 
-
-
 # ProofEngine Phase 2 Closeout
 
 
@@ -12018,8 +11940,6 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 - Language Server proof diagnostics are now live
 
-
-
 # ProofEngine Phase 2 — Post-commit bugfixes
 
 
@@ -12099,8 +12019,6 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 **Why:** The extension only needs the bundled client JavaScript plus the unchanged `server/` and `syntaxes/` assets; shipping raw `node_modules` was inflating the VSIX with ~170 JavaScript files for no runtime benefit.
 
 **Rationale:** Keeping `npm run compile` as plain `tsc` preserves the existing development loop, while `npm run bundle` becomes the production-only path that inlines `vscode-languageclient` and other client dependencies without bundling the .NET language server.
-
-
 
 # Soup Nazi — ProofEngine Phase 2 tests done
 
@@ -12198,8 +12116,6 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 - Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.
 
-
-
 # Soup Nazi review — `precept_language`
 
 
@@ -12270,8 +12186,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
   - No failure implicated `LanguageTool` or the new MCP tests.
 
-
-
 # ISO 4217 refresh workflow conversion
 
 
@@ -12302,8 +12216,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 - Optional local reference data should strengthen developer validation without turning absent downloads into red CI.
 
-
-
 # Qualifier completion honesty and Tier 1 UOM breadth
 
 
@@ -12327,8 +12239,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 - Completions are a truth surface: invalid structure should feel invalid, not productive.
 
 - Missing legitimate units damages trust faster than a somewhat longer filtered completion list.
-
-
 
 # UCUM / ISO 4217 implementation gap remediation shape
 
@@ -12362,8 +12272,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 - `FrozenSet<string>` cannot carry the metadata required for money semantics or future catalog-driven tooling.
 
-
-
 # Field and arg semantic colors
 
 
@@ -12392,8 +12300,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 - The companion-token pattern is an axis relationship, not a change to the existing 1–3 shade paradigm.
 
-
-
 ### 2026-05-09T12:55:27-04:00: User directive
 
 **By:** Shane (via Copilot)
@@ -12401,8 +12307,6 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 **What:** Do not do anything beyond the plan scope. The implementation plan is `docs/Working/typed-literal-system-plan.md` (12 slices). All work must stay within this plan — no additional features, no speculative improvements, no expanding scope beyond what the plan specifies.
 
 **Why:** User request — captured for team memory
-
-
 
 # Decision: Currency Symbol Data Strategy
 
@@ -12704,8 +12608,6 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 Currency symbols are NOT part of the language specification. They are display/formatting augmentation consumed by the evaluator's `FormatString` and the language server's hover/completion. They are first-party *editorial* data — Precept decides which symbols to use — but they are not catalog metadata in the `catalog-system.md` sense. A hardcoded dictionary is the right weight for this: visible in source, trivially maintainable, no infrastructure.
 
-
-
 # Decision: ISO 4217 / UCUM Data Layer — Embedded XML, Lazy Load
 
 
@@ -12904,8 +12806,6 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 - The refresh scripts' download logic — unchanged.
 
-
-
 # Decision: Typed Literal Framework — Q5 Deserialization + Exhaustive Gap Review
 
 
@@ -12992,8 +12892,6 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 - UCUM gap analysis: `docs/Working/frank-ucum-iso-gap.md`
 
-
-
 # Decision: Typed Literal System — Implementation Plan Produced
 
 
@@ -13071,8 +12969,6 @@ Key ordering decisions:
 
 
 - **`catalog-system.md`** needs the external reference data distinction — this is an architectural principle that was decided in `frank-data-layer-decision.md` but never flowed back to the canonical catalog doc.
-
-
 
 # Decision: UCUM Data Layer Strategy — Build-Time Codegen
 
@@ -13237,8 +13133,6 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 - `docs/language/business-domain-types.md` should document the refresh/codegen workflow once it ships.
 
 - The data pipeline pattern (XML provenance → codegen script → frozen C# catalog) should be recorded as the canonical pattern for any future external-standard integration.
-
-
 
 # UCUM Data Layer → Evaluator Gap Analysis
 
@@ -13424,8 +13318,6 @@ None of the gaps are architectural blockers — they are specification omissions
 
 **Recommendation:** Amend the plan with the 3 fixes above before George begins Slice 1d. The derived unit chain gap (#7) is the most important — it affects loader design and slice dependency ordering.
 
-
-
 ### 2026-05-09T15:50:01Z: OQ-DISP-1 closed — runtime aggregation registry concept killed
 
 
@@ -13435,8 +13327,6 @@ None of the gaps are architectural blockers — they are specification omissions
 **What:** OQ-DISP-1 (naming the runtime-layer aggregation registry / `OperationRegistry` placeholder) is closed with no action. The concept was eliminated — the global aggregation array was removed before implementation. The Builder embeds executor delegates directly into opcodes at build time; the evaluator calls `opcode.Executor(l, r)` with zero runtime lookup. No aggregation class, no registry, no naming decision needed.
 
 **Why:** User directive — concept no longer exists; open item is stale.
-
-
 
 # Modifier coloring regression anchor
 
@@ -13452,3 +13342,178 @@ None of the gaps are architectural blockers — they are specification omissions
 
 - Anchor files: `test\Precept.Tests\Language\TextMateGrammarTests.cs`, `tools\Precept.GrammarGen\Program.cs`, `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json`
 
+# Triage: BUG-039 — `at` proof obligation
+**Date:** 2026-05-10T09:33:43.989-04:00
+**Verdict:** A — Proof obligation is CORRECT; the spec has two documentation gaps
+
+## Analysis
+
+The catalog (`Types.cs`) declares a `NumericProofRequirement` (`count > 0`) on **every** collection element-returning accessor: `first`, `last`, `at`, `peek`, `peekby`, `min`, `max`. This is metadata-driven — the obligation lives on the `TypeAccessor` record, not in hardcoded engine logic. The proof engine reads it generically and fires PRE0063 (`UnguardedCollectionAccess`) when no guard or `notempty` modifier discharges the requirement.
+
+This is correct language policy for three reasons:
+
+1. **The fault is real.** `CollectionEmptyOnAccess` is a defined runtime fault. Accessing `.at(N)` on an empty collection WILL fault. The proof engine's job is to prove at compile time that this cannot happen — that's Precept's core guarantee (principle 7: "compile-time-first static checking").
+
+2. **Return type `T` describes the success type, not the precondition.** The accessor returning `T` (not `T optional`) means "when the operation succeeds, you get a definite `T`." It does NOT mean "the operation always succeeds." The precondition (non-empty) is a separate concern.
+
+3. **Optional on the receiving field doesn't discharge the obligation.** Even if the *target field* is declared `optional`, the accessor `.at()` still attempts a collection access. The fault occurs at the access site, not the assignment site. Declaring the target optional doesn't prevent the empty-collection read — it just changes what types the target can hold. This is why verdict C is incorrect: optional addresses nullability of results, not safety of preconditions.
+
+## Decision
+
+**Spec updates needed (two gaps):**
+
+1. **Accessor table (§3.5):** The "Proof" column must be filled in for all element-returning accessors. Every accessor that carries a `ProofRequirement` in the catalog should show `count > 0` in the Proof column. Specifically: `set.min`, `set.max`, `queue.peek`, `queue by P.peek`, `queue by P.peekby`, `stack.peek`, `list.first`, `list.last`, `list.at`, `log.first`, `log.last`, `log.at`, `log by P.first`, `log by P.last`, `log by P.at`.
+
+2. **`notempty` modifier description (§3.6):** The discharge list currently says "`.min`/`.max`/`.peek`/`.first`/`.last`" — this must add `.at` and `.peekby`. The complete list is: `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last`/`.at`.
+
+**No proof engine changes.** The engine behavior is correct as-is. PRE0063 fires appropriately and the `notempty` modifier already discharges the obligation (the proof engine walks modifiers generically — this already works for `at`).
+
+## Consistency check
+
+The same decision applies uniformly. All element-returning accessors already carry the proof requirement in the catalog:
+
+| Accessor | Collection types | Proof requirement | Status |
+|----------|-----------------|-------------------|--------|
+| `min` | set | `count > 0` | ✓ In catalog, missing from spec Proof column |
+| `max` | set | `count > 0` | ✓ In catalog, missing from spec Proof column |
+| `peek` | queue, stack, queue by P | `count > 0` | ✓ In catalog, missing from spec Proof column |
+| `peekby` | queue by P | `count > 0` | ✓ In catalog, missing from spec Proof column, missing from notempty list |
+| `first` | list, log, log by P | `count > 0` | ✓ In catalog, missing from spec Proof column |
+| `last` | list, log, log by P | `count > 0` | ✓ In catalog, missing from spec Proof column |
+| `at` | list, log, log by P | `count > 0` | ✓ In catalog, missing from spec Proof column, missing from notempty list |
+
+The engine is consistent. The spec is not. Fix the spec.
+
+## Downstream impact
+
+**George (implementation):** No code changes needed. The proof engine and catalog are correct. If George's BUG-039 fix already resolved the parsing/wrong-diagnostic-code issue, his work is done.
+
+**Spec update:** Frank or whoever updates the spec should fill in the Proof column and expand the `notempty` discharge list. This is a documentation-only change — no runtime behavior changes.
+
+**Test coverage:** A contract test confirming that every accessor with `ProofRequirements` appears in the spec's Proof column would prevent future drift. This is optional but recommended.
+
+# Decision: TokenMeta Boolean Flag Shape
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-10T09:22:38.840-04:00
+**Requested by:** Shane
+**Status:** Recommendation — awaiting owner sign-off
+
+---
+
+## Context
+
+George added five boolean fields to `TokenMeta` in Track 2 slice t2-1:
+
+```csharp
+bool IsAccessModeAdjective = false,
+bool IsStateWildcard = false,
+bool IsFieldBroadcast = false,
+bool IsFunctionCallLeader = false,
+bool IsMessagePosition = false
+```
+
+Plus two alias properties:
+```csharp
+public bool IsBroadcastFieldTarget => IsFieldBroadcast;
+public bool IsAlsoBuiltinFunction => IsFunctionCallLeader;
+```
+
+Shane asks: are flat bools the right catalog shape, or is there a more principled design?
+
+---
+
+## Analysis
+
+### What these flags actually express
+
+After tracing every consumer, these five flags decompose into **three distinct semantic categories**:
+
+| Flag | Consumers | What it really means |
+|------|-----------|---------------------|
+| `IsStateWildcard` | Parser (`ParseStateTarget`), NameBinder, TypeChecker | This keyword token is valid in a **state-name position** despite not being an identifier |
+| `IsFieldBroadcast` | Parser (`ParseFieldTarget`), NameBinder, TypeChecker | This keyword token is valid in a **field-name position** despite not being an identifier |
+| `IsFunctionCallLeader` | Parser.Expressions (`ParsePrimaryExpression`) | This keyword token can **lead a function call** (`keyword(args)`) despite not being an identifier |
+| `IsAccessModeAdjective` | `Tokens.AccessModeAdjectives` derived set (no direct pipeline consumer found) | This keyword participates in access-mode modifier grammar |
+| `IsMessagePosition` | GrammarGen (TextMate generation), MCP DTO | This token's trailing string argument gets the `string.quoted.double.message.precept` scope |
+
+### The catalog-driven assessment
+
+These are **not** "lazy one-off bools" in the pejorative sense. Each one expresses a genuine per-member fact about a token — "does this keyword play role X in the grammar?" That is exactly the kind of per-member metadata that belongs in the Tokens catalog rather than in parser `if` chains (catalog-system.md § "if something is domain knowledge, it is metadata").
+
+The flags *replaced* hardcoded parser `if (kind == TokenKind.All || kind == TokenKind.Any)` chains — which is the correct direction. The question is whether flat bools are the best *shape* for this metadata.
+
+### Why a `[Flags] enum TokenRole` is NOT the right answer
+
+A flags enum would look like:
+```csharp
+[Flags]
+enum TokenRole { None = 0, StateWildcard = 1, FieldBroadcast = 2, FunctionCallLeader = 4, ... }
+```
+
+This is **worse** than flat bools for this case:
+
+1. **These are not a single dimension.** `IsMessagePosition` is a grammar-generation concern. `IsAccessModeAdjective` is a modifier-grammar concern. `IsStateWildcard` and `IsFieldBroadcast` are name-position concerns. `IsFunctionCallLeader` is an expression-grammar concern. Jamming them into one bitfield conflates unrelated axes and makes the API surface *less* self-documenting.
+
+2. **Bool fields are more readable at call sites.** `IsStateWildcard: true` is immediately clear. `Roles: TokenRole.StateWildcard | TokenRole.FieldBroadcast` requires understanding the enum definition.
+
+3. **No consumer iterates "all roles" as a set.** Each consumer checks exactly one flag. A flags enum adds indirection with no composability benefit.
+
+### What IS wrong: the alias properties
+
+The alias properties are the real code smell:
+
+```csharp
+public bool IsBroadcastFieldTarget => IsFieldBroadcast;  // same thing, different name
+public bool IsAlsoBuiltinFunction => IsFunctionCallLeader;  // same thing, different name
+```
+
+This means the primary field names were chosen for the catalog-definition site (where you're marking tokens), but call sites want different names that express the call-site's perspective. Having two names for the same concept is a parallel-copy smell — one will drift.
+
+The fix: **pick one name per flag and use it everywhere.** The correct name is the one that reads naturally at the consumer site, since that's where understanding matters most:
+
+| Current primary | Current alias | Recommended single name | Rationale |
+|---|---|---|---|
+| `IsFieldBroadcast` | `IsBroadcastFieldTarget` | `IsFieldBroadcast` | The primary name is clear — it says what the token IS. The alias adds no precision. Kill the alias. |
+| `IsFunctionCallLeader` | `IsAlsoBuiltinFunction` | `IsFunctionCallLeader` | The primary name accurately describes the grammar role. `IsAlsoBuiltinFunction` is misleading — it conflates syntactic role (can lead a function-call expression) with semantic identity (is a built-in function). These tokens are keywords that ALSO accept function-call syntax, but they are not "builtin functions" in the `Functions` catalog sense. Kill the alias. |
+
+---
+
+## Recommendation
+
+### Shape: Keep flat bools. Kill aliases.
+
+The five flat boolean fields are the correct catalog shape for this metadata. They are:
+- Per-member domain knowledge ✓
+- Consumed by pipeline stages that would otherwise hardcode per-member behavior ✓
+- Independent axes (not a single dimension that a flags enum would model) ✓
+- Self-documenting at both definition and consumption sites ✓
+
+**Specific actions:**
+
+1. **Remove `IsBroadcastFieldTarget`.** It is a pure alias for `IsFieldBroadcast`. Update the one consumer in tests that references it to use `IsFieldBroadcast` directly.
+
+2. **Remove `IsAlsoBuiltinFunction`.** It is a pure alias for `IsFunctionCallLeader`. Update `CallContextResolver.cs` (language server) to use `IsFunctionCallLeader` directly.
+
+3. **Remove both alias entries from `Track2PhaseATokenCatalogTests.cs`** that reference `IsBroadcastFieldTarget` and `IsAlsoBuiltinFunction`.
+
+4. **No flags enum, no grouping record, no structural change.** The bools stay as primary fields on `TokenMeta`.
+
+### Why not "revisit later"
+
+The aliases should be killed now. They are the only structural problem, and they will spread if left alone — a new consumer will pick up `IsAlsoBuiltinFunction` and then renaming it becomes a multi-site change. The bools themselves are fine and do not need future rework.
+
+### Severity: Fix before merge, not blocking spike
+
+This is a "clean it up in the current slice" item. It does not require architectural rethinking or a new catalog. George should remove the two alias properties and update the three reference sites (one LS callsite, two test references). Fifteen-minute fix.
+
+---
+
+## Catalog-Driven Checklist Verification
+
+Per `docs/contributing/catalog-driven-checklist.md`:
+
+- ✅ Per-member behavior lives in catalog metadata, not in parser switch/if chains
+- ✅ No parallel keyword lists — `AccessModeAdjectives` FrozenSet is derived from `Tokens.All.Where(m => m.IsAccessModeAdjective)`
+- ✅ No flags enum needed — these are independent axes, not a single dimension
+- ⚠️ Alias properties violate "derive, never duplicate" — two names for one fact is a parallel copy

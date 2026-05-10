@@ -32,6 +32,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T13:29:53Z — TokenMeta bool-shape ruling executed and recorded
+- Your TokenMeta design review is now merged into `.squad/decisions.md`: the flat bools stay, no grouping/flags redesign was approved, and alias properties are treated as forbidden parallel copies.
+- George executed the prescribed cleanup in commit `19569dda`, removing both aliases and updating the one language-server callsite plus two test references while keeping 3824/3824 green.
+
 
 ### 2026-05-10T04:20:44Z — Status-hygiene protocol merged and tracker drift cleared
 - Scribe merged Frank's status-hygiene rule and the matching user directive into the canonical decision ledger.

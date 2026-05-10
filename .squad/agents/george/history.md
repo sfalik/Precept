@@ -27,6 +27,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T13:29:53Z — TokenMeta alias cleanup decision recorded
+- Frank's design review is now merged into `.squad/decisions.md`: keep the flat `TokenMeta` bools, reject a flags-enum reshape, and remove pure aliases immediately.
+- George's cleanup is durably recorded at commit `19569dda`: `IsBroadcastFieldTarget` / `IsAlsoBuiltinFunction` are gone, the language server and tests now read the primary field names directly, and validation stayed green at 3824/3824.
+
 ### 2026-05-10T12:45:39Z — Track 2 Slice 1 token-routing batch committed
 - George added the canonical `TokenMeta` routing fields (`IsStateWildcard`, `IsFieldBroadcast`, `IsFunctionCallLeader`) and then rewired parser, binder/type-checker, transition normalization, and tightly coupled proof-diagnostic mapping to read catalog truth instead of identifier-only or arithmetic-only fallbacks.
 - The slice closed BUG-001, BUG-006, BUG-025, BUG-026, BUG-037, BUG-039, and BUG-051: `from any`, `modify/omit all`, `.at(...)`, and `min(...)` / `max(...)` now route through metadata, while keyword member-name derivation comes from `Types.All[..].Accessors` instead of a parallel token list.
