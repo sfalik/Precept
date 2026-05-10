@@ -108,8 +108,8 @@ Slices 1–2 bundle catalog + pipeline work and close bugs directly. Slices 3–
 | Slice 7 | FunctionMeta — Catalog fields (prereq for Slice 11) | ✅ Complete — `b1c95512` | — |
 | Slice 8 | Parser — Replace Hardcoded Sets with Catalog Lookups | ✅ Complete — `e68008d0` | BUG-004, BUG-005, BUG-019, BUG-020, BUG-027, BUG-031, BUG-044, BUG-045, BUG-054 |
 | Slice 9 | Type Checker — Catalog-Derived Operator Typing | ⬜ Not started | BUG-002, BUG-003, BUG-007, BUG-009, BUG-010, BUG-028, BUG-029, BUG-038, BUG-040, BUG-046, BUG-052, BUG-053 |
-| Slice 10 | Name Binder — Catalog-Derived Name Resolution | ⬜ Not started | BUG-030 |
-| Slice 11 | Proof Engine — Catalog-Derived Proof Obligations | ⬜ Not started | BUG-008, BUG-013, BUG-050 |
+| Slice 10 | Name Binder — Catalog-Derived Name Resolution | ✅ Complete — `def91dbb` | BUG-001, BUG-026, BUG-030, BUG-037 |
+| Slice 11 | Proof Engine — Catalog-Derived Proof Obligations | ✅ Complete — `004e68be` | BUG-008, BUG-013, BUG-050 |
 | Slice 12 | MCP DTO Audit — Sync DTOs to Catalog Growth | ⬜ Not started | BUG-011, BUG-012, BUG-016, BUG-017, BUG-018, BUG-022, BUG-023, BUG-024, BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047 |
 | Slice 13 | MCP-Docs — Fix Incorrect Recovery Hints | ⬜ Not started | BUG-014, BUG-015, BUG-041 |
 | Slice 14 | Test Layer — Catalog Capability Tests | ⬜ Not started | (regression coverage for all 54) |
@@ -998,7 +998,7 @@ BUG-052, BUG-053
 
 ## Slice 10: Name Binder — Catalog-Derived Name Resolution
 
-**Goal:** The name binder must read `TokenMeta.IsStateWildcard` and `TokenMeta.IsBroadcastFieldTarget`
+**Goal:** The name binder must read `TokenMeta.IsStateWildcard` and `TokenMeta.IsFieldBroadcast`
 when resolving state and field target references, and must perform topological sorting of
 computed fields before binding.
 
@@ -1042,6 +1042,12 @@ in `DiagnosticCatalog` and the emission site in `NameBinder.cs`).
 ### Bugs Closed
 
 BUG-001, BUG-026, BUG-030, BUG-037
+
+### Closure Notes (2026-05-10)
+
+- `NameBinder` now derives wildcard/broadcast handling from `TokenMeta.IsStateWildcard` / `IsFieldBroadcast` through the parser's string-backed `StateTargetSlot` and `FieldTargetSlot` surfaces, so neither `any` nor `all` falls through to named-symbol lookup.
+- Computed fields are bound after a declaration-order-stable topological sort. Non-cyclic forward references now bind cleanly, and cyclic sets emit `CircularComputedField` without stray undeclared/forward-reference diagnostics.
+- The current architecture also performs state-target normalization in `TypeChecker.cs`; Slice 10 updates that second pass so `to any`, `in any`, and other wildcard state anchors no longer re-emit PRE0028 after name binding succeeds.
 
 ---
 
