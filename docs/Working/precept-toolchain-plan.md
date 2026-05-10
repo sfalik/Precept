@@ -94,18 +94,21 @@ catalog field does not exist, it must be added first (Slices 1–7).
 
 **Current reconciliation:** treat the tiny parser/type-checker/proof reads bundled into the safe Phase A batch as part of Slices 1/3/7 prerequisite closure. Do **not** mark Slices 8, 9, or 11 started unless the dedicated Phase B consumer rewires begin.
 
+Slices 1–2 bundle catalog + pipeline work and close bugs directly. Slices 3–7 are catalog prerequisites only — bugs close when the consuming pipeline slice (8–12) lands.
+
 | Slice ID | Title | Status | Bugs Closed |
 |----------|-------|--------|-------------|
-| Slice 1 | TokenMeta — Missing Catalog Fields | 🟡 Worktree-landed | BUG-001, BUG-025, BUG-026, BUG-037, BUG-039, BUG-006, BUG-051 |
-| Slice 2 | Actions Catalog Audit — Parser Prerequisite | ✅ Already satisfied (audited source) | BUG-021, BUG-048, BUG-049 |
-| Slice 3 | ModifierMeta — Missing Catalog Fields | 🔄 Active — modifier-model rename/fix still open | BUG-004, BUG-029, BUG-038 |
-| Slice 4 | OperatorMeta — Add ResultType / ResultTypePolicy | 🟡 Worktree-landed | BUG-002, BUG-003, BUG-009, BUG-052, BUG-053 |
-| Slice 5 | ConstructMeta — Missing Catalog Fields | 🟡 Worktree-landed | BUG-020, BUG-044, BUG-054 |
-| Slice 6 | OutcomeMeta — Add SerializedKind | 🟡 Worktree-landed | BUG-032, BUG-036 |
-| Slice 7 | FunctionMeta — Add ReturnValueProofFacts | 🟡 Worktree-landed | BUG-013 |
-| Slice 8 | Parser — Replace Hardcoded Sets with Catalog Lookups | ⬜ Not started | BUG-001, BUG-004, BUG-005, BUG-006, BUG-019, BUG-020, BUG-021, BUG-025, BUG-026, BUG-027, BUG-030, BUG-031, BUG-037, BUG-039, BUG-044, BUG-045, BUG-048, BUG-049, BUG-051, BUG-054 |
+| Slice 1 | TokenMeta — Catalog fields + parser rewire | ✅ Complete — `19569dda`, `a4cc3927` | BUG-001, BUG-006, BUG-025, BUG-026, BUG-037, BUG-039, BUG-051 |
+| Slice 2 | ActionMeta — Catalog fields + parser rewire (t2-2) | ✅ Complete — Slices A–C (`edc95ad3`, `fb525df0`, `ef6fedcb`) + Slice D (`a65c9fed`). BUG-021, BUG-048, BUG-049b closed. | BUG-021, BUG-048, BUG-049b |
+| Slice 2E | Proof Engine — `FixedReturnAccessor.ReturnNonnegative` early exit (BUG-049a) | ✅ Complete — `f2d1dece` | BUG-049a |
+| Slice 3 | ModifierMeta — Catalog fields (prereq for Slice 8) | ✅ Complete — `b1c95512` | — |
+| Slice 4 | OperatorMeta — Catalog fields (prereq for Slice 9) | ✅ Complete — `60de4cd0` (fields present; Slice 9 wires consumer) | — |
+| Slice 5 | ConstructMeta — Catalog fields (prereq for Slice 8) | ✅ Complete — `5251b7e7` | — |
+| Slice 6 | OutcomeMeta — Catalog fields (prereq for Slice 12) | ✅ Complete — `1536d0cb` (fields present; Slice 12 wires MCP consumer) | — |
+| Slice 7 | FunctionMeta — Catalog fields (prereq for Slice 11) | ✅ Complete — `b1c95512` | — |
+| Slice 8 | Parser — Replace Hardcoded Sets with Catalog Lookups | ⬜ Not started | BUG-004, BUG-005, BUG-019, BUG-020, BUG-027, BUG-031, BUG-044, BUG-045, BUG-054 |
 | Slice 9 | Type Checker — Catalog-Derived Operator Typing | ⬜ Not started | BUG-002, BUG-003, BUG-007, BUG-009, BUG-010, BUG-028, BUG-029, BUG-038, BUG-040, BUG-046, BUG-052, BUG-053 |
-| Slice 10 | Name Binder — Catalog-Derived Name Resolution | ⬜ Not started | BUG-001, BUG-026, BUG-030, BUG-037 |
+| Slice 10 | Name Binder — Catalog-Derived Name Resolution | ⬜ Not started | BUG-030 |
 | Slice 11 | Proof Engine — Catalog-Derived Proof Obligations | ⬜ Not started | BUG-008, BUG-013, BUG-050 |
 | Slice 12 | MCP DTO Audit — Sync DTOs to Catalog Growth | ⬜ Not started | BUG-011, BUG-012, BUG-016, BUG-017, BUG-018, BUG-022, BUG-023, BUG-024, BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047 |
 | Slice 13 | MCP-Docs — Fix Incorrect Recovery Hints | ⬜ Not started | BUG-014, BUG-015, BUG-041 |
@@ -136,23 +139,23 @@ Set `true` on `TokenKind.Any`. Consumed by:
 - `src/Precept/Pipeline/Parser.cs` — when parsing a `StateTarget` slot, accept `Any` as a
   valid state identifier using `IsStateWildcard` instead of a hardcoded kind check.
 
-**`IsBroadcastFieldTarget: bool = false`**
+**`IsFieldBroadcast: bool = false`**
 
 Set `true` on `TokenKind.All`. Consumed by:
 - `src/Precept/Pipeline/NameBinder.cs` — when resolving a `FieldTarget`, check
-  `Tokens.GetMeta(token.Kind).IsBroadcastFieldTarget`; if `true`, emit a broadcast field
+  `Tokens.GetMeta(token.Kind).IsFieldBroadcast`; if `true`, emit a broadcast field
   reference (all fields in scope) rather than a named field lookup. Fixes BUG-026, BUG-037.
 - `src/Precept/Pipeline/Parser.cs` — when parsing a `FieldTarget` slot in `modify` and `omit`
-  constructs, accept `All` as a valid target by checking `IsBroadcastFieldTarget`.
+  constructs, accept `All` as a valid target by checking `IsFieldBroadcast`.
 
-**`IsAlsoBuiltinFunction: bool = false`**
+**`IsFunctionCallLeader: bool = false`**
 
 Set `true` on `TokenKind.Min` and `TokenKind.Max`. Consumed by:
 - `src/Precept/Pipeline/Parser.Expressions.cs` — in the null-denotation dispatch (the Pratt
-  parser's prefix position handler), when the current token has `IsAlsoBuiltinFunction = true`,
+  parser's prefix position handler), when the current token has `IsFunctionCallLeader = true`,
   peek at the next token: if it is `TokenKind.LeftParen`, parse as a function call (delegate
   to `ParseFunctionCall`); otherwise, report an error ("constraint keyword not valid in
-  expression position"). Do NOT check `IsAlsoBuiltinFunction` in the field-modifier parser —
+  expression position"). Do NOT check `IsFunctionCallLeader` in the field-modifier parser —
   that context already handles `Min`/`Max` as constraint keywords. Fixes BUG-006, BUG-051.
 
 **Expand `IsValidAsMemberName` to cover type-keyword accessors**
@@ -182,9 +185,9 @@ set from `Tokens.All.Where(m => m.IsValidAsMemberName)` rather than a hardcoded
 
 - `CatalogCapability/TokenCatalogTests.cs` — new class:
   - `Any_IsStateWildcard_True()` — assert `Tokens.GetMeta(TokenKind.Any).IsStateWildcard`
-  - `All_IsBroadcastFieldTarget_True()` — assert `Tokens.GetMeta(TokenKind.All).IsBroadcastFieldTarget`
-  - `Min_IsAlsoBuiltinFunction_True()` — assert `Tokens.GetMeta(TokenKind.Min).IsAlsoBuiltinFunction`
-  - `Max_IsAlsoBuiltinFunction_True()` — assert `Tokens.GetMeta(TokenKind.Max).IsAlsoBuiltinFunction`
+  - `All_IsFieldBroadcast_True()` — assert `Tokens.GetMeta(TokenKind.All).IsFieldBroadcast`
+  - `Min_IsFunctionCallLeader_True()` — assert `Tokens.GetMeta(TokenKind.Min).IsFunctionCallLeader`
+  - `Max_IsFunctionCallLeader_True()` — assert `Tokens.GetMeta(TokenKind.Max).IsFunctionCallLeader`
   - `TypeKeywords_IsValidAsMemberName_True()` — parameterized fact for all 9 tokens above
 - Parser derivation coverage is executed in Slice 8, which owns the `Parser.Expressions.cs`
   rewire:
@@ -195,6 +198,26 @@ set from `Tokens.All.Where(m => m.IsValidAsMemberName)` rather than a hardcoded
 
 BUG-001, BUG-006, BUG-025, BUG-026, BUG-037, BUG-039, BUG-051
 (catalog prerequisite completes here; parser/name-binder fixes land in Slices 8 and 10).
+
+### Closure Notes (2026-05-10)
+
+**Field names as implemented:** Frank's design review (t2-1) locked the final field names.
+`IsBroadcastFieldTarget` and `IsAlsoBuiltinFunction` were working names in this plan;
+the implemented and committed names are `IsFieldBroadcast` and `IsFunctionCallLeader`.
+Both forwarding aliases were removed from `Token.cs` as a parallel-copy smell.
+
+**BUG-039 — `list.at(N)` proof obligation:** The original keyword-collision parsing bug is fixed.
+`at` is now valid as a member-name token (`IsValidAsMemberName = true`). The PRE0063 diagnostic
+that fires without `notempty` is **correct enforcement** — the proof engine correctly requires
+`notempty` for all element-returning accessors. Two spec gaps were also fixed in `a4cc3927`:
+the Proof column in the accessor table was blank for all element-returning accessor rows
+(min, max, peek, peekby, first, last, at), and the `notempty` discharge note omitted `.at`
+and `.peekby`. Both now document the `count > 0` requirement.
+
+**BUG-006 / BUG-051 — `min(A,B)` / `max(A,B)` PRE0009:** Root cause was a stale extension
+build. George's `IsFunctionCallLeader` fix in `Parser.Expressions.cs` is correct and passes
+all unit tests. The live editor failure was because the DLL predated the fix commit by ~28
+minutes. Resolution: Ctrl+Shift+B to rebuild. No code changes required.
 
 ---
 
@@ -291,8 +314,128 @@ terminates (since `by`/`at` are not expression-level infix operators in this con
 
 ### Bugs Closed
 
-BUG-021, BUG-048, BUG-049
+BUG-021, BUG-048, BUG-049b closed by Slice D (`a65c9fed`). BUG-049a is a proof engine issue
+tracked separately in Slice 2E below.
 (catalog baseline completes here; parser fixes land in Slice 8).
+
+---
+
+## Slice 2E: Proof Engine — `FixedReturnAccessor.ReturnNonnegative` Early Exit (BUG-049a)
+
+**Status:** ✅ Complete — `f2d1dece`
+
+**Goal:** Fix spurious PRE0084 (`'<field>' can be negative`) firing on `insert F Val at Idx`
+when the target field is a plain `list of string` with no modifiers.
+
+**Design:** Frank-approved (2026-05-10). Two mandatory requirements: B1 (unify duplicate
+`CollectionCount` instances) and B2 (update `proof-engine.md` Strategy 2 docs).
+
+**Prerequisites:** None — all required types (`FixedReturnAccessor`, `Types.CollectionCountAccessor`,
+`TryDeclarationAttributeProof`) already exist.
+
+**Files:**
+- `src/Precept/Language/Type.cs` — `FixedReturnAccessor` record definition
+- `src/Precept/Language/Types.cs` — `CollectionCountAccessor` (make `internal`, set flag)
+- `src/Precept/Language/Actions.cs` — delete `CollectionCount` local field (B1: de-dupe)
+- `src/Precept/Pipeline/ProofEngine.cs` — `TryDeclarationAttributeProof` early exit
+- `docs/compiler/proof-engine.md` — Strategy 2 subsection (B2)
+
+### Root Cause
+
+`ActionKind.Insert` has a `NumericProofRequirement(SelfSubject(CollectionCount), >=, 0m, ...)`
+obligation that fires to prove the index is within bounds. `CreateActionProofSite` (George-8)
+returns `TypedFieldRef("Steps")` for any `SelfSubject`. `TryDeclarationAttributeProof` resolves
+to the `Steps` field — a plain `list of string` with no modifiers — and none of the 5 discharge
+strategies can prove `count >= 0`. PRE0084 fires. The requirement is always trivially true
+(collection count can never be negative); the engine has no mechanism to know this.
+
+### Changes Required
+
+**1. `FixedReturnAccessor.ReturnNonnegative` (B1: unify + add flag)**
+
+In `Type.cs`, add `bool ReturnNonnegative = false` to the `FixedReturnAccessor` positional
+record:
+
+```csharp
+public sealed record FixedReturnAccessor(
+    string Name,
+    TypeKind ReturnType,
+    string Description,
+    bool ReturnNonnegative = false   // ← new
+) : TypeAccessor(Name, ReturnType, Description);
+```
+
+Precedent: `FunctionOverload.ReturnNonnegative` already exists in `Function.cs` for `abs()`.
+
+**2. `Types.CollectionCountAccessor` — make `internal`, set `ReturnNonnegative: true` (B1)**
+
+In `Types.cs`, change the existing private `CollectionCountAccessor` field:
+
+```csharp
+// BEFORE:
+private static readonly FixedReturnAccessor CollectionCountAccessor =
+    new("count", TypeKind.Integer, "Number of elements");
+
+// AFTER:
+internal static readonly FixedReturnAccessor CollectionCountAccessor =
+    new("count", TypeKind.Integer, "Number of elements", ReturnNonnegative: true);
+```
+
+**3. Delete `Actions.CollectionCount`, use `Types.CollectionCountAccessor` (B1)**
+
+In `Actions.cs`, delete the local copy:
+```csharp
+// DELETE:
+private static readonly FixedReturnAccessor CollectionCount =
+    new FixedReturnAccessor("count", TypeKind.Integer, "Number of elements");
+```
+
+In `ActionKind.Insert`'s `NumericProofRequirement`, replace `CollectionCount` with
+`Types.CollectionCountAccessor`.
+
+**4. Early exit in `TryDeclarationAttributeProof` (proof engine fix)**
+
+In `ProofEngine.cs`, add an early exit at the top of `TryDeclarationAttributeProof`, before
+the modifier loop:
+
+```csharp
+// Accessor-level nonnegative guarantee: if the requirement's accessor is statically
+// known to return a nonnegative value (e.g. collection count), discharge >= 0 trivially.
+if (reqSubject is SelfSubject { Accessor: FixedReturnAccessor { ReturnNonnegative: true } }
+    && obligation.Requirement is NumericProofRequirement {
+        Comparison: OperatorKind.GreaterThanOrEqual,
+        Threshold: 0m })
+    return true;
+```
+
+This is Strategy 2 (accessor-level nonnegative guarantee). Placement: before the modifier loop,
+after the field lookup. The pattern mirrors `FunctionReturnSatisfies` logic but applies to
+accessor metadata rather than function overload metadata.
+
+**5. Update `docs/compiler/proof-engine.md` Strategy 2 (B2)**
+
+In the Strategy 2 subsection of `proof-engine.md`, document both discharge paths as a coherent
+subsection:
+
+- **`FunctionReturnSatisfies`:** when the proof site is a `TypedFunctionCall` and the resolved
+  overload has `ReturnNonnegative = true`, the `>= 0` obligation is discharged.
+- **`FixedReturnAccessor.ReturnNonnegative`:** when the proof site's `SelfSubject` accessor has
+  `ReturnNonnegative = true` (e.g. `CollectionCountAccessor`) and the obligation is `>= 0`,
+  the obligation is discharged trivially. This handles `insert`/`insert-at` proof requirements
+  on collection fields.
+
+Also update the `FixedReturnAccessor` description in the doc to mention `ReturnNonnegative`.
+
+### Tests Required
+
+- `ProofEngineTests/ActionProofTests.cs` (new or existing):
+  - `Insert_PlainListField_NoModifiers_CompilesClean()` — regression for BUG-049a; `list of string` field + `insert F Val at N` → zero diagnostics
+  - `Insert_WithNotemptyField_CompilesClean()` — confirm `notempty` still works (no regression)
+  - `Insert_NonnegativeCountDischarge_IsEarly()` — confirm PRE0084 does not fire even without any modifiers
+
+### Bugs Closed
+
+BUG-049a — fixed in `f2d1dece`
 
 ---
 

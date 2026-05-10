@@ -25,12 +25,12 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 
 | Bug | Title | Category | Status | Assignee | Notes |
 |-----|-------|----------|--------|----------|-------|
-| BUG-001 | `any` state wildcard not recognized in any position | Compiler | Open | — | — |
+| BUG-001 | `any` state wildcard not recognized in any position | Compiler | **Fixed** | — | Retested 2026-05-10: `from any on E` compiles cleanly; definition shows `fromStates:["*"]` ✅ |
 | BUG-002 | `contains` operator rejected in all expression positions | Compiler | Open | — | — |
 | BUG-003 | `and` / `or` / `not` compound boolean expressions rejected in... | Compiler | Open | — | — |
 | BUG-004 | `default` modifier rejected on event argument declarations | Compiler | Open | — | — |
 | BUG-005 | Comma-separated field list rejected in `in S modify` declarations | Compiler | Open | — | — |
-| BUG-006 | `min(a, b)` and `max(a, b)` not recognized as function calls... | Compiler | Open | — | — |
+| BUG-006 | `min(a, b)` and `max(a, b)` not recognized as function calls... | Compiler | **Fixed** | — | Retested 2026-05-10: `min(A, B)`, `max(A, B)`, and `min(max(X, 0), 100)` all compile cleanly ✅ |
 | BUG-007 | Arithmetic operators have lower precedence than comparison... | Compiler | Open | — | — |
 | BUG-008 | `pop` and `dequeue` proof obligations use unnamed internal... | Compiler | Open | — | — |
 | BUG-009 | `for` operator resolves to key type instead of value type | Compiler | Open | — | — |
@@ -45,12 +45,12 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-018 | Collection element types lost in MCP definition output | MCP-definition | Open | — | — |
 | BUG-019 | Typed constants (single-quoted strings) not resolved from... | Compiler | Open | — | — |
 | BUG-020 | Guarded ensures (`when` guard) not parsed in any position | Compiler | Open | — | — |
-| BUG-021 | `append by P`, `enqueue by P` v3 action forms not parsed | Compiler | Open | — | — |
+| BUG-021 | `append by P`, `enqueue by P` v3 action forms not parsed | Compiler | **Fixed** | — | Retested 2026-05-10: `append Tasks Label by Priority` and `enqueue Jobs Job by Rank` both compile cleanly ✅ |
 | BUG-022 | Event ensures (`on Event ensure`) not serialized in MCP... | MCP-definition | Open | — | — |
 | BUG-023 | `because` clause includes keyword in serialized value | MCP-definition | Open | — | — |
 | BUG-024 | `omit` declarations not reflected in MCP definition output | MCP-definition | Open | — | — |
 | BUG-025 | Keyword-named member accessors rejected by parser | Compiler | **Fixed** | — | Retested 2026-05-10: `.count`, `.peek` on list/queue/stack all compile ✅ |
-| BUG-026 | `in State modify all readonly` treats `all` as field name | Compiler | Open | — | — |
+| BUG-026 | `in State modify all readonly` treats `all` as field name | Compiler | **Fixed** | — | Retested 2026-05-10: `in Draft modify all readonly` compiles cleanly ✅ |
 | BUG-027 | `choice of T(...)` type not valid in event arg declarations | Compiler | Open | — | — |
 | BUG-028 | `RedundantModifier` fires wrong diagnostic code with garbled... | Compiler | Open | — | — |
 | BUG-029 | `InvalidModifierBounds` check not enforced | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 now fires correctly for `min > max` ✅ |
@@ -61,9 +61,9 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-034 | Per-state access mode overrides not in MCP definition output | MCP-definition | Open | — | — |
 | BUG-035 | Choice element type and member values lost in MCP definition... | MCP-definition | Open | — | — |
 | BUG-036 | `no transition` and `reject` outcomes indistinguishable in... | MCP-definition | Open | — | — |
-| BUG-037 | `in State modify all` and `in State omit all` both reject... | Compiler | Open | — | — |
+| BUG-037 | `in State modify all` and `in State omit all` both reject... | Compiler | **Fixed** | — | Retested 2026-05-10: `modify all editable` and `omit all` both compile cleanly ✅ |
 | BUG-038 | `InvalidModifierBounds` not enforced for... | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 fires for `minlength > maxlength` and `mincount > maxcount` ✅ |
-| BUG-039 | `list.at(N)` method call rejected due to `at` keyword collision | Compiler | **Partial** | — | Retested 2026-05-10: parsing fixed ✅; with `notempty` compiles clean ✅; without `notempty` PRE0083 fires (wrong code — should be EmptyCollectionAccess) |
+| BUG-039 | `list.at(N)` method call rejected due to `at` keyword collision | Compiler | **Fixed** | — | Retested 2026-05-10 (round 5): spec updated — `count > 0` proof now documented for `at(N)`; without `notempty` correctly emits PRE0063 ✅; with `notempty` compiles clean ✅ |
 | BUG-040 | `queue.peekby(P)` not implemented | Compiler | Open | — | — |
 | BUG-041 | `UnexpectedNull` runtime fault recovery hint uses invalid... | MCP-docs | Open | — | — |
 | BUG-042 | Modifier bound values not serialized in MCP definition output | MCP-definition | Open | — | — |
@@ -72,10 +72,10 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-045 | `ascending`/`descending` modifiers not recognized in log type... | Compiler | Open | — | — |
 | BUG-046 | CI enforcement not applied to quantifier binding variables | Compiler | Open | — | — |
 | BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | Open | — | — |
-| BUG-048 | `by` keyword not recognized in `append`/`enqueue` priority... | Compiler | Open | — | — |
-| BUG-049 | `insert`/`remove at` actions fail due to `at` keyword ambiguity | Compiler | Open | — | — |
+| BUG-048 | `by` keyword not recognized in `append`/`enqueue` priority... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-021; `enqueue … by` compiles cleanly ✅ |
+| BUG-049 | `insert`/`remove at` actions fail due to `at` keyword ambiguity | Compiler | **Fixed** | — | Retested 2026-05-10: `remove Steps at Position` fixed in `a65c9fed`; `insert Steps NewStep at Position` fixed in `f2d1dece` ✅ |
 | BUG-050 | `dequeue`/`pop` trigger false PRE0083 "Division by zero" | Compiler | Open | — | — |
-| BUG-051 | `min(a, b)` and `max(a, b)` function calls fail due to... | Compiler | Open | — | — |
+| BUG-051 | `min(a, b)` and `max(a, b)` function calls fail due to... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-006; `min()`, `max()`, and chained `min(max(...))` all compile cleanly ✅ |
 | BUG-052 | `contains` keyword unusable in expression position | Compiler | Open | — | — |
 | BUG-053 | `and`/`or` binary boolean operators fail in all expression positions | Compiler | Open | — | — |
 | BUG-054 | `ensure` clause not supported in stateless event hooks | Compiler | Open | — | — |
@@ -2180,28 +2180,38 @@ BUG-029 covers `min`/`max` on numeric types. BUG-038 covers `minlength`/`maxleng
 ## BUG-039 — `list.at(N)` method call rejected due to `at` keyword collision **[Compiler]**
 
 ### Status
-Open
+**Fixed** — Retested 2026-05-10 (round 5)
 
-### Description
+### Resolution
+The `at` keyword collision was resolved in a prior build. The spec was also updated: the Member
+Access table now lists `count > 0` as the proof requirement for `list.at(N)` (same policy as
+`.first`, `.last`, `.peek`). PRE0063 fires correctly when the list is not guarded `notempty`,
+and compiles clean with `notempty`.
+
+### Verified behaviour
+- Without `notempty`: PRE0063 fires — "Steps may be empty — guard with `if Steps.count > 0`" ✅ (correct per updated spec)
+- With `notempty`: compiles clean ✅
+
+### Description (historical)
 `list.at(N)` is a v3 accessor that retrieves the element at zero-based index `N`. The parser
-rejects the member access because `at` is a reserved keyword (used in `insert F Expr at N`
-action form). The member access parser requires the member name to be an `Identifier` token,
-and `at` is tokenized as a keyword.
+rejected the member access because `at` is a reserved keyword (used in `insert F Expr at N`
+action form). The member access parser required the member name to be an `Identifier` token,
+and `at` was tokenized as a keyword.
 
-This is the same root cause as BUG-025 (keyword-named member accessors rejected), extended
+This was the same root cause as BUG-025 (keyword-named member accessors rejected), extended
 to the v3 `list.at` method.
 
 ### Spec reference
-- v3 accessor table: `list.at(N)` — retrieves element at zero-based index `N`
+- v3 accessor table (spec line 1351): `list.at(N)` → `T`, Proof: `count > 0`
 
-### Errors reported
+### Errors reported (historical)
 ```
 PRE0009  Error  Expected member name here, but found 'at'
 PRE0009  Error  Expected declaration keyword here, but found 'at'
 PRE0020  Error  '.' is not available on list fields
 ```
 
-### Minimal repro
+### Minimal repro (historical)
 ```
 precept BugRepro039
 
@@ -2211,7 +2221,7 @@ field ThirdStep as string optional <- Steps.at(2)
 state Active initial
 ```
 Expected: compiles cleanly — `Steps.at(2)` retrieves the element at index 2.
-Actual: PRE0009 × 2 + PRE0020.
+Actual (before fix): PRE0009 × 2 + PRE0020.
 
 ---
 
@@ -2529,16 +2539,21 @@ from Active on Finish -> transition Done
 ## BUG-049 -- `insert`/`remove at` actions fail due to `at` keyword ambiguity [Compiler]
 
 ### Status
-Open
+**Fixed** — fully closed 2026-05-10
+
+### Resolution
+- `remove Collection at Index` was fixed in `a65c9fed`.
+- `insert Collection Value at Index` was fixed in `f2d1dece`: `FixedReturnAccessor.ReturnNonnegative` now lets Strategy 2 discharge `count >= 0` trivially through the unified `Types.CollectionCountAccessor`.
 
 ### Description
-`insert Collection Value at Index` and `remove Collection at Index` both fail because the `at`
-keyword used as an action delimiter is consumed by the expression parser as the list-element
-accessor infix operator (`list.at(N)`). The parser sees `Value at Index` as a single expression
+`insert Collection Value at Index` and `remove Collection at Index` both failed because the `at`
+keyword used as an action delimiter was consumed by the expression parser as the list-element
+accessor infix operator (`list.at(N)`). The parser saw `Value at Index` as a single expression
 (list access on Value), leaving no `at` keyword for the action grammar.
 
-The result is a cascade of spurious errors including PRE0084 "sqrt() requires a non-negative
-value, but '<unknown>'" from the proof engine operating on the malformed expression.
+The insert path also produced a spurious PRE0084 "sqrt() requires a non-negative
+value, but '<unknown>'" because the proof engine had no accessor-level way to know collection
+counts cannot be negative.
 
 The non-indexed forms (`remove Collection Value` by value for sets/bags) compile correctly.
 

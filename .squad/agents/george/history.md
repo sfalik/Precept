@@ -16,6 +16,10 @@
 - `CollectionIntoBy`'s final slot is an output capture variable, so the durable role name is `OrderingCapture`, not `OrderingKey`.
 - When removing a flag field (`IntoSupported`) that is equivalent to derived slot metadata, keep the downstream DTO stable by deriving the old surface from `GetShapeMeta()` instead of preserving duplicate state.
 - `CollectionValue` and `CollectionValueBy` both have positional value slots with `PrecedingSeparator = null`; slot well-formedness should validate first-slot/null and `SeparatorTokens` consistency, not require separators on every later slot.
+- Shape method bodies call `Actions.GetShapeMeta(ActionSyntaxShape.X)` directly and index into `Slots[n].PrecedingSeparator!.Value` for both required `Expect()` calls and optional `if (Peek().Kind == slot.PrecedingSeparator)` guards. This is the correct pattern — shape methods know their own shape identity, so calling `GetShapeMeta` inside is clean and allocation-cheap compared to the alternative of widening the parameter signature from `FrozenSet<TokenKind>` to full `ActionShapeMeta`.
+- String literal `LiteralExpression.Text` is the raw lexed text WITHOUT surrounding quotes. `"Walk"` in source produces Text = `Walk`. Tests asserting on literal text must not include quote characters.
+- Shared-environment MSBuild cache-file locks (`MSB3492: Could not read existing file`) are reliably cleared by deleting the offending `.cache` file manually (`Remove-Item`) before the build invocation. The lock is always stale (held by the VS Code language server OmniSharp/Roslyn process); deleting the file unblocks the build without killing any process.
+- BUG-049a fix pattern: if a numeric accessor is structurally guaranteed non-negative, carry that fact on `FixedReturnAccessor.ReturnNonnegative` and let Strategy 2 discharge `>= 0` directly from accessor metadata. For collection counts, unify all action obligations on `Types.CollectionCountAccessor` (B1) instead of duplicating local accessor instances.
 
 ## Historical Summary
 
@@ -23,6 +27,14 @@
 - Durable chronology, rationale, and commit anchors live in `.squad/decisions.md`; this history keeps only the live implementation guidance George needs for the next slices.
 
 ## Recent Updates
+
+### 2026-05-10T09:53:14Z — t2-2 Slice C: shape method body rewire
+- George-6 completed Slice C by replacing hardcoded separator tokens in all 7 affected shape methods: `ParseAssignValueAction`, `ParseCollectionIntoAction`, `ParseCollectionValueByAction`, `ParseInsertAtAction`, `ParseRemoveAtIndexAction`, `ParsePutKeyValueAction`, `ParseCollectionIntoByAction`.
+- Each method calls `Actions.GetShapeMeta(ActionSyntaxShape.X).Slots[n]` and reads `PrecedingSeparator!.Value` for `Expect()` and `PrecedingSeparator` for optional `if (Peek().Kind == slot.PrecedingSeparator)` guards. No hardcoded `TokenKind.By`, `TokenKind.At`, `TokenKind.Into`, or `TokenKind.Assign` remain in any shape method body.
+- Expression-terminator lambdas in intermediate expression slots (`CollectionValueBy`, `InsertAt`, `PutKeyValue`) are also slot-driven.
+- 6 new tests in `ActionChainTests.cs`: 3 behavioral (Insert, Dequeue±into, Put) + 3 catalog-property (AppendBy slots, CollectionIntoBy slots, Dequeue without into).
+- Validation: 4056/4056 tests (3841 Precept.Tests + 156 LS + 59 MCP). Commit: `ef6fedcb`.
+- t2-2 (BUG-021 / BUG-048 / BUG-049) fully closed across all three slices.
 
 ### 2026-05-10T09:53:14Z — t2-2 Slice B: ParseActionTarget shape-specific separators
 - `ParseActionTarget` now accepts `FrozenSet<TokenKind> separators` from `Actions.GetShapeMeta(meta.SyntaxShape).SeparatorTokens`; old hardcoded `{=, into, by, at}` union is gone.
