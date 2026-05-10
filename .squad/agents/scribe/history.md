@@ -20,6 +20,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T13:46:52Z — BUG-006 / BUG-051 stale-build triage recorded
+- Pre-check measured `.squad/decisions.md` at 173203 bytes with 1 inbox file(s); the hard-gate 7-day archive pass found 0 eligible active decision entries older than `2026-05-03T13:46:52Z`.
+- Merged `frank-bug006-051-triage.md` into `.squad/decisions.md`, deleted the processed inbox file, wrote the Frank orchestration record plus the brief BUG-006/051 session log, and propagated the no-code-fix verdict into Frank history.
+
 ### 2026-05-10T13:37:31Z — BUG-039 spec-fix batch recorded
 - Pre-check measured `.squad/decisions.md` at 470001 bytes with 1 inbox file(s); the hard-gate 7-day archive pass found 0 eligible active decision entries older than `2026-05-03T13:37:31Z`.
 - Merged `george-bug039-spec-gaps-fixed.md` into `.squad/decisions.md`, deleted the processed inbox file, wrote the George orchestration record plus the brief BUG-039 session log, and closed with `decisions.md` at 470502 bytes and history files summarized = 0.

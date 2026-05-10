@@ -24,6 +24,34 @@
 
 ---
 
+### 2026-05-10T13:50:12Z: BUG-021 / BUG-048 / BUG-049 share one parser root cause: action shapes need slot/separator metadata
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-t2-2-plan.md`.
+
+- `ActionSyntaxShape` already tells the parser which structural pattern to use, but it does not describe which separator tokens participate in that pattern, so `ParseActionTarget` and the shape-specific parser methods still hardcode `=`, `into`, `by`, and `at`.
+- BUG-021, BUG-048, and BUG-049 are therefore one metadata gap, not three separate parser bugs: the parser needs shape-owned slot metadata that carries per-slot separator tokens plus optionality, then reads those separators instead of a global token union.
+- The approved implementation boundary is three vertical slices: catalog enrichment (`ActionSyntaxSlot` / `ActionShapeMeta`), `ParseActionTarget` rewire to shape-specific separator sets, then shape-method rewires that read separator tokens and optional suffix rules from metadata.
+
+---
+
+### 2026-05-10T13:46:52Z: BUG-006 / BUG-051 PRE0009 on `min(A,B)` is a stale extension build, not a live source defect
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-bug006-051-triage.md`.
+
+- The shipped source fix is already correct: `Parser.Expressions.cs` routes `min(`/`max(` through `IsFunctionCallLeader`, `Tokens.cs` marks `Min` and `Max` with that metadata, and the parser regression test proves `min(Amount, 10)` binds as a `FunctionCallExpression`.
+- The live editor symptom came from a stale language-server binary: the running `Precept.dll` predates George's fix commit `6d360231`, so the editor was still executing the old parse path that emitted PRE0009.
+- No code change is required for BUG-006 / BUG-051. Shane only needs to rebuild the extension/language-server output (VS Code Build task / `Ctrl+Shift+B`) so the editor picks up the already-correct source fix.
+
+---
+
 ### 2026-05-10T12:45:39Z: Track 2 Slice 1 locks token metadata as the routing surface for wildcard, broadcast, and min/max leaders
 
 **By:** Scribe

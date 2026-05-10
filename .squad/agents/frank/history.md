@@ -24,6 +24,8 @@
 
 - The pipeline audit found 27 catalog-compliance violations concentrated in Parser, TypeChecker, and ProofEngine: wildcards/broadcasts are still carried as raw names, parser grammar still depends on local token/separator branches, qualifier and modifier meaning still leaks through enum-identity checks, and proof discharge still embeds operator implication/diagnostic tables instead of reading metadata.
 
+- 2026-05-10T09:41Z — BUG-006/BUG-051 triage: PRE0009 on `min(A,B)` in the live editor was caused by a stale extension build (DLL built 28 min before the fix commit). George's parser fix (`IsFunctionCallLeader` routing in `ParseNud`) and regression test are both correct. No code change needed — rebuilding the language server DLL resolves the editor symptom. Verdict written to `.squad/decisions/inbox/frank-bug006-051-triage.md`.
+
 ## Historical Summary
 
 - Earlier May 2026 work locked the typed-literal boundary, the external-data posture for ISO/UCUM, the catalog-driven parser/checker trajectory, and the requirement that durable rationale live in decisions/research instead of scattered implementation switches.
@@ -31,6 +33,10 @@
 - Use `.squad/decisions.md` for the exact batch chronology and `docs/` / `research/` for the surviving canonical rationale.
 
 ## Recent Updates
+
+### 2026-05-10T13:46:52Z — BUG-006 / BUG-051 stale-build verdict recorded
+- Scribe merged your BUG-006 / BUG-051 triage note into `.squad/decisions.md` as the durable ruling: PRE0009 on `min(A,B)` in the editor came from a stale language-server build, not a missing source fix.
+- The recorded action is operational only: rebuild the extension/language-server output so the live editor picks up George's already-correct `IsFunctionCallLeader` routing; no new code change is needed.
 
 ### 2026-05-10T13:29:53Z — TokenMeta bool-shape ruling executed and recorded
 - Your TokenMeta design review is now merged into `.squad/decisions.md`: the flat bools stay, no grouping/flags redesign was approved, and alias properties are treated as forbidden parallel copies.
