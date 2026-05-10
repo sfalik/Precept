@@ -13517,3 +13517,15 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 - ✅ No parallel keyword lists — `AccessModeAdjectives` FrozenSet is derived from `Tokens.All.Where(m => m.IsAccessModeAdjective)`
 - ✅ No flags enum needed — these are independent axes, not a single dimension
 - ⚠️ Alias properties violate "derive, never duplicate" — two names for one fact is a parallel copy
+
+### 2026-05-10T13:37:31Z: BUG-039 spec gaps fixed
+
+**By:** George
+
+**Status:** Complete
+
+**Source:** `C:\\Users\\Shane.Falik\\source\\repos\\precept-architecture\\.squad\\decisions\\inbox\\george-bug039-spec-gaps-fixed.md`
+
+- Implemented the documentation-only follow-through from the BUG-039 triage already recorded in this ledger.
+- Proof column filled for all element-returning collection accessors with `count > 0`.
+- `notempty` discharge list updated to include `.at` and `.peekby`.

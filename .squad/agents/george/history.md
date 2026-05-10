@@ -12,6 +12,7 @@
 - `ParsedConstruct.LeadingTokenKind` is the minimal durable downstream recovery surface when parser-consumed anchor keywords still matter later in normalization or tooling.
 - `count` is a collection member/accessor, not a synthetic built-in function; proof and guard consumers should match typed member access.
 - Snippet templates are syntactically valid DSL strings: templates for constructs match top-level declaration forms; templates for actions match their respective `ActionSyntaxShape` grammars. Derived from sample files, not invented.
+- The language spec's accessor Proof column must mirror catalog-enforced non-empty obligations for all element-returning collection accessors, and the `notempty` discharge note must explicitly list `.peekby` and `.at` alongside the other discharged accessors.
 
 - Typed-literal validation is catalog-driven end to end: `TypeMeta.ContentValidation` selects the validator, `TypedConstantValidation.Validate(...)` is the only dispatcher, and runtime JSON ingress still goes through `TypeRuntime<T>` / `TypeRuntimeMeta`.
 - Temporal and UCUM parsing now live under shared language/runtime parser stacks, while ISO 4217 and UCUM source data remain embedded external reference datasets rather than Precept catalogs.
@@ -26,6 +27,10 @@
 - Token metadata only closes wildcard/broadcast regressions when binder/type-checker consumers also read the metadata; parser acceptance alone still lets `any` / `all` collapse back into undeclared-name diagnostics.
 
 ## Recent Updates
+
+### 2026-05-10T13:37:31Z — BUG-039 spec documentation gaps closed
+- The canonical language spec now matches the catalog/proof-engine truth for all element-returning collection accessors: the Proof column shows `count > 0` for `min`, `max`, `peek`, `peekby`, `first`, `last`, and `at` across the relevant collection families.
+- The `notempty` modifier note now explicitly discharges `.peekby` and `.at` alongside the existing element-returning accessors, closing the remaining BUG-039 documentation drift without runtime changes.
 
 ### 2026-05-10T13:29:53Z — TokenMeta alias cleanup decision recorded
 - Frank's design review is now merged into `.squad/decisions.md`: keep the flat `TokenMeta` bools, reject a flags-enum reshape, and remove pure aliases immediately.

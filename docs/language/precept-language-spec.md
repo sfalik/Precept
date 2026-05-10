@@ -1334,29 +1334,29 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 | Object type | Member | Result type | Proof |
 |-------------|--------|-------------|-------|
 | `set of T` | `count` | `integer` | |
-| `set of T` (T orderable) | `min` | `T` | |
-| `set of T` (T orderable) | `max` | `T` | |
+| `set of T` (T orderable) | `min` | `T` | `count > 0` |
+| `set of T` (T orderable) | `max` | `T` | `count > 0` |
 | `queue of T` | `count` | `integer` | |
-| `queue of T` | `peek` | `T` | |
+| `queue of T` | `peek` | `T` | `count > 0` |
 | `queue of T by P` | `count` | `integer` | |
-| `queue of T by P` | `peek` | `T` | |
-| `queue of T by P` | `peekby` | `P` | returns the ordering key of the next-to-dequeue element (v3) |
+| `queue of T by P` | `peek` | `T` | `count > 0` |
+| `queue of T by P` | `peekby` | `P` | `count > 0` |
 | `stack of T` | `count` | `integer` | |
-| `stack of T` | `peek` | `T` | |
+| `stack of T` | `peek` | `T` | `count > 0` |
 | `bag of T` | `count` | `integer` | |
 | `bag of T` | `countof(E)` | `integer` | returns how many times `E` appears in the bag (v3) |
 | `list of T` | `count` | `integer` | |
-| `list of T` | `first` | `T` | |
-| `list of T` | `last` | `T` | |
-| `list of T` | `at(N)` | `T` | returns the element at zero-based index `N` (v3) |
+| `list of T` | `first` | `T` | `count > 0` |
+| `list of T` | `last` | `T` | `count > 0` |
+| `list of T` | `at(N)` | `T` | `count > 0` |
 | `log of T` | `count` | `integer` | |
-| `log of T` | `first` | `T` | earliest entry |
-| `log of T` | `last` | `T` | most recent entry |
-| `log of T` | `at(N)` | `T` | returns the entry at zero-based index `N` (v3) |
+| `log of T` | `first` | `T` | `count > 0` |
+| `log of T` | `last` | `T` | `count > 0` |
+| `log of T` | `at(N)` | `T` | `count > 0` |
 | `log of T by P` | `count` | `integer` | |
-| `log of T by P` | `first` | `T` | entry with smallest `P` value |
-| `log of T by P` | `last` | `T` | entry with largest `P` value |
-| `log of T by P` | `at(N)` | `T` | returns the entry at zero-based index `N` (v3) |
+| `log of T by P` | `first` | `T` | `count > 0` |
+| `log of T by P` | `last` | `T` | `count > 0` |
+| `log of T by P` | `at(N)` | `T` | `count > 0` |
 | `lookup of K to V` | `count` | `integer` | |
 | `string` | `length` | `integer` | |
 | Event arg reference (`EventName.ArgName`) | — | arg's declared type | |
@@ -1503,7 +1503,7 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `ordered` | `choice` | all non-choice types |
 | `optional` | any field type | — (always valid) |
 
-> **`notempty` on collections:** On collection fields, `notempty` is equivalent to `mincount 1`. It statically discharges `.min`/`.max`/`.peek`/`.first`/`.last` access obligations — no per-access `.count > 0` guard is needed when the field is declared `notempty`. Not applicable to `lookup of K to V`, which has its own cardinality model.
+> **`notempty` on collections:** On collection fields, `notempty` is equivalent to `mincount 1`. It statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last`/`.at` access obligations — no per-access `.count > 0` guard is needed when the field is declared `notempty`. Not applicable to `lookup of K to V`, which has its own cardinality model.
 
 **Modifier value validation:**
 

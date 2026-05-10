@@ -20,6 +20,10 @@
 
 ## Recent Updates
 
+### 2026-05-10T13:37:31Z — BUG-039 spec-fix batch recorded
+- Pre-check measured `.squad/decisions.md` at 470001 bytes with 1 inbox file(s); the hard-gate 7-day archive pass found 0 eligible active decision entries older than `2026-05-03T13:37:31Z`.
+- Merged `george-bug039-spec-gaps-fixed.md` into `.squad/decisions.md`, deleted the processed inbox file, wrote the George orchestration record plus the brief BUG-039 session log, and closed with `decisions.md` at 470502 bytes and history files summarized = 0.
+
 ### 2026-05-10T12:15:36Z — Post-batch archive, inbox merge, and Soup Nazi closeout recorded
 - Pre-check measured `.squad/decisions.md` at 169588 bytes with 1 inbox file; the hard-gate 7-day archive pass found 0 eligible active entries older than `2026-05-03T12:15:36Z`.
 - Merged `kramer-status-bar.md` into `.squad/decisions.md`, deleted the processed inbox file, appended the resulting activation-path update to `.squad/agents/kramer/history.md`, and recorded Soup Nazi's completed grammar-regression batch in `.squad/orchestration-log/2026-05-10T12-15-36Z-soup-nazi-11.md`.
