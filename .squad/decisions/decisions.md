@@ -13529,3 +13529,28 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 - Implemented the documentation-only follow-through from the BUG-039 triage already recorded in this ledger.
 - Proof column filled for all element-returning collection accessors with `count > 0`.
 - `notempty` discharge list updated to include `.at` and `.peekby`.
+
+### 2026-05-10T13:53:14Z: t2-2 Slice A scope and cleanup directives locked
+
+**By:** Shane (via Copilot)
+
+**Status:** Directive
+
+**Merged sources:** `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\copilot-directive-no-deferrals.md`, `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\copilot-directive-t2-2-scope.md`
+
+- No deferrals inside this slice: if the cleanup is architecturally correct and fits the current slice, ship it now. Frank owns defer-vs-now scope calls rather than escalating them back to Shane.
+- For t2-2 specifically, operand roles are in scope now. `ActionSyntaxSlot.Role` must be a typed `ActionSlotRole` enum (`Target`, `Value`, `Key`, `Index`, `IntoTarget`, `OrderingKey`, `OrderingCapture`), not a freeform string.
+- `IntoSupported` is removed in Slice A; slot optionality and `ActionShapeMeta` are the source of truth. Type-checker consumption of slot roles still belongs to Slice 9.
+
+### 2026-05-10T13:53:14Z: t2-2 Slice A catalog enrichment completed with typed slot roles
+
+**By:** George
+
+**Status:** Complete
+
+**Merged sources:** `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\george-t2-2-sliceA-done.md`, `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\george-t2-2-sliceA-enum-fix.md`
+
+- Added the typed `ActionSlotRole` enum with explicit 1-based values and moved `ActionSyntaxSlot.Role` off freeform strings.
+- Added `ActionSyntaxSlot` and `ActionShapeMeta`, including pre-computed `SeparatorTokens`, plus exhaustive `Actions.GetShapeMeta()` coverage for all 9 `ActionSyntaxShape` values.
+- Removed `IntoSupported` from `ActionMeta`; consumers now derive into support from slot metadata, and `CollectionIntoBy`'s final slot is correctly modeled as `OrderingCapture` rather than `OrderingKey`.
+- Coverage was added or updated in `ActionCatalogTests`, `ActionsTests`, `LanguageToolTests`, and the MCP mapping/tests. Validation closed green at 4322 total tests (3827 + 59 + 156 + 280).

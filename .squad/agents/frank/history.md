@@ -24,6 +24,8 @@
 
 - The pipeline audit found 27 catalog-compliance violations concentrated in Parser, TypeChecker, and ProofEngine: wildcards/broadcasts are still carried as raw names, parser grammar still depends on local token/separator branches, qualifier and modifier meaning still leaks through enum-identity checks, and proof discharge still embeds operator implication/diagnostic tables instead of reading metadata.
 
+- 2026-05-10T09:46Z — t2-2 slice plan: BUG-021/048/049 all share one root cause — `ActionSyntaxShape` tells the parser which structural pattern but not which tokens. `ParseActionTarget` hardcodes a union of all separator tokens (`=`, `into`, `by`, `at`) regardless of active shape, and each shape method hardcodes its own separators. Fix is `ActionShapeMeta` with `ActionSyntaxSlot[]` carrying per-slot separator tokens and optionality, then parser reads from that metadata. Three vertical slices: catalog enrichment, target-terminator rewire, shape-method rewire.
+
 - 2026-05-10T09:41Z — BUG-006/BUG-051 triage: PRE0009 on `min(A,B)` in the live editor was caused by a stale extension build (DLL built 28 min before the fix commit). George's parser fix (`IsFunctionCallLeader` routing in `ParseNud`) and regression test are both correct. No code change needed — rebuilding the language server DLL resolves the editor symptom. Verdict written to `.squad/decisions/inbox/frank-bug006-051-triage.md`.
 
 ## Historical Summary
@@ -67,3 +69,7 @@
 - The no-deferral rule now applies explicitly to implementation-plan wording and to plan-cleanup prompts: required work must sit in its owning slice with no "skip for now" language.
 - Your Track 2 master-plan/Phase A guardrail notes and the pipeline audit findings are now merged into `.squad/decisions.md` as the durable architecture record.
 - Execution priority changed immediately afterward: Track 2 is paused until Shane explicitly reopens it.
+
+### 2026-05-10T13:53:14Z — t2-2 Slice A scope ruling executed
+- Shane's directive is now durable: no deferrals inside the slice; Frank owns defer-vs-now scope calls, and typed operand roles plus `IntoSupported` removal were both approved for immediate inclusion in t2-2.
+- George completed Slice A accordingly: `ActionShapeMeta`/`ActionSyntaxSlot` landed, roles are now typed via 1-based `ActionSlotRole`, `CollectionIntoBy` distinguishes `OrderingCapture`, and validation closed green at 4322 tests.

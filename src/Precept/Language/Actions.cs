@@ -96,7 +96,7 @@ public static class Actions
         ActionKind.Dequeue => new(
             kind, Tokens.GetMeta(TokenKind.Dequeue),
             "Dequeue the front element of a queue",
-            [new(TypeKind.Queue), new(TypeKind.QueueBy)], ActionSyntaxShape.CollectionInto, IntoSupported: true,
+            [new(TypeKind.Queue), new(TypeKind.QueueBy)], ActionSyntaxShape.CollectionInto,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
@@ -116,7 +116,7 @@ public static class Actions
         ActionKind.Pop => new(
             kind, Tokens.GetMeta(TokenKind.Pop),
             "Pop the top element of a stack",
-            StackOnly, ActionSyntaxShape.CollectionInto, IntoSupported: true,
+            StackOnly, ActionSyntaxShape.CollectionInto,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
@@ -201,7 +201,7 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Dequeue),
             "Dequeue the front element of a queue-by",
             [new(TypeKind.QueueBy)],
-            ActionSyntaxShape.CollectionIntoBy, IntoSupported: true,
+            ActionSyntaxShape.CollectionIntoBy,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
@@ -213,6 +213,86 @@ public static class Actions
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ActionKind: {kind}"),
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  GetShapeMeta — exhaustive switch over ActionSyntaxShape
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Returns the canonical <see cref="ActionShapeMeta"/> for the given <paramref name="shape"/>.
+    /// Covers every <see cref="ActionSyntaxShape"/> member exhaustively.
+    /// </summary>
+    public static ActionShapeMeta GetShapeMeta(ActionSyntaxShape shape) => shape switch
+    {
+        // set Field = value
+        ActionSyntaxShape.AssignValue => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+            new(ActionSlotRole.Value,         TokenKind.Assign,    false),
+        ]),
+
+        // add/remove/enqueue/push/append Field value
+        ActionSyntaxShape.CollectionValue => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+            new(ActionSlotRole.Value,         null,                false),
+        ]),
+
+        // dequeue/pop Field [into intoTarget]
+        ActionSyntaxShape.CollectionInto => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+            new(ActionSlotRole.IntoTarget,    TokenKind.Into,      true),
+        ]),
+
+        // clear Field
+        ActionSyntaxShape.FieldOnly => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+        ]),
+
+        // append-by/enqueue-by Field value by orderingKey
+        ActionSyntaxShape.CollectionValueBy => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+            new(ActionSlotRole.Value,         null,                false),
+            new(ActionSlotRole.OrderingKey,   TokenKind.By,        false),
+        ]),
+
+        // insert Field value at index
+        ActionSyntaxShape.InsertAt => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+            new(ActionSlotRole.Value,         null,                false),
+            new(ActionSlotRole.Index,         TokenKind.At,        false),
+        ]),
+
+        // remove-at Field at index
+        ActionSyntaxShape.RemoveAtIndex => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+            new(ActionSlotRole.Index,         TokenKind.At,        false),
+        ]),
+
+        // put Field key = value
+        ActionSyntaxShape.PutKeyValue => new(shape,
+        [
+            new(ActionSlotRole.Target,        null,                false),
+            new(ActionSlotRole.Key,           null,                false),
+            new(ActionSlotRole.Value,         TokenKind.Assign,    false),
+        ]),
+
+        // dequeue-by Field [into intoTarget] [by orderingCapture]
+        ActionSyntaxShape.CollectionIntoBy => new(shape,
+        [
+            new(ActionSlotRole.Target,         null,               false),
+            new(ActionSlotRole.IntoTarget,     TokenKind.Into,     true),
+            new(ActionSlotRole.OrderingCapture, TokenKind.By,      true),
+        ]),
+
+        _ => throw new ArgumentOutOfRangeException(nameof(shape), shape,
+            $"Unknown ActionSyntaxShape: {shape}"),
     };
 
     // ════════════════════════════════════════════════════════════════════════════

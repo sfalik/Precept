@@ -199,14 +199,14 @@ public class LanguageToolTests
 
         result.Actions.Select(action => action.Kind).Should().Equal(Actions.All.Select(action => action.Kind.ToString()));
 
-        var actionMeta = Actions.All.First(action => action.PrimaryActionKind is not null || action.IntoSupported || action.AllowedIn.Length > 1);
+        var actionMeta = Actions.All.First(action => action.PrimaryActionKind is not null || Actions.GetShapeMeta(action.SyntaxShape).Slots.Any(s => s.Role == ActionSlotRole.IntoTarget) || action.AllowedIn.Length > 1);
         var action = result.Actions.Should().ContainSingle(entry => entry.Kind == actionMeta.Kind.ToString()).Subject;
         action.Keyword.Should().Be(actionMeta.Token.Text ?? actionMeta.Kind.ToString());
         action.Description.Should().Be(actionMeta.Description);
         action.AllowedIn.Should().Equal(actionMeta.AllowedIn.Select(kind => kind.ToString()));
         action.SyntaxShape.Should().Be(actionMeta.SyntaxShape.ToString());
         action.ValueRequired.Should().Be(actionMeta.ValueRequired);
-        action.IntoSupported.Should().Be(actionMeta.IntoSupported);
+        action.IntoSupported.Should().Be(Actions.GetShapeMeta(actionMeta.SyntaxShape).Slots.Any(s => s.Role == ActionSlotRole.IntoTarget));
         action.PrimaryActionKind.Should().Be(actionMeta.PrimaryActionKind?.ToString());
         action.ProofRequirements.Should().BeNull();
         action.HoverDescription.Should().Be(actionMeta.HoverDescription);

@@ -86,34 +86,37 @@ public class ActionsTests
         Actions.GetMeta(kind).ValueRequired.Should().BeFalse($"{kind} takes no value");
     }
 
-    // ── IntoSupported flag ──────────────────────────────────────────────────────
+    // ── Into slot support (derived from ActionShapeMeta) ────────────────────────
+
+    private static bool HasIntoSlot(ActionMeta meta) =>
+        Actions.GetShapeMeta(meta.SyntaxShape).Slots.Any(s => s.Role == ActionSlotRole.IntoTarget);
 
     [Theory]
     [InlineData(ActionKind.Dequeue)]
     [InlineData(ActionKind.Pop)]
     [InlineData(ActionKind.DequeueBy)]
-    public void IntoSupported_Actions(ActionKind kind)
+    public void IntoSlot_PresentForIntoCapturingActions(ActionKind kind)
     {
-        Actions.GetMeta(kind).IntoSupported.Should().BeTrue($"{kind} supports 'into' clause");
+        HasIntoSlot(Actions.GetMeta(kind)).Should().BeTrue($"{kind} supports 'into' clause via slot metadata");
     }
 
     [Fact]
-    public void OnlyDequeuePopAndDequeueBy_SupportInto()
+    public void OnlyDequeuePopAndDequeueBy_HaveIntoSlot()
     {
-        var withInto = Actions.All.Where(a => a.IntoSupported).ToList();
+        var withInto = Actions.All.Where(HasIntoSlot).ToList();
         withInto.Should().HaveCount(3);
         withInto.Select(a => a.Kind).Should()
             .BeEquivalentTo([ActionKind.Dequeue, ActionKind.Pop, ActionKind.DequeueBy]);
     }
 
-    // ── Mutually exclusive: ValueRequired and IntoSupported ─────────────────────
+    // ── Mutually exclusive: ValueRequired and into slot ─────────────────────────
 
     [Fact]
-    public void ValueRequired_And_IntoSupported_NeverBothTrue()
+    public void ValueRequired_And_IntoSlot_NeverBothTrue()
     {
         foreach (var meta in Actions.All)
         {
-            (meta.ValueRequired && meta.IntoSupported).Should().BeFalse(
+            (meta.ValueRequired && HasIntoSlot(meta)).Should().BeFalse(
                 $"{meta.Kind} cannot both require a value and support 'into'");
         }
     }
@@ -230,7 +233,7 @@ public class ActionsTests
     [Fact]
     public void ThreeActions_SupportInto()
     {
-        Actions.All.Count(a => a.IntoSupported).Should().Be(3);
+        Actions.All.Count(HasIntoSlot).Should().Be(3);
     }
 
     [Fact]
@@ -238,7 +241,7 @@ public class ActionsTests
     {
         // clear + removeAt: no value, no into
         var neither = Actions.All
-            .Where(a => !a.ValueRequired && !a.IntoSupported)
+            .Where(a => !a.ValueRequired && !HasIntoSlot(a))
             .ToList();
         neither.Should().HaveCount(2);
         neither.Select(a => a.Kind).Should().BeEquivalentTo([ActionKind.Clear, ActionKind.RemoveAt]);

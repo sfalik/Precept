@@ -274,7 +274,7 @@ public static class LanguageTool
             action.AllowedIn.Select(kind => kind.ToString()).ToArray(),
             action.SyntaxShape.ToString(),
             action.ValueRequired,
-            action.IntoSupported,
+            Actions.GetShapeMeta(action.SyntaxShape).Slots.Any(s => s.Role == ActionSlotRole.IntoTarget),
             action.PrimaryActionKind?.ToString(),
             RenderProofRequirementsOrNull(action.ProofRequirements),
             action.HoverDescription,

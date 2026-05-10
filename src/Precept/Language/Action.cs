@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace Precept.Language;
 
 /// <summary>
@@ -11,7 +13,6 @@ public sealed record ActionMeta(
     TypeTarget[] ApplicableTo,
     ActionSyntaxShape SyntaxShape,
     bool         ValueRequired = false,
-    bool         IntoSupported = false,
     ProofRequirement[]? ProofRequirements = null,
     ConstructKind[]?    AllowedIn         = null,
     string?      HoverDescription = null,
@@ -24,6 +25,60 @@ public sealed record ActionMeta(
 
     /// <summary>Construct kinds where this action may appear.</summary>
     public ConstructKind[] AllowedIn { get; } = AllowedIn ?? [];
+}
+
+/// <summary>
+/// Logical role of a slot in an action's argument syntax.
+/// </summary>
+public enum ActionSlotRole
+{
+    /// <summary>The collection or field being operated on (always first, always present).</summary>
+    Target          = 1,
+    /// <summary>The value being inserted, added, or assigned.</summary>
+    Value           = 2,
+    /// <summary>The key in a key-value action (PutKeyValue).</summary>
+    Key             = 3,
+    /// <summary>The index position (InsertAt, RemoveAtIndex).</summary>
+    Index           = 4,
+    /// <summary>The destination field in dequeue-into actions (optional).</summary>
+    IntoTarget      = 5,
+    /// <summary>The priority or ordering key in CollectionValueBy (by expr).</summary>
+    OrderingKey     = 6,
+    /// <summary>The capture variable in CollectionIntoBy (by expr, optional).</summary>
+    OrderingCapture = 7,
+}
+
+/// <summary>
+/// Describes one positional or keyword-separated argument slot in an action's syntax.
+/// </summary>
+/// <param name="Role">Logical role of the slot.</param>
+/// <param name="PrecedingSeparator">The keyword token that precedes this slot, or <c>null</c> if the slot is positional (no preceding keyword).</param>
+/// <param name="IsOptional"><c>true</c> for slots that may be omitted (e.g. the <c>into</c> capture in dequeue).</param>
+public sealed record ActionSyntaxSlot(
+    ActionSlotRole Role,
+    TokenKind? PrecedingSeparator,
+    bool IsOptional);
+
+/// <summary>
+/// Shape metadata for one <see cref="ActionSyntaxShape"/> value: the ordered list of argument slots
+/// and a pre-computed set of the separator tokens those slots introduce.
+/// </summary>
+public sealed record ActionShapeMeta(
+    ActionSyntaxShape Shape,
+    ActionSyntaxSlot[] Slots)
+{
+    /// <summary>
+    /// Pre-computed frozen set of every distinct <see cref="TokenKind"/> that appears as a
+    /// <see cref="ActionSyntaxSlot.PrecedingSeparator"/> in <see cref="Slots"/>.
+    /// Computed once at construction — never recomputed per call.
+    /// </summary>
+    public System.Collections.Frozen.FrozenSet<TokenKind> SeparatorTokens { get; } =
+        Slots
+            .Where(s => s.PrecedingSeparator.HasValue)
+            .Select(s => s.PrecedingSeparator!.Value)
+            .Distinct()
+            .ToHashSet()
+            .ToFrozenSet();
 }
 
 /// <summary>The token consumption pattern for this action's argument syntax.</summary>

@@ -46,3 +46,7 @@
 - Pre-check measured `.squad/decisions.md` at 152750 bytes with 14 inbox file(s); the 7-day archive hard gate ran first and found 0 eligible active entries older than `2026-05-03T04:33:18Z`.
 - This pass merged 13 inbox notes into 6 canonical decisions, wrote the `kramer-8` and coordinator orchestration records, and kept Track 1 as the exclusive execution lane.
 
+
+### 2026-05-10T13:53:14Z — t2-2 Slice A closeout recorded
+- Pre-check measured `.squad/decisions.md` at 470502 bytes with 4 inbox file(s); the hard-gate 7-day archive pass ran first and found 0 eligible active entries older than `2026-05-03T13:53:14Z`, so `decisions-archive.md` stayed unchanged.
+- Merged 4 inbox notes into 2 canonical decisions, wrote orchestration logs for george-3 and george-4 plus the brief Slice A session log, propagated the result into George/Frank history, summarized `george/history.md`, and closed the inbox back to 0.
