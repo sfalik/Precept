@@ -260,56 +260,29 @@ public static partial class Parser
         }
 
         // ── Scoped construct parsing ────────────────────────────────────────────
-        // Protocol: consume leading keyword, parse anchor slot (Slots[0]),
-        // consume disambiguation keyword (no slot), walk remaining Slots[1..].
+        // Protocol: consume leading keyword, iterate all slots, consuming the
+        // disambiguation keyword at the natural boundary between scope and body.
 
         private void ParseScopedConstruct(ConstructMeta meta)
         {
             var startToken = Advance(); // consume leading keyword
             var startSpan = startToken.Span;
             var slots = new List<SlotValue>();
+            var disambTokens = meta.Entries
+                .SelectMany(entry => entry.DisambiguationTokens ?? [])
+                .ToFrozenSet();
 
-            // Slots[0] = anchor (StateTarget or EventTarget)
-            if (meta.Slots.Count > 0)
+            var disambConsumed = false;
+
+            for (int i = 0; i < meta.Slots.Count; i++)
             {
-                var anchorValue = ParseSlotValue(meta.Slots[0], meta);
-                if (meta.Slots[0].IsRequired || anchorValue.Span != SourceSpan.Missing)
-                    slots.Add(anchorValue);
-            }
-
-            if (meta.SupportsPreVerbWhenGuard && Peek().Kind == TokenKind.When)
-            {
-                var guardSlot = ParseGuardClause(new ConstructSlot(
-                    ConstructSlotKind.GuardClause,
-                    IsRequired: false,
-                    TerminationTokens: meta.Entries
-                        .SelectMany(entry => entry.DisambiguationTokens ?? [])
-                        .Distinct()
-                        .ToArray()));
-
-                if (guardSlot.Span != SourceSpan.Missing)
-                    slots.Add(guardSlot);
-            }
-
-            // Consume disambiguation keyword (not a slot) — but only if it won't
-            // be consumed by the next slot's sub-parser. Arrow serves as both
-            // disambiguation token AND ActionChain entry trigger, so we leave it.
-            var peek = Peek();
-            var isDisambToken = false;
-            foreach (var entry in meta.Entries)
-            {
-                if (entry.DisambiguationTokens is { } dTokens && dTokens.Contains(peek.Kind))
+                if (i > 0 && !disambConsumed && disambTokens.Contains(Peek().Kind))
                 {
-                    isDisambToken = true;
-                    break;
+                    if (Peek().Kind != TokenKind.Arrow)
+                        Advance(); // consume disambiguation keyword — maps to no slot
+                    disambConsumed = true;
                 }
-            }
-            if (isDisambToken && peek.Kind != TokenKind.Arrow)
-                Advance(); // consume disambiguation keyword — maps to no slot
 
-            // Walk remaining slots (Slots[1..])
-            for (int i = 1; i < meta.Slots.Count; i++)
-            {
                 var slot = meta.Slots[i];
                 var value = ParseSlotValue(slot, meta);
                 if (slot.IsRequired || value.Span != SourceSpan.Missing)

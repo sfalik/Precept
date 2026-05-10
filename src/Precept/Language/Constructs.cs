@@ -19,9 +19,12 @@ public static class Constructs
     private static readonly ConstructSlot SlotModifierList      = new(ConstructSlotKind.ModifierList,       IsRequired: false);
     private static readonly ConstructSlot SlotStateEntryList    = new(ConstructSlotKind.StateEntryList);
     private static readonly ConstructSlot SlotArgumentList      = new(ConstructSlotKind.ArgumentList,       IsRequired: false);
-    private static readonly ConstructSlot SlotComputeExpression = new(ConstructSlotKind.ComputeExpression,  IsRequired: false, TerminationTokens: []);
-    private static readonly ConstructSlot SlotGuardClause       = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Because, TokenKind.Arrow]);
-    private static readonly ConstructSlot SlotActionChain       = new(ConstructSlotKind.ActionChain,        IsRequired: false);
+    private static readonly ConstructSlot SlotComputeExpression    = new(ConstructSlotKind.ComputeExpression,  IsRequired: false, TerminationTokens: []);
+    private static readonly ConstructSlot SlotGuardClause          = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Because, TokenKind.Arrow]);
+    private static readonly ConstructSlot SlotPreVerbGuardEnsure   = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Ensure]);
+    private static readonly ConstructSlot SlotPreVerbGuardArrow    = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Arrow]);
+    private static readonly ConstructSlot SlotPreVerbGuardModify   = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Modify]);
+    private static readonly ConstructSlot SlotActionChain          = new(ConstructSlotKind.ActionChain,        IsRequired: false);
     private static readonly ConstructSlot SlotOutcome           = new(ConstructSlotKind.Outcome);
     private static readonly ConstructSlot SlotStateTarget       = new(ConstructSlotKind.StateTarget);
     private static readonly ConstructSlot SlotOptStateTarget    = new(ConstructSlotKind.StateTarget,        IsRequired: false);
@@ -124,18 +127,17 @@ public static class Constructs
             "State-scoped constraint that must hold on entry, exit, or while in a state",
             "in Approved ensure amount > 0 because \"Approved amount must be positive\"",
             [ConstructKind.StateDeclaration],
-            [SlotStateTarget, SlotEnsureClause, SlotOptBecauseClause],
+            [SlotStateTarget, SlotPreVerbGuardEnsure, SlotEnsureClause, SlotOptBecauseClause],
             [new(TokenKind.In, [TokenKind.Ensure]), new(TokenKind.To, [TokenKind.Ensure]), new(TokenKind.From, [TokenKind.Ensure])],
-            RoutingFamily.StateScoped,
-            SupportsPreVerbWhenGuard: true),
+            RoutingFamily.StateScoped),
 
         ConstructKind.AccessMode => new(
             kind,
             "access mode",
-            "Declares field access per state: 'in State modify Field readonly|editable [when Guard]'",
-            "in Draft modify Amount editable",
+            "Declares field access per state: 'in State [when Guard] modify Field readonly|editable'",
+            "in Draft when IsOwner modify Amount editable",
             [],
-            [SlotStateTarget, SlotFieldTarget, SlotAccessModeKeyword, SlotGuardClause],
+            [SlotStateTarget, SlotPreVerbGuardModify, SlotFieldTarget, SlotAccessModeKeyword],
             [new(TokenKind.In, [TokenKind.Modify])],
             RoutingFamily.StateScoped,
             ModifierDomain: ModifierDomain.Access),
@@ -156,10 +158,9 @@ public static class Constructs
             "Entry or exit hook that fires actions when entering or leaving a state",
             "to Submitted -> set submittedAt = now()",
             [ConstructKind.StateDeclaration],
-            [SlotStateTarget, SlotActionChain],
+            [SlotStateTarget, SlotPreVerbGuardArrow, SlotActionChain],
             [new(TokenKind.To, [TokenKind.Arrow]), new(TokenKind.From, [TokenKind.Arrow])],
-            RoutingFamily.StateScoped,
-            SupportsPreVerbWhenGuard: true),
+            RoutingFamily.StateScoped),
 
         ConstructKind.EventEnsure => new(
             kind,
@@ -167,10 +168,9 @@ public static class Constructs
             "Event-scoped constraint that must hold when an event fires",
             "on Submit ensure reviewer != \"\" because \"Reviewer required\"",
             [ConstructKind.EventDeclaration],
-            [SlotEventTarget, SlotEnsureClause, SlotOptBecauseClause],
+            [SlotEventTarget, SlotPreVerbGuardEnsure, SlotEnsureClause, SlotOptBecauseClause],
             [new(TokenKind.On, [TokenKind.Ensure])],
-            RoutingFamily.EventScoped,
-            SupportsPreVerbWhenGuard: true),
+            RoutingFamily.EventScoped),
 
         ConstructKind.EventHandler => new(
             kind,
