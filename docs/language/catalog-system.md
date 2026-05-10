@@ -576,8 +576,7 @@ public sealed record TokenMeta(
     string?                        Text,
     IReadOnlyList<TokenCategory>   Categories,
     string                         Description,
-    string?                        TextMateScope,
-    string?                        SemanticTokenType,
+    SemanticTokenTypeKind?         VisualCategory = null,
     TokenKind[]?                   ValidAfter = null,
     bool                           IsAccessModeAdjective = false,
     bool                           IsValidAsMemberName = false,
@@ -585,7 +584,7 @@ public sealed record TokenMeta(
 );
 ```
 
-`TokenMeta` carries no cross-references to other catalogs. The bridge direction is **unidirectional upward**: downstream catalogs (Types, Operators, Modifiers, Actions) point up to Tokens via `TokenMeta Token` object references. Consumers that need the reverse direction (token → catalog entry) use **derived frozen indexes** built at startup:
+`TokenMeta` now carries one lightweight visual-catalog link: `VisualCategory` points to `SemanticTokenTypes` by enum kind. The bridge direction remains **unidirectional upward** for object references: downstream catalogs (Types, Operators, Modifiers, Actions) point up to Tokens via `TokenMeta Token` object references. Consumers that need reverse direction (token → catalog entry or token → visual metadata) use **derived frozen indexes** built at startup or the corresponding catalog lookup:
 
 ```csharp
 // Derived at startup from the catalog that owns the relationship
@@ -828,12 +827,12 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Part | Type |
 |------|------|
 | Kind enum | `TokenKind` |
-| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TextMateScope?, SemanticTokenType?, ValidAfter[]?, IsAccessModeAdjective, IsValidAsMemberName, IsMessagePosition)` |
+| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, VisualCategory?, ValidAfter[]?, IsAccessModeAdjective, IsValidAsMemberName, IsMessagePosition)` |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
 > **✅ Resolved — No `SemanticTokenModifiers` field on `TokenMeta`**
-> Precept tokens carry zero LSP semantic token modifier bits. The modifier flags defined in the LSP specification (`readonly`, `defaultLibrary`, `deprecated`, etc.) describe declaration-role dimensions that have no meaning in Precept's token taxonomy. Tokens are categorized by their structural role (keyword, identifier, operator, etc.); that role is fully captured by `SemanticTokenType`. The language server hardcodes `tokenModifiers: 0` for all tokens and no catalog property is needed.
+> Precept tokens carry zero LSP semantic token modifier bits. The modifier flags defined in the LSP specification (`readonly`, `defaultLibrary`, `deprecated`, etc.) describe declaration-role dimensions that have no meaning in Precept's token taxonomy. Tokens are categorized by their structural role in `TokenMeta`, while visual identity is derived through `TokenMeta.VisualCategory` → `SemanticTokenTypes`. The language server hardcodes `tokenModifiers: 0` for all tokens and no catalog property is needed.
 > *Resolved: 2026-05-07 — Wave 4, team-autonomous*
 
 **Consumers:** MCP vocabulary, LS semantic tokens, LS completions, lexer keyword lookup, TextMate grammar keyword alternations.
@@ -2164,7 +2163,7 @@ The language server produces editor artifacts from catalog metadata and compiler
 
 | LS feature | Catalog source |
 |---|---|
-| Semantic token classification (Pass 1) | `TokenMeta.SemanticTokenType` — maps token kinds to LSP token types |
+| Semantic token classification (Pass 1) | `TokenMeta.VisualCategory` + `SemanticTokenTypes.GetMeta(...).CustomType` — maps token kinds to LSP custom token types |
 | Completion candidates — type position | `Types.All` |
 | Completion candidates — modifier position | `Modifiers.All` filtered by `ApplicableTo(constructKind)` |
 | Completion candidates — action verb position | `Actions.All` |
@@ -2172,7 +2171,7 @@ The language server produces editor artifacts from catalog metadata and compiler
 | Hover text for keywords | `TokenMeta.HoverDescription` |
 | Hover text for types | `TypeMeta.HoverDescription` |
 | Hover text for functions | `FunctionMeta.HoverDescription` |
-| TextMate grammar patterns | `TokenMeta.TextMateScope`, `TokenMeta.Pattern` |
+| TextMate grammar patterns | `TokenMeta.VisualCategory` + `SemanticTokenTypes.GetMeta(...).TextMateScope` (plus grammar-local structural patterns where needed) |
 
 **The failure mode:** Hardcoding completion candidate lists in LS code. The LS derives candidates from catalogs — new language features appear automatically in completions when added to the catalog.
 

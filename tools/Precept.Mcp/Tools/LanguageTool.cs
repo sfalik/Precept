@@ -52,17 +52,23 @@ public static class LanguageTool
             FirePipeline);
 
     private static TokenCatalogEntryDto MapToken(TokenMeta token)
-        => new(
+    {
+        var visual = token.VisualCategory.HasValue
+            ? SemanticTokenTypes.GetMeta(token.VisualCategory.Value)
+            : null;
+
+        return new TokenCatalogEntryDto(
             token.Kind.ToString(),
             token.Text,
             token.Categories.Select(category => category.ToString()).ToArray(),
             token.Description,
-            token.TextMateScope,
-            token.SemanticTokenType,
+            visual?.TextMateScope,
+            visual?.CustomType,
             (token.ValidAfter ?? []).Select(previous => previous.ToString()).ToArray(),
             token.IsAccessModeAdjective,
             token.IsValidAsMemberName,
             token.IsMessagePosition);
+    }
 
     private static TypeCatalogEntryDto MapType(TypeMeta type)
         => new(

@@ -191,116 +191,89 @@ public class TokensTests
                 $"{kind} should have only the Structural category");
     }
 
-    // M7 ── TextMateScope ────────────────────────────────────────────────────
+    // M7 ── VisualCategory ──────────────────────────────────────────────────
 
     [Fact]
-    public void AllKeywords_HaveTextMateScope()
+    public void AllTextualTokens_HaveVisualCategory()
     {
         Tokens.All
             .Where(m => m.Text is not null)
             .Should().AllSatisfy(m =>
-                m.TextMateScope.Should().NotBeNullOrEmpty(
-                    $"keyword token {m.Kind} should have a non-empty TextMateScope"));
+                m.VisualCategory.Should().HaveValue(
+                    $"textual token {m.Kind} should have a VisualCategory"));
     }
 
     [Fact]
-    public void TypeKeywords_HaveStorageTypeScope()
+    public void TypeKeywords_HaveTypeVisualCategory()
     {
         var syntheticKinds = SyntheticTokenKindSet();
         Tokens.All
             .Where(m => !syntheticKinds.Contains(m.Kind) && m.Categories.Any(c => c == TokenCategory.Type))
             .Should().AllSatisfy(m =>
-                m.TextMateScope.Should().Be("storage.type.precept",
+                m.VisualCategory.Should().Be(SemanticTokenTypeKind.Type,
                     $"{m.Kind} is a type keyword"));
     }
 
     [Fact]
-    public void StateModifiers_HaveStorageModifierScope()
+    public void StateModifiers_HaveKeywordSemanticVisualCategory()
     {
         Tokens.All
             .Where(m => m.Categories.Any(c => c == TokenCategory.StateModifier))
             .Should().AllSatisfy(m =>
-                m.TextMateScope.Should().Be("storage.modifier.state.precept",
+                m.VisualCategory.Should().Be(SemanticTokenTypeKind.KeywordSemantic,
                     $"{m.Kind} is a state modifier"));
     }
 
     [Fact]
-    public void StructuralTokens_HaveNullScope()
+    public void StructuralTokens_HaveNullVisualCategory()
     {
-        Tokens.GetMeta(TokenKind.EndOfSource).TextMateScope.Should().BeNull(
-            "EndOfSource is synthetic and has no TextMate scope");
-        Tokens.GetMeta(TokenKind.NewLine).TextMateScope.Should().BeNull(
-            "NewLine is synthetic and has no TextMate scope");
+        Tokens.GetMeta(TokenKind.EndOfSource).VisualCategory.Should().BeNull(
+            "EndOfSource is synthetic and has no visual category");
+        Tokens.GetMeta(TokenKind.NewLine).VisualCategory.Should().BeNull(
+            "NewLine is synthetic and has no visual category");
     }
 
     [Theory]
     [InlineData(TokenKind.And)]
     [InlineData(TokenKind.Or)]
     [InlineData(TokenKind.Not)]
-    public void LogicalOperators_HaveLogicalOperatorScope(TokenKind kind)
+    public void LogicalOperators_HaveKeywordGrammarVisualCategory(TokenKind kind)
     {
-        Tokens.GetMeta(kind).TextMateScope.Should().Be("keyword.operator.logical.precept",
-            $"{kind} is a logical operator");
-    }
-
-    // M8 ── SemanticTokenType ────────────────────────────────────────────────
-
-    [Fact]
-    public void AllKeywords_HaveSemanticTokenType()
-    {
-        Tokens.All
-            .Where(m => m.Text is not null)
-            .Should().AllSatisfy(m =>
-                m.SemanticTokenType.Should().NotBeNull(
-                    $"keyword token {m.Kind} should have a SemanticTokenType"));
+        Tokens.GetMeta(kind).VisualCategory.Should().Be(SemanticTokenTypeKind.KeywordGrammar,
+            $"{kind} is a logical operator keyword");
     }
 
     [Fact]
-    public void TypeKeywords_HaveTypeSemanticTokenType()
-    {
-        var syntheticKinds = SyntheticTokenKindSet();
-        Tokens.All
-            .Where(m => !syntheticKinds.Contains(m.Kind) && m.Categories.Any(c => c == TokenCategory.Type))
-            .Should().AllSatisfy(m =>
-                m.SemanticTokenType.Should().Be("type",
-                    $"{m.Kind} is a type keyword"));
-    }
-
-    [Fact]
-    public void StateModifiers_HaveModifierSemanticTokenType()
-    {
-        Tokens.All
-            .Where(m => m.Categories.Any(c => c == TokenCategory.StateModifier))
-            .Should().AllSatisfy(m =>
-                m.SemanticTokenType.Should().Be("modifier",
-                    $"{m.Kind} is a state modifier"));
-    }
-
-    [Fact]
-    public void Operators_HaveOperatorSemanticTokenType()
+    public void Operators_HaveOperatorVisualCategory()
     {
         Tokens.All
             .Where(m => m.Categories.Any(c => c == TokenCategory.Operator))
             .Should().AllSatisfy(m =>
-                m.SemanticTokenType.Should().Be("operator",
+                m.VisualCategory.Should().Be(SemanticTokenTypeKind.Operator,
                     $"{m.Kind} is an operator"));
     }
 
     [Fact]
-    public void NumberLiteral_HasNumberSemanticTokenType()
+    public void BooleanLiterals_HaveValueVisualCategory()
     {
-        Tokens.GetMeta(TokenKind.NumberLiteral).SemanticTokenType.Should().Be("number");
+        Tokens.GetMeta(TokenKind.True).VisualCategory.Should().Be(SemanticTokenTypeKind.Value);
+        Tokens.GetMeta(TokenKind.False).VisualCategory.Should().Be(SemanticTokenTypeKind.Value);
     }
 
     [Theory]
+    [InlineData(TokenKind.NumberLiteral)]
     [InlineData(TokenKind.StringLiteral)]
     [InlineData(TokenKind.StringStart)]
+    [InlineData(TokenKind.StringMiddle)]
     [InlineData(TokenKind.StringEnd)]
     [InlineData(TokenKind.TypedConstant)]
-    public void StringTokens_HaveStringSemanticTokenType(TokenKind kind)
+    [InlineData(TokenKind.TypedConstantStart)]
+    [InlineData(TokenKind.TypedConstantMiddle)]
+    [InlineData(TokenKind.TypedConstantEnd)]
+    public void LiteralFragments_HaveNoVisualCategory(TokenKind kind)
     {
-        Tokens.GetMeta(kind).SemanticTokenType.Should().Be("string",
-            $"{kind} is a string token");
+        Tokens.GetMeta(kind).VisualCategory.Should().BeNull(
+            $"{kind} has no semantic-token visual category");
     }
 
     // ── Ordering invariants ────────────────────────────────────────────────────────

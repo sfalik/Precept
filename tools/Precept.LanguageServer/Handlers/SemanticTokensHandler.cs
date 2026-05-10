@@ -8,7 +8,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
+using Precept.Language;
 using Compilation = Precept.Pipeline.Compilation;
+using SemanticTokenTypesCatalog = Precept.Language.SemanticTokenTypes;
 using TokenKind = Precept.Language.TokenKind;
 using TokensCatalog = Precept.Language.Tokens;
 
@@ -83,17 +85,17 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         foreach (var token in compilation.Tokens.Tokens)
         {
             var meta = TokensCatalog.GetMeta(token.Kind);
-            if (meta.SemanticTokenType is null)
+            if (!meta.VisualCategory.HasValue)
             {
                 continue;
             }
 
-            // Contextual reclassification: 'set' emits "type" in type-expression position.
-            // SetType.SemanticTokenType is intentionally null (parser-synthesized; never in the lexer stream),
-            // so we use the literal "type" rather than delegating to the catalog entry.
+            // Contextual reclassification: 'set' emits the type custom token in type-expression position.
+            // SetType.VisualCategory is intentionally null (parser-synthesized; never in the lexer stream),
+            // so we derive the type token from the catalog rather than the synthetic token kind.
             var effectiveTokenType = token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token)
-                ? "type"
-                : meta.SemanticTokenType;
+                ? SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.Type).CustomType
+                : SemanticTokenTypesCatalog.GetMeta(meta.VisualCategory.Value).CustomType;
 
             projected.Add(new LexicalSemanticToken(
                 token.Kind,
@@ -118,7 +120,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 ns.StartLine - 1,
                 ns.StartColumn - 1,
                 field.Name.Length,
-                "property"));
+                SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.FieldName).CustomType));
         }
 
         foreach (var state in index.States)
@@ -129,7 +131,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 ns.StartLine - 1,
                 ns.StartColumn - 1,
                 state.Name.Length,
-                "enum"));
+                SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.State).CustomType));
         }
 
         foreach (var evt in index.Events)
@@ -140,7 +142,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 ns.StartLine - 1,
                 ns.StartColumn - 1,
                 evt.Name.Length,
-                "function"));
+                SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.Event).CustomType));
 
             foreach (var arg in evt.Args)
             {
@@ -149,7 +151,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     arg.Span.StartLine - 1,
                     arg.Span.StartColumn - 1,
                     arg.Name.Length,
-                    "parameter"));
+                    SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.ArgName).CustomType));
             }
         }
 
@@ -160,7 +162,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 fr.Site.StartLine - 1,
                 fr.Site.StartColumn - 1,
                 fr.Site.Length,
-                "property"));
+                SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.FieldName).CustomType));
         }
 
         foreach (var sr in index.StateReferences)
@@ -170,7 +172,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 sr.Site.StartLine - 1,
                 sr.Site.StartColumn - 1,
                 sr.Site.Length,
-                "enum"));
+                SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.State).CustomType));
         }
 
         foreach (var er in index.EventReferences)
@@ -180,7 +182,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 er.Site.StartLine - 1,
                 er.Site.StartColumn - 1,
                 er.Site.Length,
-                "function"));
+                SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.Event).CustomType));
         }
 
         foreach (var ar in index.ArgReferences)
@@ -190,7 +192,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 ar.Site.StartLine - 1,
                 ar.Site.StartColumn - 1,
                 ar.Site.Length,
-                "parameter"));
+                SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.ArgName).CustomType));
         }
 
         return projected.ToImmutable();
@@ -206,22 +208,14 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 
     internal static SemanticTokensLegend BuildLegend()
     {
-        var lexicalTypes = TokensCatalog.All
-            .Select(static meta => meta.SemanticTokenType)
-            .Where(static type => type is not null)
-            .Distinct();
-
-        var identifierTypes = new[] { "property", "enum", "function", "parameter" };
-
         return new SemanticTokensLegend
         {
             TokenTypes = new Container<SemanticTokenType>(
-                lexicalTypes
-                    .Concat(identifierTypes)
-                    .Distinct()
-                    .Select(static type => new SemanticTokenType(type!))
+                SemanticTokenTypesCatalog.All
+                    .Select(static m => new SemanticTokenType(m.CustomType))
                     .ToArray()),
-            TokenModifiers = new Container<SemanticTokenModifier>(),
+            TokenModifiers = new Container<SemanticTokenModifier>(
+                new SemanticTokenModifier("preceptConstrained")),
         };
     }
 

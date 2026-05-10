@@ -53,14 +53,15 @@ public class LanguageToolTests
         result.Tokens.Select(token => token.Kind).Should().Equal(Tokens.All.Select(token => token.Kind.ToString()));
 
         var becauseMeta = Tokens.GetMeta(TokenKind.Because);
+        var becauseVisual = SemanticTokenTypes.GetMeta(becauseMeta.VisualCategory!.Value);
         var because = result.Tokens.Should().ContainSingle(token => token.Kind == TokenKind.Because.ToString()).Subject;
 
         because.Kind.Should().Be(becauseMeta.Kind.ToString());
         because.Text.Should().Be(becauseMeta.Text);
         because.Categories.Should().Equal(becauseMeta.Categories.Select(category => category.ToString()));
         because.Description.Should().Be(becauseMeta.Description);
-        because.TextMateScope.Should().Be(becauseMeta.TextMateScope);
-        because.SemanticTokenType.Should().Be(becauseMeta.SemanticTokenType);
+        because.TextMateScope.Should().Be(becauseVisual.TextMateScope);
+        because.SemanticTokenType.Should().Be(becauseVisual.CustomType);
         because.ValidAfter.Should().Equal((becauseMeta.ValidAfter ?? []).Select(previous => previous.ToString()));
         because.IsAccessModeAdjective.Should().Be(becauseMeta.IsAccessModeAdjective);
         because.IsValidAsMemberName.Should().Be(becauseMeta.IsValidAsMemberName);

@@ -148,6 +148,6 @@ public class ParserBackArrowTests
         meta.Text.Should().Be("<-");
         meta.Description.Should().Be("Computed field derivation");
         meta.Categories.Should().Contain(TokenCategory.Operator);
-        meta.TextMateScope.Should().Be("keyword.operator.arrow.precept");
+        meta.VisualCategory.Should().Be(SemanticTokenTypeKind.Operator);
     }
 }

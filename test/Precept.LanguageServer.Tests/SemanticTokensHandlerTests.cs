@@ -8,6 +8,7 @@ using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Precept.Language;
 using Precept.LanguageServer.Handlers;
 using Xunit;
 using TokenKind = Precept.Language.TokenKind;
@@ -21,12 +22,14 @@ public sealed class SemanticTokensHandlerTests
     public void LexicalTokens_Keyword_EmitsSemanticToken()
     {
         var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial");
+        var keywordSemantic = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.KeywordSemantic).CustomType;
+        var name = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Name).CustomType;
 
         var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
 
-        tokens.Should().Contain(token => token.Kind == TokenKind.Field && token.TokenType == "keyword");
-        tokens.Should().Contain(token => token.Kind == TokenKind.State && token.TokenType == "keyword");
-        tokens.Should().Contain(token => token.Kind == TokenKind.Identifier && token.TokenType == "variable");
+        tokens.Should().Contain(token => token.Kind == TokenKind.Field && token.TokenType == keywordSemantic);
+        tokens.Should().Contain(token => token.Kind == TokenKind.State && token.TokenType == keywordSemantic);
+        tokens.Should().Contain(token => token.Kind == TokenKind.Identifier && token.TokenType == name);
     }
 
     [Fact]
@@ -35,24 +38,25 @@ public sealed class SemanticTokensHandlerTests
         var compilation = Compiler.Compile("precept Sample\n");
 
         var expectedTokenCount = compilation.Tokens.Tokens.Count(token =>
-            TokensCatalog.GetMeta(token.Kind).SemanticTokenType is not null);
+            TokensCatalog.GetMeta(token.Kind).VisualCategory.HasValue);
 
         var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
 
         compilation.Tokens.Tokens
-            .Where(token => TokensCatalog.GetMeta(token.Kind).SemanticTokenType is null)
+            .Where(token => !TokensCatalog.GetMeta(token.Kind).VisualCategory.HasValue)
             .Select(token => token.Kind)
             .Should()
             .Contain([TokenKind.NewLine, TokenKind.EndOfSource]);
 
         tokens.Should().HaveCount(expectedTokenCount);
-        tokens.Should().OnlyContain(token => TokensCatalog.GetMeta(token.Kind).SemanticTokenType != null);
+        tokens.Should().OnlyContain(token => TokensCatalog.GetMeta(token.Kind).VisualCategory.HasValue);
     }
 
     [Fact]
     public void LexicalTokens_SpanConvertedToZeroBasedLines()
     {
         var compilation = Compiler.Compile("precept Sample\n  field Name as string");
+        var keywordSemantic = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.KeywordSemantic).CustomType;
 
         var fieldToken = SemanticTokensHandler.ProjectLexicalTokens(compilation)
             .Single(token => token.Kind == TokenKind.Field);
@@ -60,21 +64,24 @@ public sealed class SemanticTokensHandlerTests
         fieldToken.Line.Should().Be(1);
         fieldToken.Character.Should().Be(2);
         fieldToken.Length.Should().Be(5);
-        fieldToken.TokenType.Should().Be("keyword");
+        fieldToken.TokenType.Should().Be(keywordSemantic);
     }
 
     [Fact]
-    public void BuildLegend_ContainsAllDistinctNonNullLexicalSemanticTokenTypes()
+    public void BuildLegend_TokenTypes_MatchCatalogCustomTypes()
     {
-        var expected = TokensCatalog.All
-            .Select(meta => meta.SemanticTokenType)
-            .Where(type => type is not null)
-            .Distinct()
-            .ToArray();
-
+        var expected = SemanticTokenTypes.All.Select(m => m.CustomType).ToArray();
         var legend = SemanticTokensHandler.BuildLegend();
 
-        legend.TokenTypes.Select(type => type.ToString()).Should().Contain(expected);
+        legend.TokenTypes.Select(t => t.ToString()).Should().Equal(expected);
+    }
+
+    [Fact]
+    public void BuildLegend_IncludesPreceptConstrainedModifier()
+    {
+        var legend = SemanticTokensHandler.BuildLegend();
+
+        legend.TokenModifiers.Select(m => m.ToString()).Should().Contain("preceptConstrained");
     }
 
     [Fact]
@@ -97,10 +104,10 @@ public sealed class SemanticTokensHandlerTests
         var legend = SemanticTokensHandler.BuildLegend();
 
         legend.TokenTypes.Select(static type => type.ToString()).Should().Contain([
-            "property",
-            "enum",
-            "function",
-            "parameter",
+            SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.State).CustomType,
+            SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Event).CustomType,
+            SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType,
+            SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType,
         ]);
     }
 
@@ -113,6 +120,7 @@ public sealed class SemanticTokensHandlerTests
             state Draft initial
             """);
         var field = compilation.Semantics.Fields.Single();
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType;
 
         compilation.HasErrors.Should().BeFalse();
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
@@ -121,7 +129,7 @@ public sealed class SemanticTokensHandlerTests
                 token.Line == field.NameSpan.StartLine - 1 &&
                 token.Character == field.NameSpan.StartColumn - 1 &&
                 token.Length == field.Name.Length &&
-                token.TokenType == "property");
+                token.TokenType == expected);
     }
 
     [Fact]
@@ -134,6 +142,7 @@ public sealed class SemanticTokensHandlerTests
             event Submit(Amount as decimal)
             """);
         var arg = compilation.Semantics.Events.Single().Args.Single();
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
 
         compilation.HasErrors.Should().BeFalse();
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
@@ -142,7 +151,7 @@ public sealed class SemanticTokensHandlerTests
                 token.Line == arg.Span.StartLine - 1 &&
                 token.Character == arg.Span.StartColumn - 1 &&
                 token.Length == arg.Name.Length &&
-                token.TokenType == "parameter");
+                token.TokenType == expected);
     }
 
     [Fact]
@@ -157,6 +166,7 @@ public sealed class SemanticTokensHandlerTests
             from Draft on Submit when Submit.Amount > 0 -> transition Approved
             """);
         var argReference = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
 
         compilation.HasErrors.Should().BeFalse();
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
@@ -165,7 +175,76 @@ public sealed class SemanticTokensHandlerTests
                 token.Line == argReference.Site.StartLine - 1 &&
                 token.Character == argReference.Site.StartColumn - 1 &&
                 token.Length == argReference.Site.Length &&
-                token.TokenType == "parameter");
+                token.TokenType == expected);
+    }
+
+    [Fact]
+    public void Pass1_TokenWithVisualCategory_EmitsCorrectCustomType()
+    {
+        var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial");
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.KeywordSemantic).CustomType;
+
+        var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+
+        tokens.Should().Contain(token => token.Kind == TokenKind.Field && token.TokenType == expected);
+    }
+
+    [Fact]
+    public void Pass2_StateName_EmitsPreceptState()
+    {
+        var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial");
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.State).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+        var tokens = SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics);
+
+        tokens.Should().Contain(t => t.Kind == TokenKind.Identifier && t.TokenType == expected);
+    }
+
+    [Fact]
+    public void Pass2_EventName_EmitsPreceptEvent()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Name as string
+            state Draft initial
+            event Submit
+            """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Event).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+        var tokens = SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics);
+
+        tokens.Should().Contain(t => t.TokenType == expected);
+    }
+
+    [Fact]
+    public void Pass2_FieldName_EmitsPreceptFieldName()
+    {
+        var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial");
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+        var tokens = SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics);
+
+        tokens.Should().Contain(t => t.TokenType == expected);
+    }
+
+    [Fact]
+    public void Pass2_ArgName_EmitsPreceptArgName()
+    {
+        var compilation = Compiler.Compile("""
+            precept Sample
+            field Stored as string optional
+            state Draft initial
+            event Submit(Amount as decimal)
+            """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+        var tokens = SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics);
+
+        tokens.Should().Contain(t => t.TokenType == expected);
     }
 
     [Fact]
@@ -176,14 +255,16 @@ public sealed class SemanticTokensHandlerTests
             field Tags as set of string
             state Draft initial
             """);
+        var type = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Type).CustomType;
+        var keywordSemantic = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.KeywordSemantic).CustomType;
 
         compilation.HasErrors.Should().BeFalse();
 
         var tokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
 
-        tokens.Should().Contain(token => token.Kind == TokenKind.Set && token.TokenType == "type",
+        tokens.Should().Contain(token => token.Kind == TokenKind.Set && token.TokenType == type,
             because: "set in a type-expression slot must emit the type semantic token");
-        tokens.Should().NotContain(token => token.Kind == TokenKind.Set && token.TokenType == "keyword",
+        tokens.Should().NotContain(token => token.Kind == TokenKind.Set && token.TokenType == keywordSemantic,
             because: "set in type position must not be classified as an action keyword");
     }
 }

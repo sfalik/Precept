@@ -36,8 +36,8 @@ static JsonObject BuildGrammar()
     // Only emit tokens whose Text is non-null (keyword/operator tokens).
 
     var keywordsByScope = Tokens.All
-        .Where(m => m.Text is not null && m.TextMateScope is not null)
-        .GroupBy(m => m.TextMateScope!)
+        .Where(m => m.Text is not null && m.VisualCategory.HasValue)
+        .GroupBy(m => SemanticTokenTypes.GetMeta(m.VisualCategory!.Value).TextMateScope)
         .ToDictionary(g => g.Key, g => g.ToList());
 
     // Separate keyword tokens (word chars only) from symbol operator tokens
@@ -98,7 +98,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
     // ── Derive catalog-driven alternation strings for use in structural patterns ──
 
     // All type keywords from catalog (scalar + temporal + business + collection)
-    var typeAlt = string.Join("|", keywordsByScope.TryGetValue("storage.type.precept", out var typeTokens)
+    var typeAlt = string.Join("|", keywordsByScope.TryGetValue("entity.name.type.precept", out var typeTokens)
         ? typeTokens
             .Select(m => Regex.Escape(m.Text!))
             .OrderByDescending(t => t.Length)
@@ -113,9 +113,11 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
         .ThenBy(t => t));
 
     // State modifier keywords from catalog
-    var stateModifierAlt = string.Join("|", keywordsByScope.TryGetValue("storage.modifier.state.precept", out var stateModTokens)
-        ? stateModTokens.Select(m => Regex.Escape(m.Text!)).OrderByDescending(t => t.Length).ThenBy(t => t)
-        : []);
+    var stateModifierAlt = string.Join("|", Tokens.All
+        .Where(m => m.Categories.Contains(TokenCategory.StateModifier) && m.Text is not null)
+        .Select(m => Regex.Escape(m.Text!))
+        .OrderByDescending(t => t.Length)
+        .ThenBy(t => t));
 
     // Function names from Functions catalog (excluding CI variants — handled separately)
     var funcNames = Functions.All
@@ -146,7 +148,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
     var messageStringPatterns = new JsonArray();
 
     foreach (var token in Tokens.All
-        .Where(m => m.IsMessagePosition && m.Text is not null && m.TextMateScope is not null)
+        .Where(m => m.IsMessagePosition && m.Text is not null && m.VisualCategory.HasValue)
         .OrderBy(m => m.Text, StringComparer.Ordinal))
     {
         messageStringPatterns.Add(CreateTokenMessageStringPattern(token));
@@ -316,10 +318,10 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                                 ["match"] = "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s+as\\b)",
                                 ["captures"] = new JsonObject { ["1"] = new JsonObject { ["name"] = "variable.parameter.precept" } }
                             },
-                            new JsonObject { ["include"] = "#declarationKeywords" },
-                            new JsonObject { ["include"] = "#connectiveKeywords" },
+                            new JsonObject { ["include"] = "#semanticKeywords" },
+                            new JsonObject { ["include"] = "#grammarKeywords" },
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
-                            new JsonObject { ["include"] = "#constraintKeywords" },
+                            new JsonObject { ["include"] = "#grammarKeywords" },
                             new JsonObject { ["include"] = "#typeKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
                             new JsonObject { ["include"] = "#strings" },
@@ -369,9 +371,9 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                         ["patterns"] = new JsonArray
                         {
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
-                            new JsonObject { ["include"] = "#constraintKeywords" },
-                            new JsonObject { ["include"] = "#declarationKeywords" },
-                            new JsonObject { ["include"] = "#connectiveKeywords" },
+                            new JsonObject { ["include"] = "#grammarKeywords" },
+                            new JsonObject { ["include"] = "#semanticKeywords" },
+                            new JsonObject { ["include"] = "#grammarKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
                             new JsonObject { ["include"] = "#strings" },
                             new JsonObject { ["include"] = "#identifierReference" }
@@ -409,12 +411,11 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                     {
                         ["patterns"] = new JsonArray
                         {
-                            new JsonObject { ["include"] = "#arrowOperators" },
                             new JsonObject { ["include"] = "#symbolOperators" },
                             new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
-                            new JsonObject { ["include"] = "#constraintKeywords" },
-                            new JsonObject { ["include"] = "#declarationKeywords" },
-                            new JsonObject { ["include"] = "#connectiveKeywords" },
+                            new JsonObject { ["include"] = "#grammarKeywords" },
+                            new JsonObject { ["include"] = "#semanticKeywords" },
+                            new JsonObject { ["include"] = "#grammarKeywords" },
                             new JsonObject { ["include"] = "#typeKeywords" },
                             new JsonObject { ["include"] = "#numbers" },
                             new JsonObject { ["include"] = "#strings" },
@@ -801,7 +802,9 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
 static JsonObject CreateTokenMessageStringPattern(TokenMeta token)
 {
     var keyword = token.Text ?? throw new InvalidOperationException("Message-position tokens must declare text.");
-    var scope = token.TextMateScope ?? throw new InvalidOperationException("Message-position tokens must declare a TextMate scope.");
+    var scope = token.VisualCategory.HasValue 
+        ? SemanticTokenTypes.GetMeta(token.VisualCategory.Value).TextMateScope
+        : throw new InvalidOperationException("Message-position tokens must have a VisualCategory.");
 
     return new JsonObject
     {
@@ -845,7 +848,7 @@ static JsonArray BuildTopLevelPatterns()
     string[] includeOrder =
     [
         "#comment",
-        "#messageStrings",        // MUST precede #strings — gold message payloads
+        "#messageStrings",
         "#strings",
         "#typedConstants",
         "#preceptHeader",
@@ -854,41 +857,29 @@ static JsonArray BuildTopLevelPatterns()
         "#fieldCollectionDeclaration",
         "#fieldScalarDeclaration",
         "#ruleDeclaration",
-        "#stateAction",           // before stateEnsure — both start with to/from
+        "#stateAction",
         "#stateEnsure",
-        "#eventHandler",          // before eventEnsure — both start with on
+        "#eventHandler",
         "#eventEnsure",
         "#accessMode",
         "#omitDeclaration",
         "#fromOnHeader",
-        "#noTransition",          // before transitionTarget — compound keyword
+        "#noTransition",
         "#transitionTarget",
         "#functionCalls",
         "#functionCallsCI",
-        "#collectionMemberAccess", // before eventArgReference — prevent F.count → event scope
+        "#collectionMemberAccess",
         "#eventArgReference",
-        "#arrowOperators",
         "#symbolOperators",
-        "#logicalOperators",
-        "#isSetOperator",          // before membershipOperators/actionKeywords — compound null-check
-        "#membershipOperators",
-        "#stateModifiers",
+        "#isSetOperator",
         "#ruleDesugaringModifiers",
-        "#constraintKeywords",
         "#typeKeywords",
-        "#declarationKeywords",
-        "#controlKeywords",
-        "#assertionKeywords",
-        "#connectiveKeywords",
-        "#actionKeywords",
-        "#outcomeKeywords",
-        "#accessModeKeywords",
-        "#quantifierKeywords",
-        "#memberNameKeywords",
+        "#semanticKeywords",
+        "#grammarKeywords",
         "#booleanLiterals",
         "#numbers",
         "#punctuation",
-        "#identifierReference"    // catch-all — MUST be last
+        "#identifierReference"
     ];
 
     var arr = new JsonArray();
@@ -899,22 +890,12 @@ static JsonArray BuildTopLevelPatterns()
 
 static string ScopeToRepositoryKey(string scope) => scope switch
 {
-    "keyword.declaration.precept"       => "declarationKeywords",
-    "keyword.control.precept"           => "controlKeywords",
-    "keyword.other.assertion.precept"   => "assertionKeywords",
-    "keyword.other.connective.precept"  => "connectiveKeywords",
-    "keyword.other.action.precept"      => "actionKeywords",
-    "keyword.other.outcome.precept"     => "outcomeKeywords",
-    "keyword.other.access-mode.precept" => "accessModeKeywords",
-    "keyword.other.quantifier.precept"  => "quantifierKeywords",
-    "keyword.other.constraint.precept"  => "constraintKeywords",
-    "keyword.operator.logical.precept"  => "logicalOperators",
-    "keyword.operator.membership.precept" => "membershipOperators",
-    "storage.modifier.state.precept"    => "stateModifiers",
-    "storage.type.precept"              => "typeKeywords",
-    "constant.language.boolean.precept" => "booleanLiterals",
-    "keyword.operator.precept"          => "symbolOperators",
-    "keyword.operator.arrow.precept"    => "arrowOperators",
-    "keyword.other.precept"             => "memberNameKeywords",
+    "keyword.other.semantic.precept"  => "semanticKeywords",
+    "keyword.other.grammar.precept"   => "grammarKeywords",
+    "keyword.operator.precept"        => "symbolOperators",
+    "entity.name.type.precept"        => "typeKeywords",
+    "constant.language.precept"       => "booleanLiterals",
+    "entity.name.precept"             => "nameTokens",
+    "comment.line.precept"            => "commentTokens",
     _ => scope.Replace(".precept", "").Replace(".", "_") + "Keywords"
 };

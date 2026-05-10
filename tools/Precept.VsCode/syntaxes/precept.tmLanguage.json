@@ -73,58 +73,22 @@
       "include": "#eventArgReference"
     },
     {
-      "include": "#arrowOperators"
-    },
-    {
       "include": "#symbolOperators"
-    },
-    {
-      "include": "#logicalOperators"
     },
     {
       "include": "#isSetOperator"
     },
     {
-      "include": "#membershipOperators"
-    },
-    {
-      "include": "#stateModifiers"
-    },
-    {
       "include": "#ruleDesugaringModifiers"
-    },
-    {
-      "include": "#constraintKeywords"
     },
     {
       "include": "#typeKeywords"
     },
     {
-      "include": "#declarationKeywords"
+      "include": "#semanticKeywords"
     },
     {
-      "include": "#controlKeywords"
-    },
-    {
-      "include": "#assertionKeywords"
-    },
-    {
-      "include": "#connectiveKeywords"
-    },
-    {
-      "include": "#actionKeywords"
-    },
-    {
-      "include": "#outcomeKeywords"
-    },
-    {
-      "include": "#accessModeKeywords"
-    },
-    {
-      "include": "#quantifierKeywords"
-    },
-    {
-      "include": "#memberNameKeywords"
+      "include": "#grammarKeywords"
     },
     {
       "include": "#booleanLiterals"
@@ -141,76 +105,24 @@
   ],
   "repository": {
     "booleanLiterals": {
-      "name": "constant.language.boolean.precept",
+      "name": "constant.language.precept",
       "match": "\\b(false|true)\\b"
     },
-    "controlKeywords": {
-      "name": "keyword.control.precept",
-      "match": "\\b(else|from|into|then|when|for|at|by|if|in|of|on|to)\\b"
-    },
-    "declarationKeywords": {
-      "name": "keyword.declaration.precept",
-      "match": "\\b(descending|ascending|because|initial|precept|event|field|state|rule)\\b"
-    },
-    "logicalOperators": {
-      "name": "keyword.operator.logical.precept",
-      "match": "\\b(and|not|or)\\b"
-    },
-    "membershipOperators": {
-      "name": "keyword.operator.membership.precept",
-      "match": "\\b(contains|is)\\b"
-    },
-    "accessModeKeywords": {
-      "name": "keyword.other.access-mode.precept",
-      "match": "\\b(modify|omit)\\b"
-    },
-    "actionKeywords": {
-      "name": "keyword.other.action.precept",
-      "match": "\\b(dequeue|enqueue|append|insert|remove|clear|push|add|pop|put|set)\\b"
-    },
-    "assertionKeywords": {
-      "name": "keyword.other.assertion.precept",
-      "match": "\\b(ensure)\\b"
-    },
-    "connectiveKeywords": {
-      "name": "keyword.other.connective.precept",
-      "match": "\\b(editable|optional|readonly|writable|default|as)\\b"
-    },
-    "constraintKeywords": {
-      "name": "keyword.other.constraint.precept",
-      "match": "\\b(nonnegative|maxlength|maxplaces|minlength|maxcount|mincount|notempty|positive|nonzero|ordered|max|min)\\b"
-    },
-    "outcomeKeywords": {
-      "name": "keyword.other.outcome.precept",
-      "match": "\\b(transition|reject|no)\\b"
-    },
-    "memberNameKeywords": {
-      "name": "keyword.other.precept",
-      "match": "\\b(countof|peekby)\\b"
-    },
-    "quantifierKeywords": {
-      "name": "keyword.other.quantifier.precept",
-      "match": "\\b(each|all|any)\\b"
-    },
-    "stateModifiers": {
-      "name": "storage.modifier.state.precept",
-      "match": "\\b(irreversible|required|terminal|success|warning|error)\\b"
-    },
     "typeKeywords": {
-      "name": "storage.type.precept",
+      "name": "entity.name.type.precept",
       "match": "\\b(unitofmeasure|zoneddatetime|exchangerate|dimension|currency|datetime|duration|quantity|timezone|boolean|decimal|instant|integer|choice|lookup|number|period|string|money|price|queue|stack|date|list|time|bag|log)\\b"
     },
-    "arrowOperators": {
-      "name": "keyword.operator.arrow.precept",
-      "match": "(-\u003E|\u003C-)"
+    "grammarKeywords": {
+      "name": "keyword.other.grammar.precept",
+      "match": "\\b(nonnegative|descending|ascending|maxlength|maxplaces|minlength|contains|editable|maxcount|mincount|notempty|optional|positive|readonly|writable|countof|default|nonzero|ordered|peekby|each|else|from|into|then|when|all|and|any|for|max|min|not|as|at|by|if|in|is|of|on|or|to)\\b"
+    },
+    "semanticKeywords": {
+      "name": "keyword.other.semantic.precept",
+      "match": "\\b(irreversible|transition|required|terminal|because|dequeue|enqueue|initial|precept|success|warning|append|ensure|insert|modify|reject|remove|clear|error|event|field|state|omit|push|rule|add|pop|put|set|no)\\b"
     },
     "symbolOperators": {
       "name": "keyword.operator.precept",
-      "match": "(!=|!~|\u003C=|==|\u003E=|~=|-|\\*|/|%|\\\u002B|\u003C|=|\u003E|~)"
-    },
-    "punctuationKeywords": {
-      "name": "punctuation.precept",
-      "match": "(,|\\.|\\(|\\)|\\[|])"
+      "match": "(-\u003E|!=|!~|\u003C-|\u003C=|==|\u003E=|~=|-|,|\\.|\\(|\\)|\\[|]|\\*|/|%|\\\u002B|\u003C|=|\u003E|~)"
     },
     "comment": {
       "patterns": [
@@ -227,7 +139,7 @@
           "match": "\\b(because)(\\s\u002B)(\u0022(?:\\\\.|[^\u0022\\\\])*\u0022)",
           "captures": {
             "1": {
-              "name": "keyword.declaration.precept"
+              "name": "keyword.other.semantic.precept"
             },
             "3": {
               "name": "string.quoted.double.message.precept"
@@ -239,7 +151,7 @@
           "match": "\\b(reject)(\\s\u002B)(\u0022(?:\\\\.|[^\u0022\\\\])*\u0022)",
           "captures": {
             "1": {
-              "name": "keyword.other.outcome.precept"
+              "name": "keyword.other.semantic.precept"
             },
             "3": {
               "name": "string.quoted.double.message.precept"
@@ -378,16 +290,16 @@
                   }
                 },
                 {
-                  "include": "#declarationKeywords"
+                  "include": "#semanticKeywords"
                 },
                 {
-                  "include": "#connectiveKeywords"
+                  "include": "#grammarKeywords"
                 },
                 {
                   "include": "#ruleDesugaringModifiers"
                 },
                 {
-                  "include": "#constraintKeywords"
+                  "include": "#grammarKeywords"
                 },
                 {
                   "include": "#typeKeywords"
@@ -458,13 +370,13 @@
                   "include": "#ruleDesugaringModifiers"
                 },
                 {
-                  "include": "#constraintKeywords"
+                  "include": "#grammarKeywords"
                 },
                 {
-                  "include": "#declarationKeywords"
+                  "include": "#semanticKeywords"
                 },
                 {
-                  "include": "#connectiveKeywords"
+                  "include": "#grammarKeywords"
                 },
                 {
                   "include": "#numbers"
@@ -512,22 +424,19 @@
             "9": {
               "patterns": [
                 {
-                  "include": "#arrowOperators"
-                },
-                {
                   "include": "#symbolOperators"
                 },
                 {
                   "include": "#ruleDesugaringModifiers"
                 },
                 {
-                  "include": "#constraintKeywords"
+                  "include": "#grammarKeywords"
                 },
                 {
-                  "include": "#declarationKeywords"
+                  "include": "#semanticKeywords"
                 },
                 {
-                  "include": "#connectiveKeywords"
+                  "include": "#grammarKeywords"
                 },
                 {
                   "include": "#typeKeywords"

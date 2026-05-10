@@ -38,16 +38,12 @@ public sealed record TokenMeta(
     IReadOnlyList<TokenCategory>   Categories,
     string                         Description,
     /// <summary>
-    /// TextMate grammar scope assigned to this token. Used by the grammar generator
-    /// to emit scope rules from catalog metadata rather than hardcoding scopes in tmLanguage.json.
-    /// Null for structural/synthetic tokens that carry no scope (EndOfSource, NewLine).
+    /// Catalog-driven visual classification for tooling surfaces. Consumers derive the
+    /// TextMate scope and semantic token custom type from <see cref="SemanticTokenTypes"/>.
+    /// Null for structural/synthetic tokens that have no visual representation
+    /// (EndOfSource, NewLine, literal fragments).
     /// </summary>
-    string?                        TextMateScope,
-    /// <summary>
-    /// LSP semantic token type for this token. Used by the language server semantic token provider.
-    /// Null for structural tokens that have no tooling representation (EndOfSource, NewLine).
-    /// </summary>
-    string?                        SemanticTokenType,
+    SemanticTokenTypeKind?         VisualCategory = null,
     /// <summary>
     /// Token kinds that may immediately precede this token in a valid program. Null means
     /// unbounded context — the token may appear after any token. Populated for tokens where
