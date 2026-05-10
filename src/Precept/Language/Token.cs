@@ -65,10 +65,6 @@ public sealed record TokenMeta(
     bool                           IsMessagePosition = false
 )
 {
-    public bool IsBroadcastFieldTarget => IsFieldBroadcast;
-
-    public bool IsAlsoBuiltinFunction => IsFunctionCallLeader;
-
     public bool IsValidAsMemberName => Parser.KeywordsValidAsMemberName.Contains(Kind);
 }
 

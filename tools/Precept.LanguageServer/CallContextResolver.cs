@@ -162,7 +162,7 @@ internal static class CallContextResolver
     private static bool TryGetCallableName(Token token, out string name)
     {
         var meta = Tokens.GetMeta(token.Kind);
-        if (token.Kind == TokenKind.Identifier || meta.IsAlsoBuiltinFunction || meta.IsValidAsMemberName)
+        if (token.Kind == TokenKind.Identifier || meta.IsFunctionCallLeader || meta.IsValidAsMemberName)
         {
             name = token.Text;
             return true;

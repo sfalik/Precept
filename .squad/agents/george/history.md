@@ -91,3 +91,8 @@
 ### 2026-05-10T04:33:18Z — Track 2 plan merged, but execution is paused
 - Scribe merged the Track 2 master-plan, Phase A guardrail, and catalog-test gate notes into the canonical decision ledger: Track 2 stays metadata-first, Slice 2 is audit-only, and later consumer slices own parser/checker/proof/MCP rewires.
 - Shane then switched active execution back to Track 1 only. Do not start new Track 2 implementation work until he explicitly reopens the lane.
+
+### 2026-05-10T13:26:25Z — Frank's TokenMeta alias cleanup landed
+- Frank's verdict on the TokenMeta routing fields is now durable: the flat bools are the correct shape, and the pure alias properties were removed.
+- `IsAlsoBuiltinFunction` was semantically misleading because it blurred a token's syntactic function-call role with built-in catalog identity; consumers now read `IsFunctionCallLeader` directly.
+- Validation stayed green at 3824/3824 after the alias removal cleanup.

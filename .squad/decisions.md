@@ -34,7 +34,7 @@
 
 - `TokenMeta` now carries the canonical Track 2 Slice 1 routing fields: `IsStateWildcard`, `IsFieldBroadcast`, and `IsFunctionCallLeader`.
 - Parser, binder/type-checker, transition normalization, and the tightly coupled proof-diagnostic mapping now read catalog metadata so `from any`, `modify all` / `omit all`, `.at(...)`, and `min(...)` / `max(...)` stop falling back to undeclared-name or arithmetic-only failure paths; keyword member-name derivation now comes from `Types.All[..].Accessors` instead of a parallel token list.
-- Compatibility bridges (`IsBroadcastFieldTarget`, `IsAlsoBuiltinFunction`, `IsValidAsMemberName`) remain only as downstream shims while the canonical truth moves to the new fields and the type-catalog-derived member vocabulary.
+- Frank's follow-up review kept the flat routing bools and later removed the pure alias shims `IsBroadcastFieldTarget` and `IsAlsoBuiltinFunction`; `IsValidAsMemberName` remains the only derived helper alongside the canonical fields.
 - Regression coverage locks BUG-001, BUG-006, BUG-025, BUG-026, BUG-037, BUG-039, and BUG-051 through `Track2PhaseAToolchainRegressionTests` plus exact token-catalog shape/token assertions, and the slice closed green at 3824/3824 `Precept.Tests` after George's commit `6d360231`.
 
 ---

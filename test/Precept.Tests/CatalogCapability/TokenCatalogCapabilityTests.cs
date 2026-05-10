@@ -13,18 +13,18 @@ public sealed class TokenCatalogCapabilityTests
             .Should().Be(true);
 
     [Fact]
-    public void All_IsBroadcastFieldTarget_True()
-        => CatalogCapabilityReflection.GetInstanceValue(Tokens.GetMeta(TokenKind.All), "IsBroadcastFieldTarget")
+    public void All_IsFieldBroadcast_True()
+        => CatalogCapabilityReflection.GetInstanceValue(Tokens.GetMeta(TokenKind.All), "IsFieldBroadcast")
             .Should().Be(true);
 
     [Fact]
-    public void Min_IsAlsoBuiltinFunction_True()
-        => CatalogCapabilityReflection.GetInstanceValue(Tokens.GetMeta(TokenKind.Min), "IsAlsoBuiltinFunction")
+    public void Min_IsFunctionCallLeader_True()
+        => CatalogCapabilityReflection.GetInstanceValue(Tokens.GetMeta(TokenKind.Min), "IsFunctionCallLeader")
             .Should().Be(true);
 
     [Fact]
-    public void Max_IsAlsoBuiltinFunction_True()
-        => CatalogCapabilityReflection.GetInstanceValue(Tokens.GetMeta(TokenKind.Max), "IsAlsoBuiltinFunction")
+    public void Max_IsFunctionCallLeader_True()
+        => CatalogCapabilityReflection.GetInstanceValue(Tokens.GetMeta(TokenKind.Max), "IsFunctionCallLeader")
             .Should().Be(true);
 
     [Theory]

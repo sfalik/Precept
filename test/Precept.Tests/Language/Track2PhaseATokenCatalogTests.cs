@@ -12,14 +12,14 @@ public class Track2PhaseATokenCatalogTests
         => Tokens.GetMeta(TokenKind.Any).IsStateWildcard.Should().BeTrue();
 
     [Fact]
-    public void All_IsBroadcastFieldTarget_True()
-        => Tokens.GetMeta(TokenKind.All).IsBroadcastFieldTarget.Should().BeTrue();
+    public void All_IsFieldBroadcast_True()
+        => Tokens.GetMeta(TokenKind.All).IsFieldBroadcast.Should().BeTrue();
 
     [Theory]
     [InlineData(TokenKind.Min)]
     [InlineData(TokenKind.Max)]
-    public void MinAndMax_AreAlsoBuiltinFunctions(TokenKind kind)
-        => Tokens.GetMeta(kind).IsAlsoBuiltinFunction.Should().BeTrue();
+    public void MinAndMax_AreFunctionCallLeaders(TokenKind kind)
+        => Tokens.GetMeta(kind).IsFunctionCallLeader.Should().BeTrue();
 
     [Theory]
     [InlineData(TokenKind.CurrencyType)]
