@@ -247,8 +247,8 @@ public static class SyntaxReference
             """
             precept ShipmentOrder
 
-            field Weight as quantity of 'mass' default 0
-            field UnitPrice as price in 'USD' of 'mass' default 0
+            field Weight as quantity of 'mass' default '0 kg'
+            field UnitPrice as price in 'USD' of 'mass' default '0.00 USD/kg'
             field TotalCost as money in 'USD' <- Weight * UnitPrice
             field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
             field FinalCost as money in 'USD' <- TotalCost - (TotalCost * DiscountPercent / 100)

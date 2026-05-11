@@ -14,6 +14,7 @@
 - Documentation drift often clusters around grammar slot order and guard position; fix the canonical docs the same pass as the source change.
 - Typed literals remain on the current architectural boundary: compile-time literal validation through `TypedConstantValidation`, runtime JSON lanes through `TypeRuntime<T>`, and ISO/UCUM as embedded external datasets with Precept-owned metadata.
 - Durable rationale belongs in decisions/research, not in ephemeral review comments or ad hoc implementation switches.
+- Interpolated typed constants are completely unimplemented: the parser skips hole tokens without creating expression nodes, and the type checker maps `TypedConstantStart` to `TypedErrorExpression` with no validation. The spec (§2.5, §3.6) requires full expression parsing and context-type validation. This is architecturally distinct from B9–B12 (which fix assignment-level post-resolution checks) — I1 means no expressions exist to check in the first place. The `{expr}` syntax also precludes using curly braces for any non-interpolation semantic inside typed constants (killed C2 Approach B).
 - The type checker's `expectedType` parameter in expression resolution is advisory only — it hints numeric widening and typed constant context but does NOT enforce assignment compatibility. `ResolveAction` and `ResolveFieldExpressions` both create typed nodes without post-resolution validation, silently accepting type and qualifier mismatches. Three structural gaps exist: (1) no post-resolution type/qualifier check on assignment targets, (2) `QuantityValidator` validates UCUM syntax but is dimension-blind — `TypedConstantContext` exists for qualifier threading but is unused, (3) `TypedArgRef`/`TypedFieldRef` expression nodes strip `DeclaredQualifiers`, making variable-to-field qualifier comparison impossible at the expression tree level. Diagnostic codes `TypeMismatch` (PRE0018), `DimensionCategoryMismatch` (PRE0069), and `QualifierMismatch` (PRE0068) all exist but are never emitted in these paths. The gap also applies to money fields — it is type-agnostic.
 - B6 stayed entirely in `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`: `TryGetBinaryPeerOperandType`, `TryResolveExpressionTypeEndingAtToken`, `TryResolveParenthesizedExpressionType`, `TryResolveIdentifierType`, and `TryResolveMemberExpressionType` now thread `ImmutableArray<DeclaredQualifierMeta>` beside `TypeKind`, and `TryGetTypedConstantContext` assembles binary peer sites with `new TypedConstantContext(peerType, peerQualifiers)`.
 - The event-arg path had the same drop: current-event arg resolution in `TryResolveIdentifierType` and event-member lookup in `TryResolveMemberExpressionType` both needed `DeclaredQualifiers` propagation, not just the field path.
@@ -24,7 +25,30 @@
 - Early May work locked the typed-literal boundary, the external-data posture for ISO/UCUM, and the requirement that durable rationale live in decisions/research instead of scattered implementation branches.
 - Recent batches settled the when-guard parser model, grammar/spec doc-sync rules, terminal-state diagnostic gating, and the typed-literal implementation review loop.
 
+### 2026-05-11T08:26:04Z — X1/X2 crash triage: D26 assertion + extension JS TypeError
+- Shane reported two crashes triggered by opening/editing a file with `'1 {s}'` (interpolated typed constant assigned to a quantity field).
+- **X1 (P0):** `ResolveLiteral` in `TypeChecker.Expressions.cs:141` has a deferred stub for `TypedConstantStart` that returns `TypedErrorExpression` without emitting a diagnostic. D26 assertion fires at `PopulateEventHandlers` (TypeChecker.cs:592), `Debug.Assert` → `Environment.FailFast` → exit code 0x80131163. Crashes on both `DidOpen` and `DidChange`, creating a crash-restart loop.
+- **X2 (P2):** Inside `vscode-languageclient` library's debounced document-sync `Delayer` — `this.task` is `undefined` when the LS process dies because the connection teardown clears the callback before the pending promise resolves. Secondary to X1; no independent fix needed.
+- Fix for X1: emit an Error-severity diagnostic before returning `TypedErrorExpression` in the `TypedConstantStart` branch, following the `ResolveMissing` pattern.
+- X1 is related to frank-12's interpolation triage (C2 design conflict). The deferred stub exists because interpolated typed constants aren't implemented yet, but D26's contract wasn't satisfied.
+- Decision filed: `.squad/decisions/inbox/frank-crash-triage.md`. Tracker entries: X1, X2 in `docs/Working/completions-bugs.md`.
+
 ## Recent Updates
+
+### 2026-05-11T08:32:57.386-04:00 — I1/X1 safe-stub fix shipped
+- `ResolveLiteral` no longer returns a bare `TypedErrorExpression` for `TypedConstantStart`; the stub now emits an Error-severity TC diagnostic first, mirroring the `ResolveMissing` self-containment pattern.
+- Reused existing `DiagnosticCode.TypeMismatch` instead of inventing a new code; the message text explicitly names the unsupported interpolated typed constant so users see a clear error and D26 is satisfied.
+- Added regression coverage in `TypeCheckerTypedConstantTests` for the event-handler path and a full `Compiler.Compile(...)` non-crash path using `set q = '1 {s}'`; this closes X1 and leaves X2 closed-by-elimination.
+
+
+### 2026-05-11 — C2 Approach B invalidated + interpolation bugs I1/I2/I3 triaged
+- **C2 conflict confirmed:** `{expr}` interpolation syntax inside typed constants (`'...'`) fatally conflicts with UCUM arbitrary-unit curly-brace syntax (`'{widget}'`). The lexer parses `{widget}` as an interpolation hole, not a unit code. Approach B is dead. Replacement candidates noted: Approach E (square-bracket), F (prefix marker), or C-revisited (explicit declaration).
+- **I1 (P1):** `ParseInterpolatedTypedConstant()` in `Parser.Expressions.cs` (line 444) skips all hole tokens without parsing expressions — unlike `ParseInterpolatedString()` which properly calls `ParseExpression()` per hole. The type checker (line 141) then maps `TypedConstantStart` to `TypedErrorExpression` with "deferred" comment. Result: no type checking of interpolated typed constant expressions at all. The spec (§2.5, §3.6) requires full expression parsing and validation. This is a type-safety hole.
+- **I2 (P3):** No completions inside `{...}` holes of typed constants — the `CompletionHandler` doesn't detect interpolation-hole context inside typed constants.
+- **I3 (P3):** No semantic tokens inside `{...}` holes — the `SemanticTokensHandler` has no expression nodes to walk (downstream of I1).
+- Fix order: I1 → B9–B12 → I2 → I3. I1 is orthogonal to B9–B12 (different layers).
+- Decision filed: `.squad/decisions/inbox/frank-interpolation-triage.md`.
+- Tracker updated: `docs/Working/completions-bugs.md` — C2 updated with invalidation + alternative candidates; I1/I2/I3 filed as new entries.
 
 ### 2026-05-11T01:58:19Z — B9–B12 triage: type checker is qualifier-blind on assignments and defaults
 - All four bugs share a common architectural gap: `ResolveAction` and `ResolveFieldExpressions` pass `expectedType` as an advisory hint but never validate the resolved expression's result type or qualifiers against the target field.

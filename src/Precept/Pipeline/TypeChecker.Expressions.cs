@@ -114,6 +114,21 @@ internal static partial class TypeChecker
         return new TypedErrorExpression(m.Span);
     }
 
+    private static TypedErrorExpression ResolveInterpolatedTypedConstantStub(
+        LiteralExpression lit,
+        CheckContext ctx,
+        TypeKind? expectedType)
+    {
+        var expected = expectedType is { } type && type != TypeKind.Error
+            ? Types.GetMeta(type).DisplayName
+            : "typed constant";
+
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.TypeMismatch, lit.Span,
+                expected, "interpolated typed constant (not yet supported)"));
+        return new TypedErrorExpression(lit.Span);
+    }
+
     /// <summary>
     /// Resolve a literal expression to a <see cref="TypedLiteral"/> with the appropriate
     /// <see cref="TypeKind"/> and parsed value. When <paramref name="expectedType"/> is non-null
@@ -138,7 +153,7 @@ internal static partial class TypeChecker
 
             // Typed constants: resolve with content validation from expectedType context
             TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType, qualifiers),
-            TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span), // Interpolated typed constants deferred
+            TokenKind.TypedConstantStart => ResolveInterpolatedTypedConstantStub(lit, ctx, expectedType),
 
             _ => new TypedErrorExpression(lit.Span),
         };

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using FluentAssertions;
@@ -46,6 +47,23 @@ public class TypeCheckerTypedConstantTests
 
     private static LiteralExpression TypedConstant(string value) =>
         new(TokenKind.TypedConstant, value, TestSpan);
+
+    private static LiteralExpression InterpolatedTypedConstantStart(string value) =>
+        new(TokenKind.TypedConstantStart, value, TestSpan);
+
+    private const string InterpolatedTypedConstantEventHandlerPrecept = """
+        precept Test
+
+        field q as quantity in 'each'
+        field s as string
+        field ss as unitofmeasure
+
+        event xyz initial
+        on xyz
+            -> set s = "blah"
+            -> set ss = 'each'
+            -> set q = '1 {s}'
+        """;
 
     // ════════════════════════════════════════════════════════════════════════
     //  1. ClosedSetValidation — Currency
@@ -402,6 +420,48 @@ public class TypeCheckerTypedConstantTests
         result.Should().BeOfType<TypedErrorExpression>();
         ctx.Diagnostics.Should().ContainSingle()
             .Which.Code.Should().Be(DiagnosticCode.UnresolvedTypedConstant.ToString());
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_InEventHandler_EmitsDiagnostic()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check(InterpolatedTypedConstantEventHandlerPrecept);
+
+        diagnostics.Should().Contain(d =>
+            d.Severity == Severity.Error
+            && d.Code == nameof(DiagnosticCode.TypeMismatch)
+            && d.Message.Contains("interpolated typed constant", System.StringComparison.OrdinalIgnoreCase));
+
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(action => action.FieldName == "q");
+        assign.InputExpression.Should().BeOfType<TypedErrorExpression>();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_DoesNotCrashLanguageServer()
+    {
+        Compilation? compilation = null;
+        Action act = () => compilation = Compiler.Compile(InterpolatedTypedConstantEventHandlerPrecept);
+
+        act.Should().NotThrow("interpolated typed constants must surface a diagnostic instead of tripping D26");
+        compilation.Should().NotBeNull();
+        compilation!.HasErrors.Should().BeTrue();
+        compilation.Diagnostics.Should().Contain(d =>
+            d.Severity == Severity.Error
+            && d.Code == nameof(DiagnosticCode.TypeMismatch)
+            && d.Message.Contains("interpolated typed constant", System.StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstantStart_WithExpectedType_EmitsDiagnostic()
+    {
+        var ctx = MinimalContext();
+        var result = Resolve(InterpolatedTypedConstantStart("1 "), ctx, TypeKind.Quantity);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(DiagnosticCode.TypeMismatch.ToString());
+        ctx.Diagnostics.Single().Message.Should().Contain("interpolated typed constant");
     }
 
     // ════════════════════════════════════════════════════════════════════════

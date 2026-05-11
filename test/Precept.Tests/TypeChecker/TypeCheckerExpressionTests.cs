@@ -111,10 +111,13 @@ public class TypeCheckerExpressionTests
     public void TypedConstantStartLiteral_ReturnsErrorExpression_Stub()
     {
         var expr = new LiteralExpression(TokenKind.TypedConstantStart, "'100", TestSpan);
-        var result = Resolve(expr, MinimalContext());
+        var ctx = MinimalContext();
+        var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>(
-            because: "typed constant start is a Slice 4 stub");
+            because: "typed constant start is a deferred interpolation stub");
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(nameof(DiagnosticCode.TypeMismatch));
     }
 
     // ════════════════════════════════════════════════════════════════════════

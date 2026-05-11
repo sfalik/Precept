@@ -4,7 +4,7 @@
 **Spec:** `docs/Working/elaine-typed-literal-autocomplete-ux.md`  
 **Prior review:** Frank-6 — spec compliance BLOCKED (F1, F2)  
 **Triage:** Frank-7 — root-cause triage in progress  
-**Status:** 8 open bugs + 1 catalog gap (C1 ✅ Fixed)
+**Status:** 8 open bugs + 2 crashes (X1 P0, X2 P2) + 3 interpolation bugs (I1–I3) + 1 catalog gap (C1 ✅ Fixed)
 
 ---
 
@@ -309,16 +309,57 @@ The same fix also benefits `quantity` binary peers: `total + '5 ` where `total` 
 
 ---
 
+### X1 — D26 assertion crash: interpolated typed constant kills language server
 
+| | |
+|---|---|
+| **Trigger** | Opening or editing any `.precept` file containing an interpolated typed constant (e.g., `'1 {s}'` assigned to a quantity field) |
+| **Expected** | Error diagnostic (interpolated typed constants not yet supported) without crashing |
+| **Actual** | Fixed — the stub now emits an Error diagnostic and returns normally instead of tripping D26 / `FailFast`. |
+| **Severity** | **P0** — server-killing, blocks all editing |
+| **Status** | ✅ Fixed |
+| **Owner** | Unassigned |
+
+**Root cause (Frank):** `ResolveLiteral` in `TypeChecker.Expressions.cs:141` has a deferred stub for `TypedConstantStart` tokens:
+```csharp
+TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span), // Interpolated typed constants deferred
+```
+This returns `TypedErrorExpression` without emitting an Error-severity diagnostic. D26 requires that every `TypedErrorExpression` in the semantic index has a corresponding Error diagnostic. The assertion at `TypeChecker.cs:592` detects the violation and aborts the process.
+
+**Parser path:** `ParseInterpolatedTypedConstant()` (Parser.Expressions.cs:444) creates a `LiteralExpression(TokenKind.TypedConstantStart, ...)` — a placeholder that skips interpolation segments — which then hits the deferred stub in the type checker.
+
+**Fix:** `ResolveLiteral` now routes `TypedConstantStart` through a lightweight TC diagnostic path before returning `TypedErrorExpression`, reusing `DiagnosticCode.TypeMismatch` as the existing Error-severity self-contained code. The message explicitly identifies the unsupported interpolated typed constant stub, satisfying D26 and preventing the crash while leaving full interpolation support deferred.
+
+**Related:** C2 design conflict (interpolation in typed constants) — frank-12's interpolation triage. Long-term fix is implementing interpolated typed constant support; short-term fix is the diagnostic emission.
+
+---
+
+### X2 — Extension JS `this.task is not a function` on LS crash
+
+| | |
+|---|---|
+| **Trigger** | LS process crash (X1) during pending document change delivery |
+| **Expected** | Graceful client-side error recovery |
+| **Actual** | `TypeError: this.task is not a function` at `extension.js:35:44428` — logged as `[Error] Delivering pending changes failed` |
+| **Severity** | **P2** — secondary symptom, no independent trigger |
+| **Status** | ✅ Closed — no independent fix needed; trigger eliminated by X1 |
+| **Owner** | N/A — `vscode-languageclient` library internal |
+
+**Root cause (Frank):** The crash occurs inside the bundled `vscode-languageclient` library (v9.x), not in our extension TypeScript. The minified code shows a debounced document-sync `Delayer` pattern where `this.task` is a scheduled callback. When the LS process crashes abnormally, the pending promise resolves into the callback path after `this.task` was already cleared during connection teardown. This is a race condition in the library triggered by abnormal LS termination.
+
+**Fix approach:** No action needed. Fixing X1 eliminates the LS crash that triggers X2. If defense-in-depth is desired, upstream the race fix to `vscode-languageclient`, but this is not actionable on our side.
+
+---
 
 | File | Relevance |
 |---|---|
+| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | **X1** — `ResolveLiteral` line 141 deferred `TypedConstantStart` stub returns `TypedErrorExpression` without diagnostic; B9, B10, B12 — `ResolveAction` (lines 810–822) missing post-resolution type/qualifier check; `ResolveIdentifier` (line 549) strips qualifier metadata from `TypedArgRef` |
+| `src/Precept/Pipeline/TypeChecker.cs` | **X1** — D26 assertion at `PopulateEventHandlers` line 592; B10, B11 — `ResolveFieldExpressions` (line 452) missing qualifier check on default values; `ExtractQualifiers` (line 130) correctly builds qualifier metadata but it's never consumed downstream |
+| `src/Precept/Pipeline/Parser.Expressions.cs` | **X1** — `ParseInterpolatedTypedConstant` line 444 creates `LiteralExpression(TypedConstantStart)` placeholder |
 | `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs` | All completion logic — B1–B6, F1–F2 |
 | `tools/Precept.LanguageServer/SlotContext.cs` | `GetCursorContext` — B4, B5 (`in`/`of` qualifier routing) |
 | `tools/Precept.LanguageServer/Handlers/SemanticTokensHandler.cs` | B7 crash |
 | `src/Precept/` | B8 — UCUM atom catalog/validator |
-| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | B9, B10, B12 — `ResolveAction` (lines 810–822) missing post-resolution type/qualifier check; `ResolveIdentifier` (line 549) strips qualifier metadata from `TypedArgRef` |
-| `src/Precept/Pipeline/TypeChecker.cs` | B10, B11 — `ResolveFieldExpressions` (line 452) missing qualifier check on default values; `ExtractQualifiers` (line 130) correctly builds qualifier metadata but it's never consumed downstream |
 | `src/Precept/Language/QuantityValidator.cs` | B10, B11 — validates UCUM syntax only, dimension-blind — `TypedConstantContext` parameter unused |
 | `src/Precept/Pipeline/SemanticIndex.cs` | B12 — `TypedArgRef`, `TypedFieldRef` lack qualifier metadata on expression nodes |
 | `src/Precept/Language/Types.cs` | B9 — `IntegerWidens` does not include `Quantity` (correct behavior, but exposed the missing assignment check) |
@@ -334,6 +375,8 @@ The same fix also benefits `quantity` binary peers: `total + '5 ` where `total` 
 
 | Root Cause | Bugs |
 |---|---|
+| `ResolveLiteral` returns `TypedErrorExpression` for `TypedConstantStart` without emitting a diagnostic | X1 (D26 crash) |
+| `vscode-languageclient` debounced task race on abnormal LS termination | X2 (secondary) |
 | `'` trigger doesn't coerce inner context to `InExpression` | B1 |
 | Declaration-side qualifier literals are being coerced to enclosing-field expression literals | B4, B5 |
 | `IsInsideTypedConstantToken` boundary exclusion at `EndColumn` | B3 (+ partially B2) |
@@ -343,14 +386,16 @@ The same fix also benefits `quantity` binary peers: `total + '5 ` where `total` 
 **B9/B10/B11/B12** (type checker quantity validation gaps): Triaged by Frank. **Shared root cause:** the type checker performs no post-resolution type or qualifier compatibility check on assignment targets — `ResolveAction` and `ResolveFieldExpressions` both resolve values with an `expectedType` hint but never verify the result matches. Additionally, `QuantityValidator` is dimension-blind, and expression nodes (`TypedArgRef`, `TypedFieldRef`) strip qualifier metadata. See individual bug entries for specifics.
 
 **Priority order (Kramer):**
-1. B7 — crash
-2. B1 — quote-trigger expression/default context
-3. B4/B5 — qualifier-site routing (B4 also needs real unit catalog items)
-4. B3 — boundary fix (careful with `Contains`)
-5. B2 — catalog stub replacement
-6. F1/F2 — Ctrl+Space fallback
-7. B6 — qualifier propagation in binary expressions
-8. B8 — UCUM atom catalog gap
+1. **X1 — D26 assertion crash (P0)** — server-killing, blocks all editing
+2. B7 — crash
+3. B1 — quote-trigger expression/default context
+4. B4/B5 — qualifier-site routing (B4 also needs real unit catalog items)
+5. B3 — boundary fix (careful with `Contains`)
+6. B2 — catalog stub replacement
+7. F1/F2 — Ctrl+Space fallback
+8. B6 — qualifier propagation in binary expressions
+9. B8 — UCUM atom catalog gap
+10. X2 — resolves automatically when X1 is fixed
 
 ---
 
@@ -453,19 +498,100 @@ Rationale:
 1. **C1 covers the immediate need.** 24 logistics units solve the actual user pain (no business count units). User-defined units solve a hypothetical need that no current user has hit.
 2. **B9–B12 must land first.** Qualifier enforcement is currently broken — the type checker is dimension-blind on assignments. Building extensibility atop a broken enforcement layer is architectural malpractice.
 3. **Typo risk is real and unsolved.** `quantity in 'widgit'` silently creates a distinct dimension. Without a declaration mechanism, the system cannot warn about likely typos. This is a footgun that contradicts Precept's "prevention, not detection" philosophy.
-4. **When we do ship it, Approach B (UCUM arbitrary unit syntax) is the winner.** `quantity in '{widget}'` for user-defined, `quantity in 'kg'` for built-ins. Visual distinction at the surface, UCUM-precedented, no new language constructs. But this requires (a) working qualifier enforcement, (b) a lint/warning for undeclared arbitrary units used only once, and (c) completions UX for user-defined codes — none of which exist today.
+4. ~~**When we do ship it, Approach B (UCUM arbitrary unit syntax) is the winner.** `quantity in '{widget}'` for user-defined, `quantity in 'kg'` for built-ins. Visual distinction at the surface, UCUM-precedented, no new language constructs.~~ **⚠️ INVALIDATED (2026-05-11): Approach B has a fatal conflict with string/typed-constant interpolation.** Precept uses `{expr}` inside both `"..."` and `'...'` for interpolation (spec §1.3, §1.7, §2.5). Writing `quantity in '{widget}'` is ambiguous: the lexer interprets `{widget}` as an interpolation hole containing the identifier `widget`, not as a UCUM arbitrary-unit curly-brace code. This is not a tooling gap — it's a lexer-level ambiguity that cannot be resolved without either changing the interpolation syntax or using a different delimiter for user-defined units. **Approach B is dead.**
 5. **Approach A (implicit acceptance of unknowns) is rejected.** Silent acceptance with no declaration violates discoverability and prevention principles. A typo becoming a valid distinct dimension is the opposite of what Precept guarantees.
 6. **Approach C (explicit declaration construct) is overkill for V1** but may be the right long-term answer if user-defined units proliferate across precepts in a project.
 
-**Future design direction (post-V1):**
-- Approach B as the language surface: curly-brace codes for user-defined (`{widget}`), plain codes for catalog entries.
-- Lint diagnostic: "arbitrary unit `{widgit}` used in only one field — did you mean `{widget}`?" (cross-field consistency check).
-- Completions: user-defined codes harvested from the current precept and offered alongside catalog entries, visually distinguished.
-- No explicit declaration needed in the precept — the curly braces ARE the declaration.
+**Alternative approach candidates (post-Approach-B invalidation):**
+- **Approach E — Bracketed custom units:** `quantity in '[widget]'`. Square brackets are already used in UCUM for annotation codes (e.g., `[lb_av]`), and the lexer does not give `[` special meaning inside typed constants. Visually distinct from catalog codes, no interpolation conflict. Requires validation that `[...]` inside a typed constant isn't confused with list-literal syntax (it wouldn't be — list literals are expression-level, not inside quotes).
+- **Approach F — Prefix marker:** `quantity in 'custom:widget'`. A namespace-style prefix. No delimiter conflict. Less elegant but unambiguous.
+- **Approach C (revisited):** Explicit declaration at the precept level (`unit widget`) with plain use in qualifiers (`quantity in 'widget'`). The declaration prevents typos (the original Approach A problem) and avoids any delimiter conflict. May be the strongest candidate if the typo-prevention argument is weighty.
 
-**Design gate:** Track A when we revisit. Approach B requires no new language constructs (curly braces are valid UCUM syntax already accepted by the parser), but the enforcement and tooling additions warrant a design review.
+**Future design direction (post-V1):**
+- ~~Approach B as the language surface~~ — invalidated; see above.
+- Evaluate Approaches E, F, and C-revisited as replacements. All three avoid the interpolation conflict and address typo risk differently.
+- Lint diagnostic: consistency check across fields regardless of which approach wins.
+- Completions: user-defined codes harvested from the current precept and offered alongside catalog entries, visually distinguished.
+
+**Design gate:** Track A when we revisit. Whichever approach replaces B, the enforcement and tooling additions warrant a design review.
 
 **Decision filed:** `.squad/decisions/inbox/frank-user-defined-units.md`
+
+---
+
+### I1 — Interpolated typed constants silently compile without type checking (P1 blocker)
+
+| | |
+|---|---|
+| **Trigger** | `field q as quantity in 'each'` / `field s as string` / `-> set q = '1 {s}'` |
+| **Expected** | Type error: `s` is `string`, cannot interpolate into a `quantity` typed constant |
+| **Actual** | Fixed-safe-stub — the compiler now emits an Error diagnostic for the unsupported interpolated typed constant instead of compiling silently or crashing |
+| **Status** | ✅ Fixed — safe stub only; full interpolation support remains future work |
+| **Severity** | P1 — silent type-safety hole; contradicts Precept's "prevention, not detection" guarantee |
+| **Scope** | Medium — parser + type checker |
+| **Owner** | Frank (architecture-level, spans parser → type checker) |
+
+**Root cause — two layers:**
+
+1. **Parser (`Parser.Expressions.cs`, line 444, `ParseInterpolatedTypedConstant`):** Unlike `ParseInterpolatedString()` (line 399) which properly calls `ParseExpression()` for each `{expr}` hole and builds `InterpolatedStringExpression` with `HoleSegment` nodes, `ParseInterpolatedTypedConstant()` **skips all tokens** between `TypedConstantStart` and `TypedConstantEnd` via a bare `Advance()` loop. No expression nodes are created. It returns a flat `LiteralExpression` with kind `TypedConstantStart`.
+
+2. **Type checker (`TypeChecker.Expressions.cs`, line 141):** `TypedConstantStart => new TypedErrorExpression(lit.Span)` with comment "Interpolated typed constants deferred". Because the parser never created expression nodes for the interpolation holes, there are no expressions to type-check. The `TypedErrorExpression` is then silently accepted because the assignment path (`ResolveAction`) has no post-resolution type validation (the B9–B12 gap).
+
+**The spec IS clear** — `docs/language/precept-language-spec.md` §2.5 says `ParseInterpolatedTypedConstant()` should use the same reassembly loop as `ParseInterpolatedString()`, and §3.6 says each `{expr}` inside `'...'` should be type-checked independently with the full content validated against the context type.
+
+**Fix (safe stub):**
+1. `ResolveLiteral` now emits an Error-severity TC diagnostic before returning `TypedErrorExpression` for `TypedConstantStart`, reusing `DiagnosticCode.TypeMismatch` as the nearest existing self-contained code.
+2. This closes the silent-compile/crash behavior by surfacing a clear unsupported-feature error and satisfying D26.
+3. Full `ParseInterpolatedTypedConstant()` / typed-hole implementation remains future work; this fix intentionally does **not** implement interpolation semantics.
+
+---
+
+### I2 — No completions inside interpolation holes of typed constants (P3)
+
+| | |
+|---|---|
+| **Trigger** | Type `{` inside a typed constant, e.g., `'1 {` — no completion list |
+| **Expected** | Variable completions (fields, event args in scope) |
+| **Actual** | Nothing |
+| **Status** | 🔴 Open |
+| **Severity** | P3 — UX gap, not a correctness issue |
+| **Scope** | Small-medium — `CompletionHandler.cs` |
+| **Owner** | Kramer |
+
+**Root cause:** The `CompletionHandler` recognizes typed-constant context via `IsTypedConstantToken()` (which includes `TypedConstantStart`, `TypedConstantMiddle`, `TypedConstantEnd`) and routes to typed-constant slot items. But when the cursor is inside an interpolation hole (i.e., the lexer is in `Interpolation` mode, between `{` and `}`), the surrounding tokens are expression tokens — `Identifier`, operators, etc. — not typed-constant tokens. The handler doesn't detect that it's inside an interpolation hole of a typed constant and should offer expression completions (variable names). This is the same gap that would exist for string interpolation holes but is more impactful in typed constants because the expressions have type constraints.
+
+**Proposed fix:** Detect when the cursor is between a `TypedConstantStart`/`TypedConstantMiddle` and the corresponding `TypedConstantEnd`/`TypedConstantMiddle`, in expression context (not literal-text context), and offer standard expression completions. Depends on I1 landing first (the parser needs to produce expression nodes for the completion handler to reason about). Alternatively, a token-walk approach could detect interpolation context without AST support.
+
+---
+
+### I3 — No semantic highlighting inside interpolation holes of typed constants (P3)
+
+| | |
+|---|---|
+| **Trigger** | `'1 {s}'` — `s` inside braces has no syntax highlighting |
+| **Expected** | `s` highlighted as a variable/field reference |
+| **Actual** | No semantic token emitted for `s` |
+| **Status** | 🔴 Open |
+| **Severity** | P3 — cosmetic, but inconsistent with string interpolation behavior |
+| **Scope** | Small — `SemanticTokensHandler.cs` |
+| **Owner** | Kramer |
+
+**Root cause:** The semantic tokens handler iterates typed expression trees (`EnumerateTypedExpressions`) looking for `TypedFieldRef`, `TypedArgRef`, etc. to emit variable/field semantic tokens. Since I1 means interpolated typed constants produce `TypedErrorExpression` (no sub-expressions), there are no expression nodes for the handler to walk. The handler does handle `TypedInterpolatedString` (line 644), but there's no `TypedInterpolatedTypedConstant` equivalent because the type checker never creates one.
+
+**Proposed fix:** Downstream of I1 — once the parser and type checker produce proper expression nodes for interpolated typed constants, the semantic tokens handler needs a parallel case for `TypedInterpolatedTypedConstant` (or whatever the new node type is named), identical to the existing `TypedInterpolatedString` case at line 644.
+
+**Dependency:** Blocked on I1.
+
+---
+
+**Interpolation bug priority order:**
+1. **I1** (P1) — the type-safety hole. Must fix first. Parser + type checker.
+2. **I2** (P3) — completions. Partially depends on I1 for full solution, but a token-walk fallback could work independently.
+3. **I3** (P3) — semantic tokens. Fully blocked on I1.
+
+**Relationship to B9–B12:** I1 is orthogonal — B9–B12 fix assignment-level validation (defense-in-depth for ALL expressions), while I1 fixes the fact that interpolated typed constant expressions aren't parsed or type-checked at all. Both are needed.
+
+**Decision filed:** `.squad/decisions/inbox/frank-interpolation-triage.md`
 
 ---
 
