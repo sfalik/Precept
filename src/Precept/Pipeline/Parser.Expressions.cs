@@ -176,7 +176,7 @@ public static partial class Parser
                 {
                     Associativity.Left => meta.Precedence + 1,
                     Associativity.Right => meta.Precedence,
-                    Associativity.NonAssociative => int.MaxValue,
+                    Associativity.NonAssociative => meta.Precedence + 1,
                     _ => meta.Precedence + 1,
                 };
                 return (leftBp, rightBp);

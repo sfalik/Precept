@@ -589,8 +589,27 @@ internal static partial class TypeChecker
         if (!Operators.ByToken.TryGetValue((bin.Operator, Arity.Binary), out var opMeta))
             return new TypedErrorExpression(bin.Span);
 
+        var leftDiagStart = ctx.Diagnostics.Count;
         var left = Resolve(bin.Left, ctx);
-        var right = Resolve(bin.Right, ctx);
+        var leftDiagEnd = ctx.Diagnostics.Count;
+
+        // Proactive context propagation: when the right operand is a typed constant,
+        // use the left operand's resolved type as expectedType context.
+        // Typed constants require type context to resolve — without it they emit PRE0052.
+        var right = (bin.Right is LiteralExpression { LiteralKind: TokenKind.TypedConstant } && left is not TypedErrorExpression)
+            ? Resolve(bin.Right, ctx, left.ResultType)
+            : Resolve(bin.Right, ctx);
+
+        // Symmetric: retry left-side typed constants with right's type as context.
+        if (left is TypedErrorExpression
+            && bin.Left is LiteralExpression { LiteralKind: TokenKind.TypedConstant }
+            && right is not TypedErrorExpression)
+        {
+            // Remove the stale PRE0052 diagnostic from the failed initial resolution
+            if (leftDiagEnd > leftDiagStart)
+                ctx.Diagnostics.RemoveRange(leftDiagStart, leftDiagEnd - leftDiagStart);
+            left = Resolve(bin.Left, ctx, right.ResultType);
+        }
 
         // D13: ErrorType propagation — if either operand is error, propagate
         if (left is TypedErrorExpression || right is TypedErrorExpression)
