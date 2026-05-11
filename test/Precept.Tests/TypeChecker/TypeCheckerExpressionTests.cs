@@ -1115,6 +1115,75 @@ public class TypeCheckerExpressionTests
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
 
+    [Fact]
+    public void SetAction_MassDimensionToLengthField_EmitsDimensionCategoryMismatch()
+    {
+        var precept = """
+            precept Widget
+            field q as quantity of 'length'
+            state Open initial
+            state Closed
+            event E(qq as quantity of 'mass')
+            from Open on E
+                -> set q = qq
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DimensionCategoryMismatch);
+    }
+
+    [Fact]
+    public void SetAction_MatchingDimension_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field q as quantity of 'mass'
+            state Open initial
+            state Closed
+            event E(qq as quantity of 'mass')
+            from Open on E
+                -> set q = qq
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void SetAction_USDToEURField_EmitsQualifierMismatch()
+    {
+        var precept = """
+            precept Widget
+            field m as money in 'USD'
+            state Open initial
+            state Closed
+            event E(p as money in 'EUR')
+            from Open on E
+                -> set m = p
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.QualifierMismatch);
+    }
+
+    [Fact]
+    public void SetAction_FieldToFieldDimensionMismatch_EmitsDimensionCategoryMismatch()
+    {
+        var precept = """
+            precept Widget
+            field q1 as quantity of 'length'
+            field q2 as quantity of 'mass'
+            state Open initial
+            state Closed
+            event E
+            from Open on E
+                -> set q1 = q2
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DimensionCategoryMismatch);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  12. QualifierBinding — ResultQualifier assertion (D11)
     // ════════════════════════════════════════════════════════════════════════

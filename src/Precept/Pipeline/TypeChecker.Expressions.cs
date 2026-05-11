@@ -823,6 +823,18 @@ internal static partial class TypeChecker
                             Types.GetMeta(fieldType).DisplayName, Types.GetMeta(value.ResultType).DisplayName));
                 }
 
+                if (value is not TypedErrorExpression
+                    && ctx.FieldLookup.TryGetValue(fieldName, out var targetFieldMeta)
+                    && !targetFieldMeta.DeclaredQualifiers.IsDefaultOrEmpty)
+                {
+                    ValidateAssignmentQualifiers(
+                        value,
+                        fieldName,
+                        targetFieldMeta.DeclaredQualifiers,
+                        assign.Value.Span,
+                        ctx);
+                }
+
                 return new TypedInputAction(
                     assign.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -1164,6 +1176,104 @@ internal static partial class TypeChecker
     // ════════════════════════════════════════════════════════════════════════
     //  Expression resolution — Slice 3: Functions, Accessors, Interpolated Strings
     // ════════════════════════════════════════════════════════════════════════
+
+    private static void ValidateAssignmentQualifiers(
+        TypedExpression value,
+        string fieldName,
+        ImmutableArray<DeclaredQualifierMeta> targetQualifiers,
+        SourceSpan valueSpan,
+        CheckContext ctx)
+    {
+        if (targetQualifiers.IsDefaultOrEmpty || value is TypedErrorExpression)
+            return;
+
+        if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
+            return;
+
+        ImmutableArray<DeclaredQualifierMeta>? sourceQualifiers = value switch
+        {
+            TypedFieldRef { DeclaredQualifiers: { } fieldQualifiers } => fieldQualifiers,
+            TypedArgRef { DeclaredQualifiers: { } argQualifiers } => argQualifiers,
+            _ => null,
+        };
+
+        if (sourceQualifiers is not { } qualifiers || qualifiers.IsDefaultOrEmpty)
+            return;
+
+        foreach (var targetQualifier in targetQualifiers)
+        {
+            switch (targetQualifier)
+            {
+                case DeclaredQualifierMeta.Dimension { DimensionName: var targetDimension }:
+                {
+                    string? sourceDimension = qualifiers
+                        .OfType<DeclaredQualifierMeta.Dimension>()
+                        .Select(q => q.DimensionName)
+                        .FirstOrDefault()
+                        ?? qualifiers
+                            .OfType<DeclaredQualifierMeta.Unit>()
+                            .Select(q => q.DimensionName)
+                            .FirstOrDefault();
+
+                    if (sourceDimension is not null
+                        && !string.Equals(sourceDimension, targetDimension, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.DimensionCategoryMismatch,
+                                valueSpan,
+                                sourceDimension,
+                                targetDimension,
+                                fieldName));
+                    }
+
+                    break;
+                }
+
+                case DeclaredQualifierMeta.Unit { UnitCode: var targetUnit }:
+                {
+                    var sourceUnit = qualifiers
+                        .OfType<DeclaredQualifierMeta.Unit>()
+                        .Select(q => q.UnitCode)
+                        .FirstOrDefault();
+
+                    if (sourceUnit is not null
+                        && !string.Equals(sourceUnit, targetUnit, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.QualifierMismatch,
+                                valueSpan,
+                                targetUnit,
+                                fieldName));
+                    }
+
+                    break;
+                }
+
+                case DeclaredQualifierMeta.Currency { CurrencyCode: var targetCurrency }:
+                {
+                    var sourceCurrency = qualifiers
+                        .OfType<DeclaredQualifierMeta.Currency>()
+                        .Select(q => q.CurrencyCode)
+                        .FirstOrDefault();
+
+                    if (sourceCurrency is not null
+                        && !string.Equals(sourceCurrency, targetCurrency, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.QualifierMismatch,
+                                valueSpan,
+                                targetCurrency,
+                                fieldName));
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Check whether <paramref name="source"/> is assignable to <paramref name="target"/>
