@@ -15,8 +15,8 @@ rule ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed th
 state Draft initial
 state Submitted
 state AwaitingReturn
-state Refunded
-state Declined
+state Refunded terminal
+state Declined terminal
 
 in Submitted modify ReasonText editable
 in AwaitingReturn ensure ApprovedAmount > 0 because "A waiting return must already have an approved amount"

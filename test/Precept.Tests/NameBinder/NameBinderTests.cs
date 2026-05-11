@@ -116,6 +116,26 @@ public class NameBinderTests
     }
 
     [Fact]
+    public void Bind_StateDeclarations_NameSpan_StopsAtStateNameBeforeTrailingTrivia()
+    {
+        var source = """
+            precept Order
+            state Draft initial
+            state Rejected
+
+            # comment
+            """;
+
+        var symbols = CompileAndBind(source);
+
+        var state = symbols.States.Single(entry => entry.Name == "Rejected");
+        state.NameSpan.StartLine.Should().Be(3);
+        state.NameSpan.StartColumn.Should().Be(7);
+        state.NameSpan.EndLine.Should().Be(3);
+        state.NameSpan.EndColumn.Should().Be(15);
+    }
+
+    [Fact]
     public void Bind_EventDeclarations_CollectsAllEvents()
     {
         var source = """

@@ -143,7 +143,7 @@ public class ReferencesHandlerTests
         var qualifiedReference = compilation.Semantics.ArgReferences.First(reference =>
             reference.Arg.EventName == "JoinWaitlist"
             && reference.Arg.Name == "PartyName"
-            && reference.Site.Length > reference.Arg.Name.Length);
+            && reference.Site.StartColumn > reference.Arg.Span.StartColumn);
 
         var request = new ReferenceParams
         {

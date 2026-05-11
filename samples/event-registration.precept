@@ -16,8 +16,8 @@ rule TicketsIssued <= SeatsReserved because "Issued tickets cannot exceed reserv
 state Draft initial
 state PendingPayment
 state Confirmed
-state Cancelled
-state CheckedIn
+state Cancelled terminal
+state CheckedIn terminal
 
 # Staff can correct contact details while the registration is still open.
 in Draft modify ContactEmail editable
@@ -34,12 +34,12 @@ to Confirmed when AmountDue > 0 -> set AmountDue = 0
 event StartRegistration(
     Name as string notempty,
     Email as string notempty,
-    Seats as number default 1,
-    PricePerSeat as number default 25)
+    Seats as decimal default 1,
+    PricePerSeat as decimal default 25)
 on StartRegistration ensure StartRegistration.Seats > 0 because "At least one seat must be reserved"
 on StartRegistration ensure StartRegistration.PricePerSeat > 0 because "The seat price must be positive"
 
-event UpdateSeats(Seats as number)
+event UpdateSeats(Seats as decimal)
 on UpdateSeats ensure UpdateSeats.Seats > 0 because "Updated seat count must stay positive"
 
 event RecordPayment

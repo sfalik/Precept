@@ -58,22 +58,9 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             return Task.CompletedTask;
         }
 
-        var lexicalTokens = ProjectLexicalTokens(compilation);
-        var identifierTokens = ProjectIdentifierTokens(compilation.Semantics);
-
-        foreach (var projected in lexicalTokens
-                     .Select(static token => (Token: token, OverlayOrder: 0))
-                     .Concat(identifierTokens.Select(static token => (Token: token, OverlayOrder: 1)))
-                     .OrderBy(static entry => entry.Token.Line)
-                     .ThenBy(static entry => entry.Token.Character)
-                     .ThenBy(static entry => entry.OverlayOrder)
-                     .ThenBy(static entry => entry.Token.Length))
+        foreach (var token in ProjectMergedTokens(compilation))
         {
-            builder.Push(
-                projected.Token.Line,
-                projected.Token.Character,
-                projected.Token.Length,
-                projected.Token.TokenType);
+            builder.Push(token.Line, token.Character, token.Length, token.TokenType);
         }
 
         return Task.CompletedTask;
@@ -123,6 +110,20 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         }
 
         return projected.ToImmutable();
+    }
+
+    internal static ImmutableArray<LexicalSemanticToken> ProjectMergedTokens(Compilation compilation)
+    {
+        return ProjectLexicalTokens(compilation)
+            .Select(static token => (Token: token, OverlayOrder: 0))
+            .Concat(ProjectIdentifierTokens(compilation.Semantics).Select(static token => (Token: token, OverlayOrder: 1)))
+            .OrderBy(static entry => entry.Token.Line)
+            .ThenBy(static entry => entry.Token.Character)
+            .ThenBy(static entry => entry.Token.Length)
+            .ThenBy(static entry => entry.OverlayOrder)
+            .GroupBy(static entry => (entry.Token.Line, entry.Token.Character, entry.Token.Length))
+            .Select(static group => group.Last().Token)
+            .ToImmutableArray();
     }
 
     internal static ImmutableArray<LexicalSemanticToken> ProjectIdentifierTokens(SemanticIndex index)

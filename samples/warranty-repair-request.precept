@@ -17,8 +17,8 @@ state Submitted
 state Approved
 state InRepair
 state ReadyToReturn
-state Closed
-state Denied
+state Closed terminal
+state Denied terminal
 
 in ReadyToReturn ensure RepairComplete because "Ready-to-return cases must have finished repair work"
 in Closed ensure ShippingLabelSent because "Closed cases must have a return label on record"

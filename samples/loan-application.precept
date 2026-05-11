@@ -2,45 +2,47 @@ precept LoanApplication
 
 # This sample keeps underwriting rules in the workflow itself instead of spreading them across services.
 # The approval guard combines document verification, credit policy, and affordability checks.
-# Built-in functions (min, round, clamp) keep the logic readable without external helpers.
+# Money types enforce same-currency arithmetic and carry currency semantics throughout.
+# CreditScore uses integer — scores are whole numbers with no fractional meaning.
 
 field ApplicantName as string optional
-field RequestedAmount as number default 0 nonnegative
-field ApprovedAmount as number default 0 nonnegative
-field CreditScore as number default 0
-field AnnualIncome as number default 0 nonnegative
-field ExistingDebt as number default 0 nonnegative
+field RequestedAmount as money in 'USD' default '0.00 USD'
+field ApprovedAmount as money in 'USD' default '0.00 USD'
+field CreditScore as integer default 0
+field AnnualIncome as money in 'USD' default '0.00 USD'
+field ExistingDebt as money in 'USD' default '0.00 USD'
 field DecisionNote as string optional
 field DocumentsVerified as boolean default false
+
 rule ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
-rule ExistingDebt <= AnnualIncome * 3 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
+rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
 
 state Draft initial
 state UnderReview
 state Approved
-state Funded
-state Declined
+state Funded terminal
+state Declined terminal
 
 in Approved ensure DocumentsVerified because "Approved loans must have verified documents"
 in UnderReview when DocumentsVerified ensure CreditScore >= 300 because "Verified applicants must have a minimum credit score of 300"
-in Funded ensure ApprovedAmount > 0 because "Funded loans must have a positive approved amount"
+in Funded ensure ApprovedAmount > '0.00 USD' because "Funded loans must have a positive approved amount"
 
 in UnderReview when DocumentsVerified modify DecisionNote editable
 
 event Submit(
     Applicant as string notempty,
-    Amount as number,
-    Score as number,
-    Income as number,
-    Debt as number)
-on Submit ensure Submit.Amount > 0 because "Loan requests must be positive"
+    Amount as money in 'USD',
+    Score as integer,
+    Income as money in 'USD',
+    Debt as money in 'USD')
+on Submit ensure Submit.Amount > '0.00 USD' because "Loan requests must be positive"
 on Submit ensure Submit.Score >= 0 because "Credit score cannot be negative"
-on Submit ensure Submit.Income >= 0 because "Income cannot be negative"
-on Submit ensure Submit.Debt >= 0 because "Debt cannot be negative"
+on Submit ensure Submit.Income >= '0.00 USD' because "Income cannot be negative"
+on Submit ensure Submit.Debt >= '0.00 USD' because "Debt cannot be negative"
 
 event VerifyDocuments
-event Approve(Amount as number, Note as string optional notempty)
-on Approve ensure Approve.Amount > 0 because "Approved amounts must be positive"
+event Approve(Amount as money in 'USD', Note as string optional notempty)
+on Approve ensure Approve.Amount > '0.00 USD' because "Approved amounts must be positive"
 
 event Decline(Note as string notempty)
 event FundLoan
@@ -57,9 +59,9 @@ from UnderReview on VerifyDocuments
     -> set DocumentsVerified = true
     -> no transition
 
-from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount
-    -> set ApprovedAmount = min(Approve.Amount, RequestedAmount)
-    -> set DecisionNote = if Approve.Note is set then Approve.Note else if CreditScore >= 750 then "Prime tier  — auto-approved" else "Standard tier — approved"
+from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2.0 and RequestedAmount < AnnualIncome / 2.0 and Approve.Amount <= RequestedAmount
+    -> set ApprovedAmount = Approve.Amount
+    -> set DecisionNote = if Approve.Note is set then Approve.Note else if CreditScore >= 750 then "Prime tier — auto-approved" else "Standard tier — approved"
     -> transition Approved
 from UnderReview on Approve
     -> reject "Approval requires verified documents, strong credit, and affordable debt load"

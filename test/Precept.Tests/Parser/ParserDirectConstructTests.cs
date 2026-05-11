@@ -398,6 +398,25 @@ public class ParserDirectConstructTests
     }
 
     [Fact]
+    public void StateDeclaration_TrailingTrivia_DoesNotExtendStateNameSpan()
+    {
+        var tokens = Lexer.Lex("state Rejected\n\n# comment");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        var state = manifest.Constructs
+            .Single(c => c.Meta.Kind == ConstructKind.StateDeclaration);
+        var entry = state.Slots.OfType<StateEntryListSlot>().Single().Entries.Single();
+
+        entry.Name.Should().Be("Rejected");
+        entry.NameSpan.StartLine.Should().Be(1);
+        entry.NameSpan.StartColumn.Should().Be(7);
+        entry.NameSpan.EndLine.Should().Be(1);
+        entry.NameSpan.EndColumn.Should().Be(15);
+        state.Span.EndLine.Should().Be(1);
+        state.Span.EndColumn.Should().Be(15);
+    }
+
+    [Fact]
     public void StateDeclaration_MultipleStates_AllEntriesPresent()
     {
         // RED-P: Comma-separated state entries all land in the single StateEntryList slot.

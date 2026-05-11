@@ -326,6 +326,7 @@ public static partial class Parser
                 }
                 return new MemberAccessExpression(
                     left, memberToken.Kind, memberToken.Text,
+                    memberToken.Span,
                     SourceSpan.Covering(left.Span, memberToken.Span));
             }
 
@@ -334,6 +335,7 @@ public static partial class Parser
                 DiagnosticCode.ExpectedToken, memberToken.Span, "member name", memberToken.Text));
             return new MemberAccessExpression(
                 left, TokenKind.Identifier, "",
+                memberToken.Span,
                 SourceSpan.Covering(left.Span, memberToken.Span));
         }
 

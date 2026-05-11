@@ -16,7 +16,7 @@ state CheckedIn
 state AwaitingApproval
 state InService
 state ReadyForPickup
-state Closed
+state Closed terminal
 
 in CheckedIn modify AdvisorName editable
 in ReadyForPickup ensure PickupContacted because "Customers must be notified before pickup"

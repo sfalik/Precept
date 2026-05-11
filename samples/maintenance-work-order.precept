@@ -1,14 +1,18 @@
 precept MaintenanceWorkOrder
 
 # A facilities work order from intake through scheduling and completion.
-# This sample introduces stronger guard logic and a from-state ensure.
+# Temporal types carry scheduling and SLA semantics that plain numbers cannot:
+# - date captures when the work is due without conflating it with a count
+# - duration tracks estimated and actual labour time with exact arithmetic
+# - duration <= duration enforces SLA overrun limits structurally
 
 field RequesterName as string optional
 field Location as string optional
 field IssueSummary as string optional
 field AssignedTechnician as string optional
-field EstimatedHours as number default 0 nonnegative
-field ActualHours as number default 0 nonnegative
+field ScheduledDate as date optional
+field EstimatedDuration as duration optional
+field ActualDuration as duration default '0 hours'
 field Urgent as boolean default false
 field PartsApproved as boolean default false
 field CompletionNote as string optional
@@ -18,14 +22,14 @@ state Draft initial
 state Open
 state Scheduled
 state InProgress
-state Completed
-state Cancelled
+state Completed terminal
+state Cancelled terminal
 
 in Draft modify Location, IssueSummary, Urgent editable
 in Scheduled ensure AssignedTechnician is set because "Scheduled work must have an assigned technician"
+in Scheduled ensure ScheduledDate is set because "Scheduled work must have a date"
 in Completed ensure CompletionNote is set because "Completed work orders need a completion note"
 
-# Leaving active work still requires a technician on record.
 from InProgress ensure AssignedTechnician is set because "Active work cannot finish without a technician"
 
 event Submit(
@@ -33,13 +37,17 @@ event Submit(
     WorkLocation as string notempty,
     Summary as string notempty,
     IsUrgent as boolean default false)
-event Assign(Technician as string notempty, Estimate as number)
-on Assign ensure Assign.Estimate > 0 because "Estimated hours must be positive"
+
+event Assign(
+    Technician as string notempty,
+    DueDate as date,
+    Estimate as duration)
+on Assign ensure Assign.Estimate > '0 hours' because "Estimated duration must be positive"
 
 event ApproveParts
 event StartWork
-event RecordProgress(Hours as number)
-on RecordProgress ensure RecordProgress.Hours > 0 because "Progress entries must be positive"
+event RecordProgress(Elapsed as duration)
+on RecordProgress ensure RecordProgress.Elapsed > '0 hours' because "Progress entries must be positive"
 
 event Complete(Note as string notempty)
 event Cancel(Reason as string optional notempty)
@@ -53,7 +61,8 @@ from Draft on Submit
 
 from Open on Assign
     -> set AssignedTechnician = Assign.Technician
-    -> set EstimatedHours = Assign.Estimate
+    -> set ScheduledDate = Assign.DueDate
+    -> set EstimatedDuration = Assign.Estimate
     -> transition Scheduled
 from Open on Cancel
     -> set CancellationReason = Cancel.Reason
@@ -71,9 +80,9 @@ from Scheduled on Cancel
     -> transition Cancelled
 
 from InProgress on RecordProgress
-    -> set ActualHours = ActualHours + RecordProgress.Hours
+    -> set ActualDuration = ActualDuration + RecordProgress.Elapsed
     -> no transition
-from InProgress on Complete when ActualHours <= EstimatedHours + 4
+from InProgress on Complete when not EstimatedDuration is set or ActualDuration <= EstimatedDuration + '4 hours'
     -> set CompletionNote = Complete.Note
     -> transition Completed
 from InProgress on Complete

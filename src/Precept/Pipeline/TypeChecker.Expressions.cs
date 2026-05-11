@@ -1329,7 +1329,8 @@ internal static partial class TypeChecker
                 string.Equals(a.Name, expr.MemberName, StringComparison.Ordinal));
             if (arg is not null)
             {
-                ctx.ArgReferences.Add(new ArgReference(arg, expr.Span));
+                ctx.EventReferences.Add(new EventReference(ev, eventId.Span));
+                ctx.ArgReferences.Add(new ArgReference(arg, expr.MemberSpan));
                 return new TypedArgRef(arg.ResolvedType, ev.Name, arg.Name, expr.Span);
             }
 

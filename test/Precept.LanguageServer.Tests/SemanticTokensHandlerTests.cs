@@ -174,6 +174,7 @@ public sealed class SemanticTokensHandlerTests
         var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
 
         compilation.HasErrors.Should().BeFalse();
+        argReference.Site.Length.Should().Be(argReference.Arg.Name.Length);
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
             .Should()
             .Contain(token =>
@@ -181,6 +182,87 @@ public sealed class SemanticTokensHandlerTests
                 token.Character == argReference.Site.StartColumn - 1 &&
                 token.Length == argReference.Site.Length &&
                 token.TokenType == expected);
+    }
+
+    [Fact]
+    public void MergedTokens_QualifiedEventArgReference_AreStrictlyOrdered()
+    {
+        var compilation = Compiler.Compile("""
+            precept RestaurantWaitlist
+            field CurrentParty as string optional
+            state Accepting initial
+            state Joined terminal
+            event JoinWaitlist(PartyName as string notempty, PartySize as number)
+            on JoinWaitlist ensure JoinWaitlist.PartyName != "" because "Party name is required"
+            from Accepting on JoinWaitlist when JoinWaitlist.PartyName != ""
+                -> set CurrentParty = PartyName
+                -> transition Joined
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var merged = SemanticTokensHandler.ProjectMergedTokens(compilation)
+            .Where(token => token.Line == 5 || token.Line == 6)
+            .ToArray();
+
+        for (var i = 1; i < merged.Length; i++)
+        {
+            var previous = merged[i - 1];
+            var current = merged[i];
+
+            (current.Line > previous.Line || current.Character >= previous.Character).Should().BeTrue();
+
+            if (current.Line == previous.Line)
+            {
+                current.Character.Should().BeGreaterThanOrEqualTo(previous.Character + previous.Length,
+                    because: "semantic tokens on one line must not overlap");
+            }
+        }
+    }
+
+    [Fact]
+    public void SemanticTokensDelta_QualifiedEventArgReference_DoesNotThrow()
+    {
+        var before = Compiler.Compile("""
+            precept RestaurantWaitlist
+            field CurrentParty as string optional
+            state Accepting initial
+            state Joined terminal
+            event JoinWaitlist(PartyName as string notempty, PartySize as number)
+            on JoinWaitlist ensure JoinWaitlist.PartyName != "" because "Party name is required"
+            from Accepting on JoinWaitlist when JoinWaitlist.PartyName != ""
+                -> set CurrentParty = PartyName
+                -> transition Joined
+            """);
+        var after = Compiler.Compile("""
+            precept RestaurantWaitlist
+            field CurrentParty as string optional
+            state Accepting initial
+            state Joined terminal
+            event JoinWaitlist(GuestName as string notempty, PartySize as number)
+            on JoinWaitlist ensure JoinWaitlist.GuestName != "" because "Party name is required"
+            from Accepting on JoinWaitlist when JoinWaitlist.GuestName != ""
+                -> set CurrentParty = GuestName
+                -> transition Joined
+            """);
+        var document = new SemanticTokensDocument(SemanticTokensHandler.BuildLegend());
+
+        before.HasErrors.Should().BeFalse();
+        after.HasErrors.Should().BeFalse();
+
+        CommitSemanticTokens(document.Create(), before);
+        var full = document.GetSemanticTokens();
+        full.ResultId.Should().NotBeNull();
+
+        CommitSemanticTokens(document.Edit(new SemanticTokensDeltaParams
+        {
+            PreviousResultId = full.ResultId!,
+            TextDocument = new TextDocumentIdentifier(DocumentUri.FromFileSystemPath(@"C:\\semantic-tokens-test.precept")),
+        }), after);
+
+        var act = () => document.GetSemanticTokensEdits();
+
+        act.Should().NotThrow();
     }
 
     [Fact]
@@ -416,6 +498,16 @@ public sealed class SemanticTokensHandlerTests
             .Select(entry => (entry.TokenType, entry.HexColor, entry.Bold, entry.Italic))
             .Should()
             .Equal(SemanticTokenTypes.All.Select(meta => (meta.CustomType, meta.ForegroundHex, meta.Bold, meta.Italic)));
+    }
+
+    private static void CommitSemanticTokens(SemanticTokensBuilder builder, Compilation compilation)
+    {
+        foreach (var token in SemanticTokensHandler.ProjectMergedTokens(compilation))
+        {
+            builder.Push(token.Line, token.Character, token.Length, token.TokenType);
+        }
+
+        builder.Commit();
     }
 }
 

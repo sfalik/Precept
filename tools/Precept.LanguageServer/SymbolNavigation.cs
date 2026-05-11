@@ -66,20 +66,20 @@ internal static class SymbolNavigation
             }
         }
 
-        foreach (var eventReference in semantics.EventReferences)
-        {
-            if (Contains(eventReference.Site, position))
-            {
-                occurrence = new EventOccurrence(eventReference.Event);
-                return true;
-            }
-        }
-
         foreach (var argReference in semantics.ArgReferences)
         {
             if (Contains(argReference.Site, position))
             {
                 occurrence = new ArgOccurrence(argReference.Arg);
+                return true;
+            }
+        }
+
+        foreach (var eventReference in semantics.EventReferences)
+        {
+            if (Contains(eventReference.Site, position))
+            {
+                occurrence = new EventOccurrence(eventReference.Event);
                 return true;
             }
         }

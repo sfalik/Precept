@@ -15,8 +15,8 @@ field LeaseSigned as boolean default false
 state Draft initial
 state Submitted
 state Approved
-state MoveInReady
-state Declined
+state MoveInReady terminal   
+state Declined terminal
 
 in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
 in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"

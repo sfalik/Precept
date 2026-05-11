@@ -17,8 +17,8 @@ rule RequestedFloors.count == 0 or LowestRequestedFloor <= HighestRequestedFloor
 state Draft initial
 state Submitted
 state Approved
-state Issued
-state Rejected
+state Issued terminal
+state Rejected terminal
 
 # Requesters can revise the request while it is still being prepared.
 in Draft modify EmployeeName, Department, AccessReason, RequestedFloors editable

@@ -14,8 +14,8 @@ field ReminderLog as stack of string
 
 state Empty initial
 state AwaitingPickup
-state PickedUp
-state Returned
+state PickedUp terminal
+state Returned terminal
 
 in AwaitingPickup ensure RecipientName is set because "Loaded lockers must identify the recipient"
 in AwaitingPickup ensure PickupCode is set because "Loaded lockers must store a pickup code"

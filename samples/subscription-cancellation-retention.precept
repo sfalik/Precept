@@ -13,7 +13,7 @@ field LastAgentNote as string optional
 
 state Active initial
 state RetentionReview
-state Cancelled
+state Cancelled terminal
 
 in RetentionReview modify LastAgentNote editable
 

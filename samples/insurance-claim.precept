@@ -19,8 +19,8 @@ state Draft initial
 state Submitted
 state UnderReview
 state Approved
-state Denied
-state Paid
+state Denied terminal
+state Paid terminal
 
 in UnderReview modify FraudFlag editable
 in UnderReview when not FraudFlag modify AdjusterName editable

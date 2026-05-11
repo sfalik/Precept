@@ -87,13 +87,15 @@ public static class NameBinder
             var modifiers = modSlot?.Modifiers ?? ImmutableArray<ParsedModifier>.Empty;
             bool isComputed = computeSlot is not null;
 
-            foreach (var name in idSlot.Names)
+            for (var i = 0; i < idSlot.Names.Length; i++)
             {
+                var name = idSlot.Names[i];
+                var nameSpan = idSlot.NameSpans.Length > i ? idSlot.NameSpans[i] : idSlot.Span;
                 if (_fieldsByName.ContainsKey(name))
                 {
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.DuplicateFieldName,
-                        idSlot.Span,
+                        nameSpan,
                         name));
                     continue;
                 }
@@ -104,7 +106,7 @@ public static class NameBinder
                     Modifiers: modifiers,
                     IsComputed: isComputed,
                     Syntax: construct,
-                    NameSpan: idSlot.Span,
+                    NameSpan: nameSpan,
                     DeclarationOrder: _fieldOrder++);
 
                 _fields.Add(field);
@@ -117,25 +119,25 @@ public static class NameBinder
             var entrySlot = construct.GetSlot<StateEntryListSlot>(ConstructSlotKind.StateEntryList);
             if (entrySlot is null) return;
 
-            foreach (var (name, modifiers) in entrySlot.Entries)
+            foreach (var entry in entrySlot.Entries)
             {
-                if (_statesByName.ContainsKey(name))
+                if (_statesByName.ContainsKey(entry.Name))
                 {
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.DuplicateStateName,
-                        entrySlot.Span,
-                        name));
+                        entry.NameSpan,
+                        entry.Name));
                     continue;
                 }
 
                 var state = new DeclaredState(
-                    Name: name,
-                    Modifiers: modifiers,
+                    Name: entry.Name,
+                    Modifiers: entry.Modifiers,
                     Syntax: construct,
-                    NameSpan: entrySlot.Span);
+                    NameSpan: entry.NameSpan);
 
                 _states.Add(state);
-                _statesByName[name] = state;
+                _statesByName[entry.Name] = state;
             }
         }
 
@@ -148,29 +150,31 @@ public static class NameBinder
             if (idSlot is null) return;
 
             bool isInitial = initialSlot?.IsPresent ?? false;
-            var argTuples = argSlot?.Args ?? ImmutableArray<(string Name, ParsedTypeReference Type, ImmutableArray<ModifierKind> Modifiers)>.Empty;
+            var argEntries = argSlot?.Args ?? ImmutableArray<ArgumentSyntax>.Empty;
 
-            foreach (var eventName in idSlot.Names)
+            for (var i = 0; i < idSlot.Names.Length; i++)
             {
+                var eventName = idSlot.Names[i];
+                var nameSpan = idSlot.NameSpans.Length > i ? idSlot.NameSpans[i] : idSlot.Span;
                 if (_eventsByName.ContainsKey(eventName))
                 {
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.DuplicateEventName,
-                        idSlot.Span,
+                        nameSpan,
                         eventName));
                     continue;
                 }
 
                 // Build DeclaredArg array from argument tuples
-                var argsBuilder = ImmutableArray.CreateBuilder<DeclaredArg>(argTuples.Length);
-                foreach (var (argName, argType, argModifiers) in argTuples)
+                var argsBuilder = ImmutableArray.CreateBuilder<DeclaredArg>(argEntries.Length);
+                foreach (var argEntry in argEntries)
                 {
                     argsBuilder.Add(new DeclaredArg(
-                        Name: argName,
-                        Type: argType,
+                        Name: argEntry.Name,
+                        Type: argEntry.Type,
                         EventName: eventName,
-                        Modifiers: argModifiers,
-                        NameSpan: argSlot!.Span));
+                        Modifiers: argEntry.Modifiers,
+                        NameSpan: argEntry.NameSpan));
                 }
 
                 var evt = new DeclaredEvent(
@@ -178,7 +182,7 @@ public static class NameBinder
                     Args: argsBuilder.ToImmutable(),
                     IsInitial: isInitial,
                     Syntax: construct,
-                    NameSpan: idSlot.Span);
+                    NameSpan: nameSpan);
 
                 _events.Add(evt);
                 _eventsByName[eventName] = evt;
@@ -561,7 +565,7 @@ public static class NameBinder
                         var argOnEvent = targetEvent.Args.FirstOrDefault(a => a.Name == memberAccess.MemberName);
                         if (argOnEvent is not null)
                         {
-                            _references.Add(new SymbolReference(memberAccess.Span, memberAccess.MemberName, new ArgTarget(argOnEvent)));
+                            _references.Add(new SymbolReference(memberAccess.MemberSpan, memberAccess.MemberName, new ArgTarget(argOnEvent)));
                         }
                         else
                         {
@@ -570,7 +574,7 @@ public static class NameBinder
                                 memberAccess.Span,
                                 memberAccess.MemberName,
                                 targetEvent.Name));
-                            _references.Add(new SymbolReference(memberAccess.Span, memberAccess.MemberName, new UnresolvedTarget(memberAccess.MemberName, SymbolCategory.Any)));
+                            _references.Add(new SymbolReference(memberAccess.MemberSpan, memberAccess.MemberName, new UnresolvedTarget(memberAccess.MemberName, SymbolCategory.Any)));
                         }
                     }
                     else

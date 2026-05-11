@@ -71,8 +71,12 @@ on Activate ensure Activate.Reason != \"\" because \"Reason is required\"
     public void HandleDefinition_OnArgumentReference_ReturnsArgumentDeclarationLocation()
     {
         var compilation = Precept.Compiler.Compile(Source);
+        var argReference = compilation.Semantics.ArgReferences.Single(reference => reference.Arg.Name == "Reason");
 
-        var locations = DefinitionHandler.HandleDefinition(Uri, compilation, new Position(8, 27));
+        var locations = DefinitionHandler.HandleDefinition(
+            Uri,
+            compilation,
+            new Position(argReference.Site.StartLine - 1, argReference.Site.StartColumn - 1));
         var location = GetSingleLocation(locations);
         var arg = compilation.Semantics.Events.Single().Args.Single();
 

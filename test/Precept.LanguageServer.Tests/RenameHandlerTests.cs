@@ -148,7 +148,7 @@ public class RenameHandlerTests
         var qualifiedReference = compilation.Semantics.ArgReferences.First(reference =>
             reference.Arg.EventName == "JoinWaitlist"
             && reference.Arg.Name == "PartyName"
-            && reference.Site.Length > reference.Arg.Name.Length);
+            && reference.Site.StartColumn > reference.Arg.Span.StartColumn);
 
         var request = new RenameParams
         {
@@ -201,5 +201,5 @@ public class RenameHandlerTests
     }
 
     private static Position IdentifierPositionInQualifiedArgReference(Precept.Pipeline.ArgReference reference) =>
-        new(reference.Site.EndLine - 1, reference.Site.EndColumn - reference.Arg.Name.Length);
+        new(reference.Site.StartLine - 1, reference.Site.StartColumn - 1);
 }

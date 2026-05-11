@@ -255,7 +255,7 @@ SemanticTokens BuildLexicalTokens(Compilation compilation)
 
 **Mechanics:**
 
-Pass 2 walks `SemanticIndex` symbol tables and classifies identifier tokens by their semantic role. This pass requires the type checker to complete successfully.
+Pass 2 walks `SemanticIndex` symbol tables and classifies identifier tokens by their semantic role. This pass requires the type checker to complete successfully. Declaration and reference spans must be the bare identifier token spans (for example the `PartyName` segment of `JoinWaitlist.PartyName`), because OmniSharp's semantic-token delta encoder assumes the emitted stream is strictly ordered and non-overlapping.
 
 ```csharp
 void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
@@ -298,7 +298,7 @@ void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
 }
 ```
 
-**Pass 2 reference sites:** `SemanticIndex` carries first-class reference-site collections populated by the type checker at resolution time (CC#3): `FieldReferences` (`ImmutableArray<FieldReference>`), `StateReferences` (`ImmutableArray<StateReference>`), and `EventReferences` (`ImmutableArray<EventReference>`). Each reference record holds the resolved typed declaration and the reference `Site` span. Pass 2 projects these collections directly — no expression-tree walking needed. `ArgReferences` is not yet present; it must be added as a thin core prerequisite (see implementation plan Slice 3).
+**Pass 2 reference sites:** `SemanticIndex` carries first-class reference-site collections populated by the type checker at resolution time (CC#3): `FieldReferences` (`ImmutableArray<FieldReference>`), `StateReferences` (`ImmutableArray<StateReference>`), `EventReferences` (`ImmutableArray<EventReference>`), and `ArgReferences` (`ImmutableArray<ArgReference>`). Each reference record holds the resolved typed declaration and the reference `Site` span. Pass 2 projects these collections directly — no expression-tree walking needed. Qualified event-argument references record only the member identifier span, not the enclosing `Event.Arg` expression span, so semantic-token overlays, definition, references, highlights, and rename all target the actual editable identifier token.
 
 **Graceful Degradation:**
 

@@ -30,7 +30,7 @@ public sealed record UnaryOperationExpression(TokenKind Operator, ParsedExpressi
     : ParsedExpression(ExpressionFormKind.UnaryOperation, Span);
 
 /// <summary>Dot access on an expression target.</summary>
-public sealed record MemberAccessExpression(ParsedExpression Target, TokenKind MemberTokenKind, string MemberName, SourceSpan Span)
+public sealed record MemberAccessExpression(ParsedExpression Target, TokenKind MemberTokenKind, string MemberName, SourceSpan MemberSpan, SourceSpan Span)
     : ParsedExpression(ExpressionFormKind.MemberAccess, Span);
 
 /// <summary>An if/then/else expression.</summary>

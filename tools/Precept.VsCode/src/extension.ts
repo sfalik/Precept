@@ -349,19 +349,23 @@ async function applySemanticTokenColorCustomizations(
 ): Promise<void> {
   const configuration = vscode.workspace.getConfiguration();
   const existingCustomizations = configuration.get<SemanticTokenColorCustomizations>("editor.semanticTokenColorCustomizations") ?? {};
+
+  // Collect any precept rules that were previously written into the incorrect "[precept]"
+  // theme-scoped block and migrate them out. The "[precept]" key is treated by VS Code as
+  // a theme name selector (matching a theme called "precept"), not a language selector, so
+  // rules written there are silently ignored.
+  const stalePreceptBlock = isRecord(existingCustomizations["[precept]"])
+    ? existingCustomizations["[precept]"] as SemanticTokenColorCustomizationRuleset
+    : {};
+  const stalePreceptRules = isRecord(stalePreceptBlock.rules)
+    ? stalePreceptBlock.rules as Record<string, SemanticTokenColorRule>
+    : {};
+
   const existingGlobalRules = isRecord(existingCustomizations.rules)
     ? existingCustomizations.rules as Record<string, SemanticTokenColorRule>
     : {};
-  const existingPreceptCustomizations = isRecord(existingCustomizations["[precept]"])
-    ? existingCustomizations["[precept]"] as SemanticTokenColorCustomizationRuleset
-    : {};
-  const existingPreceptRules = isRecord(existingPreceptCustomizations.rules)
-    ? existingPreceptCustomizations.rules as Record<string, SemanticTokenColorRule>
-    : {};
-  const migratedLegacyRules = Object.fromEntries(
-    Object.entries(existingGlobalRules).filter(([ruleKey]) => isPreceptSemanticTokenRuleKey(ruleKey))
-  ) as Record<string, SemanticTokenColorRule>;
 
+  // Build the new generated rules from the server payload.
   const generatedRules = Object.fromEntries(
     entries.map((entry) => [
       entry.tokenType,
@@ -375,21 +379,22 @@ async function applySemanticTokenColorCustomizations(
 
   generatedRules["*.preceptConstrained"] = { italic: true };
 
+  // Keep non-precept global rules untouched; replace all precept rules with generated ones.
   const remainingGlobalRules = Object.fromEntries(
     Object.entries(existingGlobalRules).filter(([ruleKey]) => !isPreceptSemanticTokenRuleKey(ruleKey))
   ) as Record<string, SemanticTokenColorRule>;
 
-  const { rules: _existingRules, ...customizationsWithoutGlobalRules } = existingCustomizations;
+  // Drop the stale "[precept]" block and write rules directly into top-level "rules".
+  // VS Code resolves "editor.semanticTokenColorCustomizations".rules at workspace scope,
+  // which overrides theme-provided coloring. The "[languageId]" sub-object syntax is not
+  // supported for this setting — only "[ThemeName]" selectors are.
+  const { rules: _existingRules, "[precept]": _staleBlock, ...customizationsWithoutRules } = existingCustomizations;
   const nextCustomizations: SemanticTokenColorCustomizations = {
-    ...customizationsWithoutGlobalRules,
-    ...(Object.keys(remainingGlobalRules).length > 0 ? { rules: remainingGlobalRules } : {}),
-    "[precept]": {
-      ...existingPreceptCustomizations,
-      rules: {
-        ...migratedLegacyRules,
-        ...existingPreceptRules,
-        ...generatedRules
-      }
+    ...customizationsWithoutRules,
+    rules: {
+      ...remainingGlobalRules,
+      ...stalePreceptRules,
+      ...generatedRules
     }
   };
 

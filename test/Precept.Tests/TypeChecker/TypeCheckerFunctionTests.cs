@@ -39,6 +39,9 @@ public class TypeCheckerFunctionTests
         state Open initial
         """);
 
+    private static MemberAccessExpression MemberAccess(ParsedExpression target, string memberName, TokenKind memberTokenKind = TokenKind.Identifier)
+        => new(target, memberTokenKind, memberName, TestSpan, SourceSpan.Covering(target.Span, TestSpan));
+
     // ════════════════════════════════════════════════════════════════════════
     //  1. FunctionCall — happy path
     // ════════════════════════════════════════════════════════════════════════
@@ -434,7 +437,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("DueDate", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, accessor, TestSpan);
+        var expr = MemberAccess(target, accessor);
 
         var result = Resolve(expr, ctx);
 
@@ -453,7 +456,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Name", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "length", TestSpan);
+        var expr = MemberAccess(target, "length");
 
         var result = Resolve(expr, ctx);
 
@@ -476,7 +479,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Elapsed", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, accessor, TestSpan);
+        var expr = MemberAccess(target, accessor);
 
         var result = Resolve(expr, ctx);
 
@@ -498,7 +501,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Grace", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, accessor, TestSpan);
+        var expr = MemberAccess(target, accessor);
 
         var result = Resolve(expr, ctx);
 
@@ -516,7 +519,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Tags", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "count", TestSpan);
+        var expr = MemberAccess(target, "count");
 
         var result = Resolve(expr, ctx);
 
@@ -535,7 +538,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Steps", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "count", TestSpan);
+        var expr = MemberAccess(target, "count");
 
         var result = Resolve(expr, ctx);
 
@@ -556,7 +559,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("AppointmentTime", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, accessor, TestSpan);
+        var expr = MemberAccess(target, accessor);
 
         var result = Resolve(expr, ctx);
 
@@ -578,7 +581,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("DueDate", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "noSuchProp", TestSpan);
+        var expr = MemberAccess(target, "noSuchProp");
 
         var result = Resolve(expr, ctx);
 
@@ -596,7 +599,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Flag", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "length", TestSpan);
+        var expr = MemberAccess(target, "length");
 
         var result = Resolve(expr, ctx);
 
@@ -610,7 +613,7 @@ public class TypeCheckerFunctionTests
     {
         var ctx = MinimalContext();
         var target = new IdentifierExpression("Amount", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "year", TestSpan);
+        var expr = MemberAccess(target, "year");
 
         var result = Resolve(expr, ctx);
 
@@ -624,7 +627,7 @@ public class TypeCheckerFunctionTests
     {
         var ctx = MinimalContext();
         var target = new MissingExpression(TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "year", TestSpan);
+        var expr = MemberAccess(target, "year");
 
         var result = Resolve(expr, ctx);
 
@@ -642,7 +645,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Name", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "length", TestSpan);
+        var expr = MemberAccess(target, "length");
 
         var result = Resolve(expr, ctx);
 
@@ -811,7 +814,7 @@ public class TypeCheckerFunctionTests
             state Open initial
             """);
         var target = new IdentifierExpression("Name", TestSpan);
-        var expr = new MemberAccessExpression(target, TokenKind.Dot, "length", TestSpan);
+        var expr = MemberAccess(target, "length");
 
         var result = Resolve(expr, ctx);
 

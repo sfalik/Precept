@@ -15,8 +15,8 @@ field CancellationReason as string optional
 state Draft initial
 state Scheduled
 state CheckedIn
-state Completed
-state Cancelled
+state Completed terminal
+state Cancelled terminal
 
 in Scheduled modify ScheduledDay, ScheduledMinute editable
 in Scheduled ensure ConfirmationCode is set because "Scheduled appointments need a confirmation code"

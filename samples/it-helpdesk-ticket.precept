@@ -16,7 +16,7 @@ state New initial
 state Assigned
 state WaitingOnCustomer
 state Resolved
-state Closed
+state Closed terminal
 
 in Assigned ensure AssignedAgent is set because "Assigned tickets must name an agent"
 in New modify Priority editable

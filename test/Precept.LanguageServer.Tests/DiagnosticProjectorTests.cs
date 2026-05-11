@@ -65,6 +65,30 @@ public class DiagnosticProjectorTests
     }
 
     [Fact]
+    public void Project_GraphWarningOnState_UsesStateNameTokenRange()
+    {
+        var compilation = Compiler.Compile("""
+            precept Workflow
+            state Draft initial
+            state Rejected
+
+            # comment
+            event Reject
+            from Draft on Reject -> transition Rejected
+            """);
+
+        var diagnostic = DiagnosticProjector.Project(compilation)
+            .Single(entry => entry.Code?.String == nameof(Precept.Language.DiagnosticCode.StructuralSinkState)
+                && entry.Message.Contains("Rejected"));
+
+        diagnostic.Range.Should().BeEquivalentTo(new Range
+        {
+            Start = new Position(2, 6),
+            End = new Position(2, 14),
+        });
+    }
+
+    [Fact]
     public void Project_Diagnostic_SourceIsPreceptString()
     {
         var compilation = Compiler.Compile(WarningSource);

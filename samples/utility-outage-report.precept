@@ -17,7 +17,7 @@ state Reported initial
 state VerifiedState
 state Dispatched
 state Restored
-state Closed
+state Closed terminal
 
 in VerifiedState modify EstimatedCustomers editable
 in Dispatched ensure AssignedCrew is set because "Dispatched outages must name a crew"

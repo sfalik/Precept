@@ -125,6 +125,17 @@ public static partial class Parser
         private static bool IsTrivia(TokenKind kind) =>
             kind == TokenKind.NewLine || kind == TokenKind.Comment;
 
+        private SourceSpan LastSignificantConsumedSpan(SourceSpan fallback)
+        {
+            for (var index = _position - 1; index >= 0; index--)
+            {
+                if (!IsTrivia(_tokens[index].Kind))
+                    return _tokens[index].Span;
+            }
+
+            return fallback;
+        }
+
         private Token EofToken() => new(TokenKind.EndOfSource, "",
             _tokens.Length > 0 ? _tokens[^1].Span : SourceSpan.Missing);
 
@@ -251,9 +262,7 @@ public static partial class Parser
                     slots.Add(value);
             }
 
-            var endSpan = _position > 0 && !IsTrivia(_tokens[_position - 1].Kind)
-                ? _tokens[_position - 1].Span
-                : startSpan;
+            var endSpan = LastSignificantConsumedSpan(startSpan);
             var span = SourceSpan.Covering(startSpan, endSpan);
 
             _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span, startToken.Kind));
@@ -289,9 +298,7 @@ public static partial class Parser
                     slots.Add(value);
             }
 
-            var endSpan= _position > 0 && !IsTrivia(_tokens[_position - 1].Kind)
-                ? _tokens[_position - 1].Span
-                : startSpan;
+            var endSpan = LastSignificantConsumedSpan(startSpan);
             var span = SourceSpan.Covering(startSpan, endSpan);
 
             _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span, startToken.Kind));
@@ -326,11 +333,11 @@ public static partial class Parser
 
         private static SlotValue MakeSentinel(ConstructSlot slot) => slot.Kind switch
         {
-            ConstructSlotKind.IdentifierList    => new IdentifierListSlot(ImmutableArray<string>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.IdentifierList    => new IdentifierListSlot(ImmutableArray<string>.Empty, ImmutableArray<SourceSpan>.Empty, SourceSpan.Missing),
             ConstructSlotKind.TypeExpression    => new TypeExpressionSlot(new MissingTypeReference(SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ModifierList      => new ModifierListSlot(ImmutableArray<ParsedModifier>.Empty, SourceSpan.Missing),
-            ConstructSlotKind.StateEntryList    => new StateEntryListSlot(ImmutableArray<(string, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
-            ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<(string, ParsedTypeReference, ImmutableArray<ModifierKind>)>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.StateEntryList    => new StateEntryListSlot(ImmutableArray<StateEntrySyntax>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<ArgumentSyntax>.Empty, SourceSpan.Missing),
             ConstructSlotKind.InitialMarker     => new InitialMarkerSlot(false, SourceSpan.Missing),
             ConstructSlotKind.BecauseClause     => new BecauseClauseSlot("", SourceSpan.Missing),
             ConstructSlotKind.GuardClause       => new GuardClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
@@ -354,11 +361,13 @@ public static partial class Parser
                 return MakeSentinel(slot);
             var startSpan = Peek().Span;
             var names = new List<string>();
+            var nameSpans = new List<SourceSpan>();
 
             if (Peek().Kind == TokenKind.Identifier)
             {
                 var tok = Advance();
                 names.Add(tok.Text);
+                nameSpans.Add(tok.Span);
 
                 while (Peek().Kind == TokenKind.Comma)
                 {
@@ -367,6 +376,7 @@ public static partial class Parser
                     {
                         var next = Advance();
                         names.Add(next.Text);
+                        nameSpans.Add(next.Span);
                     }
                 }
             }
@@ -377,10 +387,12 @@ public static partial class Parser
             }
 
             var endSpan = names.Count > 0
-                ? _tokens[_position - 1].Span
+                ? LastSignificantConsumedSpan(startSpan)
                 : startSpan;
 
-            return new IdentifierListSlot(names.ToImmutableArray(),
+            return new IdentifierListSlot(
+                names.ToImmutableArray(),
+                nameSpans.ToImmutableArray(),
                 SourceSpan.Covering(startSpan, endSpan));
         }
 
@@ -558,8 +570,9 @@ public static partial class Parser
             TokenKind? orderingModifier = null;
             if (Peek().Kind is TokenKind.Ascending or TokenKind.Descending)
             {
-                orderingModifier = Advance().Kind;
-                lastSpan = _tokens[_position - 1].Span;
+                var orderingToken = Advance();
+                orderingModifier = orderingToken.Kind;
+                lastSpan = orderingToken.Span;
             }
 
             if (elementType == null)
@@ -696,7 +709,7 @@ public static partial class Parser
 
         private SlotValue ParseStateEntryList(ConstructSlot slot)
         {
-            var entries = new List<(string Name, ImmutableArray<ModifierKind> Modifiers)>();
+            var entries = new List<StateEntrySyntax>();
             var startSpan = Peek().Span;
 
             while (Peek().Kind == TokenKind.Identifier)
@@ -714,7 +727,7 @@ public static partial class Parser
                         modifiers.Add(modKind.Value);
                 }
 
-                entries.Add((nameToken.Text, modifiers.ToImmutableArray()));
+                entries.Add(new StateEntrySyntax(nameToken.Text, modifiers.ToImmutableArray(), nameToken.Span));
 
                 // Comma separates entries
                 if (Peek().Kind == TokenKind.Comma)
@@ -728,10 +741,10 @@ public static partial class Parser
                 _diagnostics.Add(DiagnosticsCatalog.Create(
                     DiagnosticCode.ExpectedToken, Peek().Span, "state name", Peek().Text));
                 return new StateEntryListSlot(
-                    ImmutableArray<(string, ImmutableArray<ModifierKind>)>.Empty, startSpan);
+                    ImmutableArray<StateEntrySyntax>.Empty, startSpan);
             }
 
-            var endSpan = _position > 0 ? _tokens[_position - 1].Span : startSpan;
+            var endSpan = LastSignificantConsumedSpan(startSpan);
             return new StateEntryListSlot(entries.ToImmutableArray(),
                 SourceSpan.Covering(startSpan, endSpan));
         }
@@ -752,7 +765,7 @@ public static partial class Parser
                 return MakeSentinel(slot);
 
             var startToken = Advance(); // consume '('
-            var args = new List<(string Name, ParsedTypeReference Type, ImmutableArray<ModifierKind> Modifiers)>();
+            var args = new List<ArgumentSyntax>();
             const ValueModifierDeclarationSite argSite = ValueModifierDeclarationSite.EventArgDeclaration;
 
             while (Peek().Kind != TokenKind.RightParen && !IsAtEnd
@@ -788,7 +801,11 @@ public static partial class Parser
                                 && nextMod.ApplicableDeclarationSites.HasFlag(argSite)));
                     }
 
-                    args.Add((nameToken.Text, parsedType, modifiers.ToImmutable()));
+                    args.Add(new ArgumentSyntax(
+                        nameToken.Text,
+                        parsedType,
+                        modifiers.ToImmutable(),
+                        nameToken.Span));
                 }
 
                 if (Peek().Kind == TokenKind.Comma)

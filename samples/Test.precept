@@ -1,5 +1,13 @@
-precept test
+precept Test
 
-field testfield as boolean optional
+# BUG: typed constant resolves correctly as a field default but fails with
+# PRE0052 (UnresolvedTypedConstant) when used in a rule expression.
+# Both uses appear in the same type context — money in 'USD'.
 
-rule testfield is set because "blah"
+field Balance as money in 'USD' default '0.00 USD' nonnegative    # OK — resolves
+field Limit   as money in 'USD' default '5000.00 USD' # OK — resolves
+
+rule Balance >= '0.00 USD' because "balance must be nonnegative"      # PRE0052 — should resolve
+rule Balance <= '5000.00 USD' because "balance must not exceed limit" # PRE0052 — should resolve
+
+state Active initial terminal

@@ -19,8 +19,8 @@ rule ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the r
 state Draft initial
 state Submitted
 state Approved
-state Paid
-state Rejected
+state Paid terminal
+state Rejected terminal
 
 in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
 

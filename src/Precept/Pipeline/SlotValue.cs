@@ -16,7 +16,7 @@ namespace Precept.Pipeline;
 public abstract record SlotValue(ConstructSlotKind Kind, SourceSpan Span);
 
 /// <summary>One or more user-defined names (e.g. field names, event names).</summary>
-public sealed record IdentifierListSlot(ImmutableArray<string> Names, SourceSpan Span)
+public sealed record IdentifierListSlot(ImmutableArray<string> Names, ImmutableArray<SourceSpan> NameSpans, SourceSpan Span)
     : SlotValue(ConstructSlotKind.IdentifierList, Span);
 
 /// <summary>"as TypeKeyword Qualifiers" type annotation — now carries full structural type reference.</summary>
@@ -30,12 +30,20 @@ public sealed record ParsedModifier(ModifierKind Kind, ParsedExpression? Value);
 public sealed record ModifierListSlot(ImmutableArray<ParsedModifier> Modifiers, SourceSpan Span)
     : SlotValue(ConstructSlotKind.ModifierList, Span);
 
+public readonly record struct StateEntrySyntax(string Name, ImmutableArray<ModifierKind> Modifiers, SourceSpan NameSpan);
+
 /// <summary>Comma-separated (name modifier*) pairs for state declarations.</summary>
-public sealed record StateEntryListSlot(ImmutableArray<(string Name, ImmutableArray<ModifierKind> Modifiers)> Entries, SourceSpan Span)
+public sealed record StateEntryListSlot(ImmutableArray<StateEntrySyntax> Entries, SourceSpan Span)
     : SlotValue(ConstructSlotKind.StateEntryList, Span);
 
+public readonly record struct ArgumentSyntax(
+    string Name,
+    ParsedTypeReference Type,
+    ImmutableArray<ModifierKind> Modifiers,
+    SourceSpan NameSpan);
+
 /// <summary>Event parameter list "(name as type, ...)".</summary>
-public sealed record ArgumentListSlot(ImmutableArray<(string Name, ParsedTypeReference Type, ImmutableArray<ModifierKind> Modifiers)> Args, SourceSpan Span)
+public sealed record ArgumentListSlot(ImmutableArray<ArgumentSyntax> Args, SourceSpan Span)
     : SlotValue(ConstructSlotKind.ArgumentList, Span);
 
 /// <summary>"-> expression" computed value.</summary>

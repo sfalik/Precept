@@ -247,6 +247,12 @@ internal static class SlotContextResolver
             return true;
         }
 
+        if (IsStateDeclarationNameToken(tokens, tokenIndex, token, construct))
+        {
+            context = SlotContext.InModifierPosition;
+            return true;
+        }
+
         if (IsTypeAnnotationKeywordContext(tokens, tokenIndex, token, position, construct))
         {
             context = SlotContext.AfterValueName;
@@ -295,6 +301,31 @@ internal static class SlotContextResolver
             Precept.Language.ConstructKind.EventDeclaration => IsEventArgumentNameToken(tokens, tokenIndex),
             _ => false,
         };
+    }
+
+    /// <summary>
+    /// Returns true when an Identifier token is a state name in a state declaration,
+    /// i.e. the token immediately after <c>state</c> or a comma in a multi-state declaration.
+    /// The cursor is past the identifier (not inside it), so modifier completions apply.
+    /// Discriminates via <see cref="Precept.Language.ModifierDomain.State"/> from catalog metadata,
+    /// not by hardcoding <see cref="Precept.Language.ConstructKind.StateDeclaration"/>.
+    /// </summary>
+    private static bool IsStateDeclarationNameToken(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Precept.Pipeline.ParsedConstruct? construct)
+    {
+        if (token.Kind != Precept.Language.TokenKind.Identifier
+            || construct?.Meta.ModifierDomain != Precept.Language.ModifierDomain.State)
+        {
+            return false;
+        }
+
+        var previousTokenIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        return previousTokenIndex >= 0
+            && (tokens[previousTokenIndex].Kind == Precept.Language.TokenKind.Comma
+                || tokens[previousTokenIndex].Kind == construct.Meta.PrimaryLeadingToken);
     }
 
     private static bool IsFieldDeclarationNameToken(
