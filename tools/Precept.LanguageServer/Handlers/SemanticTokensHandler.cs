@@ -665,6 +665,16 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 }
                 break;
 
+            case TypedInterpolatedTypedConstant interpolatedTypedConstant:
+                foreach (var slot in interpolatedTypedConstant.Slots)
+                {
+                    foreach (var nested in EnumerateExpressionTree(slot.Expression))
+                    {
+                        yield return nested;
+                    }
+                }
+                break;
+
             case TypedListLiteral listLiteral:
                 foreach (var element in listLiteral.Elements)
                 {

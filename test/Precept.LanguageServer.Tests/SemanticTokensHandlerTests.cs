@@ -833,6 +833,115 @@ public sealed class SemanticTokensHandlerTests
         result.Should().BeFalse(because: "no typed-constant tokens means no span change to detect");
     }
 
+    // ── Typed constant hole expression tokens (bug I3) ────────────────────────
+
+    [Fact]
+    public void IdentifierTokens_FieldRefInsideTypedConstantHole_EmitsFieldNameToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Test
+            field Unit as unitofmeasure default 'each'
+            field Qty as quantity default '0 {Unit}'
+            state Active initial
+            """);
+        var fieldRef = compilation.Semantics.FieldReferences.Single(r => r.Field.Name == "Unit");
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == fieldRef.Site.StartLine - 1 &&
+                token.Character == fieldRef.Site.StartColumn - 1 &&
+                token.Length == fieldRef.Site.Length &&
+                token.TokenType == expected);
+    }
+
+    [Fact]
+    public void IdentifierTokens_ArgRefInsideTypedConstantHole_EmitsArgNameToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Test
+            field Balance as money in 'USD' default '0.00 USD'
+            state Active initial
+            event Deposit(Amount as decimal)
+            from Active on Deposit
+                -> set Balance = '{Amount} USD'
+            """);
+        var argRef = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == argRef.Site.StartLine - 1 &&
+                token.Character == argRef.Site.StartColumn - 1 &&
+                token.Length == argRef.Site.Length &&
+                token.TokenType == expected);
+    }
+
+    [Fact]
+    public void IdentifierTokens_QualifiedArgRefInsideTypedConstantHole_EmitsArgNameToken()
+    {
+        var compilation = Compiler.Compile("""
+            precept Test
+            field Balance as money in 'USD' default '0.00 USD'
+            state Active initial
+            event Deposit(Amount as decimal)
+            from Active on Deposit
+                -> set Balance = '{Deposit.Amount} USD'
+            """);
+        var argRef = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == argRef.Site.StartLine - 1 &&
+                token.Character == argRef.Site.StartColumn - 1 &&
+                token.Length == argRef.Site.Length &&
+                token.TokenType == expected);
+    }
+
+    [Fact]
+    public void IdentifierTokens_FunctionCallInsideTypedConstantHole_EmitsFunctionToken()
+    {
+        // This is the actual bug I3 regression test: EnumerateExpressionTree must walk
+        // TypedInterpolatedTypedConstant.Slots so TypedFunctionCall nodes inside holes
+        // get their built-in function semantic token.
+        var compilation = Compiler.Compile("""
+            precept Test
+            field Timeout as duration default '0 hours'
+            state Active initial
+            event Start(Hours as decimal)
+            from Active on Start
+                -> set Timeout = '{round(Hours)} hours'
+            """);
+        var slots = compilation.Semantics.EventHandlers
+            .SelectMany(h => h.Actions)
+            .OfType<TypedInputAction>()
+            .Select(a => a.InputExpression)
+            .OfType<TypedInterpolatedTypedConstant>()
+            .Single();
+        var call = (TypedFunctionCall)slots.Slots.Single().Expression;
+        var expectedLength = Functions.GetMeta(call.ResolvedFunction).Name.Length;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == call.Span.StartLine - 1 &&
+                token.Character == call.Span.StartColumn - 1 &&
+                token.Length == expectedLength &&
+                token.TokenType == SemanticTokensHandler.BuiltInFunctionTokenType);
+    }
+
     private static IDictionary GetPrivateDictionary(SemanticTokensHandler handler, string fieldName)
     {
         var field = typeof(SemanticTokensHandler).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
