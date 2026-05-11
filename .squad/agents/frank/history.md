@@ -7,6 +7,7 @@
 
 ## Learnings
 
+- Produced architectural brief for skill rewrite (`frank-authoring-skill-architecture.md`). Key decisions: keep authoring/debugging as two separate skills (generative vs diagnostic cognitive mode); authoring tool order is quickstart → patterns → conditional domain tools → compile loop; `precept_syntax`/`precept_types` are on-demand reference not workflow steps; debugging is fully static (compile → `precept_diagnostic` per code → transition-table reasoning); `precept_diagnostic` is reactive in both skills; keep `precept/*` wildcard in agent definition; strike all references to `precept_language`, `precept_inspect`, `precept_fire`, `precept_update`.
 - Three shared root causes explain most typed-literal completion bugs: quote-trigger context normalization, typed-constant boundary detection at unterminated end positions, and missing recovery branches for `NumberTyping` / `AfterPlus` slot phases.
 - Invoked completion inside a typed constant cannot key solely on `TriggerCharacter == null`; clients may send an empty trigger character, and peer-expression inference must step left past the active typed-constant token.
 - For domain-type bounds, qualifier semantics split by qualifier axis: exact unit match for `in 'kg'`, dimension membership for `of 'mass'`; currency remains an exact-match follow-up gap shared with `default`.
@@ -19,6 +20,8 @@
 - B6 stayed entirely in `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`: `TryGetBinaryPeerOperandType`, `TryResolveExpressionTypeEndingAtToken`, `TryResolveParenthesizedExpressionType`, `TryResolveIdentifierType`, and `TryResolveMemberExpressionType` now thread `ImmutableArray<DeclaredQualifierMeta>` beside `TypeKind`, and `TryGetTypedConstantContext` assembles binary peer sites with `new TypedConstantContext(peerType, peerQualifiers)`.
 - The event-arg path had the same drop: current-event arg resolution in `TryResolveIdentifierType` and event-member lookup in `TryResolveMemberExpressionType` both needed `DeclaredQualifiers` propagation, not just the field path.
 - Regression coverage is integration-style in `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`: trigger a space after `'100 ` in rule/when binary expressions and assert the returned completion labels hard-filter to `USD` for both field-peer and event-arg-peer cases.
+- Interpolation slot classification must be type-grammar-driven, not position-text-driven. Each type that supports interpolation defines a closed set of valid segment-sequence patterns; the type checker matches against these patterns, assigns slot identities on match, and emits a structural error on no match. Position-text heuristics fail for compound qualifier types (price, exchangerate) where two adjacent holes have different semantic identities, and for compound temporal forms where `+` bridges create multi-magnitude patterns.
+- Formatted temporal types (date, time, instant, datetime, zoneddatetime, timezone) do not support interpolation — their content is positional character patterns with no independently typed components. This is consistent with the zero-constructor discipline and the canonical docs which show no interpolation examples for these types.
 
 ## Historical Summary
 
