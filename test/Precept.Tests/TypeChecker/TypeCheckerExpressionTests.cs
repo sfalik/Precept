@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using FluentAssertions;
 using Precept;
 using Precept.Language;
@@ -38,6 +39,15 @@ public class TypeCheckerExpressionTests
     /// <summary>Resolves a <see cref="ParsedExpression"/> in the given context.</summary>
     private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx) =>
         Precept.Pipeline.TypeChecker.ResolveExpression(expr, ctx);
+
+    private static TypedAction ResolveAction(ParsedAction action, CheckContext ctx)
+    {
+        var method = typeof(Precept.Pipeline.TypeChecker).GetMethod(
+            "ResolveAction",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        return (TypedAction)method!.Invoke(null, new object?[] { action, ctx })!;
+    }
 
     /// <summary>Minimal context: one integer field, one state.</summary>
     private static CheckContext MinimalContext() => BuildContext("""
@@ -454,6 +464,22 @@ public class TypeCheckerExpressionTests
     }
 
     [Fact]
+    public void BinaryOperator_UnregisteredToken_EmitsTypeMismatch()
+    {
+        var ctx = MinimalContext();
+        var left = new LiteralExpression(TokenKind.NumberLiteral, "1", TestSpan);
+        var right = new LiteralExpression(TokenKind.NumberLiteral, "2", TestSpan);
+        var expr = new BinaryOperationExpression(left, TokenKind.LeftParen, right, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle(d =>
+            d.Code == DiagnosticCode.TypeMismatch.ToString()
+            && d.Message.Contains("binary operator"));
+    }
+
+    [Fact]
     public void IntegerTimesInteger_ResolvesToMultiplication()
     {
         var ctx = MinimalContext();
@@ -663,6 +689,21 @@ public class TypeCheckerExpressionTests
         unOp.ResolvedOp.Should().Be(OperationKind.NegateNumber);
     }
 
+    [Fact]
+    public void UnaryOperator_UnregisteredToken_EmitsTypeMismatch()
+    {
+        var ctx = MinimalContext();
+        var operand = new LiteralExpression(TokenKind.NumberLiteral, "5", TestSpan);
+        var expr = new UnaryOperationExpression(TokenKind.Plus, operand, TestSpan);
+
+        var result = Resolve(expr, ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle(d =>
+            d.Code == DiagnosticCode.TypeMismatch.ToString()
+            && d.Message.Contains("unary operator"));
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  6. Grouped (parenthesized) expression — transparent unwrap
     // ════════════════════════════════════════════════════════════════════════
@@ -696,6 +737,42 @@ public class TypeCheckerExpressionTests
         ctx.Diagnostics.Should().ContainSingle(
                 because: "B3: TC emits lightweight diagnostic on MissingExpression to satisfy D26")
             .Which.Code.Should().Be(nameof(DiagnosticCode.TypeMismatch));
+    }
+
+    [Fact]
+    public void Resolve_UnknownExpressionSubtype_EmitsTypeMismatch()
+    {
+        var ctx = MinimalContext();
+        var result = Resolve(new UnknownParsedExpression(TestSpan), ctx);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle(d =>
+            d.Code == DiagnosticCode.TypeMismatch.ToString()
+            && d.Message.Contains("known expression"));
+    }
+
+    [Fact]
+    public void ResolveAction_DefaultCase_EmitsTypeMismatch()
+    {
+        var ctx = MinimalContext();
+        var result = ResolveAction(new UnknownParsedAction(ActionKind.Set, TestSpan), ctx);
+
+        result.FieldType.Should().Be(TypeKind.Error);
+        ctx.Diagnostics.Should().ContainSingle(d =>
+            d.Code == DiagnosticCode.TypeMismatch.ToString()
+            && d.Message.Contains("known action"));
+    }
+
+    [Fact]
+    public void ResolveAction_MalformedAction_EmitsTypeMismatch()
+    {
+        var ctx = MinimalContext();
+        var result = ResolveAction(new MalformedAction(ActionKind.Set, TestSpan), ctx);
+
+        result.FieldType.Should().Be(TypeKind.Error);
+        ctx.Diagnostics.Should().ContainSingle(d =>
+            d.Code == DiagnosticCode.TypeMismatch.ToString()
+            && d.Message.Contains("malformed"));
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1282,4 +1359,10 @@ public class TypeCheckerExpressionTests
 
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.IsSetOnNonOptional);
     }
+
+    private sealed record UnknownParsedExpression(SourceSpan Span)
+        : ParsedExpression(ExpressionFormKind.Literal, Span);
+
+    private sealed record UnknownParsedAction(ActionKind Kind, SourceSpan Span)
+        : ParsedAction(Kind, Span);
 }

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using FluentAssertions;
 using Precept.Language;
+using Precept.Pipeline;
 using Xunit;
 
 namespace Precept.Tests;
@@ -53,6 +54,29 @@ public class FaultsTests
         // We verify at minimum that Create doesn't throw and the message is the template itself.
         var fault = Faults.Create(FaultCode.DivisionByZero);
         fault.Message.Should().Be("Divisor evaluated to zero");
+    }
+
+    [Fact]
+    public void Fault_Create_ExpressionContext_IsNullByDefault()
+    {
+        var fault = Faults.Create(FaultCode.DivisionByZero);
+        fault.ExpressionContext.Should().BeNull();
+    }
+
+    [Fact]
+    public void Fault_Create_InputValues_IsNullByDefault()
+    {
+        var fault = Faults.Create(FaultCode.DivisionByZero);
+        fault.InputValues.Should().BeNull();
+    }
+
+    [Fact]
+    public void Fault_WithExpression_SetsExpressionContext()
+    {
+        var span = new SourceSpan(1, 2, 1, 2, 1, 4);
+        var fault = Faults.Create(FaultCode.DivisionByZero) with { ExpressionContext = span };
+
+        fault.ExpressionContext.Should().Be(span);
     }
 
     // ── CodeName identity ───────────────────────────────────────────────────────
