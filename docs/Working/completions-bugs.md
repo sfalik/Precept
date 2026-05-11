@@ -4,7 +4,7 @@
 **Spec:** `docs/Working/elaine-typed-literal-autocomplete-ux.md`  
 **Prior review:** Frank-6 — spec compliance BLOCKED (F1, F2)  
 **Triage:** Frank-7 — root-cause triage in progress  
-**Status:** 8 open bugs
+**Status:** 8 open bugs + 1 catalog gap (C1)
 
 ---
 
@@ -102,13 +102,64 @@
 | **Trigger** | Field declared `money in 'USD'`, then `rule balance >= '100 ` + space |
 | **Expected** | Only `USD` shown |
 | **Actual** | All currencies shown |
-| **Status** | 🔴 Open |
+| **Status** | ✅ Fixed (`65badacb`) |
 
 **Root cause (Frank-7):** `TryGetTypedConstantContext` resolution path #1 (`FindAtPosition`) fails for incomplete literals — the type checker emits `TypedErrorExpression` (not `TypedTypedConstant`) for `'100 `, and `FindAtPosition` filters to `TypedTypedConstant` only. Path #5 (`TryGetEnclosingField`) then fails because the rule construct's `Syntax` reference doesn't match any `compilation.Semantics.Fields` entry (the match at line 1152 uses reference equality). Control reaches path #6: `TryGetBinaryPeerOperandType` (line 761), which resolves `balance` as a `money` type and returns `TypedConstantContext.FromType(peerType)` — with **empty qualifiers**. The `in 'USD'` qualifier declared on the field is never propagated.
 
 **Fix:** When `TryGetBinaryPeerOperandType` resolves a peer operand that is a direct field reference, propagate that field's `DeclaredQualifiers` into the returned `TypedConstantContext`. Change line 763 from `TypedConstantContext.FromType(peerType)` to a variant that also carries the source field's qualifiers. This requires `TryGetBinaryPeerOperandType` to return the source field (or its qualifiers), not just the type. Fix must only propagate when the LHS is a direct field reference — not a computed expression — to avoid over-constraining completions.
 
 **Risk:** Medium. Binary-peer resolution is used for any binary expression with a typed constant RHS. This is the most structurally complex fix — touches the type resolution infrastructure in `TryGetTypedConstantContext`.
+
+---
+
+#### B6 Triage — Frank (2026-05-11)
+
+**Root cause — exact location:**
+
+The defect is entirely in `CompletionHandler.cs` (LS side). The call chain is:
+
+1. `TryGetTypedConstantContext` (line 728) exhausts paths #1–#5, reaching path #6 at line 778.
+2. `TryGetBinaryPeerOperandType` (line 947) walks tokens left to find the binary operator, then calls `TryResolveExpressionTypeEndingAtToken` (line 971) on the LHS.
+3. `TryResolveExpressionTypeEndingAtToken` (line 974) dispatches to `TryResolveIdentifierType` (line 999) for the `balance` identifier.
+4. `TryResolveIdentifierType` (line 1064) looks up `compilation.Semantics.FieldsByName["balance"]` at line 1079, retrieves the `TypedField` — which carries both `ResolvedType: Money` **and** `DeclaredQualifiers: [Currency("USD")]` — but returns only `field.ResolvedType` (line 1081). The qualifiers are right there but discarded.
+5. Back at line 780, the context is created via `TypedConstantContext.FromType(peerType)`, which produces empty qualifiers.
+6. `GetMoneySlotItems` (line 618) and `GetCurrencyCodeItems` (line 365) both check `tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>()` for filtering. With empty qualifiers, no filtering occurs — all 156 ISO 4217 currencies are shown.
+
+The downstream consumer code is already correct. Only the data-assembly path is broken.
+
+**Fix location:** Kramer — LS side only (`CompletionHandler.cs`). No pipeline changes needed.
+
+**Interaction with B9-B12 Slices 1–5:**
+
+Slice 4 (commit `cdec821f`) added `DeclaredQualifiers` to `TypedConstantContext` (in `TypedConstantParseResult.cs` line 24) and created the `FromField` / `FromArg` factory methods on the LS-local `TypedConstantContext` record (lines 26–30). The B6 fix has a **much cleaner path** now:
+
+- `TypedConstantContext` already knows how to carry qualifiers (the record has the `Qualifiers` field).
+- `FromField` already extracts `field.DeclaredQualifiers` — so if the binary peer resolution can return a `TypedField` instead of a bare `TypeKind`, the existing factory does all the work.
+- `GetMoneySlotItems` and `GetCurrencyCodeItems` already consume qualifiers for filtering — no downstream changes needed.
+
+Before Slice 4, this bug would have required adding qualifier support to `TypedConstantContext` itself. Now it's purely a plumbing fix in the binary peer resolution helpers.
+
+**Proposed fix approach:**
+
+1. **Widen `TryGetBinaryPeerOperandType` signature** — change from `out TypeKind expectedType` to also return `out ImmutableArray<DeclaredQualifierMeta> qualifiers` (or return a `TypedConstantContext` directly). A second `out` parameter is simpler and lower-risk than changing the return type.
+
+2. **Widen `TryResolveExpressionTypeEndingAtToken`** — same signature change, threading the qualifiers through the dispatch.
+
+3. **Widen `TryResolveIdentifierType`** — when the identifier resolves to a field (line 1079), also return `field.DeclaredQualifiers`. When it resolves to an event arg (line 1071), return `arg.DeclaredQualifiers` (Slice 4 added qualifiers to `TypedArg` too). For non-field/non-arg resolution (computed expressions, function calls, parenthesized expressions), return empty qualifiers — this is correct because computed values don't have declared qualifiers.
+
+4. **Update line 780** — change from `TypedConstantContext.FromType(peerType)` to `new TypedConstantContext(peerType, qualifiers)` using the newly-returned qualifier data.
+
+5. **No changes to `GetMoneySlotItems`, `GetCurrencyCodeItems`, or any other downstream consumer** — they already filter on qualifiers.
+
+The same fix also benefits `quantity` binary peers: `total + '5 ` where `total` is `quantity in 'kg'` would now filter to mass-dimensional units. This is free from the same plumbing change.
+
+**Risk:** Low-medium. The change is additive — all existing paths that return empty qualifiers today continue to do so for computed expressions. Only direct field-ref and arg-ref peers gain qualifier propagation. Regression risk is limited to:
+
+- Binary expressions where the LHS is a field with qualifiers — verify the qualifier appears in completions.
+- Binary expressions where the LHS is a computed expression — verify qualifiers remain empty (no false constraint).
+- Money and quantity types are both affected — test both axes.
+
+**Scope estimate:** **S (Small).** Four method signatures gain a qualifier out-parameter, one call site at line 780 uses it. No new infrastructure, no pipeline changes, no new diagnostic codes. The hard part (getting qualifiers into `TypedConstantContext`) was already done in Slice 4.
 
 ---
 
@@ -300,6 +351,82 @@
 6. F1/F2 — Ctrl+Space fallback
 7. B6 — qualifier propagation in binary expressions
 8. B8 — UCUM atom catalog gap
+
+---
+
+### C1 — Count/logistics unit catalog gap
+
+| | |
+|---|---|
+| **Trigger** | `field qty as quantity of 'count' default '10 ` + space → no business count units in completions |
+| **Expected** | Units like `each`, `pkg`, `box`, `case`, `pallet`, `doz`, `pair`, etc. |
+| **Actual** | Only scientific count units: `1` (unity), `%`, `[ppm]`, `[ppb]`, `[ppth]`, `[pptr]`, `[pH]`, `[iU]`, `[arb'U]`, `[USP'U]`, `[CFU]`, `dB` |
+| **Component** | `UcumAtomCatalog.cs` (Tier1Codes array + SeedIntrinsicAtoms), `UnitDimensionHelper.cs` (CountQualifierUnitCodes) |
+| **Status** | 🔴 Open |
+
+**Problem:** The tier-1 UCUM catalog contains ~150 curated units spanning physical measurement (length, mass, volume, temperature, etc.) but has zero business/logistics count units. The only count-adjacent entry is `each`, which exists as a synthetic intrinsic atom in `SeedIntrinsicAtoms` (line 300) but is **not in the `Tier1Codes` array** — so it is not browsable via `BrowseTier1()` and does not appear in completions. A user writing `quantity of 'count'` gets no useful units. Standard UCUM is oriented toward scientific and physical measurement — it does not define units for packages, boxes, cartons, or pallets.
+
+**Design options considered:**
+
+- **Option A — UCUM arbitrary units** (`{each}`, `{pkg}`): Technically UCUM-compliant, but curly-brace syntax is unintuitive for business users. No `PrintSymbol`, no `Name` in the UCUM XML. Completions would show `{each}` — users won't recognize it.
+- **Option B — Curated business units as Precept-defined tier-1 atoms** ✅ **RECOMMENDED**: Define synthetic atoms in `SeedIntrinsicAtoms` with clean codes (`each`, `pkg`, `box`, etc.), human-readable `Name`, and `PrintSymbol`. Add to `Tier1Codes`. Add to `CountQualifierUnitCodes`. Completions show `each (each)`, `pkg (package)`, `box (box)` — exactly what a business user expects. Precedent: `each` already follows this pattern.
+- **Option C — UCUM annotations with metadata overlay** (`{each}` canonical, `each` display): Unnecessary complexity. Curly braces leak into typed literals (`'10 {each}'`), error messages, and UCUM validation paths. Option B gives the same UX without the indirection.
+- **Option D — New `count of '...'` qualifier tier**: Requires a language construct change and design gate. Overkill for what is a data gap in the catalog.
+
+**Recommended approach: Option B.**
+
+Rationale:
+1. **Precedent exists.** `each` is already a synthetic Precept-defined atom in `SeedIntrinsicAtoms`. Adding more follows the identical pattern — no architectural change.
+2. **Catalog-driven architecture is satisfied.** These are catalog entries with `Code`, `Name`, `PrintSymbol`, `Vector: DimensionVector.None`, `Dimension: count`. All downstream surfaces (completions, hover, validation) derive from the catalog automatically.
+3. **No language construct change.** This is purely new catalog data. No design gate required.
+4. **Business-user UX.** Users type `'10 each'`, `'5 pkg'`, `'20 box'` — clean, readable, no curly braces.
+
+**Proposed tier-1 count/logistics units:**
+
+| Code | Name | PrintSymbol | Dimension |
+|------|------|-------------|-----------|
+| `each` | each | ea | count |
+| `piece` | piece | pc | count |
+| `unit` | unit | U | count |
+| `item` | item | item | count |
+| `pair` | pair | pr | count |
+| `dozen` | dozen | doz | count |
+| `gross` | gross | gr | count |
+| `set` | set | set | count |
+| `bundle` | bundle | bdl | count |
+| `pkg` | package | pkg | count |
+| `box` | box | box | count |
+| `case` | case | cs | count |
+| `carton` | carton | ctn | count |
+| `pallet` | pallet | plt | count |
+| `bag` | bag | bag | count |
+| `drum` | drum | drm | count |
+| `container` | container | ctr | count |
+| `tote` | tote | tote | count |
+| `bin` | bin | bin | count |
+| `roll` | roll | roll | count |
+| `sheet` | sheet | sht | count |
+| `tablet` | tablet | tab | count |
+| `capsule` | capsule | cap | count |
+| `dose` | dose | dose | count |
+
+**Implementation scope:** S (Small) — catalog data only.
+
+**Changes required (3 files, read-only for this triage):**
+
+1. `src/Precept/Language/Ucum/UcumAtomCatalog.cs`:
+   - Add 24 synthetic atoms to `SeedIntrinsicAtoms` (same pattern as existing `each` at line 300).
+   - Add all 24 codes to the `Tier1Codes` array in the `COUNT / DIMENSIONLESS` section (line 164).
+   - Note: `each` is already in `SeedIntrinsicAtoms` but must also be added to `Tier1Codes`.
+
+2. `src/Precept/Language/UnitDimensionHelper.cs`:
+   - Add all 24 codes to `CountQualifierUnitCodes` (line 7) so `DeriveUnitDimensionName` returns `"count"` for them.
+
+3. MCP tool sync: `precept_domains` output (units section) will automatically pick up the new tier-1 entries via `BrowseTier1()` — no manual MCP change needed.
+
+**No design gate needed.** This is catalog data addition following an established pattern.
+
+**Implementation owner:** Kramer — catalog data + completions verification.
 
 ---
 
