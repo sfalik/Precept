@@ -2163,12 +2163,6 @@
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: R2 Gate Verdict — Slices 5–7
 
 
@@ -2277,12 +2271,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-ci-fix-done
 
 
@@ -2319,12 +2307,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-parser-fix-done
 
 
@@ -2341,12 +2323,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-slice-1-done
 
 
@@ -2360,12 +2336,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-1-done.md`.
-
----
-
----
-
----
 
 ---
 
@@ -2411,12 +2381,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-slice-2-done
 
 
@@ -2430,12 +2394,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-2-done.md`.
-
----
-
----
-
----
 
 ---
 
@@ -2455,12 +2413,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-slice-4-done
 
 
@@ -2474,12 +2426,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-4-done.md`.
-
----
-
----
-
----
 
 ---
 
@@ -2499,12 +2445,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-slice-6-done
 
 
@@ -2521,12 +2461,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-slice-7-done
 
 
@@ -2540,12 +2474,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-7-done.md`.
-
----
-
----
-
----
 
 ---
 
@@ -2677,12 +2605,6 @@ when "admin@example.com" == Email
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: george-slice-9-done
 
 
@@ -2756,12 +2678,6 @@ when "admin@example.com" == Email
 
 
 **Notes for Soup Nazi:** Quantifier bindings shadow both event args and fields (tested in `QuantifierBindingShadowsEventArg`). The `GetElementType` helper only resolves `TypedFieldRef` receivers via `FieldLookup` — chained collection access (e.g., `each x in obj.Items(...)`) returns null and emits InvalidQuantifierTarget. Empty list literals `[]` are valid but produce Error element type (no inference possible). ConditionalExpression arm remains a stub (Slice TBD).
-
----
-
----
-
----
 
 ---
 
@@ -2846,12 +2762,6 @@ when "admin@example.com" == Email
 
 
 **Test result:** 3196/3196 passing (26/26 TypeCheckerTransitionTests, 0 regressions)
-
----
-
----
-
----
 
 ---
 
@@ -2991,12 +2901,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: soup-nazi-slice-10-done
 
 
@@ -3107,12 +3011,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: soup-nazi-slice-2-done
 
 
@@ -3156,12 +3054,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 - Widening tested via IntegerPlusDecimal (bidirectional catalog entry) and IntegerPlusNumber; no real widening-only path exists for scalar types since the catalog is exhaustive with bidirectional entries
 
 - Full suite: 3075 passed, 0 failed
-
----
-
----
-
----
 
 ---
 
@@ -3219,12 +3111,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: soup-nazi-slice-4-done
 
 
@@ -3272,12 +3158,6 @@ George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken over
 - RegexValidation: no TypeKind currently uses RegexValidation in production, so no test coverage. The code path exists and is tested implicitly via the DU dispatch. If a type gains RegexValidation, add tests.
 
 **Ready for R1:** YES
-
----
-
----
-
----
 
 ---
 
@@ -3345,12 +3225,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: soup-nazi-slice-6-done
 
 
@@ -3384,12 +3258,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Any red tests:** None — all 17 green. 2 pre-existing failures in TypeCheckerModifierTests (Slice 7) unrelated.
 
 **R2-readiness for Slice 6:** YES
-
----
-
----
-
----
 
 ---
 
@@ -3455,12 +3323,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-08: soup-nazi-slice-8-done
 
 
@@ -3512,12 +3374,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **George's inbox note correction:** CI not-equals operator is `!~`, not `~!=` as stated in george-slice-8-done.md.
 
 **R3-readiness for Slice 8:** NO — blocked by the two TYPE B bugs above (FormatException crash on violation, rules not enforced).
-
----
-
----
-
----
 
 ---
 
@@ -4063,12 +3919,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: R4 gate stays separate from the comprehensive audit, and the grammar generator cannot replace the hand-authored grammar until parity exists
 
 
@@ -4090,12 +3940,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 - D8 locked the tooling ruling: the grammar generator must reach hand-authored `tmLanguage.json` quality before it becomes canonical; no generated base + manual-edit hybrid workflow is allowed.
 
 - Durable implication: the catalog-driven architecture still demands a single generated source of truth, but the current generator output remains scaffold-quality and must not overwrite production grammar assets yet.
-
----
-
----
-
----
 
 ---
 
@@ -4123,12 +3967,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: OQ2 ContentValidation DU must land before Slice 4
 
 
@@ -4153,12 +3991,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: OQ3 CI enforcement remains TypeChecker logic until the rule surface grows
 
 
@@ -4180,12 +4012,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 - The current rule set is considered stable and too small to justify new catalog metadata infrastructure.
 
 - Revisit cataloging only if the rule surface expands again (explicitly, if a sixth CI rule appears).
-
----
-
----
-
----
 
 ---
 
@@ -4215,12 +4041,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: Parser metadata promotion lands `ExpressionFormMeta.BindingPower` and `ConstructSlot.TerminationTokens`
 
 
@@ -4244,12 +4064,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 - Binary operator precedence stays on the `Operators` catalog, and `is set` / `is not set` sequence validation remains parser-owned token-sequence checking.
 
 - Regression coverage plus `docs/language/catalog-system.md` now document both metadata additions; validation closed green at 2949 tests.
-
----
-
----
-
----
 
 ---
 
@@ -4279,12 +4093,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: Parser gap fixes complete
 
 **Commit:** 514f82f
@@ -4296,12 +4104,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 **Test results:** 4/4 previously-failing tests now pass, 3029/3029 total passing.
 
 **Any issues:** Two existing parser tests (`TypeExpression_QueueOfNumber_ProducesCollectionTypeReference`, `QueueOfNumber_TypeExpressionSlot_PreservesCollectionAndElementTypes`) were asserting the buggy `QueueBy` behavior — updated them to assert `Queue`. No other regressions.
-
----
-
----
-
----
 
 ---
 
@@ -4346,12 +4148,6 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 
 
 **SemanticIndex fields populated by Slice 1:** Fields ✓, States ✓, Events ✓, FieldsByName ✓, StatesByName ✓, EventsByName ✓, Diagnostics ✓ (type-checker diagnostics only; does not include parser/binder diagnostics). All other arrays are ImmutableArray.Empty / FrozenDictionary.Empty.
-
----
-
----
-
----
 
 ---
 
@@ -4420,12 +4216,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 
 
 **Test results:** 3021 passed, 8 failed (same 8 pre-existing DeclaredArg/qualified-type parser gaps from Slice 1). All 2974 baseline tests pass.
-
----
-
----
-
----
 
 ---
 
@@ -4545,12 +4335,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: Slice 4 Complete
 
 **By:** George (for Soup Nazi)
@@ -4641,12 +4425,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: Slice 5 Complete
 
 **By:** George (for Soup Nazi)
@@ -4733,12 +4511,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: Slice 6 Complete
 
 **By:** George (for Soup Nazi)
@@ -4765,12 +4537,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: Slice 7 Complete
 
 **By:** George (for Soup Nazi)
@@ -4790,12 +4556,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 **Redundant modifier detection:** Two sources: (1) `FieldModifierMeta.Subsumes` — if another explicit modifier subsumes this one → `RedundantModifier` warning; (2) `TypeMeta.ImpliedModifiers` — if the type already implies this modifier → `RedundantModifier` warning
 
 **Notes for Soup Nazi:** `IsTypeApplicable` handles both simple `TypeTarget` (kind match) and `ModifiedTypeTarget` (kind + required modifiers). Empty `ApplicableTo` array means "any type" — no validation needed. Writable checks are the only non-catalog-driven dispatch (`kind == ModifierKind.Writable`) — these are structural constraints on the modifier's semantics, not type applicability. 7 pre-existing test failures from Slice 5 transition row processing (UndeclaredField on event arg member access); no new failures from Slice 7.
-
----
-
----
-
----
 
 ---
 
@@ -4867,12 +4627,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-07: GraphAnalyzer OQ1 — DeadEndStateFact is a separate fact from TerminalCompletenessFact
 
 **By:** Frank (frank-graphanalyzer-oqs)
@@ -4880,12 +4634,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 **What:** Dead-end states get a new, separate `DeadEndStateFact` rather than being an expansion of `TerminalCompletenessFact`. New `DiagnosticCode.DeadEndState = 108` (Warning) added. Detection uses reverse-reachability BFS from terminal states in Phase 2.
 
 **Why:** Clean separation of concerns — TerminalCompletenessFact assesses reachability of terminal states; DeadEndStateFact identifies states with no outbound transitions to terminals. Mixing them would conflate two distinct structural properties.
-
----
-
----
-
----
 
 ---
 
@@ -5159,12 +4907,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
-
----
-
----
-
 ### 2026-05-06: Wave 1 cross-cutting facilitation started with CC#7 first
 
 
@@ -5231,8 +4973,74 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
+### 2026-05-11T22:41:49Z: Proof Engine Qualifier Coverage — Part B (Slices 7+8+9)
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-proof-qualifier-coverage-partb.md`.
+
+- Added `QualifierCompatibilityProofRequirement` on `QualifierAxis.Currency` to all 8 money operations so same-currency enforcement is no longer implicit-only.
+- Introduced `QualifierChainProofRequirement` for cross-type qualifier validation on `ExchangeRateTimesMoney` and `PriceTimesQuantity`, with dual-axis comparison support.
+- Added Unit→Dimension fallback in `ResolveQualifierOnAxis()` so dimension-only fields can satisfy unit-axis proof obligations.
+- Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
 
 ---
 
+### 2026-05-11T22:41:49Z: TypeChecker Slices 10 + 11 Complete
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-typechecker-slices-done.md`.
+
+- Extended `ValidateAssignmentQualifiers` to recursively extract leaf operands from binary/unary expression trees before applying the existing qualifier checks.
+- Added `FromCurrency` and `ToCurrency` switch arms so exchange-rate assignments now validate both currency sides.
+- Preserved the existing proof-engine boundary for bare-expression assignment gaps that still need structural provenance.
+- Shipped with 10 new assignment-qualifier tests.
+
 ---
+
+### 2026-05-11T22:41:49Z: Slice 2 Complete: Full Type-Grammar Matching for Interpolated Typed Constants
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-slice2-done.md`.
+
+- Replaced the stubs with segment-aware matching against per-type interpolated typed-constant forms.
+- Added temporal compound matching plus slot compatibility checks for magnitude, currency, unit, whole-value, and compound slots.
+- Introduced diagnostics for invalid forms, unsupported types, hole-type mismatches, and dimension/unit mismatches.
+- Closed with 39 new tests and 129 typed-constant tests passing.
+
+---
+
+### 2026-05-11T22:41:49Z: Slice 1 (Parser) Complete
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-slice1-done.md`.
+
+- Added the `InterpolatedTypedConstantExpression` AST and rewrote parsing to emit the full segment structure.
+- Updated NameBinder and TypeChecker routing so holes still bind correctly while the type checker owns slot classification.
+- Added the interpolated typed-constant expression form to the catalog and moved `TypedConstantStart` to that form.
+- Parser coverage landed with 10 round-trip tests.
+
+---
+
+### 2026-05-11T22:41:49Z: string Excluded from Typed Constant Interpolation Holes
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-string-excluded-from-interpolation.md`.
+
+- `string` stays invalid in every typed-constant interpolation hole position; compile-time rejection is the canonical behavior.
+- The decision restores the prior compile-time guarantee and rejects runtime-deferral as a structural escape hatch.
+- No new diagnostic code is needed because `InterpolatedTypedConstantHoleTypeMismatch` already covers the failure.

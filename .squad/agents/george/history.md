@@ -53,3 +53,9 @@
 - Added 4 diagnostics: InvalidInterpolatedTypedConstantForm (121), InterpolationNotSupportedForType (122), InterpolatedTypedConstantHoleTypeMismatch (123), DimensionMismatchInUnitSlot (124).
 - Added TypedInterpolatedTypedConstant, TypedInterpolationSlot, InterpolationSlotKind to SemanticIndex.
 - 39 new tests, 4 existing tests updated. All 129 typed constant tests pass.
+
+### 2026-05-11T22:41:49Z — Squad batch closeout
+- Slice 1 parser work landed with `InterpolatedTypedConstantExpression` and 10 parser tests.
+- Part B slices 7+8+9 landed proof-engine qualifier enforcement, chain requirements, and dimension fallback.
+- Slices 10+11 landed assignment qualifier propagation plus `FromCurrency`/`ToCurrency` handling.
+- Slice 2 and Slice 12 remain in progress under the current batch.

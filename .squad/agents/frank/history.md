@@ -31,6 +31,12 @@
 - frank-7 updated the Slice 6 plan to use `GetSlotSource`, raised the estimate to roughly 90 LOC / 10 tests, and documented the no-qualifier-propagation rationale directly in the plan.
 - The compile-time guarantee ruling still stands above the plan: simplification-by-runtime-validation is rejected.
 
+### 2026-05-11T22:41:49Z — Squad batch closeout
+- The interpolation slot-table decision to exclude `string` was restored and recorded canonically.
+- Proof-engine qualifier coverage work remains the architectural backdrop for the typed-constants plan.
+- `frank-5` inbox work was merged into the durable decision ledger and cleared from the inbox.
+
+
 ## Learnings
 
 ### 2026-05-11 — Exhaustive proof engine × qualifier audit completed
