@@ -7,6 +7,12 @@
 
 ## Learnings
 
+### 2026-05-11T14:55:38.348-04:00 — Interpolation LOE review exposed the real runtime/tooling cost
+
+- Frank's frank-23 plan is workable, but the real cost is Slice 2: the type-grammar matcher, segment classifier, three new diagnostics, and typed-node propagation push the feature to roughly 795 changed lines when tests and required walkers are counted.
+- The plan currently under-lists critical traversal follow-through: `NameBinder` still only walks `InterpolatedStringExpression`, and the language server has four separate interpolated-string walkers beyond `SemanticTokensHandler` that will all need `TypedInterpolatedTypedConstant` support.
+- The hardest design edge is temporal compounds: the doc says `duration`/`period` compounds generalize to N components, while the slice text assumes a small finite matcher. That scope choice changes implementation complexity more than any parser work does.
+
 ### 2026-05-11T09:32:39.453-04:00 — Pipeline audit fixes landed cleanly on feature/pipeline-audit-fixes
 
 - Added repo-root `Directory.Build.props` so the workspace defaults to a single Release-with-PDB build surface.
