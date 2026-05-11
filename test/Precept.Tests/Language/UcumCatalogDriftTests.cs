@@ -81,8 +81,8 @@ public class UcumCatalogDriftTests
         var tier1 = UcumAtomCatalog.BrowseTier1();
         var tier1Codes = tier1.Select(atom => atom.Code).ToArray();
 
-        tier1.Should().HaveCount(146);
-        tier1Codes.Distinct(StringComparer.Ordinal).Count().Should().Be(146, "Tier 1 should not contain duplicate codes");
+        tier1.Should().HaveCount(170);
+        tier1Codes.Distinct(StringComparer.Ordinal).Count().Should().Be(170, "Tier 1 should not contain duplicate codes");
 
         foreach (var code in RequiredTier1Codes)
             tier1Codes.Should().Contain(code, $"Tier 1 should retain curated UCUM code '{code}'");

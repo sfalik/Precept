@@ -175,6 +175,32 @@ public static class UcumAtomCatalog
         "[CFU]",      // colony forming unit (microbiology; food safety; pharma)
         "dB",         // decibel (isSpecial — logarithmic; occupational health)
 
+        // ── COUNT / LOGISTICS (Precept-defined) ─────────────────────────────────────
+        "each",       // single item (generic)
+        "piece",      // individual piece
+        "unit",       // generic unit of count
+        "pkg",        // package
+        "box",        // box
+        "case",       // case
+        "carton",     // carton
+        "pallet",     // pallet
+        "dozen",      // twelve items
+        "gross",      // 144 items (twelve dozen)
+        "bag",        // bag
+        "bundle",     // bundle
+        "roll",       // roll
+        "sheet",      // sheet
+        "drum",       // drum
+        "container",  // shipping container
+        "tote",       // tote
+        "bin",        // bin
+        "tablet",     // tablet (pharma/dispensing)
+        "capsule",    // capsule (pharma/dispensing)
+        "dose",       // dose (pharma/dispensing)
+        "item",       // item (generic)
+        "pair",       // pair (two items)
+        "set",        // set (matched group)
+
         // ── PLANE ANGLE (additional dimension) ──────────────────────────────────────
         "rad",        // radian (SI base angle unit)
         "deg",        // degree of arc (= π/180 rad)
@@ -298,6 +324,31 @@ public static class UcumAtomCatalog
         atoms["C"] = new UcumAtom("C", "coulomb", new DimensionVector(0, 0, 1, 1, 0, 0, 0), UcumExactFactor.One, false, null);
         atoms["rad"] = new UcumAtom("rad", "radian", DimensionVector.None, UcumExactFactor.One, false, null);
         atoms["each"] = new UcumAtom("each", "each", DimensionVector.None, UcumExactFactor.One, false, null);
+
+        // Precept-defined count/logistics atoms (not in UCUM; same dimension as "each")
+        atoms["piece"]     = new UcumAtom("piece",     "piece",     DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["unit"]      = new UcumAtom("unit",      "unit",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["pkg"]       = new UcumAtom("pkg",       "package",   DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["box"]       = new UcumAtom("box",       "box",       DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["case"]      = new UcumAtom("case",      "case",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["carton"]    = new UcumAtom("carton",    "carton",    DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["pallet"]    = new UcumAtom("pallet",    "pallet",    DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["dozen"]     = new UcumAtom("dozen",     "dozen",     DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["gross"]     = new UcumAtom("gross",     "gross",     DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["bag"]       = new UcumAtom("bag",       "bag",       DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["bundle"]    = new UcumAtom("bundle",    "bundle",    DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["roll"]      = new UcumAtom("roll",      "roll",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["sheet"]     = new UcumAtom("sheet",     "sheet",     DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["drum"]      = new UcumAtom("drum",      "drum",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["container"] = new UcumAtom("container", "container", DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["tote"]      = new UcumAtom("tote",      "tote",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["bin"]       = new UcumAtom("bin",       "bin",       DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["tablet"]    = new UcumAtom("tablet",    "tablet",    DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["capsule"]   = new UcumAtom("capsule",   "capsule",   DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["dose"]      = new UcumAtom("dose",      "dose",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["item"]      = new UcumAtom("item",      "item",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["pair"]      = new UcumAtom("pair",      "pair",      DimensionVector.None, UcumExactFactor.One, false, null);
+        atoms["set"]       = new UcumAtom("set",       "set",       DimensionVector.None, UcumExactFactor.One, false, null);
     }
 
     private static bool IsAtomElement(XElement element)

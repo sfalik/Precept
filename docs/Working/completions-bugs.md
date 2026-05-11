@@ -4,7 +4,7 @@
 **Spec:** `docs/Working/elaine-typed-literal-autocomplete-ux.md`  
 **Prior review:** Frank-6 — spec compliance BLOCKED (F1, F2)  
 **Triage:** Frank-7 — root-cause triage in progress  
-**Status:** 8 open bugs + 1 catalog gap (C1)
+**Status:** 8 open bugs + 1 catalog gap (C1 ✅ Fixed)
 
 ---
 
@@ -362,7 +362,7 @@ The same fix also benefits `quantity` binary peers: `total + '5 ` where `total` 
 | **Expected** | Units like `each`, `pkg`, `box`, `case`, `pallet`, `doz`, `pair`, etc. |
 | **Actual** | Only scientific count units: `1` (unity), `%`, `[ppm]`, `[ppb]`, `[ppth]`, `[pptr]`, `[pH]`, `[iU]`, `[arb'U]`, `[USP'U]`, `[CFU]`, `dB` |
 | **Component** | `UcumAtomCatalog.cs` (Tier1Codes array + SeedIntrinsicAtoms), `UnitDimensionHelper.cs` (CountQualifierUnitCodes) |
-| **Status** | 🔴 Open |
+| **Status** | ✅ Fixed — George (C1) — commit `9a790d81` |
 
 **Problem:** The tier-1 UCUM catalog contains ~150 curated units spanning physical measurement (length, mass, volume, temperature, etc.) but has zero business/logistics count units. The only count-adjacent entry is `each`, which exists as a synthetic intrinsic atom in `SeedIntrinsicAtoms` (line 300) but is **not in the `Tier1Codes` array** — so it is not browsable via `BrowseTier1()` and does not appear in completions. A user writing `quantity of 'count'` gets no useful units. Standard UCUM is oriented toward scientific and physical measurement — it does not define units for packages, boxes, cartons, or pallets.
 
@@ -427,6 +427,45 @@ Rationale:
 **No design gate needed.** This is catalog data addition following an established pattern.
 
 **Implementation owner:** Kramer — catalog data + completions verification.
+
+---
+
+### C2 — User-defined unit extensibility assessment
+
+| | |
+|---|---|
+| **Question** | Can users define custom unit codes (e.g., `quantity in 'widget'`) beyond UCUM-standard and Precept-shipped atoms? |
+| **Date** | 2026-05-11 |
+| **Author** | Frank |
+| **Status** | 🟡 Deferred — ship C1, revisit extensibility post-V1 |
+
+**Design assessment:**
+
+The question is whether `quantity in '...'` should accept user-defined codes — not just UCUM and Precept-shipped atoms — with dimensional enforcement. The answer is: **yes, it's feasible and architecturally clean, but it's premature to ship before C1 lands and the type checker's qualifier enforcement is sound (B9–B12).**
+
+**Feasibility:** If a user writes `quantity in 'widget'`, the system treats `widget` as an opaque custom dimension. `DeriveUnitDimensionName` currently returns a dimension string from catalog metadata. For an unknown code, the only derivable dimension is the code itself — so `widget` gets dimension `"widget"` and `sprocket` gets dimension `"sprocket"`. Assignment between them would trigger `DimensionCategoryMismatch` (PRE0069). This works cleanly with no special-casing.
+
+**Enforcement model:** Custom units are self-dimensioned. `field w as quantity in 'widget'` and `field x as quantity in 'sprocket'` are dimensionally incompatible. `set w = x` fails with PRE0069. Two fields both declared `quantity in 'widget'` are compatible. This is the correct behavior — the dimension system treats unknown codes as distinct singletons.
+
+**Recommended approach: D — Not now. Ship C1 first, revisit user extensibility post-V1.**
+
+Rationale:
+1. **C1 covers the immediate need.** 24 logistics units solve the actual user pain (no business count units). User-defined units solve a hypothetical need that no current user has hit.
+2. **B9–B12 must land first.** Qualifier enforcement is currently broken — the type checker is dimension-blind on assignments. Building extensibility atop a broken enforcement layer is architectural malpractice.
+3. **Typo risk is real and unsolved.** `quantity in 'widgit'` silently creates a distinct dimension. Without a declaration mechanism, the system cannot warn about likely typos. This is a footgun that contradicts Precept's "prevention, not detection" philosophy.
+4. **When we do ship it, Approach B (UCUM arbitrary unit syntax) is the winner.** `quantity in '{widget}'` for user-defined, `quantity in 'kg'` for built-ins. Visual distinction at the surface, UCUM-precedented, no new language constructs. But this requires (a) working qualifier enforcement, (b) a lint/warning for undeclared arbitrary units used only once, and (c) completions UX for user-defined codes — none of which exist today.
+5. **Approach A (implicit acceptance of unknowns) is rejected.** Silent acceptance with no declaration violates discoverability and prevention principles. A typo becoming a valid distinct dimension is the opposite of what Precept guarantees.
+6. **Approach C (explicit declaration construct) is overkill for V1** but may be the right long-term answer if user-defined units proliferate across precepts in a project.
+
+**Future design direction (post-V1):**
+- Approach B as the language surface: curly-brace codes for user-defined (`{widget}`), plain codes for catalog entries.
+- Lint diagnostic: "arbitrary unit `{widgit}` used in only one field — did you mean `{widget}`?" (cross-field consistency check).
+- Completions: user-defined codes harvested from the current precept and offered alongside catalog entries, visually distinguished.
+- No explicit declaration needed in the precept — the curly braces ARE the declaration.
+
+**Design gate:** Track A when we revisit. Approach B requires no new language constructs (curly braces are valid UCUM syntax already accepted by the parser), but the enforcement and tooling additions warrant a design review.
+
+**Decision filed:** `.squad/decisions/inbox/frank-user-defined-units.md`
 
 ---
 
