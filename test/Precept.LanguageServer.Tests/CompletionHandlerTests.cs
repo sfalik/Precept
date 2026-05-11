@@ -898,6 +898,124 @@ public class CompletionHandlerTests
 
     // ─── Slice 5 — Ctrl+Space Recovery ───────────────────────────────────────────
 
+    // ─── Deferred: Quote-Close Logic ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_Boolean_StarterInsertTextIncludesClosingQuote()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept FlagTest
+            field Active as boolean default ¦
+            state Open initial terminal
+            """, "'");
+
+        completions.IsIncomplete.Should().BeFalse();
+        completions.Items.Should().NotBeEmpty();
+        foreach (var item in completions.Items)
+        {
+            item.InsertText.Should().EndWith("'", $"starter item '{item.Label}' must include a closing quote");
+        }
+    }
+
+    [Fact]
+    public async Task TypedConstant_Temporal_StarterInsertTextIncludesClosingQuote()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default ¦
+            """, "'");
+
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Duration).ContentValidation!.Examples;
+
+        completions.IsIncomplete.Should().BeFalse();
+        completions.Items.Should().NotBeEmpty();
+        foreach (var item in completions.Items)
+        {
+            item.InsertText.Should().EndWith("'", $"starter item '{item.Label}' must include a closing quote");
+        }
+
+        // Labels (display text) must still be the bare content — no closing quote in Label.
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+        labels.Should().Contain(expected);
+    }
+
+    [Fact]
+    public async Task TypedConstant_Temporal_SlotUnit_InsertTextNoClosingQuote()
+    {
+        // Space trigger inside an existing '30 ¦' → unit slot items must NOT have a closing quote.
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '30 ¦'
+            """, " ");
+
+        completions.IsIncomplete.Should().BeFalse();
+        completions.Items.Should().NotBeEmpty();
+        foreach (var item in completions.Items)
+        {
+            item.InsertText.Should().NotEndWith("'", $"slot unit item '{item.Label}' must NOT append a closing quote");
+        }
+    }
+
+    // ─── Deferred: Singular vs Plural Temporal Preference ────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_Temporal_NumberOne_ShowsSingularUnits()
+    {
+        // Space after '1 ' → singular forms should be shown (day, hour, week, etc.).
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '1 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("day");
+        labels.Should().Contain("hour");
+        labels.Should().Contain("week");
+        labels.Should().NotContain("days");
+        labels.Should().NotContain("hours");
+        labels.Should().NotContain("weeks");
+    }
+
+    [Fact]
+    public async Task TypedConstant_Temporal_NumberTwo_ShowsPluralUnits()
+    {
+        // Space after '2 ' → plural forms should be shown (days, hours, weeks, etc.).
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '2 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("days");
+        labels.Should().Contain("hours");
+        labels.Should().Contain("weeks");
+        labels.Should().NotContain("day");
+        labels.Should().NotContain("hour");
+        labels.Should().NotContain("week");
+    }
+
+    [Fact]
+    public async Task TypedConstant_Temporal_CompoundSingular_ShowsSingularUnits()
+    {
+        // Space after '2 hours + 1 ' → second segment number is 1 → singular units.
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '2 hours + 1 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("day");
+        labels.Should().Contain("hour");
+        labels.Should().NotContain("days");
+        labels.Should().NotContain("hours");
+    }
+
     [Fact]
     public async Task TypedConstant_CtrlSpace_EmptyBoolean_ShowsTrueFalse()
     {

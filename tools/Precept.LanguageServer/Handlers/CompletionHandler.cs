@@ -66,9 +66,10 @@ internal sealed class CompletionHandler : ICompletionHandler
 
         // A single quote always opens a typed constant — never show keyword completions.
         // If type inference succeeds, show typed constant values; otherwise return empty.
+        // The opening quote always starts a new literal, so always append a closing quote.
         if (triggerCharacter == "'")
         {
-            return CreateCompletionList(GetTypedConstantItems(compilation, position, context));
+            return CreateCompletionList(GetTypedConstantItems(compilation, position, context, appendClosingQuote: true));
         }
 
         // Space trigger inside a typed constant: show slot-specific vocabulary (money codes,
@@ -103,7 +104,9 @@ internal sealed class CompletionHandler : ICompletionHandler
             var innerContext = context is SlotContext.InExpression or SlotContext.InArgDefault
                 ? context
                 : SlotContext.InExpression;
-            return CreateCompletionList(GetTypedConstantItems(compilation, position, innerContext));
+            // Append closing quote only when the token is empty (cursor right after opening ').
+            var appendQuote = IsEmptyTypedConstantToken(compilation.Tokens.Tokens, position);
+            return CreateCompletionList(GetTypedConstantItems(compilation, position, innerContext, appendQuote));
         }
 
         return context switch
@@ -258,12 +261,13 @@ internal sealed class CompletionHandler : ICompletionHandler
             .Concat(booleanLiteralItems);
     }
 
-    private static IEnumerable<CompletionItem> GetTypedConstantItems(Compilation compilation, Position position, SlotContext context)
+    private static IEnumerable<CompletionItem> GetTypedConstantItems(
+        Compilation compilation, Position position, SlotContext context, bool appendClosingQuote = false)
     {
         if (!TryGetTypedConstantContext(compilation, position, context, out var tcContext))
             return [];
 
-        return tcContext.ExpectedType switch
+        var items = tcContext.ExpectedType switch
         {
             TypeKind.Boolean => GetBooleanLiteralItems(tcContext),
             TypeKind.Duration or TypeKind.Period => GetTemporalLiteralItems(compilation, tcContext, position),
@@ -276,7 +280,24 @@ internal sealed class CompletionHandler : ICompletionHandler
             TypeKind.Quantity => GetQuantityLiteralItems(compilation, tcContext, position),
             _ => GetFreeFormItems(compilation, tcContext),
         };
+
+        if (appendClosingQuote)
+            items = items.Select(item => AppendToInsertText(item, "'"));
+
+        return items;
     }
+
+    private static CompletionItem AppendToInsertText(CompletionItem item, string suffix) =>
+        new()
+        {
+            Label = item.Label,
+            InsertText = (item.InsertText ?? item.Label) + suffix,
+            InsertTextFormat = InsertTextFormat.PlainText,
+            Documentation = item.Documentation,
+            SortText = item.SortText,
+            Detail = item.Detail,
+            Kind = item.Kind,
+        };
 
     private static IEnumerable<CompletionItem> GetBooleanLiteralItems(TypedConstantContext tcContext)
     {
@@ -526,13 +547,13 @@ internal sealed class CompletionHandler : ICompletionHandler
         return phase switch
         {
             TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping
-                or TypedConstantPhase.AfterPlusNumberSpace => BuildTemporalUnitItems(tcContext),
+                or TypedConstantPhase.AfterPlusNumberSpace => BuildTemporalUnitItems(tcContext, textBeforeCursor),
             TypedConstantPhase.SegmentComplete => BuildTemporalContinuationItem(),
             _ => [],
         };
     }
 
-    private static IEnumerable<CompletionItem> BuildTemporalUnitItems(TypedConstantContext tcContext)
+    private static IEnumerable<CompletionItem> BuildTemporalUnitItems(TypedConstantContext tcContext, string textBeforeCursor)
     {
         IEnumerable<TemporalUnits.TemporalUnitEntry> units = TemporalUnits.AllEntries;
 
@@ -551,11 +572,15 @@ internal sealed class CompletionHandler : ICompletionHandler
                 units = units.Where(u => UnitMatchesDimension(u, dimQualifier.Value));
         }
 
-        return units.SelectMany(entry => new[]
+        // Show singular form when the last typed number is exactly 1; plural otherwise.
+        var lastNumber = ExtractLastNumber(textBeforeCursor);
+        var preferSingular = lastNumber == 1;
+
+        return units.Select(entry =>
         {
-            CreateItem(entry.Plural, "temporal unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment),
-            CreateItem(entry.Singular, "temporal unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment),
-        }).GroupBy(item => item.Label, StringComparer.Ordinal).Select(g => g.First());
+            var label = preferSingular ? entry.Singular : entry.Plural;
+            return CreateItem(label, "temporal unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment);
+        });
     }
 
     private static bool UnitMatchesDimension(TemporalUnits.TemporalUnitEntry entry, PeriodDimension dimension) =>
@@ -1268,6 +1293,25 @@ internal sealed class CompletionHandler : ICompletionHandler
         var token = tokens[tokenIndex];
         return IsTypedConstantToken(token.Kind)
             && Contains(token.Span, position);
+    }
+
+    private static bool IsEmptyTypedConstantToken(ImmutableArray<Token> tokens, Position position) =>
+        TryGetTypedConstantSlotPhase(tokens, position, out var phase, out _)
+        && phase == TypedConstantPhase.Empty;
+
+    private static string WithClosingQuote(string content) => content + "'";
+
+    private static int ExtractLastNumber(string textBeforeCursor)
+    {
+        // For compound segments (e.g. "2 hours + 1 " or "2 hours + 1 da"), look at the part after the last '+'.
+        var lastPlusIdx = textBeforeCursor.LastIndexOf('+');
+        var relevant = lastPlusIdx >= 0
+            ? textBeforeCursor[(lastPlusIdx + 1)..].TrimStart()
+            : textBeforeCursor;
+
+        // Extract the leading integer from the relevant segment.
+        var match = Regex.Match(relevant, @"^-?(\d+)");
+        return match.Success && int.TryParse(match.Groups[1].Value, out var n) ? n : 0;
     }
 
     private static bool IsTypedConstantToken(TokenKind kind) =>
