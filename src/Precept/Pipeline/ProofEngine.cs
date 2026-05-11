@@ -338,6 +338,8 @@ public static class ProofEngine
             return (ProofDisposition.Proved, ProofStrategy.FlowNarrowing);
         if (TryQualifierCompatibilityProof(obligation, semantics))
             return (ProofDisposition.Proved, ProofStrategy.QualifierCompatibility);
+        if (TryCompositionalConstraintProof(obligation, semantics))
+            return (ProofDisposition.Proved, ProofStrategy.CompositionalConstraint);
 
         return (ProofDisposition.Unresolved, null);
     }
@@ -960,7 +962,138 @@ public static class ProofEngine
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  S8 — Error-Tainted Obligation Suppression
+    //  S6 — Strategy 6: Compositional Constraint Propagation
+    // ════════════════════════════════════════════════════════════════════════════
+
+    private static bool TryCompositionalConstraintProof(ProofObligation obligation, SemanticIndex semantics)
+    {
+        if (obligation.Requirement is not NumericProofRequirement numericReq)
+            return false;
+
+        // Resolve the target field from the obligation subject
+        var fieldName = GetFieldName(numericReq.Subject, obligation.Site);
+        if (fieldName is null) return false;
+
+        // Find ALL assignments to this field across transition rows and event handlers
+        var interpolatedAssignments = FindInterpolatedAssignments(fieldName, semantics);
+
+        // No interpolated assignments → decline
+        if (interpolatedAssignments.Length == 0) return false;
+
+        // For each interpolated assignment, extract the relevant slot source and
+        // verify its modifiers satisfy the numeric obligation
+        foreach (var assignment in interpolatedAssignments)
+        {
+            var slotSource = GetMagnitudeSlotSource(assignment);
+            if (slotSource is null) return false;
+
+            // Resolve the source's modifiers (field or arg)
+            var modifiers = ResolveSourceModifiers(slotSource, semantics);
+            if (modifiers.IsDefault || modifiers.IsEmpty) return false;
+
+            bool covered = false;
+            foreach (var modifier in modifiers)
+            {
+                var meta = Modifiers.GetMeta(modifier);
+                if (meta is not ValueModifierMeta vmm) continue;
+
+                foreach (var satisfaction in vmm.ProofSatisfactions)
+                {
+                    if (SatisfactionCovers(satisfaction, numericReq))
+                    {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (covered) break;
+            }
+
+            if (!covered) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Finds all <see cref="TypedInterpolatedTypedConstant"/> nodes assigned to the
+    /// named field across all transition rows and event handlers. If ANY assignment
+    /// to this field is NOT an interpolated typed constant, returns empty (conservative).
+    /// </summary>
+    private static ImmutableArray<TypedInterpolatedTypedConstant> FindInterpolatedAssignments(
+        string fieldName, SemanticIndex semantics)
+    {
+        var builder = ImmutableArray.CreateBuilder<TypedInterpolatedTypedConstant>();
+        bool hasNonInterpolated = false;
+
+        void ScanActions(ImmutableArray<TypedAction> actions)
+        {
+            foreach (var action in actions)
+            {
+                if (action is TypedInputAction { FieldName: var name, InputExpression: var expr }
+                    && string.Equals(name, fieldName, StringComparison.Ordinal))
+                {
+                    if (expr is TypedInterpolatedTypedConstant itc)
+                        builder.Add(itc);
+                    else
+                        hasNonInterpolated = true;
+                }
+            }
+        }
+
+        foreach (var row in semantics.TransitionRows)
+            ScanActions(row.Actions);
+        foreach (var handler in semantics.EventHandlers)
+            ScanActions(handler.Actions);
+
+        return hasNonInterpolated ? ImmutableArray<TypedInterpolatedTypedConstant>.Empty : builder.ToImmutable();
+    }
+
+    /// <summary>
+    /// Extracts the magnitude slot source expression from an interpolated typed constant.
+    /// Falls back to whole-value slot if no magnitude slot exists.
+    /// </summary>
+    private static TypedExpression? GetMagnitudeSlotSource(TypedInterpolatedTypedConstant itc)
+    {
+        TypedExpression? wholeValue = null;
+
+        foreach (var slot in itc.Slots)
+        {
+            if (slot.SlotKind == InterpolationSlotKind.Magnitude)
+                return slot.Expression;
+            if (slot.SlotKind == InterpolationSlotKind.WholeValue)
+                wholeValue = slot.Expression;
+        }
+
+        return wholeValue;
+    }
+
+    /// <summary>
+    /// Resolves the declared modifiers for a source expression that is either a
+    /// <see cref="TypedFieldRef"/> (look up field modifiers) or a
+    /// <see cref="TypedArgRef"/> (look up event arg modifiers).
+    /// </summary>
+    private static ImmutableArray<ModifierKind> ResolveSourceModifiers(
+        TypedExpression source, SemanticIndex semantics)
+    {
+        if (source is TypedFieldRef fieldRef
+            && semantics.FieldsByName.TryGetValue(fieldRef.FieldName, out var field))
+        {
+            return field.Modifiers;
+        }
+
+        if (source is TypedArgRef argRef
+            && semantics.EventsByName.TryGetValue(argRef.EventName, out var evt))
+        {
+            foreach (var arg in evt.Args)
+            {
+                if (string.Equals(arg.Name, argRef.ArgName, StringComparison.Ordinal))
+                    return arg.Modifiers;
+            }
+        }
+
+        return ImmutableArray<ModifierKind>.Empty;
+    }
+
     // ════════════════════════════════════════════════════════════════════════════
 
     private static bool ContainsErrorExpression(TypedExpression expr) => expr switch

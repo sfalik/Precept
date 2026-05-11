@@ -4026,4 +4026,252 @@ public class ProofEngineTests
                 .Should().BeTrue(because: "QuantityMinusQuantity should declare unit proof requirement");
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Strategy 6 — Compositional Constraint Propagation
+    // ════════════════════════════════════════════════════════════════════════
+
+    public class Strategy6_CompositionalConstraint
+    {
+        [Fact]
+        public void Compositional_NonzeroOnMagnitudeSource_Proved()
+        {
+            // event Pay(Amount as number nonzero, Code as currency)
+            // set Balance = '{Amount} {Code}'
+            // prove: Balance is nonzero (for Ratio = Total / Balance) → Proved via S6
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                event Pay(Amount as number nonzero, Code as currency)
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.CompositionalConstraint);
+        }
+
+        [Fact]
+        public void Compositional_TwoPathsBothNonzero_Proved()
+        {
+            // Two transitions both set Balance from '{Amount} {Code}' where Amount is nonzero
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                state Review
+                event Pay(Amount as number nonzero, Code as currency)
+                event Adjust(Amount as number nonzero, Code as currency)
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Review
+                from Review on Adjust -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Active
+                """);
+
+            var obligations = ledger.Obligations.Where(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext).ToList();
+
+            obligations.Should().HaveCountGreaterThanOrEqualTo(2);
+            obligations.Should().OnlyContain(o => o.Disposition == ProofDisposition.Proved);
+            obligations.Should().OnlyContain(o => o.Strategy == ProofStrategy.CompositionalConstraint);
+        }
+
+        [Fact]
+        public void Compositional_MixedPathsOneNotNonzero_Unresolved()
+        {
+            // One transition: Amount nonzero, another: Amount2 has no modifier → Unresolved
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field Amount2 as number default 1 writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                state Review
+                event Pay(Amount as number nonzero, Code as currency)
+                event Adjust(Code as currency)
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Review
+                from Review on Adjust -> set Balance = '{Amount2} {Code}' -> set Ratio = Total / Balance -> transition Active
+                """);
+
+            var obligations = ledger.Obligations.Where(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext).ToList();
+
+            obligations.Should().NotBeEmpty();
+            obligations.Any(o => o.Disposition == ProofDisposition.Unresolved).Should().BeTrue();
+        }
+
+        [Fact]
+        public void Compositional_NonInterpolatedAssignmentMixed_Declines()
+        {
+            // set Balance = '{Amount} {Code}' in one transition
+            // set Balance = Total in another transition → strategy declines
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                state Review
+                event Pay(Amount as number nonzero, Code as currency)
+                event Reset
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Review
+                from Review on Reset -> set Balance = Total -> set Ratio = Total / Balance -> transition Active
+                """);
+
+            var obligations = ledger.Obligations.Where(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext).ToList();
+
+            obligations.Should().NotBeEmpty();
+            obligations.Any(o => o.Strategy == ProofStrategy.CompositionalConstraint).Should().BeFalse();
+        }
+
+        [Fact]
+        public void Compositional_WholeValueHoleWithNonzeroModifier_Proved()
+        {
+            // field m as money nonzero; set Balance = '{m}' (whole-value hole) → Proved
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field m as money in 'USD' nonzero default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                event Go
+                from Active on Go -> set Balance = '{m}' -> set Ratio = Total / Balance -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.CompositionalConstraint);
+        }
+
+        [Fact]
+        public void Compositional_WholeValueHoleWithoutModifier_NotProvedByS6()
+        {
+            // field m as money (no modifier); set Balance = '{m}' → S6 can't prove
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field m as money in 'USD' default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                event Go
+                from Active on Go -> set Balance = '{m}' -> set Ratio = Total / Balance -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull();
+            obligation!.Strategy.Should().NotBe(ProofStrategy.CompositionalConstraint);
+        }
+
+        [Fact]
+        public void Compositional_PositiveCoversNonzeroObligation_Proved()
+        {
+            // Amount as number positive → positive subsumes nonzero via SatisfactionCovers → Proved
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                event Pay(Amount as number positive, Code as currency)
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.CompositionalConstraint);
+        }
+
+        [Fact]
+        public void Compositional_NonnegativeDoesNotCoverNonzero_Unresolved()
+        {
+            // Amount as number nonnegative → nonneg does NOT subsume nonzero → Unresolved
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                event Pay(Amount as number nonnegative, Code as currency)
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Unresolved);
+        }
+
+        [Fact]
+        public void Compositional_NonNumericObligation_Declines()
+        {
+            // Presence obligation → strategy declines (only handles numeric)
+            var ledger = Prove("""
+                precept Wallet
+                field Balance as money in 'USD' default '1 USD' writable
+                field Desc as string optional writable
+                state Active initial
+                event Pay(Amount as number nonzero, Code as currency)
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> no transition
+                rule Desc is set because "must have description"
+                """);
+
+            var presenceObligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is PresenceProofRequirement);
+
+            if (presenceObligation is not null)
+            {
+                presenceObligation.Strategy.Should().NotBe(ProofStrategy.CompositionalConstraint);
+            }
+        }
+
+        [Fact]
+        public void Compositional_ArgRefWithModifierAsMagnitudeSource_Proved()
+        {
+            // Event arg as number nonzero used as magnitude slot → proved via arg's modifier
+            var ledger = Prove("""
+                precept Wallet
+                field Total as money in 'USD' default '100 USD' writable
+                field Balance as money in 'USD' default '1 USD' writable
+                field Ratio as decimal default 1 writable
+                state Active initial
+                event Pay(Amount as number nonzero, Code as currency)
+                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.CompositionalConstraint);
+        }
+    }
 }

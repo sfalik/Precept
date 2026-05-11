@@ -39,7 +39,8 @@ public enum ProofStrategy
     DeclarationAttribute = 2,
     GuardInPath = 3,
     FlowNarrowing = 4,
-    QualifierCompatibility = 5
+    QualifierCompatibility = 5,
+    CompositionalConstraint = 6
 }
 
 public sealed record FaultSiteLink(
