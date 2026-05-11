@@ -51,7 +51,7 @@ function ensureBuild() {
 function resolveBuildDllPath() {
   const candidate = findFile(buildBinRoot, mcpDllName, (fullPath) => {
     const normalized = normalizePath(fullPath);
-    return normalized.includes("/Precept.Mcp/") && normalized.includes("/debug/");
+    return normalized.includes("/Precept.Mcp/") && (normalized.includes("/debug/") || normalized.includes("/release/"));
   });
 
   if (!candidate) {
