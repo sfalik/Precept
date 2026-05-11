@@ -2,6 +2,7 @@ global using OmniSharp.Extensions.LanguageServer.Protocol;
 global using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 
 using System;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -328,6 +329,51 @@ public sealed class SemanticTokensHandlerTests
     }
 
     [Fact]
+    public void NormalizeMergedTokens_SameStartPrefersShortestOverlayRange()
+    {
+        var normalized = SemanticTokensHandler.NormalizeMergedTokens([
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 5, 13, "name"), 0),
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 5, 6, "event"), 1),
+        ]);
+
+        normalized.Should().ContainSingle();
+        normalized.Single().Should().Be(new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 5, 6, "event"));
+    }
+
+    [Fact]
+    public void NormalizeMergedTokens_TruncatesEarlierSameLineOverlap()
+    {
+        var normalized = SemanticTokensHandler.NormalizeMergedTokens([
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 3, 10, "event"), 0),
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 8, 6, "arg"), 1),
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 16, 4, "state"), 1),
+        ]);
+
+        normalized.Should().Equal([
+            new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 3, 5, "event"),
+            new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 8, 6, "arg"),
+            new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 16, 4, "state"),
+        ]);
+
+        AssertMergedTokensAreStrictlyOrdered(normalized);
+    }
+
+    [Fact]
+    public void SemanticTokensDelta_OverlappingSyntheticTokens_DoesNotThrow()
+    {
+        var before = SemanticTokensHandler.NormalizeMergedTokens([
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 3, 10, "event"), 0),
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 8, 6, "arg"), 1),
+        ]);
+        var after = SemanticTokensHandler.NormalizeMergedTokens([
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 3, 11, "event"), 0),
+            (new SemanticTokensHandler.LexicalSemanticToken(TokenKind.Identifier, 0, 9, 6, "arg"), 1),
+        ]);
+
+        AssertSemanticTokensDeltaDoesNotThrow(before, after, @"C:\\overlap.precept");
+    }
+
+    [Fact]
     public void Pass1_TokenWithVisualCategory_EmitsCorrectCustomType()
     {
         var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial");
@@ -569,10 +615,11 @@ public sealed class SemanticTokensHandlerTests
     private static string ReadSample(string fileName) =>
         File.ReadAllText(Path.Combine(SamplesRoot, fileName));
 
-    private static void AssertMergedTokensAreStrictlyOrdered(Compilation compilation)
-    {
-        var merged = SemanticTokensHandler.ProjectMergedTokens(compilation).ToArray();
+    private static void AssertMergedTokensAreStrictlyOrdered(Compilation compilation) =>
+        AssertMergedTokensAreStrictlyOrdered(SemanticTokensHandler.ProjectMergedTokens(compilation));
 
+    private static void AssertMergedTokensAreStrictlyOrdered(ImmutableArray<SemanticTokensHandler.LexicalSemanticToken> merged)
+    {
         for (var i = 1; i < merged.Length; i++)
         {
             var previous = merged[i - 1];
@@ -588,7 +635,16 @@ public sealed class SemanticTokensHandlerTests
         }
     }
 
-    private static void AssertSemanticTokensDeltaDoesNotThrow(Compilation before, Compilation after, string path)
+    private static void AssertSemanticTokensDeltaDoesNotThrow(Compilation before, Compilation after, string path) =>
+        AssertSemanticTokensDeltaDoesNotThrow(
+            SemanticTokensHandler.ProjectMergedTokens(before),
+            SemanticTokensHandler.ProjectMergedTokens(after),
+            path);
+
+    private static void AssertSemanticTokensDeltaDoesNotThrow(
+        ImmutableArray<SemanticTokensHandler.LexicalSemanticToken> before,
+        ImmutableArray<SemanticTokensHandler.LexicalSemanticToken> after,
+        string path)
     {
         var document = new SemanticTokensDocument(SemanticTokensHandler.BuildLegend());
 
@@ -607,9 +663,14 @@ public sealed class SemanticTokensHandlerTests
         act.Should().NotThrow();
     }
 
-    private static void CommitSemanticTokens(SemanticTokensBuilder builder, Compilation compilation)
+    private static void CommitSemanticTokens(SemanticTokensBuilder builder, Compilation compilation) =>
+        CommitSemanticTokens(builder, SemanticTokensHandler.ProjectMergedTokens(compilation));
+
+    private static void CommitSemanticTokens(
+        SemanticTokensBuilder builder,
+        ImmutableArray<SemanticTokensHandler.LexicalSemanticToken> tokens)
     {
-        foreach (var token in SemanticTokensHandler.ProjectMergedTokens(compilation))
+        foreach (var token in tokens)
         {
             builder.Push(token.Line, token.Character, token.Length, token.TokenType);
         }

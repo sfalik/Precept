@@ -16,6 +16,7 @@
 - Transition outcomes and comma-separated field-target slots need their own identifier spans; reusing container spans produces overlapping state/field semantic tokens even after arg-span fixes land.
 - Modifier diagnostics need per-modifier spans from parser metadata; reusing declaration spans widens user-visible squiggles from the offending keyword to the whole field line.
 - Typed-constant autocomplete cannot rely on the enclosing field alone; rule, ensure, and other expression sites need local expected-type inference from the peer operand or active call parameter. The fix belongs in the language server: infer the expected type from nearby expression context, then reuse the existing type examples and in-document typed constants.
+- Semantic-token delta safety needs a second normalization pass after start-position dedup: prefer the shortest same-start range, then truncate or drop earlier same-line tokens so no emitted span overlaps the next token.
 
 ## Historical Summary
 

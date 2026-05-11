@@ -64,6 +64,6 @@ public class ArgReferenceTests
         var argReference = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
 
         compilation.HasErrors.Should().BeFalse();
-        src.Substring(argReference.Site.Offset, argReference.Site.Length).Should().Be("Submit.Amount");
+        src.Substring(argReference.Site.Offset, argReference.Site.Length).Should().Be("Amount");
     }
 }

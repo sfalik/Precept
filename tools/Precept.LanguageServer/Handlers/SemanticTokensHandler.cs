@@ -112,19 +112,62 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         return projected.ToImmutable();
     }
 
-    internal static ImmutableArray<LexicalSemanticToken> ProjectMergedTokens(Compilation compilation)
+    internal static ImmutableArray<LexicalSemanticToken> ProjectMergedTokens(Compilation compilation) =>
+        NormalizeMergedTokens(
+            ProjectLexicalTokens(compilation)
+                .Select(static token => (Token: token, OverlayOrder: 0))
+                .Concat(ProjectIdentifierTokens(compilation.Semantics).Select(static token => (Token: token, OverlayOrder: 1))));
+
+    internal static ImmutableArray<LexicalSemanticToken> NormalizeMergedTokens(
+        IEnumerable<(LexicalSemanticToken Token, int OverlayOrder)> entries)
     {
-        return ProjectLexicalTokens(compilation)
-            .Select(static token => (Token: token, OverlayOrder: 0))
-            .Concat(ProjectIdentifierTokens(compilation.Semantics).Select(static token => (Token: token, OverlayOrder: 1)))
-            .Where(static entry => entry.Token.Line >= 0 && entry.Token.Character >= 0 && entry.Token.Length > 0)
-            .OrderBy(static entry => entry.Token.Line)
-            .ThenBy(static entry => entry.Token.Character)
-            .ThenBy(static entry => entry.Token.Length)
-            .ThenBy(static entry => entry.OverlayOrder)
-            .GroupBy(static entry => (entry.Token.Line, entry.Token.Character))
-            .Select(static group => group.Last().Token)
-            .ToImmutableArray();
+        var normalized = ImmutableArray.CreateBuilder<LexicalSemanticToken>();
+
+        foreach (var token in entries
+                     .Where(static entry => entry.Token.Line >= 0 && entry.Token.Character >= 0 && entry.Token.Length > 0)
+                     .OrderBy(static entry => entry.Token.Line)
+                     .ThenBy(static entry => entry.Token.Character)
+                     .GroupBy(static entry => (entry.Token.Line, entry.Token.Character))
+                     .Select(static group => group
+                         .OrderBy(static entry => entry.Token.Length)
+                         .ThenByDescending(static entry => entry.OverlayOrder)
+                         .First()
+                         .Token))
+        {
+            if (normalized.Count == 0)
+            {
+                normalized.Add(token);
+                continue;
+            }
+
+            var previous = normalized[^1];
+            if (previous.Line != token.Line)
+            {
+                normalized.Add(token);
+                continue;
+            }
+
+            var previousEnd = previous.Character + previous.Length;
+            if (previousEnd <= token.Character)
+            {
+                normalized.Add(token);
+                continue;
+            }
+
+            var truncatedLength = token.Character - previous.Character;
+            if (truncatedLength > 0)
+            {
+                normalized[^1] = previous with { Length = truncatedLength };
+            }
+            else
+            {
+                normalized.RemoveAt(normalized.Count - 1);
+            }
+
+            normalized.Add(token);
+        }
+
+        return normalized.ToImmutable();
     }
 
     internal static ImmutableArray<LexicalSemanticToken> ProjectIdentifierTokens(SemanticIndex index)

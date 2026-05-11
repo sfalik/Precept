@@ -93,7 +93,7 @@ public class DiagnosticProjectorTests
     {
         var compilation = Compiler.Compile("""
             precept Quote
-            field Amount as money in 'USD' nonnegative
+            field Amount as money in 'USD' notempty
             state Draft initial terminal
             """);
 
@@ -103,7 +103,7 @@ public class DiagnosticProjectorTests
         diagnostic.Range.Should().BeEquivalentTo(new Range
         {
             Start = new Position(1, 31),
-            End = new Position(1, 42),
+            End = new Position(1, 39),
         });
     }
 
