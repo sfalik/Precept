@@ -46,6 +46,14 @@
 - Updated MCP tools (LanguageTool, ProofsTool) for chain rendering and dual-subject classification.
 - Updated ProofRequirementCatalogTests for 6th kind. 19 new ProofEngine tests, all 193 pass.
 
+### 2026-05-11 — Slice 12: Temporal Chain Validation — BLOCKED
+- Investigated G8 (PriceTimesPeriod) and G13 (PriceTimesDuration) for QualifierChainProofRequirement additions.
+- Finding: price type uses `QS_CurrencyAndDimension` with `of` → `QualifierAxis.Dimension` (physical). No temporal qualifier axis exists on price. No `per` preposition exists in the token catalog. Duration is unqualified.
+- Adding chain requirements would break existing valid `price × period` arithmetic (ResolveQualifierOnAxis returns null → proof always fails).
+- `ExtractComparableValue` also lacks TemporalDimension/TemporalUnit arms.
+- Deferred: requires price type extension with temporal denominator support before catalog entries can be added.
+- Decision filed: `.squad/decisions/inbox/george-slice12-blocked.md`.
+
 ### 2025-07-24 — Slice 2: Full type-grammar matching for interpolated typed constants
 - Replaced both interpolated typed constant stubs with complete ResolveInterpolatedTypedConstant() implementation.
 - Redesigned form matching from element-per-element to segment-aware model using SegmentForm with TextMatch delegates, correctly handling parser's 2N+1 segment structure.
