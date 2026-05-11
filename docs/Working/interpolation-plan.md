@@ -272,7 +272,7 @@ These tables define the valid expression types for each semantic slot across all
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
 | `magnitude` | `integer`, `decimal`, `number`, `string` | Magnitude component — any numeric type is valid for a quantity's decimal-backed magnitude. |
-| `unit` | `unitofmeasure`, `string` | Unit name component. Only `unitofmeasure` and `string` can produce a valid UCUM unit code. |
+| `unit` | `unitofmeasure`, `string` | Unit name component. Only `unitofmeasure` and `string` can produce a valid UCUM unit code. **Dimension consistency:** When the hole resolves to `unitofmeasure` via a qualifier-returning accessor (e.g., `f1.unit` where `f1` is `quantity of 'length'`), a post-slot-assignment dimension check compares the source field's declared dimension against the target field's declared dimension. Mismatch emits `DimensionMismatchInUnitSlot`. `string` bypasses dimension checking (runtime-deferred). See §Dimension-Unit Consistency Validation. |
 | `whole-value` | `quantity`, `string` | Entire quantity value. |
 
 #### `price`
@@ -281,7 +281,7 @@ These tables define the valid expression types for each semantic slot across all
 |------|-----------------|-----------|
 | `magnitude` | `integer`, `decimal`, `number`, `string` | Rate/amount component. |
 | `currency` | `currency`, `string` | Numerator currency component. |
-| `unit` | `unitofmeasure`, `string` | Denominator unit component. |
+| `unit` | `unitofmeasure`, `string` | Denominator unit component. **Dimension consistency:** Same dimension check as `quantity` — a `unitofmeasure` hole sourced from a qualifier-returning accessor triggers `DimensionMismatchInUnitSlot` if the source dimension conflicts with the target field's declared dimension. See §Dimension-Unit Consistency Validation. |
 | `whole-value` | `price`, `string` | Entire price value. |
 
 #### `exchangerate`
@@ -337,7 +337,7 @@ These tables define the valid expression types for each semantic slot across all
 
 ### New Diagnostic Codes
 
-**`InvalidInterpolatedTypedConstantForm = 120`**
+**`InvalidInterpolatedTypedConstantForm = 121`**
 
 Emitted when the segment sequence of an interpolated typed constant does not match any valid pattern for the context-determined type. This is a **structural error** — the arrangement of text and holes is wrong, independent of the types of the hole expressions.
 
@@ -349,7 +349,7 @@ Emitted when the segment sequence of an interpolated typed constant does not mat
 - `'{x}/{y}'` for `money` → `/` separator — money uses space separator, not `/`.
 - `'{x}'` for `date` → interpolation not supported for formatted temporal types.
 
-**`InterpolationNotSupportedForType = 121`**
+**`InterpolationNotSupportedForType = 122`**
 
 Emitted when an interpolated typed constant appears in a context where the target type does not support interpolation (formatted temporal types).
 
@@ -398,6 +398,83 @@ Emitted when an interpolated typed constant appears in a context where the targe
 
 ---
 
+## Dimension-Unit Consistency Validation
+
+### The Gap
+
+When an interpolated typed constant's unit slot is filled by a member access like `f1.unit`, the slot compatibility check (§Per-Slot Hole Type Compatibility Tables) validates that the expression is `unitofmeasure` — but this is a **TypeKind-only** check. It does not verify that the *dimension* of the extracted unit is compatible with the target field's declared dimension.
+
+**Example:** `field f1 as quantity of 'length'`, `field f2 as quantity of 'mass' default '1 {f1.unit}'`. The hole `f1.unit` resolves to `TypeKind.UnitOfMeasure` and passes the unit-slot type check. But `f1.unit` carries a length unit (because `f1` is `of 'length'`), and `f2` requires mass. This is dimensionally incoherent and must be caught at compile time.
+
+### Why This Is Not a Type System Problem
+
+The `TypedMemberAccess` record stores `ResultType = TypeKind.UnitOfMeasure` — no dimension qualifier flows through accessor return types. `FixedReturnAccessor.ReturnsQualifier` is metadata for the proof engine (signals "which qualifier axis this accessor extracts"), not a type-narrowing mechanism. Enriching accessor return types with dimension provenance (Option A from the analysis) would require a qualified-type concept that does not exist in the type system today — a disproportionate investment for a check that can be done structurally.
+
+### Approach: Structural AST Pattern Match (Option B)
+
+After slot assignment and per-hole type compatibility checks, a dedicated consistency pass examines each `unit`-slot hole whose resolved type is `unitofmeasure` (not `string`). The check works on the resolved typed AST, not on the type system:
+
+**Pattern match:**
+```
+hole.ResolvedExpression is TypedMemberAccess {
+    ResolvedAccessor: FixedReturnAccessor { ReturnsQualifier: QualifierAxis.Unit },
+    Object: TypedFieldRef { DeclaredQualifiers: { } sourceQualifiers }
+            | TypedArgRef { DeclaredQualifiers: { } sourceQualifiers }
+}
+```
+
+**Dimension extraction from source:**
+```csharp
+string? sourceDimension = sourceQualifiers
+    .OfType<DeclaredQualifierMeta.Dimension>().Select(q => q.DimensionName).FirstOrDefault()
+    ?? sourceQualifiers
+    .OfType<DeclaredQualifierMeta.Unit>().Select(q => q.DimensionName).FirstOrDefault();
+```
+
+**Dimension extraction from target field:** Same logic applied to the target field's `DeclaredQualifiers` (available from `CheckContext.FieldLookup` via the assignment target).
+
+**Decision logic:**
+1. If `sourceDimension` is null → **accept** (source has no declared dimension; cannot statically determine — conservative).
+2. If target has no dimension qualifier → **accept** (target is unconstrained).
+3. If both are non-null and case-insensitive equal → **accept** (matching dimensions).
+4. If both are non-null and differ → **emit `DimensionMismatchInUnitSlot`**.
+
+This reuses the same dimension-extraction logic already present in `ValidateAssignmentQualifiers()` (`TypeChecker.Expressions.cs` ~line 1281) and `QuantityValidator.Validate()` (`QuantityValidator.cs` ~line 30). The pattern match is ~25 lines of new code in `ResolveInterpolatedTypedConstant()`.
+
+### Applicability
+
+The check applies to the `unit` slot of:
+- **`quantity`** — `QualifierShape: QS_UnitOrDimension` (patterns Q3, Q4)
+- **`price`** — `QualifierShape: QS_CurrencyAndDimension`, unit in denominator position (patterns P4, P5, P7, P8)
+
+It does NOT apply to:
+- **`duration`/`period`** unit slots — temporal units (`hours`, `days`, etc.) are a separate namespace from UCUM physical units. Temporal dimension consistency (`period of 'date'` vs `period of 'time'`) operates on the `TemporalDimension` axis, not the physical `Dimension` axis. A temporal unit hole would need different checking, but the surface area is narrow (temporal unit literals are a closed set), and this is out of scope for this plan.
+- **`currency`** slots — currency qualifier mismatch is a separate axis (`QualifierAxis.Currency`) already handled for direct assignments by `ValidateAssignmentQualifiers()`. The interpolated currency case is analogous but is tracked separately since it requires the same structural pattern match on `QualifierAxis.Currency` rather than dimension extraction.
+- **`string`** holes — string bypasses all dimension checking (the universal escape hatch).
+
+### Static Typed Constant Dimension Validation
+
+The static case (`field f2 as quantity of 'mass' default '1 [ft_i]'`) is **already handled**. `QuantityValidator.Validate()` (`src/Precept/Language/QuantityValidator.cs` lines 30–53) extracts the literal unit's dimension via `UnitDimensionHelper.DeriveUnitDimensionName()` and compares it against `DeclaredQualifiers` from the `TypedConstantContext`. The `DeclaredQualifiers` are threaded from `ResolveTypedConstant()` → `TypedConstantContext` → `QuantityValidator.Validate()`. This was verified in the current analysis; the earlier gap assessment in `frank-dimension-proof-propagation.md` was incorrect about the static case.
+
+No additional work is needed for static typed constant dimension validation.
+
+### New Diagnostic
+
+**`DimensionMismatchInUnitSlot = 124`**
+
+Emitted when a unit-slot hole expression carries a dimension that conflicts with the target field's declared dimension. This is a dimension consistency error specific to interpolated typed constant unit slots.
+
+**Message template:** `"Unit from '{sourceFieldName}' has dimension '{sourceDimension}' but target field '{targetFieldName}' requires dimension '{targetDimension}'."`
+
+**Teachable message:** `"The .unit accessor extracts the unit from the source field, but that field's dimension ('{sourceDimension}') does not match the target field's declared dimension ('{targetDimension}'). Use a field with a compatible dimension, or remove the dimension constraint from the target field."`
+
+**Example triggers:**
+- `f1.unit` from `quantity of 'length'` in unit slot of `quantity of 'mass'` target
+- `f1.unit` from `quantity in 'kg'` (derived dimension = 'mass') in unit slot of `quantity of 'length'` target
+- `Arg.unit` from event arg `as quantity of 'length'` in unit slot of `price of 'mass'` target
+
+---
+
 ## Type-Grammar Matching Algorithm (Slice 2 Design)
 
 ### Overview
@@ -419,7 +496,10 @@ The type checker implements `ResolveInterpolatedTypedConstant()` with this flow:
      a. Resolve the hole expression (ParseExpression result)
      b. Check resolved type against slot compatibility table
      c. If mismatch → emit InterpolatedTypedConstantHoleTypeMismatch
-9. Construct TypedInterpolatedTypedConstant with slot-annotated holes
+9. For each unit-slot hole that resolved to unitofmeasure (not string):
+     → Apply dimension-unit consistency check (§Dimension-Unit Consistency Validation)
+     → If dimension mismatch → emit DimensionMismatchInUnitSlot
+10. Construct TypedInterpolatedTypedConstant with slot-annotated holes
 ```
 
 ### Text Segment Classification
@@ -462,9 +542,10 @@ The valid-form tables above are finite and small (≤ 8 patterns per type). The 
 
 | Code | Name | Value | Severity | Description |
 |------|------|-------|----------|-------------|
-| New | `InvalidInterpolatedTypedConstantForm` | `120` | Error | Segment sequence does not match any valid interpolated form for the target type |
-| New | `InterpolationNotSupportedForType` | `121` | Error | Target type does not support interpolation (formatted temporal types) |
-| New | `InterpolatedTypedConstantHoleTypeMismatch` | `122` | Error | Hole expression type is not valid for the assigned slot |
+| New | `InvalidInterpolatedTypedConstantForm` | `121` | Error | Segment sequence does not match any valid interpolated form for the target type |
+| New | `InterpolationNotSupportedForType` | `122` | Error | Target type does not support interpolation (formatted temporal types) |
+| New | `InterpolatedTypedConstantHoleTypeMismatch` | `123` | Error | Hole expression type is not valid for the assigned slot |
+| New | `DimensionMismatchInUnitSlot` | `124` | Error | Unit-slot hole carries a dimension that conflicts with the target field's declared dimension |
 
 ### AST Node (Parser output)
 `InterpolatedTypedConstantExpression` — mirrors `InterpolatedStringExpression`
@@ -512,7 +593,7 @@ The valid-form tables above are finite and small (≤ 8 patterns per type). The 
 - `src/Precept/Pipeline/TypeChecker.Expressions.cs` — new `ResolveInterpolatedTypedConstant()`
 - `src/Precept/Pipeline/SemanticIndex.cs` — new `TypedInterpolatedTypedConstant` record
 - `src/Precept/Pipeline/TypeChecker.cs` — add `TypedInterpolatedTypedConstant` to `ContainsError()`
-- `src/Precept/Language/DiagnosticCode.cs` — add codes 120, 121, 122
+- `src/Precept/Language/DiagnosticCode.cs` — add codes 121, 122, 123, 124
 - `src/Precept/Language/Diagnostics.cs` — add message templates and teachable messages
 
 **Work:**
@@ -541,6 +622,10 @@ The valid-form tables above are finite and small (≤ 8 patterns per type). The 
 
 5. **Type-grammar table implementation:** The per-type valid-form tables are best represented as static data — an array of pattern descriptors per type. Each pattern descriptor is a sequence of `(SegmentKind, SlotIdentity?)` entries. The matching function walks pattern and actual segments in parallel. This is ~50 lines of matching code plus the static data tables — no complex state machines needed.
 
+6. **Dimension-unit consistency validation** (see §Dimension-Unit Consistency Validation below): After slot assignment and per-hole type compatibility checks (step 8), apply the dimension consistency check to every `unit`-slot hole that resolved to `unitofmeasure`. ~25 lines of checking code.
+
+**Slice 2 LOC estimate:** ~200 lines new code + ~9 dimension-consistency tests on top of existing test count. Breakdown: `ResolveInterpolatedTypedConstant` dispatch + algorithm (~80 lines), type-grammar tables + matching (~50 lines), slot compatibility checking (~30 lines), dimension-unit consistency checking (~25 lines), diagnostic definitions (~15 lines).
+
 **Tests:**
 
 _Structural validity (InvalidInterpolatedTypedConstantForm):_
@@ -562,6 +647,17 @@ _Hole type compatibility (InterpolatedTypedConstantHoleTypeMismatch):_
 - `'100 {q}'` where `q` is `quantity` → currency/unit slot type mismatch
 - `'{q} USD'` where `q` is `quantity` → magnitude slot type mismatch (quantity in magnitude)
 - `'{d} days'` where `d` is `decimal` → temporal magnitude requires integer
+
+_Dimension-unit consistency (DimensionMismatchInUnitSlot):_
+- `'1 {f1.unit}'` where `f1` is `quantity of 'length'`, target is `quantity of 'mass'` → `DimensionMismatchInUnitSlot` (length ≠ mass)
+- `'1 {f1.unit}'` where `f1` is `quantity of 'mass'`, target is `quantity of 'mass'` → no error (matching dimensions)
+- `'1 {f1.unit}'` where `f1` is `quantity` (no declared dimension), target is `quantity of 'mass'` → no error (source dimension unknown, cannot statically determine — conservative accept)
+- `'1 {f1.unit}'` where `f1` is `quantity of 'length'`, target is `quantity` (no declared dimension) → no error (target dimension unconstrained)
+- `'1 {f1.unit}'` where `f1` is `quantity in 'kg'`, target is `quantity of 'length'` → `DimensionMismatchInUnitSlot` (`in 'kg'` produces `DeclaredQualifierMeta.Unit("kg", "mass")`, source dimension = 'mass' ≠ target 'length')
+- `'{r} USD/{f1.unit}'` where `f1` is `quantity of 'length'`, target is `price of 'mass'` → `DimensionMismatchInUnitSlot` (same check applies to price unit slot)
+- `'1 {s}'` where `s` is `string`, target is `quantity of 'mass'` → no dimension check (string escape hatch, existing rule)
+- `'1 {u}'` where `u` is bare `unitofmeasure` field, target is `quantity of 'mass'` → no dimension check (`unitofmeasure` fields carry no dimension qualifiers — conservative accept)
+- `'1 {Arg.unit}'` where `Arg` is event arg `as quantity of 'length'`, target is `quantity of 'mass'` → `DimensionMismatchInUnitSlot` (works via `TypedArgRef.DeclaredQualifiers`)
 
 _String exception:_
 - `'{s} kg'` where `s` is `string` → valid (string in magnitude)
@@ -715,7 +811,7 @@ Slice 5 (Docs/MCP)
 
 2. **Compound temporal with unit holes:** The current plan prohibits unit holes in compound forms (`'{n} {u1} + {m} {u2}'`) because the `+` semantics depend on knowing the unit names. Should this be a Phase 2 feature, or is it permanently out of scope?
 
-3. **Diagnostic code numbering:** I've used 120/121/122. The previous plan used 120 for a single code. Confirm the three-code allocation is acceptable, or suggest a different numbering range.
+3. ~~**Diagnostic code numbering:** I've used 120/121/122. The previous plan used 120 for a single code. Confirm the three-code allocation is acceptable, or suggest a different numbering range.~~ **Resolved:** `ConflictingModifiers = 120` was added to `DiagnosticCode.cs` after the original plan was written. Codes renumbered to 121/122/123 for the three interpolation diagnostics, 124 for `DimensionMismatchInUnitSlot`. The gap at 120 is intentional — it is already allocated.
 
 ---
 

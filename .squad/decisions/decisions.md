@@ -15977,3 +15977,228 @@ These fixes apply equally to `money` fields — a `money in 'USD'` field with `s
 ## Issues encountered
 - The embedded UCUM snapshot stores `printSymbol` as an XML element for these units, so parsing needed element support instead of attribute-only handling.
 - Quote-trigger completions still append the closing quote in the existing completion postprocess path; the unit code remains the inserted UCUM payload prefix used for sorting and slot completion behavior.
+
+# Decision: Dimension-Unit Consistency Validation in Interpolation Plan
+
+**By:** Frank  
+**Date:** 2026-05-11  
+**Directive:** Shane explicitly rejected deferral. The dimension-to-unit consistency gap is addressed in the interpolation plan.
+
+---
+
+## The Gap
+
+When an interpolated typed constant's unit slot is filled by `f1.unit` where `f1` is `quantity of 'length'` and the target field is `quantity of 'mass'`, the slot compatibility check accepts the expression (it's `unitofmeasure`) but does not verify dimension consistency. This produces a dimensionally incoherent quantity that compiles clean.
+
+## Approach Chosen: Option B — Structural AST Pattern Match
+
+**Not Option A** (type system enrichment): `TypedMemberAccess` stores only `TypeKind ResultType`. Adding qualified return types would require a new concept (`TypedUnitOfMeasure(dimension: "length")` or a general qualified-type wrapper) that permeates the type system. The cost is disproportionate — the check can be done structurally with ~25 lines because the dimension information is already available on the receiver's `DeclaredQualifiers`.
+
+**Not Option C** (share static validator logic): The static case is ALREADY HANDLED. `QuantityValidator.Validate()` at `src/Precept/Language/QuantityValidator.cs` lines 30–53 checks dimension-to-unit consistency for static typed constants. The earlier analysis (`frank-dimension-proof-propagation.md`) was incorrect about the static gap. No companion change needed.
+
+**Option B works because:** After `ResolveMemberAccess()` produces a `TypedMemberAccess`, the AST already contains:
+- `ResolvedAccessor` — a `FixedReturnAccessor` with `ReturnsQualifier: QualifierAxis.Unit`  
+- `Object` — the receiver expression (e.g., `TypedFieldRef` or `TypedArgRef`) carrying `DeclaredQualifiers`
+
+The dimension is extractable from `DeclaredQualifiers` using the same logic already in `ValidateAssignmentQualifiers()` (line ~1281 of `TypeChecker.Expressions.cs`). Pattern-match the hole expression, extract dimension from source, compare to target. No type system changes.
+
+## Static Typed Constant Dimension Validation
+
+**NOT in the interpolation plan** — it is already implemented. `QuantityValidator.Validate()` handles it via `TypedConstantContext.DeclaredQualifiers`. The correction is documented in the plan's new §Dimension-Unit Consistency Validation subsection.
+
+## New Diagnostic
+
+- **Code:** `DimensionMismatchInUnitSlot = 124`
+- **Message:** `"Unit from '{sourceFieldName}' has dimension '{sourceDimension}' but target field '{targetFieldName}' requires dimension '{targetDimension}'."`
+- **Emitted by:** Slice 2's `ResolveInterpolatedTypedConstant()`, step 9
+
+## LOC Impact
+
+Slice 2 gains ~25 lines of dimension-checking code and ~9 additional tests. Total Slice 2 LOC estimate: ~200 lines (was implicitly ~175 before this addition).
+
+## Scope Exclusions
+
+- **Currency qualifier mismatch in interpolated slots** — analogous gap on `QualifierAxis.Currency`, tracked separately. The structural pattern match would be identical but on a different axis.
+- **Temporal dimension consistency for duration/period unit slots** — temporal units are a closed-set literal namespace, not physical UCUM dimensions. Different check, narrow surface, out of scope.
+
+# Decision: Dimension-Qualified Unit Slot Compatibility is a Real Gap — Deferred as Separate Issue
+
+**By:** Frank  
+**Date:** 2026-05-11T17:28:00-04:00  
+**Context:** Shane's example — `field f2 as quantity of 'mass' default '1 {f1.unit}'` where `f1 as quantity of 'length'`
+
+---
+
+## Analysis
+
+### 1. Type Resolution: `f1.unit` Is Plain `unitofmeasure` — No Dimension Qualifier
+
+**Source:** `src/Precept/Language/Types.cs:533`
+```csharp
+new FixedReturnAccessor("unit", TypeKind.UnitOfMeasure, "Unit of measure", ReturnsQualifier: QualifierAxis.Unit)
+```
+
+**Source:** `src/Precept/Pipeline/TypeChecker.Expressions.cs:1648-1658` (`ResolveAccessorReturnType`)
+```csharp
+return accessor switch
+{
+    FixedReturnAccessor f => f.Returns,  // Returns TypeKind.UnitOfMeasure — no qualifier
+    ...
+};
+```
+
+**Source:** `src/Precept/Pipeline/SemanticIndex.cs:73-79` (`TypedMemberAccess` record)
+```csharp
+public sealed record TypedMemberAccess(
+    TypeKind ResultType,         // Just the enum — no qualifier metadata
+    TypedExpression Object,
+    TypeAccessor ResolvedAccessor,
+    ImmutableArray<ProofRequirement> ProofRequirements,
+    SourceSpan Span
+) : TypedExpression(ResultType, Span);
+```
+
+**Conclusion:** `f1.unit` resolves to `TypeKind.UnitOfMeasure` with **zero dimension information** in its static type. The type system has no concept of "unitofmeasure of 'length'" as a qualified return type. The `ReturnsQualifier: QualifierAxis.Unit` metadata on the accessor signals "this accessor extracts the qualifier value from its receiver's declaration" — it's used by proof strategies for qualifier discharge, not for narrowing the accessor's own return type.
+
+### 2. Pipeline Stage Analysis: No Stage Currently Catches This
+
+**Slice 2 slot compatibility (per-plan):** Step 8b checks `resolved expression type against the slot's compatibility table`. The `quantity` unit slot accepts `unitofmeasure` and `string`. `f1.unit` resolves to `TypeKind.UnitOfMeasure`. **The check passes.** There is no mechanism in the current slot compatibility design to perform cross-qualifier validation — the table is `TypeKind`-only.
+
+**Slice 6 (ProofEngine):** Explicitly numeric-only. Does not handle dimension or qualifier obligations. Would not fire.
+
+**S2/S5 (declaration-driven qualifier strategies):** S5 reads `f2.DeclaredQualifiers` and checks that `f2`'s declared dimension (`mass`) is consistent — but it checks the *declaration* of `f2`, not the *provenance* of `f2`'s default value's unit slot. It would verify `f2` has a valid dimension declaration; it would NOT trace into the default assignment to verify the RHS unit's dimension matches.
+
+**Result: The mismatch is undetectable with the current type system and the interpolation plan as written.** The compiler will accept `field f2 as quantity of 'mass' default '1 {f1.unit}'` without error, and at runtime `f2` will hold a quantity with a length unit tagged to a mass dimension — dimensionally incoherent.
+
+### 3. Current Plan Assessment: Known Gap, Not Addressed
+
+The plan explicitly excludes this class of check:
+
+> "Non-numeric obligations (presence, qualifier, dimension) — strategy only handles numeric requirements" (S6 scope)
+
+And the S6 rationale says:
+
+> "Adding qualifier propagation in S6 would be redundant with the existing strategy resolution and could introduce conflicting proof paths."
+
+That rationale is **correct for the qualifier obligation discharge case** (is `f2`'s dimension valid? — yes, S5 answers from declaration). But it **does not cover the slot-to-declaration compatibility case** (is the unit being injected into `f2`'s unit slot dimensionally consistent with `f2`'s declared dimension?). These are different questions:
+
+- **S5 question:** "Does `f2` have a valid dimension declaration?" → Yes (mass).
+- **Unasked question:** "Is the expression in `f2`'s unit slot producing a unit from a dimension compatible with `f2`'s declaration?" → Not checked anywhere.
+
+### 4. What Would Be Required to Detect This
+
+Two possible approaches:
+
+**Option A — Dimension-qualified `unitofmeasure` return type (type system enrichment):**
+- `f1.unit` would resolve to something like `TypeKind.UnitOfMeasure` with a `DimensionQualifier = "length"` annotation.
+- The slot compatibility check in Slice 2 would verify that a `unitofmeasure` expression's dimension qualifier matches the target quantity's declared dimension.
+- **Cost:** Requires a new concept of "qualified return types" on accessors — `TypedMemberAccess` would need to carry qualifier metadata, not just `TypeKind`. This is a significant type system extension touching `SemanticIndex`, `TypeChecker.Expressions`, and every consumer of `TypedMemberAccess`.
+
+**Option B — Dimensional slot validation in Slice 2 (lighter, accessor-specific):**
+- When Slice 2 matches a `unitofmeasure`-typed expression in a unit slot, check whether the expression is a `TypedMemberAccess` with `ReturnsQualifier == QualifierAxis.Unit` on a receiver whose field declaration carries a dimension qualifier.
+- If so, compare the receiver field's declared dimension against the target type's declared dimension.
+- **Cost:** ~20 LOC in the slot validation step. Requires access to the field lookup to read the receiver's qualifiers. Only works for direct `.unit` access on fields — not for arbitrary `unitofmeasure` expressions passed through variables.
+
+**Option C — Proof obligation on dimension consistency (new proof strategy):**
+- A new proof strategy (S7?) that fires when an interpolated constant assigns to a field with a declared dimension, checking whether slot sources carry compatible dimension qualifiers.
+- **Cost:** New strategy, new proof requirement type. Overlaps with S5 in uncomfortable ways.
+
+---
+
+## Recommendation: Justified Deferral — Separate Issue, Not This Plan
+
+**This is a real gap.** It contradicts the philosophy. A length unit in a mass quantity is exactly the kind of invalid configuration Precept is built to prevent.
+
+**However, it should NOT be patched into the current interpolation plan.** Reasons:
+
+1. **The gap is not unique to interpolation.** The same mismatch is undetectable for `set f2 = '1 [ft_i]'` (static constant where the user wrote a length unit for a mass field) — that's an existing content-validation gap in static typed constants, not an interpolation-specific issue. The interpolation plan should not be the vehicle for fixing a pre-existing dimensional consistency problem.
+
+2. **The proper fix is broader than one slot check.** Dimension-to-unit consistency validation should apply uniformly: in static typed constants (content validation), in interpolated assignments (slot validation), and potentially in computed assignments. This is a cross-cutting feature, not a Slice 2 bolt-on.
+
+3. **Option B (the cheapest fix) only catches one specific pattern** — `.unit` accessor on a dimension-declared field injected into a different-dimension unit slot. It misses `string` holes carrying wrong units, `unitofmeasure` fields with the wrong dimension, and all indirect paths. Partial detection without the type system enrichment (Option A) would give false confidence.
+
+4. **The `string` exception already establishes the precedent** that some dimensional validity is runtime-deferred. A `string` in a unit slot could also carry a wrong-dimension unit. The system already accepts this class of runtime deferral.
+
+**Action:** File a separate issue: "Dimension-to-unit consistency validation for quantity/price fields." Scope it to cover static and interpolated typed constants, define whether it requires type system enrichment (qualified return types) or a lighter accessor-provenance check, and design it as a unified validation pass rather than a bolt-on to S6 or S2.
+
+The interpolation plan's S6 scope boundary holds. This is not an S6 gap — it's a Slice 2 slot validation gap that requires broader design work.
+
+---
+
+## Decision
+
+- The current interpolation plan does NOT catch dimension-incompatible unit slot assignments.
+- This is acknowledged as a real philosophy gap but is **not** in scope for the current plan.
+- A separate issue should be filed for dimension-to-unit consistency validation.
+- The S6 "no dimension propagation" rationale remains architecturally correct for its stated purpose (obligation discharge from declarations). The gap is in slot validation, not in proof propagation.
+- The `string` exception precedent means the system already accepts some dimensional runtime-deferral. Extending compile-time checks is desirable but is a distinct feature with its own design space.
+
+# Fix: `quantity of ` completion bug
+
+**Date:** 2026-05-11  
+**Author:** Kramer  
+**Status:** Implemented
+
+---
+
+## Bug
+
+After typing `field f1 as quantity of ` and pressing space, VS Code showed type-keyword completions (`bag`, `boolean`, `choice`, `currency`, …). These are wrong: `quantity of` is a qualifier preposition expecting a dimension typed constant like `'mass'`, not a type keyword.
+
+---
+
+## Root Cause
+
+`IsTypePositionContext` in `tools/Precept.LanguageServer/SlotContext.cs` tested only two conditions:
+
+1. The previous significant token is `of`
+2. The enclosing construct has a `TypeExpression` slot
+
+A field declaration (`field f1 as quantity of ...`) satisfies both, so `GetCursorContext` returned `SlotContext.InTypePosition` and `CompletionHandler` served `GetTypeItems()` — the full type catalog.
+
+The problem: `of` plays two distinct roles in type expressions:
+
+| Context | Role | Expects |
+|---------|------|---------|
+| `set of `, `list of `, `bag of `, `queue of ` | collection element-type preposition | type keyword → `InTypePosition` ✓ |
+| `choice of ` | choice element-type preposition | type keyword → `InTypePosition` ✓ |
+| `quantity of `, `price of `, `period of ` | qualifier preposition | typed constant (e.g. `'mass'`) → NOT `InTypePosition` |
+
+The original code could not distinguish them.
+
+---
+
+## Fix
+
+Extended `IsTypePositionContext` with `tokens` + `tokenIndex` parameters. The method now looks at the token immediately before `of` and resolves it against `Types.ByToken`. It returns `true` only when the preceding type is:
+
+- `TypeCategory.Collection` (set, list, bag, queue, log, lookup, …), OR
+- `TypeKind.Choice`
+
+All other types (BusinessDomain, Temporal, Scalar with qualifier shapes) return `false`, causing the context to fall through to `AfterKeyword` → empty completion list instead of wrong type-keyword completions.
+
+This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kind` from catalog metadata — no per-type identity hardcoding.
+
+---
+
+## Files Changed
+
+- `tools/Precept.LanguageServer/SlotContext.cs` — updated `IsTypePositionContext` signature and logic; updated call site in `TryGetSpecializedContext`
+- `test/Precept.LanguageServer.Tests/SlotContextResolverTests.cs` — added 3 tests:
+  - `GetCursorContext_ChoiceElementTypeAfterOf_ReturnsInTypePosition` (regression anchor for `choice of`)
+  - `GetCursorContext_QuantityDimensionQualifierAfterOf_DoesNotReturnInTypePosition` (the bug case)
+  - Existing `GetCursorContext_CollectionInnerTypeAfterOf_ReturnsInTypePosition` still passes
+
+---
+
+## Scope Check
+
+`set of ` and `list of ` were NOT broken — confirmed by the existing test and the fix logic (`TypeCategory.Collection` → still returns `InTypePosition`).
+
+`price of ` and `period of ` are also fixed by the same logic (they are `BusinessDomain` and `Temporal` respectively).
+
+---
+
+## Not Done / Follow-up
+
+After `quantity of ` (no typed constant yet), completions are now empty. Ideally a follow-up could offer dimension name suggestions via a new `InQualifierPosition` context with `GetDimensionItems()` — but that requires catalog-driven qualifier-site detection and is a separate improvement.
