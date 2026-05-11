@@ -17,7 +17,7 @@ public class ExpressionFormCatalogTests
     [Fact]
     public void ExpressionForms_All_HasExpectedCount()
     {
-        ExpressionForms.All.Should().HaveCount(14);
+        ExpressionForms.All.Should().HaveCount(15);
     }
 
     [Fact]

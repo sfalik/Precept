@@ -440,22 +440,47 @@ public static partial class Parser
                 SourceSpan.Covering(startToken.Span, lastSpan));
         }
 
-        [HandlesCatalogMember(ExpressionFormKind.Literal)]
+        [HandlesCatalogMember(ExpressionFormKind.InterpolatedTypedConstant)]
         private ParsedExpression ParseInterpolatedTypedConstant()
         {
             var startToken = Advance(); // consume TypedConstantStart
+            var segments = ImmutableArray.CreateBuilder<InterpolationSegment>();
+
+            // Add the initial text segment (the text before the first hole)
+            segments.Add(new TextSegment(startToken.Text, startToken.Span));
             var lastSpan = startToken.Span;
 
+            // Process segments until TypedConstantEnd
             while (!IsAtEnd && Peek().Kind != TokenKind.TypedConstantEnd)
             {
-                lastSpan = Advance().Span;
+                if (Peek().Kind == TokenKind.TypedConstantMiddle)
+                {
+                    // Text between holes
+                    var middleToken = Advance();
+                    segments.Add(new TextSegment(middleToken.Text, middleToken.Span));
+                    lastSpan = middleToken.Span;
+                }
+                else
+                {
+                    // An embedded expression (hole)
+                    var holeExpr = ParseExpression(0, () =>
+                        Peek().Kind == TokenKind.TypedConstantMiddle ||
+                        Peek().Kind == TokenKind.TypedConstantEnd);
+                    segments.Add(new HoleSegment(holeExpr, holeExpr.Span));
+                    lastSpan = holeExpr.Span;
+                }
             }
 
+            // Consume the TypedConstantEnd token (the text after the last hole)
             if (Peek().Kind == TokenKind.TypedConstantEnd)
-                lastSpan = Advance().Span;
+            {
+                var endToken = Advance();
+                segments.Add(new TextSegment(endToken.Text, endToken.Span));
+                lastSpan = endToken.Span;
+            }
 
-            return new LiteralExpression(
-                TokenKind.TypedConstantStart, startToken.Text,
+            return new InterpolatedTypedConstantExpression(
+                segments.ToImmutable(),
                 SourceSpan.Covering(startToken.Span, lastSpan));
         }
 

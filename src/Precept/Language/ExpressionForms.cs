@@ -34,6 +34,9 @@ public enum ExpressionFormKind
 
     // Interpolated string with embedded expressions
     InterpolatedString = 14,
+
+    // Interpolated typed constant with embedded expressions
+    InterpolatedTypedConstant = 15,
 }
 
 /// <summary>
@@ -80,7 +83,7 @@ public static class ExpressionForms
 
     public static ExpressionFormMeta GetMeta(ExpressionFormKind kind) => kind switch
     {
-        ExpressionFormKind.Literal          => new(kind, ExpressionCategory.Atom,       false, [TokenKind.StringLiteral, TokenKind.NumberLiteral, TokenKind.TypedConstant, TokenKind.TypedConstantStart, TokenKind.True, TokenKind.False], "A literal value: string, number, boolean, or typed constant."),
+        ExpressionFormKind.Literal          => new(kind, ExpressionCategory.Atom,       false, [TokenKind.StringLiteral, TokenKind.NumberLiteral, TokenKind.TypedConstant, TokenKind.True, TokenKind.False], "A literal value: string, number, boolean, or typed constant."),
         ExpressionFormKind.Identifier       => new(kind, ExpressionCategory.Atom,       false, [TokenKind.Identifier],    "A bare field or parameter name."),
         ExpressionFormKind.Grouped          => new(kind, ExpressionCategory.Atom,       false, [TokenKind.LeftParen],     "A parenthesized expression: (expr)."),
         ExpressionFormKind.BinaryOperation  => new(kind, ExpressionCategory.Composite,  true,  [],                        "An infix binary operation: left op right."),
@@ -100,6 +103,9 @@ public static class ExpressionForms
         ExpressionFormKind.InterpolatedString => new(kind, ExpressionCategory.Atom, false,
             [TokenKind.StringStart],
             "An interpolated string with embedded expressions: \"Hello {name}!\"."),
+        ExpressionFormKind.InterpolatedTypedConstant => new(kind, ExpressionCategory.Atom, false,
+            [TokenKind.TypedConstantStart],
+            "An interpolated typed constant with embedded expressions: '{x} kg'."),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

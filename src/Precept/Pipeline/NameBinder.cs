@@ -385,6 +385,10 @@ public static class NameBinder
                     foreach (var segment in interpolated.Segments.OfType<HoleSegment>())
                         CollectFieldDependencies(segment.Expression, refs, bindings);
                     break;
+                case InterpolatedTypedConstantExpression interpolatedTyped:
+                    foreach (var segment in interpolatedTyped.Segments.OfType<HoleSegment>())
+                        CollectFieldDependencies(segment.Expression, refs, bindings);
+                    break;
             }
         }
 
@@ -641,6 +645,16 @@ public static class NameBinder
 
                 case InterpolatedStringExpression interp:
                     foreach (var segment in interp.Segments)
+                    {
+                        if (segment is HoleSegment hole)
+                        {
+                            WalkExpression(hole.Expression, eventContext, bindings, declaringField);
+                        }
+                    }
+                    break;
+
+                case InterpolatedTypedConstantExpression interpTyped:
+                    foreach (var segment in interpTyped.Segments)
                     {
                         if (segment is HoleSegment hole)
                         {

@@ -92,3 +92,7 @@ public sealed record HoleSegment(ParsedExpression Expression, SourceSpan Span) :
 /// <summary>An interpolated string with embedded expressions: "Hello {name}!".</summary>
 public sealed record InterpolatedStringExpression(ImmutableArray<InterpolationSegment> Segments, SourceSpan Span)
     : ParsedExpression(ExpressionFormKind.InterpolatedString, Span);
+
+/// <summary>An interpolated typed constant with embedded expressions: '{x} kg'.</summary>
+public sealed record InterpolatedTypedConstantExpression(ImmutableArray<InterpolationSegment> Segments, SourceSpan Span)
+    : ParsedExpression(ExpressionFormKind.InterpolatedTypedConstant, Span);

@@ -1229,7 +1229,9 @@ public class ParserExpressionTests
     [InlineData(ExpressionFormKind.ListLiteral,      ExpressionCategory.Collection, false)]
     [InlineData(ExpressionFormKind.PostfixOperation, ExpressionCategory.Composite,  true)]
     [InlineData(ExpressionFormKind.Quantifier,       ExpressionCategory.Composite,  false)]
-    [InlineData(ExpressionFormKind.CIFunctionCall,   ExpressionCategory.Invocation, false)]
+    [InlineData(ExpressionFormKind.CIFunctionCall,          ExpressionCategory.Invocation, false)]
+    [InlineData(ExpressionFormKind.InterpolatedString,      ExpressionCategory.Atom,       false)]
+    [InlineData(ExpressionFormKind.InterpolatedTypedConstant, ExpressionCategory.Atom,     false)]
     public void ExpressionFormCatalog_AllMembers_HaveCorrectCategoryAndDenotation(
         ExpressionFormKind kind, ExpressionCategory expectedCategory, bool expectedIsLed)
     {
@@ -1244,10 +1246,10 @@ public class ParserExpressionTests
     }
 
     [Fact]
-    public void ExpressionFormCatalog_All_HasExactly14Members()
+    public void ExpressionFormCatalog_All_HasExactly15Members()
     {
-        // GREEN — the expression form enum must have exactly 14 members.
-        ExpressionForms.All.Should().HaveCount(14,
-            "there are exactly 14 ExpressionFormKind members in the Precept expression grammar");
+        // GREEN — the expression form enum must have exactly 15 members.
+        ExpressionForms.All.Should().HaveCount(15,
+            "there are exactly 15 ExpressionFormKind members in the Precept expression grammar");
     }
 }
