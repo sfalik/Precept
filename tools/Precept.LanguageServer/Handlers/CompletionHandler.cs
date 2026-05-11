@@ -45,9 +45,23 @@ internal sealed class CompletionHandler : ICompletionHandler
     private static CompletionList GetCompletions(Compilation compilation, Position position, string? triggerCharacter)
     {
         var context = SlotContextResolver.GetCursorContext(compilation, position);
-        if (triggerCharacter == "'" && context is SlotContext.InTypePosition or SlotContext.InExpression or SlotContext.InArgDefault)
+
+        // A single quote always opens a typed constant — never show keyword completions.
+        // If type inference succeeds, show typed constant values; otherwise return empty.
+        if (triggerCharacter == "'")
         {
             return CreateCompletionList(GetTypedConstantItems(compilation, position, context));
+        }
+
+        // Ctrl+Space inside an already-open typed constant (e.g. cursor between '' chars).
+        // SlotContextResolver may return TopLevel if the parse tree doesn't cover the literal
+        // span, so detect by inspecting the raw token under the cursor instead.
+        if (triggerCharacter is null && IsInsideTypedConstantToken(compilation.Tokens.Tokens, position))
+        {
+            var innerContext = context is SlotContext.InExpression or SlotContext.InArgDefault
+                ? context
+                : SlotContext.InExpression;
+            return CreateCompletionList(GetTypedConstantItems(compilation, position, innerContext));
         }
 
         return context switch
@@ -308,7 +322,7 @@ internal sealed class CompletionHandler : ICompletionHandler
             return true;
         }
 
-        if (context == SlotContext.InExpression && TryGetEnclosingFieldType(compilation, position, out expectedType))
+        if (TryGetCallParameterType(compilation, position, out expectedType))
         {
             return true;
         }
@@ -320,8 +334,338 @@ internal sealed class CompletionHandler : ICompletionHandler
             return true;
         }
 
+        if (context == SlotContext.InExpression && TryGetEnclosingFieldType(compilation, position, out expectedType))
+        {
+            return true;
+        }
+
+        if (context == SlotContext.InExpression && TryGetBinaryPeerOperandType(compilation, position, out expectedType))
+        {
+            return true;
+        }
+
         expectedType = default;
         return false;
+    }
+
+    private static bool TryGetCallParameterType(Compilation compilation, Position position, out TypeKind expectedType)
+    {
+        if (!CallContextResolver.TryFindActiveCall(compilation, position, out var call))
+        {
+            expectedType = default;
+            return false;
+        }
+
+        if (call.IsAccessor)
+        {
+            if (call.ReceiverType is not { } receiverType)
+            {
+                expectedType = default;
+                return false;
+            }
+
+            var accessor = Types.GetMeta(receiverType).Accessors.FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, call.Name, StringComparison.Ordinal));
+            if (accessor is null)
+            {
+                expectedType = default;
+                return false;
+            }
+
+            if (accessor is FixedReturnAccessor fixedReturn && fixedReturn.ParameterType is { } fixedParameterType)
+            {
+                expectedType = fixedParameterType;
+                return true;
+            }
+
+            if (accessor.ParameterType is { } parameterType)
+            {
+                expectedType = parameterType;
+                return true;
+            }
+
+            expectedType = default;
+            return false;
+        }
+
+        var parameterKinds = Functions.FindByName(call.Name)
+            .ToArray()
+            .SelectMany(meta => meta.Overloads)
+            .Where(overload => overload.Parameters.Count > call.ActiveParameter)
+            .Select(overload => overload.Parameters[call.ActiveParameter].Kind)
+            .Distinct()
+            .ToArray();
+
+        if (parameterKinds.Length == 1)
+        {
+            expectedType = parameterKinds[0];
+            return true;
+        }
+
+        expectedType = default;
+        return false;
+    }
+
+    private static bool TryGetBinaryPeerOperandType(Compilation compilation, Position position, out TypeKind expectedType)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            expectedType = default;
+            return false;
+        }
+
+        tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
+        tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
+        if (tokenIndex < 0
+            || !Operators.ByToken.ContainsKey((tokens[tokenIndex].Kind, Arity.Binary)))
+        {
+            expectedType = default;
+            return false;
+        }
+
+        return TryResolveExpressionTypeEndingAtToken(compilation, FindPreviousSignificantToken(tokens, tokenIndex - 1), out expectedType);
+    }
+
+    private static bool TryResolveExpressionTypeEndingAtToken(Compilation compilation, int tokenIndex, out TypeKind expectedType)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
+        if (tokenIndex < 0)
+        {
+            expectedType = default;
+            return false;
+        }
+
+        var token = tokens[tokenIndex];
+        switch (token.Kind)
+        {
+            case TokenKind.Identifier:
+                var dotIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+                if (dotIndex >= 0 && tokens[dotIndex].Kind == TokenKind.Dot)
+                {
+                    var receiverIndex = FindPreviousSignificantToken(tokens, dotIndex - 1);
+                    if (receiverIndex >= 0
+                        && TryResolveMemberExpressionType(compilation, receiverIndex, token.Text, out expectedType))
+                    {
+                        return true;
+                    }
+                }
+
+                return TryResolveIdentifierType(compilation, token.Text, token.Span, out expectedType);
+
+            case TokenKind.RightParen:
+                return TryResolveParenthesizedExpressionType(compilation, tokenIndex, out expectedType);
+
+            case TokenKind.StringLiteral:
+                expectedType = TypeKind.String;
+                return true;
+
+            case TokenKind.True:
+            case TokenKind.False:
+                expectedType = TypeKind.Boolean;
+                return true;
+
+            case TokenKind.NumberLiteral:
+                expectedType = token.Text.Contains('.') ? TypeKind.Decimal : TypeKind.Integer;
+                return true;
+
+            default:
+                expectedType = default;
+                return false;
+        }
+    }
+
+    private static bool TryResolveParenthesizedExpressionType(Compilation compilation, int closeParenIndex, out TypeKind expectedType)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var openParenIndex = FindMatchingOpenParen(tokens, closeParenIndex);
+        if (openParenIndex < 0)
+        {
+            expectedType = default;
+            return false;
+        }
+
+        var nameIndex = FindPreviousSignificantToken(tokens, openParenIndex - 1);
+        if (nameIndex >= 0 && TryGetCallableName(tokens[nameIndex], out var callableName))
+        {
+            var qualifierIndex = FindPreviousSignificantToken(tokens, nameIndex - 1);
+            if (qualifierIndex >= 0 && tokens[qualifierIndex].Kind == TokenKind.Dot)
+            {
+                var receiverIndex = FindPreviousSignificantToken(tokens, qualifierIndex - 1);
+                if (receiverIndex >= 0
+                    && TryResolveExpressionTypeEndingAtToken(compilation, receiverIndex, out var receiverType)
+                    && TryResolveAccessorResultType(receiverType, callableName, out expectedType))
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                if (qualifierIndex >= 0 && tokens[qualifierIndex].Kind == TokenKind.Tilde)
+                {
+                    callableName = "~" + callableName;
+                }
+
+                if (TryResolveFunctionResultType(callableName, CountArguments(tokens, openParenIndex, closeParenIndex), out expectedType))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return TryResolveExpressionTypeEndingAtToken(compilation, closeParenIndex - 1, out expectedType);
+    }
+
+    private static bool TryResolveIdentifierType(Compilation compilation, string name, SourceSpan span, out TypeKind expectedType)
+    {
+        var position = new Position(span.StartLine - 1, Math.Max(span.StartColumn - 1, 0));
+        var eventName = SlotContextResolver.GetCurrentEventName(compilation, position);
+        if (eventName is not null
+            && compilation.Semantics.EventsByName.TryGetValue(eventName, out var currentEvent))
+        {
+            var arg = currentEvent.Args.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
+            if (arg is not null)
+            {
+                expectedType = arg.ResolvedType;
+                return true;
+            }
+        }
+
+        if (compilation.Semantics.FieldsByName.TryGetValue(name, out var field))
+        {
+            expectedType = field.ResolvedType;
+            return true;
+        }
+
+        expectedType = default;
+        return false;
+    }
+
+    private static bool TryResolveMemberExpressionType(
+        Compilation compilation,
+        int receiverIndex,
+        string memberName,
+        out TypeKind expectedType)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        receiverIndex = FindPreviousSignificantToken(tokens, receiverIndex);
+        if (receiverIndex < 0)
+        {
+            expectedType = default;
+            return false;
+        }
+
+        var receiverToken = tokens[receiverIndex];
+        if (receiverToken.Kind == TokenKind.Identifier
+            && compilation.Semantics.EventsByName.TryGetValue(receiverToken.Text, out var evt))
+        {
+            var arg = evt.Args.FirstOrDefault(candidate => string.Equals(candidate.Name, memberName, StringComparison.Ordinal));
+            if (arg is not null)
+            {
+                expectedType = arg.ResolvedType;
+                return true;
+            }
+        }
+
+        if (!TryResolveExpressionTypeEndingAtToken(compilation, receiverIndex, out var receiverType))
+        {
+            expectedType = default;
+            return false;
+        }
+
+        return TryResolveAccessorResultType(receiverType, memberName, out expectedType);
+    }
+
+    private static bool TryResolveAccessorResultType(TypeKind receiverType, string memberName, out TypeKind expectedType)
+    {
+        var accessor = Types.GetMeta(receiverType).Accessors.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, memberName, StringComparison.Ordinal));
+        if (accessor is FixedReturnAccessor fixedReturn)
+        {
+            expectedType = fixedReturn.Returns;
+            return true;
+        }
+
+        expectedType = default;
+        return false;
+    }
+
+    private static bool TryResolveFunctionResultType(string functionName, int arity, out TypeKind expectedType)
+    {
+        var returnTypes = Functions.FindByName(functionName)
+            .ToArray()
+            .SelectMany(meta => meta.Overloads)
+            .Where(overload => overload.Parameters.Count == arity)
+            .Select(overload => overload.ReturnType)
+            .Distinct()
+            .ToArray();
+
+        if (returnTypes.Length == 1)
+        {
+            expectedType = returnTypes[0];
+            return true;
+        }
+
+        expectedType = default;
+        return false;
+    }
+
+    private static int FindMatchingOpenParen(ImmutableArray<Token> tokens, int closeParenIndex)
+    {
+        var depth = 0;
+        for (var index = closeParenIndex; index >= 0; index--)
+        {
+            switch (tokens[index].Kind)
+            {
+                case TokenKind.RightParen:
+                    depth++;
+                    break;
+                case TokenKind.LeftParen:
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return index;
+                    }
+                    break;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int CountArguments(ImmutableArray<Token> tokens, int openParenIndex, int closeParenIndex)
+    {
+        var argumentCount = 0;
+        var sawArgumentToken = false;
+        var nesting = 0;
+
+        for (var index = openParenIndex + 1; index < closeParenIndex; index++)
+        {
+            var token = tokens[index];
+            switch (token.Kind)
+            {
+                case TokenKind.LeftParen:
+                    nesting++;
+                    sawArgumentToken = true;
+                    break;
+                case TokenKind.RightParen when nesting > 0:
+                    nesting--;
+                    break;
+                case TokenKind.Comma when nesting == 0:
+                    argumentCount++;
+                    break;
+                default:
+                    if (!Tokens.GetMeta(token.Kind).Categories.Contains(TokenCategory.Structural))
+                    {
+                        sawArgumentToken = true;
+                    }
+                    break;
+            }
+        }
+
+        return sawArgumentToken ? argumentCount + 1 : 0;
     }
 
     private static bool TryGetEnclosingFieldType(Compilation compilation, Position position, out TypeKind expectedType)
@@ -485,6 +829,45 @@ internal sealed class CompletionHandler : ICompletionHandler
         return StartsAt(tokens[tokenIndex].Span, position)
             ? tokenIndex - 1
             : tokenIndex;
+    }
+
+    private static int FindPreviousSignificantToken(ImmutableArray<Token> tokens, int startIndex)
+    {
+        for (var index = startIndex; index >= 0; index--)
+        {
+            if (!Tokens.GetMeta(tokens[index].Kind).Categories.Contains(TokenCategory.Structural))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool TryGetCallableName(Token token, out string name)
+    {
+        var meta = Tokens.GetMeta(token.Kind);
+        if (token.Kind == TokenKind.Identifier || meta.IsFunctionCallLeader || meta.IsValidAsMemberName)
+        {
+            name = token.Text;
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
+
+    private static bool IsInsideTypedConstantToken(ImmutableArray<Token> tokens, Position position)
+    {
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        var token = tokens[tokenIndex];
+        return token.Kind is TokenKind.TypedConstant or TokenKind.TypedConstantStart
+            && Contains(token.Span, position);
     }
 
     private static bool StartsAt(SourceSpan span, Position position) =>

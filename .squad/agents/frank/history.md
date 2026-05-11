@@ -6,6 +6,8 @@
 - Investigation docs can be archived once their outcomes are captured in canonical docs, proposals, or the squad decision ledger.
 
 ## Learnings
+- 2026-05-10 — Refined the min/max bound unit-matching rule after Shane's correction. The previous decision said "same dimension (convertible unit) for quantity" regardless of qualifier kind. Shane drew a sharper line keyed on DeclaredQualifierMeta subtype: (1) `Unit` qualifier (`in 'kg'`) → bound must be the **exact same unit** — `'100 lbs'` on `quantity in 'kg'` is a compile error (`QualifierMismatch`, code 68); (2) `Dimension` qualifier (`of 'mass'`) → bound may be any unit in the declared dimension — `'100 lbs'` on `quantity of 'mass'` is valid (`DimensionCategoryMismatch`, code 69, only on cross-dimension). Currency remains exact-match for `money` (`TypeMismatch`). Both `QualifierMismatch` and `DimensionCategoryMismatch` were already declared — neither had an emission site before this. The code change in `ValidateMinMaxBoundQualifier` is: Path A uses `boundUnit.CanonicalCode` vs `unitQualifier.UnitCode` (exact); Path B calls `DeriveUnitDimensionName(boundUnit)` vs `dimQualifier.DimensionName` (dimension). Decision updated at `.squad/decisions/inbox/frank-money-modifiers.md`.
+
 - 2026-05-10T15:38:30-04:00 — Comprehensive grammar doc review found 17 issues (8 Error, 6 Warning, 3 Minor). All doc-only. The systematic pattern: pre-verb `when` guard slots are missing from 6 anatomy/family-detail locations. Additionally: computed-field anatomy has wrong slot order annotation (modifiers shown trailing when they precede `<-`), ExpressionForms count says 13 but is 14, CIFunctionCall example syntax is inverted (`startswith~` vs `~startsWith`), BecauseClause incorrectly called "mandatory" in StateEnsure context, quick-reference invariant 2 stale. Full report at `docs/working/frank-grammar-comprehensive-review-2026-05-10.md`.
 
 - 2026-05-10T15:32:08-04:00 — Exhaustive grammar/parser audit confirmed `SupportsPostActionEnsure` is the SOLE out-of-band parser injection. No other `Supports*` flags or post-slot-walk injection blocks exist. `IsOutlineNode` is LS-only, never read by parser. Grammar doc lags on `when` guard slots for EventEnsure, StateEnsure, and StateAction — all doc-only fixes. Language spec line 861–869 documents the bad form and must be corrected on removal. Audit at `docs/working/frank-grammar-spec-audit-2026-05-10.md`.
@@ -29,7 +31,42 @@
 - Recent batches settled the language-server baseline, the Phase 2 gap-closure plan, the parser/proof metadata audit, and tracker-status hygiene.
 - Use `.squad/decisions.md` for exact chronology and `docs/` / `research/` for the surviving canonical rationale.
 
+## Learnings (continued)
+
+- 2026-05-10 (revised) — Reversed the `min`/`max` exclusion from `money`/`quantity`. Code investigation found: (1) the parser already accepts typed constants in modifier value positions (`TypedConstant` is in `ExpressionStartTokens` from `ExpressionForms.Literal`); (2) `ValidateModifierBounds` already silently skips non-NumberLiteral bounds — no parser or validation-path blocker; (3) the TypeChecker doesn't type-check `min`/`max` bound expressions for ANY type (only `default` is resolved via `Resolve()`); (4) `NumericBoundSource.DeclarationValue` is already conservative in the proof engine for all types. The original "different literal form, different validation path, currency enforcement needed" claim was wrong on all three counts. Currency-mismatch detection for modifier bounds requires adding `Resolve()` calls for min/max bound values — same pattern as `default`, ~3 lines — not a separate feature. Decision updated to allow `min`/`max` on `money`/`quantity` with typed-constant bounds.
+
+- 2026-05-10 — Cross-checked `frank-money-modifiers.md` against `docs/language/business-domain-types.md`. Key findings: (1) D16 in that doc is the authoritative governing principle — it explicitly lists `positive`/`nonnegative`/`nonzero` for ALL FOUR business-domain types, and `min`/`max` for `money`/`quantity`/`price` (blocked for `exchangerate` since ordering is undefined there). (2) The spec already lists `nonnegative` in the individual Constraints rows for `money` and `quantity` — the main language spec exclusion was the error, not the business-domain-types doc. (3) Scope gap identified: `price` should be in the same implementation pass (D16 includes it, constraint example shows `positive` on `price`). (4) Tension identified: D16 says bounds must be "same domain type with matching unit/currency" (typed constants), but the constraint interaction example shows `min 0 max 1000` with plain integers on `quantity in 'kg'` — needs Shane's call before implementation. Decision addendum written at the bottom of `frank-money-modifiers.md`.
+
+- 2026-05-10 — Shane ruled: any modifier that takes a value uses the same `Resolve(expr, ctx, typedField.ResolvedType)` call as `default` — no bespoke qualifier helper, no asymmetric post-resolve check. Code confirmed: `Resolve()` takes bare `TypeKind`, qualifier info is never passed through, the `default` path has no post-resolve mismatch check. Qualifier-alignment gap (currency, unit) and plain-number gap exist equally for `default` and `min`/`max` — note as pre-existing, fix uniformly in follow-up. `ValidateMinMaxBoundQualifier` removed from Kramer's brief. Test anchors revised: `min '100.00 EUR'` and `min 100` on money fields are 0-error, same as `default`.
+
+### 2026-05-10T[finalized] — Money/quantity/price modifier decision finalized with full implementation brief
+
+- Shane ruled on the open bound-form question: typed constants are required for `min`/`max` on business domain types — plain numerics (`min 0`) are rejected. A "convertible" unit means same physical dimension (e.g., `lbs` valid for `quantity in 'kg'`); same currency required for `money`.
+- Scope expanded from money+quantity to money+quantity+price per D16 (`exchangerate` gets zero-bound modifiers as valid but redundant; `min`/`max` permanently blocked for `exchangerate`).
+- Convertibility mechanism: `QualifierMatch.Same` is proof-engine only and does NOT fire during standalone `Resolve()` calls on bound expressions. A new `ValidateMinMaxBoundQualifier` method is needed in `TypeChecker.cs` that (a) for money — extracts currency from `TypedTypedConstant.ParsedValue` and compares to field's `DeclaredQualifierMeta.Currency.CurrencyCode`; (b) for quantity — calls `DeriveUnitDimensionName()` on the bound's `UcumParsedUnit` and compares to field's `DeclaredQualifierMeta.Unit.DimensionName` or `Dimension.DimensionName`; emits `DimensionCategoryMismatch` (already declared, never emitted).
+- Plain-number rejection mechanism: `Resolve(NumberLiteral, ctx, Money)` yields `TypedLiteral(Integer, ...)` because `Integer` doesn't widen to `Money`; post-resolve type check `resolved.ResultType != typedField.ResolvedType` → `TypeMismatch`.
+- Implementation brief written in `.squad/decisions/inbox/frank-money-modifiers.md` with 3 slices, 13 test anchors, and explicit scope boundary. Price qualifier check is out of scope for the first PR; `DimensionCategoryMismatch` finally gets its first emission site.
+- The spec's `min 0 max 1000` constraint interaction example is confirmed wrong shorthand; must be corrected to `min '0 kg' max '1000 kg'` per the ruling.
+
 ## Recent Updates
+
+### 2026-05-10T[revised] — Simplified min/max TypeChecker brief per Shane's principle: use Resolve() same as default, no bespoke qualifier helper
+
+Shane reviewed the three-part implementation brief (Resolve() + post-resolve mismatch check + ValidateMinMaxBoundQualifier) and ruled: any modifier that takes a value must use the same resolution path as `default` — not a special-cased helper.
+
+Code-level verification confirmed the ruling is correct:
+
+1. `Resolve()` signature: `TypeKind? expectedType` — a bare TypeKind. `typedField.ResolvedType` is also `TypeKind`. No qualifier information is passed through.
+2. `ResolveTypedConstant()` validates that the typed-constant content is valid for the declared type (ISO 4217 code exists, UCUM string parses). It does NOT check qualifier alignment — no field-qualifier context reaches it.
+3. The `default` path has NO post-resolve `ResultType != typedField.ResolvedType` check. The resolved expression is stored as-is.
+4. Therefore: `'100.00 EUR'` on `money in 'USD'` passes `Resolve()` for `default` — same gap would exist for `min`/`max`. Adding a qualifier check only to `min`/`max` would be asymmetric.
+5. `min 100` on `money in 'USD'` would similarly pass silently — `IsAssignable(Integer, Money)` is false, so `Resolve()` returns `TypedLiteral(Integer)`, and no post-resolve check exists for `default`.
+
+**Revised implementation for Kramer:** Call `Resolve(boundExpr, ctx, typedField.ResolvedType)` for each valued modifier (min/max), exactly as `default` does. That is the complete TypeChecker change — no post-resolve check, no `ValidateMinMaxBoundQualifier`.
+
+**Revised test anchors:** `min '100.00 EUR'` and `min 100` on `money in 'USD'` are no longer expected errors — they pass through with the same gap as `default`. Only invalid content (e.g., `'not-valid-currency'`) produces `InvalidTypedConstantContent`.
+
+**Qualifier-alignment and plain-number gaps** recorded as pre-existing, present equally in `default`, to be fixed uniformly in a follow-up (threading qualifier context through `Resolve()` or adding a post-resolve check to ALL valued modifier and default paths).
 
 ### 2026-05-11T01:38:51Z — Diagnostic-gating analysis and parser follow-through recorded
 - Frank-2's terminal-state analysis is now durable: path-to-terminal warnings only make sense once at least one terminal state is declared, and lifecycle messaging should make the declared-terminal contract explicit.

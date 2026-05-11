@@ -350,6 +350,42 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_TypedConstant_RuleComparison_UsesPeerOperandType()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept LoanApplication
+            field ApprovedAmount as money in 'USD' default '0.00 USD'
+            rule ApprovedAmount > ¦ because "Approved amount must be positive"
+            state Draft initial terminal
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("0.00 USD");
+        labels.Should().Contain(Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Money).ContentValidation!.Examples);
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_NoKeywordsInsideTypedConstantSpan()
+    {
+        // Ctrl+Space (no trigger char) inside '' must not bleed top-level keyword completions.
+        var completions = await GetCompletionsAsync("""
+            precept LoanApplication
+            field Status as text
+            rule Status == '¦' because "Status must be set"
+            state Draft initial terminal
+            """);
+
+        var keywords = completions.Items
+            .Where(item => item.Kind == CompletionItemKind.Keyword)
+            .Select(item => item.Label)
+            .ToArray();
+
+        keywords.Should().BeEmpty("top-level construct keywords must not appear inside a typed constant");
+    }
+
+    [Fact]
     public async Task Completions_TopLevelConstruct_UsesSnippetInsertText()
     {
         var meta = Precept.Language.Constructs.GetMeta(Precept.Language.ConstructKind.FieldDeclaration);

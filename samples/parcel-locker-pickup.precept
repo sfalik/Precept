@@ -42,7 +42,7 @@ from Empty on LoadParcel
     -> set LastReminderDay = CurrentDay
     -> transition AwaitingPickup
 
-from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1
+from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1 
     -> push ReminderLog SendReminder.Note
     -> set ReminderCount = ReminderCount + 1
     -> set LastReminderDay = CurrentDay
