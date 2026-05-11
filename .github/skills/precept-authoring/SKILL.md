@@ -13,30 +13,44 @@ description: >-
 
 Follow these steps when creating or editing a `.precept` file.
 
-## Step 1: Understand the DSL Vocabulary
+## Step 1: Orient (New Sessions Only)
 
-Call `precept_language` to get the current keyword categories, operators, type system, expression scopes, and constraint forms. This is the authoritative reference — do not guess syntax.
+Call `precept_quickstart` at the start of a new authoring session. It returns what Precept is, core concepts, a guide to all authoring tools, and minimal verified DSL examples. Skip if context from an earlier step in this session is already established.
 
-## Step 2: Gather Conventions
+## Step 2: Gather Local Conventions
 
-If the workspace contains existing `.precept` files, read at least one to learn the local style (naming conventions, comment placement, field ordering, guard patterns). If no local files exist, use the structure returned by `precept_language` as your guide.
+Read one or more existing `.precept` files from the workspace to understand local style: naming conventions, comment placement, field ordering, and guard patterns. If no local files exist, the verified patterns from `precept_patterns` (Step 3) serve as the style reference.
 
-## Step 3: Design the Model
+## Step 3: Get Patterns Before Drafting
+
+Call `precept_patterns` before writing the first draft. The 8 verified common patterns and 3 anti-patterns are the most efficient way to avoid mistakes that would require backtracking later.
+
+## Step 4: Design the Model
 
 Before writing code, outline the domain model:
 
-1. **States** — identify the distinct lifecycle stages. Mark one as `initial`.
-2. **Fields** — identify the data tracked across states. Choose types (`string`, `number`, `boolean`), set defaults, and mark nullable fields.
+1. **States** — identify the distinct lifecycle stages. Mark one as `initial`. Mark terminal stages as `terminal`.
+2. **Fields** — identify the data tracked across states. Choose types (`string`, `integer`, `number`, `boolean`, `money`, `quantity`), set defaults, and mark optional fields.
 3. **Events** — identify the actions that cause transitions. Define event arguments with types and defaults.
-4. **Rules** — identify rules that must hold in every state.
+4. **Rules** — identify invariants that must hold in every state.
 5. **State constraints** — identify ensures that must be true when entering or remaining in a specific state.
 6. **Event ensures** — identify validation rules on event arguments.
-7. **Transitions** — map out `from <State> on <Event>` rows with guards (`when`), field mutations (`set`), and outcomes (`transition`, `no transition`, `reject`).
-8. **Edit declarations** — identify which fields are directly editable in which states.
+7. **Transitions** — map out `from <State> on <Event>` rows with guards (`when`), field mutations (`set`/`clear`), and outcomes (`transition`, `no transition`, `reject`).
+8. **Write declarations** — identify which fields are directly editable in which states.
 
-## Step 4: Write the Precept
+## Step 5: Consult Reference Tools as Needed During Writing
 
-Author the `.precept` file following this canonical order:
+Use these tools when you need authoritative answers while drafting:
+
+- `precept_syntax` — when you need the syntax for a construct, action chain, operator, or grammar rule.
+- `precept_types` — when declaring field types, choosing modifiers (`optional`, `nonnegative`, `notempty`, `terminal`), or using built-in functions.
+- `precept_domains` — when working with money, quantity, price, or temporal fields. Returns ISO 4217 currencies, UCUM units, SI prefixes, and named physical dimensions.
+- `precept_operations` — when you need to know what operator combinations work for a given type (e.g., `Money + Money`, `Quantity * Number`). Pass a type name as the optional category filter.
+- `precept_proofs` — when writing `when` guards or `ensure` constraints. Returns the proof obligation catalog and runtime fault catalog — what the proof engine verifies and what faults to prevent.
+
+## Step 6: Write the Precept
+
+Author the `.precept` file in this canonical order:
 
 ```
 precept <Name>
@@ -44,63 +58,55 @@ precept <Name>
 # Description comment
 
 # Fields
-field <Name> as <type> [nullable] [default <value>]
+field <Name> as <type> [optional] [default <value>]
 
 # Rules
-rule <expr> because "<message>"
+rule <expr> [when <condition>] because "<message>"
 
 # States
-state <Name> [initial]
+state <Name> [initial] [terminal]
 
 # State constraints
-in <State> ensure <expr> because "<message>"
+in <State> [when <condition>] ensure <expr> because "<message>"
 
 # Write declarations
-in <State> write <Field1>, <Field2>
+in <State> modify <Field1>, <Field2> editable
 
 # Events and event ensures
-event <Name> [with <Arg> as <type> [default <value>], ...]
+event <Name>[(Arg as <type> [default <value>], ...)]
 on <Event> ensure <expr> because "<message>"
 
 # Transitions
-from <State|any> on <Event> [when <guard>] -> <action chain>
+from <State|any> on <Event> [when <guard>]
+    -> <action>
+    -> <outcome>
 ```
 
-Action chains use `->` to sequence: `set <field> = <expr>`, `transition <State>`, `no transition`, `reject "<message>"`.
+Outcomes: `transition <State>`, `no transition`, `reject "<message>"`.
+Actions: `set <field> = <expr>`, `clear <field>` (for optional fields).
 
-## Step 5: Compile and Fix
+## Step 7: Compile and Fix
 
-Call `precept_compile` with the full text. If there are diagnostics:
+Call `precept_compile` with the full text. Read all diagnostics:
+
 - **Errors**: fix immediately — these prevent the definition from loading.
-- **Warnings**: review each one. Common warnings include unreachable states, dead-end states, and unused fields.
+- **Warnings**: review each one. Common warnings include unreachable states, dead-end states, and shadowed transition rows.
 - **Hints**: informational — address if they reveal design gaps.
+
+For any diagnostic code you don't immediately understand, call `precept_diagnostic` with the code name (e.g., `UndeclaredField`) or PRE-number (e.g., `PRE0017`). It returns the trigger condition, recovery steps, and before/after fix examples. Don't guess — look it up.
 
 Repeat until the definition compiles cleanly.
 
-## Step 6: Verify Behavior
+## Step 8: State Diagram (Optional)
 
-Verification is sequential, not unconditional:
-
-1. Use `precept_inspect` only after `precept_compile` succeeds.
-2. If `precept_inspect` fails because the definition is invalid or the chosen snapshot is inconsistent, fix that problem before continuing.
-3. Use `precept_fire` only after `precept_inspect` succeeds and identifies a concrete event worth tracing.
-4. Do not run `precept_fire` just because it is the next step in the workflow; run it only when it adds new behavioral evidence beyond compile or inspect.
-
-Use `precept_inspect` with a state and data snapshot to confirm which events are available and what each would do. Use `precept_fire` to trace individual transitions and verify field mutations and guard evaluation.
-
-## Step 7: State Diagram
-
-After the precept compiles successfully, generate a Mermaid `stateDiagram-v2` diagram from the `precept_compile` output. Use the `transitions` array to build the diagram:
+After the precept compiles, generate a Mermaid `stateDiagram-v2` from the `transitions` array in the compile result. Use this when it adds clarity or the user asks.
 
 - Each unique `from → to` pair becomes an arrow.
 - Label arrows with the event name.
 - If a transition has a guard, append it in brackets: `Event [guard]`.
 - Mark the initial state with `[*] --> StateName`.
-- If there are reject outcomes, add a note: `StateName --> StateName : Event [reject]`.
-- A Mermaid diagram is optional. Use it when it would help the user understand all or part of the precept, or when the user explicitly asks for a diagram.
-- When you do present a user-facing diagram in chat, prefer the Mermaid render tool over pasting raw Mermaid source.
-- Do not also paste the Mermaid source in the same response unless the user explicitly asks for the source or asks to place it in a file.
-- If Mermaid source is shown, label it clearly as source text and do not imply that the chat itself is rendering it.
+- Reject outcomes: `StateName --> StateName : Event [reject]`.
+- Use the render tool rather than pasting raw Mermaid source unless the user asks for source or wants to save it to a file.
 - If a guard-heavy label fails to render cleanly, simplify the label text for the diagram and explain that the exact guard remains in the precept source.
 
 Example:
@@ -140,9 +146,9 @@ Use `from any on <Event>` for events that apply regardless of state.
 from any on VehiclesArrive -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count -> no transition
 ```
 
-### Nullable field clearing
-Set a nullable field to `null` to clear it.
+### Clearing an optional field
+Use `clear` to reset an optional field to unset.
 
 ```
-from FlashingRed on ClearEmergency -> set EmergencyReason = null -> transition Red
+from FlashingRed on ClearEmergency -> clear EmergencyReason -> transition Red
 ```

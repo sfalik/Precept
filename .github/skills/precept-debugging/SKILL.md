@@ -13,65 +13,53 @@ description: >-
 
 Follow these steps when diagnosing problems in a `.precept` file.
 
-Before guessing about DSL syntax, operators, or runtime semantics, call `precept_language`. It is the authoritative source for language behavior.
-
 When proposing a fix, match local `.precept` conventions when samples or nearby definitions already exist.
 
 ## Step 1: Compile First
 
-Call `precept_compile` with the full precept text. This is always the first step — it catches syntax errors, type errors, and structural issues before you look at runtime behavior.
+Call `precept_compile` with the full precept text. This is always the first step — never skip it. It catches syntax errors, type errors, and structural issues and returns the full definition structure.
 
 Read the diagnostics carefully:
-- **Errors** block the definition from loading. Fix these first.
-- **Warnings** reveal structural problems: unreachable states, dead-end states, unused fields, shadowed transitions.
-- **Hints** are informational but may point to design gaps.
 
-## Step 2: Understand the Structure
+- **Errors**: block the definition from loading. Fix these first.
+- **Warnings**: reveal structural problems — unreachable states, dead-end states, unused fields, shadowed transitions.
+- **Hints**: informational but may point to design gaps.
+
+## Step 2: Look Up Each Diagnostic
+
+For every diagnostic code in the compile output, call `precept_diagnostic` with the code name (e.g., `UndeclaredField`) or PRE-number (e.g., `PRE0017`). It returns the trigger condition, recovery steps, and before/after fix examples. Do not guess what a diagnostic means — look it up.
+
+## Step 3: Understand the Structure
 
 From the `precept_compile` output, review:
-- **States**: which states exist, which is initial
+
+- **States**: which states exist, which is initial, which are terminal
 - **Fields**: names, types, defaults, nullability
 - **Events**: names, arguments, ensures
 - **Transitions**: the full `from/on/when/actions` table — this is the core logic
 
-If the user reports a specific problem, locate the relevant transitions in this table.
+If the user reports a specific problem, locate the relevant transition rows in this table.
 
-## Step 3: Inspect from the Problem State
+## Step 4: Consult Reference Tools for Expression and Type Issues
 
-Use `precept_inspect` only after `precept_compile` succeeds.
+Use these tools when the problem is in expression syntax, type usage, or operator combinations:
 
-Call `precept_inspect` with the precept text, the state where the problem occurs, and the current data snapshot. The response shows:
-- Which events are available from this state
-- What each event would do (transition target, field changes, or rejection)
-- Which fields are editable in this state
+- `precept_syntax` — when the issue involves malformed construct syntax, incorrect action chain, or operator usage
+- `precept_types` — when the issue involves field type declarations, modifier usage, or built-in function calls
+- `precept_operations` — when the issue involves operator type mismatches (e.g., adding incompatible types); pass a type name to filter
+- `precept_proofs` — when the issue involves guard evaluation or constraint violations; shows what the proof engine expects and what runtime faults result
 
-This tells you what the runtime *would* do without actually executing anything.
+## Step 5: Reason from the Compile Output
 
-## Step 4: Trace with Fire
+The runtime does not have MCP-accessible introspection tools. All diagnosis is static — from compile output, diagnostic lookup, and reasoning about the transition table. Do not suggest running or tracing execution.
 
-Use `precept_fire` only after `precept_inspect` succeeds and the problem involves a specific event that still needs tracing. If inspect already answers the question, stop there.
-
-If the problem involves a specific event, call `precept_fire` with the precept text, current state, event name, data, and event arguments. Compare the actual outcome against what the user expected. The mismatch reveals the bug.
-
-Useful checkpoints when comparing outcomes:
-1. Event ensures
-2. Transition row selection
-3. Guard pass or fail
-4. Field mutations
-5. State-entry constraints
-6. Final outcome: transition, no transition, or reject
-
-## Step 5: Test Field Edits
-
-If the problem involves field editing or constraint violations during data entry, call `precept_update` with the precept text, current state, data, and the fields being changed. This tests the `in <State> edit` declarations and any associated constraints. Do not run `precept_update` speculatively when the issue is clearly about transition behavior rather than editable fields.
-
-## Common Diagnostic Patterns
+Common patterns that can be fully diagnosed from the compile output:
 
 ### Guard ordering issues
-Transition rows are evaluated top-to-bottom. The first matching `from/on` row wins.
+Transition rows are evaluated top-to-bottom. The first matching `from/on` row wins. An unguarded catch-all row shadows any guarded rows below it.
 
 ```
-# BUG: the unguarded row matches first
+# BUG: the unguarded row matches first — the guarded row is never reached
 from Draft on Submit -> transition Review
 from Draft on Submit when IsValid -> transition Approved
 ```
@@ -82,22 +70,22 @@ Move the guarded row above the catch-all.
 A state has no incoming transitions. Either add a transition that targets it or remove the state.
 
 ### Dead-end states
-A state has no outgoing transitions. That can be valid for terminal states, but it is often accidental.
+A non-terminal state has no outgoing transitions. Check whether this is intentional or an omission.
 
 ### Constraint violations on transition
-If a state constraint fails after a transition, check whether the `set` actions produce the data that the target state's ensures require.
+If a state constraint fails after a transition, check whether the `set` actions produce data satisfying the target state's `ensure` expressions.
 
 ### Event ensure rejection
-If an `on <Event> ensure ...` fails, the event is rejected before transition logic runs. Check the provided event arguments first.
+If an `on <Event> ensure ...` fails, the event is rejected before transition logic runs. Check the provided event arguments, not the current state.
 
-## Optional State Diagram For Diagnosis
+## Optional State Diagram for Diagnosis
 
-When transition structure is the problem, a focused Mermaid `stateDiagram-v2` can make the bug obvious.
+When transition structure is the problem, a focused Mermaid `stateDiagram-v2` can make the bug obvious by revealing shadowed rows or unreachable states.
 
 ```mermaid
 stateDiagram-v2
   [*] --> Draft
   Draft --> Review : Submit
-  note right of Draft : BUG - unguarded rule shadows guarded rule
+  note right of Draft : BUG — unguarded row shadows guarded row below it
   Draft --> Approved : Submit [IsValid] (never reached)
 ```

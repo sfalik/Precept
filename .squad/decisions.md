@@ -3,6 +3,106 @@
 ---
 
 ## ACTIVE DECISIONS — Current Sprint
+### 2026-05-11T00:00:00Z: Precept skills and Precept Author agent now match the actual 10-tool MCP surface
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files → 1 canonical entry).
+
+**Merged sources:** `newman-skill-mcp-sync.md`, `frank-authoring-skill-architecture.md`.
+
+- Both Precept skills (`.github/skills/precept-authoring/SKILL.md` and `.github/skills/precept-debugging/SKILL.md`) and the Precept Author agent (`.github/agents/precept-author.agent.md`) were rewritten to reference only tools that actually exist: `precept_ping`, `precept_quickstart`, `precept_syntax`, `precept_types`, `precept_patterns`, `precept_proofs`, `precept_operations`, `precept_domains`, `precept_compile`, `precept_diagnostic`. All phantom tool references (`precept_language`, `precept_inspect`, `precept_fire`, `precept_update`) removed.
+- Stale DSL syntax corrected in the same pass: `[nullable]` → `optional`, `in <State> write ...` → `in <State> modify ... editable`, `set X = null` → `clear X`.
+- Frank established the durable architectural decisions: keep two separate skills (authoring = generative cognitive mode, debugging = diagnostic cognitive mode); authoring tool order is `precept_quickstart` (new session only) → `precept_patterns` (before writing) → conditional domain tools → compile loop; `precept_syntax`/`precept_types` are on-demand reference, not workflow steps; debugging is fully static (compile → `precept_diagnostic` per code → transition-table reasoning); `precept_diagnostic` is reactive in both skills; keep `precept/*` wildcard in the agent definition so new tools are picked up automatically without agent-file edits.
+- The debugging workflow now explicitly acknowledges that runtime tracing via MCP does not exist; all diagnosis is static. The debugging skill includes explicit reasoning guidance on guard ordering, unreachable/dead-end states, constraint satisfaction on entry, event ensures, and conditional rules to compensate for the absent runtime tools.
+
+---
+
+### 2026-05-11T00:00:00Z: Interpolation plan evolved to type-grammar-driven slot classification with explicit structural validation
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (4 files → 1 canonical entry).
+
+**Merged sources:** `frank-interpolation-plan.md`, `frank-interpolation-position-aware.md`, `frank-interpolation-redesign.md`, `frank-interpolation-redesign-response.md`.
+
+- frank-16 produced the initial 5-slice interpolation plan grounded in `docs/philosophy.md`; all type mismatches caught at compile time (no V2 deferrals). String is the one exception: valid in any hole position because a string field could hold a valid unit code or currency code at runtime.
+- frank-18 revised to position-aware slot classification after Shane identified that the flat compatibility table allowed structurally invalid forms (e.g., `'1 {x} kg'` — double magnitude). Hole position within the typed constant (magnitude slot, unit/qualifier slot, whole-value slot) determines valid types, not just the target type. Position detection belongs in the type checker, not the parser.
+- frank-23 redesign replaced position-text heuristics with type-grammar matching: each type that supports interpolation defines a finite set of valid `(TextSegment | HoleSegment)*` patterns; the type checker matches the full segment sequence against the target type's pattern table, assigns slot identities to holes on match, and emits `InvalidInterpolatedTypedConstantForm` (code 120) on no match. This covers compound qualifier holes for `price`/`exchangerate`, compound period forms (`'{n} years + {m} months'`), and all 19 typed constant types exhaustively. Formatted temporal types (`date`, `time`, `instant`, `datetime`, `zoneddatetime`, `timezone`) explicitly prohibited from interpolation.
+- Three diagnostic codes allocated: 120 (`InvalidInterpolatedTypedConstantForm`), 121 (`InterpolationUnsupportedForType`), 122 (`InterpolatedTypedConstantHoleTypeMismatch`). Slice 1 (Parser) unchanged from frank-16; Slice 2 (TypeChecker) fully redesigned to match-then-check. Plan written to `docs/Working/interpolation-plan.md`. Three open questions filed for Shane review before Slice 1 begins.
+
+---
+
+### 2026-05-11T00:00:00Z: B9–B12 slices 2/3/4 shipped — post-resolution type and qualifier checking now enforced
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (3 files → 1 canonical entry).
+
+**Merged sources:** `kramer-slice2-done.md`, `kramer-slice3-done.md`, `kramer-slice4-done.md`.
+
+- Slice 2: Post-resolution `IsAssignable` check added to `ResolveAction`. B9 (bare integer → quantity assignment) now emits `TypeMismatch`.
+- Slice 3: `ValidateAssignmentQualifiers` helper added and called in `ResolveAction`. B12 (cross-dimension arg/field assignment) now caught. Money qualifier mismatches caught.
+- Slice 4: `UnitDimensionHelper` extracted. `QuantityValidator` now checks dimension against `DeclaredQualifiers`. Qualifiers threaded through resolve chain. Regression coverage added to `TypeCheckerTypedConstantTests` and `TypeCheckerFieldDefaultTests`.
+- All three slices closed green. Slice 5 remains.
+
+---
+
+### 2026-05-11T00:00:00Z: Release-only build policy is now the repo default; all Debug.Assert sites converted
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-debug-release-policy.md`.
+
+- Shane chose Option A (release-only with symbols) over Frank's Option B (keep Debug config, replace asserts): "No debug builds. Production builds can have symbols. I'm a one man show I don't have bandwidth to test two different builds."
+- `Directory.Build.props` sets `Release` as the default configuration with `DebugSymbols=true` and `DebugType=portable`.
+- All 7 `Debug.Assert` sites in `src/Precept/Pipeline/` and `src/Precept/Language/` converted to unconditional `throw new InvalidOperationException(...)`. No `#if DEBUG` blocks remain.
+
+---
+
+### 2026-05-11T00:00:00Z: Fix 7's unconditional throw in GraphAnalyzer stands; PRECEPT019 does not supersede it
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-fix7-precept019.md`.
+
+- PRECEPT019 enforces method-level catalog exhaustiveness via `[HandlesCatalogExhaustively]` attribute but has zero visibility into an inline switch inside a loop — it can only annotate whole methods.
+- Fix 7's unconditional `throw new InvalidOperationException(...)` as the default case in the `GraphAnalysisKind` dispatch loop is minimal, self-enforcing, and proportionate for a two-member enum with a single dispatch site.
+- Fix 7 stands as-is. Revisit if `GraphAnalysisKind` grows to 4+ members across multiple dispatch sites — at that scale, PRECEPT019-style annotation becomes the better tool. Defense-in-depth also applies: the runtime throw catches cases where the analyzer is bypassed.
+
+---
+
+### 2026-05-11T00:00:00Z: B6 fixed — DeclaredQualifiers threaded through binary peer context in CompletionHandler
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-b6-fixed.md`.
+
+- `TypedConstantContext` now carries `DeclaredQualifiers` for money/quantity fields, threaded through binary peer context in `CompletionHandler`.
+- Commit: `65badacb`. Tests green.
+
+---
+
+### 2026-05-11T00:00:00Z: GraphAnalyzer event-modifier dispatch adapted to current semantic model without widening TypedEvent
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-pipeline-audit.md`.
+
+- The fix plan assumed `TypedEvent.Modifiers`, but the runtime model carries only `TypedEvent.IsInitial` plus syntax back-pointers. Adding a new typed-event modifier collection would have expanded the semantic surface beyond the audit's surgical scope.
+- `GraphAnalyzer.Analyze()` now derives the active event modifier set from `evt.IsInitial` (`ModifierKind.InitialEvent` when true, empty otherwise), routes through `Modifiers.GetMeta(modifier)` and `EventModifierMeta.RequiredAnalysis`, and keeps the unconditional `throw` default so future `GraphAnalysisKind` additions still fail loudly.
+- `ResolveAction()` remains private; new defensive tests invoke it via reflection instead of widening production visibility for test access.
+
+---
+
 ### 2026-05-11T05:34:40Z: B4/B5 retriage reopens qualifier-site routing for declaration-side typed literals
 
 **By:** Scribe
