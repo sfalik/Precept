@@ -167,10 +167,35 @@ public static class GraphAnalyzer
                 IsReachable: reachability.Reachable.Contains(state.Name)))
             .ToImmutableArray();
 
-        // TODO(Gap1): When additional event modifiers with RequiredAnalysis ship, add an
-        // EventModifierMeta dispatch loop here reading EventModifierMeta.RequiredAnalysis
-        // (GraphAnalysisKind) and routing to the appropriate analysis subroutine,
-        // mirroring the StateModifierMeta dispatch in GetStateFlags().
+        // Event modifier graph analysis dispatch
+        // Mirrors the StateModifierMeta dispatch in GetStateFlags(). TypedEvent currently
+        // carries IsInitial rather than a general modifier array, so derive the active
+        // modifier set from the event surface before dispatching through catalog metadata.
+        foreach (var evt in semantics.Events)
+        {
+            ImmutableArray<ModifierKind> eventModifiers = evt.IsInitial
+                ? [ModifierKind.InitialEvent]
+                : ImmutableArray<ModifierKind>.Empty;
+
+            foreach (var modifier in eventModifiers)
+            {
+                if (Modifiers.GetMeta(modifier) is EventModifierMeta eventMeta
+                    && eventMeta.RequiredAnalysis != GraphAnalysisKind.None)
+                {
+                    switch (eventMeta.RequiredAnalysis)
+                    {
+                        case GraphAnalysisKind.InitialEventCompatibility:
+                            // Currently handled by the initialState logic above.
+                            // When this analysis needs explicit dispatch, add it here.
+                            break;
+                        default:
+                            throw new InvalidOperationException(
+                                $"Unhandled GraphAnalysisKind: {eventMeta.RequiredAnalysis} for modifier {modifier}");
+                    }
+                }
+            }
+        }
+
         var graphEvents = semantics.Events
             .Select(evt => new GraphEvent(
                 Name: evt.Name,
