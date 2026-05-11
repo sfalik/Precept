@@ -89,6 +89,8 @@ public enum DiagnosticCode
     /// Entities that enter it will be permanently stuck with no way to progress.
     /// </summary>
     StructuralSinkState                = 119,
+    /// <summary>Two modifiers that are mutually exclusive are declared on the same field or event argument.</summary>
+    ConflictingModifiers               = 120,
 
     // ── Type (collection safety) ─────────────────────────
     UnguardedCollectionAccess          =  63,

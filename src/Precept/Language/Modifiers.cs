@@ -57,7 +57,8 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Optional),
             "Field is nullable; use is set / is not set for presence",
             ModifierCategory.Structural, AnyType,
-            HoverDescription: "The field may have no value. Use 'is set' and 'is not set' to test for presence. Absent values appear as null in the API."),
+            HoverDescription: "The field may have no value. Use 'is set' and 'is not set' to test for presence. Absent values appear as null in the API.",
+            MutuallyExclusiveWith: [ModifierKind.Notempty]),
 
         ModifierKind.Ordered => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Ordered),
@@ -126,7 +127,8 @@ public static class Modifiers
                     new NumericBoundSource.Constant(0m)),
             ],
             HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time.",
-            DesugarsToRule: true),
+            DesugarsToRule: true,
+            MutuallyExclusiveWith: [ModifierKind.Optional]),
 
         ModifierKind.Default => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Default),

@@ -119,8 +119,8 @@ internal static partial class TypeChecker
                 }
 
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.InvalidModifierForType, modifierSpan,
-                        meta.Token.Text, $"it conflicts with '{conflictMeta.Token.Text}'"));
+                    Diagnostics.Create(DiagnosticCode.ConflictingModifiers, modifierSpan,
+                        meta.Token.Text, conflictMeta.Token.Text));
             }
 
             // Subsumption: if another explicit modifier already subsumes this one

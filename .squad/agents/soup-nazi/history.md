@@ -14,6 +14,9 @@
 - Span-heavy regressions often need full compiler fixtures so parser, binder, semantic-token, and analyzer seams all surface together.
 - If a full-feature battery passes immediately, that is an honest finding: the implementation was already complete and the value is in locking behavior, not manufacturing red tests.
 - Modifier and domain-type follow-up gaps should be recorded as explicit passing anchors when the shipped implementation intentionally preserves pre-existing behavior.
+- When a new diagnostic covers modifier-modifier mutual exclusivity, use `Check()` + `ContainSingle` (not `CheckExpectingError`) so the test enforces exactly one diagnostic — avoiding false passes where the target code appears alongside an unexpected error.
+- Skip a clean-path test only when the existing test has the exact method name required; a different name means add it, even if the body is near-identical, because the charter regression name is the anchor.
+- Conflicting-modifier tests for event args need a minimal but valid lifecycle (initial state, at least one non-initial state, and a matching transition) or the precept will fail for structural reasons, masking the modifier diagnostic.
 
 ## Historical Summary
 
@@ -37,3 +40,13 @@
 ### 2026-05-10T(late) — Money/quantity modifier regression suite closed green
 - Added 14 regression anchors for domain-type modifier legality, typed-constant bounds, invalid typed-constant content, and the two known follow-up gaps (qualifier alignment and plain-number acceptance).
 - The full core suite stayed green and the passing-gap anchors now document exactly what a future uniform `default` / valued-modifier fix must change.
+
+### 2026-05-11 — ConflictingModifiers (PRE0120) regression suite added
+- Added 4 new tests in `TypeCheckerModifierTests.cs` Category 3b: `Field_OptionalAndNotempty_EmitsConflictingModifiers`, `EventArg_OptionalAndNotempty_EmitsConflictingModifiers`, `Field_CollectionOptionalAndNotempty_EmitsConflictingModifiers`, and `Field_NotemptyAlone_CompilesClean`.
+- Tests assert `ContainSingle(DiagnosticCode.ConflictingModifiers)` — enforces exactly one diagnostic, not merely presence.
+- `Field_OptionalAlone_CompilesClean` skipped: `OptionalModifier_OnStringField_NoDiagnostic` in Category 1 already covers this path.
+- Tests are written against `DiagnosticCode.ConflictingModifiers` (pending George's enum addition at ordinal 120) and will not compile until that change lands.
+
+### 2026-05-11T20:03:33Z — ConflictingModifiers coverage recorded
+- The optional+notempty batch is now durably closed with four regression anchors for field, event-arg, and collection conflicts plus a clean `notempty`-alone case.
+- This remains the canonical assertion pattern for modifier-conflict diagnostics: `Check()` plus `ContainSingle` on the dedicated code.

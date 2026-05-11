@@ -985,7 +985,7 @@ Field modifiers appear after the type reference and before any computed expressi
 | `nonnegative` | flag | Value ≥ 0 |
 | `positive` | flag | Value > 0 |
 | `nonzero` | flag | Value ≠ 0 |
-| `notempty` | flag | String is non-empty; collection contains at least one element (equivalent to `mincount 1`) |
+| `notempty` | flag | String is non-empty; collection contains at least one element (equivalent to `mincount 1`). Mutually exclusive with `optional` — use `on Event ensure ... is not set or ....length > 0` for "non-empty if present". |
 | `default` _Expr_ | value | Default value |
 | `min` _Expr_ | value | Minimum value |
 | `max` _Expr_ | value | Maximum value |
@@ -1508,6 +1508,8 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 
 > **`notempty` on collections:** On collection fields, `notempty` is equivalent to `mincount 1`. It statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last`/`.at` access obligations — no per-access `.count > 0` guard is needed when the field is declared `notempty`. Not applicable to `lookup of K to V`, which has its own cardinality model.
 
+> **`notempty` + `optional` are mutually exclusive:** A field or event argument cannot be both `optional` and `notempty`. `optional` means the value may be absent; `notempty` asserts the value has content. These constraints cannot both hold — the compiler emits `ConflictingModifiers` (C120) when both appear on the same declaration. To express "non-empty if present" semantics, use: `on Event ensure Arg is not set or Arg.length > 0 because "..."`. 
+
 **Modifier value validation:**
 
 | Check | Fires when | Diagnostic |
@@ -1519,6 +1521,7 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `maxplaces` not integer | Decimal places must be a whole number | `InvalidModifierValue` |
 | Duplicate modifier | Same modifier applied twice to one field | `DuplicateModifier` |
 | Redundant modifier | `nonnegative` and `positive` on the same field (`positive` subsumes `nonnegative`) | `RedundantModifier` (warning) |
+| Conflicting modifiers | `optional` and `notempty` on the same field or event arg | `ConflictingModifiers` (C120) |
 
 #### Action statement validation
 

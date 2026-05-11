@@ -2,12 +2,14 @@ precept ApartmentRentalApplication
 
 # A rental application moves from submission through screening, approval, and lease execution.
 # The rules stay realistic: income, credit, and household size all influence approval.
+# Money types enforce currency semantics; CreditScore and HouseholdSize use integer.
+# Applicant fills in the form in Draft state before submitting.
 
 field ApplicantName as string optional
-field MonthlyIncome as number default 0 nonnegative
-field RequestedRent as number default 0 nonnegative
-field CreditScore as number default 0 nonnegative
-field HouseholdSize as number default 1 positive
+field MonthlyIncome as money in 'USD'
+field RequestedRent as money in 'USD'
+field CreditScore as integer default 0 nonnegative
+field HouseholdSize as integer default 1 positive
 field ReviewerNote as string optional
 field DepositPaid as boolean default false
 field LeaseSigned as boolean default false
@@ -15,29 +17,25 @@ field LeaseSigned as boolean default false
 state Draft initial
 state Submitted
 state Approved
-state MoveInReady terminal   
+state MoveInReady terminal
 state Declined terminal
+
+in Draft modify ApplicantName, MonthlyIncome, RequestedRent, CreditScore, HouseholdSize editable
 
 in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
 in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
 
-event Submit(
-    Name as string notempty,
-    Income as number nonnegative,
-    Rent as number positive,
-    Score as number nonnegative,
-    Household as number default 1 positive)
-event Approve(Note as string optional notempty)
+event Submit
+on Submit ensure ApplicantName is set because "Applicant name is required before submitting"
+on Submit ensure MonthlyIncome > '0.00 USD' because "Monthly income must be provided before submitting"
+on Submit ensure RequestedRent > '0.00 USD' because "Requested rent must be provided before submitting"
+
+event Approve(Note as string optional)
 event PayDeposit
 event SignLease
 event Decline(Note as string notempty)
 
 from Draft on Submit
-    -> set ApplicantName = Submit.Name
-    -> set MonthlyIncome = Submit.Income
-    -> set RequestedRent = Submit.Rent
-    -> set CreditScore = Submit.Score
-    -> set HouseholdSize = Submit.Household
     -> transition Submitted
 
 from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650 and HouseholdSize < 8

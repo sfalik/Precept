@@ -244,6 +244,70 @@ public class TypeCheckerModifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  Category 3b: Conflicting modifiers (optional + notempty — error)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Field_OptionalAndNotempty_EmitsConflictingModifiers()
+    {
+        // optional permits absence; notempty asserts content — logically contradictory
+        var precept = """
+            precept Widget
+            field Note as string optional notempty
+            state Open initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ConflictingModifiers));
+    }
+
+    [Fact]
+    public void EventArg_OptionalAndNotempty_EmitsConflictingModifiers()
+    {
+        var precept = """
+            precept Widget
+            field Status as string
+            state Open initial
+            state Closed
+            event Close(Note as string optional notempty)
+            from Open on Close -> set Status = "done" -> Closed
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ConflictingModifiers));
+    }
+
+    [Fact]
+    public void Field_CollectionOptionalAndNotempty_EmitsConflictingModifiers()
+    {
+        // conflict applies to collection fields as well as scalar fields
+        var precept = """
+            precept Widget
+            field Tags as set of string optional notempty
+            state Open initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ConflictingModifiers));
+    }
+
+    [Fact]
+    public void Field_NotemptyAlone_CompilesClean()
+    {
+        // regression: ConflictingModifiers must not fire when notempty appears without optional
+        var precept = """
+            precept Widget
+            field Note as string notempty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  Category 4: Redundant modifier (subsumption + implied)
     // ════════════════════════════════════════════════════════════════════════
 
