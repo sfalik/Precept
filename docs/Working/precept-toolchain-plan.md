@@ -112,7 +112,7 @@ Slices 1–2 bundle catalog + pipeline work and close bugs directly. Slices 3–
 | Slice 11 | Proof Engine — Catalog-Derived Proof Obligations | ✅ Complete — `004e68be` | BUG-008, BUG-013, BUG-050 |
 | Slice 12 | MCP DTO Audit — Sync DTOs to Catalog Growth | ✅ Complete — 5f79fc7a | BUG-011, BUG-012, BUG-016, BUG-017, BUG-018, BUG-022, BUG-023, BUG-024, BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047 |
 | Slice 13 | MCP-Docs — Fix Incorrect Recovery Hints | ⬜ Not started | BUG-014, BUG-015, BUG-041 |
-| Slice 14 | Test Layer — Catalog Capability Tests | ⬜ Not started | (regression coverage for all 54) |
+| Slice 14 | Test Layer — Catalog Capability Tests | ✅ Complete — `7a4c2e31` | (regression coverage for all 54) |
 | Slice 15 | Test Layer — Pipeline Stage Unit Tests | ⬜ Not started | (regression coverage for all 54) |
 
 **Current active-slice note:** no Track 2 slice is currently active in the shared worktree. Slices 1–11 are durably recorded on this branch; Slice 12 is the next consumer slice when implementation resumes.
@@ -1348,6 +1348,12 @@ BUG-014, BUG-015, BUG-041
 ---
 
 ## Slice 14: Test Layer — Catalog Capability Tests
+
+**Status:** ✅ Complete — `7a4c2e31`
+
+**Closure notes (2026-05-10):**
+- Landed reflection-based completeness coverage under `test/Precept.Tests/CatalogTests/` for `OperatorMeta`, `OutcomeMeta`, `ModifierMeta`, `TypeMeta`, and `DiagnosticMeta`.
+- The shipped tests derive cases from the live catalogs and assert the actual surface names in code today (`Token`/`Tokens`, `DisplayName`, `RecoverySteps` / `FixHint`) so future metadata drift fails fast.
 
 **Goal:** Add a comprehensive suite of catalog-capability tests that compile one minimal precept
 per relevant catalog member and assert clean output (or the expected diagnostic if the member
