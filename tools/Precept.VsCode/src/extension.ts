@@ -28,7 +28,7 @@ const devLanguageServerBuildDllRelativePath = path.join(
   devLanguageServerRootRelativePath,
   "bin",
   "Precept.LanguageServer",
-  "debug",
+  "release",
   languageServerDllName
 );
 const devLanguageServerRuntimeRelativePath = path.join(devLanguageServerRootRelativePath, "runtime");

@@ -55,3 +55,7 @@
 ### 2026-05-10T13:53:14Z — t2-2 Slice A closeout recorded
 - Pre-check measured `.squad/decisions.md` at 470502 bytes with 4 inbox file(s); the hard-gate 7-day archive pass ran first and found 0 eligible active entries older than `2026-05-03T13:53:14Z`, so `decisions-archive.md` stayed unchanged.
 - Merged 4 inbox notes into 2 canonical decisions, wrote orchestration logs for george-3 and george-4 plus the brief Slice A session log, propagated the result into George/Frank history, summarized `george/history.md`, and closed the inbox back to 0.
+
+### 2026-05-11T20:03:33Z — Hard-gate interpolation closeout recorded
+- Pre-check measured `decisions.md` at 192678 bytes with 15 inbox files; the ≥50 KB hard gate triggered an immediate 7-day archive pass before any merge work.
+- This pass archived 0 decision entries, merged the inbox into two canonical decisions plus one duplicate-source fold-in, wrote orchestration logs for `frank-6` / `frank-7`, summarized Frank and George history, and logged the post-pass health report in the session log.

@@ -27,7 +27,7 @@ function findDll() {
       if (entry.isDirectory()) { stack.push(p); continue; }
       if (entry.name === mcpDllName) {
         const norm = p.replace(/\\/g, "/");
-        if (norm.includes("/Precept.Mcp/") && norm.includes("/debug/")) return p;
+        if (norm.includes("/Precept.Mcp/") && (norm.includes("/debug/") || norm.includes("/release/"))) return p;
       }
     }
   }

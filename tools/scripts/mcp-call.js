@@ -2,7 +2,7 @@
 const { spawn } = require("child_process");
 const path = require("path");
 
-const dllPath = path.resolve(__dirname, "../../temp/dev-mcp/bin/Precept.Mcp/debug/Precept.Mcp.dll");
+const dllPath = path.resolve(__dirname, "../../temp/dev-mcp/bin/Precept.Mcp/release/Precept.Mcp.dll");
 const toolName = process.argv[2];
 const argsJson = process.argv[3];
 

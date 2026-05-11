@@ -3,7 +3,7 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const dllPath = path.resolve(__dirname, "../../temp/dev-mcp/bin/Precept.Mcp/debug/Precept.Mcp.dll");
+const dllPath = path.resolve(__dirname, "../../temp/dev-mcp/bin/Precept.Mcp/release/Precept.Mcp.dll");
 const dslText = fs.readFileSync(path.resolve(__dirname, "../../tools/scripts/_dsl-input.txt"), "utf8");
 const toolArgs = { text: dslText };
 

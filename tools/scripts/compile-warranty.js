@@ -1,7 +1,7 @@
 const { spawn } = require("child_process");
 const path = require("path");
 
-const dllPath = path.resolve(__dirname, "../../temp/dev-mcp/bin/Precept.Mcp/debug/Precept.Mcp.dll");
+const dllPath = path.resolve(__dirname, "../../temp/dev-mcp/bin/Precept.Mcp/release/Precept.Mcp.dll");
 const toolName = "precept_compile";
 const toolArgs = {
   text: `precept WarrantyRepairRequest

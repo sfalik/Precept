@@ -624,6 +624,66 @@ _Whole-value forms:_
 
 ---
 
+### Slice 6 — Compositional Constraint Propagation (ProofEngine)
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs`  
+**Depends on:** Slice 2 (requires `TypedInterpolatedTypedConstant` with slot annotations)  
+**Can parallel with:** Slices 3, 4, 5
+
+**Rationale:** The primary use case for interpolated typed constants is compositional typed-literal construction from typed event args: `set Balance = '{Amount} {Code}'` where `Amount as number nonzero`. Without this slice, the proof engine cannot reason that Balance's magnitude is nonzero — producing an unresolved warning on `Total / Balance` even though the source is provably constrained. This contradicts the philosophy ("make invalid configurations structurally impossible") for the most common interpolation scenario.
+
+**Work:**
+
+1. **Add `ProofStrategy.CompositionalConstraint = 6`** to `src/Precept/Pipeline/ProofLedger.cs`.
+
+2. **Implement `TryCompositionalConstraintProof(obligation, semantics)`** — new strategy method (~55 lines):
+   - Accept only `NumericProofRequirement` obligations (nonzero, positive, nonnegative).
+   - Resolve the target field name from the obligation subject.
+   - Iterate `semantics.TransitionRows[].Actions[]` and `semantics.EventHandlers[].Actions[]` to find ALL `TypedInputAction` assignments to that field where `InputExpression` is `TypedInterpolatedTypedConstant`.
+   - If no interpolated assignments found → decline (return false).
+   - For each interpolated assignment, call `GetSlotSource()` to extract the relevant source expression: magnitude slot if present; whole-value slot if the interpolated constant is a single whole-value hole with no magnitude decomposition.
+   - Resolve the source expression to a field name, look up that field's modifiers.
+   - Use existing `SatisfactionCovers()` to check whether the source's modifier satisfactions cover the obligation.
+   - **Intersection semantics:** ALL assignment paths must satisfy. One path without coverage → conservative failure (return false).
+
+3. **Helper: `FindInterpolatedAssignments(fieldName, semantics)`** (~20 lines) — iterates transition rows and event handlers, collects all `TypedInterpolatedTypedConstant` RHS values assigned to the named field.
+
+4. **Helper: `GetSlotSource(TypedInterpolatedTypedConstant)`** (~15 lines) — iterates slot-annotated holes; returns the `Magnitude` slot source expression if present; if no magnitude slot exists but the interpolated constant is a single whole-value hole, returns that hole's source expression instead. This covers both composite typed-constant construction (magnitude path) and degenerate whole-value interpolation (`'{x}'` pattern).
+
+5. **Integration:** Add `TryCompositionalConstraintProof` call to `TryDischarge()` after S5 (QualifierCompatibility), before the Unresolved fallback.
+
+**What S6 proves:**
+- `Total / Balance` where Balance = `'{Amount} {Code}'` with `Amount as number nonzero` → **Proved** (nonzero obligation on Balance discharged via Amount's modifier)
+- `ensure Balance > '0 USD'` where Balance's magnitude source is `positive` → **Proved**
+- Any numeric proof obligation on a field whose ALL interpolated-assignment magnitude sources carry satisfying modifiers
+
+**What S6 does NOT prove (conservative decline):**
+- Fields with ANY non-interpolated assignment (e.g., `set Balance = someOtherField`) — strategy declines entirely
+- Non-numeric obligations (presence, qualifier, dimension) — strategy only handles numeric requirements
+- Fields where some assignment paths lack modifier coverage on the slot source — intersection fails
+
+> **Why `in`/`of` qualifier constraints do NOT need propagation here:** Qualifier constraints (currency `in`, unit `in`, dimension `of`, etc.) are resolved by S2/S5 directly from the target field's declaration — not from assignment provenance. If `Balance as money in 'USD'`, S5 reads `Balance.DeclaredQualifiers` and never traces back through the interpolated assignment. Adding qualifier propagation in S6 would be redundant with the existing strategy resolution and could introduce conflicting proof paths. What might appear to be a gap here is actually qualifier *inference* (inferring an undeclared qualifier from assignment flow) — a different feature with different complexity that does not belong in this plan.
+
+**LOC estimate:** ~90 lines new code (less than Strategy 4 / FlowNarrowing at ~120 lines)
+- `TryCompositionalConstraintProof`: ~55 lines
+- `GetSlotSource` helper: ~15 lines
+- `FindInterpolatedAssignments` helper: ~20 lines
+- Tests: ~10
+
+**Tests (~10):**
+- Basic: `nonzero` on magnitude source → numeric obligation discharged
+- Multiple paths: 2 transitions both assign from `nonzero` sources → proved
+- Mixed paths: 1 of 2 assignments lacks `nonzero` → conservative Unresolved
+- Non-interpolated assignment to same field mixed with interpolated → decline
+- Whole-value hole (`'{x}'` where x is `money nonzero`) → **proved** (whole-value source's modifier covers numeric obligation)
+- Whole-value hole (`'{x}'` where x is bare `money`) → decline (no modifier coverage)
+- `positive` covers both `> 0` and `≠ 0` obligations (subsumption via existing `SatisfactionCovers`)
+- Non-numeric obligation (presence, qualifier) → strategy declines
+- Arg source vs field source: `TypedArgRef` with modifiers from event arg declaration
+- `GetSlotSource` returns magnitude slot when present even if whole-value slot also exists
+
+---
+
 ## Dependency Order
 
 ```
@@ -631,8 +691,9 @@ Slice 1 (Parser) — UNCHANGED from frank-16
     ↓
 Slice 2 (TypeChecker) — REDESIGNED, type-grammar matching
     ↓
-Slice 3 (Completions) ← can parallel with Slice 4
-Slice 4 (SemanticTokens) ← can parallel with Slice 3
+Slice 3 (Completions) ← can parallel with Slice 4 and Slice 6
+Slice 4 (SemanticTokens) ← can parallel with Slice 3 and Slice 6
+Slice 6 (ProofEngine) ← can parallel with Slices 3, 4, 5
     ↓
 Slice 5 (Docs/MCP)
 ```
