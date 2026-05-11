@@ -620,7 +620,12 @@ internal static partial class TypeChecker
     {
         // Map TokenKind → OperatorKind via the Operators catalog
         if (!Operators.ByToken.TryGetValue((bin.Operator, Arity.Binary), out var opMeta))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, bin.Span,
+                    "binary operator", bin.Operator.ToString()));
             return new TypedErrorExpression(bin.Span);
+        }
 
         var leftDiagStart = ctx.Diagnostics.Count;
         var left = Resolve(bin.Left, ctx);
@@ -761,7 +766,12 @@ internal static partial class TypeChecker
 
         // Map TokenKind → OperatorKind via the Operators catalog
         if (!Operators.ByToken.TryGetValue((un.Operator, Arity.Unary), out var opMeta))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, un.Span,
+                    "unary operator", un.Operator.ToString()));
             return new TypedErrorExpression(un.Span);
+        }
 
         var resolved = Operations.FindUnary(opMeta.Kind, operand.ResultType);
         if (resolved is not null)
