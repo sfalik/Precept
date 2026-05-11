@@ -51,6 +51,18 @@
 
 ## Recent Updates
 
+### 2026-05-10 — Doc sync: money/quantity modifier decision landed in spec and business-domain-types
+
+Following George/Soup Nazi's code+test landing for the money/quantity modifier decision:
+
+- `docs/language/precept-language-spec.md` modifier validation table updated: `nonnegative`, `positive`, `nonzero`, `min`, `max` now list `money` and `quantity` in "Applicable to"; the vague "domain" catch-all in "Error when applied to" replaced with specific exclusions (`currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate`). Added a note below the table clarifying that `min`/`max` bounds on `money`/`quantity` must be typed constants, and that qualifier alignment is a pre-existing gap (same as `default`).
+- `docs/language/business-domain-types.md` Constraints rows for `money` and `quantity` now include `positive`, `nonzero`, `min '...'`, `max '...'` with a typed-constant bound note.
+- `docs/language/business-domain-types.md` constraint interaction example corrected: `min 0 max 1000` on `quantity in 'kg'` changed to `min '0 kg' max '1000 kg'` (plain integer bounds are invalid for domain types per the ruling).
+- D16 table was already correct (no change needed).
+- Decision inbox: `.squad/decisions/inbox/frank-doc-sync-money-modifiers.md`.
+
+
+
 ### 2026-05-10T[revised] — Simplified min/max TypeChecker brief per Shane's principle: use Resolve() same as default, no bespoke qualifier helper
 
 Shane reviewed the three-part implementation brief (Resolve() + post-resolve mismatch check + ValidateMinMaxBoundQualifier) and ruled: any modifier that takes a value must use the same resolution path as `default` — not a special-cased helper.
@@ -91,3 +103,11 @@ Code-level verification confirmed the ruling is correct:
 
 ### 2026-05-10T13:46:52Z — BUG-006 / BUG-051 stayed operational, not architectural
 - PRE0009 on `min(A,B)` was a stale build symptom; George's parser fix remained correct and the required action was rebuild-only.
+
+### 2026-05-10T23:31:04-04:00 — Reviewed Elaine's typed literal autocomplete UX spec; wrote Kramer's implementation plan
+- Verdict: APPROVED with binding gaps noted. Elaine's spec is architecturally sound — type-driven routing, catalog-derived vocabulary, qualifier-aware hard filtering, compound temporal as V1.
+- Infrastructure gap 1: `TryGetExpectedTypedConstantType` returns bare `TypeKind` — needs extension to carry `ImmutableArray<DeclaredQualifierMeta>` for qualifier-aware filtering.
+- Infrastructure gap 2: Slot detection within typed constant token text is new — the lexer emits the entire `'2 hours + 30 minutes'` as a single `TypedConstant` token, so a lightweight text-position parser classifies cursor position into number/unit/continuation phase.
+- Scope ruling: `price`/`exchangerate` slot-aware completion deferred to V2. V1 covers boolean, temporal (duration/period), money, quantity, date/time/instant/datetime/zoneddatetime/timezone, currency, unitofmeasure, dimension.
+- Implementation plan: 5 vertical slices (type-branching → slot detection → qualifier filtering → compound temporal → integration tests). All vocabulary from catalogs, never hardcoded.
+- Decision: `.squad/decisions/inbox/frank-typed-literal-completion-review.md`. Plan: `docs/Working/kramer-typed-literal-impl-plan.md`.
