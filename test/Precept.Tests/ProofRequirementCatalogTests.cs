@@ -41,7 +41,7 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        ProofRequirements.All.Should().HaveCount(5);
+        ProofRequirements.All.Should().HaveCount(6);
     }
 
     // ── DU subtype correctness ──────────────────────────────────────────────────
@@ -84,20 +84,26 @@ public class ProofRequirementCatalogTests
     // ── QualifierCompatibility is the only dual-subject kind ───────────────────
 
     [Fact]
-    public void OnlyQualifierCompatibility_IsDualSubject()
+    public void DualSubjectKinds_AreQualifierCompatibilityAndChain()
     {
         var dual = ProofRequirements.All
-            .OfType<ProofRequirementMeta.QualifierCompatibility>()
+            .Where(m => m is ProofRequirementMeta.QualifierCompatibility
+                        or ProofRequirementMeta.QualifierChain)
             .ToList();
-        dual.Should().HaveCount(1);
-        dual[0].Kind.Should().Be(ProofRequirementKind.QualifierCompatibility);
+        dual.Should().HaveCount(2);
+        dual.Select(d => d.Kind).Should().BeEquivalentTo(new[]
+        {
+            ProofRequirementKind.QualifierCompatibility,
+            ProofRequirementKind.QualifierChain,
+        });
     }
 
     [Fact]
     public void FourKinds_AreSingleSubject()
     {
         var singleSubject = ProofRequirements.All
-            .Where(m => m is not ProofRequirementMeta.QualifierCompatibility)
+            .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
+                        and not ProofRequirementMeta.QualifierChain)
             .ToList();
         singleSubject.Should().HaveCount(4);
     }

@@ -875,25 +875,63 @@ public static class ProofEngine
 
     private static bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex semantics)
     {
-        if (obligation.Requirement is not QualifierCompatibilityProofRequirement qcReq)
-            return false;
-
-        var leftQualifier = ResolveQualifierOnAxis(qcReq.LeftSubject, qcReq.Axis, obligation.Site, semantics);
-        var rightQualifier = ResolveQualifierOnAxis(qcReq.RightSubject, qcReq.Axis, obligation.Site, semantics);
-
-        if (leftQualifier is null || rightQualifier is null)
-            return false;
-
-        // PeriodDimension.Any does NOT satisfy qualifier compatibility (locked decision)
-        if (qcReq.Axis == QualifierAxis.TemporalDimension)
+        if (obligation.Requirement is QualifierCompatibilityProofRequirement qcReq)
         {
-            if (leftQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any }
-                || rightQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any })
+            var leftQualifier = ResolveQualifierOnAxis(qcReq.LeftSubject, qcReq.Axis, obligation.Site, semantics);
+            var rightQualifier = ResolveQualifierOnAxis(qcReq.RightSubject, qcReq.Axis, obligation.Site, semantics);
+
+            if (leftQualifier is null || rightQualifier is null)
                 return false;
+
+            // PeriodDimension.Any does NOT satisfy qualifier compatibility (locked decision)
+            if (qcReq.Axis == QualifierAxis.TemporalDimension)
+            {
+                if (leftQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any }
+                    || rightQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any })
+                    return false;
+            }
+
+            return leftQualifier == rightQualifier;
         }
 
-        return leftQualifier == rightQualifier;
+        if (obligation.Requirement is QualifierChainProofRequirement chainReq)
+        {
+            var leftQualifier = ResolveQualifierOnAxis(chainReq.LeftSubject, chainReq.LeftAxis, obligation.Site, semantics);
+            var rightQualifier = ResolveQualifierOnAxis(chainReq.RightSubject, chainReq.RightAxis, obligation.Site, semantics);
+
+            if (leftQualifier is null || rightQualifier is null)
+                return false;
+
+            return ChainQualifiersMatch(leftQualifier, rightQualifier);
+        }
+
+        return false;
     }
+
+    /// <summary>
+    /// Compares two qualifier values across potentially different axes by extracting
+    /// their comparable string values.
+    /// </summary>
+    private static bool ChainQualifiersMatch(DeclaredQualifierMeta left, DeclaredQualifierMeta right)
+    {
+        var leftValue = ExtractComparableValue(left);
+        var rightValue = ExtractComparableValue(right);
+        return leftValue is not null && rightValue is not null
+            && string.Equals(leftValue, rightValue, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Extracts a string value suitable for cross-axis comparison from a qualifier.
+    /// </summary>
+    private static string? ExtractComparableValue(DeclaredQualifierMeta qualifier) => qualifier switch
+    {
+        DeclaredQualifierMeta.Currency c       => c.CurrencyCode,
+        DeclaredQualifierMeta.FromCurrency fc  => fc.CurrencyCode,
+        DeclaredQualifierMeta.ToCurrency tc    => tc.CurrencyCode,
+        DeclaredQualifierMeta.Unit u           => u.UnitCode,
+        DeclaredQualifierMeta.Dimension d      => d.DimensionName,
+        _                                      => null,
+    };
 
     private static DeclaredQualifierMeta? ResolveQualifierOnAxis(
         ProofSubject subject, QualifierAxis axis, TypedExpression site, SemanticIndex semantics)
@@ -907,6 +945,17 @@ public static class ProofEngine
             if (qual.Axis == axis)
                 return qual;
         }
+
+        // Axis fallback: Unit → Dimension (dimension-only fields satisfy unit-axis proofs)
+        if (axis == QualifierAxis.Unit)
+        {
+            foreach (var qual in field.DeclaredQualifiers)
+            {
+                if (qual.Axis == QualifierAxis.Dimension)
+                    return qual;
+            }
+        }
+
         return null;
     }
 
@@ -966,6 +1015,13 @@ public static class ProofEngine
                     GetFieldName(qcReq.LeftSubject, obligation.Site) ?? "<unknown>",
                     GetFieldName(qcReq.RightSubject, obligation.Site) ?? "<unknown>",
                     qcReq.Axis.ToString(),
+                    $" in {contextDesc}");
+
+            case QualifierChainProofRequirement chainReq:
+                return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
+                    GetFieldName(chainReq.LeftSubject, obligation.Site) ?? "<unknown>",
+                    GetFieldName(chainReq.RightSubject, obligation.Site) ?? "<unknown>",
+                    $"{chainReq.LeftAxis}↔{chainReq.RightAxis}",
                     $" in {contextDesc}");
 
             case PresenceProofRequirement presence:
@@ -1067,6 +1123,8 @@ public static class ProofEngine
             case DimensionProofRequirement:
                 return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedDimensionRequirement);
             case QualifierCompatibilityProofRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedQualifierCompatibility);
+            case QualifierChainProofRequirement:
                 return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedQualifierCompatibility);
             case PresenceProofRequirement:
                 return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedPresenceRequirement);

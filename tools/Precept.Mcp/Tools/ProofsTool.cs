@@ -21,6 +21,7 @@ public static class ProofsTool
             meta.Kind.ToString(),
             meta.Description,
             meta is ProofRequirementMeta.QualifierCompatibility
+                or ProofRequirementMeta.QualifierChain
         );
 
     private static FaultMetaDto MapFaultMeta(FaultMeta fault)

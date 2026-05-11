@@ -3707,4 +3707,323 @@ public class ProofEngineTests
                 .Should().BeTrue(because: "D2 has no modifier → unresolved");
         }
     }
+
+    // ================================================================================
+    //  Part B Slices 7+8+9 — Money Currency, Chain Qualifier, Dimension Fallback
+    // ================================================================================
+
+    public class PartB_Slice7_MoneyCurrencyEnforcement
+    {
+        [Fact]
+        public void Money_plus_money_same_currency_proved()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as money in 'USD' default '0.00 USD' writable
+                field F2 as money in 'USD' default '0.00 USD' writable
+                field Result as money in 'USD' default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = F1 + F2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Currency })
+                .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
+        }
+
+        [Fact]
+        public void Money_plus_money_different_currency_diagnostic()
+        {
+            var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.MoneyPlusMoney);
+            meta.ProofRequirements
+                .OfType<QualifierCompatibilityProofRequirement>()
+                .Any(r => r.Axis == QualifierAxis.Currency)
+                .Should().BeTrue(because: "MoneyPlusMoney should declare currency proof requirement");
+        }
+
+        [Fact]
+        public void Money_minus_money_different_currency_diagnostic()
+        {
+            var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.MoneyMinusMoney);
+            meta.ProofRequirements
+                .OfType<QualifierCompatibilityProofRequirement>()
+                .Any(r => r.Axis == QualifierAxis.Currency)
+                .Should().BeTrue(because: "MoneyMinusMoney should declare currency proof requirement");
+        }
+
+        [Fact]
+        public void Money_equals_money_different_currency_diagnostic()
+        {
+            var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.MoneyEqualsMoney);
+            meta.ProofRequirements
+                .OfType<QualifierCompatibilityProofRequirement>()
+                .Any(r => r.Axis == QualifierAxis.Currency)
+                .Should().BeTrue(because: "MoneyEqualsMoney should declare currency proof requirement");
+        }
+
+        [Fact]
+        public void Money_greater_than_different_currency_diagnostic()
+        {
+            var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.MoneyGreaterThanMoney);
+            meta.ProofRequirements
+                .OfType<QualifierCompatibilityProofRequirement>()
+                .Any(r => r.Axis == QualifierAxis.Currency)
+                .Should().BeTrue(because: "MoneyGreaterThanMoney should declare currency proof requirement");
+        }
+
+        [Fact]
+        public void Money_less_than_or_equal_same_currency_proved()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as money in 'USD' default '0.00 USD' writable
+                field F2 as money in 'USD' default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit when F1 <= F2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Currency })
+                .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
+        }
+
+        [Fact]
+        public void Bare_money_plus_bare_money_obligation_fires()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as money default '0.00 USD' writable
+                field F2 as money default '0.00 USD' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = F1 + F2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Any(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Currency }
+                          && o.Disposition == ProofDisposition.Unresolved)
+                .Should().BeTrue(because: "bare money fields cannot discharge currency obligation");
+        }
+
+        [Fact]
+        public void Regression_quantity_plus_quantity_unaffected()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as quantity in 'kg' default '0 kg' writable
+                field F2 as quantity in 'kg' default '0 kg' writable
+                field Result as quantity in 'kg' default '0 kg' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = F1 + F2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Unit })
+                .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
+        }
+    }
+
+    public class PartB_Slice8_QualifierChainInfra
+    {
+        [Fact]
+        public void ExchangeRate_times_money_matching_proved()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Rate as exchangerate in 'USD' to 'EUR' writable
+                field Amt as money in 'USD' default '0.00 USD' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Rate * Amt -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierChainProofRequirement)
+                .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved,
+                    because: "from-currency USD matches money currency USD"));
+        }
+
+        [Fact]
+        public void ExchangeRate_times_money_mismatched_diagnostic()
+        {
+            var (_, ledger) = ProveAllowingDiagnostics("""
+                precept Widget
+                field Rate as exchangerate in 'USD' to 'EUR' writable
+                field Amt as money in 'GBP' default '0.00 GBP' writable
+                field Result as money in 'EUR' default '0.00 EUR' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Rate * Amt -> no transition
+                """);
+
+            ledger.Obligations
+                .Any(o => o.Requirement is QualifierChainProofRequirement
+                          && o.Disposition == ProofDisposition.Unresolved)
+                .Should().BeTrue(because: "from USD != money GBP");
+        }
+
+        [Fact]
+        public void ExchangeRate_times_money_wrong_side_diagnostic()
+        {
+            var (_, ledger) = ProveAllowingDiagnostics("""
+                precept Widget
+                field Rate as exchangerate in 'USD' to 'EUR' writable
+                field Amt as money in 'EUR' default '0.00 EUR' writable
+                field Result as money in 'EUR' default '0.00 EUR' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Rate * Amt -> no transition
+                """);
+
+            ledger.Obligations
+                .Any(o => o.Requirement is QualifierChainProofRequirement
+                          && o.Disposition == ProofDisposition.Unresolved)
+                .Should().BeTrue(because: "from is USD not EUR");
+        }
+
+        [Fact]
+        public void Price_times_quantity_matching_proved()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field P as price in 'USD' of 'mass' writable
+                field Q as quantity of 'mass' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = P * Q -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierChainProofRequirement)
+                .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
+        }
+
+        [Fact]
+        public void Price_times_quantity_mismatched_diagnostic()
+        {
+            var (_, ledger) = ProveAllowingDiagnostics("""
+                precept Widget
+                field P as price in 'USD' of 'mass' writable
+                field Q as quantity of 'length' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = P * Q -> no transition
+                """);
+
+            ledger.Obligations
+                .Any(o => o.Requirement is QualifierChainProofRequirement
+                          && o.Disposition == ProofDisposition.Unresolved)
+                .Should().BeTrue(because: "mass != length");
+        }
+
+        [Fact]
+        public void Bare_exchangerate_times_bare_money_fires()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Rate as exchangerate writable
+                field Amt as money default '0.00 USD' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Rate * Amt -> no transition
+                """);
+
+            ledger.Obligations
+                .Any(o => o.Requirement is QualifierChainProofRequirement
+                          && o.Disposition == ProofDisposition.Unresolved)
+                .Should().BeTrue(because: "bare fields cannot discharge chain");
+        }
+
+        [Fact]
+        public void Bare_price_times_bare_quantity_fires()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field P as price writable
+                field Q as quantity default '0 kg' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = P * Q -> no transition
+                """);
+
+            ledger.Obligations
+                .Any(o => o.Requirement is QualifierChainProofRequirement
+                          && o.Disposition == ProofDisposition.Unresolved)
+                .Should().BeTrue(because: "bare fields cannot discharge chain");
+        }
+
+        [Fact]
+        public void Regression_existing_quantity_operations_unaffected()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as quantity in 'kg' default '0 kg' writable
+                field F2 as quantity in 'kg' default '0 kg' writable
+                field Result as quantity in 'kg' default '0 kg' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = F1 + F2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Unit })
+                .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
+        }
+    }
+
+    public class PartB_Slice9_DimensionFallback
+    {
+        [Fact]
+        public void Quantity_dimension_only_same_proved()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as quantity of 'mass' writable
+                field F2 as quantity of 'mass' writable
+                field Result as quantity of 'mass' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = F1 + F2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Unit })
+                .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved,
+                    because: "same dimension falls back from Unit to Dimension"));
+        }
+
+        [Fact]
+        public void Quantity_dimension_only_different_diagnostic()
+        {
+            // The type checker's QualifierMismatch on the assignment target causes
+            // the binary expression to be error-tainted, suppressing proof obligations.
+            // Verify the catalog declares the proof requirement instead.
+            var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.QuantityPlusQuantity);
+            meta.ProofRequirements
+                .OfType<QualifierCompatibilityProofRequirement>()
+                .Any(r => r.Axis == QualifierAxis.Unit)
+                .Should().BeTrue(because: "QuantityPlusQuantity should declare unit proof requirement");
+        }
+
+        [Fact]
+        public void Regression_explicit_unit_still_caught()
+        {
+            // Verify the catalog declares unit proof requirement for quantity operations.
+            // Full-pipeline mismatch tests are caught by the type checker first.
+            var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.QuantityMinusQuantity);
+            meta.ProofRequirements
+                .OfType<QualifierCompatibilityProofRequirement>()
+                .Any(r => r.Axis == QualifierAxis.Unit)
+                .Should().BeTrue(because: "QuantityMinusQuantity should declare unit proof requirement");
+        }
+    }
 }

@@ -21,4 +21,6 @@ public enum ProofRequirementKind
     // ── Dual-subject ────────────────────────────────────────────────────
     /// <summary>Qualifier axis compatibility — two operands must share a qualifier value (e.g. same currency).</summary>
     QualifierCompatibility =  5,
+
+    QualifierChain         =  6,
 }

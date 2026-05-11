@@ -18,6 +18,14 @@
 
 ## Recent Updates
 
+### 2026-05-11T22:41:00Z — Slice 1 Parser for InterpolatedTypedConstantExpression complete
+- Rewrote `ParseInterpolatedTypedConstant()` to produce `InterpolatedTypedConstantExpression` with full segment AST (mirrors `InterpolatedStringExpression`).
+- Added `ExpressionFormKind.InterpolatedTypedConstant = 15` with catalog metadata; moved `TypedConstantStart` from Literal LeadTokens to the new form.
+- Added NameBinder arms for both `CollectFieldDependencies` and `WalkExpression`.
+- TC stub (`ResolveInterpolatedTypedConstantExpressionStub`) routes the new node to crash-prevention diagnostics; the old `ResolveInterpolatedTypedConstantStub` for `LiteralExpression(TypedConstantStart)` is now dead code.
+- 10 parser round-trip tests added covering 1/2/3-hole patterns, expressions in holes, and form kind verification.
+- Segment shape: always starts and ends with `TextSegment` (may be empty); for N holes → 2N+1 segments.
+
 ### 2026-05-11T20:03:33Z — ConflictingModifiers implementation recorded
 - George's canonical closeout is `DiagnosticCode.ConflictingModifiers = 120`, dedicated validator routing, and symmetric `MutuallyExclusiveWith` declarations on `Optional` and `Notempty`.
 - The PRECEPT0011c symmetry requirement is now a durable implementation note for any future mutual-exclusion work.
@@ -30,3 +38,10 @@
 - Slice 10 (G7): Added binary/unary expression handling to `ValidateAssignmentQualifiers` via recursive leaf operand extraction (`ExtractLeafOperands`). `set usdField = eurField + eurField` now correctly produces `QualifierMismatch`.
 - Architecture decision: leaf-extraction approach over proof obligations — keeps consistency with existing direct-diagnostic pattern in `ValidateAssignmentQualifiers`.
 - Known limitation: bare-operand-to-qualified-target (`set usdField = bareField + bareField`) deferred to proof engine scope.
+
+### 2025-07-11 — Part B Slices 7+8+9: Proof engine qualifier coverage
+- Slice 7: Added QualifierCompatibilityProofRequirement on QualifierAxis.Currency to all 8 money operations (2 arithmetic + 6 comparison). Closes critical gap where `money in 'USD' + money in 'EUR'` had no proof enforcement.
+- Slice 8: Introduced QualifierChainProofRequirement DU subtype with dual-subject, dual-axis design for cross-type qualifier chains. Added to ExchangeRateTimesMoney (FromCurrency↔Currency) and PriceTimesQuantity (Dimension↔Dimension). Extended ProofEngine Strategy 5 with chain comparison via ExtractComparableValue.
+- Slice 9: Added Unit→Dimension fallback in ResolveQualifierOnAxis so dimension-only fields satisfy Unit-axis proofs.
+- Updated MCP tools (LanguageTool, ProofsTool) for chain rendering and dual-subject classification.
+- Updated ProofRequirementCatalogTests for 6th kind. 19 new ProofEngine tests, all 193 pass.

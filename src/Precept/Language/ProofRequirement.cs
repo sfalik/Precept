@@ -100,6 +100,16 @@ public sealed record QualifierCompatibilityProofRequirement(
     QualifierAxis Axis,
     string        Description
 ) : ProofRequirement(ProofRequirementKind.QualifierCompatibility, Description);
+/// <summary>
+/// Qualifier chain proof: cross-type, cross-axis qualifier validation.
+/// </summary>
+public sealed record QualifierChainProofRequirement(
+    ProofSubject  LeftSubject,
+    QualifierAxis LeftAxis,
+    ProofSubject  RightSubject,
+    QualifierAxis RightAxis,
+    string        Description
+) : ProofRequirement(ProofRequirementKind.QualifierChain, Description);
 
 /// <summary>
 /// Modifier proof: the operand(s) matching <see cref="Subject"/> must have
@@ -157,6 +167,11 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
     public sealed record QualifierCompatibility()
         : ProofRequirementMeta(ProofRequirementKind.QualifierCompatibility,
             "Qualifier compatibility — two operands must share a qualifier value on the specified axis");
+
+    /// <summary>Qualifier chain — cross-type, cross-axis qualifier validation.</summary>
+    public sealed record QualifierChain()
+        : ProofRequirementMeta(ProofRequirementKind.QualifierChain,
+            "Qualifier chain — cross-type, cross-axis qualifier validation");
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement

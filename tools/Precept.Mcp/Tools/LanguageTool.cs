@@ -522,6 +522,7 @@ public static class LanguageTool
             PresenceProofRequirement presence => $"{RenderProofSubject(presence.Subject)} is present — {presence.Description}",
             DimensionProofRequirement dimension => $"{RenderProofSubject(dimension.Subject)} has {dimension.RequiredDimension.ToString().ToLowerInvariant()} temporal dimension — {dimension.Description}",
             QualifierCompatibilityProofRequirement qualifierCompatibility => $"{RenderCompatibleSubjects(qualifierCompatibility.LeftSubject, qualifierCompatibility.RightSubject)} share {qualifierCompatibility.Axis.ToString().ToLowerInvariant()} qualifiers — {qualifierCompatibility.Description}",
+            QualifierChainProofRequirement chain => $"{RenderCompatibleSubjects(chain.LeftSubject, chain.RightSubject)} chain {chain.LeftAxis.ToString().ToLowerInvariant()}↔{chain.RightAxis.ToString().ToLowerInvariant()} — {chain.Description}",
             ModifierRequirement modifier => $"{RenderProofSubject(modifier.Subject)} declares {RenderModifier(modifier.Required)} — {modifier.Description}",
             _ => throw new ArgumentOutOfRangeException(nameof(proofRequirement), proofRequirement, null),
         };

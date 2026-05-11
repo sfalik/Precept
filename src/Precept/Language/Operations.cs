@@ -421,11 +421,21 @@ public static class Operations
         // ── Business: money ─────────────────────────────────────────
         OperationKind.MoneyPlusMoney => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PMoney, PMoney, TypeKind.Money,
-            "Money + money → money (same currency required)"),
+            "Money + money → money (same currency required)",
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
 
         OperationKind.MoneyMinusMoney => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PMoney, PMoney, TypeKind.Money,
-            "Money − money → money (same currency required)"),
+            "Money − money → money (same currency required)",
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
 
         OperationKind.MoneyTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PMoney, PDecimal, TypeKind.Money,
@@ -594,7 +604,13 @@ public static class Operations
 
         OperationKind.PriceTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PQuantity, TypeKind.Money,
-            "Price × quantity → money (dimensional cancellation)", BidirectionalLookup: true),
+            "Price × quantity → money (dimensional cancellation)", BidirectionalLookup: true,
+            ProofRequirements:
+            [
+                new QualifierChainProofRequirement(new ParamSubject(PPrice), QualifierAxis.Dimension,
+                    new ParamSubject(PQuantity), QualifierAxis.Dimension,
+                    "Price dimension must match quantity dimension"),
+            ]),
 
         OperationKind.PriceTimesPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PPeriod, TypeKind.Money,
@@ -620,7 +636,13 @@ public static class Operations
         // ── Business: exchangerate ──────────────────────────────────
         OperationKind.ExchangeRateTimesMoney => new BinaryOperationMeta(
             kind, OperatorKind.Times, PExchangeRate, PMoney, TypeKind.Money,
-            "ExchangeRate × money → money (currency conversion)", BidirectionalLookup: true),
+            "ExchangeRate × money → money (currency conversion)", BidirectionalLookup: true,
+            ProofRequirements:
+            [
+                new QualifierChainProofRequirement(new ParamSubject(PExchangeRate), QualifierAxis.FromCurrency,
+                    new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Exchange rate 'from' currency must match money currency"),
+            ]),
 
         OperationKind.ExchangeRateTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PExchangeRate, PDecimal, TypeKind.ExchangeRate,
@@ -914,27 +936,57 @@ public static class Operations
         OperationKind.MoneyEqualsMoney => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PMoney, PMoney, TypeKind.Boolean,
             "Money equality (same currency required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.MoneyNotEqualsMoney => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PMoney, PMoney, TypeKind.Boolean,
             "Money inequality (same currency required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.MoneyLessThanMoney => new BinaryOperationMeta(
             kind, OperatorKind.LessThan, PMoney, PMoney, TypeKind.Boolean,
             "Money less-than (same currency required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.MoneyGreaterThanMoney => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThan, PMoney, PMoney, TypeKind.Boolean,
             "Money greater-than (same currency required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.MoneyLessThanOrEqualMoney => new BinaryOperationMeta(
             kind, OperatorKind.LessThanOrEqual, PMoney, PMoney, TypeKind.Boolean,
             "Money less-than-or-equal (same currency required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.MoneyGreaterThanOrEqualMoney => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThanOrEqual, PMoney, PMoney, TypeKind.Boolean,
             "Money greater-than-or-equal (same currency required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
 
         // ── Orderable same-type: quantity (same dimension required) ──
         OperationKind.QuantityEqualsQuantity => new BinaryOperationMeta(

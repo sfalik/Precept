@@ -17,6 +17,7 @@ public static class ProofRequirements
         ProofRequirementKind.Dimension             => new ProofRequirementMeta.Dimension(),
         ProofRequirementKind.Modifier              => new ProofRequirementMeta.Modifier(),
         ProofRequirementKind.QualifierCompatibility => new ProofRequirementMeta.QualifierCompatibility(),
+        ProofRequirementKind.QualifierChain        => new ProofRequirementMeta.QualifierChain(),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ProofRequirementKind: {kind}"),
     };
