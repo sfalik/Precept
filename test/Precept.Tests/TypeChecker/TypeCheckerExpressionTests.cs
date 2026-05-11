@@ -1045,6 +1045,76 @@ public class TypeCheckerExpressionTests
         conditional.ResultType.Should().Be(TypeKind.Boolean);
     }
 
+    // ── B9: post-resolution assignment type validation ────────────────────
+
+    [Fact]
+    public void SetAction_IntegerToQuantityField_EmitsTypeMismatch()
+    {
+        var precept = """
+            precept Widget
+            field q as quantity of 'mass' default '0 kg'
+            state Open initial
+            state Closed
+            event Update
+            from Open on Update
+                -> set q = 5
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void SetAction_IntegerToMoneyField_EmitsTypeMismatch()
+    {
+        var precept = """
+            precept Widget
+            field m as money in 'USD'
+            state Open initial
+            state Closed
+            event Update
+            from Open on Update
+                -> set m = 42
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void SetAction_MatchingType_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field n as integer
+            state Open initial
+            state Closed
+            event Update
+            from Open on Update
+                -> set n = 5
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void SetAction_WidenedType_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field d as decimal
+            state Open initial
+            state Closed
+            event Update
+            from Open on Update
+                -> set d = 5
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  12. QualifierBinding — ResultQualifier assertion (D11)
     // ════════════════════════════════════════════════════════════════════════

@@ -812,6 +812,17 @@ internal static partial class TypeChecker
                 (fieldName, fieldType) = ResolveActionTarget(assign.Target, ctx);
                 var value = Resolve(assign.Value, ctx,
                     fieldType != TypeKind.Error ? fieldType : null);
+
+                // B9: Post-resolution type check — verify resolved value is assignable to target field.
+                if (value is not TypedErrorExpression
+                    && fieldType != TypeKind.Error
+                    && !IsAssignable(value.ResultType, fieldType))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.TypeMismatch, assign.Value.Span,
+                            Types.GetMeta(fieldType).DisplayName, Types.GetMeta(value.ResultType).DisplayName));
+                }
+
                 return new TypedInputAction(
                     assign.Kind, fieldName, fieldType,
                     InputExpression: value,

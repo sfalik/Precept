@@ -19,6 +19,9 @@
 - B9-B12 Slice 1 touched 6 `TypedArgRef`/`TypedFieldRef` construction sites end-to-end: 5 explicit constructors in `src/` plus the target-typed `MakeFieldRef(...)` helper in `test/Precept.Tests/ProofEngineTests.cs`.
 - Surprise from the Slice 1 audit: no positional `TypedArgRef(...)`/`TypedFieldRef(...)` pattern matches needed updates; the only non-obvious break was the target-typed test helper constructor.
 - For qualifier propagation coverage, `test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs` can validate full-pipeline expression nodes by asserting against `TypedInputAction.InputExpression` from `index.EventHandlers` and `TypedField.ComputedExpression` from `index.FieldsByName`.
+- B9-B12 Slice 2 modified `src/Precept/Pipeline/TypeChecker.Expressions.cs` at current lines 812-824, inserting the post-resolution `IsAssignable` gate directly in `ResolveAction`'s `AssignAction` arm before `TypedInputAction` construction.
+- `test/Precept.Tests/TypeChecker/MoneyQuantityModifierRegressionTests.cs` did not need updates for Slice 2; its gap anchors cover modifier/default validation, while the new check only affects assignment actions.
+- Surprise from Slice 2: the assignability helper to reuse is the local `TypeChecker.Expressions.cs` implementation (`private static bool IsAssignable` at current line 1172), not a shared helper in `TypeChecker.cs`.
 
 ## Historical Summary
 
