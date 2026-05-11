@@ -151,7 +151,7 @@ public sealed record TypedPostfixOp(
 /// <summary>
 /// Error expression — propagates <see cref="TypeKind.Error"/>, replacing failed sub-expressions.
 /// Invariant (D26): any <see cref="SemanticIndex"/> containing a <c>TypedErrorExpression</c>
-/// must also contain ≥1 <see cref="Severity.Error"/> diagnostic. Enforced by Debug.Assert in Slice 10.
+/// must also contain ≥1 <see cref="Severity.Error"/> diagnostic. Enforced by unconditional invariant check in TypeChecker.
 /// </summary>
 public sealed record TypedErrorExpression(SourceSpan Span)
     : TypedExpression(TypeKind.Error, Span);
@@ -441,7 +441,7 @@ public sealed record ArgReference(TypedArg Arg, SourceSpan Site);
 /// <para>
 /// <b>D26 (Slice 10):</b> If any <see cref="TypedErrorExpression"/> is present in any typed expression
 /// reachable from this index, at least one <see cref="Severity.Error"/> diagnostic must also be present.
-/// Enforced by <c>Debug.Assert</c> at construction time in Slice 10.
+/// Enforced by unconditional <c>throw</c> at construction time in Slice 10.
 /// </para>
 /// </summary>
 public sealed record SemanticIndex(

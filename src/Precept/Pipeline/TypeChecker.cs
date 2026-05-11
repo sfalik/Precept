@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using NodaTime;
 using NodaTime.Text;
 using Precept.Language;
@@ -17,7 +16,7 @@ namespace Precept.Pipeline;
 /// ResolveFieldExpressions → PopulateTransitionRows → PopulateEventHandlers →
 /// PopulateRules → PopulateEnsures → PopulateAccessModes → PopulateStateHooks →
 /// PopulateEditDeclarations → ValidateModifiers → ValidateStructural →
-/// ValidateCIEnforcement → BuildSemanticIndex (final assembly with D26 global assert).
+/// ValidateCIEnforcement → BuildSemanticIndex (final assembly with D26 global invariant check).
 /// </remarks>
 internal static partial class TypeChecker
 {
@@ -569,10 +568,12 @@ internal static partial class TypeChecker
         }
 
         // D26: if any TypedErrorExpression in transition rows → at least one Error diagnostic must exist
-        Debug.Assert(
-            !ctx.TransitionRows.Any(r => ContainsErrorExpression(r)) ||
-            ctx.Diagnostics.Any(d => d.Severity == Severity.Error),
-            "D26: TypedErrorExpression present in transition rows but no Error-severity diagnostic emitted.");
+        if (ctx.TransitionRows.Any(r => ContainsErrorExpression(r))
+            && !ctx.Diagnostics.Any(d => d.Severity == Severity.Error))
+        {
+            throw new InvalidOperationException(
+                "D26 violated: TypedErrorExpression present in transition rows but no Error-severity diagnostic emitted.");
+        }
     }
 
     /// <summary>
@@ -589,10 +590,12 @@ internal static partial class TypeChecker
         }
 
         // D26: if any TypedErrorExpression in event handlers → at least one Error diagnostic must exist
-        Debug.Assert(
-            !ctx.EventHandlers.Any(h => h.Actions.Any(a => a is TypedInputAction ia && ContainsErrorExpressionInAction(ia))) ||
-            ctx.Diagnostics.Any(d => d.Severity == Severity.Error),
-            "D26: TypedErrorExpression present in event handlers but no Error-severity diagnostic emitted.");
+        if (ctx.EventHandlers.Any(h => h.Actions.Any(a => a is TypedInputAction ia && ContainsErrorExpressionInAction(ia)))
+            && !ctx.Diagnostics.Any(d => d.Severity == Severity.Error))
+        {
+            throw new InvalidOperationException(
+                "D26 violated: TypedErrorExpression present in event handlers but no Error-severity diagnostic emitted.");
+        }
     }
 
     /// <summary>
@@ -1208,10 +1211,12 @@ internal static partial class TypeChecker
             Diagnostics:      ctx.Diagnostics.ToImmutableArray());
 
         // D26: If any TypedErrorExpression exists, at least one Error diagnostic must be present
-        Debug.Assert(
-            !ContainsAnyErrorExpression(index) ||
-            index.Diagnostics.Any(d => d.Severity == Severity.Error),
-            "D26 violated: TypedErrorExpression present but no Error diagnostic in SemanticIndex");
+        if (ContainsAnyErrorExpression(index)
+            && !index.Diagnostics.Any(d => d.Severity == Severity.Error))
+        {
+            throw new InvalidOperationException(
+                "D26 violated: TypedErrorExpression present but no Error diagnostic in SemanticIndex");
+        }
 
         return index;
     }

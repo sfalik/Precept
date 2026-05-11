@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -937,7 +936,8 @@ internal static partial class TypeChecker
                 var value = Resolve(colBy.Value, ctx, valueExpectedType);
                 var key = Resolve(colBy.OrderingKey, ctx, keyExpectedType);
                 // D5: SecondaryRole = Key, SecondaryExpression = key
-                Debug.Assert(key is not null, "D5: SecondaryExpression for CollectionValueBy must not be null");
+                if (key is null)
+                    throw new InvalidOperationException("D5: SecondaryExpression for CollectionValueBy must not be null");
                 return new TypedInputAction(
                     colBy.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -956,7 +956,8 @@ internal static partial class TypeChecker
                 var value = Resolve(insertAt.Value, ctx, valueExpectedType);
                 var index = Resolve(insertAt.Index, ctx, TypeKind.Integer);
                 // D5: SecondaryRole = Index, SecondaryExpression = index
-                Debug.Assert(index is not null, "D5: SecondaryExpression for InsertAt must not be null");
+                if (index is null)
+                    throw new InvalidOperationException("D5: SecondaryExpression for InsertAt must not be null");
                 return new TypedInputAction(
                     insertAt.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -992,7 +993,8 @@ internal static partial class TypeChecker
                 var value = Resolve(put.Value, ctx, valueExpectedType);
                 var key = Resolve(put.Key, ctx, keyExpectedType);
                 // D5: SecondaryRole = Key, SecondaryExpression = key
-                Debug.Assert(key is not null, "D5: SecondaryExpression for PutKeyValue must not be null");
+                if (key is null)
+                    throw new InvalidOperationException("D5: SecondaryExpression for PutKeyValue must not be null");
                 return new TypedInputAction(
                     put.Kind, fieldName, fieldType,
                     InputExpression: value,
