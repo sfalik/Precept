@@ -16202,3 +16202,109 @@ This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kin
 ## Not Done / Follow-up
 
 After `quantity of ` (no typed constant yet), completions are now empty. Ideally a follow-up could offer dimension name suggestions via a new `InQualifierPosition` context with `GetDimensionItems()` — but that requires catalog-driven qualifier-site detection and is a separate improvement.
+
+# Decision: Plan Renamed and Expanded
+
+**Author:** Frank  
+**Date:** 2026-05-11  
+**Status:** Recorded
+
+## What Changed
+
+`docs/Working/interpolation-plan.md` → `docs/Working/typed-constants-and-proof-coverage-plan.md`
+
+## Why This Name
+
+The plan outgrew "interpolation" — it now covers two workstreams:
+
+1. **Typed constant interpolation** (Part A, Slices 1–6): parser → type checker → completions → semantic tokens → docs → proof engine for `'{x} kg'`, `'{Amt} {Curr}'`, and related forms.
+2. **Proof engine qualifier coverage** (Part B, Slices 7–12): 14 gaps identified in the exhaustive qualifier-proof audit, 10 gaps addressed by 6 new slices, ~167 LOC, ~38 tests.
+
+"Typed constants" covers both static and interpolated typed constant work. "Proof coverage" covers the qualifier-proof audit findings. Together they are the two pillars of the plan.
+
+## What Was Added
+
+- **Executive summary** of audit findings (currency axis enforcement failure, root cause = catalog metadata gap, architecture sound)
+- **Full audit matrix** — 7 tables covering dimension, currency, exchange rate, numeric, compound, string, and temporal qualifiers
+- **Gap inventory** — G1–G14 with ID, category, scenario, status, fix location, LOC estimate
+- **6 new implementation slices** (Slices 7–12) matching the existing slice format:
+  - Slice 7: Money Currency Enforcement (G1+G2+G3) — ~20 LOC, ~8 tests
+  - Slice 8: Qualifier Chain Validation Infrastructure (G4+G5) — ~54 LOC, ~10 tests
+  - Slice 9: Dimension-Only Field False Positive Fix (G6) — ~15 LOC, ~4 tests
+  - Slice 10: Assignment Expression Qualifier Propagation (G7) — ~50 LOC, ~8 tests
+  - Slice 11: Exchange Rate Assignment Qualifier Validation (G9) — ~20 LOC, ~4 tests
+  - Slice 12: Temporal Chain Validation (G8+G13) — ~8 LOC, ~4 tests (depends on Slice 8)
+- **Test coverage assessment** and **architecture assessment** sections
+- **Proof gap dependency order** — all independent except Slice 12 → Slice 8
+- **Updated gates** — separate approval tracks for Part A and Part B
+
+## Architectural Call
+
+**S1–S5 architecture is sound.** All 14 gaps trace to catalog metadata omissions, not structural engine defects. No new strategy tier needed — only catalog entries, one axis fallback (~15 LOC), one new DU subtype (~10 LOC), and one assignment proof obligation (~50 LOC). The proof engine faithfully processes what the catalog declares. The catalog was simply silent.
+
+## Canonical Status
+
+`docs/Working/typed-constants-and-proof-coverage-plan.md` is now the canonical implementation document for **both** interpolation typed constants AND proof engine qualifier coverage. The old `interpolation-plan.md` has been deleted. The source audit documents (`proof-engine-qualifier-audit.md`, `proof-gaps-issues.md`) remain as reference.
+
+# Decision: Proof Engine Qualifier Audit Findings
+
+**Author:** Frank  
+**Date:** 2026-05-11  
+**Status:** Findings delivered — implementation priorities established  
+**Scope:** Exhaustive qualifier × proof engine interaction audit
+
+## Top-Level Findings
+
+### Finding 1: Currency axis has near-total enforcement failure on money operations
+
+`MoneyPlusMoney`, `MoneyMinusMoney`, and all 6 money comparison operations in `Operations.cs` declare "same currency required" in their descriptions but carry **zero** `QualifierCompatibilityProofRequirement` entries. This is not a proof engine bug — the engine correctly processes whatever the catalog declares. The catalog is simply silent.
+
+**Impact:** `money in 'USD' + money in 'EUR'` compiles clean. Direct philosophy violation.
+
+**Fix:** Add `QualifierCompatibilityProofRequirement(PMoney, PMoney, QualifierAxis.Currency, ...)` to 8 operation catalog entries. ~20 LOC. Zero architectural change needed.
+
+### Finding 2: Cross-type qualifier chain validation does not exist
+
+Three operations require that a qualifier on one type matches a qualifier on a DIFFERENT type:
+- `ExchangeRateTimesMoney`: rate's `from` currency must match money's currency
+- `PriceTimesQuantity`: price's per-unit dimension must match quantity's dimension
+- `PriceTimesPeriod`/`PriceTimesDuration`: price's temporal denominator must match the temporal operand
+
+The current `QualifierCompatibilityProofRequirement` only supports same-axis equality between two operands of the same type. A new requirement subtype (`QualifierChainProofRequirement`) is needed for cross-axis validation.
+
+**Impact:** Currency conversion with wrong currencies compiles clean. Dimensional cancellation with incompatible dimensions compiles clean.
+
+**Fix:** New DU subtype + Strategy 5 extension. ~50 LOC infrastructure + 4-8 LOC per operation.
+
+### Finding 3: Dimension-only fields produce false positives on Unit-axis operations
+
+Fields declared as `quantity of 'mass'` (Dimension axis) fail proof when operations require `QualifierAxis.Unit` matching. Two fields with identical dimension qualifiers should be compatible for addition — the current engine rejects them because it looks for Unit qualifiers and finds none.
+
+**Impact:** Valid programs rejected. Users forced to declare explicit units even when dimension-level granularity is sufficient.
+
+**Fix:** Axis fallback in `ResolveQualifierOnAxis`. ~15 LOC.
+
+## Architectural Recommendations
+
+1. **The S1–S5 strategy architecture is sound.** No new strategy tier is needed. The gaps are catalog-metadata gaps, not engine-logic gaps.
+
+2. **One new proof requirement subtype is needed:** `QualifierChainProofRequirement` for cross-type qualifier validation. This extends the existing DU pattern.
+
+3. **One Strategy 5 extension is needed:** Axis fallback logic when `QualifierAxis.Unit` is requested but only `QualifierAxis.Dimension` exists on the field.
+
+4. **Priority order for implementation:**
+   - P1: G1-G3 (money currency enforcement) — 20 LOC, zero risk
+   - P2: G6 (dimension-only false positive fix) — 15 LOC, unblocks valid programs
+   - P3: G4-G5 (cross-type chain validation) — 50 LOC infrastructure
+   - P4: G7 (expression qualifier propagation) — 40-60 LOC, deeper change
+   - P5: G9 (ValidateAssignmentQualifiers missing cases) — 20 LOC
+
+5. **No philosophy document update needed.** The philosophy is correct — the implementation doesn't fulfill it. This audit surfaces implementation gaps, not philosophy gaps.
+
+## Implications for Existing Work
+
+The interpolation plan (docs/Working/interpolation-plan.md) is unaffected. The dimension-unit gap (Slice 2 extension) identified in earlier work is confirmed as real (G10) and correctly scoped. The Slice 6 "no qualifier propagation" rationale remains correct — qualification obligations flow from catalog metadata on operations, not from expression-level propagation.
+
+## Risk Assessment
+
+G1-G3 (money currency enforcement) is the only gap that could be classified as a **shipped regression risk** — if users rely on the current silent acceptance of cross-currency arithmetic, adding enforcement would be a breaking change. However, since the behavior is semantically invalid (adding USD + EUR is meaningless), this is correctly classified as a bug fix, not a behavioral change.
