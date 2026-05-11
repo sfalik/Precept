@@ -775,9 +775,10 @@ internal sealed class CompletionHandler : ICompletionHandler
             return true;
         }
 
-        if (context == SlotContext.InExpression && TryGetBinaryPeerOperandType(compilation, position, out var peerType))
+        if (context == SlotContext.InExpression
+            && TryGetBinaryPeerOperandType(compilation, position, out var peerType, out var peerQualifiers))
         {
-            tcContext = TypedConstantContext.FromType(peerType);
+            tcContext = new TypedConstantContext(peerType, peerQualifiers);
             return true;
         }
 
@@ -944,13 +945,18 @@ internal sealed class CompletionHandler : ICompletionHandler
         return false;
     }
 
-    private static bool TryGetBinaryPeerOperandType(Compilation compilation, Position position, out TypeKind expectedType)
+    private static bool TryGetBinaryPeerOperandType(
+        Compilation compilation,
+        Position position,
+        out TypeKind expectedType,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
     {
         var tokens = compilation.Tokens.Tokens;
         var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
         if (tokenIndex < 0)
         {
             expectedType = default;
+            qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
             return false;
         }
 
@@ -965,19 +971,29 @@ internal sealed class CompletionHandler : ICompletionHandler
             || !Operators.ByToken.ContainsKey((tokens[tokenIndex].Kind, Arity.Binary)))
         {
             expectedType = default;
+            qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
             return false;
         }
 
-        return TryResolveExpressionTypeEndingAtToken(compilation, FindPreviousSignificantToken(tokens, tokenIndex - 1), out expectedType);
+        return TryResolveExpressionTypeEndingAtToken(
+            compilation,
+            FindPreviousSignificantToken(tokens, tokenIndex - 1),
+            out expectedType,
+            out qualifiers);
     }
 
-    private static bool TryResolveExpressionTypeEndingAtToken(Compilation compilation, int tokenIndex, out TypeKind expectedType)
+    private static bool TryResolveExpressionTypeEndingAtToken(
+        Compilation compilation,
+        int tokenIndex,
+        out TypeKind expectedType,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
     {
         var tokens = compilation.Tokens.Tokens;
         tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
         if (tokenIndex < 0)
         {
             expectedType = default;
+            qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
             return false;
         }
 
@@ -990,43 +1006,52 @@ internal sealed class CompletionHandler : ICompletionHandler
                 {
                     var receiverIndex = FindPreviousSignificantToken(tokens, dotIndex - 1);
                     if (receiverIndex >= 0
-                        && TryResolveMemberExpressionType(compilation, receiverIndex, token.Text, out expectedType))
+                        && TryResolveMemberExpressionType(compilation, receiverIndex, token.Text, out expectedType, out qualifiers))
                     {
                         return true;
                     }
                 }
 
-                return TryResolveIdentifierType(compilation, token.Text, token.Span, out expectedType);
+                return TryResolveIdentifierType(compilation, token.Text, token.Span, out expectedType, out qualifiers);
 
             case TokenKind.RightParen:
-                return TryResolveParenthesizedExpressionType(compilation, tokenIndex, out expectedType);
+                return TryResolveParenthesizedExpressionType(compilation, tokenIndex, out expectedType, out qualifiers);
 
             case TokenKind.StringLiteral:
                 expectedType = TypeKind.String;
+                qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
                 return true;
 
             case TokenKind.True:
             case TokenKind.False:
                 expectedType = TypeKind.Boolean;
+                qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
                 return true;
 
             case TokenKind.NumberLiteral:
                 expectedType = token.Text.Contains('.') ? TypeKind.Decimal : TypeKind.Integer;
+                qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
                 return true;
 
             default:
                 expectedType = default;
+                qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
                 return false;
         }
     }
 
-    private static bool TryResolveParenthesizedExpressionType(Compilation compilation, int closeParenIndex, out TypeKind expectedType)
+    private static bool TryResolveParenthesizedExpressionType(
+        Compilation compilation,
+        int closeParenIndex,
+        out TypeKind expectedType,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
     {
         var tokens = compilation.Tokens.Tokens;
         var openParenIndex = FindMatchingOpenParen(tokens, closeParenIndex);
         if (openParenIndex < 0)
         {
             expectedType = default;
+            qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
             return false;
         }
 
@@ -1038,9 +1063,10 @@ internal sealed class CompletionHandler : ICompletionHandler
             {
                 var receiverIndex = FindPreviousSignificantToken(tokens, qualifierIndex - 1);
                 if (receiverIndex >= 0
-                    && TryResolveExpressionTypeEndingAtToken(compilation, receiverIndex, out var receiverType)
+                    && TryResolveExpressionTypeEndingAtToken(compilation, receiverIndex, out var receiverType, out _)
                     && TryResolveAccessorResultType(receiverType, callableName, out expectedType))
                 {
+                    qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
                     return true;
                 }
             }
@@ -1053,15 +1079,21 @@ internal sealed class CompletionHandler : ICompletionHandler
 
                 if (TryResolveFunctionResultType(callableName, CountArguments(tokens, openParenIndex, closeParenIndex), out expectedType))
                 {
+                    qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
                     return true;
                 }
             }
         }
 
-        return TryResolveExpressionTypeEndingAtToken(compilation, closeParenIndex - 1, out expectedType);
+        return TryResolveExpressionTypeEndingAtToken(compilation, closeParenIndex - 1, out expectedType, out qualifiers);
     }
 
-    private static bool TryResolveIdentifierType(Compilation compilation, string name, SourceSpan span, out TypeKind expectedType)
+    private static bool TryResolveIdentifierType(
+        Compilation compilation,
+        string name,
+        SourceSpan span,
+        out TypeKind expectedType,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
     {
         var position = new Position(span.StartLine - 1, Math.Max(span.StartColumn - 1, 0));
         var eventName = SlotContextResolver.GetCurrentEventName(compilation, position);
@@ -1072,6 +1104,7 @@ internal sealed class CompletionHandler : ICompletionHandler
             if (arg is not null)
             {
                 expectedType = arg.ResolvedType;
+                qualifiers = arg.DeclaredQualifiers;
                 return true;
             }
         }
@@ -1079,10 +1112,12 @@ internal sealed class CompletionHandler : ICompletionHandler
         if (compilation.Semantics.FieldsByName.TryGetValue(name, out var field))
         {
             expectedType = field.ResolvedType;
+            qualifiers = field.DeclaredQualifiers;
             return true;
         }
 
         expectedType = default;
+        qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
         return false;
     }
 
@@ -1090,13 +1125,15 @@ internal sealed class CompletionHandler : ICompletionHandler
         Compilation compilation,
         int receiverIndex,
         string memberName,
-        out TypeKind expectedType)
+        out TypeKind expectedType,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
     {
         var tokens = compilation.Tokens.Tokens;
         receiverIndex = FindPreviousSignificantToken(tokens, receiverIndex);
         if (receiverIndex < 0)
         {
             expectedType = default;
+            qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
             return false;
         }
 
@@ -1108,16 +1145,19 @@ internal sealed class CompletionHandler : ICompletionHandler
             if (arg is not null)
             {
                 expectedType = arg.ResolvedType;
+                qualifiers = arg.DeclaredQualifiers;
                 return true;
             }
         }
 
-        if (!TryResolveExpressionTypeEndingAtToken(compilation, receiverIndex, out var receiverType))
+        if (!TryResolveExpressionTypeEndingAtToken(compilation, receiverIndex, out var receiverType, out _))
         {
             expectedType = default;
+            qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
             return false;
         }
 
+        qualifiers = ImmutableArray<DeclaredQualifierMeta>.Empty;
         return TryResolveAccessorResultType(receiverType, memberName, out expectedType);
     }
 

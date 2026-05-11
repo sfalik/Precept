@@ -367,6 +367,42 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task BinaryPeer_MoneyField_QualifiersThreadedToContext()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept LoanApplication
+            field ApprovedAmount as money in 'USD' default '0.00 USD'
+            rule ApprovedAmount > '100 ¦' because "Approved amount must be positive"
+            state Draft initial terminal
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["USD"]);
+    }
+
+    [Fact]
+    public async Task BinaryPeer_MoneyArg_QualifiersThreadedToContext()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentWorkflow
+            field ApprovedAmount as money default '0.00 USD'
+            state Draft initial
+            state Submitted terminal
+            event Submit(Amount as money in 'USD')
+            from Draft on Submit when Amount > '100 ¦'
+                -> set ApprovedAmount = Amount
+                -> transition Submitted
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["USD"]);
+    }
+
+    [Fact]
     public void TypedConstantCursorDiagnostic_DefaultEmptyLiteral_ReportsTopLevelContextAndTypedConstantToken()
     {
         var (compilation, position) = GetCompilationAtCursor("""
