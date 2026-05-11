@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using Precept.Language;
 
@@ -91,6 +92,11 @@ internal static partial class TypeChecker
         MethodCallExpression meth           => ResolveMethodCall(meth, ctx),
         InterpolatedStringExpression interp => ResolveInterpolatedString(interp, ctx),
 
+        // Interpolated typed constant — Slice 1 parser produces full AST;
+        // Slice 2 will implement proper resolution. Until then, route to stub.
+        InterpolatedTypedConstantExpression interpTyped =>
+            ResolveInterpolatedTypedConstantExpressionStub(interpTyped, ctx, expectedType),
+
         // ── Conditionals, quantifiers, lists, postfix ──
         ConditionalExpression cond => ResolveConditional(cond, ctx),
         QuantifierExpression q    => ResolveQuantifier(q, ctx),
@@ -134,6 +140,26 @@ internal static partial class TypeChecker
             Diagnostics.Create(DiagnosticCode.TypeMismatch, lit.Span,
                 expected, "interpolated typed constant (not yet supported)"));
         return new TypedErrorExpression(lit.Span);
+    }
+
+    /// <summary>
+    /// Stub resolver for <see cref="InterpolatedTypedConstantExpression"/> — emits
+    /// <see cref="DiagnosticCode.TypeMismatch"/> and returns <see cref="TypedErrorExpression"/>.
+    /// Slice 2 will replace this with proper slot classification and per-hole type checking.
+    /// </summary>
+    private static TypedErrorExpression ResolveInterpolatedTypedConstantExpressionStub(
+        InterpolatedTypedConstantExpression expr,
+        CheckContext ctx,
+        TypeKind? expectedType)
+    {
+        var expected = expectedType is { } type && type != TypeKind.Error
+            ? Types.GetMeta(type).DisplayName
+            : "typed constant";
+
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                expected, "interpolated typed constant (not yet supported)"));
+        return new TypedErrorExpression(expr.Span);
     }
 
     /// <summary>
@@ -1259,6 +1285,17 @@ internal static partial class TypeChecker
         if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
             return;
 
+        // Binary/unary expressions: validate each qualified leaf operand against the target.
+        // Scalar operands (no qualifiers) are skipped — e.g. `set usdField = usdField * 2` is valid.
+        if (value is TypedBinaryOp or TypedUnaryOp)
+        {
+            foreach (var leaf in ExtractLeafOperands(value))
+            {
+                ValidateAssignmentQualifiers(leaf, fieldName, targetQualifiers, valueSpan, ctx);
+            }
+            return;
+        }
+
         ImmutableArray<DeclaredQualifierMeta>? sourceQualifiers = value switch
         {
             TypedFieldRef { DeclaredQualifiers: { } fieldQualifiers } => fieldQualifiers,
@@ -1345,7 +1382,77 @@ internal static partial class TypeChecker
 
                     break;
                 }
+
+                case DeclaredQualifierMeta.FromCurrency { CurrencyCode: var targetFromCurrency }:
+                {
+                    var sourceFromCurrency = qualifiers
+                        .OfType<DeclaredQualifierMeta.FromCurrency>()
+                        .Select(q => q.CurrencyCode)
+                        .FirstOrDefault();
+
+                    if (sourceFromCurrency is not null
+                        && !string.Equals(sourceFromCurrency, targetFromCurrency, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.QualifierMismatch,
+                                valueSpan,
+                                targetFromCurrency,
+                                fieldName));
+                    }
+
+                    break;
+                }
+
+                case DeclaredQualifierMeta.ToCurrency { CurrencyCode: var targetToCurrency }:
+                {
+                    var sourceToCurrency = qualifiers
+                        .OfType<DeclaredQualifierMeta.ToCurrency>()
+                        .Select(q => q.CurrencyCode)
+                        .FirstOrDefault();
+
+                    if (sourceToCurrency is not null
+                        && !string.Equals(sourceToCurrency, targetToCurrency, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.QualifierMismatch,
+                                valueSpan,
+                                targetToCurrency,
+                                fieldName));
+                    }
+
+                    break;
+                }
             }
+        }
+    }
+
+    /// <summary>
+    /// Recursively extracts non-expression leaf operands from a binary/unary expression tree.
+    /// For <see cref="TypedBinaryOp"/>, yields leaves from both sides.
+    /// For <see cref="TypedUnaryOp"/>, yields leaves from the operand.
+    /// All other typed expressions are yielded as leaves directly.
+    /// </summary>
+    private static IEnumerable<TypedExpression> ExtractLeafOperands(TypedExpression expression)
+    {
+        switch (expression)
+        {
+            case TypedBinaryOp binary:
+                foreach (var leaf in ExtractLeafOperands(binary.Left))
+                    yield return leaf;
+                foreach (var leaf in ExtractLeafOperands(binary.Right))
+                    yield return leaf;
+                break;
+
+            case TypedUnaryOp unary:
+                foreach (var leaf in ExtractLeafOperands(unary.Operand))
+                    yield return leaf;
+                break;
+
+            default:
+                yield return expression;
+                break;
         }
     }
 

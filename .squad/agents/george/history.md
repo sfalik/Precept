@@ -24,3 +24,9 @@
 
 ### 2026-05-11T20:03:33Z — Interpolation LOE warning retained
 - The interpolation plan is still feasible, but Slice 2 owns most of the complexity and the binder / language-server walker follow-through must be treated as in-scope work, not cleanup.
+
+### 2026-05-11T22:41:00Z — Slices 10+11: Assignment qualifier propagation
+- Slice 11 (G9): Added `FromCurrency` and `ToCurrency` cases to `ValidateAssignmentQualifiers` switch. Exchange rate field-to-field assignment now validates from/to currency match.
+- Slice 10 (G7): Added binary/unary expression handling to `ValidateAssignmentQualifiers` via recursive leaf operand extraction (`ExtractLeafOperands`). `set usdField = eurField + eurField` now correctly produces `QualifierMismatch`.
+- Architecture decision: leaf-extraction approach over proof obligations — keeps consistency with existing direct-diagnostic pattern in `ValidateAssignmentQualifiers`.
+- Known limitation: bare-operand-to-qualified-target (`set usdField = bareField + bareField`) deferred to proof engine scope.
