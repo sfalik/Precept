@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -127,8 +126,9 @@ public static class Lexer
             // The mode stack alternates literal ↔ Interpolation. A literal can only
             // push Interpolation, and Interpolation can only push a literal. The depth
             // check in each literal scanner (>= MaxModeStackDepth) prevents overflow
-            // before we get here, so this assert should never fire in production.
-            Debug.Assert(_modeDepth < MaxModeStackDepth, "Mode stack overflow — alternating-parity invariant violated");
+            // before we get here, so this invariant should never fail.
+            if (_modeDepth >= MaxModeStackDepth)
+                throw new InvalidOperationException("Mode stack overflow — alternating-parity invariant violated");
             _modeStack[_modeDepth++] = new ModeState
             {
                 Mode = mode,

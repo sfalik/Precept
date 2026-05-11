@@ -58,7 +58,11 @@ public sealed record QuantifierExpression(TokenKind QuantifierToken, string Bind
     : ParsedExpression(ExpressionFormKind.Quantifier, Span);
 
 /// <summary>A case-insensitive function call using the ~ prefix surface.</summary>
-// TODO: Revisit whether the parser should stamp resolved FunctionKind here once the CI-variant lookup decision lands.
+/// <remarks>
+/// FunctionKind is resolved by the type checker (ResolveCIFunctionCall), not stamped here.
+/// The parser produces syntax; the type checker resolves names to catalog entries.
+/// This is consistent with FunctionCallExpression, which also carries a string name.
+/// </remarks>
 public sealed record CIFunctionCallExpression(string FunctionName, ImmutableArray<ParsedExpression> Arguments, SourceSpan Span)
     : ParsedExpression(ExpressionFormKind.CIFunctionCall, Span);
 

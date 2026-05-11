@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -98,7 +97,7 @@ internal static partial class TypeChecker
         ListLiteralExpression l   => ResolveListLiteral(l, ctx),
         PostfixOperationExpression postfix => ResolvePostfixOp(postfix, ctx),
 
-        _ => new TypedErrorExpression(expr.Span),
+        _ => ResolveUnknownExpression(expr, ctx),
     };
 
     /// <summary>
@@ -112,6 +111,14 @@ internal static partial class TypeChecker
         ctx.Diagnostics.Add(
             Diagnostics.Create(DiagnosticCode.TypeMismatch, m.Span, "expression", "missing"));
         return new TypedErrorExpression(m.Span);
+    }
+
+    private static TypedErrorExpression ResolveUnknownExpression(ParsedExpression expr, CheckContext ctx)
+    {
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                "known expression", expr.GetType().Name));
+        return new TypedErrorExpression(expr.Span);
     }
 
     private static TypedErrorExpression ResolveInterpolatedTypedConstantStub(
@@ -621,7 +628,12 @@ internal static partial class TypeChecker
     {
         // Map TokenKind → OperatorKind via the Operators catalog
         if (!Operators.ByToken.TryGetValue((bin.Operator, Arity.Binary), out var opMeta))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, bin.Span,
+                    "binary operator", bin.Operator.ToString()));
             return new TypedErrorExpression(bin.Span);
+        }
 
         var leftDiagStart = ctx.Diagnostics.Count;
         var left = Resolve(bin.Left, ctx);
@@ -762,7 +774,12 @@ internal static partial class TypeChecker
 
         // Map TokenKind → OperatorKind via the Operators catalog
         if (!Operators.ByToken.TryGetValue((un.Operator, Arity.Unary), out var opMeta))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.TypeMismatch, un.Span,
+                    "unary operator", un.Operator.ToString()));
             return new TypedErrorExpression(un.Span);
+        }
 
         var resolved = Operations.FindUnary(opMeta.Kind, operand.ResultType);
         if (resolved is not null)
@@ -937,7 +954,8 @@ internal static partial class TypeChecker
                 var value = Resolve(colBy.Value, ctx, valueExpectedType);
                 var key = Resolve(colBy.OrderingKey, ctx, keyExpectedType);
                 // D5: SecondaryRole = Key, SecondaryExpression = key
-                Debug.Assert(key is not null, "D5: SecondaryExpression for CollectionValueBy must not be null");
+                if (key is null)
+                    throw new InvalidOperationException("D5: SecondaryExpression for CollectionValueBy must not be null");
                 return new TypedInputAction(
                     colBy.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -956,7 +974,8 @@ internal static partial class TypeChecker
                 var value = Resolve(insertAt.Value, ctx, valueExpectedType);
                 var index = Resolve(insertAt.Index, ctx, TypeKind.Integer);
                 // D5: SecondaryRole = Index, SecondaryExpression = index
-                Debug.Assert(index is not null, "D5: SecondaryExpression for InsertAt must not be null");
+                if (index is null)
+                    throw new InvalidOperationException("D5: SecondaryExpression for InsertAt must not be null");
                 return new TypedInputAction(
                     insertAt.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -992,7 +1011,8 @@ internal static partial class TypeChecker
                 var value = Resolve(put.Value, ctx, valueExpectedType);
                 var key = Resolve(put.Key, ctx, keyExpectedType);
                 // D5: SecondaryRole = Key, SecondaryExpression = key
-                Debug.Assert(key is not null, "D5: SecondaryExpression for PutKeyValue must not be null");
+                if (key is null)
+                    throw new InvalidOperationException("D5: SecondaryExpression for PutKeyValue must not be null");
                 return new TypedInputAction(
                     put.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -1017,6 +1037,9 @@ internal static partial class TypeChecker
 
             case MalformedAction malformed:
             {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.TypeMismatch, malformed.Span,
+                        "action", "malformed"));
                 return new TypedAction(
                     malformed.Kind, "", TypeKind.Error,
                     ProofRequirements: ImmutableArray<ProofRequirement>.Empty,
@@ -1024,6 +1047,9 @@ internal static partial class TypeChecker
             }
 
             default:
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.TypeMismatch, parsedAction.Span,
+                        "known action", parsedAction.GetType().Name));
                 return new TypedAction(
                     parsedAction.Kind, "", TypeKind.Error,
                     ProofRequirements: ImmutableArray<ProofRequirement>.Empty,
