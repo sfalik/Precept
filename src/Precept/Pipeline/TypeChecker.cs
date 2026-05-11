@@ -403,6 +403,27 @@ internal static partial class TypeChecker
                 ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
                 ctx.CurrentFieldIndex = i;
                 var resolved = Resolve(defaultMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
+                if (resolved is not TypedErrorExpression && typedField.ResolvedType != TypeKind.Error)
+                {
+                    if (!IsAssignable(resolved.ResultType, typedField.ResolvedType))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.TypeMismatch,
+                                defaultMod.Value.Span,
+                                Types.GetMeta(typedField.ResolvedType).DisplayName,
+                                Types.GetMeta(resolved.ResultType).DisplayName));
+                    }
+                    else if (!typedField.DeclaredQualifiers.IsDefaultOrEmpty)
+                    {
+                        ValidateAssignmentQualifiers(
+                            resolved,
+                            typedField.Name,
+                            typedField.DeclaredQualifiers,
+                            defaultMod.Value.Span,
+                            ctx);
+                    }
+                }
                 ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };
                 ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
                 ctx.CurrentScope = FieldScopeMode.AllFields;
@@ -415,7 +436,27 @@ internal static partial class TypeChecker
             if (minMod?.Value is not null and not MissingExpression)
             {
                 var resolved = Resolve(minMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
-                _ = resolved;
+                if (resolved is not TypedErrorExpression && typedField.ResolvedType != TypeKind.Error)
+                {
+                    if (!IsAssignable(resolved.ResultType, typedField.ResolvedType))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.TypeMismatch,
+                                minMod.Value.Span,
+                                Types.GetMeta(typedField.ResolvedType).DisplayName,
+                                Types.GetMeta(resolved.ResultType).DisplayName));
+                    }
+                    else if (!typedField.DeclaredQualifiers.IsDefaultOrEmpty)
+                    {
+                        ValidateAssignmentQualifiers(
+                            resolved,
+                            typedField.Name,
+                            typedField.DeclaredQualifiers,
+                            minMod.Value.Span,
+                            ctx);
+                    }
+                }
             }
 
             // —— Max bound expression ——
@@ -424,7 +465,27 @@ internal static partial class TypeChecker
             if (maxMod?.Value is not null and not MissingExpression)
             {
                 var resolved = Resolve(maxMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
-                _ = resolved;
+                if (resolved is not TypedErrorExpression && typedField.ResolvedType != TypeKind.Error)
+                {
+                    if (!IsAssignable(resolved.ResultType, typedField.ResolvedType))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.TypeMismatch,
+                                maxMod.Value.Span,
+                                Types.GetMeta(typedField.ResolvedType).DisplayName,
+                                Types.GetMeta(resolved.ResultType).DisplayName));
+                    }
+                    else if (!typedField.DeclaredQualifiers.IsDefaultOrEmpty)
+                    {
+                        ValidateAssignmentQualifiers(
+                            resolved,
+                            typedField.Name,
+                            typedField.DeclaredQualifiers,
+                            maxMod.Value.Span,
+                            ctx);
+                    }
+                }
             }
 
             // —— Computed expression (from ComputeExpressionSlot on the field's Syntax) ——
@@ -434,7 +495,16 @@ internal static partial class TypeChecker
             {
                 ctx.CurrentScope = FieldScopeMode.AllFields;
                 ctx.CurrentFieldIndex = i;
-                var resolved = Resolve(computeSlot.Expression, ctx, typedField.ResolvedType);
+                var resolved = Resolve(computeSlot.Expression, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
+                if (resolved is not TypedErrorExpression && !typedField.DeclaredQualifiers.IsDefaultOrEmpty)
+                {
+                    ValidateAssignmentQualifiers(
+                        resolved,
+                        typedField.Name,
+                        typedField.DeclaredQualifiers,
+                        computeSlot.Expression.Span,
+                        ctx);
+                }
                 ctx.Fields[i] = ctx.Fields[i] with { ComputedExpression = resolved };
                 ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
                 ctx.CurrentScope = FieldScopeMode.AllFields;

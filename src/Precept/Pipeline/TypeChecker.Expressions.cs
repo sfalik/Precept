@@ -172,6 +172,10 @@ internal static partial class TypeChecker
         {
             _ = decimal.TryParse(lit.Text, System.Globalization.NumberStyles.AllowDecimalPoint,
                 System.Globalization.CultureInfo.InvariantCulture, out var decVal);
+
+            if (expectedType == TypeKind.Number)
+                return new TypedLiteral(TypeKind.Number, decVal, lit.Span);
+
             return new TypedLiteral(TypeKind.Decimal, decVal, lit.Span);
         }
 
@@ -1218,6 +1222,11 @@ internal static partial class TypeChecker
         {
             TypedFieldRef { DeclaredQualifiers: { } fieldQualifiers } => fieldQualifiers,
             TypedArgRef { DeclaredQualifiers: { } argQualifiers } => argQualifiers,
+            TypedTypedConstant
+            {
+                ResultType: TypeKind.Money,
+                ParsedValue: ValueTuple<decimal, object?> (_, CurrencyEntry currency)
+            } => [new DeclaredQualifierMeta.Currency(currency.AlphaCode)],
             _ => null,
         };
 

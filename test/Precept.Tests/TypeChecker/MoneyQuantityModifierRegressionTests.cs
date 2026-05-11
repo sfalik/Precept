@@ -130,37 +130,31 @@ public class MoneyQuantityModifierRegressionTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Pre-existing gaps — qualifier mismatch and plain-number pass silently
-    //  (consistent with default modifier behavior — not new regressions)
+    //  Regression anchors — previously silent gaps must now emit diagnostics
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Min_OnMoneyField_QualifierMismatch_NoDiagnostic_PreExistingGap()
+    public void Min_OnMoneyField_QualifierMismatch_EmitsDiagnostic()
     {
-        // EUR is a valid ISO 4217 code; qualifier alignment is not checked at
-        // compile time (same gap exists for `default`). This anchor documents
-        // the known gap and must stay 0 errors until the gap is fixed uniformly.
         var precept = """
             precept Widget
             field X as money in 'USD' min '100.00 EUR'
             state Open initial
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.QualifierMismatch);
     }
 
     [Fact]
-    public void Min_OnMoneyField_PlainNumber_NoDiagnostic_PreExistingGap()
+    public void Min_OnMoneyField_PlainNumber_EmitsTypeMismatch()
     {
-        // A plain integer bound on a money field passes silently (same gap
-        // exists for `default 100` on a money field). Documents the known gap.
         var precept = """
             precept Widget
             field X as money in 'USD' min 100
             state Open initial
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.TypeMismatch);
     }
 
     // ════════════════════════════════════════════════════════════════════════

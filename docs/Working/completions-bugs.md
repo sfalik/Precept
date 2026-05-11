@@ -188,7 +188,7 @@
 | **Repro** | `precept Test` / `field q as quantity of 'mass'` / `event xyz (qq as quantity of 'mass') initial` / `on xyz -> set q = 12` |
 | **Component** | Type checker (`TypeChecker`) — integer not widened/rejected correctly when assigned to `quantity` field |
 | **Note** | This is a runtime correctness bug, not a completions bug — separate from B1–B8/F1–F2 |
-| **Status** | 🔴 Open |
+| **Status** | ✅ Fixed — Slice 2 (`8a601e0d`) |
 
 **Root cause (Frank):** `ResolveAction` in `TypeChecker.Expressions.cs` (lines 810–822, `AssignAction` case) resolves the assignment value by calling `Resolve(assign.Value, ctx, fieldType)` with `fieldType = Quantity`, but **never validates the resolved expression's `ResultType` against the target `fieldType`**. The `expectedType` parameter is only an advisory hint — it propagates through `ResolveLiteral` → `ResolveNumericLiteral` (line 161), which checks `IsAssignable(Integer, Quantity)`. Integer does NOT widen to Quantity (`IntegerWidens = [Decimal, Number]` — Types.cs line 54), so the integer literal keeps its `TypeKind.Integer` result type. But since `ResolveAction` never checks `value.ResultType != fieldType`, the mismatch goes undetected. The `TypedInputAction` record is created with `FieldType = Quantity` and `InputExpression.ResultType = Integer` — contradictory types accepted silently.
 
@@ -208,7 +208,7 @@
 | **Repro** | `field q as quantity of 'length'` / `event xyz (qq as quantity of 'mass') initial` / `on xyz -> set q = '5 kg'` |
 | **Component** | Type checker — qualifier dimension is not validated against field declaration |
 | **Note** | Together with B9, this confirms the type checker performs **no qualifier-aware quantity validation** — neither unit presence nor dimensional category is enforced |
-| **Status** | 🔴 Open |
+| **Status** | ✅ Fixed — Slices 3+4 (`94b38f96`, `cdec821f`) |
 
 **Root cause (Frank):** Two independent gaps combine. (1) `QuantityValidator.Validate` (`QuantityValidator.cs` lines 11–32) validates that the literal is syntactically `<number> <UCUM-unit>` and that the unit is UCUM-valid, but is **structurally blind to the field's declared qualifier** — it never receives the field's `DeclaredQualifiers` and never checks whether the unit's dimension matches the declared dimension. The `TypedConstantContext` parameter exists but is unused. (2) Same as B9 — `ResolveAction` never validates the resolved expression against the target field's qualifiers. Even if `QuantityValidator` returned `TypeKind.Quantity` successfully, no post-resolution check compares the literal's unit dimension against the field's `DeclaredQualifiers[Dimension]`. The diagnostic codes exist: `DimensionCategoryMismatch` (PRE0069) and `QualifierMismatch` (PRE0068) — they are just never emitted in this path.
 
@@ -228,7 +228,7 @@
 | **Repro** | `precept Test` / `field q as quantity of 'length' default '5 kg'` |
 | **Component** | Type checker — field declaration default value not validated against qualifier dimension |
 | **Note** | Distinct code path from B9/B10 (field default validation vs. `set` action assignment) |
-| **Status** | 🔴 Open |
+| **Status** | ✅ Fixed — Slices 4+5 (`cdec821f`, this slice) |
 
 **Root cause (Frank):** Same validator-level gap as B10, different call site. `ResolveFieldExpressions` in `TypeChecker.cs` (line 452) calls `Resolve(defaultMod.Value, ctx, typedField.ResolvedType)`, which routes to `ResolveTypedConstant` → `QuantityValidator.Validate`. As with B10, the validator succeeds because it only checks UCUM syntax, not dimension compatibility. The field's `DeclaredQualifiers` are already populated (line 296, `ExtractQualifiers`), but they are never passed to the validator. There is also no post-resolution qualifier check in `ResolveFieldExpressions` — the resolved expression is stored directly at line 453 without any compatibility validation.
 
@@ -248,7 +248,7 @@
 | **Repro** | `field q as quantity of 'length' default '5 kg'` / `event xyz (qq as quantity of 'mass') initial` / `on xyz -> set q = qq` |
 | **Component** | Type checker — typed variable-to-field assignment not validated against qualifier dimension |
 | **Note** | B10 covers literal assignment (`set q = '5 kg'`); this covers typed-parameter assignment (`set q = qq`) — different resolution path in the type checker |
-| **Status** | 🔴 Open |
+| **Status** | ✅ Fixed — Slice 3 (`94b38f96`) |
 
 **Root cause (Frank):** `ResolveIdentifier` in `TypeChecker.Expressions.cs` (line 549) resolves event arg `qq` to `TypedArgRef(ResultType: Quantity, ...)`. The `TypedArgRef` record carries only `ResultType` (a `TypeKind`) — it has **no qualifier metadata**. The arg's `DeclaredQualifiers` are computed and stored on `TypedArg` (line 412, `ExtractQualifiers`), but the `TypedArgRef` expression node strips them. So even if the `ResolveAction` post-resolution check from the B9 fix were added, it would only compare `TypeKind.Quantity == TypeKind.Quantity` — a match — and miss the qualifier dimension mismatch entirely. This is the deepest of the four bugs: fixing it requires carrying qualifier information through the expression tree, not just checking types.
 
@@ -345,7 +345,7 @@ _Updates will be added here as bugs are fixed._
 
 **Author:** Frank  
 **Date:** 2026-05-11  
-**Status:** Ready for Kramer — pending Shane review  
+**Status:** ✅ Complete  
 **Scope:** Type checker qualifier-aware validation for quantity, money, and domain-typed assignments
 
 ### Problem Statement
@@ -354,10 +354,10 @@ The type checker performs no post-resolution type or qualifier validation on ass
 
 | Bug | Symptom | Core Gap |
 |-----|---------|----------|
-| B9 | Bare integer assignable to `quantity` field | No post-resolution `IsAssignable` check in `ResolveAction` |
-| B10 | `kg` literal assigned to `quantity of 'length'` field | `QuantityValidator` is dimension-blind; no post-resolution qualifier check |
-| B11 | `default '5 kg'` on `quantity of 'length'` field | Same as B10, different call site (`ResolveFieldExpressions`) |
-| B12 | `set q = qq` where `q: length`, `qq: mass` | `TypedArgRef`/`TypedFieldRef` strip qualifier metadata from expression tree |
+| B9 | Bare integer assignable to `quantity` field | ✅ Fixed — Slice 2 (`8a601e0d`): post-resolution `IsAssignable` check in `ResolveAction` |
+| B10 | `kg` literal assigned to `quantity of 'length'` field | ✅ Fixed — Slices 3+4 (`94b38f96`, `cdec821f`): validator + assignment-level qualifier checks |
+| B11 | `default '5 kg'` on `quantity of 'length'` field | ✅ Fixed — Slices 4+5 (`cdec821f`, this slice): validator + `ResolveFieldExpressions` safety net |
+| B12 | `set q = qq` where `q: length`, `qq: mass` | ✅ Fixed — Slice 3 (`94b38f96`): qualifier metadata carried on expression refs |
 
 Three structural deficits combine:
 1. **No post-resolution type check** — `ResolveAction` (line 813) and `ResolveFieldExpressions` (line 452) both call `Resolve(value, ctx, fieldType)` but never verify `value.ResultType` against `fieldType`.

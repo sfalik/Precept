@@ -28,6 +28,9 @@
 - Slice 4 extracted `DeriveUnitDimensionName` plus the count/non-count dimensionless UCUM sets into `src/Precept/Language/UnitDimensionHelper.cs` as `internal` shared runtime helpers so both `TypeChecker` and `QuantityValidator` can derive qualifier dimensions from the same metadata.
 - Slice 4 threaded `DeclaredQualifiers` through 4 resolve-chain touchpoints (`TypeChecker.ResolveExpression`, private `Resolve`, `ResolveLiteral`, and `ResolveTypedConstant`) plus the `ResolveAction` assign call site and 3 `ResolveFieldExpressions` modifier/default call sites.
 - `QuantityValidator.Validate(...)` uses `TypedConstantParseResult.Failed(formatDescription, params TypedConstantDiagnostic[] diagnostics)`; the only surprise was that validator-specific `DimensionCategoryMismatch` details ride inside the typed-constant diagnostic payload, while the surfaced pipeline diagnostic remains `InvalidTypedConstantContent`.
+- Slice 5 leaves `ResolveFieldExpressions` split by site: default/min/max now resolve with `typedField.DeclaredQualifiers` and then run post-resolution `IsAssignable` plus `ValidateAssignmentQualifiers`, while computed expressions resolve with qualifiers threaded in but only run the qualifier safety net (not the type gate) to preserve existing `number <- decimal-expression` behavior.
+- `test/Precept.Tests/TypeChecker/MoneyQuantityModifierRegressionTests.cs` gap anchors were updated in Slice 5: `Min_OnMoneyField_QualifierMismatch_EmitsDiagnostic` now asserts `QualifierMismatch`, and `Min_OnMoneyField_PlainNumber_EmitsTypeMismatch` now asserts `TypeMismatch`.
+- B9/B10/B11/B12 are all fixed as of Slice 5: B9 via Slice 2, B10 via Slices 3+4, B11 via Slices 4+5, and B12 via Slice 3.
 
 ## Historical Summary
 
