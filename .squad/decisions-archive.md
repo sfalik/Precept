@@ -27284,3 +27284,45 @@ George may proceed to Slice 5.
 - Scope remains documentation only; any source-code rename is a separate implementation task.
 
 ---
+
+---
+
+## Archive Batch — 2026-05-11T20:25:57Z
+
+- Archived 1 decision entry older than `2026-05-04T20:25:57Z` from `decisions.md` after the hard gate fired.
+
+---
+
+### 2026-05-04T17:00:09Z: Business value type coverage narrowed: Price stays semantic-only; ExchangeRate, Percentage, and DateRange advance as candidates
+
+
+
+**By:** Frank
+
+
+
+**Status:** Recommendation recorded from inbox; Shane decision still needed on OQ-7a through OQ-7f.
+
+
+
+**Merged source:** `frank-business-types-coverage.md`.
+
+
+
+- `Price` is not a new first-class type; it remains a role name on `MoneyValue` fields rather than a distinct structural/runtime type.
+
+
+
+- `ExchangeRate` is recommended as a new first-class value type with `(BaseCurrency, QuoteCurrency, Rate)` shape and a positive-rate invariant lean.
+
+
+
+- `Percentage` and `DateRange` are recommended as additional first-class candidates because they introduce invariant-bearing, runtime-significant semantics that bare decimals and paired dates cannot express safely.
+
+
+
+- The investigation scope should expand from unit types to the broader Precept value-type surface; six open questions remain for Shane on built-in status, invariants, interval semantics, and a future `DateTimeRange` companion.
+
+---
+
+---

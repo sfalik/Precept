@@ -6,6 +6,36 @@
 
 ---
 
+### 2026-05-11T20:25:57Z: DTO-free MCP catalog exposure stays off the public contract path
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-dto-free-mcp.md`.
+
+- Raw catalog serialization is not a viable public MCP contract as the code stands; the problem is contract shape, not basic serializability.
+- The curated projection layer remains justified because it renders enums as stable strings, preserves polymorphic subtype data that abstract-base serialization drops, and normalizes transport-hostile runtime structures into AI-legible JSON.
+- Frank's probe confirmed `ImmutableArray<T>` and `FrozenSet<T>` are not the blocker on .NET 10; the decisive gaps are polymorphism, enum readability, and transport-safe shaping for values like `UcumExactFactor`.
+- Durable direction: keep an explicit MCP projection contract, and reduce mapper maintenance only by moving or generating that projection layer rather than exposing raw core types.
+
+---
+
+### 2026-05-11T20:25:57Z: Semantic-token invalidation now clears `_latestResults` so delta requests reseed from a full baseline
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's inbox note.
+
+**Merged source:** `kramer-semantic-tokens-invalidation-fix.md`.
+
+- Typed-constant span changes must invalidate both semantic-token caches for the URI: removing only `_documents` leaves a stale `_latestResults` baseline behind for the next delta request.
+- `SemanticTokensHandler.TryInvalidateForTypedConstantSpanChange(...)` now calls `_latestResults.TryRemove(...)` alongside the document-cache removal, so the next request returns a full payload and seeds a fresh baseline instead of diffing against missing state.
+- Regression coverage now proves invalidation clears both caches and forces the next delta response down the safe full-response path.
+- Kramer reported the fix closed with a successful build and green language-server tests.
+
+---
+
 ### 2026-05-11T20:03:33Z: Interpolated typed constants keep compile-time structural guarantees; Slice 6 remains numeric with a whole-value fallback
 
 **By:** Scribe
@@ -5202,40 +5232,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 ---
 
 ---
-
----
-
----
-
-### 2026-05-04T17:00:09Z: Business value type coverage narrowed: Price stays semantic-only; ExchangeRate, Percentage, and DateRange advance as candidates
-
-
-
-**By:** Frank
-
-
-
-**Status:** Recommendation recorded from inbox; Shane decision still needed on OQ-7a through OQ-7f.
-
-
-
-**Merged source:** `frank-business-types-coverage.md`.
-
-
-
-- `Price` is not a new first-class type; it remains a role name on `MoneyValue` fields rather than a distinct structural/runtime type.
-
-
-
-- `ExchangeRate` is recommended as a new first-class value type with `(BaseCurrency, QuoteCurrency, Rate)` shape and a positive-rate invariant lean.
-
-
-
-- `Percentage` and `DateRange` are recommended as additional first-class candidates because they introduce invariant-bearing, runtime-significant semantics that bare decimals and paired dates cannot express safely.
-
-
-
-- The investigation scope should expand from unit types to the broader Precept value-type surface; six open questions remain for Shane on built-in status, invariants, interval semantics, and a future `DateTimeRange` companion.
 
 ---
 

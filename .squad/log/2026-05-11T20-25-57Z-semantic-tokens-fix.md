@@ -1,0 +1,3 @@
+# Session Log — semantic-tokens-fix
+
+2026-05-11T20:25:57Z — Ran the Scribe hard-gate closeout for Kramer's semantic-token invalidation fix: measured `decisions.md` at 197921 bytes with 2 inbox file(s), archived 1 decision entry older than `2026-05-04T20:25:57Z` into `decisions-archive.md`, merged 2 inbox file(s) into the active ledger, deleted the processed inbox artifacts, wrote the Kramer orchestration record, appended Kramer and Frank history, skipped history summarization because no `history.md` met the 15 KB gate, and closed with health `decisions.md` 197921B -> 198759B, `decisions-archive.md` 879597B -> 880883B, inbox processed = 2, history files summarized = 0.

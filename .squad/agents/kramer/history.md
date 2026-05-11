@@ -31,6 +31,7 @@
 - Slice 5 leaves `ResolveFieldExpressions` split by site: default/min/max now resolve with `typedField.DeclaredQualifiers` and then run post-resolution `IsAssignable` plus `ValidateAssignmentQualifiers`, while computed expressions resolve with qualifiers threaded in but only run the qualifier safety net (not the type gate) to preserve existing `number <- decimal-expression` behavior.
 - `test/Precept.Tests/TypeChecker/MoneyQuantityModifierRegressionTests.cs` gap anchors were updated in Slice 5: `Min_OnMoneyField_QualifierMismatch_EmitsDiagnostic` now asserts `QualifierMismatch`, and `Min_OnMoneyField_PlainNumber_EmitsTypeMismatch` now asserts `TypeMismatch`.
 - B9/B10/B11/B12 are all fixed as of Slice 5: B9 via Slice 2, B10 via Slices 3+4, B11 via Slices 4+5, and B12 via Slice 3.
+- Semantic-token invalidation has two caches, not one: when typed-constant span changes force a new `SemanticTokensDocument`, clear both `_documents` and `_latestResults` or the next delta request can reuse a stale null-baseline identity and crash inside OmniSharp diffing.
 
 ## Historical Summary
 
@@ -43,6 +44,10 @@
 - Added `UcumAtom.PrintSymbol`, parsed UCUM XML `printSymbol` metadata, and surfaced print-symbol labels with name details in quantity completions.
 - Pruned troy/apothecary mass units from tier-1 while keeping `[gr]` because the embedded UCUM XML marks it `class="avoirdupois"`.
 - Quantity hover now shows resolved unit metadata (`code`, `printSymbol`, `name`); validation closed green at 4567/4567 core tests and 221/221 language-server tests.
+
+### 2026-05-11T20:25:57Z — Semantic-token invalidation now clears both caches
+- `TryInvalidateForTypedConstantSpanChange(...)` must remove both `_documents` and `_latestResults`; otherwise the next delta request can reuse stale baseline metadata and crash inside the diff path.
+- Regression coverage now proves invalidation forces the next request back to the full-response seeding path; Kramer closed green with a successful build and language-server test pass.
 
 ### 2026-05-11T05:34:40Z — Frank retriage reopened B4/B5
 - The earlier apostrophe-trigger normalization correctly fixed B1/default-site recovery, but it does **not** fix declaration-side qualifier literals.
