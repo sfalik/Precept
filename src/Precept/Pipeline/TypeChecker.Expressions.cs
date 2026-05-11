@@ -97,7 +97,7 @@ internal static partial class TypeChecker
         ListLiteralExpression l   => ResolveListLiteral(l, ctx),
         PostfixOperationExpression postfix => ResolvePostfixOp(postfix, ctx),
 
-        _ => new TypedErrorExpression(expr.Span),
+        _ => ResolveUnknownExpression(expr, ctx),
     };
 
     /// <summary>
@@ -111,6 +111,14 @@ internal static partial class TypeChecker
         ctx.Diagnostics.Add(
             Diagnostics.Create(DiagnosticCode.TypeMismatch, m.Span, "expression", "missing"));
         return new TypedErrorExpression(m.Span);
+    }
+
+    private static TypedErrorExpression ResolveUnknownExpression(ParsedExpression expr, CheckContext ctx)
+    {
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                "known expression", expr.GetType().Name));
+        return new TypedErrorExpression(expr.Span);
     }
 
     private static TypedErrorExpression ResolveInterpolatedTypedConstantStub(
@@ -1029,6 +1037,9 @@ internal static partial class TypeChecker
 
             case MalformedAction malformed:
             {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.TypeMismatch, malformed.Span,
+                        "action", "malformed"));
                 return new TypedAction(
                     malformed.Kind, "", TypeKind.Error,
                     ProofRequirements: ImmutableArray<ProofRequirement>.Empty,
@@ -1036,6 +1047,9 @@ internal static partial class TypeChecker
             }
 
             default:
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.TypeMismatch, parsedAction.Span,
+                        "known action", parsedAction.GetType().Name));
                 return new TypedAction(
                     parsedAction.Kind, "", TypeKind.Error,
                     ProofRequirements: ImmutableArray<ProofRequirement>.Empty,
