@@ -28,6 +28,10 @@
 
 ## Recent Updates
 
+### 2026-05-11T01:38:51Z — Span-refactor fallout batch restored suite health
+- Your follow-up fixes are now recorded as the durable closeout for the span-refactor fallout: test helpers construct the new `MemberAccessExpression` shape correctly, qualified arg semantic sites remain full `Event.Arg` spans, and overlapping LS navigation prefers arg references first.
+- The no-terminal projector fixture now asserts `StructuralSinkState`, matching George's gated dead-end split, and the batch closed with `dotnet test` green at 5,085 passed / 0 failed.
+
 ### 2026-05-11T00:27:07Z — t2-14 and t2-15 regression coverage recorded
 - Commits `7a4c2e31` / `65fad947` landed Slice 14 catalog-capability coverage for operators, outcomes, modifiers, types, and diagnostics so missing metadata now fails the suite immediately.
 - Commits `78779818` / `c0d0e059` landed Slice 15 parser, binder, and MCP pipeline-stage regression suites (88 new tests total), bringing the batch closeout to 4,531 core tests and 105 MCP tests passing.
@@ -98,3 +102,9 @@
 - Added the four approved `DocumentSymbolHandlerTests` acceptance cases for field/state/event/precept selection ranges, all asserting the identifier-facing selection span instead of the handler's current construct-keyword span.
 - Important seam: for states, the approved Slice 23 contract is the current semantic `TypedState.NameSpan`, which today still includes trailing state modifiers (`initial`, etc.); the test locks that exact runtime contract rather than inventing a narrower token-only span.
 - Validation: targeted `DocumentSymbolHandlerTests` now run 8 total with 4 legacy greens and 4 intentional reds; full `test\Precept.LanguageServer.Tests` is red only on those four new Slice 23 tests (104 total, 100 green, 4 red pending handler work).
+
+### 2026-05-10T21:24:12.804-04:00 — TypeCheckerFunction + qualified-arg span seam closed
+- Updated `TypeCheckerFunctionTests.cs` to build `MemberAccessExpression` through a helper that matches the new `(memberTokenKind, memberSpan, span)` constructor shape.
+- Learning: qualified event-arg semantic reference sites must stay anchored to the full `Event.Arg` span; per-name spans belong on declaration/name metadata, not on the semantic reference-site contract consumed by semantic tokens and LS navigation.
+- Learning: when `ArgReference.Site` overlaps `EventReference.Site`, symbol navigation must check arg occurrences first or go-to-definition/highlight/references from the start of `Event.Arg` will resolve the event instead of the argument.
+- Learning: graph-warning range tests need fixtures that match the current analyzer split — no-terminal workflows produce `StructuralSinkState`, while `DeadEndState` only fires when at least one terminal exists.

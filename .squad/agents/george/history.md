@@ -50,7 +50,13 @@
 - 2026-05-10T09:53:14Z — t2-2 Slice B: ParseActionTarget shape-specific separators: `ParseActionTarget` now accepts `FrozenSet<TokenKind> separators` from `Actions.GetShapeMeta(meta.SyntaxShape).SeparatorTokens`; old hardcoded `{=, into, by, at}` union is gone.
 - 2026-05-10T13:53:14Z — t2-2 Slice A complete with typed operand roles: Shane's scope ruling is now durable: no deferrals inside the slice, operand roles are in scope now, `ActionSyntaxSlot.Role` must be `ActionSlotRole`, and `IntoSupported` is removed rather than preserved beside slot metadata.
 - 2026-05-10T13:53:14Z — Scribe handoff for t2-2 Slice B: George-5's Slice B result is now recorded in `.squad/decisions.md` and the orchestration/session logs, so future parser separator work should use the canonical ledger entry rather than the transient inbox note.
+- 2026-05-11T01:38:51Z — Older recent-update entries were summarized into `history-archive.md`; keep this file focused on live guidance and the newest batch context.
+
 ## Recent Updates
+
+### 2026-05-11T01:38:51Z — Terminal-state split closed with clean downstream validation
+- George's C119/C108 graph-analyzer split is now the canonical implementation for terminal-state diagnostics; `DeadEndStateFact` keeps proof suppression semantics while vacuous no-terminal warnings stay gone.
+- Soup Nazi's downstream test/handler fixes are part of the same durable batch boundary: `MemberAccessExpression` helpers now stamp both spans, arg-reference navigation again prefers `Event.Arg`, and the full suite closed green at 5,085 / 5,085.
 
 ### 2026-05-10T21:11:48-04:00 — Terminal-state diagnostic split implemented (StructuralSinkState + gated DeadEndState)
 - Added `StructuralSinkState = 119` to `DiagnosticCode`; added full catalog entry in `Diagnostics.cs`.
@@ -65,23 +71,6 @@
 - Commit `2763a433` fixed `TypeChecker.ExtractQualifiers()` so `period of 'date'` / `period of 'time'` and `period in 'days'` qualifiers survive into semantic metadata instead of being dropped.
 - Added temporal qualifier diagnostics (`InvalidTemporalDimensionString`, `InvalidTemporalUnitString`) plus 7 regression tests in `TypeCheckerSymbolTests`; the batch closes at 4,531 core tests and 105 MCP tests passing.
 
-
 ### 2026-05-10T23:55:32Z — BUG-057 routed to Slice 8; t2-16 plan updated
 - George-7 narrowed BUG-057 to field-type/parser support for qualified `period` declarations, updated `precept-toolchain-bugs.md`, and wrote `george-bug057-slice-assessment.md` recommending Slice 8 as the first implementation home.
 - George-6 appended the t2-16 DTO Source Generator slice spec to `precept-toolchain-plan.md`, so Track 2 now has an explicit generator-planning slice ready for implementation follow-through.
-
-### 2026-05-10T20:56:42Z — Track 2 slices 4/9/10/11 durably recorded
-- George-6's commit `df874e15` established `OperatorMeta.ResultType` / `ResultTypePolicy` as the catalog authority for operator result typing, including the `OperationResult` handoff to `OperationMeta.Result` for arithmetic.
-- George-7 finished t2-9 in `b7868d60` and `2f75c829`: TypeChecker now consumes operator typing metadata directly, tightened adjacent choice/quantifier/modifier typing, and closed BUG-002,003,007,009,010,028,029,038,040,046,052,053 at 3,925 / 3,925.
-- George-8 finished t2-10 in `def91dbb` and `b08b1fc4`: wildcard/broadcast name resolution is catalog-derived, computed fields bind via stable topological ordering with cycle diagnostics, and BUG-001,026,030,037 closed at 3,911 / 3,911.
-- George-9 finished t2-11 in `004e68be`, `e48c0071`, and `599206b6`: proof obligations now project by proof-site metadata, collection mutation diagnostics bind real field names, 5 new proof tests landed, and the transient shared-tree binder failures were superseded by George-7's clean full run.
-
-### 2026-05-10T19:47:35Z — Grammar doc-fix commits and validation recorded
-- George-5 durably closed the grammar/spec/catalog documentation batch in commits 9b8e8384 and b8e7df94, covering the precept-grammar.md correction pass plus the removal of illegal trailing-ensure EventHandler grammar and obsolete SupportsPostActionEnsure documentation.
-- The squad ledger, orchestration log, and this history now agree on the batch boundary, so follow-up doc work should cite the committed artifacts rather than the deleted inbox notes.
-- Final validation stayed green across all four test projects at 4,388 passing tests.
-
-### 2026-05-10T15:34:08Z — Slice 2E and Slice C closeouts recorded
-- Scribe merged both your t2-2 Slice C note and your Slice 2E BUG-049a completion into `.squad/decisions.md`, with BUG-049a paired to Frank's approved design review as one canonical closeout entry.
-- Durable implementation rules now recorded: shape-method separators come from `Actions.GetShapeMeta(...).Slots[n].PrecedingSeparator`, and intrinsic non-negative accessor returns discharge through `FixedReturnAccessor.ReturnNonnegative` while action cardinality obligations reuse the single shared `Types.CollectionCountAccessor`.
-- Validation anchors now captured in the ledger: Slice C stayed green at 4056/4056 on `ef6fedcb`; Slice 2E closed targeted build + tests at 3857 passing on `f2d1dece` and `e826e4bd`.

@@ -55,6 +55,10 @@
 
 ## Recent Updates
 
+### 2026-05-11T01:38:51Z — Terminal-state diagnostic UX recommendation shipped
+- Elaine's Message A / Message B split is now the durable team decision: warn structural sinks independently, and only emit no-path-to-terminal warnings after at least one terminal state exists.
+- George implemented the design as `StructuralSinkState` (C119) plus gated `DeadEndState` (C108), so future UX follow-ups should treat Elaine's wording and timing guidance as the canonical rationale.
+
 ### 2026-05-09T15:26:09Z — Data-family anchor removal recorded
 - Scribe merged Elaine's slate audit, literal-safety check, and final anchor-drop implementation into the canonical ledger.
 - Durable outcome: the Data family is now the four-token semantic grouping `--data-t` / `--data-v` / `--field` / `--arg`, with no surviving `--data` anchor dependency.

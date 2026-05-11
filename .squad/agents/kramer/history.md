@@ -6,6 +6,7 @@
 
 ## Learnings
 
+- Semantic-token delta stability depends on exact identifier spans; reusing container spans for event args or qualified member access creates overlapping tokens that can crash OmniSharp delta mode.
 - Incomplete-code routing is safest when it reuses semantic spans plus neighboring significant tokens instead of trusting parser recovery spans alone.
 - Cursor positions parked at the next token boundary belong to the preceding separator for member-access and default-value completions.
 - Shared helpers (`LanguageServerComposition`, `SemanticExpressionLocator`, `SymbolNavigation`, `OutlineSymbolProjector`) are the durable way to keep the shipped host and test harness aligned.
@@ -20,6 +21,15 @@
 - The canonical decision ledger in `.squad/decisions.md` carries the batch-level detail; this history keeps only the durable tooling baseline and newest live updates.
 
 ## Recent Updates
+
+### 2026-05-11T01:38:51Z — Span precision and semantic-token crash fixes closed together
+- The parser/binder span pass is now durable: declaration diagnostics and tooling name sites should anchor to per-name identifier spans, with parser end spans driven by the last significant consumed token rather than trailing trivia.
+- Follow-up semantic-token work propagated bare arg-name spans parser -> binder -> typed args, switched qualified arg references to `expr.MemberSpan`, and narrowed token dedup to exact duplicate ranges; the LS delta crash is closed with 160/160 language-server tests green.
+
+### 2026-05-10T21:27:42.716-04:00 — Semantic-token delta crash fix narrowed arg spans to real identifier tokens
+- Kramer traced the `semanticTokens/full/delta` crash to malformed parameter tokens: event-arg declarations still reused `ArgumentListSlot.Span`, qualified `Event.Arg` references still reused the full member-access span, and the overlay merge deduplicated by start position instead of exact range.
+- Durable tooling rule: semantic-token, definition, highlight, references, and rename flows must all consume the bare event-arg identifier span, and semantic-token overlays may only collapse exact duplicate ranges.
+- Validation stayed green: `dotnet test test\Precept.LanguageServer.Tests\ --no-restore` passed 160/160, and `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server` succeeded.
 
 ### 2026-05-10T12:25:21Z — Log triage isolated protocol bugs from the status item
 - Kramer used VS Code logs to isolate two real protocol bugs: semantic-token color rules now cross the client boundary in a stable `rules` envelope and the VS Code client tolerates that payload safely; document symbols also normalize `selectionRange` inside `range` before publishing.

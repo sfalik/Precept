@@ -247,3 +247,29 @@ Archived updates moved from `history.md` during Scribe summarization.
 ### 2026-05-02 — Historical Summary (recompacted)
 - Older recent-update detail was moved to history-archive.md during Scribe closeout to keep active context under the 15 KB gate.
 - Use the archive for the Phase 2 closeout trail, rename-shipping notes, and earlier parser/analyzer implementation history.
+
+---
+
+## Archive Batch — 2026-05-11T01:38:51Z
+
+---
+
+### 2026-05-10T20:56:42Z — Track 2 slices 4/9/10/11 durably recorded
+- George-6's commit `df874e15` established `OperatorMeta.ResultType` / `ResultTypePolicy` as the catalog authority for operator result typing, including the `OperationResult` handoff to `OperationMeta.Result` for arithmetic.
+- George-7 finished t2-9 in `b7868d60` and `2f75c829`: TypeChecker now consumes operator typing metadata directly, tightened adjacent choice/quantifier/modifier typing, and closed BUG-002,003,007,009,010,028,029,038,040,046,052,053 at 3,925 / 3,925.
+- George-8 finished t2-10 in `def91dbb` and `b08b1fc4`: wildcard/broadcast name resolution is catalog-derived, computed fields bind via stable topological ordering with cycle diagnostics, and BUG-001,026,030,037 closed at 3,911 / 3,911.
+- George-9 finished t2-11 in `004e68be`, `e48c0071`, and `599206b6`: proof obligations now project by proof-site metadata, collection mutation diagnostics bind real field names, 5 new proof tests landed, and the transient shared-tree binder failures were superseded by George-7's clean full run.
+
+---
+
+### 2026-05-10T19:47:35Z — Grammar doc-fix commits and validation recorded
+- George-5 durably closed the grammar/spec/catalog documentation batch in commits 9b8e8384 and b8e7df94, covering the precept-grammar.md correction pass plus the removal of illegal trailing-ensure EventHandler grammar and obsolete SupportsPostActionEnsure documentation.
+- The squad ledger, orchestration log, and this history now agree on the batch boundary, so follow-up doc work should cite the committed artifacts rather than the deleted inbox notes.
+- Final validation stayed green across all four test projects at 4,388 passing tests.
+
+---
+
+### 2026-05-10T15:34:08Z — Slice 2E and Slice C closeouts recorded
+- Scribe merged both your t2-2 Slice C note and your Slice 2E BUG-049a completion into `.squad/decisions.md`, with BUG-049a paired to Frank's approved design review as one canonical closeout entry.
+- Durable implementation rules now recorded: shape-method separators come from `Actions.GetShapeMeta(...).Slots[n].PrecedingSeparator`, and intrinsic non-negative accessor returns discharge through `FixedReturnAccessor.ReturnNonnegative` while action cardinality obligations reuse the single shared `Types.CollectionCountAccessor`.
+- Validation anchors now captured in the ledger: Slice C stayed green at 4056/4056 on `ef6fedcb`; Slice 2E closed targeted build + tests at 3857 passing on `f2d1dece` and `e826e4bd`.

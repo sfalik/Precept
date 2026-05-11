@@ -31,6 +31,11 @@
 
 ## Recent Updates
 
+### 2026-05-11T01:38:51Z — Diagnostic-gating analysis and parser follow-through recorded
+- Frank-2's terminal-state analysis is now durable: path-to-terminal warnings only make sense once at least one terminal state is declared, and lifecycle messaging should make the declared-terminal contract explicit.
+- The team ultimately adopted Elaine's two-diagnostic UX split rather than the one-code refinement, so George shipped C119 `StructuralSinkState` alongside the gated C108 path warning.
+- Frank's separate parser/type-checker batch is also now in the ledger: non-associative operators use `meta.Precedence + 1` on the RHS, and typed constants inherit peer operand type context before the D13 bailout.
+
 ### 2026-05-10T19:47:35Z — Grammar doc-fix batch durably recorded
 - Frank-10/11/12 are now recorded together: the comprehensive precept-grammar.md audit, the spec/catalog cleanup for the illegal EventHandler trailing-ensure form, and the final doc-alignment pass all landed in the squad ledger.
 - Durable guidance now locked: pre-verb when coverage must appear anywhere StateEnsure, StateAction, EventEnsure, or AccessMode are documented; computed-field modifiers precede <-; and ConstructMeta no longer carries ad-hoc handler-ensure support metadata.
