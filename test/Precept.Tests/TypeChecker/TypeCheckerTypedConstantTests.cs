@@ -425,12 +425,12 @@ public class TypeCheckerTypedConstantTests
     [Fact]
     public void InterpolatedTypedConstant_InEventHandler_EmitsDiagnostic()
     {
+        // '1 {s}' where s is string → string rejected in magnitude slot
         var (index, diagnostics) = TypeCheckerTestHelpers.Check(InterpolatedTypedConstantEventHandlerPrecept);
 
         diagnostics.Should().Contain(d =>
             d.Severity == Severity.Error
-            && d.Code == nameof(DiagnosticCode.TypeMismatch)
-            && d.Message.Contains("interpolated typed constant", System.StringComparison.OrdinalIgnoreCase));
+            && d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
 
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(action => action.FieldName == "q");
@@ -448,20 +448,17 @@ public class TypeCheckerTypedConstantTests
         compilation!.HasErrors.Should().BeTrue();
         compilation.Diagnostics.Should().Contain(d =>
             d.Severity == Severity.Error
-            && d.Code == nameof(DiagnosticCode.TypeMismatch)
-            && d.Message.Contains("interpolated typed constant", System.StringComparison.OrdinalIgnoreCase));
+            && d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
     }
 
     [Fact]
-    public void InterpolatedTypedConstantStart_WithExpectedType_EmitsDiagnostic()
+    public void InterpolatedTypedConstantStart_AsBareLiteral_ReturnsError()
     {
+        // TypedConstantStart as bare LiteralExpression is now dead code path — returns TypedErrorExpression
         var ctx = MinimalContext();
         var result = Resolve(InterpolatedTypedConstantStart("1 "), ctx, TypeKind.Quantity);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(DiagnosticCode.TypeMismatch.ToString());
-        ctx.Diagnostics.Single().Message.Should().Contain("interpolated typed constant");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -481,5 +478,655 @@ public class TypeCheckerTypedConstantTests
         tc.RawText.Should().Be("anything");
         tc.ParsedValue.Should().Be("anything");
         ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  11. Slice 2 — Interpolated typed constant form grammar matching
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── Structural validity (InvalidInterpolatedTypedConstantForm) ────────
+
+    [Fact]
+    public void InterpolatedTypedConstant_ThreeHolesForMoney_StructuralError()
+    {
+        // '{x} {y} {z}' for money → 3 holes, money has max 2
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field x as integer
+            field y as currency
+            field z as integer
+            event Go initial
+            on Go
+                -> set m = '{x} {y} {z}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InvalidInterpolatedTypedConstantForm));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_SlashSeparatorForMoney_StructuralError()
+    {
+        // '{x}/{y}' for money → slash separator not valid for money
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field x as integer
+            field y as currency
+            event Go initial
+            on Go
+                -> set m = '{x}/{y}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InvalidInterpolatedTypedConstantForm));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_TwoCurrencyTextsForMoney_StructuralError()
+    {
+        // '{x} USD EUR' for money → no pattern with two currency texts after hole
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field x as integer
+            event Go initial
+            on Go
+                -> set m = '{x} USD EUR'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InvalidInterpolatedTypedConstantForm));
+    }
+
+    // ── Interpolation not supported (InterpolationNotSupportedForType) ────
+
+    [Theory]
+    [InlineData("date")]
+    [InlineData("time")]
+    [InlineData("instant")]
+    [InlineData("datetime")]
+    [InlineData("zoneddatetime")]
+    [InlineData("timezone")]
+    public void InterpolatedTypedConstant_UnsupportedType_EmitsNotSupported(string typeName)
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check($$"""
+            precept Test
+            field f as {{typeName}}
+            field x as integer
+            event Go initial
+            on Go
+                -> set f = '{x}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolationNotSupportedForType));
+    }
+
+    // ── Hole type compatibility (InterpolatedTypedConstantHoleTypeMismatch) ──
+
+    [Fact]
+    public void InterpolatedTypedConstant_BooleanInMagnitudeSlot_TypeMismatch()
+    {
+        // '{b} kg' where b is boolean → magnitude slot type mismatch
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field q as quantity in 'kg'
+            field b as boolean
+            event Go initial
+            on Go
+                -> set q = '{b} kg'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_QuantityInCurrencySlot_TypeMismatch()
+    {
+        // '100 {q}' where q is quantity for money → currency slot type mismatch
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field q as quantity in 'kg'
+            event Go initial
+            on Go
+                -> set m = '100 {q}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_QuantityInMagnitudeSlot_TypeMismatch()
+    {
+        // '{q} USD' where q is quantity → magnitude slot type mismatch
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field q as quantity in 'kg'
+            event Go initial
+            on Go
+                -> set m = '{q} USD'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_DecimalInTemporalMagnitude_TypeMismatch()
+    {
+        // '{d} days' where d is decimal → temporal magnitude requires integer
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field p as period
+            field d as decimal
+            event Go initial
+            on Go
+                -> set p = '{d} days'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    // ── String rejection (InterpolatedTypedConstantHoleTypeMismatch) ──────
+
+    [Fact]
+    public void InterpolatedTypedConstant_StringInMagnitudeSlot_Rejected()
+    {
+        // '{s} kg' where s is string → string not valid in magnitude slot
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field q as quantity in 'kg'
+            field s as string
+            event Go initial
+            on Go
+                -> set q = '{s} kg'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_StringInUnitSlot_Rejected()
+    {
+        // '100 {s}' where s is string for quantity → string not valid in unit slot
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field q as quantity in 'kg'
+            field s as string
+            event Go initial
+            on Go
+                -> set q = '100 {s}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_StringInWholeValueSlot_Rejected()
+    {
+        // '{s}' where s is string for money → string not valid in whole-value slot
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field s as string
+            event Go initial
+            on Go
+                -> set m = '{s}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    // ── Valid combinations (positive tests) ──────────────────────────────
+
+    [Fact]
+    public void InterpolatedTypedConstant_IntegerMagnitudeWithUnit_ValidQuantity()
+    {
+        // '{n} kg' where n is integer → valid quantity
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field q as quantity in 'kg'
+            field n as integer
+            event Go initial
+            on Go
+                -> set q = '{n} kg'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "q");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_DecimalMagnitudeWithUnit_ValidQuantity()
+    {
+        // '{n} kg' where n is decimal → valid quantity
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field q as quantity in 'kg'
+            field n as decimal
+            event Go initial
+            on Go
+                -> set q = '{n} kg'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "q");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_MagnitudeAndCurrency_ValidMoney()
+    {
+        // '{a} {c}' where a is integer, c is currency → valid money
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field a as integer
+            field c as currency
+            event Go initial
+            on Go
+                -> set m = '{a} {c}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "m");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Money);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_PriceWithAllHoles_ValidPrice()
+    {
+        // '{r} {c}/{u}' where r is decimal, c is currency, u is unitofmeasure → valid price
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field p as price
+            field r as decimal
+            field c as currency
+            field u as unitofmeasure
+            event Go initial
+            on Go
+                -> set p = '{r} {c}/{u}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "p");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Price);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_ExchangeRateWithFromTo_ValidExchangeRate()
+    {
+        // '{r} {f}/{t}' where r is decimal, f/t are currency → valid exchangerate
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field x as exchangerate
+            field r as decimal
+            field f as currency
+            field t as currency
+            event Go initial
+            on Go
+                -> set x = '{r} {f}/{t}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "x");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.ExchangeRate);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_IntegerWithTemporalUnit_ValidPeriod()
+    {
+        // '{n} days' where n is integer → valid period
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field p as period
+            field n as integer
+            event Go initial
+            on Go
+                -> set p = '{n} days'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "p");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Period);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_CompoundDuration_ValidDuration()
+    {
+        // '{n} hours + {m} minutes' where n, m are integer → valid compound duration
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field d as duration
+            field n as integer
+            field m as integer
+            event Go initial
+            on Go
+                -> set d = '{n} hours + {m} minutes'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "d");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Duration);
+    }
+
+    // ── Whole-value forms ────────────────────────────────────────────────
+
+    [Fact]
+    public void InterpolatedTypedConstant_MoneyWholeValue_Valid()
+    {
+        // '{m}' where m is money → valid whole-value
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as money
+            field m as money
+            event Go initial
+            on Go
+                -> set target = '{m}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Money);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_QuantityWholeValue_Valid()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity in 'kg'
+            field q as quantity in 'kg'
+            event Go initial
+            on Go
+                -> set target = '{q}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_DurationWholeValue_Valid()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as duration
+            field d as duration
+            event Go initial
+            on Go
+                -> set target = '{d}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_CurrencyWholeValue_Valid()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as currency
+            field c as currency
+            event Go initial
+            on Go
+                -> set target = '{c}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_UnitOfMeasureWholeValue_Valid()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field u as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{u}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+    }
+
+    // ── Dimension-unit consistency (DimensionMismatchInUnitSlot) ──────────
+
+    [Fact]
+    public void InterpolatedTypedConstant_DimensionMismatch_LengthVsMass_Error()
+    {
+        // '1 {f1.unit}' where f1 is quantity of 'length', target is quantity of 'mass' → DimensionMismatchInUnitSlot
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity of 'mass'
+            field f1 as quantity of 'length'
+            event Go initial
+            on Go
+                -> set target = '1 {f1.unit}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.DimensionMismatchInUnitSlot));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_DimensionMatch_MassVsMass_NoError()
+    {
+        // '1 {f1.unit}' where f1 is quantity of 'mass', target is quantity of 'mass' → no error
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity of 'mass'
+            field f1 as quantity of 'mass'
+            event Go initial
+            on Go
+                -> set target = '1 {f1.unit}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_SourceNoDimension_ConservativeAccept()
+    {
+        // '1 {f1.unit}' where f1 is quantity (no dimension), target is quantity of 'mass' → no error
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity of 'mass'
+            field f1 as quantity
+            event Go initial
+            on Go
+                -> set target = '1 {f1.unit}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_TargetNoDimension_NoError()
+    {
+        // '1 {f1.unit}' where f1 is quantity of 'length', target is quantity (no dimension) → no error
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity
+            field f1 as quantity of 'length'
+            event Go initial
+            on Go
+                -> set target = '1 {f1.unit}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_UnitQualifierMismatch_KgVsLength_Error()
+    {
+        // '1 {f1.unit}' where f1 is quantity in 'kg' (dimension=mass), target is quantity of 'length' → DimensionMismatchInUnitSlot
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity of 'length'
+            field f1 as quantity in 'kg'
+            event Go initial
+            on Go
+                -> set target = '1 {f1.unit}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.DimensionMismatchInUnitSlot));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_BareUnitOfMeasure_ConservativeAccept()
+    {
+        // '1 {u}' where u is bare unitofmeasure field, target is quantity of 'mass' → no dimension check
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity of 'mass'
+            field u as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '1 {u}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+    }
+
+    // ── Additional form variations ───────────────────────────────────────
+
+    [Fact]
+    public void InterpolatedTypedConstant_NumericMagnitudeWithCurrencyHole_ValidMoney()
+    {
+        // '100 {c}' where c is currency → valid money (M3 form)
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field c as currency
+            event Go initial
+            on Go
+                -> set m = '100 {c}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "m");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Money);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_MagnitudeWithFixedCurrency_ValidMoney()
+    {
+        // '{n} USD' where n is integer → valid money (M2 form)
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field m as money
+            field n as integer
+            event Go initial
+            on Go
+                -> set m = '{n} USD'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "m");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Money);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_NumericWithUnitHole_ValidQuantity()
+    {
+        // '100 {u}' where u is unitofmeasure → valid quantity (Q3 form)
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field q as quantity
+            field u as unitofmeasure
+            event Go initial
+            on Go
+                -> set q = '100 {u}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "q");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_PriceWithMagnitudeAndFixedCurrencyUnit_Valid()
+    {
+        // '{n} USD/kg' where n is decimal → valid price (P2 form)
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field p as price
+            field n as decimal
+            event Go initial
+            on Go
+                -> set p = '{n} USD/kg'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "p");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Price);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_NoExpectedType_EmitsUnresolved()
+    {
+        // Interpolated typed constant without expected type context → UnresolvedTypedConstant
+        var ctx = MinimalContext();
+        var segments = ImmutableArray.Create<InterpolationSegment>(
+            new TextSegment("", TestSpan),
+            new HoleSegment(new LiteralExpression(TokenKind.Identifier, "Amount", TestSpan), TestSpan),
+            new TextSegment("", TestSpan));
+        var expr = new InterpolatedTypedConstantExpression(segments, TestSpan);
+        var result = Resolve(expr, ctx, expectedType: null);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(DiagnosticCode.UnresolvedTypedConstant.ToString());
     }
 }

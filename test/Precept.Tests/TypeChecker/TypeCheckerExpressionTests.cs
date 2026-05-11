@@ -125,9 +125,7 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>(
-            because: "typed constant start is a deferred interpolation stub");
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(nameof(DiagnosticCode.TypeMismatch));
+            because: "TypedConstantStart as bare literal is dead code — returns error without diagnostic");
     }
 
     // ════════════════════════════════════════════════════════════════════════

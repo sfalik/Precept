@@ -1322,6 +1322,7 @@ internal static partial class TypeChecker
         TypedConditional cond => ContainsError(cond.Condition) || ContainsError(cond.ThenBranch) || ContainsError(cond.ElseBranch),
         TypedQuantifier q => ContainsError(q.Collection) || ContainsError(q.Predicate),
         TypedInterpolatedString interp => interp.Segments.Any(s => s is TypedHoleSegment hole && ContainsError(hole.Expression)),
+        TypedInterpolatedTypedConstant itc => itc.Slots.Any(s => ContainsError(s.Expression)),
         TypedListLiteral list => list.Elements.Any(ContainsError),
         TypedPostfixOp post => ContainsError(post.Operand),
         _ => false, // TypedFieldRef, TypedArgRef, TypedLiteral, TypedTypedConstant — leaf nodes

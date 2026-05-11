@@ -934,6 +934,42 @@ public static class Diagnostics
             ExampleBefore: "field Offset as period in 'fortnights'",
             ExampleAfter: "field Offset as period in 'days'"),
 
+        DiagnosticCode.InvalidInterpolatedTypedConstantForm => new(nameof(DiagnosticCode.InvalidInterpolatedTypedConstantForm), DiagnosticStage.Type, Severity.Error,
+            "Invalid interpolated form for '{0}'. The segment pattern does not match any valid interpolated form for this type.",
+            DiagnosticCategory.Structure,
+            FixHint: "Restructure the interpolated typed constant to match a valid form for the target type",
+            TriggerCondition: "The segment sequence of an interpolated typed constant does not match any recognized form for the context-determined type.",
+            RecoverySteps: ["Check the target type's valid interpolated forms", "For money: '{amt} USD' or '{amt} {curr}'", "For quantity: '{n} kg' or '{n} {unit}'"],
+            ExampleBefore: "precept Example\nfield q as quantity\nstate S initial\nevent E initial\non E\n-> set q = '1 {x} kg'",
+            ExampleAfter: "precept Example\nfield q as quantity\nstate S initial\nevent E initial\non E\n-> set q = '{x} kg'"),
+
+        DiagnosticCode.InterpolationNotSupportedForType => new(nameof(DiagnosticCode.InterpolationNotSupportedForType), DiagnosticStage.Type, Severity.Error,
+            "Interpolation is not supported for '{0}' typed constants. {1}",
+            DiagnosticCategory.Structure,
+            FixHint: "Write the value as a complete literal or use arithmetic for dynamic computation",
+            TriggerCondition: "An interpolated typed constant appears in a context where the target type does not support interpolation (formatted temporal types: date, time, instant, datetime, zoneddatetime, timezone).",
+            RecoverySteps: ["Write a complete literal value", "Use temporal arithmetic for dynamic computation (e.g. StartDate + '{n} days')"],
+            ExampleBefore: "precept Example\nfield d as date\nstate S initial\nevent E(y as integer) initial\non E\n-> set d = '{y}-01-01'",
+            ExampleAfter: "precept Example\nfield d as date\nstate S initial\nevent E initial\non E\n-> set d = '2026-01-01'"),
+
+        DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch => new(nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch), DiagnosticStage.Type, Severity.Error,
+            "Hole expression of type '{0}' is not valid in the {1} slot. Expected {2}.",
+            DiagnosticCategory.Structure,
+            FixHint: "Use an expression of a compatible type for this slot",
+            TriggerCondition: "A hole expression in an interpolated typed constant resolves to a type that is not compatible with the slot it fills.",
+            RecoverySteps: ["Use an expression that resolves to one of the compatible types for this slot", "Magnitude slots accept integer, decimal, or number", "Currency slots accept currency only", "Unit slots accept unitofmeasure only"],
+            ExampleBefore: "precept Example\nfield q as quantity\nfield b as boolean\nstate S initial\nevent E initial\non E\n-> set b = true\n-> set q = '{b} kg'",
+            ExampleAfter: "precept Example\nfield q as quantity\nfield n as integer\nstate S initial\nevent E initial\non E\n-> set n = 5\n-> set q = '{n} kg'"),
+
+        DiagnosticCode.DimensionMismatchInUnitSlot => new(nameof(DiagnosticCode.DimensionMismatchInUnitSlot), DiagnosticStage.Type, Severity.Error,
+            "Unit from '{0}' has dimension '{1}' but target requires dimension '{2}'.",
+            DiagnosticCategory.Structure,
+            FixHint: "Use a field with a compatible dimension, or remove the dimension constraint from the target field",
+            TriggerCondition: "A unit-slot hole expression carries a dimension that conflicts with the target field's declared dimension.",
+            RecoverySteps: ["Use a field whose declared dimension matches the target field", "Remove the dimension qualifier from the target field if it should accept any dimension"],
+            ExampleBefore: "precept Example\nfield f1 as quantity of 'length'\nfield f2 as quantity of 'mass'\nstate S initial\nevent E initial\non E\n-> set f1 = '1 kg'\n-> set f2 = '1 {f1.unit}'",
+            ExampleAfter: "precept Example\nfield f1 as quantity of 'mass'\nfield f2 as quantity of 'mass'\nstate S initial\nevent E initial\non E\n-> set f1 = '1 kg'\n-> set f2 = '1 {f1.unit}'"),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

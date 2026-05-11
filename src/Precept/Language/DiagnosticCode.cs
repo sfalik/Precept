@@ -91,6 +91,14 @@ public enum DiagnosticCode
     StructuralSinkState                = 119,
     /// <summary>Two modifiers that are mutually exclusive are declared on the same field or event argument.</summary>
     ConflictingModifiers               = 120,
+    /// <summary>The segment sequence of an interpolated typed constant does not match any valid form for the target type.</summary>
+    InvalidInterpolatedTypedConstantForm = 121,
+    /// <summary>The target type does not support interpolation (formatted temporal types).</summary>
+    InterpolationNotSupportedForType   = 122,
+    /// <summary>A hole expression type is not valid for the assigned slot in an interpolated typed constant.</summary>
+    InterpolatedTypedConstantHoleTypeMismatch = 123,
+    /// <summary>A unit-slot hole carries a dimension that conflicts with the target field's declared dimension.</summary>
+    DimensionMismatchInUnitSlot        = 124,
 
     // ── Type (collection safety) ─────────────────────────
     UnguardedCollectionAccess          =  63,

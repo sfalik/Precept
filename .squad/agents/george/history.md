@@ -45,3 +45,11 @@
 - Slice 9: Added Unit→Dimension fallback in ResolveQualifierOnAxis so dimension-only fields satisfy Unit-axis proofs.
 - Updated MCP tools (LanguageTool, ProofsTool) for chain rendering and dual-subject classification.
 - Updated ProofRequirementCatalogTests for 6th kind. 19 new ProofEngine tests, all 193 pass.
+
+### 2025-07-24 — Slice 2: Full type-grammar matching for interpolated typed constants
+- Replaced both interpolated typed constant stubs with complete ResolveInterpolatedTypedConstant() implementation.
+- Redesigned form matching from element-per-element to segment-aware model using SegmentForm with TextMatch delegates, correctly handling parser's 2N+1 segment structure.
+- Per-type form tables: Money (4), Quantity (4), Price (8), ExchangeRate (8), Currency/UoM/Dimension (1 each), Duration/Period (4 single + compound).
+- Added 4 diagnostics: InvalidInterpolatedTypedConstantForm (121), InterpolationNotSupportedForType (122), InterpolatedTypedConstantHoleTypeMismatch (123), DimensionMismatchInUnitSlot (124).
+- Added TypedInterpolatedTypedConstant, TypedInterpolationSlot, InterpolationSlotKind to SemanticIndex.
+- 39 new tests, 4 existing tests updated. All 129 typed constant tests pass.

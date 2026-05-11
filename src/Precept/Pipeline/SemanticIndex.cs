@@ -128,6 +128,33 @@ public sealed record TypedTypedConstant(
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>
+/// A resolved interpolated typed constant with slot-annotated hole expressions.
+/// Each hole is assigned a semantic slot identity by the type-grammar matching algorithm.
+/// </summary>
+public sealed record TypedInterpolatedTypedConstant(
+    ImmutableArray<TypedInterpolationSlot> Slots,
+    TypeKind ResultType,
+    SourceSpan Span
+) : TypedExpression(ResultType, Span);
+
+/// <summary>A resolved hole expression with its assigned slot identity.</summary>
+public sealed record TypedInterpolationSlot(
+    TypedExpression Expression,
+    InterpolationSlotKind SlotKind
+);
+
+/// <summary>Semantic identity of a hole slot in an interpolated typed constant.</summary>
+public enum InterpolationSlotKind
+{
+    Magnitude = 1,
+    Currency,
+    Unit,
+    FromCurrency,
+    ToCurrency,
+    WholeValue
+}
+
+/// <summary>
 /// A typed list literal with unified element type.
 /// <see cref="ResultType"/> is the collection kind; <see cref="ElementType"/> is the unified element kind.
 /// </summary>
