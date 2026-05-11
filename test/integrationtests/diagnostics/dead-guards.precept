@@ -1,0 +1,25 @@
+# Demonstrates: C97 — dead guards provably false from field constraints
+
+# This file covers both a bounded interval contradiction and a positive-constraint contradiction.
+
+precept DeadGuardsDemo
+
+field Score as number default 50 min 0 max 100
+field Rate as number default 5 positive
+
+state Review initial
+state Approved
+state Escalated
+
+event Submit
+event Escalate
+
+# C97: Score can never exceed 150 when the field is capped at 100.
+# EXPECT: C97 | severity=warning | match=exact | message=Guard 'when Score > 150' is provably always false — this row can never execute. | line=19 | start=27 | end=38
+from Review on Submit when Score > 150 -> transition Approved
+from Review on Submit -> transition Approved
+
+# C97: a positive field can never satisfy <= 0.
+# EXPECT: C97 | severity=warning | match=exact | message=Guard 'when Rate <= 0' is provably always false — this row can never execute. | line=24 | start=29 | end=38
+from Review on Escalate when Rate <= 0 -> transition Escalated
+from Review on Escalate -> transition Escalated

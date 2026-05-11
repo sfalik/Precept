@@ -78,7 +78,7 @@ public class PreceptConstraintViolationTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance cannot go negative"
+            rule Balance >= 0 because "Balance cannot go negative"
             state A initial
             event Debit with Amount as number
             from A on Debit -> set Balance = Balance - Debit.Amount -> transition A
@@ -121,7 +121,7 @@ public class PreceptConstraintViolationTests
             precept Test
             state A initial
             event Go with Amount as number
-            on Go assert Amount > 0 because "must be positive"
+            on Go ensure Amount > 0 because "must be positive"
             from A on Go -> no transition
             """;
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -161,7 +161,7 @@ public class PreceptConstraintViolationTests
         const string dsl = """
             precept Test
             field Priority as number default 3
-            invariant Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
+            rule Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
             state Open initial
             in Open edit Priority
             """;
@@ -197,12 +197,12 @@ public class PreceptConstraintViolationTests
     }
 
     [Fact]
-    public void Fire_PostMutationInvariantFailure_ProducesConstraintFailureOutcome_NotRejected()
+    public void Fire_PostMutationRuleFailure_ProducesConstraintFailureOutcome_NotRejected()
     {
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance cannot go negative"
+            rule Balance >= 0 because "Balance cannot go negative"
             state A initial
             event Debit with Amount as number
             from A on Debit -> set Balance = Balance - Debit.Amount -> transition A
@@ -217,17 +217,17 @@ public class PreceptConstraintViolationTests
     }
 
     // ========================================================================================
-    // Scenario 1: Event assert → EventArgTarget + EventTarget (Rejected)
+    // Scenario 1: Event ensure → EventArgTarget + EventTarget (Rejected)
     // ========================================================================================
 
     [Fact]
-    public void Violation_EventAssert_HasEventArgAndEventTargets()
+    public void Violation_EventEnsure_HasEventArgAndEventTargets()
     {
         const string dsl = """
             precept Payment
             state Active initial
             event MakePayment with Amount as number
-            on MakePayment assert Amount > 0 because "Amount must be positive"
+            on MakePayment ensure Amount > 0 because "Amount must be positive"
             from Active on MakePayment -> no transition
             """;
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -238,22 +238,22 @@ public class PreceptConstraintViolationTests
         result.Outcome.Should().Be(TransitionOutcome.Rejected);
         var v = result.Violations.Should().ContainSingle().Subject;
         v.Message.Should().Contain("Amount must be positive");
-        v.Source.Kind.Should().Be(ConstraintSourceKind.EventAssertion);
+        v.Source.Kind.Should().Be(ConstraintSourceKind.EventEnsure);
         v.Targets.OfType<ConstraintTarget.EventArgTarget>().Should().Contain(ea => ea.EventName == "MakePayment" && ea.ArgName == "Amount");
         v.Targets.OfType<ConstraintTarget.EventTarget>().Should().Contain(et => et.EventName == "MakePayment");
     }
 
     // ========================================================================================
-    // Scenario 2: Post-mutation invariant → FieldTarget + DefinitionTarget (ConstraintFailure)
+    // Scenario 2: Post-mutation rule → FieldTarget + DefinitionTarget (ConstraintFailure)
     // ========================================================================================
 
     [Fact]
-    public void Violation_PostMutationInvariant_HasFieldAndDefinitionTargets()
+    public void Violation_PostMutationRule_HasFieldAndDefinitionTargets()
     {
         const string dsl = """
             precept Payment
             field Balance as number default 1000
-            invariant Balance >= 0 because "Balance cannot go negative"
+            rule Balance >= 0 because "Balance cannot go negative"
             state Active initial
             event MakePayment with Amount as number
             from Active on MakePayment -> set Balance = Balance - MakePayment.Amount -> transition Active
@@ -266,24 +266,24 @@ public class PreceptConstraintViolationTests
         result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
         var v = result.Violations.Should().ContainSingle().Subject;
         v.Message.Should().Contain("Balance cannot go negative");
-        v.Source.Kind.Should().Be(ConstraintSourceKind.Invariant);
+        v.Source.Kind.Should().Be(ConstraintSourceKind.Rule);
         v.Targets.OfType<ConstraintTarget.FieldTarget>().Should().Contain(ft => ft.FieldName == "Balance");
         v.Targets.OfType<ConstraintTarget.DefinitionTarget>().Should().ContainSingle();
     }
 
     // ========================================================================================
-    // Scenario 3: State assert on entry → FieldTarget + StateTarget (ConstraintFailure)
+    // Scenario 3: State ensure on entry → FieldTarget + StateTarget (ConstraintFailure)
     // ========================================================================================
 
     [Fact]
-    public void Violation_StateAssertOnEntry_HasFieldAndStateTargets()
+    public void Violation_StateEnsureOnEntry_HasFieldAndStateTargets()
     {
         const string dsl = """
             precept Ticket
             field AssignedAgent as string nullable
             state Open initial
             state Assigned
-            in Assigned assert AssignedAgent != null because "Must have an assigned agent"
+            in Assigned ensure AssignedAgent != null because "Must have an assigned agent"
             event StartWork
             from Open on StartWork -> transition Assigned
             """;
@@ -295,7 +295,7 @@ public class PreceptConstraintViolationTests
         result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
         var v = result.Violations.Should().ContainSingle().Subject;
         v.Message.Should().Contain("Must have an assigned agent");
-        v.Source.Kind.Should().Be(ConstraintSourceKind.StateAssertion);
+        v.Source.Kind.Should().Be(ConstraintSourceKind.StateEnsure);
         v.Targets.OfType<ConstraintTarget.FieldTarget>().Should().Contain(ft => ft.FieldName == "AssignedAgent");
         v.Targets.OfType<ConstraintTarget.StateTarget>().Should().Contain(st => st.StateName == "Assigned");
     }
@@ -353,17 +353,17 @@ public class PreceptConstraintViolationTests
     }
 
     // ========================================================================================
-    // Scenario 7: Multi-subject invariant → multiple FieldTargets + DefinitionTarget
+    // Scenario 7: Multi-subject rule → multiple FieldTargets + DefinitionTarget
     // ========================================================================================
 
     [Fact]
-    public void Violation_MultiSubjectInvariant_HasAllReferencedFieldTargets()
+    public void Violation_MultiSubjectRule_HasAllReferencedFieldTargets()
     {
         const string dsl = """
             precept TimeWindow
             field StartHour as number default 0
             field EndHour as number default 24
-            invariant StartHour <= EndHour because "Start must not exceed end"
+            rule StartHour <= EndHour because "Start must not exceed end"
             state Active initial
             in Active edit StartHour, EndHour
             """;
@@ -375,7 +375,7 @@ public class PreceptConstraintViolationTests
         result.IsSuccess.Should().BeFalse();
         var v = result.Violations.Should().ContainSingle().Subject;
         v.Message.Should().Contain("Start must not exceed end");
-        v.Source.Kind.Should().Be(ConstraintSourceKind.Invariant);
+        v.Source.Kind.Should().Be(ConstraintSourceKind.Rule);
         v.Targets.OfType<ConstraintTarget.FieldTarget>().Should().Contain(ft => ft.FieldName == "StartHour");
         v.Targets.OfType<ConstraintTarget.FieldTarget>().Should().Contain(ft => ft.FieldName == "EndHour");
         v.Targets.OfType<ConstraintTarget.DefinitionTarget>().Should().ContainSingle();

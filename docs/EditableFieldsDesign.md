@@ -2,7 +2,7 @@
 
 Date: 2026-03-04
 
-Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, invariant/assert rule evaluation, and `Inspect` integration are now implemented.
+Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, rule/ensure evaluation, and `Inspect` integration are now implemented.
 
 > **Inspector UX note (2026-03-06):** The preview inspector applies direct field edits in explicit **Edit** mode. While typing, draft values are validated through `Inspect(...)`-based preview checks and violations are surfaced inline; runtime data is not committed until the user clicks **Save**. **Cancel** discards draft edits.
 >
@@ -12,9 +12,9 @@ Status: **Runtime implemented.** Parser/model support was included in the langua
 >
 > Attribution is owned by the preview service layer, not the webview. The webview renders the authoritative `EditableFields[i].Violation`, `FieldErrors`, and `FormErrors` returned by `inspectUpdate`; it does not infer ownership client-side from the raw runtime payload.
 
-> **Language redesign note (2026-03-05):** The editable fields syntax has been updated from indentation-based `from <State> edit` blocks to flat keyword-anchored `in <State> edit <Field>, <Field>` statements, consistent with the new Precept language design (`docs/PreceptLanguageDesign.md`). The `in` preposition is used instead of `from` because editability is about what you can do **while residing in** a state, matching `in <State> assert` semantics. The parser/model support for `in <State> edit` is included in the language redesign; the runtime `Update` API is deferred to a follow-on task.
+> **Language redesign note (2026-03-05, reconciled 2026-04-13):** Editable fields now use flat keyword-anchored declarations: stateful `in <State> [when <Guard>] edit <Field>, <Field>` and stateless root-level `edit <Field>, <Field> [when <Guard>]` / `edit all [when <Guard>]`. The `in` preposition remains the stateful form because editability is about what you can do **while residing in** a state, matching `in <State> ensure` semantics. Parser, type-checker, runtime `Update`, and `Inspect` support for guarded root-level edit are all implemented.
 
-Depends on: **Rules** (docs/RulesDesign.md) — ✅ rules are now implemented. The prerequisite dependency is satisfied. Rules enforce data invariants on every mutation regardless of path, making direct field editing safe.
+Depends on: the implemented `rule` system. Rules enforce data invariants on every mutation regardless of path, making direct field editing safe.
 
 ## Overview
 
@@ -46,7 +46,7 @@ The DSL's event pipeline maps cleanly to the actor model: private state, message
 
 ### Rules as the safety net
 
-Editable fields are viable *because* rules exist. Without rules, direct field editing would bypass all data integrity constraints. With rules, the DSL author declares invariants once (`rule Balance >= 0 "..."`) and those invariants are enforced regardless of whether the field changes via an event `set` assignment or a direct `Update` call.
+Editable fields are viable *because* rules exist. Without rules, direct field editing would bypass all data integrity constraints. With rules, the DSL author declares rules once (`rule Balance >= 0 because "..."`) and those rules are enforced regardless of whether the field changes via an event `set` assignment or a direct `Update` call.
 
 ## Syntax
 
@@ -57,6 +57,14 @@ Editable field declarations use the `in` preposition ("while residing in a state
 ```text
 in <any|StateA[,StateB...]> edit <FieldName>, <FieldName>, ...
 ```
+
+A conditional form accepts a `when` guard between the state target and `edit`:
+
+```text
+in <any|StateA[,StateB...]> when <Guard> edit <FieldName>, <FieldName>, ...
+```
+
+Where `<Guard>` is a boolean expression over entity fields.
 
 Each field name in the list declares that field as editable in the specified state(s). This is a flat, keyword-anchored statement — consistent with all other Precept declarations.
 
@@ -92,7 +100,7 @@ in Resolved edit ResolutionSummary
 
 ### Multi-state support
 
-Multi-state `in` is already supported for state asserts (`in Open, InProgress assert ...`). Edit declarations reuse the same syntax — the parser handles comma-separated state lists identically.
+Multi-state `in` is already supported for state ensures (`in Open, InProgress ensure ...`). Edit declarations reuse the same syntax — the parser handles comma-separated state lists identically.
 
 ### `in any edit`
 
@@ -108,14 +116,27 @@ edit all
 
 # Specific fields are editable
 edit Field1, Field2
+
+# Conditional editability with guards
+edit Field1 when Guard
+edit all when Guard
 ```
 
 - `edit all` — the `all` sentinel is stored as `["all"]` in `FieldNames`. At engine construction, `ExpandEditFieldNames()` expands `["all"]` to every declared scalar and collection field name. This is a stateless-only shorthand for "every field the precept declares."
 - `edit Field1, Field2` — only the listed fields are editable. The remaining fields are read-only.
+- `edit Field1 when Guard` — the listed fields are editable only when the guard expression evaluates to `true`. The guard uses the same `WhenOpt` grammar as state-scoped edit declarations.
+- `edit all when Guard` — all fields are editable only when the guard is satisfied.
 
-**Relationship to state-scoped edit:** Root-level `edit` is only valid for stateless precepts. Using it alongside `state` declarations produces **C55 (compile Error)**: `"Root-level 'edit' is not valid when states are declared."` For stateful precepts, use `in any edit all` or `in <State> edit <Fields>`.
+**Guard semantics** for root-level guarded edits follow the same rules as state-scoped guarded edits:
 
-**Access:** At runtime, `Update` on a stateless instance uses `_rootEditableFields` as the editable field set. `BuildEditableFieldInfosForStateless()` surfaces root-editable fields in the `Inspect(instance)` aggregate result.
+- **Additive union:** Unconditional and guarded root-level edit blocks combine. A field is editable if ANY unconditional or passing-guard block grants it.
+- **Fail-closed:** Guard evaluation error → field not granted.
+- **Dynamic evaluation:** Guards are evaluated on each `Update` / `Inspect` call with current instance data.
+- **Type checking:** Guard must be a non-nullable boolean expression. C69 fires for out-of-scope references; C46 rejects nullable or non-boolean guard expressions.
+
+**Relationship to state-scoped edit:** Root-level `edit` (with or without guards) is only valid for stateless precepts. Using it alongside `state` declarations produces **C55 (compile Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+
+**Access:** At runtime, `Update` on a stateless instance uses the union of `_rootEditableFields` (unconditional root edit blocks) and guarded root-level edit blocks whose guards pass. `EvaluateGuardedEditFields(null, data)` evaluates root-level guards by matching on `null` state. `BuildEditableFieldInfosForStateless()` surfaces the combined editable field set in the `Inspect(instance)` aggregate result.
 
 ## Semantics
 
@@ -132,18 +153,27 @@ in Open edit Description
 # In state Closed: only Notes is editable
 ```
 
-This is consistent with how `in any assert` coexists with state-specific `in State assert` declarations — they are independent declarations, not overrides.
+This is consistent with how `in any ensure` coexists with state-specific `in State ensure` declarations — they are independent declarations, not overrides.
 
 ### Independence from events
 
 Edit declarations and event transitions are independent features. A field can be both editable (via `in ... edit`) and modified by event `set` assignments. There is no conflict — they are different mutation paths with different semantics:
 
 - **Event path**: lifecycle action with guards, branching, state transitions, audit trail
-- **Edit path**: direct data modification with editability scope and invariant/assert enforcement
+- **Edit path**: direct data modification with editability scope and rule/ensure enforcement
 
 ### No special terminal state treatment
 
 `in any edit` includes terminal states (states with no outgoing transitions). If the author wants to exclude a terminal state, they list states explicitly instead of using `any`.
+
+### Conditional editability
+
+`in <State> when <Guard> edit <Field>` makes fields conditionally editable based on current instance data. The guard is a boolean expression over entity fields, evaluated dynamically at each `Update` or `Inspect` call.
+
+- **Additive:** Static fields (from unconditional `in <State> edit`) + dynamic fields (from guarded blocks whose guard passes) = effective editable set for the state.
+- **Fail-closed:** If a guard expression evaluation fails (expression error, missing data, non-boolean result), the guarded fields are NOT granted editability. This prevents data integrity holes from expression evaluation edge cases.
+- **Dynamic evaluation:** Guards are evaluated at each `Update` / `Inspect` call with current instance data — the editable set can change as data changes.
+- **Guard scope:** Entity fields only (same as unconditional edit declarations). C69 fires for out-of-scope references in the guard expression.
 
 ### Fields without rules
 
@@ -163,7 +193,7 @@ Collection editing supports both granular operations (add/remove individual elem
 The compiler validates edit declarations at compile time:
 
 - **Unknown field names**: every field listed in an `edit` declaration must be a declared instance data field.
-- **Unknown state names**: every state in the `in` clause must be a declared state (same validation as state asserts).
+- **Unknown state names**: every state in the `in` clause must be a declared state (same validation as state ensures).
 - **Duplicate field in same declaration**: a field listed twice in the same `edit` declaration is a warning.
 - **No fields**: an `edit` declaration with no field names is a parse error.
 
@@ -177,10 +207,12 @@ The parser produces one `PreceptEditBlock` per `(State, FieldNames)` grouping:
 public sealed record PreceptEditBlock(
     string? State,          // null for root-level (stateless) edit declarations
     IReadOnlyList<string> FieldNames,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null,
     int SourceLine = 0);
 ```
 
-`State` is `null` for root-level `edit` declarations (stateless precepts). When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock` per declared state. When `in State1, State2 edit` is used, the parser creates one `PreceptEditBlock` per listed state.
+`State` is `null` for root-level `edit` declarations (stateless precepts). `WhenText` and `WhenGuard` are populated when the declaration includes a `when` clause. When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock` per declared state. When `in State1, State2 edit` is used, the parser creates one `PreceptEditBlock` per listed state.
 
 ### `PreceptDefinition` extension
 
@@ -193,9 +225,9 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptTransitionRow> TransitionRows,
     IReadOnlyList<PreceptField> Fields,
     IReadOnlyList<PreceptCollectionField> CollectionFields,
-    IReadOnlyList<PreceptInvariant>? Invariants = null,
-    IReadOnlyList<StateAssertion>? StateAsserts = null,
-    IReadOnlyList<EventAssertion>? EventAsserts = null,
+    IReadOnlyList<PreceptRule>? Rules = null,
+    IReadOnlyList<StateEnsure>? StateEnsures = null,
+    IReadOnlyList<EventEnsure>? EventEnsures = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null);
 ```
 
@@ -209,13 +241,18 @@ At compile time, `PreceptEngine` builds two internal editability structures:
 // State-scoped edit (stateful precepts): state name → set of editable field names
 private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
 
+// Guarded edit blocks — evaluated per-call against current instance data
+private readonly IReadOnlyList<PreceptEditBlock> _guardedEditBlocks;
+
 // Root-level edit (stateless precepts): set of editable field names, or null if none declared
 private HashSet<string>? _rootEditableFields;
 ```
 
-`_rootEditableFields` is populated from `PreceptEditBlock` entries where `State == null`. The `ExpandEditFieldNames()` private helper expands `["all"]` to all scalar and collection field names. `BuildEditableFieldInfosForStateless()` is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+`_rootEditableFields` is populated from unconditional `PreceptEditBlock` entries where `State == null` and `WhenGuard == null`. The `ExpandEditFieldNames()` private helper expands `["all"]` to all scalar and collection field names.
 
-At runtime, `Update` Stage 1 branches on `IsStateless`: stateless instances pull the editable field set from `_rootEditableFields`; stateful instances use the `_editableFieldsByState` lookup.
+`_guardedEditBlocks` contains edit blocks where `WhenGuard != null`, including both state-scoped and root-level guarded edit blocks. The constructor routes these blocks to `_guardedEditBlocks` instead of `_editableFieldsByState` or `_rootEditableFields`. At runtime, `EvaluateGuardedEditFields(state, data)` iterates guarded blocks matching the current state (or `null` for root-level blocks), evaluates each guard fail-closed (guard error → field not granted), and returns the union of passing field names.
+
+At runtime, `Update` Stage 1 branches on `IsStateless`: stateless instances pull the editable field set from the union of `_rootEditableFields` and `EvaluateGuardedEditFields(null, data)`; stateful instances use the `_editableFieldsByState` lookup unioned with guarded edit results. `BuildEditableFieldInfosForStateless()` is used by `Inspect(instance)` to surface the combined editable field set for stateless instances, returning `null` only when no root-level edit declarations exist and an empty list when declarations exist but none currently grant editability.
 
 This precomputed map makes `Update` validation O(1) per field.
 
@@ -283,13 +320,13 @@ if (result.IsSuccess)
 
 When `Update` is called, the runtime executes the following steps in order:
 
-1. **Editability check** — For each field in the patch, verify the field is editable in the current state (union of matching `in ... edit` declarations). If any field is not editable, the entire update is rejected with `UneditableField` outcome. No partial application.
+1. **Editability check** — For each field in the patch, verify the field is editable in the current state. For stateful precepts, the effective set is the union of unconditional `in ... edit` declarations plus guarded edit blocks whose guards currently pass. For stateless precepts, the effective set is the union of unconditional root-level `edit` declarations plus guarded root-level edit blocks whose guards currently pass. If any field is not editable, the entire update is rejected with `UneditableField` outcome. No partial application.
 
 2. **Type check** — Verify each value matches the declared field type. Scalar type mismatches, null on non-nullable fields, and wrong-typed collection elements are rejected.
 
 3. **Atomic mutation** — Apply all patch operations to a working copy of instance data, in declaration order within the patch. This is the same working-copy pattern used by `set` assignments in transitions.
 
-4. **Constraint evaluation** — Evaluate invariants, state asserts (`in <CurrentState>` asserts), and field invariants against the post-mutation working copy. If any fail, all mutations are rolled back and the outcome is `ConstraintFailure` with violations. (Note: state asserts are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
+4. **Constraint evaluation** — Evaluate rules, state ensures (`in <CurrentState>` ensures), and field rules against the post-mutation working copy. If any fail, all mutations are rolled back and the outcome is `ConstraintFailure` with violations. (Note: state ensures are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
 
 5. **Commit** — If all validations pass, the working copy replaces the live instance data.
 
@@ -348,13 +385,13 @@ Extend `InspectionResult` with an `EditableFields` collection:
 
 ```csharp
 public sealed record InspectionResult(
-    string CurrentState,
+    string? CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
     IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);  // <-- NEW
 ```
 
-Each entry provides enough metadata for the host to render edit controls, and carries a back-pointer to an associated `ConstraintViolation` (populated during hypothetical-patch inspection):
+Each entry provides enough metadata for the host to render edit controls. During hypothetical-patch inspection, `Violation` is populated with a human-readable message for fields implicated by the failed patch:
 
 ```csharp
 public sealed record PreceptEditableFieldInfo(
@@ -362,25 +399,14 @@ public sealed record PreceptEditableFieldInfo(
     string FieldType,        // composite type: "string", "number", "boolean", "set<string>", "queue<number>", etc.
     bool IsNullable,
     object? CurrentValue,    // Current field value (scalar or collection)
-    ConstraintViolation? Violation = null);  // non-null when a patch inspection found a violation implicating this field
+    string? Violation = null);
 ```
 
-### `ConstraintViolation` — structured violation with field attribution
-
-A violation carries both a human-readable reason and a list of all `PreceptEditableFieldInfo` objects it implicates. This allows the host to highlight every field involved in a multi-field constraint (e.g. `A + B <= 100` implicates both `A` and `B`):
-
-```csharp
-public sealed record ConstraintViolation(
-    string Message,
-    ConstraintSource Source,
-    IReadOnlyList<ConstraintTarget> Targets);
-```
-
-The bidirectional references (`FieldInfo.Violation` and `Violation.Targets`) form an object graph that is safe in C# but never serialized directly. The preview protocol uses indices instead (see Preview Protocol Extension).
+`UpdateResult` still returns structured `ConstraintViolation` objects for failed commits. `EditableFields` on `InspectionResult` carries per-field messages only.
 
 ### `Inspect(instance, patches)` — hypothetical-patch inspection
 
-A new `Inspect` overload applies a patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, invariant/assert evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the session instance is unchanged. This is the runtime primitive used for per-keystroke rule checking in the preview UI.
+A new `Inspect` overload applies a patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, rule/ensure evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the session instance is unchanged. This is the runtime primitive used for per-keystroke rule checking in the preview UI.
 
 ```csharp
 InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
@@ -388,7 +414,7 @@ InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> p
 
 The returned `EditableFields` is the same as for `Inspect(instance)`, but each `PreceptEditableFieldInfo` whose field is implicated in a violation has its `Violation` property set.
 
-When no edit declarations exist, `EditableFields` is `null`. Otherwise, it contains the effective editable field set for the instance's current state (the union of all matching `in ... edit` declarations), pre-populated with current values.
+When no edit declarations exist for the engine, `EditableFields` is `null`. When declarations exist but none are currently effective (for example, all matching guarded edit blocks evaluate false), `EditableFields` is an empty list. Otherwise, it contains the effective editable field set for the instance's current state or stateless root context, pre-populated with current values.
 
 ### Relationship to per-event Inspect
 
@@ -414,15 +440,15 @@ field Tags as set of string
 field EstimatedHours as number nullable
 field ResolutionSummary as string nullable
 
-# Invariants protect data integrity regardless of mutation path
-invariant Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
+# Rules protect data integrity regardless of mutation path
+rule Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
 
 state Open initial
 state InProgress
 state Resolved
 state Closed
 
-in Resolved assert ResolutionSummary != null because "Resolution requires a summary"
+in Resolved ensure ResolutionSummary != null because "Resolution requires a summary"
 
 event Assign with Technician as string
 event StartWork
@@ -488,7 +514,7 @@ EventInspectionResult inspectResolve = engine.Inspect(instance, "Resolve");
 
 // Hypothetical-patch inspect: validate edits before applying
 InspectionResult dryRun = engine.Inspect(instance, patch => patch.Set("Priority", 99));
-// dryRun.EditableFields[Priority].Violation.Reason == "Priority must be between 1 and 5"
+// dryRun.EditableFields[Priority].Violation == "Priority must be between 1 and 5"
 // No commit — instance is unchanged
 
 // Rules enforcement: priority out of range
@@ -508,19 +534,23 @@ UpdateResult wrongState = engine.Update(instance, patch => patch
 
 ## Grammar Extension
 
-The edit declaration adds one new production to the DSL grammar:
+Editability now has both state-scoped and root-level productions in the DSL grammar:
 
 ```text
-<EditDecl> := "in" <StateTarget> "edit" <FieldList>
+<EditDecl> := <StateEditDecl> | <RootEditDecl>
 
-<FieldList> := <FieldName> ("," <FieldName>)*
+<StateEditDecl> := "in" <StateTarget> <WhenOpt> "edit" <FieldList>
+<RootEditDecl>  := "edit" <FieldList> <WhenOpt>
+
+<FieldList> := "all" | <FieldName> ("," <FieldName>)*
 <FieldName> := identifier referencing a declared instance data field
 <StateTarget> := "any" | Identifier ("," Identifier)*
+<WhenOpt> := ε | "when" <BoolExpr>
 ```
 
-The `edit` keyword is a new reserved word. It appears only in the `in ... edit` position — it cannot be used as a field name, state name, or event name.
+The `edit` keyword is a reserved word. It appears either in the state-scoped `in ... edit` position or as the root-level stateless declaration keyword — it cannot be used as a field name, state name, or event name.
 
-**Disambiguation:** `in <State>` is followed by either `assert` (state-scoped invariant) or `edit` (editable field declaration). The parser disambiguates at LL(2).
+**Disambiguation:** `in <State>` is followed by either `ensure` (state-scoped rule) or `edit` (editable field declaration). The parser disambiguates at LL(2).
 
 ## Preview Protocol Extension
 
@@ -604,7 +634,7 @@ The data panel has two modes — **read-only** and **edit mode**:
 - On each input change, the webview debounces and sends an `"inspect"` action with the full current patch buffer. No commit occurs.
 - The server applies patches to a working copy, runs the full validation pipeline, and returns a snapshot with `editableFields[i].violationIndex` populated for any violations.
 - Inputs with violations are highlighted red; the violation reason appears below the input.
-- The full patch buffer is sent each time (not just the changed field) so multi-field invariants are evaluated correctly.
+- The full patch buffer is sent each time (not just the changed field) so multi-field rules are evaluated correctly.
 
 ### Collection field edit controls
 
@@ -643,10 +673,10 @@ internal sealed record PreceptPreviewPatchOp(
 
 ### Parser
 
-- The `EditDecl` parser combinator recognizes `in <states> edit <fieldList>` as a statement (no regex needed — Superpower token stream).
+- The `EditDecl` parser combinator recognizes both `in <states> [when <guard>] edit <fieldList>` and root-level `edit <fieldList> [when <guard>]` as statements (no regex needed — Superpower token stream).
 - Report errors for unknown fields, unknown states, empty field lists.
-- Expand multi-state and `any` targets (same as state asserts).
-- Generate one `PreceptEditBlock` per source state.
+- Expand multi-state and `any` targets (same as state ensures).
+- Generate one `PreceptEditBlock` per source state, or a single `State == null` block for each root-level stateless declaration.
 
 ### Analyzer
 
@@ -656,91 +686,15 @@ internal sealed record PreceptPreviewPatchOp(
 
 ### Completions
 
-- After `in <states>`, suggest both `assert` and `edit` as continuations.
-- After `in <states> edit`, suggest declared field names (comma-separated context).
+- After `in <states>`, suggest both `ensure` and `edit` as continuations.
+- After `in <states> when <guard>` or root-level `edit`, suggest declared field names (comma-separated context).
+- After a root-level field list in a stateless precept, allow `when` as the guarded continuation.
 
 ### Semantic tokens
 
-- `edit` keyword highlighted consistently with `assert`, `transition`, etc.
+- `edit` keyword highlighted consistently with `ensure`, `transition`, etc.
 - Field names in edit declarations highlighted as variable references.
 
-## Implementation Prompt
-
-The following prompt can be pasted into a new session to implement the editable fields feature:
-
----
-
-Implement the editable fields feature for the Precept state machine DSL as specified in `docs/EditableFieldsDesign.md`. This is a full-stack implementation across parser, model, compiler, runtime, language server, preview protocol, preview UI, and documentation. Read `docs/EditableFieldsDesign.md` thoroughly before starting — it is the complete design spec. Also read `docs/RuntimeApiDesign.md` for the current public API surface and naming conventions. Read at least one sample from `samples/` before writing any DSL strings.
-
-**Summary:** Editable fields allow direct modification of instance data fields in specific states without going through the event pipeline. The DSL syntax is `in <any|State1,State2> edit <Field>, <Field>` as a flat statement. The runtime exposes `engine.Update(instance, patch)` for atomic edits with full validation. The preview UI adds an explicit edit mode with per-keystroke inspect validation and a single Apply/Cancel commit.
-
-**DSL syntax:** `in <any|StateA[,StateB...]> edit <FieldName>, <FieldName>, ...` — flat, keyword-anchored, comma-separated field names. Multi-state lists supported (same as `in <State> assert`). `in any edit` = editable in all states. Multiple declarations are additive (union). The `in` preposition is used because editability is about residing in a state. `edit` is a new reserved word.
-
-**Compiler validations:** Unknown field names → error. Unknown state names → error. Empty field list → parse error. Duplicate field in same declaration → warning.
-
-**Model:** Add `PreceptEditBlock(string State, IReadOnlyList<string> FieldNames, int SourceLine = 0)` record. Add `IReadOnlyList<PreceptEditBlock>? EditBlocks = null` to `PreceptDefinition`. Parser expands `in any edit` into one `PreceptEditBlock` per declared state and `in State1, State2 edit` into one per listed state (same expansion as state asserts).
-
-**Runtime API:**
-- Add `Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` on `PreceptEngine`, returning `UpdateResult`.
-- `IUpdatePatchBuilder` supports: `Set` (scalars), `Add`/`Remove` (sets), `Enqueue`/`Dequeue` (queues), `Push`/`Pop` (stacks), `Replace` and `Clear` (all collections).
-- Validation sequence: editability check → type check → atomic mutation on working copy → invariant/`in <CurrentState>` assert evaluation → commit or rollback.
-- Outcomes: `UpdateOutcome.Update`, `UneditableField`, `ConstraintFailure`, `InvalidInput`.
-- Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular on same collection, Set on collection field, granular op on scalar field.
-- `UpdateResult(UpdateOutcome Outcome, IReadOnlyList<ConstraintViolation> Violations, PreceptInstance? UpdatedInstance)`.
-
-**Inspect integration:**
-- Add `IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null` to `InspectionResult`.
-- `PreceptEditableFieldInfo(string FieldName, string FieldType, bool IsNullable, object? CurrentValue, ConstraintViolation? Violation = null)`. `FieldType` is composite: `"string"`, `"set<string>"`, `"queue<number>"`, etc. No separate `CollectionType` property.
-- Add `ConstraintViolation(string Message, ConstraintSource Source, IReadOnlyList<ConstraintTarget> Targets)` — structured violation with attribution.
-- Add `Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` overload: applies patch to working copy, runs full validation pipeline, returns `InspectionResult` with violations reflected in `EditableFields`. **No commit.** Used for per-keystroke validation.
-- The aggregate `engine.Inspect(instance)` returns event statuses AND editable field info in one call. `engine.Inspect(instance, patches)` does the same with hypothetical patch evaluation.
-
-**Preview protocol (`PreceptPreviewProtocol.cs`):**
-- Change `PreceptPreviewSnapshot.Data` from `IReadOnlyDictionary<string, object?>` to `IReadOnlyDictionary<string, PreceptPreviewFieldValue>`.
-- `PreceptPreviewFieldValue(object? Value, string Type, bool IsNullable)` — `Type` is composite (e.g. `"set<string>"`).
-- Add `IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null` and `IReadOnlyList<PreceptPreviewViolation>? Violations = null` to `PreceptPreviewSnapshot`.
-- `PreceptPreviewEditableField(string Name, int? ViolationIndex = null)` — index into `Violations`.
-- `PreceptPreviewViolation(string Reason, IReadOnlyList<int> AffectedFieldIndexes)` — indices into `EditableFields`.
-- `PreceptPreviewRequest` gains `IReadOnlyList<PreceptPreviewPatchOp>? Patches = null`.
-- `PreceptPreviewPatchOp(string Field, string Op, object? Value)` — ops: `"set"`, `"add"`, `"remove"`, `"enqueue"`, `"dequeue"`, `"push"`, `"pop"`, `"replace"`, `"clear"`.
-- `"inspect"` action with `Patches`: applies patches to working copy, returns snapshot with `EditableFields`/`Violations` populated, **no commit**. Used for per-keystroke validation (debounced).
-- `"update"` action with `Patches`: commits atomically. Returns updated snapshot on success; failure snapshot with violations on `Blocked`/`Invalid`.
-
-**Preview handler (`PreceptPreviewHandler.cs`):**
-- Build typed `Data` map using `session.Engine.Fields` (scalar) and `session.Engine.CollectionFields` (collections) — both already public on `PreceptEngine`. No new engine API needed.
-- Handle `"inspect"` with patches: call `engine.Inspect(instance, patches)`, translate bidirectional object graph to index-based protocol types, return snapshot without updating `session.Instance`.
-- Handle `"update"` with patches: call `engine.Update(instance, patches)`, on `Updated` advance `session.Instance` and return fresh snapshot; on `Blocked`/`Invalid` return failure snapshot with violations.
-
-**Preview UI (`inspector-preview.html`):**
-- **Collection display (read-only):** Parse `type` to detect collections (`type.includes('<')`). Render: `set` → `{ a, b }`, `queue` → `[ a, b, c →]`, `stack` → `[ top | 2 | 3 ]`, empty → `{ }` or `[ ]`. Update `formatValue` to be collection-aware.
-- **Edit mode toggle:** "Edit" button in the data panel header. In read-only mode, fields listed in `snapshot.editableFields` show a subtle ✎ indicator next to their value; non-editable fields show no indicator. Field order matches declaration order throughout.
-- **Edit mode layout:** Editable fields show type-appropriate input controls; non-editable fields stay as dimmed text. Header shows "Apply" and "Cancel" buttons.
-- **Per-keystroke validation:** On each input change, debounce (e.g. 300ms) and send `"inspect"` with the full current patch buffer. Read `editableFields[i].violationIndex` from the response — highlight the input red and show `violations[j].reason` below if violated. Also highlight any sibling fields implicated by `violations[j].affectedFieldIndexes`.
-- **Apply:** Send `"update"` with full patch buffer. On success, update session state and exit edit mode. On `Blocked`/`Invalid`, stay in edit mode and display violations.
-- **Cancel:** Discard buffer, exit edit mode. No server call.
-- **Collection edit controls — `set<T>`:** Chip list with ✕ per item + add-item input + **Clear** button.
-- **Collection edit controls — `queue<T>`:** Ordered list; Enqueue input at tail; Dequeue button at head; **Clear** button.
-- **Collection edit controls — `stack<T>`:** Ordered list top-first; Push input at top; Pop button at top; **Clear** button.
-- **Replace (all collection types):** A **Replace** button opens a confirmation textarea pre-filled with current items; on confirm, adds a `"replace"` op and disables granular controls for that field.
-
-**Tests:** Add to `test/Precept.Tests/` and `test/Precept.LanguageServer.Tests/`:
-- Edit declaration parsing: single state, multi-state, `in any`
-- Additive semantics across overlapping declarations
-- `Update` with scalar fields: `Updated`, `NotAllowed`, `Blocked`, `Invalid` outcomes
-- `Update` with collection fields: all op types (`Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop`, `Replace`, `Clear`)
-- Editability enforcement per state (field editable in one state, not another)
-- Patch conflict detection at build time
-- Invariant/assert enforcement on update; atomic rollback on violation
-- `Inspect(instance)` → `EditableFields` populated correctly
-- `Inspect(instance, patches)` → violations reflected in `EditableFields` with correct `AffectedFields`
-- Coexistence of edit declarations with event transitions
-
-**Documentation:** Update `README.md` to mention editable fields. Update `docs/EditableFieldsDesign.md` status from "Design phase" to "Implemented". Update `docs/RuntimeApiDesign.md` if API signatures changed.
-
-**Grammar sync (non-negotiable — do not skip):** Update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`:
-1. Add `inEditHeader` pattern for `in … edit` header lines, consistent with existing `inAssertHeader`.
-2. Add `edit` to `controlKeywords` alternation with `\b` word-boundary anchors.
-3. Insert `inEditHeader` before `controlKeywords` in the top-level `patterns` array.
 4. Verify JSON is valid after changes.
 
 **Intellisense sync (non-negotiable — do not skip):** Update `tools/Precept.LanguageServer/PreceptAnalyzer.cs` and `PreceptSemanticTokensHandler.cs`:

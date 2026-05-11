@@ -48,8 +48,8 @@ A proposal without proper placement is invisible. Apply these when opening the i
 **Research corpus section (required when research exists):**
 ```markdown
 ## Research corpus consulted
-- `docs/research/language/expressiveness/expression-language-audit.md`
-- `docs/research/language/references/constraint-composition.md`
+- `research/language/expressiveness/expression-language-audit.md`
+- `research/language/references/constraint-composition.md`
 ```
 
 ### Proposal Structure (GitHub Issue)

@@ -107,11 +107,11 @@ Non-mutating evaluation of a single event. Returns `EventInspectionResult`.
 - Accepts calls with missing/partial event arguments — this is a discovery API. `RequiredEventArgumentKeys` on the result tells callers what is needed before `Fire`.
 - When event arguments are provided, validates them against the event's argument contract. Unknown keys are rejected.
 - Evaluates ordered `if`/`else if`/`else` guards; the first matching clause determines the outcome.
-- Simulates `set` assignments and collection mutations on a working copy, then evaluates field, top-level, and target-state rules. Rejects if any rule would be violated.
+- Simulates `set` assignments and collection mutations on a working copy, then evaluates field rules, top-level rules, and target-state ensures. Returns `ConstraintFailure` if any post-mutation validation would be violated.
 - Does **not** mutate the instance.
 
 **Event argument validation during Inspect:**
-Arguments are only validated and event rules are only run when `eventArguments != null`. Calling `Inspect` without arguments is explicitly supported for discover-mode callers.
+Arguments are only validated and event ensures are only run when `eventArguments != null`. Calling `Inspect` without arguments is explicitly supported for discover-mode callers.
 
 ### `Inspect` (aggregate)
 
@@ -123,8 +123,8 @@ Evaluates all events that have at least one transition from the instance's curre
 
 - Events are ordered by declaration position.
 - Each event is evaluated as `Inspect(instance, eventName)` with no event arguments (discovery mode).
-- **Stateless precepts:** All events return `Undefined` outcome (no transition surface). `EditableFields` is populated from root-level `edit` declarations if any exist.
-- `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the union of all matching edit declarations for the current state.
+- **Stateless precepts:** All events return `Undefined` outcome (no transition surface). `EditableFields` is populated from the effective root-level editable set, including guarded root-level edit blocks whose guards currently pass.
+- `EditableFields` is `null` when the engine has no edit declarations at all, an empty list when edit declarations exist but none are currently effective, or the union of all matching unconditional edit declarations plus any guarded edit declarations whose guards currently pass.
 - If the instance fails `CheckCompatibility`, returns a result with an empty events list.
 
 Use this as the primary API for rendering a state-machine inspector view.
@@ -135,7 +135,7 @@ Use this as the primary API for rendering a state-machine inspector view.
 public InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Applies a hypothetical patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, invariant/assert evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the instance is unchanged. Used for per-keystroke rule checking in the preview UI.
+Applies a hypothetical patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, rule/ensure evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the instance is unchanged. Used for per-keystroke rule checking in the preview UI.
 
 ### `Update`
 
@@ -143,7 +143,7 @@ Applies a hypothetical patch to a working copy of instance data, runs the full r
 public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Atomically updates editable fields. For **stateful** precepts, only fields declared in an `in <State> edit` block for the current state are mutable. For **stateless** precepts, only fields declared in a root-level `edit` block are mutable (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
+Atomically updates editable fields. For **stateful** precepts, only fields granted by the effective edit set for the current state are mutable: unconditional `in <State> edit` declarations plus any guarded edit blocks whose guards pass. For **stateless** precepts, only fields granted by the effective root-level edit set are mutable: unconditional root-level `edit` declarations plus guarded root-level `edit ... when ...` / `edit all when ...` blocks whose guards pass (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → rule/state-ensure evaluation → commit or rollback. Returns `UpdateResult`.
 
 ### `Fire`
 
@@ -162,19 +162,25 @@ Mutating event execution. Returns `FireResult`.
 
 1. **Compatibility check** — same as `CheckCompatibility`; returns `Undefined` if incompatible.
 2. **Event argument validation** — validates types against the event's argument contract; returns `Rejected` on unknown keys or wrong types.
-3. **Event rules** — evaluated against event-argument-only context (field data does not shadow args); returns `Rejected` on violation.
+3. **Event ensures** — evaluated against event-argument-only context (field data does not shadow args); returns `Rejected` on violation.
 4. **`when` precondition** — if present and false, returns `Unmatched`.
 5. **Guard evaluation** — evaluates ordered `if`/`else if`/`else` clauses; returns `Rejected` if all guards fail.
 6. **`set` assignments** — executed on a working copy of instance data; returns `Rejected` if an expression fails or the result violates a field's declared type.
 7. **Collection mutations** — `add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear` operations on working copies.
-8. **Field and top-level rules** — checked against post-`set` working data; returns `Rejected` if violated.
-9. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
+8. **Derived field recomputation** — re-evaluates all computed fields in dependency order against post-mutation data. Computed values are current before validation.
+9. **Field and top-level rules** — checked against post-mutation working data (including recomputed derived fields); returns `ConstraintFailure` if violated.
+10. **State ensures** — checked against the resulting state. Cross-state `transition` outcomes evaluate `from <Source>`, `to <Target>`, and `in <Target>` ensures; `no transition` outcomes evaluate only `in <CurrentState>` ensures. Returns `ConstraintFailure` if violated.
 
-On any rejection, the original instance is unchanged — all stages are fully rolled back.
+**`when` guard evaluation on declarations:**
+- **Event ensures (stage 3):** If an event ensure has a `when` guard, the guard is evaluated against event args before the ensure body. If the guard is false, that ensure is skipped. Guards on event ensures are arg-scoped only.
+- **Rules and state ensures (stage 9–10):** If a rule or state ensure has a `when` guard, the guard is evaluated against post-mutation field data before the declaration body. If the guard is false, that declaration is skipped. Collect-all semantics are preserved — guard-skipped declarations don’t short-circuit other declarations.
+- **Edit blocks (`Update`/`Inspect`):** If an edit declaration has a `when` guard, the guard is evaluated against current instance data at each `Update`/`Inspect` call. Fail-closed: guard evaluation error → field not granted editability.
+
+On any failure outcome, the original instance is unchanged — all stages are fully rolled back.
 
 On success, returns `FireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.
 
-`no transition` outcomes execute `set` and collection mutations but do **not** trigger state rules.
+`no transition` outcomes execute `set` and collection mutations, skip entry/exit actions, and still evaluate `in <CurrentState>` ensures before commit.
 
 ### `CheckCompatibility`
 
@@ -187,7 +193,7 @@ Validates that an externally loaded or deserialized instance is compatible with 
 1. `WorkflowName` matches `Name`.
 2. For stateful precepts: `CurrentState` is a known declared state. For stateless precepts: `CurrentState` must be `null`.
 3. `InstanceData` satisfies the field type contract (no unknown fields with wrong types).
-4. All data rules (field rules + top-level rules) and the current state's entry rules pass.
+4. All data rules (field rules + top-level rules) and the current state's `in` ensures pass.
 
 Returns `PreceptCompatibilityResult(IsCompatible, Reason?)`. If `IsCompatible` is false, `Reason` contains a human-readable explanation.
 
@@ -218,7 +224,7 @@ Call this on arguments obtained from JSON deserialization (e.g. CLI input or HTT
 ```csharp
 public sealed record PreceptInstance(
     string WorkflowName,
-    string CurrentState,
+    string? CurrentState,
     string? LastEvent,
     DateTimeOffset UpdatedAt,
     IReadOnlyDictionary<string, object?> InstanceData)
@@ -258,15 +264,15 @@ There are no `__collection__` prefix keys in instances returned by the engine. T
 ```csharp
 public enum TransitionOutcome
 {
+    // Failure
+    Undefined,           // Event or state is unknown to the engine
+    Unmatched,           // All when-guards failed, no row matched
+    Rejected,            // Explicit reject outcome in transition row
+    ConstraintFailure,   // Post-mutation rule or state ensure violation
+
     // Success
     Transition,          // Event fired; state changed to TargetState / NewState
-    NoTransition,        // 'no transition' outcome; state unchanged, data may change
-
-    // Failure
-    Rejected,            // Explicit reject outcome in transition row
-    ConstraintFailure,   // Invariant or state assert violated post-mutation
-    Unmatched,           // All when-guards failed, no row matched
-    Undefined            // Event or state is unknown to the engine
+    NoTransition         // 'no transition' outcome; state unchanged, data may change
 }
 ```
 
@@ -298,7 +304,7 @@ public sealed record InspectionResult(
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null)
 ```
 
-Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `CurrentState` is `null` for stateless instances. `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the effective editable field set for the current state.
+Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `CurrentState` is `null` for stateless instances. `EditableFields` is `null` when the engine has no edit declarations, an empty list when edit declarations exist but none are currently effective, or the effective editable field set for the current state/root context after guarded edit blocks are evaluated against the current data.
 
 ### `PreceptEditableFieldInfo`
 
@@ -413,7 +419,7 @@ else
         Console.WriteLine(v.Message);
 }
 
-// 6. Direct field editing (for fields declared with `in <State> edit`)
+// 6. Direct field editing (for fields granted by state-scoped `in <State> edit` or stateless root-level `edit`)
 var editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer called back")
     .Set("Priority", 1.0));
@@ -430,25 +436,26 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 
 | Type | Description |
 |------|-------------|
-| `PreceptDefinition` | Root record — name, states, events, transition rows, fields, invariants, asserts |
+| `PreceptDefinition` | Root record — name, states, events, transition rows, fields, rules, ensures |
 | `PreceptState` | State declaration |
 | `PreceptEvent` | Event with argument contract |
 | `PreceptEventArg` | One typed argument: name, `PreceptScalarType`, nullability, optional default |
-| `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default |
+| `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default, optional derived expression (`IsComputed`, `DerivedExpression`, `DerivedExpressionText`) |
 | `PreceptCollectionField` | One collection field: name, `PreceptCollectionKind`, `PreceptScalarType` inner type |
-| `PreceptInvariant` | A global data rule: `invariant <expr> because "reason"` — always holds |
-| `StateAssertion` | A state-scoped assert: `in/to/from <State> assert <expr> because "reason"` |
-| `EventAssertion` | An event-scoped arg validator: `on <Event> assert <expr> because "reason"` |
+| `PreceptRule` | A global data rule: `rule <expr> because "reason"` — always holds |
+| `StateEnsure` | A state-scoped ensure: `in/to/from <State> ensure <expr> because "reason"` |
+| `EventEnsure` | An event-scoped arg validator: `on <Event> ensure <expr> because "reason"` |
 | `PreceptTransitionRow` | One flat transition row: `from <State> on <Event> [when <expr>] → <outcome>` |
 | `StateTransition` | Row outcome: `transition <State>` |
 | `Rejection` | Row outcome: `reject "<message>"` |
 | `NoTransition` | Row outcome: `no transition` |
-| `PreceptEditBlock` | Editable field declaration: `in <State> edit <Field>, ...` |
+| `PreceptEditBlock` | Editable field declaration: state-scoped `in <State> [when <Guard>] edit <Field>, ...` or stateless root-level `edit <Field>, ... [when <Guard>]` |
+| `PreceptStateAction` | State entry/exit action: `to <State> ->` or `from <State> ->` automatic mutations |
 
 ### Scalar and Collection Enums
 
 ```csharp
-public enum PreceptScalarType  { String, Number, Boolean, Null }
+public enum PreceptScalarType  { String, Number, Boolean, Null, Integer, Decimal, Choice }
 public enum PreceptCollectionKind { Set, Queue, Stack }
 ```
 
@@ -460,8 +467,10 @@ Guard predicates and rule expressions are pre-parsed at compile time into a `Pre
 |-----------|-----------|
 | `PreceptLiteralExpression` | `true`, `false`, `null`, string literal, number literal |
 | `PreceptIdentifierExpression` | bare field/arg name, or dotted `EventName.ArgKey` form |
-| `PreceptUnaryExpression` | `!` operator |
-| `PreceptBinaryExpression` | `&&`, `\|\|`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/` |
+| `PreceptUnaryExpression` | `not` operator |
+| `PreceptBinaryExpression` | `and`, `or`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/`, `contains` |
 | `PreceptParenthesizedExpression` | `( … )` grouping |
+| `PreceptFunctionCallExpression` | Built-in function calls: `round()`, `abs()`, `pow()`, `sqrt()`, etc. |
+| `PreceptConditionalExpression` | `if ... then ... else` conditional expressions |
 
-The AST is evaluated by `PreceptExpressionRuntimeEvaluator` (internal). Callers never need to evaluate the AST directly.
+The AST is evaluated by `PreceptExpressionEvaluator` (internal). Callers never need to evaluate the AST directly.

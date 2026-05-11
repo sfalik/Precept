@@ -100,7 +100,7 @@ public class UpdateToolTests
         var text = """
             precept Test
             field Priority as number default 5
-            invariant Priority >= 1 because "Priority must be positive"
+            rule Priority >= 1 because "Priority must be positive"
             state Open initial
             in Open edit Priority
             """;
@@ -125,6 +125,62 @@ public class UpdateToolTests
         };
 
         var result = UpdateTool.Update(text, "Open", null, fields);
+
+        result.Error.Should().BeNull();
+        result.Outcome.Should().Be("UneditableField");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Computed fields (issue #17)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ComputedFieldInPatch_ReturnsInvalidInputError()
+    {
+        var text = """
+            precept Test
+            field A as number default 1
+            field B as number default 2
+            field Total as number -> A + B
+            state Open initial
+            in Open edit A, B
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = UpdateTool.Update(text, "Open", null,
+            new Dictionary<string, object?> { ["Total"] = 99.0 });
+
+        result.Error.Should().BeNull();
+        result.Outcome.Should().Be("InvalidInput");
+        result.Violations.Should().NotBeEmpty();
+        result.Violations[0].Message.Should().Contain("computed field");
+    }
+
+    [Fact]
+    public void Update_UnknownFieldInPatch_ReturnsUneditableOutcome()
+    {
+        // Fields not declared or not listed in edit are uneditable.
+        var text = """
+            precept Test
+            field Name as string default "init"
+            state Open initial
+            in Open edit Name
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Name"] = "hello"
+        };
+
+        var fields = new Dictionary<string, object?>
+        {
+            ["NonExistentField"] = "value"
+        };
+
+        var result = UpdateTool.Update(text, "Open", data, fields);
 
         result.Error.Should().BeNull();
         result.Outcome.Should().Be("UneditableField");

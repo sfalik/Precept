@@ -1,0 +1,21 @@
+# Demonstrates: C96 — vacuous rules already guaranteed by field constraints
+
+# This file covers lower-bound, upper-bound, and positive-constraint vacuity.
+
+precept VacuousRulesDemo
+
+field Limit as number default 50 min 1 max 100
+field Rate as number default 5 positive
+field Window as number default 10 min 0 max 10
+
+# C96: Limit is already constrained above zero.
+# EXPECT: C96 | severity=warning | match=exact | message=Rule 'Limit >= 0' is vacuous — field 'Limit' constraints already guarantee this (field constrained to 1 to 100 (inclusive), rule requires 0 or greater). | line=13 | start=0 | end=0
+rule Limit >= 0 because "Limit must be non-negative"
+
+# C96: Rate is already constrained to be strictly positive.
+# EXPECT: C96 | severity=warning | match=exact | message=Rule 'Rate > 0' is vacuous — field 'Rate' constraints already guarantee this (field constrained to always greater than 0, rule requires always greater than 0). | line=17 | start=0 | end=0
+rule Rate > 0 because "Rate must be positive"
+
+# C96: Window is already capped at 10.
+# EXPECT: C96 | severity=warning | match=exact | message=Rule 'Window <= 10' is vacuous — field 'Window' constraints already guarantee this (field constrained to 0 to 10 (inclusive), rule requires 10 or less). | line=21 | start=0 | end=0
+rule Window <= 10 because "Window must stay at or below ten"

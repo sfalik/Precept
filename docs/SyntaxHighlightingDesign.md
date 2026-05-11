@@ -21,20 +21,21 @@ Background: `#0c0c0f`
 
 | # | Family | Hex | Typography | Tokens |
 |---|--------|-----|------------|--------|
-| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `state`, `event`, `invariant`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `assert`, `reject`, `when`, `no` |
-| 2 | Structure · Grammar | `#6366F1` | normal | `as`, `with`, `default`, `nullable`, `any`, `of`, `into`, `because`, `initial`, `=`, `->`, operators, punctuation |
-| 3 | States | `#A898F5` | normal / *italic if constrained* | State names |
-| 4 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
-| 5 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
-| 6 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, `set`, `queue`, `stack` |
-| 7 | Data · Values | `#84929F` | normal | `true`, `false`, `null`, string literals, number literals |
-| 8 | Rules · Messages | `#FBBF24` | normal | String content in `because` / `reject`, and the precept name |
+| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `as`, `nullable`, `default`, `state`, `initial`, `event`, `with`, `edit`, `in`, `to`, `from`, `on`, `when`, `if`, `then`, `else`, `any`, `all`, `of`, `into`, `set`, `transition`, `reject`, `no`, `rule`, `ensure` |
+| 2 | Operators · Punctuation | `#6366F1` | normal | `=`, `->`, operators, all punctuation (parens, commas, dots) |
+| 3 | Contract Identity | `#A5B4FC` | normal | Precept name |
+| 4 | States | `#A898F5` | normal / *italic if constrained* | State names |
+| 5 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
+| 6 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
+| 7 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
+| 8 | Data · Values | `#84929F` | normal | `true`, `false`, `null`, string literals, number literals |
+| 9 | Constraint · Messages | `#FBBF24` | normal | constraint keywords (`nonnegative`, `positive`, `min`, `max`, etc.), string content in `because` / `reject` |
 
 Verdict colors (`#34D399` enabled, `#F87171` blocked, `#FDE047` warning) are runtime-only — never in syntax highlighting.
 
 ## Current Implementation Pipeline
 
-Three layers produce highlighting today. None currently apply custom colors — all colors inherit from the active VS Code theme.
+Three layers produce highlighting today. Semantic tokens drive the compiler-aware categorization, TextMate provides the immediate fallback, and `package.json` binds both to the locked palette through Precept-owned scopes.
 
 ### Layer 1: TextMate Grammar (static, regex-based)
 
@@ -47,15 +48,17 @@ Current scope assignments:
 | Token class | TextMate scope |
 |-------------|---------------|
 | Control keywords | `keyword.control.precept` |
+| Grammar keywords (`rule`, `ensure`) | `keyword.other.precept` (same as declaration keywords — bold indigo) |
 | Declaration keywords | `keyword.other.precept` |
 | Action keywords | `keyword.other.precept` |
+| Constraint keywords | `keyword.other.constraint.precept` |
 | Type keywords | `storage.type.precept` |
 | State names | `entity.name.type.state.precept` |
 | Event names | `entity.name.function.event.precept` |
 | Field names | `variable.other.field.precept` |
 | Event arg refs | `variable.other.property.precept` |
 | Operators | `keyword.operator.{comparison,logical,arithmetic,assignment}.precept` |
-| Arrow | `punctuation.separator.arrow.precept` |
+| Punctuation | `punctuation.separator.arrow.precept`, `punctuation.separator.comma.precept`, `punctuation.accessor.precept`, `punctuation.section.group.{begin,end}.precept` |
 | Literals | `constant.language.precept` / `constant.numeric.precept` |
 | Strings | `string.quoted.double.precept` |
 | Comments | `comment.line.number-sign.precept` |
@@ -69,31 +72,40 @@ The language server tokenizes `.precept` source and emits LSP semantic tokens. W
 Current legend:
 
 ```
-TokenTypes:    keyword, type, function, variable, number, string, operator, comment, preceptComment, ...custom Precept types
-TokenModifiers: (none)
+TokenTypes:    keyword, type, function, variable, number, string, operator, comment,
+               preceptComment, preceptKeywordSemantic, preceptKeywordGrammar,
+               preceptState, preceptEvent, preceptFieldName, preceptName,
+               preceptType, preceptValue, preceptMessage
+TokenModifiers: preceptConstrained
 ```
 
 Current classification:
 
 | `TokenCategory` | Semantic type | Tokens |
 |------------------|---------------|--------|
-| Control | `keyword` | `state`, `from`, `on`, `initial`, `when`, `if`, `else`, `in`, `to`, `any`, `of` |
-| Declaration | `keyword` | `precept`, `field`, `event`, `as`, `with`, `assert`, `because`, `nullable`, `default`, `invariant`, `edit` |
-| Action | `keyword` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`, `contains` |
-| Outcome | `keyword` | `transition`, `reject`, `no` |
-| Type | `type` | `string`, `number`, `boolean`, `set`, `queue`, `stack` |
-| Literal | `keyword` | `true`, `false`, `null` |
-| Operator | `operator` | All comparison, logical, arithmetic, assignment operators |
+| Control | `preceptKeywordSemantic` | `when`, `if`, `then`, `else` |
+| Declaration | `preceptKeywordSemantic` | `precept`, `field`, `state`, `event`, `edit`, `in`, `to`, `from`, `on`, `with`, `default`, `nullable`, `because`, `initial`, `any`, `all`, `of`, `into` |
+| Action | `preceptKeywordSemantic` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
+| Outcome | `preceptKeywordSemantic` | `transition`, `reject`, `no` |
+| Grammar | `preceptKeywordSemantic` | `rule`, `ensure` |
+| Constraint | `preceptKeywordGrammar` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
+| Type | `preceptType` | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
+| Literal | `preceptValue` | `true`, `false`, `null` |
+| Operator | `operator` | All comparison, logical, arithmetic, assignment, and `contains` operators |
+| Punctuation | `operator` | All punctuation (`->`, `,`, `.`, `(`, `)`, `{`, `}`) |
+
+Grammar tokens (`rule`, `ensure`) map to `preceptKeywordSemantic` — the same bold indigo lane as other structural keywords. They are declaration-anchoring keywords that introduce constraint blocks, not constraint modifiers themselves. Constraint tokens (`nonnegative`, `positive`, etc.) map to `preceptKeywordGrammar` — the gold lane shared with reason text. This separation reflects the distinction between *declaring* a rule and *modifying* a field with a constraint.
 
 Identifier classification (context-aware via `ClassifyIdentifier()`):
 
 | Context | Semantic type | Example |
 |---------|---------------|---------|
-| After `precept`, `from`, `state`, `transition`, `in`, `to` | `type` | state names |
-| After `event`, `on` | `function` | event names |
-| After `field`, `set`, `add`, `remove`, etc. | `variable` | field names |
-| After `.` | `variable` | member access |
-| Default | `variable` | bare identifiers |
+| After `state`, `transition`, `in`, `to` | `preceptState` | state names |
+| After `event`, `on` | `preceptEvent` | event names |
+| After `field`, `set`, `add`, `remove`, etc. | `preceptFieldName` | field names |
+| After `precept` | `preceptName` | precept name |
+| After `.` | `preceptFieldName` | member access |
+| Default | `preceptFieldName` | bare identifiers |
 
 ### Layer 3: VS Code Color Mapping
 
@@ -103,9 +115,9 @@ Currently: `"semanticHighlighting": true` is set, custom semantic token types/mo
 
 ## Design: Mapping the 8-Shade Palette to the Pipeline
 
-### Problem
+### Why The Split Was Needed
 
-The current pipeline classifies tokens into generic LSP semantic types (`keyword`, `type`, `function`, `variable`). These collapse all keywords to one color, all identifiers to another. The locked design requires 8 distinct shades plus italic/bold modifiers — far more granularity than the current generic types provide.
+The earlier pipeline classified tokens into generic LSP semantic types (`keyword`, `type`, `function`, `variable`). Those generic buckets collapsed all keywords to one color and all identifiers to another. The locked design required 8 distinct shades plus italic/bold modifiers, which is why the semantic-token split was introduced.
 
 ### Strategy
 
@@ -115,11 +127,11 @@ The current pipeline classifies tokens into generic LSP semantic types (`keyword
 
 **`semanticTokenScopes` + Precept-owned TextMate scopes as the color lock.** The language server still emits custom semantic token types, but when no theme provides semantic token color rules, VS Code intentionally falls back through the semantic token scope map. By mapping custom semantic tokens to Precept-specific TextMate scopes, then binding those scopes in `editor.tokenColorCustomizations`, the extension gets stable colors without bundling a dedicated theme.
 
-### Required Changes
+### Implemented Changes
 
 #### A. Language Server — New Token Types and Modifiers
 
-**Current legend expansion needed.** The generic `keyword` type must split into types that the `package.json` color map can target independently. There are two approaches:
+**Implemented legend split.** The generic `keyword` bucket was split into types that the `package.json` color map can target independently. Two approaches were considered:
 
 **Option 1 — Custom semantic token types.** Register Precept-specific token types in the legend:
 
@@ -134,6 +146,7 @@ TokenTypes = new Container<SemanticTokenType>(
     "preceptState",              // States
     "preceptEvent",              // Events
     "preceptFieldName",          // Data · Names
+    "preceptName",               // Contract Identity
     "preceptType",               // Data · Types
     "preceptValue",              // Data · Values
     "preceptMessage"             // Rules · Messages
@@ -158,9 +171,10 @@ Then in `package.json`, declare each custom type and map it to Precept-specific 
       "preceptEvent.preceptConstrained": ["entity.name.function.event.constrained.precept"],
       "preceptFieldName": ["variable.other.field.precept"],
       "preceptFieldName.preceptConstrained": ["variable.other.field.constrained.precept"],
+      "preceptName": ["entity.name.type.precept.precept"],
       "preceptType": ["storage.type.precept"],
       "preceptValue": ["constant.other.value.precept"],
-      "preceptMessage": ["entity.name.precept.message.precept", "string.quoted.double.message.precept"]
+      "preceptMessage": ["string.quoted.double.message.precept"]
     }
   }
 ]
@@ -191,21 +205,16 @@ Then the `package.json` rules would use `keyword:declaration` for semantic and `
 
 #### B. `TokenCategory` Refactor and `BuildSemanticTypeMap()` Reclassification
 
-**✅ Decided: Add `Grammar` category to `PreceptToken.cs`.** The semantic/grammar split is a first-class DSL concept, not just a visual hack. The `precept_language` MCP tool will surface it automatically.
+**✅ Implemented: Add `Grammar` category to `PreceptToken.cs`.** The semantic/grammar split is a first-class DSL concept, not just a visual hack. The `precept_language` MCP tool surfaces it automatically.
 
-**Token moves (8 tokens change category):**
+**Grammar keyword realignment (locked):**
 
-| Token | Old category | New category | Rationale |
-|-------|-------------|-------------|-----------|
-| `as` | Declaration | **Grammar** | Type annotation glue |
-| `with` | Declaration | **Grammar** | Argument list introducer |
-| `nullable` | Declaration | **Grammar** | Type modifier |
-| `default` | Declaration | **Grammar** | Value modifier — lighter weight than behavioral drivers |
-| `because` | Declaration | **Grammar** | Links reject/assert to message string |
-| `any` | Control | **Grammar** | Wildcard modifier, not flow control |
-| `of` | Control | **Grammar** | Type connector ("set of string") |
-| `into` | Action | **Grammar** | Capture preposition, connective role |
-| `initial` | Control | **Grammar** | State modifier — lighter weight, same as `nullable`/`default` |
+| Token | Category | Rationale |
+|-------|----------|-----------|
+| `rule` | **Grammar** | Bold indigo — declaration-anchoring keyword for timeless constraint blocks, same lane as `state`, `event`, `field` |
+| `ensure` | **Grammar** | Bold indigo — declaration-anchoring keyword for temporal constraint blocks, same lane as `state`, `event`, `field` |
+
+**Declaration / control split (implemented):** connective and modifier keywords such as `as`, `with`, `nullable`, `default`, `because`, `initial`, `any`, `all`, `of`, and `into` remain `Declaration` tokens and therefore stay in the semantic keyword family. `Control` is reserved for actual flow-control keywords: `when`, `if`, `then`, and `else`.
 
 **`BuildSemanticTypeMap()` reclassification:**
 
@@ -215,11 +224,12 @@ Then the `package.json` rules would use `keyword:declaration` for semantic and `
 | Declaration | `keyword` → `preceptKeywordSemantic` |
 | Action | `keyword` → `preceptKeywordSemantic` |
 | Outcome | `keyword` → `preceptKeywordSemantic` |
-| Grammar | *(new)* → `preceptKeywordGrammar` |
+| Grammar | *(new)* → `preceptKeywordSemantic` |
+| Constraint | `keyword` → `preceptKeywordGrammar` |
 | Type | `type` → `preceptType` |
 | Literal | `keyword` → `preceptValue` |
-| Operator | `operator` → `preceptKeywordGrammar` |
-| Punctuation (Arrow) | `operator` → `preceptKeywordGrammar` |
+| Operator | `operator` → `operator` |
+| Punctuation | `operator` → `operator` (all punctuation, not just Arrow) |
 
 Every category now maps to exactly one shade — no per-token overrides needed.
 
@@ -227,7 +237,7 @@ Every category now maps to exactly one shade — no per-token overrides needed.
 
 | File | Change |
 |------|--------|
-| `PreceptToken.cs` | Add `Grammar` to enum, re-tag 9 tokens |
+| `PreceptToken.cs` | Add `Grammar` to enum, re-tag grammar keywords and statement-anchor keywords |
 | `PreceptSemanticTokensHandler.cs` | Add `Grammar` case in `BuildSemanticTypeMap()` switch |
 | `LanguageTool.cs` + `VocabularyDto` | Add `grammarKeywords` list + `case TokenCategory.Grammar` |
 | `CatalogDriftTests.cs` | Add `TokenCategory.Grammar` to `needsSymbol` list |
@@ -244,7 +254,7 @@ Every category now maps to exactly one shade — no per-token overrides needed.
 | After state-context tokens | `type` → `preceptState` |
 | After event-context tokens | `function` → `preceptEvent` |
 | After field-context tokens | `variable` → `preceptFieldName` |
-| After `precept` | `type` → **`preceptMessage`** (gold — the contract identity) |
+| After `precept` | `type` → **`preceptName`** (`#A5B4FC` contract identity lane) |
 | After `.` | `variable` → `preceptFieldName` (member access) |
 | Default (bare identifier) | `variable` → `preceptFieldName` |
 
@@ -256,15 +266,17 @@ This is new capability. The handler must determine which states, events, and fie
 
 **Required analysis (performed once per document):**
 
-1. **Constrained states:** Collect all state names that appear in `in <State> assert`, `to <State> assert`, or `from <State> assert` blocks.
-2. **Constrained events:** Collect all event names that have `on <Event> assert` blocks.
-3. **Guarded fields:** Collect all field names referenced in `invariant` expressions.
+1. **Constrained states:** Collect all state names that appear in `in <State> ensure`, `to <State> ensure`, or `from <State> ensure` blocks.
+2. **Constrained events:** Collect all event names that have `on <Event> ensure` blocks.
+3. **Guarded fields:** Collect all field names referenced in `rule` expressions.
 
 **Implementation approach:** Before the per-token loop, extract constraint sets from the analyzer's `PreceptDefinition` for the document, building three `HashSet<string>` collections: `constrainedStates`, `constrainedEvents`, `guardedFields`. Then during token emission, when an identifier is classified as `preceptState`/`preceptEvent`/`preceptFieldName`, check membership and add the modifier. If the parse is incomplete or failed, skip italic entirely (fail open).
 
 #### E. Extension `package.json` — Type Declarations, `semanticTokenScopes`, and Fallback Scope Rules
 
 **✅ Decided.** Mechanical — follows directly from A and B. Comments are scanned from raw text and emitted as a Precept-specific semantic token (`preceptComment`). In practice, many themes still define aggressive styling for the standard semantic selector `comment`, so the extension also ships a targeted semantic token color override for `preceptComment` and `comment:precept` to force the Precept comment color to win.
+
+Similarly, `preceptMessage` (rule/rejection message strings) and `preceptName` (the precept declaration name) each get direct semantic color overrides. The scope-map fallback for `preceptMessage` resolves through `string.quoted.double.message.precept`, while `preceptName` resolves through `entity.name.type.precept.precept`, so both colors remain stable even when a theme contributes generic string or name styling.
 
 Add the custom semantic token type contributions, semantic-token-to-scope mappings, and Precept-owned fallback scope rules:
 
@@ -273,16 +285,17 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
   "semanticTokenTypes": [
     { "id": "preceptComment",         "description": "Precept comment" },
     { "id": "preceptKeywordSemantic", "description": "Precept behavioral structure keyword" },
-    { "id": "preceptKeywordGrammar",  "description": "Precept connective grammar keyword" },
+    { "id": "preceptKeywordGrammar",  "description": "Precept constraint keyword" },
     { "id": "preceptState",           "description": "Precept state name" },
     { "id": "preceptEvent",           "description": "Precept event name" },
     { "id": "preceptFieldName",       "description": "Precept field or argument name" },
+    { "id": "preceptName",            "description": "Precept declaration name" },
     { "id": "preceptType",            "description": "Precept type keyword" },
     { "id": "preceptValue",           "description": "Precept literal value" },
     { "id": "preceptMessage",         "description": "Precept rule message string" }
   ],
   "semanticTokenModifiers": [
-    { "id": "preceptConstrained", "description": "Token is under constraint/invariant pressure" }
+    { "id": "preceptConstrained", "description": "Token is under constraint/rule pressure" }
   ],
   "semanticTokenScopes": [
     {
@@ -297,9 +310,10 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
         "preceptEvent.preceptConstrained": ["entity.name.function.event.constrained.precept"],
         "preceptFieldName": ["variable.other.field.precept"],
         "preceptFieldName.preceptConstrained": ["variable.other.field.constrained.precept"],
+        "preceptName": ["entity.name.type.precept.precept"],
         "preceptType": ["storage.type.precept"],
         "preceptValue": ["constant.other.value.precept"],
-        "preceptMessage": ["entity.name.precept.message.precept", "string.quoted.double.message.precept"]
+        "preceptMessage": ["string.quoted.double.message.precept"]
       }
     }
   ],
@@ -308,23 +322,26 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
     "editor.semanticTokenColorCustomizations": {
       "rules": {
         "preceptComment": { "foreground": "#9096A6", "italic": true },
-        "comment:precept": { "foreground": "#9096A6", "italic": true }
+        "comment:precept": { "foreground": "#9096A6", "italic": true },
+        "operator:precept": { "foreground": "#6366F1" },
+        "preceptName": { "foreground": "#A5B4FC" },
+        "preceptMessage": { "foreground": "#FBBF24" },
+        "preceptKeywordGrammar": { "foreground": "#FBBF24" }
       }
     },
     "editor.tokenColorCustomizations": {
       "[*]": {
         "textMateRules": [
           { "scope": "keyword.other.semantic.precept",              "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
-          { "scope": "keyword.other.grammar.precept",               "settings": { "foreground": "#6366F1" } },
           { "scope": "entity.name.type.state.precept",              "settings": { "foreground": "#A898F5" } },
           { "scope": "entity.name.type.state.constrained.precept",  "settings": { "foreground": "#A898F5", "fontStyle": "italic" } },
           { "scope": "entity.name.function.event.precept",          "settings": { "foreground": "#30B8E8" } },
           { "scope": "entity.name.function.event.constrained.precept", "settings": { "foreground": "#30B8E8", "fontStyle": "italic" } },
           { "scope": "variable.other.field.precept",                "settings": { "foreground": "#B0BEC5" } },
           { "scope": "variable.other.field.constrained.precept",    "settings": { "foreground": "#B0BEC5", "fontStyle": "italic" } },
+          { "scope": "entity.name.type.precept.precept",            "settings": { "foreground": "#A5B4FC" } },
           { "scope": "storage.type.precept",                        "settings": { "foreground": "#9AA8B5" } },
           { "scope": "constant.other.value.precept",                "settings": { "foreground": "#84929F" } },
-          { "scope": "entity.name.precept.message.precept",         "settings": { "foreground": "#FBBF24" } },
           { "scope": "string.quoted.double.message.precept",        "settings": { "foreground": "#FBBF24" } }
         ]
       }
@@ -335,7 +352,7 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
 
 #### F. TextMate Grammar — Fallback Color Anchoring
 
-**✅ Decided.** Strings default to slate (Data · Values) in generic fallback, but dedicated message-string scopes (`string.quoted.double.message.precept`) and the dedicated precept-name scope (`entity.name.precept.message.precept`) are colored gold immediately. This keeps the two most important Rules · Messages cases correct even when VS Code is rendering through the semantic-token scope map fallback.
+**✅ Decided.** Strings default to slate (Data · Values) in generic fallback, but dedicated message-string scopes (`string.quoted.double.message.precept`) stay gold and the dedicated precept-name scope (`entity.name.type.precept.precept`) stays `#A5B4FC`. This keeps both the contract identity and rule-message cases correct even when VS Code is rendering through the semantic-token scope map fallback.
 
 The TextMate grammar already assigns specific scopes. To lock fallback colors before the language server loads, add `tokenColorCustomizations` in `configurationDefaults`:
 
@@ -344,6 +361,7 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
   "[*]": {
     "textMateRules": [
       { "scope": "keyword.control.precept",                "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+      { "scope": "keyword.other.constraint.precept",      "settings": { "foreground": "#6366F1" } },
       { "scope": "keyword.other.precept",                  "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
       { "scope": "entity.name.type.state.precept",         "settings": { "foreground": "#A898F5" } },
       { "scope": "entity.name.function.event.precept",     "settings": { "foreground": "#30B8E8" } },
@@ -367,7 +385,7 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
 }
 ```
 
-**Note:** TextMate cannot distinguish Structure · Semantic from Structure · Grammar for keywords that share the `keyword.other.precept` scope. This is a known limitation — the semantic tokens layer handles the split when the language server is active. For the TextMate fallback, all keywords get Structure · Semantic (`#4338CA` bold) as the safer default. Grammar-role keywords (`as`, `with`, `default`, etc.) will briefly appear bold until semantic tokens load and correct them. This could be improved by splitting `keyword.other.precept` into dedicated scopes for grammar keywords. Comments are the exception to the pure scope-map path: they also get a targeted semantic override because themes commonly hard-style the standard `comment` semantic selector.
+**Note:** The TextMate grammar assigns grammar-role keywords (`rule`, `ensure`) to `keyword.other.precept` — the same scope as declaration keywords — so cold-start fallback renders them in bold indigo. Constraint keywords use `keyword.other.constraint.precept` for the gold treatment. Bracket pair colorization is disabled for `.precept` files via `"colorizedBracketPairs": []` in `language-configuration.json`, ensuring semantic token colors for parentheses and other punctuation are not overridden by the bracket colorizer. Comments remain the exception to the pure scope-map path: they also get a targeted semantic override because themes commonly hard-style the standard `comment` semantic selector.
 
 #### G. String Literal Context — Messages vs. Plain Strings
 
@@ -399,9 +417,9 @@ Italic requires knowing which states/events/fields are constrained. This depends
 
 VS Code semantic token rules support `"bold": true` in `settings.json` / `configurationDefaults`, but this is applied via CSS `font-weight`. The actual rendering depends on whether the editor font has a bold variant. Cascadia Cove (the brand font) has a usable weight range for this, so bold will render correctly when that family is available. For users with other fonts, bold is best-effort. **Decision:** Acceptable — bold is a brand signal, not a correctness requirement.
 
-### R5: TextMate keyword scope granularity — ✅ Accepted
+### R5: TextMate keyword scope granularity — ✅ Resolved
 
-The current grammar uses `keyword.other.precept` for both semantic and grammar keywords. Until Phase 8, TextMate fallback cannot distinguish Structure · Semantic (bold `#4338CA`) from Structure · Grammar (normal `#6366F1`). All keywords will appear as `#4338CA` bold in the 1–2 second cold-start window before semantic tokens load. **Decision:** Acceptable for v1. Phase 8 can add `keyword.other.grammar.precept` later if the flash is noticeable.
+The grammar assigns grammar-role keywords (`rule`, `ensure`) to `keyword.other.precept` — the same scope as declaration keywords — so cold-start fallback renders them in bold indigo. Constraint keywords use `keyword.other.constraint.precept` for the gold treatment. **Decision:** Keep the scope assignments in sync with the semantic token mapping: Grammar → `preceptKeywordSemantic` (bold indigo), Constraint → `preceptKeywordGrammar` (gold).
 
 ### R6: Dual-category tokens — ✅ Accepted
 

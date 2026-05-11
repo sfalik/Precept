@@ -73,11 +73,11 @@ For `.precept` editor highlighting, the locked direction is a dark-mode-only 8-s
 
 | Family | Hex | Typography | Locked role |
 |--------|-----|------------|-------------|
-| Structure · Semantic | `#4338CA` | bold | `precept`, `field`, `state`, `event`, `invariant`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `assert`, `reject`, `when`, `no` |
+| Structure · Semantic | `#4338CA` | bold | `precept`, `field`, `state`, `event`, `rule`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `ensure`, `reject`, `when`, `no` |
 | Structure · Grammar | `#6366F1` | normal | `as`, `with`, `default`, `nullable`, `any`, `of`, `into`, `because`, `=`, `->`, operators, punctuation glue |
-| States | `#A898F5` | normal / italic if constrained | State names; italic means the state participates in `in/to/from X assert` |
-| Events | `#30B8E8` | normal / italic if constrained | Event names; italic means the event has `on X assert` |
-| Data · Names | `#B0BEC5` | normal / italic if guarded | Field and argument names; italic means referenced by an `invariant` |
+| States | `#A898F5` | normal / italic if constrained | State names; italic means the state participates in `in/to/from X ensure` |
+| Events | `#30B8E8` | normal / italic if constrained | Event names; italic means the event has `on X ensure` |
+| Data · Names | `#B0BEC5` | normal / italic if guarded | Field and argument names; italic means referenced by a `rule` |
 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, collection types |
 | Data · Values | `#84929F` | normal | literals such as `true`, `false`, `null`, strings, and numbers |
 | Rules · Messages | `#FBBF24` | normal | human-readable message strings in `because` / `reject` |
@@ -87,14 +87,14 @@ Rule keywords do not use a separate gold keyword shade. They join Structure · S
 **Semantic color as brand.** Most tools pick colors for aesthetics, then assign meanings later. Precept's palette is the reverse — every color exists because the compiler knows something about the code and needs a way to say it. The system is organized along two dimensions:
 
 - **Dimension 1 — what kind of thing:** Structure, States, Events, and Data each get their own visual lane, so a line is scannable before it is read.
-- **Dimension 2 — constraint signal:** Italic means "this token is under rule pressure" — constrained states, constrained events, and invariant-guarded data names all use typography, not extra hues.
-- **Rules are mostly absorbed into structure** — `assert`, `reject`, `when`, and `no` are treated as semantic structure keywords. Gold is reserved for the human-readable message payload.
+- **Dimension 2 — constraint signal:** Italic means "this token is under rule pressure" — constrained states, constrained events, and rule-referenced data names all use typography, not extra hues.
+- **Rules are mostly absorbed into structure** — `rule`, `ensure`, `reject`, `when`, and `no` are treated as semantic structure keywords. Gold is reserved for the human-readable message payload.
 - **Verdicts remain runtime-only** — enabled / blocked / warning stay outside authoring-time syntax so green and red cannot be confused with static code meaning.
 
 **Typography as a second channel.** Color alone doesn't carry enough information when five hue families cluster in the cool hemisphere. Typography adds a second axis:
 
 - **Bold** — structure semantic keywords. Weight marks the DSL words that drive behavior.
-- **Italic** — constrained states, constrained events, and invariant-guarded data names.
+- **Italic** — constrained states, constrained events, and rule-referenced data names.
 - **Normal weight** — structure grammar, unconstrained actors, data types, data values, and rule messages.
 
 #### Structure · Indigo · 239–245°
@@ -103,7 +103,7 @@ Scaffolding and control. Two indigo shades split the words that drive behavior f
 
 | Shade | Hex | CR | Typography | Role | Keywords |
 |-------|-----|----|------------|------|----------|
-| Semantic | `#4338CA` | 2.5 | bold | Behavioral drivers | precept, field, state, event, invariant, from, on, in, to, set, transition, edit, assert, reject, when, no |
+| Semantic | `#4338CA` | 2.5 | bold | Behavioral drivers | precept, field, state, event, rule, from, on, in, to, set, transition, edit, ensure, reject, when, no |
 | Grammar | `#6366F1` | 4.4 | normal | Connective tissue | as, with, default, nullable, any, of, into, because, operators, punctuation glue, `->`, `=` |
 
 #### States · Violet · 260°
@@ -124,7 +124,7 @@ Verbs — what happens. Events keep a single cyan hue. Constraint presence is sh
 
 #### Data · Bright Slate · 215°
 
-Variables — what you know. Data splits into names, types, and values. Only names use italic, and only when guarded by invariants.
+Variables — what you know. Data splits into names, types, and values. Only names use italic, and only when referenced by rules.
 
 | Shade | Hex | CR | Typography | Role |
 |-------|-----|----|------------|------|
@@ -169,9 +169,9 @@ Constraint visibility is no longer expressed with extra hues. It is expressed th
 
 | Target | Signal | Detection |
 |--------|--------|-----------|
-| State names | Violet italic | State participates in `in/to/from X assert` |
-| Event names | Cyan italic | Event has `on X assert` |
-| Field / arg names | Slate italic | Name is referenced by an `invariant` |
+| State names | Violet italic | State participates in `in/to/from X ensure` |
+| Event names | Cyan italic | Event has `on X ensure` |
+| Field / arg names | Slate italic | Name is referenced by a `rule` |
 
 The rule is uniform: same hue means same category; italic means constrained.
 
@@ -214,7 +214,7 @@ Code:      precept LoanApplication  (Cascadia Cove 400-700, normal case)
 
 **Secondary visual surface**: State diagrams from the VS Code preview panel. The diagram uses the same hue families as syntax highlighting, but shape — not lifecycle tint — carries initial/final structure.
 
-**Constraint-aware semantic coloring**: Syntax highlighting uses one hue per category, with italic indicating constrained states/events and invariant-guarded names. This is automatic — no DSL annotation needed.
+**Constraint-aware semantic coloring**: Syntax highlighting uses one hue per category, with italic indicating constrained states/events and rule-referenced names. This is automatic — no DSL annotation needed.
 
 **The system**: Every color means something. Nothing is decorative. 8 authoring-time shades plus runtime verdict colors:
 - **Indigo** = structure semantic + structure grammar

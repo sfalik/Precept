@@ -37,3 +37,6 @@ tools/Precept.VsCode/server/
 .squad/sessions/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+
+# Private keys — never commit
+*.pem

@@ -21,7 +21,7 @@ Make the runtime the source of truth for "which constraint was violated and what
 
 ## Design Principles
 
-1. **The runtime reports the semantic subjects a violated rule is about, not just the literal tokens it mentions and not the operation inputs that happened to feed them.** Directly referenced stored fields remain targets. If a rule references a computed field, that computed field is also a target, and the runtime expands it transitively to the concrete stored fields it depends on. This broadens targeting from direct syntax to dependency-aware subject attribution while preserving the same non-goal as today: the runtime does not reverse-map through mutations or blame event arguments for a post-mutation field rule unless the rule itself is an event assertion.
+1. **The runtime reports the semantic subjects a violated rule is about, not just the literal tokens it mentions and not the operation inputs that happened to feed them.** Directly referenced stored fields remain targets. If a rule references a computed field, that computed field is also a target, and the runtime expands it transitively to the concrete stored fields it depends on. This broadens targeting from direct syntax to dependency-aware subject attribution while preserving the same non-goal as today: the runtime does not reverse-map through mutations or blame event arguments for a post-mutation field rule unless the rule itself is an event ensure.
 
 2. **The consumer decides rendering.** The runtime provides targets. The consumer knows what its current inputs are and can trivially check: "is this target one of my inputs? → inline. Otherwise → banner."
 
@@ -29,16 +29,16 @@ Make the runtime the source of truth for "which constraint was violated and what
 
 4. **Keep `Inspect` as the method name.** Three overloads differentiated by signature (aggregate, event, update) stay as they are.
 
-5. **Every scoped constraint includes its scope as a target.** Event asserts include `Event(name)`. State asserts include `State(name, anchor)`. Invariants include `Definition()`. This is uniform — every violation carries both its semantic subjects (what's wrong) and its scope (why this constraint exists).
+5. **Every scoped constraint includes its scope as a target.** Event ensures include `Event(name)`. State ensures include `State(name, anchor)`. Rules include `Definition()`. This is uniform — every violation carries both its semantic subjects (what's wrong) and its scope (why this constraint exists).
 
 ## Four Kinds of Constraints
 
-A precept is a collection of rules among other things. Invariants, asserts, and rejects are all constraints — each expresses a condition the engine enforces. When a constraint is violated, the engine reports a `ConstraintViolation`.
+A precept is a collection of rules among other things. Rules, ensures, and rejects are all constraints — each expresses a condition the engine enforces. When a constraint is violated, the engine reports a `ConstraintViolation`.
 
-### A. Event asserts
+### A. Event ensures
 
 ```precept
-on MakePayment assert Amount > 0 because "Amount must be positive"
+on MakePayment ensure Amount > 0 because "Amount must be positive"
 ```
 
 - **Scope:** Event args only (enforced at parse time).
@@ -46,10 +46,10 @@ on MakePayment assert Amount > 0 because "Amount must be positive"
 - **Author-supplied reason:** Yes (`because`).
 - **Targets:** Expression-referenced arg(s) + `Event(name)`.
 
-### B. Invariants
+### B. Rules
 
 ```precept
-invariant Balance >= 0 because "Balance cannot go negative"
+rule Balance >= 0 because "Balance cannot go negative"
 ```
 
 - **Scope:** Fields only.
@@ -57,12 +57,12 @@ invariant Balance >= 0 because "Balance cannot go negative"
 - **Author-supplied reason:** Yes (`because`).
 - **Targets:** Directly referenced field(s), any transitive field dependencies beneath referenced computed fields, + `Definition()`.
 
-### C. State asserts
+### C. State ensures
 
 ```precept
-in Assigned assert AssignedAgent != null because "Must have an assigned agent"
-from Draft assert Email != null because "Must provide email before submitting"
-to Submitted assert Items.count > 0 because "Must have items to submit"
+in Assigned ensure AssignedAgent != null because "Must have an assigned agent"
+from Draft ensure Email != null because "Must provide email before submitting"
+to Submitted ensure Items.count > 0 because "Must have items to submit"
 ```
 
 - **Scope:** Fields only.
@@ -101,9 +101,9 @@ Every scoped constraint includes its scope alongside its semantic subjects:
 
 | Source | Targets |
 |---|---|
-| Event assertion | Expression-referenced arg(s) + `Event(name)` |
-| Invariant | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `Definition()` |
-| State assertion | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `State(name, anchor)` |
+| Event ensure | Expression-referenced arg(s) + `Event(name)` |
+| Rule | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `Definition()` |
+| State ensure | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `State(name, anchor)` |
 | Transition rejection | `Event(name)` |
 
 ## Runtime Model
@@ -131,14 +131,14 @@ public abstract record ConstraintTarget(ConstraintTargetKind Kind)
     public sealed record EventTarget(string EventName)
         : ConstraintTarget(ConstraintTargetKind.Event);
 
-    public sealed record StateTarget(string StateName, AssertAnchor? Anchor = null)
+    public sealed record StateTarget(string StateName, EnsureAnchor? Anchor = null)
         : ConstraintTarget(ConstraintTargetKind.State);
 
     public sealed record DefinitionTarget()
         : ConstraintTarget(ConstraintTargetKind.Definition);
 }
 
-public enum AssertAnchor { In, To, From }
+public enum EnsureAnchor { In, To, From }
 ```
 
 ### `ConstraintSource` — where it came from
@@ -146,24 +146,24 @@ public enum AssertAnchor { In, To, From }
 ```csharp
 public enum ConstraintSourceKind
 {
-    Invariant,
-    StateAssertion,
-    EventAssertion,
+    Rule,
+    StateEnsure,
+    EventEnsure,
     TransitionRejection
 }
 
 public abstract record ConstraintSource(ConstraintSourceKind Kind, int? SourceLine = null)
 {
-    public sealed record InvariantSource(string ExpressionText, string Reason, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.Invariant, SourceLine);
+    public sealed record RuleSource(string ExpressionText, string Reason, int? SourceLine = null)
+        : ConstraintSource(ConstraintSourceKind.Rule, SourceLine);
 
-    public sealed record StateAssertionSource(string ExpressionText, string Reason,
-        string StateName, AssertAnchor Anchor, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.StateAssertion, SourceLine);
+    public sealed record StateEnsureSource(string ExpressionText, string Reason,
+        string StateName, EnsureAnchor Anchor, int? SourceLine = null)
+        : ConstraintSource(ConstraintSourceKind.StateEnsure, SourceLine);
 
-    public sealed record EventAssertionSource(string ExpressionText, string Reason,
+    public sealed record EventEnsureSource(string ExpressionText, string Reason,
         string EventName, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.EventAssertion, SourceLine);
+        : ConstraintSource(ConstraintSourceKind.EventEnsure, SourceLine);
 
     public sealed record TransitionRejectionSource(string Reason, string EventName, int? SourceLine = null)
         : ConstraintSource(ConstraintSourceKind.TransitionRejection, SourceLine);
@@ -196,21 +196,21 @@ for each violation:
 
 ### Compile-time subject extraction
 
-At compile time, walk each constraint's expression AST to record two layers of subject data: the direct subjects named by the expression itself, and the expanded subjects produced by walking any referenced computed fields through the computed-field dependency graph.
+At compile time, walk each constraint's expression AST to extract referenced identifiers.
 
 ```csharp
 public sealed record ExpressionSubjects(
-    IReadOnlyList<string> DirectFieldReferences,
-    IReadOnlyList<string> ExpandedFieldReferences,
+    IReadOnlyList<string> FieldReferences,
     IReadOnlyList<(string Event, string Arg)> ArgReferences);
 ```
 
-- `PreceptIdentifierExpression` with no dot in field scope → direct field reference.
-- `PreceptIdentifierExpression` with no dot in event-assert scope → event arg reference for that event.
+- `PreceptIdentifierExpression` with no dot in field scope → field reference.
+- `PreceptIdentifierExpression` with no dot in event-ensure scope → event arg reference for that event.
 - `PreceptIdentifierExpression` with dot (`Event.Arg`) → explicit event arg reference.
-- Any directly referenced computed field contributes itself to the direct subject set and contributes its full transitive stored-field dependency closure to the expanded field set.
 
-This is computed once in `PreceptCompiler` and stored alongside each invariant, state assert, event assert, and transition row's `WhenGuard`. At inspect time, the runtime looks up the precomputed subjects and returns a de-duplicated union of direct and expanded subjects in stable dependency order, then appends the scope target — no expression re-parsing needed.
+This is computed once in `PreceptCompiler` and stored alongside each rule, state ensure, event ensure, and transition row's `WhenGuard`. At inspect time, the runtime looks up the precomputed subjects and appends the scope target — no expression re-parsing needed.
+
+> **Future:** Transitive expansion of computed-field references into their underlying stored-field dependencies is described in Design Principles §1 but not yet implemented. When implemented, `ExpressionSubjects` will gain a separate `ExpandedFieldReferences` property.
 
 ### Outcome enums
 
@@ -219,15 +219,15 @@ Two separate enums for the two operation paths, with `IsSuccess` on result types
 ```csharp
 public enum TransitionOutcome
 {
-    // Success
-    Transition,              // state A → state B
-    NoTransition,            // event processed, no state change
-
     // Failure
+    Undefined,               // no rows exist for this event/state
+    Unmatched,               // rows exist but no guard matched
     Rejected,                // author's explicit reject
     ConstraintFailure,       // constraints failed post-mutation
-    Unmatched,               // rows exist but no guard matched
-    Undefined                // no rows exist for this event/state
+
+    // Success
+    Transition,              // state A → state B
+    NoTransition             // event processed, no state change
 }
 
 public enum UpdateOutcome
@@ -236,8 +236,8 @@ public enum UpdateOutcome
     Update,                  // field edit succeeded
 
     // Failure
-    ConstraintFailure,       // constraints failed post-edit
     UneditableField,         // field not editable in current state
+    ConstraintFailure,       // constraints failed post-edit
     InvalidInput             // wrong type, unknown field, etc.
 }
 ```
@@ -249,7 +249,7 @@ All result types carry `IReadOnlyList<ConstraintViolation> Violations` (replacin
 ```csharp
 public sealed record FireResult(
     TransitionOutcome Outcome,
-    string PreviousState,
+    string? PreviousState,
     string EventName,
     string? NewState,
     IReadOnlyList<ConstraintViolation> Violations,
@@ -261,7 +261,7 @@ public sealed record FireResult(
 
 public sealed record EventInspectionResult(
     TransitionOutcome Outcome,
-    string CurrentState,
+    string? CurrentState,
     string EventName,
     string? TargetState,
     IReadOnlyList<string> RequiredEventArgumentKeys,
@@ -272,7 +272,7 @@ public sealed record EventInspectionResult(
 }
 
 public sealed record InspectionResult(
-    string CurrentState,
+    string? CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
     IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);
@@ -290,23 +290,23 @@ public sealed record UpdateResult(
 
 ### Naming conventions
 
-**Prefix rule (middle-ground):** Keep `Precept` on types whose bare name is too generic for C# (`PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptInvariant`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`). Drop it on domain-specific types (`FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `AssertAnchor`, etc.).
+**Prefix rule (middle-ground):** Keep `Precept` on types whose bare name is too generic for C# (`PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptEngine`, `PreceptCompiler`, `PreceptRule`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`). Drop it on domain-specific types (`FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `EnsureAnchor`, etc.).
 
 **Model type renames:**
-- `PreceptStateAssert` → `StateAssertion`
-- `PreceptEventAssert` → `EventAssertion`
-- `PreceptAssertPreposition` → `AssertAnchor` (members: `In`, `To`, `From`)
-- `PreceptRejection` → `Rejection`
-- `PreceptStateTransition` → `StateTransition`
-- `PreceptNoTransition` → `NoTransition`
+- `PreceptStateAssert` → `StateEnsure` *(done)*
+- `PreceptEventAssert` → `EventEnsure` *(done)*
+- `PreceptAssertPreposition` → `EnsureAnchor` (members: `In`, `To`, `From`) *(done)*
+- `PreceptRejection` → `Rejection` *(done)*
+- `PreceptStateTransition` → `StateTransition` *(done)*
+- `PreceptNoTransition` → `NoTransition` *(done)*
 
 **Compile-time vs runtime vocabulary:**
-- "Constraints" = runtime data rules (invariants, assertions, rejections) that produce `ConstraintViolation`
+- "Constraints" = runtime data rules (rules, ensures, rejections) that produce `ConstraintViolation`
 - "Diagnostics" = compile-time DSL checks (`DiagnosticCatalog`, `ValidationResult`)
 
 ## Scenarios (Agreed)
 
-### Scenario 1: Event assert fails
+### Scenario 1: Event ensure fails
 
 ```precept
 precept Payment
@@ -316,7 +316,7 @@ field Balance as number default 100
 state Active initial
 
 event MakePayment with Amount as number
-on MakePayment assert Amount > 0 because "Amount must be positive"
+on MakePayment ensure Amount > 0 because "Amount must be positive"
 
 from Active on MakePayment
     -> set Balance = Balance - MakePayment.Amount
@@ -327,24 +327,24 @@ from Active on MakePayment
 
 ```
 Message:    "Amount must be positive"
-Source:     EventAssertion
+Source:     EventEnsure
 Targets:    [ EventArg("MakePayment", "Amount"), Event("MakePayment") ]
 ```
 
-Event asserts only reference event args. The user provided those args. The consumer shows this inline on the Amount input. The `Event` scope target tells the consumer which event this constraint belongs to.
+Event ensures only reference event args. The user provided those args. The consumer shows this inline on the Amount input. The `Event` scope target tells the consumer which event this constraint belongs to.
 
-### Scenario 2: Post-mutation invariant fails during event inspection
+### Scenario 2: Post-mutation rule fails during event inspection
 
 ```precept
 precept Payment
 
 field Balance as number default 1000
-invariant Balance >= 0 because "Balance cannot go negative"
+rule Balance >= 0 because "Balance cannot go negative"
 
 state Active initial
 
 event MakePayment with Amount as number
-on MakePayment assert Amount > 0 because "Amount must be positive"
+on MakePayment ensure Amount > 0 because "Amount must be positive"
 
 from Active on MakePayment
     -> set Balance = Balance - MakePayment.Amount
@@ -353,19 +353,19 @@ from Active on MakePayment
 
 `Inspect(instance, "MakePayment", { Amount: 5000 })` when `Balance` is `1000`.
 
-Event assert passes. Row matches. Simulation: `Balance = 1000 - 5000 = -4000`. Invariant fails.
+Event ensure passes. Row matches. Simulation: `Balance = 1000 - 5000 = -4000`. Rule fails.
 
 ```
 Message:    "Balance cannot go negative"
-Source:     Invariant
+Source:     Rule
 Targets:    [ Field("Balance"), Definition() ]
 ```
 
-The consumer checks: is `Field("Balance")` one of my inputs? No — the user typed `Amount`. The `Definition()` scope confirms this is a global invariant. Shows as a banner/event-level error.
+The consumer checks: is `Field("Balance")` one of my inputs? No — the user typed `Amount`. The `Definition()` scope confirms this is a global rule. Shows as a banner/event-level error.
 
-The runtime does not reverse-map through mutations. If the author wants arg-level feedback, they write a `when` guard or an event assert.
+The runtime does not reverse-map through mutations. If the author wants arg-level feedback, they write a `when` guard or an event ensure.
 
-### Scenario 3: State assert fails on entry
+### Scenario 3: State ensure fails on entry
 
 ```precept
 precept Ticket
@@ -375,7 +375,7 @@ field Priority as number default 3
 
 state Open initial
 state Assigned
-in Assigned assert AssignedAgent != null because "Must have an assigned agent"
+in Assigned ensure AssignedAgent != null because "Must have an assigned agent"
 
 event StartWork
 
@@ -384,11 +384,11 @@ from Open on StartWork -> transition Assigned
 
 `Inspect(instance, "StartWork")` when `AssignedAgent` is `null`.
 
-Row matches. No mutations. Entry into Assigned triggers `in Assigned assert AssignedAgent != null`. Fails.
+Row matches. No mutations. Entry into Assigned triggers `in Assigned ensure AssignedAgent != null`. Fails.
 
 ```
 Message:    "Must have an assigned agent"
-Source:     StateAssertion
+Source:     StateEnsure
 Targets:    [ Field("AssignedAgent"), State("Assigned", In) ]
 ```
 
@@ -456,13 +456,13 @@ One row for `(Expired, ExtendExpiry)` with a `when` guard. Guard: `!true` → `f
 
 **No `ConstraintViolation` is emitted.** `Unmatched` is a disposition, not a failure. The event simply doesn't apply right now. The caller gets the disposition and can render accordingly (e.g., grayed-out button).
 
-### Scenario 6: Field edit fails an invariant
+### Scenario 6: Field edit fails a rule
 
 ```precept
 precept Settings
 
 field Priority as number default 3
-invariant Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
+rule Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
 
 state Open initial
 
@@ -471,11 +471,11 @@ in Open edit Priority
 
 `Inspect(instance, patch => patch.Set("Priority", 99))`
 
-The patch sets Priority to 99. Simulation runs. Invariant `Priority >= 1 && Priority <= 5` fails.
+The patch sets Priority to 99. Simulation runs. Rule `Priority >= 1 && Priority <= 5` fails.
 
 ```
 Message:    "Priority must be between 1 and 5"
-Source:     Invariant
+Source:     Rule
 Targets:    [ Field("Priority"), Definition() ]
 ```
 
@@ -483,14 +483,14 @@ The consumer (in edit mode) checks: is `Field("Priority")` one of my inputs? Yes
 
 ## Scenarios (Remaining)
 
-### Scenario 7: Multi-subject invariant (cross-field)
+### Scenario 7: Multi-subject rule (cross-field)
 
 ```precept
 precept TimeWindow
 
 field StartHour as number default 0
 field EndHour as number default 24
-invariant StartHour <= EndHour because "Start must not exceed end"
+rule StartHour <= EndHour because "Start must not exceed end"
 
 state Active initial
 
@@ -499,11 +499,11 @@ in Active edit StartHour, EndHour
 
 **Case A:** `Inspect(instance, patch => patch.Set("StartHour", 20))` when `EndHour = 10`.
 
-Simulation: `StartHour = 20`, `EndHour = 10`. Invariant `StartHour <= EndHour` fails.
+Simulation: `StartHour = 20`, `EndHour = 10`. Rule `StartHour <= EndHour` fails.
 
 ```
 Message:    "Start must not exceed end"
-Source:     Invariant
+Source:     Rule
 Targets:    [ Field("StartHour"), Field("EndHour"), Definition() ]
 ```
 
@@ -511,9 +511,9 @@ Both fields appear as targets because the expression references both. The runtim
 
 **Case B:** `Inspect(instance, patch => patch.Set("StartHour", 20).Set("EndHour", 10))`
 
-Same invariant fails, same violation, same targets. The consumer can now attach the violation to both inputs.
+Same rule fails, same violation, same targets. The consumer can now attach the violation to both inputs.
 
-**Rule:** The runtime always returns the full semantic dependency target set for the violated rule. All Inspect paths behave identically — no filtering by patch, event, or overload. For field-based rules, that means directly referenced fields plus any transitive field dependencies beneath referenced computed fields; for event assertions, it remains the expression-referenced event args. The consumer decides how to render based on what it knows about its own inputs.
+**Rule:** The runtime always returns the full semantic dependency target set for the violated rule. All Inspect paths behave identically — no filtering by patch, event, or overload. For field-based rules, that means directly referenced fields plus any transitive field dependencies beneath referenced computed fields; for event ensures, it remains the expression-referenced event args. The consumer decides how to render based on what it knows about its own inputs.
 
 ### Scenario 8: Mixed `when` guard (fields + args)
 
@@ -559,14 +559,14 @@ Key decisions and the reasoning behind them, recorded during the naming consiste
 
 ### Why `Rejected` and `ConstraintFailure` are separate outcomes
 
-The old `Rejected` outcome was overloaded — it covered both author-intentional rejects (`reject "reason"`) and automatic constraint failures (invariant/state assert violations post-mutation). These are fundamentally different:
+The old `Rejected` outcome was overloaded — it covered both author-intentional rejects (`reject "reason"`) and automatic constraint failures (rule/state ensure violations post-mutation). These are fundamentally different:
 
 - **`Rejected`** = the author wrote an explicit reject as a routing decision. The message is a literal string, not a predicate over data. The user can't "fix" the input to avoid it — it's the author's declared outcome for that path.
-- **`ConstraintFailure`** = a data constraint (invariant or state assert) failed after the mutation was simulated. The user might be able to change inputs to avoid it.
+- **`ConstraintFailure`** = a data constraint (rule or state ensure) failed after the mutation was simulated. The user might be able to change inputs to avoid it.
 
 Consumers need to distinguish these: a `Rejected` outcome should display the author's message as a definitive "no"; a `ConstraintFailure` should display which constraints failed and what they're about, potentially with inline field-level feedback.
 
-Event asserts use `Rejected` (not `ConstraintFailure`) because they are author-intentional pre-checks on args — semantically equivalent to a reject. They fire before row selection, their expressions reference only event args, and the author wrote them with a `because` reason. `ConstraintFailure` is reserved for post-mutation constraint violations.
+Event ensures use `Rejected` (not `ConstraintFailure`) because they are author-intentional pre-checks on args — semantically equivalent to a reject. They fire before row selection, their expressions reference only event args, and the author wrote them with a `because` reason. `ConstraintFailure` is reserved for post-mutation constraint violations.
 
 ### Why `NoTransition` replaced `AcceptedInPlace`
 
@@ -585,7 +585,7 @@ The old name `AcceptedInPlace` was misleading. Source code confirmed that when t
 
 "Event" collides with the `event` keyword and `PreceptEvent` type in the DSL. An outcome enum named `EventOutcome` would be ambiguous — does it describe the outcome of processing an event, or is it a kind of event? `TransitionOutcome` is unambiguous because "transition" is the noun for state-machine movement, which is exactly what this enum describes.
 
-### Why `AssertAnchor`
+### Why `EnsureAnchor`
 
 The prepositions `in`, `to`, and `from` describe **spatial anchoring** relative to a state:
 
@@ -594,17 +594,17 @@ The prepositions `in`, `to`, and `from` describe **spatial anchoring** relative 
 - `from Draft` = unanchoring from that state (leaving)
 
 Alternatives considered:
-- `AssertScope` — too broad, "scope" means many things in a language
-- `AssertTiming` — temporal framing, but the prepositions aren't purely about time
-- `AssertBinding` — implies a data binding relationship that doesn't exist
+- `EnsureScope` — too broad, "scope" means many things in a language
+- `EnsureTiming` — temporal framing, but the prepositions aren't purely about time
+- `EnsureBinding` — implies a data binding relationship that doesn't exist
 
-`AssertAnchor` captures the spatial metaphor of prepositions applied to state positions.
+`EnsureAnchor` captures the spatial metaphor of prepositions applied to state positions.
 
 ### Why `DiagnosticCatalog` (not `ConstraintCatalog`)
 
 `ConstraintCatalog` was the original name. After introducing the runtime `ConstraintViolation` model, "constraint" became overloaded — it would mean both "compile-time DSL validity check" and "runtime data rule." These are distinct concepts:
 
-- **Constraints** (runtime vocabulary): invariants, assertions, and rejections that the engine enforces at runtime, producing `ConstraintViolation` when they fail.
+- **Constraints** (runtime vocabulary): rules, ensures, and rejections that the engine enforces at runtime, producing `ConstraintViolation` when they fail.
 - **Diagnostics** (compile-time vocabulary): DSL syntax and semantic checks that the compiler/parser enforces during compilation, producing error diagnostics.
 
 Renaming to `DiagnosticCatalog` separates the vocabularies cleanly. `ConstraintViolationException` stays as-is — it's thrown by the catalog infrastructure and represents a violation of a *language* constraint (a registered diagnostic), which is a different concept from a runtime `ConstraintViolation`.
@@ -627,7 +627,7 @@ Three approaches were evaluated:
 2. **Prefix nothing** — clean but risks collision with common C# types (`Field`, `State`, `Event`, `Instance`)
 3. **Middle-ground** — keep `Precept` on types whose bare names are too generic for C#; drop it on domain-specific types
 
-The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptInvariant`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `AssertAnchor`, `StateAssertion`, `EventAssertion`, `Rejection`, `StateTransition`, `NoTransition`, `ValidationResult`, etc.
+The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptEngine`, `PreceptCompiler`, `PreceptRule`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `EnsureAnchor`, `StateEnsure`, `EventEnsure`, `Rejection`, `StateTransition`, `NoTransition`, `ValidationResult`, etc.
 
 ---
 
@@ -641,6 +641,33 @@ Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate v
 | C49 / PRECEPT049 | compile | Warning | Event declared but never referenced in any transition row. On a stateless precept, every declared event is structurally orphaned \u2014 no state routing surface exists. Emitted per event. |
 | C50 / PRECEPT050 | compile | Warning | Non-terminal state has outgoing rows but none can reach another state. Upgraded from `Hint` to `Warning` (2026-04-08). Rationale: a state where every outgoing path dead-ends is a structural smell that warrants author attention, not just an informational note. Consistent with the severity model for C49 (same kind of structural quality problem). |
 | C55 / PRECEPT055 | compile | Error | Root-level `edit` is not valid when states are declared. Message: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."` |
+| C69 / PRECEPT069 | compile | Error | Cross-scope guard reference in `when` clause. Guard expression references an identifier that belongs to a different scope than the declaration's guard allows. Rule/state-ensure/edit guards are entity-field-scoped; event-ensure guards are event-arg-scoped. |
+| C70 / PRECEPT070 | parse | Error | Duplicate modifier on field or event argument declaration. Each modifier (`nullable`, `default`, `ordered`) may appear at most once per declaration. |
+| C71 / PRECEPT071 | compile | Error | Unknown function name in expression. The identifier is not a recognized built-in function. |
+| C72 / PRECEPT072 | compile | Error | Function called with incorrect number of arguments, or argument types do not match any overload. Message includes the function name and argument count. |
+| C73 / PRECEPT073 | compile | Error | Function argument type mismatch. A specific parameter expects one type but received another. Message identifies the parameter and the expected vs. actual types. |
+| C74 / PRECEPT074 | compile | Error | `round()` precision argument must be a non-negative integer literal. The second argument to `round(value, places)` cannot be a field reference or expression — it must be a compile-time constant like `2`. |
+| C75 / PRECEPT075 | compile | Error | `pow()` exponent must be integer type. The second argument to `pow(base, exponent)` must resolve to `integer`, not `number` or `decimal`. This ensures totality — integer exponentiation always produces a finite result. |
+| C76 / PRECEPT076 | compile | Error | `sqrt()` requires a non-negative argument. The argument may be negative at runtime. Proof sources: `nonnegative` or `positive` constraint, `rule Field >= 0`, state/event `ensure`, or `when` guard with `>= 0`. Also accepted: literal values ≥ 0 and `abs()` results. |
+| C77 / PRECEPT077 | compile | Error | Function does not accept nullable arguments. The argument may be null at runtime. Add a null check (e.g., `field != null and ...`) before calling the function. Same pattern as C56 for string `.length`. |
+| C78 / PRECEPT078 | compile | Error | Conditional expression condition must be a non-nullable boolean. The `if` clause evaluates to a non-boolean type. |
+| C79 / PRECEPT079 | compile | Error | Conditional expression branches must produce the same scalar type. The `then` and `else` branches return different types. |
+| C80 / PRECEPT080 | parse | Error | A field cannot have both a default value and a derived expression. Use `default` for user-set fields or `->` for computed fields, not both. |
+| C81 / PRECEPT081 | parse | Error | A nullable field cannot have a derived expression. Computed fields always produce a value and cannot be nullable. |
+| C82 / PRECEPT082 | parse | Error | Multi-name field declarations cannot have a derived expression. Each computed field must be declared separately. |
+| C83 / PRECEPT083 | compile | Error | Computed field expression references a nullable field. Computed fields must always produce a value — use only non-nullable fields or collection accessors that guarantee a result. |
+| C84 / PRECEPT084 | compile | Error | Computed field expression references an event argument. Computed fields can only reference persistent fields and safe collection accessors. |
+| C85 / PRECEPT085 | compile | Error | Computed field expression uses an unsafe collection accessor (`.peek`, `.min`, `.max`). Only `.count` is allowed in computed expressions. |
+| C86 / PRECEPT086 | compile | Error | Circular dependency detected among computed fields. The cycle path is included in the message (e.g., "A → B → A"). |
+| C87 / PRECEPT087 | compile | Error | Computed field cannot appear in edit declarations. Computed fields are read-only — the formula is the only authority on the field's value. |
+| C88 / PRECEPT088 | compile | Error | Computed field cannot be assigned via set. Its value is always derived from the declared expression. |
+| C92 / PRECEPT092 | compile | Error | Division by zero — proved dangerous. The proof engine evaluates `IntervalOf(divisor)` and determines the divisor is provably always zero (e.g., literal `0`, or a field/expression whose interval collapses to `[0, 0]`). This is an unconditional error — the author must fix the expression. |
+| C93 / PRECEPT093 | compile | Error | Divisor safety unresolved — the proof engine cannot prove the divisor is nonzero. `IntervalOf(divisor)` returns an interval that does not exclude zero, or `Unknown`. Three context-aware message variants: (1) field is `nonnegative` but not `nonzero` — explains that `nonnegative` allows zero and suggests `positive` instead; (2) simple identifier with no proof — suggests adding a `positive` constraint, `rule Field != 0`, or `when Field != 0` guard; (3) compound expression — reports the proven interval if available. The author must supply additional constraints to help the compiler prove nonzero. See [ProofEngineDesign.md](ProofEngineDesign.md) § IntervalOf query dispatch order and § Assessment Model. |
+| C94 / PRECEPT094 | compile | Error | Assignment violates field constraint — proved dangerous. The proof engine evaluates `IntervalOf(rhs)` for a `set` assignment and determines the result interval has NO overlap with the target field's constraint interval (e.g., `set Score = Score + 200` where `Score max 100` produces an interval entirely above 100). Fires only on proven contradiction — partial overlap produces no diagnostic (the runtime catches actual violations). See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
+| C95 / PRECEPT095 | compile | Error | Contradictory rule — proved dangerous. The proof engine determines a `rule` declaration is always unsatisfiable given other rules and field constraints (e.g., `rule Rate > 100` with `Rate max 50`). This is a global integrity failure. Analyzes simple single-field comparisons (`Field <op> Literal`). See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
+| C96 / PRECEPT096 | compile | Warning | Vacuous rule — proved redundant. The proof engine determines a `rule` declaration is always true given field constraints (e.g., `rule Rate >= 0` when `Rate` is `nonnegative`). Not harmful, but indicates unnecessary code. Analyzes simple single-field comparisons. See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
+| C97 / PRECEPT097 | compile | Warning | Dead guard — proved unreachable. The proof engine determines a `when` guard condition is always false given the proof state at that point (e.g., `when Rate < 0` when `Rate` is `positive`). The guarded transition row is unreachable. Analyzes simple single-field comparisons. See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
+| C98 / PRECEPT098 | compile | Warning | Vacuous guard — proved unnecessary. The proof engine determines a `when` guard condition is always true given the proof state (e.g., `when Rate > 0` when `Rate` is `positive`). The guard adds no filtering. Analyzes simple single-field comparisons. See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
 
 **Distinction from runtime violations:** These are compile-time diagnostics, not runtime `ConstraintViolation` objects. They are reported during `PreceptCompiler.CompileFromText()` and surfaced via the language server (squiggles), MCP `precept_compile`, and CLI. They do not produce `ConstraintViolation` instances.
 

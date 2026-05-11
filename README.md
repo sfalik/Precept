@@ -28,12 +28,12 @@ precept Subscription
 field PlanName as string nullable
 field MonthlyPrice as number default 0
 
-invariant MonthlyPrice >= 0 because "Monthly price cannot be negative"
+rule MonthlyPrice >= 0 because "Monthly price cannot be negative"
 
 state Trial initial, Active, Cancelled
 
 event Activate with Plan as string, Price as number
-on Activate assert Price > 0 because "Plan price must be positive"
+on Activate ensure Price > 0 because "Plan price must be positive"
 
 event Cancel
 
@@ -96,11 +96,14 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 **Unified Domain Integrity** — In most codebases, entity governance is scattered: validators in one layer, state checks in another, editability rules in a third, conditional logic in service handlers that bypass everything else. Each layer exists because the one before it wasn't enough. Precept consolidates all of it into a single `.precept` declaration that the runtime compiles and enforces structurally — no code path outside the contract, no window where an invalid configuration can exist.
 
 - Prevention, not detection — invalid configurations are structurally impossible, not caught after the fact
-- One file, all rules — guards, constraints, invariants, and transitions together
-- Lifecycle optional — stateless precepts enforce field declarations, invariants, and constraints without a state machine
+- One file, all rules — guards, constraints, rules, and transitions together
+- Lifecycle optional — stateless precepts enforce field declarations, rules, and constraints without a state machine
 - Full inspectability — preview any action's outcome without executing it
-- Compile-time checking — unreachable states and type errors caught before runtime
+- Compile-time proof engine — a unified interval + relational inference engine that proves numeric properties at compile time, before any instance exists. Catches divisor safety (C92/C93), sqrt safety (C76), assignment constraint violations (C94), contradictory rules (C95), vacuous rules (C96), dead guards (C97), and tautological guards (C98). Proof covers compound operands, sum-on-RHS rules, computed-field intermediaries, transitive ordering chains, and 10 built-in numeric functions. All diagnostics include source attribution so authors see what was proved and why.
 - **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
+- **Conditional declarations** — `when` guards on rules, ensures, and edit blocks make rules apply only when a precondition is met
+- **Conditional expressions** — `if...then...else` selects between values inline, replacing row duplication for data-dependent field assignments
+- **Computed fields** — `field X as number -> A + B` declares a derived value that recomputes automatically after every mutation, eliminating manual synchronization
 
 Precept is not a workflow orchestrator, event sourcing framework, or ORM — it integrates with all of them. It governs the entity contract; they handle orchestration, persistence, and storage. Think: scattered governance across six service classes — Precept puts it in one file.
 
@@ -114,14 +117,14 @@ Precept is not a workflow orchestrator, event sourcing framework, or ORM — it 
 | [Language Reference](docs/PreceptLanguageDesign.md) | Full DSL syntax and construct reference |
 | [Quickstart Guide](docs/RuntimeApiDesign.md) | Step-by-step runtime integration walkthrough |
 | [MCP Server Docs](docs/McpServerDesign.md) | Tool reference for AI agent integration |
-| [Sample Catalog](samples/) | 21 domain models in `.precept` |
+| [Sample Catalog](samples/) | 28 domain models in `.precept` |
 
 **Highlighted samples:**
 
 | Sample | Pattern |
 |--------|---------|
 | [Loan Application](samples/loan-application.precept) | Multi-stage approval with cross-field guards |
-| [Insurance Claim](samples/insurance-claim.precept) | Claims lifecycle with conditional invariants |
+| [Insurance Claim](samples/insurance-claim.precept) | Claims lifecycle with conditional rules |
 | [Hiring Pipeline](samples/hiring-pipeline.precept) | Pipeline stages with typed event arguments |
 | [Subscription Retention](samples/subscription-cancellation-retention.precept) | Retention flow with branching outcomes |
 | [Traffic Light](samples/trafficlight.precept) | Minimal lifecycle — great starting point |

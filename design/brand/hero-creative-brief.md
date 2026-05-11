@@ -35,11 +35,11 @@ Six to eight recommended domains. Fictional and fun preferred — real-world dom
 
 **Premise:** A spell with mana cost, cast time, and forbidden targets. The spell cannot be cast while cooling down. A higher-level version can be cast only while empowered. Once broken, the incantation cannot be re-attempted without first resetting.
 
-**Emotional hook:** Every developer who has played an RPG has been rejected by "insufficient mana" or "spell not ready." This converts that memory into structural truth. The invariant on mana has a `because` that can be genuinely funny.
+**Emotional hook:** Every developer who has played an RPG has been rejected by "insufficient mana" or "spell not ready." This converts that memory into structural truth. The rule on mana has a `because` that can be genuinely funny.
 
 **Naturally scores well on:**
 - Voice/Wit (25): "The arcane laws do not bend for convenience" earns its line
-- DSL Coverage (20): typed event args (TargetId, SpellTier), when guard on empowerment state, reject for cooldown, invariant on mana
+- DSL Coverage (20): typed event args (TargetId, SpellTier), when guard on empowerment state, reject for cooldown, rule on mana
 - Precept Differentiation (15): "you cannot cast this spell from this state" is identical to "this transition is structurally forbidden"
 
 **Risks:** Fantasy jargon can cloud legibility. Spell names need to be self-explanatory (`Cast`, `Recharge`, not `InvokeArcaneChannel`). State names must be immediate: `Ready`, `Casting`, `Cooling`, `Broken` — not `ArcanePreparation`.
@@ -54,7 +54,7 @@ Six to eight recommended domains. Fictional and fun preferred — real-world dom
 
 **Naturally scores well on:**
 - Precept Differentiation (15): "cannot abort after commit" is cleaner as a structural fact than as a conditional check
-- DSL Coverage (20): multi-state machine, typed event args for abort authority, invariant on fuel level or system readiness, when guard on commitment flag
+- DSL Coverage (20): multi-state machine, typed event args for abort authority, rule on fuel level or system readiness, when guard on commitment flag
 - Emotional Hook (20): the stakes are enormous; the language can be calm and authoritative
 
 **Risks:** "Rocket" as a domain can feel startup-y or clichéd. The tone must be NASA-dry, not SpaceX-marketing. State names: `StandbyClear`, `Armed`, `Committed`, `Launched`. No exclamation points.
@@ -100,7 +100,7 @@ Six to eight recommended domains. Fictional and fun preferred — real-world dom
 **Naturally scores well on:**
 - Precept Differentiation (15): the impossible-even-if-correct scenario is uniquely expressible with structural constraints
 - Voice/Wit (25): "The combination is correct. The safe does not care." is a brand line
-- DSL Coverage (20): invariant on attempt count, when guard for max attempts, terminal state with reject
+- DSL Coverage (20): rule on attempt count, when guard for max attempts, terminal state with reject
 
 **Risks:** The "correct combination" must come in as a typed event arg, not a magic field, or the when-guard elegance is lost. State count: `Locked`, `Closed`, `Open` — exactly three. Don't add `Disarmed` or `Tampered`.
 
@@ -123,13 +123,13 @@ Six to eight recommended domains. Fictional and fun preferred — real-world dom
 
 ### 2.8 Chess Piece Promotion
 
-**Premise:** A pawn that can only be promoted to queen, rook, bishop, or knight — never back to pawn. Promotion requires reaching the eighth rank. Once promoted, the piece type is structurally fixed. The promotion event has a typed arg (`PieceTo as string`) with an assert that rejects invalid piece names.
+**Premise:** A pawn that can only be promoted to queen, rook, bishop, or knight — never back to pawn. Promotion requires reaching the eighth rank. Once promoted, the piece type is structurally fixed. The promotion event has a typed arg (`PieceTo as string`) with an ensure that rejects invalid piece names.
 
 **Emotional hook:** Chess is universal. Promotion is one of the few rules most people know. The irreversibility of promotion maps perfectly to a terminal-state-flavored transition — once you promote, you don't un-promote.
 
 **Naturally scores well on:**
 - Domain Legibility (20): zero domain education required
-- DSL Coverage (20): typed event arg with string assert, when guard on rank, reject for invalid piece type, terminal post-promotion state
+- DSL Coverage (20): typed event arg with string ensure, when guard on rank, reject for invalid piece type, terminal post-promotion state
 - Line Economy: Chess piece state machines are naturally minimal
 
 **Risks:** The domain may feel too abstract — chess as a domain has low stakes. The `because` messages must do emotional work ("A queen does not become a pawn again") that the scenario itself doesn't provide.
@@ -138,27 +138,27 @@ Six to eight recommended domains. Fictional and fun preferred — real-world dom
 
 ## 3. DSL Coverage Targets
 
-The rubric requires a raw DSL Coverage score of ≥ 8/10 to pass (hard disqualifier). That means demonstrating at minimum: `invariant`, `when` guard, `reject`, dotted field set (e.g. `set Speed = FloorIt.TargetMph`), `transition`, `no transition`, three or more states, a typed `event` with args, and an `on Event assert`.
+The rubric requires a raw DSL Coverage score of ≥ 8/10 to pass (hard disqualifier). That means demonstrating at minimum: `rule`, `when` guard, `reject`, dotted field set (e.g. `set Speed = FloorIt.TargetMph`), `transition`, `no transition`, three or more states, a typed `event` with args, and an `on Event ensure`.
 
 ### Constructs by strategic value
 
 **Most differentiating (show if possible):**
-- `invariant` — this is what "structural impossibility" looks like at the data layer. One invariant with a memorable `because` message is proof.
+- `rule` — this is what "structural impossibility" looks like at the data layer. One rule with a memorable `because` message is proof.
 - `reject` in a non-terminal state — a `reject` after a failed `when` guard is the product thesis in action. The invalid state never exists. Don't bury it in a terminal state (where it's compiler-redundant).
 - `when` guard on event args — more legible than guarding on field values because the contract is visible at the moment of the transition. `when FloorIt.Gigawatts >= 1.21` reads as intention; `when PowerLevel >= 1.21` reads as implementation.
 
 **Easy to show (structural baseline, always include):**
 - Three distinct states with meaningful names — the state machine is the hero's skeleton
 - `transition` — the most basic Precept operation; include at least two
-- `on Event assert` with a typed event arg — proves Precept validates inputs, not just states
+- `on Event ensure` with a typed event arg — proves Precept validates inputs, not just states
 
 **Adds depth without statement cost:**
 - `from any on X` — one rule that applies in multiple states is more expressive than two identical rules. Use it at least once.
 - `no transition` — actions that update data without changing state prove Precept isn't just a state machine
-- `in State assert` — state-entry constraints show the engine guards against structural contradictions
+- `in State ensure` — state-entry constraints show the engine guards against structural contradictions
 
 **What to omit at budget pressure:**
-- More than one `invariant` — one with a great `because` message is worth five with generic ones
+- More than one `rule` — one with a great `because` message is worth five with generic ones
 - `edit` declarations — useful but not hero-critical; save for documentation examples
 - Collection field types (`set<T>`, `queue<T>`, `stack<T>`) — powerful but consume budget fast; leave for extended library
 
@@ -174,7 +174,7 @@ The Line Economy gate is **6–8 meaningful statements** (pass/fail; outside ran
 |------|----------|-------|
 | `precept` declaration | `precept TimeMachine` | 1 |
 | `field` declaration | `field Speed as number default 0` | 1 each |
-| `invariant` declaration | `invariant Speed >= 0 because "..."` | 1 each |
+| `rule` declaration | `rule Speed >= 0 because "..."` | 1 each |
 | `state` declaration | `state Parked initial` | 1 each |
 | `event` declaration | `event FloorIt with Mph as number` | 1 each |
 | `from X on Y` rule header | `from Parked on FloorIt when Mph >= 88` | 1 each |
@@ -182,7 +182,7 @@ The Line Economy gate is **6–8 meaningful statements** (pass/fail; outside ran
 | `transition` action | `-> transition TimeTraveling` | 1 each |
 | `no transition` action | `-> no transition` | 1 each |
 | `reject` action | `-> reject "The flux capacitor..."` | 1 each |
-| `on X assert` | `on FloorIt assert Mph > 0 because "..."` | **0** (part of event) |
+| `on X ensure` | `on FloorIt ensure Mph > 0 because "..."` | **0** (part of event) |
 | Blank lines, `{`, `}`, `#` comments | — | **0** |
 
 **This is a tight budget.** Count before you write. A minimal viable hero with full coverage requires:
@@ -191,7 +191,7 @@ The Line Economy gate is **6–8 meaningful statements** (pass/fail; outside ran
 |-----------|-------|
 | `precept` | 1 |
 | Fields (1–2 max) | 1–2 |
-| Invariant (1 max) | 1 |
+| Rule (1 max) | 1 |
 | States (3 min for legible machine) | 3 |
 | Events (2 min for a meaningful interaction) | 2 |
 | Rule headers (2–3) | 2–3 |
@@ -204,7 +204,7 @@ The Line Economy gate is **6–8 meaningful statements** (pass/fail; outside ran
 
 **Editorial rules for staying compact:**
 
-1. **One field is enough.** Use it for the invariant. A second field can appear in a dotted set (`set Score = Level.Points`) without needing its own dedicated invariant.
+1. **One field is enough.** Use it for the rule. A second field can appear in a dotted set (`set Score = Level.Points`) without needing its own dedicated rule.
 
 2. **`from any on X` saves one statement per state.** If the same event is valid in multiple states, collapse it.
 
@@ -212,7 +212,7 @@ The Line Economy gate is **6–8 meaningful statements** (pass/fail; outside ran
 
 4. **State names do the work of state comments.** `Committed`, not `AwaitingCommitment`. `Fallen`, not `TerminalStatePostDuel`.
 
-5. **One `on Event assert` is enough.** If you have a typed event, assert its most important constraint. One, with a memorable `because`. Not three.
+5. **One `on Event ensure` is enough.** If you have a typed event, ensure its most important constraint. One, with a memorable `because`. Not three.
 
 ---
 
@@ -242,7 +242,7 @@ The Line Economy gate is **6–8 meaningful statements** (pass/fail; outside ran
 
 **The trivial real-world domain.** A `CoffeeOrder` with states `Ordered → Brewing → Ready → Collected` is legible but unmemorable. Any developer has seen this pattern in onboarding docs for six other tools. Fictional domains avoid the "oh, another coffee example" dismissal.
 
-**The kitchen-sink hero.** Four fields, three invariants, five events, eight rule rows. Technically covers every DSL construct. Reads like a tutorial, not a hook. A developer who has to work to understand the domain cannot evaluate the product.
+**The kitchen-sink hero.** Four fields, three rules, five events, eight transition rows. Technically covers every DSL construct. Reads like a tutorial, not a hook. A developer who has to work to understand the domain cannot evaluate the product.
 
 **The clever-but-opaque domain.** "Quantum entanglement state machine." Sounds interesting; requires domain education. The test is: can a developer who has never heard of Precept understand the domain in under three seconds? If not, the domain is working against the hero sample, not with it.
 
@@ -265,7 +265,7 @@ Quick gut-check questions before submitting a candidate.
 - Did you collapse multi-statement rows? Unpack them. `-> set X = Y -> transition Z` is two statements.
 
 **DSL Coverage (≥ 8/10 required):**
-- Does the snippet show an `invariant`? (If not, Coverage < 8 automatically.)
+- Does the snippet show a `rule` or `ensure`? (If not, Coverage < 8 automatically.)
 - Is there a `when` guard on a rule header?
 - Is there a `reject` that guards a path where a `transition` could succeed?
 - Is there a dotted field set — `set Field = Event.Arg` — not just `set Field = 0`?

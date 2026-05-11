@@ -1,3 +1,13 @@
+## 2026-04-11T00:00:00Z - Slice 9 language design doc sync (#25, #27, #29)
+
+- Updated `docs/PreceptLanguageDesign.md`: grammar BNF (ConstraintSuffix, ScalarType), reserved keywords, scalar types section (integer/decimal/choice), field-level constraints table (maxplaces/ordered), built-in functions subsection (round()), and diagnostic codes (C60–C66).
+- `docs/McpServerDesign.md`: confirmed already complete (Newman's Slice 6 commit). No changes needed.
+- `README.md`: no dedicated types/constraints table exists; no update needed.
+- `research/language/README.md`: #25, #27, #29 already present in domain index and open proposal issue map. No update needed.
+- **Docs gap noted:** The `## Status` section at the end of `PreceptLanguageDesign.md` lists locked design decisions but does not mention integer, decimal, or choice types being locked. These should be added to the locked list in a follow-up pass if the team wants the status section kept current.
+
+---
+
 ## 2026-04-08T13:37:07Z - Issue #17 wording clarification recorded
 
 - Wrote a brief session log and a canonical decision entry for the Issue #17 review consensus.
@@ -96,6 +106,11 @@ Deleted inbox files. Appended updates to agent histories.
 Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elaine (MCP/AI), Soup Nazi (Tester), Uncle Leo (Code Reviewer), J. Peterman (Brand/DevRel), Steinbrenner (PM).
 
 ## Recent Updates
+
+### 2026-04-12T19:45:41Z - Squad `@copilot` lane retirement recorded
+- Wrote orchestration logs for Newman and Frank plus a session log for the Squad operations contract change.
+- Merged 2 relevant inbox items into one canonical `decisions.md` entry, recording the lane retirement and marking the earlier direct-`@copilot` directive as superseded.
+- Updated affected cross-agent memory for Frank and Ralph, then cleared the processed inbox files.
 
 ### 2026-04-08T13:29:23Z - Language research corpus closeout recorded
 - Merged the remaining `.squad/decisions/inbox/` backlog into `.squad/decisions.md`, recorded 61 entries, skipped 2 superseded duplicate(s), and cleared the inbox.

@@ -1,0 +1,2076 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 18: Three Surfaces — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 18 — THREE SURFACES (Data-Forward Layout)
+       ================================================================
+       Three dedicated surface areas, each owning one domain:
+         1. DATA PANEL — wide top band, front and center
+         2. STATE DIAGRAM — bottom-left panel (topology)
+         3. EVENT TIMELINE — bottom-right panel (past→present→future)
+
+       Round 2: Future state cards, slim event cards, edit/save mode,
+       cross-panel hover, brand-spec §2.2 compliance.
+       ================================================================ */
+
+    body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    .header-actions button:hover { border-color: var(--indigo); color: var(--indigo); }
+    .header-actions button:active { transform: scale(0.96); }
+
+    /* — Main 3-surface layout — */
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+
+    /* ===============================================================
+       SURFACE 1: DATA PANEL (wide top band — primary surface)
+       =============================================================== */
+
+    .data-panel {
+      background: var(--bg);
+      border-bottom: 1.5px solid var(--border);
+      overflow-y: auto;
+      padding: 14px 24px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 45vh;
+      min-height: 180px;
+    }
+
+    .dp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .dp-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dp-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .dp-count {
+      font-size: 9px;
+      color: var(--dim);
+    }
+
+    .dp-dirty-badge {
+      font-size: 8px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: rgba(251, 191, 36, 0.10);
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      color: var(--gold);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      animation: dirtyPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes dirtyPulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    .dp-header-actions { display: flex; gap: 6px; align-items: center; }
+
+    .dp-edit-btn, .dp-save-btn, .dp-cancel-btn {
+      font: inherit;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 150ms;
+    }
+
+    .dp-edit-btn {
+      border: 1px solid rgba(99, 102, 241, 0.30);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.06);
+    }
+    .dp-edit-btn:hover { background: rgba(99, 102, 241, 0.14); border-color: var(--indigo); }
+
+    .dp-save-btn {
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+    }
+    .dp-save-btn:hover { background: rgba(52, 211, 153, 0.18); }
+    .dp-save-btn:disabled {
+      opacity: 0.30;
+      cursor: not-allowed;
+    }
+    .dp-save-btn:disabled:hover { background: rgba(52, 211, 153, 0.08); }
+
+    .dp-cancel-btn {
+      border: 1px solid var(--border);
+      color: var(--dim);
+      background: transparent;
+    }
+    .dp-cancel-btn:hover { border-color: rgba(251, 113, 133, 0.40); color: var(--blocked); }
+
+    /* 2-column grid for field cards */
+    .dp-field-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 8px;
+    }
+
+    .dp-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 8px 12px;
+      background: rgba(17, 17, 20, 0.4);
+      border: 1px solid rgba(39, 39, 42, 0.5);
+      border-radius: 6px;
+      transition: all 300ms ease;
+    }
+
+    .dp-field.recently-changed {
+      border-color: rgba(52, 211, 153, 0.30);
+      background: rgba(52, 211, 153, 0.04);
+      animation: dataFlash 800ms ease-out;
+    }
+
+    .dp-field.editable {
+      border-color: rgba(99, 102, 241, 0.25);
+    }
+
+    .dp-field.editing {
+      border-color: rgba(99, 102, 241, 0.45);
+      background: rgba(99, 102, 241, 0.04);
+      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.10);
+    }
+
+    .dp-field.dirty {
+      border-color: rgba(251, 191, 36, 0.35);
+      background: rgba(251, 191, 36, 0.04);
+    }
+
+    .dp-field-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .dp-field-name {
+      font-size: 11px;
+      color: var(--slate);
+      font-weight: 500;
+    }
+
+    .dp-field-type {
+      font-size: 9px;
+      color: var(--slate-type);
+      opacity: 0.7;
+    }
+
+    .dp-field-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--slate-val);
+    }
+
+    .dp-field-value.null {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 11px;
+      font-weight: 400;
+    }
+
+    .dp-field-value.bool-true { color: var(--enabled); }
+    .dp-field-value.bool-false { color: var(--blocked); opacity: 0.6; }
+
+    .dp-edit-badge {
+      font-size: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.10);
+      border: 1px solid rgba(99, 102, 241, 0.20);
+      border-radius: 3px;
+      padding: 1px 5px;
+    }
+
+    /* Inline edit controls */
+    .dp-edit-input {
+      width: 100%;
+      background: rgba(12, 12, 15, 0.7);
+      border: 1px solid var(--indigo);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 4px 7px;
+      border-radius: 4px;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+    }
+
+    .dp-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+
+    .dp-toggle .toggle-track {
+      width: 32px;
+      height: 18px;
+      border-radius: 9px;
+      background: rgba(251, 113, 133, 0.15);
+      border: 1px solid rgba(251, 113, 133, 0.30);
+      position: relative;
+      transition: all 200ms;
+    }
+
+    .dp-toggle .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--blocked);
+      opacity: 0.5;
+      transition: all 200ms;
+    }
+
+    .dp-toggle.on .toggle-track {
+      background: rgba(52, 211, 153, 0.20);
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .dp-toggle.on .toggle-track::after {
+      left: 17px;
+      background: var(--enabled);
+      opacity: 1;
+    }
+
+    .dp-toggle-label {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Invariants + assertions in a horizontal strip below the field grid */
+    .dp-constraints-strip {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    .dp-constraint-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .dp-constraint-group-title {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .dp-inv-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      padding: 2px 0;
+    }
+
+    .dp-inv-icon { font-size: 8px; }
+    .dp-inv-item.ok .dp-inv-icon { color: var(--enabled); }
+    .dp-inv-item.violated .dp-inv-icon { color: var(--blocked); }
+    .dp-inv-item .dp-inv-msg { color: var(--gold); font-size: 10px; }
+
+    .dp-assert-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      padding: 2px 0;
+    }
+
+    .dp-assert-item.ok { color: var(--enabled); }
+    .dp-assert-item.violated { color: var(--blocked); }
+    .dp-assert-item .dp-assert-msg { color: var(--gold); }
+
+    .dp-constraint-target {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(176, 190, 197, 0.08);
+      border: 1px solid rgba(176, 190, 197, 0.18);
+      color: var(--slate);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    /* ===============================================================
+       BOTTOM HALF: diagram + timeline side by side
+       =============================================================== */
+
+    .bottom-split {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      overflow: hidden;
+    }
+
+    /* ===============================================================
+       SURFACE 2: STATE DIAGRAM — Topology (bottom-left)
+       Brand-spec §2.2: indigo borders, violet names, emerald edges,
+       transparent fill (not filled), current state gets fill tint.
+       =============================================================== */
+
+    .state-diagram-panel {
+      background: var(--bg);
+      border-right: 1px solid var(--border);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .sd-panel-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .sd-svg-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .sd-svg-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 100%;
+    }
+
+    /* §2.2: Nodes — indigo borders, transparent fill */
+    .sd-node {
+      fill: transparent;
+      stroke: #4338CA;
+      stroke-width: 1.5;
+      transition: fill 400ms ease, stroke 400ms ease, stroke-width 400ms ease;
+      cursor: pointer;
+    }
+
+    .sd-node-initial {
+      fill: transparent;
+      stroke: #4338CA;
+      stroke-width: 2.5;
+      cursor: pointer;
+    }
+
+    .sd-node-visited {
+      fill: rgba(144, 150, 166, 0.06);
+      stroke: var(--dusk);
+      stroke-width: 1.5;
+      cursor: pointer;
+    }
+
+    /* §2.2 runtime verdict: current state gets fill tint */
+    .sd-node-current {
+      fill: rgba(30, 27, 75, 0.25);
+      stroke: var(--violet);
+      stroke-width: 2.5;
+      cursor: pointer;
+    }
+
+    .sd-node-terminal {
+      fill: transparent;
+      stroke: #6366F1;
+      stroke-width: 2;
+      cursor: pointer;
+    }
+
+    .sd-node-terminal-outer {
+      fill: none;
+      stroke: rgba(99, 102, 241, 0.30);
+      stroke-width: 1;
+    }
+
+    .sd-glow {
+      fill: none;
+      stroke: rgba(168, 152, 245, 0.25);
+      stroke-width: 2;
+      animation: sdGlowPulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes sdGlowPulse {
+      0%, 100% { stroke-opacity: 0.15; }
+      50% { stroke-opacity: 0.6; }
+    }
+
+    .sd-initial-dot { fill: #4338CA; }
+
+    /* §2.2: State names — violet */
+    .sd-label {
+      fill: rgba(113, 113, 122, 0.5);
+      font-size: 9px;
+      text-anchor: middle;
+      font-family: inherit;
+      pointer-events: none;
+    }
+
+    .sd-label-visited { fill: var(--dusk); }
+    .sd-label-current { fill: var(--violet); font-weight: 700; font-size: 9.5px; }
+
+    /* §2.2: Edges — emerald for transitions */
+    .sd-edge {
+      stroke: rgba(39, 39, 42, 0.5);
+      stroke-width: 1;
+      fill: none;
+      cursor: pointer;
+      transition: stroke 400ms ease;
+    }
+
+    .sd-edge-traced {
+      stroke: rgba(52, 211, 153, 0.35);
+      stroke-width: 1.5;
+    }
+
+    .sd-edge-active {
+      stroke: var(--enabled);
+      stroke-width: 2;
+      animation: sdEdgeFlash 900ms ease-out;
+    }
+
+    @keyframes sdEdgeFlash {
+      0% { stroke: rgba(52, 211, 153, 0.9); stroke-width: 3; }
+      100% { stroke: rgba(52, 211, 153, 0.35); stroke-width: 1.5; }
+    }
+
+    .sd-arrow {
+      fill: rgba(39, 39, 42, 0.4);
+      transition: fill 400ms ease;
+    }
+
+    .sd-arrow-traced { fill: rgba(52, 211, 153, 0.35); }
+    .sd-arrow-active { fill: var(--enabled); animation: sdArrowFlash 900ms ease-out; }
+
+    @keyframes sdArrowFlash {
+      0% { fill: rgba(52, 211, 153, 0.9); }
+      100% { fill: rgba(52, 211, 153, 0.35); }
+    }
+
+    /* §2.2: Edge labels — cyan for event names */
+    .sd-edge-label {
+      fill: rgba(113, 113, 122, 0.35);
+      font-size: 7.5px;
+      text-anchor: middle;
+      font-family: inherit;
+      cursor: pointer;
+      transition: fill 300ms ease;
+    }
+
+    .sd-edge-label-traced { fill: var(--cyan); opacity: 0.8; }
+    .sd-edge-label-active { fill: var(--cyan); opacity: 1; }
+
+    .sd-self-loop {
+      stroke: rgba(39, 39, 42, 0.3);
+      stroke-width: 1;
+      fill: none;
+      cursor: pointer;
+      transition: stroke 300ms ease;
+    }
+
+    .sd-self-flash { stroke: rgba(52, 211, 153, 0.6); stroke-width: 1.5; animation: sdSelfFlash 800ms ease-out; }
+
+    @keyframes sdSelfFlash {
+      0% { stroke: rgba(52, 211, 153, 0.9); stroke-width: 2.5; }
+      100% { stroke: rgba(52, 211, 153, 0.6); stroke-width: 1.5; }
+    }
+
+    .sd-self-label {
+      fill: rgba(113, 113, 122, 0.35);
+      font-size: 7px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    /* Cross-panel hover highlights — topology side */
+    .sd-node-hover {
+      stroke: var(--violet) !important;
+      stroke-width: 2.5 !important;
+      fill: rgba(168, 152, 245, 0.12) !important;
+    }
+
+    .sd-edge-hover {
+      stroke: var(--cyan) !important;
+      stroke-width: 2 !important;
+    }
+
+    .sd-edge-label-hover {
+      fill: var(--cyan) !important;
+      opacity: 1 !important;
+    }
+
+    /* ===============================================================
+       SURFACE 3: EVENT TIMELINE (bottom-right, scrollable)
+       =============================================================== */
+
+    .timeline-surface {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 28px;
+      position: relative;
+    }
+
+    /* Section dividers */
+    .tl-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      margin-top: 8px;
+    }
+
+    .tl-section .label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tl-section .label.past { color: var(--dusk); }
+    .tl-section .label.present { color: var(--violet); }
+    .tl-section .label.future { color: var(--cyan); }
+
+    .tl-section .line { flex: 1; height: 1px; background: var(--border); }
+    .tl-section .step-count { font-size: 9px; color: var(--muted); }
+
+    /* -- Past trail -- */
+    .past-trail {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 20px;
+      padding-left: 18px;
+      position: relative;
+    }
+
+    .past-trail::before {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: linear-gradient(to bottom, rgba(144, 150, 166, 0.12), rgba(168, 152, 245, 0.30));
+      border-radius: 1px;
+    }
+
+    .trail-step {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 8px 0;
+      position: relative;
+      animation: fadeSlideIn 300ms ease-out;
+    }
+
+    .trail-step + .trail-step { border-top: 1px solid rgba(39, 39, 42, 0.3); }
+
+    .step-marker {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--dusk);
+      background: var(--bg);
+      margin-top: 3px;
+      margin-left: -18px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-marker.origin { border-color: var(--dim); background: var(--dim); }
+
+    .step-content { display: flex; flex-direction: column; gap: 3px; }
+
+    .step-headline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .step-state { color: var(--violet); font-weight: 600; opacity: 0.7; }
+
+    .step-event {
+      font-size: 10px;
+      color: var(--cyan);
+      padding: 1px 6px;
+      border: 1px solid rgba(48, 184, 232, 0.20);
+      border-radius: 3px;
+      background: rgba(48, 184, 232, 0.04);
+    }
+
+    .step-number { font-size: 9px; color: var(--muted); font-weight: 600; }
+
+    .step-deltas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 10px;
+    }
+
+    .delta {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      color: var(--dim);
+    }
+
+    .delta .field { color: var(--slate); }
+    .delta .before { text-decoration: line-through; color: var(--muted); font-size: 9px; }
+    .delta .arrow { color: var(--muted); font-size: 8px; }
+    .delta .after { color: var(--violet); }
+
+    .step-outcome {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .step-outcome.transition { color: var(--enabled); }
+    .step-outcome.no-transition { color: var(--dusk); opacity: 0.8; }
+    .step-outcome.rejected { color: var(--blocked); }
+
+    /* -- Present marker (state card) -- */
+    .present-marker {
+      background: var(--card);
+      border: 1.5px solid rgba(168, 152, 245, 0.40);
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-bottom: 4px;
+      position: relative;
+      animation: spotlightIn 400ms ease-out;
+      cursor: pointer;
+      transition: border-color 200ms, box-shadow 200ms;
+    }
+
+    .present-marker:hover,
+    .present-marker.hover-highlight {
+      border-color: rgba(168, 152, 245, 0.65);
+      box-shadow: 0 0 20px rgba(168, 152, 245, 0.10);
+    }
+
+    .present-marker::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 12px;
+      pointer-events: none;
+      box-shadow: 0 0 28px rgba(168, 152, 245, 0.08), 0 0 56px rgba(168, 152, 245, 0.04);
+    }
+
+    .present-marker.terminal-state { border-color: rgba(113, 113, 122, 0.35); }
+    .present-marker.terminal-state::before { box-shadow: 0 0 28px rgba(113, 113, 122, 0.06); }
+
+    .pm-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .pm-state-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--violet);
+      letter-spacing: -0.01em;
+    }
+
+    .pm-badges { display: flex; gap: 6px; align-items: center; }
+
+    .pm-badge {
+      font-size: 8px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .pm-badge.current {
+      border: 1px solid rgba(168, 152, 245, 0.40);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.10);
+    }
+
+    .pm-badge.step-badge {
+      border: 1px solid rgba(144, 150, 166, 0.25);
+      color: var(--dusk);
+      background: rgba(144, 150, 166, 0.06);
+    }
+
+    .pm-badge.terminal {
+      border: 1px solid rgba(113, 113, 122, 0.30);
+      color: var(--dim);
+      background: rgba(113, 113, 122, 0.06);
+    }
+
+    .pm-subtitle {
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    /* — Connector lines between sections — */
+    .tl-connector {
+      display: flex;
+      justify-content: center;
+    }
+
+    .tl-connector-line {
+      width: 2px;
+      height: 20px;
+      background: linear-gradient(to bottom, rgba(168, 152, 245, 0.3), rgba(48, 184, 232, 0.3));
+      border-radius: 1px;
+    }
+
+    /* — Future section: slim event cards → target state cards — */
+    .future-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .future-event-connector {
+      display: flex;
+      justify-content: center;
+    }
+
+    .future-event-connector-line {
+      width: 2px;
+      height: 14px;
+      background: rgba(48, 184, 232, 0.20);
+      border-radius: 1px;
+    }
+
+    .future-state-connector {
+      display: flex;
+      justify-content: center;
+    }
+
+    .future-state-connector-line {
+      width: 2px;
+      height: 14px;
+      background: rgba(67, 56, 202, 0.25);
+      border-radius: 1px;
+    }
+
+    /* Slim event cards — no icon, no outcome header */
+    .event-card {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: border-color 200ms, background 200ms, transform 200ms;
+      cursor: default;
+    }
+
+    .event-card.can-fire { cursor: pointer; }
+
+    .event-card.can-fire:hover,
+    .event-card.hover-highlight {
+      border-color: rgba(48, 184, 232, 0.35);
+      background: var(--card-hover);
+      transform: translateX(2px);
+    }
+
+    .event-card.blocked-card { opacity: 0.55; }
+
+    .event-card.blocked-card:hover {
+      border-color: rgba(251, 113, 133, 0.20);
+    }
+
+    .ec-body { display: flex; flex-direction: column; gap: 3px; }
+
+    .ec-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ec-name { font-size: 12px; font-weight: 600; color: var(--cyan); }
+
+    .self-loop-badge {
+      font-size: 8px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: var(--dusk);
+      background: rgba(144, 150, 166, 0.06);
+      border: 1px solid rgba(144, 150, 166, 0.20);
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .ec-guard { font-size: 10px; color: var(--slate); }
+    .ec-guard-status { font-size: 9px; padding: 1px 6px; border-radius: 3px; }
+    .ec-guard-status.pass { color: var(--enabled); background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.20); }
+    .ec-guard-status.fail { color: var(--blocked); background: rgba(251, 113, 133, 0.08); border: 1px solid rgba(251, 113, 133, 0.20); }
+
+    .ec-mutations { font-size: 9px; color: var(--dim); line-height: 1.5; }
+    .ec-rejection-msg { font-size: 10px; color: var(--gold); font-style: italic; }
+
+    .ec-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+      flex-wrap: wrap;
+    }
+
+    .ec-arg { display: flex; align-items: center; gap: 4px; }
+
+    .ec-arg label {
+      font-size: 8px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .ec-arg input, .ec-arg select {
+      width: 100px;
+      background: rgba(12, 12, 15, 0.6);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 6px;
+      border-radius: 3px;
+      transition: border-color 150ms, box-shadow 150ms;
+    }
+
+    .ec-arg input::placeholder { color: var(--muted); font-style: italic; opacity: 0.7; }
+
+    .ec-arg input:focus, .ec-arg select:focus {
+      outline: none;
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+    }
+
+    /* Fire button styled as event name — cyan per brand-spec */
+    .ec-fire-btn {
+      font: inherit;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      background: rgba(48, 184, 232, 0.08);
+      white-space: nowrap;
+      transition: all 150ms;
+    }
+
+    .ec-fire-btn:hover { background: rgba(48, 184, 232, 0.22); }
+
+    .ec-fire-btn.blocked {
+      border-color: var(--blocked);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* Future target state card — smaller, connected via lines */
+    .future-state-card {
+      padding: 10px 16px;
+      background: var(--card);
+      border: 1.5px solid rgba(67, 56, 202, 0.30);
+      border-radius: 10px;
+      text-align: center;
+      transition: border-color 200ms, background 200ms;
+      cursor: pointer;
+    }
+
+    .future-state-card:hover,
+    .future-state-card.hover-highlight {
+      border-color: rgba(168, 152, 245, 0.50);
+      background: rgba(168, 152, 245, 0.05);
+    }
+
+    .future-state-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--violet);
+    }
+
+    .future-state-sub {
+      font-size: 9px;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    .future-state-sources {
+      font-size: 8px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .future-state-sources .source-event {
+      color: var(--cyan);
+    }
+
+    /* -- Terminal state message -- */
+    .terminal-message {
+      text-align: center;
+      padding: 24px;
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    .terminal-message .tm-icon { font-size: 24px; margin-bottom: 8px; }
+
+    /* -- No past -- */
+    .no-past {
+      text-align: center;
+      padding: 12px;
+      color: var(--muted);
+      font-size: 11px;
+      font-style: italic;
+    }
+
+    /* — Toast — */
+    .toast {
+      position: fixed;
+      top: 50px;
+      right: 20px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 300ms ease;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .toast.transition-toast {
+      background: rgba(52, 211, 153, 0.15);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: var(--enabled);
+    }
+
+    .toast.no-transition-toast {
+      background: rgba(48, 184, 232, 0.10);
+      border: 1px solid rgba(48, 184, 232, 0.25);
+      color: var(--cyan);
+    }
+
+    .toast.rejected-toast {
+      background: rgba(251, 113, 133, 0.12);
+      border: 1px solid rgba(251, 113, 133, 0.30);
+      color: var(--blocked);
+    }
+
+    /* — Status bar — */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 16px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .status-left { display: flex; gap: 12px; }
+    .status-ok { color: var(--enabled); }
+    .status-warn { color: var(--gold); }
+
+    /* — Animations — */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes spotlightIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes dataFlash {
+      0% { background: rgba(52, 211, 153, 0.12); }
+      100% { background: rgba(52, 211, 153, 0.03); }
+    }
+
+    /* — Responsive — */
+    @media (max-width: 700px) {
+      .bottom-split { grid-template-columns: 1fr; }
+      .state-diagram-panel { display: none; }
+      .dp-field-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">18 · THREE SURFACES</span>
+      <span class="header-title">MaintenanceWorkOrder</span>
+      <span class="sep">·</span>
+      <span class="header-file">maintenance-work-order.precept</span>
+    </div>
+    <div class="header-actions">
+      <button onclick="undoStep()">← Undo</button>
+      <button onclick="resetSimulation()">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- Main layout -->
+  <div class="main-layout">
+    <!-- Surface 1: Data Panel (full-width top band) -->
+    <div id="dataPanel" class="data-panel"></div>
+
+    <!-- Bottom: diagram + timeline side by side -->
+    <div class="bottom-split">
+      <!-- Surface 2: State Diagram -->
+      <div class="state-diagram-panel">
+        <div class="sd-panel-label">Topology</div>
+        <div id="stateDiagram" class="sd-svg-container"></div>
+      </div>
+
+      <!-- Surface 3: Event Timeline -->
+      <div class="timeline-surface" id="timeline"></div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-left">
+      <span id="statusStep">Step 0</span>
+      <span class="sep">·</span>
+      <span id="statusInvariants" class="status-ok">✓ 2 invariants ok</span>
+      <span class="sep">·</span>
+      <span id="statusInfo">6 states · 7 events · 10 fields</span>
+    </div>
+    <div>
+      <span><span style="color: var(--indigo);">Click</span> <span>an event name</span> to advance</span>
+    </div>
+  </div>
+
+  <script>
+    // ================================================================
+    // MAINTENANCE WORK ORDER — Full state machine simulation
+    // ================================================================
+
+    const STATES = ['Draft', 'Open', 'Scheduled', 'InProgress', 'Completed', 'Cancelled'];
+
+    const STATE_META = {
+      Draft:      { initial: true,  terminal: false },
+      Open:       { initial: false, terminal: false },
+      Scheduled:  { initial: false, terminal: false },
+      InProgress: { initial: false, terminal: false },
+      Completed:  { initial: false, terminal: true  },
+      Cancelled:  { initial: false, terminal: true  },
+    };
+
+    const FIELD_DEFS = {
+      RequesterName:       { type: 'string',  nullable: true,  default: null },
+      Location:            { type: 'string',  nullable: true,  default: null },
+      IssueSummary:        { type: 'string',  nullable: true,  default: null },
+      AssignedTechnician:  { type: 'string',  nullable: true,  default: null },
+      EstimatedHours:      { type: 'number',  nullable: false, default: 0 },
+      ActualHours:         { type: 'number',  nullable: false, default: 0 },
+      Urgent:              { type: 'boolean', nullable: false, default: false },
+      PartsApproved:       { type: 'boolean', nullable: false, default: false },
+      CompletionNote:      { type: 'string',  nullable: true,  default: null },
+      CancellationReason:  { type: 'string',  nullable: true,  default: null },
+    };
+
+    const INVARIANTS = [
+      { expr: 'EstimatedHours >= 0', msg: 'Estimated hours cannot be negative',
+        targets: ['EstimatedHours'], check: d => d.EstimatedHours >= 0 },
+      { expr: 'ActualHours >= 0', msg: 'Actual hours cannot be negative',
+        targets: ['ActualHours'], check: d => d.ActualHours >= 0 },
+    ];
+
+    const EDITABLE_FIELDS = {
+      Draft: ['Location', 'IssueSummary', 'Urgent'],
+    };
+
+    const STATE_ASSERTIONS = {
+      Scheduled: [{ expr: 'AssignedTechnician != null', msg: 'Scheduled work must have an assigned technician',
+                    targets: ['AssignedTechnician'], check: d => d.AssignedTechnician !== null }],
+      Completed: [{ expr: 'CompletionNote != null', msg: 'Completed work orders need a completion note',
+                    targets: ['CompletionNote'], check: d => d.CompletionNote !== null }],
+    };
+
+    const FROM_ASSERTIONS = {
+      InProgress: [{ expr: 'AssignedTechnician != null', msg: 'Active work cannot finish without a technician',
+                     targets: ['AssignedTechnician'], check: d => d.AssignedTechnician !== null }],
+    };
+
+    // ================================================================
+    // EVENT DEFINITIONS
+    // ================================================================
+
+    function getAvailableEvents(state, data) {
+      const events = [];
+
+      if (state === 'Draft') {
+        events.push({
+          name: 'Submit',
+          args: [
+            { name: 'Requester', type: 'string', placeholder: 'Jane Doe' },
+            { name: 'WorkLocation', type: 'string', placeholder: 'Building A, Room 204' },
+            { name: 'Summary', type: 'string', placeholder: 'HVAC not cooling' },
+            { name: 'IsUrgent', type: 'boolean', default: false },
+          ],
+          rows: [{
+            guard: null, guardDisplay: null, outcome: 'transition', target: 'Open',
+            mutations: ['RequesterName = Requester', 'Location = WorkLocation', 'IssueSummary = Summary', 'Urgent = IsUrgent'],
+            eventAsserts: [
+              { expr: 'Requester != ""', msg: 'A requester name is required', check: (args) => args.Requester && args.Requester !== '' },
+              { expr: 'WorkLocation != ""', msg: 'A location is required', check: (args) => args.WorkLocation && args.WorkLocation !== '' },
+              { expr: 'Summary != ""', msg: 'An issue summary is required', check: (args) => args.Summary && args.Summary !== '' },
+            ],
+            canFire: (args) => args.Requester && args.Requester !== '' && args.WorkLocation && args.WorkLocation !== '' && args.Summary && args.Summary !== '',
+            blockReason: (args) => {
+              if (!args.Requester || args.Requester === '') return 'A requester name is required';
+              if (!args.WorkLocation || args.WorkLocation === '') return 'A location is required';
+              if (!args.Summary || args.Summary === '') return 'An issue summary is required';
+              return '';
+            },
+            apply: (d, args) => ({ ...d, RequesterName: args.Requester, Location: args.WorkLocation, IssueSummary: args.Summary, Urgent: !!args.IsUrgent }),
+          }],
+        });
+      }
+
+      if (state === 'Open') {
+        events.push({
+          name: 'Assign',
+          args: [
+            { name: 'Technician', type: 'string', placeholder: 'Bob Smith' },
+            { name: 'Estimate', type: 'number', placeholder: '4' },
+          ],
+          rows: [{
+            guard: null, guardDisplay: null, outcome: 'transition', target: 'Scheduled',
+            mutations: ['AssignedTechnician = Technician', 'EstimatedHours = Estimate'],
+            eventAsserts: [
+              { expr: 'Technician != ""', msg: 'A technician is required', check: (args) => args.Technician && args.Technician !== '' },
+              { expr: 'Estimate > 0', msg: 'Estimated hours must be positive', check: (args) => Number(args.Estimate) > 0 },
+            ],
+            canFire: (args) => args.Technician && args.Technician !== '' && Number(args.Estimate) > 0,
+            blockReason: (args) => {
+              if (!args.Technician || args.Technician === '') return 'A technician is required';
+              if (!Number(args.Estimate) || Number(args.Estimate) <= 0) return 'Estimated hours must be positive';
+              return '';
+            },
+            apply: (d, args) => ({ ...d, AssignedTechnician: args.Technician, EstimatedHours: Number(args.Estimate) }),
+          }],
+        });
+
+        events.push({
+          name: 'Cancel',
+          args: [{ name: 'Reason', type: 'string', placeholder: 'No longer needed', nullable: true, default: '' }],
+          rows: [{
+            guard: null, guardDisplay: null, outcome: 'transition', target: 'Cancelled',
+            mutations: ['CancellationReason = Reason'],
+            eventAsserts: [{ expr: 'Reason == null || Reason != ""', msg: 'A supplied cancellation reason cannot be blank', check: (args) => !args.Reason || args.Reason === '' || args.Reason.trim() !== '' }],
+            canFire: () => true, blockReason: () => '',
+            apply: (d, args) => ({ ...d, CancellationReason: args.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === 'Scheduled') {
+        events.push({
+          name: 'ApproveParts', args: [],
+          rows: [{
+            guard: null, guardDisplay: null, outcome: 'no-transition', target: null,
+            mutations: ['PartsApproved = true'], eventAsserts: [],
+            canFire: () => true, blockReason: () => '',
+            apply: (d) => ({ ...d, PartsApproved: true }),
+          }],
+        });
+
+        events.push({
+          name: 'StartWork', args: [],
+          rows: [
+            { guard: '!Urgent || PartsApproved', guardDisplay: '!Urgent || PartsApproved', outcome: 'transition', target: 'InProgress',
+              eventAsserts: [], canFire: (args, d) => !d.Urgent || d.PartsApproved,
+              blockReason: () => 'Urgent work must have parts approved before it starts', apply: (d) => d },
+            { guard: null, guardDisplay: null, outcome: 'rejected', target: null,
+              rejectMsg: 'Urgent work must have parts approved before it starts',
+              eventAsserts: [], canFire: () => false, apply: (d) => d },
+          ],
+        });
+
+        events.push({
+          name: 'Cancel',
+          args: [{ name: 'Reason', type: 'string', placeholder: 'Budget cut', nullable: true, default: '' }],
+          rows: [{
+            guard: null, guardDisplay: null, outcome: 'transition', target: 'Cancelled',
+            mutations: ['CancellationReason = Reason'],
+            eventAsserts: [{ expr: 'Reason == null || Reason != ""', msg: 'A supplied cancellation reason cannot be blank', check: (args) => !args.Reason || args.Reason === '' || args.Reason.trim() !== '' }],
+            canFire: () => true, blockReason: () => '',
+            apply: (d, args) => ({ ...d, CancellationReason: args.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === 'InProgress') {
+        events.push({
+          name: 'RecordProgress',
+          args: [{ name: 'Hours', type: 'number', placeholder: '2' }],
+          rows: [{
+            guard: null, guardDisplay: null, outcome: 'no-transition', target: null,
+            mutations: ['ActualHours = ActualHours + Hours'],
+            eventAsserts: [{ expr: 'Hours > 0', msg: 'Progress entries must be positive', check: (args) => Number(args.Hours) > 0 }],
+            canFire: (args) => Number(args.Hours) > 0, blockReason: () => 'Progress entries must be positive',
+            apply: (d, args) => ({ ...d, ActualHours: d.ActualHours + Number(args.Hours) }),
+          }],
+        });
+
+        events.push({
+          name: 'Complete',
+          args: [{ name: 'Note', type: 'string', placeholder: 'Fixed compressor unit' }],
+          rows: [
+            { guard: 'ActualHours <= EstimatedHours + 4', guardDisplay: 'ActualHours <= EstimatedHours + 4',
+              outcome: 'transition', target: 'Completed',
+              mutations: ['CompletionNote = Note'],
+              eventAsserts: [{ expr: 'Note != ""', msg: 'A completion note is required', check: (args) => args.Note && args.Note !== '' }],
+              canFire: (args, d) => args.Note && args.Note !== '' && d.ActualHours <= d.EstimatedHours + 4,
+              blockReason: (args, d) => {
+                if (!args.Note || args.Note === '') return 'A completion note is required';
+                return 'Work orders that exceed the estimate by more than four hours need review first';
+              },
+              apply: (d, args) => ({ ...d, CompletionNote: args.Note }),
+            },
+            { guard: null, guardDisplay: null, outcome: 'rejected', target: null,
+              rejectMsg: 'Work orders that exceed the estimate by more than four hours need review first',
+              eventAsserts: [], canFire: () => false, apply: (d) => d },
+          ],
+        });
+      }
+
+      return events;
+    }
+
+    // ================================================================
+    // SIMULATION STATE
+    // ================================================================
+
+    function getDefaultData() {
+      const d = {};
+      for (const [k, v] of Object.entries(FIELD_DEFS)) d[k] = v.default;
+      return d;
+    }
+
+    function getInitialSimulation() {
+      return {
+        currentState: 'Draft',
+        data: getDefaultData(),
+        history: [],
+        stepCount: 0,
+        visitedStates: new Set(['Draft']),
+        changedFields: new Set(),
+      };
+    }
+
+    let sim = getInitialSimulation();
+
+    // Edit/Save state
+    let isEditing = false;
+    let draftData = null;
+    let dirtyFields = new Set();
+
+    function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+    // ================================================================
+    // EDIT / SAVE MODE
+    // ================================================================
+
+    function startEditing() {
+      if (!EDITABLE_FIELDS[sim.currentState]) return;
+      isEditing = true;
+      draftData = deepClone(sim.data);
+      dirtyFields = new Set();
+      render();
+    }
+
+    function cancelEditing() {
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      render();
+    }
+
+    function saveDraftEdits() {
+      if (!isEditing || dirtyFields.size === 0) return;
+
+      const deltas = [];
+      for (const field of dirtyFields) {
+        const before = sim.data[field];
+        const after = draftData[field];
+        if (JSON.stringify(before) !== JSON.stringify(after)) {
+          deltas.push({ field, before, after });
+          sim.data[field] = after;
+        }
+      }
+
+      if (deltas.length > 0) {
+        sim.stepCount++;
+        sim.history.push({
+          stepNum: sim.stepCount,
+          fromState: sim.currentState,
+          event: 'edit ' + [...dirtyFields].join(', '),
+          args: {},
+          toState: sim.currentState,
+          outcome: 'no-transition',
+          deltas,
+          dataSnapshot: deepClone(sim.data),
+        });
+        sim.changedFields = new Set(deltas.map(d => d.field));
+        showToast(`Saved ${deltas.length} field${deltas.length > 1 ? 's' : ''}`, 'no-transition');
+      }
+
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      render();
+    }
+
+    function updateDraftField(fieldName, value) {
+      if (!draftData) return;
+      draftData[fieldName] = value;
+      if (JSON.stringify(value) !== JSON.stringify(sim.data[fieldName])) {
+        dirtyFields.add(fieldName);
+      } else {
+        dirtyFields.delete(fieldName);
+      }
+      render();
+    }
+
+    function toggleDraftBool(fieldName) {
+      if (!draftData) return;
+      updateDraftField(fieldName, !draftData[fieldName]);
+    }
+
+    // ================================================================
+    // FIRE EVENT
+    // ================================================================
+
+    function fireEvent(eventName, rowIndex) {
+      if (isEditing) cancelEditing();
+
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      const evt = events.find(e => e.name === eventName);
+      if (!evt) return;
+
+      const args = gatherArgs(evt);
+      let row;
+      if (rowIndex !== undefined) {
+        row = evt.rows[rowIndex];
+      } else {
+        row = evt.rows.find(r => r.canFire(args, sim.data)) || evt.rows[0];
+      }
+
+      if (row.eventAsserts) {
+        for (const a of row.eventAsserts) {
+          if (!a.check(args)) { showToast(a.msg, 'rejected'); return; }
+        }
+      }
+
+      if (!row.canFire(args, sim.data)) {
+        const reason = row.blockReason ? row.blockReason(args, sim.data) : (row.rejectMsg || 'Guard failed');
+        showToast(reason, 'rejected');
+        return;
+      }
+
+      const prevData = deepClone(sim.data);
+      const prevState = sim.currentState;
+      sim.data = row.apply(deepClone(sim.data), args);
+
+      const deltas = [];
+      for (const key of Object.keys(FIELD_DEFS)) {
+        const before = prevData[key];
+        const after = sim.data[key];
+        if (JSON.stringify(before) !== JSON.stringify(after)) deltas.push({ field: key, before, after });
+      }
+
+      sim.changedFields = new Set(deltas.map(d => d.field));
+      const toState = row.target || sim.currentState;
+      sim.stepCount++;
+
+      sim.history.push({
+        stepNum: sim.stepCount, fromState: prevState, event: eventName,
+        args: deepClone(args), toState, outcome: row.outcome, deltas,
+        dataSnapshot: deepClone(sim.data),
+      });
+
+      sim.currentState = toState;
+      sim.visitedStates.add(toState);
+
+      if (row.outcome === 'transition') showToast(`${eventName} → ${toState}`, 'transition');
+      else showToast(`${eventName} stayed in ${sim.currentState}`, 'no-transition');
+
+      render();
+      setTimeout(() => { const tl = document.getElementById('timeline'); tl.scrollTop = tl.scrollHeight; }, 50);
+    }
+
+    function gatherArgs(evt) {
+      const args = {};
+      evt.args.forEach(a => {
+        const el = document.getElementById(`arg-${evt.name}-${a.name}`);
+        if (el) {
+          if (a.type === 'boolean') args[a.name] = el.checked || el.value === 'true';
+          else if (a.type === 'number') args[a.name] = el.value ? Number(el.value) : 0;
+          else args[a.name] = el.value || '';
+        } else {
+          args[a.name] = a.default !== undefined ? a.default : '';
+        }
+      });
+      return args;
+    }
+
+    function resetSimulation() {
+      isEditing = false; draftData = null; dirtyFields = new Set();
+      sim = getInitialSimulation();
+      render();
+      showToast('Reset to Draft', 'transition');
+    }
+
+    function undoStep() {
+      if (sim.history.length === 0) return;
+      isEditing = false; draftData = null; dirtyFields = new Set();
+      sim.history.pop();
+      sim.stepCount = sim.history.length;
+      if (sim.history.length > 0) {
+        const last = sim.history[sim.history.length - 1];
+        sim.currentState = last.toState;
+        sim.data = deepClone(last.dataSnapshot);
+      } else {
+        sim.currentState = 'Draft';
+        sim.data = getDefaultData();
+      }
+      sim.visitedStates = new Set(['Draft']);
+      sim.history.forEach(h => { sim.visitedStates.add(h.fromState); sim.visitedStates.add(h.toState); });
+      sim.visitedStates.add(sim.currentState);
+      sim.changedFields = new Set();
+      render();
+      showToast(`Undid back to ${sim.currentState}`, 'no-transition');
+    }
+
+    // ================================================================
+    // TOAST
+    // ================================================================
+
+    let toastTimer = null;
+    function showToast(message, type) {
+      const toast = document.getElementById('toast');
+      toast.className = `toast ${type}-toast show`;
+      toast.textContent = type === 'transition' ? `▸ ${message}` : type === 'rejected' ? `✕ ${message}` : `∼ ${message}`;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    // ================================================================
+    // CROSS-PANEL HOVER
+    // ================================================================
+
+    function setHoverEvent(name) {
+      document.querySelectorAll('[data-event]').forEach(el => {
+        const match = el.dataset.event === name;
+        el.classList.toggle('sd-edge-label-hover', match && el.classList.contains('sd-edge-label'));
+        el.classList.toggle('sd-edge-hover', match && (el.tagName === 'line' || el.tagName === 'LINE'));
+        el.classList.toggle('hover-highlight', match && el.classList.contains('event-card'));
+      });
+    }
+
+    function clearHoverEvent() {
+      document.querySelectorAll('.sd-edge-label-hover, .sd-edge-hover, .event-card.hover-highlight').forEach(el => {
+        el.classList.remove('sd-edge-label-hover', 'sd-edge-hover', 'hover-highlight');
+      });
+    }
+
+    function setHoverState(name) {
+      document.querySelectorAll('[data-state]').forEach(el => {
+        const match = el.dataset.state === name;
+        if (el.tagName === 'rect' || el.tagName === 'circle' || el.tagName === 'RECT' || el.tagName === 'CIRCLE') {
+          el.classList.toggle('sd-node-hover', match);
+        } else {
+          el.classList.toggle('hover-highlight', match);
+        }
+      });
+    }
+
+    function clearHoverState() {
+      document.querySelectorAll('.sd-node-hover, .hover-highlight').forEach(el => {
+        el.classList.remove('sd-node-hover', 'hover-highlight');
+      });
+    }
+
+    // ================================================================
+    // RENDER
+    // ================================================================
+
+    function render() {
+      renderDataPanel();
+      renderStateDiagram();
+      renderTimeline();
+      renderStatus();
+    }
+
+    // --- DATA PANEL (with edit/save mode) ---
+    function renderDataPanel() {
+      const el = document.getElementById('dataPanel');
+      const editableSet = new Set(EDITABLE_FIELDS[sim.currentState] || []);
+      const hasEditable = editableSet.size > 0;
+      const displayData = isEditing ? draftData : sim.data;
+
+      let html = `<div class="dp-header">
+        <div class="dp-header-left">
+          <span class="dp-title">Data</span>
+          <span class="dp-count">${Object.keys(FIELD_DEFS).length} fields · ${sim.currentState}</span>
+          ${isEditing && dirtyFields.size > 0 ? `<span class="dp-dirty-badge">${dirtyFields.size} unsaved</span>` : ''}
+        </div>
+        <div class="dp-header-actions">`;
+
+      if (hasEditable && !isEditing) {
+        html += `<button class="dp-edit-btn" onclick="startEditing()">✎ Edit</button>`;
+      }
+      if (isEditing) {
+        html += `<button class="dp-cancel-btn" onclick="cancelEditing()">Cancel</button>`;
+        html += `<button class="dp-save-btn" onclick="saveDraftEdits()" ${dirtyFields.size === 0 ? 'disabled' : ''}>Save</button>`;
+      }
+      html += `</div></div>`;
+
+      html += `<div class="dp-field-grid">`;
+      for (const [name, def] of Object.entries(FIELD_DEFS)) {
+        const val = displayData[name];
+        const isEditableField = editableSet.has(name);
+        const wasChanged = sim.changedFields.has(name) && !isEditing;
+        const isDirty = isEditing && dirtyFields.has(name);
+        let cls = 'dp-field';
+        if (wasChanged) cls += ' recently-changed';
+        if (isEditableField && !isEditing) cls += ' editable';
+        if (isEditing && isEditableField) cls += ' editing';
+        if (isDirty) cls += ' dirty';
+
+        html += `<div class="${cls}">`;
+        html += `<div class="dp-field-header">`;
+        html += `<span class="dp-field-name">${name}</span>`;
+        html += `<span class="dp-field-type">${def.type}${def.nullable ? '?' : ''}</span>`;
+        if (isEditableField) html += `<span class="dp-edit-badge">editable</span>`;
+        html += `</div>`;
+
+        if (isEditing && isEditableField && def.type === 'boolean') {
+          const onCls = val ? 'dp-toggle on' : 'dp-toggle';
+          html += `<div class="${onCls}" onclick="toggleDraftBool('${name}')">
+            <div class="toggle-track"></div>
+            <span class="dp-toggle-label" style="color: ${val ? 'var(--enabled)' : 'var(--blocked); opacity: 0.6'}">${val}</span>
+          </div>`;
+        } else if (isEditing && isEditableField && def.type === 'string') {
+          html += `<input class="dp-edit-input" id="edit-${name}" type="text"
+            value="${val !== null ? escHtml(String(val)) : ''}"
+            placeholder="${def.nullable ? 'null' : ''}"
+            oninput="updateDraftField('${name}', this.value || null)" />`;
+        } else {
+          html += renderFieldValue(val, def);
+        }
+
+        html += `</div>`;
+      }
+      html += `</div>`;
+
+      // Constraints strip
+      html += `<div class="dp-constraints-strip">`;
+      html += `<div class="dp-constraint-group">`;
+      html += `<div class="dp-constraint-group-title">Invariants</div>`;
+      for (const inv of INVARIANTS) {
+        const ok = inv.check(displayData);
+        html += `<div class="dp-inv-item ${ok ? 'ok' : 'violated'}">
+          <span class="dp-inv-icon">${ok ? '✓' : '✕'}</span>
+          <span class="dp-inv-msg">${inv.msg}</span>
+          ${inv.targets ? inv.targets.map(t => `<span class="dp-constraint-target">${t}</span>`).join('') : ''}
+        </div>`;
+      }
+      html += `</div>`;
+
+      const stateAsserts = STATE_ASSERTIONS[sim.currentState];
+      const fromAsserts = FROM_ASSERTIONS[sim.currentState];
+      if (stateAsserts || fromAsserts) {
+        html += `<div class="dp-constraint-group">`;
+        html += `<div class="dp-constraint-group-title">State constraints · ${sim.currentState}</div>`;
+        const allAsserts = [...(stateAsserts || []), ...(fromAsserts || [])];
+        for (const a of allAsserts) {
+          const ok = a.check(displayData);
+          html += `<div class="dp-assert-item ${ok ? 'ok' : 'violated'}">
+            <span>${ok ? '✓' : '✕'}</span>
+            <span class="dp-assert-msg">${a.msg}</span>
+            ${a.targets ? a.targets.map(t => `<span class="dp-constraint-target">${t}</span>`).join('') : ''}
+          </div>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+      el.innerHTML = html;
+    }
+
+    function renderFieldValue(val, def) {
+      if (val === null || val === undefined) return `<span class="dp-field-value null">null</span>`;
+      if (def.type === 'boolean') {
+        const cls = val ? 'dp-field-value bool-true' : 'dp-field-value bool-false';
+        return `<span class="${cls}">${val}</span>`;
+      }
+      return `<span class="dp-field-value">${escHtml(String(val))}</span>`;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // --- STATE DIAGRAM (§2.2 brand-spec, with cross-panel hover) ---
+    function renderStateDiagram() {
+      const el = document.getElementById('stateDiagram');
+      if (!el) return;
+
+      const nW = 86, nH = 26, nR = 13;
+
+      const nodes = [
+        { id: 'Draft',      x: 100, y: 30  },
+        { id: 'Open',       x: 100, y: 80  },
+        { id: 'Scheduled',  x: 100, y: 130 },
+        { id: 'InProgress', x: 100, y: 180 },
+        { id: 'Completed',  x: 100, y: 230 },
+        { id: 'Cancelled',  x: 235, y: 105 },
+      ];
+
+      const edges = [
+        { from: 'Draft',      to: 'Open',       label: 'Submit' },
+        { from: 'Open',       to: 'Scheduled',  label: 'Assign' },
+        { from: 'Open',       to: 'Cancelled',  label: 'Cancel' },
+        { from: 'Scheduled',  to: 'InProgress', label: 'StartWork' },
+        { from: 'Scheduled',  to: 'Cancelled',  label: 'Cancel' },
+        { from: 'InProgress', to: 'Completed',  label: 'Complete' },
+      ];
+
+      const selfLoops = {
+        'Scheduled': ['ApproveParts'],
+        'InProgress': ['RecordProgress'],
+      };
+
+      const nMap = {};
+      nodes.forEach(n => nMap[n.id] = n);
+
+      const lastStep = sim.history.length > 0 ? sim.history[sim.history.length - 1] : null;
+      const lastEdge = lastStep && lastStep.fromState !== lastStep.toState
+        ? { from: lastStep.fromState, to: lastStep.toState } : null;
+      const lastSelfLoop = lastStep && lastStep.fromState === lastStep.toState && !lastStep.event.startsWith('edit')
+        ? lastStep.fromState : null;
+
+      function arrowPath(x1, y1, x2, y2, s) {
+        const a = Math.atan2(y2 - y1, x2 - x1);
+        return `M${x2.toFixed(1)},${y2.toFixed(1)} L${(x2 - s * Math.cos(a - 0.45)).toFixed(1)},${(y2 - s * Math.sin(a - 0.45)).toFixed(1)} L${(x2 - s * Math.cos(a + 0.45)).toFixed(1)},${(y2 - s * Math.sin(a + 0.45)).toFixed(1)} Z`;
+      }
+
+      let svg = '<svg viewBox="0 0 290 260" xmlns="http://www.w3.org/2000/svg">';
+
+      // Edges — with data-event for cross-panel hover
+      edges.forEach(e => {
+        const f = nMap[e.from], t = nMap[e.to];
+        let x1, y1, x2, y2;
+
+        if (t.x > f.x) { x1 = f.x + nW / 2; y1 = f.y; x2 = t.x - nW / 2; y2 = t.y; }
+        else if (f.x > t.x) { x1 = f.x - nW / 2; y1 = f.y; x2 = t.x + nW / 2; y2 = t.y; }
+        else { x1 = f.x; y1 = f.y + nH / 2; x2 = t.x; y2 = t.y - nH / 2; }
+
+        const isTraced = sim.history.some(h => h.fromState === e.from && h.toState === e.to);
+        const isActive = lastEdge && lastEdge.from === e.from && lastEdge.to === e.to;
+
+        let lCls = 'sd-edge', aCls = 'sd-arrow', tCls = 'sd-edge-label';
+        if (isActive) { lCls += ' sd-edge-active'; aCls += ' sd-arrow-active'; tCls += ' sd-edge-label-active'; }
+        else if (isTraced) { lCls += ' sd-edge-traced'; aCls += ' sd-arrow-traced'; tCls += ' sd-edge-label-traced'; }
+
+        svg += `<line class="${lCls}" data-event="${e.label}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" onmouseenter="setHoverEvent('${e.label}')" onmouseleave="clearHoverEvent()"/>`;
+        svg += `<path class="${aCls}" d="${arrowPath(x1, y1, x2, y2, 5)}"/>`;
+
+        let mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        if (t.x > f.x) my -= 8; else mx -= 36;
+        svg += `<text class="${tCls} sd-edge-label" data-event="${e.label}" x="${mx}" y="${my}" onmouseenter="setHoverEvent('${e.label}')" onmouseleave="clearHoverEvent()">${e.label}</text>`;
+      });
+
+      // Self loops
+      for (const [sid, evts] of Object.entries(selfLoops)) {
+        const n = nMap[sid];
+        const isFlash = lastSelfLoop === sid;
+        let cls = 'sd-self-loop';
+        if (isFlash) cls += ' sd-self-flash';
+
+        const leftX = n.x - nW / 2 - 1;
+        svg += `<path class="${cls}" data-event="${evts[0]}" d="M${leftX},${n.y - 8} C${leftX - 18},${n.y - 8} ${leftX - 18},${n.y + 8} ${leftX},${n.y + 8}" onmouseenter="setHoverEvent('${evts[0]}')" onmouseleave="clearHoverEvent()"/>`;
+        svg += `<text class="sd-self-label sd-edge-label" data-event="${evts[0]}" x="${leftX - 20}" y="${n.y + 3}" text-anchor="end" style="font-size:6.5px" onmouseenter="setHoverEvent('${evts[0]}')" onmouseleave="clearHoverEvent()">${evts.join(', ')}</text>`;
+      }
+
+      // Nodes — with data-state for cross-panel hover
+      nodes.forEach(n => {
+        const isCurrent = sim.currentState === n.id;
+        const isVisited = sim.visitedStates.has(n.id);
+        const meta = STATE_META[n.id];
+        const hAttrs = `data-state="${n.id}" onmouseenter="setHoverState('${n.id}')" onmouseleave="clearHoverState()"`;
+
+        if (isCurrent) {
+          if (meta.initial) svg += `<circle class="sd-glow" cx="${n.x}" cy="${n.y}" r="${nR + 5}"/>`;
+          else svg += `<rect class="sd-glow" x="${n.x - nW / 2 - 4}" y="${n.y - nH / 2 - 4}" width="${nW + 8}" height="${nH + 8}" rx="${nR + 3}"/>`;
+        }
+
+        let nodeCls = 'sd-node';
+        if (isCurrent) nodeCls = 'sd-node-current';
+        else if (isVisited) nodeCls = 'sd-node-visited';
+
+        if (meta.initial) {
+          svg += `<circle class="${nodeCls} sd-node-initial" cx="${n.x}" cy="${n.y}" r="${nR}" ${isCurrent ? 'style="stroke-width:2.5"' : ''} ${hAttrs}/>`;
+          svg += `<circle class="sd-initial-dot" cx="${n.x}" cy="${n.y}" r="4" opacity="${isCurrent ? 1 : 0.5}"/>`;
+        } else if (meta.terminal) {
+          svg += `<rect class="sd-node-terminal-outer" x="${n.x - nW / 2 - 3}" y="${n.y - nH / 2 - 3}" width="${nW + 6}" height="${nH + 6}" rx="${nR + 2}"/>`;
+          svg += `<rect class="${nodeCls} sd-node-terminal" x="${n.x - nW / 2}" y="${n.y - nH / 2}" width="${nW}" height="${nH}" rx="${nR}" ${hAttrs}/>`;
+        } else {
+          svg += `<rect class="${nodeCls}" x="${n.x - nW / 2}" y="${n.y - nH / 2}" width="${nW}" height="${nH}" rx="${nR}" ${hAttrs}/>`;
+        }
+
+        let lblCls = 'sd-label';
+        if (isCurrent) lblCls = 'sd-label sd-label-current';
+        else if (isVisited) lblCls = 'sd-label sd-label-visited';
+        svg += `<text class="${lblCls}" x="${n.x}" y="${n.y + 3.5}">${n.id}</text>`;
+      });
+
+      svg += '</svg>';
+      el.innerHTML = svg;
+    }
+
+    // --- EVENT TIMELINE ---
+    function renderTimeline() {
+      const el = document.getElementById('timeline');
+      const isTerminal = STATE_META[sim.currentState].terminal;
+      let html = '';
+
+      // PAST
+      html += `<div class="tl-section">
+        <span class="label past">Past</span>
+        <span class="line"></span>
+        <span class="step-count">${sim.history.length} step${sim.history.length !== 1 ? 's' : ''}</span>
+      </div>`;
+
+      if (sim.history.length === 0) {
+        html += `<div class="no-past">No events fired yet — pick an event below to begin.</div>`;
+      } else {
+        html += `<div class="past-trail">`;
+        html += `<div class="trail-step">
+          <div class="step-marker origin"></div>
+          <div class="step-content">
+            <div class="step-headline">
+              <span class="step-state">Draft</span>
+              <span class="step-number">origin</span>
+            </div>
+          </div>
+        </div>`;
+
+        sim.history.forEach(h => {
+          html += `<div class="trail-step">
+            <div class="step-marker"></div>
+            <div class="step-content">
+              <div class="step-headline">
+                <span class="step-event">${escHtml(h.event)}</span>
+                <span class="step-outcome ${h.outcome}">`;
+          if (h.outcome === 'transition') {
+            html += `→ <span style="color:var(--violet);font-weight:600">${h.toState}</span>`;
+          } else {
+            html += `↻ <span style="color:var(--violet);font-weight:600">${h.fromState}</span>`;
+          }
+          html += `</span>
+                <span class="step-number">#${h.stepNum}</span>
+              </div>`;
+
+          if (h.deltas.length > 0) {
+            html += `<div class="step-deltas">`;
+            h.deltas.forEach(d => {
+              html += `<span class="delta">
+                <span class="field">${d.field}</span>
+                <span class="before">${formatVal(d.before)}</span>
+                <span class="arrow">→</span>
+                <span class="after">${formatVal(d.after)}</span>
+              </span>`;
+            });
+            html += `</div>`;
+          }
+          html += `</div></div>`;
+        });
+        html += `</div>`;
+      }
+
+      // PRESENT — state card with hover bridge
+      html += `<div class="tl-section">
+        <span class="label present">Present</span>
+        <span class="line"></span>
+      </div>`;
+
+      html += `<div class="present-marker ${isTerminal ? 'terminal-state' : ''}" data-state="${sim.currentState}" onmouseenter="setHoverState('${sim.currentState}')" onmouseleave="clearHoverState()">
+        <div class="pm-header">
+          <span class="pm-state-name">${sim.currentState}</span>
+          <div class="pm-badges">
+            <span class="pm-badge current">current</span>
+            <span class="pm-badge step-badge">step ${sim.stepCount}</span>
+            ${isTerminal ? '<span class="pm-badge terminal">terminal</span>' : ''}
+            ${EDITABLE_FIELDS[sim.currentState] ? '<span class="pm-badge step-badge">✎ editable</span>' : ''}
+          </div>
+        </div>
+        <div class="pm-subtitle">${getStateDescription(sim.currentState)}</div>
+      </div>`;
+
+      // FUTURE — slim event cards grouped by target → target state cards
+      if (isTerminal) {
+        const icon = sim.currentState === 'Completed' ? '✓' : '⊘';
+        html += `<div class="terminal-message">
+          <div class="tm-icon">${icon}</div>
+          <div>${sim.currentState} is a terminal state — no further events.</div>
+        </div>`;
+      } else {
+        html += `<div class="tl-connector"><div class="tl-connector-line"></div></div>`;
+        html += `<div class="tl-section">
+          <span class="label future">Future</span>
+          <span class="line"></span>
+        </div>`;
+
+        const events = getAvailableEvents(sim.currentState, sim.data);
+
+        // Separate self-loop events (no-transition) from transition events
+        const selfLoopEvents = events.filter(e => e.rows[0].outcome === 'no-transition' || !e.rows[0].target);
+        const transitionEvents = events.filter(e => e.rows[0].outcome === 'transition' && e.rows[0].target);
+
+        html += `<div class="future-flow">`;
+
+        // Render self-loop events first (they stay in current state)
+        selfLoopEvents.forEach(evt => {
+          html += renderSlimEventCard(evt);
+          html += `<div style="height:6px"></div>`;
+        });
+
+        // Group transition events by target state
+        const targetGroups = {};
+        transitionEvents.forEach(evt => {
+          const target = evt.rows[0].target;
+          if (!targetGroups[target]) targetGroups[target] = [];
+          targetGroups[target].push(evt);
+        });
+
+        // Render each group: event card(s) → connector → target state card
+        const targetEntries = Object.entries(targetGroups);
+        targetEntries.forEach(([target, evts], gi) => {
+          // Event cards for this target
+          evts.forEach((evt, ei) => {
+            if (ei > 0) html += `<div style="height:4px"></div>`;
+            html += renderSlimEventCard(evt);
+          });
+
+          // Connector line → target state card
+          html += `<div class="future-state-connector"><div class="future-state-connector-line"></div></div>`;
+
+          html += `<div class="future-state-card" data-state="${target}" onmouseenter="setHoverState('${target}')" onmouseleave="clearHoverState()">
+            <div class="future-state-name">${target}</div>
+            <div class="future-state-sub">${getStateDescription(target)}</div>`;
+
+          // Show which events lead here when multiple
+          if (evts.length > 1) {
+            html += `<div class="future-state-sources">via ${evts.map(e => `<span class="source-event">${e.name}</span>`).join(' or ')}</div>`;
+          }
+          html += `</div>`;
+
+          if (gi < targetEntries.length - 1) html += `<div style="height:12px"></div>`;
+        });
+
+        html += `</div>`;
+      }
+
+      el.innerHTML = html;
+    }
+
+    function renderSlimEventCard(evt) {
+      const primaryRow = evt.rows[0];
+      const isBlocked = !primaryRow.canFire({}, sim.data) && primaryRow.guard;
+      let html = '';
+
+      html += `<div class="event-card ${isBlocked ? 'blocked-card' : 'can-fire'}" data-event="${evt.name}" onmouseenter="setHoverEvent('${evt.name}')" onmouseleave="clearHoverEvent()">`;
+      html += `<div class="ec-body">`;
+
+      // Name row (+ self-loop badge if no-transition)
+      html += `<div class="ec-name-row">
+        <span class="ec-name">${evt.name}</span>`;
+      if (primaryRow.outcome === 'no-transition') {
+        html += `<span class="self-loop-badge">↻ stays</span>`;
+      }
+      html += `</div>`;
+
+      // Guard display
+      if (primaryRow.guardDisplay) {
+        const guardPasses = primaryRow.canFire({}, sim.data);
+        html += `<div style="display:flex;align-items:center;gap:6px;">
+          <span class="ec-guard">guard: ${primaryRow.guardDisplay}</span>
+          <span class="ec-guard-status ${guardPasses ? 'pass' : 'fail'}">${guardPasses ? '✓ pass' : '✕ blocked'}</span>
+        </div>`;
+      }
+
+      // Mutations
+      if (primaryRow.mutations && primaryRow.mutations.length > 0) {
+        html += `<div class="ec-mutations">${primaryRow.mutations.map(m => `<span style="color:var(--dusk)">set</span> ${m}`).join('<br>')}</div>`;
+      }
+
+      // Rejection message (if blocked with a guard)
+      if (evt.rows.length > 1 && evt.rows[1].outcome === 'rejected' && evt.rows[1].rejectMsg && isBlocked) {
+        html += `<div class="ec-rejection-msg">"${evt.rows[1].rejectMsg}"</div>`;
+      }
+
+      // Event assertions
+      if (primaryRow.eventAsserts && primaryRow.eventAsserts.length > 0) {
+        html += `<div style="font-size:9px;color:var(--dim);margin-top:1px;">`;
+        primaryRow.eventAsserts.forEach(a => {
+          html += `<span style="margin-right:8px;">assert: <span style="color:var(--gold)">${a.msg}</span></span>`;
+        });
+        html += `</div>`;
+      }
+
+      // Args + fire button
+      html += `<div class="ec-actions">`;
+      evt.args.forEach(a => {
+        if (a.type === 'boolean') {
+          html += `<div class="ec-arg"><label>${a.name}</label>
+            <select id="arg-${evt.name}-${a.name}">
+              <option value="false" ${!a.default ? 'selected' : ''}>false</option>
+              <option value="true" ${a.default ? 'selected' : ''}>true</option>
+            </select></div>`;
+        } else {
+          html += `<div class="ec-arg"><label>${a.name}</label>
+            <input id="arg-${evt.name}-${a.name}" type="${a.type === 'number' ? 'number' : 'text'}" placeholder="${a.placeholder || ''}" /></div>`;
+        }
+      });
+
+      if (!isBlocked || !primaryRow.guard) {
+        html += `<button class="ec-fire-btn" onclick="fireEvent('${evt.name}')">${evt.name}</button>`;
+      } else {
+        html += `<button class="ec-fire-btn blocked">${evt.name}</button>`;
+      }
+
+      html += `</div></div></div>`;
+      return html;
+    }
+
+    function formatVal(v) {
+      if (v === null || v === undefined) return 'null';
+      if (typeof v === 'boolean') return String(v);
+      return escHtml(String(v));
+    }
+
+    function getStateDescription(state) {
+      const descs = {
+        Draft: 'New work order — fill in details and submit.',
+        Open: 'Submitted and awaiting assignment.',
+        Scheduled: 'Technician assigned — approve parts or start work.',
+        InProgress: 'Work underway — record progress or complete.',
+        Completed: 'Work finished and closed.',
+        Cancelled: 'Work order cancelled.',
+      };
+      return descs[state] || '';
+    }
+
+    // --- STATUS BAR ---
+    function renderStatus() {
+      document.getElementById('statusStep').textContent = `Step ${sim.stepCount}`;
+      const invOk = INVARIANTS.every(i => i.check(sim.data));
+      const invEl = document.getElementById('statusInvariants');
+      if (invOk) { invEl.className = 'status-ok'; invEl.textContent = `✓ ${INVARIANTS.length} invariants ok`; }
+      else { invEl.className = 'status-warn'; invEl.textContent = '⚠ invariant violated'; }
+    }
+
+    // --- Initial render ---
+    render();
+  </script>
+</body>
+</html>

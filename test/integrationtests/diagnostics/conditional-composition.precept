@@ -1,0 +1,32 @@
+# Demonstrates: C92, C93 — conditional composition and guard-local proof narrowing
+
+# The guarded row is safe because the proof only exists inside the when-true branch.
+# The conditional rows show Hull behavior for conditional expressions used as divisors.
+
+precept ConditionalCompositionDemo
+
+field Amount as number default 100 positive
+field Divisor as number default 1
+field UseFallback as boolean default false
+field GuardedShare as number default 0
+field ConditionalShare as number default 0
+field ZeroShare as number default 0
+
+state Active initial
+state Done
+
+event ComputeGuarded
+event ComputeConditional
+event ComputeZeroConditional
+
+# SAFE: the guard proves Divisor > 0 only inside this row.
+from Active on ComputeGuarded when Divisor > 0 -> set GuardedShare = Amount / Divisor -> transition Done
+from Active on ComputeGuarded -> transition Done
+
+# C93: one branch is safe (1), the other has no proof (Divisor), so the merged divisor is still unresolved.
+# EXPECT: C93 | severity=error | match=exact | message=Divisor 'expression' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule expression != 0', or 'when expression != 0' guard. | line=28 | start=69 | end=105
+from Active on ComputeConditional -> set ConditionalShare = Amount / (if UseFallback then Divisor else 1) -> transition Done
+
+# C92: both branches are the literal 0, so the conditional divisor is provably zero.
+# EXPECT: C92 | severity=error | match=exact | message=Division by zero: divisor 'expression' is provably zero. | line=32 | start=66 | end=96
+from Active on ComputeZeroConditional -> set ZeroShare = Amount / (if UseFallback then 0 else 0) -> transition Done

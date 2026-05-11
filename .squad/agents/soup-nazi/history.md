@@ -1,11 +1,51 @@
 ## Core Context
 
-- Owns test discipline, validation strategy, and compile/runtime verification for the DSL and surrounding tools.
-- Samples and hero candidates should be validated against the real compiler/runtime before the team treats them as canonical.
-- Coverage work should record meaningful gaps, not just raw counts; behavior claims need executable proof.
+- Owns test discipline across parser, type checker, runtime, MCP, and language-server validation.
+- Keeps behavioral claims tied to executable proof and records gaps as actionable test findings, not just counts.
+- Historical summary (pre-2026-04-13): led broad verification for declaration guards, including parser/type-checker/runtime/LS/MCP coverage and test-matrix planning for guarded editability.
+
+## Learnings
+
+- When a test is added to satisfy a "count" AC, always verify it also satisfies any "correctness" sub-clauses (e.g., StateContext, message text). A test that checks `ContainSingle()` for AC #21 does NOT satisfy the "correct state context" part of that AC.
+- Prior-round blockers can be marked "fixed" while still having a gap: B2 (AC #21) shipped the right test method but the assertion stopped at count=1, never checking StateContext. The AC said "with correct state context."
+- Integration tests (diagnostic samples with EXPECT annotations) can cover message text gaps that unit tests leave open — but unit tests with code-only assertions are a weaker safety net. Both should be present where the design specifies message content.
+- When Elaine-B1 (FormatInterval → natural language) ships, divisor-safety.precept:41 EXPECT line will need updating. Track this dependency proactively.
+- Compile-time/default-data behavior must be tested explicitly whenever new guard semantics are introduced.
+- Guard scope rules need separate coverage for field-scoped and arg-scoped contexts.
+- Regression risk is highest where hydration, editability, and inspect/update paths share runtime machinery.
+- When slice agents do their job, drift tests arrive pre-populated — audit confirms rather than creates. Slice 5 agent added C92/C93 drift entries correctly.
+- Event arg constraint keyword → C93 suppression must be tested separately from event arg ensure → C93 suppression. The mechanism overlaps but the AC names them as distinct.
+- `from any` expansion tests must cover each proof-scoped diagnostic independently. A null-narrowing `from any` test does NOT satisfy the divisor `from any` AC.
+- For structural refactors, regression anchors must map to the moved method clusters' real owning test files, not just the broad umbrella suite. Helper extraction especially needs explicit canaries for row expansion, symbol-table construction, accessor resolution, and proof-context lookup.
+- Theory-based tests with `messageFragment` inline data are the strongest pattern for context-aware diagnostic messages — each row self-documents what the message should say.
+- Principle #8 stance from the testing seat: compile-clean should not imply safety the checker did not actually prove. Runtime failure tests are a backstop, not the guarantee, but tighter philosophy must preserve already-proven compound patterns rather than flattening the language into trivial-only proofs.
+
+- Compound "assume satisfiable" heuristic has a latent soundness gap: `D - D` is always zero but no C93 fires. Any future compound analysis must address this test (`Check_DivisorCompound_Subtraction_NoWarning`).
+- The sample corpus has ZERO non-literal field-based divisors that lack proof — every division by a field or event arg is already constrained. Future proof techniques have no corpus gap to close for existing samples; their value is in enabling NEW patterns (inline if/then/else division, function-wrapped divisors, relational cross-field proofs).
+- if/then/else in Precept is ternary expression only — narrowing applies to typing within branches, not control-flow reachability. This simplifies branch analysis compared to general PL.
+- Function proofs (abs, max, min, clamp, round, sqrt) have the highest ratio of new provable patterns to implementation complexity. `max(D, 1)` as safe divisor is the single most impactful pattern.
+- Interval arithmetic's biggest win in the current corpus is computed field constraint verification (e.g., proving `LineTotal nonnegative` from upstream field ranges).
+- A large proof-test count can still hide guarantee holes. For PR #108, the critical misses are concentrated at the design-expansion edges: truth-based `C92` vs unresolved `C93`, the entire `C94`-`C98` family, the 64-fact / 256-node graph caps, and proof surfacing in hover/MCP.
 
 ## Recent Updates
 
+### 2026-04-17 — Proof Technique Test Inventory (pre-implementation research)
+- Read all 25 sample files, cataloged every arithmetic expression: 5 divisions, 2 modulos, 22+ additions/subtractions, 11+ multiplications, 8 function calls, 5 if/then/else ternaries, 12+ relational guard expressions.
+- All sample divisions are already safe: either literal divisors or event-arg-proven. No new technique closes a gap in the existing corpus.
+- Identified `Check_DivisorCompound_Subtraction_NoWarning` (`D - D`) as a latent soundness gap that any compound analysis would expose.
+- Produced 40+ concrete test cases across 5 techniques with positive/negative/edge categories in actual Precept syntax.
+- Output: `temp/soup-nazi-proof-test-inventory.md`
+
+
+## Recent Updates
+
+### 2026-04-17 — PR #108 Test Review (Issue #106 divisor safety)
+- Reviewed full PR: 34 behavioral ACs mapped to tests. 32/34 covered, 2 blockers.
+- B1: No test for event arg `positive` constraint keyword suppressing C93 (AC #12). The sqrt variant is tested but not divisor.
+- B2: No test for `from any` expansion with per-state divisor proof (AC #21). Existing `from any` test is null-narrowing only.
+- Warnings: guarded state ensure exclusion from divisor proof covered by mechanism but no explicit test; generic C93 message text not asserted.
+- Strengths: Theory-based proof source × operator matrix, 7-variant or-pattern suite, zero disabled tests, CatalogDriftTests fully populated, code action tests go beyond core AC.
+- Total: ~51 new test methods (47 Precept.Tests + 4 LS.Tests). 1463 total tests, 0 failures.
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 
@@ -14,50 +54,47 @@
 - Created new `test/Precept.Tests/PreceptKeywordLogicalOperatorTests.cs` covering: basic keyword parsing (not/and/or), precedence validation (not > and > or), null narrowing through `not (Field == null)`, `!=` operator unaffected, old symbols `&&`/`||`/`!` produce parse errors, compound expression parse/evaluate, invariant context (or/and).
 - George's runtime changes (parser, tokenizer, type checker, evaluator, samples) were already on the branch — tests written against the finished spec.
 - Key learning: always check if the partner's runtime changes are already on branch before assuming tests will fail. The old-symbol-produces-error tests and keyword tests may pass immediately if George's work is complete.
+### 2026-04-15 — Issue #100 Testing Gate: Precept Name Token Scope
+- **BLOCKED** PR #101. The TextMate grammar fix is correct (`entity.name.precept.message.precept` → `entity.name.type.precept.precept`), but the semantic token handler (`PreceptSemanticTokensHandler.cs` line 331) still maps `PreceptToken.Precept => "preceptMessage"`. Because `editor.semanticHighlighting.enabled = true` is set for precept files, the semantic path overrides TextMate and the precept name still renders gold.
+- Identified that `GetClassifiedTokens_PreceptName_IsPreceptMessage` (line 125, `PreceptSemanticTokensClassificationTests.cs`) asserts the broken behavior and must be updated as part of the fix.
+- Required: semantic handler change + legend registration (if new type) + package.json semantic color rule + test update.
 
-### 2026-04-08 - Charter: MCP Regression Testing skill section added
-- `charter.md` now includes a `## MCP Regression Testing` section with the full 4-round methodology, all authoring rules hard-won from live execution (multi-line rows, `when` guard placement, `dequeue`/`pop` into, diagnostic code vs. constraint index, C50 scope), and per-round pass criteria.
-- The section is the canonical reference for future regression rounds authored by any agent — no need to rediscover parse failures from scratch.
+### 2026-04-11 — Guarded declaration validation sweep
+- Built and verified multi-layer tests for guarded invariants, state asserts, event asserts, and guarded edit blocks, including runtime and MCP coverage.
 
-### 2026-04-08 - Exploratory MCP regression rounds 1 & 2 (synthesized probes)
-- Wrote 127 new tests across 3 files covering all stateless precept behaviors: parser (IsStateless, root edit all/fields, C12/C13/C49/C55 diagnostics), runtime (CreateInstance null state, Fire→Undefined, Inspect→null currentState, Update editability), MCP tools (CompileTool IsStateless/InitialState/StateCount, InspectTool/FireTool/UpdateTool with null currentState), and LS completions (root edit 'all' and field names).
-- Fixed 8 nullable warnings in pre-existing test files (InitialState!, TransitionRows!, col!).
-- Fixed stale CompileToolTests.DeadEndState_HintDiagnostic — C50 severity is Warning not Hint per squad decision.
-- Final baseline: 754 passing, 0 failing (612 core / 55 mcp / 87 ls). Build: 0 warnings, 0 errors.
-- Key learning: root edit blocks have State == null; "all" is stored as FieldNames sentinel ["all"] expanded at engine construction. GetEditableFieldNames(null) is the internal API. Stateless CreateInstance(state, ...) throws ArgumentException with "stateless" in the message.
+### 2026-04-17 — Unified proof plan full test review (pre-implementation)
+- Reviewed `temp/unified-proof-plan.md` §4-§8a against existing test codebase. Plan has ~166 new tests across 9 files.
+- Coverage matrix (§8): All 20 input patterns mapped to planned test files. Every "✅ proves" and "💀 correctly rejected" has at least one test. No coverage gaps in the matrix proper.
+- §8a unsupported patterns: Found that 4 of 17 rows need explicit "correctly rejected" tests that are NOT listed in any planned test file: row 1 (non-linear `A*B-C`), row 4 (function opacity `abs(X)-B`), row 14 (inequality-without-ordering `A!=B`), row 16 (modulo `A%B`). Filed as NON-BLOCKING finding — these are easy to add.
+- Edge cases missing per file: LinearFormTests needs constant-only normalization, single-term form, `long.MaxValue` GCD stress, and construction-order equality. RationalTests needs `long.MinValue` negation overflow, multiplication overflow, division by zero. ProofContextTests needs deeply nested `Child()`, unknown field `WithAssignment`, opaque expression `IntervalOf`. TransitiveClosureTests needs disconnected graph, self-loop, mixed-scope chains.
+- Regression risk: Highest risk files are PreceptTypeCheckerTests.cs (C-Nano section specifically), ConditionalExpressionTests.cs, CatalogDriftTests.cs (C92/C93 entries), DiagnosticSpanPrecisionTests.cs (C93 column tests). The ProofContext signature refactor (commit 2) touches every narrowing method — mechanical but high blast radius.
+- Soundness invariant tests: -3..+3 range is acceptable first pass but narrow. Missing: decimal values (0.001, 0.1), larger magnitudes (100, 1000), explicit saturation tests.
+- Workaround flagging feasibility: Assessed all 5 unsupported categories. Detection is feasible for all — `LinearForm.TryNormalize` failure reason + expression shape inspection + rule set scanning. Suggestion generation requires ~100-200 new LOC. Recommendation: follow-up PR, not this one — it improves diagnostic quality but doesn't change proof power.
+- Verdict: APPROVED-WITH-CAVEATS (1 blocker, 6 non-blocking findings).
 
-### 2026-04-10 - Hero candidate DSL validation
-- Compile-validated the hero candidate set with precept_compile and separated valid examples from advisory failures.
-- Key learning: a hero sample is not real until the engine accepts it without caveat.
+### 2026-04-17 — Slice 8: C92/C93 catalog drift + sample audit (#106)
+- Verified C92 (literal zero divisor) and C93 (unproven divisor) drift test entries already present and correct in both `ConstraintTriggers` and `LineAccuracyData`.
+- Audited 5 sample files: loan-application, invoice-line-item, insurance-claim, travel-reimbursement, clinic-appointment-scheduling — all compile clean, zero C92/C93 diagnostics.
+- Critical validation: `travel-reimbursement.precept` with `Submit.Lodging / Submit.Days` (non-literal divisor) produces no C93 warning, confirming `BuildEventEnsureNarrowings` (Slice 4) is working correctly.
+- No code changes needed. All 1290 tests pass.
 
-### 2026-04-10 - Test refresh coverage analysis
-- Reviewed current test/project coverage and documented where follow-up strengthening would matter most.
-- Key learning: coverage summaries are useful only when they identify the specific behavioral lanes still at risk.
+### 2026-04-19 — Issue #118 regression gate audit (PR #123 structural refactor)
+- Audited issue #118 acceptance criteria and PR #123 regression anchors against the actual test surface of `PreceptTypeChecker`.
+- Verdict: MANAGEABLE.
+- Slice 1 anchors are directionally right, but the exact watch methods that matter most are `Check_TypeContext_CapturesScopedSymbolsForGuardedTransition`, `Check_FromAny_UsesPerStateExpansionAndStateEnsureNarrowing`, `Check_DivisorFromAny_PartialStateEnsure_C93WithContext`, `Check_DottedEventArgNullNarrowing_NarrowsSuccessfully`, `Check_BareEventArgInTransitionGuard_ProducesC38`, `Check_StateEnsure_AppliesInCorrectState_C93InOtherState`, and `Regression_CollectionCount_ParsesAndCompiles_Unaffected`.
+- Slice 2 anchors in the PR body are incomplete. `ValidateChoiceField(...)` coverage lives in `PreceptChoiceTypeTests.cs` (`C62/C63/C64/C66`), and `C61` maxplaces coverage lives in `PreceptDecimalTypeTests.cs` and `PreceptIntegerTypeTests.cs`, not just `FieldConstraintTests.cs`.
+- Slices 3-5 are directionally sufficient if each one runs `dotnet build` plus the targeted anchor set from the PR body before moving on.
+- Filed inbox note: `.squad/decisions/inbox/soup-nazi-issue-118-regression-gate.md`.
+- Recommended targeted commands before full suite:
+	- Slice 1: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~Precept.Tests.PreceptTypeCheckerTests|FullyQualifiedName~Precept.Tests.ProofContextScopeTests|FullyQualifiedName~Precept.Tests.StringAccessorTests"`
+	- Slice 2: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~Precept.Tests.FieldConstraintTests|FullyQualifiedName~Precept.Tests.PreceptChoiceTypeTests|FullyQualifiedName~Precept.Tests.PreceptDecimalTypeTests|FullyQualifiedName~Precept.Tests.PreceptIntegerTypeTests"`
+- Full gate: `dotnet build` per slice, then `dotnet test` before PR-ready.
+- Verified current branch health for the proposed gate: Slice 1 candidate set 190 passed; Slice 2 candidate set 137 passed.
+- Current build still emits 2 warnings in `PreceptTypeChecker.cs`, so the bar stays “no new warnings attributable to the refactor,” not merely “build succeeds.”
 
-### 2026-04-08 - Exploratory MCP regression rounds 1 & 2 (synthesized probes)
-- Executed 18 compile probes and 3 runtime shapes via live MCP tools (no sample file reads except to learn syntax).
-- Round 1: 15/18 probes passed as authored. Three failures were test plan syntax errors, not engine bugs. Corrected versions all passed.
-  - Multi-line transition action chains fail parsing — all actions must be on one line.
-  - `when` guard must appear before the first `->`, not after it.
-  - `dequeue`/`pop` require `into <field>` target; bare form is not valid.
-  - Probe 16 used wrong code: duplicate initial state emits PRECEPT008, not C13/PRECEPT013.
-  - Probe 17 had wrong expectation: C50 fires only for states WITH rows that can't reach another state. Zero-row terminal state = no diagnostic.
-- Round 2: All 7 outcome kinds confirmed across Approval/FeatureGate/RangeGuard shapes. Transition, NoTransition, Rejected, ConstraintFailure, UneditableField, Update, Undefined — all verified.
-- Verdict: PASS (engine). Five test plan items need correction.
-- Report: `.squad/decisions/inbox/soup-nazi-mcp-regression-exploratory.md`.
-- Key learning: `from any` expansion is eager at compile time — visible as separate rows in compile output. C-prefixed constraint indices ≠ emitted PRECEPT diagnostic codes.
-
-### 2026-04-08 - MCP regression pass for PR #48 (data-only precepts)
-- Full manual regression via live MCP tools: 24 sample compiles (Round 1), stateful end-to-end on maintenance-work-order (Round 2), stateless end-to-end on customer-profile + fee-schedule (Round 3), 4 edge-case diagnostics (Round 4).
-- Round 1: 24/24 valid, 0 error diagnostics. 3 new stateless samples (customer-profile, fee-schedule, payment-method) all return `isStateless: true`.
-- Round 2: Draft→Open transition fired correctly; UneditableField and Update outcomes both confirmed.
-- Round 3: `edit all` expands to all fields, selective edit (`edit BaseFee, DiscountPercent, MinimumCharge`) blocks TaxRate with UneditableField "(stateless)". ConstraintFailure triggered by MarketingOptIn invariant. Fire on stateless precept → Undefined with "stateless" message.
-- Round 4: C12, C55, C49, and parse-failure all behave exactly per spec. C49 is warning (precept stays valid:true); C55 is error (valid:false).
-- Verdict: PASS. PR #48 is clear to merge. Report filed to `.squad/decisions/inbox/soup-nazi-mcp-regression.md`.
-- Key learning: Inspect of an event that triggers a state assertion shows ConstraintFailure in pre-flight when required args are absent (e.g., Assign in Open shows ConstraintFailure against the Scheduled assertion before args are evaluated). Fire still succeeds when args are provided.
-
-### 2026-04-08 - Frank PR #48 review gaps: C49 multi-event + stateful edit-all
-- Added `Parse_C49_MultipleEvents_ProducesOneWarningPerEvent` to `PreceptStatelessParserTests` — verifies 3-event stateless precept produces exactly 3 PRECEPT049 warnings (Decision 10 guarantee).
-- Added `Update_StatefulPrecept_EditAll_ExpandsToAllFields` to `PreceptStatelessUpdateTests` — verifies `in State edit all` on a stateful precept expands correctly through the engine (Update returns success, not UneditableField).
-- Both tests pass; committed on feature/issue-22-data-only-precepts.
-- Key learning: `engine.Update(instance, patch => patch.Set(...))` is the only overload — task brief's `Dictionary` form doesn't exist in the API; use the builder lambda.
+### 2026-04-19 — Issue #118 diagnostic drift triage (PR #123)
+- Re-ran `DiagnosticSampleDriftTests` locally on current `feature/issue-118`: targeted drift theory passed, and a fresh full-suite run passed `2073/2073`.
+- Verified the two reported sample failures are not baseline by running the same drift theory on pre-refactor commit `b686893`; it passed there too.
+- Walked the refactor commits `032b897`, `89bf5bb`, `4dad80b`, `eb88c4e`, `ad3f65d`, and `49e9090`; the same drift theory passed on every retained slice commit.
+- Read the current branch diff from `b686893..a83956d`: no sample or drift-harness changes, only `PreceptTypeChecker` partial extraction files plus main-file edits.
+- Key lesson: when a handoff claims named failing samples but no assertion payload survives, do not classify from squad notes alone. Re-run the exact theory on the pre-refactor base, each retained slice commit, and current `HEAD` before calling something baseline or regression-attributable.

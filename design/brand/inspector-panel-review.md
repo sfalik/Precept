@@ -3,7 +3,7 @@
 **Reviewer:** Elaine (UX Designer)  
 **Requested by:** Shane  
 **Date:** 2026-04-05  
-**Reference spec:** `brand/brand-spec.html § 2.3 Inspector Panel`  
+**Reference spec:** `design/system/foundations/semantic-visual-system.html`  
 **Compared against:** `tools/Precept.VsCode/webview/inspector-preview.html`, `tools/Precept.VsCode/mockups/interactive-inspector-mockup.html`, `docs/archive/InteractiveInspectorMockup.md`
 
 ---
@@ -20,7 +20,7 @@ The old review was right about the **brand drift**. It is no longer current abou
 
 These findings still hold and should stay in the PRD:
 
-- **Custom palette drift remains unresolved.** The webview still defines off-system colors in `:root` (`--state: #6D7F9B`, `--event: #8573A8`, `--ok: #1FFF7A`, `--err: #FF2A57`, `--muted: #59657A`) instead of the locked inspector colors from `brand-spec.html §2.3`.
+- **Custom palette drift remains unresolved.** The webview still defines off-system colors in `:root` (`--state: #6D7F9B`, `--event: #8573A8`, `--ok: #1FFF7A`, `--err: #FF2A57`, `--muted: #59657A`) instead of the locked preview and inspector guidance in `design/system/foundations/semantic-visual-system.html`.
 - **Typography drift remains unresolved.** `body` still uses `"Segoe UI", Arial, sans-serif` instead of the locked Cascadia Cove-based mono treatment for field data.
 - **Field hierarchy still needs brand mapping.** Field names still read as plain white/inherited text, read-only values still lean on the blue-gray muted color, and inline violation text still uses error red instead of the spec's gold message treatment.
 - **Field types are still not surfaced.** The runtime already carries `fieldType` for editable fields, but the panel does not render type information in the data lane.
@@ -33,7 +33,7 @@ These findings still hold and should stay in the PRD:
 
 The old review cited `brand/visual-surfaces-draft.html`. That is no longer the right source of truth. The live reference is now:
 
-- `brand/brand-spec.html § 2.3 Inspector Panel`
+- `design/system/foundations/semantic-visual-system.html`
 
 That matters because the color and semantics guidance has been tightened since the draft surface writeup.
 

@@ -12,7 +12,7 @@ public class PreceptCompilerPhaseITests
         const string dsl = """
             precept M
             field Score as number default 0
-            invariant Score > 0 because "must be positive"
+            rule Score > 0 because "must be positive"
             state A initial
             state B
             state Unreachable
@@ -34,13 +34,13 @@ public class PreceptCompilerPhaseITests
         const string dsl = """
             precept M
             field Score as number default 0
-            invariant Score > 0 because "must be positive"
+            rule Score > 0 because "must be positive"
             state A initial
             state B
-            in B assert Score > 0 because "first"
-            in B assert Score > 0 because "duplicate"
+            in B ensure Score > 0 because "first"
+            in B ensure Score > 0 because "duplicate"
             event Go with Amount as number default 0
-            on Go assert Amount > 1 because "amount must be positive"
+            on Go ensure Amount > 1 because "amount must be positive"
             from A on Go -> transition B
             """;
 

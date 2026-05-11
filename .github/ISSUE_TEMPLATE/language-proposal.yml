@@ -12,7 +12,7 @@ body:
 
         Canonical workflow:
         - Proposal body lives in the GitHub issue
-        - Rationale and precedent live in `docs/research/`
+        - Rationale and precedent live in `research/`
         - Implementation checklist lives in the PR body
         - Spec docs in `docs/` are updated at implementation time
 
@@ -100,7 +100,7 @@ body:
     attributes:
       label: Research and rationale links
       description: Link the research docs, precedent surveys, or prior issues that explain why this proposal exists.
-      placeholder: docs/research/language/...
+      placeholder: research/language/...
     validations:
       required: true
 

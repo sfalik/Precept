@@ -21,9 +21,17 @@ Work monitor. Tracks GitHub issues, PRs, CI status. Keeps the pipeline moving.
 
 ## Recent Updates
 
+### 2026-04-12 — Dedicated Squad `@copilot` lane removed
+- Ralph should no longer expect `squad:copilot` labels or any `@copilot` auto-assignment step in Squad heartbeat, triage, or assignment flows. `squad:chore` remains active as a non-routing chore marker — Ralph does not act on it for auto-assignment.
+- All Squad issue flow now stays on the named-member path: `squad` backlog triage, then `squad:{member}` pickup.
+- Repo-wide Copilot tooling remains available; only the Squad-owned routing lane was retired.
+
 📌 Team initialized on 2026-04-04
 
 ## Learnings
 
 Initial setup complete.
+
+- 2026-04-15: Chore lane is currently clear on GitHub. Issue #97 (`squad:chore`) is closed as completed and PR #98 is merged; there are no remaining open `squad:chore` issues or open chore PRs to route this cycle.
+- 2026-04-15: Chore lane reopened with issue #100 (`type:chore`, `squad:chore`) about the precept-name token color scope bug. It is already routed to Frank via `squad:frank`, has no open linked chore PR, and the chore PR board remains empty this cycle.
 

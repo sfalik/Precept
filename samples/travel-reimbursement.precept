@@ -2,21 +2,19 @@ precept TravelReimbursement
 
 # Finance reviews a reimbursement request by checking both totals and policy ratios.
 # This sample brings in multiplication and division without making the domain obscure.
+# Built-in functions (round, min, clamp) keep arithmetic readable.
+# RequestedTotal is a computed field — always equal to the sum of its components.
 
 field EmployeeName as string nullable
-field TripDays as number default 1
+field TripDays as number default 1 positive
 field LodgingTotal as number default 0
 field MealsTotal as number default 0
-field MileageTotal as number default 0
+field MileageTotal as decimal default 0 maxplaces 2
 field MileageRate as number default 0.67
-field RequestedTotal as number default 0
-field ApprovedTotal as number default 0
+field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal nonnegative
+field ApprovedTotal as number default 0 nonnegative
 field FinanceNote as string nullable
-
-invariant TripDays > 0 because "Trip days must be positive"
-invariant RequestedTotal >= 0 because "Requested total cannot be negative"
-invariant ApprovedTotal >= 0 because "Approved total cannot be negative"
-invariant ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the request"
+rule ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the request"
 
 state Draft initial
 state Submitted
@@ -24,31 +22,48 @@ state Approved
 state Paid
 state Rejected
 
-in Paid assert ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
+in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
 
-event Submit with Employee as string, Days as number, Lodging as number, Meals as number, Miles as number, Rate as number default 0.67
-on Submit assert Employee != "" because "An employee name is required"
-on Submit assert Days > 0 because "Trip days must be positive"
-on Submit assert Lodging >= 0 because "Lodging cannot be negative"
-on Submit assert Meals >= 0 because "Meals cannot be negative"
-on Submit assert Miles >= 0 because "Mileage cannot be negative"
-on Submit assert Rate >= 0 because "Mileage rate cannot be negative"
+event Submit with
+    Employee as string notempty,
+    Days as number,
+    Lodging as number,
+    Meals as number,
+    Miles as number,
+    Rate as number default 0.67
+on Submit ensure Days > 0 because "Trip days must be positive"
+on Submit ensure Lodging >= 0 because "Lodging cannot be negative"
+on Submit ensure Meals >= 0 because "Meals cannot be negative"
+on Submit ensure Miles >= 0 because "Mileage cannot be negative"
+on Submit ensure Rate >= 0 because "Mileage rate cannot be negative"
 
-event Approve with Amount as number, Note as string nullable default null
-on Approve assert Amount > 0 because "Approved amounts must be positive"
-on Approve assert Note == null or Note != "" because "A supplied finance note cannot be blank"
+event Approve with Amount as number, Note as string nullable default null notempty
+on Approve ensure Amount > 0 because "Approved amounts must be positive"
 
-event Reject with Note as string
-on Reject assert Note != "" because "A rejection note is required"
-
+event Reject with Note as string notempty
 event Pay
 
 # Average lodging per day is checked with division to keep the example realistic.
-from Draft on Submit when Submit.Lodging / Submit.Days <= 350 -> set EmployeeName = Submit.Employee -> set TripDays = Submit.Days -> set LodgingTotal = Submit.Lodging -> set MealsTotal = Submit.Meals -> set MileageTotal = Submit.Miles * Submit.Rate -> set MileageRate = Submit.Rate -> set RequestedTotal = Submit.Lodging + Submit.Meals + (Submit.Miles * Submit.Rate) -> transition Submitted
-from Draft on Submit -> reject "Average lodging per day exceeds the policy cap"
+from Draft on Submit when Submit.Lodging / Submit.Days <= 350
+    -> set EmployeeName = Submit.Employee
+    -> set TripDays = Submit.Days
+    -> set LodgingTotal = Submit.Lodging
+    -> set MealsTotal = Submit.Meals
+    -> set MileageTotal = round(Submit.Miles * Submit.Rate, 2)
+    -> set MileageRate = Submit.Rate
+    -> transition Submitted
+from Draft on Submit
+    -> reject "Average lodging per day exceeds the policy cap"
 
-from Submitted on Approve when Approve.Amount <= RequestedTotal -> set ApprovedTotal = Approve.Amount -> set FinanceNote = Approve.Note -> transition Approved
-from Submitted on Approve -> reject "Finance cannot approve more than the requested total"
-from Submitted on Reject -> set FinanceNote = Reject.Note -> transition Rejected
+from Submitted on Approve when Approve.Amount <= RequestedTotal
+    -> set ApprovedTotal = min(Approve.Amount, RequestedTotal)
+    -> set FinanceNote = Approve.Note
+    -> transition Approved
+from Submitted on Approve
+    -> reject "Finance cannot approve more than the requested total"
+from Submitted on Reject
+    -> set FinanceNote = Reject.Note
+    -> transition Rejected
 
-from Approved on Pay -> transition Paid
+from Approved on Pay
+    -> transition Paid

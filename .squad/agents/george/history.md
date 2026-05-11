@@ -1,12 +1,118 @@
 ## Core Context
 
-- Owns the core DSL/runtime: parser, type checker, graph analysis, runtime engine, and authoritative language semantics.
-- The engine flow is parser to semantic analysis to graph/state validation to runtime execution. Fire behavior must stay consistent with diagnostics, README examples, and MCP output.
-- Key runtime areas to protect: constraints, transition guards, event assertions, collection hydration, edit rules, and diagnostic catalogs.
-- Documentation should describe the six-stage fire pipeline and implemented semantics accurately, without inventing capabilities.
+- Owns the core DSL/runtime: parser, type checker, diagnostics, graph analysis, and execution semantics.
+- Protects the fire/update/inspect pipeline contract and keeps runtime behavior aligned with docs, tests, and MCP output.
+- Historical summary (pre-2026-04-13): led runtime feasibility and implementation analysis for guarded declarations, event hooks, computed fields, and verdict-modifier semantics.
+
+## Learnings
+
+- Runtime/design gaps should be separated cleanly from philosophy decisions; product-identity calls belong to Shane.
+- Recompute-style features succeed when insertion points are explicit across Fire, Update, and Inspect.
+- Documentation must describe implemented pipeline stages exactly, especially around editability, hooks, and validation order.
+- DSL `ensure` statements always require a `because` clause — tests that omit it get parse failures, not type-check failures.
+- When narrowing injects `$positive:` it always co-injects `$nonneg:`, so `$positive:` alone is never the only marker present. Adding `$positive:` as a C76 fallback is defensive but aligns with the C92/C93 pattern.
+- The dotted-key translation for event args happens in `BuildEventEnsureNarrowings` — bare markers like `$nonneg:Val` become `$nonneg:Submit.Val`. The C76 check constructs dotted keys via `TryGetIdentifierKey`, so both ends line up.
+- Transition-row `set` chains are checked against one guard-narrowed snapshot per row. Earlier assignments do not feed later assignments today, which is the root cause of the intra-row divisor/null false negatives.
+- State actions share the same stale-snapshot limitation as transition rows. A sequential action-flow fix should update both sites to avoid divergent compile-time semantics.
+- The compiler-side fix is local to `PreceptTypeChecker`, but editor/type-context precision is coarser: `transition-actions` currently records one scope snapshot per row, not per assignment.
+- Principle #8 should be described as capability-scoped strictness, not a blanket "assume satisfiable" default: the checker already rejects missing proof in some safety domains (nullability, `sqrt`, divisor safety) while remaining conservative in others (sequential flow, collection emptiness, arithmetic transfer).
+- A bounded proof engine without SMT is a natural extension of the current checker: `ApplyNarrowing`, rule/state/event ensure snapshots, and C76/C93 already form a small abstract-interpretation pipeline.
+- The sample corpus puts pressure on identifier/literal arithmetic and null-guarded `.length`, not on hard algebra. Sign/nonzero propagation plus sequential `set` flow is a better first investment than intervals or solver work.
+- The honest no-SMT ceiling is a bounded abstract interpreter, not general algebra: sequential flow plus sign analysis buys the most; intervals help next; relational reasoning is the expensive last mile; nonlinear formulas like amortization denominators still need helper values or a solver.
+- CORRECTION: Previous feasibility analysis imported general PL static analysis complexity (loop joins, widening, fixpoints, CFG reconvergence) that does not exist in Precept. Precept has no loops, no control-flow branches, no reconverging flow. `when` guards select rows independently; `if/then/else` is an inline ternary. The "join" for conditionals is a single bitwise AND of sign facts, not a lattice merge. This dramatically simplifies all proof techniques.
+- The full non-SMT proof stack (sequential flow + interval arithmetic + relational patterns) is ~500 new lines of type checker code. The previous estimate of "high complexity" for intervals and "very high" for relational reasoning was inflated by 3-5x because it included complexity that doesn't apply to Precept's execution model.
+- Interval arithmetic subsumes sign analysis. Building both is redundant — intervals give you signs for free (Positive = `(0, ∞)`, Nonneg = `[0, ∞)`). The optimal build is A (sequential flow) → C (intervals) → D (relational patterns), skipping B (signs) as a separate step.
+- Relational inference in Precept is pattern matching, not symbolic algebra. `A - B` in divisor position + `$gt:A:B` marker = safe. No normalization, no canonicalization, no solver. ~65 lines total.
 
 ## Recent Updates
 
+### 2026-04-19 — Diagnostic triage: `assignment-constraints.precept` and `sqrt-safety.precept`
+
+Two `DiagnosticSampleDriftTests` failures were reported at Slice 6 verification time. Independent triage conclusively shows neither is refactor-attributable.
+
+Key findings:
+- Current HEAD (a83956d) passes 1752/1752 — zero drift test failures.
+- MCP compile verification confirms both samples produce exact EXPECT-annotated diagnostics (code, severity, line, column, end column, message all match).
+- Automated bisect across all 6 slice commits shows 8/8 passing at every checkpoint.
+- C94 emission code (both blocks) lives in the **main** `PreceptTypeChecker.cs` and was never moved by any slice — it cannot be refactor-attributable.
+- C76 emission (`AssessNonnegativeArgument`) was extracted byte-for-byte to ProofChecks.cs (Slice 4); its call site extracted byte-for-byte to TypeInference.cs (Slice 5).
+- The Slice 6 history entry claiming "1742/1744 passed, same 2 pre-existing failures confirmed by stash cycle" is contradicted by current evidence. Most likely cause: stale test discovery cache or out-of-sync build artifact at the time of that run.
+- Post-turn edits to PreceptTypeChecker.cs were limited to a 5-line header comment (commit 49e9090, 0 deletions) — incapable of introducing or fixing logical behavior.
+
+Lesson: "stash/test-without-change/stash-pop cycle" for confirming pre-existing failures is unreliable if the failing tests live in committed files that the stash does not touch. An independent git-archive test at the introducing commit (`b686893`) is the correct isolation method.
+
+### 2026-04-19 — Issue #118 Slice 1 validation (PR #123)
+
+Slice 1 (extract Helpers partial class) was already committed at `032b897` when assigned. Performed independent validation.
+
+- `PreceptTypeChecker.Helpers.cs`: 398 lines, all 29 methods present and correctly placed.
+- Build: succeeds with 2 pre-existing CS8629 nullable warnings (lines 177, 947 of main file) — not introduced by the refactor.
+- Focused tests (PreceptTypeChecker, FieldConstraint, ConditionalExpression, StringAccessor, ProofEngine filter): **371/371 passed**.
+- PR body Slice 1 checklist was already fully checked at commit time.
+- Slice 2 (FieldConstraints) also already committed at `89bf5bb` (HEAD).
+
+Learnings from slice review:
+- `using` directives in Helpers.cs are trimmed correctly to `System` + `System.Collections.Generic` only — no namespace-level pollution.
+- `partial` keyword was added to the main class declaration in the Slice 1 commit — a prerequisite that must be confirmed for each new partial file.
+- The 29 Helpers methods span two line regions in the original: L220–278 (early mapping/literal/assignability cluster) and L1592–3700 (late builder/copy/formatting cluster). Both regions were correctly cleared from the main file.
+
+### 2026-04-18 — Proof engine design-to-code accuracy review (PR #108)
+
+Full review written to `.squad/decisions/inbox/george-proof-engine-review.md`.
+
+Key findings:
+
+**Architecture:** The five gaps (1–5) are genuinely closed in Commits 1–6. The core proof engine (`LinearForm`, `RelationalGraph`, 5-tier lookup, kill loop) is correct. The prevention guarantee holds for compound divisor patterns. The engine is sound — no false positives. `TryInferRelationalNonzero` and `InferSubtractionInterval` are correctly deleted.
+
+**Discrepancies (13 total):**
+- D1: Design doc status header says "Implemented" — FALSE. Commits 7–15 not started.
+- D2: String markers (`$ival:`, `$positive:`, `$nonneg:`, `$nonzero:`, `$gt:`, `$gte:`) NOT eliminated. Still active in `PreceptTypeChecker.cs`, `ApplyAssignmentNarrowing`, `ExtractIntervalFromMarkers`, `LookupLegacyRelationalInterval`, `NumericInterval.ToMarkerKey/TryParseMarkerKey`.
+- D3: `_fieldIntervals`, `_flags`, `_exprFacts` typed stores do not exist. Only `_relationalFacts` is typed.
+- D4: No `GlobalProofContext`/`EventProofContext` class split. Single `ProofContext` only.
+- D5: `BuildEventEnsureNarrowings` still uses string surgery — compound relational ensure narrowings are LOST (not translated to dotted form).
+- D6: No `ProofAssessment` model. C92 fires only on literal 0 (not truth-based). Identifier divisor path reads markers directly, bypasses `IntervalOf`.
+- D7: No `Dump()` method on `ProofContext`.
+- D8: No `NumericInterval.ToNaturalLanguage()`.
+- D9: `LookupLegacyRelationalInterval` (Tier 6) still present.
+- D10: C94–C98 do not exist. Zero matches in `src/Precept/`.
+- D11: W2 — `WithRule` doesn't GCD-normalize. Functionally recovered by tier-5 `RelationalGraph`.
+- D12: W1 — `ConstantOffsetScan` `>=` + offset 0 wrong inclusivity. Unreachable, trivial fix.
+- D13 (undocumented): Identifier divisor path in `TryInferBinaryKind` checks markers directly — `field D as number min 1` has `$ival:D:1:...` (ExcludesZero=true) but gets C93 because no `$positive:D` or `$nonzero:D` marker. False positive. Must be fixed in Commit 7 by unifying to `IntervalOf`/`KnowsNonzero` for all expression shapes.
+
+**Key implementation risks:**
+- Commit 7 (typed stores) must atomically unify the identifier divisor path — otherwise `min N` fields get false C93 errors.
+- `TryApplyNumericComparisonNarrowing` writes BOTH markers AND LinearForm facts for `id op id` — both must be cleaned up in Commit 7.
+- `BuildEventEnsureNarrowings` also loses `_relationalFacts` from compound ensures — Commit 9 must fix this.
+- Commit 11 (C92 truth-based) breaks code action message parsing in `PreceptCodeActionHandler.cs` — structured metadata required in same commit.
+- Commit 14 (hover) needs proof source attribution threading through `IntervalOf` — this is non-trivial new API surface.
+
+**Philosophy verdict:** Engine is sound. Prevention guarantee holds for all compound patterns. No false-positive proof paths. Conservative false negatives (C93 on min-constrained identifiers, D13) are the only failure mode — annoying but never unsafe.
+
+**Action required:** (a) Update design doc status header to reflect in-progress state. (b) Deliver Commits 7–15 in this PR per Shane's "no more shortcuts" directive.
+
+### 2026-04-17 — Stateless event handlers (`on EventName`) feasibility evaluation
+- Verdict: **feasible**. All 7 implementation layers have clear insertion points. Total size: M.
+- Parser: new `StatelessTransitionRowParser` combinator after `EventEnsureDecl.Try()`. No ambiguity — `ensure` token disambiguates.
+- Model: `PreceptTransitionRow.FromState` must become `string?`. ~5 callsite null-guards. Stateless rows store `null`.
+- Type checker: null-safe group key in `ValidateTransitionRows`. One new diagnostic: `transition <State>` not valid in stateless `on` block.
+- Analysis: C49 must become conditional — suppress for events that have a stateless row handler.
+- Engine: `Fire()` and `Inspect()` hard-wall on `IsStateless` must be replaced with branching paths. `_transitionRowMap` key type → `(string?, string)`. `ResolveTransition` signature → `string?`.
+- Philosophy flag: `docs/philosophy.md` frames Precept as a "state machine/lifecycle" engine. Stateless event handlers expand that identity. Frank's call — not a technical blocker.
+- Design decision needed: explicit `-> no transition` required (Option A) vs. implicit default. Recommend starting with explicit for parser consistency.
+- Key files: `PreceptParser.cs` (Statement union, new combinator), `PreceptModel.cs` (FromState nullable), `PreceptTypeChecker.cs` (ValidateTransitionRows null-guarding), `PreceptRuntime.cs` (Fire/Inspect branching), `PreceptAnalysis.cs` (C49 conditional).
+
+
+
+
+## Recent Updates
+
+### 2026-04-17 — Issue #106 Slice 6: sqrt C76 rework with unified narrowing + dotted key fix
+- Verified the C76 `$nonneg:` proof lookup already handled dotted event-arg keys (inline ternary, not broken as initially suspected).
+- Refactored the C76 identifier check to use `TryGetIdentifierKey(idArg, out var idKey)` for consistency with the rest of the narrowing infrastructure.
+- Added `$positive:` as alternate C76 proof (defensive, matches the C92/C93 divisor check pattern). `positive` implies nonneg, so this is sound.
+- Updated C76 message in `DiagnosticCatalog.cs` and the instance message in `PreceptTypeChecker.cs` to mention `rule`, state/event `ensure`, and guard as proof sources (not just `nonnegative` constraint).
+- 5 new tests: rule proof, state ensure proof, guard proof, dotted event-arg with event ensure (no C76), dotted event-arg without proof (C76 emitted with `Submit.Val` in message).
+- All 1290 Precept.Tests + 169 LS tests pass. Catalog drift tests unaffected (fragment `"non-negative"` still matches).
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 
@@ -19,96 +125,100 @@
 - **Build:** 0 errors, 0 warnings on full solution (`dotnet build`). Committed as `83497aa` on `squad/31-keyword-logical-operators`.
 - **Key pattern:** When a branch has pre-staged diffs, always run `git status` + `git diff` to inventory existing work before touching files — avoids double-applying changes.
 
-### 2026-04-08 - Slice 4 implementation for issue #22 (data-only precepts)
-- `PreceptEngine.IsStateless` computed property (`States.Count == 0`); `InitialState` made `string?`.
-- Constructor: `InitialState = model.InitialState?.Name`; edit blocks loop replaced to route `block.State == null` to `_rootEditableFields` (new `HashSet<string>?` field); `"all"` sentinel expanded via `ExpandEditFieldNames()` private helper.
-- `CreateInstance(data)`: stateless path bypasses 2-arg and creates instance with `CurrentState = null`. `CreateInstance(state, data)`: throws `ArgumentException` for stateless.
-- `CheckCompatibility`: stateless branch validates `CurrentState == null`; stateful branch validates state membership; `EvaluateStateAssertions` wrapped in `if (instance.CurrentState is not null)` guard.
-- `Fire`: early `Undefined` return after compatibility check when `IsStateless`.
-- `Inspect(instance, event)`: early `Undefined` return after compatibility check when `IsStateless`.
-- `Inspect(instance)`: stateless path produces all events with `Undefined` outcome; editable fields via new `BuildEditableFieldInfosForStateless`.
-- `Update` Stage 1: branches on `IsStateless` to pull editableFieldSet from `_rootEditableFields` vs `_editableFieldsByState`; Stage 4: `EvaluateStateAssertions` null-guarded.
-- `GetEditableFieldNames(string? state)` + `BuildEditableFieldInfos(string? state, ...)` accept nullable state; BuildEditableFieldInfos delegates to `BuildEditableFieldInfosForStateless` for null.
-- Result records: `EventInspectionResult.CurrentState`, `InspectionResult.CurrentState`, `FireResult.PreviousState` made `string?`; all 12 factory method `string state` params made `string?`.
-- Nullable fixups: null-forgiving `!` after IsStateless guards in Fire/Inspect stateful branches; `EvaluateCurrentRules` + `Inspect(patch)` `EvaluateStateAssertions` null-guarded; `TryValidateScalarValue` `out string? error` → `out string error`; `InitialState` dereferences in `PreceptAnalysis` and `CollectCompileTimeDiagnostics` made null-safe with `!`.
-- Build: 0 errors, 0 warnings on `src/Precept/Precept.csproj`. Committed as `d3fe90d`.
-- Unguarded `CurrentState` in OTHER projects (not fixed in this slice): `tools/Precept.Mcp/Tools/CompileTool.cs:54`, `tools/Precept.LanguageServer/PreceptPreviewHandler.cs:296-297`, `tools/Precept.LanguageServer/PreceptDocumentIntellisense.cs:465`, `test/Precept.Tests/NewSyntaxParserTests.cs:34,1044,1058,1072,1086`, `test/Precept.Tests/PreceptWorkflowTests.cs:47,921`, `test/Precept.Tests/PreceptCollectionTests.cs:946`.
-- Key pattern: after `if (IsStateless) return ...;` the compiler still sees `CurrentState` as `string?` — use `instance.CurrentState!` throughout the now-stateful path. Compiler stops emitting CS8604 for the same variable after the first flagged call site in a method, so some warning sites only appear after upstream ones are fixed.
+### 2026-04-17 — Issue #106 Slice 3: unified rule-based proof extraction
+- Replaced the bespoke `$nonneg:` constraint-inspection loop in `Check()` with unified rule-based proof iteration through `ApplyNarrowing`.
+- The old loop directly inspected `FieldConstraint.Nonnegative`, `Positive`, and `Min { Value: >= 0 }` properties. The new approach iterates `model.Rules` (unguarded only) and delegates to `ApplyNarrowing(rule.Expression, dataFieldKinds, assumeTrue: true)`.
+- This works because constraints desugar to synthetic rules at parse time (e.g., `positive` → `rule Field > 0`), so iterating rules automatically picks up constraint proofs.
+- Guarded rules excluded via `.Where(r => r.WhenGuard is null)` — a guarded rule's fact only holds when its guard is true, so injecting it unconditionally would be unsound.
+- Had to widen `dataFieldKinds` declaration from `var` (inferred `Dictionary<>`) to explicit `IReadOnlyDictionary<>` since `ApplyNarrowing` returns the readonly interface.
+- DSL gotcha: `rule` statements require a `because` clause, and `when` guards must reference boolean fields (not state names). Also, duplicate unguarded `from S on E` rows are caught at parse time — use separate events to avoid conflicts in tests.
+- New test: `Check_GuardedRule_ExcludedFromProofIteration_SqrtStillC76` — verifies guarded `rule D >= 0 when IsActive` does NOT suppress C76 on `sqrt(D)`.
+- All 1498 tests pass (1237 Precept + 92 MCP + 169 LS).
 
-### 2026-04-08 - Slice 3 implementation for issue #22 (data-only precepts)
-- C50 severity upgraded from `ConstraintSeverity.Hint` to `ConstraintSeverity.Warning` in `DiagnosticCatalog.cs`. Safe: all 21 samples produce zero C50 diagnostics.
-- `PreceptRuntime.Validate`: wrapped C27/C28 checks inside `if (!model.IsStateless)`. Both checks dereference `model.InitialState.Name` which is null for stateless; the guard prevents `NullReferenceException`. Used null-forgiving operator (`!`) inside the block — parser's C13 guarantees `InitialState != null` when `States.Count > 0`.
-- `PreceptAnalysis.Analyze`: added stateless early-return immediately after the three variable declarations (`states`, `events`, `transitionRows`), before `allStateNames`. Fires C49 per declared event (each is structurally orphaned — no state routing surface). Suppresses C53 (no-events hint) for stateless. Returns all-empty state/reachability arrays. Comment uses `// Stateful path continues below...` before the moved `allStateNames` declaration.
-- Build: 0 warnings, 0 errors. The 23 nullable warnings from Slices 1/2 resolved (build mode/config difference — Precept.csproj alone reports clean). Committed as `72c65c1`.
+### 2026-04-17 — Issue #106 Slice 2: or-pattern null-guard decomposition
+- Implemented `TryDecomposeNullOrPattern` in `PreceptTypeChecker.cs` — recognizes `Field == null or Field > 0` patterns from `MaybeNullGuard` desugars and extracts numeric proof markers from the non-null branch.
+- Handles both orderings (null-check first or numeric first), reversed null literal position (`null == Field`), compound `and` patterns (`Field == null or (Field >= 0 and Field < 100)`), and same-field identity checks to prevent unsound cross-field decomposition.
+- Wired into `ApplyNarrowing()` `or` branch under `assumeTrue: true`, with C42-dependency soundness comment.
+- Nullable field syntax is `number nullable`, not `number?` — caught by test parse failures.
+- Nullable fields hit C77 (null-argument) before C76 (non-negative proof) when no null-guard is present. Tests for reject cases assert either C76 or C77.
+- 7 new tests, all 1236 tests pass (+ 92 MCP + 169 LS = full green).
 
-### 2026-04-08 - Slice 2 implementation for issue #22 (data-only precepts)
-- Implemented all parser/diagnostic changes for data-only precepts: `FieldTarget` parser (`all` | identifier list, mirrors `StateTarget`/`any`); `EditDecl` updated to use `FieldTarget` instead of inline identifier list; `RootEditDecl` parser (`edit <FieldTarget>`, root-level, no `in` prefix); `RootEditResult` sealed record; `AssembleModel` routes `RootEditResult` → `PreceptEditBlock(State: null, ...)`; C12 broadened ("at least one field or state"); C13 made conditional on `states.Count > 0`; C55 added to `DiagnosticCatalog` (compile phase, Error) and enforced in `CollectCompileTimeDiagnostics`.
-- Key design decision: C55 is "compile" phase, not "parse" — enforced in type-checker pass, not in `AssembleModel`. Allows root `edit` to parse cleanly; cross-cutting check (states + root edit) runs at validation time.
-- Build confirmed: 23 nullable warnings (Slice 4 scope, unchanged from Slice 1), 0 errors. Committed as `7e9bece`.
+### 2026-04-19 — Issue #118 Slice 3: extract Narrowing partial class
+- Extracted 9 narrowing methods from `PreceptTypeChecker.cs` into `src/Precept/Dsl/PreceptTypeChecker.Narrowing.cs`.
+- Methods moved: `BuildEventEnsureSymbols`, `BuildStateEnsureNarrowings`, `BuildEventEnsureNarrowings`, `ApplyAssignmentNarrowing`, `ApplyNarrowing`, `TryApplyNullComparisonNarrowing`, `TryApplyNumericComparisonNarrowing`, `TryStoreLinearFact`, `TryDecomposeNullOrPattern`.
+- Used PowerShell line-range extraction to guarantee byte-for-byte identical method bodies — no manual transcription risk.
+- Main file shrank from 3002 → 2407 lines (595 lines removed across two non-contiguous blocks).
+- `FlipComparisonOperator` and `TryGetNumericLiteral` remain in the main file for now; they move to ProofChecks in Slice 4. Cross-file calls work seamlessly because partial classes share a single compilation unit.
+- Build: clean (2 pre-existing CS8629 warnings, unchanged). Tests: 75/75 targeted anchor tests pass. Commit: `4dad80b`.
 
-### 2026-04-08 - Slice 1 implementation for issue #22 (data-only precepts)
-- Implemented all 4 model/token changes as specified: `PreceptToken.All` added after `Any` with `[TokenCategory(Grammar)]`/`[TokenSymbol("all")]`; `PreceptDefinition.InitialState` made nullable (`PreceptState?`); `PreceptDefinition.IsStateless` computed property added (`States.Count == 0`); `PreceptEditBlock.State` made nullable (`string?`); `PreceptInstance.CurrentState` made nullable (`string?`).
-- Build succeeded with 23 expected nullable warnings (CS8602/CS8604/CS8620/CS8601) in `PreceptRuntime.cs` and `PreceptAnalysis.cs` — all in Slice 4 scope. Zero build errors.
-- Committed as `e0eac05` on `feature/issue-22-data-only-precepts`.
+### 2026-04-17 — Issue #106 Slice 1: numeric narrowing infrastructure
+- Implemented `FlipComparisonOperator`, `TryGetNumericLiteral`, and `TryApplyNumericComparisonNarrowing` in `PreceptTypeChecker.cs`.
+- Wired numeric comparison narrowing into `ApplyNarrowing()` after the existing null-comparison branch.
+- Proof markers injected: `$positive:`, `$nonneg:`, `$nonzero:` keyed as `StaticValueKind.Boolean` (matching existing `$nonneg:` convention from the bespoke constraint loop).
+- Existing `$nonneg:` markers use `StaticValueKind.Boolean`, not `NonNull` (which doesn't exist in the enum). The C76 check only does `ContainsKey`, so the value type doesn't matter — but consistency matters.
+- Tested via sqrt() C76 interaction: if narrowing correctly injects `$nonneg:`, sqrt() inside the guard doesn't emit C76. This validates the infrastructure without needing C92/C93 (Slice 5).
+- All 1229 existing tests pass with the new code. 6 new tests added.
+- Key file paths: `src/Precept/Dsl/PreceptTypeChecker.cs` (~L2130–2280 for new methods), `test/Precept.Tests/PreceptTypeCheckerTests.cs` (bottom of file for new tests).
 
-### 2026-04-08 - Issue #22 semantic rules runtime/parser analysis
-- Reviewed issue #22 semantic rules against actual parser/type-checker code at Shane's request.
-- Key findings: (1) C12 fires at end of AssembleModel — adding a state doesn't violate anything, making "states forbidden" tautological. (2) EventDecl parser has zero state dependencies — events parse fine without states but have no dispatch surface; a new diagnostic would be needed. (3) C54 already rejects transitions referencing undeclared states, making "transitions forbidden" structurally redundant.
-- Recommended reframe: drop tautological rules, add explicit "events forbidden in stateless" as a new type-checker diagnostic.
+### 2026-04-17 — Unified proof plan full design review
+- **Verdict: APPROVED-WITH-CAVEATS** on `temp/unified-proof-plan.md`.
+- §8a completeness: found 2 missing patterns — (1) scalar-distributed differences `k*A - k*B` not provable from `rule A > B` (workaround: factor as `k*(A-B)`), (2) `pow`/`truncate` function opacity not listed alongside `abs`/`min`/`sqrt` in the unsupported table.
+- Found 2 patterns missing from §8 coverage matrix that the plan DOES prove but doesn't claim: `rule A > -B` proving `Y/(A+B)` and `rule A+B > C` proving `Y/(A+B-C)`. Both validate via LinearForm normalization.
+- Rational `long/long` overflow: reachable within depth-8 bound via 3 multiplications of large constants (e.g., `A * 10^9 * 10^9 * 10`). **[CAVEAT]** Plan must specify `checked` arithmetic in `Rational.Multiply` with null-fallback in `TryNormalize` on `OverflowException`. Also recommend cross-GCD pre-reduction before multiplication to prevent overflow in common cases.
+- `INumber<Rational>`: over-engineering for current usage (~50+ interface members vs ~20 actually needed). Non-blocking — recommend implementing operators directly, add interface later if generic math needed.
+- `ProofContext.Dump()` unspecced: confirmed low priority, agree.
+- LinearForm depth bound (8): verified parens do NOT blow the budget in practice (7-level paren nesting compiles clean today). Plan should clarify that `PreceptParenthesizedExpression` unwrapping does not decrement depth counter.
+- CodeContracts Pentagons: confirms architectural validity. Our lazy composition (query-time reduced product) is sufficient for divisor-safety — no backward propagation from relational → interval needed. No patterns to adopt.
+- Confidence on §8a completeness: MEDIUM-HIGH. Systematically checked all 11 expression forms, all rule/guard/ensure contexts, cross-namespace patterns, negation, scaling, depth stress. The 2 missing patterns are low-frequency with simple workarounds.
 
-### 2026-04-08 - Language research corpus completed
-- George's type-system lane now sits inside a finished language research corpus: Batch 1/2 evidence landed in `54a77da` and `48860ae`, and the closing corpus/index sweep landed in `3cc5343`.
-- Final bookkeeping preserved the domain-first indexes so the type-system survey and semantics work stay grounded in research docs rather than being pushed back into proposal-body edits.
+### 2026-04-12 — Issue #17 computed fields feasibility
+- Confirmed computed fields are feasible with additive parser/model/runtime work and a single recomputation helper inserted before constraint evaluation.
 
-### 2026-04-08 - Type-system research corpus landed
-- The type-system domain research packet landed as part of Batch 1, and the later rewrite of `docs/research/language/references/type-system-survey.md` was included in the Batch 2 commit `48860ae`.
-- The durable type lane now has both a domain survey and a stronger formal/reference survey, which keeps the research corpus aligned with the no-proposal-body-edit rule for batch curation.
+### 2026-04-11 — Issue #14 documentation sync
+- Synced language, runtime, editability, MCP, and README docs for declaration `when` guards after implementation.
 
-### 2026-04-05 - Named rule scope and naming converged
-- Confirmed field-scoped reuse is sound in when, invariant, and state assert, while on <Event> assert remains incompatible because it is event-arg-only.
-- Reweighted the naming decision around Precept's readability goals and aligned the runtime recommendation with rule over predicate.
+### 2026-04-19 — PRECEPT097/PRECEPT098 diagnostic-span root cause
+- The decisive fix point for PRECEPT097/PRECEPT098 was upstream: emitted diagnostics needed explicit end-column precision in the core model before tooling could ever render a tighter range.
+- Threading `EndColumn` through runtime/type-checker emission is the right first move; language-server range logic should only be adjusted after verifying the upstream payload is precise.
+- Regression tests for diagnostic precision belong near the emitting layer, not only in tooling, so LS consumers are protected from future coarse-span regressions.
 
-### 2026-04-04 - DSL pipeline overview
-- Consolidated the runtime mental model, major constraint categories, fire stages, and edge cases for downstream agents.
-- Key learning: Precept's value is structural integrity across state, data, and rules; every outward-facing description should preserve that unified model.
+### 2026-04-19 — Issue #118 Slice 4 (extract ProofChecks partial class, PR #123)
 
-### 2026-04-06 - README restructure proposal review
-- Checked that proposed README/API explanations matched the real runtime surface.
-- Key learning: the quickest way to damage trust is to let public examples diverge from actual parser/runtime behavior.
+Extracted 9 proof-analysis methods into `PreceptTypeChecker.ProofChecks.cs` — pure structural refactor.
 
-### 2026-05-14 - Named predicate naming analysis
+Methods extracted: `ExtractFieldInterval`, `TryInferInterval`, `FlipComparisonOperator`, `AssessDivisorSafety`, `AssessGuard`, `TryExtractSingleFieldComparison`, `DescribeExpression`, `AssessNonnegativeArgument`, `TryGetNumericLiteral`.
 
-- Re-evaluated whether `guard` is the correct category for a declaration reusable in transition `when`, `invariant`, and state `assert`.
-- Key finding: `guard` carries strong transition-gate semantics (UML, xstate) and is misleading when a declaration appears in `invariant` or state `assert` positions. The concept is a **named field-scope boolean predicate**, not a transition guard.
-- Compared options: `guard` (misleading), `predicate` (recommended), `rule` (existing informal overloading in docs), `let`/`define` (too generic, blurs computed-field boundary), split `guard`+`predicate` (fragmentation without benefit).
-- Verdict: rename from `guard` → `predicate`. Keyword `predicate <Name> when <BoolExpr>`. All prior structural recommendations (reuse sites, scope rules, exclusions) unchanged.
-- Amended `docs/research/dsl-expressiveness/expression-feature-proposals.md` (Proposal 3: all keyword and prose references updated) and `expression-language-audit.md` (L3: title, implementation notes, verdict, philosophy fit updated).
-- Wrote `.squad/decisions/inbox/george-guard-naming.md` with full options analysis.
-- Key pattern: when a DSL construct's name implies narrower semantics than its actual reuse scope, fix the name before the design doc is written — not after.
+- Main file went from 2407 → 2003 lines; ProofChecks.cs created at 416 lines.
+- `FlipComparisonOperator` is called cross-file from Narrowing (`TryApplyNumericComparisonNarrowing`) — this is intentional and works because both files are in the same partial class. No caller updates needed.
+- The PR checklist had items 3–5 of Slice 4 pre-checked but items 1–2 unchecked; corrected all to checked after implementation.
+- Line-array surgery via `[System.IO.File]::ReadAllLines` + `WriteAllLines` (UTF8 no-BOM) is the reliable approach for 400-line block extraction when replace_string_in_file would require exact matching of the entire block.
+- Targeted test run (5 test classes, 148 tests): all passed. Build: succeeded with same 2 pre-existing CS8629 warnings.
+- Commit: `eb88c4e`.
 
-### 2026-05-01 - Named guard reuse scope analysis
+### 2026-04-19 — Issue #118 Slice 6: final cleanup and verification (PR #123)
 
-- Researched whether named guard declarations (Proposal 3) can be soundly reused in `invariant` and `in/to/from <State> assert` contexts, not just `when` clauses.
-- Key finding: guard body scope (fields + collection accessors) is a subset of invariant/state-assert scope — reuse is sound in both. `on <Event> assert` is explicitly incompatible (event-arg-only scope at Stage 1, disjoint from field scope).
-- Verdict: `feasible-with-caveats`. Caveats: (a) guard body must be validated in field-only scope at declaration time, not deferred to use site; (b) `on <Event> assert` must produce a clear diagnostic; (c) cycle risk resolved since guard-to-guard refs are banned.
-- Updated `docs/research/dsl-expressiveness/expression-feature-proposals.md` (Proposal 3 scope rules, new invariant/assert examples) and `expression-language-audit.md` (L3 what is missing, implementation notes, verdict).
-- Wrote `.squad/decisions/inbox/george-guard-reuse.md` with full analysis for team.
+All 5 extracted partial files already had header comments from their respective slice commits. The only missing header was on the main file (`PreceptTypeChecker.cs`), which is also a partial-class file and should have one.
 
-- Audited the full expression surface: parser, type checker, evaluator, all 21 sample files.
-- Produced `docs/research/dsl-expressiveness/expression-language-audit.md` with 12 numbered limitations, implementation verdicts, and cross-cutting notes.
-- Key findings:
-  - No ternary expression (forces row duplication for conditional values)
-  - No `string.length` accessor (string length constraints are inexpressible — trivially fixable)
-  - No named guard declarations (multi-condition guards must be copy-pasted verbatim)
-  - `on <Event> assert` scope excludes data fields (pipeline design constraint, not parser issue)
-  - No numeric math functions like `abs()` (requires new function-call AST node)
-  - `contains` is collection-only; no substring matching on strings
-  - Division by zero produces silent NaN/infinity at runtime — evaluator should return Fail
-- Feasibility verdicts: ternary=feasible, string.length=feasible, named-guards=feasible-with-caveats, abs/functions=feasible-with-caveats, collection-any-all predicates=not-recommended.
-- The `on <Event> assert` scope limitation is the one item needing a design decision before any code — it touches the fire pipeline stage contract, not just the parser.
-- Notified team via `.squad/decisions/inbox/george-expression-limitations.md`. No implementation until Frank's proposal and Shane's approval.
+- Added 5-line header comment to `PreceptTypeChecker.cs` before `internal static partial class PreceptTypeChecker` — describing it as the main orchestration partial hosting front-matter types and the 9 orchestration entry points.
+- Verified all 8 required front-matter types present in main file: `StaticValueKind`, `PreceptValidationDiagnostic`, `PreceptValidationDiagnosticFactory`, `PreceptTypeExpressionInfo`, `PreceptTypeScopeInfo`, `PreceptTypeContext`, `TypeCheckResult`, `ValidationResult`.
+- Verified `using` directives in all partial files are trimmed correctly: `Helpers.cs` (`System` + `Collections.Generic`), `FieldConstraints.cs` (`System` + `Collections.Generic` + `Linq`), `Narrowing.cs` (`System` + `Collections.Generic` + `Linq`), `ProofChecks.cs` (`System` + `Collections.Generic`), `TypeInference.cs` (`System` + `Collections.Generic` + `Linq`). Main file retains `System.Text.RegularExpressions` (used by `Regex.Replace` at L274).
+- Confirmed no duplicate method bodies across partial files (each method name is unique per file).
+- Pre-existing test failures (2 `DiagnosticSampleDriftTests` — `assignment-constraints.precept` and `sqrt-safety.precept`) are pre-existing, not introduced by this refactor. Confirmed by stash/test-without-change/stash-pop cycle.
+- Build: clean solution build. Full test suite: 1742/1744 passed, same 2 pre-existing failures, 0 new failures.
+- Commit: `49e9090`.
+- Key lesson: the main partial file is often overlooked during header-comment audits because it predates the extracted files. Check it explicitly during Slice 6.
 
-### 2026-04-08 - Issue #22 semantic rules review (data-only precepts)
-- Reviewed issue #22 semantic rule about "states, events, and transitions forbidden in stateless precepts" against actual parser/type-checker code.
-- Key findings from parser source: (1) C12 fires at the *end* of AssembleModel — adding a `state` to a definition doesn't violate anything, it just makes it stateful. The "prohibition" is tautological. (2) `EventDecl` parser has zero state dependencies — events parse fine without states, but have no dispatch surface. The type checker would need a *new* diagnostic to reject them. (3) C54 already rejects transition rows referencing undeclared states, making an explicit "transitions forbidden" rule structurally redundant.
-- Recommended the issue reframe: remove tautological "states forbidden" rule, add explicit "events forbidden in stateless" as a new type-checker diagnostic (not parser), and note that transitions are already structurally impossible via C54.
+### 2026-04-19 — Issue #118 Slice 5: extract TypeInference partial class
+- Extracted 4 type-inference methods from `PreceptTypeChecker.cs` into `src/Precept/Dsl/PreceptTypeChecker.TypeInference.cs`.
+- Methods moved: `ValidateExpression`, `TryInferKind`, `TryInferFunctionCallKind`, `TryInferBinaryKind` (~748 lines).
+- Used PowerShell line-range splice (`$content[0..1171] + $content[1920..$last]`) to remove lines 1173–1920 from main file — preserves exactly one blank-line separator between the preceding method and `ValidateCollectionMutations`.
+- TypeInference is the highest fan-in partial: callers live in Main; bodies call into Narrowing (`ApplyNarrowing`), ProofChecks (`AssessDivisorSafety`, `AssessNonnegativeArgument`), and Helpers (13 utility methods). Extracted last for cleanliness; all dependencies already in final locations.
+- `using System.Linq;` is required (for `Enumerable.Range`, `Select`, `Where`, `DefaultIfEmpty`, `First`, `LastOrDefault` inside `TryInferFunctionCallKind`).
+- Build: clean (same 2 pre-existing CS8629 warnings, no new warnings). Targeted tests: 211/211 (PreceptTypeCheckerTests + ConditionalExpressionTests + StringAccessorTests). Full suite: 1752/1752.
+- Commit: `ad3f65d`.
+
+## 2026-04-19 — Research: .NET Typechecker Implementation Patterns (meta-evaluation)
+- Surveyed Roslyn Binder, F# Checking/, NRules, DynamicExpresso for partial-class layout, file sizing, helper distribution, dispatch patterns.
+- Verdict: KEEP AS-IS. Our 6-file split, naming, and switch-on-NodeKind dispatch all match Roslyn precedent. Static-partial is justified by stateless model.
+- Minor opportunity: distribute helpers closer to consumers if Helpers.cs grows. Not blocking.
+- Output: research/architecture/typechecker-implementation-patterns-george.md

@@ -154,7 +154,7 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_FromAny_UsesPerStateExpansionAndStateAssertNarrowing()
+    public void Check_FromAny_UsesPerStateExpansionAndStateEnsureNarrowing()
     {
         const string dsl = """
             precept M
@@ -162,7 +162,7 @@ public class PreceptTypeCheckerTests
             field TechnicianName as string default ""
             state Scheduled initial
             state Open
-            in Scheduled assert AssignedTechnician != null because "scheduled work must have a technician"
+            in Scheduled ensure AssignedTechnician != null because "scheduled work must have a technician"
             event Snapshot
             from any on Snapshot -> set TechnicianName = AssignedTechnician -> no transition
             """;
@@ -172,6 +172,28 @@ public class PreceptTypeCheckerTests
         result.Diagnostics.Should().ContainSingle();
         result.Diagnostics[0].Constraint.Id.Should().Be("C42");
         result.Diagnostics[0].StateContext.Should().Be("Open");
+    }
+
+    [Fact]
+    public void Check_DivisorFromAny_PartialStateEnsure_C93WithContext()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            state B
+            event Go
+            event Switch
+            in B ensure D > 0 because "D positive in B"
+            from A on Switch -> transition B
+            from any on Go -> set Y = Y / D -> no transition
+            """;
+        var result = Check(dsl);
+        // Should warn for state A (no ensure) but not state B
+        var c93 = result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().ContainSingle().Subject;
+        c93.StateContext.Should().Be("A",
+            "state A has no divisor proof — C93 must be attributed to the state where the divisor is unproven, not the state with the ensure");
     }
 
     [Fact]
@@ -256,7 +278,7 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_StateAction_WithStateAssertNarrowing_NarrowsSuccessfully()
+    public void Check_StateAction_WithStateEnsureNarrowing_NarrowsSuccessfully()
     {
         const string dsl = """
             precept M
@@ -264,7 +286,7 @@ public class PreceptTypeCheckerTests
             field MaybeNull as number nullable
             state Open initial
             state Closed
-            in Closed assert MaybeNull != null because "closed requires value"
+            in Closed ensure MaybeNull != null because "closed requires value"
             event Close
             from Open on Close -> transition Closed
             to Closed -> set Value = MaybeNull
@@ -541,13 +563,13 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_EventAssertStillAcceptsBareArgName()
+    public void Check_EventEnsureStillAcceptsBareArgName()
     {
         const string dsl = """
             precept M
             state A initial
             event Go with Count as number
-            on Go assert Count > 0 because "count must be positive"
+            on Go ensure Count > 0 because "count must be positive"
             """;
 
         var result = Check(dsl);
@@ -577,20 +599,20 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_StringExpressionInInvariant_ProducesC46()
+    public void Check_StringExpressionInRule_ProducesC46()
     {
         const string dsl = """
             precept M
             field Name as string default ""
             state A initial
-            invariant Name because "non-boolean invariant"
+            rule Name because "non-boolean rule"
             """;
 
         var result = Check(dsl);
 
         result.Diagnostics.Should().ContainSingle();
         result.Diagnostics[0].Constraint.Id.Should().Be("C46");
-        result.Diagnostics[0].Message.Should().Contain("invariant");
+        result.Diagnostics[0].Message.Should().Contain("rule");
     }
 
     [Fact]
@@ -612,13 +634,13 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_NumberInStateAssert_ProducesC46()
+    public void Check_NumberInStateEnsure_ProducesC46()
     {
         const string dsl = """
             precept M
             field Balance as number default 10
             state Open initial
-            in Open assert Balance because "non-boolean assert"
+            in Open ensure Balance because "non-boolean ensure"
             """;
 
         var result = Check(dsl);
@@ -690,5 +712,1797 @@ public class PreceptTypeCheckerTests
     {
         var model = PreceptParser.Parse(dsl);
         return PreceptTypeChecker.Check(model);
+    }
+
+    // ─── Issue #14 Slice 9: When-guard type checker tests ───────────
+
+    [Fact]
+    public void Check_Rule_WhenGuardFalse_AtDefaultData_NoPrecompileViolation()
+    {
+        // EC-3: A guarded rule whose guard is false at default data
+        // should NOT produce a pre-compile violation.
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            rule X > 100 when Active because "X must be high when active"
+            from A on Go -> no transition
+            event Go
+            """;
+
+        // This should compile clean — the rule body (X > 100) fails at defaults,
+        // but the guard (Active == false at defaults) means it's skipped.
+        var compiled = PreceptCompiler.CompileFromText(dsl);
+        compiled.HasErrors.Should().BeFalse("guarded rule with false guard should not trigger pre-compile violation");
+    }
+
+    [Fact]
+    public void TypeCheck_RuleGuard_ValidBooleanField_NoDiagnostic()
+    {
+        const string dsl = """
+            precept M
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            rule X >= 0 when Active because "guarded"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeCheck_RuleGuard_NonBooleanField_DiagnosticEmitted()
+    {
+        const string dsl = """
+            precept M
+            field X as number default 0
+            field Count as number default 0
+            state A initial
+            rule X >= 0 when Count because "count is not boolean"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C46");
+    }
+
+    [Fact]
+    public void TypeCheck_EventEnsureGuard_ValidArgReference_NoDiagnostic()
+    {
+        const string dsl = """
+            precept M
+            state A initial
+            state B
+            event Submit with Amount as number, Priority as number
+            on Submit ensure Amount > 0 when Priority > 1 because "high priority needs amount"
+            from A on Submit -> transition B
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeCheck_C69_RuleGuard_EventArgReference_Emitted()
+    {
+        const string dsl = """
+            precept M
+            field X as number default 0
+            state A initial
+            state B
+            event Go with Amount as number
+            rule X >= 0 when Go.Amount > 0 because "bad guard"
+            from A on Go -> transition B
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C69");
+    }
+
+    [Fact]
+    public void TypeCheck_C69_EventEnsureGuard_EntityFieldReference_Emitted()
+    {
+        const string dsl = """
+            precept M
+            field Total as number default 0
+            state A initial
+            state B
+            event Submit with Amount as number
+            on Submit ensure Amount > 0 when Total > 0 because "bad guard scope"
+            from A on Submit -> transition B
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C69");
+    }
+
+    [Fact]
+    public void TypeCheck_EditGuard_ValidFieldReference_NoDiagnostic()
+    {
+        const string dsl = """
+            precept M
+            field Priority as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open when Active edit Priority
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeCheck_GuardedStateEnsure_ExcludedFromNarrowing()
+    {
+        // A guarded state ensure should NOT contribute to type narrowing.
+        // Without the guard filter, the ensure "MaybeNull != null" would narrow
+        // MaybeNull to non-nullable, making `set Value = MaybeNull` pass.
+        // With the filter, it remains nullable → C42.
+        const string dsl = """
+            precept M
+            field Value as number default 0
+            field MaybeNull as number nullable
+            field Active as boolean default false
+            state Open initial
+            state Closed
+            in Closed ensure MaybeNull != null when Active because "conditional guarantee"
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> set Value = MaybeNull
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C42");
+    }
+
+    // ─── Issue #106 Slice 1: Numeric comparison narrowing ───────────
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldGreaterThanZero_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when Rate > 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldGreaterEqualZero_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when Rate >= 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_ReversedZeroLessThanField_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when 0 < Rate -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_ReversedZeroLessEqualField_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when 0 <= Rate -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldNotEqualZero_SqrtStillC76()
+    {
+        // != 0 proves nonzero but NOT nonneg, so sqrt should still emit C76
+        const string dsl = """
+            precept M
+            field Rate as number default 1
+            state A initial
+            event Go
+            from A on Go when Rate != 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldLessThanZero_SqrtStillC76()
+    {
+        // < 0 proves nonzero but NOT nonneg, so sqrt should still emit C76
+        const string dsl = """
+            precept M
+            field Rate as number default -1
+            state A initial
+            event Go
+            from A on Go when Rate < 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
+
+    // ─── Issue #106 Slice 2: Or-pattern null-guard decomposition ────
+
+    [Fact]
+    public void Check_OrPattern_NullOrPositive_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate == null or Rate > 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_PositiveOrNull_SqrtNoC76()
+    {
+        // Reversed ordering: numeric branch first, null-check second
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate > 0 or Rate == null -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_NullLiteralOnLeft_SqrtNoC76()
+    {
+        // null == Field instead of Field == null
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when null == Rate or Rate > 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_NullableNonnegativeConstraint_SqrtNoC76()
+    {
+        // nonnegative constraint on nullable field desugars to Rate == null or Rate >= 0
+        const string dsl = """
+            precept M
+            field Rate as number nullable nonnegative default null
+            state A initial
+            event Go
+            from A on Go when Rate != null -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_BothNullChecks_NoNumericProof()
+    {
+        // Both branches are null checks — no numeric proof to extract.
+        // C77 fires (nullable argument) because the or-pattern doesn't narrow away null.
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate == null or Rate == null -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76" || d.Constraint.Id == "C77");
+    }
+
+    [Fact]
+    public void Check_OrPattern_CompoundAnd_SqrtNoC76()
+    {
+        // Compound: Field == null or (Field >= 0 and Field < 100)
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate == null or (Rate >= 0 and Rate < 100) -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_CrossField_SqrtStillC76()
+    {
+        // Different fields in null-check vs numeric branch — no proof extracted.
+        // C77 fires (nullable argument) because there's no null-guard for B.
+        const string dsl = """
+            precept M
+            field A as number nullable default null
+            field B as number nullable default null
+            state S initial
+            event Go
+            from S on Go when A == null or B >= 0 -> set B = sqrt(B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76" || d.Constraint.Id == "C77");
+    }
+
+    // ─── Issue #106 Slice 3: Guarded rule exclusion from proof iteration ────
+
+    [Fact]
+    public void Check_GuardedRule_ExcludedFromProofIteration_SqrtStillC76()
+    {
+        // A guarded rule (rule D >= 0 when IsActive) should NOT inject $nonneg: unconditionally.
+        // The fact D >= 0 only holds when IsActive is true — injecting it always would be unsound.
+        // sqrt(D) should still produce C76 because no unconditional proof exists.
+        const string dsl = """
+            precept Test
+            field D as number default 1
+            field IsActive as boolean default true
+            state Active initial
+            state Done
+            event Finish
+            event Check
+            from Active on Finish -> transition Done
+            rule D >= 0 when IsActive because "D nonneg only when active"
+            from Active on Check when sqrt(D) > 0 -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
+
+    // ─── Issue #106 Slice 4: Event ensure narrowing with name translation ───────
+
+    [Fact]
+    public void Check_EventEnsureNonneg_ProvesSqrt_NoC76()
+    {
+        const string dsl = """
+            precept Test
+            field Result as number default 0
+            event Submit with Days as number
+            on Submit ensure Days >= 0 because "nonneg"
+            state Draft initial
+            from Draft on Submit -> set Result = sqrt(Submit.Days) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_GuardedEventEnsure_ExcludedFromProof_SqrtC76()
+    {
+        const string dsl = """
+            precept Test
+            field Result as number default 0
+            event Submit with Days as number
+            on Submit ensure Days >= 0 when Days != null because "conditional nonneg"
+            state Draft initial
+            from Draft on Submit -> set Result = sqrt(Submit.Days) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
+
+    [Fact]
+    public void Check_EventArgPositiveConstraint_ProvesSqrt_NoC76()
+    {
+        const string dsl = """
+            precept Test
+            field Result as number default 0
+            event Submit with Days as number positive
+            state Draft initial
+            from Draft on Submit -> set Result = sqrt(Submit.Days) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    // ─── Issue #106 Slice 5: Divisor safety diagnostics (C92/C93) ───────
+
+    // A. Proof source × operator theory
+
+    [Theory]
+    [InlineData("positive", "/", false, null)]
+    [InlineData("positive", "%", false, null)]
+    [InlineData("nonnegative", "/", true, "nonnegative but not nonzero")]
+    [InlineData("nonnegative", "%", true, "nonnegative but not nonzero")]
+    [InlineData("min 1", "/", false, null)]
+    [InlineData("min 1", "%", false, null)]
+    [InlineData("min 0", "/", true, "nonnegative but not nonzero")]
+    public void Check_DivisorProofSource_Theory(string constraint, string op, bool expectC93, string? messageFragment)
+    {
+        var dsl = $"""
+            precept M
+            field Y as number default 10
+            field D as number default 1 {constraint}
+            state A initial
+            event Go
+            from A on Go -> set Y = Y {op} D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        var c93 = result.Diagnostics.Where(d => d.Constraint.Id == "C93").ToList();
+        if (expectC93)
+        {
+            c93.Should().ContainSingle();
+            if (messageFragment is not null)
+                c93[0].Message.Should().Contain(messageFragment);
+        }
+        else
+        {
+            c93.Should().BeEmpty();
+        }
+    }
+
+    [Theory]
+    [InlineData("rule D > 0 because \"pos\"", "/")]
+    [InlineData("rule D != 0 because \"nonzero\"", "/")]
+    public void Check_DivisorRuleProof_Clean(string rule, string op)
+    {
+        var dsl = $"""
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            event Go
+            {rule}
+            from A on Go -> set Y = Y {op} D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("when D != 0", "/")]
+    [InlineData("when D > 0", "/")]
+    public void Check_DivisorGuardProof_Clean(string guard, string op)
+    {
+        var dsl = $"""
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            event Go
+            from A on Go {guard} -> set Y = Y {op} D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorStateEnsureProof_Clean()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            state B
+            event Go
+            event Next
+            in B ensure D > 0 because "D pos in B"
+            from A on Go -> transition B
+            from B on Next -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("%")]
+    public void Check_DivisorNoProof_EmitsC93(string op)
+    {
+        var dsl = $"""
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            event Go
+            from A on Go -> set Y = Y {op} D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    // B. Field types
+
+    [Theory]
+    [InlineData("number")]
+    [InlineData("integer")]
+    [InlineData("decimal")]
+    public void Check_DivisorFieldType_PositiveClean(string type)
+    {
+        var dsl = $"""
+            precept M
+            field Y as {type} default 10
+            field D as {type} default 1 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // C. Literal divisors
+
+    [Theory]
+    [InlineData("Y / 0", true)]
+    [InlineData("Y / 0.0", true)]
+    [InlineData("Y % 0", true)]
+    [InlineData("Y / 2", false)]
+    [InlineData("Y / -1", false)]
+    [InlineData("Y / 100", false)]
+    public void Check_DivisorLiteral_Theory(string expression, bool expectC92)
+    {
+        var dsl = $"""
+            precept M
+            field Y as number default 10
+            state A initial
+            event Go
+            from A on Go -> set Y = {expression} -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        if (expectC92)
+            result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
+        else
+            result.Diagnostics.Where(d => d.Constraint.Id == "C92").Should().BeEmpty();
+    }
+
+    // D. Compound expression divisors
+
+    [Fact]
+    public void Check_DivisorCompound_Addition_NoWarning()
+    {
+        // D is nonnegative → interval [0,∞). [0,∞)+[1,1]=[1,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 nonnegative
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D + 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id is "C92" or "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_Multiplication_NoWarning()
+    {
+        // D and C are positive → (0,∞)*(0,∞)=(0,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 positive
+            field C as number default 2 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D * C) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id is "C92" or "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_Subtraction_ProvablyZero_EmitsC92()
+    {
+        // D - D is provably zero — LinearForm normalization yields constant 0 → [0,0] → C92 contradiction.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D - D) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_AbsFunction_NoWarning()
+    {
+        // D is positive → abs((0,∞))=(0,∞) excludes zero.
+        // Note: $nonzero: alone maps to Unknown interval; abs(Unknown)=[0,∞) does NOT exclude zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / abs(D) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id is "C92" or "C93").Should().BeEmpty();
+    }
+
+    // E. Event arg divisors
+
+    [Fact]
+    public void Check_DivisorEventArg_EnsurePositive_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Result as number default 0
+            event Calc with Divisor as number
+            on Calc ensure Divisor > 0 because "pos"
+            state A initial
+            from A on Calc -> set Result = Result / Calc.Divisor -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorEventArg_NoProof_C93()
+    {
+        const string dsl = """
+            precept M
+            field Result as number default 0
+            event Calc with Divisor as number
+            state A initial
+            from A on Calc -> set Result = Result / Calc.Divisor -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorEventArg_GuardNonzero_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Result as number default 0
+            event Calc with Divisor as number
+            state A initial
+            from A on Calc when Calc.Divisor != 0 -> set Result = Result / Calc.Divisor -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorEventArg_PositiveConstraint_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Result as number default 0
+            event Calc with Divisor as number positive
+            state A initial
+            from A on Calc -> set Result = Result / Calc.Divisor -> no transition
+            """;
+        var result = Check(dsl);
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // F. Nullable fields
+
+    [Fact]
+    public void Check_DivisorNullable_NoGuard_C41()
+    {
+        // Nullable field without guard fails the numeric operand check (C41) before
+        // the divisor check can fire. number? is not a numeric kind.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number nullable default null
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C41");
+    }
+
+    [Fact]
+    public void Check_DivisorNullable_NullGuardOnly_C93Only()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number nullable default null
+            state A initial
+            event Go
+            from A on Go when D != null -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C42").Should().BeEmpty();
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorNullable_CompoundGuard_Clean()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number nullable default null
+            state A initial
+            event Go
+            from A on Go when D != null and D > 0 -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id is "C42" or "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorNullable_PositiveConstraint_Clean()
+    {
+        // positive constraint on nullable desugars via or-pattern: D == null or D > 0
+        // This proves both nonneg and nonzero, so no C93.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number nullable positive default null
+            state A initial
+            event Go
+            from A on Go when D != null -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // G. min 0 vs min 1 boundary
+
+    [Fact]
+    public void Check_DivisorMin0_C93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 0 min 0
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorMin1_Clean()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 min 1
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // H. Context-aware C93 message
+
+    [Fact]
+    public void Check_DivisorNonnegative_ContextAwareMessage()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 0 nonnegative
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        var c93 = result.Diagnostics.Where(d => d.Constraint.Id == "C93").ToList();
+        c93.Should().ContainSingle();
+        c93[0].Message.Should().Contain("nonnegative but not nonzero");
+    }
+
+    // I. Computed field
+
+    [Fact]
+    public void Check_DivisorComputedField_NoProof_C93()
+    {
+        const string dsl = """
+            precept M
+            field Amount as number default 100
+            field Rate as number default 1
+            field Ratio as number -> Amount / Rate
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    // J. Intra-row mutation: set Rate = 0 then divide by Rate
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetZero_EmitsC92()
+    {
+        // Slice 11 (sequential assignment flow): set Rate = 0 injects point interval [0,0].
+        // Subsequent A / Rate sees [0,0] → C92 contradiction (provably zero).
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 1 positive
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = 0 -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C92");
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetZero_EmitsC92_Duplicate()
+    {
+        // Same scenario as Check_DivisorIntraRowMutation_SetZero_EmitsC92: set Rate = 0
+        // injects [0,0] → C92 contradiction.
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 1 positive
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = 0 -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C92");
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetLiteral5_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 0
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = 5 -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetNull_Kills()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number nullable default 1 positive
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = null -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        // null assignment kills numeric proof; Rate is nullable so type errors fire (C41 or C42/C93)
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C41" || d.Constraint.Id == "C42" || d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetIdentifier_Copies()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field OtherPositive as number default 5 positive
+            field Rate as number default 0
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = OtherPositive -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetCompound_KillsMarkers_EmitsC92()
+    {
+        // set Rate = D - D: LinearForm normalization yields [0,0], stored as point interval.
+        // Subsequent A / Rate sees [0,0] → C92 contradiction (provably zero).
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field D as number default 5 positive
+            field Rate as number default 5 positive
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = D - D -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
+    }
+
+    [Fact]
+    public void Check_DivisorStateAction_SetZero_EmitsC92()
+    {
+        // set Rate = 0 produces interval [0,0] — provably zero.
+        // A / Rate: AssessDivisorSafety finds [0,0] → Contradiction → C92.
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 1 positive
+            field X as number default 0
+            state S initial
+            to S -> set Rate = 0 -> set X = A / Rate
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C92");
+    }
+
+    [Fact]
+    public void Check_DivisorStateAction_SetLiteral_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 0
+            field X as number default 0
+            state S initial
+            to S -> set Rate = 3 -> set X = A / Rate
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // K. Multiple/redundant proofs
+
+    [Fact]
+    public void Check_DivisorRedundantProofs_PositiveAndRule_Clean()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 positive
+            state A initial
+            event Go
+            rule D > 0 because "redundant"
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorComplementaryProofs_NonnegAndRule_Clean()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 nonnegative
+            state A initial
+            event Go
+            rule D != 0 because "nonzero"
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // L. Severity
+
+    [Fact]
+    public void Check_C93_IsError_NotWarning()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 0
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        var c93 = result.Diagnostics.Single(d => d.Constraint.Id == "C93");
+        c93.Constraint.Severity.Should().Be(ConstraintSeverity.Error);
+    }
+
+    // ── Slice 13: Interval arithmetic compound expression tests ──────────────
+
+    [Fact]
+    public void Check_DivisorCompound_PositiveTimesPositive_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 positive
+            field C as number default 2 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D * C) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_AbsPositive_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / abs(D) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_AbsUnproven_C93()
+    {
+        // abs(Unknown)=[0,∞) — nonnegative but not nonzero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / abs(D) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_AdditionLiteral_NoC93()
+    {
+        // [0,∞)+[1,1]=[1,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 0 nonnegative
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D + 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_SubtractionSelf_C92()
+    {
+        // D-D: LinearForm normalization yields constant 0 → [0,0] → C92 contradiction.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D - D) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_NegativeLiteral_C93()
+    {
+        // [0,∞)-[10,10]=[-10,∞) includes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 0 nonnegative
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D - 10) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_Min5Field_NoC93()
+    {
+        // field D min 5 → interval [5,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 5 min 5
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_SqrtCompound_AbsInput_NoC76()
+    {
+        // abs(X) produces [0,∞) which is nonnegative → sqrt is safe.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field X as number default 5
+            state A initial
+            event Go
+            from A on Go -> set Y = sqrt(abs(X)) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_SqrtCompound_ProductOfNonneg_NoC76()
+    {
+        // A*A with A positive: (0,∞)*(0,∞)=(0,∞) is nonneg → sqrt safe.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = sqrt(A * A) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_SqrtCompound_Unproven_C76()
+    {
+        // sqrt(A-B) with no ordering → Unknown interval, not nonneg → C76.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5 positive
+            field B as number default 3 positive
+            state S initial
+            event Go
+            from S on Go -> set Y = sqrt(A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_ClampPositive_NoC93()
+    {
+        // clamp(D, 1, 100) → [1,100] excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 5
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / clamp(D, 1, 100) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_MaxOfPositives_NoC93()
+    {
+        // max(A,B) with both positive → (0,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5 positive
+            field B as number default 3 positive
+            state S initial
+            event Go
+            from S on Go -> set Y = Y / max(A, B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCompound_PostMutationInterval_NoC93()
+    {
+        // L1 assigns Rate=[5,5]. L3 computes [5,5]+[1,1]=[6,6] which excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field X as number default 5 positive
+            field Rate as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = 5 -> set Y = X / (Rate + 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorModuloCompound_NonnegPlusOne_NoC93()
+    {
+        // D%C with D nonneg, C positive → [0,∞). [0,∞)+[1,1]=[1,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 3 nonnegative
+            field C as number default 2 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D % C + 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorModuloCompound_Unconstrained_C93()
+    {
+        // D%C with no constraints → Unknown → C93.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 3
+            field C as number default 2
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (D % C) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Theory]
+    [InlineData("D - D", "D", "positive", "C92")]
+    [InlineData("D * 0", "D", "positive", "C92")]
+    [InlineData("abs(D) - abs(D)", "D", "positive", "C93")]
+    public void Check_ProvablyZeroDivisors_Theory(string divisorExpr, string fieldName, string constraint, string expectedCode)
+    {
+        var dsl = $"""
+            precept M
+            field Y as number default 10
+            field {fieldName} as number default 1 {constraint}
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / ({divisorExpr}) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == expectedCode);
+    }
+
+    // ── Slice 14: Relational inference tests ─────────────────────────────────
+
+    [Fact]
+    public void Check_DivisorRelational_AMinusB_RuleGt_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorRelational_AMinusB_GuardGt_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            field X as number default 1 positive
+            state S initial
+            event Go
+            from S on Go when A > B -> set Y = X / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorRelational_AMinusB_EnsureGt_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            in S ensure A > B because "A exceeds B"
+            event Go
+            from S on Go -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorRelational_BMinusA_RuleGt_NoC93()
+    {
+        // rule A > B → B-A < 0, still nonzero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / (B - A) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorRelational_AMinusB_RuleGte_C93()
+    {
+        // A >= B allows A==B → difference=0.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A >= B because "A at least B"
+            from S on Go -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorRelational_AMinusB_NoRelation_C93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            from S on Go -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorRelational_AMinusB_GuardLt_NoC93()
+    {
+        // B < A ≡ A > B → injects $gt:A:B.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            field X as number default 1 positive
+            state S initial
+            event Go
+            from S on Go when B < A -> set Y = X / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorRelational_EventArgGt_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            event Go with A as number, B as number
+            on Go ensure A > B because "A exceeds B"
+            state S initial
+            from S on Go -> set Y = Y / (Go.A - Go.B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // ── Slice 15: Conditional expression proof synthesis tests ────────────────
+
+    [Fact]
+    public void Check_DivisorConditional_BothBranchesPositive_NoC93()
+    {
+        // Hull of then:(0,∞) and else:[1,1] = (0,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field X as number default 5 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (if X > 0 then X else 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorConditional_ElseZero_C93()
+    {
+        // Hull of (0,∞) and [0,0] = [0,∞) includes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field X as number default 5 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (if X > 0 then X else 0) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorConditional_ElseNegative_C93()
+    {
+        // Hull of (0,∞) and [-1,-1] = [-1,∞) includes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field X as number default 5 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (if X > 0 then X else -1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorConditional_BothBranchesNonneg_C93()
+    {
+        // Then: X positive (0,∞). Else: abs(Z) with Z unconstrained = [0,∞). Hull = [0,∞) includes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field X as number default 5 positive
+            field Z as number default 3
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / (if X > 0 then X else abs(Z)) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_SqrtConditional_BothNonneg_NoC76()
+    {
+        // Hull of (0,∞) and [0,0] = [0,∞) is nonnegative → sqrt safe.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field X as number default 5 positive
+            state A initial
+            event Go
+            from A on Go -> set Y = sqrt(if X > 0 then X else 0) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorConditional_RelationalThenBranch_NoC93()
+    {
+        // Cross-layer L3+L5: rule A>B + conditional with concrete else.
+        // Then: A positive, so A interval is (0,∞). Else: [1,1]. Hull (0,∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5 positive
+            field B as number default 3
+            state S initial
+            event Go
+            from S on Go -> set Y = Y / (if A > B then A else 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // ── Slice 16: C-Nano — relational-aware interval subtraction + invalidation ────────────
+
+    [Fact]
+    public void Check_DivisorCNano_ConditionalAMinusB_RuleGt_NoC93()
+    {
+        // Composition: L3 relational marker + L5 conditional synthesis.
+        // Then-branch: A-B ∈ (0,+∞) via $gt:A:B; else-branch: [1,1]. Hull (0,+∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / (if A > B then A - B else 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCNano_AMinusBPlusOne_RuleGt_NoC93()
+    {
+        // A-B ∈ (0,+∞) via $gt:A:B; add 1 → (1,+∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / ((A - B) + 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCNano_AMinusBTimesC_RuleGtCPositive_NoC93()
+    {
+        // A-B ∈ (0,+∞) via $gt:A:B; C ∈ (0,+∞) positive; product ∈ (0,+∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            field C as number default 2 positive
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / ((A - B) * C) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_SqrtCNano_AMinusB_RuleGte_NoC76()
+    {
+        // A-B ∈ [0,+∞) via $gte:A:B; nonnegative → sqrt safe (C76 suppressed).
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A >= B because "A at least B"
+            from S on Go -> set Y = sqrt(A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCNano_ReassignmentInvalidatesRelational_C93()
+    {
+        // After set A = 0, the relational marker $gt:A:B must be killed by ApplyAssignmentNarrowing.
+        // Without invalidation, the stale $gt:A:B would incorrectly suppress C93 for A - B.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set A = 0 -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
     }
 }

@@ -26,7 +26,7 @@ How to decide who handles what.
 - `design/system/foundations/semantic-visual-system.html` routes to Elaine as both owner and maintainer.
 - The two canonical design HTML artifacts should be treated as a coordinated pair and reviewed together for visual consistency.
 - `design/prototypes/` routes to the owner of the surface or domain being explored; if unclear, start with Elaine.
-- `docs/research/` stays technical and cross-domain; route by subject matter rather than treating it as a design bucket.
+- `research/` stays technical and cross-domain; route by subject matter rather than treating it as a design bucket.
 - Changes that alter both brand meaning and reusable visual-system rules should involve both Peterman and Elaine, with Frank arbitrating boundary questions.
 
 ## Issue Routing
@@ -35,8 +35,17 @@ How to decide who handles what.
 |-------|--------|-----|
 | `squad` | Triage: analyze issue, assign `squad:{member}` label | Lead |
 | `squad:{name}` | Pick up issue and complete the work | Named member |
+| `squad:chore` | Autonomous pickup: Ralph routes to a real member, applies `squad:{member}` label, preserves review ceremony | Ralph (automatic) |
 
-### How Issue Assignment Works
+### Label Semantics — Backlog vs Autonomous Lane
+
+| Label | Meaning | Behavior |
+|-------|---------|----------|
+| `squad` | Issue is in Squad backlog, awaiting triage | Lead analyzes and assigns `squad:{member}` |
+| `squad:{member}` | Issue is assigned to a specific named agent | That agent picks it up in their next session |
+| `squad:chore` | **Explicit chore gate for Ralph autonomous pickup** | Ralph routes to the best-fit real member, applies `squad:{member}` label; normal review flow follows |
+
+`squad:chore` is the authoritative autonomous lane. Shane applies it to a chore issue to signal "Ralph may pick this up." Ralph routes it to the best-fit real member and preserves the review ceremony. No second label is required.
 
 1. When a GitHub issue gets the `squad` label, the **Lead** triages it — analyzing content, assigning the right `squad:{member}` label, and commenting with triage notes.
 2. When a `squad:{member}` label is applied, that member picks up the issue in their next session.

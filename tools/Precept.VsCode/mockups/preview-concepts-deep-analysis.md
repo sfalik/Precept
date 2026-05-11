@@ -601,7 +601,7 @@ The runtime returns structured violations with source (kind, expression, reason,
 | [Observable Notebooks](https://observablehq.com/) | Reactive cells with inline results; cell collapse | 05 |
 | [Elm Debugger](https://guide.elm-lang.org/effects/debugger.html) | Delta snapshots; inline diffs; event labeling | 01, 12 |
 | [VS Code Webview UI Toolkit](https://github.com/microsoft/vscode-webview-ui-toolkit) | Theme adaptation; message passing; responsive layout | All |
-| [Precept Language Expressiveness Research](../../docs/research/language/expressiveness/README.md) | Guard complexity; collection patterns; field constraints | 03, 07, 12 |
+| [Precept Language Expressiveness Research](../../research/language/expressiveness/README.md) | Guard complexity; collection patterns; field constraints | 03, 07, 12 |
 
 ---
 

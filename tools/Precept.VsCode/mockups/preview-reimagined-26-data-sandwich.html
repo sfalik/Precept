@@ -1,0 +1,2594 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 26: Data Sandwich - Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 26 — DATA SANDWICH
+       ================================================================
+       Direct derivative of Concept 19 with the same construction:
+         1. STATE DIAGRAM — thinner top strip
+         2. DATA PANEL — dominant middle surface
+         3. EVENTS / TIMELINE — shallower bottom band
+
+       Same simulation engine, same interaction model, same component
+       vocabulary. Only the panel arrangement and sizing change.
+       ================================================================ */
+
+    body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .header-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .layout-hint {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .layout-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      background: rgba(17, 17, 20, 0.78);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .header-actions button,
+    .layout-switch button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+
+    .layout-switch button {
+      border-color: transparent;
+      padding-inline: 9px;
+    }
+
+    .layout-switch button.active {
+      border-color: rgba(99, 102, 241, 0.35);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.10);
+    }
+
+    .header-actions button:hover,
+    .layout-switch button:hover {
+      border-color: var(--indigo);
+      color: var(--indigo);
+    }
+
+    .header-actions button:active,
+    .layout-switch button:active {
+      transform: scale(0.96);
+    }
+
+    .main-layout {
+      --state-size: 128px;
+      --data-size: minmax(280px, 1fr);
+      --timeline-size: 120px;
+      --split-size: 10px;
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: var(--state-size) var(--split-size) var(--data-size) var(--split-size) var(--timeline-size);
+      grid-template-areas:
+        'state'
+        'split-primary'
+        'data'
+        'split-secondary'
+        'timeline';
+      overflow: hidden;
+      gap: 0;
+      padding: 8px 10px 10px;
+      background:
+        radial-gradient(circle at top right, rgba(48, 184, 232, 0.05), transparent 34%),
+        radial-gradient(circle at left center, rgba(99, 102, 241, 0.05), transparent 32%),
+        var(--bg);
+    }
+
+    .main-layout.layout-flow {
+      grid-template-columns: var(--state-size) var(--split-size) var(--data-size);
+      grid-template-rows: minmax(0, 1fr) var(--split-size) var(--timeline-size);
+      grid-template-areas:
+        'state split-primary data'
+        'split-secondary split-secondary split-secondary'
+        'timeline timeline timeline';
+    }
+
+    .panel-shell {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(39, 39, 42, 0.92);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(22, 22, 26, 0.96), rgba(13, 13, 16, 0.98));
+    }
+
+    .state-shell { grid-area: state; }
+    .data-shell { grid-area: data; }
+    .timeline-shell { grid-area: timeline; }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.82);
+      background: linear-gradient(180deg, rgba(26, 26, 32, 0.82), rgba(19, 19, 23, 0.74));
+      flex-shrink: 0;
+    }
+
+    .panel-head-copy {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .panel-name {
+      font-size: 10px;
+      color: var(--text);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .panel-mini-label {
+      display: none;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--dusk);
+      font-weight: 700;
+    }
+
+    .panel-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .panel-collapse-btn {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      border-radius: 4px;
+      border: 1px solid rgba(99, 102, 241, 0.18);
+      background: rgba(99, 102, 241, 0.05);
+      color: var(--violet);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 120ms, border-color 120ms, color 120ms;
+    }
+
+    .panel-collapse-btn:hover {
+      border-color: rgba(99, 102, 241, 0.45);
+      background: rgba(99, 102, 241, 0.16);
+      color: var(--text);
+    }
+
+    .panel-body {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .state-panel-body {
+      padding: 6px 10px 8px;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    .panel-shell.is-collapsed .panel-body {
+      display: none;
+    }
+
+    .panel-shell.is-collapsed .panel-name {
+      display: none;
+    }
+
+    .panel-shell.is-collapsed .panel-mini-label {
+      display: inline;
+    }
+
+    .main-layout.layout-flow .panel-shell.is-collapsed .panel-head {
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 6px;
+      height: 100%;
+    }
+
+    .main-layout.layout-flow .panel-shell.is-collapsed .panel-mini-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+
+    .splitter {
+      position: relative;
+      user-select: none;
+      touch-action: none;
+      isolation: isolate;
+    }
+
+    .splitter::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      opacity: 0;
+      transition: opacity 140ms ease, box-shadow 140ms ease, background 140ms ease;
+    }
+
+    .splitter::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: calc(100% - 20px);
+      height: 1px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(144, 150, 166, 0), rgba(144, 150, 166, 0.3), rgba(144, 150, 166, 0));
+      opacity: 0.78;
+      transition: opacity 140ms ease, background 140ms ease, box-shadow 140ms ease;
+    }
+
+    .splitter:hover::before,
+    .splitter:focus-visible::before,
+    .splitter.is-active::before {
+      background: linear-gradient(180deg, rgba(99, 102, 241, 0.05), rgba(48, 184, 232, 0.03));
+      box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.08);
+      opacity: 1;
+    }
+
+    .splitter:hover::after,
+    .splitter:focus-visible::after,
+    .splitter.is-active::after {
+      opacity: 1;
+      background: linear-gradient(90deg, rgba(168, 152, 245, 0), rgba(168, 152, 245, 0.72), rgba(48, 184, 232, 0.62), rgba(168, 152, 245, 0));
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.14);
+    }
+
+    .layout-sandwich .splitter-primary,
+    .layout-sandwich .splitter-secondary {
+      grid-column: 1;
+      cursor: ns-resize;
+    }
+
+    .splitter-primary { grid-area: split-primary; }
+    .splitter-secondary { grid-area: split-secondary; }
+
+    .layout-sandwich .splitter::after,
+    .layout-flow .splitter-secondary::after {
+      width: calc(100% - 20px);
+      height: 1px;
+    }
+
+    .layout-flow .splitter-primary {
+      cursor: ew-resize;
+    }
+
+    .layout-flow .splitter-primary::after {
+      width: 1px;
+      height: calc(100% - 20px);
+      background: linear-gradient(180deg, rgba(144, 150, 166, 0), rgba(144, 150, 166, 0.3), rgba(144, 150, 166, 0));
+    }
+
+    .splitter.is-active::before {
+      background: linear-gradient(180deg, rgba(99, 102, 241, 0.08), rgba(48, 184, 232, 0.05));
+      box-shadow:
+        inset 0 0 0 1px rgba(99, 102, 241, 0.12),
+        0 0 16px rgba(99, 102, 241, 0.08);
+    }
+
+    .splitter.is-active::after {
+      opacity: 0.96;
+    }
+
+    body.is-resizing {
+      user-select: none;
+    }
+
+    .sd-panel-label { display: none; }
+
+    .sd-svg-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 60px;
+      flex: 1;
+    }
+
+    .sd-svg-container svg {
+      width: 100%;
+      max-width: 720px;
+      height: auto;
+    }
+
+    .main-layout.layout-flow .state-panel-body {
+      padding: 10px 12px 14px;
+      overflow: auto;
+    }
+
+    .main-layout.layout-flow .sd-svg-container {
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+
+    .main-layout.layout-flow .sd-svg-container svg {
+      max-width: none;
+    }
+
+    .sd-node {
+      fill: transparent;
+      stroke: #4338CA;
+      stroke-width: 1.5;
+      cursor: pointer;
+      transition: fill 400ms ease, stroke 400ms ease, stroke-width 400ms ease;
+    }
+
+    .sd-node-initial {
+      fill: transparent;
+      stroke: #4338CA;
+      stroke-width: 2.5;
+      cursor: pointer;
+    }
+
+    .sd-node-visited {
+      fill: rgba(144, 150, 166, 0.06);
+      stroke: var(--dusk);
+      stroke-width: 1.5;
+      cursor: pointer;
+    }
+
+    .sd-node-current {
+      fill: rgba(30, 27, 75, 0.25);
+      stroke: var(--violet);
+      stroke-width: 2;
+      cursor: pointer;
+    }
+
+    .sd-node-terminal {
+      fill: transparent;
+      stroke: #6366F1;
+      stroke-width: 2;
+      cursor: pointer;
+    }
+
+    .sd-node-terminal-outer {
+      fill: none;
+      stroke: rgba(99, 102, 241, 0.30);
+      stroke-width: 1;
+    }
+
+    .sd-glow { display: none; }
+
+    .sd-initial-dot { fill: #4338CA; }
+
+    .sd-label {
+      fill: rgba(113, 113, 122, 0.7);
+      font-size: 9px;
+      text-anchor: middle;
+      font-family: inherit;
+      pointer-events: none;
+    }
+
+    .sd-label-visited { fill: var(--dusk); }
+    .sd-label-current { fill: var(--violet); font-weight: 700; font-size: 9.5px; }
+
+    .sd-edge {
+      stroke: rgba(39, 39, 42, 0.6);
+      stroke-width: 1;
+      fill: none;
+      cursor: pointer;
+      transition: stroke 400ms ease;
+    }
+
+    .sd-edge-traced { stroke: rgba(52, 211, 153, 0.35); stroke-width: 1.5; }
+    .sd-edge-active,
+    .sd-edge-selected { stroke: var(--enabled); stroke-width: 2; }
+
+    .sd-arrow { fill: rgba(39, 39, 42, 0.5); transition: fill 400ms ease; }
+    .sd-arrow-traced { fill: rgba(52, 211, 153, 0.35); }
+    .sd-arrow-active,
+    .sd-arrow-selected { fill: var(--enabled); }
+
+    .sd-edge-label {
+      fill: rgba(113, 113, 122, 0.4);
+      font-size: 7.5px;
+      text-anchor: middle;
+      font-family: inherit;
+      cursor: pointer;
+      transition: fill 300ms ease;
+    }
+
+    .sd-edge-label-traced { fill: var(--cyan); opacity: 0.8; }
+    .sd-edge-label-active,
+    .sd-edge-label-selected { fill: var(--cyan); opacity: 1; }
+
+    .sd-self-loop {
+      stroke: rgba(39, 39, 42, 0.35);
+      stroke-width: 1;
+      fill: none;
+      cursor: pointer;
+      transition: stroke 300ms ease;
+    }
+
+    .sd-self-flash,
+    .sd-self-selected { stroke: rgba(52, 211, 153, 0.6); stroke-width: 1.5; }
+
+    .sd-self-label {
+      fill: rgba(113, 113, 122, 0.35);
+      font-size: 7px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .sd-node-hover {
+      stroke: var(--violet) !important;
+      stroke-width: 2.5 !important;
+      fill: rgba(168, 152, 245, 0.12) !important;
+    }
+
+    .sd-node-selected-target {
+      stroke: var(--cyan) !important;
+      stroke-width: 2.5 !important;
+      fill: rgba(48, 184, 232, 0.08) !important;
+    }
+
+    .sd-edge-hover {
+      stroke: var(--cyan) !important;
+      stroke-width: 2 !important;
+    }
+
+    .sd-edge-label-hover {
+      fill: var(--cyan) !important;
+      opacity: 1 !important;
+    }
+
+    .data-panel {
+      background: transparent;
+      overflow-y: auto;
+      padding: 10px 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
+
+    .dp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .dp-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .dp-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .dp-count {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .dp-dirty-badge {
+      font-size: 8px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(251, 191, 36, 0.10);
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      color: var(--gold);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .dp-header-actions { display: flex; gap: 6px; align-items: center; }
+
+    .dp-field-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+      gap: 8px;
+      align-content: start;
+    }
+
+    .dp-edit-btn, .dp-save-btn, .dp-cancel-btn, .dp-fire-btn {
+      font: inherit;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+
+    .dp-edit-btn {
+      border: 1px solid rgba(99, 102, 241, 0.28);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.06);
+    }
+    .dp-edit-btn:hover { background: rgba(99, 102, 241, 0.12); border-color: var(--indigo); }
+
+    .dp-save-btn,
+    .dp-fire-btn {
+      border: 1px solid rgba(52, 211, 153, 0.32);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+    }
+    .dp-save-btn:hover,
+    .dp-fire-btn:hover { background: rgba(52, 211, 153, 0.16); }
+    .dp-save-btn:disabled,
+    .dp-fire-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .dp-cancel-btn {
+      border: 1px solid var(--border);
+      color: var(--dim);
+      background: transparent;
+    }
+    .dp-cancel-btn:hover { border-color: rgba(251, 113, 133, 0.40); color: var(--blocked); }
+
+    .dp-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding-top: 2px;
+      font-size: 9px;
+      color: var(--dim);
+    }
+
+    .dp-footer-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .dp-footer-text {
+      min-width: 0;
+      line-height: 1.35;
+      color: var(--dim);
+    }
+
+    .dp-field-card {
+      min-width: 0;
+      border: 1px solid rgba(39, 39, 42, 0.58);
+      border-radius: 7px;
+      background: rgba(19, 19, 24, 0.74);
+    }
+
+    .dp-field-label {
+      font-size: 8px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+    }
+
+    .dp-field {
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .dp-field-card {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 9px;
+      min-height: 96px;
+    }
+
+    .dp-field-card.selected-impact {
+      border-color: rgba(48, 184, 232, 0.28);
+      background: rgba(18, 26, 32, 0.42);
+    }
+
+    .dp-field-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .dp-field-top .dp-row-badges {
+      justify-content: flex-start;
+      gap: 4px;
+    }
+
+    .dp-field-control {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+    }
+
+    .dp-field-readout {
+      width: 100%;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 5px;
+      border: 1px solid rgba(54, 54, 64, 0.72);
+      background: rgba(12, 12, 15, 0.52);
+      overflow: hidden;
+    }
+
+    .dp-field-meta {
+      margin-top: auto;
+      font-size: 8px;
+      color: var(--dim);
+      line-height: 1.35;
+    }
+
+    .dp-field.recently-changed {
+      background: rgba(52, 211, 153, 0.05);
+      border-color: rgba(52, 211, 153, 0.20);
+    }
+
+    .dp-field.editing {
+      background: rgba(99, 102, 241, 0.04);
+      border-color: rgba(99, 102, 241, 0.18);
+    }
+
+    .dp-field.dirty {
+      background: rgba(251, 191, 36, 0.05);
+      border-color: rgba(251, 191, 36, 0.22);
+    }
+
+    .dp-field-name,
+    .dp-row-name {
+      font-size: 10px;
+      color: var(--slate);
+      font-weight: 600;
+      min-width: 0;
+    }
+
+    .dp-field-value,
+    .dp-row-value {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--slate-val);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dp-field-value.null,
+    .dp-row-value.null {
+      color: var(--muted);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .dp-field-value.bool-true,
+    .dp-row-value.bool-true { color: var(--enabled); }
+
+    .dp-field-value.bool-false,
+    .dp-row-value.bool-false { color: var(--blocked); opacity: 0.7; }
+
+    .dp-row-badges {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .dp-edit-badge {
+      font-size: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      font-weight: 700;
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 999px;
+      padding: 1px 5px;
+    }
+
+    .dp-edit-input,
+    .dp-arg-input,
+    .dp-arg-select {
+      width: 100%;
+      background: rgba(12, 12, 15, 0.72);
+      border: 1px solid rgba(99, 102, 241, 0.28);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 5px 7px;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .dp-edit-input:focus,
+    .dp-arg-input:focus,
+    .dp-arg-select:focus {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.10);
+    }
+
+    .dp-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+
+    .dp-toggle .toggle-track {
+      width: 30px;
+      height: 16px;
+      border-radius: 9px;
+      background: rgba(251, 113, 133, 0.15);
+      border: 1px solid rgba(251, 113, 133, 0.28);
+      position: relative;
+      transition: all 140ms;
+    }
+
+    .dp-toggle .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--blocked);
+      opacity: 0.7;
+      transition: all 140ms;
+    }
+
+    .dp-toggle.on .toggle-track {
+      background: rgba(52, 211, 153, 0.20);
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .dp-toggle.on .toggle-track::after {
+      left: 16px;
+      background: var(--enabled);
+      opacity: 1;
+    }
+
+    .dp-toggle-label {
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .dp-empty {
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .timeline-surface {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 8px 10px 10px;
+      position: relative;
+      background: transparent;
+      border-top: none;
+      flex: 1 1 auto;
+      min-height: 0;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
+    }
+
+    .timeline-lane {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+      min-width: max-content;
+      min-height: 84px;
+    }
+
+    .timeline-history-rail {
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .timeline-future-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+      position: relative;
+      padding-left: 10px;
+    }
+
+    .timeline-future-rail::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 18px;
+      bottom: 18px;
+      width: 2px;
+      background: linear-gradient(to bottom, rgba(48, 184, 232, 0.25), rgba(48, 184, 232, 0.06));
+      border-radius: 1px;
+    }
+
+    .timeline-current-cluster {
+      display: flex;
+      align-items: stretch;
+      flex-shrink: 0;
+      min-width: 188px;
+    }
+
+    .timeline-connector {
+      align-self: center;
+      width: 24px;
+      height: 2px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(144, 150, 166, 0.14), rgba(168, 152, 245, 0.34), rgba(48, 184, 232, 0.18));
+      flex-shrink: 0;
+    }
+
+    .timeline-connector.major {
+      width: 34px;
+      background: linear-gradient(90deg, rgba(168, 152, 245, 0.34), rgba(48, 184, 232, 0.36));
+    }
+
+    .timeline-state-tile {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px 9px;
+      border: 1.5px solid rgba(144, 150, 166, 0.18);
+      border-radius: 9px;
+      background: rgba(18, 18, 22, 0.72);
+      transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+      min-width: 188px;
+      max-width: 188px;
+    }
+
+    .timeline-state-tile.is-current {
+      border-color: rgba(168, 152, 245, 0.42);
+      background: rgba(30, 27, 46, 0.56);
+    }
+
+    .timeline-state-tile.is-terminal {
+      box-shadow: inset 0 0 0 1px rgba(12, 12, 15, 0.94), inset 0 0 0 2px rgba(99, 102, 241, 0.24);
+    }
+
+    .timeline-state-tile.hover-highlight {
+      border-color: rgba(168, 152, 245, 0.52);
+      background: rgba(30, 27, 46, 0.62);
+    }
+
+    .timeline-state-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .timeline-state-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--violet);
+      line-height: 1.1;
+    }
+
+    .timeline-state-badges {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .timeline-state-copy {
+      font-size: 9px;
+      color: var(--slate-val);
+      line-height: 1.35;
+      min-height: 24px;
+    }
+
+    /* ── Unified tag system ── */
+    .tag {
+      font-size: 7px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .tag-violet  { border: 1px solid rgba(168, 152, 245, 0.35); color: var(--violet); background: rgba(168, 152, 245, 0.08); }
+    .tag-neutral { border: 1px solid rgba(144, 150, 166, 0.22); color: var(--dusk); background: rgba(144, 150, 166, 0.06); }
+    .tag-dim     { border: 1px solid rgba(113, 113, 122, 0.25); color: var(--dim); background: rgba(113, 113, 122, 0.05); }
+    .tag-cyan    { border: 1px solid rgba(48, 184, 232, 0.30); color: var(--cyan); background: rgba(48, 184, 232, 0.06); }
+    .tag-indigo  { border: 1px solid rgba(99, 102, 241, 0.25); color: var(--indigo); background: rgba(99, 102, 241, 0.08); }
+    .tag-enabled { border: 1px solid rgba(52, 211, 153, 0.25); color: var(--enabled); background: rgba(52, 211, 153, 0.06); }
+    .tag-blocked { border: 1px solid rgba(251, 113, 133, 0.25); color: var(--blocked); background: rgba(251, 113, 133, 0.06); }
+    .tag-gold    { border: 1px solid rgba(251, 191, 36, 0.25); color: var(--gold); background: rgba(251, 191, 36, 0.06); }
+    .tag-slate   { border: 1px solid rgba(176, 190, 197, 0.22); color: var(--slate); background: rgba(176, 190, 197, 0.06); }
+
+    .timeline-event-card {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 7px 8px;
+      border: 1px solid rgba(39, 39, 42, 0.72);
+      border-radius: 8px;
+      background: rgba(18, 22, 27, 0.62);
+      min-height: 62px;
+      min-width: 214px;
+      max-width: 240px;
+      flex-shrink: 0;
+      transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+      cursor: default;
+    }
+
+    .timeline-event-card.selectable {
+      cursor: pointer;
+    }
+
+    .timeline-event-card.selectable:hover,
+    .timeline-event-card.hover-highlight {
+      border-color: rgba(48, 184, 232, 0.38);
+      background: rgba(18, 26, 32, 0.72);
+    }
+
+    .timeline-event-card.is-selected {
+      border-color: rgba(48, 184, 232, 0.58);
+      box-shadow: inset 0 0 0 1px rgba(48, 184, 232, 0.18);
+    }
+
+    .timeline-event-card.blocked {
+      border-color: rgba(251, 113, 133, 0.18);
+      background: rgba(32, 19, 24, 0.46);
+    }
+
+    .timeline-event-card.history {
+      border-color: rgba(176, 190, 197, 0.18);
+      background: rgba(18, 18, 22, 0.52);
+    }
+
+    .timeline-event-card.transitioned {
+      border-color: rgba(52, 211, 153, 0.22);
+    }
+
+    .timeline-event-card.edit-card {
+      background: rgba(19, 20, 27, 0.68);
+    }
+
+    .timeline-event-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: start;
+    }
+
+    .timeline-event-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+      min-width: 0;
+    }
+
+    .timeline-event-effect {
+      font-size: 8px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      white-space: nowrap;
+    }
+
+    .timeline-event-subtitle {
+      font-size: 9px;
+      color: var(--slate-val);
+      line-height: 1.3;
+    }
+
+    .timeline-event-meta {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .timeline-event-args {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 6px;
+    }
+
+    .timeline-event-arg {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(39, 39, 42, 0.58);
+      background: rgba(12, 12, 15, 0.46);
+    }
+
+    .timeline-event-arg-label {
+      font-size: 7px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.65px;
+    }
+
+    .timeline-event-arg-value {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      padding: 5px 6px;
+      border-radius: 5px;
+      border: 1px solid rgba(54, 54, 64, 0.72);
+      background: rgba(15, 15, 20, 0.65);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--slate-val);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .timeline-event-card .dp-arg-input,
+    .timeline-event-card .dp-arg-select {
+      font-size: 10px;
+      padding: 5px 6px;
+      min-width: 0;
+    }
+
+    .timeline-event-note {
+      font-size: 9px;
+      color: var(--dim);
+      line-height: 1.35;
+      min-height: 18px;
+    }
+
+    .timeline-event-card.blocked .timeline-event-note {
+      color: var(--gold);
+    }
+
+    .timeline-fire-btn {
+      font: inherit;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      background: rgba(48, 184, 232, 0.08);
+      white-space: nowrap;
+      transition: all 150ms;
+      align-self: flex-start;
+    }
+
+    .timeline-fire-btn:hover {
+      background: rgba(48, 184, 232, 0.22);
+    }
+
+    .timeline-fire-btn.blocked {
+      border-color: var(--blocked);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .timeline-empty-card {
+      padding: 9px 10px;
+      border: 1px dashed rgba(144, 150, 166, 0.20);
+      border-radius: 8px;
+      background: rgba(17, 17, 20, 0.52);
+      color: var(--dim);
+      font-size: 9px;
+      line-height: 1.4;
+      min-width: 214px;
+      max-width: 240px;
+      flex-shrink: 0;
+    }
+
+    .toast {
+      position: fixed;
+      top: 50px;
+      right: 20px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 300ms ease;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .toast.transition-toast { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.35); color: var(--enabled); }
+    .toast.no-transition-toast { background: rgba(48, 184, 232, 0.10); border: 1px solid rgba(48, 184, 232, 0.25); color: var(--cyan); }
+    .toast.rejected-toast { background: rgba(251, 113, 133, 0.12); border: 1px solid rgba(251, 113, 133, 0.30); color: var(--blocked); }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 16px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .status-left { display: flex; gap: 12px; }
+    .status-ok { color: var(--enabled); }
+    .status-warn { color: var(--gold); }
+
+    @keyframes dataFlash {
+      0% { background: rgba(52, 211, 153, 0.12); }
+      100% { background: rgba(52, 211, 153, 0.03); }
+    }
+
+    @media (max-width: 900px) {
+      .header {
+        align-items: flex-start;
+      }
+
+      .header-actions {
+        justify-content: flex-end;
+      }
+
+      .layout-hint {
+        display: none;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .dp-field-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-event-args {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-event-card,
+      .timeline-empty-card,
+      .timeline-state-tile {
+        min-width: 188px;
+        max-width: 188px;
+      }
+
+      .main-layout {
+        padding: 8px;
+      }
+
+      .panel-head {
+        padding: 8px 10px;
+      }
+
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toast" class="toast"></div>
+
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">26 · DATA SANDWICH</span>
+      <span class="header-title">MaintenanceWorkOrder</span>
+      <span class="sep">·</span>
+      <span class="header-file">maintenance-work-order.precept</span>
+    </div>
+    <div class="header-actions">
+      <div class="header-group">
+        <span class="layout-hint">Bounded presets</span>
+        <div class="layout-switch" role="group" aria-label="Layout presets">
+          <button data-layout-mode="sandwich" class="active" onclick="setLayoutMode('sandwich')">Data stack</button>
+          <button data-layout-mode="flow" onclick="setLayoutMode('flow')">Flow split</button>
+        </div>
+      </div>
+      <div class="header-group">
+        <button onclick="undoStep()">← Undo</button>
+        <button onclick="resetSimulation()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mainLayout" class="main-layout layout-sandwich">
+    <section class="panel-shell state-shell" data-panel-shell="state">
+      <div class="panel-head">
+        <div class="panel-head-copy">
+          <span class="panel-name">State</span>
+          <span class="panel-mini-label">State</span>
+        </div>
+        <div class="panel-head-actions">
+          <button class="panel-collapse-btn" data-panel-toggle="state" onclick="togglePanel('state')" title="Collapse state panel" aria-label="Collapse state panel">−</button>
+        </div>
+      </div>
+      <div class="panel-body state-panel-body">
+        <div id="stateDiagram" class="sd-svg-container"></div>
+      </div>
+    </section>
+
+    <div id="splitterPrimary" class="splitter splitter-primary" role="separator" aria-label="Resize state and data panels" onpointerdown="startResize(event, 'primary')"></div>
+
+    <section class="panel-shell data-shell" data-panel-shell="data">
+      <div class="panel-head">
+        <div class="panel-head-copy">
+          <span class="panel-name">Data</span>
+          <span class="panel-mini-label">Data</span>
+        </div>
+        <div class="panel-head-actions">
+          <button class="panel-collapse-btn" data-panel-toggle="data" onclick="togglePanel('data')" title="Collapse data panel" aria-label="Collapse data panel">−</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="dataPanel" class="data-panel"></div>
+      </div>
+    </section>
+
+    <div id="splitterSecondary" class="splitter splitter-secondary" role="separator" aria-label="Resize data and timeline panels" onpointerdown="startResize(event, 'secondary')"></div>
+
+    <section class="panel-shell timeline-shell" data-panel-shell="timeline">
+      <div class="panel-head">
+        <div class="panel-head-copy">
+          <span class="panel-name">Timeline</span>
+          <span class="panel-mini-label">Time</span>
+        </div>
+        <div class="panel-head-actions">
+          <button class="panel-collapse-btn" data-panel-toggle="timeline" onclick="togglePanel('timeline')" title="Collapse timeline panel" aria-label="Collapse timeline panel">−</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="timeline-surface" id="timeline"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-left">
+      <span id="statusStep">Step 0</span>
+      <span class="sep">·</span>
+      <span id="statusInvariants" class="status-ok">✓ 2 invariants ok</span>
+      <span class="sep">·</span>
+      <span id="statusInfo">6 states · 7 events · 10 fields</span>
+    </div>
+    <div>
+      <span><span style="color: var(--indigo);">Select</span> <span>an event card</span> to inspect or fire</span>
+    </div>
+  </div>
+
+  <script>
+    const STATES = ['Draft', 'Open', 'Scheduled', 'InProgress', 'Completed', 'Cancelled'];
+
+    const STATE_META = {
+      Draft:      { initial: true,  terminal: false },
+      Open:       { initial: false, terminal: false },
+      Scheduled:  { initial: false, terminal: false },
+      InProgress: { initial: false, terminal: false },
+      Completed:  { initial: false, terminal: true  },
+      Cancelled:  { initial: false, terminal: true  },
+    };
+
+    const FIELD_DEFS = {
+      RequesterName:       { type: 'string',  nullable: true,  default: null },
+      Location:            { type: 'string',  nullable: true,  default: null },
+      IssueSummary:        { type: 'string',  nullable: true,  default: null },
+      AssignedTechnician:  { type: 'string',  nullable: true,  default: null },
+      EstimatedHours:      { type: 'number',  nullable: false, default: 0 },
+      ActualHours:         { type: 'number',  nullable: false, default: 0 },
+      Urgent:              { type: 'boolean', nullable: false, default: false },
+      PartsApproved:       { type: 'boolean', nullable: false, default: false },
+      CompletionNote:      { type: 'string',  nullable: true,  default: null },
+      CancellationReason:  { type: 'string',  nullable: true,  default: null },
+    };
+
+    const INVARIANTS = [
+      { expr: 'EstimatedHours >= 0', msg: 'Estimated hours cannot be negative', targets: ['EstimatedHours'], check: d => d.EstimatedHours >= 0 },
+      { expr: 'ActualHours >= 0', msg: 'Actual hours cannot be negative', targets: ['ActualHours'], check: d => d.ActualHours >= 0 },
+    ];
+
+    const EDITABLE_FIELDS = { Draft: ['Location', 'IssueSummary', 'Urgent'] };
+
+    const STATE_ASSERTIONS = {
+      Scheduled: [{ expr: 'AssignedTechnician != null', msg: 'Scheduled work must have an assigned technician', targets: ['AssignedTechnician'], check: d => d.AssignedTechnician !== null }],
+      Completed: [{ expr: 'CompletionNote != null', msg: 'Completed work orders need a completion note', targets: ['CompletionNote'], check: d => d.CompletionNote !== null }],
+    };
+
+    const FROM_ASSERTIONS = {
+      InProgress: [{ expr: 'AssignedTechnician != null', msg: 'Active work cannot finish without a technician', targets: ['AssignedTechnician'], check: d => d.AssignedTechnician !== null }],
+    };
+
+    function getAvailableEvents(state, data) {
+      const events = [];
+
+      if (state === 'Draft') {
+        events.push({ name: 'Submit', args: [
+            { name: 'Requester', type: 'string', placeholder: 'Jane Doe' },
+            { name: 'WorkLocation', type: 'string', placeholder: 'Building A, Room 204' },
+            { name: 'Summary', type: 'string', placeholder: 'HVAC not cooling' },
+            { name: 'IsUrgent', type: 'boolean', default: false },
+          ], rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Open',
+            mutations: ['RequesterName = Requester', 'Location = WorkLocation', 'IssueSummary = Summary', 'Urgent = IsUrgent'],
+            eventAsserts: [
+              { expr: 'Requester != ""', msg: 'A requester name is required', check: a => a.Requester && a.Requester !== '' },
+              { expr: 'WorkLocation != ""', msg: 'A location is required', check: a => a.WorkLocation && a.WorkLocation !== '' },
+              { expr: 'Summary != ""', msg: 'An issue summary is required', check: a => a.Summary && a.Summary !== '' },
+            ],
+            canFire: a => a.Requester && a.Requester !== '' && a.WorkLocation && a.WorkLocation !== '' && a.Summary && a.Summary !== '',
+            blockReason: a => { if (!a.Requester || a.Requester === '') return 'A requester name is required'; if (!a.WorkLocation || a.WorkLocation === '') return 'A location is required'; if (!a.Summary || a.Summary === '') return 'An issue summary is required'; return ''; },
+            apply: (d, a) => ({ ...d, RequesterName: a.Requester, Location: a.WorkLocation, IssueSummary: a.Summary, Urgent: !!a.IsUrgent }),
+          }],
+        });
+      }
+
+      if (state === 'Open') {
+        events.push({ name: 'Assign', args: [
+            { name: 'Technician', type: 'string', placeholder: 'Bob Smith' },
+            { name: 'Estimate', type: 'number', placeholder: '4' },
+          ], rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Scheduled',
+            mutations: ['AssignedTechnician = Technician', 'EstimatedHours = Estimate'],
+            eventAsserts: [
+              { expr: 'Technician != ""', msg: 'A technician is required', check: a => a.Technician && a.Technician !== '' },
+              { expr: 'Estimate > 0', msg: 'Estimated hours must be positive', check: a => Number(a.Estimate) > 0 },
+            ],
+            canFire: a => a.Technician && a.Technician !== '' && Number(a.Estimate) > 0,
+            blockReason: a => { if (!a.Technician || a.Technician === '') return 'A technician is required'; if (!Number(a.Estimate) || Number(a.Estimate) <= 0) return 'Estimated hours must be positive'; return ''; },
+            apply: (d, a) => ({ ...d, AssignedTechnician: a.Technician, EstimatedHours: Number(a.Estimate) }),
+          }],
+        });
+        events.push({ name: 'Cancel', args: [{ name: 'Reason', type: 'string', placeholder: 'No longer needed', nullable: true, default: '' }],
+          rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Cancelled', mutations: ['CancellationReason = Reason'],
+            eventAsserts: [{ expr: 'Reason == null || Reason != ""', msg: 'A supplied cancellation reason cannot be blank', check: a => !a.Reason || a.Reason === '' || a.Reason.trim() !== '' }],
+            canFire: () => true, blockReason: () => '', apply: (d, a) => ({ ...d, CancellationReason: a.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === 'Scheduled') {
+        events.push({ name: 'ApproveParts', args: [], rows: [{ guard: null, guardDisplay: null, outcome: 'no-transition', target: null, mutations: ['PartsApproved = true'], eventAsserts: [], canFire: () => true, blockReason: () => '', apply: d => ({ ...d, PartsApproved: true }) }] });
+        events.push({ name: 'StartWork', args: [], rows: [
+            { guard: '!Urgent || PartsApproved', guardDisplay: '!Urgent || PartsApproved', outcome: 'transition', target: 'InProgress', eventAsserts: [], canFire: (a, d) => !d.Urgent || d.PartsApproved, blockReason: () => 'Urgent work must have parts approved before it starts', apply: d => d },
+            { guard: null, guardDisplay: null, outcome: 'rejected', target: null, rejectMsg: 'Urgent work must have parts approved before it starts', eventAsserts: [], canFire: () => false, apply: d => d },
+          ] });
+        events.push({ name: 'Cancel', args: [{ name: 'Reason', type: 'string', placeholder: 'Budget cut', nullable: true, default: '' }],
+          rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Cancelled', mutations: ['CancellationReason = Reason'],
+            eventAsserts: [{ expr: 'Reason == null || Reason != ""', msg: 'A supplied cancellation reason cannot be blank', check: a => !a.Reason || a.Reason === '' || a.Reason.trim() !== '' }],
+            canFire: () => true, blockReason: () => '', apply: (d, a) => ({ ...d, CancellationReason: a.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === 'InProgress') {
+        events.push({ name: 'RecordProgress', args: [{ name: 'Hours', type: 'number', placeholder: '2' }],
+          rows: [{ guard: null, guardDisplay: null, outcome: 'no-transition', target: null, mutations: ['ActualHours = ActualHours + Hours'],
+            eventAsserts: [{ expr: 'Hours > 0', msg: 'Progress entries must be positive', check: a => Number(a.Hours) > 0 }],
+            canFire: a => Number(a.Hours) > 0, blockReason: () => 'Progress entries must be positive',
+            apply: (d, a) => ({ ...d, ActualHours: d.ActualHours + Number(a.Hours) }),
+          }],
+        });
+        events.push({ name: 'Complete', args: [{ name: 'Note', type: 'string', placeholder: 'Fixed compressor unit' }],
+          rows: [
+            { guard: 'ActualHours <= EstimatedHours + 4', guardDisplay: 'ActualHours <= EstimatedHours + 4', outcome: 'transition', target: 'Completed', mutations: ['CompletionNote = Note'],
+              eventAsserts: [{ expr: 'Note != ""', msg: 'A completion note is required', check: a => a.Note && a.Note !== '' }],
+              canFire: (a, d) => a.Note && a.Note !== '' && d.ActualHours <= d.EstimatedHours + 4,
+              blockReason: (a, d) => { if (!a.Note || a.Note === '') return 'A completion note is required'; return 'Work orders that exceed the estimate by more than four hours need review first'; },
+              apply: (d, a) => ({ ...d, CompletionNote: a.Note }),
+            },
+            { guard: null, guardDisplay: null, outcome: 'rejected', target: null, rejectMsg: 'Work orders that exceed the estimate by more than four hours need review first', eventAsserts: [], canFire: () => false, apply: d => d },
+          ],
+        });
+      }
+
+      return events;
+    }
+
+    function getDefaultData() { const d = {}; for (const [k, v] of Object.entries(FIELD_DEFS)) d[k] = v.default; return d; }
+
+    function getInitialSimulation() {
+      return { currentState: 'Draft', data: getDefaultData(), history: [], stepCount: 0, visitedStates: new Set(['Draft']), changedFields: new Set() };
+    }
+
+    let sim = getInitialSimulation();
+    let isEditing = false;
+    let draftData = null;
+    let dirtyFields = new Set();
+    let selectedEvent = null;
+    const eventDrafts = {};
+
+    const COLLAPSED_PANEL_SIZE = 44;
+    const PANEL_MIN = {
+      sandwich: { state: 120, timeline: 112, data: 280, dataPreferred: 420 },
+      flow: { state: 260, data: 320, timeline: 120, topPreferred: 380, topMinimum: 320 },
+    };
+
+    const PANEL_MAX = {
+      sandwich: { state: 136, timeline: 132 },
+      flow: { timeline: 132 },
+    };
+
+    const panelUi = {
+      layout: 'sandwich',
+      collapsed: { state: false, data: false, timeline: false },
+      sizes: {
+        sandwich: { state: 128, timeline: 120 },
+        flow: { state: 320, timeline: 124 },
+      },
+      manual: {
+        sandwich: { state: false, timeline: false },
+        flow: { state: false, timeline: false },
+      },
+      dragging: null,
+      autoSizeQueued: false,
+    };
+
+    function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+    function clamp(value, min, max) { return Math.min(Math.max(value, min), max); }
+
+    function getEventDraftKey(state, eventName) {
+      return `${state}::${eventName}`;
+    }
+
+    function ensureEventDraft(evt) {
+      const key = getEventDraftKey(sim.currentState, evt.name);
+      if (!eventDrafts[key]) {
+        const draft = {};
+        evt.args.forEach(arg => {
+          if (arg.type === 'boolean') draft[arg.name] = !!arg.default;
+          else if (arg.default !== undefined && arg.default !== null) draft[arg.name] = String(arg.default);
+          else draft[arg.name] = '';
+        });
+        eventDrafts[key] = draft;
+      }
+      return eventDrafts[key];
+    }
+
+    function syncSelectedEvent() {
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      if (!selectedEvent) return;
+      if (!events.some(evt => evt.name === selectedEvent)) selectedEvent = null;
+    }
+
+    function getSelectedEventMeta() {
+      syncSelectedEvent();
+      if (!selectedEvent) return null;
+      const evt = getAvailableEvents(sim.currentState, sim.data).find(item => item.name === selectedEvent);
+      return evt ? getEventPreview(evt) : null;
+    }
+
+    function getEventPreview(evt, explicitArgs) {
+      const args = explicitArgs || gatherArgs(evt);
+      const primaryRow = evt.rows.find(row => row.outcome !== 'rejected') || evt.rows[0];
+      const failedAssert = (primaryRow.eventAsserts || []).find(assertion => !assertion.check(args));
+      const blocked = !!failedAssert || !primaryRow.canFire(args, sim.data);
+      const rejectedRow = evt.rows.find(row => row.outcome === 'rejected');
+      const reason = failedAssert
+        ? failedAssert.msg
+        : (blocked
+            ? (primaryRow.blockReason ? primaryRow.blockReason(args, sim.data) : (rejectedRow?.rejectMsg || primaryRow.rejectMsg || 'Blocked'))
+            : '');
+      const targetState = primaryRow.outcome === 'transition' && primaryRow.target ? primaryRow.target : sim.currentState;
+      const effectLabel = primaryRow.outcome === 'transition' && primaryRow.target ? `→ ${primaryRow.target}` : `stays ${sim.currentState}`;
+      const touchedFields = new Set();
+      (primaryRow.mutations || []).forEach(mutation => {
+        const fieldName = mutation.split('=')[0]?.trim();
+        if (FIELD_DEFS[fieldName]) touchedFields.add(fieldName);
+      });
+      (primaryRow.eventAsserts || []).forEach(assertion => {
+        (assertion.targets || []).forEach(target => {
+          if (FIELD_DEFS[target]) touchedFields.add(target);
+        });
+      });
+
+      return {
+        evt,
+        args,
+        primaryRow,
+        blocked,
+        reason,
+        targetState,
+        effectLabel,
+        touchedFields: [...touchedFields],
+      };
+    }
+
+    function getSplitSize() {
+      const main = document.getElementById('mainLayout');
+      if (!main) return 10;
+      const size = parseFloat(getComputedStyle(main).getPropertyValue('--split-size'));
+      return Number.isFinite(size) ? size : 10;
+    }
+
+    function shrinkPairToFit(primaryDesired, secondaryDesired, primaryMin, secondaryMin, available) {
+      let primary = primaryDesired;
+      let secondary = secondaryDesired;
+      const desiredTotal = primary + secondary;
+      if (desiredTotal <= available) return { primary, secondary };
+
+      let overflow = desiredTotal - available;
+      const primaryFlex = Math.max(0, primary - primaryMin);
+      const secondaryFlex = Math.max(0, secondary - secondaryMin);
+      const totalFlex = primaryFlex + secondaryFlex;
+
+      if (totalFlex > 0) {
+        const primaryShare = overflow * (primaryFlex / totalFlex);
+        const secondaryShare = overflow - primaryShare;
+        primary = Math.max(primaryMin, Math.round(primary - primaryShare));
+        secondary = Math.max(secondaryMin, Math.round(secondary - secondaryShare));
+      }
+
+      const remainingOverflow = primary + secondary - available;
+      if (remainingOverflow > 0) {
+        const primaryReduction = Math.min(remainingOverflow, Math.max(0, primary - primaryMin));
+        primary -= primaryReduction;
+        secondary -= Math.min(remainingOverflow - primaryReduction, Math.max(0, secondary - secondaryMin));
+      }
+
+      return { primary, secondary };
+    }
+
+    function getPanelMeasurements() {
+      const stateShell = document.querySelector('[data-panel-shell="state"]');
+      const timelineShell = document.querySelector('[data-panel-shell="timeline"]');
+      const stateHead = stateShell?.querySelector('.panel-head');
+      const timelineHead = timelineShell?.querySelector('.panel-head');
+      const stateBody = stateShell?.querySelector('.state-panel-body');
+      const stateDiagram = document.getElementById('stateDiagram');
+      const stateSvg = stateDiagram?.querySelector('svg');
+      const stateViewBox = stateSvg?.viewBox?.baseVal;
+      const stateLabel = stateBody?.querySelector('.sd-panel-label');
+      const stateBodyStyle = stateBody ? getComputedStyle(stateBody) : null;
+      const stateVerticalPadding = stateBodyStyle
+        ? parseFloat(stateBodyStyle.paddingTop) + parseFloat(stateBodyStyle.paddingBottom)
+        : 0;
+      const stateHorizontalPadding = stateBodyStyle
+        ? parseFloat(stateBodyStyle.paddingLeft) + parseFloat(stateBodyStyle.paddingRight)
+        : 0;
+      const stateHeight = Math.ceil(
+        (stateHead?.offsetHeight || 0)
+        + stateVerticalPadding
+        + (stateLabel?.offsetHeight || 0)
+        + (stateSvg?.getBoundingClientRect().height || stateViewBox?.height || stateDiagram?.scrollHeight || 0)
+      );
+      const stateWidth = Math.ceil(Math.max(
+        (stateHead?.scrollWidth || 0) + 4,
+        stateHorizontalPadding + (stateViewBox?.width || stateDiagram?.scrollWidth || 0)
+      ));
+
+      const timelineSurface = document.getElementById('timeline');
+      const timelineHeight = Math.ceil((timelineHead?.offsetHeight || 0) + (timelineSurface?.scrollHeight || 0));
+
+      return {
+        stateHeight,
+        stateWidth,
+        timelineHeight,
+      };
+    }
+
+    function getResolvedPanelSizes() {
+      const main = document.getElementById('mainLayout');
+      if (!main) return { state: 0, timeline: 0 };
+
+      const splitSize = getSplitSize();
+      const width = main.clientWidth;
+      const height = main.clientHeight;
+      const layout = panelUi.layout;
+
+      if (layout === 'sandwich') {
+        const stateMin = panelUi.collapsed.state ? COLLAPSED_PANEL_SIZE : PANEL_MIN.sandwich.state;
+        const timelineMin = panelUi.collapsed.timeline ? COLLAPSED_PANEL_SIZE : PANEL_MIN.sandwich.timeline;
+        const expandedMinSum = stateMin + timelineMin;
+        const available = Math.max(0, height - splitSize * 2);
+        const desiredState = panelUi.collapsed.state ? COLLAPSED_PANEL_SIZE : panelUi.sizes.sandwich.state;
+        const desiredTimeline = panelUi.collapsed.timeline ? COLLAPSED_PANEL_SIZE : panelUi.sizes.sandwich.timeline;
+        const reserveData = panelUi.collapsed.data
+          ? COLLAPSED_PANEL_SIZE
+          : (available >= expandedMinSum + PANEL_MIN.sandwich.data
+              ? Math.min(PANEL_MIN.sandwich.dataPreferred, available - expandedMinSum)
+              : Math.max(0, available - expandedMinSum));
+        const availableForBands = Math.max(0, available - reserveData);
+        const fitted = shrinkPairToFit(desiredState, desiredTimeline, stateMin, timelineMin, availableForBands);
+        return { state: fitted.primary, timeline: fitted.secondary };
+      }
+
+      const timelineMin = panelUi.collapsed.timeline ? COLLAPSED_PANEL_SIZE : PANEL_MIN.flow.timeline;
+      const availableHeight = Math.max(0, height - splitSize);
+      const desiredTimeline = panelUi.collapsed.timeline ? COLLAPSED_PANEL_SIZE : panelUi.sizes.flow.timeline;
+      let timeline = desiredTimeline;
+      if (!panelUi.collapsed.timeline) {
+        const preferredMaxTimeline = Math.max(timelineMin, availableHeight - PANEL_MIN.flow.topPreferred);
+        const hardMaxTimeline = Math.max(timelineMin, availableHeight - PANEL_MIN.flow.topMinimum);
+        if (availableHeight - timeline < PANEL_MIN.flow.topPreferred) timeline = Math.min(timeline, preferredMaxTimeline);
+        timeline = clamp(timeline, timelineMin, hardMaxTimeline);
+      }
+
+      const stateMin = panelUi.collapsed.state ? COLLAPSED_PANEL_SIZE : PANEL_MIN.flow.state;
+      const desiredState = panelUi.collapsed.state ? COLLAPSED_PANEL_SIZE : panelUi.sizes.flow.state;
+      const dataFloor = panelUi.collapsed.data ? COLLAPSED_PANEL_SIZE : PANEL_MIN.flow.data;
+      const hardMaxState = Math.max(stateMin, width - splitSize - dataFloor);
+      const state = clamp(desiredState, stateMin, hardMaxState);
+      return { state, timeline };
+    }
+
+    function queueAutoPanelSizing() {
+      if (panelUi.dragging || panelUi.autoSizeQueued) return;
+      panelUi.autoSizeQueued = true;
+      requestAnimationFrame(() => {
+        panelUi.autoSizeQueued = false;
+        autoSizePanels();
+      });
+    }
+
+    function autoSizePanels() {
+      const main = document.getElementById('mainLayout');
+      if (!main || panelUi.dragging) return;
+
+      const measured = getPanelMeasurements();
+      let changed = false;
+
+      if (panelUi.layout === 'sandwich') {
+        if (!panelUi.collapsed.state && !panelUi.manual.sandwich.state) {
+          const nextState = clamp(measured.stateHeight + 4, PANEL_MIN.sandwich.state, PANEL_MAX.sandwich.state);
+          if (Math.abs(panelUi.sizes.sandwich.state - nextState) > 1) {
+            panelUi.sizes.sandwich.state = nextState;
+            changed = true;
+          }
+        }
+        if (!panelUi.collapsed.timeline && !panelUi.manual.sandwich.timeline) {
+          const nextTimeline = clamp(measured.timelineHeight + 6, PANEL_MIN.sandwich.timeline, PANEL_MAX.sandwich.timeline);
+          if (Math.abs(panelUi.sizes.sandwich.timeline - nextTimeline) > 1) {
+            panelUi.sizes.sandwich.timeline = nextTimeline;
+            changed = true;
+          }
+        }
+      } else {
+        if (!panelUi.collapsed.state && !panelUi.manual.flow.state) {
+          const nextState = Math.max(PANEL_MIN.flow.state, measured.stateWidth + 16);
+          if (Math.abs(panelUi.sizes.flow.state - nextState) > 1) {
+            panelUi.sizes.flow.state = nextState;
+            changed = true;
+          }
+        }
+        if (!panelUi.collapsed.timeline && !panelUi.manual.flow.timeline) {
+          const nextTimeline = clamp(measured.timelineHeight + 6, PANEL_MIN.flow.timeline, PANEL_MAX.flow.timeline);
+          if (Math.abs(panelUi.sizes.flow.timeline - nextTimeline) > 1) {
+            panelUi.sizes.flow.timeline = nextTimeline;
+            changed = true;
+          }
+        }
+      }
+
+      if (changed) applyLayoutState();
+    }
+
+    function applyLayoutState() {
+      const main = document.getElementById('mainLayout');
+      if (!main) return;
+
+      const isFlow = panelUi.layout === 'flow';
+      main.classList.toggle('layout-sandwich', !isFlow);
+      main.classList.toggle('layout-flow', isFlow);
+
+      const resolvedSizes = getResolvedPanelSizes();
+      const stateSize = resolvedSizes.state;
+      const timelineSize = resolvedSizes.timeline;
+      const dataSize = panelUi.collapsed.data ? `${COLLAPSED_PANEL_SIZE}px` : (isFlow ? 'minmax(320px, 1fr)' : 'minmax(280px, 1fr)');
+
+      main.style.setProperty('--state-size', `${stateSize}px`);
+      main.style.setProperty('--timeline-size', `${timelineSize}px`);
+      main.style.setProperty('--data-size', dataSize);
+
+      ['state', 'data', 'timeline'].forEach(panel => {
+        const shell = document.querySelector(`[data-panel-shell="${panel}"]`);
+        if (shell) shell.classList.toggle('is-collapsed', panelUi.collapsed[panel]);
+      });
+
+      document.querySelectorAll('[data-layout-mode]').forEach(button => {
+        const active = button.dataset.layoutMode === panelUi.layout;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+
+      document.querySelectorAll('[data-panel-toggle]').forEach(button => {
+        const panel = button.dataset.panelToggle;
+        const collapsed = panelUi.collapsed[panel];
+        const label = collapsed ? 'Expand' : 'Collapse';
+        button.textContent = collapsed ? '+' : '−';
+        button.title = `${label} ${panel} panel`;
+        button.setAttribute('aria-label', `${label} ${panel} panel`);
+        button.setAttribute('aria-expanded', String(!collapsed));
+      });
+
+      const primary = document.getElementById('splitterPrimary');
+      const secondary = document.getElementById('splitterSecondary');
+      if (primary) primary.setAttribute('aria-orientation', isFlow ? 'vertical' : 'horizontal');
+      if (secondary) secondary.setAttribute('aria-orientation', 'horizontal');
+    }
+
+    function setLayoutMode(mode) {
+      if (mode !== 'sandwich' && mode !== 'flow') return;
+      if (panelUi.layout === mode) return;
+      panelUi.layout = mode;
+      applyLayoutState();
+      renderStateDiagram();
+      queueAutoPanelSizing();
+      showToast(mode === 'flow' ? 'Flow-first split layout' : 'Data-first stacked layout', 'no-transition');
+    }
+
+    function togglePanel(panel) {
+      if (!(panel in panelUi.collapsed)) return;
+      panelUi.collapsed[panel] = !panelUi.collapsed[panel];
+      applyLayoutState();
+      if (panel === 'state') renderStateDiagram();
+      queueAutoPanelSizing();
+    }
+
+    function startResize(event, splitter) {
+      const main = document.getElementById('mainLayout');
+      if (!main) return;
+
+      if (splitter === 'primary' && panelUi.collapsed.state) panelUi.collapsed.state = false;
+      if (splitter === 'secondary' && panelUi.collapsed.timeline) panelUi.collapsed.timeline = false;
+
+      applyLayoutState();
+
+      const axis = panelUi.layout === 'flow' && splitter === 'primary' ? 'x' : 'y';
+      panelUi.dragging = { splitter, axis };
+      event.preventDefault();
+
+      document.body.classList.add('is-resizing');
+      document.body.style.cursor = axis === 'x' ? 'col-resize' : 'row-resize';
+      event.currentTarget.classList.add('is-active');
+
+      document.addEventListener('pointermove', onResize);
+      document.addEventListener('pointerup', stopResize);
+    }
+
+    function onResize(event) {
+      if (!panelUi.dragging) return;
+
+      const main = document.getElementById('mainLayout');
+      if (!main) return;
+
+      const rect = main.getBoundingClientRect();
+
+      if (panelUi.dragging.splitter === 'primary') {
+        if (panelUi.layout === 'sandwich') {
+          const splitSize = getSplitSize();
+          const timelineFloor = panelUi.collapsed.timeline ? COLLAPSED_PANEL_SIZE : PANEL_MIN.sandwich.timeline;
+          const dataFloor = panelUi.collapsed.data ? COLLAPSED_PANEL_SIZE : PANEL_MIN.sandwich.data;
+          const max = Math.max(PANEL_MIN.sandwich.state, rect.height - (splitSize * 2) - timelineFloor - dataFloor);
+          panelUi.sizes.sandwich.state = Math.round(clamp(event.clientY - rect.top, PANEL_MIN.sandwich.state, max));
+          panelUi.manual.sandwich.state = true;
+        } else {
+          const splitSize = getSplitSize();
+          const reserved = panelUi.collapsed.data ? COLLAPSED_PANEL_SIZE : PANEL_MIN.flow.data;
+          const max = Math.max(PANEL_MIN.flow.state, rect.width - reserved - splitSize);
+          panelUi.sizes.flow.state = Math.round(clamp(event.clientX - rect.left, PANEL_MIN.flow.state, max));
+          panelUi.manual.flow.state = true;
+        }
+      } else {
+        const splitSize = getSplitSize();
+        const topAllowance = panelUi.layout === 'sandwich'
+          ? (panelUi.collapsed.state ? COLLAPSED_PANEL_SIZE : PANEL_MIN.sandwich.state) + (panelUi.collapsed.data ? COLLAPSED_PANEL_SIZE : PANEL_MIN.sandwich.data) + (splitSize * 2)
+          : PANEL_MIN.flow.topMinimum + splitSize;
+        const max = Math.max(panelUi.layout === 'sandwich' ? PANEL_MIN.sandwich.timeline : PANEL_MIN.flow.timeline, rect.height - topAllowance);
+        panelUi.sizes[panelUi.layout].timeline = Math.round(clamp(
+          rect.bottom - event.clientY,
+          panelUi.layout === 'sandwich' ? PANEL_MIN.sandwich.timeline : PANEL_MIN.flow.timeline,
+          max
+        ));
+        panelUi.manual[panelUi.layout].timeline = true;
+      }
+
+      applyLayoutState();
+    }
+
+    function stopResize() {
+      if (!panelUi.dragging) return;
+
+      panelUi.dragging = null;
+      document.body.classList.remove('is-resizing');
+      document.body.style.cursor = '';
+      document.querySelectorAll('.splitter.is-active').forEach(el => el.classList.remove('is-active'));
+      document.removeEventListener('pointermove', onResize);
+      document.removeEventListener('pointerup', stopResize);
+    }
+
+    function startEditing() {
+      if (!EDITABLE_FIELDS[sim.currentState]) return;
+      isEditing = true;
+      draftData = deepClone(sim.data);
+      dirtyFields = new Set();
+      render();
+    }
+
+    function cancelEditing() {
+      isEditing = false; draftData = null; dirtyFields = new Set(); render();
+    }
+
+    function saveDraftEdits() {
+      if (!isEditing || dirtyFields.size === 0) return;
+      const deltas = [];
+      for (const field of dirtyFields) {
+        const before = sim.data[field], after = draftData[field];
+        if (JSON.stringify(before) !== JSON.stringify(after)) { deltas.push({ field, before, after }); sim.data[field] = after; }
+      }
+      if (deltas.length > 0) {
+        sim.stepCount++;
+        sim.history.push({ stepNum: sim.stepCount, fromState: sim.currentState, event: 'edit ' + [...dirtyFields].join(', '), args: {}, toState: sim.currentState, outcome: 'no-transition', deltas, dataSnapshot: deepClone(sim.data) });
+        sim.changedFields = new Set(deltas.map(d => d.field));
+        showToast(`Saved ${deltas.length} field${deltas.length > 1 ? 's' : ''}`, 'no-transition');
+      }
+      isEditing = false; draftData = null; dirtyFields = new Set(); render();
+    }
+
+    function selectEvent(eventName) {
+      const exists = getAvailableEvents(sim.currentState, sim.data).some(evt => evt.name === eventName);
+      if (!exists) return;
+      selectedEvent = selectedEvent === eventName ? null : eventName;
+      render();
+    }
+
+    function updateEventArg(eventName, argName, value) {
+      const evt = getAvailableEvents(sim.currentState, sim.data).find(item => item.name === eventName);
+      if (!evt) return;
+      const arg = evt.args.find(item => item.name === argName);
+      if (!arg) return;
+      const draft = ensureEventDraft(evt);
+      draft[argName] = arg.type === 'boolean' ? (value === true || value === 'true') : value;
+      render();
+    }
+
+    function updateDraftField(fieldName, value) {
+      if (!draftData) return;
+      draftData[fieldName] = value;
+      if (JSON.stringify(value) !== JSON.stringify(sim.data[fieldName])) dirtyFields.add(fieldName);
+      else dirtyFields.delete(fieldName);
+      // Lightweight DOM patch — do NOT call render() or the input loses focus
+      const dirtyBadge = document.querySelector('.dp-dirty-badge');
+      if (dirtyFields.size > 0) {
+        if (dirtyBadge) dirtyBadge.textContent = `${dirtyFields.size} unsaved`;
+        else { const hdr = document.querySelector('.dp-header-left'); if (hdr) hdr.insertAdjacentHTML('beforeend', `<span class="dp-dirty-badge">${dirtyFields.size} unsaved</span>`); }
+      } else if (dirtyBadge) dirtyBadge.remove();
+      const saveBtn = document.querySelector('.dp-save-btn');
+      if (saveBtn) saveBtn.disabled = dirtyFields.size === 0;
+      document.querySelectorAll('.dp-field').forEach(el => {
+        const name = el.dataset.field;
+        if (!name) return;
+        el.classList.toggle('dirty', dirtyFields.has(name));
+      });
+    }
+
+    function toggleDraftBool(fieldName) { if (!draftData) return; updateDraftField(fieldName, !draftData[fieldName]); }
+
+    function fireEvent(eventName, rowIndex) {
+      if (isEditing) cancelEditing();
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      const evt = events.find(e => e.name === eventName);
+      if (!evt) return;
+      const args = gatherArgs(evt);
+      let row = rowIndex !== undefined ? evt.rows[rowIndex] : evt.rows.find(r => r.canFire(args, sim.data)) || evt.rows[0];
+
+      if (row.eventAsserts) { for (const a of row.eventAsserts) { if (!a.check(args)) { showToast(a.msg, 'rejected'); return; } } }
+      if (!row.canFire(args, sim.data)) { showToast(row.blockReason ? row.blockReason(args, sim.data) : (row.rejectMsg || 'Guard failed'), 'rejected'); return; }
+
+      const prevData = deepClone(sim.data), prevState = sim.currentState;
+      sim.data = row.apply(deepClone(sim.data), args);
+      const deltas = [];
+      for (const key of Object.keys(FIELD_DEFS)) { const b = prevData[key], a = sim.data[key]; if (JSON.stringify(b) !== JSON.stringify(a)) deltas.push({ field: key, before: b, after: a }); }
+      sim.changedFields = new Set(deltas.map(d => d.field));
+      const toState = row.target || sim.currentState;
+      sim.stepCount++;
+      sim.history.push({ stepNum: sim.stepCount, fromState: prevState, event: eventName, args: deepClone(args), toState, outcome: row.outcome, deltas, dataSnapshot: deepClone(sim.data) });
+      sim.currentState = toState;
+      sim.visitedStates.add(toState);
+      selectedEvent = null;
+      showToast(row.outcome === 'transition' ? `${eventName} → ${toState}` : `${eventName} stayed in ${sim.currentState}`, row.outcome === 'transition' ? 'transition' : 'no-transition');
+      render();
+    }
+
+    function gatherArgs(evt) {
+      const draft = ensureEventDraft(evt);
+      const args = {};
+      evt.args.forEach(arg => {
+        const raw = draft[arg.name];
+        if (arg.type === 'boolean') args[arg.name] = !!raw;
+        else if (arg.type === 'number') args[arg.name] = raw === '' || raw === null || raw === undefined ? 0 : Number(raw);
+        else args[arg.name] = raw || '';
+      });
+      return args;
+    }
+
+    function resetSimulation() { isEditing = false; draftData = null; dirtyFields = new Set(); selectedEvent = null; sim = getInitialSimulation(); render(); showToast('Reset to Draft', 'transition'); }
+
+    function undoStep() {
+      if (sim.history.length === 0) return;
+      isEditing = false; draftData = null; dirtyFields = new Set();
+      sim.history.pop(); sim.stepCount = sim.history.length;
+      if (sim.history.length > 0) { const l = sim.history[sim.history.length - 1]; sim.currentState = l.toState; sim.data = deepClone(l.dataSnapshot); }
+      else { sim.currentState = 'Draft'; sim.data = getDefaultData(); }
+      sim.visitedStates = new Set(['Draft']);
+      sim.history.forEach(h => { sim.visitedStates.add(h.fromState); sim.visitedStates.add(h.toState); });
+      sim.visitedStates.add(sim.currentState); sim.changedFields = new Set();
+      selectedEvent = null;
+      render(); showToast(`Undid back to ${sim.currentState}`, 'no-transition');
+    }
+
+    let toastTimer = null;
+    function showToast(message, type) {
+      const toast = document.getElementById('toast');
+      toast.className = `toast ${type}-toast show`;
+      toast.textContent = type === 'transition' ? `▸ ${message}` : type === 'rejected' ? `✕ ${message}` : `∼ ${message}`;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function setHoverEvent(name, fromState = sim.currentState) {
+      document.querySelectorAll('[data-event]').forEach(el => {
+        const match = el.dataset.event === name && (!el.dataset.fromState || el.dataset.fromState === fromState);
+        el.classList.toggle('sd-edge-label-hover', match && el.classList.contains('sd-edge-label'));
+        el.classList.toggle('sd-edge-hover', match && (el.tagName === 'line' || el.tagName === 'LINE'));
+        el.classList.toggle('hover-highlight', match && el.classList.contains('timeline-event-card'));
+      });
+    }
+
+    function clearHoverEvent() {
+      document.querySelectorAll('.sd-edge-label-hover, .sd-edge-hover, .timeline-event-card.hover-highlight').forEach(el => {
+        el.classList.remove('sd-edge-label-hover', 'sd-edge-hover', 'hover-highlight');
+      });
+    }
+
+    function setHoverState(name) {
+      document.querySelectorAll('[data-state]').forEach(el => {
+        const match = el.dataset.state === name;
+        if (el.tagName === 'rect' || el.tagName === 'circle' || el.tagName === 'RECT' || el.tagName === 'CIRCLE') el.classList.toggle('sd-node-hover', match);
+        else el.classList.toggle('hover-highlight', match);
+      });
+    }
+
+    function clearHoverState() {
+      document.querySelectorAll('.sd-node-hover, .hover-highlight').forEach(el => el.classList.remove('sd-node-hover', 'hover-highlight'));
+    }
+
+    function render() {
+      syncSelectedEvent();
+      renderDataPanel();
+      renderStateDiagram();
+      renderTimeline();
+      renderStatus();
+    }
+
+    function renderBadge(label, tone = 'neutral') {
+      return `<span class="tag tag-${tone}">${escHtml(label)}</span>`;
+    }
+
+    function formatMutationSummary(mutations) {
+      if (!mutations || mutations.length === 0) return 'No data consequence';
+      const first = mutations[0].replace(/\s*=\s*/g, ' = ');
+      return mutations.length > 1 ? `${first} +${mutations.length - 1}` : first;
+    }
+
+    function formatDeltaSummary(entry) {
+      if (!entry.deltas || entry.deltas.length === 0) return entry.outcome === 'transition' ? `to ${entry.toState}` : `stays ${entry.fromState}`;
+      const first = entry.deltas[0];
+      return `${first.field} = ${formatVal(first.after)}${entry.deltas.length > 1 ? ` +${entry.deltas.length - 1}` : ''}`;
+    }
+
+    function isMaterialValue(name, value, def) {
+      if (value === null || value === undefined) return false;
+      if (def.type === 'boolean') return value === true;
+      if (def.type === 'number') return Number(value) !== 0;
+      return String(value).trim() !== '';
+    }
+
+    function collectDiagnostics(data) {
+      const invariantChecks = INVARIANTS.map(item => ({ ...item, kind: 'invariant', ok: item.check(data) }));
+      const assertionDefs = [...(STATE_ASSERTIONS[sim.currentState] || []), ...(FROM_ASSERTIONS[sim.currentState] || [])];
+      const assertionChecks = assertionDefs.map(item => ({ ...item, kind: 'assertion', ok: item.check(data) }));
+      return {
+        invariantsPassed: invariantChecks.filter(item => item.ok).length,
+        assertionsPassed: assertionChecks.filter(item => item.ok).length,
+        failing: [...invariantChecks, ...assertionChecks].filter(item => !item.ok),
+      };
+    }
+
+    function renderFieldRow(name, def, displayData, editableSet, selectedMeta) {
+      const value = displayData[name];
+      const isEditableField = editableSet.has(name);
+      const wasChanged = sim.changedFields.has(name) && !isEditing;
+      const isDirty = isEditing && dirtyFields.has(name);
+      const isSelectedImpact = !!selectedMeta && selectedMeta.touchedFields.includes(name);
+      const badges = [];
+      if (isSelectedImpact) badges.push(renderBadge('selected', 'cyan'));
+      if (wasChanged) badges.push(renderBadge('changed', 'enabled'));
+      if (isEditableField) badges.push('<span class="dp-edit-badge">editable</span>');
+
+      let rowClass = 'dp-field';
+      if (isSelectedImpact) rowClass += ' selected-impact';
+      if (wasChanged) rowClass += ' recently-changed';
+      if (isEditableField && isEditing) rowClass += ' editing';
+      if (isDirty) rowClass += ' dirty';
+
+      let valueHtml = `<div class="dp-field-readout">${renderFieldValue(value, def)}</div>`;
+      if (isEditing && isEditableField && def.type === 'boolean') {
+        valueHtml = `<div class="${value ? 'dp-toggle on' : 'dp-toggle'}" onclick="toggleDraftBool('${name}')"><div class="toggle-track"></div><span class="dp-toggle-label" style="color: ${value ? 'var(--enabled)' : 'var(--blocked); opacity: 0.7'}">${value}</span></div>`;
+      } else if (isEditing && isEditableField && def.type === 'number') {
+        valueHtml = `<input class="dp-edit-input" id="edit-${name}" type="number" value="${value !== null ? escHtml(String(value)) : ''}" oninput="updateDraftField('${name}', this.value === '' ? 0 : Number(this.value))" />`;
+      } else if (isEditing && isEditableField) {
+        valueHtml = `<input class="dp-edit-input" id="edit-${name}" type="text" value="${value !== null && value !== undefined ? escHtml(String(value)) : ''}" placeholder="${def.nullable ? 'null' : ''}" oninput="updateDraftField('${name}', this.value || null)" />`;
+      }
+
+      const metaParts = [def.type];
+      if (def.nullable) metaParts.push('nullable');
+      if (isSelectedImpact) metaParts.push('selected');
+      else if (wasChanged) metaParts.push('recently updated');
+      else if (isEditableField) metaParts.push('editable in this state');
+
+      return `<div class="${rowClass} dp-field-card" data-field="${escHtml(name)}">
+        <div class="dp-field-top">
+          <label class="dp-field-label" for="edit-${name}">${escHtml(name)}</label>
+          <div class="dp-row-badges">${badges.join('')}</div>
+        </div>
+        <div class="dp-field-control">${valueHtml}</div>
+        <div class="dp-field-meta">${escHtml(metaParts.join(' · '))}</div>
+      </div>`;
+    }
+
+    function getRelevantFieldNames(displayData, selectedMeta, diagnostics) {
+      const relevant = new Set([...(EDITABLE_FIELDS[sim.currentState] || []), ...sim.changedFields]);
+      (selectedMeta?.touchedFields || []).forEach(name => relevant.add(name));
+      diagnostics.failing.forEach(item => {
+        (item.targets || []).forEach(target => {
+          if (FIELD_DEFS[target]) relevant.add(target);
+        });
+      });
+      Object.entries(FIELD_DEFS).forEach(([name, def]) => {
+        if (isMaterialValue(name, displayData[name], def)) relevant.add(name);
+      });
+      return Object.keys(FIELD_DEFS).filter(name => relevant.has(name));
+    }
+
+    function renderDataFooter(diagnostics, selectedMeta) {
+      const items = [];
+      items.push(`<div class="dp-footer-item">${renderBadge(sim.currentState, 'violet')}${renderBadge(`step ${sim.stepCount}`, 'neutral')}${STATE_META[sim.currentState].terminal ? renderBadge('terminal', 'dim') : ''}</div>`);
+
+      if (selectedMeta) {
+        const summary = selectedMeta.blocked
+          ? `${selectedMeta.evt.name} ${selectedMeta.effectLabel} · ${selectedMeta.reason}`
+          : `${selectedMeta.evt.name} ${selectedMeta.effectLabel}${selectedMeta.touchedFields.length > 0 ? ` · ${selectedMeta.touchedFields.length} field${selectedMeta.touchedFields.length === 1 ? '' : 's'}` : ''}`;
+        items.push(`<div class="dp-footer-item"><span class="dp-footer-text">${escHtml(summary)}</span></div>`);
+      }
+
+      if (diagnostics.failing.length > 0) {
+        const first = diagnostics.failing[0];
+        const summary = diagnostics.failing.length === 1
+          ? first.msg
+          : `${diagnostics.failing.length} checks failing · ${first.msg}`;
+        items.push(`<div class="dp-footer-item"><span class="dp-footer-text">${escHtml(summary)}</span></div>`);
+      }
+
+      return items.length === 0 ? '' : `<div class="dp-footer">${items.join('')}</div>`;
+    }
+
+    function renderDataPanel() {
+      const el = document.getElementById('dataPanel');
+      const editableSet = new Set(EDITABLE_FIELDS[sim.currentState] || []);
+      const hasEditable = editableSet.size > 0;
+      const displayData = isEditing ? draftData : sim.data;
+      const selectedMeta = getSelectedEventMeta();
+      const diagnostics = collectDiagnostics(displayData);
+      const relevantFieldNames = getRelevantFieldNames(displayData, selectedMeta, diagnostics);
+      const otherFieldNames = Object.keys(FIELD_DEFS).filter(name => !relevantFieldNames.includes(name));
+      const orderedFieldNames = [...relevantFieldNames, ...otherFieldNames];
+
+      let html = `<div class="dp-header">
+        <div class="dp-header-left">
+          <span class="dp-title">Data Form</span>
+          <span class="dp-count">${Object.keys(FIELD_DEFS).length} fields · ${sim.currentState}</span>
+          ${isEditing && dirtyFields.size > 0 ? `<span class="dp-dirty-badge">${dirtyFields.size} unsaved</span>` : ''}
+        </div>
+        <div class="dp-header-actions">`;
+
+      if (hasEditable && !isEditing) html += `<button class="dp-edit-btn" onclick="startEditing()">Edit</button>`;
+      if (isEditing) {
+        html += `<button class="dp-cancel-btn" onclick="cancelEditing()">Cancel</button>`;
+        html += `<button class="dp-save-btn" onclick="saveDraftEdits()" ${dirtyFields.size === 0 ? 'disabled' : ''}>Save</button>`;
+      }
+      html += `</div></div>`;
+
+      html += `<div class="dp-field-grid">`;
+      orderedFieldNames.forEach(name => {
+        html += renderFieldRow(name, FIELD_DEFS[name], displayData, editableSet, selectedMeta);
+      });
+      html += `</div>`;
+      html += renderDataFooter(diagnostics, selectedMeta);
+      el.innerHTML = html;
+    }
+
+    function renderFieldValue(val, def) {
+      if (val === null || val === undefined) return `<span class="dp-field-value null">null</span>`;
+      if (def.type === 'boolean') return `<span class="dp-field-value ${val ? 'bool-true' : 'bool-false'}">${val}</span>`;
+      return `<span class="dp-field-value">${escHtml(String(val))}</span>`;
+    }
+
+    function inferValueType(value) {
+      if (typeof value === 'boolean') return 'boolean';
+      if (typeof value === 'number') return 'number';
+      return 'string';
+    }
+
+    function renderTimelineArgFields(model) {
+      if (!model.argDefs || model.argDefs.length === 0) return '';
+      const editable = !!model.editableArgs;
+      return `<div class="timeline-event-args" onclick="event.stopPropagation()">${model.argDefs.map(arg => {
+        const rawValue = model.argValues?.[arg.name];
+        let controlHtml;
+        if (editable) {
+          if (arg.type === 'boolean') {
+            controlHtml = `<select class="dp-arg-select" onclick="event.stopPropagation()" onchange="updateEventArg('${model.eventName}', '${arg.name}', this.value)"><option value="false" ${!rawValue ? 'selected' : ''}>false</option><option value="true" ${rawValue ? 'selected' : ''}>true</option></select>`;
+          } else {
+            controlHtml = `<input class="dp-arg-input" type="${arg.type === 'number' ? 'number' : 'text'}" value="${escHtml(String(rawValue ?? ''))}" placeholder="${escHtml(arg.placeholder || '')}" onclick="event.stopPropagation()" onchange="updateEventArg('${model.eventName}', '${arg.name}', this.value)" />`;
+          }
+        } else {
+          const displayHtml = rawValue === '' ? 'empty' : formatVal(rawValue ?? null);
+          controlHtml = `<div class="timeline-event-arg-value">${displayHtml}</div>`;
+        }
+        return `<div class="timeline-event-arg">
+          <div class="timeline-event-arg-label">${escHtml(arg.name)}</div>
+          ${controlHtml}
+        </div>`;
+      }).join('')}</div>`;
+    }
+
+    function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+    function renderStateDiagram() {
+      const el = document.getElementById('stateDiagram');
+      if (!el) return;
+
+      const isFlow = panelUi.layout === 'flow';
+      const nW = 82, nH = 24, nR = 12, xS = 120, yM = 40, yC = 90;
+      const nodes = isFlow
+        ? [
+            { id: 'Draft', x: 96, y: 48 },
+            { id: 'Open', x: 96, y: 124 },
+            { id: 'Scheduled', x: 96, y: 200 },
+            { id: 'InProgress', x: 96, y: 276 },
+            { id: 'Completed', x: 96, y: 352 },
+            { id: 'Cancelled', x: 214, y: 200 },
+          ]
+        : [
+            { id: 'Draft', x: 60, y: yM },
+            { id: 'Open', x: 60 + xS, y: yM },
+            { id: 'Scheduled', x: 60 + xS * 2, y: yM },
+            { id: 'InProgress', x: 60 + xS * 3, y: yM },
+            { id: 'Completed', x: 60 + xS * 4, y: yM },
+            { id: 'Cancelled', x: 60 + xS * 2, y: yC },
+          ];
+      const edges = isFlow
+        ? [
+            { from: 'Draft', to: 'Open', label: 'Submit', labelDx: 34, labelDy: -4 },
+            { from: 'Open', to: 'Scheduled', label: 'Assign', labelDx: 34, labelDy: -4 },
+            { from: 'Open', to: 'Cancelled', label: 'Cancel', labelDx: 14, labelDy: -12 },
+            { from: 'Scheduled', to: 'InProgress', label: 'StartWork', labelDx: 40, labelDy: -4 },
+            { from: 'Scheduled', to: 'Cancelled', label: 'Cancel', labelDx: 16, labelDy: -12 },
+            { from: 'InProgress', to: 'Completed', label: 'Complete', labelDx: 38, labelDy: -4 },
+          ]
+        : [
+            { from: 'Draft', to: 'Open', label: 'Submit' },
+            { from: 'Open', to: 'Scheduled', label: 'Assign' },
+            { from: 'Open', to: 'Cancelled', label: 'Cancel' },
+            { from: 'Scheduled', to: 'InProgress', label: 'StartWork' },
+            { from: 'Scheduled', to: 'Cancelled', label: 'Cancel' },
+            { from: 'InProgress', to: 'Completed', label: 'Complete' },
+          ];
+      const selfLoops = { Scheduled: ['ApproveParts'], InProgress: ['RecordProgress'] };
+
+      const nMap = {}; nodes.forEach(n => nMap[n.id] = n);
+      const lastStep = sim.history.length > 0 ? sim.history[sim.history.length - 1] : null;
+      const lastEdge = lastStep && lastStep.fromState !== lastStep.toState ? { from: lastStep.fromState, to: lastStep.toState } : null;
+      const lastSelf = lastStep && lastStep.fromState === lastStep.toState && !lastStep.event.startsWith('edit') ? lastStep.fromState : null;
+      const selectedMeta = getSelectedEventMeta();
+      const selectedName = selectedMeta?.evt.name || null;
+      const selectedTarget = selectedMeta?.targetState || null;
+
+      const svgW = isFlow ? 280 : 60 + xS * 4 + nW / 2 + 20;
+      const svgH = isFlow ? 392 : yC + nH / 2 + 20;
+      function ap(x1, y1, x2, y2, s) { const a = Math.atan2(y2 - y1, x2 - x1); return `M${x2.toFixed(1)},${y2.toFixed(1)} L${(x2 - s * Math.cos(a - 0.45)).toFixed(1)},${(y2 - s * Math.sin(a - 0.45)).toFixed(1)} L${(x2 - s * Math.cos(a + 0.45)).toFixed(1)},${(y2 - s * Math.sin(a + 0.45)).toFixed(1)} Z`; }
+
+      let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">`;
+
+      edges.forEach(e => {
+        const f = nMap[e.from], t = nMap[e.to];
+        let x1, y1, x2, y2;
+        if (isFlow) {
+          const isMostlyVertical = Math.abs(t.y - f.y) >= Math.abs(t.x - f.x);
+          if (isMostlyVertical) {
+            x1 = f.x;
+            y1 = t.y > f.y ? f.y + nH / 2 : f.y - nH / 2;
+            x2 = t.x;
+            y2 = t.y > f.y ? t.y - nH / 2 : t.y + nH / 2;
+          } else {
+            x1 = t.x > f.x ? f.x + nW / 2 : f.x - nW / 2;
+            y1 = f.y;
+            x2 = t.x > f.x ? t.x - nW / 2 : t.x + nW / 2;
+            y2 = t.y;
+          }
+        } else if (t.y > f.y) {
+          x1 = f.x;
+          y1 = f.y + nH / 2;
+          x2 = t.x;
+          y2 = t.y - nH / 2;
+        } else {
+          x1 = f.x + nW / 2;
+          y1 = f.y;
+          x2 = t.x - nW / 2;
+          y2 = t.y;
+        }
+        const isT = sim.history.some(h => h.fromState === e.from && h.toState === e.to);
+        const isA = lastEdge && lastEdge.from === e.from && lastEdge.to === e.to;
+        const isSelected = !!selectedName && sim.currentState === e.from && selectedName === e.label;
+        let lC = 'sd-edge', aC = 'sd-arrow', tC = 'sd-edge-label';
+        if (isSelected) { lC += ' sd-edge-selected'; aC += ' sd-arrow-selected'; tC += ' sd-edge-label-selected'; }
+        else if (isA) { lC += ' sd-edge-active'; aC += ' sd-arrow-active'; tC += ' sd-edge-label-active'; }
+        else if (isT) { lC += ' sd-edge-traced'; aC += ' sd-arrow-traced'; tC += ' sd-edge-label-traced'; }
+        svg += `<line class="${lC}" data-event="${e.label}" data-from-state="${e.from}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" onmouseenter="setHoverEvent('${e.label}', '${e.from}')" onmouseleave="clearHoverEvent()"/>`;
+        svg += `<path class="${aC}" d="${ap(x1, y1, x2, y2, 5)}"/>`;
+        let mx = (x1 + x2) / 2 + (e.labelDx || 0), my = (y1 + y2) / 2 + (e.labelDy || 0);
+        if (!isFlow) {
+          if (t.y > f.y) mx += 30;
+          else my -= 8;
+        }
+        svg += `<text class="${tC} sd-edge-label" data-event="${e.label}" data-from-state="${e.from}" x="${mx}" y="${my}" onmouseenter="setHoverEvent('${e.label}', '${e.from}')" onmouseleave="clearHoverEvent()">${e.label}</text>`;
+      });
+
+      for (const [sid, evts] of Object.entries(selfLoops)) {
+        const n = nMap[sid]; let cls = 'sd-self-loop'; if (lastSelf === sid) cls += ' sd-self-flash'; if (selectedName === evts[0] && sid === sim.currentState) cls += ' sd-self-selected';
+        const labelClass = selectedName === evts[0] && sid === sim.currentState ? 'sd-self-label sd-edge-label sd-edge-label-selected' : 'sd-self-label sd-edge-label';
+        const ty = n.y - nH / 2 - 1;
+        if (isFlow) {
+          svg += `<path class="${cls}" data-event="${evts[0]}" data-from-state="${sid}" d="M${n.x + 10},${ty + 3} C${n.x + 24},${ty + 3} ${n.x + 24},${ty - 14} ${n.x + 10},${ty - 14}" onmouseenter="setHoverEvent('${evts[0]}', '${sid}')" onmouseleave="clearHoverEvent()"/>`;
+          svg += `<text class="${labelClass}" data-event="${evts[0]}" data-from-state="${sid}" x="${n.x + 28}" y="${ty - 12}" text-anchor="start" style="font-size:6.5px" onmouseenter="setHoverEvent('${evts[0]}', '${sid}')" onmouseleave="clearHoverEvent()">${evts.join(', ')}</text>`;
+        } else {
+          svg += `<path class="${cls}" data-event="${evts[0]}" data-from-state="${sid}" d="M${n.x - 10},${ty} C${n.x - 10},${ty - 16} ${n.x + 10},${ty - 16} ${n.x + 10},${ty}" onmouseenter="setHoverEvent('${evts[0]}', '${sid}')" onmouseleave="clearHoverEvent()"/>`;
+          svg += `<text class="${labelClass}" data-event="${evts[0]}" data-from-state="${sid}" x="${n.x}" y="${ty - 16}" text-anchor="middle" style="font-size:6.5px" onmouseenter="setHoverEvent('${evts[0]}', '${sid}')" onmouseleave="clearHoverEvent()">${evts.join(', ')}</text>`;
+        }
+      }
+
+      nodes.forEach(n => {
+        const isCur = sim.currentState === n.id, isVis = sim.visitedStates.has(n.id), meta = STATE_META[n.id];
+        const hA = `data-state="${n.id}" onmouseenter="setHoverState('${n.id}')" onmouseleave="clearHoverState()"`;
+        const selectedNodeClass = selectedTarget === n.id ? ' sd-node-selected-target' : '';
+        let nc = 'sd-node'; if (isCur) nc = 'sd-node-current'; else if (isVis) nc = 'sd-node-visited';
+        if (meta.initial) { svg += `<circle class="${nc} sd-node-initial${selectedNodeClass}" cx="${n.x}" cy="${n.y}" r="${nR}" ${isCur ? 'style="stroke-width:2.5"' : ''} ${hA}/>`; svg += `<circle class="sd-initial-dot" cx="${n.x}" cy="${n.y}" r="4" opacity="${isCur ? 1 : 0.5}"/>`; }
+        else if (meta.terminal) { svg += `<rect class="sd-node-terminal-outer" x="${n.x - nW / 2 - 3}" y="${n.y - nH / 2 - 3}" width="${nW + 6}" height="${nH + 6}" rx="${nR + 2}"/>`; svg += `<rect class="${nc} sd-node-terminal${selectedNodeClass}" x="${n.x - nW / 2}" y="${n.y - nH / 2}" width="${nW}" height="${nH}" rx="${nR}" ${hA}/>`; }
+        else { svg += `<rect class="${nc}${selectedNodeClass}" x="${n.x - nW / 2}" y="${n.y - nH / 2}" width="${nW}" height="${nH}" rx="${nR}" ${hA}/>`; }
+        let lc = 'sd-label'; if (isCur) lc = 'sd-label sd-label-current'; else if (isVis) lc = 'sd-label sd-label-visited';
+        svg += `<text class="${lc}" x="${n.x}" y="${n.y + 3.5}">${n.id}</text>`;
+      });
+
+      svg += '</svg>';
+      el.innerHTML = svg;
+    }
+
+    function renderTimelineStateTile(state, options = {}) {
+      const meta = STATE_META[state] || {};
+      const classes = ['timeline-state-tile'];
+      if (meta.initial) classes.push('is-initial');
+      if (meta.terminal) classes.push('is-terminal');
+      if (options.current) classes.push('is-current');
+      const badges = [];
+      if (options.origin) badges.push(renderBadge('origin', 'violet'));
+      if (options.current) badges.push(renderBadge('current', 'neutral'));
+      if (meta.terminal) badges.push(renderBadge('terminal', 'dim'));
+      return `<div class="${classes.join(' ')}" data-state="${state}" onmouseenter="setHoverState('${state}')" onmouseleave="clearHoverState()">
+        <div class="timeline-state-head">
+          <div class="timeline-state-name">${escHtml(state)}</div>
+          <div class="timeline-state-badges">${badges.join('')}</div>
+        </div>
+        <div class="timeline-state-copy">${escHtml(getStateDescription(state))}</div>
+      </div>`;
+    }
+
+    function renderTimelineEventCard(model) {
+      const classes = ['timeline-event-card'];
+      if (model.selectable) classes.push('selectable');
+      if (model.selected) classes.push('is-selected');
+      if (model.blocked) classes.push('blocked');
+      if (model.history) classes.push('history');
+      if (model.transitioned) classes.push('transitioned');
+      if (model.editCard) classes.push('edit-card');
+      const interactionAttrs = model.selectable
+        ? ` data-event="${escHtml(model.eventName)}" data-from-state="${escHtml(model.fromState || sim.currentState)}" onmouseenter="setHoverEvent('${model.eventName}', '${model.fromState || sim.currentState}')" onmouseleave="clearHoverEvent()" onclick="selectEvent('${model.eventName}')"`
+        : '';
+      return `<div class="${classes.join(' ')}"${interactionAttrs}>
+        <div class="timeline-event-head">
+          <div>
+            <div class="timeline-event-name">${escHtml(model.eventName)}</div>
+            <div class="timeline-event-subtitle">${escHtml(model.subtitle)}</div>
+          </div>
+          <span class="timeline-event-effect">${escHtml(model.effectLabel)}</span>
+        </div>
+        <div class="timeline-event-meta">${model.badges.join('')}</div>
+        ${renderTimelineArgFields(model)}
+        ${model.selectable ? `<button class="timeline-fire-btn${model.blocked ? ' blocked' : ''}" onclick="event.stopPropagation(); ${model.blocked ? '' : `fireEvent('${model.eventName}')`}" ${model.blocked ? 'disabled' : ''}>${escHtml(model.eventName)}</button>` : ''}
+        <div class="timeline-event-note">${escHtml(model.note)}</div>
+      </div>`;
+    }
+
+    function buildTimelineColumns(events) {
+      const columns = [];
+
+      function ensureColumn(state) {
+        const last = columns[columns.length - 1];
+        if (last && last.state === state) return last;
+        const column = { state, historyCards: [], futureCards: [], current: false };
+        columns.push(column);
+        return column;
+      }
+
+      if (sim.history.length === 0) {
+        ensureColumn(sim.currentState);
+      } else {
+        sim.history.forEach(entry => {
+          const column = ensureColumn(entry.fromState);
+          const historyBadges = [renderBadge(`#${entry.stepNum}`, 'neutral')];
+          if (entry.event.startsWith('edit ')) historyBadges.push(renderBadge('edit', 'indigo'));
+          else historyBadges.push(renderBadge(entry.outcome === 'transition' ? 'fired' : 'stayed', entry.outcome === 'transition' ? 'enabled' : 'slate'));
+
+          column.historyCards.push({
+            eventName: entry.event,
+            subtitle: entry.outcome === 'transition' ? `${entry.fromState} to ${entry.toState}` : `Within ${entry.fromState}`,
+            effectLabel: entry.outcome === 'transition' ? `→ ${entry.toState}` : 'stays',
+            note: formatDeltaSummary(entry),
+            badges: historyBadges,
+            argDefs: Object.keys(entry.args || {}).map(name => ({ name, type: inferValueType(entry.args[name]) })),
+            argValues: entry.args || {},
+            editableArgs: false,
+            history: true,
+            transitioned: entry.outcome === 'transition',
+            editCard: entry.event.startsWith('edit '),
+            blocked: false,
+            selectable: false,
+            selected: false,
+            fromState: entry.fromState,
+          });
+
+          if (entry.outcome === 'transition') ensureColumn(entry.toState);
+        });
+      }
+
+      const currentColumn = ensureColumn(sim.currentState);
+      currentColumn.current = true;
+
+      if (STATE_META[sim.currentState].terminal) {
+        currentColumn.futureCards.push({
+          empty: true,
+          copy: 'Terminal state reached. No further events are available from this state.',
+        });
+      } else {
+        events.forEach(evt => {
+          const preview = getEventPreview(evt);
+          const futureBadges = [renderBadge(preview.blocked ? 'blocked' : 'ready', preview.blocked ? 'blocked' : 'enabled')];
+          if (preview.primaryRow.outcome === 'no-transition') futureBadges.push(renderBadge('stays', 'slate'));
+          else if (preview.primaryRow.target) futureBadges.push(renderBadge(preview.primaryRow.target, 'violet'));
+
+          currentColumn.futureCards.push({
+            eventName: evt.name,
+            subtitle: preview.primaryRow.outcome === 'transition' ? `From ${sim.currentState} to ${preview.targetState}` : `Within ${sim.currentState}`,
+            effectLabel: preview.effectLabel,
+            note: preview.blocked
+              ? preview.reason
+              : (preview.primaryRow.mutations?.length ? formatMutationSummary(preview.primaryRow.mutations) : (preview.primaryRow.guardDisplay || 'No data consequence')),
+            badges: futureBadges,
+            argDefs: evt.args,
+            argValues: ensureEventDraft(evt),
+            editableArgs: evt.args.length > 0,
+            history: false,
+            transitioned: false,
+            editCard: false,
+            blocked: preview.blocked,
+            selectable: true,
+            selected: selectedEvent === evt.name,
+            fromState: sim.currentState,
+          });
+        });
+      }
+
+      return columns;
+    }
+
+    function renderTimeline() {
+      const el = document.getElementById('timeline');
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      let html = `<div class="timeline-lane">`;
+
+      if (sim.history.length > 0) {
+        html += `<div class="timeline-history-rail">`;
+        sim.history.forEach((entry, index) => {
+          const historyBadges = [renderBadge(`#${entry.stepNum}`, 'neutral')];
+          if (entry.event.startsWith('edit ')) historyBadges.push(renderBadge('edit', 'indigo'));
+          else historyBadges.push(renderBadge(entry.outcome === 'transition' ? 'fired' : 'stayed', entry.outcome === 'transition' ? 'enabled' : 'slate'));
+
+          html += renderTimelineEventCard({
+            eventName: entry.event,
+            subtitle: entry.outcome === 'transition' ? `${entry.fromState} to ${entry.toState}` : `Within ${entry.fromState}`,
+            effectLabel: entry.outcome === 'transition' ? `→ ${entry.toState}` : 'stays',
+            note: formatDeltaSummary(entry),
+            badges: historyBadges,
+            argDefs: Object.keys(entry.args || {}).map(name => ({ name, type: inferValueType(entry.args[name]) })),
+            argValues: entry.args || {},
+            editableArgs: false,
+            history: true,
+            transitioned: entry.outcome === 'transition',
+            editCard: entry.event.startsWith('edit '),
+            blocked: false,
+            selectable: false,
+            selected: false,
+            fromState: entry.fromState,
+          });
+
+          if (index < sim.history.length - 1) html += `<div class="timeline-connector" aria-hidden="true"></div>`;
+        });
+        html += `</div><div class="timeline-connector major" aria-hidden="true"></div>`;
+      }
+
+      html += `<div class="timeline-current-cluster">`;
+      html += renderTimelineStateTile(sim.currentState, {
+        current: true,
+        origin: sim.history.length === 0 && STATE_META[sim.currentState].initial,
+      });
+      html += `</div><div class="timeline-connector major" aria-hidden="true"></div>`;
+
+      if (STATE_META[sim.currentState].terminal) {
+        html += `<div class="timeline-future-rail"><div class="timeline-empty-card">Terminal state reached. No further events are available from this state.</div></div>`;
+      } else {
+        html += `<div class="timeline-future-rail">`;
+        events.forEach((evt, index) => {
+          const preview = getEventPreview(evt);
+          const futureBadges = [renderBadge(preview.blocked ? 'blocked' : 'ready', preview.blocked ? 'blocked' : 'enabled')];
+          if (preview.primaryRow.outcome === 'no-transition') futureBadges.push(renderBadge('stays', 'slate'));
+          else if (preview.primaryRow.target) futureBadges.push(renderBadge(preview.primaryRow.target, 'violet'));
+
+          html += renderTimelineEventCard({
+            eventName: evt.name,
+            subtitle: preview.primaryRow.outcome === 'transition' ? `${sim.currentState} to ${preview.targetState}` : `Within ${sim.currentState}`,
+            effectLabel: preview.effectLabel,
+            note: preview.blocked
+              ? preview.reason
+              : (preview.primaryRow.mutations?.length ? formatMutationSummary(preview.primaryRow.mutations) : (preview.primaryRow.guardDisplay || 'No data consequence')),
+            badges: futureBadges,
+            argDefs: evt.args,
+            argValues: ensureEventDraft(evt),
+            editableArgs: evt.args.length > 0,
+            history: false,
+            transitioned: false,
+            editCard: false,
+            blocked: preview.blocked,
+            selectable: true,
+            selected: selectedEvent === evt.name,
+            fromState: sim.currentState,
+          });
+
+          // future events stack vertically — no connectors needed
+        });
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+      el.innerHTML = html;
+      requestAnimationFrame(() => {
+        const focusTarget = el.querySelector('.timeline-event-card.is-selected') || el.querySelector('.timeline-current-cluster') || el.querySelector('.timeline-future-rail');
+        if (focusTarget && typeof focusTarget.scrollIntoView === 'function') {
+          focusTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+        } else {
+          el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+        }
+      });
+    }
+
+    function formatVal(v) { if (v === null || v === undefined) return 'null'; if (typeof v === 'boolean') return String(v); return escHtml(String(v)); }
+
+    function getStateDescription(state) {
+      return { Draft: 'New work order — fill in details and submit.', Open: 'Submitted and awaiting assignment.', Scheduled: 'Technician assigned — approve parts or start work.', InProgress: 'Work underway — record progress or complete.', Completed: 'Work finished and closed.', Cancelled: 'Work order cancelled.' }[state] || '';
+    }
+
+    function renderStatus() {
+      document.getElementById('statusStep').textContent = `Step ${sim.stepCount}`;
+      const ok = INVARIANTS.every(i => i.check(sim.data));
+      const invEl = document.getElementById('statusInvariants');
+      if (ok) { invEl.className = 'status-ok'; invEl.textContent = `✓ ${INVARIANTS.length} invariants ok`; }
+      else { invEl.className = 'status-warn'; invEl.textContent = '⚠ invariant violated'; }
+    }
+
+    render();
+    applyLayoutState();
+    queueAutoPanelSizing();
+    window.addEventListener('resize', () => {
+      applyLayoutState();
+      queueAutoPanelSizing();
+    });
+  </script>
+</body>
+</html>

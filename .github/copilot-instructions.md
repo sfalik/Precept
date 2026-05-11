@@ -24,7 +24,7 @@ dotnet build
 # Build language server only (default build task — Ctrl+Shift+B)
 dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server
 
-# Run all tests (xUnit + FluentAssertions, 666 tests across 3 projects)
+# Run all tests (xUnit + FluentAssertions, ~2000 tests across 3 projects)
 dotnet test
 
 # Run a single test project
@@ -48,6 +48,19 @@ npm run loop:local     # Package + install locally (also a VS Code task)
 - **Plugin (agents/skills markdown)** → edit workspace-native copies in `.github/agents/` and `.github/skills/` → reload window → changes appear immediately. Run `plugin: sync payload` only when updating the shipped plugin payload under `tools/Precept.Plugin/` for explicit validation.
 
 Keep `tools/Precept.Plugin/.mcp.json` in shipped `dotnet tool run precept-mcp` form. That plugin file uses its own `mcpServers` payload schema. Use `.vscode/mcp.json` for repo-local MCP development with the VS Code `servers` schema, `.github/agents/` and `.github/skills/` as the workspace-native customization source, and treat plugin/distribution-shaped validation as explicit validation, not the default inner loop.
+
+## Issue Implementation Workflow
+
+For issue-based implementation work:
+
+- Read `CONTRIBUTING.md` before starting and treat it as the canonical workflow for issue work.
+- Open or reuse the linked **draft PR** immediately and treat it as the execution hub for the issue.
+- Use the exact PR-body structure required by `CONTRIBUTING.md` and the repository PR template: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, and `## Implementation Plan`.
+- Keep the `## Summary` and `## Why` sections current so reviewers can see what changed and why without reconstructing it from the diff.
+- **Design review gate:** No implementation plan is authored until the design review ceremony completes with owner sign-off. The `## Implementation Plan` section says \"Pending design review\" until the gate clears. For Track B proposals (those introducing a new canonical design doc), all inline PR review comments on the design doc must also be resolved. See `CONTRIBUTING.md` § 3. Design Review for full Track A / Track B details.
+- **Build a detailed implementation plan after design review completes.** The plan lives in the PR body's `## Implementation Plan` section and must meet the quality bar defined in `CONTRIBUTING.md` § Implementation Plan Quality Bar: vertical slices with method-level specificity, exact file paths, tests per slice, regression anchors, dependency ordering, file inventory, and tooling/MCP sync assessment.
+- Work in vertical slices. After each completed slice, commit, push, and update the PR-body summary/checklist before continuing.
+- Do **not** create a separate implementation-plan markdown file; the PR body is the ephemeral plan artifact for this repo.
 
 ## Use the MCP Tools First
 
@@ -182,9 +195,9 @@ See [CONTRIBUTING.md](/CONTRIBUTING.md) for the full proposal lifecycle and wher
 
 Language proposals (GitHub issues) must include the design philosophy and rationale — not just the syntax and acceptance criteria. When a proposal is revised or a new feature is decided through design discussion:
 
-1. **Capture the reasoning in `docs/research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
+1. **Capture the reasoning in `research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
 2. **Reference research from the proposal issue** — the issue body should link to the research file(s) that ground its decisions.
-3. **Update the issue map** in `docs/research/language/README.md` — connect each proposal to its research starting points.
+3. **Update the issue map** in `research/language/README.md` — connect each proposal to its research starting points.
 4. **Design doc updates happen at implementation time** — `docs/PreceptLanguageDesign.md` tracks what EXISTS in the runtime. Proposals describe what's PLANNED. The design doc is updated in the same PR that implements the feature, not before.
 
 ### Per-Decision Rationale Requirement

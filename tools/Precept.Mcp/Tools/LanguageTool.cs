@@ -17,10 +17,14 @@ public static class LanguageTool
             .Select(c => new ConstructDto(c.Form, c.Context, c.Description, c.Example))
             .ToList();
         var constraints = DiagnosticCatalog.Constraints
-            .Select(c => new ConstraintDto(c.Id, c.Phase, c.Rule))
+            .Select(c => new ConstraintDto(c.Id, c.Phase, c.Rule,
+                GetAssessmentModel(c.Id),
+                GetRemediation(c.Id),
+                GetProofDependency(c.Id)))
             .ToList();
+        var functions = BuildFunctionCatalog();
 
-        return new LanguageResult(vocabulary, constructs, constraints, ExpressionScopes, FirePipeline, OutcomeKinds);
+        return new LanguageResult(vocabulary, constructs, constraints, ExpressionScopes, functions, FirePipeline, OutcomeKinds);
     }
 
     private static VocabularyDto BuildVocabulary()
@@ -31,6 +35,7 @@ public static class LanguageTool
         var grammarKeywords = new List<string>();
         var outcomeKeywords = new List<string>();
         var typeKeywords = new List<string>();
+        var constraintKeywords = new List<string>();
         var literalKeywords = new List<string>();
         var operators = new List<OperatorDto>();
 
@@ -61,6 +66,9 @@ public static class LanguageTool
                     case TokenCategory.Grammar when symbol is not null:
                         grammarKeywords.Add(symbol);
                         break;
+                    case TokenCategory.Constraint when symbol is not null:
+                        constraintKeywords.Add(symbol);
+                        break;
                     case TokenCategory.Type when symbol is not null:
                         typeKeywords.Add(symbol);
                         break;
@@ -82,9 +90,52 @@ public static class LanguageTool
                     grammarKeywords,
                     outcomeKeywords,
                     typeKeywords,
+                    constraintKeywords,
                     literalKeywords,
                     operators);
     }
+
+    private static IReadOnlyList<FunctionDto> BuildFunctionCatalog()
+    {
+        return FunctionRegistry.AllFunctions
+            .OrderBy(f => f.Name, StringComparer.Ordinal)
+            .Select(f => new FunctionDto(
+                f.Name,
+                f.Description,
+                f.Overloads.Select(o => new FunctionSignatureDto(
+                    o.Parameters.Select(p => new FunctionParamDto(
+                        p.Name,
+                        FormatValueKind(p.AcceptedTypes),
+                        FormatArgConstraint(p.Constraint)
+                    )).ToList(),
+                    FormatValueKind(o.ReturnType),
+                    o.MinArity.HasValue
+                )).ToList()
+            ))
+            .ToList();
+    }
+
+    private static string FormatValueKind(StaticValueKind kind)
+    {
+        var allNumeric = StaticValueKind.Number | StaticValueKind.Integer | StaticValueKind.Decimal;
+        if ((kind & allNumeric) == allNumeric)
+            return "number";
+
+        var parts = new List<string>();
+        if (kind.HasFlag(StaticValueKind.Number)) parts.Add("number");
+        if (kind.HasFlag(StaticValueKind.Integer)) parts.Add("integer");
+        if (kind.HasFlag(StaticValueKind.Decimal)) parts.Add("decimal");
+        if (kind.HasFlag(StaticValueKind.String)) parts.Add("string");
+        if (kind.HasFlag(StaticValueKind.Boolean)) parts.Add("boolean");
+        return parts.Count > 0 ? string.Join(" | ", parts) : "unknown";
+    }
+
+    private static string? FormatArgConstraint(FunctionArgConstraint constraint) => constraint switch
+    {
+        FunctionArgConstraint.MustBeIntegerLiteral => "must be integer literal",
+        FunctionArgConstraint.RequiresNonNegativeProof => "requires non-negative proof",
+        _ => null
+    };
 
     private static (int Precedence, string Arity) GetOperatorInfo(PreceptToken token) => token switch
     {
@@ -107,23 +158,66 @@ public static class LanguageTool
         _ => (0, "binary")
     };
 
+    // ── Proof-enrichment helpers for ConstraintDto ────────────────────────────
+
+    private static string? GetAssessmentModel(string id) => id switch
+    {
+        "C76" => "obligation",
+        "C92" => "contradiction",
+        "C93" => "obligation",
+        "C94" => "contradiction",
+        "C95" => "contradiction",
+        "C96" => "satisfied",
+        "C97" => "contradiction",
+        "C98" => "satisfied",
+        _ => null
+    };
+
+    private static string? GetRemediation(string id) => id switch
+    {
+        "C76" => "add-constraint",
+        "C92" => "fix-expression",
+        "C93" => "add-constraint",
+        "C94" => "fix-value",
+        "C95" => "fix-rule",
+        "C96" => "remove-rule",
+        "C97" => "fix-guard",
+        "C98" => "remove-guard",
+        _ => null
+    };
+
+    private static string? GetProofDependency(string id) => id switch
+    {
+        "C76" => "flag",
+        "C92" => "interval",
+        "C93" => "interval",
+        "C94" => "interval",
+        "C95" => "interval",
+        "C96" => "interval",
+        "C97" => "interval",
+        "C98" => "interval",
+        _ => null
+    };
+
     private static readonly IReadOnlyList<ExpressionScopeDto> ExpressionScopes =
     [
-        new("invariant expression", "All data fields, collection accessors"),
-        new("state assert expression", "All data fields, collection accessors"),
-        new("event assert expression", "That event's args only (bare ArgName or EventName.ArgName)"),
+        new("rule expression", "All data fields, collection accessors"),
+        new("state ensure expression", "All data fields, collection accessors"),
+        new("event ensure expression", "That event's args only (bare ArgName or EventName.ArgName)"),
         new("when guard", "All data fields, EventName.ArgName, collection accessors"),
-        new("set RHS", "All data fields (read-your-writes), EventName.ArgName, collection accessors")
+        new("set RHS", "All data fields (read-your-writes), EventName.ArgName, collection accessors"),
+        new("computed field expression", "Data fields and .count only \u2014 no event arguments (C84), no nullable field references (C83), no unsafe collection accessors like .peek/.min/.max (C85)")
     ];
 
     private static readonly IReadOnlyList<FirePipelineStageDto> FirePipeline =
     [
-        new(1, "Event asserts", "Validate event args against 'on <Event> assert' rules. Failure → Rejected."),
+        new(1, "Event ensures", "Validate event args against 'on <Event> ensure' rules. Failure → Rejected."),
         new(2, "Row selection", "Iterate transition rows for (state, event) in source order. First 'when' match wins. No match → Unmatched."),
         new(3, "Exit actions", "Run 'from <SourceState> ->' automatic mutations."),
         new(4, "Row mutations", "Execute the matched row's '-> set/add/remove/...' action chain in declaration order."),
         new(5, "Entry actions", "Run 'to <TargetState> ->' automatic mutations."),
-        new(6, "Validation", "Check invariants, state asserts (in/to/from with temporal scoping). Any failure → full rollback, ConstraintFailure.")
+        new(6, "Derived field recomputation", "Re-evaluate all computed fields in dependency order after all mutations are committed. Computed values are current before validation."),
+        new(7, "Validation", "Check rules, state ensures (in/to/from with temporal scoping). Any failure → full rollback, ConstraintFailure.")
     ];
 
     private static readonly IReadOnlyList<OutcomeKindDto> OutcomeKinds =
@@ -142,6 +236,7 @@ public sealed record LanguageResult(
     IReadOnlyList<ConstructDto> Constructs,
     IReadOnlyList<ConstraintDto> Constraints,
     IReadOnlyList<ExpressionScopeDto> ExpressionScopes,
+    IReadOnlyList<FunctionDto> Functions,
     IReadOnlyList<FirePipelineStageDto> FirePipeline,
     IReadOnlyList<OutcomeKindDto> OutcomeKinds);
 
@@ -152,12 +247,20 @@ public sealed record VocabularyDto(
     IReadOnlyList<string> GrammarKeywords,
     IReadOnlyList<string> OutcomeKeywords,
     IReadOnlyList<string> TypeKeywords,
+    IReadOnlyList<string> ConstraintKeywords,
     IReadOnlyList<string> LiteralKeywords,
     IReadOnlyList<OperatorDto> Operators);
 
 public sealed record OperatorDto(string Symbol, int Precedence, string Arity, string Description);
 public sealed record ConstructDto(string Form, string Context, string Description, string Example);
-public sealed record ConstraintDto(string Id, string Phase, string Rule);
+public sealed record ConstraintDto(
+    string Id, string Phase, string Rule,
+    string? AssessmentModel = null,
+    string? Remediation = null,
+    string? ProofDependency = null);
 public sealed record ExpressionScopeDto(string Position, string Allowed);
+public sealed record FunctionDto(string Name, string Description, IReadOnlyList<FunctionSignatureDto> Signatures);
+public sealed record FunctionSignatureDto(IReadOnlyList<FunctionParamDto> Parameters, string ReturnType, bool IsVariadic);
+public sealed record FunctionParamDto(string Name, string Type, string? Constraint);
 public sealed record FirePipelineStageDto(int Stage, string Name, string Description);
 public sealed record OutcomeKindDto(string Kind, string Description, bool Mutated);

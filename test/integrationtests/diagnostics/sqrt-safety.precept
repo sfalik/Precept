@@ -1,0 +1,27 @@
+# Demonstrates: C76 — unresolved and contradictory sqrt() proof outcomes
+
+# C76 currently covers both "may be negative" and "provably negative" message paths.
+
+precept SqrtSafetyDemo
+
+field Measurement as number default 0
+field Root as number default 0
+
+state Active initial
+state Done
+
+event ComputeMaybeNegative
+event ComputeProvablyNegative
+event ComputeGuarded
+
+# C76: Measurement has no nonnegative proof, so sqrt() remains unresolved.
+# EXPECT: C76 | severity=error | match=exact | message=sqrt() requires a non-negative argument. 'Measurement' may be negative. Add a 'nonnegative' constraint, 'rule Measurement >= 0', state/event 'ensure', or guard with 'Measurement >= 0'. | line=19 | start=55 | end=66
+from Active on ComputeMaybeNegative -> set Root = sqrt(Measurement) -> transition Done
+
+# C76: 0.0 - 1.0 is a constant negative expression, so the contradiction branch fires.
+# EXPECT: C76 | severity=error | match=exact | message=sqrt() argument 'expression' is provably negative. (from: constant expression) | line=23 | start=58 | end=67
+from Active on ComputeProvablyNegative -> set Root = sqrt(0.0 - 1.0) -> transition Done
+
+# SAFE: the guard proves Measurement >= 0 inside the row.
+from Active on ComputeGuarded when Measurement >= 0 -> set Root = sqrt(Measurement) -> transition Done
+from Active on ComputeGuarded -> transition Done

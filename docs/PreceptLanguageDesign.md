@@ -28,11 +28,11 @@ These principles have driven every syntax and semantics decision:
 
 3. **Minimal ceremony.** No colons, no curly braces, no semicolons. `because` is the sentinel between expressions and reasons. Keyword anchoring replaces punctuation for structure.
 
-4. **Locality of reference.** Rules live near the things they describe — invariants near fields, state asserts near states, event asserts near events. Cross-cutting auditing is a tooling concern, not a syntax concern.
+4. **Locality of reference.** Rules live near the things they describe — rules near fields, state ensures near states, event ensures near events. Cross-cutting auditing is a tooling concern, not a syntax concern.
 
-5. **Data truth vs movement truth.** `invariant` = static data constraints (always hold). `assert` = movement constraints (checked when something happens — an event fires, a state is entered or exited). The keyword tells you the category.
+5. **Data truth vs movement truth.** `rule` = static data constraints (always hold). `ensure` = movement constraints (checked when something happens — an event fires, a state is entered or exited). The keyword tells you the category.
 
-6. **Collect-all for validation, first-match for routing.** Validation (invariants, asserts) reports every failure. Transition rows are evaluated top-to-bottom, first match wins. These are different problems with different evaluation strategies.
+6. **Collect-all for validation, first-match for routing.** Validation (rules, ensures) reports every failure. Transition rows are evaluated top-to-bottom, first match wins. These are different problems with different evaluation strategies.
 
 7. **Self-contained rows.** Each transition row is independently readable. No shared context with sibling rows — if a mutation appears in two rows, it's explicit in both.
 
@@ -40,7 +40,7 @@ These principles have driven every syntax and semantics decision:
 
 9. **Tooling drives syntax.** IntelliSense, diagnostics, and preview are first-class design constraints. Keyword anchoring enables predictable suggestions. The language server uses semantic ordering to prioritize completions based on what has already been declared. The grammar is also intentionally kept friendly to the Superpower token/combinator parser that underpins the runtime and tooling: syntax that would require indentation-aware parsing or workaround-heavy block balancing is rejected even if it is more concise.
 
-10. **Consistent prepositions.** `from`, `to`, `in`, `on` carry the same meaning everywhere they appear. `from` = leaving a state. `to` = entering a state. `in` = while in a state. `on` = when an event fires. The token after the identifier (`assert`, `->`, `on`, body keywords) determines the kind of statement — the preposition's meaning never changes.
+10. **Consistent prepositions.** `from`, `to`, `in`, `on` carry the same meaning everywhere they appear. `from` = leaving a state. `to` = entering a state. `in` = while in a state. `on` = when an event fires. The token after the identifier (`ensure`, `->`, `on`, body keywords) determines the kind of statement — the preposition's meaning never changes.
 
 11. **`->` means "do something."** The arrow introduces an action — a mutation, an outcome, or a side effect. It separates the *context* (what state, what event, what condition) from the *action* (what to do about it). Sequential execution, read-your-writes. Uniform across transition rows and state entry/exit actions.
 
@@ -60,34 +60,34 @@ Four prepositions are used throughout the language to dereference named entities
 
 | Preposition | Meaning | Dereferences | Used in |
 |---|---|---|---|
-| `in` | While residing in a state | State name | `in <State> assert ...`, `in <State> edit ...` |
-| `to` | Crossing into a state | State name | `to <State> assert ...`, `to <State> -> ...` |
-| `from` | Crossing out of a state | State name | `from <State> assert ...`, `from <State> -> ...`, `from <State> on ...` |
-| `on` | When an event fires | Event name | `on <Event> assert ...`, `from ... on <Event>` |
+| `in` | While residing in a state | State name | `in <State> ensure ...`, `in <State> edit ...` |
+| `to` | Crossing into a state | State name | `to <State> ensure ...`, `to <State> -> ...` |
+| `from` | Crossing out of a state | State name | `from <State> ensure ...`, `from <State> -> ...`, `from <State> on ...` |
+| `on` | When an event fires | Event name | `on <Event> ensure ...`, `from ... on <Event>` |
 
 **Design principle:** The preposition always means the same thing — `from` always means "leaving this state," `on` always means "when this event fires." What follows the preposition+identifier determines the *kind* of statement:
 
-- `from Draft assert ...` → exit gate (assert context)
+- `from Draft ensure ...` → exit gate (ensure context)
 - `from Draft on SubmitOrder` → transition routing (transition context)
-- `on SubmitOrder assert ...` → event arg validation (assert context)
+- `on SubmitOrder ensure ...` → event arg validation (ensure context)
 - `in Open edit Notes, Priority` → editable field declaration (edit context)
 
 **Disambiguation:** The token after the identifier resolves any ambiguity:
-- `assert` → constraint/validation statement
+- `ensure` → constraint/validation statement
 - `edit` → editable field declaration (continues with field name list)
 - `on` → transition header (continues with event name)
 - Transition body keywords (`set`, `transition`, `if`, etc.) → transition body
 
 This is unambiguous at the token level — no lookahead beyond the keyword following the identifier is needed.
 
-**Multi-target shorthand:** State prepositions (`in`, `to`, `from`) accept comma-separated state names or `any` (expands to all declared states). Event prepositions (`on`) do **not** — event asserts are arg-scoped, and different events have different arg shapes.
+**Multi-target shorthand:** State prepositions (`in`, `to`, `from`) accept comma-separated state names or `any` (expands to all declared states). Event prepositions (`on`) do **not** — event ensures are arg-scoped, and different events have different arg shapes.
 
 ```precept
-# Comma-separated — one assert per listed state internally
-in Open, InProgress, Blocked assert Assignee != null because "Must have an assignee"
+# Comma-separated — one ensure per listed state internally
+in Open, InProgress, Blocked ensure Assignee != null because "Must have an assignee"
 
 # any — expands to all declared states
-from any assert AuditLog.count > 0 because "Must have audit trail to leave any state"
+from any ensure AuditLog.count > 0 because "Must have audit trail to leave any state"
 ```
 
 ---
@@ -123,7 +123,7 @@ More keyword-dominant than C#/TypeScript, but without the verbosity of COBOL or 
 | Category | Rule | Examples |
 |----------|------|----------|
 | **Structural anchors** (start-of-statement, delimiters) | ALWAYS keywords | `field`, `state`, `from`, `on`, `set`, `transition` |
-| **Domain concepts** (ubiquitous language) | ALWAYS keywords | `invariant`, `assert`, `because`, `contains` |
+| **Domain concepts** (ubiquitous language) | ALWAYS keywords | `rule`, `ensure`, `because`, `contains` |
 | **Logical operators** (boolean connectives) | Keywords | `and`, `or`, `not` |
 | **Math/comparison operators** | Symbols | `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `>`, `<`, `>=`, `<=` |
 | **Structural separators** | Symbols only if universally understood | `->` (state machine notation), `.` (member access) |
@@ -156,16 +156,16 @@ The runtime accepts `not`, `and`, `or` as keywords. `!`, `&&`, `||` have been re
 A `.precept` file is a flat sequence of keyword-anchored statements:
 
 - `precept <Name>` header (required, first non-comment line)
-- Then any number of statements in any order: `field`, `invariant`, `state`, `in`/`to`/`from` (asserts and actions), `event`, `on` (event asserts), `from ... on` (transition rows)
+- Then any number of statements in any order: `field`, `rule`, `state`, `in`/`to`/`from` (ensures and actions), `event`, `on` (event ensures), `from ... on` (transition rows)
 - No section headers — the leading keyword determines statement kind
 
 ### Recommended ordering
 
 While the parser accepts statements in any order, the recommended convention is:
 
-1. Fields and invariants
-2. States, state asserts, and state entry/exit actions
-3. Events and event asserts
+1. Fields and rules
+2. States, state ensures, and state entry/exit actions
+3. Events and event ensures
 4. Transition rows
 
 The language server uses this ordering for IntelliSense: it prioritizes completions for constructs that typically appear next based on what has already been declared (e.g., after fields are defined, `state` and state-related keywords are suggested first). All statement-starting keywords are valid at any point, but the LS re-ranks them based on semantic context.
@@ -187,24 +187,29 @@ PreceptFile        := PreceptHeader Statement*
 
 PreceptHeader      := "precept" Identifier
 
-Statement          := FieldDecl | Invariant | StateDecl | StateAssert | StateAction
-                    | EditDecl | EventDecl | EventAssert | TransitionRow
+Statement          := FieldDecl | Rule | StateDecl | StateEnsure | StateAction
+                    | EditDecl | EventDecl | EventEnsure | TransitionRow
                     | Comment | Blank
 
-FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef NullableOpt DefaultOpt
-NullableOpt        := ("nullable")?
-DefaultOpt         := ("default" LiteralOrList)?
+FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef FieldModifier*
+                    | "field" Identifier "as" TypeRef "->" Expr ConstraintSuffix*
+FieldModifier      := "nullable" | "default" LiteralOrList | ConstraintSuffix | "ordered"
+ConstraintSuffix   := "nonnegative" | "positive" | "notempty"
+                    | "min" NumberLiteral | "max" NumberLiteral
+                    | "minlength" IntegerLiteral | "maxlength" IntegerLiteral
+                    | "mincount" IntegerLiteral | "maxcount" IntegerLiteral
+                    | "maxplaces" IntegerLiteral
 
-Invariant          := "invariant" BoolExpr "because" StringLiteral
+Rule               := "rule" BoolExpr WhenOpt "because" StringLiteral
 
 StateDecl          := "state" StateNameEntry ("," StateNameEntry)*
 StateNameEntry     := Identifier InitialOpt
 InitialOpt         := ("initial")?
 
-StateAssert        := StateInAssert | StateToAssert | StateFromAssert
-StateInAssert      := "in" StateTarget "assert" BoolExpr "because" StringLiteral
-StateToAssert      := "to" StateTarget "assert" BoolExpr "because" StringLiteral
-StateFromAssert    := "from" StateTarget "assert" BoolExpr "because" StringLiteral
+StateEnsure        := StateInEnsure | StateToEnsure | StateFromEnsure
+StateInEnsure      := "in" StateTarget "ensure" BoolExpr WhenOpt "because" StringLiteral
+StateToEnsure      := "to" StateTarget "ensure" BoolExpr WhenOpt "because" StringLiteral
+StateFromEnsure    := "from" StateTarget "ensure" BoolExpr WhenOpt "because" StringLiteral
 StateTarget        := "any" | Identifier ("," Identifier)*
 
 StateAction        := StateToAction | StateFromAction
@@ -224,15 +229,15 @@ PopAction          := "pop" Identifier ("into" Identifier)?
 ClearAction        := "clear" Identifier
 
 EditDecl           := StateEditDecl | RootEditDecl
-StateEditDecl      := "in" StateTarget "edit" FieldTarget
-RootEditDecl       := "edit" FieldTarget
+StateEditDecl      := "in" StateTarget WhenOpt "edit" FieldTarget
+RootEditDecl       := "edit" FieldTarget WhenOpt
 FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
-ArgDecl            := Identifier "as" TypeRef NullableOpt DefaultOpt
+ArgDecl            := Identifier "as" TypeRef FieldModifier*
 
-EventAssert        := "on" Identifier "assert" BoolExpr "because" StringLiteral
+EventEnsure        := "on" Identifier "ensure" BoolExpr WhenOpt "because" StringLiteral
 
 TransitionRow      := "from" StateTarget "on" Identifier WhenOpt ActionChain? "->" Outcome
 WhenOpt            := ("when" BoolExpr)?
@@ -242,35 +247,38 @@ NoTransition       := "no" "transition"
 RejectOutcome      := "reject" StringLiteral
 
 TypeRef            := ScalarType | CollectionType
-ScalarType         := "string" | "number" | "boolean"
+ScalarType         := "string" | "number" | "boolean" | "integer" | "decimal"
+                    | "choice" "(" StringLiteral ("," StringLiteral)* ")"
 CollectionType     := ("set" | "queue" | "stack") "of" ScalarType
 
 LiteralOrList      := ScalarLiteral | ListLiteral
 ScalarLiteral      := NumberLiteral | BooleanLiteral | StringLiteral | NullLiteral
 ListLiteral        := "[" (ScalarLiteral ("," ScalarLiteral)*)? "]"
 
-BoolExpr           := <expression grammar; carried forward>
-Identifier         := <token>
+BoolExpr           := Expr
+                      (* Expression grammar uses standard precedence:
+                         or < and < not < comparison < contains < arithmetic < unary.
+                         Atoms: literals, identifiers, parenthesized, function calls,
+                         if/then/else conditionals, dotted member access. *)\nIdentifier         := <token>
 StringLiteral      := '"' ... '"'
 Comment            := "#" ... end-of-line
 Blank              := (whitespace only)
 ```
 
 Notes:
-- `Invariant` = data truth. Always holds, checked post-commit. May reference any declared fields.
-- `StateInAssert` = state-scoped field invariant. Checked post-commit on any transition where the resulting state is the named state (entry **and** NoTransition).
-- `StateToAssert` = entry gate. Checked post-commit only when crossing **into** the named state from a different state.
-- `StateFromAssert` = exit gate. Checked post-commit only when crossing **out of** the named state to a different state.
-- All three state assert forms evaluate against the **proposed world** (post-mutation, pre-commit). Fields-scoped.
-- `EventAssert` = movement truth. Checked pre-transition when the named event fires. Scoped to that event's args only.
-- Whether `EventAssert` must appear after its `EventDecl` is not locked yet; recommended to keep asserts near the related event for readability.
+- `Rule` = data truth. Always holds, checked post-commit. May reference any declared fields.
+- `StateInEnsure` = state-scoped field rule. Checked post-commit on any transition where the resulting state is the named state (entry **and** NoTransition).
+- `StateEnsure` (with `EnsureAnchor.To`) = entry gate. Checked post-commit only when crossing **into** the named state from a different state.
+- `StateEnsure` (with `EnsureAnchor.From`) = exit gate. Checked post-commit only when crossing **out of** the named state to a different state.
+- All three state ensure forms evaluate against the **proposed world** (post-mutation, pre-commit). Fields-scoped.
+- `EventEnsure` = movement truth. Checked pre-transition when the named event fires. Scoped to that event's args only.
+- `EventEnsure` may appear before or after its `EventDecl`; keeping ensures near the related event is still recommended for readability.
+- **`when` guards on declarations** — `WhenOpt` is an optional `when <BoolExpr>` clause on rules, state ensures, event ensures, and edit declarations. When present, the guard acts as a precondition: if false, the declaration is skipped entirely (rule/ensure not checked, edit fields not granted). Guard scope is inherited from the declaration form: rule/state-ensure/edit guards reference entity fields only; event-ensure guards reference event args only. C69 fires for cross-scope guard references (e.g. entity field in an event-ensure guard). Guarded state ensures are excluded from unconditional null-narrowing at compile time.
 - **Compile-time error:** duplicate `in` + `to` on the same state with the same expression (syntactic identity after whitespace normalization). `in` already subsumes `to`.
-- **Compile-time error:** duplicate assert — same preposition + same state + same expression appearing more than once.
+- **Compile-time error:** duplicate ensure — same preposition + same state + same expression appearing more than once.
 - **Compile-time error:** `in` on the initial state where default field values violate the expression. Both defaults and initial state are statically known.
-- **Compile-time error (contradiction):** multiple asserts with the same preposition on the same state whose conjoined per-field domains are empty (e.g. two `in Open` asserts that require contradictory values for the same field).
-- **Compile-time error (deadlock):** `in`/`to` vs `from` asserts on the same state whose conjoined per-field domains are empty — the state is provably unexitable.
-- All domain checks use interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (no false positives).
-- **Stateless precept** — a precept with no `state` declarations. Only `field`, `invariant`, and root-level `edit` declarations are valid. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
+- No broader contradiction/deadlock analysis currently runs across distinct state-ensure declarations beyond duplicate detection and initial-state default validation.
+- **Stateless precept** — a precept with no `state` declarations. Root-level declarations such as `field`, `rule`, and root-level `edit` are valid; state-scoped declarations are not. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
 
 ---
 
@@ -287,7 +295,7 @@ Use a stateless precept when the entity has fields and integrity rules but no me
 A stateless precept omits all `state`, `event`, and `from ... on ...` declarations. Valid declarations are:
 
 - `field` — scalar and collection field declarations
-- `invariant` — data integrity rules (always enforced)
+- `rule` — data integrity rules (always enforced)
 - `edit` (root-level) — which fields are directly editable; see [Root-level editability](#root-level-editability-stateless-precepts)
 
 ```precept
@@ -299,7 +307,7 @@ field Phone as string nullable
 field PreferredContactMethod as string default "email"
 field MarketingOptIn as boolean default false
 
-invariant Name != "" because "Name cannot be empty"
+rule Name != "" because "Name cannot be empty"
 
 edit all
 ```
@@ -307,7 +315,7 @@ edit all
 ### Constraints
 
 - **C12 (parse):** At least one `field` or `state` must be declared. A `precept` header alone is not valid.
-- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in <State> edit` instead.
+- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead.
 - **C49 (compile, Warning):** Event declared in a stateless precept is unreachable — no transition surface exists.
 - C13 ("Exactly one state must be initial") is suppressed for stateless precepts — no states means no initial state required.
 
@@ -318,8 +326,8 @@ edit all
 - `CreateInstance(state, data?)` — throws `ArgumentException` for stateless precepts.
 - `Fire` on a stateless instance — returns `Undefined` outcome. Events have no transition surface.
 - `Inspect(instance, event)` on stateless — returns `Undefined` outcome.
-- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects root-editable fields.
-- `Update` on stateless — applies to root-editable fields; `CurrentState` is `null`.
+- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects the effective root-editable set (unconditional root blocks union passing guarded root blocks). It is `null` only when no root-level `edit` declarations exist, and an empty list when declarations exist but none currently grant editability.
+- `Update` on stateless — applies to the same effective root-editable set; `CurrentState` is `null`.
 
 ---
 
@@ -361,7 +369,7 @@ When `IsVip` is `false`, `ApplyDiscount` is `Unmatched`. The branches never eval
 
 ```precept
 field ReopenCount as number default 0
-  invariant ReopenCount >= 0 because "Reopen count cannot be negative"
+  rule ReopenCount >= 0 because "Reopen count cannot be negative"
 
 from Resolved on Reopen when ReopenCount < 3
   -> set ReopenCount = ReopenCount + 1
@@ -376,7 +384,7 @@ When the `when` expression constrains a nullable field (e.g. `when OfficerName !
 
 ### Scope restriction
 
-`when` expressions may only reference declared instance data fields and their properties. Event argument references (`EventName.ArgName`) in a `when` expression are a parse error. Arguments are not yet available when availability is evaluated — use additional rows with argument-dependent `when` guards for argument-dependent routing.
+`when` expressions may reference declared instance data fields and their properties. In transition rows, event arguments are also valid, but only in dotted form (`EventName.ArgName`). Bare arg names are not valid in transition guards, and event args are not available outside the row forms that bind them.
 
 ### Multiple rows for the same state+event
 
@@ -388,7 +396,7 @@ When multiple rows target the same `(State, Event)` pair, rows are evaluated in 
 
 - Identifiers are case-sensitive and compared ordinally.
 - String literals use double quotes: `"like this"`.
-- Reasons on `on ... assert`/`invariant` are **required** and must be quoted strings.
+- Reasons on `on ... ensure`/`rule` are **required** and must be quoted strings.
 
 ### Reserved keywords (Locked)
 
@@ -396,13 +404,15 @@ Keywords are **strictly lowercase**. Identifiers are case-sensitive. `From` and 
 
 Full reserved keyword list:
 
-`precept`, `field`, `as`, `nullable`, `default`, `invariant`, `because`,
-`state`, `initial`, `event`, `with`, `assert`, `edit`,
+`precept`, `field`, `as`, `nullable`, `default`, `rule`, `because`,
+`state`, `initial`, `event`, `with`, `ensure`, `edit`,
 `in`, `to`, `from`, `on`, `when`, `any`, `all`, `of`,
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
-`string`, `number`, `boolean`, `true`, `false`, `null`, `contains`,
-`and`, `or`, `not`
+`string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`,
+`true`, `false`, `null`, `contains`,
+`and`, `or`, `not`,
+`if`, `then`, `else`
 
 ### Dual-use: `set`
 
@@ -421,6 +431,9 @@ No ambiguity in the token stream — the parser knows which meaning applies from
 - `string`
 - `number`
 - `boolean`
+- `integer` — whole number, no decimal component. Supports arithmetic and numeric range constraints (`nonnegative`, `positive`, `min`, `max`). Widens to `number` and `decimal` — an integer value is accepted wherever a number or decimal is expected (assignment, comparison, arithmetic, conditional branches). This is lossless: every integer is a valid number and a valid decimal. Integer division truncates toward zero.
+- `decimal` — exact base-10 decimal number. Supports the `maxplaces` constraint and the `round()` built-in function.
+- `choice("A","B","C")` — constrained string value set; the value must be one of the declared members. Supports the `ordered` constraint for ordinal comparison. At least one member required (C62). No duplicate members (C63). Default value must be a declared member (C64).
 
 ### Collection types
 
@@ -472,22 +485,45 @@ Design rule: writes are lenient where they can be safely idempotent; reads that 
 
 ---
 
+### String accessors
+
+`string` fields expose a single parameterless accessor:
+
+- `<Field>.length` — returns the **UTF-16 code unit count** of the string value as `number`. This matches .NET's `string.Length` and is O(1). Note: characters outside the Basic Multilingual Plane (e.g. emoji) count as 2 code units. Example: `"💀".length == 2`.
+
+**Scope:** valid in `rule`, `in`/`to`/`from` state ensure, `when` guard, and `set` RHS — the same scopes as collection accessors.
+
+**Null handling:** `.length` does not coerce `null` to `0`. Using `.length` on a nullable `string` field without first narrowing it to non-null is a type error (diagnostic `C56`). Null-check before access using one of:
+
+```
+# Non-null minimum length check (rule)
+rule Name.length >= 2 because "Names require at least 2 characters"
+
+# Nullable max length (field may be null or short)
+rule Note == null or Note.length <= 500 because "Notes cannot exceed 500 characters"
+
+# Post-narrowing in a when guard (AccessReason narrowed to non-null by prior condition)
+from Draft on Submit when EmployeeName != null and AccessReason != null and AccessReason.length >= 5 -> transition Submitted
+```
+
+---
+
 ## Fields (Mostly locked)
 
 ### Field declarations
 
 Forms:
 
-- `field <Name> as <Type> [nullable] [default <Literal>]`
-- `field <Name>, <Name>, ... as <Type> [nullable] [default <Literal>]`
+- `field <Name> as <Type> [<modifier>...]`
+- `field <Name>, <Name>, ... as <Type> [<modifier>...]`
 
-Multi-name declarations declare multiple fields sharing the same type, nullability, and default value. The type, `nullable`, and `default` clauses apply uniformly to every name in the list.
+Modifiers (`nullable`, `default <value>`, and constraint keywords) may appear in **any order** after the type. Each modifier may appear at most once per declaration (C70). Multi-name declarations declare multiple fields sharing the same type and modifiers.
 
 Defaults:
 - Non-nullable scalar fields must declare a `default ...`.
 - Nullable scalar fields default to `null` when `default ...` is omitted.
 - Collection fields default to empty when `default ...` is omitted.
-- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]` (exact literal rules TBD).
+- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]`.
 
 Constraints:
 - No duplicate field names (within a single declaration or across declarations).
@@ -512,13 +548,114 @@ field MinAmount, MaxAmount as number default 0
 field FirstName, LastName, MiddleName as string nullable
 ```
 
-### Field invariants (Locked)
+### Computed (derived) fields (Locked)
 
-Data integrity rules live adjacent to fields.
+Computed fields are fields whose values are calculated from other fields and re-evaluated automatically after every state transition, field edit, or inspect operation. They eliminate manual synchronization — the formula is declared once, and the value is always current.
 
 Form:
 
-- `invariant <BoolExpr> because "<Reason>"`
+- `field <Name> as <Type> -> <Expression> [<constraint>...]`
+
+The bare `->` signals derivation, consistent with Principle 11 ("`->` means results in"). A computed field is a formula that always results in a value.
+
+Semantic rules:
+
+- **Mutually exclusive with `default`:** A field is either initialized (`default`) or derived (`->`), never both (C80).
+- **Cannot be `nullable`:** Computed fields always produce a value (C81).
+- **Multi-name declarations not allowed:** Each computed field must have its own expression (C82).
+- **Field-level constraints allowed:** Type-appropriate constraints may be declared after the expression (e.g., `nonnegative`).
+- **Expression scope:** Only persistent fields and safe collection accessors (`.count`). Event arguments are rejected (C84) — store via `set` first if needed. Nullable field references are rejected (C83). Unsafe collection accessors (`.peek`, `.min`, `.max`) are rejected (C85).
+- **Dependency ordering:** Computed fields referencing other computed fields are evaluated in topological order. Circular dependencies are compile errors (C86) with cycle path reporting.
+- **Read-only:** Cannot appear in `edit` declarations (C87) or as targets of `set` actions (C88). The formula is the single authority on the field's value.
+- **Recomputation timing:** Recomputed after ALL mutations committed, before constraint evaluation — in Fire, Update, and Inspect pipelines. One recomputation pass per operation.
+- **External input rejection:** Caller-provided values for computed fields in `CreateInstance`, `Update`, or MCP payloads are rejected with a descriptive error. The formula is the only authority.
+
+Examples:
+
+```precept
+# Simple arithmetic derivation
+field Quantity as number default 10
+field UnitPrice as number default 5.00
+field TotalCost as number -> Quantity * UnitPrice
+
+# Collection accessor reference
+field AllRejections as set default []
+field RejectionCount as number -> AllRejections.count
+
+# Chained computation — depends on another computed field
+field SubTotal as number -> Quantity * UnitPrice
+field Tax as number default 0
+field GrandTotal as number -> SubTotal + Tax
+
+# Conditional expression in computed field
+field Score as number default 0
+field Priority as choice("high", "medium", "low") -> if Score >= 90 then "high" else "low"
+
+# Computed field with constraint
+field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal nonnegative
+```
+
+### Field-level constraints (Locked)
+
+Constraint keywords may appear on field declarations and event argument declarations, between the type (and `nullable`) and the `default` clause. They desugar at parse time — field constraints become `rule` nodes; event-arg constraints become `on E ensure` nodes. No new runtime behavior.
+
+| Keyword | Applies to | Desugar |
+|---------|------------|---------|
+| `nonnegative` | `number`, `integer`, `decimal` | `Field >= 0` |
+| `positive` | `number`, `integer`, `decimal` | `Field > 0` |
+| `min N` | `number`, `integer`, `decimal` | `Field >= N` |
+| `max N` | `number`, `integer`, `decimal` | `Field <= N` |
+| `notempty` | string, collection | `Field != ""` / `Field.count > 0` |
+| `minlength N` | string | `Field.length >= N` |
+| `maxlength N` | string | `Field.length <= N` |
+| `mincount N` | collection | `Field.count >= N` |
+| `maxcount N` | collection | `Field.count <= N` |
+| `maxplaces N` | `decimal` | Caps the decimal value to at most N decimal places (runtime enforcement; not a desugared rule expression) |
+| `ordered` | `choice` | Enables ordinal comparison operators (`<`, `<=`, `>`, `>=`); values compare in declaration order (not a desugared rule expression) |
+
+**Nullable interaction:** When a nullable field carries a constraint, the desugared expression gains a null guard: `Field == null or Field >= N`. The constraint is only evaluated when the value is non-null.
+
+**Compile-time diagnostics:**
+- **C57** — constraint applied to an incompatible type (e.g. `notempty` on a number field, `nonnegative` on a string).
+- **C58** — contradictory constraints (`min 10 max 5`), duplicate constraints (`min 5 min 10`), or subsumed constraints (`nonnegative positive` — `positive` already implies `nonnegative`).
+- **C59** — the declared `default` value violates a constraint (`default -1` with `nonnegative`).
+- **C61** — `maxplaces` applied to a non-`decimal` field.
+- **C62** — `choice` type declared with no members.
+- **C63** — `choice` type contains a duplicate member value.
+- **C64** — the declared `default` value is not in the `choice` member set.
+- **C65** — Ordinal comparison operator (`<`, `<=`, `>`, `>=`) used on a `choice` field that lacks the `ordered` constraint.
+- **C66** — `ordered` constraint applied to a non-`choice` field.
+- **C67** — Ordinal comparison between two `choice` fields — ordinal rank is field-local and the two fields have independent orderings.
+- **C68** — Literal value assigned to a `choice` field (or added to a `choice` collection) is not a member of the declared value set.
+
+Examples:
+
+```precept
+# Numeric boundaries
+field Price as number default 0 nonnegative
+field Weight as number default 1 positive
+field Score as number default 50 min 0 max 100
+
+# String guards
+field Name as string nullable notempty
+field Code as string default "ABC" minlength 3 maxlength 20
+
+# Collection cardinality
+field Tags as set of string notempty
+field Reviewers as set of string mincount 1
+
+# Nullable with constraint — null guard added automatically
+field Discount as number nullable nonnegative
+
+# Event arg constraints
+event Submit with Name as string notempty, Amount as number positive
+```
+
+Data integrity rules live adjacent to fields. For simple per-field bounds, prefer inline constraints (see above) — `rule` is the right tool for cross-field relationships and expressions that can't be expressed as a single constraint keyword.
+
+Form:
+
+- `rule <BoolExpr> because "<Reason>"`
 
 Notes:
 - Evaluated after a successful transition/mutation commit; if false, the event is rejected with the given reason.
@@ -526,18 +663,18 @@ Notes:
 
 Example:
 
-- `invariant Balance >= 0 because "Balance cannot go negative"`
-- `invariant MaxAmount >= MinAmount because "MaxAmount must be >= MinAmount"`
+- `rule Balance >= 0 because "Balance cannot go negative"`
+- `rule MaxAmount >= MinAmount because "MaxAmount must be >= MinAmount"`
 
 Focused example:
 
 ```precept
 field Balance as number default 0
-invariant Balance >= 0 because "Balance cannot go negative"
+rule Balance >= 0 because "Balance cannot go negative"
 
 field MinAmount as number default 0
 field MaxAmount as number default 100
-invariant MaxAmount >= MinAmount because "MaxAmount must be >= MinAmount"
+rule MaxAmount >= MinAmount because "MaxAmount must be >= MinAmount"
 ```
 
 ### Nullability and narrowing (Locked)
@@ -588,7 +725,7 @@ After the first branch rejects on `null`, the language server knows every subseq
 
 **`when` narrowing:** A `when` expression also narrows. `from Active on Fire when OfficerName != null` makes `OfficerName` non-nullable inside the entire row body. See the `when` Preconditions section.
 
-**Rules:** Rules inherit the same strict null model. A nullable field used in a rule expression without an explicit null guard is a compile-time error in the rule. See [docs/RulesDesign.md](RulesDesign.md#Nullable-Behaviour-in-Rules) for rule-specific examples.
+**Rules:** Rules inherit the same strict null model. A nullable field used in a rule expression without an explicit null guard is a compile-time error in the rule, just as it is in guards and ensure expressions.
 
 
 ---
@@ -625,34 +762,37 @@ state Draft initial
 state UnderReview, Approved, Funded, Declined
 ```
 
-### State asserts (Locked)
+### State ensures (Locked)
 
-State asserts are checked post-mutation, pre-commit. They may reference any declared fields. All three forms evaluate against the **proposed world** (after mutations apply but before commit finalizes).
+State ensures are checked post-mutation, pre-commit. They may reference any declared fields. All three forms evaluate against the **proposed world** (after mutations apply but before commit finalizes).
 
 Three forms, each with a distinct temporal scope:
 
 | Preposition | Meaning | When checked |
 |---|---|---|
-| `in <State>` | State-scoped field invariant | After **any** transition resulting in `<State>` (entry **and** NoTransition) |
+| `in <State>` | State-scoped field rule | After **any** transition resulting in `<State>` (entry **and** NoTransition) |
 | `to <State>` | Entry gate | Only when crossing **into** `<State>` from a different state |
 | `from <State>` | Exit gate | Only when crossing **out of** `<State>` to a different state |
 
 Forms:
 
-- `in <StateTarget> assert <BoolExpr> because "<Reason>"`
-- `to <StateTarget> assert <BoolExpr> because "<Reason>"`
-- `from <StateTarget> assert <BoolExpr> because "<Reason>"`
+- `in <StateTarget> ensure <BoolExpr> because "<Reason>"`
+- `to <StateTarget> ensure <BoolExpr> because "<Reason>"`
+- `from <StateTarget> ensure <BoolExpr> because "<Reason>"`
+- `in <StateTarget> ensure <BoolExpr> when <Guard> because "<Reason>"` (conditional — guard is entity-field-scoped)
+- `to <StateTarget> ensure <BoolExpr> when <Guard> because "<Reason>"`
+- `from <StateTarget> ensure <BoolExpr> when <Guard> because "<Reason>"`
 
 Where `<StateTarget>` is one of:
 - A single state name: `Open`
 - Comma-separated state names: `Open, InProgress, Blocked`
 - The keyword `any` (expands to all declared states at parse time)
 
-Multi-state and `any` are syntactic sugar — the parser expands them into one assert per state internally. Compile-time checks (subsumption, duplication, domain analysis) apply per-state after expansion.
+Multi-state and `any` are syntactic sugar — the parser expands them into one ensure per state internally. Compile-time checks (subsumption, duplication, domain analysis) apply per-state after expansion.
 
 Semantics:
-- `invariant` = static data truth (always holds)
-- `assert` = movement truth (something is happening — an event fires, a state is entered, or a state is exited)
+- `rule` = static data truth (always holds)
+- `ensure` = movement truth (something is happening — an event fires, a state is entered, or a state is exited)
 - `in <State>` is strictly stronger than `to <State>`: if data must hold while *in* the state, you can never enter violating it either
 - `to <State>` is entry-only: a condition must hold on arrival but may change later via in-place mutations
 - `from <State>` is exit-only: you can't leave until the condition is met
@@ -663,12 +803,14 @@ Compile-time checks (Locked):
 | # | Check | Condition | Severity |
 |---|---|---|---|
 | 1 | `in` + `to` subsumption | Same state, same expression (syntactic identity) | Error |
-| 2 | Duplicate assert | Same preposition + state + expression | Error |
+| 2 | Duplicate ensure | Same preposition + state + expression | Error |
 | 3 | `in` on initial state vs defaults | Default field values violate `in <InitialState>` expression | Error |
-| 4 | Same-preposition contradiction | Multiple asserts with same preposition on same state, conjoined per-field domains are empty | Error |
+| 4 | Same-preposition contradiction | Multiple ensures with same preposition on same state, conjoined per-field domains are empty | Error |
 | 5 | Cross-preposition deadlock | `in`/`to` vs `from` on same state, conjoined per-field domains are empty → unexitable | Error |
 
 All domain checks (#3–#5) use per-field interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (sound — no false positives).
+
+**`when` guards on state ensures:** All three state ensure forms accept an optional `when <Guard>` clause between the expression and `because`. When the guard is present, the ensure is conditional — if the guard evaluates to false against current field data, the ensure is skipped. Guarded state ensures are excluded from unconditional null-narrowing at compile time (a guarded `in State ensure Field != null` does not narrow `Field` for transition rows, because the guard may be false). C69 fires if the guard references identifiers outside the entity-field scope.
 
 Focused example:
 
@@ -682,16 +824,16 @@ state Resolved
 state Closed
 
 # Exit gates — can't leave until conditions are met
-from Draft assert Email != null because "Must provide email before leaving draft"
-from Review assert ApproverCount > 0 because "Need at least one approval to leave review"
+from Draft ensure Email != null because "Must provide email before leaving draft"
+from Review ensure ApproverCount > 0 because "Need at least one approval to leave review"
 
 # Entry gates — must hold on arrival, can change later
-to Escalated assert Priority == "High" because "Must be high priority to escalate"
+to Escalated ensure Priority == "High" because "Must be high priority to escalate"
 
-# State-scoped invariants — must hold while in the state (entry + in-place)
-in Open, InProgress, Blocked assert Assignee != null because "Must have an assignee"
-in Blocked assert BlockReason != null because "Blocked requires a block reason"
-in Resolved assert Resolution != null because "Resolved requires a resolution"
+# State-scoped rules — must hold while in the state (entry + in-place)
+in Open, InProgress, Blocked ensure Assignee != null because "Must have an assignee"
+in Blocked ensure BlockReason != null because "Blocked requires a block reason"
+in Resolved ensure Resolution != null because "Resolved requires a resolution"
 
 # Entry/exit actions (New) — mutations that fire automatically on state change
 to Open -> set SubmittedCount = SubmittedCount + 1
@@ -710,26 +852,26 @@ Forms:
 Constraints:
 - No `in <State> ->` actions (in-place mutations on every event would be surprising and dangerous)
 - No outcomes (`transition`, `no transition`, `reject`) — actions are mutations only
-- Multi-state and `any` supported (same as asserts)
+- Multi-state and `any` supported (same as ensures)
 - Fields-scoped only (no event args available)
 
 Execution order:
 1. Exit actions (`from <SourceState> ->`) run first
 2. Transition row mutations (`->` chain) run second
 3. Entry actions (`to <TargetState> ->`) run third
-4. Validation (asserts, invariants) runs last
+4. Validation (ensures, rules) runs last
 
 For `no transition` / NoTransition: no exit or entry actions fire (you didn't leave or arrive).
 
 Disambiguation:
-- `to Open assert ...` — validation (next token: `assert`)
+- `to Open ensure ...` — validation (next token: `ensure`)
 - `to Open -> ...` — entry action (next token: `->`)
 
 ---
 
 ## Editable Fields (Locked)
 
-Editable field declarations specify which fields can be modified directly (via the runtime `Update` API) while residing in a state. They use the `in` preposition because editability is about what you can do **while in** a state — consistent with `in <State> assert` (state-scoped invariants).
+Editable field declarations specify which fields can be modified directly (via the runtime `Update` API) while residing in a state. They use the `in` preposition because editability is about what you can do **while in** a state — consistent with `in <State> ensure` (state-scoped rules).
 
 ### Syntax
 
@@ -737,7 +879,7 @@ Form:
 
 - `in <StateTarget> edit <FieldList>`
 
-Where `<FieldList>` is a comma-separated list of declared field names. `<StateTarget>` follows the same rules as state asserts: a single state, comma-separated states, or `any`.
+Where `<FieldList>` is a comma-separated list of declared field names. `<StateTarget>` follows the same rules as state ensures: a single state, comma-separated states, or `any`.
 
 Examples:
 
@@ -756,17 +898,40 @@ in Resolved edit ResolutionSummary
 
 The `in` preposition followed by a state target is disambiguated by the next keyword:
 
-- `in Open assert ...` → state-scoped invariant (next token: `assert`)
+- `in Open ensure ...` → state-scoped rule (next token: `ensure`)
 - `in Open edit ...` → editable field declaration (next token: `edit`)
 
-This is LL(2) at most — the parser sees `in` → state list → `assert` or `edit`.
+This is LL(2) at most — the parser sees `in` → state list → `ensure` or `edit`.
 
 ### Semantics
 
 - **Additive across declarations:** Multiple `in ... edit` statements matching the same state are unioned. The effective editable set for a state is the union of all matching declarations.
-- **`in any edit`** expands to all declared states at parse time (same as `in any assert`).
+- **`in any edit`** expands to all declared states at parse time (same as `in any ensure`).
 - **Independence from events:** Edit declarations and event transitions are orthogonal. A field can be both editable and modified by event `set` assignments.
 - **No terminal state exclusion:** `in any edit` includes terminal states. To exclude specific states, list states explicitly.
+
+### Conditional editability
+
+Edit declarations accept an optional `when <Guard>` clause:
+
+```
+in <StateTarget> when <Guard> edit <FieldList>
+```
+
+Where `<Guard>` is a boolean expression over entity fields. When the guard is present, the listed fields are conditionally editable — only granted when the guard evaluates to true against the current instance data.
+
+Example:
+
+```precept
+in Active when HasPermission == true edit SensitiveField
+in Open, InProgress edit Notes, Description
+```
+
+Semantics:
+- **Additive union:** Unconditional edit blocks + guarded edit blocks whose guard passes = effective editable set. Static fields are always included; guarded fields are added when their guard is satisfied.
+- **Fail-closed:** If a guard expression evaluation fails (expression error, missing data), the guarded fields are NOT granted editability.
+- **Dynamic evaluation:** Guards are evaluated at each `Update` / `Inspect` call with current instance data.
+- **Guard scope:** Entity fields only (same as unconditional edit declarations). C69 fires for out-of-scope references.
 
 ### Root-level editability (stateless precepts)
 
@@ -775,14 +940,25 @@ Stateless precepts (no `state` declarations) use a root-level `edit` form withou
 ```
 edit all
 edit Field1, Field2
+edit Field1 when Guard
+edit all when Guard
 ```
 
 - `edit all` — declares all declared fields as editable. The `all` sentinel is stored as `["all"]` in `FieldNames` and expanded to all scalar and collection field names at engine construction via `ExpandEditFieldNames()`.
 - `edit Field1, Field2` — declares specific named fields as editable.
+- `edit Field1 when Guard` — declares fields as editable only when the guard expression evaluates to `true`. The guard uses the same `WhenOpt` grammar as state-scoped edit declarations.
+- `edit all when Guard` — declares all fields as editable only when the guard is satisfied.
 
-Root-level `edit` is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+**Guard semantics** follow the same rules as state-scoped guarded edits:
 
-At runtime, `Update` on a stateless instance pulls the editable field set from `_rootEditableFields` (the internal set built from root edit blocks). The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+- **Additive union:** Unconditional and guarded root-level edit blocks combine. A field is editable if ANY unconditional or passing-guard block grants it.
+- **Fail-closed:** Guard evaluation error → field not granted.
+- **Dynamic evaluation:** Guards are evaluated on each `Update` / `Inspect` call with current instance data.
+- **Type checking:** Guard must be a non-nullable boolean expression. C69 fires for out-of-scope references; C46 rejects nullable or non-boolean guard expressions.
+
+Root-level `edit` (with or without guards) is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+
+At runtime, `Update` on a stateless instance pulls the editable field set from the union of `_rootEditableFields` (unconditional root edit blocks) and any guarded root-level edit blocks whose guards pass. `EvaluateGuardedEditFields(null, data)` evaluates root-level guards by matching on `null` state. The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface the combined editable field set for stateless instances.
 
 ### Compile-time checks
 
@@ -796,24 +972,31 @@ At runtime, `Update` on a stateless instance pulls the editable field set from `
 
 ### Model
 
-The parser produces one `DslEditBlock` per state after expansion:
+The parser produces one `PreceptEditBlock` per expanded edit target:
 
 ```csharp
-public sealed record DslEditBlock(
-    string State,
+public sealed record PreceptEditBlock(
+    string? State,          // null for root-level (stateless) edit declarations
     IReadOnlyList<string> FieldNames,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null,
     int SourceLine = 0);
 ```
 
-`DslWorkflowModel` gains an optional `IReadOnlyList<DslEditBlock>? EditBlocks` property.
+- `State` is `null` for root-level `edit` declarations on stateless precepts.
+- `WhenText` and `WhenGuard` are populated for guarded edit declarations.
+- `in any edit` expands to one `PreceptEditBlock` per declared state.
+- `in StateA, StateB edit` expands to one `PreceptEditBlock` per listed state.
+
+`PreceptDefinition` carries these via `IReadOnlyList<PreceptEditBlock>? EditBlocks`.
 
 ### Runtime
 
-The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are fully implemented. See `docs/EditableFieldsDesign.md` for the design.
+The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are fully implemented for both state-scoped guarded edits and stateless root-level guarded edits. See `docs/EditableFieldsDesign.md` for the implementation design notes.
 
 ---
 
-## Events (Locked: event-level asserts are arg-only)
+## Events (Locked: event-level ensures are arg-only)
 
 ### Event declarations
 
@@ -853,36 +1036,38 @@ event Approve, Reject with Note as string
 event Cancel, Archive
 ```
 
-### Event asserts (Locked)
+### Event ensures (Locked)
 
-Event asserts are **event-only** (not state-specific) and **arg-only**.
+Event ensures are **event-only** (not state-specific) and **arg-only**.
 
 Form:
 
-- `on <EventName> assert <BoolExpr> because "<Reason>"`
+- `on <EventName> ensure <BoolExpr> because "<Reason>"`
 
 Uniqueness:
-- Multiple `on <EventName> assert` statements are allowed for the same event — all are evaluated, and any failure rejects the event.
+- Multiple `on <EventName> ensure` statements are allowed for the same event — all are evaluated, and any failure rejects the event.
 
 Scope (Locked):
 - `<BoolExpr>` may reference **only** that event’s argument identifiers.
 - Dotted access on args is permitted if the underlying expression language supports it (e.g., `items.count`).
 - Referencing any non-arg identifier (including fields) is a parse/validation error.
-- Validation that combines event args with field state belongs in `when` guards on transition rows, not in event asserts. Event asserts answer "is this event well-formed?" — `when` guards answer "does this event apply given the current state?"
+- Validation that combines event args with field state belongs in `when` guards on transition rows, not in event ensures. Event ensures answer "is this event well-formed?" — `when` guards answer "does this event apply given the current state?"
+
+**`when` guards on event ensures:** Event ensures accept an optional `when <Guard>` clause: `on <Event> ensure <Expr> when <Guard> because "..."`. Guards on event ensures are **arg-scoped only** — consistent with the event-ensure body scope. C69 fires for entity field references in event-ensure guards. When the guard is false, the ensure is skipped.
 
 Semantics (Locked ordering):
-- Event asserts run **before** transition selection.
-- If an event assert is false, the fire/inspect outcome is `Rejected` with the provided reason.
+- Event ensures run **before** transition selection.
+- If an event ensure is false, the fire/inspect outcome is `Rejected` with the provided reason.
 
 Example:
 
-- `on SubmitOrder assert items.count > 0 and paymentToken != null because "Order must include items and payment"`
+- `on SubmitOrder ensure items.count > 0 and paymentToken != null because "Order must include items and payment"`
 
 Focused example:
 
 ```precept
 event Cancel with reason as string
-on Cancel assert reason != "" because "Cancel requires a reason"
+on Cancel ensure reason != "" because "Cancel requires a reason"
 ```
 
 ---
@@ -896,17 +1081,190 @@ The expression language supports:
 - logical: `and`, `or`
 - comparisons: `==`, `!=`, `>`, `>=`, `<`, `<=`
 - membership: `contains`
+- conditional: `if <condition> then <value> else <value>` (see [Conditional Expressions](#conditional-expressions-locked))
 - parentheses
 - identifier expressions with optional dotted member access (`Name.member`)
 
-Collection accessor members carried forward conceptually:
-- `.count`
-- `.min`, `.max` (sets)
-- `.peek` (queue/stack)
+Dotted member accessors:
+
+| Form | Receiver | Returns | Notes |
+|---|---|---|---|
+| `Field.count` | `set<T>`, `queue<T>`, `stack<T>` | `number` | Total — empty collection → 0 |
+| `Field.min`, `Field.max` | `set<T>` (numeric inner) | inner type | Partial — error on empty set |
+| `Field.peek` | `queue<T>`, `stack<T>` | inner type | Partial — error on empty collection |
+| `Field.length` | `string` | `number` | UTF-16 code unit count. Null-unsafe — requires non-null narrowing first (C56). See [String accessors](#string-accessors). |
+| `EventName.ArgName` | event arg in transition row `when` guard | arg type | Required dotted form to avoid field shadowing. See [Expression scope in transitions](#expression-scope-in-transitions). |
+| `EventName.ArgName.length` | `string` event arg | `number` | Three-level form — combines arg dotted form with string `.length`. |
+
+Built-in functions:
+
+| Function | Signatures | Returns | Description |
+|---|---|---|---|
+| `abs(value)` | `integer → integer`, `decimal → decimal`, `number → number` | Same as input | Absolute value. Type-preserving. |
+| `floor(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward negative infinity. |
+| `ceil(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward positive infinity. |
+| `round(value)` | `integer → integer`, `decimal → integer`, `number → integer` | `integer` | 1-arg: banker's rounding (MidpointRounding.ToEven) to nearest integer. |
+| `round(value, places)` | `(numeric, integer-literal) → decimal` | `decimal` | 2-arg: precision rounding. `places` must be a non-negative integer literal (C74). |
+| `truncate(value)` | `decimal → integer`, `number → integer` | `integer` | Truncates toward zero (not toward negative infinity like `floor`). |
+| `min(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Smallest of 2+ values. Variadic. All args must match the same numeric type. |
+| `max(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Largest of 2+ values. Variadic. All args must match the same numeric type. |
+| `clamp(value, min, max)` | `(integer, integer, integer) → integer`, `(decimal×3) → decimal`, `(number×3) → number` | Same as input | Constrains value to [min, max]. Type-preserving. |
+| `pow(base, exponent)` | `(integer, integer) → integer`, `(decimal, integer) → decimal`, `(number, integer) → number` | Same as base | Integer exponent only (C75). Type-preserving. `pow(0, 0) = 1` (IEEE 754). |
+| `sqrt(value)` | `decimal → decimal`, `number → number` | Same as input | Square root. Requires compile-time non-negative proof: `nonnegative` or `positive` constraint, `rule Field >= 0`, state/event `ensure`, or `when` guard with `>= 0` (C76). |
+| `toLower(value)` | `string → string` | `string` | Lowercase using invariant culture. |
+| `toUpper(value)` | `string → string` | `string` | Uppercase using invariant culture. |
+| `trim(value)` | `string → string` | `string` | Removes leading and trailing whitespace. |
+| `startsWith(value, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive prefix test. |
+| `endsWith(value, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive suffix test. |
+| `left(value, count)` | `(string, numeric) → string` | `string` | Leftmost N characters. Clamping: negative count → empty, count > length → full string. |
+| `right(value, count)` | `(string, numeric) → string` | `string` | Rightmost N characters. Clamping semantics. |
+| `mid(value, start, length)` | `(string, numeric, numeric) → string` | `string` | Substring. 1-indexed start. Clamping: start > length → empty, length beyond end → to end. |
+
+All functions are valid in `set` RHS, `rule`, `in`/`to`/`from` ensure, and `when` guard expression positions. Functions that return `boolean` (`startsWith`, `endsWith`) are additionally valid as standalone guard conditions.
+
+Function arguments must be non-nullable — passing a nullable field without a null guard emits C77. `min` and `max` share tokens with constraint keywords; the parser disambiguates by position (function call requires `(` after the name).
 
 Exact operator precedence and literal forms should align with the runtime expression parser.
 
 See [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked) for the rationale behind using keywords for logical operators and symbols for math/comparison.
+
+### Divisor safety (Locked)
+
+The compiler checks the right operand of `/` and `%` for a compile-time nonzero proof. This prevents division-by-zero errors that would surface only at runtime.
+
+**Two-tier severity (Principle #8):**
+
+| Condition | Diagnostic | Severity | Message |
+|---|---|---|---|
+| Divisor is literal `0` or `0.0` | C92 | Error | `Division by zero: the divisor is literal 0.` |
+| Divisor is an identifier with no nonzero proof | C93 | Error | `Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.` |
+| Divisor is nonnegative but not nonzero | C93 | Error | `Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.` |
+
+C92 is an **error** because the compiler can prove a contradiction — dividing by literal zero is always wrong. C93 is also an **error** because an unproven divisor risks runtime division by zero, which produces IEEE 754 Infinity or NaN — values that silently corrupt field state and cannot be serialized. The runtime guards against this at evaluation time, but the compile-time error ensures authors fix the proof gap before deployment. Compound expressions (binary operations, function calls) are analyzed by the proof engine using interval arithmetic, relational inference, and sequential assignment flow. For the full design of the interval-arithmetic proof engine that powers compound-expression analysis, see [ProofEngineDesign.md](ProofEngineDesign.md).
+
+**Proof sources that suppress C93:**
+
+| Proof source | Example | Marker |
+|---|---|---|
+| `positive` constraint | `field Quantity as number positive` | `$positive:` |
+| `min N` where N > 0 | `field Rate as number min 1` | `$positive:` |
+| `rule Field > 0` | `rule Quantity > 0 because "..."` | `$positive:` |
+| `rule Field != 0` | `rule Divisor != 0 because "..."` | `$nonzero:` |
+| `when Field != 0` guard | `when Divisor != 0 -> set Result = Total / Divisor` | `$nonzero:` |
+| `when Field > 0` guard | `when Quantity > 0 -> set Average = Total / Quantity` | `$positive:` |
+| State `ensure Field > 0` | `in Active ensure Quantity > 0 because "..."` | `$positive:` |
+| Event `ensure Arg > 0` | `on Submit ensure Amount > 0 because "..."` | `$positive:` |
+
+**The `nonnegative` ≠ nonzero distinction:** `nonnegative` (and `min 0`) prove `Field >= 0` — a `$nonneg:` marker. This does *not* prove nonzero, because zero is a valid nonnegative value. Dividing by a nonnegative field triggers C93 with a context-aware message explaining that `nonnegative` allows zero and suggesting `positive` instead.
+
+### Proof-backed integrity diagnostics (Locked)
+
+The proof engine uses interval arithmetic and relational inference to detect structural integrity issues beyond divisor safety. These diagnostics fire when the engine can prove a property from field constraints, rules, and guards — they never guess.
+
+| Condition | Diagnostic | Severity | Message |
+|---|---|---|---|
+| Assignment provably outside target field's constraint range | C94 | Error | `Assignment expression is provably outside the target field's constraint range.` |
+| Rules are contradictory — no value can satisfy both simultaneously | C95 | Error | `Rules are contradictory — no value can satisfy both simultaneously.` |
+| Rule is vacuous — provably always true given field constraints | C96 | Warning | `Rule is vacuous — provably always true given field constraints.` |
+| Guard is dead — provably always false; row/block can never execute | C97 | Warning | `Guard is dead — provably always false; this row/block can never execute.` |
+| Guard is tautological — provably always true; the `when` clause has no effect | C98 | Warning | `Guard is tautological — provably always true; the 'when' clause has no effect.` |
+
+C94 is an **error** because the engine can prove the assignment will always violate a field constraint — the runtime will reject every execution of this row, making it structurally dead code. C95 is an **error** when rules form a global integrity failure (no value satisfies all rules simultaneously). C96–C98 are **warnings** — the constructs are not harmful, but they indicate unnecessary or unreachable logic that likely represents an authoring mistake.
+
+All five diagnostics use the shared assessment model: the proof engine classifies the outcome (proven contradiction, proven vacuity, proven dead, proven tautological), and the diagnostic message is a rendering of the structured assessment. The message template includes `{message}` which carries the engine's natural-language explanation of the proof, including attribution to the contributing constraints and rules.
+
+These diagnostics currently analyze simple single-field comparisons (`Field <op> Literal`). Cross-field and complex expressions are unanalyzed — the engine conservatively skips what it cannot prove.
+
+---
+
+## Conditional Expressions (Locked)
+
+Conditional expressions select between two values based on a boolean condition.
+
+### Syntax
+
+```
+if <condition> then <value> else <value>
+```
+
+All three keywords (`if`, `then`, `else`) are required. There is no short-form ternary (`? :`), no statement-level `if`, and no short-circuit evaluation — both branches are type-checked at compile time, and exactly one is evaluated at runtime.
+
+### Semantics
+
+A conditional expression is a **pure value expression**. It produces a single value and is valid in any expression position: `set` RHS, `rule`, `ensure`, and `when` guard. It is not a control-flow statement — it does not skip or apply declarations.
+
+### Type rules
+
+- The **condition** must be a non-nullable `boolean`. Non-boolean conditions (numbers, strings) emit **C78**. Nullable booleans also emit C78 — narrow with an explicit comparison first.
+- Both **branches** must resolve to compatible scalar base types. Integer widens to number or decimal (lossless subset), so `if Flag then abs(X) else 0` is valid when X is `number`. Incompatible types (e.g., `string` vs `number`, or `number` vs `decimal`) emit **C79**.
+- The result type is the wider of the two branch types. If either branch is nullable, the result is nullable.
+
+### `when` vs `if` — the teaching model
+
+`when` and `if` serve fundamentally different roles in Precept:
+
+| | `when` | `if` |
+|---|---|---|
+| **Kind** | Structural guard | Value expression |
+| **Effect** | Applies or skips an entire declaration (row, rule, ensure, edit block) | Selects between two values within an expression |
+| **Position** | After `from...on`, on `rule`, `ensure`, `edit` declarations | Inside any expression position |
+| **Branching** | Multiple rows with different `when` guards → first-match routing | Single expression with two branches → one value produced |
+
+`when` answers: *does this rule apply?* `if` answers: *which value do I use?*
+
+### Null-narrowing
+
+When the condition is a null check (`field != null`), the field is narrowed to non-nullable in the `then` branch. The `else` branch retains the original nullable type.
+
+```precept
+# Name is string nullable — narrowed to string in then-branch
+set Display = if Name != null then Name else "anonymous"
+```
+
+### Nesting
+
+Conditional expressions nest via parentheses. Without parentheses, the `else` branch greedily consumes the next `if`:
+
+```precept
+# Nested conditional — explicit parentheses for clarity
+set X = if A then (if B then 1 else 2) else 3
+
+# Chained else-if — greedy else binding
+set Note = if Score >= 90 then "excellent" else if Score >= 70 then "good" else "needs work"
+```
+
+### Diagnostic codes
+
+| Code | Condition | Message |
+|---|---|---|
+| C78 | Condition is not a non-nullable boolean | `Conditional expression condition must be a non-nullable boolean, but got {actual}.` |
+| C79 | Branch types incompatible | `Conditional expression branches produce incompatible types: {thenType} and {elseType}. {hint}` For numeric kinds: integer widens to both number and decimal, but number and decimal do not unify with each other. |
+
+### Examples
+
+```precept
+# Conditional in set assignment
+from Decision on ExtendOffer when FeedbackCount >= 2
+    -> set OfferAmount = ExtendOffer.Amount
+    -> set FinalNote = if FeedbackCount >= 3 then "Strong Hire" else "Standard Hire"
+    -> transition OfferExtended
+
+# Conditional in rule
+rule ApprovedAmount <= (if FraudFlag then ClaimAmount / 2 else ClaimAmount) because "Fraud-flagged claims capped at half"
+
+# Null-narrowing with conditional
+set DecisionNote = if Approve.Note != null then Approve.Note else "Auto-approved"
+
+# Nested conditional (chained else-if)
+set Tier = if CreditScore >= 750 then "prime" else if CreditScore >= 680 then "standard" else "subprime"
+```
+
+### Explicit exclusions
+
+- **No ternary syntax** — `condition ? value : value` is not supported. The keyword form `if...then...else` is deliberate per Principle #13 (keywords for domain, symbols for math).
+- **No statement-level `if`** — `if` does not control declaration applicability. Use `when` guards for structural branching. The parser detects `if` at statement level and emits a redirect message pointing to `when`.
+- **No short-circuit evaluation** — both branches are type-checked at compile time. At runtime, only the selected branch is evaluated.
+- **No implicit boolean coercion** — numbers and strings are not truthy/falsy. The condition must be explicitly boolean.
 
 ---
 
@@ -940,7 +1298,7 @@ from <StateTarget> on <EventName> [when <BoolExpr>] [-> <Action>]* -> <Outcome>
 - `from Open, InProgress on Close -> transition Closed`
 - `from any on Prioritize -> set Priority = Prioritize.Level -> no transition`
 
-Same expansion as state asserts — one row per state internally.
+Same expansion as state ensures — one row per state internally.
 
 ### First-match evaluation
 
@@ -1009,7 +1367,7 @@ Actions execute left-to-right with read-your-writes — each action sees the res
 - `when` guards: fields + event args (dotted form only: `EventName.ArgName`)
 - `set` / mutation RHS: fields + event args (dotted form only: `EventName.ArgName`)
 - Bare arg names (e.g., `reason` instead of `Cancel.reason`) are **not valid** in transition rows — they could collide with field names and are ambiguous when multiple events share arg names.
-- Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only and no collision is possible.
+- Bare arg names are valid only inside event ensures (`on <Event> ensure`), where scope is arg-only and no collision is possible.
 - Narrowing applies to the exact symbol form used. In transition guards, `when Cancel.reason != null` narrows the dotted key `Cancel.reason`; no cross-form mirroring is needed.
 - Cross-event arg references are invalid: a row for `on EventA` cannot reference `EventB.Arg`.
 
@@ -1017,14 +1375,14 @@ Actions execute left-to-right with read-your-writes — each action sees the res
 
 When a transition row matches:
 
-1. **Event asserts** (`on <Event> assert`) — arg-only, pre-transition. If false → `Rejected`.
+1. **Event ensures** (`on <Event> ensure`) — arg-only, pre-transition. If false → `Rejected`.
 2. **`when` guard** — if false, skip this row and try next.
 3. **Exit actions** (`from <SourceState> ->`) — automatic mutations on leaving source state.
 4. **Row mutations** (`-> set ...`, `-> add ...`, etc.) — the row's own pipeline.
 5. **Entry actions** (`to <TargetState> ->`) — automatic mutations on entering target state.
-6. **Validation** — invariants, state asserts (`in`/`to`/`from`), field rules. Collect-all. If any fail → full rollback, `ConstraintFailure` (see `ConstraintViolationDesign.md` for the `Rejected` vs `ConstraintFailure` distinction — `Rejected` is reserved for author-explicit `reject` outcomes and event assert failures).
+6. **Validation** — rules, state ensures (`in`/`to`/`from`), field rules. Collect-all. If any fail → full rollback, `ConstraintFailure` (see `ConstraintViolationDesign.md` for the `Rejected` vs `ConstraintFailure` distinction — `Rejected` is reserved for author-explicit `reject` outcomes and event ensure failures).
 
-For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` asserts still run (the resulting state is the current state).
+For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` ensures still run (the resulting state is the current state).
 
 ### Compile-time checks
 
@@ -1032,7 +1390,7 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` a
 |---|---|---|---|
 | Unreachable row | A row follows an unguarded row for the same `(state, event)` | Error | C25 |
 | Identical-guard duplicate | A row has the same guard as a prior row for the same `(state, event)` | Error | C47 |
-| Non-boolean rule position | `when` guard, `invariant`, or `assert` expression does not produce a boolean | Error | C46 |
+| Non-boolean rule position | `when` guard, `rule`, or `ensure` expression does not produce a boolean | Error | C46 |
 | Missing outcome | Row has no outcome (`transition`, `no transition`, or `reject`) | Error | C10 |
 | Unknown state/event | `from` references undeclared state; `transition` references undeclared state | Error | C54 |
 | Unknown field | `set` targets undeclared field; mutation targets non-collection field | Error | — |
@@ -1043,7 +1401,7 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` a
 | Event never succeeds | Event has rows but every reachable state either has no rows or all rows reject for that event | Warning | C52 |
 | Empty precept | Precept declares no events | Hint | C53 |
 
-Checks C48–C53 are graph-level structural analysis, evaluated after parsing succeeds as part of structured compile validation. They do not block compilation unless an error-severity diagnostic is also present — they are advisory diagnostics that surface structural quality issues in the VS Code Problems panel and in MCP tool output. See Phase I in `PreceptLanguageImplementationPlan.md` for implementation details.
+Checks C48–C53 are graph-level structural analysis, evaluated after parsing succeeds as part of structured compile validation. They do not block compilation unless an error-severity diagnostic is also present — they are advisory diagnostics that surface structural quality issues in the VS Code Problems panel and in MCP tool output. See Phase I in `archive/PreceptLanguageImplementationPlan.md` for implementation details.
 
 No catch-all row is required — if all guarded rows fail, the result is `Unmatched`.
 
@@ -1053,8 +1411,8 @@ All diagnostics follow a three-tier severity model:
 
 | Severity | Meaning | Examples |
 |---|---|---|
-| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes |
-| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49) |
+| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes, literal zero divisor (C92), unproven divisor (C93), assignment constraint violation (C94), contradictory rules (C95) |
+| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49), vacuous rules (C96), dead guards (C97), tautological guards (C98) |
 | **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states (C50), empty precept (C53) |
 
 The rule: if the checker can **prove** it, it’s an **error**. If the analyzer can **observe** a structural concern, it’s a **warning** or **hint**. The checker never guesses — uncertain cases are left to the inspector.
@@ -1064,7 +1422,7 @@ The rule: if the checker can **prove** it, it’s an **error**. If the analyzer 
 Compile-time validation is fully structured:
 
 1. Parse text into a `PreceptDefinition` plus parse diagnostics.
-2. Run shared compile validation, which collects type diagnostics, compile-time default-data/assert diagnostics, and graph diagnostics in one pass.
+2. Run shared compile validation, which collects type diagnostics, compile-time default-data/ensure diagnostics, and graph diagnostics in one pass.
 3. Only construct `PreceptEngine` when no error-severity diagnostics exist.
 
 Expected author mistakes are reported as diagnostics, not as exception-driven control flow. `Compile()` may still throw as a convenience wrapper, but tooling surfaces (`CompileFromText`, language server, MCP) consume structured diagnostics directly.
@@ -1120,21 +1478,21 @@ field Balance as number default 0
 field Email as string nullable
 field Items as set of string default []
 
-invariant Balance >= 0 because "Balance cannot go negative"
+rule Balance >= 0 because "Balance cannot go negative"
 
 state Draft initial
 state Submitted
 state Canceled
 
-from Draft assert Email != null because "Must provide email before submitting"
-to Submitted assert Items.count > 0 because "Must have items to submit"
-in Submitted assert Email != null because "Email must remain set while submitted"
+from Draft ensure Email != null because "Must provide email before submitting"
+to Submitted ensure Items.count > 0 because "Must have items to submit"
+in Submitted ensure Email != null because "Email must remain set while submitted"
 
 event SubmitOrder with items as set of string, paymentToken as string nullable
-on SubmitOrder assert items.count > 0 and paymentToken != null because "Order must include items and payment"
+on SubmitOrder ensure items.count > 0 and paymentToken != null because "Order must include items and payment"
 
 event Cancel with reason as string
-on Cancel assert reason != "" because "Cancel requires a reason"
+on Cancel ensure reason != "" because "Cancel requires a reason"
 
 from Draft on SubmitOrder
     -> set Items = SubmitOrder.items
@@ -1177,23 +1535,23 @@ This matches the broader design direction of explicit null handling and determin
 
 | Expression position | Expected type | Symbol scope |
 |---|---|---|
-| `when` guard | boolean | data fields + event args + collection accessors |
-| `set` assignment RHS | target field type | data fields + event args + collection accessors (narrowed by prior `when`) |
-| `add`/`remove`/`push`/`enqueue` value | collection inner type | data fields + event args + collection accessors |
+| `when` guard | boolean | data fields + event args + collection accessors + string `.length` |
+| `set` assignment RHS | target field type | data fields + event args + collection accessors + string `.length` (narrowed by prior `when`) |
+| `add`/`remove`/`push`/`enqueue` value | collection inner type | data fields + event args + collection accessors + string `.length` |
 | `dequeue`/`pop into` target | collection inner type assignable to target field | data fields only |
-| `invariant` expression | boolean | data fields + collection accessors |
-| `in`/`to`/`from` state assert | boolean | data fields + collection accessors |
-| `on` event assert | boolean | event args only |
-| State action `set`/mutations | same as transition rows | data fields + collection accessors (no event args) |
+| `rule` expression | boolean | data fields + collection accessors + string `.length` |
+| `in`/`to`/`from` state ensure | boolean | data fields + collection accessors + string `.length` |
+| `on` event ensure | boolean | event args only |
+| State action `set`/mutations | same as transition rows | data fields + collection accessors + string `.length` (no event args) |
 
 ### Null-flow narrowing
 
-Nullable fields (`string nullable`, `number nullable`) carry a `T|null` union kind. Assigning a nullable value to a non-nullable target is a type error unless the value has been narrowed.
+Nullable fields (`string nullable`, `number nullable`) carry a `T|null` union kind. Assigning a nullable value to a non-nullable target is a type error unless the value has been narrowed. Accessing `.length` on a nullable string without narrowing is also a type error (C56).
 
 Narrowing sources:
 - **`when` guard:** `when Field != null` narrows `Field` from `T|null` to `T` for the row's action scope.
 - **Cross-row negation:** An unguarded row following a `when Field != null` row inherits the negation — `Field` remains `T|null`.
-- **State assert propagation:** `in State assert Field != null` narrows `Field` to `T` for all `from State on ...` transition rows and `to`/`from State -> ...` state actions.
+- **State ensure propagation:** `in State ensure Field != null` narrows `Field` to `T` for all `from State on ...` transition rows and `to`/`from State -> ...` state actions.
 
 ### Equality and null-comparison policy (Locked)
 
@@ -1231,7 +1589,7 @@ Runtime semantics must match the compile-time rule:
 
 ### `from any` expansion
 
-Type checking for `from any` rows expands to per-state checking. Each state may have different assert-derived narrowings, so a row that type-checks in one state may fail in another. Diagnostics report the specific state that has the problem.
+Type checking for `from any` rows expands to per-state checking. Each state may have different ensure-derived narrowings, so a row that type-checks in one state may fail in another. Diagnostics report the specific state that has the problem.
 
 ### Constraint codes
 
@@ -1243,6 +1601,10 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C41 / PRECEPT041 | Binary operator type error (includes `contains` RHS mismatch) |
 | C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
+| C60 / PRECEPT060 | Narrowing assignment: `number` or `decimal` cannot be implicitly narrowed to `integer`. Use `floor()`, `ceil()`, `truncate()`, or `round()` to produce an integer value. (`round(value)` returns `integer` for all numeric input types.) |
+| C69 / PRECEPT069 | Cross-scope guard reference in `when` clause |
+| C78 / PRECEPT078 | Conditional expression condition must be a non-nullable boolean |
+| C79 / PRECEPT079 | Conditional expression branches produce incompatible types. For numeric mismatches: explains that integer widens to both number and decimal, but number and decimal do not unify. |
 
 ### Design principle
 
@@ -1258,9 +1620,9 @@ The current type-checking surface is intentionally conservative and already comp
 
 | Area | Current behavior | Likely direction |
 |---|---|---|
-| Event-arg scope and narrowing (Locked) | Transition rows require dotted form (`Event.Arg`); event asserts use bare arg names. Narrowing applies to exact symbol form. | No design change needed — enforce dotted-only in transition row symbol tables and add tests |
-| Event-assert scope isolation (Locked) | Event asserts are arg-only; field references are a compile-time error (C14/C15/C16) | No change needed — arg+state validation belongs in `when` guards, not event asserts |
-| Boolean-only rule positions | `when`, `assert`, and `invariant` are expected to produce boolean | Continue hardening so every non-boolean rule position is rejected uniformly |
+| Event-arg scope and narrowing (Locked) | Transition rows require dotted form (`Event.Arg`); event ensures use bare arg names. Narrowing applies to exact symbol form. | No design change needed — enforce dotted-only in transition row symbol tables and add tests |
+| Event-ensure scope isolation (Locked) | Event ensures are arg-only; field references are a compile-time error (C14/C15/C16) | No change needed — arg+state validation belongs in `when` guards, not event ensures |
+| Boolean-only rule positions | `when`, `ensure`, and `rule` are expected to produce boolean | Continue hardening so every non-boolean rule position is rejected uniformly |
 | Collection mutation contracts (Locked) | Inner-type and `into` checks exist; nullable values require explicit narrowing | No change needed — existing C42 null-flow violation enforces this consistently across all collection verbs |
 | Provable impossible conditions (Locked) | Type and null-flow reasoning catches non-nullable null comparisons and post-narrowing contradictions; identical-guard duplicate rows are detectable | No cross-field or arithmetic reasoning. Inspector handles data-dependent impossibility. Add identical-guard duplicate detection as a compile-time error. |
 
@@ -1278,15 +1640,15 @@ Overload an existing code when the new condition is the same conceptual error ca
 
 Locked in this discussion:
 - Sectionless flat-statement design: all statements are keyword-anchored, no section headers. The recommended ordering (fields → states → events → transitions) is a convention enforced by language server IntelliSense prioritization, not by grammar.
-- `invariant` = static data truth (fields); checked post-commit, always
-- `assert` = movement truth (states + events); checked when something happens
-  - `in <State> assert` — state-scoped field invariant; entry **and** NoTransition
-  - `to <State> assert` — entry gate; only on cross-state entry
-  - `from <State> assert` — exit gate; only on cross-state exit
-  - `on <Event> assert` — event-fire constraint, arg-only
+- `rule` = static data truth (fields); checked post-commit, always
+- `ensure` = movement truth (states + events); checked when something happens
+  - `in <State> ensure` — state-scoped field rule; entry **and** NoTransition
+  - `to <State> ensure` — entry gate; only on cross-state entry
+  - `from <State> ensure` — exit gate; only on cross-state exit
+  - `on <Event> ensure` — event-fire constraint, arg-only
 - State entry/exit actions: `to <State> -> <actions>`, `from <State> -> <actions>`; fields-scoped, no outcomes, no `in` actions
-- All state asserts/actions evaluate against the proposed world (post-mutation, pre-commit); fields-scoped
-- Multi-state and `any` for state asserts, state actions, and transition rows; not for event asserts
+- All state ensures/actions evaluate against the proposed world (post-mutation, pre-commit); fields-scoped
+- Multi-state and `any` for state ensures, state actions, and transition rows; not for event ensures
 - `in X` strictly subsumes `to X`; duplicate = compile-time error
 - Cross-checking `in`/`to` vs `from` on same state for contradictions via per-field domain analysis; provably unexitable state = compile-time error
 - Event declarations use `with` instead of parentheses: `event Submit with items as set of string`
@@ -1296,16 +1658,19 @@ Locked in this discussion:
 - `->` pipeline: sequential, read-your-writes, separates context from actions
 - First-match evaluation for multiple rows on same `(state, event)`; no catch-all required
 - `when` = applicability precondition → `Unmatched` if no row matches
-- Execution order: event asserts → when guard → exit actions → row mutations → entry actions → validation
+- Execution order: event ensures → when guard → exit actions → row mutations → entry actions → validation
 - Coverage warning (not error) for reachable `(state, event)` pairs without transition rows
 - Unreachable row after unguarded row = compile-time error
-- Editable field declarations: `in <StateTarget> edit <FieldList>` — flat comma-separated syntax, `in` preposition (consistent with "while residing in"), additive across declarations, `any` support. Syntax and model included in language redesign; runtime `Update` API deferred (see `docs/EditableFieldsDesign.md`).
+- Editable field declarations: stateful form `in <StateTarget> [when <Guard>] edit <FieldList>` and stateless root form `edit <FieldList> [when <Guard>]` / `edit all [when <Guard>]` — flat comma-separated syntax, additive across declarations, `any` support for stateful forms, runtime `Update`/`Inspect` integration implemented.
 - Collection mutation nullability: `add`/`enqueue`/`push`/`remove` with a `T|null` value into a non-nullable collection require prior narrowing. The shared type checker enforces this via C42 (null-flow violation). Guard narrowing (`when Value != null`) and cross-branch narrowing (prior row handles null case) both satisfy the requirement.
-- Event-arg reference form: transition rows (guards, set RHS, mutation values) require the dotted form (`EventName.ArgName`). Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only. Narrowing applies to the exact symbol form used — no cross-form mirroring. Cross-event arg references (`EventB.Arg` in a row for `EventA`) are invalid.
-- Event-assert scope: permanently arg-only. Field references in event asserts are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event asserts.
+- Event-arg reference form: transition rows (guards, set RHS, mutation values) require the dotted form (`EventName.ArgName`). Bare arg names are valid only inside event ensures (`on <Event> ensure`), where scope is arg-only. Narrowing applies to the exact symbol form used — no cross-form mirroring. Cross-event arg references (`EventB.Arg` in a row for `EventA`) are invalid.
+- Event-ensure scope: permanently arg-only. Field references in event ensures are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event ensures.
+- `when` guards on declarations: `rule <Expr> when <Guard> because "..."`, `in <State> ensure <Expr> when <Guard> because "..."`, `on <Event> ensure <Expr> when <Guard> because "..."`, `in <State> when <Guard> edit <Fields>`. Guard scope is inherited from declaration form. Collect-all semantics preserved. C69 for cross-scope references. Guarded state ensures excluded from unconditional null-narrowing.
 - Static impossibility boundary: the compile-time checker proves contradictions only from type information and null-flow narrowing (single-symbol, local reasoning). Additionally, identical-guard duplicate rows for the same `(state, event)` are a compile-time error. No cross-field arithmetic reasoning — the inspector handles data-dependent impossibility.
 - Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
 - Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C45 are stable and will not be split. New codes start at C46.
+- Conditional expressions: `if <condition> then <value> else <value>` — pure value expressions valid in set RHS, rule, ensure, and guard positions. Both branches type-checked; condition must be non-nullable boolean (C78). Branches must produce compatible scalar types with integer widening (C79). Null-narrowing applies in then-branch when condition is a null check. No ternary syntax, no statement-level `if`, no short-circuit evaluation.
+- Computed (derived) fields: `field <Name> as <Type> -> <Expression>` — bare `->` signals derivation (Principle 11). Mutually exclusive with `default` (C80) and `nullable` (C81). Multi-name declarations rejected (C82). Expression scope: fields and `.count` only — no event arguments (C84), no nullable field references (C83), no unsafe collection accessors (C85). Dependency ordering via topological sort; circular dependencies are compile errors (C86). Read-only: excluded from `edit` (C87) and `set` (C88). Recomputed after all mutations, before constraint evaluation in Fire, Update, and Inspect. External input rejected (Terraform model). Type-appropriate field constraints allowed after the expression.
 
 Not yet locked:
 - Full EBNF and tokenization rules
