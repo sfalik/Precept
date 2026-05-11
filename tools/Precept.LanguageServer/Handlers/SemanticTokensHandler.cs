@@ -117,11 +117,12 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         return ProjectLexicalTokens(compilation)
             .Select(static token => (Token: token, OverlayOrder: 0))
             .Concat(ProjectIdentifierTokens(compilation.Semantics).Select(static token => (Token: token, OverlayOrder: 1)))
+            .Where(static entry => entry.Token.Line >= 0 && entry.Token.Character >= 0 && entry.Token.Length > 0)
             .OrderBy(static entry => entry.Token.Line)
             .ThenBy(static entry => entry.Token.Character)
             .ThenBy(static entry => entry.Token.Length)
             .ThenBy(static entry => entry.OverlayOrder)
-            .GroupBy(static entry => (entry.Token.Line, entry.Token.Character, entry.Token.Length))
+            .GroupBy(static entry => (entry.Token.Line, entry.Token.Character))
             .Select(static group => group.Last().Token)
             .ToImmutableArray();
     }

@@ -64,11 +64,17 @@ public sealed record OutcomeSlot(ParsedOutcome Outcome, SourceSpan Span)
 
 /// <summary>State name or quantifier (any).</summary>
 public sealed record StateTargetSlot(string? StateName, SourceSpan Span)
-    : SlotValue(ConstructSlotKind.StateTarget, Span);
+    : SlotValue(ConstructSlotKind.StateTarget, Span)
+{
+    public SourceSpan NameSpan { get; init; } = Span;
+}
 
 /// <summary>Event name (or "initial" marker).</summary>
 public sealed record EventTargetSlot(string? EventName, SourceSpan Span)
-    : SlotValue(ConstructSlotKind.EventTarget, Span);
+    : SlotValue(ConstructSlotKind.EventTarget, Span)
+{
+    public SourceSpan NameSpan { get; init; } = Span;
+}
 
 /// <summary>"ensure expression because message" clause.</summary>
 public sealed record EnsureClauseSlot(ParsedExpression Expression, SourceSpan Span)
@@ -84,7 +90,10 @@ public sealed record AccessModeSlot(TokenKind AccessMode, SourceSpan Span)
 
 /// <summary>Field name or "all".</summary>
 public sealed record FieldTargetSlot(string? FieldName, SourceSpan Span)
-    : SlotValue(ConstructSlotKind.FieldTarget, Span);
+    : SlotValue(ConstructSlotKind.FieldTarget, Span)
+{
+    public SourceSpan NameSpan { get; init; } = Span;
+}
 
 /// <summary>The rule's boolean expression (e.g. amount > 0).</summary>
 public sealed record RuleExpressionSlot(ParsedExpression Expression, SourceSpan Span)

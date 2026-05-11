@@ -13,6 +13,7 @@
 - Versioned document updates must reject stale recompiles while preserving the unversioned fallback path for clients that omit version data.
 - Modifier completions should derive from `ValueModifierMeta.ApplicableTo` and declaration-site legality so the completion surface stays catalog-truthful.
 - Visible editor-color drift can come from VS Code fallback/theme ordering even when catalog metadata and semantic tokens are already correct.
+- Transition outcomes and comma-separated field-target slots need their own identifier spans; reusing container spans produces overlapping state/field semantic tokens even after arg-span fixes land.
 
 ## Historical Summary
 
@@ -21,6 +22,11 @@
 - The canonical decision ledger in `.squad/decisions.md` carries the batch-level detail; this history keeps only the durable tooling baseline and newest live updates.
 
 ## Recent Updates
+
+### 2026-05-11T02:20:00Z — Live sample overlaps traced to transition and field-target container spans
+- The remaining `semanticTokens/full/delta` crash path was not event-arg spans anymore: `TypedArg.Span` and qualified arg refs were already name-precise, but transition outcomes still published `-> transition State` container spans and access-mode / omit field targets still published whole comma-list spans.
+- Durable tooling rule: any semantic reference site that can include protocol punctuation or sibling identifiers needs a dedicated identifier span (`NameSpan` / `StateSpan`), and `ProjectMergedTokens` must still filter invalid coordinates and deduplicate by start position as a safety rail.
+- Validation closed green at 165/165 language-server tests, a successful language-server build, and zero merged-token overlaps in both `loan-application.precept` and `building-access-badge-request.precept`.
 
 ### 2026-05-11T01:38:51Z — Span precision and semantic-token crash fixes closed together
 - The parser/binder span pass is now durable: declaration diagnostics and tooling name sites should anchor to per-name identifier spans, with parser end spans driven by the last significant consumed token rather than trailing trivia.

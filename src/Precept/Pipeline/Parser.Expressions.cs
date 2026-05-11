@@ -669,7 +669,10 @@ public static partial class Parser
             {
                 Advance();
                 var span = SourceSpan.Covering(arrowToken.Span, token.Span);
-                return new TransitionOutcome(token.Text, span);
+                return new TransitionOutcome(token.Text, span)
+                {
+                    StateSpan = token.Span,
+                };
             }
             // Missing state name — malformed
             _diagnostics.Add(Language.Diagnostics.Create(

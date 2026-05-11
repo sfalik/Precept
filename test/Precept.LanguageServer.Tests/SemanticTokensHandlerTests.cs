@@ -2,6 +2,7 @@ global using OmniSharp.Extensions.LanguageServer.Protocol;
 global using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -185,6 +186,97 @@ public sealed class SemanticTokensHandlerTests
     }
 
     [Fact]
+    public void IdentifierTokens_TransitionOutcomeStateReference_UseStateIdentifierSpan()
+    {
+        var compilation = Compiler.Compile("""
+            precept LoanWorkflow
+            state Draft initial
+            state Approved
+            event Submit
+            from Draft on Submit
+                -> transition Approved
+            """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.State).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var stateReference = compilation.Semantics.StateReferences.Single(reference =>
+            reference.State.Name == "Approved"
+            && reference.Site.StartLine == 6);
+
+        stateReference.Site.StartColumn.Should().Be(19);
+        stateReference.Site.Length.Should().Be("Approved".Length);
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == stateReference.Site.StartLine - 1
+                && token.Character == stateReference.Site.StartColumn - 1
+                && token.Length == stateReference.Site.Length
+                && token.TokenType == expected);
+    }
+
+    [Fact]
+    public void IdentifierTokens_FieldTargetList_UseFirstFieldIdentifierSpan()
+    {
+        var compilation = Compiler.Compile("""
+            precept BadgeRequest
+            field EmployeeName as string optional
+            field Department as string optional
+            state Draft initial
+            in Draft modify EmployeeName, Department editable
+            """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType;
+
+        compilation.HasErrors.Should().BeFalse();
+
+        var fieldReference = compilation.Semantics.FieldReferences.Single(reference =>
+            reference.Field.Name == "EmployeeName"
+            && reference.Site.StartLine == 5);
+
+        fieldReference.Site.StartColumn.Should().Be(17);
+        fieldReference.Site.Length.Should().Be("EmployeeName".Length);
+        SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
+            .Should()
+            .Contain(token =>
+                token.Line == fieldReference.Site.StartLine - 1
+                && token.Character == fieldReference.Site.StartColumn - 1
+                && token.Length == fieldReference.Site.Length
+                && token.TokenType == expected);
+    }
+
+    [Fact]
+    public void MergedTokens_LoanApplicationSample_AreStrictlyOrdered()
+    {
+        var compilation = Compiler.Compile(ReadSample("loan-application.precept"));
+
+        compilation.HasErrors.Should().BeFalse();
+
+        AssertMergedTokensAreStrictlyOrdered(compilation);
+    }
+
+    [Fact]
+    public void MergedTokens_BuildingAccessBadgeRequestSample_AreStrictlyOrdered()
+    {
+        var compilation = Compiler.Compile(ReadSample("building-access-badge-request.precept"));
+
+        compilation.HasErrors.Should().BeFalse();
+
+        AssertMergedTokensAreStrictlyOrdered(compilation);
+    }
+
+    [Fact]
+    public void SemanticTokensDelta_LoanApplicationSample_DoesNotThrow()
+    {
+        var before = Compiler.Compile(ReadSample("loan-application.precept"));
+        var after = Compiler.Compile(ReadSample("loan-application.precept").Replace("UnderReview", "ManualReview"));
+
+        before.HasErrors.Should().BeFalse();
+        after.HasErrors.Should().BeFalse();
+
+        AssertSemanticTokensDeltaDoesNotThrow(before, after, @"C:\\loan-application.precept");
+    }
+
+    [Fact]
     public void MergedTokens_QualifiedEventArgReference_AreStrictlyOrdered()
     {
         var compilation = Compiler.Compile("""
@@ -201,23 +293,7 @@ public sealed class SemanticTokensHandlerTests
 
         compilation.HasErrors.Should().BeFalse();
 
-        var merged = SemanticTokensHandler.ProjectMergedTokens(compilation)
-            .Where(token => token.Line == 5 || token.Line == 6)
-            .ToArray();
-
-        for (var i = 1; i < merged.Length; i++)
-        {
-            var previous = merged[i - 1];
-            var current = merged[i];
-
-            (current.Line > previous.Line || current.Character >= previous.Character).Should().BeTrue();
-
-            if (current.Line == previous.Line)
-            {
-                current.Character.Should().BeGreaterThanOrEqualTo(previous.Character + previous.Length,
-                    because: "semantic tokens on one line must not overlap");
-            }
-        }
+        AssertMergedTokensAreStrictlyOrdered(compilation);
     }
 
     [Fact]
@@ -245,24 +321,10 @@ public sealed class SemanticTokensHandlerTests
                 -> set CurrentParty = GuestName
                 -> transition Joined
             """);
-        var document = new SemanticTokensDocument(SemanticTokensHandler.BuildLegend());
-
         before.HasErrors.Should().BeFalse();
         after.HasErrors.Should().BeFalse();
 
-        CommitSemanticTokens(document.Create(), before);
-        var full = document.GetSemanticTokens();
-        full.ResultId.Should().NotBeNull();
-
-        CommitSemanticTokens(document.Edit(new SemanticTokensDeltaParams
-        {
-            PreviousResultId = full.ResultId!,
-            TextDocument = new TextDocumentIdentifier(DocumentUri.FromFileSystemPath(@"C:\\semantic-tokens-test.precept")),
-        }), after);
-
-        var act = () => document.GetSemanticTokensEdits();
-
-        act.Should().NotThrow();
+        AssertSemanticTokensDeltaDoesNotThrow(before, after, @"C:\\semantic-tokens-test.precept");
     }
 
     [Fact]
@@ -498,6 +560,51 @@ public sealed class SemanticTokensHandlerTests
             .Select(entry => (entry.TokenType, entry.HexColor, entry.Bold, entry.Italic))
             .Should()
             .Equal(SemanticTokenTypes.All.Select(meta => (meta.CustomType, meta.ForegroundHex, meta.Bold, meta.Italic)));
+    }
+
+    private static string SamplesRoot =>
+        Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples"));
+
+    private static string ReadSample(string fileName) =>
+        File.ReadAllText(Path.Combine(SamplesRoot, fileName));
+
+    private static void AssertMergedTokensAreStrictlyOrdered(Compilation compilation)
+    {
+        var merged = SemanticTokensHandler.ProjectMergedTokens(compilation).ToArray();
+
+        for (var i = 1; i < merged.Length; i++)
+        {
+            var previous = merged[i - 1];
+            var current = merged[i];
+
+            (current.Line > previous.Line || current.Character >= previous.Character).Should().BeTrue();
+
+            if (current.Line == previous.Line)
+            {
+                current.Character.Should().BeGreaterThanOrEqualTo(previous.Character + previous.Length,
+                    because: "semantic tokens on one line must not overlap");
+            }
+        }
+    }
+
+    private static void AssertSemanticTokensDeltaDoesNotThrow(Compilation before, Compilation after, string path)
+    {
+        var document = new SemanticTokensDocument(SemanticTokensHandler.BuildLegend());
+
+        CommitSemanticTokens(document.Create(), before);
+        var full = document.GetSemanticTokens();
+        full.ResultId.Should().NotBeNull();
+
+        CommitSemanticTokens(document.Edit(new SemanticTokensDeltaParams
+        {
+            PreviousResultId = full.ResultId!,
+            TextDocument = new TextDocumentIdentifier(DocumentUri.FromFileSystemPath(path)),
+        }), after);
+
+        var act = () => document.GetSemanticTokensEdits();
+
+        act.Should().NotThrow();
     }
 
     private static void CommitSemanticTokens(SemanticTokensBuilder builder, Compilation compilation)

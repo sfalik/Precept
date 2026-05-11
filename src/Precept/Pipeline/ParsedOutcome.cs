@@ -9,7 +9,10 @@ public abstract record ParsedOutcome(SourceSpan Span);
 
 /// <summary>Transition to a named target state: -> transition StateName</summary>
 public sealed record TransitionOutcome(string StateName, SourceSpan Span)
-    : ParsedOutcome(Span);
+    : ParsedOutcome(Span)
+{
+    public SourceSpan StateSpan { get; init; } = Span;
+}
 
 /// <summary>Explicit no-transition: -> no transition</summary>
 public sealed record NoTransitionOutcome(SourceSpan Span)

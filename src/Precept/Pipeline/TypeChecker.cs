@@ -613,12 +613,12 @@ internal static partial class TypeChecker
                     else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
                     {
                         anchorState = typedState.Name;
-                        ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
+                        ctx.StateReferences.Add(new StateReference(typedState, stateSlot.NameSpan));
                     }
                     else
                     {
                         ctx.Diagnostics.Add(
-                            Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.Span, stateSlot.StateName));
+                            Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.NameSpan, stateSlot.StateName));
                     }
                 }
 
@@ -665,13 +665,13 @@ internal static partial class TypeChecker
                     {
                         anchorEvent = evTyped.Name;
                         resolvedEvent = evTyped;
-                        ctx.EventReferences.Add(new EventReference(evTyped, eventSlot.Span));
+                        ctx.EventReferences.Add(new EventReference(evTyped, eventSlot.NameSpan));
                     }
                     else
                     {
                         anchorEvent = eventSlot.EventName;
                         ctx.Diagnostics.Add(
-                            Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventSlot.Span, eventSlot.EventName));
+                            Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventSlot.NameSpan, eventSlot.EventName));
                     }
                 }
 
@@ -737,13 +737,13 @@ internal static partial class TypeChecker
                 else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
                 {
                     stateName = typedState.Name;
-                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
+                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.NameSpan));
                 }
                 else
                 {
                     stateName = stateSlot.StateName;
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.Span, stateSlot.StateName));
+                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.NameSpan, stateSlot.StateName));
                 }
             }
 
@@ -759,13 +759,13 @@ internal static partial class TypeChecker
                 else if (ctx.FieldLookup.TryGetValue(fieldSlot.FieldName, out var typedField))
                 {
                     fieldName = typedField.Name;
-                    ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.Span));
+                    ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.NameSpan));
                 }
                 else
                 {
                     fieldName = fieldSlot.FieldName;
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.UndeclaredField, fieldSlot.Span, fieldSlot.FieldName));
+                        Diagnostics.Create(DiagnosticCode.UndeclaredField, fieldSlot.NameSpan, fieldSlot.FieldName));
                 }
             }
 
@@ -825,13 +825,13 @@ internal static partial class TypeChecker
                 else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
                 {
                     stateName = typedState.Name;
-                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.Span));
+                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.NameSpan));
                 }
                 else
                 {
                     stateName = stateSlot.StateName;
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.Span, stateSlot.StateName));
+                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.NameSpan, stateSlot.StateName));
                 }
             }
 
@@ -894,7 +894,7 @@ internal static partial class TypeChecker
                 {
                     fields = [fieldName];
                     if (ctx.FieldLookup.TryGetValue(fieldName, out var typedField))
-                        ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.Span));
+                        ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.NameSpan));
                 }
             }
 
@@ -920,12 +920,12 @@ internal static partial class TypeChecker
             else if (ctx.StateLookup.TryGetValue(stateTargetSlot.StateName, out var fromTypedState))
             {
                 fromState = fromTypedState.Name;
-                ctx.StateReferences.Add(new StateReference(fromTypedState, stateTargetSlot.Span));
+                ctx.StateReferences.Add(new StateReference(fromTypedState, stateTargetSlot.NameSpan));
             }
             else
             {
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.UndeclaredState, stateTargetSlot.Span, stateTargetSlot.StateName));
+                    Diagnostics.Create(DiagnosticCode.UndeclaredState, stateTargetSlot.NameSpan, stateTargetSlot.StateName));
             }
         }
         // StateName == null or wildcard token text → any-state wildcard (D10): FromState stays null, no error
@@ -940,13 +940,13 @@ internal static partial class TypeChecker
             {
                 eventName = evTyped.Name;
                 resolvedEvent = evTyped;
-                ctx.EventReferences.Add(new EventReference(evTyped, eventTargetSlot.Span));
+                ctx.EventReferences.Add(new EventReference(evTyped, eventTargetSlot.NameSpan));
             }
             else
             {
                 eventName = eventTargetSlot.EventName;
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.Span, eventTargetSlot.EventName));
+                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.NameSpan, eventTargetSlot.EventName));
             }
         }
 
@@ -1003,12 +1003,12 @@ internal static partial class TypeChecker
                         if (ctx.StateLookup.TryGetValue(trans.StateName, out var toTypedState))
                         {
                             targetState = toTypedState.Name;
-                            ctx.StateReferences.Add(new StateReference(toTypedState, trans.Span));
+                            ctx.StateReferences.Add(new StateReference(toTypedState, trans.StateSpan));
                         }
                         else
                         {
                             ctx.Diagnostics.Add(
-                                Diagnostics.Create(DiagnosticCode.UndeclaredState, trans.Span, trans.StateName));
+                                Diagnostics.Create(DiagnosticCode.UndeclaredState, trans.StateSpan, trans.StateName));
                         }
                         break;
                     case NoTransitionOutcome:
@@ -1054,13 +1054,13 @@ internal static partial class TypeChecker
             {
                 eventName = evTyped.Name;
                 resolvedEvent = evTyped;
-                ctx.EventReferences.Add(new EventReference(evTyped, eventTargetSlot.Span));
+                ctx.EventReferences.Add(new EventReference(evTyped, eventTargetSlot.NameSpan));
             }
             else
             {
                 eventName = eventTargetSlot.EventName;
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.Span, eventTargetSlot.EventName));
+                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.NameSpan, eventTargetSlot.EventName));
             }
         }
 

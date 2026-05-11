@@ -872,7 +872,10 @@ public static partial class Parser
             if (current.Kind == TokenKind.Identifier || meta.IsStateWildcard)
             {
                 var tok = Advance();
-                return new StateTargetSlot(tok.Text, tok.Span);
+                return new StateTargetSlot(tok.Text, tok.Span)
+                {
+                    NameSpan = tok.Span,
+                };
             }
             if (!slot.IsRequired)
                 return MakeSentinel(slot);
@@ -888,7 +891,10 @@ public static partial class Parser
             if (Peek().Kind == TokenKind.Identifier)
             {
                 var tok = Advance();
-                return new EventTargetSlot(tok.Text, tok.Span);
+                return new EventTargetSlot(tok.Text, tok.Span)
+                {
+                    NameSpan = tok.Span,
+                };
             }
             if (!slot.IsRequired)
                 return MakeSentinel(slot);
@@ -922,7 +928,10 @@ public static partial class Parser
             if (meta.IsFieldBroadcast)
             {
                 var tok = Advance();
-                return new FieldTargetSlot(tok.Text, tok.Span);
+                return new FieldTargetSlot(tok.Text, tok.Span)
+                {
+                    NameSpan = tok.Span,
+                };
             }
 
             if (current.Kind == TokenKind.Identifier)
@@ -944,7 +953,10 @@ public static partial class Parser
                     break;
                 }
 
-                return new FieldTargetSlot(first.Text, SourceSpan.Covering(first.Span, lastSpan));
+                return new FieldTargetSlot(first.Text, SourceSpan.Covering(first.Span, lastSpan))
+                {
+                    NameSpan = first.Span,
+                };
             }
 
             if (!slot.IsRequired)

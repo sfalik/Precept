@@ -405,20 +405,20 @@ public static class NameBinder
             var stateTargetSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
             if (stateTargetSlot?.StateName is { } stateName)
             {
-                ResolveStateReference(stateName, stateTargetSlot.Span);
+                ResolveStateReference(stateName, stateTargetSlot.NameSpan);
             }
 
             // Resolve event target slots (the event name reference itself)
             if (eventTargetSlot?.EventName is { } eventRefName)
             {
-                ResolveEventReference(eventRefName, eventTargetSlot.Span);
+                ResolveEventReference(eventRefName, eventTargetSlot.NameSpan);
             }
 
             // Resolve field target slots (for access mode, omit declarations)
             var fieldTargetSlot = construct.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
             if (fieldTargetSlot?.FieldName is { } fieldName)
             {
-                ResolveFieldReference(fieldName, fieldTargetSlot.Span, null);
+                ResolveFieldReference(fieldName, fieldTargetSlot.NameSpan, null);
             }
 
             // Resolve expressions in various slots
@@ -428,7 +428,7 @@ public static class NameBinder
             var outcomeSlot = construct.GetSlot<OutcomeSlot>(ConstructSlotKind.Outcome);
             if (outcomeSlot?.Outcome is TransitionOutcome transition)
             {
-                ResolveStateReference(transition.StateName, transition.Span);
+                ResolveStateReference(transition.StateName, transition.StateSpan);
             }
         }
 
