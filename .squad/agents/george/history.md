@@ -7,6 +7,24 @@
 
 ## Learnings
 
+### 2026-05-11T09:32:39.453-04:00 — Pipeline audit fixes landed cleanly on feature/pipeline-audit-fixes
+
+- Added repo-root `Directory.Build.props` so the workspace defaults to a single Release-with-PDB build surface.
+- Eliminated every remaining `Debug.Assert` site in `src/Precept/` and converted D26/D5/mode-stack invariants to unconditional `InvalidOperationException` guards; the pipeline no longer has build-configuration-dependent safety nets.
+- Closed the D26 diagnostic gaps by emitting `TypeMismatch` before returning `TypedErrorExpression`/error-typed `TypedAction` from operator lookup failures plus the `Resolve()` / `ResolveAction()` defensive fallbacks.
+- `Fault.cs` already had the requested `ExpressionContext` and `InputValues` fields, so I verified the shape and added regression coverage instead of re-implementing it.
+- The fix-plan's GraphAnalyzer loop assumed `TypedEvent.Modifiers`, but the current semantic model exposes only `TypedEvent.IsInitial`; I derived the active event modifier set from that surface before dispatching through `EventModifierMeta.RequiredAnalysis`, which preserves the intended invariant without widening the typed-event model mid-fix.
+- Validation closed green with `dotnet build src/Precept/Precept.csproj -c Release` after each change group and a final `dotnet test test/Precept.Tests/ -c Release` run at 4,598 / 4,598 passing.
+
+### 2026-05-11T00:08:48-04:00 — Text qualifier axis: design drafted, implementation blocked
+
+- **System state found:** `QualifierAxis` has 9 members (None, Currency, Unit, Dimension, FromCurrency, ToCurrency, Timezone, TemporalDimension, TemporalUnit). All are single-value axes mapped to external catalogs. `text`/`String` type has `QualifierShape: null` — no qualifier support at all.
+- **Design gate triggered:** Frank's V1/V2 scope ruling (`.squad/decisions/inbox/frank-typed-literal-completion-review.md`) explicitly deferred `text` qualifier-aware mode to V2, calling out "no current qualifier shape for `text`". No approved design exists for the DSL type-system change.
+- **Key design tension:** `field Status as text in ['pending', 'active', 'closed']` requires the FIRST multi-value qualifier in the system. All existing qualifiers take a single `TypedConstant`: `in 'USD'`, `in 'days'`. A closed string set is structurally different and may require a `ParsedQualifier` discriminated union if bracket-list syntax is chosen. This is precedent-setting.
+- **Design doc written:** `docs/Working/george-text-qualifier-design.md` covers syntax options (bracket-list vs repeated-single-value), `DeclaredQualifierMeta.TextValues` shape, parser change surface, type checker behavior, runtime enforcement question, Kramer's integration point, and Newman's MCP concern.
+- **Inbox note:** `.squad/decisions/inbox/george-text-qualifier-design-needed.md` — implementation is blocked pending Frank + Shane sign-off on the design doc.
+- **No implementation code written.** Design gate respected.
+
 ### 2026-05-10T15:38:30-04:00 — SupportsPostActionEnsure removed (BUG)
 - Code commit: `c1572613`; test commit: `5be86341`. Final suite: 4,388 total (3,891 Precept.Tests, 280 Analyzers.Tests, 157 LS.Tests, 60 Mcp.Tests). Zero failures.
 - `SupportsPostActionEnsure` was an out-of-band parser injection flag that grafted EventEnsure slot semantics (`ensure expr because reason`) onto EventHandler after the main slot-walk. This violated the `on`-family disambiguation contract: `ensure` and `->` are mutually exclusive routing tokens — the parser must never mix their semantics on a single construct.
