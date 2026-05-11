@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Collections.Generic;
@@ -27,6 +28,8 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
     internal const string BuiltInStringTokenType = "string";
 
     private readonly ConcurrentDictionary<DocumentUri, SemanticTokensDocument> _documents = new();
+    private readonly ConcurrentDictionary<DocumentUri, ImmutableArray<LexicalSemanticToken>> _previousTypedConstantTokens = new();
+    private readonly ConcurrentDictionary<DocumentUri, SemanticTokensResultState> _latestResults = new();
     private readonly DocumentStore _store;
 
     public SemanticTokensHandler(DocumentStore store)
@@ -48,6 +51,37 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             Range = new SemanticTokensCapabilityRequestRange(),
         };
 
+    public override async Task<SemanticTokens?> Handle(SemanticTokensParams request, CancellationToken cancellationToken)
+    {
+        var document = await GetSemanticTokensDocument(request, cancellationToken).ConfigureAwait(false);
+        var builder = document.Create();
+        await Tokenize(builder, request, cancellationToken).ConfigureAwait(false);
+        return StampFullResult(request.TextDocument.Uri, document, builder.Commit().GetSemanticTokens());
+    }
+
+    public override async Task<SemanticTokensFullOrDelta?> Handle(
+        SemanticTokensDeltaParams request,
+        CancellationToken cancellationToken)
+    {
+        var document = await GetSemanticTokensDocument(request, cancellationToken).ConfigureAwait(false);
+        if (!_latestResults.TryGetValue(request.TextDocument.Uri, out var latest) ||
+            request.PreviousResultId != latest.ClientResultId ||
+            document.Id != latest.DocumentId)
+        {
+            var fullBuilder = document.Create();
+            await Tokenize(fullBuilder, request, cancellationToken).ConfigureAwait(false);
+            return StampFullResult(request.TextDocument.Uri, document, fullBuilder.Commit().GetSemanticTokens());
+        }
+
+        var deltaBuilder = document.Edit(new SemanticTokensDeltaParams
+        {
+            TextDocument = request.TextDocument,
+            PreviousResultId = document.Id,
+        });
+        await Tokenize(deltaBuilder, request, cancellationToken).ConfigureAwait(false);
+        return StampDeltaResult(request.TextDocument.Uri, document, deltaBuilder.Commit().GetSemanticTokensEdits());
+    }
+
     protected override Task Tokenize(
         SemanticTokensBuilder builder,
         ITextDocumentIdentifierParams identifier,
@@ -68,8 +102,67 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 
     protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(
         ITextDocumentIdentifierParams @params,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(_documents.GetOrAdd(@params.TextDocument.Uri, static _ => new SemanticTokensDocument(Legend)));
+        CancellationToken cancellationToken)
+    {
+        var uri = @params.TextDocument.Uri;
+        if (_store.TryGet(uri, out var state) && state.Current is { } compilation)
+        {
+            TryInvalidateForTypedConstantSpanChange(uri, compilation);
+        }
+        return Task.FromResult(_documents.GetOrAdd(uri, static _ => new SemanticTokensDocument(Legend)));
+    }
+
+    // Returns true when typed-constant spans changed and the cached document was invalidated.
+    // Internal for testing.
+    internal bool TryInvalidateForTypedConstantSpanChange(DocumentUri uri, Compilation compilation)
+    {
+        var current = ExtractTypedConstantTokens(compilation);
+        var changed = _previousTypedConstantTokens.TryGetValue(uri, out var previous) &&
+                      !current.SequenceEqual(previous);
+        _previousTypedConstantTokens[uri] = current;
+        if (changed)
+        {
+            _documents.TryRemove(uri, out _);
+        }
+        return changed;
+    }
+
+    private SemanticTokens StampFullResult(DocumentUri uri, SemanticTokensDocument document, SemanticTokens tokens)
+    {
+        var resultId = Guid.NewGuid().ToString();
+        _latestResults[uri] = new SemanticTokensResultState(resultId, document.Id);
+        return new SemanticTokens
+        {
+            ResultId = resultId,
+            Data = tokens.Data,
+        };
+    }
+
+    private SemanticTokensFullOrDelta StampDeltaResult(
+        DocumentUri uri,
+        SemanticTokensDocument document,
+        SemanticTokensFullOrDelta tokens)
+    {
+        var resultId = Guid.NewGuid().ToString();
+        _latestResults[uri] = new SemanticTokensResultState(resultId, document.Id);
+
+        return tokens.IsDelta
+            ? new SemanticTokensDelta
+            {
+                ResultId = resultId,
+                Edits = tokens.Delta!.Edits,
+            }
+            : new SemanticTokens
+            {
+                ResultId = resultId,
+                Data = tokens.Full!.Data,
+            };
+    }
+
+    private static ImmutableArray<LexicalSemanticToken> ExtractTypedConstantTokens(Compilation compilation) =>
+        ProjectLexicalTokens(compilation)
+            .Where(static t => IsTypedConstantToken(t.Kind))
+            .ToImmutableArray();
 
     internal static ImmutableArray<LexicalSemanticToken> ProjectLexicalTokens(Compilation compilation)
     {
@@ -576,6 +669,8 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 break;
         }
     }
+
+    private sealed record SemanticTokensResultState(string ClientResultId, string DocumentId);
 
     internal readonly record struct LexicalSemanticToken(
         TokenKind Kind,

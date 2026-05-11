@@ -294,3 +294,20 @@ _Updates will be added here as bugs are fixed._
 **Root cause:** `GetQuantitySlotItems` used `u.Code` as the completion label. `UcumAtom` had no `PrintSymbol` field. Tier-1 list included troy (`[oz_tr]`, `[pwt_tr]`) and apothecary (`[oz_ap]`, `[lb_ap]`) variants that are never relevant for business users.
 
 **Fix:** Added `PrintSymbol` field to `UcumAtom` (parsed from the UCUM XML `printSymbol` element/attribute). Changed completion label to `printSymbol ?? code`, detail to `u.Name`, insertText to `u.Code` (always — UCUM codes are what get typed). Removed troy/apothecary units from tier-1 while keeping `[gr]` because the embedded XML classifies it as `avoirdupois`. Enhanced hover to show unit name alongside code.
+
+---
+
+### B14 — Semantic tokens delta crash: ArgumentOutOfRangeException in ImmutableArray.Create
+
+| | |
+|---|---|
+| **Trigger** | Editing a `.precept` file while the language server is running |
+| **Expected** | Semantic tokens updated incrementally without error |
+| **Actual** | `ArgumentOutOfRangeException: Specified argument was out of the range of valid values (Parameter 'length')` in `SemanticTokensDocument.GetSemanticTokensEdits()` |
+| **Status** | ✅ Fixed — Kramer (kramer-11) |
+
+**Stack trace:** `ImmutableArray.Create[T](items, start, length)` → `SemanticTokensDocument.GetSemanticTokensEdits()` → `SemanticTokensDeltaPipeline.Handle`
+
+**Root cause (Kramer):** OmniSharp's `SemanticTokensDocument` keeps a single per-document `Id`, so the framework cannot tell whether a client `PreviousResultId` refers to the latest semantic-token baseline or an older one. After one successful delta request, `_prevData` stays armed inside the framework document; a later delta against a stale client result can therefore diff against the wrong baseline and produce an invalid `start`/`length` slice in `ImmutableArray.Create(...)`. This is not related to the UCUM display-label work — `SemanticTokensHandler` never touches `UcumAtom`, `PrintSymbol`, or quantity-completion metadata.
+
+**Fix:** The language server now stamps its own client-visible semantic-token result IDs on every full or delta response, tracks the latest `(resultId, SemanticTokensDocument.Id)` per URI, and falls back to a full semantic-tokens response whenever the client requests delta from a stale baseline or after typed-constant span invalidation replaced the framework document. Added handler-level regression tests for stale result IDs and typed-constant span changes, and validation passed with `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server` plus `dotnet test test/Precept.LanguageServer.Tests/`.

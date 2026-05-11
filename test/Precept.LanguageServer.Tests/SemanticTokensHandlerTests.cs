@@ -608,12 +608,226 @@ public sealed class SemanticTokensHandlerTests
             .Equal(SemanticTokenTypes.All.Select(meta => (meta.CustomType, meta.ForegroundHex, meta.Bold, meta.Italic)));
     }
 
+    [Fact]
+    public void SemanticTokensDelta_TypedConstantSpanGrows_DoesNotThrow()
+    {
+        // Simulates user typing inside a typed literal, growing the span by one character.
+        var before = Compiler.Compile("""
+            precept Sample
+            field Due as date <- '2026-01-01'
+            """);
+        var after = Compiler.Compile("""
+            precept Sample
+            field Due as date <- '2026-01-012'
+            """);
+
+        before.HasErrors.Should().BeFalse();
+
+        AssertSemanticTokensDeltaDoesNotThrow(before, after, @"C:\\typed-constant-span.precept");
+    }
+
+    [Fact]
+    public void SemanticTokensDelta_TypedConstantTokenCountChanges_DoesNotThrow()
+    {
+        // Simulates a typed literal being removed entirely between versions.
+        var before = Compiler.Compile("""
+            precept Sample
+            field Due as date <- '2026-01-01'
+            """);
+        var after = Compiler.Compile("""
+            precept Sample
+            field Due as date optional
+            """);
+
+        AssertSemanticTokensDeltaDoesNotThrow(before, after, @"C:\\typed-constant-removed.precept");
+    }
+
+    [Fact]
+    public void SemanticTokensDelta_NonTypedConstantEdit_DoesNotThrow()
+    {
+        // Normal non-typed-constant edits must continue to work correctly.
+        var before = Compiler.Compile("""
+            precept Sample
+            field Name as string optional
+            state Draft initial
+            state Active
+            """);
+        var after = Compiler.Compile("""
+            precept Sample
+            field Name as string optional
+            state Pending initial
+            state Active
+            """);
+
+        before.HasErrors.Should().BeFalse();
+        after.HasErrors.Should().BeFalse();
+
+        AssertSemanticTokensDeltaDoesNotThrow(before, after, @"C:\\non-typed-constant.precept");
+    }
+
+    [Fact]
+    public async Task HandleDelta_WhenPreviousResultIdIsStale_ReturnsFullResponse()
+    {
+        var store = new DocumentStore();
+        var handler = new SemanticTokensHandler(store);
+        var uri = DocumentUri.FromFileSystemPath(@"C:\test.precept");
+        var state = store.GetOrAdd(uri);
+
+        var before = Compiler.Compile("precept Sample\nfield Name as string optional\nstate Draft initial\n");
+        var after = Compiler.Compile("precept Sample\nfield Title as string optional\nstate Draft initial\n");
+        var latest = Compiler.Compile("precept Sample\nfield Title as string optional\nstate Ready initial\n");
+
+        state.Update(before);
+        var full = await handler.Handle(new SemanticTokensParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+        }, default);
+
+        full.Should().NotBeNull();
+        var originalResultId = full!.ResultId;
+        originalResultId.Should().NotBeNull();
+
+        state.Update(after);
+        var firstDelta = await handler.Handle(new SemanticTokensDeltaParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            PreviousResultId = originalResultId!,
+        }, default);
+
+        firstDelta.Should().NotBeNull();
+        firstDelta!.IsDelta.Should().BeTrue();
+
+        state.Update(latest);
+        var stale = await handler.Handle(new SemanticTokensDeltaParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            PreviousResultId = originalResultId!,
+        }, default);
+
+        stale.Should().NotBeNull();
+        stale!.IsDelta.Should().BeFalse(because: "a stale baseline must fall back to a full semantic tokens response");
+        stale.Full.Should().NotBeNull();
+        stale.Full!.Data.Should().Equal(GetFullSemanticTokens(latest).Data);
+    }
+
+    [Fact]
+    public async Task HandleDelta_WhenTypedConstantSpanChanges_ReturnsFullResponse()
+    {
+        var store = new DocumentStore();
+        var handler = new SemanticTokensHandler(store);
+        var uri = DocumentUri.FromFileSystemPath(@"C:\typed-constant.precept");
+        var state = store.GetOrAdd(uri);
+
+        var before = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-01'\n");
+        var after = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-012'\n");
+
+        state.Update(before);
+        var full = await handler.Handle(new SemanticTokensParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+        }, default);
+
+        full.Should().NotBeNull();
+        state.Update(after);
+        var delta = await handler.Handle(new SemanticTokensDeltaParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            PreviousResultId = full!.ResultId!,
+        }, default);
+
+        delta.Should().NotBeNull();
+        delta!.IsDelta.Should().BeFalse(because: "typed-constant span changes invalidate the cached semantic tokens document");
+        delta.Full.Should().NotBeNull();
+        delta.Full!.Data.Should().Equal(GetFullSemanticTokens(after).Data);
+    }
+
+    [Fact]
+    public void TryInvalidateForTypedConstantSpanChange_WhenSpanUnchanged_ReturnsFalse()
+    {
+        var store = new DocumentStore();
+        var handler = new SemanticTokensHandler(store);
+        var uri = DocumentUri.FromFileSystemPath(@"C:\test.precept");
+        var compilation = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-01'\n");
+
+        var firstCall = handler.TryInvalidateForTypedConstantSpanChange(uri, compilation);
+        var secondCall = handler.TryInvalidateForTypedConstantSpanChange(uri, compilation);
+
+        firstCall.Should().BeFalse(because: "no previous state on first call");
+        secondCall.Should().BeFalse(because: "typed-constant spans are identical on second call");
+    }
+
+    [Fact]
+    public void TryInvalidateForTypedConstantSpanChange_WhenSpanChanged_ReturnsTrue()
+    {
+        var store = new DocumentStore();
+        var handler = new SemanticTokensHandler(store);
+        var uri = DocumentUri.FromFileSystemPath(@"C:\test.precept");
+        var compilationBefore = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-01'\n");
+        var compilationAfter = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-012'\n");
+
+        handler.TryInvalidateForTypedConstantSpanChange(uri, compilationBefore);
+        var result = handler.TryInvalidateForTypedConstantSpanChange(uri, compilationAfter);
+
+        result.Should().BeTrue(because: "the typed-constant token span grew between compilations");
+    }
+
+    [Fact]
+    public void TryInvalidateForTypedConstantSpanChange_WhenSpanChanged_InvalidatesCachedDocument()
+    {
+        var store = new DocumentStore();
+        var handler = new SemanticTokensHandler(store);
+        var uri = DocumentUri.FromFileSystemPath(@"C:\test.precept");
+        var compilationBefore = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-01'\n");
+        var compilationAfter = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-012'\n");
+
+        // Seed the before-state and capture the first document.
+        handler.TryInvalidateForTypedConstantSpanChange(uri, compilationBefore);
+
+        // Mutate the document cache by seeding a document instance.
+        var legend = SemanticTokensHandler.BuildLegend();
+        // The handler's _documents is private, but we can verify invalidation indirectly:
+        // After invalidation, the handler should return a fresh document on the next GetOrAdd.
+        // We verify this by checking that TryInvalidateForTypedConstantSpanChange returns true,
+        // which means the _documents entry was removed.
+
+        handler.TryInvalidateForTypedConstantSpanChange(uri, compilationAfter)
+            .Should().BeTrue(because: "span changed, so the cached document must be invalidated");
+
+        // After invalidation the previous span state should track the new spans —
+        // a third call with the same 'after' compilation should return false (no further change).
+        handler.TryInvalidateForTypedConstantSpanChange(uri, compilationAfter)
+            .Should().BeFalse(because: "span is stable on the third call");
+    }
+
+    [Fact]
+    public void TryInvalidateForTypedConstantSpanChange_NoTypedConstantTokens_NeverInvalidates()
+    {
+        var store = new DocumentStore();
+        var handler = new SemanticTokensHandler(store);
+        var uri = DocumentUri.FromFileSystemPath(@"C:\test.precept");
+        var before = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial\n");
+        var after = Compiler.Compile("precept Sample\nfield Label as string\nstate Draft initial\n");
+
+        // No typed-constant tokens in either compilation.
+        handler.TryInvalidateForTypedConstantSpanChange(uri, before);
+        var result = handler.TryInvalidateForTypedConstantSpanChange(uri, after);
+
+        result.Should().BeFalse(because: "no typed-constant tokens means no span change to detect");
+    }
+
     private static string SamplesRoot =>
         Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples"));
 
     private static string ReadSample(string fileName) =>
         File.ReadAllText(Path.Combine(SamplesRoot, fileName));
+
+    private static SemanticTokens GetFullSemanticTokens(Compilation compilation)
+    {
+        var document = new SemanticTokensDocument(SemanticTokensHandler.BuildLegend());
+        CommitSemanticTokens(document.Create(), compilation);
+        return document.GetSemanticTokens();
+    }
 
     private static void AssertMergedTokensAreStrictlyOrdered(Compilation compilation) =>
         AssertMergedTokensAreStrictlyOrdered(SemanticTokensHandler.ProjectMergedTokens(compilation));
