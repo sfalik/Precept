@@ -28,6 +28,11 @@
 
 ## Recent Updates
 
+### 2026-05-11T00:27:07Z — t2-14 and t2-15 regression coverage recorded
+- Commits `7a4c2e31` / `65fad947` landed Slice 14 catalog-capability coverage for operators, outcomes, modifiers, types, and diagnostics so missing metadata now fails the suite immediately.
+- Commits `78779818` / `c0d0e059` landed Slice 15 parser, binder, and MCP pipeline-stage regression suites (88 new tests total), bringing the batch closeout to 4,531 core tests and 105 MCP tests passing.
+
+
 ### 2026-05-10T12:45:39Z — Track 2 Slice 1 regression suite closed green
 - Added `Track2PhaseAToolchainRegressionTests` coverage for wildcard state targets, broadcast field targets, collection-access diagnostics, and dual-use `min` / `max` call leaders, plus `Track2PhaseATokenCatalogTests` that lock the new `TokenMeta` fields and their exact token sets.
 - The suite now fixes the intended BUG-039 red by proving `Steps.at(2)` reports `UnguardedCollectionAccess` instead of the arithmetic `DivisionByZero` family, while BUG-001, BUG-006, BUG-026, BUG-037, BUG-051, and token-shape drift all stay locked.

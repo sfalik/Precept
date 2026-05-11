@@ -52,6 +52,11 @@
 - 2026-05-10T13:53:14Z — Scribe handoff for t2-2 Slice B: George-5's Slice B result is now recorded in `.squad/decisions.md` and the orchestration/session logs, so future parser separator work should use the canonical ledger entry rather than the transient inbox note.
 ## Recent Updates
 
+### 2026-05-11T00:27:07Z — BUG-057 temporal qualifier fix recorded
+- Commit `2763a433` fixed `TypeChecker.ExtractQualifiers()` so `period of 'date'` / `period of 'time'` and `period in 'days'` qualifiers survive into semantic metadata instead of being dropped.
+- Added temporal qualifier diagnostics (`InvalidTemporalDimensionString`, `InvalidTemporalUnitString`) plus 7 regression tests in `TypeCheckerSymbolTests`; the batch closes at 4,531 core tests and 105 MCP tests passing.
+
+
 ### 2026-05-10T23:55:32Z — BUG-057 routed to Slice 8; t2-16 plan updated
 - George-7 narrowed BUG-057 to field-type/parser support for qualified `period` declarations, updated `precept-toolchain-bugs.md`, and wrote `george-bug057-slice-assessment.md` recommending Slice 8 as the first implementation home.
 - George-6 appended the t2-16 DTO Source Generator slice spec to `precept-toolchain-plan.md`, so Track 2 now has an explicit generator-planning slice ready for implementation follow-through.

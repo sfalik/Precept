@@ -26,6 +26,11 @@
 
 ## Recent Updates
 
+### 2026-05-11T00:27:07Z — t2-13 MCP recovery guidance recorded
+- Commit `617d175f` fixed catalog-driven recovery hints in `Faults.cs` / `Diagnostics.cs`, aligning BUG-014, BUG-015, and BUG-041 guidance with real `when ...count > 0`, `notempty`, and `is set` authoring patterns.
+- Added `test/Precept.Mcp.Tests/RecoveryHintTests.cs`; the broader batch now closes at 105 MCP tests and 4,531 core tests passing.
+
+
 ### 2026-05-10T23:55:32Z — t2-12 MCP DTO audit durably recorded
 - Commits `5f79fc7a` and `6a211bc4` synced the `precept_compile` DTO surface, compile projection, focused MCP regression coverage, and `docs/tooling/mcp.md` contract text.
 - Validation closed BUG-011/012/016/017/018/022/023/024/032/033/034/035/036/042/043/047 with 74 passing MCP tests and 3,925 passing core tests.

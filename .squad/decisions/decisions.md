@@ -14334,3 +14334,189 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 - George completed Slice 2E accordingly: `ReturnNonnegative` now lives on `FixedReturnAccessor`, action proof requirements reuse `Types.CollectionCountAccessor`, and `TryDeclarationAttributeProof` short-circuits `>= 0` obligations for intrinsically non-negative accessor returns.
 - `docs/compiler/proof-engine.md` Strategy 2 now documents both intrinsic return-value discharge paths, and 3 regression tests lock the BUG-049a fix.
 - Validation passed via `dotnet build src\Precept\Precept.csproj` and `dotnet test test\Precept.Tests\Precept.Tests.csproj`, closing at 3857 passing tests. Commits: `f2d1dece` (fix) and `e826e4bd` (tracking).
+
+
+
+## 2026-05-11T00:27:07Z — t2-13 / t2-14 / t2-15 / BUG-057 batch
+
+- Batch scope: t2-13, t2-14, t2-15, BUG-057 fix.
+- Commits: `617d175f`, `7a4c2e31`, `65fad947`, `2763a433`, `78779818`, `c0d0e059`.
+- Final validation after the batch: Core `4,531` passing; MCP `105` passing.
+- Merged inbox files: `.squad/decisions/inbox/newman-t2-13-complete.md`, `.squad/decisions/inbox/soup-nazi-t2-14-complete.md`, `.squad/decisions/inbox/soup-nazi-t2-15-complete.md`, `.squad/decisions/inbox/george-bug057-fix.md`
+- Missing inbox files skipped: `.squad/decisions/inbox/frank-bug057-spec-analysis.md`
+
+### Merged from `.squad/decisions/inbox/newman-t2-13-complete.md`
+
+# Newman t2-13 complete
+
+- Commit: `617d175f`
+- Scope: corrected catalog-driven MCP recovery guidance in `src/Precept/Language/Faults.cs` and `src/Precept/Language/Diagnostics.cs`; `ProofsTool` and `DiagnosticTool` remain thin catalog projections.
+- BUG-014: `CollectionEmptyOnMutation` now tells consumers to use a `when Field.count > 0` row guard or the `notempty` field modifier.
+- BUG-015: the current runtime's collection-mutation diagnostic entry (`UnguardedCollectionMutation`) now exposes the same count-guard / `notempty` guidance through `precept_diagnostic`.
+- BUG-041: `UnexpectedNull` now uses `when Field is set` guidance instead of invalid `!= null` syntax.
+- Regression coverage: added `test/Precept.Mcp.Tests/RecoveryHintTests.cs`.
+- Validation: `dotnet test test\Precept.Mcp.Tests\` -> 77 passed; `dotnet test test\Precept.Tests\` -> 3925 passed.
+
+---
+
+### Merged from `.squad/decisions/inbox/soup-nazi-t2-14-complete.md`
+
+# Soup Nazi — t2-14 complete
+
+- Slice: 14 — Test Layer — Catalog Capability Tests
+- Completed: 2026-05-10
+- Test commit: `7a4c2e31`
+- Validation: `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore -m:1 /nr:false --nologo` passed at 4471/4471 (baseline 3925; +546 tests)
+
+## What landed
+
+- Added reflection-based `[Theory]` + `[MemberData]` coverage in `test\Precept.Tests\CatalogTests\` for operators, outcomes, modifiers, types, and diagnostics.
+- Adapted assertions to the catalog surface that exists in source today:
+  - operator symbols derive from `Token` / `Tokens`
+  - modifier keywords derive from `Token.Text`
+  - type serialization names currently come from `DisplayName` when `SerializedName` is absent
+  - diagnostic recovery guidance currently comes from `RecoverySteps` / `FixHint` when `RecoveryHint` is absent
+
+## Acceptance
+
+- Every new test is catalog-driven, so adding a new member without filling required metadata now fails the suite.
+- No skipped tests were required; the assertions adapt to the shipped catalog shapes instead of assuming plan-era property names.
+
+---
+
+### Merged from `.squad/decisions/inbox/soup-nazi-t2-15-complete.md`
+
+# t2-15 Completion Record — Pipeline Stage Unit Tests (Catalog-Aware)
+
+**Author:** Soup Nazi (test engineer)  
+**Date:** 2026-05-11  
+**Branch:** Precept-V2-Radical  
+**Slice:** 15 of 16 (Track 2)
+
+---
+
+## Summary
+
+Slice 15 adds catalog-aware pipeline stage unit tests to lock in the bug fixes from Slices 8–12.
+Five new test files were created covering the Parser, NameBinder, and MCP layers.
+
+## Test Count
+
+| Project | Before | After | New Tests |
+|---------|--------|-------|-----------|
+| `Precept.Tests` | 4,471 | 4,531 | +60 |
+| `Precept.Mcp.Tests` | 77 | 105 | +28 |
+| **Total** | **4,548** | **4,636** | **+88** |
+
+## Files Created
+
+| File | Tests | Pipeline Stage | Key Behaviors |
+|------|-------|---------------|---------------|
+| `test/Precept.Tests/Parser/StateTargetTests.cs` | 14 | Parser | `IsStateWildcard`/`IsFieldBroadcast` catalog metadata; `from any`, `to any`, `modify all`, `omit all` parser recognition; full compilation round-trips |
+| `test/Precept.Tests/Parser/MemberAccessTests.cs` | 12 | Parser | `IsValidAsMemberName` for `at`, `peekby`, `min`, `max`; `KeywordsValidAsMemberName` set coverage; `list.at(N)`, `peekby`, `set.min/max` compilation |
+| `test/Precept.Tests/NameBinder/ForwardReferenceTests.cs` | 15 | NameBinder | Topological sort (single/chain/diamond forward refs); cycle detection (direct/self/indirect); `DefaultForwardReference` for non-computed defaults |
+| `test/Precept.Mcp.Tests/DefinitionProjectionTests.cs` | 18 | MCP | `EnsureDto.Kind` (StateResident/EventPrecondition); `EnsureDto.Anchor`; `StateHookDto` entry/exit; `EventArgDto` required/optional; `PreceptDefinitionDto` structural fields |
+| `test/Precept.Mcp.Tests/OutcomeKindProjectionTests.cs` | 14 | MCP | `OutcomeMeta.SerializedKind` catalog values; transition/no-transition/reject row DTO projection; wildcard row `FromStates`; guard expression projection |
+
+## Bugs Locked In
+
+These bugs are now regression-protected by the new tests:
+
+- **BUG-001** — `any` state wildcard: `IsStateWildcard` catalog + compilation
+- **BUG-025** — Keyword-named accessors (`at`, `peekby`, `min`, `max`): `IsValidAsMemberName` + compilation
+- **BUG-026/BUG-037** — `modify all` / `omit all` broadcast: `IsFieldBroadcast` catalog + compilation
+- **BUG-030** — Computed field forward references: topological sort tests
+- **BUG-032/BUG-036** — Outcome field in transition row DTOs: `SerializedKind` round-trip tests
+- **BUG-039** — `list.at(N)` rejected: member access parser test
+- **CircularComputedField** — Cycle detection: direct, self, indirect, message content
+
+## Notes
+
+- All 88 new tests pass with zero failures.
+- Existing 4,548 tests remain green — no regressions.
+- Guarded state ensures (`in State ensure X when Y`) were intentionally not tested; BUG-020
+  may still be partially unfixed at the language-server level. The `EnsureDto.Guard` null
+  case is tested via the unguarded ensure path instead.
+- Files specified in the plan as "already exist" (ActionChainTests, StateWildcardTests,
+  BroadcastFieldTargetTests, ComputedFieldTests, OperatorTypingTests, ModifierValidationTests,
+  CollectionMutationProofTests, FunctionReturnProofTests) were confirmed present and not
+  recreated.
+
+---
+
+### Merged from `.squad/decisions/inbox/george-bug057-fix.md`
+
+# BUG-057 Fix Record — George
+
+**Date:** 2026-05-10
+**Branch:** Precept-V2-Radical
+
+---
+
+## Root Cause
+
+**File:** `src/Precept/Pipeline/TypeChecker.cs`
+**Method:** `ExtractQualifiers()` (line ~149)
+
+The `qualifier.Axis switch` inside `ExtractQualifiers` handled:
+- `QualifierAxis.Currency` → `MapCurrencyQualifier`
+- `QualifierAxis.Unit` → `MapUnitQualifier`
+- `QualifierAxis.Dimension` → `MapDimensionQualifier`
+- `QualifierAxis.FromCurrency` → `MapFromCurrencyQualifier`
+- `QualifierAxis.ToCurrency` → `MapToCurrencyQualifier`
+- `_ => null` ← **bug: TemporalDimension and TemporalUnit fell here**
+
+`null` results were filtered out, so `period of 'date'` and `period in 'days'`
+qualifiers were silently discarded. The `TypedField.DeclaredQualifiers` array
+came back empty for these qualifier types.
+
+The `ProofEngine.ResolvePeriodDimension()` correctly reads `DeclaredQualifierMeta.TemporalDimension`
+and `DeclaredQualifierMeta.TemporalUnit` from `DeclaredQualifiers` — but since the type checker
+never populated them, resolution returned `null`, and `DimensionProofRequirement` for
+`DatePlusPeriod` could never be satisfied → PRE0113.
+
+---
+
+## Fix Applied
+
+**`src/Precept/Language/DiagnosticCode.cs`**
+- Added `InvalidTemporalDimensionString = 117` — emitted when `period of '...'` value is not "date" or "time"
+- Added `InvalidTemporalUnitString = 118` — emitted when `period in '...'` value is not a recognized temporal unit
+
+**`src/Precept/Language/Diagnostics.cs`**
+- Added `GetMeta` entries for codes 117 and 118 with category `Temporal`, full trigger conditions, recovery steps, and examples
+
+**`src/Precept/Pipeline/TypeChecker.cs`**
+- Added two switch arms to `ExtractQualifiers`:
+  - `QualifierAxis.TemporalDimension => MapTemporalDimensionQualifier(qualifier, ctx)`
+  - `QualifierAxis.TemporalUnit      => MapTemporalUnitQualifier(qualifier, ctx)`
+- Added `MapTemporalDimensionQualifier`: maps "date" → `PeriodDimension.Date`, "time" → `PeriodDimension.Time`; emits `InvalidTemporalDimensionString` for unknown strings (fallback: `PeriodDimension.Any`)
+- Added `MapTemporalUnitQualifier`: looks up value in `TemporalUnits.TryGet`; derives dimension from `entry.IsCalendarBased` (true → `PeriodDimension.Date`, false → `PeriodDimension.Time`); emits `InvalidTemporalUnitString` for unknown strings (fallback: `PeriodDimension.Any`)
+
+The fix follows the exact same pattern as the existing mappers (`MapCurrencyQualifier`,
+`MapUnitQualifier`, etc.) — catalog-driven, no hardcoded parallel lists.
+
+---
+
+## Tests Added
+
+**`test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs`** — 7 new `[Fact]` tests:
+
+1. `PeriodOfDate_QualifierPreservedInSemanticIndex` — verifies `period of 'date'` → `TemporalDimension(PeriodDimension.Date)` in DeclaredQualifiers
+2. `PeriodOfTime_QualifierPreservedInSemanticIndex` — verifies `period of 'time'` → `TemporalDimension(PeriodDimension.Time)`
+3. `PeriodInDays_QualifierPreservedInSemanticIndex` — verifies `period in 'days'` → `TemporalUnit("days", PeriodDimension.Date)`
+4. `PeriodInHours_QualifierPreservedInSemanticIndex` — verifies `period in 'hours'` → `TemporalUnit("hours", PeriodDimension.Time)`
+5. `PeriodOfDate_AllowsDatePlusPeriodOperation_NoDiagnostic` — verifies `date + period_of_date_field` compiles clean (no PRE0113)
+6. `PeriodOfInvalidString_EmitsInvalidTemporalDimensionStringDiagnostic` — validates error for `period of 'week'`
+7. `PeriodInInvalidUnit_EmitsInvalidTemporalUnitStringDiagnostic` — validates error for `period in 'fortnights'`
+
+---
+
+## Regression Confirmation
+
+- `src/Precept/Precept.csproj`: builds cleanly, 0 errors, 0 warnings
+- `test/Precept.Tests`: 4,515 pre-existing tests pass + 7 new tests = 4,522 pass (excluding pre-existing compile error in `StateTargetTests.cs` introduced by another squad member, confirmed pre-existing via `git stash`)
+- `test/Precept.Mcp.Tests`: 77/77 pass ✅
+- `test/Precept.LanguageServer.Tests`: 157/157 pass ✅
+
+No regressions introduced.
