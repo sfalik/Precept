@@ -592,6 +592,389 @@ public class CompletionHandlerTests
         string.CompareOrdinal(items[1].SortText, function.SortText).Should().BeLessThan(0);
     }
 
+    // ─── Slice 1 — Type-Branching on ' Trigger ──────────────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_Boolean_ShowsTrueAndFalse()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept FlagTest
+            field Active as boolean default ¦
+            state Open initial terminal
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["true", "false"]);
+    }
+
+    [Fact]
+    public async Task TypedConstant_Temporal_ShowsStarters()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Duration).ContentValidation!.Examples;
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(expected);
+    }
+
+    [Fact]
+    public async Task TypedConstant_Money_ShowsExamples()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Money).ContentValidation!.Examples;
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(expected);
+    }
+
+    [Fact]
+    public async Task TypedConstant_Text_NoAutoPopup()
+    {
+        // text is free-form; no examples exist and no reused values → empty on ' trigger.
+        var completions = await GetCompletionsAsync("""
+            precept ProfileTest
+            field FullName as text default ¦
+            """, "'");
+
+        completions.IsIncomplete.Should().BeFalse();
+        completions.Items.Should().BeEmpty("text fields have no enumerable vocabulary; autocomplete noise is unwanted");
+    }
+
+    [Fact]
+    public async Task TypedConstant_Currency_ShowsAllCodes()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept CurrencyTest
+            field BaseCurrency as currency default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["USD", "EUR", "GBP"]);
+    }
+
+    // ─── Slice 2 — Space Trigger Slot Detection ──────────────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_SpaceTrigger_Temporal_AfterNumber_ShowsUnits()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '3 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var unitPluralNames = Precept.Language.TemporalUnits.AllEntries.Select(e => e.Plural).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(unitPluralNames);
+        labels.Should().NotContain(["field", "state", "event", "rule"]);
+    }
+
+    [Fact]
+    public async Task TypedConstant_SpaceTrigger_Money_AfterAmount_ShowsCurrencyCodes()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money default '100 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["USD", "EUR", "GBP"]);
+        labels.Should().NotContain(["field", "state", "event", "rule"]);
+    }
+
+    [Fact]
+    public async Task TypedConstant_SpaceTrigger_SegmentComplete_ShowsPlusContinuation()
+    {
+        // Ctrl+Space right after a complete temporal unit → only the + continuation item is offered.
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '3 days¦'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("+");
+    }
+
+    // ─── Slice 3 — Qualifier-Aware Filtering ─────────────────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_Qualifier_Money_InUSD_SpaceAfterAmount_ShowsOnlyUSD()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money in 'USD' default '100 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["USD"], "qualifier hard-filter must reduce the candidate set to exactly the declared currency code");
+    }
+
+    [Fact]
+    public async Task TypedConstant_Qualifier_Temporal_InDays_AfterNumber_ShowsOnlyDays()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Grace as period in 'days' default '30 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("days");
+        labels.Should().NotContain(["hours", "minutes", "seconds", "weeks", "months", "years"],
+            "qualifier 'in days' must hard-filter temporal units to the declared unit only");
+    }
+
+    // ─── Slice 4 — Compound Temporal Full Cycle ───────────────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_Compound_AfterFirstSegment_ShowsPlus()
+    {
+        // Ctrl+Space after a complete temporal segment shows the + continuation affordance.
+        var completions = await GetCompletionsAsync("""
+            precept RetryTest
+            field RetryAfter as duration default '2 hours¦'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("+", "after a complete temporal segment the only proactive continuation choice is +");
+    }
+
+    [Fact]
+    public async Task TypedConstant_Compound_AfterPlus_ShowsNothing()
+    {
+        // Space typed immediately after + (before the next number) → nothing until a number is typed.
+        var completions = await GetCompletionsAsync("""
+            precept RetryTest
+            field RetryAfter as duration default '2 hours + ¦'
+            """, " ");
+
+        completions.IsIncomplete.Should().BeFalse();
+        completions.Items.Should().BeEmpty("after '+' the author must type a number before units are offered");
+    }
+
+    [Fact]
+    public async Task TypedConstant_Compound_AfterPlusNumber_Space_ShowsUnits()
+    {
+        // Space after <number> in the second segment → temporal units again, same as the first segment.
+        var completions = await GetCompletionsAsync("""
+            precept RetryTest
+            field RetryAfter as duration default '2 hours + 30 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var unitPluralNames = Precept.Language.TemporalUnits.AllEntries.Select(e => e.Plural).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(unitPluralNames);
+    }
+
+    // ─── Slice 5 — Edge Cases ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_SpaceInsideText_NoCompletions()
+    {
+        // Space inside a text literal must not open completion — space is not a slot boundary in text.
+        var completions = await GetCompletionsAsync("""
+            precept ProfileTest
+            field FullName as text default 'hello ¦'
+            """, " ");
+
+        completions.IsIncomplete.Should().BeFalse();
+        completions.Items.Should().BeEmpty("space inside a text literal must not trigger any completions");
+    }
+
+    [Fact]
+    public async Task TypedConstant_CtrlSpaceInsidePartialTemporal_ShowsUnitsForCurrentSlot()
+    {
+        // Cursor is mid-unit ('3 da|ys') — slot phase is UnitTyping → full temporal unit list returned;
+        // VS Code handles prefix filtering for 'da' client-side.
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '3 da¦ys'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var unitPluralNames = Precept.Language.TemporalUnits.AllEntries.Select(e => e.Plural).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(unitPluralNames);
+    }
+
+    [Fact]
+    public async Task TypedConstant_BooleanInRule_SameBehaviorAsDefault()
+    {
+        // A boolean literal inside a rule guard must show the same closed set as a boolean field default.
+        var completions = await GetCompletionsAsync("""
+            precept FlagTest
+            field Active as boolean default false
+            state Open initial terminal
+            event Toggle
+            from Open on Toggle when Active == ¦
+                -> no transition
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["true", "false"]);
+    }
+
+    [Fact]
+    public async Task TypedConstant_MoneyQualifier_SpaceAfterAmount_ShowsOnlyDeclaredCurrency()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money in 'USD' default '100 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["USD"]);
+    }
+
+    [Theory]
+    [InlineData("boolean")]
+    [InlineData("duration")]
+    [InlineData("money")]
+    public async Task TypedConstant_NoKeywordsInAnyTypedConstant(string typeName)
+    {
+        // Ctrl+Space inside '' for any typed-constant type must never bleed keyword items.
+        var source = $$"""
+            precept NoKeywordTest
+            field Value as {{typeName}} default '¦'
+            state Open initial terminal
+            """;
+
+        var completions = await GetCompletionsAsync(source, new CompletionContext
+        {
+            TriggerKind = CompletionTriggerKind.Invoked,
+            TriggerCharacter = string.Empty,
+        });
+
+        var keywords = completions.Items
+            .Where(item => item.Kind == CompletionItemKind.Keyword)
+            .Select(item => item.Label)
+            .ToArray();
+
+        keywords.Should().BeEmpty($"top-level construct keywords must never appear inside a {typeName} typed constant");
+    }
+
+    // ─── Slice 5 — Ctrl+Space Recovery ───────────────────────────────────────────
+
+    [Fact]
+    public async Task TypedConstant_CtrlSpace_EmptyBoolean_ShowsTrueFalse()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept FlagTest
+            field Active as boolean default '¦'
+            state Open initial terminal
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["true", "false"]);
+    }
+
+    [Fact]
+    public async Task TypedConstant_CtrlSpace_EmptyTemporal_ShowsStarters()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default '¦'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Duration).ContentValidation!.Examples;
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(expected);
+    }
+
+    [Fact]
+    public async Task TypedConstant_CtrlSpace_EmptyMoney_ShowsExamples()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money default '¦'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Money).ContentValidation!.Examples;
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(expected);
+    }
+
+    [Fact]
+    public async Task TypedConstant_CtrlSpace_PartialMoneyCode_ShowsFilteredCodes()
+    {
+        // Ctrl+Space at '100 U| (UnitTyping phase) → currency codes returned; VS Code filters by 'U' prefix client-side.
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money default '100 U¦'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["USD", "GBP"]);
+        labels.Should().NotContain(["field", "state", "event", "rule"]);
+    }
+
     private static async Task<CompletionList> GetCompletionsAsync(string source, Position position)
     {
         return await GetCompletionsAsync(source, position, context: null);
