@@ -89,6 +89,25 @@ public class DiagnosticProjectorTests
     }
 
     [Fact]
+    public void Project_InvalidModifierForMoney_UsesModifierTokenRange()
+    {
+        var compilation = Compiler.Compile("""
+            precept Quote
+            field Amount as money in 'USD' nonnegative
+            state Draft initial terminal
+            """);
+
+        var diagnostic = DiagnosticProjector.Project(compilation)
+            .Single(entry => entry.Code?.String == nameof(Precept.Language.DiagnosticCode.InvalidModifierForType));
+
+        diagnostic.Range.Should().BeEquivalentTo(new Range
+        {
+            Start = new Position(1, 31),
+            End = new Position(1, 42),
+        });
+    }
+
+    [Fact]
     public void Project_Diagnostic_SourceIsPreceptString()
     {
         var compilation = Compiler.Compile(WarningSource);

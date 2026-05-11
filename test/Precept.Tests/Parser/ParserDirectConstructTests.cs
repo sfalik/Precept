@@ -298,6 +298,26 @@ public class ParserDirectConstructTests
     }
 
     [Fact]
+    public void FieldDeclaration_WithModifier_ParsedModifierSpan_MatchesKeywordToken()
+    {
+        var tokens = Lexer.Lex("field amount as number nonnegative");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var field = manifest.Constructs
+            .Single(c => c.Meta.Kind == ConstructKind.FieldDeclaration);
+        var modifierSlot = field.GetRequiredSlot<ModifierListSlot>(ConstructSlotKind.ModifierList);
+        var modifier = modifierSlot.Modifiers.Should().ContainSingle().Subject;
+
+        modifier.Kind.Should().Be(ModifierKind.Nonnegative);
+        modifier.Span.StartLine.Should().Be(1);
+        modifier.Span.StartColumn.Should().Be(24);
+        modifier.Span.EndLine.Should().Be(1);
+        modifier.Span.EndColumn.Should().Be(35);
+    }
+
+    [Fact]
     public void FieldDeclaration_WithoutModifierOrCompute_OptionalSlots_AreAbsent()
     {
         // RED-P: Optional slots must not be materialized when absent from source.

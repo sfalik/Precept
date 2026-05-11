@@ -24,7 +24,7 @@ public sealed record TypeExpressionSlot(ParsedTypeReference TypeRef, SourceSpan 
     : SlotValue(ConstructSlotKind.TypeExpression, Span);
 
 /// <summary>A parsed modifier with optional value expression (for min/max/default etc.).</summary>
-public sealed record ParsedModifier(ModifierKind Kind, ParsedExpression? Value);
+public sealed record ParsedModifier(ModifierKind Kind, ParsedExpression? Value, SourceSpan Span);
 
 /// <summary>Field modifiers (nonnegative, positive, notempty, etc.) — now carries values for valued modifiers.</summary>
 public sealed record ModifierListSlot(ImmutableArray<ParsedModifier> Modifiers, SourceSpan Span)

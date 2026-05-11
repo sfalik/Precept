@@ -35,7 +35,7 @@ internal static partial class TypeChecker
             {
                 if (arg.ResolvedType == TypeKind.Error) continue;
                 ValidateValueModifiers(
-                    arg.Modifiers.Select(kind => new ParsedModifier(kind, null)).ToImmutableArray(),
+                    arg.Modifiers.Select(kind => new ParsedModifier(kind, null, arg.Span)).ToImmutableArray(),
                     arg.ResolvedType,
                     ImmutableArray<ModifierKind>.Empty,
                     isComputed: false,
@@ -69,12 +69,13 @@ internal static partial class TypeChecker
             var modifier = modifiers[i];
             var kind = modifier.Kind;
             var meta = Modifiers.GetMeta(kind);
+            var modifierSpan = modifier.Span;
 
             // Duplicate check
             if (!seen.Add(kind))
             {
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.DuplicateModifier, span, meta.Token.Text));
+                    Diagnostics.Create(DiagnosticCode.DuplicateModifier, modifierSpan, meta.Token.Text));
                 continue;
             }
 
@@ -88,7 +89,7 @@ internal static partial class TypeChecker
             {
                 var typeName = Types.GetMeta(resolvedType).DisplayName;
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.InvalidModifierForType, span, meta.Token.Text, typeName));
+                    Diagnostics.Create(DiagnosticCode.InvalidModifierForType, modifierSpan, meta.Token.Text, typeName));
             }
 
             // Mutual exclusivity / subsumption
@@ -103,7 +104,7 @@ internal static partial class TypeChecker
                     if (conflictValue.Subsumes.Contains(kind))
                     {
                         ctx.Diagnostics.Add(
-                            Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                            Diagnostics.Create(DiagnosticCode.RedundantModifier, modifierSpan,
                                 meta.Token.Text, conflictMeta.Token.Text));
                         continue;
                     }
@@ -111,14 +112,14 @@ internal static partial class TypeChecker
                     if (valueMeta.Subsumes.Contains(conflict))
                     {
                         ctx.Diagnostics.Add(
-                            Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                            Diagnostics.Create(DiagnosticCode.RedundantModifier, modifierSpan,
                                 conflictMeta.Token.Text, meta.Token.Text));
                         continue;
                     }
                 }
 
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.InvalidModifierForType, span,
+                    Diagnostics.Create(DiagnosticCode.InvalidModifierForType, modifierSpan,
                         meta.Token.Text, $"it conflicts with '{conflictMeta.Token.Text}'"));
             }
 
@@ -130,7 +131,7 @@ internal static partial class TypeChecker
                 if (otherMeta is ValueModifierMeta otherValue && otherValue.Subsumes.Contains(kind))
                 {
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                        Diagnostics.Create(DiagnosticCode.RedundantModifier, modifierSpan,
                             meta.Token.Text, otherMeta.Token.Text));
                 }
             }
@@ -140,7 +141,7 @@ internal static partial class TypeChecker
             {
                 var typeName = Types.GetMeta(resolvedType).DisplayName;
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.RedundantModifier, span,
+                    Diagnostics.Create(DiagnosticCode.RedundantModifier, modifierSpan,
                         meta.Token.Text, typeName));
             }
 
@@ -153,7 +154,7 @@ internal static partial class TypeChecker
                 if (isEventArg && kind == ModifierKind.Writable)
                 {
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.WritableOnEventArg, span, declarationName));
+                        Diagnostics.Create(DiagnosticCode.WritableOnEventArg, modifierSpan, declarationName));
                 }
             }
 
@@ -161,7 +162,7 @@ internal static partial class TypeChecker
             if (kind == ModifierKind.Writable && isComputed)
             {
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, span, declarationName));
+                    Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, modifierSpan, declarationName));
             }
         }
 

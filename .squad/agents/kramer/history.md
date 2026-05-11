@@ -14,6 +14,7 @@
 - Modifier completions should derive from `ValueModifierMeta.ApplicableTo` and declaration-site legality so the completion surface stays catalog-truthful.
 - Visible editor-color drift can come from VS Code fallback/theme ordering even when catalog metadata and semantic tokens are already correct.
 - Transition outcomes and comma-separated field-target slots need their own identifier spans; reusing container spans produces overlapping state/field semantic tokens even after arg-span fixes land.
+- Modifier diagnostics need per-modifier spans from parser metadata; reusing declaration spans widens user-visible squiggles from the offending keyword to the whole field line.
 
 ## Historical Summary
 
@@ -22,6 +23,10 @@
 - The canonical decision ledger in `.squad/decisions.md` carries the batch-level detail; this history keeps only the durable tooling baseline and newest live updates.
 
 ## Recent Updates
+
+### 2026-05-10T22:30:01.1468838-04:00 — Modifier diagnostics now anchor to modifier tokens
+- `ParsedModifier` now carries a dedicated span, and modifier validation publishes invalid/redundant/duplicate constraint diagnostics on that span instead of the enclosing declaration.
+- Validation closed green on the targeted parser span regression, 166/166 language-server tests, and the language-server build; full `test\Precept.Tests\` still has the unrelated existing `ArgReferenceTests.TypeChecker_ArgReference_SiteSpanMatchesSource` failure.
 
 ### 2026-05-11T02:15:00Z — Semantic-token delta pass 2 recorded
 - Commit `308713a5` closed the remaining delta-crash path by replacing transition-outcome and access-mode/omit container spans with identifier-precise state/field spans before semantic-token projection.

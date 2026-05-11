@@ -690,7 +690,10 @@ public static partial class Parser
                         }
                     }
 
-                    modifiers.Add(new ParsedModifier(modMeta.Kind, valueExpr));
+                    modifiers.Add(new ParsedModifier(
+                        modMeta.Kind,
+                        valueExpr,
+                        valueExpr is null ? modToken.Span : SourceSpan.Covering(modToken.Span, valueExpr.Span)));
                 }
                 else
                 {
