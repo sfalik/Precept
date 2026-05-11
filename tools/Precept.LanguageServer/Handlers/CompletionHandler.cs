@@ -69,7 +69,10 @@ internal sealed class CompletionHandler : ICompletionHandler
         // The opening quote always starts a new literal, so always append a closing quote.
         if (triggerCharacter == "'")
         {
-            return CreateCompletionList(GetTypedConstantItems(compilation, position, context, appendClosingQuote: true));
+            var innerContext = context is SlotContext.InExpression or SlotContext.InArgDefault
+                ? context
+                : SlotContext.InExpression;
+            return CreateCompletionList(GetTypedConstantItems(compilation, position, innerContext, appendClosingQuote: true));
         }
 
         // Space trigger inside a typed constant: show slot-specific vocabulary (money codes,
@@ -366,11 +369,9 @@ internal sealed class CompletionHandler : ICompletionHandler
         return codes.Select(code => CreateItem(code, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
     }
 
-    private static IEnumerable<CompletionItem> GetUnitOfMeasureItems(TypedConstantContext _)
+    private static IEnumerable<CompletionItem> GetUnitOfMeasureItems(TypedConstantContext tcContext)
     {
-        var typeMeta = Types.GetMeta(TypeKind.UnitOfMeasure);
-        var examples = typeMeta.ContentValidation?.Examples ?? [];
-        return examples.Select(e => CreateItem(e, "UCUM unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+        return GetQuantitySlotItems(tcContext, string.Empty, TypedConstantPhase.AfterNumberSpace);
     }
 
     private static IEnumerable<CompletionItem> GetDimensionItems(TypedConstantContext _)
@@ -632,12 +633,23 @@ internal sealed class CompletionHandler : ICompletionHandler
         var unitQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault();
         if (unitQualifier is not null)
         {
-            return [CreateItem(unitQualifier.UnitCode, "quantity unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+            var atom = UcumCatalog.LookupAtom(unitQualifier.UnitCode);
+            var label = atom?.PrintSymbol ?? unitQualifier.UnitCode;
+            var detail = atom?.Name ?? "quantity unit";
+            return [CreateItem(label, detail, CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment, insertText: unitQualifier.UnitCode)];
         }
 
-        var typeMeta = Types.GetMeta(TypeKind.UnitOfMeasure);
-        var examples = typeMeta.ContentValidation?.Examples ?? [];
-        return examples.Select(e => CreateItem(e, "quantity unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+        IEnumerable<UcumAtom> units = UcumCatalog.BrowseTier1();
+
+        var dimQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+        if (dimQualifier is not null && DimensionCatalog.All.TryGetValue(dimQualifier.DimensionName, out var dimAlias))
+            units = units.Where(u => u.Vector == dimAlias.Vector);
+
+        return units.Select(u =>
+        {
+            var label = u.PrintSymbol ?? u.Code;
+            return CreateItem(label, u.Name, CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment, insertText: u.Code);
+        });
     }
 
     private static string[]? GetQualifierAllowedValues(TypedConstantContext tcContext)
@@ -752,6 +764,11 @@ internal sealed class CompletionHandler : ICompletionHandler
             return true;
         }
 
+        if (TryGetDeclarationQualifierContext(compilation, position, out tcContext))
+        {
+            return true;
+        }
+
         if (context == SlotContext.InExpression && TryGetEnclosingField(compilation, position, out var exprField))
         {
             tcContext = TypedConstantContext.FromField(exprField);
@@ -766,6 +783,107 @@ internal sealed class CompletionHandler : ICompletionHandler
 
         tcContext = default;
         return false;
+    }
+
+    private static bool TryGetDeclarationQualifierContext(
+        Compilation compilation,
+        Position position,
+        out TypedConstantContext tcContext)
+    {
+        if (!TryGetCurrentDeclarationType(compilation, position, out var declaredType)
+            || !TryGetQualifierSitePreposition(compilation.Tokens.Tokens, position, out var preposition))
+        {
+            tcContext = default;
+            return false;
+        }
+
+        var qualifierSlot = Types.GetMeta(declaredType).QualifierShape?.Slots
+            .FirstOrDefault(slot => slot.Preposition == preposition);
+        if (qualifierSlot is null
+            || !TryMapQualifierAxisToExpectedType(qualifierSlot.Axis, out var expectedType))
+        {
+            tcContext = default;
+            return false;
+        }
+
+        tcContext = TypedConstantContext.FromType(expectedType);
+        return true;
+    }
+
+    private static bool TryGetCurrentDeclarationType(Compilation compilation, Position position, out TypeKind declaredType)
+    {
+        if (TryGetEnclosingField(compilation, position, out var field))
+        {
+            declaredType = field.ResolvedType;
+            return true;
+        }
+
+        if (TryGetCurrentEventArg(compilation, position, out var arg))
+        {
+            declaredType = arg.ResolvedType;
+            return true;
+        }
+
+        declaredType = default;
+        return false;
+    }
+
+    private static bool TryGetQualifierSitePreposition(
+        ImmutableArray<Token> tokens,
+        Position position,
+        out TokenKind preposition)
+    {
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            preposition = default;
+            return false;
+        }
+
+        tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
+        tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
+        if (tokenIndex < 0)
+        {
+            preposition = default;
+            return false;
+        }
+
+        if (IsTypedConstantToken(tokens[tokenIndex].Kind))
+        {
+            tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+            if (tokenIndex < 0)
+            {
+                preposition = default;
+                return false;
+            }
+        }
+
+        preposition = tokens[tokenIndex].Kind;
+        return preposition is TokenKind.In or TokenKind.Of or TokenKind.To;
+    }
+
+    private static bool TryMapQualifierAxisToExpectedType(QualifierAxis axis, out TypeKind expectedType)
+    {
+        switch (axis)
+        {
+            case QualifierAxis.Currency:
+            case QualifierAxis.FromCurrency:
+            case QualifierAxis.ToCurrency:
+                expectedType = TypeKind.Currency;
+                return true;
+            case QualifierAxis.Unit:
+                expectedType = TypeKind.UnitOfMeasure;
+                return true;
+            case QualifierAxis.Dimension:
+                expectedType = TypeKind.Dimension;
+                return true;
+            case QualifierAxis.Timezone:
+                expectedType = TypeKind.Timezone;
+                return true;
+            default:
+                expectedType = default;
+                return false;
+        }
     }
 
     private static bool TryGetCallParameterType(Compilation compilation, Position position, out TypeKind expectedType)
@@ -1377,14 +1495,15 @@ internal sealed class CompletionHandler : ICompletionHandler
         CompletionSortGroup sortGroup,
         string? documentation = null,
         string? usageExample = null,
-        string? snippetTemplate = null) =>
+        string? snippetTemplate = null,
+        string? insertText = null) =>
         new()
         {
             Label = label,
-            InsertText = snippetTemplate ?? label,
+            InsertText = snippetTemplate ?? insertText ?? label,
             InsertTextFormat = snippetTemplate is null ? InsertTextFormat.PlainText : InsertTextFormat.Snippet,
             Documentation = CreateDocumentation(documentation, usageExample),
-            SortText = CreateSortText(sortGroup, label),
+            SortText = CreateSortText(sortGroup, insertText ?? label),
             Detail = detail,
             Kind = kind,
         };

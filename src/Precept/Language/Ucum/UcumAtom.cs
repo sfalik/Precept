@@ -6,4 +6,5 @@ public sealed record UcumAtom(
     DimensionVector Vector,
     UcumExactFactor Scale,
     bool Prefixable,
-    string? AnnotationClass);
+    string? AnnotationClass,
+    string? PrintSymbol = null);

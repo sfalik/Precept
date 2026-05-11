@@ -30,13 +30,17 @@ public class UcumCatalogTests
         var tier1 = UcumAtomCatalog.BrowseTier1();
         var derivedSpeed = UcumParser.Parse("km/h").Unit!;
 
-        tier1.Should().HaveCount(150);
+        tier1.Should().HaveCount(146);
         tier1.Select(atom => atom.Code).Take(8).Should().Equal("m", "dm", "cm", "mm", "km", "um", "nm", "Ao");
         tier1.Should().Contain(atom => atom.Code == "km/h");
         tier1.Should().Contain(atom => atom.Code == "m2");
         tier1.Should().Contain(atom => atom.Code == "[degF]");
         tier1.Should().NotContain(atom => atom.Code == "s");
         tier1.Should().NotContain(atom => atom.Code == "mol");
+        tier1.Should().NotContain(atom => atom.Code == "[oz_tr]");
+        tier1.Should().NotContain(atom => atom.Code == "[pwt_tr]");
+        tier1.Should().NotContain(atom => atom.Code == "[oz_ap]");
+        tier1.Should().NotContain(atom => atom.Code == "[lb_ap]");
         tier1.Single(atom => atom.Code == "[degF]").Should().BeSameAs(UcumAtomCatalog.All["[degF]"]);
         tier1.Single(atom => atom.Code == "km/h").Vector.Should().Be(derivedSpeed.Vector);
         tier1.Single(atom => atom.Code == "km/h").Scale.Should().Be(derivedSpeed.Scale);

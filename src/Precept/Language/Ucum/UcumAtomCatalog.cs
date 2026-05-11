@@ -44,14 +44,10 @@ public static class UcumAtomCatalog
         "[ston_av]",  // short ton (US ton = 2000 lb)
         "[lton_av]",  // long ton (British = 2240 lb)
         "[gr]",       // grain
-        "[oz_tr]",    // troy ounce
-        "[pwt_tr]",   // pennyweight (troy)
         "[stone_av]", // stone (14 lb; UK body weight)
         "[scwt_av]",  // short hundredweight (100 lb)
         "[lcwt_av]",  // long hundredweight (112 lb)
         "[car_m]",    // metric carat (0.2 g)
-        "[oz_ap]",    // apothecary ounce
-        "[lb_ap]",    // apothecary pound
 
         // ── VOLUME (L³) ─────────────────────────────────────────────────────────────
         "L",          // liter (prefer uppercase L over l)
@@ -224,7 +220,8 @@ public static class UcumAtomCatalog
                     evaluation.Vector,
                     evaluation.Scale,
                     candidate.Prefixable,
-                    null);
+                    null,
+                    candidate.PrintSymbol);
                 pending.RemoveAt(index);
                 progress = true;
             }
@@ -318,9 +315,15 @@ public static class UcumAtomCatalog
         var name = element.Elements().FirstOrDefault(child => child.Name.LocalName == "name")?.Value.Trim() ?? code;
         var prefixable = string.Equals(element.Attribute("isMetric")?.Value, "yes", StringComparison.OrdinalIgnoreCase)
                          && code != "kg";
+        var printSymbol = element.Attribute("printSymbol")?.Value
+            ?? element.Elements().FirstOrDefault(child => child.Name.LocalName == "printSymbol")?.Value;
+        if (string.IsNullOrWhiteSpace(printSymbol))
+            printSymbol = null;
+        else
+            printSymbol = printSymbol.Trim();
 
         var expression = GetDefinitionExpression(element, code);
-        return expression is null ? null : new PendingAtom(code, name, expression, prefixable);
+        return expression is null ? null : new PendingAtom(code, name, expression, prefixable, printSymbol);
     }
 
     private static string? GetDefinitionExpression(XElement element, string code)
@@ -431,7 +434,7 @@ public static class UcumAtomCatalog
             new(Vector.Pow(exponent), Scale.Pow(exponent));
     }
 
-    private sealed record PendingAtom(string Code, string Name, string Expression, bool Prefixable);
+    private sealed record PendingAtom(string Code, string Name, string Expression, bool Prefixable, string? PrintSymbol = null);
 
     private sealed partial class MiniExpressionEvaluator
     {

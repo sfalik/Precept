@@ -188,6 +188,22 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnQuantityTypedConstant_ShowsResolvedUnitMetadata()
+    {
+        var compilation = Precept.Compiler.Compile("""
+            precept HoverUnits
+            field Weight as quantity <- '5 [lb_av]'
+            """);
+        var typedConstant = compilation.Tokens.Tokens.Single(token => token.Kind == Precept.Language.TokenKind.TypedConstant);
+
+        var hover = HoverHandler.CreateHover(compilation, new Position(typedConstant.Span.StartLine - 1, typedConstant.Span.StartColumn - 1));
+
+        hover.Should().NotBeNull();
+        hover!.Contents.MarkupContent!.Value.Should().Contain("quantity typed constant");
+        hover.Contents.MarkupContent.Value.Should().Contain("Unit: `[lb_av]` (lb) — pound");
+    }
+
+    [Fact]
     public void Hover_OnFunctionCall_ShowsSignatureAndDescription()
     {
         var compilation = Precept.Compiler.Compile(RichHoverSource);

@@ -640,6 +640,87 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task TypedConstant_QuantityDefault_QuoteTrigger_ShowsQuantityExamples()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field q as quantity default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Quantity).ContentValidation!.Examples;
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(expected);
+    }
+
+    [Fact]
+    public async Task TypedConstant_QuantityInQualifier_QuoteTrigger_ShowsUcumUnitCatalog()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field q as quantity in ¦
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var quantityExamples = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Quantity).ContentValidation!.Examples;
+        var ounce = GetItem(completions, "oz", "ounce");
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["kg", "m", "oz"], "quantity 'in' qualifier sites must offer real UCUM unit labels");
+        labels.Should().NotContain(quantityExamples, "qualifier-site completions must not fall back to quantity literal examples");
+        labels.Should().NotContain(["field", "state", "event", "rule"], "DSL keywords must not appear in qualifier-site completions");
+        labels.Should().NotContain("[oz_av]", "print symbols should be used as labels when available");
+        ounce.InsertText.Should().StartWith("[oz_av]", "quantity unit completions must insert the UCUM code");
+        ounce.InsertText.Should().EndWith("'", "quote-trigger completions should preserve the closing quote convenience");
+    }
+
+    [Fact]
+    public async Task TypedConstant_QuantityOfQualifier_QuoteTrigger_ShowsDimensionCatalog()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field q as quantity of ¦
+            """, "'");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var quantityExamples = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Quantity).ContentValidation!.Examples;
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["mass", "length", "temperature", "count"], "quantity 'of' qualifier sites must offer real dimension names");
+        labels.Should().NotContain(quantityExamples, "qualifier-site completions must not fall back to quantity literal examples");
+        labels.Should().NotContain(["kg", "m", "[oz_av]"], "dimension qualifier completions must not route to UCUM unit codes");
+        labels.Should().NotContain(["field", "state", "event", "rule"], "DSL keywords must not appear in qualifier-site completions");
+    }
+
+    [Fact]
+    public async Task TypedConstant_QuantityDefault_CtrlSpace_MatchesQuoteTriggerExamples()
+    {
+        var quoteTriggerCompletions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field q as quantity default ¦
+            """, "'");
+        var ctrlSpaceCompletions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field q as quantity default '¦'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var quoteTriggerLabels = quoteTriggerCompletions.Items.Select(item => item.Label).ToArray();
+        var ctrlSpaceLabels = ctrlSpaceCompletions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Quantity).ContentValidation!.Examples;
+
+        quoteTriggerCompletions.IsIncomplete.Should().BeFalse();
+        ctrlSpaceCompletions.IsIncomplete.Should().BeFalse();
+        quoteTriggerLabels.Should().Contain(expected);
+        ctrlSpaceLabels.Should().Contain(expected);
+        ctrlSpaceLabels.Should().BeEquivalentTo(quoteTriggerLabels);
+    }
+
+    [Fact]
     public async Task TypedConstant_Text_NoAutoPopup()
     {
         // text is free-form; no examples exist and no reused values → empty on ' trigger.
@@ -1052,6 +1133,78 @@ public class CompletionHandlerTests
 
         completions.IsIncomplete.Should().BeFalse();
         labels.Should().Contain(expected);
+    }
+
+    // ─── B2 — Quantity unit slot: full UCUM tier-1 catalog ───────────────────────
+
+    [Fact]
+    public async Task TypedConstant_SpaceTrigger_Quantity_AfterAmount_ShowsFullUnitCatalog()
+    {
+        // B2 fix: space trigger inside '5 ¦' must return the full UCUM tier-1 catalog, not 3 hardcoded examples.
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity default '5 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Length.Should().BeGreaterThan(3, "the full UCUM tier-1 catalog has many more than 3 entries");
+        labels.Should().Contain(["kg", "m", "g", "L", "m/s", "oz"], "these are representative tier-1 unit labels");
+        labels.Should().NotContain(["field", "state", "event", "rule"], "DSL keywords must not appear in unit slot completions");
+    }
+
+    [Fact]
+    public async Task TypedConstant_SpaceTrigger_Quantity_DimensionQualifier_FiltersToMatchingUnits()
+    {
+        // B2 fix: when a 'of <dimension>' qualifier is declared, only units of that dimension are returned.
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity of 'mass' default '5 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("kg", "kg is a mass unit");
+        labels.Should().Contain("g", "g is a mass unit");
+        labels.Should().NotContain("m", "m is a length unit, not mass");
+        labels.Should().NotContain("L", "L is a volume unit, not mass");
+        labels.Should().NotContain(["field", "state", "event", "rule"]);
+    }
+
+    [Fact]
+    public async Task TypedConstant_SpaceTrigger_Quantity_UnitQualifier_ShowsOnlyPinnedUnit()
+    {
+        // B2: 'in <unit>' qualifier pins the completion list to exactly that one unit code.
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity in '[lb_av]' default '5 ¦'
+            """, " ");
+
+        var item = GetItem(completions, "lb", "pound");
+
+        completions.IsIncomplete.Should().BeFalse();
+        completions.Items.Should().ContainSingle();
+        item.InsertText.Should().Be("[lb_av]", "unit qualifier completions must insert the UCUM code");
+    }
+
+    [Fact]
+    public async Task TypedConstant_SpaceTrigger_Quantity_ItemsUsePrintSymbolsAndNameDetails()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity default '5 ¦'
+            """, " ");
+
+        var ounce = GetItem(completions, "oz", "ounce");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("kg");
+        labels.Should().Contain("oz");
+        labels.Should().NotContain("[oz_av]", "print symbols should be used as labels when available");
+        ounce.InsertText.Should().Be("[oz_av]", "quantity unit completions must insert valid UCUM codes");
     }
 
     [Fact]

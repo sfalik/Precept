@@ -28,7 +28,7 @@ public class UcumCatalogDriftTests
     private static readonly string[] RequiredTier1Codes =
     [
         "m", "km", "[in_i]", "[ft_i]", "[mi_i]", "[nmi_i]",
-        "kg", "g", "[lb_av]", "t", "[oz_tr]",
+        "kg", "g", "[lb_av]", "[oz_av]", "[gr]", "t",
         "L", "mL", "[gal_us]", "[bbl_us]",
         "m2", "har", "[acr_us]",
         "K", "Cel", "[degF]", "[degR]",
@@ -40,7 +40,7 @@ public class UcumCatalogDriftTests
         "rad", "deg", "gon"
     ];
 
-    private static readonly string[] ExcludedTier1Codes = ["s", "min", "h", "d", "mol"];
+    private static readonly string[] ExcludedTier1Codes = ["s", "min", "h", "d", "mol", "[oz_tr]", "[pwt_tr]", "[oz_ap]", "[lb_ap]"];
 
     private static readonly (string Code, DimensionVector Vector)[] DerivedTier1Vectors =
     [
@@ -69,6 +69,10 @@ public class UcumCatalogDriftTests
             var atom = GetRequiredAtom(all, code);
             atom.Vector.Should().Be(expectedVector, $"{code} should keep its expected UCUM dimension vector");
         }
+
+        all["[lb_av]"].PrintSymbol.Should().Be("lb");
+        all["[oz_av]"].PrintSymbol.Should().Be("oz");
+        all["[gr]"].PrintSymbol.Should().BeNull();
     }
 
     [Fact]
@@ -77,8 +81,8 @@ public class UcumCatalogDriftTests
         var tier1 = UcumAtomCatalog.BrowseTier1();
         var tier1Codes = tier1.Select(atom => atom.Code).ToArray();
 
-        tier1.Should().HaveCount(150);
-        tier1Codes.Distinct(StringComparer.Ordinal).Count().Should().Be(150, "Tier 1 should not contain duplicate codes");
+        tier1.Should().HaveCount(146);
+        tier1Codes.Distinct(StringComparer.Ordinal).Count().Should().Be(146, "Tier 1 should not contain duplicate codes");
 
         foreach (var code in RequiredTier1Codes)
             tier1Codes.Should().Contain(code, $"Tier 1 should retain curated UCUM code '{code}'");

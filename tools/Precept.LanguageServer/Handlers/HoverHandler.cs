@@ -633,7 +633,25 @@ internal sealed class HoverHandler : IHoverHandler
             sections.Add($"Format: {validation.FormatDescription}");
         }
 
+        if (constant.ResultType is TypeKind.Quantity or TypeKind.UnitOfMeasure)
+        {
+            var unitCode = ExtractUnitCode(constant.RawText);
+            if (unitCode is not null && UcumCatalog.LookupAtom(unitCode) is { } atom)
+            {
+                var symbolPart = atom.PrintSymbol is not null ? $" ({atom.PrintSymbol})" : string.Empty;
+                sections.Add($"Unit: `{atom.Code}`{symbolPart} — {atom.Name}");
+            }
+        }
+
         return string.Join("\n\n", sections);
+    }
+
+    private static string? ExtractUnitCode(string rawText)
+    {
+        var lastSpace = rawText.LastIndexOf(' ');
+        var unitCode = lastSpace >= 0 ? rawText[(lastSpace + 1)..] : rawText;
+        unitCode = unitCode.Trim();
+        return string.IsNullOrWhiteSpace(unitCode) ? null : unitCode;
     }
 
     private static string CreateAccessorMarkdown(TypeMeta ownerType, TypeAccessor accessor, TypeKind? resultType)

@@ -9,7 +9,7 @@ namespace Precept.Mcp.Tools;
 public static class DomainsTool
 {
     [McpServerTool(Name = "precept_domains")]
-    [Description("Return the Precept domain catalog: ISO 4217 currencies, curated UCUM tier-1 units (150 entries), UCUM SI prefixes, and named physical dimensions. Call when working with money, quantity, price, or temporal fields.")]
+    [Description("Return the Precept domain catalog: ISO 4217 currencies, curated UCUM tier-1 units (146 entries), UCUM SI prefixes, and named physical dimensions. Call when working with money, quantity, price, or temporal fields.")]
     public static DomainsDto Domains()
     {
         var baseDomains = LanguageTool.Language().Domains;
