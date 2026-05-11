@@ -1,3 +1,176 @@
+# BUG-057 Spec Analysis
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-10T19:55:32-04:00
+**Status:** Analysis complete
+
+## Verdict: VALID BUG
+
+`period of 'date'` is a spec-mandated qualifier form that the parser accepts, the type checker silently drops, and the proof engine then cannot satisfy. This is not a spec gap — the spec explicitly requires it, the catalog models it, and the implementation fails to propagate it.
+
+## Evidence
+
+### 1. What the spec says (precept-language-spec.md)
+
+**§2.3 Type References (line 963):**
+The grammar production `TypeQualifier := (in | of | to) Expr` applies to all scalar types including `period`. Line 968 confirms: "Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family."
+
+**§3.5 Temporal operators (lines 1240, 1243):**
+
+| Left | Op | Right | Result | Notes |
+|------|----|-------|--------|-------|
+| `date` | `±` | `period of 'date'` | `date` | Unconstrained period → `UnqualifiedPeriodArithmetic`. |
+| `time` | `±` | `period of 'time'` | `time` | Unconstrained period → `UnqualifiedPeriodArithmetic`. |
+| `datetime` | `±` | `period` | `datetime` | Accepts all period components. |
+
+The spec explicitly defines `period of 'date'` as the **required** RHS type for `date ± period`. An unqualified period on a date produces the `UnqualifiedPeriodArithmetic` proof violation. This is not optional surface — the spec demands it.
+
+### 2. What the type catalog says (Types.cs, Operations.cs)
+
+**Period qualifier shape (Types.cs:34-38):**
+```
+QS_TemporalUnitOrDimension = new([
+    new(TokenKind.In, QualifierAxis.TemporalUnit),
+    new(TokenKind.Of, QualifierAxis.TemporalDimension),
+], InOfExclusive: true);
+```
+Period supports two qualifier axes: `in '<unit>'` (e.g., `in 'days'`) and `of '<dimension>'` (e.g., `of 'date'`, `of 'time'`). They're mutually exclusive.
+
+**DeclaredQualifierMeta (DeclaredQualifierMeta.cs:54-58):**
+A `TemporalDimension` record exists carrying `PeriodDimension Value` — the exact metadata shape needed to store `of 'date'`.
+
+**Operations catalog (Operations.cs:264-280):**
+`DatePlusPeriod` and `DateMinusPeriod` both carry `DimensionProofRequirement(PeriodDimension.Date)` — the proof engine requires the period operand to have `PeriodDimension.Date`. `TimePlusPeriod`/`TimeMinusPeriod` require `PeriodDimension.Time`.
+
+**PeriodDimension enum (ProofRequirement.cs:66-73):**
+`Any`, `Date`, `Time` — all three values exist.
+
+### 3. What the compiler actually does (compile test results)
+
+| Declaration | Result | Qualifier in output? |
+|-------------|--------|---------------------|
+| `field Offset as period` | ✅ Compiles | No qualifier (correct) |
+| `field Offset as period of 'date'` | ✅ Compiles | **No qualifier (BUG — silently dropped)** |
+| `field Offset as period of 'time'` | ✅ Compiles | **No qualifier (BUG — silently dropped)** |
+| `field Offset as period in 'days'` | ✅ Compiles | **No qualifier (BUG — silently dropped)** |
+| `field Price as money in 'USD'` | ✅ Compiles | `"in 'USD'"` ✅ preserved |
+| `field Weight as quantity in 'kg'` | ✅ Compiles | `"in 'kg'"` ✅ preserved |
+
+The period qualifier is parsed without error but **silently discarded** during type checking. Money and quantity qualifiers are preserved correctly — the bug is specific to the period type's qualifier propagation path.
+
+**Arithmetic consequence:**
+
+| Expression | Offset type | Result |
+|------------|-------------|--------|
+| `Start + Offset` (Offset: `period of 'date'`, Start: `date`) | PRE0113: "requires Date dimension but has unknown" | ❌ BUG |
+| `Start + Offset` (Offset: `period`, Start: `date`) | PRE0113: same error | ❌ Correct behavior — unqualified period should fail |
+| `Start + Offset` (Offset: `period`, Start: `datetime`) | ✅ No error | ✅ Correct — datetime accepts all period components |
+
+The proof engine correctly requires `PeriodDimension.Date` for `date + period`, but the qualifier was already dropped at the type-checking stage, so the declared `of 'date'` qualifier is invisible to the proof engine. The result: `date + period of 'date'` fails identically to `date + period` (unqualified).
+
+### 4. Sample file coverage
+
+Zero sample files use any temporal types (date, time, datetime, period, etc.). The temporal arithmetic surface has **no integration test coverage from samples**.
+
+## Root Cause
+
+The parser accepts the `of 'date'` qualifier on `period` (the `QS_TemporalUnitOrDimension` shape allows it). The type checker resolves the qualifier value. But somewhere between type checking and the `PreceptField` model that the proof engine reads, the `TemporalDimension` qualifier metadata is dropped. Money/quantity qualifiers survive this path; period qualifiers do not.
+
+The likely failure point is the type checker's field-type construction: it may not be wiring `DeclaredQualifierMeta.TemporalDimension` into the field's type representation, even though the parser produced the qualifier node and the catalog says it's valid.
+
+## Recommendation
+
+**This is a valid implementation bug.** The fix requires:
+
+1. **Type checker** — ensure `period of 'date'` / `period of 'time'` qualifiers are preserved in the field's type representation (same path that works for `money in 'USD'` and `quantity in 'kg'`).
+2. **Proof engine** — once the qualifier is preserved, the existing `DimensionProofRequirement` check should work — it already looks for `PeriodDimension.Date` on the operand. The machinery exists; it just can't see the declaration.
+3. **`period in '<unit>'` qualifiers** — same silent-drop behavior observed for `period in 'days'`. Should be checked/fixed in the same pass.
+4. **MCP DTO** — once the field model carries the qualifier, the MCP serialization should pick it up automatically (it already does for money/quantity).
+
+### Pipeline stages affected
+
+| Stage | Change needed? | Why |
+|-------|---------------|-----|
+| Parser | No | Already parses the qualifier correctly |
+| Type checker | **Yes** | Must preserve `TemporalDimension`/`TemporalUnit` qualifiers on period fields |
+| Proof engine | No (probably) | `DimensionProofRequirement` already models the check; just needs input |
+| Graph analyzer | Verify | Check whether qualifier metadata flows through the graph |
+| Runtime evaluator | Verify | Period qualifier may affect runtime validation |
+| MCP DTO | No (probably) | Already serializes qualifiers when present |
+
+### Design review required?
+
+**No.** This is not new language surface. The spec already defines `period of 'date'` as valid syntax with defined semantics. The catalog already models the qualifier shape and the proof requirements. This is a bug fix — making the implementation match the spec — not a feature addition.
+
+### Suggested test coverage
+
+1. `field X as period of 'date'` — qualifier preserved in compiled definition
+2. `field X as period of 'time'` — qualifier preserved
+3. `field X as period in 'days'` — unit qualifier preserved
+4. `date + period_of_date` — no PRE0113 error
+5. `date + period` (unqualified) — PRE0113 fires correctly (regression anchor)
+6. `time + period_of_time` — no error
+7. `datetime + period` — no error (accepts all — regression anchor)
+8. Sample file with temporal period arithmetic (gap: zero samples today)
+
+## Impact if not fixed
+
+Authors cannot express `date + period` arithmetic at all. The only workaround is `datetime + period`, which changes the semantic domain (datetime vs. date) and forces the author to carry unnecessary time components. The spec's temporal arithmetic table has a dead row.
+
+# BUG-057 slice assessment
+
+Date: 2026-05-10
+Assessor: George (Runtime Dev)
+
+## Conclusion
+
+BUG-057 fits best as an addition to **Slice 8 (Parser — Replace Hardcoded Token Sets with Catalog Lookups)**, specifically in the `ParseTypeReference()` / field-type parsing area.
+
+## Why
+
+- The narrowed bug is no longer about temporal arithmetic semantics in general.
+- The remaining failure is that `field Offset as period of 'date'` appears unsupported in field type position.
+- Slice 8 already owns parser/type-reference surface fixes:
+  - BUG-027 expands event-arg type parsing by delegating to full `ParseTypeReference()`.
+  - BUG-045 explicitly extends `ParseTypeReference()` for additional type syntax.
+- That makes Slice 8 the closest existing pending slice for adding/supporting `period` temporal-dimension qualifiers on field declarations.
+
+## Not the best fit
+
+- **Slice 9** is about operator result typing and modifier validation, not declaration syntax.
+- **Slice 11** is about proof-obligation derivation, but the narrowed bug says the required field type cannot be declared in the first place.
+- There is no existing pending slice dedicated to temporal arithmetic beyond operator/proof behavior, and this issue is upstream of both.
+
+## Recommended handling
+
+Add BUG-057 to Slice 8 as a parser/type-reference support item for qualified `period` field types.
+
+If implementation later shows the parser already accepts the syntax and the qualifier is instead dropped during type binding/projection, then BUG-057 should be split:
+
+1. **Slice 8** for field-type syntax acceptance / TypeRef construction
+2. **Follow-on type-checker or proof slice** for preserving the `date` temporal dimension through semantic resolution
+
+Based on the narrowed bug statement and the current plan text, though, **Slice 8 is the right first home** rather than creating a standalone temporal-arithmetic slice.
+
+# Newman t2-12 complete
+
+## Commit
+- `5f79fc7a` — `feat(t2-12): MCP DTO audit — sync DTOs to catalog growth`
+
+## What changed
+- Synced `CompileToolDtos.cs` to the audited compile contract: state hooks, event ensures, rule guards, row outcomes/reject messages, state omit/access details, event arg optionality, and choice metadata are now represented.
+- Rewired `CompileTool.cs` to populate every added DTO field from the real semantic/construct surfaces already present in core (`SemanticIndex`, `ConstructManifest`, and catalog metadata).
+- Fixed compile rendering gaps: `~string`, structural collection type names, valued modifiers, stripped `because` keyword/message quotes, and string default values.
+- Added focused MCP definition regression tests covering each DTO sync item.
+- Updated `docs/tooling/mcp.md` (the current MCP design doc surface in-repo) to match the shipped `precept_compile` contract.
+
+## Validation
+- `dotnet test test/Precept.Mcp.Tests/` → 74 passed
+- `dotnet test test/Precept.Tests/` → 3925 passed
+
+## Notes
+- `docs/McpServerDesign.md` is not present in this repo; `docs/tooling/mcp.md` is the active design-contract document that was updated in the same pass.
+
 # Elaine — samples when-guard audit
 
 Date: 2026-05-10
@@ -39,8 +212,8 @@ The three language docs now agree on the final slot-driven, pre-verb-guard model
 
 # Decision: Grammar Doc Comprehensive Review Findings
 
-**Date:** 2026-05-10  
-**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-10
+**Author:** Frank (Lead/Architect)
 **Context:** Comprehensive line-by-line review of `docs/language/precept-grammar.md`
 
 ## Decision
@@ -67,9 +240,9 @@ The grammar doc is a design reference for people working ON the language. Factua
 
 # Decision: Remove `SupportsPostActionEnsure` — Grammar Integrity Fix
 
-**Date:** 2026-05-10T15:32:08-04:00  
-**Author:** Frank (Lead/Architect)  
-**Status:** Ready for implementation  
+**Date:** 2026-05-10T15:32:08-04:00
+**Author:** Frank (Lead/Architect)
+**Status:** Ready for implementation
 **Audit:** `docs/working/frank-grammar-spec-audit-2026-05-10.md`
 
 ## Decision
@@ -116,9 +289,9 @@ Reconcile `.squad/decisions.md` so the active canonical entry reflects the final
 
 # Decision: Eliminate GuardPolicy — Slot List IS the Metadata
 
-**Author:** Frank — Lead/Architect  
-**Date:** 2026-05-10T13:16:47-04:00  
-**Status:** Final recommendation  
+**Author:** Frank — Lead/Architect
+**Date:** 2026-05-10T13:16:47-04:00
+**Status:** Final recommendation
 **Supersedes:** `frank-when-guard-revised.md` (2-member GuardPolicy enum proposal)
 
 ---
@@ -162,9 +335,9 @@ See `docs/Working/frank-when-guard-audit-2.md` for the complete analysis includi
 
 # Decision: When-Guard Catalog Shape — Revised (PostVerb Eliminated)
 
-**Author:** Frank — Lead/Architect  
-**Date:** 2026-05-10T13:15:46-04:00  
-**Status:** Recommendation — awaiting owner decision  
+**Author:** Frank — Lead/Architect
+**Date:** 2026-05-10T13:15:46-04:00
+**Status:** Recommendation — awaiting owner decision
 **Supersedes:** Prior 4-member `GuardPolicy` proposal (frank-when-guard-audit-2.md)
 
 ---
@@ -450,8 +623,8 @@ No sample files use guarded access mode — no sample changes needed.
 
 # BUG-020 Committed — George Runtime Dev
 
-**Date:** 2026-05-10T15:32:08-04:00  
-**Author:** George (Runtime Dev)  
+**Date:** 2026-05-10T15:32:08-04:00
+**Author:** George (Runtime Dev)
 **Branch:** Precept-V2-Radical
 
 ---
@@ -489,7 +662,7 @@ No sample files use guarded access mode — no sample changes needed.
 
 # Decision: SupportsPostActionEnsure Removed
 
-**Author:** George (Runtime Dev)  
+**Author:** George (Runtime Dev)
 **Date:** 2026-05-10
 
 ## Commit SHAs
@@ -662,9 +835,9 @@ Option 3: standalone companion tokens.
 
 
 
-**Agent:** George (Runtime Dev)  
+**Agent:** George (Runtime Dev)
 
-**Date:** 2026-05-09T10:41:11Z  
+**Date:** 2026-05-09T10:41:11Z
 
 **Action:** Implement `CurrencyEntry` + `CurrencyCatalog` (Action 1 from Frank's gap analysis)
 
@@ -728,7 +901,7 @@ Option 3: standalone companion tokens.
 
 ### Fund code MinorUnit = -1 for N/A
 
-ISO 4217 lists certain codes with `N/A` for minor units. Convention: `MinorUnit = -1`. Applies to:  
+ISO 4217 lists certain codes with `N/A` for minor units. Convention: `MinorUnit = -1`. Applies to:
 
 XBA, XBB, XBC, XBD (bond market units), XDR (SDR/Special Drawing Right), XSU (Sucre), XUA (ADB Unit of Account).
 
@@ -12880,13 +13053,13 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
-**Author:** Frank (Lead/Architect)  
+**Author:** Frank (Lead/Architect)
 
-**Date:** 2026-05-09T12:44:09-04:00  
+**Date:** 2026-05-09T12:44:09-04:00
 
-**Status:** RULING  
+**Status:** RULING
 
-**Scope:** CurrencyEntry symbol field, data ownership, maintenance strategy  
+**Scope:** CurrencyEntry symbol field, data ownership, maintenance strategy
 
 **Affects:** Slice 1c (CurrencyCatalog loader migration)
 
@@ -13706,11 +13879,11 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
-**Date:** 2026-05-09T12:51:10-04:00  
+**Date:** 2026-05-09T12:51:10-04:00
 
-**Author:** Frank (Lead/Architect)  
+**Author:** Frank (Lead/Architect)
 
-**Requested by:** Shane  
+**Requested by:** Shane
 
 **Scope:** Does the UCUM data layer as designed (Slices 1d, 2, 3, 10) provide sufficient grammar/data for ALL required evaluator unit-math behavior?
 

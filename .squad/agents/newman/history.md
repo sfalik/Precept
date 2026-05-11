@@ -26,6 +26,11 @@
 
 ## Recent Updates
 
+### 2026-05-10T23:55:32Z — t2-12 MCP DTO audit durably recorded
+- Commits `5f79fc7a` and `6a211bc4` synced the `precept_compile` DTO surface, compile projection, focused MCP regression coverage, and `docs/tooling/mcp.md` contract text.
+- Validation closed BUG-011/012/016/017/018/022/023/024/032/033/034/035/036/042/043/047 with 74 passing MCP tests and 3,925 passing core tests.
+- Durable note: `docs/tooling/mcp.md` is the active in-repo MCP contract doc on this branch; `docs/McpServerDesign.md` is absent.
+
 ### 2026-05-09T23:21:36Z — Focused MCP tool implementation pattern durably merged
 - Scribe merged Newman's 8-tool implementation note into `.squad/decisions.md`: focused tools project from `LanguageTool.Language()`, `precept_language` stays internal-only for discovery, `precept_operations(category?)` filters on `LhsType`, and `precept_domains` includes `UcumPrefixCatalog`.
 

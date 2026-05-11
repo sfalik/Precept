@@ -46,8 +46,15 @@
 
 - Earlier 2026-05-09 and 2026-05-10 work completed the typed-literal system, enriched diagnostics/quickstart/syntax catalogs, added `TypedField.NameSpan` and `ArgReference`, landed outline/snippet/catalog metadata, shipped the Track 2 Phase A safe batch, renamed the value-modifier family, and closed the TokenMeta alias cleanup plus BUG-039 documentation follow-through.
 - Durable chronology, rationale, and commit anchors live in `.squad/decisions.md`; this history keeps only the live implementation guidance George needs for the next slices.
-
+- 2026-05-10T09:53:14Z — t2-2 Slice C: shape method body rewire: George-6 completed Slice C by replacing hardcoded separator tokens in all 7 affected shape methods: `ParseAssignValueAction`, `ParseCollectionIntoAction`, `ParseCollectionValueByAction`, `ParseInsertAtAction`, `ParseRemoveAtIndexAction`, `ParsePutKeyValueAction`, `ParseCollectionIntoByAction`.
+- 2026-05-10T09:53:14Z — t2-2 Slice B: ParseActionTarget shape-specific separators: `ParseActionTarget` now accepts `FrozenSet<TokenKind> separators` from `Actions.GetShapeMeta(meta.SyntaxShape).SeparatorTokens`; old hardcoded `{=, into, by, at}` union is gone.
+- 2026-05-10T13:53:14Z — t2-2 Slice A complete with typed operand roles: Shane's scope ruling is now durable: no deferrals inside the slice, operand roles are in scope now, `ActionSyntaxSlot.Role` must be `ActionSlotRole`, and `IntoSupported` is removed rather than preserved beside slot metadata.
+- 2026-05-10T13:53:14Z — Scribe handoff for t2-2 Slice B: George-5's Slice B result is now recorded in `.squad/decisions.md` and the orchestration/session logs, so future parser separator work should use the canonical ledger entry rather than the transient inbox note.
 ## Recent Updates
+
+### 2026-05-10T23:55:32Z — BUG-057 routed to Slice 8; t2-16 plan updated
+- George-7 narrowed BUG-057 to field-type/parser support for qualified `period` declarations, updated `precept-toolchain-bugs.md`, and wrote `george-bug057-slice-assessment.md` recommending Slice 8 as the first implementation home.
+- George-6 appended the t2-16 DTO Source Generator slice spec to `precept-toolchain-plan.md`, so Track 2 now has an explicit generator-planning slice ready for implementation follow-through.
 
 ### 2026-05-10T20:56:42Z — Track 2 slices 4/9/10/11 durably recorded
 - George-6's commit `df874e15` established `OperatorMeta.ResultType` / `ResultTypePolicy` as the catalog authority for operator result typing, including the `OperationResult` handoff to `OperationMeta.Result` for arithmetic.
@@ -64,27 +71,3 @@
 - Scribe merged both your t2-2 Slice C note and your Slice 2E BUG-049a completion into `.squad/decisions.md`, with BUG-049a paired to Frank's approved design review as one canonical closeout entry.
 - Durable implementation rules now recorded: shape-method separators come from `Actions.GetShapeMeta(...).Slots[n].PrecedingSeparator`, and intrinsic non-negative accessor returns discharge through `FixedReturnAccessor.ReturnNonnegative` while action cardinality obligations reuse the single shared `Types.CollectionCountAccessor`.
 - Validation anchors now captured in the ledger: Slice C stayed green at 4056/4056 on `ef6fedcb`; Slice 2E closed targeted build + tests at 3857 passing on `f2d1dece` and `e826e4bd`.
-
-### 2026-05-10T09:53:14Z — t2-2 Slice C: shape method body rewire
-- George-6 completed Slice C by replacing hardcoded separator tokens in all 7 affected shape methods: `ParseAssignValueAction`, `ParseCollectionIntoAction`, `ParseCollectionValueByAction`, `ParseInsertAtAction`, `ParseRemoveAtIndexAction`, `ParsePutKeyValueAction`, `ParseCollectionIntoByAction`.
-- Each method calls `Actions.GetShapeMeta(ActionSyntaxShape.X).Slots[n]` and reads `PrecedingSeparator!.Value` for `Expect()` and `PrecedingSeparator` for optional `if (Peek().Kind == slot.PrecedingSeparator)` guards. No hardcoded `TokenKind.By`, `TokenKind.At`, `TokenKind.Into`, or `TokenKind.Assign` remain in any shape method body.
-- Expression-terminator lambdas in intermediate expression slots (`CollectionValueBy`, `InsertAt`, `PutKeyValue`) are also slot-driven.
-- 6 new tests in `ActionChainTests.cs`: 3 behavioral (Insert, Dequeue±into, Put) + 3 catalog-property (AppendBy slots, CollectionIntoBy slots, Dequeue without into).
-- Validation: 4056/4056 tests (3841 Precept.Tests + 156 LS + 59 MCP). Commit: `ef6fedcb`.
-- t2-2 (BUG-021 / BUG-048 / BUG-049) fully closed across all three slices.
-
-### 2026-05-10T09:53:14Z — t2-2 Slice B: ParseActionTarget shape-specific separators
-- `ParseActionTarget` now accepts `FrozenSet<TokenKind> separators` from `Actions.GetShapeMeta(meta.SyntaxShape).SeparatorTokens`; old hardcoded `{=, into, by, at}` union is gone.
-- `ParseActionByShape` computes separators once from catalog; all 9 shape methods receive and forward it.
-- 8 new tests in `ParseActionTargetTests.cs`: 4 catalog property tests + 4 behavioral parser tests.
-- Validation: 4050/4050 tests (3835 Precept.Tests + 156 LS + 59 MCP). Commit: `fb525df0`.
-
-### 2026-05-10T13:53:14Z — t2-2 Slice A complete with typed operand roles
-- Shane's scope ruling is now durable: no deferrals inside the slice, operand roles are in scope now, `ActionSyntaxSlot.Role` must be `ActionSlotRole`, and `IntoSupported` is removed rather than preserved beside slot metadata.
-- George-3 added `ActionSyntaxSlot`, `ActionShapeMeta`, pre-computed `SeparatorTokens`, and exhaustive `Actions.GetShapeMeta()` coverage for all 9 shapes, with slot metadata replacing the old into flag.
-- George-4 finished the typed-role cleanup: `ActionSlotRole` is 1-based for PRECEPT0018, `CollectionIntoBy` now uses `OrderingCapture` for the dequeue-by output slot, and MCP/test consumers now read `ActionSlotRole.IntoTarget` directly.
-- Validation stayed green at 4322 total tests across Precept, MCP, LanguageServer, and Analyzers.
-
-### 2026-05-10T13:53:14Z — Scribe handoff for t2-2 Slice B
-- George-5's Slice B result is now recorded in `.squad/decisions.md` and the orchestration/session logs, so future parser separator work should use the canonical ledger entry rather than the transient inbox note.
-- Durable implementation guidance is unchanged: shape-specific separator sets come from `Actions.GetShapeMeta()`, and `CollectionValueBy` / `RemoveAtIndex` remain parser-unreachable via `Actions.ByTokenKind`, so behavioral coverage for those shapes still belongs outside direct parser dispatch tests.
