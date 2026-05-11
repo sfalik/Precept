@@ -20,18 +20,23 @@ omits or flattens catalog-derived structure that the DTOs have no slot to hold. 
 treats `any` as a literal state lookup and `all` as a field name, ignoring the token
 classification metadata that already distinguishes wildcards from identifiers.
 
-Track 2 addresses this in two phases that must be executed in order. **Phase A (Slices 1–7)**
+Track 2 addresses this in three phases that must be executed in order. **Phase A (Slices 1–7)**
 adds missing fields to the catalogs so that pipeline stages have somewhere to read the truth
 from. **Phase B (Slices 8–15)** rewires pipeline stages and MCP DTOs to read those fields
 instead of their current hardcoded equivalents. Doing Phase B without Phase A produces
 patchwork fixes that cement the catalog-drift pattern. Doing Phase A first makes Phase B
 mechanically derivable — in almost every case, "fix the pipeline stage" reduces to "replace
-the switch or hardcoded check with a catalog field read."
+the switch or hardcoded check with a catalog field read. **Phase C (Slice 16)** then replaces
+the hand-maintained structural MCP DTO declarations with generated output derived from the
+`SemanticIndex` record shapes, so the DTO surface no longer drifts from its source-of-truth
+types.
 
 A third layer — Slices 14–15 — closes the test gap. The 54 bugs were all detectable before
 they shipped if the project had had catalog-capability fixture tests (one test per catalog
 member, exercising that member through the full pipeline). Those tests would have caught ~40
-of 54 bugs. Adding them now provides the regression net that prevents recurrence.
+of 54 bugs. Adding them now provides the regression net that prevents recurrence. A final
+infrastructure slice — Slice 16 — hardens the MCP boundary after Slice 12 by generating the
+DTO record declarations from the audited semantic model instead of keeping them hand-synced.
 
 ---
 
@@ -82,6 +87,11 @@ catalog field does not exist, it must be added first (Slices 1–7).
 5. **Test layer additions FIFTH (Slices 14–15).** Catalog-capability tests and pipeline-stage
    unit tests provide the regression net. Write them against the fixed behavior to lock it in.
 
+6. **DTO source generator SIXTH (Slice 16).** After Slice 12 establishes the final hand-authored
+   MCP DTO baseline, add a generator patterned after `tools/Precept.GrammarGen/` that emits the
+   structural DTO record declarations from `SemanticIndex` type shapes and fails the build if
+   the checked-in generated output is stale.
+
 ---
 
 ## Status Tracker
@@ -110,10 +120,11 @@ Slices 1–2 bundle catalog + pipeline work and close bugs directly. Slices 3–
 | Slice 9 | Type Checker — Catalog-Derived Operator Typing | ✅ Complete — `b7868d60` | BUG-002, BUG-003, BUG-007, BUG-009, BUG-010, BUG-028, BUG-029, BUG-038, BUG-040, BUG-046, BUG-052, BUG-053 |
 | Slice 10 | Name Binder — Catalog-Derived Name Resolution | ✅ Complete — `def91dbb` | BUG-001, BUG-026, BUG-030, BUG-037 |
 | Slice 11 | Proof Engine — Catalog-Derived Proof Obligations | ✅ Complete — `004e68be` | BUG-008, BUG-013, BUG-050 |
-| Slice 12 | MCP DTO Audit — Sync DTOs to Catalog Growth | ✅ Complete — 5f79fc7a | BUG-011, BUG-012, BUG-016, BUG-017, BUG-018, BUG-022, BUG-023, BUG-024, BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047 |
-| Slice 13 | MCP-Docs — Fix Incorrect Recovery Hints | ⬜ Not started | BUG-014, BUG-015, BUG-041 |
+| Slice 12 | MCP DTO Audit — Sync DTOs to Catalog Growth | ✅ Complete — `5f79fc7a` | BUG-011, BUG-012, BUG-016, BUG-017, BUG-018, BUG-022, BUG-023, BUG-024, BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047 |
+| Slice 13 | MCP-Docs — Fix Incorrect Recovery Hints | ✅ Complete — `617d175f` | BUG-014, BUG-015, BUG-041 |
 | Slice 14 | Test Layer — Catalog Capability Tests | ✅ Complete — `7a4c2e31` | (regression coverage for all 54) |
-| Slice 15 | Test Layer — Pipeline Stage Unit Tests | ⬜ Not started | (regression coverage for all 54) |
+| Slice 15 | Test Layer — Pipeline Stage Unit Tests | ✅ Complete | (regression coverage for all 54) |
+| Slice 16 | DTO Source Generator | ⬜ Not started | — |
 
 **Current active-slice note:** no Track 2 slice is currently active in the shared worktree. Slices 1–11 are durably recorded on this branch; Slice 12 is the next consumer slice when implementation resumes.
 
@@ -1295,6 +1306,8 @@ BUG-034, BUG-035, BUG-036, BUG-042, BUG-043, BUG-047
 
 ## Slice 13: MCP-Docs — Fix Incorrect Recovery Hints
 
+**Status:** ✅ Complete — `617d175f`
+
 **Goal:** Update recovery hints in `ProofsTool.cs` and `DiagnosticTool.cs` (or their backing
 catalog entries in `DiagnosticMeta` / `RuntimeFaultMeta`) that contain invalid Precept syntax
 or incorrect advice. These fixes should happen AFTER the underlying compiler bugs are fixed
@@ -1443,6 +1456,45 @@ typed.ResolvedType.Should().Be(TypeKind.Boolean);
 
 ---
 
+### Slice 16 — DTO Source Generator
+
+**Phase:** C (MCP Sync)
+
+**Goal:** Auto-emit the structural DTO record declarations from `SemanticIndex` types so
+`tools/Precept.Mcp/Dtos/CompileToolDtos.cs` stops being a hand-maintained parallel copy.
+
+**Files:**
+- `tools/Precept.DtoGen/` — new generator project mirroring Kramer's `tools/Precept.GrammarGen/`
+  structure (`Precept.DtoGen.csproj` + executable entry point)
+- `tools/Precept.Mcp/Dtos/CompileToolDtos.cs` — generated structural DTO output
+- `tools/Precept.Mcp/Tools/CompileTool.cs` — mapping/rendering methods stay hand-authored
+
+**Prerequisite:** Slice 12 / t2-12 — MCP DTO Audit — Sync DTOs to Catalog Growth. This slice
+starts only after the audited hand-authored baseline is complete.
+
+### Key Design Constraints
+
+- Read `SemanticIndex` record type shapes (field names, types, optionality) via Roslyn or
+  reflection and emit matching DTO record declarations.
+- Generate only the structural DTO shape. Do **not** generate mapping or rendering logic such as
+  expression-to-string projection or `TypeKind` display labels like `"set of money"`.
+- Emit a `// <auto-generated>` preamble in the generated `CompileToolDtos.cs`.
+- Follow the grammar-generator stale-output pattern: the build fails if the checked-in generated
+  DTO file is out of date.
+
+### Tests Required
+
+- Generator output determinism test — identical `SemanticIndex` inputs produce byte-for-byte
+  identical DTO output.
+- Round-trip test — generate the DTOs, compile, serialize a representative definition, and
+  deserialize it back successfully.
+
+**Status:** ⬜ Not started
+
+**Bugs Closed:** — this is infrastructure, not a bug-fix slice.
+
+---
+
 ## Bug Map — Slice Coverage
 
 | Bug | Title (abbreviated) | Category | Root Cause | Slice(s) |
@@ -1535,10 +1587,9 @@ Slices 1–7 (catalog additions)
 Slices 8–11 (pipeline fixes — can proceed in parallel after all of 1–7)
     ↓
 Slice 12 (MCP DTO audit — requires clean pipeline output)
-    ↓
-Slice 13 (MCP-docs fixes — requires accurate compiler behavior to give correct hints)
-    ↓
-Slices 14–15 (test layer — written against fixed behavior to lock it in)
+    ├── Slice 16 (DTO source generator — requires the audited DTO baseline)
+    ├── Slice 13 (MCP-docs fixes — requires accurate compiler behavior to give correct hints)
+    └── Slices 14–15 (test layer — written against fixed behavior to lock it in)
 ```
 
 Within Phase A (Slices 1–7): keep the work metadata-only. The real schema-addition slices
