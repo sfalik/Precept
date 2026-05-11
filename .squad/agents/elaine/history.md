@@ -58,6 +58,9 @@
 - Free-form literal types should stay lightweight. Text and plain numeric literals benefit more from reused local values and format examples on demand than from aggressive auto-popup behavior.
 - Empty typed literals and partial typed literals should feel different: empty state teaches the format with full examples, while partial state narrows to the exact segment vocabulary the user is finishing.
 
+- Qualifier-aware completion is a reusable design pattern: whenever a quoted scalar slot carries `in` or `of`, candidate lists hard-filter to the declared value(s) before any type-specific ranking.
+- Compound temporal is a V1 requirement, not a follow-on polish pass: temporal completion must preserve a visible continuation path for `+ <number> <temporal unit>` instead of treating the first unit as terminal.
+
 ## Recent Updates
 
 ### 2026-05-11T01:38:51Z — Terminal-state diagnostic UX recommendation shipped
@@ -206,3 +209,4 @@ Task: Revised the paradigm recommendation after Shane's feedback that the axis l
 ### 2026-05-09T15:21:46Z — Scribe merged the Data-family anchor-drop batch
 - `.squad/decisions.md` now records Elaine's slate audit, literal-safety confirmation, and anchor-removal outcome as one canonical decision.
 - Durable direction: the Data family stays `--data-t`, `--data-v`, `--field`, and `--arg`; the retired `--data` anchor no longer has standing consumers.
+

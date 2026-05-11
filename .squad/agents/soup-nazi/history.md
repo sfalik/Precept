@@ -28,6 +28,13 @@
 
 ## Recent Updates
 
+### 2026-05-10T(late) — Money/quantity modifier regression suite added
+- Confirmed George's `Modifiers.cs` + `TypeChecker.cs` changes were complete and correct before writing any tests.
+- Wrote 14 regression anchors in `test/Precept.Tests/TypeChecker/MoneyQuantityModifierRegressionTests.cs`: 5 zero-bound (nonnegative/positive/nonzero on money/quantity), 4 ranged-bound (min/max typed constants), 2 pre-existing-gap anchors (qualifier mismatch, plain number), 1 invalid-typed-constant error anchor, 2 regression guards against `InvalidModifierForType`.
+- All 14 passed immediately — no implementation gap from George. Full suite: 4567/4567 (up from 4553 baseline).
+- Pre-existing gaps documented as anchors 10 and 11 (qualifier alignment, plain-number on money): both apply equally to `default` modifier and need a uniform follow-up fix.
+- Decision note filed to `.squad/decisions/inbox/soup-nazi-money-modifier-tests.md`.
+
 ### 2026-05-11T01:38:51Z — Span-refactor fallout batch restored suite health
 - Your follow-up fixes are now recorded as the durable closeout for the span-refactor fallout: test helpers construct the new `MemberAccessExpression` shape correctly, qualified arg semantic sites remain full `Event.Arg` spans, and overlapping LS navigation prefers arg references first.
 - The no-terminal projector fixture now asserts `StructuralSinkState`, matching George's gated dead-end split, and the batch closed with `dotnet test` green at 5,085 passed / 0 failed.
