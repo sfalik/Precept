@@ -101,3 +101,9 @@
 - The semantic-token color notification must cross the VS Code client boundary as an object envelope (`rules`) or the extension can receive a non-array payload and throw `map is not a function` while applying theme rules.
 - Outline/document symbols need a defensive full-range normalization step even when semantic name spans are preferred, because VS Code enforces `selectionRange ⊆ range` at the protocol boundary.
 - The missing status-bar surface was **not** explained by either of those protocol bugs in the current code: the status item is created independently and survives a client stop by rendering the stopped state.
+
+## Recent Updates
+
+### 2026-05-11T02:32:33Z — Shane confirmed modifier-token squiggle fix
+- Shane confirmed the PRE0033 `money ... nonnegative` squiggle now lands on just `nonnegative`, so the per-modifier `SourceSpan` carry-through is the right durable fix.
+- Batch record: commit `4467e41d`, `ParsedModifier` now owns the modifier span, and language-server validation stayed green at 166/166 tests.
