@@ -14388,9 +14388,9 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 # t2-15 Completion Record — Pipeline Stage Unit Tests (Catalog-Aware)
 
-**Author:** Soup Nazi (test engineer)  
-**Date:** 2026-05-11  
-**Branch:** Precept-V2-Radical  
+**Author:** Soup Nazi (test engineer)
+**Date:** 2026-05-11
+**Branch:** Precept-V2-Radical
 **Slice:** 15 of 16 (Track 2)
 
 ---
@@ -14520,3 +14520,722 @@ The fix follows the exact same pattern as the existing mappers (`MapCurrencyQual
 - `test/Precept.LanguageServer.Tests`: 157/157 pass ✅
 
 No regressions introduced.
+
+# Decision: Numeric Range Modifiers Apply to `money`, `quantity`, and `price`
+
+**By:** Frank
+**Date:** 2026-05-10 (finalized 2026-05-10 after Shane's bound-form ruling)
+**Status:** FINALIZED — implementation brief complete, ready for Kramer
+
+---
+
+## Root Cause
+
+This is a **spec gap that propagated correctly into the catalog and TypeChecker**. The catalog and TypeChecker are not bugs — they faithfully implement the spec. The spec is wrong.
+
+---
+
+## What I Found
+
+### 1. Spec (line 1498)
+
+The modifier validation table explicitly lists:
+
+| Modifier | Applicable to | Error when applied to |
+|---|---|---|
+| `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, **domain** |
+| `positive` | (same) | (same) |
+| `nonzero` | (same) | (same) |
+| `min` / `max` | `integer`, `decimal`, `number` | everything else |
+
+`money` is `TypeCategory.BusinessDomain`. The spec explicitly says "domain types get an error." So the spec explicitly rejects both `money nonnegative` and `money min '100.00 USD'`. This wording is too coarse on both counts.
+
+### 2. Catalog (`Modifiers.cs`)
+
+```csharp
+private static readonly TypeTarget[] NumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+];
+```
+
+No `Money`. No `Quantity`. The catalog correctly implements the (wrong) spec. The TypeChecker fires `InvalidModifierForType` when the resolved type isn't in `ApplicableTo`. This is correct behavior given the current catalog. **Catalog gap, not implementation gap.**
+
+### 3. TypeChecker — applicability and bound parsing
+
+`IsTypeApplicable` checks the `ApplicableTo` array from the catalog. It does not hardcode type logic — if the catalog entry changes, the TypeChecker follows automatically.
+
+`ValidateModifierBounds` is called for cross-validation when both `min` and `max` are present. It uses `TryGetComparableModifierValue` which accepts only `NumberLiteral` or `-NumberLiteral` patterns; for anything else it returns `null` and **silently skips the cross-check**. No error is emitted.
+
+**Critical: the TypeChecker does not call `Resolve()` on `min`/`max` bound values at all.** Only `default` modifier values are type-resolved. This means the bound expression currently receives no type-checking against the field type for any type — integer, decimal, money, or otherwise.
+
+### 4. Parser — valued modifier expressions
+
+The parser's `ParseModifierList` calls `ParseExpression(0, ...)` for valued modifier bounds. `ExpressionStartTokens` is derived from `ExpressionForms.All` and includes `TokenKind.TypedConstant` (via `ExpressionForms.Literal.LeadTokens`). Therefore `'100.00 USD'` is **already a valid parse** in a modifier value position. No parser change is required.
+
+### 5. ProofEngine — `DeclarationValue` is already conservative
+
+The `ProofSatisfaction.Numeric(SelfValue, >=, DeclarationValue)` proof obligation for `min` uses `DeclarationValue` as the bound source. In `SatisfactionCovers`, `DeclarationValue` maps to `null` — conservative: cannot compare without a runtime value. This is already the correct behavior for money fields (the static prover cannot evaluate `'100.00 USD'` without runtime context). No change needed.
+
+### 6. Runtime evaluator
+
+`Evaluator.Fire`, `Update`, `Restore` are all `throw new NotImplementedException()`. Runtime modifier bound enforcement does not exist yet for any type. This is not a factor in the decision.
+
+### 7. Contradiction in Constructs.cs
+
+`ConstructKind.FieldDeclaration` usage example (line ~63):
+
+```
+"field amount as money nonnegative"
+```
+
+This is the canonical field declaration example displayed in completions, hover, and MCP output. The TypeChecker rejects it. The catalog authored this as the archetypal field declaration example — which means the catalog *intended* this to work. The spec fell behind the intended model.
+
+### 8. `nonpositive` / `negative` — not in the language
+
+They don't exist. There is no `ModifierKind.Nonpositive` or `ModifierKind.Negative`. The existing zero-bound set is: `nonnegative`, `positive`, `nonzero`. Out of scope.
+
+---
+
+## The Design Question: Why Is Zero Universal And Min/Max Are Not A Special Problem
+
+The zero-bound insight stands unchanged: `nonnegative`, `positive`, `nonzero` all compare against the **universal zero**. Currency dimension is irrelevant to the zero predicate.
+
+My original claim that `min`/`max` on `money` required "a different literal form, a different validation path, and potentially currency-consistency enforcement" was **wrong on all three counts**:
+
+1. **Different literal form**: False. The parser already accepts typed constants (`'100.00 USD'`) in modifier value positions — `TypedConstant` is in `ExpressionStartTokens`. There is no parser change required.
+
+2. **Different validation path**: False. `ValidateModifierBounds` already handles non-NumberLiteral values gracefully (returns null → skips cross-check). The TypeChecker doesn't validate ANY min/max bound expression against the field type today — not for integer, not for decimal, not for money. The validation path is uniformly absent, not money-specific.
+
+3. **Currency-consistency enforcement is unresolved**: True but overstated as a blocker. Currency-mismatch detection for `min '100.00 EUR'` on `money in 'USD'` requires adding a `Resolve()` call for `min`/`max` bound values in the TypeChecker — the same 3-line pattern already used for `default` modifier values. This is a small, contained addition, not a "separate larger feature." And it should be done for correctness on ALL types, not just money.
+
+---
+
+## Revised Decision
+
+**`nonnegative`, `positive`, and `nonzero` SHALL apply to `money` and `quantity` fields.**
+
+**`min` and `max` SHALL ALSO apply to `money` and `quantity` fields.** The bound value must be a typed constant in the field's declared unit — `field Balance as money in 'USD' min '100.00 USD'`. Currency-denominated bounds desugar to `rule Balance >= '100.00 USD'`, exactly as numeric bounds desugar to `rule Amount >= 100`.
+
+Rationale for inclusion: The bound form already parses. `DeclarationValue` is already conservative in the proof engine. Adding `Resolve()` calls for `min`/`max` bounds in the TypeChecker enables currency-mismatch detection via the existing `QualifierMatch.Same` path — the same mechanism that catches currency mismatches in binary expressions. The alleged structural barrier was a fiction arising from not reading the code carefully enough.
+
+`price` and `exchangerate` are also `TypeTrait.Orderable` and are natural follow-ons; scope them to `money` and `quantity` for now.
+
+---
+
+## What Must Change
+
+### A. Modifiers.cs
+
+Split the current `NumericTypes` into two applicability arrays:
+
+```csharp
+// For zero-bound modifiers (amount-only comparison): integer, decimal, number, money, quantity
+private static readonly TypeTarget[] ZeroBoundNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money),   new(TypeKind.Quantity),
+];
+
+// For ranged bound modifiers (min/max) — also includes money/quantity (bound is a typed constant)
+private static readonly TypeTarget[] RangedNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money),   new(TypeKind.Quantity),
+];
+```
+
+Update the modifier entries:
+
+- `ModifierKind.Nonnegative` → `ZeroBoundNumericTypes`
+- `ModifierKind.Positive`    → `ZeroBoundNumericTypes`
+- `ModifierKind.Nonzero`     → `ZeroBoundNumericTypes`
+- `ModifierKind.Min`         → `RangedNumericTypes`
+- `ModifierKind.Max`         → `RangedNumericTypes`
+
+(If `ZeroBoundNumericTypes` and `RangedNumericTypes` are identical, they can be merged into one array — the names serve as documentation of intent.)
+
+### B. TypeChecker.cs — resolve min/max bound expressions
+
+Add `Resolve()` calls for `min`/`max` modifier bound values, using the same pattern as `default`:
+
+```csharp
+// After resolving default, resolve min/max bounds against the field type
+foreach (var boundKind in new[] { ModifierKind.Min, ModifierKind.Max })
+{
+    var boundMod = declared.Modifiers.FirstOrDefault(m => m.Kind == boundKind);
+    if (boundMod?.Value is not null and not MissingExpression)
+    {
+        ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
+        ctx.CurrentFieldIndex = i;
+        Resolve(boundMod.Value, ctx, typedField.ResolvedType); // type-checks currency match
+        ctx.CurrentScope = FieldScopeMode.AllFields;
+        ctx.CurrentFieldIndex = -1;
+    }
+}
+```
+
+This is what catches `min '100.00 EUR'` on `money in 'USD'` — the `Resolve` call evaluates the bound expression against the field's resolved type, and `QualifierMatch.Same` enforcement in `ResolveBinaryOp` (from the PRE0052 fix) will fire `TypeMismatch` on currency-mismatched typed constants. Without this, the currency-mismatch gap exists — but it is the SAME gap that already exists for all other modifier bound expressions. Add it in the same pass as the applicability change.
+
+### C. precept-language-spec.md (line ~1498)
+
+Update the Modifier validation table:
+
+| Modifier | Applicable to | Error when applied to |
+|---|---|---|
+| `nonnegative` | `integer`, `decimal`, `number`, `money`, `quantity` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate` |
+| `positive` | (same as nonnegative) | (same as above) |
+| `nonzero` | (same as nonnegative) | (same as above) |
+| `min` / `max` | `integer`, `decimal`, `number`, `money`, `quantity` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate` |
+
+Remove the original note explaining why `min`/`max` excluded domain types. Replace with:
+
+> **`min`/`max` on `money`/`quantity` fields:** The bound value must be a typed constant matching the field's declared unit — `field Balance as money in 'USD' min '100.00 USD'`. The TypeChecker validates the bound's currency against the field's declared currency. A mismatched currency (e.g., `min '100.00 EUR'` on a `money in 'USD'` field) is a `TypeMismatch` error.
+
+### D. Tests (TypeCheckerValidationTests or equivalent)
+
+Required regression anchors:
+
+```
+field X as money in 'USD' nonnegative             → 0 errors
+field X as money in 'USD' positive                → 0 errors
+field X as money in 'USD' nonzero                 → 0 errors
+field X as quantity in 'kg' nonnegative           → 0 errors
+field X as quantity in 'kg' positive              → 0 errors
+field X as money in 'USD' min '100.00 USD'        → 0 errors
+field X as money in 'USD' max '500.00 USD'        → 0 errors
+field X as money in 'USD' min '100.00 USD' max '500.00 USD'  → 0 errors
+field X as quantity in 'kg' min '1.0 kg'          → 0 errors
+field X as money in 'USD' min '100.00 EUR'        → TypeMismatch (currency mismatch)
+field X as money in 'USD' min 100                 → TypeMismatch (plain number is not money)
+```
+
+---
+
+## Known Gap: min/max cross-check for domain-typed bounds
+
+`ValidateModifierBounds` checks that `min < max` when both are declared. `TryGetComparableModifierValue` currently handles only `NumberLiteral` — for money/quantity typed constants it returns `null` and the ordering check is silently skipped. This means `field Balance as money in 'USD' min '500.00 USD' max '100.00 USD'` (min > max) emits no error. This gap pre-exists for any non-standard literal form and can be addressed in a follow-up by adding typed-constant parsing to `TryGetComparableModifierValue` or by materializing a typed bound comparison in the TypeChecker. It is NOT a blocker for this change — the ordering check is a usability convenience, not a correctness requirement.
+
+---
+
+## What Kramer Does NOT Need to Touch
+
+- `TypeChecker.Validation.cs` — the `IsTypeApplicable` logic is correct; it reads from the catalog; `ValidateModifierBounds` gracefully skips non-NumberLiteral bounds
+- `ProofEngine.cs` — `DeclarationValue` is already conservative for all types; no change needed
+- `Constructs.cs` — the usage example `"field amount as money nonnegative"` is already correct; this decision makes the catalog agree with it
+- `Types.cs` — no trait changes needed
+- `Parser.cs` — `TypedConstant` is already in `ExpressionStartTokens`; modifier value positions already accept typed constants
+
+---
+
+## Shane's Ruling: Bound Form and Convertibility (2026-05-10)
+
+> "Same domain type, with matching currency/unit — or a convertible unit. e.g. `in 'kg' max '100 lbs'` should be ok."
+> "Plain numeric literals like `min 0 max 1000` are NOT valid for business domain types — the bound must carry its unit/currency."
+
+**Bound form:** Typed constants are required. `min '100.00 USD'`, `min '1.0 kg'`, `min '100 lbs'`. Plain integer or decimal literals (`min 0`, `max 1000`) are compile errors on `money`, `quantity`, and `price` fields.
+
+**Convertibility for `quantity`:** The bound's unit must be in the same physical dimension as the field's declared unit. `field Weight as quantity in 'kg' max '100 lbs'` is valid — `lbs` and `kg` are both mass. `field Weight as quantity in 'kg' max '100 m'` is an error — `m` (length) is a different dimension from `kg` (mass). Same-dimension different-unit is explicitly valid because unit conversion within a dimension is well-defined.
+
+**Convertibility for `money`:** The bound's currency must be the same ISO 4217 code as the field's declared currency. `field Balance as money in 'USD' min '100.00 EUR'` is a compile error. There is no compile-time exchange rate, so cross-currency bounds have no defined comparison semantics.
+
+**Spec update:** The constraint interaction example in `business-domain-types.md` that shows `min 0 max 1000` on a quantity field is wrong shorthand. It must be corrected to `min '0 kg' max '1000 kg'` per this ruling.
+
+---
+
+## Convertibility Check Mechanism — Code Investigation
+
+The existing type system was audited against the "same dimension, convertible unit" requirement for modifier bounds. Key findings:
+
+**`QualifierMatch.Same`** (in the `Operation.cs` enum) is used in binary operations to signal qualifier compatibility. It is a **proof-engine concept**, not a type-checker enforcement point. `DisambiguateCandidates` returns the `Same` entry and creates a `SameQualifierRequired` qualifier binding — this is verified by the proof engine at analysis time, NOT by the type checker at resolve time. Therefore, calling `Resolve()` on a modifier bound expression does NOT automatically invoke `QualifierMatch.Same` enforcement.
+
+**`DeclaredQualifierMeta.Unit`** (in `DeclaredQualifierMeta.cs`) carries both `UnitCode` (e.g., `"kg"`) and `DimensionName` (e.g., `"mass"`). The dimension name is already computed by `DeriveUnitDimensionName()` in `TypeChecker.cs` when a field is declared with `in '<unit>'`. This is the mechanism Kramer wires into for the cross-unit dimension check.
+
+**`DimensionCategoryMismatch`** (diagnostic code 69) is already declared in `DiagnosticCode.cs` and has a catalog entry in `Diagnostics.cs`. It is never currently emitted. Kramer should use it for the cross-dimension bound error on `quantity` fields.
+
+**`MoneyValidator.Validate(rawText)`** returns a `TypedConstantParseResult` whose `Value` is `(decimal amount, string canonicalCurrencyCode)`. The currency code is directly extractable.
+
+**`QuantityValidator.Validate(rawText, ...)`** returns a `TypedConstantParseResult` whose `Value` is `(decimal amount, UcumParsedUnit unit)`. The `UcumParsedUnit` can be passed to `DeriveUnitDimensionName(unit)` to get the dimension name.
+
+**`TypedTypedConstant.ParsedValue`** (in `SemanticIndex.cs`) carries the `object?` from the validator's result. Kramer can cast this to the appropriate tuple type after the `Resolve()` call succeeds.
+
+**`ResolveNumericLiteral`** with `expectedType = TypeKind.Money` (or `Quantity`): `IsAssignable(Integer, Money)` returns false (Integer widens to Decimal and Number only). Therefore, `Resolve(NumberLiteral, ctx, TypeKind.Money)` yields `TypedLiteral(TypeKind.Integer, ...)`, whose `ResultType` (Integer) ≠ field type (Money). An explicit post-resolve type mismatch check is needed to catch plain-number bounds.
+
+**`TypedConstantValidation.Validate`** with `Money` content validation rejects UCUM unit strings (e.g., `'100 kg'` fails money format — currency must be 3-letter ISO 4217). Similarly, `Quantity` content validation rejects pure currency codes as UCUM units (e.g., `'100 USD'` as a quantity fails UCUM parsing — USD is not a UCUM expression). So the "wrong domain type" case (e.g., `min '100 kg'` on a `money` field) is caught by content validation → `InvalidTypedConstantContent`, before the qualifier check runs.
+
+**New code needed:** A `ValidateMinMaxBoundQualifier(TypedTypedConstant, TypedField, SourceSpan, CheckContext)` helper in `TypeChecker.cs` that:
+1. For `money` fields: extracts the currency code from `ParsedValue`, compares to `typedField.DeclaredQualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault()?.CurrencyCode`. Emits `TypeMismatch` on mismatch.
+2. For `quantity` fields with a `Unit` qualifier: extracts `UcumParsedUnit` from `ParsedValue`, calls `DeriveUnitDimensionName(unit)`, compares to `typedField.DeclaredQualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault()?.DimensionName`. Emits `DimensionCategoryMismatch` on mismatch. Empty dimension names (dimensionless units, `count`) skip the check — no restriction.
+3. For `quantity` fields with a `Dimension` qualifier: the bound's dimension name must match `typedField.DeclaredQualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault()?.DimensionName`. Emits `DimensionCategoryMismatch` on mismatch.
+4. `price` bound qualifier check: **OUT OF SCOPE** for this PR — the bound form for price (currency AND denominator unit) is more complex; leave price out of the qualifier check for now even though `price` goes into `RangedNumericTypes`.
+
+---
+
+## Complete Modifier × Type Matrix (Final)
+
+| Modifier | `integer` | `decimal` | `number` | `money` | `quantity` | `price` | `exchangerate` |
+|----------|-----------|-----------|----------|---------|------------|---------|----------------|
+| `nonnegative` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant — implicit positive) |
+| `positive` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant) |
+| `nonzero` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant) |
+| `min` | ✓ plain number | ✓ plain number | ✓ plain number | ✓ typed constant, same currency | ✓ typed constant, same dimension | ✓ typed constant, no qualifier check this PR | ✗ (ordering undefined) |
+| `max` | ✓ plain number | ✓ plain number | ✓ plain number | ✓ typed constant, same currency | ✓ typed constant, same dimension | ✓ typed constant, no qualifier check this PR | ✗ (ordering undefined) |
+
+"Redundant" for `exchangerate`: the modifier is accepted without error (no `InvalidModifierForType`), but the language server may warn that it is redundant per D16 Corollary 2. That warning is out of scope for this PR.
+
+---
+
+## What Must Change (Revised — Scope Includes `price`)
+
+### A. `src/Precept/Language/Modifiers.cs`
+
+Replace the single `NumericTypes` array with two applicability arrays:
+
+```csharp
+// Zero-bound modifiers — compare against the universal zero; unit/currency is irrelevant
+private static readonly TypeTarget[] ZeroBoundNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
+    new(TypeKind.ExchangeRate), // implicit positive — declaring is valid, not an error
+];
+
+// Ranged bound modifiers — require typed-constant bounds; undefined for exchangerate
+private static readonly TypeTarget[] RangedNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
+];
+```
+
+Wire to modifier catalog entries:
+- `ModifierKind.Nonnegative` → `ZeroBoundNumericTypes`
+- `ModifierKind.Positive`    → `ZeroBoundNumericTypes`
+- `ModifierKind.Nonzero`     → `ZeroBoundNumericTypes`
+- `ModifierKind.Min`         → `RangedNumericTypes`
+- `ModifierKind.Max`         → `RangedNumericTypes`
+
+### B. `src/Precept/Pipeline/TypeChecker.cs` — `ResolveFieldExpressions`
+
+After the existing `default` modifier resolution block (lines ~445–462), add min/max bound resolution:
+
+```csharp
+// —— Min/Max bound expressions ——
+foreach (var boundKind in (ReadOnlySpan<ModifierKind>)[ModifierKind.Min, ModifierKind.Max])
+{
+    var boundMod = declared.Modifiers.FirstOrDefault(m => m.Kind == boundKind);
+    if (boundMod?.Value is not null and not MissingExpression)
+    {
+        ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
+        ctx.CurrentFieldIndex = i;
+        var resolved = Resolve(boundMod.Value, ctx, typedField.ResolvedType);
+        ctx.CurrentScope = FieldScopeMode.AllFields;
+        ctx.CurrentFieldIndex = -1;
+
+        // Bound resolved without content error — check type and qualifier match
+        if (resolved is not TypedErrorExpression)
+        {
+            if (resolved.ResultType != typedField.ResolvedType)
+            {
+                // Plain numeric literal (or other wrong type) used as bound for a domain type
+                ctx.Diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.TypeMismatch, boundMod.Value.Span,
+                    Types.GetMeta(resolved.ResultType).DisplayName,
+                    Types.GetMeta(typedField.ResolvedType).DisplayName));
+            }
+            else if (resolved is TypedTypedConstant typedConst)
+            {
+                // Typed-constant bound: validate qualifier compatibility
+                ValidateMinMaxBoundQualifier(typedConst, typedField, boundMod.Value.Span, ctx);
+            }
+        }
+        // TypedErrorExpression: Resolve already emitted InvalidTypedConstantContent or similar
+    }
+}
+```
+
+### C. `src/Precept/Pipeline/TypeChecker.cs` — new private method `ValidateMinMaxBoundQualifier`
+
+Add alongside the other `Map*Qualifier` and `DeriveUnitDimensionName` helpers:
+
+```csharp
+/// <summary>
+/// Validates that a <see cref="TypedTypedConstant"/> used as a min/max modifier bound
+/// is qualifier-compatible with the field's declared qualifier.
+/// For money: bound currency must match field currency.
+/// For quantity with unit: bound unit must be in the same dimension as the field unit.
+/// For quantity with dimension: bound unit dimension must match the declared dimension.
+/// Price qualifier check is deferred to a follow-up PR.
+/// </summary>
+private static void ValidateMinMaxBoundQualifier(
+    TypedTypedConstant boundConst,
+    TypedField typedField,
+    SourceSpan boundSpan,
+    CheckContext ctx)
+{
+    switch (typedField.ResolvedType)
+    {
+        case TypeKind.Money:
+        {
+            if (boundConst.ParsedValue is not (decimal, string boundCurrency))
+                return;
+            var fieldCurrency = typedField.DeclaredQualifiers
+                .OfType<DeclaredQualifierMeta.Currency>()
+                .FirstOrDefault()?.CurrencyCode;
+            if (fieldCurrency is not null &&
+                !string.Equals(boundCurrency, fieldCurrency, StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.TypeMismatch, boundSpan,
+                    $"money in '{boundCurrency}'",
+                    $"money in '{fieldCurrency}'"));
+            }
+            break;
+        }
+
+        case TypeKind.Quantity:
+        {
+            if (boundConst.ParsedValue is not (decimal, Precept.Language.Ucum.UcumParsedUnit boundUnit))
+                return;
+            var boundDimension = DeriveUnitDimensionName(boundUnit);
+
+            // Check against declared unit qualifier
+            var unitQualifier = typedField.DeclaredQualifiers
+                .OfType<DeclaredQualifierMeta.Unit>()
+                .FirstOrDefault();
+            if (unitQualifier is not null &&
+                !string.IsNullOrEmpty(unitQualifier.DimensionName) &&
+                !string.IsNullOrEmpty(boundDimension) &&
+                !string.Equals(boundDimension, unitQualifier.DimensionName, StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.DimensionCategoryMismatch, boundSpan,
+                    boundDimension, unitQualifier.DimensionName, typedField.Name));
+            }
+
+            // Check against declared dimension qualifier (quantity of 'mass')
+            var dimQualifier = typedField.DeclaredQualifiers
+                .OfType<DeclaredQualifierMeta.Dimension>()
+                .FirstOrDefault();
+            if (dimQualifier is not null &&
+                !string.IsNullOrEmpty(dimQualifier.DimensionName) &&
+                !string.IsNullOrEmpty(boundDimension) &&
+                !string.Equals(boundDimension, dimQualifier.DimensionName, StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.DimensionCategoryMismatch, boundSpan,
+                    boundDimension, dimQualifier.DimensionName, typedField.Name));
+            }
+            break;
+        }
+        // Price: bound qualifier check deferred — compound unit/currency form requires
+        // separate design. Price accepts any valid price-typed constant for now.
+    }
+}
+```
+
+**Note on `UcumParsedUnit` namespace:** Kramer must verify the exact namespace for `UcumParsedUnit` (likely `Precept.Language.Ucum` or directly `Precept.Language`) and adjust the cast accordingly.
+
+### D. `docs/language/business-domain-types.md`
+
+**D16 table row — `min N`/`max N` field constraints:**
+
+Replace the current row:
+> Bound constant `N` must be the same domain type as the field, with matching unit/currency. Blocked for `exchangerate`...
+
+With:
+> Bound constant `N` must be a typed constant of the same domain type as the field. **For `money`:** bound currency must exactly match the field's declared currency (`'100.00 EUR'` on `money in 'USD'` is a compile error). **For `quantity`:** bound unit must be in the same physical dimension as the field's declared unit — a different unit in the same dimension is valid ("`100 lbs`" on `quantity in 'kg'` is valid — both mass). **For `price`:** bound must be a typed price constant; full qualifier validation is a follow-on. Plain numeric literals (`min 0`) are rejected for all domain types. Blocked for `exchangerate`.
+
+**Individual type Constraints rows:**
+
+Line 385 — `money` Constraints:
+```
+**Constraints:** `in '<currency>'`, `optional`, `default '...'`, `nonnegative`, `positive`, `nonzero`, `min '<decimal> <currency>'`, `max '<decimal> <currency>'`. The `maxplaces` constraint overrides the ISO 4217 default when needed. Bounds must use a typed constant in the field's declared currency.
+```
+
+Line 550 — `quantity` Constraints:
+```
+**Constraints:** `in '<unit>'`, `of '<dimension>'`, `optional`, `default '...'`, `nonnegative`, `positive`, `nonzero`, `min '<decimal> <unit>'`, `max '<decimal> <unit>'`. Bounds must use a typed constant; the bound unit must be in the same physical dimension as the field's declared unit (different units within the same dimension are valid — e.g., `lbs` for a `kg` field).
+```
+
+Line 779 — `price` Constraints:
+Add `positive`, `nonnegative`, `nonzero`, `min '<decimal> <currency>/<unit>'`, `max '<decimal> <currency>/<unit>'`.
+
+**Constraint interaction example** (wherever `min 0 max 1000` appears on a quantity field):
+Change to `min '0 kg' max '1000 kg'` and add a note: "Bounds are typed constants. Plain numeric literals are not valid for business domain types."
+
+### E. `docs/language/precept-language-spec.md` — modifier applicability table (~line 1495)
+
+Replace the current rows:
+```
+| `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
+| `positive` | (same as nonnegative) | (same as above) |
+| `nonzero` | (same as nonnegative) | (same as above) |
+| `min` / `max` | `integer`, `decimal`, `number` | `string`, `boolean`, collections |
+```
+
+With:
+```
+| `nonnegative` | `integer`, `decimal`, `number`, `money`, `quantity`, `price`, `exchangerate` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension` |
+| `positive` | (same as nonnegative) | (same as above) |
+| `nonzero` | (same as nonnegative) | (same as above) |
+| `min` / `max` | `integer`, `decimal`, `number`, `money`, `quantity`, `price` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `exchangerate` |
+```
+
+Add a new note below the table:
+> **`min`/`max` on `money`/`quantity`/`price` fields:** The bound must be a typed constant matching the field's domain type — `field Balance as money in 'USD' min '100.00 USD'`. Plain numeric literals are rejected. For `money`, the bound currency must match the field's declared currency. For `quantity`, the bound unit must be in the same physical dimension as the field's declared unit — different units within the same dimension are valid. For `price`, the bound must be a price-typed constant; full qualifier enforcement is a follow-on. `exchangerate` does not support `min`/`max` (ordering is undefined); use `positive` instead.
+
+Also update the summary column descriptions on lines 306–308:
+- Line 306: `nonnegative` — change "Number/integer constraint" to "Numeric constraint (including money, quantity, price, exchangerate)"
+- Line 307: `positive` — same
+- Line 308: `nonzero` — same
+
+---
+
+## Known Gap: min/max cross-check for domain-typed bounds
+
+`ValidateModifierBounds` in `TypeChecker.Validation.cs` checks that `min < max` when both are declared. `TryGetComparableModifierValue` handles only `NumberLiteral`; for typed constants it returns `null` and the ordering check is silently skipped. `field Balance as money in 'USD' min '500.00 USD' max '100.00 USD'` (min > max) emits no error. This gap pre-exists for any non-numeric literal form. It is NOT a blocker — the ordering check is a usability convenience, not a correctness requirement. Address in a follow-up.
+
+---
+
+## What Kramer Does NOT Need to Touch
+
+- `TypeChecker.Validation.cs` — `IsTypeApplicable` reads from the catalog and will automatically allow the new types once `Modifiers.cs` is updated; `ValidateModifierBounds` already gracefully skips non-NumberLiteral bounds
+- `ProofEngine.cs` — `DeclarationValue` is already conservative for all types; no change needed
+- `Constructs.cs` — the usage example `"field amount as money nonnegative"` is already correct; this decision makes the catalog agree with it
+- `Types.cs` — no trait changes needed
+- `Parser.cs` — `TypedConstant` is already in `ExpressionStartTokens`; modifier value positions already accept typed constants
+
+---
+
+## Implementation Brief for Kramer
+
+This section provides complete, unambiguous implementation guidance. No further design questions need to be raised. Implement in this order.
+
+### Slice 1: Catalog change — `Modifiers.cs` (no TypeChecker changes yet)
+
+**File:** `src/Precept/Language/Modifiers.cs`
+
+1. Rename or split the existing `NumericTypes` array into two:
+
+```csharp
+private static readonly TypeTarget[] ZeroBoundNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
+    new(TypeKind.ExchangeRate),
+];
+
+private static readonly TypeTarget[] RangedNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
+];
+```
+
+2. Update modifier entries:
+   - `ModifierKind.Nonnegative`, `ModifierKind.Positive`, `ModifierKind.Nonzero` → `ZeroBoundNumericTypes`
+   - `ModifierKind.Min`, `ModifierKind.Max` → `RangedNumericTypes`
+
+**Tests after Slice 1 (before TypeChecker changes):**
+- `field X as money in 'USD' nonnegative` → 0 errors (was `InvalidModifierForType`)
+- `field X as money in 'USD' positive` → 0 errors
+- `field X as money in 'USD' nonzero` → 0 errors
+- `field X as quantity in 'kg' nonnegative` → 0 errors
+- `field X as price in 'USD/each' positive` → 0 errors
+- `field X as exchangerate in 'USD' to 'EUR' positive` → 0 errors (redundant but not error)
+- `field X as money in 'USD' min '100.00 USD'` → 0 errors for applicability (bound not type-checked yet)
+- `field X as exchangerate in 'USD' to 'EUR' min '1.0 USD/EUR'` → `InvalidModifierForType` (exchangerate not in `RangedNumericTypes`)
+
+### Slice 2: TypeChecker bound resolution
+
+**File:** `src/Precept/Pipeline/TypeChecker.cs` — method `ResolveFieldExpressions`
+
+After the existing `default` modifier resolution block (find: `ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };`), add the min/max resolution loop as described in section C above.
+
+Also add the `ValidateMinMaxBoundQualifier` private static method to `TypeChecker.cs` as described in section C. Verify the `UcumParsedUnit` fully-qualified name by checking the `using` directives in `TypeChecker.cs` or adding the appropriate using.
+
+**Tests after Slice 2:**
+
+Valid cases (0 errors):
+1. `field Balance as money in 'USD' min '100.00 USD'` → 0 errors
+2. `field Balance as money in 'USD' max '500.00 USD'` → 0 errors
+3. `field Balance as money in 'USD' min '100.00 USD' max '500.00 USD'` → 0 errors
+4. `field Weight as quantity in 'kg' min '1.0 kg'` → 0 errors
+5. `field Weight as quantity in 'kg' max '100 lbs'` → 0 errors (lbs is mass — convertible)
+6. `field Distance as quantity of 'length' max '100 m'` → 0 errors (m is length — matches declared dimension)
+
+Error cases:
+7. `field Balance as money in 'USD' min '100.00 EUR'` → `TypeMismatch` (currency mismatch: EUR vs USD)
+8. `field Balance as money in 'USD' min 100` → `TypeMismatch` (integer ≠ money)
+9. `field Weight as quantity in 'kg' max '100 m'` → `DimensionCategoryMismatch` (length ≠ mass)
+10. `field Weight as quantity in 'kg' max 50` → `TypeMismatch` (integer ≠ quantity)
+11. `field Weight as quantity in 'kg' max '100 USD'` → `InvalidTypedConstantContent` (USD is not a UCUM unit — caught by QuantityValidator before qualifier check)
+
+Regression (must still pass):
+12. `field Amount as integer min 0 max 100` → 0 errors (existing behavior preserved)
+13. `field Rate as decimal min 0.0 max 1.0` → 0 errors (existing behavior preserved)
+
+### Slice 3: Doc sync
+
+**Files to update in the same PR:**
+1. `docs/language/business-domain-types.md` — per section D above: D16 table row, money/quantity/price Constraints rows, constraint interaction example
+2. `docs/language/precept-language-spec.md` — per section E above: modifier applicability table and note, summary column descriptions at lines 306–308
+
+### Scope summary
+
+**IN SCOPE:**
+- Modifiers.cs applicability arrays (all 5 modifiers, 4 domain types)
+- TypeChecker.cs min/max bound resolution via `Resolve()`
+- TypeChecker.cs qualifier check: currency for money, dimension for quantity
+- Diagnostics: `TypeMismatch` for wrong type or currency mismatch; `DimensionCategoryMismatch` for wrong dimension
+- Doc sync: D16, individual Constraints rows (money, quantity, price), modifier table in spec
+
+**OUT OF SCOPE for this PR:**
+- Runtime enforcement (evaluator is `throw new NotImplementedException()`)
+- `exchangerate` min/max (ordering undefined by D2 — permanently blocked)
+- Price bound qualifier check (compound unit/currency — follow-on)
+- `min < max` ordering check for typed-constant bounds (follow-up)
+- Language-server `RedundantModifier` warning for explicit `positive` on `exchangerate`
+- Any changes to `ValidateModifierBounds` / `TryGetComparableModifierValue`
+
+---
+
+## Addendum: Cross-check against `docs/language/business-domain-types.md` (Archived)
+
+This addendum was written before Shane's bound-form ruling. The open question ("plain integer vs typed constant") has been resolved: typed constants are required. The "Flag to Shane" section is resolved. The spec's `min 0 max 1000` example is wrong shorthand and must be corrected per Slice 3.
+
+The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-bound inclusion — are captured in the final decision above.
+
+**Read:** 2026-05-10 (after the revised decision above was drafted). The business-domain types spec was not consulted during the original investigation — only `precept-language-spec.md` and the code were read. This section records what the dedicated spec doc says and where it agrees, extends, or conflicts with the decision above.
+
+---
+
+### What the spec confirms
+
+**D16 (the master governing design decision in that doc) explicitly resolves the question:**
+
+> **`positive`, `nonnegative`, `nonzero` field constraints** → "All four" business-domain magnitude types: `money`, `quantity`, `price`, `exchangerate`. (`exchangerate` carries an implicit `positive` — explicitly declaring it is redundant but not an error.)
+
+> **`min N`/`max N` field constraints** → `money`, `quantity`, `price`. **Blocked for `exchangerate`** — these constraints require `>=`/`<=` ordering, which is undefined for `exchangerate`; use `positive` instead.
+
+> **Bound form requirement:** "Bound constant `N` must be the same domain type as the field, with matching unit/currency."
+
+This is fully consistent with the revised decision's core claim: the modifiers apply to `money` and `quantity`. D16 was the authoritative place to look and confirms the conclusion.
+
+The individual type **Constraints rows** in the spec already list `nonnegative` for both `money` (line 385) and `quantity` (line 550), which independently confirms that the spec authors intended `nonnegative` to work on these types — the main language spec's exclusion of all business-domain types from the modifier table was the error.
+
+The `exchangerate` section explicitly says: _"Implicit constraint: `positive` — zero and negative exchange rates are always invalid configurations (D16 Corollary 2). Declaring `positive` or `nonzero` explicitly is redundant."_ — meaning `positive`/`nonzero` are syntactically valid on `exchangerate`, just redundant.
+
+---
+
+### What the spec extends beyond the revised decision
+
+**Two gaps in scope the revised decision missed:**
+
+**1. `price` should be in the same pass.**
+
+D16 includes `price` in both the zero-bound modifier row ("all four") and the `min N`/`max N` row (`money`, `quantity`, `price`). The constraint interaction example shows:
+
+```precept
+field UnitPrice as price in 'USD/each' positive maxplaces 4
+```
+
+The revised decision deferred `price`/`exchangerate` as "natural follow-ons." But D16 and the spec example already specify them. **The Modifiers.cs change should include `price` in `ZeroBoundNumericTypes` and `RangedNumericTypes` at the same time as `money` and `quantity`.** `exchangerate` gets `ZeroBoundNumericTypes` (for completeness — the declaration is redundant but valid) and NOT `RangedNumericTypes` (ordering is undefined for `exchangerate`).
+
+**Revised applicability arrays:**
+
+```csharp
+// Zero-bound modifiers (nonnegative, positive, nonzero): money, quantity, price, exchangerate
+private static readonly TypeTarget[] ZeroBoundNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money),   new(TypeKind.Quantity), new(TypeKind.Price),
+    new(TypeKind.ExchangeRate),   // implicit positive — declaring is redundant but valid, not an error
+];
+
+// Ranged bound modifiers (min/max): money, quantity, price only — NOT exchangerate
+private static readonly TypeTarget[] RangedNumericTypes =
+[
+    new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+    new(TypeKind.Money),   new(TypeKind.Quantity), new(TypeKind.Price),
+];
+```
+
+---
+
+### Tension to resolve: bound form for `quantity` — typed constant vs. plain integer
+
+D16 says bounds must be "the same domain type as the field, with matching unit/currency." This implies `min '100.00 USD' max '500.00 USD'` for `money` and `min '0 kg' max '1000 kg'` for `quantity`.
+
+But the spec's constraint interaction example (the canonical illustration section) shows:
+
+```precept
+field Weight as quantity in 'kg' min 0 max 1000
+```
+
+Plain integers — not typed constants. This is a **direct conflict between D16's prose and the spec's own code example**.
+
+Possible resolutions:
+- The example is aspirational shorthand and should use typed constants per D16.
+- Plain integer bounds are accepted as "magnitude-only" shorthand for `quantity` and `money` (the unit is inherited from the field's `in` declaration, and the bound is evaluated as a dimensionally-agnostic magnitude comparison).
+- Zero is universal and `min 0` is always valid; `max 1000` as a plain integer is the ambiguous case.
+
+**This needs a call from Shane or owner before implementation.** The code change for TypeChecker.cs (adding `Resolve()` for `min`/`max` bounds) assumes typed-constant bounds. If plain-integer bounds are also valid, the TypeChecker must accept both forms — resolving a plain integer as the magnitude component of the field's declared type, and resolving a typed constant against the full field type. The `ValidateModifierBounds` cross-check (`min < max`) also needs to handle both forms.
+
+**Recommendation:** Clarify the bound form in D16 or add a note to the constraint interaction example. Until resolved, implement typed-constant bounds as described — it's the stricter interpretation and can be loosened later.
+
+---
+
+### Gaps in `business-domain-types.md` that need updating
+
+The spec needs the following additions to align with D16 (which is already in the doc):
+
+1. **`money` Constraints row (line 385):** Add `positive`, `nonzero`, `min '<typed-constant>'`, `max '<typed-constant>'` alongside `nonnegative`.
+
+2. **`quantity` Constraints row (line 550):** Add `positive`, `nonzero`, `min '<typed-constant-or-integer>'`, `max '<typed-constant-or-integer>'` (resolve the plain-integer tension before wording this).
+
+3. **`price` Constraints row (line 779):** Add `positive`, `nonnegative`, `nonzero`, `min`, `max`. Currently completely omits numeric constraints.
+
+4. **The constraint interaction example (line ~1454):** Resolve the `min 0 max 1000` tension — either change it to `min '0 kg' max '1000 kg'` (to match D16), or add a note explaining that plain integer bounds are valid as magnitude-only shorthand.
+
+5. **The main language spec modifier table (`precept-language-spec.md` ~line 1498):** Already captured in the revised decision (section C). Needs the same update as the spec.
+
+These are doc-only fixes — the D16 design decision already specifies the correct behavior. The individual type sections just haven't been synced to it.
+
+---
+
+## Flag to Shane
+
+**One blocker before implementation:**
+
+The `min`/`max` bound form for `quantity` and `money` fields is ambiguous between the spec: D16 says "same domain type with matching unit/currency" (typed constants like `'0 kg'`), but the constraint interaction example shows `min 0 max 1000` with plain integers. This needs a call before Kramer starts work. The rest of the decision stands.
+
+**Scope expansion confirmed by spec:**
+
+`price` should be added to Kramer's implementation pass at the same time as `money` and `quantity` — it's already specified in D16 and the constraint example shows `positive` on `price`. Deferring it creates a spec/code gap immediately.
+
+**No further design decisions needed** beyond resolving the bound-form tension. The spec confirms the core direction: `positive`, `nonnegative`, `nonzero`, `min`, `max` on `money`, `quantity`, and `price` is the correct and spec-sanctioned design.
+
+# Kramer — semantic tokens delta fix 2
+
+- **Timestamp:** 2026-05-11T02:20:00Z
+- **Requester:** Shane
+
+## Diagnosis
+- The remaining live overlaps were **not** the qualified arg path anymore: `TypedArg.Span` already carries the arg-name span and qualified arg refs already use `expr.MemberSpan` / `ar.Site.Length == arg.Name.Length`.
+- The real malformed tokens in the live samples came from two broader semantic reference sites:
+  - `TransitionOutcome.Span` covered `-> transition StateName`, so the emitted state token started at the arrow and overlapped both the arrow token and `transition` keyword.
+  - `FieldTargetSlot.Span` covered comma-separated field lists in access-mode / omit surfaces, so the first field reference token spanned the whole list and overlapped following punctuation / tokens.
+
+## Decision
+- Keep the defensive merge hardening in `ProjectMergedTokens`: filter invalid coordinates/lengths before sorting and deduplicate by `(Line, Character)` instead of `(Line, Character, Length)`.
+- Fix the upstream semantic sites so the emitted tokens are correct before they reach OmniSharp:
+  - add name-site spans on target slots,
+  - add `TransitionOutcome.StateSpan`,
+  - use those precise spans in NameBinder + TypeChecker reference/diagnostic emission.
+
+## Validation
+- `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore --verbosity minimal` → **165 passed**.
+- `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --no-restore --verbosity minimal` → **succeeded**.
+- Post-fix sample inspection: `loan-application.precept` overlaps = 0, `building-access-badge-request.precept` overlaps = 0.

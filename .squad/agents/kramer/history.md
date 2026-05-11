@@ -23,6 +23,11 @@
 
 ## Recent Updates
 
+### 2026-05-11T02:15:00Z — Semantic-token delta pass 2 recorded
+- Commit `308713a5` closed the remaining delta-crash path by replacing transition-outcome and access-mode/omit container spans with identifier-precise state/field spans before semantic-token projection.
+- Durable tooling rule: merged semantic tokens must reject invalid coordinates/lengths and collapse duplicates by start position only; range precision belongs upstream in parser/binder/type-checker name spans.
+- Validation stayed green at 165/165 language-server tests, and the batch decision plus orchestration/session records were folded into the squad ledger.
+
 ### 2026-05-11T02:20:00Z — Live sample overlaps traced to transition and field-target container spans
 - The remaining `semanticTokens/full/delta` crash path was not event-arg spans anymore: `TypedArg.Span` and qualified arg refs were already name-precise, but transition outcomes still published `-> transition State` container spans and access-mode / omit field targets still published whole comma-list spans.
 - Durable tooling rule: any semantic reference site that can include protocol punctuation or sibling identifiers needs a dedicated identifier span (`NameSpan` / `StateSpan`), and `ProjectMergedTokens` must still filter invalid coordinates and deduplicate by start position as a safety rail.
