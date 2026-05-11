@@ -6,106 +6,37 @@
 
 ## Learnings
 
-- Semantic-token delta stability depends on exact identifier spans; reusing container spans for event args or qualified member access creates overlapping tokens that can crash OmniSharp delta mode.
-- Incomplete-code routing is safest when it reuses semantic spans plus neighboring significant tokens instead of trusting parser recovery spans alone.
-- Cursor positions parked at the next token boundary belong to the preceding separator for member-access and default-value completions.
-- Shared helpers (`LanguageServerComposition`, `SemanticExpressionLocator`, `SymbolNavigation`, `OutlineSymbolProjector`) are the durable way to keep the shipped host and test harness aligned.
+- Semantic-token delta stability depends on exact identifier spans; when typed-constant token layouts shift, invalidate the cached `SemanticTokensDocument` for that URI instead of swallowing exceptions or disabling deltas globally.
 - Versioned document updates must reject stale recompiles while preserving the unversioned fallback path for clients that omit version data.
-- Modifier completions should derive from `ValueModifierMeta.ApplicableTo` and declaration-site legality so the completion surface stays catalog-truthful.
-- Visible editor-color drift can come from VS Code fallback/theme ordering even when catalog metadata and semantic tokens are already correct.
-- Transition outcomes and comma-separated field-target slots need their own identifier spans; reusing container spans produces overlapping state/field semantic tokens even after arg-span fixes land.
-- Modifier diagnostics need per-modifier spans from parser metadata; reusing declaration spans widens user-visible squiggles from the offending keyword to the whole field line.
-- Typed-constant autocomplete cannot rely on the enclosing field alone; rule, ensure, and other expression sites need local expected-type inference from the peer operand or active call parameter. The fix belongs in the language server: infer the expected type from nearby expression context, then reuse the existing type examples and in-document typed constants.
-- Semantic-token delta safety needs a second normalization pass after start-position dedup: prefer the shortest same-start range, then truncate or drop earlier same-line tokens so no emitted span overlaps the next token.
+- Declaration and slot completions should derive from catalog metadata plus nearby semantic context rather than parser recovery spans alone.
+- Typed-constant completion needs local expected-type inference plus qualifier metadata; `TypedConstantContext` is the durable carrier for `(TypeKind, DeclaredQualifiers)`.
+- Space and Ctrl+Space inside typed constants must intercept before the outer context switch; invoked completion should treat both null and empty trigger characters as the same recovery path.
+- Quantity slot completions should use `UcumCatalog.BrowseTier1()` for the open catalog, pin exact `DeclaredQualifierMeta.Unit` values directly, and filter `DeclaredQualifierMeta.Dimension` through `DimensionVector` equality.
+- Quote-close starter insertion belongs in a postprocess step on returned `CompletionItem`s; temporal segment items remain the exception because the caret must stay inside the quote for `+` continuation.
+- Singular vs plural temporal unit preference comes from the last numeric segment, including compound literals after the most recent `+`.
+- Semantic-token, definition, highlight, references, and rename flows all depend on the same identifier-precise span story; container spans are acceptable only when the semantic site contract explicitly requires them.
+- B4/B5 are not expression-site bugs: qualifier declaration literals must resolve the active qualifier slot from parsed qualifier metadata before any enclosing-field expression fallback runs.
 
 ## Historical Summary
 
-- Early May 2026 tooling work established the catalog-driven language-server baseline: Phase 1 handler wiring, semantic-token color publication, trigger-character and `set` context fixes, and Slice 13/14 completion routing over semantic context instead of LS-local lists.
-- Later 2026-05-10 slices closed the shared navigation and symbol stack (`SymbolNavigation`, rename, document/workspace symbols), document version ordering, completion item quality, hover completion, and typed-constant editor polish, all backed by language-server regression coverage.
-- The canonical decision ledger in `.squad/decisions.md` carries the batch-level detail; this history keeps only the durable tooling baseline and newest live updates.
+- Early May tooling work established the catalog-driven language-server baseline: semantic-context completions, semantic-token publication, shared symbol-navigation helpers, document version ordering, and VS Code activation coverage.
+- The canonical decision ledger in `.squad/decisions.md` carries full batch chronology; this history keeps only the durable tooling rules and the newest live context needed for future implementation runs.
 
 ## Recent Updates
 
-### 2026-05-10T22:30:01.1468838-04:00 — Modifier diagnostics now anchor to modifier tokens
-- `ParsedModifier` now carries a dedicated span, and modifier validation publishes invalid/redundant/duplicate constraint diagnostics on that span instead of the enclosing declaration.
-- Validation closed green on the targeted parser span regression, 166/166 language-server tests, and the language-server build; full `test\Precept.Tests\` still has the unrelated existing `ArgReferenceTests.TypeChecker_ArgReference_SiteSpanMatchesSource` failure.
+### 2026-05-11T05:34:40Z — Frank retriage reopened B4/B5
+- The earlier apostrophe-trigger normalization correctly fixed B1/default-site recovery, but it does **not** fix declaration-side qualifier literals.
+- At `field q as quantity in '` and `field q as quantity of '`, coercing the site to `InExpression` makes `TryGetTypedConstantContext(...)` fall back to the enclosing field and recover `Quantity`, so completion incorrectly routes to quantity-literal examples instead of the active qualifier slot.
+- Next safe implementation path: detect declaration-side qualifier literal sites before `TryGetEnclosingField(...)`, resolve the active qualifier axis from parsed qualifier metadata/shape, return `UnitOfMeasure` / `Dimension` slot context (and the analogous currency / temporal qualifier slots), and strengthen tests to assert concrete unit or dimension labels rather than non-empty lists.
 
-### 2026-05-11T02:15:00Z — Semantic-token delta pass 2 recorded
-- Commit `308713a5` closed the remaining delta-crash path by replacing transition-outcome and access-mode/omit container spans with identifier-precise state/field spans before semantic-token projection.
-- Durable tooling rule: merged semantic tokens must reject invalid coordinates/lengths and collapse duplicates by start position only; range precision belongs upstream in parser/binder/type-checker name spans.
-- Validation stayed green at 165/165 language-server tests, and the batch decision plus orchestration/session records were folded into the squad ledger.
+### 2026-05-11 — B2 quantity slot now returns the full UCUM tier-1 catalog
+- `GetQuantitySlotItems` replaced the 3-example fallback with `UcumCatalog.BrowseTier1()` and dimension-vector filtering, while preserving exact pinned-unit behavior for `DeclaredQualifierMeta.Unit`.
+- Regression coverage now asserts representative UCUM codes, dimension exclusions, and pinned-unit exactness; language-server validation closed green at 220/220 tests.
 
-### 2026-05-11T02:20:00Z — Live sample overlaps traced to transition and field-target container spans
-- The remaining `semanticTokens/full/delta` crash path was not event-arg spans anymore: `TypedArg.Span` and qualified arg refs were already name-precise, but transition outcomes still published `-> transition State` container spans and access-mode / omit field targets still published whole comma-list spans.
-- Durable tooling rule: any semantic reference site that can include protocol punctuation or sibling identifiers needs a dedicated identifier span (`NameSpan` / `StateSpan`), and `ProjectMergedTokens` must still filter invalid coordinates and deduplicate by start position as a safety rail.
-- Validation closed green at 165/165 language-server tests, a successful language-server build, and zero merged-token overlaps in both `loan-application.precept` and `building-access-badge-request.precept`.
+### 2026-05-11 — B7 semantic-tokens delta crash fixed
+- Typed-constant span changes now invalidate the cached semantic-token document per URI so OmniSharp falls back to a full refresh only when the typed-constant token layout actually changed.
+- Durable rule: targeted cache invalidation beats global full-refresh mode and beats exception swallowing.
 
-### 2026-05-11T01:38:51Z — Span precision and semantic-token crash fixes closed together
-- The parser/binder span pass is now durable: declaration diagnostics and tooling name sites should anchor to per-name identifier spans, with parser end spans driven by the last significant consumed token rather than trailing trivia.
-- Follow-up semantic-token work propagated bare arg-name spans parser -> binder -> typed args, switched qualified arg references to `expr.MemberSpan`, and narrowed token dedup to exact duplicate ranges; the LS delta crash is closed with 160/160 language-server tests green.
-
-### 2026-05-10T21:27:42.716-04:00 — Semantic-token delta crash fix narrowed arg spans to real identifier tokens
-- Kramer traced the `semanticTokens/full/delta` crash to malformed parameter tokens: event-arg declarations still reused `ArgumentListSlot.Span`, qualified `Event.Arg` references still reused the full member-access span, and the overlay merge deduplicated by start position instead of exact range.
-- Durable tooling rule: semantic-token, definition, highlight, references, and rename flows must all consume the bare event-arg identifier span, and semantic-token overlays may only collapse exact duplicate ranges.
-- Validation stayed green: `dotnet test test\Precept.LanguageServer.Tests\ --no-restore` passed 160/160, and `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server` succeeded.
-
-### 2026-05-10T12:25:21Z — Log triage isolated protocol bugs from the status item
-- Kramer used VS Code logs to isolate two real protocol bugs: semantic-token color rules now cross the client boundary in a stable `rules` envelope and the VS Code client tolerates that payload safely; document symbols also normalize `selectionRange` inside `range` before publishing.
-- The log evidence showed those failures were separate from the missing language-server status item, which remains an activation-surface issue rather than an extension-host crash path. Validation stayed green: `npm run compile` succeeded and `test\Precept.LanguageServer.Tests` passed 156/156.
-
-### 2026-05-10T12:25:21Z — Status-bar regression contract gained dedicated extension coverage
-- Soup Nazi added `test\Precept.VsCode.Tests` coverage that now locks the status item's creation/show lifecycle, click-command wiring, and visibility across server-state updates, so the activation-path fix is guarded end to end.
-- `docs\tooling\language-server.md` now states the durable status-bar contract, while the remaining full language-server rebuild blocker stays isolated to the unrelated `DocumentSymbolHandlerTests.cs` `SourceSpan(offset: ...)` compile issue.
-
-### 2026-05-10T12:25:21Z — Activation regression fixed for standalone editor sessions
-- Kramer traced the missing VS Code language-server status item to extension activation scope: `workspaceContains:**/*.precept` alone skipped single-file and no-workspace `.precept` sessions, so the extension never started there.
-- Durable rule: keep both activation paths, `workspaceContains:**/*.precept` and `onLanguage:precept`, with manifest coverage and docs sync so the status item stays visible wherever Precept authoring happens.
-
-### 2026-05-10T12:25:21Z — Status-bar activation contract recorded
-- Kept both shipped VS Code activation paths, `workspaceContains:**/*.precept` and `onLanguage:precept`, so the status bar and language server still activate in single-file and no-workspace sessions.
-- Durable tooling rule: activation coverage is part of the user-visible tooling surface; repo-workspace activation alone is too narrow for Precept authoring.
-
-
-### 2026-05-10T12:15:36Z — Grammar keyword fallback color fix recorded
-- Kramer closed the `as`/`default` gold drift by fixing the VS Code fallback TextMate color rule in `tools\Precept.VsCode\package.json` instead of changing language-server semantic token classification.
-- Validation stayed green: `SemanticTokensHandlerTests` passed 150/150, and `npm run compile` succeeded in `tools\Precept.VsCode`.
-
-### 2026-05-10T12:25:21Z — Extension activation keeps status-bar support in single-file sessions
-- The VS Code extension must retain both `workspaceContains:**/*.precept` and `onLanguage:precept` activation events so the status bar item and language server still appear in no-workspace or single-file authoring sessions.
-- This is a tooling-activation durability rule, not a catalog or language-surface change.
-
-### 2026-05-10T12:15:36Z — Boolean field modifier completion filtering landed
-- `CompletionHandler` now filters field modifiers through modifier metadata and declaration-site legality, so boolean fields offer only `default`, `optional`, and `writable` instead of leaking numeric-only items like `max` and `maxplaces`.
-- `CompletionHandlerTests.cs` now locks the exact boolean-valid surface, and the full language-server test project passed 150/150 after the fix.
-
-### 2026-05-10T07:15:00Z — Slice 18 hover surface completion landed
-- `HoverHandler` now reuses `SemanticExpressionLocator` so hover can project catalog-driven details for function calls, typed constants, accessors, and semantic expression sites without LS-local symbol mirrors.
-- Validation stayed green: targeted hover coverage passed 15/15, then the full language-server test project passed 141/141.
-
-### 2026-05-10T06:55:00Z — Slice 17 completion item quality landed
-- Completion items now carry snippet insert text, markdown documentation, and stable sort grouping while keeping semantic symbols ahead of catalog entries.
-- Validation stayed green: `CompletionHandlerTests` passed 23/23, then the full language-server test project passed 135/135.
-
-### 2026-05-10T06:33:00Z — Slice 26 document version ordering landed
-- `DocumentState` now stores versioned snapshots and rejects stale `TryUpdate(...)` calls; `TextDocumentSyncHandler` suppresses stale diagnostic publishes while retaining the unversioned fallback path.
-- Targeted Slice 26 coverage passed 7/7, then the full language-server test project passed 115/115.
-
-### 2026-05-10T05:25:00Z — Slice 20 shared symbol navigation landed
-- `SymbolNavigation` now centralizes declaration/reference lookup for fields, states, events, and event args, and the server capability surface registers references plus document highlights through the shared composition path.
-- The durable event-arg rule is still explicit: qualified arg references can share the broad semantic site for navigation/highlights, but rename must trim edits back to the identifier token.
-
-### 2026-05-10T08:25:21.928-04:00 — Status bar activation gap closed
-- The VS Code extension manifest now activates on onLanguage:precept as well as workspaceContains:**/*.precept, so the language-server status item appears in single-file and no-workspace editor sessions instead of only in workspaces that already contain .precept files.
-- Added manifest coverage in ExtensionManifestTests to lock both activation paths, and updated docs\tooling\extension.md to document the single-file activation behavior.
-
-
-### 2026-05-10T08:25:21-04:00 — Log-driven status follow-up
-- The semantic-token color notification must cross the VS Code client boundary as an object envelope (`rules`) or the extension can receive a non-array payload and throw `map is not a function` while applying theme rules.
-- Outline/document symbols need a defensive full-range normalization step even when semantic name spans are preferred, because VS Code enforces `selectionRange ⊆ range` at the protocol boundary.
-- The missing status-bar surface was **not** explained by either of those protocol bugs in the current code: the status item is created independently and survives a client stop by rendering the stopped state.
-
-## Recent Updates
-
-### 2026-05-11T02:32:33Z — Shane confirmed modifier-token squiggle fix
-- Shane confirmed the PRE0033 `money ... nonnegative` squiggle now lands on just `nonnegative`, so the per-modifier `SourceSpan` carry-through is the right durable fix.
-- Batch record: commit `4467e41d`, `ParsedModifier` now owns the modifier span, and language-server validation stayed green at 166/166 tests.
+### 2026-05-11T02:32:33Z — Modifier-token squiggle precision closed the latest span pass
+- `ParsedModifier` now owns its own span so modifier diagnostics land on the offending keyword instead of the whole field declaration.
+- The broader span program stays intact: identifier-precise semantic ranges upstream, exact-range dedup and invalid-coordinate filtering as downstream safety rails.

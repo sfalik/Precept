@@ -26950,3 +26950,337 @@ George may proceed to Slice 5.
 
 
 - Trace record shape and LS/MCP consumption remain open implementation seams, but the architecture no longer permits a second semantic engine.
+
+---
+
+## Archive Batch — 2026-05-11T05:34:40Z
+
+---
+
+### 2026-05-04T05:45:56Z: Audit-gap P2 clarifications recorded; compiler/runtime innovation callouts confirmed clean
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged, inbox cleared (1 file).
+
+
+
+**Merged sources:** `frank-p2-doc-fixes.md`.
+
+
+
+- `docs/runtime/evaluator.md` §4 now records both the `TypeBuilder` rejection rationale and the stable compiled-path upgrade seam against the existing A+G execution contract.
+
+
+
+- `docs/runtime/evaluator.md` §7.3 now clarifies that per-type `TypeRuntimeMeta.BinaryExecutors` / `UnaryExecutors` are registered into flat `Operations` arrays, preserving zero-knowledge O(1) dispatch inside the evaluator.
+
+
+
+- `docs/compiler-and-runtime-design.md` required no edit for Item 14; all `Precept Innovations` callouts already match the single-interpreter, catalog-dispatch architecture.
+
+---
+
+---
+
+---
+
+### 2026-05-04T05:45:56Z: Decision ledger summary created as a non-canonical navigation aid
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Recorded from inbox note.
+
+
+
+**Merged source:** `frank-decisions-summary.md`.
+
+
+
+- `docs/working/decisions-summary.md` was added as a scanning aid over `.squad/decisions.md`.
+
+
+
+- The durable source of truth remains `.squad/decisions.md`; the summary is reference-only and does not supersede the ledger.
+
+---
+
+---
+
+---
+
+### 2026-05-04T05:44:10Z: `ConstraintViolation` public contract promoted to the 5-field rich shape
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged, inbox cleared (1 file).
+
+
+
+**Merged sources:** `frank-constraint-violation-promoted.md`.
+
+
+
+- Shane's 2026-05-04 ruling promotes the 5-field `ConstraintViolation` shape from `docs/runtime/evaluator.md` §7.6 to the public runtime contract; the earlier 2-field minimal shape is superseded.
+
+
+
+- `FailingValue` is `PreceptValue?`, not `object?`; CLR callers convert through `TypeRuntime<T>.ToClr` rather than through evaluator-owned boxing.
+
+
+
+- `docs/runtime/runtime-api.md` now documents the public 5-field shape, and the evaluator docs frame the remaining work as implementation follow-through rather than as an unresolved contract question.
+
+---
+
+---
+
+---
+
+### 2026-05-04T05:31:45Z: Evaluator pseudocode and §8 integration contract aligned to `FiredArgs` / `PreceptValue` lanes
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged, inbox cleared (1 file).
+
+
+
+**Merged sources:** `frank-evaluator-pseudocode-fix.md`.
+
+
+
+- `docs/runtime/evaluator.md` pseudocode now uses the actual CC#25 internal types throughout: `FiredArgs`, `PreceptValue[]`, `PreceptValue[]? patch`, and `version.Slots.ToArray()`.
+
+
+
+- Update patch application and access-mode checks are slot-indexed, `FiredArgs.Empty` replaces the stale standalone `EmptyArgs`, and the old `object?[]` readability caveat is removed.
+
+
+
+- §8 now documents the durable dual-lane public contract: both JSON ingress and CLR-builder ingress materialize `FiredArgs`, and the evaluator never consumes raw dictionaries or raw JSON.
+
+---
+
+---
+
+---
+
+### 2026-05-04T04:36:09Z: Deep content audit filled seven specificity gaps in canonical docs
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged, inbox cleared (1 file).
+
+
+
+**Merged sources:** `frank-deep-content-audit.md`.
+
+
+
+- Filled seven specificity gaps across `docs/runtime/evaluator.md`, `docs/language/catalog-system.md`, and `docs/runtime/runtime-api.md`, while confirming adjacent runtime surfaces that were already correct.
+
+
+
+- `evaluator.md` now gives `PreceptValue` a full performance-and-memory section (GC rationale, the 32-byte tagged-value rationale, and the hot-path memory picture around 44–48 slots / ~4,480 bytes), expands Fire to a 7-step lifecycle, corrects `LOAD_ARG` to slot-index dispatch, and replaces stale `object?` executor examples with canonical `stackalloc PreceptValue[32]` examples.
+
+
+
+- `catalog-system.md` now places `BinaryExecutors` and `UnaryExecutors` on `TypeRuntime` and explains executor-array dispatch as catalog-owned runtime behavior rather than evaluator-owned switches.
+
+
+
+- `runtime-api.md` now defines the arg presence mask concretely as a `bool[]` aligned to the arg slot array and documents the required-arg fault boundary.
+
+
+
+- Open design questions stay explicit in the canonical docs: `PreceptValue` FieldOffset layout, `ArgDescriptor.SlotIndex`, and the executor registration / assembly mechanism.
+
+---
+
+---
+
+---
+
+### 2026-05-04T04:30:00Z: Full CC#25 / CC#2 decisions audit closed the remaining five canonical doc gaps
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged, inbox cleared (1 file).
+
+
+
+**Merged sources:** `frank-audit-report.md`.
+
+
+
+- Audited CC#25 Q1–Q10, CC#2, and the `PreceptValue` slot-storage follow-through across canonical runtime and compiler docs; confirmed Q1, Q2, Q4, Q7, and Q10 were already covered.
+
+
+
+- Closed the lagging doc gaps in `docs/runtime/evaluator.md`, `docs/runtime/result-types.md`, `docs/runtime/precept-builder.md`, `docs/compiler-and-runtime-design.md`, and `docs/working/cross-cutting-decisions.md`.
+
+
+
+- Durable audit rule: after runtime API updates, re-audit `result-types.md`, `evaluator.md`, and the cross-cutting register together so locked decisions do not leave stale `object?`, dictionary, or pending-status language behind.
+
+
+
+- Open flags stay explicit: `TypeRuntime<T>` documentation reconciliation and the non-expression `SlotValue` shape conflicts still need owner direction.
+
+---
+
+---
+
+---
+
+### 2026-05-04T04:02:05Z: Catalog gap register migration completed and archived
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged, deduplicated, inbox cleared (2 files).
+
+
+
+**Merged sources:** `frank-chunk4-gaps.md`, `frank-chunk4-unplaced-gaps.md`.
+
+
+
+- The 43 entries from the catalog gap register are now fully triaged: 23 pending gaps were attributed into canonical Open Question blocks across 9 docs, 3 resolved-in-source gaps were marked closed, 5 already-captured gaps were confirmed in place, and gap #39 was promoted to a first-class open-question block.
+
+
+
+- Cross-cutting routing is durable: 8 entries stay owned by the cross-cutting register, while 4 out-of-scope items remain runtime/MCP/tooling design questions rather than catalog metadata gaps.
+
+
+
+- The working register was retired: `docs/working/catalog-gap-register.md` now lives at `docs/working/Archived/catalog-gap-register-migrated.md`, preserving the original content plus a migration notice.
+
+---
+
+---
+
+---
+
+### 2026-05-04T03:26:10Z: CC#25 Q7 acceptance revision locked
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Recorded from the full Q7 acceptance inbox merge.
+
+
+
+**Merged sources:** `frank-cc25-q7-typed-api.md`, `frank-cc25-q7-accepted.md`, `frank-cc25-q7-challenges.md`, `copilot-cc25-q7-ingress-egress.md`, `copilot-directive-20260503-231016.md`, `copilot-directive-20260503-231158-no-string-json-overloads.md`.
+
+
+
+- Q7 is now fully accepted. `Version.Get<T>(string)` is the primary typed field API, raw indexers return `PreceptValue`, and `Transitioned` / `Applied` carry `FiredArgs` with the same `Get<T>` + `PreceptValue` indexer pattern for event-arg egress.
+
+
+
+- `TypeRuntime` naming is final: `FromJson` / `ToJson` / `FromClr` / `ToClr`. `TypeRuntime<T>` is the zero-boxing CLR ingress/egress path, and typed `Get<T>` / `Set<T>` dispatch through those delegates.
+
+
+
+- Typed ingress is fluent and AOT-safe: `Fire()` / `Inspect()` use `Action<IArgBuilder>`, `Create()` uses `Action<IFieldBuilder>`, and `IArgBuilder` now materializes `PreceptValue[]` plus a presence mask rather than an arg dictionary.
+
+
+
+- JSON boundaries stay `JsonElement`-only. No string convenience overloads exist anywhere on the JSON API surface, and typed `Restore` is removed so restore remains round-trip-faithful hydration from Precept's own serialized egress.
+
+
+
+- The JSON ingress/egress boundary remains outside the evaluator: public API / `Version` conversion owns JSON parsing and lazy `ToJson()` egress, while the evaluator only sees typed `PreceptValue` data.
+
+
+
+- This supersedes the earlier provisional note that `IReadOnlyDictionary<string, object?>` would survive as a convenience extension lane.
+
+---
+
+---
+
+---
+
+### 2026-05-04T03:26:10Z: CC#25 Q7 dictionary convenience lane closed
+
+
+
+**By:** Shane (via Copilot)
+
+
+
+**Status:** Recorded from inbox closeout.
+
+
+
+**Merged source:** `copilot-cc25-q7-dict-extension-obsolete.md`.
+
+
+
+- `IReadOnlyDictionary<string, object?>` convenience overloads and extension methods are fully obsolete. They are not part of the main API, not a test-only helper lane, and not a future convenience surface.
+
+
+
+- Wire-format callers use `JsonElement`; in-process typed callers use the fluent builders. No third ingress lane remains.
+
+---
+
+---
+
+---
+
+### 2026-05-04T01:45:56Z: ConstructManifest name confirmed as the working-doc parser artifact label
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged, inbox cleared (1 file).
+
+
+
+**Merged sources:** `frank-construct-manifest-rename.md`.
+
+
+
+- The working docs now use `ConstructManifest` consistently for the parser output artifact, matching the already-correct pipeline diagram and earlier canonical rename decisions.
+
+
+
+- Scope remains documentation only; any source-code rename is a separate implementation task.
+
+---
