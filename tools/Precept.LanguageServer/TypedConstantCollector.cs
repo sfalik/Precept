@@ -27,6 +27,19 @@ internal static class TypedConstantCollector
             .ThenByDescending(constant => constant.Span.StartColumn)
             .FirstOrDefault();
 
+    /// <summary>
+    /// Finds the innermost <see cref="TypedInterpolatedTypedConstant"/> whose span contains
+    /// <paramref name="position"/>. Used to look up the slot kind for a cursor inside a hole.
+    /// </summary>
+    internal static TypedInterpolatedTypedConstant? FindInterpolatedAtPosition(SemanticIndex index, Position position) =>
+        EnumerateTypedExpressions(index)
+            .OfType<TypedInterpolatedTypedConstant>()
+            .Where(itc => Contains(itc.Span, position))
+            .OrderBy(itc => GetSpanWidth(itc.Span))
+            .ThenByDescending(itc => itc.Span.StartLine)
+            .ThenByDescending(itc => itc.Span.StartColumn)
+            .FirstOrDefault();
+
     private static IEnumerable<TypedExpression> EnumerateTypedExpressions(SemanticIndex semantics)
     {
         foreach (var field in semantics.Fields)

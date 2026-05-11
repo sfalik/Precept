@@ -5,6 +5,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- OmniSharp transitively imports a source generator that emits TargetFrameworkAttribute
+         and the standard assembly-info attributes, which conflicts with the SDK auto-generated
+         copies. Disable SDK generation and let the package-side generator own these attributes. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
 
   <ItemGroup>

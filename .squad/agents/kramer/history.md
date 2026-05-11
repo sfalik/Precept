@@ -34,6 +34,7 @@
 - `test/Precept.Tests/TypeChecker/MoneyQuantityModifierRegressionTests.cs` gap anchors were updated in Slice 5: `Min_OnMoneyField_QualifierMismatch_EmitsDiagnostic` now asserts `QualifierMismatch`, and `Min_OnMoneyField_PlainNumber_EmitsTypeMismatch` now asserts `TypeMismatch`.
 - B9/B10/B11/B12 are all fixed as of Slice 5: B9 via Slice 2, B10 via Slices 3+4, B11 via Slices 4+5, and B12 via Slice 3.
 - Semantic-token invalidation has two caches, not one: when typed-constant span changes force a new `SemanticTokensDocument`, clear both `_documents` and `_latestResults` or the next delta request can reuse a stale null-baseline identity and crash inside OmniSharp diffing.
+- `EnumerateExpressionTree` must include a `TypedInterpolatedTypedConstant` case that walks `slot.Expression` for every slot — same pattern as `TypedInterpolatedString` over `TypedHoleSegment`. Without it, `TypedFunctionCall` nodes inside typed constant holes are invisible to the `OfType<TypedFunctionCall>()` scan and get no built-in function semantic token. Note: `FieldRef`/`ArgRef` tokens inside holes already surface correctly via `index.FieldReferences`/`index.ArgReferences` (populated by `Resolve()` during type-checking); the expression-tree walker is only needed for function-call tokens.
 
 ## Historical Summary
 
@@ -41,6 +42,20 @@
 - The canonical decision ledger in `.squad/decisions.md` carries full batch chronology; this history keeps only the durable tooling rules and the newest live context needed for future implementation runs.
 
 ## Recent Updates
+
+### 2026-05-11 — Slice 3: Completions inside typed constant holes (bug I2 closed)
+- Added `FindInterpolatedAtPosition` to `TypedConstantCollector`, `IsInsideTypedConstantHole`/`GetHoleIndex`/`GetHoleItems`/`GetHoleItemsForSlot`/`GetHoleFieldsOfTypes` to `CompletionHandler`.
+- `IsInsideTypedConstantHole` tracks `inHole` by walking TypedConstantStart/Middle/End tokens; cursor on an Identifier token inside a hole passes the hole check (because TypedConstant* check fails for Identifier tokens).
+- Key trap: cursor at `'{¦identifier}'` is still inside TypedConstantStart's span (Start ends AFTER `{`). Must place cursor mid-identifier `'{Am¦ount}'` for hole detection to fire.
+- Slot → type mapping: Magnitude → Integer/Decimal/Number; Currency/FromCurrency/ToCurrency → Currency; Unit → UnitOfMeasure; WholeValue → outer ResultType.
+- Fixed pre-existing CS0579 build error in LanguageServer.csproj (OmniSharp source generator conflict) with `GenerateAssemblyInfo=false` + `GenerateTargetFrameworkAttribute=false`.
+- 4 tests added. 229 pass total; 6 pre-existing failures unchanged.
+
+### 2026-05-11 — Slice 4: Semantic tokens inside typed constant holes (bug I3 closed)
+- `EnumerateExpressionTree` now has a `TypedInterpolatedTypedConstant` case that walks `slot.Expression` for each slot, mirroring the existing `TypedInterpolatedString` case.
+- Without this, `TypedFunctionCall` nodes inside typed constant holes were never found by `EnumerateTypedExpressions(index).OfType<TypedFunctionCall>()`, so no function semantic token was emitted.
+- 4 tests added: FieldRef, ArgRef, qualified ArgRef, and FunctionCall inside holes. All pass. Pre-existing 3 failures are unrelated WIP on the branch.
+- Commit: `72aa0c1b`.
 
 ### 2026-05-14 — kramer-10 UCUM display labels and tier-1 pruning
 - Added `UcumAtom.PrintSymbol`, parsed UCUM XML `printSymbol` metadata, and surfaced print-symbol labels with name details in quantity completions.

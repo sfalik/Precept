@@ -1282,6 +1282,111 @@ public class CompletionHandlerTests
         labels.Should().NotContain(["field", "state", "event", "rule"]);
     }
 
+    // ─── Slice 3 — Completions inside typed constant holes ───────────────────────
+
+    [Fact]
+    public async Task HoleCompletion_Quantity_MagnitudeHole_ShowsNumericFieldsAndArgsOnly()
+    {
+        // '{Am¦ount} kg' → QuantityForm M2: H[magnitude] " kg" → Magnitude slot → Integer/Decimal/Number only.
+        // Cursor is inside the identifier, past the TypedConstantStart token's span.
+        var completions = await GetCompletionsAsync("""
+            precept QuantityTest
+            field Weight as quantity default '0 kg'
+            field Amount as decimal default 0.0
+            field Name as text
+            state Draft initial terminal
+            event Receive(Qty as integer)
+            from Draft on Receive
+                -> set Weight = '{Am¦ount} kg'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("Amount", "decimal field is in the Magnitude slot type set");
+        labels.Should().Contain("Qty", "integer event arg is in the Magnitude slot type set");
+        labels.Should().NotContain("Name", "text field is not a numeric type");
+    }
+
+    [Fact]
+    public async Task HoleCompletion_Money_CurrencyHole_ShowsCurrencyFieldsOnly()
+    {
+        // '100 {Co¦de}' → MoneyForm M3: "100 " H[currency] → Currency slot → Currency fields only.
+        var completions = await GetCompletionsAsync("""
+            precept MoneyTest
+            field Cost as money default '0 USD'
+            field Code as currency default 'USD'
+            field Amount as decimal default 0.0
+            state Draft initial terminal
+            event Pay(CurrencyArg as currency)
+            from Draft on Pay
+                -> set Cost = '100 {Co¦de}'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("Code", "currency field is in the Currency slot type set");
+        labels.Should().Contain("CurrencyArg", "currency event arg is in the Currency slot type set");
+        labels.Should().NotContain("Amount", "decimal field is not a currency type");
+    }
+
+    [Fact]
+    public async Task HoleCompletion_Quantity_UnitHole_ShowsUnitOfMeasureFieldsOnly()
+    {
+        // '5 {BaseUn¦it}' → QuantityForm M3: "5 " H[unit] → Unit slot → UnitOfMeasure fields only.
+        var completions = await GetCompletionsAsync("""
+            precept QuantityTest
+            field Weight as quantity default '0 kg'
+            field BaseUnit as unitofmeasure default 'kg'
+            field Amount as decimal default 0.0
+            state Draft initial terminal
+            event Ship(UnitArg as unitofmeasure)
+            from Draft on Ship
+                -> set Weight = '5 {BaseUn¦it}'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("BaseUnit", "unit-of-measure field is in the Unit slot type set");
+        labels.Should().Contain("UnitArg", "unit-of-measure event arg is in the Unit slot type set");
+        labels.Should().NotContain("Amount", "decimal field is not a unit-of-measure type");
+    }
+
+    [Fact]
+    public async Task HoleCompletion_OutsideHole_NormalExpressionCompletions()
+    {
+        // Cursor outside any hole: normal expression completions must be returned (regression guard).
+        var completions = await GetCompletionsAsync("""
+            precept RegressionTest
+            field Amount as decimal default 0.0
+            field Code as currency default 'USD'
+            state Draft initial terminal
+            event Submit
+            from Draft on Submit when ¦Amount > 0
+                -> no transition
+            """);
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("Amount", "field name must appear in expression completions");
+        labels.Should().Contain("Code", "field name must appear in expression completions");
+    }
+
     private static async Task<CompletionList> GetCompletionsAsync(string source, Position position)
     {
         return await GetCompletionsAsync(source, position, context: null);

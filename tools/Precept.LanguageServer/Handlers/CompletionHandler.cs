@@ -135,6 +135,14 @@ internal sealed class CompletionHandler : ICompletionHandler
             return CreateCompletionList(GetTypedConstantItems(compilation, position, innerContext, appendQuote));
         }
 
+        // Ctrl+Space / invoked completion inside a {hole} in an interpolated typed constant.
+        // The cursor sits between a TypedConstantStart/Middle and the next TypedConstantMiddle/End,
+        // so IsInsideTypedConstantToken returns false — we need a separate check here.
+        if (string.IsNullOrEmpty(triggerCharacter) && IsInsideTypedConstantHole(compilation.Tokens.Tokens, position))
+        {
+            return CreateCompletionList(GetHoleItems(compilation, position));
+        }
+
         return context switch
         {
             SlotContext.TopLevel => CreateCompletionList(GetTopLevelItems()),
@@ -1479,6 +1487,152 @@ internal sealed class CompletionHandler : ICompletionHandler
     private static bool IsEmptyTypedConstantToken(ImmutableArray<Token> tokens, Position position) =>
         TryGetTypedConstantSlotPhase(tokens, position, out var phase, out _)
         && phase == TypedConstantPhase.Empty;
+
+    // ── Typed-constant hole detection ─────────────────────────────────────────
+
+    /// <summary>
+    /// Returns true when the cursor sits inside a <c>{…}</c> interpolation hole within
+    /// a typed constant — i.e., between a TypedConstantStart/Middle token (ending at the
+    /// opening <c>{</c>) and the next TypedConstantMiddle/End token (starting at <c>}</c>).
+    /// </summary>
+    private static bool IsInsideTypedConstantHole(ImmutableArray<Token> tokens, Position position)
+    {
+        var inHole = false;
+
+        foreach (var token in tokens)
+        {
+            switch (token.Kind)
+            {
+                case TokenKind.TypedConstant:
+                    if (Contains(token.Span, position)) return false;
+                    inHole = false;
+                    break;
+
+                case TokenKind.TypedConstantStart:
+                    if (Contains(token.Span, position)) return false;
+                    if (IsBefore(position, token.Span)) return false;
+                    // Cursor is past this token's end (past `{`) → entered hole 0.
+                    inHole = true;
+                    break;
+
+                case TokenKind.TypedConstantMiddle:
+                    // If we're in a hole and cursor precedes this token's start (`}`) → cursor is in the hole.
+                    if (inHole && IsBefore(position, token.Span)) return true;
+                    if (Contains(token.Span, position)) return false;
+                    if (IsBefore(position, token.Span)) return false;
+                    // Cursor is past this token's end → entered the next hole.
+                    inHole = true;
+                    break;
+
+                case TokenKind.TypedConstantEnd:
+                    if (inHole && IsBefore(position, token.Span)) return true;
+                    inHole = false;
+                    break;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the 0-based index of the hole the cursor is currently inside, or -1 if the
+    /// cursor is not inside any hole. Assumes <see cref="IsInsideTypedConstantHole"/> is true.
+    /// </summary>
+    private static int GetHoleIndex(ImmutableArray<Token> tokens, Position position)
+    {
+        var holeIndex = -1;
+
+        foreach (var token in tokens)
+        {
+            switch (token.Kind)
+            {
+                case TokenKind.TypedConstant:
+                    holeIndex = -1;
+                    break;
+
+                case TokenKind.TypedConstantStart:
+                    if (IsBefore(position, token.Span) || Contains(token.Span, position)) return holeIndex;
+                    holeIndex = 0;
+                    break;
+
+                case TokenKind.TypedConstantMiddle:
+                    if (IsBefore(position, token.Span)) return holeIndex;
+                    if (Contains(token.Span, position)) return holeIndex;
+                    holeIndex = holeIndex < 0 ? 0 : holeIndex + 1;
+                    break;
+
+                case TokenKind.TypedConstantEnd:
+                    if (IsBefore(position, token.Span)) return holeIndex;
+                    holeIndex = -1;
+                    break;
+            }
+        }
+
+        return holeIndex;
+    }
+
+    // ── Hole completion items ──────────────────────────────────────────────────
+
+    private static IEnumerable<CompletionItem> GetHoleItems(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var holeIndex = GetHoleIndex(tokens, position);
+
+        // Look up the already-computed TypedInterpolatedTypedConstant from the semantic model.
+        var interpolated = TypedConstantCollector.FindInterpolatedAtPosition(compilation.Semantics, position);
+        if (interpolated is not null && holeIndex >= 0 && holeIndex < interpolated.Slots.Length)
+        {
+            var slotKind = interpolated.Slots[holeIndex].SlotKind;
+            return GetHoleItemsForSlot(compilation, position, slotKind, interpolated.ResultType);
+        }
+
+        // Fallback: semantic model unavailable (file has errors) — return all fields/args.
+        return GetCurrentEventArgItems(compilation, position)
+            .Concat(GetFieldItems(compilation));
+    }
+
+    private static IEnumerable<CompletionItem> GetHoleItemsForSlot(
+        Compilation compilation,
+        Position position,
+        InterpolationSlotKind slotKind,
+        TypeKind outerType)
+    {
+        return slotKind switch
+        {
+            InterpolationSlotKind.Magnitude =>
+                GetHoleFieldsOfTypes(compilation, position, TypeKind.Integer, TypeKind.Decimal, TypeKind.Number),
+            InterpolationSlotKind.Currency or InterpolationSlotKind.FromCurrency or InterpolationSlotKind.ToCurrency =>
+                GetHoleFieldsOfTypes(compilation, position, TypeKind.Currency),
+            InterpolationSlotKind.Unit =>
+                GetHoleFieldsOfTypes(compilation, position, TypeKind.UnitOfMeasure),
+            InterpolationSlotKind.WholeValue =>
+                GetHoleFieldsOfTypes(compilation, position, outerType),
+            _ => GetCurrentEventArgItems(compilation, position).Concat(GetFieldItems(compilation)),
+        };
+    }
+
+    private static IEnumerable<CompletionItem> GetHoleFieldsOfTypes(
+        Compilation compilation,
+        Position position,
+        params TypeKind[] allowedTypes)
+    {
+        var typeSet = new HashSet<TypeKind>(allowedTypes);
+
+        var eventName = SlotContextResolver.GetCurrentEventName(compilation, position);
+        IEnumerable<CompletionItem> argItems = [];
+        if (eventName is not null && compilation.Semantics.EventsByName.TryGetValue(eventName, out var currentEvent))
+        {
+            argItems = currentEvent.Args
+                .Where(arg => typeSet.Contains(arg.ResolvedType))
+                .Select(arg => CreateItem(arg.Name, "Event argument", CompletionItemKind.Variable, CompletionSortGroup.SemanticArgument));
+        }
+
+        var fieldItems = compilation.Semantics.Fields
+            .Where(field => typeSet.Contains(field.ResolvedType))
+            .Select(field => CreateItem(field.Name, "Field", CompletionItemKind.Field, CompletionSortGroup.SemanticSymbol));
+
+        return argItems.Concat(fieldItems);
+    }
 
     private static string WithClosingQuote(string content) => content + "'";
 
