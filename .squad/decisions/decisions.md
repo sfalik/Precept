@@ -15855,3 +15855,125 @@ Shane reported that `field Amount as money in 'USD' nonnegative` underlined the 
 - `dotnet test test/Precept.LanguageServer.Tests/ --nologo --verbosity minimal`
 - `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --nologo --verbosity minimal`
 - Note: `dotnet test test/Precept.Tests/ --nologo --verbosity minimal` still reports an unrelated existing failure in `ArgReferenceTests.TypeChecker_ArgReference_SiteSpanMatchesSource`.
+
+# Decision: B9–B12 Triage — Type Checker Quantity Validation Gaps
+
+**Author:** Frank  
+**Date:** 2026-05-11T01:58:19.194-04:00  
+**Status:** Proposed  
+**Scope:** Type checker — assignment and default value validation
+
+## Context
+
+B9, B10, B11, and B12 are four bugs that all manifest as the type checker silently accepting invalid quantity assignments. They share a common architectural gap: the type checker uses `expectedType` as an advisory hint during expression resolution but never validates the resolved result against the target.
+
+## Root Cause Analysis
+
+Three structural gaps combine to produce all four bugs:
+
+### Gap 1: No post-resolution assignment validation (B9, B10, B11, B12)
+
+`ResolveAction` (TypeChecker.Expressions.cs, `AssignAction` case, lines 810–822) passes `fieldType` to `Resolve` as `expectedType`, but the `expectedType` parameter is a hint — it guides numeric literal widening and typed constant context, but does not enforce compatibility. After resolution, the method creates `TypedInputAction` directly without checking `value.ResultType` against `fieldType`. Same gap exists in `ResolveFieldExpressions` (TypeChecker.cs, line 452) for field default values.
+
+### Gap 2: QuantityValidator is dimension-blind (B10, B11)
+
+`QuantityValidator.Validate` (QuantityValidator.cs) validates that typed constants match the `<number> <UCUM-unit>` pattern and that the unit is UCUM-valid, but never compares the unit's dimension against the field's declared dimension qualifier. The `TypedConstantContext` parameter exists for this purpose but is unused. `DeclaredQualifiers` from the owning field are never threaded into the validator.
+
+### Gap 3: Expression nodes strip qualifier metadata (B12)
+
+`TypedArgRef` and `TypedFieldRef` carry only `ResultType` (a `TypeKind`), discarding the `DeclaredQualifiers` from `TypedArg`/`TypedField`. This means even with a post-resolution assignment check, variable-to-field assignments (`set q = qq`) would compare `Quantity == Quantity` and pass — the dimension mismatch is invisible at the expression tree level.
+
+## Fix Strategy
+
+### Layer 1: Post-resolution assignment type check (fixes B9)
+
+In `ResolveAction`'s `AssignAction` case, after resolving the value expression, check `!IsAssignable(value.ResultType, fieldType)` and emit `DiagnosticCode.TypeMismatch`. Same check in `ResolveFieldExpressions` for defaults. This catches type-level mismatches (integer → quantity) immediately.
+
+### Layer 2: Qualifier-aware typed constant validation (fixes B10, B11)
+
+Thread the target field's `DeclaredQualifiers` into `ResolveTypedConstant` → `QuantityValidator.Validate` via the existing `TypedConstantContext` parameter. After UCUM validation succeeds, derive the literal's dimension via `DeriveUnitDimensionName` and compare against the declared dimension. Emit `DimensionCategoryMismatch` on mismatch.
+
+### Layer 3: Qualifier metadata on expression nodes (fixes B12)
+
+Extend `TypedArgRef` and `TypedFieldRef` to carry `DeclaredQualifiers` (nullable/optional). Populate from `TypedArg.DeclaredQualifiers` and `TypedField.DeclaredQualifiers` respectively during identifier resolution. The post-resolution assignment check then compares qualifier dimensions, not just type kinds.
+
+## Execution Order
+
+1. Layer 1 first — smallest change, highest impact (fixes B9, partially B10/B11 at type level)
+2. Layer 2 second — validator enhancement (completes B10, B11)
+3. Layer 3 last — structural expression tree change (fixes B12, enables future qualifier-aware analysis)
+
+Layers 1 and 2 can ship independently. Layer 3 is a prerequisite for any future qualifier-aware type checking beyond literals.
+
+## Diagnostic Codes
+
+All required codes already exist:
+- `TypeMismatch` (PRE0018) — for B9 (integer → quantity)
+- `DimensionCategoryMismatch` (PRE0069) — for B10, B11, B12
+- `QualifierMismatch` (PRE0068) — for B12 (if we want a more specific diagnostic than DimensionCategoryMismatch)
+
+No new diagnostic codes needed.
+
+## Risk Assessment
+
+- **Layer 1:** Low risk. Additive guard with error-type suppression already in `IsAssignable`.
+- **Layer 2:** Medium risk. Plumbing change through the validation pipeline — `TypedConstantContext` needs to carry `DeclaredQualifiers`.
+- **Layer 3:** Medium-high risk. Structural change to expression tree model. All expression tree consumers need audit. However, data is additive and nullable.
+
+## Scope Note
+
+These fixes apply equally to `money` fields — a `money in 'USD'` field with `set amount = '100 EUR'` has the same gap. The architectural fix is type-agnostic; it should be implemented generically, not quantity-specific.
+
+# Kramer — Semantic tokens delta crash
+
+## Summary
+- Fixed the `textDocument/semanticTokens/full/delta` crash that surfaced as `ArgumentOutOfRangeException` inside OmniSharp's `SemanticTokensDocument.GetSemanticTokensEdits()`.
+- Commit: `ef7374dd` (`fix(semantic-tokens): prevent delta crash on ImmutableArray out-of-range`).
+
+## What I found
+- The framework keeps a single `SemanticTokensDocument.Id` for the lifetime of each cached document.
+- That means the stock delta path cannot distinguish "latest client baseline" from "older client baseline" once a delta request has already primed `_prevData`.
+- A later delta request with an older `PreviousResultId` could therefore diff against stale cached token data and hand `ImmutableArray.Create(...)` an invalid slice.
+- This was not introduced by the UCUM display-label work; `SemanticTokensHandler` does not read `UcumAtom`, `PrintSymbol`, or quantity-completion metadata.
+
+## Decision
+- Keep semantic-token delta support enabled, but stop trusting the framework's fixed document ID as the client-visible result ID.
+- Stamp a fresh result ID on every full and delta response, track the latest `(clientResultId, frameworkDocumentId)` per URI, and fall back to a full response whenever the client's delta baseline is stale or the typed-constant invalidation path replaced the framework document.
+
+## Validation
+- `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server`
+- `dotnet test test/Precept.LanguageServer.Tests/`
+- Added handler-level regression tests covering stale result IDs and typed-constant span changes.
+
+# Kramer — UCUM display follow-up
+
+## What changed
+- Added `PrintSymbol` to `src/Precept/Language/Ucum/UcumAtom.cs`.
+- Updated `src/Precept/Language/Ucum/UcumAtomCatalog.cs` to carry `PrintSymbol`, parse it from the embedded UCUM XML (`printSymbol` is stored as a child element in this snapshot, with attribute fallback), and prune troy/apothecary mass units from tier-1.
+- Updated `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs` so quantity-unit completions use `printSymbol ?? code` for `Label`, `Name` for `Detail`, and the UCUM code for insertion/sorting.
+- Updated `tools/Precept.LanguageServer/Handlers/HoverHandler.cs` so quantity/unit typed-constant hover shows resolved unit metadata.
+- Updated tracker/tests/MCP description in:
+  - `docs/Working/completions-bugs.md`
+  - `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`
+  - `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs`
+  - `test/Precept.Tests/Language/UcumCatalogDriftTests.cs`
+  - `test/Precept.Tests/Language/Ucum/UcumCatalogTests.cs`
+  - `tools/Precept.Mcp/Tools/DomainsTool.cs`
+
+## Grain (`[gr]`)
+- Kept `[gr]` in tier-1.
+- Reason: `src/Precept/Data/Ucum/ucum-essence.xml` classifies `[gr]` as `class="avoirdupois"`, not `apoth`.
+
+## Print symbols found
+- `[lb_av]` -> `lb`
+- `[oz_av]` -> `oz`
+
+## Final validation
+- `dotnet build src/Precept/Precept.csproj` ✅
+- `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server` ✅
+- `dotnet test test/Precept.Tests/` -> 4567 passed
+- `dotnet test test/Precept.LanguageServer.Tests/` -> 221 passed
+
+## Issues encountered
+- The embedded UCUM snapshot stores `printSymbol` as an XML element for these units, so parsing needed element support instead of attribute-only handling.
+- Quote-trigger completions still append the closing quote in the existing completion postprocess path; the unit code remains the inserted UCUM payload prefix used for sorting and slot completion behavior.
