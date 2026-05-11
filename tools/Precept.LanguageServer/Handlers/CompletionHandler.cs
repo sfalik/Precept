@@ -53,10 +53,12 @@ internal sealed class CompletionHandler : ICompletionHandler
             return CreateCompletionList(GetTypedConstantItems(compilation, position, context));
         }
 
-        // Ctrl+Space inside an already-open typed constant (e.g. cursor between '' chars).
+        // Ctrl+Space / invoked completion inside an already-open typed constant (e.g. cursor
+        // between '' chars). Some clients send an empty trigger character for invoked completion,
+        // so normalize null/empty the same way here.
         // SlotContextResolver may return TopLevel if the parse tree doesn't cover the literal
         // span, so detect by inspecting the raw token under the cursor instead.
-        if (triggerCharacter is null && IsInsideTypedConstantToken(compilation.Tokens.Tokens, position))
+        if (string.IsNullOrEmpty(triggerCharacter) && IsInsideTypedConstantToken(compilation.Tokens.Tokens, position))
         {
             var innerContext = context is SlotContext.InExpression or SlotContext.InArgDefault
                 ? context
@@ -418,6 +420,11 @@ internal sealed class CompletionHandler : ICompletionHandler
 
         tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
         tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
+        if (tokenIndex >= 0 && IsTypedConstantToken(tokens[tokenIndex].Kind))
+        {
+            tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        }
+
         if (tokenIndex < 0
             || !Operators.ByToken.ContainsKey((tokens[tokenIndex].Kind, Arity.Binary)))
         {
@@ -866,9 +873,15 @@ internal sealed class CompletionHandler : ICompletionHandler
         }
 
         var token = tokens[tokenIndex];
-        return token.Kind is TokenKind.TypedConstant or TokenKind.TypedConstantStart
+        return IsTypedConstantToken(token.Kind)
             && Contains(token.Span, position);
     }
+
+    private static bool IsTypedConstantToken(TokenKind kind) =>
+        kind is TokenKind.TypedConstant
+            or TokenKind.TypedConstantStart
+            or TokenKind.TypedConstantMiddle
+            or TokenKind.TypedConstantEnd;
 
     private static bool StartsAt(SourceSpan span, Position position) =>
         span.StartLine == position.Line + 1

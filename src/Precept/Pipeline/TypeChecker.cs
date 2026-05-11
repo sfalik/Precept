@@ -456,6 +456,24 @@ internal static partial class TypeChecker
                 ctx.CurrentFieldIndex = -1;
             }
 
+            // —— Min bound expression ——
+            var minMod = declared.Modifiers.FirstOrDefault(
+                m => m.Kind == ModifierKind.Min);
+            if (minMod?.Value is not null and not MissingExpression)
+            {
+                var resolved = Resolve(minMod.Value, ctx, typedField.ResolvedType);
+                _ = resolved;
+            }
+
+            // —— Max bound expression ——
+            var maxMod = declared.Modifiers.FirstOrDefault(
+                m => m.Kind == ModifierKind.Max);
+            if (maxMod?.Value is not null and not MissingExpression)
+            {
+                var resolved = Resolve(maxMod.Value, ctx, typedField.ResolvedType);
+                _ = resolved;
+            }
+
             // —— Computed expression (from ComputeExpressionSlot on the field's Syntax) ——
             var computeSlot = declared.Syntax.GetSlot<ComputeExpressionSlot>(
                 ConstructSlotKind.ComputeExpression);

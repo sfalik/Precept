@@ -375,4 +375,128 @@ public class TypeCheckerModifierTests
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 7: Numeric range modifiers on money and quantity fields
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void NonnegativeModifier_OnMoneyField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' nonnegative
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void PositiveModifier_OnMoneyField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' positive
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void NonzeroModifier_OnMoneyField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' nonzero
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void NonnegativeModifier_OnQuantityField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity in 'kg' nonnegative
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void PositiveModifier_OnQuantityField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity in 'kg' positive
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void MinModifier_OnMoneyField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' min '100.00 USD'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void MaxModifier_OnMoneyField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' max '500.00 USD'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void MinAndMaxModifiers_OnMoneyField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' min '100.00 USD' max '500.00 USD'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void MinModifier_OnQuantityField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity in 'kg' min '1.0 kg'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void MinModifier_OnMoneyField_InvalidCurrency_EmitsInvalidTypedConstantContent()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' min 'not-valid-currency'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidTypedConstantContent);
+    }
 }

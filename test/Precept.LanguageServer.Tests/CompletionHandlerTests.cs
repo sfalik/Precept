@@ -367,6 +367,110 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public void TypedConstantCursorDiagnostic_DefaultEmptyLiteral_ReportsTopLevelContextAndTypedConstantToken()
+    {
+        var (compilation, position) = GetCompilationAtCursor("""
+            precept TravelReimbursement
+            field SubmittedOn as date default '2037-08-09'
+            field ApprovedOn as date default '¦'
+            state Draft initial terminal
+            """);
+
+        var context = SlotContextResolver.GetCursorContext(compilation, position);
+        var tokenIndex = FindTokenAtOrBeforeCursor(compilation, position);
+        var token = compilation.Tokens.Tokens[tokenIndex];
+
+        context.Should().Be(SlotContext.TopLevel);
+        token.Kind.Should().Be(Precept.Language.TokenKind.TypedConstant);
+        Contains(token.Span, position).Should().BeTrue();
+    }
+
+    [Fact]
+    public void TypedConstantCursorDiagnostic_ExpressionEmptyLiteral_ReportsExpressionContextAndTypedConstantToken()
+    {
+        var (compilation, position) = GetCompilationAtCursor("""
+            precept LoanApplication
+            field ApprovedAmount as money in 'USD' default '0.00 USD'
+            rule ApprovedAmount > '¦' because "Approved amount must be positive"
+            state Draft initial terminal
+            """);
+
+        var context = SlotContextResolver.GetCursorContext(compilation, position);
+        var tokenIndex = FindTokenAtOrBeforeCursor(compilation, position);
+        var token = compilation.Tokens.Tokens[tokenIndex];
+
+        context.Should().Be(SlotContext.InExpression);
+        token.Kind.Should().Be(Precept.Language.TokenKind.TypedConstant);
+        Contains(token.Span, position).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_InvokedInsideEmptyDefaultLiteral_UsesTypedConstantValues()
+    {
+        const string sourceWithCursor = """
+            precept TravelReimbursement
+            field SubmittedOn as date default '2037-08-09'
+            field ApprovedOn as date default '¦'
+            state Draft initial terminal
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor, new CompletionContext
+        {
+            TriggerKind = CompletionTriggerKind.Invoked,
+            TriggerCharacter = string.Empty,
+        });
+        var noContextCompletions = await GetCompletionsAsync(sourceWithCursor);
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var noContextLabels = noContextCompletions.Items.Select(item => item.Label).ToArray();
+        var keywords = completions.Items
+            .Where(item => item.Kind == CompletionItemKind.Keyword)
+            .Select(item => item.Label)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        noContextCompletions.IsIncomplete.Should().BeFalse();
+        keywords.Should().BeEmpty();
+        labels.Should().Contain("2037-08-09");
+        labels.Should().Contain(Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Date).ContentValidation!.Examples);
+        labels.Should().NotContain(["field", "rule", "state"]);
+        labels.Should().BeEquivalentTo(noContextLabels);
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_InvokedInsideEmptyExpressionLiteral_UsesTypedConstantValues()
+    {
+        const string sourceWithCursor = """
+            precept LoanApplication
+            field ApprovedAmount as money in 'USD' default '0.00 USD'
+            rule ApprovedAmount > '¦' because "Approved amount must be positive"
+            state Draft initial terminal
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor, new CompletionContext
+        {
+            TriggerKind = CompletionTriggerKind.Invoked,
+            TriggerCharacter = string.Empty,
+        });
+        var noContextCompletions = await GetCompletionsAsync(sourceWithCursor);
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var noContextLabels = noContextCompletions.Items.Select(item => item.Label).ToArray();
+        var keywords = completions.Items
+            .Where(item => item.Kind == CompletionItemKind.Keyword)
+            .Select(item => item.Label)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        noContextCompletions.IsIncomplete.Should().BeFalse();
+        keywords.Should().BeEmpty();
+        labels.Should().Contain("0.00 USD");
+        labels.Should().Contain(Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Money).ContentValidation!.Examples);
+        labels.Should().NotContain(["ApprovedAmount", "false", "true", "abs", "approximate", "ceil", "clamp"]);
+        labels.Should().BeEquivalentTo(noContextLabels);
+    }
+
+    [Fact]
     public async Task Completions_TypedConstant_NoKeywordsInsideTypedConstantSpan()
     {
         // Ctrl+Space (no trigger char) inside '' must not bleed top-level keyword completions.
@@ -490,18 +594,7 @@ public class CompletionHandlerTests
 
     private static async Task<CompletionList> GetCompletionsAsync(string source, Position position)
     {
-        var store = new DocumentStore();
-        var uri = DocumentUri.FromFileSystemPath(@"C:\completion-test.precept");
-        store.GetOrAdd(uri).Update(Precept.Compiler.Compile(source));
-
-        var handler = new CompletionHandler(store);
-        var request = new CompletionParams
-        {
-            TextDocument = new TextDocumentIdentifier(uri),
-            Position = position,
-        };
-
-        return await handler.Handle(request, CancellationToken.None);
+        return await GetCompletionsAsync(source, position, context: null);
     }
 
     private static Task<CompletionList> GetCompletionsAsync(string sourceWithCursor)
@@ -515,10 +608,21 @@ public class CompletionHandlerTests
     {
         var position = GetCursorPosition(sourceWithCursor);
         var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
-        return GetCompletionsAsync(source, position, triggerCharacter);
+        return GetCompletionsAsync(source, position, new CompletionContext
+        {
+            TriggerKind = CompletionTriggerKind.TriggerCharacter,
+            TriggerCharacter = triggerCharacter,
+        });
     }
 
-    private static async Task<CompletionList> GetCompletionsAsync(string source, Position position, string triggerCharacter)
+    private static Task<CompletionList> GetCompletionsAsync(string sourceWithCursor, CompletionContext? context)
+    {
+        var position = GetCursorPosition(sourceWithCursor);
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        return GetCompletionsAsync(source, position, context);
+    }
+
+    private static async Task<CompletionList> GetCompletionsAsync(string source, Position position, CompletionContext? context)
     {
         var store = new DocumentStore();
         var uri = DocumentUri.FromFileSystemPath(@"C:\completion-test.precept");
@@ -529,11 +633,7 @@ public class CompletionHandlerTests
         {
             TextDocument = new TextDocumentIdentifier(uri),
             Position = position,
-            Context = new CompletionContext
-            {
-                TriggerKind = CompletionTriggerKind.TriggerCharacter,
-                TriggerCharacter = triggerCharacter,
-            },
+            Context = context,
         };
 
         return await handler.Handle(request, CancellationToken.None);
@@ -543,6 +643,76 @@ public class CompletionHandlerTests
         completions.Items.Single(item =>
             string.Equals(item.Label, label, StringComparison.Ordinal)
             && string.Equals(item.Detail, detail, StringComparison.Ordinal));
+
+    private static (Precept.Pipeline.Compilation Compilation, Position Position) GetCompilationAtCursor(string sourceWithCursor)
+    {
+        var position = GetCursorPosition(sourceWithCursor);
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        return (Precept.Compiler.Compile(source), position);
+    }
+
+    private static int FindTokenAtOrBeforeCursor(Precept.Pipeline.Compilation compilation, Position position)
+    {
+        var candidate = -1;
+        var tokens = compilation.Tokens.Tokens;
+        for (var index = 0; index < tokens.Length; index++)
+        {
+            var token = tokens[index];
+            if (IsBefore(position, token.Span))
+            {
+                break;
+            }
+
+            candidate = index;
+            if (Contains(token.Span, position))
+            {
+                break;
+            }
+        }
+
+        candidate.Should().BeGreaterThanOrEqualTo(0);
+        return candidate;
+    }
+
+    private static bool IsBefore(Position position, Precept.Pipeline.SourceSpan span)
+    {
+        var line = position.Line + 1;
+        var character = position.Character + 1;
+        if (line != span.StartLine)
+        {
+            return line < span.StartLine;
+        }
+
+        return character < span.StartColumn;
+    }
+
+    private static bool Contains(Precept.Pipeline.SourceSpan span, Position position)
+    {
+        var line = position.Line + 1;
+        var character = position.Character + 1;
+
+        if (line < span.StartLine || line > span.EndLine)
+        {
+            return false;
+        }
+
+        if (span.StartLine == span.EndLine)
+        {
+            return character >= span.StartColumn && character < span.EndColumn;
+        }
+
+        if (line == span.StartLine)
+        {
+            return character >= span.StartColumn;
+        }
+
+        if (line == span.EndLine)
+        {
+            return character < span.EndColumn;
+        }
+
+        return true;
+    }
 
     private static Position GetCursorPosition(string sourceWithCursor)
     {

@@ -13,9 +13,16 @@ public static class Modifiers
     //  Shared applicability arrays
     // ════════════════════════════════════════════════════════════════════════════
 
-    private static readonly TypeTarget[] NumericTypes =
+    private static readonly TypeTarget[] ZeroBoundNumericTypes =
     [
         new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+        new(TypeKind.Money),   new(TypeKind.Quantity),
+    ];
+
+    private static readonly TypeTarget[] RangedNumericTypes =
+    [
+        new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+        new(TypeKind.Money),   new(TypeKind.Quantity),
     ];
 
     private static readonly TypeTarget[] StringOnly = [new(TypeKind.String)];
@@ -61,7 +68,7 @@ public static class Modifiers
         ModifierKind.Nonnegative => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonnegative),
             "Value ≥ 0",
-            ModifierCategory.Structural, NumericTypes,
+            ModifierCategory.Structural, ZeroBoundNumericTypes,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -76,7 +83,7 @@ public static class Modifiers
         ModifierKind.Positive => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Positive),
             "Value > 0",
-            ModifierCategory.Structural, NumericTypes,
+            ModifierCategory.Structural, ZeroBoundNumericTypes,
             Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero],
             ProofSatisfactions:
             [
@@ -92,7 +99,7 @@ public static class Modifiers
         ModifierKind.Nonzero => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonzero),
             "Value ≠ 0",
-            ModifierCategory.Structural, NumericTypes,
+            ModifierCategory.Structural, ZeroBoundNumericTypes,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
@@ -130,7 +137,7 @@ public static class Modifiers
         ModifierKind.Min => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Min),
             "Minimum value",
-            ModifierCategory.Structural, NumericTypes, HasValue: true,
+            ModifierCategory.Structural, RangedNumericTypes, HasValue: true,
             BoundCounterpart: ModifierKind.Max,
             ProofSatisfactions:
             [
@@ -145,7 +152,7 @@ public static class Modifiers
         ModifierKind.Max => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Max),
             "Maximum value",
-            ModifierCategory.Structural, NumericTypes, HasValue: true,
+            ModifierCategory.Structural, RangedNumericTypes, HasValue: true,
             BoundCounterpart: ModifierKind.Min,
             ProofSatisfactions:
             [

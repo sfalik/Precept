@@ -96,11 +96,11 @@ public class ModifiersTests
     [InlineData(ModifierKind.Nonzero)]
     [InlineData(ModifierKind.Min)]
     [InlineData(ModifierKind.Max)]
-    public void NumericModifiers_ApplyToIntegerDecimalNumber(ModifierKind kind)
+    public void NumericModifiers_ApplyToIntegerDecimalNumberMoneyQuantity(ModifierKind kind)
     {
         var meta = ValueModifierTestAccess.GetMeta(kind);
         meta.ApplicableTo.Select(t => t.Kind).Should()
-            .BeEquivalentTo([TypeKind.Integer, TypeKind.Decimal, TypeKind.Number]);
+            .BeEquivalentTo([TypeKind.Integer, TypeKind.Decimal, TypeKind.Number, TypeKind.Money, TypeKind.Quantity]);
     }
 
     [Theory]

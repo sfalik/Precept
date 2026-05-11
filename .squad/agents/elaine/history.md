@@ -52,6 +52,11 @@
 - Sample accuracy matters at the grammar-slot level: a single stale `when` position teaches the wrong mental model even when the surrounding workflow is otherwise sound.
 - The 2026-05-10 sample audit found stale post-verb guard examples in `samples/insurance-claim.precept` and `samples/loan-application.precept`; I moved StateEnsure, EventEnsure, and AccessMode examples to pre-verb `when`, and added a minimal guarded StateAction example in `samples/event-registration.precept` so all four guard-bearing construct families now have at least one positive sample.
 - The current compile/diagnostic path on this branch still rejects the corrected pre-verb sample syntax, so the user-facing samples now match the design decision while parser/tooling parity still needs follow-through elsewhere.
+- Typed literal completion should behave like a type-owned mini-mode: once the caret is inside `'...'`, the menu belongs to the literal slot, never to outer grammar constructs.
+- Wrong completions are worse than empty state inside a typed literal; if expected type or slot cannot be resolved, suppress the list rather than leaking `field`, `state`, functions, or general expression items.
+- Structured literals need phase-specific help: numeric-entry phases stay quiet, but the first separator space should pivot instantly into suffix vocabularies such as temporal units or currency codes.
+- Free-form literal types should stay lightweight. Text and plain numeric literals benefit more from reused local values and format examples on demand than from aggressive auto-popup behavior.
+- Empty typed literals and partial typed literals should feel different: empty state teaches the format with full examples, while partial state narrows to the exact segment vocabulary the user is finishing.
 
 ## Recent Updates
 
