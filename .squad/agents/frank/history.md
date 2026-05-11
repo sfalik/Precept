@@ -96,3 +96,7 @@
 - Key architectural call: S1–S5 proof strategy architecture is sound. All 14 gaps trace to catalog metadata omissions, not structural engine defects. Fixes are catalog entries + one axis fallback + one new DU subtype + one assignment proof obligation.
 - Source audit documents (`proof-engine-qualifier-audit.md`, `proof-gaps-issues.md`) retained as reference.
 - Decision recorded: `.squad/decisions/inbox/frank-plan-renamed.md`.
+
+### 2026-05-11T23:43:07Z — Slice 12 unblock context recorded
+- Frank's temporal price-denominator design is the ready handoff for Slice 12: keep temporal denomination on price `of`, give duration implied temporal-dimension qualifiers, and extend Strategy 5 comparison support accordingly.
+- Cross-agent inventory analysis also flagged future sample fallout in `samples/inventory-item.precept`: binary-chain qualifier propagation, ensure-expression coverage, and bare `unitofmeasure` semantics.

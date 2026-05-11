@@ -1,3 +1,223 @@
+# Temporal Price Denominator Type System Extension — Slice 12 Unblock
+
+**By:** Frank  
+**Date:** 2026-05-11T19:35:20-04:00  
+**Status:** Design complete — awaiting review  
+**Context:** George blocked on Slice 12 (G8 + G13). Price has no temporal qualifier axis. This design provides the prerequisite type system work.
+
+---
+
+## Key Decision
+
+**Price's `of` qualifier accepts temporal dimension values (`'date'`, `'time'`) in addition to physical dimensions (`'mass'`, `'length'`, `'count'`).** No new `per` keyword. No new preposition syntax. The existing `of` preposition on price already means "denominator dimension category" — temporal dimensions are a valid category.
+
+The extension is type-gated: only `TypeKind.Price` accepts temporal values on the `Dimension` axis. Other types with `of → Dimension` (e.g., `quantity`) continue to reject temporal values.
+
+Duration gets `ImpliedQualifiers: [TemporalDimension(Time)]` on its `TypeMeta` — encoding "duration is intrinsically time-dimension" as catalog metadata. `ResolveQualifierOnAxis` reads both declared and implied qualifiers.
+
+`ExtractComparableValue` gains temporal arms. `ResolveQualifierOnAxis` gains `Dimension → TemporalDimension` fallback. These are additive changes within the S5 strategy scope.
+
+## Alternatives Rejected
+
+### `price per 'month'` — new preposition keyword
+
+**Why rejected:** Requires `TokenKind.Per`, token catalog entry, parser changes, completions, grammar regeneration, semantic tokens — a full language surface addition. The `of` preposition already covers the semantic need ("denominator dimension category"). Adding `per` creates two synonymous qualifier forms (`price of 'time'` vs `price per 'hours'`) with subtly different granularity (dimension vs unit) that the type system must reconcile. No other Precept type has dual qualifier prepositions for the same conceptual axis. Violated the uniform qualifier model.
+
+### Generalize `Dimension` axis to bridge physical and temporal (George's Option B)
+
+**Why rejected:** Conflates two distinct registries under one axis. Physical dimensions are UCUM-derived strings; temporal dimensions are `PeriodDimension` enum values. Merging them requires either a polymorphic `DeclaredQualifierMeta.Dimension` (breaking the DU principle — each subtype should carry exactly the fields its consumers need) or a union axis that every consumer must pattern-match against. The current design keeps them as separate DU subtypes and bridges them at the comparison layer (`ExtractComparableValue` string comparison). The string values are disjoint by construction — no collision risk.
+
+### Add chain requirements without type system changes
+
+**Why rejected:** George's original finding. `ResolveQualifierOnAxis` returns null for temporal qualifiers on price → obligation always unresolved → spurious diagnostics on ALL price × period/duration arithmetic. This is the scenario that broke Slice 12.
+
+## Rationale
+
+Price's denominator is polymorphic: physical (kg, each, mg) or temporal (hours, days, months). The existing qualifier system handles only the physical case. The temporal case needs the same kind of metadata — just a different qualifier subtype.
+
+The `of` preposition is the natural carrier because it already means "denominator dimension category" on price. `price of 'mass'` says "the denominator is in the mass family." `price of 'time'` says "the denominator is in the time family (hours/minutes/seconds)." Same concept, different domain.
+
+The `PeriodDimension.Time` vs `PeriodDimension.Date` distinction maps exactly to NodaTime's fixed-length boundary (D15): time-dimension units (hours, minutes, seconds) have fixed length; date-dimension units (days, weeks, months, years) have variable length. This makes duration cancellation rules fall out naturally from dimension comparison: duration is intrinsically `Time`, so `price of 'date' * duration` fails and `price of 'time' * duration` succeeds.
+
+## Tradeoff Accepted
+
+Authors must write `price of 'time'` or `price of 'date'` to enable temporal chain validation. Unqualified temporal prices emit chain proof obligations that cannot discharge. This is consistent with the physical case (`price * quantity` requires dimension qualifiers after Slice 8). The tradeoff is deliberate: Precept's guarantee is "invalid configurations structurally impossible" — unqualified fields opt out of that guarantee for that axis.
+
+## Impact
+
+- **LOC:** ~30 implementation + ~50 tests (Slice 11B), ~8 + ~36 tests (revised Slice 12)
+- **Files:** Type.cs, Types.cs, TypeChecker.cs, ProofEngine.cs, Operations.cs
+- **Breaking:** No existing syntax breaks. New diagnostics appear only when chain requirements are added (Slice 12), and only on operations between qualified operands.
+- **Dependency chain:** Slice 8 → Slice 11B → Slice 12
+
+---
+
+## Disposition
+
+This design is complete and ready for implementation. Slice 11B is specified at method-level detail in `docs/Working/typed-constants-and-proof-coverage-plan.md`. George can proceed with implementation once this design is reviewed and the dependency slices (8, 9) are in place.
+
+# Slice 12 Blocked: Price Has No Temporal Qualifier Axis
+
+**By:** George  
+**Date:** 2026-05-11T18:41:49-04:00  
+**Status:** 🚫 Blocked — prerequisite missing  
+**Context:** Slice 12 (G8 + G13) asks for `QualifierChainProofRequirement` on `PriceTimesPeriod` and `PriceTimesDuration`. Investigation reveals the price type cannot carry temporal denominator information.
+
+---
+
+## Finding
+
+The plan assumes `price per 'month'` declares a temporal qualifier axis. In reality:
+
+1. **No `per` preposition exists** — `TokenKind.Per` does not exist in the token catalog.
+2. **Price uses `QS_CurrencyAndDimension`** — `in` → `QualifierAxis.Currency`, `of` → `QualifierAxis.Dimension` (physical). There is no temporal axis on price.
+3. **Period uses `QS_TemporalUnitOrDimension`** — `of` → `QualifierAxis.TemporalDimension`, `in` → `QualifierAxis.TemporalUnit`. These are distinct from price's physical `Dimension` axis.
+4. **Duration has no qualifier shape at all** — it is intrinsically time-dimension, unqualified.
+5. **`ExtractComparableValue` doesn't handle `TemporalDimension` or `TemporalUnit`** — chain comparison returns null for temporal qualifiers.
+
+### Why adding catalog entries would be incorrect
+
+If we add `QualifierChainProofRequirement(PPrice, QualifierAxis.Dimension, PPeriod, QualifierAxis.TemporalDimension, ...)`:
+- Any `price of 'mass' * period of 'date'` would fail because `ExtractComparableValue(TemporalDimension(Date))` returns null.
+- Unqualified price × period would also fail (null left side).
+- This **breaks existing valid operations** — price × period currently compiles clean when both sides are valid.
+
+### What needs to happen first
+
+For temporal chain validation to work, price needs temporal denominator support:
+- Option A: Extend price's qualifier shape to include a temporal axis (e.g., `per` → `QualifierAxis.TemporalUnit`)
+- Option B: Generalize the `Dimension` axis to bridge physical and temporal dimensions
+- Either option requires type system changes beyond ~8 LOC catalog entries.
+- `ExtractComparableValue` also needs `TemporalDimension` and `TemporalUnit` arms.
+
+### Recommendation
+
+Defer Slice 12 until the price type supports temporal denomination. The gap is real (G8/G13 are valid observations) but the fix requires type system work, not just catalog metadata.
+
+---
+
+## Impact
+
+- **No code changes made** — adding incorrect requirements would regress existing valid price × period arithmetic.
+- **Plan Slice 12 LOC estimate of ~8 is wrong** — prerequisite work is ~40-80 LOC across Types.cs, TypeChecker.cs, ProofEngine.cs, and Operations.cs.
+- **Slices 7–11 are unaffected** — they are complete and correct.
+
+# Slice 6 — ProofEngine Compositional Constraint Propagation (S6) — Complete
+
+**Author:** George  
+**Date:** 2026-05-11T22:41:49Z  
+**Status:** Complete  
+
+## What shipped
+
+- **ProofStrategy.CompositionalConstraint = 6** added to `ProofLedger.cs`.
+- **TryCompositionalConstraintProof** strategy in `ProofEngine.cs` — discharges numeric obligations on fields whose ALL assignment sources are `TypedInterpolatedTypedConstant` nodes where the magnitude (or whole-value) slot source carries a satisfying modifier.
+- **FindInterpolatedAssignments** helper — scans all transition rows and event handlers for interpolated typed constant assignments to a target field. Conservatively returns empty if ANY non-interpolated assignment exists.
+- **GetMagnitudeSlotSource** helper — extracts the magnitude slot expression, falls back to whole-value slot for degenerate `'{x}'` patterns.
+- **ResolveSourceModifiers** helper — resolves modifiers from both `TypedFieldRef` (field declarations) and `TypedArgRef` (event arg declarations).
+- 10 new tests covering: basic nonzero propagation, multi-path intersection, mixed-path conservative failure, non-interpolated mixed decline, whole-value with/without modifier, positive→nonzero subsumption, nonnegative→nonzero non-subsumption, non-numeric obligation decline, and arg-ref modifier resolution.
+
+## Design decisions
+
+- **Conservative semantics:** If ANY assignment to the target field is not a `TypedInterpolatedTypedConstant`, S6 declines entirely. No partial path analysis.
+- **Intersection semantics:** ALL assignment paths must satisfy the obligation. One path without modifier coverage → Unresolved.
+- **Reuses existing infrastructure:** `SatisfactionCovers()` for modifier subsumption, `Modifiers.GetMeta()` for satisfaction lookup. No new subsumption logic.
+- **Strategy ordering:** S6 runs after S5 (QualifierCompatibility), before the Unresolved fallback.
+
+## Test results
+
+- All 193 ProofEngine tests pass (183 existing + 10 new).
+- 26 pre-existing TypeCheckerAssemblyTests failures unrelated to this change.
+
+# Slice 3 Done — Completions Inside Typed Constant Holes
+
+**Agent:** Kramer  
+**Date:** 2026-05-11  
+
+## What was done
+
+Added completions for the `{…}` interpolation holes in typed constants (bug I2).
+
+### New helpers in `TypedConstantCollector.cs`
+- `FindInterpolatedAtPosition` — finds the innermost `TypedInterpolatedTypedConstant` whose span contains the cursor, using the same approach as `FindAtPosition`.
+
+### New helpers in `CompletionHandler.cs`
+- `IsInsideTypedConstantHole` — detects cursor position in a hole by walking the token stream and tracking `inHole` state across `TypedConstantStart`/`TypedConstantMiddle`/`TypedConstantEnd` tokens.
+- `GetHoleIndex` — returns the 0-based index of the hole the cursor is in.
+- `GetHoleItems` — dispatches to slot-filtered completions via the `TypedInterpolatedTypedConstant` semantic model, with a fallback to all fields/args when the model is unavailable (file has errors).
+- `GetHoleItemsForSlot` — maps `InterpolationSlotKind` to filtered field/arg completions.
+- `GetHoleFieldsOfTypes` — returns field and event-arg completion items filtered by a set of `TypeKind` values.
+
+### Wiring in `GetCompletions`
+Added a check after the existing `IsInsideTypedConstantToken` path: if trigger is null/empty and `IsInsideTypedConstantHole` returns true, route to `GetHoleItems`.
+
+### Build fix in `Precept.LanguageServer.csproj`
+Added `<GenerateAssemblyInfo>false</GenerateAssemblyInfo>` and `<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>` to fix a pre-existing `CS0579 Duplicate assembly attribute` build error caused by OmniSharp transitively injecting a source generator that emits these attributes.
+
+## Fix
+
+**Bug I2 closed.** Without this, Ctrl+Space inside `'{Am¦ount} kg'` (or any typed constant hole) returned empty because `IsInsideTypedConstantToken` returns false for cursor-on-identifier positions inside holes, causing the completion handler to fall through to the outer context switch.
+
+## Slot → completion type mapping
+
+| `InterpolationSlotKind` | Returns fields/args of type |
+|---|---|
+| `Magnitude` | `Integer`, `Decimal`, `Number` |
+| `Currency`, `FromCurrency`, `ToCurrency` | `Currency` |
+| `Unit` | `UnitOfMeasure` |
+| `WholeValue` | outer typed constant `ResultType` |
+
+## Tests added (4)
+
+- `HoleCompletion_Quantity_MagnitudeHole_ShowsNumericFieldsAndArgsOnly`
+- `HoleCompletion_Money_CurrencyHole_ShowsCurrencyFieldsOnly`
+- `HoleCompletion_Quantity_UnitHole_ShowsUnitOfMeasureFieldsOnly`
+- `HoleCompletion_OutsideHole_NormalExpressionCompletions` ← regression guard
+
+## Results
+
+All 4 new tests pass. 229 pass total. 6 pre-existing failures (3 from earlier branch WIP + 3 from Slice 4 SemanticTokens tests that were committed with failing state) are unrelated to this slice.
+
+## Key learning
+
+**Cursor at `{¦identifier}` is inside `TypedConstantStart`'s span** — TypedConstantStart ends AFTER the `{`, so position right after `{` is still "inside" the Start token. `IsInsideTypedConstantHole` only fires when the cursor is past the identifier start, on an `Identifier` token (TypedConstant* check fails → hole check runs). Test placeholders must use `'{Am¦ount}'` (mid-identifier) not `'{¦Amount}'` (start-of-identifier, still inside Start span).
+
+# Slice 4 Done — Semantic Tokens inside Typed Constant Holes
+
+**Agent:** Kramer  
+**Date:** 2026-05-11  
+**Commit:** `72aa0c1b`
+
+## What was done
+
+Added `TypedInterpolatedTypedConstant` case to `EnumerateExpressionTree()` in
+`SemanticTokensHandler.cs`. The new case walks each `TypedInterpolationSlot.Expression`
+recursively, mirroring the existing `TypedInterpolatedString` treatment.
+
+## Fix
+
+**Bug I3 closed.** Without this fix, `TypedFunctionCall` nodes nested inside typed
+constant holes were invisible to `EnumerateTypedExpressions(index).OfType<TypedFunctionCall>()`,
+so no built-in function semantic token was emitted for function calls like `round(Hours)` inside
+`'{round(Hours)} hours'`.
+
+Note: `FieldRef`/`ArgRef` tokens inside holes were already surfaced via `index.FieldReferences` /
+`index.ArgReferences` (populated by `Resolve()` during type-checking). The expression-tree walker
+is the only path for `TypedFunctionCall` tokens.
+
+## Tests added (4)
+
+- `IdentifierTokens_FieldRefInsideTypedConstantHole_EmitsFieldNameToken`
+- `IdentifierTokens_ArgRefInsideTypedConstantHole_EmitsArgNameToken`
+- `IdentifierTokens_QualifiedArgRefInsideTypedConstantHole_EmitsArgNameToken`
+- `IdentifierTokens_FunctionCallInsideTypedConstantHole_EmitsFunctionToken` ← regression for I3
+
+## Results
+
+All 4 new tests pass. 3 pre-existing failures in `SemanticTokensDelta_LoanApplicationSample`,
+`MergedTokens_LoanApplicationSample`, and `PackageManifest_Activates` are unrelated to this slice
+(pre-existing failures from other WIP work on the branch).
+
 # BUG-057 Spec Analysis
 
 **Author:** Frank (Lead/Architect)

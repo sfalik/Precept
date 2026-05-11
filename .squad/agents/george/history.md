@@ -75,3 +75,7 @@
 - Part B slices 7+8+9 landed proof-engine qualifier enforcement, chain requirements, and dimension fallback.
 - Slices 10+11 landed assignment qualifier propagation plus `FromCurrency`/`ToCurrency` handling.
 - Slice 2 and Slice 12 remain in progress under the current batch.
+
+### 2026-05-11T23:43:07Z — Slice 12 handoff and sample fallout recorded
+- Frank completed the unblock design for Slice 12: temporal price denominators stay on `of`, duration gains implied temporal-dimension qualifiers, and Strategy 5 needs Dimension→TemporalDimension comparison support.
+- Cross-agent inventory analysis says `samples/inventory-item.precept` will need follow-up on binary-chain qualifier propagation, ensure-expression coverage, and bare `unitofmeasure` semantics.
