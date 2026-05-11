@@ -1,20 +1,20 @@
-updated_at: 2026-05-10T08:34:54.266-04:00
+updated_at: 2026-05-11T13:03:16.000-04:00
 focus_area: Track 2 resumed — reopen bug-fix execution and drive slices from the tracker
 active_issues: []
 spike_mode: true
 ---
 
-# ⚠️ SPIKE MODE — Branch: `precept-architecture`
+# ⚠️ SPIKE MODE — Branch: `spike/Precept-V2-Radical`
 
-**All work happens on `precept-architecture`. No new branches. No PRs. No `git checkout -b`. No `gh pr create`.**
+**All work happens on `spike/Precept-V2-Radical`. No new branches. No PRs. No `git checkout -b`. No `gh pr create`.**
 
-Commits go directly to `precept-architecture`. If you feel the urge to open a PR or create a branch, stop — you are in spike mode. Commit and push to the current branch only.
+Commits go directly to `spike/Precept-V2-Radical`. If you feel the urge to open a PR or create a branch, stop — you are in spike mode. Commit and push to the current branch only.
 
 ---
 
 # What We're Focused On
 
-**Branch:** `spike/Precept-V2` — Track 2 bug-fix work is active now.
+**Branch:** `spike/Precept-V2-Radical` — continuation of `spike/Precept-V2`; Track 2 bug-fix work is active now.
 
 **Current lane:** Track 2 bug-fix slices, resumed for execution.
 
