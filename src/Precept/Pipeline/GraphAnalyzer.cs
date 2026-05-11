@@ -102,13 +102,43 @@ public static class GraphAnalyzer
             .ToImmutableArray();
         var terminalStateSet = terminalStates.ToImmutableHashSet(StringComparer.Ordinal);
 
-        var deadEndStates = ComputeDeadEnds(semantics.States, reachability.Reachable, terminalStateSet, reverseAdjacency);
-        foreach (var deadEndState in semantics.States.Where(state => deadEndStates.Contains(state.Name)))
+        // Message A: structural sinks — reachable, non-terminal states with zero outgoing transitions.
+        // Fires regardless of whether any terminal states are declared.
+        var structuralSinkNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var state in semantics.States)
         {
-            diagnostics.Add(Diagnostics.Create(
-                DiagnosticCode.DeadEndState,
-                deadEndState.NameSpan,
-                deadEndState.Name));
+            if (reachability.Reachable.Contains(state.Name)
+                && !stateFlags[state.Name].IsTerminal
+                && adjacency[state.Name].IsEmpty)
+            {
+                structuralSinkNames.Add(state.Name);
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.StructuralSinkState,
+                    state.NameSpan,
+                    state.Name));
+            }
+        }
+
+        // Message B: no-path-to-terminal dead-ends, gated on at least one terminal state existing.
+        // Structural sinks are excluded here — they are already reported by Message A.
+        ImmutableArray<string> deadEndStates;
+        if (terminalStates.Length > 0)
+        {
+            deadEndStates = ComputeDeadEnds(semantics.States, reachability.Reachable, terminalStateSet, reverseAdjacency);
+            foreach (var deadEndState in semantics.States.Where(s => deadEndStates.Contains(s.Name) && !structuralSinkNames.Contains(s.Name)))
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.DeadEndState,
+                    deadEndState.NameSpan,
+                    deadEndState.Name));
+            }
+        }
+        else
+        {
+            // No terminal states declared: BFS dead-end detection is vacuous (every state
+            // would be flagged). Use only structural sinks so the ProofEngine still has
+            // the right suppression set without false dead-end claims.
+            deadEndStates = structuralSinkNames.ToImmutableArray();
         }
 
         var dominanceResult = initialState is null

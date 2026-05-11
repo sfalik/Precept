@@ -237,6 +237,7 @@ public enum DiagnosticCode
     TerminalStateHasOutgoingEdges      = 109,
     IrreversibleStateHasBackEdge       = 110,
     RequiredStateDoesNotDominateTerminal = 111,
+    StructuralSinkState                = 119,
 
     // ── Proof ────────────────────────────────────────────
     UnsatisfiableGuard                 =  82,

@@ -84,6 +84,11 @@ public enum DiagnosticCode
     InvalidTemporalDimensionString     = 117,
     /// <summary>The string in a <c>period in '...'</c> qualifier is not a recognized temporal unit name.</summary>
     InvalidTemporalUnitString          = 118,
+    /// <summary>
+    /// A reachable non-terminal state has no outgoing transitions and is not marked 'terminal'.
+    /// Entities that enter it will be permanently stuck with no way to progress.
+    /// </summary>
+    StructuralSinkState                = 119,
 
     // ── Type (collection safety) ─────────────────────────
     UnguardedCollectionAccess          =  63,

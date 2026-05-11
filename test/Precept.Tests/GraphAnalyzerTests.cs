@@ -62,9 +62,12 @@ public class GraphAnalyzerTests
             from Review on Stall -> transition Stalled
             """);
 
-        var deadEndDiagnostic = graph.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.DeadEndState) && d.Message.Contains("Stalled"));
-        deadEndDiagnostic.Severity.Should().Be(Severity.Warning);
+        // Stalled has no outgoing transitions: fires StructuralSinkState (Message A), not DeadEndState.
+        var sinkDiagnostic = graph.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.StructuralSinkState) && d.Message.Contains("Stalled"));
+        sinkDiagnostic.Severity.Should().Be(Severity.Warning);
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DeadEndState));
 
+        // DeadEndStateFact still contains Stalled so the ProofEngine can suppress vacuous obligations.
         var deadEndFact = graph.ProofFacts.OfType<DeadEndStateFact>().Single();
         deadEndFact.DeadEndStates.Should().Equal("Stalled");
         deadEndFact.DeadEndStates.Should().NotContain("Approved");
@@ -541,13 +544,80 @@ public class GraphAnalyzerTests
             from A on ToD -> transition D
             """);
 
+        // C and D are structural sinks (no outgoing transitions) — Message A, not Message B.
         var deadEndFact = graph.ProofFacts.OfType<DeadEndStateFact>().Single();
         deadEndFact.DeadEndCount.Should().Be(2);
         deadEndFact.DeadEndStates.Should().BeEquivalentTo(["C", "D"]);
 
-        var deadEndDiagnostics = graph.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.DeadEndState)).ToList();
-        deadEndDiagnostics.Should().HaveCount(2);
-        deadEndDiagnostics.Should().OnlyContain(d => d.Severity == Severity.Warning);
+        // StructuralSinkState fires for C and D; DeadEndState must not fire (no double-report).
+        var sinkDiagnostics = graph.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.StructuralSinkState)).ToList();
+        sinkDiagnostics.Should().HaveCount(2);
+        sinkDiagnostics.Should().OnlyContain(d => d.Severity == Severity.Warning);
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DeadEndState));
+    }
+
+    [Fact]
+    public void Analyze_NoTerminalStates_StructuralSinkFires_DeadEndDoesNot()
+    {
+        // No terminal states declared. States with outgoing transitions should not fire
+        // any dead-end diagnostic (previously DeadEndState fired vacuously for all states).
+        // States with NO outgoing transitions should fire StructuralSinkState.
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Active
+            state Stuck
+            event Move
+            event GoStuck
+            from Draft on Move -> transition Active
+            from Active on Move -> transition Draft
+            from Draft on GoStuck -> transition Stuck
+            """);
+
+        // Stuck has no outgoing transitions: Message A fires.
+        graph.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.StructuralSinkState) && d.Message.Contains("Stuck"));
+
+        // Draft and Active have outgoing transitions: no diagnostic at all for them.
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DeadEndState));
+        graph.Diagnostics.Should().NotContain(d =>
+            d.Code == nameof(DiagnosticCode.StructuralSinkState)
+            && (d.Message.Contains("Draft") || d.Message.Contains("Active")));
+
+        // DeadEndStateFact contains only structural sinks (not all reachable states).
+        var deadEndFact = graph.ProofFacts.OfType<DeadEndStateFact>().Single();
+        deadEndFact.DeadEndStates.Should().Equal("Stuck");
+        deadEndFact.DeadEndCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Analyze_DeadEndState_WithOutgoingTransitions_FiresMessageB()
+    {
+        // State X transitions to structural sink Y. X has outgoing transitions so Message A
+        // does not fire for X. X cannot reach any terminal, so Message B fires for X.
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Limbo
+            state Stuck
+            state Done terminal
+            event GoLimbo
+            event GoStuck
+            event Complete
+            from Draft on GoLimbo -> transition Limbo
+            from Limbo on GoStuck -> transition Stuck
+            from Draft on Complete -> transition Done
+            """);
+
+        // Stuck: structural sink → Message A only.
+        graph.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.StructuralSinkState) && d.Message.Contains("Stuck"));
+
+        // Limbo: has an outgoing transition (to Stuck) but cannot reach Done → Message B only.
+        graph.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.DeadEndState) && d.Message.Contains("Limbo"));
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.StructuralSinkState) && d.Message.Contains("Limbo"));
+
+        // DeadEndStateFact includes both Limbo and Stuck.
+        var deadEndFact = graph.ProofFacts.OfType<DeadEndStateFact>().Single();
+        deadEndFact.DeadEndStates.Should().BeEquivalentTo(["Limbo", "Stuck"]);
     }
 
     private static StateGraph Analyze(string source)

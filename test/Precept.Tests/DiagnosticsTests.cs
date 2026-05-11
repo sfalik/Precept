@@ -308,6 +308,7 @@ public class DiagnosticsTests
         DiagnosticCode.UnreachableState,
         DiagnosticCode.UnhandledEvent,
         DiagnosticCode.DeadEndState,
+        DiagnosticCode.StructuralSinkState,
     };
 
     public static TheoryData<DiagnosticCode> ProofCodes=> new()

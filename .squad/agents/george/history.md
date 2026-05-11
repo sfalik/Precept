@@ -52,6 +52,15 @@
 - 2026-05-10T13:53:14Z — Scribe handoff for t2-2 Slice B: George-5's Slice B result is now recorded in `.squad/decisions.md` and the orchestration/session logs, so future parser separator work should use the canonical ledger entry rather than the transient inbox note.
 ## Recent Updates
 
+### 2026-05-10T21:11:48-04:00 — Terminal-state diagnostic split implemented (StructuralSinkState + gated DeadEndState)
+- Added `StructuralSinkState = 119` to `DiagnosticCode`; added full catalog entry in `Diagnostics.cs`.
+- `GraphAnalyzer.Analyze()` now computes structural sinks (reachable, non-terminal, zero outgoing) first and fires C119 (Message A) unconditionally.
+- `DeadEndState` (C108 / Message B) is now gated: only fires when `terminalStates.Length > 0`, and excludes structural sinks to prevent double-firing.
+- `DeadEndStateFact` contains: BFS dead-ends when terminals exist; only structural sinks when no terminals exist. This preserves ProofEngine obligation suppression without false claims.
+- Key invariant: structural sinks can never appear as `fromState` in proof obligations (no outgoing transitions), so removing them from the fact when terminals are absent is safe for the ProofEngine.
+- Updated 2 existing `GraphAnalyzerTests` (`Analyze_DeadEndState_EmitsWarningAndDeadEndFact`, `Analyze_MultipleDeadEndStates_AllReported`) and added 2 new tests (`Analyze_NoTerminalStates_StructuralSinkFires_DeadEndDoesNot`, `Analyze_DeadEndState_WithOutgoingTransitions_FiresMessageB`).
+- Pre-existing `TypeCheckerFunctionTests.cs` build errors (MemberAccessExpression missing Span parameter) are unrelated to this work — they exist in the working tree and were present before this task.
+
 ### 2026-05-11T00:27:07Z — BUG-057 temporal qualifier fix recorded
 - Commit `2763a433` fixed `TypeChecker.ExtractQualifiers()` so `period of 'date'` / `period of 'time'` and `period in 'days'` qualifiers survive into semantic metadata instead of being dropped.
 - Added temporal qualifier diagnostics (`InvalidTemporalDimensionString`, `InvalidTemporalUnitString`) plus 7 regression tests in `TypeCheckerSymbolTests`; the batch closes at 4,531 core tests and 105 MCP tests passing.
