@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -11,6 +12,23 @@ using Precept.Language;
 using Precept.Pipeline;
 
 namespace Precept.LanguageServer.Handlers;
+
+/// <summary>
+/// Carries the expected type and any declared qualifier metadata for a typed-constant completion site.
+/// </summary>
+internal readonly record struct TypedConstantContext(
+    TypeKind ExpectedType,
+    ImmutableArray<DeclaredQualifierMeta> Qualifiers)
+{
+    public static TypedConstantContext FromType(TypeKind type) =>
+        new(type, ImmutableArray<DeclaredQualifierMeta>.Empty);
+
+    public static TypedConstantContext FromField(TypedField field) =>
+        new(field.ResolvedType, field.DeclaredQualifiers);
+
+    public static TypedConstantContext FromArg(TypedArg arg) =>
+        new(arg.ResolvedType, arg.DeclaredQualifiers);
+}
 
 internal sealed class CompletionHandler : ICompletionHandler
 {
@@ -51,6 +69,28 @@ internal sealed class CompletionHandler : ICompletionHandler
         if (triggerCharacter == "'")
         {
             return CreateCompletionList(GetTypedConstantItems(compilation, position, context));
+        }
+
+        // Space trigger inside a typed constant: show slot-specific vocabulary (money codes,
+        // temporal units, + continuation) instead of falling through to outer grammar routing.
+        if (triggerCharacter == " " && IsInsideTypedConstantToken(compilation.Tokens.Tokens, position))
+        {
+            var innerContext = context is SlotContext.InExpression or SlotContext.InArgDefault
+                ? context
+                : SlotContext.InExpression;
+            if (TryGetTypedConstantContext(compilation, position, innerContext, out var tcCtx)
+                && TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var phase, out var textBefore))
+            {
+                var slotItems = tcCtx.ExpectedType switch
+                {
+                    TypeKind.Duration or TypeKind.Period => GetTemporalSlotItems(tcCtx, textBefore, phase),
+                    TypeKind.Money => GetMoneySlotItems(tcCtx, textBefore, phase),
+                    TypeKind.Quantity => GetQuantitySlotItems(tcCtx, textBefore, phase),
+                    _ => Enumerable.Empty<CompletionItem>(),
+                };
+                return CreateCompletionList(slotItems);
+            }
+            return new CompletionList([], true);
         }
 
         // Ctrl+Space / invoked completion inside an already-open typed constant (e.g. cursor
@@ -220,24 +260,366 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     private static IEnumerable<CompletionItem> GetTypedConstantItems(Compilation compilation, Position position, SlotContext context)
     {
-        if (!TryGetExpectedTypedConstantType(compilation, position, context, out var expectedType))
-        {
+        if (!TryGetTypedConstantContext(compilation, position, context, out var tcContext))
             return [];
+
+        return tcContext.ExpectedType switch
+        {
+            TypeKind.Boolean => GetBooleanLiteralItems(tcContext),
+            TypeKind.Duration or TypeKind.Period => GetTemporalLiteralItems(compilation, tcContext, position),
+            TypeKind.Money => GetMoneyLiteralItems(compilation, tcContext, position),
+            TypeKind.Date or TypeKind.Time or TypeKind.Instant or TypeKind.DateTime
+                or TypeKind.ZonedDateTime or TypeKind.Timezone => GetStructuredExampleItems(compilation, tcContext),
+            TypeKind.Currency => GetCurrencyCodeItems(tcContext),
+            TypeKind.UnitOfMeasure => GetUnitOfMeasureItems(tcContext),
+            TypeKind.Dimension => GetDimensionItems(tcContext),
+            TypeKind.Quantity => GetQuantityLiteralItems(compilation, tcContext, position),
+            _ => GetFreeFormItems(compilation, tcContext),
+        };
+    }
+
+    private static IEnumerable<CompletionItem> GetBooleanLiteralItems(TypedConstantContext tcContext)
+    {
+        string[] candidates = ["true", "false"];
+        var qualifierValues = GetQualifierAllowedValues(tcContext);
+        if (qualifierValues is not null)
+            candidates = candidates.Where(v => qualifierValues.Contains(v, StringComparer.OrdinalIgnoreCase)).ToArray();
+
+        return candidates.Select(v => CreateItem(
+            label: v,
+            detail: "boolean literal",
+            kind: CompletionItemKind.Value,
+            sortGroup: CompletionSortGroup.TypedConstant));
+    }
+
+    private static IEnumerable<CompletionItem> GetTemporalLiteralItems(Compilation compilation, TypedConstantContext tcContext, Position position)
+    {
+        if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var phase, out var textBefore)
+            && phase != TypedConstantPhase.Empty)
+        {
+            return GetTemporalSlotItems(tcContext, textBefore, phase);
         }
 
-        var typeMeta = Types.GetMeta(expectedType);
+        var typeMeta = Types.GetMeta(tcContext.ExpectedType);
         var examples = typeMeta.ContentValidation?.Examples ?? [];
-        var detail = typeMeta.ContentValidation?.FormatDescription ?? $"{typeMeta.DisplayName} typed constant";
+        var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
+        return DistinctByLabel(
+            reused.Select(v => CreateItem(v, "temporal literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
+    }
 
-        return DistinctByLabel(TypedConstantCollector
-            .CollectByType(compilation.Semantics, expectedType)
-            .Concat(examples)
-            .Select(value => CreateItem(
-                label: value,
-                detail: detail,
-                kind: CompletionItemKind.Constant,
-                sortGroup: CompletionSortGroup.TypedConstant,
-                documentation: detail)));
+    private static IEnumerable<CompletionItem> GetMoneyLiteralItems(Compilation compilation, TypedConstantContext tcContext, Position position)
+    {
+        if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var phase, out var textBefore)
+            && phase != TypedConstantPhase.Empty)
+        {
+            return GetMoneySlotItems(tcContext, textBefore, phase);
+        }
+
+        var typeMeta = Types.GetMeta(tcContext.ExpectedType);
+        var examples = typeMeta.ContentValidation?.Examples ?? [];
+        var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
+        return DistinctByLabel(
+            reused.Select(v => CreateItem(v, "money literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
+    }
+
+    private static IEnumerable<CompletionItem> GetStructuredExampleItems(Compilation compilation, TypedConstantContext tcContext)
+    {
+        var typeMeta = Types.GetMeta(tcContext.ExpectedType);
+        var examples = typeMeta.ContentValidation?.Examples ?? [];
+        var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
+        var detail = typeMeta.ContentValidation?.FormatDescription ?? $"{typeMeta.DisplayName} literal";
+        return DistinctByLabel(
+            reused.Select(v => CreateItem(v, detail, CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            .Concat(examples.Select(e => CreateItem(e, detail, CompletionItemKind.Constant, CompletionSortGroup.TypedConstant))));
+    }
+
+    private static IEnumerable<CompletionItem> GetCurrencyCodeItems(TypedConstantContext tcContext)
+    {
+        var codes = CurrencyCatalog.All.Keys.AsEnumerable();
+        var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+        if (currencyQualifier is not null)
+            codes = codes.Where(c => c.Equals(currencyQualifier.CurrencyCode, StringComparison.OrdinalIgnoreCase));
+
+        return codes.Select(code => CreateItem(code, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    private static IEnumerable<CompletionItem> GetUnitOfMeasureItems(TypedConstantContext _)
+    {
+        var typeMeta = Types.GetMeta(TypeKind.UnitOfMeasure);
+        var examples = typeMeta.ContentValidation?.Examples ?? [];
+        return examples.Select(e => CreateItem(e, "UCUM unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    private static IEnumerable<CompletionItem> GetDimensionItems(TypedConstantContext _)
+    {
+        return DimensionCatalog.All.Keys.Select(name =>
+            CreateItem(name, "dimension family", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    private static IEnumerable<CompletionItem> GetQuantityLiteralItems(Compilation compilation, TypedConstantContext tcContext, Position position)
+    {
+        if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var phase, out var textBefore)
+            && phase != TypedConstantPhase.Empty)
+        {
+            return GetQuantitySlotItems(tcContext, textBefore, phase);
+        }
+
+        var typeMeta = Types.GetMeta(tcContext.ExpectedType);
+        var examples = typeMeta.ContentValidation?.Examples ?? [];
+        var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
+        return DistinctByLabel(
+            reused.Select(v => CreateItem(v, "quantity literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
+    }
+
+    private static IEnumerable<CompletionItem> GetFreeFormItems(Compilation compilation, TypedConstantContext tcContext)
+    {
+        var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
+        if (tcContext.ExpectedType == TypeKind.String)
+        {
+            // text is mostly free-form: only suggest reused values, no noisy examples
+            return reused.Select(v => CreateItem(v, "used elsewhere in this file", CompletionItemKind.Text, CompletionSortGroup.TypedConstant));
+        }
+
+        var typeMeta = Types.GetMeta(tcContext.ExpectedType);
+        var examples = typeMeta.ContentValidation?.Examples ?? [];
+        return DistinctByLabel(
+            reused.Select(v => CreateItem(v, "used elsewhere in this file", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
+    }
+
+    // ── Typed-constant slot phase detection ───────────────────────────────────
+
+    private enum TypedConstantPhase
+    {
+        Empty,
+        NumberTyping,
+        AfterNumberSpace,
+        UnitTyping,
+        SegmentComplete,
+        AfterPlus,
+        AfterPlusNumber,
+        AfterPlusNumberSpace,
+    }
+
+    private static readonly Regex NumberOnlyPattern =
+        new(@"^-?\d+$", RegexOptions.Compiled);
+
+    private static readonly Regex NumberSpacePattern =
+        new(@"^-?\d+\s$", RegexOptions.Compiled);
+
+    private static readonly Regex NumberSpaceAlphaPattern =
+        new(@"^(-?\d+)\s+([A-Za-z/]+(?:\^-?\d+)?)$", RegexOptions.Compiled);
+
+    private static bool TryGetTypedConstantSlotPhase(
+        ImmutableArray<Token> tokens,
+        Position position,
+        out TypedConstantPhase phase,
+        out string textBeforeCursor)
+    {
+        phase = TypedConstantPhase.Empty;
+        textBeforeCursor = string.Empty;
+
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+            return false;
+
+        var token = tokens[tokenIndex];
+        if (!IsTypedConstantToken(token.Kind) || !Contains(token.Span, position))
+            return false;
+
+        // token.Text has quotes stripped; opening quote is at token.Span.StartColumn (1-based).
+        // position.Character is 0-based. Content starts one column after the opening quote.
+        var cursorContentOffset = Math.Clamp(
+            position.Character - token.Span.StartColumn,
+            0,
+            token.Text.Length);
+
+        textBeforeCursor = token.Text[..cursorContentOffset];
+        phase = ClassifyPhase(textBeforeCursor);
+        return true;
+    }
+
+    private static TypedConstantPhase ClassifyPhase(string text)
+    {
+        if (text.Length == 0)
+            return TypedConstantPhase.Empty;
+
+        // Handle compound: look for last '+' in the text
+        var lastPlusIdx = text.LastIndexOf('+');
+        if (lastPlusIdx >= 0)
+        {
+            var beforePlus = text[..lastPlusIdx].TrimEnd();
+            // Ensure there's a complete segment before the +
+            if (IsCompleteTemporalSegment(beforePlus))
+            {
+                var afterPlus = text[(lastPlusIdx + 1)..];
+                var trimmed = afterPlus.TrimStart();
+                if (trimmed.Length == 0)
+                    return TypedConstantPhase.AfterPlus;
+                return ClassifyAfterPlusContent(trimmed);
+            }
+        }
+
+        return ClassifySimplePhase(text);
+    }
+
+    private static TypedConstantPhase ClassifyAfterPlusContent(string trimmedAfterPlus)
+    {
+        if (NumberOnlyPattern.IsMatch(trimmedAfterPlus))
+            return TypedConstantPhase.AfterPlusNumber;
+
+        if (NumberSpacePattern.IsMatch(trimmedAfterPlus))
+            return TypedConstantPhase.AfterPlusNumberSpace;
+
+        var match = NumberSpaceAlphaPattern.Match(trimmedAfterPlus);
+        if (match.Success)
+        {
+            var unitPart = match.Groups[2].Value;
+            return TemporalUnits.TryGet(unitPart, out _)
+                ? TypedConstantPhase.SegmentComplete
+                : TypedConstantPhase.UnitTyping;
+        }
+
+        // Partial alpha with no space
+        return trimmedAfterPlus.Any(char.IsLetter)
+            ? TypedConstantPhase.UnitTyping
+            : TypedConstantPhase.AfterPlusNumber;
+    }
+
+    private static TypedConstantPhase ClassifySimplePhase(string text)
+    {
+        if (NumberOnlyPattern.IsMatch(text))
+            return TypedConstantPhase.NumberTyping;
+
+        if (NumberSpacePattern.IsMatch(text))
+            return TypedConstantPhase.AfterNumberSpace;
+
+        var match = NumberSpaceAlphaPattern.Match(text);
+        if (match.Success)
+        {
+            var unitPart = match.Groups[2].Value;
+            return TemporalUnits.TryGet(unitPart, out _)
+                ? TypedConstantPhase.SegmentComplete
+                : TypedConstantPhase.UnitTyping;
+        }
+
+        // Partial alpha with no space yet (e.g. "3d")
+        return TypedConstantPhase.UnitTyping;
+    }
+
+    private static bool IsCompleteTemporalSegment(string text)
+    {
+        var match = NumberSpaceAlphaPattern.Match(text.Trim());
+        return match.Success && TemporalUnits.TryGet(match.Groups[2].Value, out _);
+    }
+
+    // ── Slot-specific item generators ─────────────────────────────────────────
+
+    private static IEnumerable<CompletionItem> GetTemporalSlotItems(
+        TypedConstantContext tcContext,
+        string textBeforeCursor,
+        TypedConstantPhase phase)
+    {
+        return phase switch
+        {
+            TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping
+                or TypedConstantPhase.AfterPlusNumberSpace => BuildTemporalUnitItems(tcContext),
+            TypedConstantPhase.SegmentComplete => BuildTemporalContinuationItem(),
+            _ => [],
+        };
+    }
+
+    private static IEnumerable<CompletionItem> BuildTemporalUnitItems(TypedConstantContext tcContext)
+    {
+        IEnumerable<TemporalUnits.TemporalUnitEntry> units = TemporalUnits.AllEntries;
+
+        // Qualifier hard-filtering: TemporalUnit pins to a specific unit; TemporalDimension
+        // restricts to calendar or clock units.
+        var unitQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.TemporalUnit>().FirstOrDefault();
+        if (unitQualifier is not null)
+        {
+            units = units.Where(u => u.Singular.Equals(unitQualifier.UnitName, StringComparison.OrdinalIgnoreCase)
+                || u.Plural.Equals(unitQualifier.UnitName, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            var dimQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.TemporalDimension>().FirstOrDefault();
+            if (dimQualifier is not null)
+                units = units.Where(u => UnitMatchesDimension(u, dimQualifier.Value));
+        }
+
+        return units.SelectMany(entry => new[]
+        {
+            CreateItem(entry.Plural, "temporal unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment),
+            CreateItem(entry.Singular, "temporal unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment),
+        }).GroupBy(item => item.Label, StringComparer.Ordinal).Select(g => g.First());
+    }
+
+    private static bool UnitMatchesDimension(TemporalUnits.TemporalUnitEntry entry, PeriodDimension dimension) =>
+        dimension switch
+        {
+            PeriodDimension.Date => entry.IsCalendarBased,
+            PeriodDimension.Time => !entry.IsCalendarBased,
+            _ => true,
+        };
+
+    private static IEnumerable<CompletionItem> BuildTemporalContinuationItem()
+    {
+        yield return new CompletionItem
+        {
+            Label = "+",
+            InsertText = " + ",
+            InsertTextFormat = InsertTextFormat.PlainText,
+            Detail = "continue temporal literal",
+            Documentation = new StringOrMarkupContent("Add another <number> <temporal unit> segment."),
+            Kind = CompletionItemKind.Operator,
+            SortText = CreateSortText(CompletionSortGroup.TypedConstantSegment, "+"),
+        };
+    }
+
+    private static IEnumerable<CompletionItem> GetMoneySlotItems(
+        TypedConstantContext tcContext,
+        string textBeforeCursor,
+        TypedConstantPhase phase)
+    {
+        if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
+            return [];
+
+        IEnumerable<string> codes = CurrencyCatalog.All.Keys;
+        var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+        if (currencyQualifier is not null)
+            codes = codes.Where(c => c.Equals(currencyQualifier.CurrencyCode, StringComparison.OrdinalIgnoreCase));
+
+        return codes.Select(code => CreateItem(code, "money code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    private static IEnumerable<CompletionItem> GetQuantitySlotItems(
+        TypedConstantContext tcContext,
+        string textBeforeCursor,
+        TypedConstantPhase phase)
+    {
+        if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
+            return [];
+
+        var unitQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault();
+        if (unitQualifier is not null)
+        {
+            return [CreateItem(unitQualifier.UnitCode, "quantity unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+        }
+
+        var typeMeta = Types.GetMeta(TypeKind.UnitOfMeasure);
+        var examples = typeMeta.ContentValidation?.Examples ?? [];
+        return examples.Select(e => CreateItem(e, "quantity unit", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    private static string[]? GetQualifierAllowedValues(TypedConstantContext tcContext)
+    {
+        // For qualifier-aware filtering on closed-set types (boolean), return allowed values if qualifiers constrain them
+        // Currently no qualifier axes pin boolean values, so return null (no filtering).
+        return null;
     }
 
     private static IEnumerable<CompletionItem> GetCurrentEventArgItems(Compilation compilation, Position position)
@@ -306,47 +688,58 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     internal static string GetAccessorLabel(TypeAccessor accessor) => accessor.Name;
 
-    private static bool TryGetExpectedTypedConstantType(
+    private static bool TryGetTypedConstantContext(
         Compilation compilation,
         Position position,
         SlotContext context,
-        out TypeKind expectedType)
+        out TypedConstantContext tcContext)
     {
         var currentConstant = TypedConstantCollector.FindAtPosition(compilation.Semantics, position);
         if (currentConstant is not null)
         {
-            expectedType = currentConstant.ResultType;
+            // Typed constant already resolved — we know the type but not the declaring field's qualifiers.
+            // Attempt to recover qualifiers from the enclosing field if possible.
+            if (TryGetEnclosingField(compilation, position, out var enclosingField))
+            {
+                tcContext = TypedConstantContext.FromField(enclosingField);
+                return true;
+            }
+            tcContext = TypedConstantContext.FromType(currentConstant.ResultType);
             return true;
         }
 
-        if (context == SlotContext.InArgDefault && TryGetCurrentEventArgType(compilation, position, out expectedType))
+        if (context == SlotContext.InArgDefault && TryGetCurrentEventArg(compilation, position, out var arg))
         {
+            tcContext = TypedConstantContext.FromArg(arg);
             return true;
         }
 
-        if (TryGetCallParameterType(compilation, position, out expectedType))
+        if (TryGetCallParameterType(compilation, position, out var callParamType))
         {
+            tcContext = TypedConstantContext.FromType(callParamType);
             return true;
         }
 
         var targetField = SlotContextResolver.GetCurrentActionTargetField(compilation, position);
         if (targetField is not null)
         {
-            expectedType = targetField.ResolvedType;
+            tcContext = TypedConstantContext.FromField(targetField);
             return true;
         }
 
-        if (context == SlotContext.InExpression && TryGetEnclosingFieldType(compilation, position, out expectedType))
+        if (context == SlotContext.InExpression && TryGetEnclosingField(compilation, position, out var exprField))
         {
+            tcContext = TypedConstantContext.FromField(exprField);
             return true;
         }
 
-        if (context == SlotContext.InExpression && TryGetBinaryPeerOperandType(compilation, position, out expectedType))
+        if (context == SlotContext.InExpression && TryGetBinaryPeerOperandType(compilation, position, out var peerType))
         {
+            tcContext = TypedConstantContext.FromType(peerType);
             return true;
         }
 
-        expectedType = default;
+        tcContext = default;
         return false;
     }
 
@@ -982,6 +1375,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         SemanticArgument = 0,
         SemanticSymbol = 1,
         TypedConstant = 2,
+        TypedConstantSegment = 3,
         Type = 10,
         Keyword = 11,
         Function = 12,
