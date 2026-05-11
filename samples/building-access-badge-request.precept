@@ -1,18 +1,17 @@
 precept BuildingAccessBadgeRequest
 
 # A practical approval workflow that uses a numeric set for requested floors.
-# The sample demonstrates add/remove, contains, .min, .max, and editable fields.
+# Demonstrates: integer type, positive/nonnegative modifiers, minlength constraint,
+# conditional action (if/then/else), add/remove, contains, .min, .max, and editable fields.
 
 field EmployeeName as string optional
 field Department as string optional
-field AccessReason as string optional maxlength 200
+field AccessReason as string optional maxlength 200 minlength 5
 field ReviewerNote as string optional
-field LowestRequestedFloor as number default 0
-field HighestRequestedFloor as number default 0
+field LowestRequestedFloor as integer default 0 nonnegative
+field HighestRequestedFloor as integer default 0 nonnegative
 field BadgePrinted as boolean default false
-field RequestedFloors as set of number
-
-rule RequestedFloors.count == 0 or LowestRequestedFloor <= HighestRequestedFloor because "Requested floor bounds must stay ordered"
+field RequestedFloors as set of integer
 
 state Draft initial
 state Submitted
@@ -29,14 +28,11 @@ in Issued ensure BadgePrinted because "Issued badges must be printed"
 
 to Approved -> set BadgePrinted = false
 
-event AddFloor(Floor as number)
-on AddFloor ensure AddFloor.Floor > 0 because "Floors must be positive"
-
-event RemoveFloor(Floor as number)
-on RemoveFloor ensure RemoveFloor.Floor > 0 because "Floors must be positive"
+event AddFloor(Floor as integer positive)
+event RemoveFloor(Floor as integer positive)
 
 event Submit
-event Approve(Note as string optional notempty)
+event Approve(Note as string optional)
 event Reject(Reason as string notempty)
 event PrintBadge
 
@@ -49,15 +45,15 @@ from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor
 from Draft on RemoveFloor
     -> reject "That floor is not currently requested"
 
-from Draft on Submit when EmployeeName is set and Department is set and AccessReason is set and AccessReason.length >= 5 and RequestedFloors.count > 0
+from Draft on Submit when EmployeeName is set and Department is set and AccessReason is set and RequestedFloors.count > 0
     -> set LowestRequestedFloor = RequestedFloors.min
     -> set HighestRequestedFloor = RequestedFloors.max
     -> transition Submitted
 from Draft on Submit
-    -> reject "A complete request needs employee details, a reason, and at least one floor"
+    -> reject "A complete request needs employee details, a reason (at least 5 characters), and at least one floor"
 
 from Submitted on Approve
-    -> set ReviewerNote = Approve.Note
+    -> set ReviewerNote = if Approve.Note is set then Approve.Note else "Approved without comment"
     -> transition Approved
 from Submitted on Reject
     -> set ReviewerNote = Reject.Reason

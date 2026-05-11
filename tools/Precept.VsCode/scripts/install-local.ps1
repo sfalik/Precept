@@ -13,6 +13,7 @@ foreach ($p in $nodePaths) {
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $extensionRoot = Resolve-Path (Join-Path $scriptDirectory "..")
+$repoRoot = Resolve-Path (Join-Path $extensionRoot "..\..")
 Set-Location $extensionRoot
 
 $nodeModulesPath = Join-Path $extensionRoot "node_modules"
@@ -23,6 +24,18 @@ if (-not (Test-Path $typescriptCliPath)) {
     if ($LASTEXITCODE -ne 0) {
         throw "npm install failed with exit code $LASTEXITCODE"
     }
+}
+
+# Rebuild dev language server so the installed extension picks up the latest source.
+# The bundled server is rebuilt separately by vscode:prepublish (dotnet publish -o ./server).
+# Without this step, the running extension would use a potentially stale dev DLL from
+# temp/dev-language-server/ since dev mode bypasses the bundled server entirely.
+$lsProjectPath = Join-Path $repoRoot "tools\Precept.LanguageServer\Precept.LanguageServer.csproj"
+$devArtifactsPath = Join-Path $repoRoot "temp\dev-language-server"
+Write-Host "Rebuilding dev language server..."
+dotnet build $lsProjectPath --artifacts-path $devArtifactsPath -c Release
+if ($LASTEXITCODE -ne 0) {
+    throw "Dev language server build failed with exit code $LASTEXITCODE"
 }
 
 npm run package:local

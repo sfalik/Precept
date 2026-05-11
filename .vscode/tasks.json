@@ -13,7 +13,9 @@
                 "build",
                 "${workspaceFolder}/tools/Precept.LanguageServer/Precept.LanguageServer.csproj",
                 "--artifacts-path",
-                "${workspaceFolder}/temp/dev-language-server"
+                "${workspaceFolder}/temp/dev-language-server",
+                "-c",
+                "Release"
             ],
             "problemMatcher": "$msCompile",
             "group": {

@@ -101,6 +101,32 @@ public class SlotContextResolverTests
     }
 
     [Fact]
+    public void GetCursorContext_ChoiceElementTypeAfterOf_ReturnsInTypePosition()
+    {
+        var context = GetCursorContext("""
+            precept Ticket
+            field Priority as choice of¦ string("Low","High")
+            state Open initial
+            """);
+
+        context.Should().Be(SlotContext.InTypePosition);
+    }
+
+    [Fact]
+    public void GetCursorContext_QuantityDimensionQualifierAfterOf_DoesNotReturnInTypePosition()
+    {
+        // 'quantity of' is a qualifier preposition (expects a typed constant like 'mass'),
+        // NOT a collection element-type position. Type keyword completions (bag, boolean, …) must not appear.
+        var context = GetCursorContext("""
+            precept Shipment
+            field Weight as quantity of¦
+            state Pending initial
+            """);
+
+        context.Should().NotBe(SlotContext.InTypePosition);
+    }
+
+    [Fact]
     public void GetCursorContext_FieldModifierDefaultValue_ReturnsInExpression()
     {
         var context = GetCursorContext("""

@@ -2,11 +2,12 @@ precept InsuranceClaim
 
 # Claims often bounce between missing-document collection and adjuster review.
 # This example keeps that back-and-forth in one readable file.
-# Built-in functions (min, trim) keep the logic clear.
+# Demonstrates: money type, form-fill pattern, conditional state constraints,
+# conditional rules (FraudFlag cap), and trim() on adjuster name.
 
 field ClaimantName as string optional
-field ClaimAmount as decimal default 0 nonnegative maxplaces 2
-field ApprovedAmount as decimal default 0 nonnegative maxplaces 2
+field ClaimAmount as money in 'USD' default '0.00 USD'
+field ApprovedAmount as money in 'USD' default '0.00 USD'
 field AdjusterName as string optional
 field DecisionNote as string optional maxlength 500
 field PoliceReportRequired as boolean default false
@@ -22,32 +23,26 @@ state Approved
 state Denied terminal
 state Paid terminal
 
+in Draft modify ClaimantName, ClaimAmount, PoliceReportRequired editable
 in UnderReview modify FraudFlag editable
 in UnderReview when not FraudFlag modify AdjusterName editable
-in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
+in Approved ensure ApprovedAmount > '0.00 USD' because "Approved claims must specify a payout amount"
 in Approved when FraudFlag ensure DecisionNote is set because "Fraud-flagged approvals require a decision note"
 
-event Submit(
-    Claimant as string notempty,
-    Amount as decimal,
-    RequiresPoliceReport as boolean default false)
-on Submit ensure Submit.Amount > 0 because "Claim amounts must be positive"
-on Submit when Submit.RequiresPoliceReport ensure Submit.Amount <= 100000 because "Police-report claims are capped at $100,000"
-
+event Submit
 event RequestDocument(Name as string notempty)
 event ReceiveDocument(Name as string notempty)
 event AssignAdjuster(Name as string notempty)
-event Approve(Amount as decimal, Note as string optional notempty)
-on Approve ensure Approve.Amount > 0 because "Approved claim amounts must be positive"
-
+event Approve(Amount as money in 'USD' positive, Note as string optional)
 event Deny(Note as string notempty)
 event PayClaim
 
-from Draft on Submit
-    -> set ClaimantName = Submit.Claimant
-    -> set ClaimAmount = Submit.Amount
-    -> set PoliceReportRequired = Submit.RequiresPoliceReport
+from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD' and (not PoliceReportRequired or ClaimAmount <= '100000.00 USD')
     -> transition Submitted
+from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD'
+    -> reject "Police-report claims are capped at $100,000"
+from Draft on Submit
+    -> reject "A claim needs a claimant name and a positive claim amount"
 
 from Submitted on RequestDocument
     -> add MissingDocuments RequestDocument.Name
@@ -67,7 +62,7 @@ from UnderReview on ReceiveDocument
 
 from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.count == 0) and Approve.Amount <= ClaimAmount
     -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
-    -> set DecisionNote = Approve.Note
+    -> set DecisionNote = if Approve.Note is set then Approve.Note else "Approved"
     -> transition Approved
 from UnderReview on Approve
     -> reject "Required documents must be complete before a claim can be approved"

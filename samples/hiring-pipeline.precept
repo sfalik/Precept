@@ -2,12 +2,13 @@ precept HiringPipeline
 
 # Hiring is a good fit for Precept because the state flow is clear but the details still matter.
 # The interview loop uses a set of pending interviewers to track who still owes feedback.
+# Demonstrates: form-fill pattern, money type for offer amount, set operations.
 
 field CandidateName as string optional maxlength 100
 field RoleName as string optional
 field RecruiterName as string optional
 field FeedbackCount as integer default 0 nonnegative
-field OfferAmount as number default 0 nonnegative
+field OfferAmount as money in 'USD' default '0.00 USD'
 field FinalNote as string optional maxlength 500
 field PendingInterviewers as set of string
 
@@ -19,25 +20,23 @@ state OfferExtended
 state Hired terminal
 state Rejected terminal
 
-in InterviewLoop ensure PendingInterviewers.count > 0 because "Interview loops require at least one pending interviewer"
-in Hired ensure OfferAmount > 0 because "Hired candidates must have an offer amount"
+in Draft modify CandidateName, RoleName, RecruiterName editable
 
-event SubmitApplication(
-    Candidate as string notempty,
-    Role as string notempty,
-    Recruiter as string notempty)
+in InterviewLoop ensure PendingInterviewers.count > 0 because "Interview loops require at least one pending interviewer"
+in Hired ensure OfferAmount > '0.00 USD' because "Hired candidates must have an offer amount"
+
+event Submit
 event AddInterviewer(Name as string notempty)
 event PassScreen
 event RecordInterviewFeedback(Interviewer as string notempty)
-event ExtendOffer(Amount as number positive)
+event ExtendOffer(Amount as money in 'USD' positive)
 event AcceptOffer
 event RejectCandidate(Note as string notempty)
 
-from Draft on SubmitApplication
-    -> set CandidateName = SubmitApplication.Candidate
-    -> set RoleName = SubmitApplication.Role
-    -> set RecruiterName = SubmitApplication.Recruiter
+from Draft on Submit when CandidateName is set and RoleName is set and RecruiterName is set
     -> transition Screening
+from Draft on Submit
+    -> reject "A complete application needs a candidate name, role, and recruiter"
 
 from Screening on AddInterviewer
     -> add PendingInterviewers AddInterviewer.Name

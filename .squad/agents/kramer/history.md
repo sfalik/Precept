@@ -6,6 +6,8 @@
 
 ## Learnings
 
+- `IsTypePositionContext` in `SlotContext.cs` must look at the token *before* `of`, not just that `of` appears in a `TypeExpression`-slotted construct. `of` is both a collection/choice element-type preposition (expects a type keyword → `InTypePosition`) and a qualifier preposition (expects a typed constant, e.g. `quantity of 'mass'`). Disambiguate catalog-side: `TypeCategory.Collection || TypeKind.Choice` → type position; all other preceding types → not type position.
+
 - Semantic-token delta stability depends on exact identifier spans; when typed-constant token layouts shift, invalidate the cached `SemanticTokensDocument` for that URI instead of swallowing exceptions or disabling deltas globally.
 - Versioned document updates must reject stale recompiles while preserving the unversioned fallback path for clients that omit version data.
 - Declaration and slot completions should derive from catalog metadata plus nearby semantic context rather than parser recovery spans alone.

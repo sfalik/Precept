@@ -2,9 +2,11 @@ global using OmniSharp.Extensions.LanguageServer.Protocol;
 global using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 
 using System;
+using System.Collections;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
@@ -772,31 +774,47 @@ public sealed class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void TryInvalidateForTypedConstantSpanChange_WhenSpanChanged_InvalidatesCachedDocument()
+    public async Task TryInvalidateForTypedConstantSpanChange_WhenSpanChanged_ClearsCachedBaselineStateAsync()
     {
         var store = new DocumentStore();
         var handler = new SemanticTokensHandler(store);
         var uri = DocumentUri.FromFileSystemPath(@"C:\test.precept");
+        var state = store.GetOrAdd(uri);
         var compilationBefore = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-01'\n");
         var compilationAfter = Compiler.Compile("precept Sample\nfield Due as date <- '2026-01-012'\n");
 
-        // Seed the before-state and capture the first document.
-        handler.TryInvalidateForTypedConstantSpanChange(uri, compilationBefore);
+        state.Update(compilationBefore);
+        var full = await handler.Handle(new SemanticTokensParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+        }, default);
 
-        // Mutate the document cache by seeding a document instance.
-        var legend = SemanticTokensHandler.BuildLegend();
-        // The handler's _documents is private, but we can verify invalidation indirectly:
-        // After invalidation, the handler should return a fresh document on the next GetOrAdd.
-        // We verify this by checking that TryInvalidateForTypedConstantSpanChange returns true,
-        // which means the _documents entry was removed.
+        var documents = GetPrivateDictionary(handler, "_documents");
+        var latestResults = GetPrivateDictionary(handler, "_latestResults");
+
+        documents.Contains(uri).Should().BeTrue(because: "the initial full request seeds the cached semantic token document");
+        latestResults.Contains(uri).Should().BeTrue(because: "the initial full request seeds the latest semantic token baseline");
+
+        state.Update(compilationAfter);
+        handler.TryInvalidateForTypedConstantSpanChange(uri, compilationAfter)
+            .Should().BeTrue(because: "typed-constant span changes must invalidate the cached semantic token baseline");
+
+        documents.Contains(uri).Should().BeFalse(because: "typed-constant span changes remove the cached semantic token document");
+        latestResults.Contains(uri).Should().BeFalse(because: "typed-constant span changes must also clear the latest result guard state");
+
+        var delta = await handler.Handle(new SemanticTokensDeltaParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            PreviousResultId = full!.ResultId!,
+        }, default);
+
+        delta.Should().NotBeNull();
+        delta!.IsDelta.Should().BeFalse(because: "clearing the cached baseline forces the next request down the full-response path");
+        delta.Full.Should().NotBeNull();
+        delta.Full!.Data.Should().Equal(GetFullSemanticTokens(compilationAfter).Data);
 
         handler.TryInvalidateForTypedConstantSpanChange(uri, compilationAfter)
-            .Should().BeTrue(because: "span changed, so the cached document must be invalidated");
-
-        // After invalidation the previous span state should track the new spans —
-        // a third call with the same 'after' compilation should return false (no further change).
-        handler.TryInvalidateForTypedConstantSpanChange(uri, compilationAfter)
-            .Should().BeFalse(because: "span is stable on the third call");
+            .Should().BeFalse(because: "after the invalidation pass, the new typed-constant span layout becomes the baseline");
     }
 
     [Fact]
@@ -813,6 +831,13 @@ public sealed class SemanticTokensHandlerTests
         var result = handler.TryInvalidateForTypedConstantSpanChange(uri, after);
 
         result.Should().BeFalse(because: "no typed-constant tokens means no span change to detect");
+    }
+
+    private static IDictionary GetPrivateDictionary(SemanticTokensHandler handler, string fieldName)
+    {
+        var field = typeof(SemanticTokensHandler).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        field.Should().NotBeNull($"SemanticTokensHandler should expose the private {fieldName} cache for this regression assertion.");
+        return field!.GetValue(handler).Should().BeAssignableTo<IDictionary>().Which;
     }
 
     private static string SamplesRoot =>

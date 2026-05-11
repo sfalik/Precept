@@ -1,11 +1,12 @@
 precept ClinicAppointmentScheduling
 
 # Appointment slots are kept intentionally simple: a day number and minute-of-day.
-# The event ensures show that modulo checks belong on event arguments, not fields.
+# Demonstrates: integer + nonnegative modifiers on event args, notempty on a required
+# field, conditional actions (if/then/else), and the 15-minute boundary rule.
 
-field PatientName as string optional
-field ScheduledDay as number default 0 nonnegative
-field ScheduledMinute as number default 0 nonnegative
+field PatientName as string notempty
+field ScheduledDay as integer default 0 nonnegative
+field ScheduledMinute as integer default 0 nonnegative
 field ConfirmationCode as string optional
 field ReminderSent as boolean default false
 field CheckInNote as string optional
@@ -24,20 +25,16 @@ in Completed ensure VisitCompleted because "Completed visits must be marked comp
 
 to Scheduled -> set ConfirmationCode = "CONFIRMED" -> set ReminderSent = false
 
-event Schedule(Name as string notempty, DayNumber as number, MinuteOfDay as number)
-on Schedule ensure Schedule.DayNumber >= 0 because "The scheduled day cannot be negative"
-on Schedule ensure Schedule.MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
+event Schedule(Name as string notempty, DayNumber as integer nonnegative, MinuteOfDay as integer nonnegative)
 on Schedule ensure Schedule.MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
 
-event Reschedule(DayNumber as number, MinuteOfDay as number)
-on Reschedule ensure Reschedule.DayNumber >= 0 because "The scheduled day cannot be negative"
-on Reschedule ensure Reschedule.MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
+event Reschedule(DayNumber as integer nonnegative, MinuteOfDay as integer nonnegative)
 on Reschedule ensure Reschedule.MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
 
 event SendReminder
-event CheckIn(Note as string optional notempty)
+event CheckIn(Note as string optional)
 event CompleteVisit
-event Cancel(Reason as string optional notempty)
+event Cancel(Reason as string optional)
 
 from Draft on Schedule
     -> set PatientName = Schedule.Name
@@ -54,10 +51,10 @@ from Scheduled on SendReminder
     -> set ReminderSent = true
     -> no transition
 from Scheduled on CheckIn
-    -> set CheckInNote = CheckIn.Note
+    -> set CheckInNote = if CheckIn.Note is set then CheckIn.Note else "No note"
     -> transition CheckedIn
 from Scheduled on Cancel
-    -> set CancellationReason = Cancel.Reason
+    -> set CancellationReason = if Cancel.Reason is set then Cancel.Reason else "No reason given"
     -> transition Cancelled
 
 from CheckedIn on CompleteVisit

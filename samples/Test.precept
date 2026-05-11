@@ -1,7 +1,8 @@
 precept Test
 
-field dim as dimension
 
+field f1 as quantity of 'length'
+field f2 as quantity of 'mass' default '1 {f1.dimension}'
 
 
 

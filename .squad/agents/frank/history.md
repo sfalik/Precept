@@ -33,6 +33,16 @@
 
 ## Learnings
 
+### 2026-05-11 — Exhaustive proof engine × qualifier audit completed
+- **Currency axis has near-total enforcement failure on money operations.** `MoneyPlusMoney`, `MoneyMinusMoney`, and all 6 money comparison operations have NO `QualifierCompatibilityProofRequirement`. Descriptions say "same currency required" but the catalog metadata is silent. `money in 'USD' + money in 'EUR'` compiles clean. Fix: add 8 catalog entries, ~20 LOC.
+- **Cross-type qualifier chain validation does not exist.** `ExchangeRateTimesMoney`, `PriceTimesQuantity`, `PriceTimesPeriod` have no mechanism to validate that the from-currency/dimension of one operand matches the currency/dimension of the other. Requires new `QualifierChainProofRequirement` DU subtype (~50 LOC infrastructure).
+- **Dimension-only fields produce false positives.** `quantity of 'mass' + quantity of 'mass'` triggers unresolved `QualifierAxis.Unit` obligation because `ResolveQualifierOnAxis` doesn't fall back from Unit to Dimension. Fix: axis fallback in Strategy 5, ~15 LOC.
+- **ValidateAssignmentQualifiers** handles Dimension, Unit, Currency but NOT FromCurrency/ToCurrency. Exchange rate field-to-field assignment with different from/to currencies passes silently.
+- **Expression results carry no qualifier provenance** — `set usdField = eurField + eurField` bypasses assignment qualifier checks because binary expression results are invisible to `ValidateAssignmentQualifiers`.
+- **The S1-S5 strategy architecture is sound.** All gaps are catalog-metadata or resolution-logic gaps, not fundamental architectural gaps. No new strategy tier needed.
+- **Numeric modifier subsumption is correct and comprehensive.** positive ⊇ nonzero ⊇ != 0. nonnegative does NOT subsume nonzero. All chains tested.
+- Full audit report: `docs/Working/proof-engine-qualifier-audit.md`. Issue specs: `docs/Working/proof-gaps-issues.md`.
+
 ### 2026-05-11 — Dimension-qualified unit slot compatibility analysis
 - `f1.unit` accessor resolves to bare `TypeKind.UnitOfMeasure` — no dimension qualifier is carried in the static type. `FixedReturnAccessor.Returns` is just a `TypeKind` enum; `ReturnsQualifier` metadata signals "which qualifier axis this extracts" for proof strategy use, not for narrowing the return type itself.
 - `TypedMemberAccess` stores only `TypeKind ResultType` — there is no concept of "qualified return types" on accessor results anywhere in the type system.
@@ -61,6 +71,22 @@
 - frank-1 confirmed that `.unit` access resolves to bare `unitofmeasure`, so the existing interpolation slot-compatibility pass cannot prove or reject dimension mismatches from source-field provenance.
 - The deferral recommendation is preserved as rejected-path evidence only; Shane overruled it and the batch closed on a compile-time fix path.
 
-### 2026-05-11T22:07:10Z — frank-2 interpolation plan correction merged
+### 2026-05-11T22:35:56Z — String exclusion from interpolation restored
+
+- The plan integration work (proof audit merge) re-introduced `string` as a valid hole type with a "string exception" section and full slot compatibility table entries. This contradicted the prior decision (checkpoint 184, `decisions.md` line 48, `history.md` line 10).
+- Removed `string` from ALL slot compatibility tables across all 9 typed constant types (money, quantity, price, exchangerate, duration, period, currency, unitofmeasure, dimension).
+- Replaced "The `string` Exception" section with "The `string` Exclusion" — string in a hole position is a compile-time error (`InterpolatedTypedConstantHoleTypeMismatch`, code 123).
+- Updated the type-grammar matching algorithm step to explicitly reject string.
+- Converted all string-valid test cases to string-error test cases.
+- The Part B proof engine `string` references (qualifier chain `string Description` parameter) are unaffected — different concept, different scope.
+- Decision file: `.squad/decisions/inbox/frank-string-excluded-from-interpolation.md`.
 - frank-2 corrected the static-case analysis (`QuantityValidator.Validate()` already covers non-interpolated constants), chose the Slice 2 structural AST match, and added `DimensionMismatchInUnitSlot = 124` with interpolation diagnostics renumbered to 121/122/123.
 - The plan now carries the physical-dimension scope boundary plus the added Slice 2 estimate (+25 LOC, 9 tests) for unit-slot consistency.
+
+### 2026-05-11T22:24:12Z — Plan renamed and expanded with proof audit findings
+- `docs/Working/interpolation-plan.md` → `docs/Working/typed-constants-and-proof-coverage-plan.md`
+- Plan now covers two workstreams: Part A (interpolation typed constants, Slices 1–6) and Part B (proof engine qualifier coverage, Slices 7–12).
+- Integrated full audit findings: executive summary, audit matrix (7 tables), gap inventory (G1–G14), 6 new implementation slices (~167 LOC, ~38 tests), test coverage assessment, architecture assessment.
+- Key architectural call: S1–S5 proof strategy architecture is sound. All 14 gaps trace to catalog metadata omissions, not structural engine defects. Fixes are catalog entries + one axis fallback + one new DU subtype + one assignment proof obligation.
+- Source audit documents (`proof-engine-qualifier-audit.md`, `proof-gaps-issues.md`) retained as reference.
+- Decision recorded: `.squad/decisions/inbox/frank-plan-renamed.md`.

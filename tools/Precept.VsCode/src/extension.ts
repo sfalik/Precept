@@ -554,7 +554,9 @@ function updateLanguageServerStatusItem(
     if (nonCapabilityKeys.has(k)) { return false; }
     const v = obj[k]; return v !== undefined && v !== null && v !== false;
   }).length : undefined;
-  const capCountLabel = activeCount !== undefined ? ` · $(list-unordered) ${activeCount}` : "";
+  // Don't show "0" when activeCount is 0 — dynamic registration means caps are registered
+  // after initialize and won't appear in initializeResult.
+  const capCountLabel = activeCount !== undefined && activeCount > 0 ? ` · $(list-unordered) ${activeCount}` : "";
 
   switch (state) {
     case "starting":
@@ -611,7 +613,11 @@ function buildCapabilityTooltipLines(caps: object): string {
     }
   }
   if (active.length === 0) {
-    return "No capabilities reported.";
+    // Server responded but all document capabilities are registered dynamically
+    // (via client/registerCapability after initialize). This is correct LSP behavior
+    // when the client advertises dynamicRegistration: true.
+    const serverAlive = Object.keys(obj).length > 0;
+    return serverAlive ? "Active · capabilities registered dynamically" : "No capabilities reported.";
   }
   return active.map(k => `✓ ${k}`).join(" · ");
 }

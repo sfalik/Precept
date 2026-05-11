@@ -66,13 +66,16 @@ internal sealed class CompletionHandler : ICompletionHandler
 
         // A single quote always opens a typed constant — never show keyword completions.
         // If type inference succeeds, show typed constant values; otherwise return empty.
-        // The opening quote always starts a new literal, so always append a closing quote.
+        // If auto-close is enabled, VS Code inserts '' and the closing quote is already present —
+        // detect this via IsEmptyTypedConstantToken and skip appending to avoid 'length''.
+        // If auto-close is disabled, the token is not closed, so we append the closing quote.
         if (triggerCharacter == "'")
         {
             var innerContext = context is SlotContext.InExpression or SlotContext.InArgDefault
                 ? context
                 : SlotContext.InExpression;
-            return CreateCompletionList(GetTypedConstantItems(compilation, position, innerContext, appendClosingQuote: true));
+            var appendClosingQuote = !IsEmptyTypedConstantToken(compilation.Tokens.Tokens, position);
+            return CreateCompletionList(GetTypedConstantItems(compilation, position, innerContext, appendClosingQuote));
         }
 
         // Space trigger inside a typed constant: show slot-specific vocabulary (money codes,
@@ -95,6 +98,26 @@ internal sealed class CompletionHandler : ICompletionHandler
                 return CreateCompletionList(slotItems);
             }
             return new CompletionList([], true);
+        }
+
+        // Dot trigger: always attempt member access completions.
+        // GetCursorContext may return TopLevel when the file doesn't parse cleanly (e.g. the user
+        // just typed 'Weight.' and the parser error-recovers over the incomplete expression), so
+        // we must handle '.' here before the context switch rather than rely on InExpression routing.
+        // TryGetReceiverTypeForDotTrigger is used instead of TryGetReceiverType because the latter
+        // goes through AdjustTokenIndexForBoundary, which steps back past the dot when the cursor
+        // lands exactly at the dot token's start column — causing the dot to be missed entirely.
+        if (triggerCharacter == ".")
+        {
+            return SlotContextResolver.TryGetReceiverTypeForDotTrigger(compilation, position, out var receiverType)
+                ? CreateCompletionList(Types.GetMeta(receiverType).Accessors.Select(accessor =>
+                    CreateItem(
+                        label: GetAccessorLabel(accessor),
+                        detail: accessor.Description,
+                        kind: accessor.ParameterType is null ? CompletionItemKind.Property : CompletionItemKind.Method,
+                        sortGroup: CompletionSortGroup.Keyword,
+                        documentation: accessor.Description)))
+                : new CompletionList([], true);
         }
 
         // Ctrl+Space / invoked completion inside an already-open typed constant (e.g. cursor

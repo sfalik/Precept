@@ -29,7 +29,7 @@ function ensureBuild() {
 
   const build = spawnSync(
     "dotnet",
-    ["build", projectPath, "--artifacts-path", buildRoot],
+    ["build", projectPath, "--artifacts-path", buildRoot, "-c", "Release"],
     {
       cwd: workspaceRoot,
       encoding: "utf8"
@@ -51,7 +51,7 @@ function ensureBuild() {
 function resolveBuildDllPath() {
   const candidate = findFile(buildBinRoot, mcpDllName, (fullPath) => {
     const normalized = normalizePath(fullPath);
-    return normalized.includes("/Precept.Mcp/") && (normalized.includes("/debug/") || normalized.includes("/release/"));
+    return normalized.includes("/Precept.Mcp/") && normalized.includes("/release/");
   });
 
   if (!candidate) {

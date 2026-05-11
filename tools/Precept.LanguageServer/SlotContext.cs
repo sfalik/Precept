@@ -175,6 +175,86 @@ internal static class SlotContextResolver
                 && HasMatchingSyntax(candidate.Syntax, construct))?.AnchorEvent;
     }
 
+    /// <summary>
+    /// Resolves the receiver type when the completion trigger was a literal '.' keystroke.
+    /// Unlike <see cref="TryGetReceiverType"/>, this method does not go through
+    /// <see cref="TryGetMemberAccessDotIndex"/> — which uses AdjustTokenIndexForBoundary and
+    /// can step back past the dot when the cursor lands exactly at the dot's start position.
+    /// Instead it locates the dot directly via Contains at (line, character-1) and then
+    /// resolves the receiver by name lookup + expression tree.
+    /// </summary>
+    internal static bool TryGetReceiverTypeForDotTrigger(Compilation compilation, Position position, out TypeKind receiverType)
+    {
+        receiverType = default;
+        var tokens = compilation.Tokens.Tokens;
+
+        if (position.Character <= 0)
+            return false;
+
+        // The dot was just inserted at one character to the left of the cursor.
+        var dotSearchPos = new Position(position.Line, position.Character - 1);
+
+        // Find the Dot token whose span contains dotSearchPos.
+        var dotIndex = -1;
+        for (var i = 0; i < tokens.Length; i++)
+        {
+            if (tokens[i].Kind == TokenKind.Dot && Contains(tokens[i].Span, dotSearchPos))
+            {
+                dotIndex = i;
+                break;
+            }
+        }
+
+        if (dotIndex <= 0)
+            return false;
+
+        // Primary: resolve from the typed expression tree (handles complete chained access like
+        // Foo.Bar. where Bar is already typed). Position just before the dot.
+        if (TryGetPositionBefore(tokens[dotIndex].Span, out var receiverPosition)
+            && TryGetInnermostExpressionType(compilation, receiverPosition, out receiverType))
+        {
+            return true;
+        }
+
+        // Fallback: the expression at the cursor is incomplete — look up the identifier before
+        // the dot directly in the semantic index.
+        var receiverTokenIndex = FindPreviousSignificantToken(tokens, dotIndex - 1);
+        if (receiverTokenIndex < 0)
+            return false;
+
+        var receiverToken = tokens[receiverTokenIndex];
+        if (receiverToken.Kind != TokenKind.Identifier)
+            return false;
+
+        // Field reference: Weight.
+        if (compilation.Semantics.FieldsByName.TryGetValue(receiverToken.Text, out var field))
+        {
+            receiverType = field.ResolvedType;
+            return true;
+        }
+
+        // Event arg reference: EventName.ArgName.
+        var argDotIdx = FindPreviousSignificantToken(tokens, receiverTokenIndex - 1);
+        if (argDotIdx >= 0 && tokens[argDotIdx].Kind == TokenKind.Dot)
+        {
+            var eventNameIdx = FindPreviousSignificantToken(tokens, argDotIdx - 1);
+            if (eventNameIdx >= 0
+                && tokens[eventNameIdx].Kind == TokenKind.Identifier
+                && compilation.Semantics.EventsByName.TryGetValue(tokens[eventNameIdx].Text, out var evt))
+            {
+                var arg = evt.Args.FirstOrDefault(a =>
+                    string.Equals(a.Name, receiverToken.Text, StringComparison.Ordinal));
+                if (arg is not null)
+                {
+                    receiverType = arg.ResolvedType;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     internal static bool TryGetReceiverType(Compilation compilation, Position position, out TypeKind receiverType)
     {
         receiverType = default;
@@ -185,13 +265,55 @@ internal static class SlotContextResolver
         }
 
         var dot = compilation.Tokens.Tokens[dotIndex];
-        if (!TryGetPositionBefore(dot.Span, out var receiverPosition)
-            || !TryGetInnermostExpressionType(compilation, receiverPosition, out receiverType))
+        if (!TryGetPositionBefore(dot.Span, out var receiverPosition))
         {
             return false;
         }
 
-        return true;
+        // Primary: resolve from the typed expression tree (covers complete, already-typed expressions).
+        if (TryGetInnermostExpressionType(compilation, receiverPosition, out receiverType))
+        {
+            return true;
+        }
+
+        // Fallback: the expression tree doesn't cover the receiver because the user just typed '.'
+        // and the compilation has an incomplete expression at the cursor. Look up the token
+        // immediately before the dot by name in the semantic index.
+        var tokenBeforeDotIndex = FindPreviousSignificantToken(compilation.Tokens.Tokens, dotIndex - 1);
+        if (tokenBeforeDotIndex >= 0)
+        {
+            var tokenBeforeDot = compilation.Tokens.Tokens[tokenBeforeDotIndex];
+            if (tokenBeforeDot.Kind == TokenKind.Identifier)
+            {
+                // Field reference: Weight.
+                if (compilation.Semantics.FieldsByName.TryGetValue(tokenBeforeDot.Text, out var field))
+                {
+                    receiverType = field.ResolvedType;
+                    return true;
+                }
+
+                // Event arg reference in scope: EventName.ArgName. — look two tokens back.
+                // Token pattern: <EventName> <Dot> <ArgName> <Dot> <cursor>
+                var argNameIndex = tokenBeforeDotIndex;
+                var argDotIndex = FindPreviousSignificantToken(compilation.Tokens.Tokens, argNameIndex - 1);
+                var eventNameIndex = argDotIndex >= 0 && compilation.Tokens.Tokens[argDotIndex].Kind == TokenKind.Dot
+                    ? FindPreviousSignificantToken(compilation.Tokens.Tokens, argDotIndex - 1)
+                    : -1;
+                if (eventNameIndex >= 0
+                    && compilation.Tokens.Tokens[eventNameIndex].Kind == TokenKind.Identifier
+                    && compilation.Semantics.EventsByName.TryGetValue(compilation.Tokens.Tokens[eventNameIndex].Text, out var evt))
+                {
+                    var arg = evt.Args.FirstOrDefault(a => string.Equals(a.Name, tokenBeforeDot.Text, StringComparison.Ordinal));
+                    if (arg is not null)
+                    {
+                        receiverType = arg.ResolvedType;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     internal static TypedField? GetCurrentActionTargetField(Compilation compilation, Position position)
@@ -271,7 +393,7 @@ internal static class SlotContextResolver
             return true;
         }
 
-        if (IsTypePositionContext(token, construct))
+        if (IsTypePositionContext(tokens, tokenIndex, token, construct))
         {
             context = SlotContext.InTypePosition;
             return true;
@@ -508,11 +630,43 @@ internal static class SlotContextResolver
     }
 
     private static bool IsTypePositionContext(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
         Precept.Language.Token token,
         Precept.Pipeline.ParsedConstruct? construct)
     {
-        return token.Kind == Precept.Language.TokenKind.Of
-            && ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.TypeExpression);
+        if (token.Kind != Precept.Language.TokenKind.Of
+            || !ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.TypeExpression))
+        {
+            return false;
+        }
+
+        // 'of' serves two distinct roles in type expressions:
+        //   (a) Collection/choice element-type preposition — expects a type keyword (e.g. 'set of string')
+        //   (b) Qualifier preposition — expects a typed constant (e.g. 'quantity of \'mass\'')
+        // Only case (a) warrants InTypePosition completions. Distinguish by reading the type keyword
+        // preceding 'of' from the catalog — no per-type identity hardcoding.
+        var prevIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        if (prevIndex < 0)
+        {
+            return false;
+        }
+
+        var prevToken = tokens[prevIndex];
+        // 'set' shares a TokenKind with the action keyword; resolve to the type lookup key the same way the parser does.
+        var lookupKind = prevToken.Kind == Precept.Language.TokenKind.Set
+            ? Precept.Language.TokenKind.SetType
+            : prevToken.Kind;
+        if (!Precept.Language.Types.ByToken.TryGetValue(lookupKind, out var prevTypeMeta))
+        {
+            return false;
+        }
+
+        // Collection types use 'of' to introduce an element type keyword.
+        // 'choice' (TypeCategory.Scalar) also uses 'of' for its element type.
+        // All other types (e.g. 'quantity', 'price', 'period') use 'of' as a qualifier preposition.
+        return prevTypeMeta.Category == Precept.Language.TypeCategory.Collection
+            || prevTypeMeta.Kind == Precept.Language.TypeKind.Choice;
     }
 
     private static bool ConstructHasSlot(

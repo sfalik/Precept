@@ -73,13 +73,26 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             return StampFullResult(request.TextDocument.Uri, document, fullBuilder.Commit().GetSemanticTokens());
         }
 
-        var deltaBuilder = document.Edit(new SemanticTokensDeltaParams
+        try
         {
-            TextDocument = request.TextDocument,
-            PreviousResultId = document.Id,
-        });
-        await Tokenize(deltaBuilder, request, cancellationToken).ConfigureAwait(false);
-        return StampDeltaResult(request.TextDocument.Uri, document, deltaBuilder.Commit().GetSemanticTokensEdits());
+            var deltaBuilder = document.Edit(new SemanticTokensDeltaParams
+            {
+                TextDocument = request.TextDocument,
+                PreviousResultId = document.Id,
+            });
+            await Tokenize(deltaBuilder, request, cancellationToken).ConfigureAwait(false);
+            return StampDeltaResult(request.TextDocument.Uri, document, deltaBuilder.Commit().GetSemanticTokensEdits());
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // OmniSharp delta computation produced an invalid edit range — fall back to full result.
+            _documents.TryRemove(request.TextDocument.Uri, out _);
+            _latestResults.TryRemove(request.TextDocument.Uri, out _);
+            var freshDoc = _documents.GetOrAdd(request.TextDocument.Uri, static _ => new SemanticTokensDocument(Legend));
+            var fullBuilder = freshDoc.Create();
+            await Tokenize(fullBuilder, request, cancellationToken).ConfigureAwait(false);
+            return StampFullResult(request.TextDocument.Uri, freshDoc, fullBuilder.Commit().GetSemanticTokens());
+        }
     }
 
     protected override Task Tokenize(
@@ -123,6 +136,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         if (changed)
         {
             _documents.TryRemove(uri, out _);
+            _latestResults.TryRemove(uri, out _);
         }
         return changed;
     }

@@ -1,13 +1,24 @@
-# Interpolation Implementation Plan — Type-Grammar-Driven Slot Classification
+# Typed Constants & Proof Coverage Plan
 
 **Status:** Awaiting Shane review before Slice 1 (Parser) implementation begins  
-**Architect:** Frank (frank-16, frank-18, frank-23 revision)  
+**Architect:** Frank (frank-16, frank-18, frank-23 revision; proof audit integration 2026-05-11)  
 **Philosophy grounding:** `docs/philosophy.md` — make invalid configurations structurally impossible  
-**Supersedes:** Previous position-text plan (frank-16/frank-18)
+**Supersedes:** Previous position-text plan (frank-16/frank-18); standalone `interpolation-plan.md`  
+**Scope:** Interpolated typed constant implementation (Slices 1–6) + Proof engine qualifier coverage gaps (Slices 7–12)  
+**Source audits:** `docs/Working/proof-engine-qualifier-audit.md`, `docs/Working/proof-gaps-issues.md`
 
 ---
 
-## Problem Statement
+> **This plan is the canonical implementation document for two workstreams:**
+>
+> 1. **Part A — Interpolated Typed Constants** (§Problem Statement through §Slice 6): Full parser → type checker → completions → semantic tokens → docs → proof engine pipeline for `'{x} kg'`, `'{Amt} {Curr}'`, and related forms.
+> 2. **Part B — Proof Engine Qualifier Coverage** (§Proof Engine Qualifier Coverage onward): Surgical fixes to catalog metadata and proof resolution logic to close 14 gaps identified in the exhaustive qualifier-proof audit.
+
+---
+
+## Part A — Interpolated Typed Constants
+
+### Problem Statement
 
 Interpolated typed constants (`'{x} kg'`, `'1 {x}'`, `'{Amt} {Curr}'`) are lexed correctly but completely unimplemented beyond a crash-prevention stub. The parser skips all hole tokens. The type checker maps `TypedConstantStart` to `TypedErrorExpression` with no expression nodes created.
 
@@ -21,13 +32,13 @@ Interpolated typed constants (`'{x} kg'`, `'1 {x}'`, `'{Amt} {Curr}'`) are lexed
 
 Precept's core identity: **make invalid configurations structurally impossible, not deferred to runtime.**
 
-A `boolean` in a `quantity` hole that compiles clean is exactly what Precept is built to prevent. There are no "V1 permissive" or "V2 deferred" semantics. All type mismatches must be caught at compile time, with one explicit exception (see `string` below).
+A `boolean` in a `quantity` hole that compiles clean is exactly what Precept is built to prevent. There are no "V1 permissive" or "V2 deferred" semantics. All type mismatches must be caught at compile time — no exceptions.
 
-### The `string` Exception
+### The `string` Exclusion
 
-`string` is valid in any hole position. A string field could hold a valid unit code or currency code at runtime — the compiler cannot statically know the string's content. This is the one legitimately justified runtime-deferred check, explicitly reasoned against the philosophy.
+`string` is **NOT** valid in any hole position. A `string` field in a typed constant hole produces `InterpolatedTypedConstantHoleTypeMismatch` (code 123) at compile time — the author must convert to the appropriate typed field before using it in a typed constant.
 
-**Rationale:** Types like `currency` or `unitofmeasure` are string-representable at the boundary. A `string` field could carry `"USD"` or `"kg"`. The compiler cannot statically verify string content but must not prevent the author from bridging string data into typed constant construction. Runtime validators catch illegal values; the compiler defers only when it structurally cannot decide.
+**Rationale:** The inability to statically validate string content is a reason to **reject**, not accept. Typed interpolation composes typed holes — qualifier resolution and proof power collapse once hole text becomes opaque runtime content. If an author has a `string` field that holds a currency code, they must use a properly typed `currency` field instead. This preserves Precept's core guarantee: invalid configurations are structurally impossible, not deferred to runtime.
 
 ---
 
@@ -263,35 +274,35 @@ These tables define the valid expression types for each semantic slot across all
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `magnitude` | `integer`, `decimal`, `number`, `string` | Amount component — any numeric type widens to `decimal` (money's backing magnitude). `number` accepted because the widening check is post-resolution (the hole expression resolved to `number`, and `number → decimal` is the explicit `round()` bridge — the type checker's assignment validation handles this, not the slot compatibility table). |
-| `currency` | `currency`, `string` | Currency code component. Only `currency` and `string` can produce a valid ISO 4217 code. |
-| `whole-value` | `money`, `string` | Entire money value. Only `money` (same type) and `string` (runtime-deferred) are valid. |
+| `magnitude` | `integer`, `decimal`, `number` | Amount component — any numeric type widens to `decimal` (money's backing magnitude). `number` accepted because the widening check is post-resolution (the hole expression resolved to `number`, and `number → decimal` is the explicit `round()` bridge — the type checker's assignment validation handles this, not the slot compatibility table). |
+| `currency` | `currency` | Currency code component. Only `currency` can produce a statically validated ISO 4217 code. |
+| `whole-value` | `money` | Entire money value. Only `money` (same type) preserves compile-time guarantees. |
 
 #### `quantity`
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `magnitude` | `integer`, `decimal`, `number`, `string` | Magnitude component — any numeric type is valid for a quantity's decimal-backed magnitude. |
-| `unit` | `unitofmeasure`, `string` | Unit name component. Only `unitofmeasure` and `string` can produce a valid UCUM unit code. **Dimension consistency:** When the hole resolves to `unitofmeasure` via a qualifier-returning accessor (e.g., `f1.unit` where `f1` is `quantity of 'length'`), a post-slot-assignment dimension check compares the source field's declared dimension against the target field's declared dimension. Mismatch emits `DimensionMismatchInUnitSlot`. `string` bypasses dimension checking (runtime-deferred). See §Dimension-Unit Consistency Validation. |
-| `whole-value` | `quantity`, `string` | Entire quantity value. |
+| `magnitude` | `integer`, `decimal`, `number` | Magnitude component — any numeric type is valid for a quantity's decimal-backed magnitude. |
+| `unit` | `unitofmeasure` | Unit name component. Only `unitofmeasure` can produce a statically validated UCUM unit code. **Dimension consistency:** When the hole resolves to `unitofmeasure` via a qualifier-returning accessor (e.g., `f1.unit` where `f1` is `quantity of 'length'`), a post-slot-assignment dimension check compares the source field's declared dimension against the target field's declared dimension. Mismatch emits `DimensionMismatchInUnitSlot`. See §Dimension-Unit Consistency Validation. |
+| `whole-value` | `quantity` | Entire quantity value. Only `quantity` (same type) preserves compile-time guarantees. |
 
 #### `price`
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `magnitude` | `integer`, `decimal`, `number`, `string` | Rate/amount component. |
-| `currency` | `currency`, `string` | Numerator currency component. |
-| `unit` | `unitofmeasure`, `string` | Denominator unit component. **Dimension consistency:** Same dimension check as `quantity` — a `unitofmeasure` hole sourced from a qualifier-returning accessor triggers `DimensionMismatchInUnitSlot` if the source dimension conflicts with the target field's declared dimension. See §Dimension-Unit Consistency Validation. |
-| `whole-value` | `price`, `string` | Entire price value. |
+| `magnitude` | `integer`, `decimal`, `number` | Rate/amount component. |
+| `currency` | `currency` | Numerator currency component. |
+| `unit` | `unitofmeasure` | Denominator unit component. **Dimension consistency:** Same dimension check as `quantity` — a `unitofmeasure` hole sourced from a qualifier-returning accessor triggers `DimensionMismatchInUnitSlot` if the source dimension conflicts with the target field's declared dimension. See §Dimension-Unit Consistency Validation. |
+| `whole-value` | `price` | Entire price value. Only `price` (same type) preserves compile-time guarantees. |
 
 #### `exchangerate`
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `magnitude` | `integer`, `decimal`, `number`, `string` | Rate component. |
-| `from-currency` | `currency`, `string` | Numerator currency. |
-| `to-currency` | `currency`, `string` | Denominator currency. |
-| `whole-value` | `exchangerate`, `string` | Entire exchange rate value. |
+| `magnitude` | `integer`, `decimal`, `number` | Rate component. |
+| `from-currency` | `currency` | Numerator currency. |
+| `to-currency` | `currency` | Denominator currency. |
+| `whole-value` | `exchangerate` | Entire exchange rate value. Only `exchangerate` (same type) preserves compile-time guarantees. |
 
 ### Temporal Quantity Types
 
@@ -299,17 +310,17 @@ These tables define the valid expression types for each semantic slot across all
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `magnitude` (including compound `magnitude₁`..`magnitudeₙ`) | `integer`, `string` | Temporal quantities require integer magnitudes (Decision #28). `decimal` and `number` are compile errors — `'3.5 hours'` is invalid. `string` is the universal escape. |
-| `unit` | `unitofmeasure`, `string` | Unit name slot — valid temporal unit names (`hours`, `minutes`, `seconds`) are a subset of `unitofmeasure`. |
-| `whole-value` | `duration`, `string` | Entire duration value. |
+| `magnitude` (including compound `magnitude₁`..`magnitudeₙ`) | `integer` | Temporal quantities require integer magnitudes (Decision #28). `decimal` and `number` are compile errors — `'3.5 hours'` is invalid. |
+| `unit` | `unitofmeasure` | Unit name slot — valid temporal unit names (`hours`, `minutes`, `seconds`) are a subset of `unitofmeasure`. |
+| `whole-value` | `duration` | Entire duration value. Only `duration` (same type) preserves compile-time guarantees. |
 
 #### `period`
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `magnitude` (including compound `magnitude₁`..`magnitudeₙ`) | `integer`, `string` | Same integer requirement as `duration` (Decision #28). |
-| `unit` | `unitofmeasure`, `string` | Valid temporal unit names (`years`, `months`, `weeks`, `days`, `hours`, `minutes`, `seconds`). |
-| `whole-value` | `period`, `string` | Entire period value. |
+| `magnitude` (including compound `magnitude₁`..`magnitudeₙ`) | `integer` | Same integer requirement as `duration` (Decision #28). |
+| `unit` | `unitofmeasure` | Valid temporal unit names (`years`, `months`, `weeks`, `days`, `hours`, `minutes`, `seconds`). |
+| `whole-value` | `period` | Entire period value. Only `period` (same type) preserves compile-time guarantees. |
 
 ### Single-Component Types
 
@@ -317,19 +328,19 @@ These tables define the valid expression types for each semantic slot across all
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `whole-value` | `currency`, `string` | The entire content is a currency code. |
+| `whole-value` | `currency` | The entire content is a currency code. Only `currency` preserves compile-time guarantees. |
 
 #### `unitofmeasure`
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `whole-value` | `unitofmeasure`, `string` | The entire content is a unit name. |
+| `whole-value` | `unitofmeasure` | The entire content is a unit name. Only `unitofmeasure` preserves compile-time guarantees. |
 
 #### `dimension`
 
 | Slot | Valid hole types | Rationale |
 |------|-----------------|-----------|
-| `whole-value` | `dimension`, `string` | The entire content is a dimension name. |
+| `whole-value` | `dimension` | The entire content is a dimension name. Only `dimension` preserves compile-time guarantees. |
 
 ---
 
@@ -412,7 +423,7 @@ The `TypedMemberAccess` record stores `ResultType = TypeKind.UnitOfMeasure` — 
 
 ### Approach: Structural AST Pattern Match (Option B)
 
-After slot assignment and per-hole type compatibility checks, a dedicated consistency pass examines each `unit`-slot hole whose resolved type is `unitofmeasure` (not `string`). The check works on the resolved typed AST, not on the type system:
+After slot assignment and per-hole type compatibility checks, a dedicated consistency pass examines each `unit`-slot hole whose resolved type is `unitofmeasure`. The check works on the resolved typed AST, not on the type system:
 
 **Pattern match:**
 ```
@@ -450,7 +461,7 @@ The check applies to the `unit` slot of:
 It does NOT apply to:
 - **`duration`/`period`** unit slots — temporal units (`hours`, `days`, etc.) are a separate namespace from UCUM physical units. Temporal dimension consistency (`period of 'date'` vs `period of 'time'`) operates on the `TemporalDimension` axis, not the physical `Dimension` axis. A temporal unit hole would need different checking, but the surface area is narrow (temporal unit literals are a closed set), and this is out of scope for this plan.
 - **`currency`** slots — currency qualifier mismatch is a separate axis (`QualifierAxis.Currency`) already handled for direct assignments by `ValidateAssignmentQualifiers()`. The interpolated currency case is analogous but is tracked separately since it requires the same structural pattern match on `QualifierAxis.Currency` rather than dimension extraction.
-- **`string`** holes — string bypasses all dimension checking (the universal escape hatch).
+- **`string`** holes — `string` is not valid in any hole position; it produces `InterpolatedTypedConstantHoleTypeMismatch` before dimension checking is reached.
 
 ### Static Typed Constant Dimension Validation
 
@@ -496,7 +507,7 @@ The type checker implements `ResolveInterpolatedTypedConstant()` with this flow:
      a. Resolve the hole expression (ParseExpression result)
      b. Check resolved type against slot compatibility table
      c. If mismatch → emit InterpolatedTypedConstantHoleTypeMismatch
-9. For each unit-slot hole that resolved to unitofmeasure (not string):
+9. For each unit-slot hole that resolved to unitofmeasure:
      → Apply dimension-unit consistency check (§Dimension-Unit Consistency Validation)
      → If dimension mismatch → emit DimensionMismatchInUnitSlot
 10. Construct TypedInterpolatedTypedConstant with slot-annotated holes
@@ -611,7 +622,7 @@ The valid-form tables above are finite and small (≤ 8 patterns per type). The 
    - Step 8: On match, iterate over holes with their assigned slot identities. For each:
      - Call `Resolve(holeExpr, ctx, slotExpectedType)` where `slotExpectedType` is advisory (same as the existing `expectedType` threading).
      - Check the resolved expression type against the slot's compatibility table.
-     - If `string` → accept (universal escape).
+     - If `string` → reject with `InterpolatedTypedConstantHoleTypeMismatch` (string is not a valid hole type).
      - If compatible → accept.
      - If incompatible → emit `InterpolatedTypedConstantHoleTypeMismatch`.
    - Step 9: Construct `TypedInterpolatedTypedConstant` with the resolved typed holes and their slot annotations.
@@ -655,14 +666,14 @@ _Dimension-unit consistency (DimensionMismatchInUnitSlot):_
 - `'1 {f1.unit}'` where `f1` is `quantity of 'length'`, target is `quantity` (no declared dimension) → no error (target dimension unconstrained)
 - `'1 {f1.unit}'` where `f1` is `quantity in 'kg'`, target is `quantity of 'length'` → `DimensionMismatchInUnitSlot` (`in 'kg'` produces `DeclaredQualifierMeta.Unit("kg", "mass")`, source dimension = 'mass' ≠ target 'length')
 - `'{r} USD/{f1.unit}'` where `f1` is `quantity of 'length'`, target is `price of 'mass'` → `DimensionMismatchInUnitSlot` (same check applies to price unit slot)
-- `'1 {s}'` where `s` is `string`, target is `quantity of 'mass'` → no dimension check (string escape hatch, existing rule)
+- `'1 {s}'` where `s` is `string`, target is `quantity of 'mass'` → `InterpolatedTypedConstantHoleTypeMismatch` (string is not a valid hole type — rejected before dimension check)
 - `'1 {u}'` where `u` is bare `unitofmeasure` field, target is `quantity of 'mass'` → no dimension check (`unitofmeasure` fields carry no dimension qualifiers — conservative accept)
 - `'1 {Arg.unit}'` where `Arg` is event arg `as quantity of 'length'`, target is `quantity of 'mass'` → `DimensionMismatchInUnitSlot` (works via `TypedArgRef.DeclaredQualifiers`)
 
-_String exception:_
-- `'{s} kg'` where `s` is `string` → valid (string in magnitude)
-- `'100 {s}'` where `s` is `string` → valid (string in unit)
-- `'{s}'` for any type → valid (string in whole-value)
+_String rejection (InterpolatedTypedConstantHoleTypeMismatch):_
+- `'{s} kg'` where `s` is `string` → error (string not valid in magnitude slot)
+- `'100 {s}'` where `s` is `string` → error (string not valid in unit slot)
+- `'{s}'` where `s` is `string`, for any typed constant type → error (string not valid in whole-value slot)
 
 _Valid combinations (positive tests):_
 - `'{n} kg'` where `n` is `integer` → valid quantity
@@ -815,7 +826,339 @@ Slice 5 (Docs/MCP)
 
 ---
 
-## Gates Before Slice 1
+---
 
-- [ ] Shane approves this revised plan
+## Part B — Proof Engine Qualifier Coverage
+
+### Executive Summary
+
+An exhaustive audit of all qualifier-proof interactions across the Precept proof engine, type checker, and operations catalog revealed **14 gaps** — 7 critical, 4 significant, 3 minor. The most severe finding: **the currency axis has near-total enforcement failure for money arithmetic and comparison operations.** `MoneyPlusMoney`, `MoneyMinusMoney`, and all 6 money comparison operators declare "same currency required" in their catalog descriptions but carry NO `QualifierCompatibilityProofRequirement`. This means `money in 'USD' + money in 'EUR'` compiles clean — a direct violation of the "invalid configurations structurally impossible" guarantee from `docs/philosophy.md`.
+
+In contrast, the **quantity unit axis** and **price compound axis** are correctly enforced, the **temporal dimension axis** is correctly enforced via `DimensionProofRequirement` (Strategy 2), and the **numeric modifier subsumption** system works correctly with comprehensive test coverage. The architecture is sound — the S1–S5 strategy pipeline, the obligation collection machinery, and the strategy dispatch loop all function correctly. **The root cause is catalog metadata gaps**: operations were declared with textual descriptions noting requirements but the corresponding `ProofRequirements` array entries were never added.
+
+**No structural redesign is needed.** All fixes are surgical additions to catalog metadata (`Operations.cs`), one axis-fallback fix in `ResolveQualifierOnAxis`, one new DU subtype (`QualifierChainProofRequirement`), and one new proof obligation on assignment actions. The proof engine's machinery is correct — it faithfully processes whatever obligations the catalog declares. The catalog is simply silent on money operations.
+
+### Audit Matrix
+
+#### Dimension Qualifiers (`quantity of 'X'`, `price per 'X'`)
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| `quantity of 'mass' + quantity of 'mass'` (same dimension, no explicit unit) | ⚠️ False Positive | Operations.cs L496: requires `QualifierAxis.Unit`. Fields with only `DeclaredQualifierMeta.Dimension` have no Unit-axis entry. `ResolveQualifierOnAxis` returns null → obligation UNRESOLVED → spurious diagnostic. |
+| `quantity in 'kg' + quantity in 'kg'` (same unit) | ✅ Proved | Strategy 5 resolves both, compares via record equality → proved. |
+| `quantity in 'kg' + quantity in 'lb_av'` (different unit, same dimension) | ✅ Caught | `Unit("kg", "Mass") != Unit("lb_av", "Mass")` → UNRESOLVED → diagnostic. |
+| `quantity in 'kg' + quantity in 'm'` (different dimension) | ✅ Caught | `Unit("kg", "Mass") != Unit("m", "Length")` → caught. |
+| Cross-field assignment `set f2 = f1` (different dimensions) | ✅ Caught | `ValidateAssignmentQualifiers` checks `DimensionCategoryMismatch`. |
+| Cross-field assignment via expression `set f2 = f1 + f3` | ⚠️ Silent Gap | `ValidateAssignmentQualifiers` only extracts qualifiers from `TypedFieldRef`, `TypedArgRef`, or `TypedTypedConstant`. Binary expression results carry no qualifier provenance. |
+| Static typed constant dimension validation | ✅ Caught | `QuantityValidator.Validate()` checks dimension-to-unit consistency. |
+| Interpolated typed constant `.unit` dimension gap | ⚠️ Silent Gap | Known gap — tracked in Part A Slice 2 extension. |
+| Guard/rule with mismatched qualifier | ✅ Caught | Operation catalog requirements fire at resolution. |
+| `price + price` with matching qualifiers | ✅ Proved | Both `QualifierAxis.Unit` AND `QualifierAxis.Currency` requirements → Strategy 5 discharges both. |
+| `price + price` mismatched on one axis | ✅ Caught | Each axis checked independently. |
+
+#### Currency Qualifiers (`money in 'USD'`)
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| `money in 'USD' + money in 'USD'` | ⚠️ **Silent Gap** | Operations.cs L422-424: `MoneyPlusMoney` has NO `ProofRequirements`. |
+| `money in 'USD' + money in 'EUR'` | ⚠️ **CRITICAL** | Compiles clean. Philosophy violation. |
+| `money in 'USD' - money in 'EUR'` | ⚠️ **CRITICAL** | Same — `MoneyMinusMoney` has no proof requirements. |
+| `money in 'USD' == money in 'EUR'` | ⚠️ **CRITICAL** | `Match: QualifierMatch.Same` has NO proof enforcement — it is a disambiguation selector only. |
+| `money in 'USD' > money in 'EUR'` | ⚠️ **CRITICAL** | Same for all 6 comparison operators (L914-937). |
+| `set usdField = eurField` (direct) | ✅ Caught | `ValidateAssignmentQualifiers` compares `DeclaredQualifierMeta.Currency`. |
+| `set usdField = usdField + eurField` (expression) | ⚠️ Silent Gap | Binary expression result has no qualifier → passes silently. |
+| `money / money` (same currency ratio) | ✅ Proved | Type checker disambiguation selects `MoneyDivideMoneySameCurrency`. |
+| `money / money` (cross currency) | ✅ Caught | Type checker selects `MoneyDivideMoneyCrossCurrency` → result is `exchangerate`. |
+| Static money typed constant currency mismatch | ✅ Caught | `TypedTypedConstant` extracts `CurrencyEntry` → `ValidateAssignmentQualifiers` catches mismatch. |
+
+#### Exchange Rate Qualifiers (`exchangerate from 'USD' to 'EUR'`)
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| `exchangerate from 'USD' to 'EUR' * money in 'GBP'` | ⚠️ **CRITICAL** | No `ProofRequirements` on `ExchangeRateTimesMoney`. No from-currency chain validation. |
+| `set rateField = otherRate` (different from/to) | ⚠️ Silent Gap | `ValidateAssignmentQualifiers` missing `FromCurrency`/`ToCurrency` cases. |
+
+#### Numeric Modifiers (`nonzero`, `nonnegative`, `positive`)
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| `a / b` where b has no modifier | ✅ Caught | Division entries carry `NumericProofRequirement` → diagnostic. |
+| `a / b` where b is `nonzero` | ✅ Proved | Modifier satisfaction → Strategy 2 discharges. |
+| `a / b` where b is `positive` | ✅ Proved | `positive` subsumes `nonzero` via `SatisfactionCovers`. |
+| `a / b` where b is `nonnegative` | ✅ Caught | `nonnegative` does NOT subsume `nonzero` — correct. |
+| `sqrt(x)` where x is `nonnegative` | ✅ Proved | `>= 0` requirement met. |
+| `sqrt(x)` where x is `positive` | ✅ Proved | Subsumption: `> 0` ⊇ `>= 0`. |
+| Guard `when b > 0` then `a / b` | ✅ Proved | Strategy 3 extracts guard → subsumes. |
+| Guard `when b >= 0` then `a / b` | ✅ Caught | `>= 0` does not subsume `!= 0` — correct. |
+| Implied modifiers | ✅ Proved | `attributeField.Modifiers.Concat(attributeField.ImpliedModifiers)` — both walked. |
+
+#### Compound Qualifiers (`price in 'USD' per 'kg'`)
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| `price + price` matching both axes | ✅ Proved | Two `QualifierCompatibilityProofRequirement` entries — Unit + Currency. |
+| `price + price` mismatched one axis | ✅ Caught | Each axis checked independently. |
+| `price * quantity` — dimension chain | ⚠️ **CRITICAL** | No `ProofRequirements` on `PriceTimesQuantity`. |
+| `price * period` — temporal chain | ⚠️ Silent Gap | No `ProofRequirements` on `PriceTimesPeriod`. |
+| `price * decimal` scaling | ✅ Correct | No qualifier interaction needed. |
+
+#### String Escape Hatch
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| Bare field (no qualifier) in qualified operation | ✅ Correct | Obligation fires but cannot discharge → correct: must declare qualifiers. |
+| Unqualified field in qualifier slot | ✅ Correct | No false obligation generated. |
+
+#### Temporal Qualifiers (`period of 'date'`, `period in 'months'`)
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| `date + period of 'date'` | ✅ Proved | `DimensionProofRequirement` → Strategy 2 matches. |
+| `date + period of 'time'` | ✅ Caught | Dimension mismatch → diagnostic. |
+| `time + period of 'time'` | ✅ Proved | Matches. |
+| `PeriodDimension.Any` in compatibility | ✅ Caught | Explicit rejection — locked decision. |
+| `period in 'months'` dimension inference | ✅ Proved | `TemporalUnit.DerivedDimension` → works. |
+
+### Gap Inventory
+
+| ID | Category | Scenario | Status | Fix Location | Est. LOC |
+|----|----------|----------|--------|--------------|----------|
+| G1 | Currency | `money + money` — no currency enforcement | ⚠️ CRITICAL | Operations.cs catalog | 4 |
+| G2 | Currency | `money - money` — no currency enforcement | ⚠️ CRITICAL | Operations.cs catalog | 4 |
+| G3 | Currency | `money == != < > <= >= money` — no currency enforcement | ⚠️ CRITICAL | Operations.cs catalog | 12 |
+| G4 | Currency Chain | `exchangerate * money` — no from-currency validation | ⚠️ CRITICAL | New `QualifierChainProofRequirement` + catalog | 30–50 |
+| G5 | Dimension Chain | `price * quantity` — no dimension chain validation | ⚠️ CRITICAL | Same infrastructure as G4 + catalog entry | 4 (after G4) |
+| G6 | Dimension | `quantity of 'mass' + quantity of 'mass'` — false positive | ⚠️ False Positive | ProofEngine.cs `ResolveQualifierOnAxis` — axis fallback | 15 |
+| G7 | Assignment | Expression results carry no qualifier provenance | ⚠️ Silent Gap | New proof obligation on `set` actions | 50 |
+| G8 | Temporal Chain | `price * period` — no temporal dimension chain validation | ⚠️ Silent Gap | Operations.cs catalog (after G4 infra) | 4–8 |
+| G9 | ExchangeRate | `ValidateAssignmentQualifiers` missing `FromCurrency`/`ToCurrency` | ⚠️ Silent Gap | TypeChecker.Expressions.cs | 20 |
+| G10 | Interpolation | `.unit` accessor drops dimension provenance | ⚠️ Silent Gap | Part A Slice 2 extension (already tracked) | 25 |
+| G11 | Modifier Propagation | No proof that `nonneg + nonneg = nonneg` | ❓ By Design | Would require new strategy (S6+) | 80–120 |
+| G12 | Price Dimension | `price of 'mass'` — same false-positive risk as G6 | ⚠️ False Positive | Subsumed by G6 fix | 0 |
+| G13 | Temporal Chain | `price * duration` — no temporal unit chain validation | ⚠️ Silent Gap | Operations.cs catalog (after G4 infra) | 4–8 |
+| G14 | Division Qualifier | `money / money` disambiguation — works correctly | ✅ By Design | N/A | 0 |
+
+**Gap disposition:**
+- **G10** — already tracked in Part A Slice 2. No separate slice needed.
+- **G11** — by-design limitation. Modifier propagation through arithmetic is out of scope for the current proof engine. No slice.
+- **G12** — subsumed by G6 fix. No separate LOC.
+- **G14** — working correctly by design. No fix needed.
+- **Gaps addressed by new slices:** G1, G2, G3, G4, G5, G6, G7, G8, G9, G13 (10 gaps → 6 slices).
+
+### Implementation Slices for Proof Gaps
+
+---
+
+### Slice 7: Money Currency Enforcement (G1 + G2 + G3)
+
+**Status:** Not Started  
+**Goal:** Add `QualifierCompatibilityProofRequirement` on `QualifierAxis.Currency` to all 8 money arithmetic and comparison operations that currently lack currency enforcement.
+
+**Work items:**
+
+1. **Add proof requirements to money arithmetic** — `Operations.cs` L422 (`MoneyPlusMoney`) and L426 (`MoneyMinusMoney`): add `QualifierCompatibilityProofRequirement(ParamSubject(PMoney), ParamSubject(PMoney), QualifierAxis.Currency, "Operands must have matching currency qualifiers")` ~4 LOC
+2. **Add proof requirements to money comparisons** — `Operations.cs` L914–L937 (`MoneyEqualsMoney` through `MoneyGreaterThanOrEqualMoney`): same requirement on all 6 comparison entries ~12 LOC
+3. **Verify existing Strategy 5 discharges** — no new strategy code needed; `QualifierAxis.Currency` is already handled by the `ResolveQualifierOnAxis` → `QualifierCompatibility` path ~0 LOC
+
+**Tests:**
+- `money in 'USD' + money in 'USD'` → proved (same currency)
+- `money in 'USD' + money in 'EUR'` → `UnprovedQualifierCompatibility` diagnostic
+- `money in 'USD' - money in 'EUR'` → diagnostic
+- `money in 'USD' == money in 'EUR'` → diagnostic
+- `money in 'USD' > money in 'EUR'` → diagnostic
+- `money in 'USD' <= money in 'USD'` → proved
+- Bare `money + money` (no qualifiers) → obligation fires, cannot discharge — correct
+- Regression: existing quantity/price operations still pass
+
+**LOC estimate:** ~20  
+**Risk:** Low — identical pattern to quantity operations that already work.
+
+---
+
+### Slice 8: Qualifier Chain Validation Infrastructure (G4 + G5)
+
+**Status:** Not Started  
+**Goal:** Introduce `QualifierChainProofRequirement` DU subtype for cross-type, cross-axis qualifier validation. Use it to enforce exchange rate × money currency chains and price × quantity dimension chains.
+
+**Work items:**
+
+1. **New DU subtype** — `src/Precept/Pipeline/ProofLedger.cs`: `QualifierChainProofRequirement(ProofSubject Left, QualifierAxis LeftAxis, ProofSubject Right, QualifierAxis RightAxis, string Description)` inheriting from `ProofRequirement` ~10 LOC
+2. **Strategy 5 extension** — `src/Precept/Pipeline/ProofEngine.cs`: extend `TryQualifierCompatibilityProof` to handle `QualifierChainProofRequirement` by resolving LeftAxis on Left and RightAxis on Right, then comparing the resolved qualifier values ~20 LOC
+3. **Catalog entry: `ExchangeRateTimesMoney`** — `Operations.cs` L621: add `QualifierChainProofRequirement(ParamSubject(PExchangeRate), QualifierAxis.FromCurrency, ParamSubject(PMoney), QualifierAxis.Currency, ...)` ~4 LOC
+4. **Catalog entry: `PriceTimesQuantity`** — `Operations.cs` L595: add `QualifierChainProofRequirement(ParamSubject(PPrice), QualifierAxis.Unit, ParamSubject(PQuantity), QualifierAxis.Unit, ...)` ~4 LOC
+5. **Obligation collection update** — `ProofEngine.cs` obligation walker: ensure `QualifierChainProofRequirement` is collected from operation metadata ~6 LOC
+6. **MCP fire pipeline sync** — verify `LanguageTool.cs` `FirePipeline` array still matches ~0 LOC (no new stage)
+
+**Tests:**
+- `exchangerate from 'USD' to 'EUR' * money in 'USD'` → proved (from-currency matches)
+- `exchangerate from 'USD' to 'EUR' * money in 'GBP'` → diagnostic (USD ≠ GBP)
+- `exchangerate from 'USD' to 'EUR' * money in 'EUR'` → diagnostic (from is USD, not EUR)
+- `price in 'USD' per 'kg' * quantity of 'mass'` → proved (dimension match)
+- `price in 'USD' per 'kg' * quantity of 'length'` → diagnostic (mass ≠ length)
+- `price in 'USD' per 'kg' * quantity in 'kg'` → proved (unit-level match → dimension inferred)
+- Regression: existing operations unaffected
+- Regression: quantity + quantity still works
+- Bare `exchangerate * money` (no qualifiers) → obligation fires, cannot discharge
+- Bare `price * quantity` (no qualifiers) → same
+
+**LOC estimate:** ~54 (10 + 20 + 4 + 4 + 6 + 0 + overhead)  
+**Risk:** Medium — new DU subtype and strategy extension, but follows established patterns.
+
+---
+
+### Slice 9: Dimension-Only Field False Positive Fix (G6)
+
+**Status:** Not Started  
+**Goal:** Fix `ResolveQualifierOnAxis` to fall back from `QualifierAxis.Unit` to `QualifierAxis.Dimension` when a field has only a dimension qualifier. Eliminates spurious `UnprovedQualifierCompatibility` diagnostics on `quantity of 'mass' + quantity of 'mass'`.
+
+**Work items:**
+
+1. **Axis fallback logic** — `src/Precept/Pipeline/ProofEngine.cs` `ResolveQualifierOnAxis` (~L898–911): when requested axis is `QualifierAxis.Unit` and no Unit qualifier exists, check for `QualifierAxis.Dimension` and return the Dimension qualifier for compatibility comparison ~15 LOC
+
+**Tests:**
+- `quantity of 'mass' + quantity of 'mass'` → proved (same dimension, no explicit unit)
+- `quantity of 'mass' + quantity of 'length'` → diagnostic (dimension mismatch)
+- `price of 'mass' + price of 'mass'` → proved (G12 subsumed — same fix)
+- Regression: `quantity in 'kg' + quantity in 'lb_av'` still caught
+
+**LOC estimate:** ~15  
+**Risk:** Low — single method, clear fallback logic.
+
+---
+
+### Slice 10: Assignment Expression Qualifier Propagation (G7)
+
+**Status:** Not Started  
+**Goal:** Add proof obligation on `set` actions when the target field has qualifiers and the source is an expression (not a simple field/arg ref). The proof engine becomes the qualifier authority for expression-result assignments.
+
+**Work items:**
+
+1. **Assignment qualifier obligation generation** — `src/Precept/Pipeline/TypeChecker.Expressions.cs` `ValidateAssignmentQualifiers` or new call site: when the assignment source is a binary/unary expression (not `TypedFieldRef`, `TypedArgRef`, or `TypedTypedConstant`) and the target field has `DeclaredQualifiers`, generate a `QualifierCompatibilityProofRequirement` between each operand and the target field ~30 LOC
+2. **Proof engine integration** — ensure generated obligations flow through existing Strategy 5 discharge path. The operands of the expression are fields with known qualifiers; Strategy 5 compares them against the target ~10 LOC
+3. **Edge case handling** — nested expressions (`a + b + c`), mixed qualified/unqualified operands ~10 LOC
+
+**Tests:**
+- `set usdField = eurField + eurField` → diagnostic (EUR operands, USD target)
+- `set usdField = usdField + usdField` → proved (matching currencies)
+- `set usdField = eurField` (direct ref) → still caught by existing `ValidateAssignmentQualifiers`
+- `set usdField = usdField * 2` (scaling) → proved (scaling preserves qualifier)
+- `set massField = lengthField + lengthField` → diagnostic (dimension mismatch)
+- `set bareMoneyField = eurField + eurField` → no obligation (target has no qualifiers)
+- `set usdField = usdField + bareField` → obligation fires, bare side cannot discharge
+- Regression: direct ref assignments still work
+
+**LOC estimate:** ~50  
+**Risk:** Medium — touches assignment validation flow, requires careful edge-case handling.
+
+---
+
+### Slice 11: Exchange Rate Assignment Qualifier Validation (G9)
+
+**Status:** Not Started  
+**Goal:** Add `FromCurrency` and `ToCurrency` cases to the `ValidateAssignmentQualifiers` switch statement so that exchange rate field-to-field assignments with mismatched from/to currencies produce diagnostics.
+
+**Work items:**
+
+1. **Add switch cases** — `src/Precept/Pipeline/TypeChecker.Expressions.cs` `ValidateAssignmentQualifiers` (~L1277–1349): add `case DeclaredQualifierMeta.FromCurrency` and `case DeclaredQualifierMeta.ToCurrency` with the same comparison logic as the existing `Currency` case ~20 LOC
+
+**Tests:**
+- `set rate1 = rate2` where `rate1` is `from 'USD' to 'EUR'` and `rate2` is `from 'USD' to 'EUR'` → no diagnostic
+- `set rate1 = rate2` where `rate1` is `from 'USD' to 'EUR'` and `rate2` is `from 'GBP' to 'EUR'` → `QualifierMismatch` on from-currency
+- `set rate1 = rate2` where `rate1` is `from 'USD' to 'EUR'` and `rate2` is `from 'USD' to 'GBP'` → `QualifierMismatch` on to-currency
+- Regression: existing Dimension/Unit/Currency cases unaffected
+
+**LOC estimate:** ~20  
+**Risk:** Low — extending an existing switch with identical pattern.
+
+---
+
+### Slice 12: Temporal Chain Validation (G8 + G13)
+
+**Status:** Not Started  
+**Depends on:** Slice 8 (requires `QualifierChainProofRequirement` infrastructure)  
+**Goal:** Add temporal dimension chain validation to `PriceTimesPeriod` and `PriceTimesDuration` using the infrastructure built in Slice 8.
+
+**Work items:**
+
+1. **Catalog entry: `PriceTimesPeriod`** — `Operations.cs` L599: add `QualifierChainProofRequirement` for temporal dimension axis ~4 LOC
+2. **Catalog entry: `PriceTimesDuration`** — `Operations.cs`: add matching requirement ~4 LOC
+
+**Tests:**
+- `price in 'USD' per 'month' * period of 'date'` → proved (temporal dimension match)
+- `price in 'USD' per 'month' * period of 'time'` → diagnostic (date ≠ time)
+- `price in 'USD' per 'hour' * duration` → proved (time dimension match)
+- Regression: existing price × period operations still compile when valid
+
+**LOC estimate:** ~8  
+**Risk:** Low — pure catalog additions using Slice 8 infrastructure.
+
+---
+
+### Proof Gap Slice Summary
+
+| Slice | Gaps Covered | LOC | Tests | Dependencies |
+|-------|-------------|-----|-------|--------------|
+| 7 | G1, G2, G3 | ~20 | ~8 | None |
+| 8 | G4, G5 | ~54 | ~10 | None |
+| 9 | G6, G12 | ~15 | ~4 | None |
+| 10 | G7 | ~50 | ~8 | None |
+| 11 | G9 | ~20 | ~4 | None |
+| 12 | G8, G13 | ~8 | ~4 | Slice 8 |
+| **Total** | **10 gaps** | **~167** | **~38** | |
+
+**Not sliced (by design or tracked elsewhere):**
+- G10 — tracked in Part A Slice 2 extension (~25 LOC, 9 tests)
+- G11 — by-design limitation, deferred
+- G14 — working correctly, no fix needed
+
+### Test Coverage Assessment
+
+**Existing coverage:** The proof engine has ~173 test cases across 13 slice classes in `ProofEngineTests.cs`. Well covered: numeric obligations (S1–S4), subsumption chains, guard extraction, flow narrowing, error taint suppression, constraint influence, initial state satisfiability, forwarding facts. Partially covered: qualifier compatibility (record equality, axis values — no E2E obligation-through-discharge tests with real money/quantity expressions). Not covered: currency compatibility on arithmetic, dimension-only field compatibility, exchange rate chain validation, assignment qualifier propagation through expressions.
+
+**New tests estimated:** ~38 tests across Slices 7–12, plus ~6 regression tests = **~44 new tests total** (including regression anchors).
+
+### Proof Engine Architecture Assessment
+
+The S1–S5 strategy architecture is **sound and sufficient**:
+
+| Strategy | Handles | Status |
+|----------|---------|--------|
+| S1: Literal | Numeric: literal value satisfies threshold | ✅ Correct |
+| S2: DeclarationAttribute | Numeric: field modifier; Dimension: temporal period; Modifier; Presence | ✅ Correct |
+| S3: GuardInPath | Numeric: guard comparison; Presence: `is set` guard | ✅ Correct |
+| S4: FlowNarrowing | Numeric: field-to-field guard implies result sign | ✅ Correct |
+| S5: QualifierCompatibility | QualifierAxis equality between operands | ⚠️ Needs axis fallback (G6) + chain extension (G4/G5) |
+
+**Two targeted additions needed** (both within S5's scope):
+
+1. **Axis fallback** (Slice 9, G6): ~15 LOC in `ResolveQualifierOnAxis` to handle Dimension↔Unit equivalence.
+2. **Chain validation** (Slice 8, G4/G5): new `QualifierChainProofRequirement` DU subtype + S5 extension for cross-type, cross-axis qualifier matching.
+
+**Root cause:** This is not a proof engine bug. The operations were declared with textual descriptions noting "same currency required" but the corresponding `ProofRequirements` entries were never added. The engine faithfully processes whatever obligations the catalog declares — the catalog was simply silent on money operations. The fix belongs in the catalog, not in the engine. The engine does not need money-specific logic — it needs the catalog to declare what it already describes in prose.
+
+### Proof Gap Dependency Order
+
+```
+Slice 7 (Money Currency)     — independent, can start immediately
+Slice 8 (Chain Infra)        — independent, can start immediately
+Slice 9 (Dimension Fallback) — independent, can start immediately
+Slice 10 (Assignment Quals)  — independent, can start immediately
+Slice 11 (ExRate Assignment)  — independent, can start immediately
+Slice 12 (Temporal Chain)    — DEPENDS ON Slice 8
+```
+
+Slices 7–11 can execute in any order. Slice 12 is blocked on Slice 8's `QualifierChainProofRequirement` infrastructure.
+
+All proof gap slices (7–12) are independent of Part A interpolation slices (1–6). The two workstreams can execute in parallel.
+
+---
+
+## Gates
+
+### Part A — Interpolated Typed Constants
+- [ ] Shane approves the interpolation plan (Slices 1–6)
 - [ ] Open questions above are resolved (or deferred with explicit acknowledgment)
+
+### Part B — Proof Engine Qualifier Coverage
+- [ ] Shane reviews proof gap audit findings and slice assignments
+- [ ] Priority 1 (Slice 7 — money currency) approved for immediate implementation
