@@ -54,6 +54,14 @@
 - Deferred: requires price type extension with temporal denominator support before catalog entries can be added.
 - Decision filed: `.squad/decisions/inbox/george-slice12-blocked.md`.
 
+### 2026-05-11T22:41:49Z — Slice 6: ProofEngine compositional constraint propagation (S6)
+- Added ProofStrategy.CompositionalConstraint = 6 and TryCompositionalConstraintProof strategy.
+- Strategy discharges numeric obligations on fields whose ALL assignments are TypedInterpolatedTypedConstant nodes where magnitude/whole-value slot source carries a satisfying modifier (nonzero, positive, etc.).
+- Conservative intersection semantics: ALL assignment paths must satisfy; any non-interpolated assignment causes decline.
+- Helpers: FindInterpolatedAssignments (scans transition rows + event handlers), GetMagnitudeSlotSource (magnitude → whole-value fallback), ResolveSourceModifiers (field + arg ref resolution).
+- Reuses existing SatisfactionCovers() for subsumption — no new proof logic.
+- 10 new tests, all 193 ProofEngine tests pass.
+
 ### 2025-07-24 — Slice 2: Full type-grammar matching for interpolated typed constants
 - Replaced both interpolated typed constant stubs with complete ResolveInterpolatedTypedConstant() implementation.
 - Redesigned form matching from element-per-element to segment-aware model using SegmentForm with TextMatch delegates, correctly handling parser's 2N+1 segment structure.
