@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Precept.Language;
 
 public readonly record struct TypedConstantParseResult(
@@ -16,4 +18,7 @@ public readonly record struct TypedConstantParseResult(
 
 public sealed record TypedConstantDiagnostic(string Code, string Message, string? Suggestion = null);
 
-public sealed record TypedConstantContext(TypeKind? PeerType = null, OperatorKind? Operator = null);
+public sealed record TypedConstantContext(
+    TypeKind? PeerType = null,
+    OperatorKind? Operator = null,
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers = null);

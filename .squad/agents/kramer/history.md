@@ -25,6 +25,9 @@
 - Slice 3 qualifier comparison uses the `DeclaredQualifierMeta` DU from `src/Precept/Language/DeclaredQualifierMeta.cs`: `Dimension.DimensionName`, `Unit.UnitCode`, `Unit.DimensionName`, and `Currency.CurrencyCode` are the relevant properties for assignment checks.
 - `Diagnostics.Create(DiagnosticCode.DimensionCategoryMismatch, span, sourceDimension, targetDimension, fieldName)` matches PRE0069's `{0}=source dimension`, `{1}=declared category`, `{2}=field name`; `Diagnostics.Create(DiagnosticCode.QualifierMismatch, span, targetQualifier, fieldName)` matches PRE0068's `{0}=declared qualifier`, `{1}=field name`.
 - `MoneyQuantityModifierRegressionTests` still needed no updates for Slice 3 because the new helper only runs in `ResolveAction` assignment paths, not modifier/default validation paths.
+- Slice 4 extracted `DeriveUnitDimensionName` plus the count/non-count dimensionless UCUM sets into `src/Precept/Language/UnitDimensionHelper.cs` as `internal` shared runtime helpers so both `TypeChecker` and `QuantityValidator` can derive qualifier dimensions from the same metadata.
+- Slice 4 threaded `DeclaredQualifiers` through 4 resolve-chain touchpoints (`TypeChecker.ResolveExpression`, private `Resolve`, `ResolveLiteral`, and `ResolveTypedConstant`) plus the `ResolveAction` assign call site and 3 `ResolveFieldExpressions` modifier/default call sites.
+- `QuantityValidator.Validate(...)` uses `TypedConstantParseResult.Failed(formatDescription, params TypedConstantDiagnostic[] diagnostics)`; the only surprise was that validator-specific `DimensionCategoryMismatch` details ride inside the typed-constant diagnostic payload, while the surfaced pipeline diagnostic remains `InvalidTypedConstantContent`.
 
 ## Historical Summary
 

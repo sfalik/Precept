@@ -21,33 +21,6 @@ namespace Precept.Pipeline;
 /// </remarks>
 internal static partial class TypeChecker
 {
-    private static readonly FrozenSet<string> CountQualifierUnitCodes = new[]
-    {
-        "1",
-        "%",
-        "[ppm]",
-        "[ppb]",
-        "[ppth]",
-        "[pptr]",
-        "each",
-        "[iU]",
-        "[arb'U]",
-        "[USP'U]",
-        "[CFU]",
-        "[pH]",
-        "dB",
-    }.ToFrozenSet(StringComparer.Ordinal);
-
-    private static readonly FrozenSet<string> NonCountDimensionlessUnitCodes = new[]
-    {
-        "rad",
-        "deg",
-        "'",
-        "''",
-        "gon",
-        "sr",
-    }.ToFrozenSet(StringComparer.Ordinal);
-
     /// <summary>
     /// Entry point: type-check <paramref name="manifest"/> using pre-resolved
     /// <paramref name="symbols"/> and return a <see cref="SemanticIndex"/>.
@@ -172,7 +145,7 @@ internal static partial class TypeChecker
 
     private static DeclaredQualifierMeta.Unit MapUnitQualifier(ParsedQualifier q, CheckContext ctx)
     {
-        if (CountQualifierUnitCodes.Contains(q.Value))
+        if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(q.Value))
             return new DeclaredQualifierMeta.Unit(q.Value, "count");
 
         var result = UcumParser.Parse(q.Value);
@@ -182,28 +155,8 @@ internal static partial class TypeChecker
             return new DeclaredQualifierMeta.Unit(q.Value, "");
         }
 
-        return new DeclaredQualifierMeta.Unit(q.Value, DeriveUnitDimensionName(result.Unit!));
+        return new DeclaredQualifierMeta.Unit(q.Value, UnitDimensionHelper.DeriveUnitDimensionName(result.Unit!));
     }
-
-    private static string DeriveUnitDimensionName(UcumParsedUnit unit)
-    {
-        if (!unit.Vector.IsDimensionless)
-            return unit.PreferredDimensionAlias ?? "";
-
-        if (CountQualifierUnitCodes.Contains(unit.CanonicalCode))
-            return "count";
-
-        if (IsNonCountDimensionlessUnit(unit))
-            return "";
-
-        return DimensionCatalog.TryGetAlias(unit.Vector, out var alias) && alias is not null
-            ? alias.Name
-            : unit.PreferredDimensionAlias ?? "";
-    }
-
-    private static bool IsNonCountDimensionlessUnit(UcumParsedUnit unit) =>
-        NonCountDimensionlessUnitCodes.Contains(unit.CanonicalCode)
-        || unit.UsedAtoms.Any(atom => NonCountDimensionlessUnitCodes.Contains(atom.Code));
 
     private static DeclaredQualifierMeta.Dimension MapDimensionQualifier(ParsedQualifier q, CheckContext ctx)
     {
@@ -449,7 +402,7 @@ internal static partial class TypeChecker
             {
                 ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
                 ctx.CurrentFieldIndex = i;
-                var resolved = Resolve(defaultMod.Value, ctx, typedField.ResolvedType);
+                var resolved = Resolve(defaultMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
                 ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };
                 ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
                 ctx.CurrentScope = FieldScopeMode.AllFields;
@@ -461,7 +414,7 @@ internal static partial class TypeChecker
                 m => m.Kind == ModifierKind.Min);
             if (minMod?.Value is not null and not MissingExpression)
             {
-                var resolved = Resolve(minMod.Value, ctx, typedField.ResolvedType);
+                var resolved = Resolve(minMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
                 _ = resolved;
             }
 
@@ -470,7 +423,7 @@ internal static partial class TypeChecker
                 m => m.Kind == ModifierKind.Max);
             if (maxMod?.Value is not null and not MissingExpression)
             {
-                var resolved = Resolve(maxMod.Value, ctx, typedField.ResolvedType);
+                var resolved = Resolve(maxMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
                 _ = resolved;
             }
 
@@ -521,8 +474,12 @@ internal static partial class TypeChecker
     /// Resolves a single <see cref="ParsedExpression"/> in the given context.
     /// Thin wrapper over the private <see cref="Resolve"/> for test access.
     /// </summary>
-    internal static TypedExpression ResolveExpression(ParsedExpression expr, CheckContext ctx, TypeKind? expectedType = null) =>
-        Resolve(expr, ctx, expectedType);
+    internal static TypedExpression ResolveExpression(
+        ParsedExpression expr,
+        CheckContext ctx,
+        TypeKind? expectedType = null,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers = null) =>
+        Resolve(expr, ctx, expectedType, qualifiers);
 
     // ════════════════════════════════════════════════════════════════════════
     //  Pass 2 — transition row + event handler normalization (Slice 5)

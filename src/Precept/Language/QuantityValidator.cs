@@ -27,6 +27,31 @@ public static class QuantityValidator
                 validation.FormatDescription,
                 unitResult.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(diagnostic.Code, diagnostic.Message, diagnostic.Suggestion)).ToArray());
 
+        if (context?.DeclaredQualifiers is { } qualifiers && !qualifiers.IsDefaultOrEmpty)
+        {
+            var literalDimension = UnitDimensionHelper.DeriveUnitDimensionName(unitResult.Unit!);
+            foreach (var qualifier in qualifiers)
+            {
+                string? requiredDimension = qualifier switch
+                {
+                    DeclaredQualifierMeta.Dimension { DimensionName: var dimensionName } => dimensionName,
+                    DeclaredQualifierMeta.Unit { DimensionName: var dimensionName } => dimensionName,
+                    _ => null,
+                };
+
+                if (requiredDimension is not null
+                    && !string.IsNullOrEmpty(literalDimension)
+                    && !string.Equals(literalDimension, requiredDimension, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return TypedConstantParseResult.Failed(
+                        validation.FormatDescription,
+                        new TypedConstantDiagnostic(
+                            DiagnosticCode.DimensionCategoryMismatch.ToString(),
+                            $"Unit '{unitResult.Unit!.CanonicalCode}' has dimension '{literalDimension}' but field requires '{requiredDimension}'"));
+                }
+            }
+        }
+
         var canonicalText = $"{amount.ToString(CultureInfo.InvariantCulture)} {unitResult.Unit!.CanonicalCode}";
         return new TypedConstantParseResult(true, (amount, unitResult.Unit), canonicalText, validation.FormatDescription, []);
     }

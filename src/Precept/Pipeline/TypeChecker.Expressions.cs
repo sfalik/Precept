@@ -61,13 +61,17 @@ internal static partial class TypeChecker
     /// Dispatches on expression form, resolves types via catalogs, and propagates
     /// <see cref="TypedErrorExpression"/> on failure (D13).
     /// </summary>
-    private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx, TypeKind? expectedType = null) => expr switch
+    private static TypedExpression Resolve(
+        ParsedExpression expr,
+        CheckContext ctx,
+        TypeKind? expectedType = null,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers = null) => expr switch
     {
         // ── Missing sentinel → error + lightweight TC diagnostic to satisfy D26 ──
         MissingExpression m => ResolveMissing(m, ctx),
 
         // ── Literal ──
-        LiteralExpression lit => ResolveLiteral(lit, ctx, expectedType),
+        LiteralExpression lit => ResolveLiteral(lit, ctx, expectedType, qualifiers),
 
         // ── Identifier (field, arg, or quantifier binding) ──
         IdentifierExpression id => ResolveIdentifier(id, ctx),
@@ -116,7 +120,11 @@ internal static partial class TypeChecker
     /// and the target type has <see cref="TypeMeta.ContentValidation"/>, numeric literals are
     /// re-interpreted as the expected type and typed constants are validated.
     /// </summary>
-    private static TypedExpression ResolveLiteral(LiteralExpression lit, CheckContext ctx, TypeKind? expectedType)
+    private static TypedExpression ResolveLiteral(
+        LiteralExpression lit,
+        CheckContext ctx,
+        TypeKind? expectedType,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers)
     {
         if (expectedType == TypeKind.Choice && IsChoiceLiteralToken(lit.LiteralKind))
             return ResolveChoiceLiteral(lit);
@@ -129,7 +137,7 @@ internal static partial class TypeChecker
             TokenKind.NumberLiteral => ResolveNumericLiteral(lit, expectedType),
 
             // Typed constants: resolve with content validation from expectedType context
-            TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType),
+            TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType, qualifiers),
             TokenKind.TypedConstantStart => new TypedErrorExpression(lit.Span), // Interpolated typed constants deferred
 
             _ => new TypedErrorExpression(lit.Span),
@@ -189,7 +197,11 @@ internal static partial class TypeChecker
     /// <see cref="TypeMeta.ContentValidation"/>, the content is validated against it.
     /// Without context, emits <see cref="DiagnosticCode.UnresolvedTypedConstant"/>.
     /// </summary>
-    private static TypedExpression ResolveTypedConstant(LiteralExpression lit, CheckContext ctx, TypeKind? expectedType)
+    private static TypedExpression ResolveTypedConstant(
+        LiteralExpression lit,
+        CheckContext ctx,
+        TypeKind? expectedType,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers)
     {
         var rawText = lit.Text;
 
@@ -209,7 +221,10 @@ internal static partial class TypeChecker
         if (cv is null)
             return new TypedTypedConstant(targetType, rawText, rawText, lit.Span);
 
-        var result = TypedConstantValidation.Validate(cv, rawText, targetType);
+        var typedConstantContext = qualifiers is not null
+            ? new TypedConstantContext(DeclaredQualifiers: qualifiers)
+            : null;
+        var result = TypedConstantValidation.Validate(cv, rawText, targetType, typedConstantContext);
 
         if (result.IsValid)
             return new TypedTypedConstant(targetType, rawText, result.Value, lit.Span);
@@ -810,8 +825,17 @@ internal static partial class TypeChecker
             case AssignAction assign:
             {
                 (fieldName, fieldType) = ResolveActionTarget(assign.Target, ctx);
+                TypedField? targetFieldMeta = null;
+                ImmutableArray<DeclaredQualifierMeta>? fieldQualifiers = null;
+                if (ctx.FieldLookup.TryGetValue(fieldName, out var resolvedTargetFieldMeta))
+                {
+                    targetFieldMeta = resolvedTargetFieldMeta;
+                    fieldQualifiers = resolvedTargetFieldMeta.DeclaredQualifiers;
+                }
+
                 var value = Resolve(assign.Value, ctx,
-                    fieldType != TypeKind.Error ? fieldType : null);
+                    fieldType != TypeKind.Error ? fieldType : null,
+                    fieldQualifiers);
 
                 // B9: Post-resolution type check — verify resolved value is assignable to target field.
                 if (value is not TypedErrorExpression
@@ -824,7 +848,7 @@ internal static partial class TypeChecker
                 }
 
                 if (value is not TypedErrorExpression
-                    && ctx.FieldLookup.TryGetValue(fieldName, out var targetFieldMeta)
+                    && targetFieldMeta is not null
                     && !targetFieldMeta.DeclaredQualifiers.IsDefaultOrEmpty)
                 {
                     ValidateAssignmentQualifiers(

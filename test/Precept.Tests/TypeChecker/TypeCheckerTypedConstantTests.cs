@@ -37,8 +37,12 @@ public class TypeCheckerTypedConstantTests
         return Precept.Pipeline.TypeChecker.CreateContext(manifest, symbols);
     }
 
-    private static TypedExpression Resolve(ParsedExpression expr, CheckContext ctx, TypeKind? expectedType = null) =>
-        Precept.Pipeline.TypeChecker.ResolveExpression(expr, ctx, expectedType);
+    private static TypedExpression Resolve(
+        ParsedExpression expr,
+        CheckContext ctx,
+        TypeKind? expectedType = null,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers = null) =>
+        Precept.Pipeline.TypeChecker.ResolveExpression(expr, ctx, expectedType, qualifiers);
 
     private static LiteralExpression TypedConstant(string value) =>
         new(TokenKind.TypedConstant, value, TestSpan);
@@ -121,6 +125,39 @@ public class TypeCheckerTypedConstantTests
         result.Should().BeOfType<TypedErrorExpression>();
         ctx.Diagnostics.Should().ContainSingle()
             .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+    }
+
+    [Fact]
+    public void QuantityLiteral_WrongDimension_EmitsInvalidTypedConstantContent()
+    {
+        var ctx = MinimalContext();
+        var qualifiers = ImmutableArray.Create<DeclaredQualifierMeta>(new DeclaredQualifierMeta.Dimension("length"));
+        var result = Resolve(TypedConstant("5 kg"), ctx, TypeKind.Quantity, qualifiers);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+    }
+
+    [Fact]
+    public void QuantityLiteral_MatchingDimension_Succeeds()
+    {
+        var ctx = MinimalContext();
+        var qualifiers = ImmutableArray.Create<DeclaredQualifierMeta>(new DeclaredQualifierMeta.Dimension("mass"));
+        var result = Resolve(TypedConstant("5 kg"), ctx, TypeKind.Quantity, qualifiers);
+
+        result.Should().BeOfType<TypedTypedConstant>();
+        ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void QuantityLiteral_NoDeclaredDimension_Succeeds()
+    {
+        var ctx = MinimalContext();
+        var result = Resolve(TypedConstant("5 kg"), ctx, TypeKind.Quantity);
+
+        result.Should().BeOfType<TypedTypedConstant>();
+        ctx.Diagnostics.Should().BeEmpty();
     }
 
     // ════════════════════════════════════════════════════════════════════════
