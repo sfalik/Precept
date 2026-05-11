@@ -903,6 +903,25 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Name as string optional\nstate Draft initial\nstate Done terminal\nevent Submit(UserName as string)\nevent Complete\nfrom Draft on Submit -> set Name = Submit.FullName -> no transition\nfrom Draft on Complete -> transition Done",
             ExampleAfter: "precept Example\nfield Name as string optional\nstate Draft initial\nstate Done terminal\nevent Submit(UserName as string)\nevent Complete\nfrom Draft on Submit -> set Name = Submit.UserName -> no transition\nfrom Draft on Complete -> transition Done"),
 
+        // ── Type (temporal — period qualifier validation) ─────────────────────
+        DiagnosticCode.InvalidTemporalDimensionString => new(nameof(DiagnosticCode.InvalidTemporalDimensionString), DiagnosticStage.Type, Severity.Error,
+            "'{0}' is not a recognized temporal dimension — use 'date' or 'time'",
+            DiagnosticCategory.Temporal,
+            FixHint: "Use 'date' for calendar-aligned periods or 'time' for time-of-day periods",
+            TriggerCondition: "The value in a 'period of ...' qualifier is not one of the two valid temporal dimension identifiers: 'date' or 'time'.",
+            RecoverySteps: ["Use 'date' for calendar-aligned periods (year, month, day)", "Use 'time' for time-of-day periods (hour, minute, second)"],
+            ExampleBefore: "field Offset as period of 'week'",
+            ExampleAfter: "field Offset as period of 'date'"),
+
+        DiagnosticCode.InvalidTemporalUnitString => new(nameof(DiagnosticCode.InvalidTemporalUnitString), DiagnosticStage.Type, Severity.Error,
+            "'{0}' is not a recognized temporal unit — use 'days', 'months', 'years', 'hours', 'minutes', or 'seconds'",
+            DiagnosticCategory.Temporal,
+            FixHint: "Use a recognized temporal unit name such as 'days', 'months', or 'hours'",
+            TriggerCondition: "The value in a 'period in ...' qualifier is not a recognized temporal unit name.",
+            RecoverySteps: ["Use one of: year/years, month/months, week/weeks, day/days, hour/hours, minute/minutes, second/seconds"],
+            ExampleBefore: "field Offset as period in 'fortnights'",
+            ExampleAfter: "field Offset as period in 'days'"),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

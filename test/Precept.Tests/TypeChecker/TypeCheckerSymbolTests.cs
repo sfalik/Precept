@@ -390,6 +390,131 @@ public class TypeCheckerSymbolTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  BUG-057 regression: period of/in qualifier propagation
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void PeriodOfDate_QualifierPreservedInSemanticIndex()
+    {
+        // BUG-057: 'period of 'date'' qualifier was silently dropped by the type checker.
+        var precept = """
+            precept Widget
+            field Offset as period of 'date'
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        var qualifier = index.Fields.Single(f => f.Name == "Offset")
+            .DeclaredQualifiers.Should().ContainSingle(because: "period of 'date' qualifier must not be dropped")
+            .Which;
+
+        var td = qualifier.Should().BeOfType<DeclaredQualifierMeta.TemporalDimension>().Which;
+        td.Value.Should().Be(PeriodDimension.Date);
+    }
+
+    [Fact]
+    public void PeriodOfTime_QualifierPreservedInSemanticIndex()
+    {
+        // BUG-057: 'period of 'time'' qualifier must also propagate correctly.
+        var precept = """
+            precept Widget
+            field Delay as period of 'time'
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        var qualifier = index.Fields.Single(f => f.Name == "Delay")
+            .DeclaredQualifiers.Should().ContainSingle(because: "period of 'time' qualifier must not be dropped")
+            .Which;
+
+        var td = qualifier.Should().BeOfType<DeclaredQualifierMeta.TemporalDimension>().Which;
+        td.Value.Should().Be(PeriodDimension.Time);
+    }
+
+    [Fact]
+    public void PeriodInDays_QualifierPreservedInSemanticIndex()
+    {
+        // BUG-057: 'period in 'days'' qualifier was silently dropped by the type checker.
+        var precept = """
+            precept Widget
+            field Grace as period in 'days'
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        var qualifier = index.Fields.Single(f => f.Name == "Grace")
+            .DeclaredQualifiers.Should().ContainSingle(because: "period in 'days' qualifier must not be dropped")
+            .Which;
+
+        var tu = qualifier.Should().BeOfType<DeclaredQualifierMeta.TemporalUnit>().Which;
+        tu.UnitName.Should().Be("days");
+        tu.DerivedDimension.Should().Be(PeriodDimension.Date, because: "days is a calendar-based unit");
+    }
+
+    [Fact]
+    public void PeriodInHours_QualifierPreservedInSemanticIndex()
+    {
+        // BUG-057: time-level unit must derive PeriodDimension.Time.
+        var precept = """
+            precept Widget
+            field Window as period in 'hours'
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        var qualifier = index.Fields.Single(f => f.Name == "Window")
+            .DeclaredQualifiers.Should().ContainSingle(because: "period in 'hours' qualifier must not be dropped")
+            .Which;
+
+        var tu = qualifier.Should().BeOfType<DeclaredQualifierMeta.TemporalUnit>().Which;
+        tu.UnitName.Should().Be("hours");
+        tu.DerivedDimension.Should().Be(PeriodDimension.Time, because: "hours is a time-level unit");
+    }
+
+    [Fact]
+    public void PeriodOfDate_AllowsDatePlusPeriodOperation_NoDiagnostic()
+    {
+        // BUG-057: date + period_of_date_field produced PRE0113 because qualifier was dropped.
+        var precept = """
+            precept Widget
+            field StartDate as date
+            field Offset as period of 'date'
+            field EndDate as date <- StartDate + Offset
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void PeriodOfInvalidString_EmitsInvalidTemporalDimensionStringDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Offset as period of 'week'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidTemporalDimensionString);
+    }
+
+    [Fact]
+    public void PeriodInInvalidUnit_EmitsInvalidTemporalUnitStringDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Offset as period in 'fortnights'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidTemporalUnitString);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  4. Modifier preservation
     // ════════════════════════════════════════════════════════════════════════
 

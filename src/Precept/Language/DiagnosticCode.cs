@@ -80,6 +80,10 @@ public enum DiagnosticCode
     UnqualifiedPeriodArithmetic        =  60,
     MissingTemporalUnit                =  61,
     FractionalUnitValue                =  62,
+    /// <summary>The string in a <c>period of '...'</c> qualifier is not 'date' or 'time'.</summary>
+    InvalidTemporalDimensionString     = 117,
+    /// <summary>The string in a <c>period in '...'</c> qualifier is not a recognized temporal unit name.</summary>
+    InvalidTemporalUnitString          = 118,
 
     // ── Type (collection safety) ─────────────────────────
     UnguardedCollectionAccess          =  63,

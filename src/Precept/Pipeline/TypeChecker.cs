@@ -148,12 +148,14 @@ internal static partial class TypeChecker
         {
             DeclaredQualifierMeta? meta = qualifier.Axis switch
             {
-                QualifierAxis.Currency     => MapCurrencyQualifier(qualifier, ctx),
-                QualifierAxis.Unit         => MapUnitQualifier(qualifier, ctx),
-                QualifierAxis.Dimension    => MapDimensionQualifier(qualifier, ctx),
-                QualifierAxis.FromCurrency => MapFromCurrencyQualifier(qualifier, ctx),
-                QualifierAxis.ToCurrency   => MapToCurrencyQualifier(qualifier, ctx),
-                _                          => null,
+                QualifierAxis.Currency         => MapCurrencyQualifier(qualifier, ctx),
+                QualifierAxis.Unit             => MapUnitQualifier(qualifier, ctx),
+                QualifierAxis.Dimension        => MapDimensionQualifier(qualifier, ctx),
+                QualifierAxis.FromCurrency     => MapFromCurrencyQualifier(qualifier, ctx),
+                QualifierAxis.ToCurrency       => MapToCurrencyQualifier(qualifier, ctx),
+                QualifierAxis.TemporalDimension => MapTemporalDimensionQualifier(qualifier, ctx),
+                QualifierAxis.TemporalUnit      => MapTemporalUnitQualifier(qualifier, ctx),
+                _                              => null,
             };
             if (meta is not null)
                 builder.Add(meta);
@@ -222,6 +224,33 @@ internal static partial class TypeChecker
         if (!CurrencyCatalog.All.ContainsKey(q.Value))
             ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, q.ValueSpan, q.Value));
         return new DeclaredQualifierMeta.ToCurrency(q.Value);
+    }
+
+    private static DeclaredQualifierMeta.TemporalDimension MapTemporalDimensionQualifier(ParsedQualifier q, CheckContext ctx)
+    {
+        var dimension = q.Value switch
+        {
+            "date" => (PeriodDimension?)PeriodDimension.Date,
+            "time" => (PeriodDimension?)PeriodDimension.Time,
+            _      => null,
+        };
+        if (dimension is null)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalDimensionString, q.ValueSpan, q.Value));
+            return new DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Any);
+        }
+        return new DeclaredQualifierMeta.TemporalDimension(dimension.Value);
+    }
+
+    private static DeclaredQualifierMeta.TemporalUnit MapTemporalUnitQualifier(ParsedQualifier q, CheckContext ctx)
+    {
+        if (!TemporalUnits.TryGet(q.Value, out var entry))
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalUnitString, q.ValueSpan, q.Value));
+            return new DeclaredQualifierMeta.TemporalUnit(q.Value, PeriodDimension.Any);
+        }
+        var dimension = entry.IsCalendarBased ? PeriodDimension.Date : PeriodDimension.Time;
+        return new DeclaredQualifierMeta.TemporalUnit(q.Value, dimension);
     }
 
     /// <summary>

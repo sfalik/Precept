@@ -26,8 +26,8 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | Bug | Title | Category | Status | Assignee | Notes |
 |-----|-------|----------|--------|----------|-------|
 | BUG-001 | `any` state wildcard not recognized in any position | Compiler | **Fixed** | — | Retested 2026-05-10: `from any on E` compiles cleanly; definition shows `fromStates:["*"]` ✅ |
-| BUG-002 | `contains` operator rejected in all expression positions | Compiler | Open | — | — |
-| BUG-003 | `and` / `or` / `not` compound boolean expressions rejected in... | Compiler | Open | — | — |
+| BUG-002 | `contains` operator rejected in all expression positions | Compiler | **Fixed** | — | Retested 2026-05-10: `Items contains Target` in stateless `ensure` compiles cleanly ✅ |
+| BUG-003 | `and` / `or` / `not` compound boolean expressions rejected in... | Compiler | **Fixed** | — | Retested 2026-05-10: `A and B` in stateless `ensure` compiles cleanly ✅ |
 | BUG-004 | `default` modifier rejected on event argument declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `event E(arg as number default 1)` now parses and compiles cleanly ✅ |
 | BUG-005 | Comma-separated field list rejected in `in S modify` declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `in S modify A, B editable` compiles cleanly ✅ |
 | BUG-006 | `min(a, b)` and `max(a, b)` not recognized as function calls... | Compiler | **Fixed** | — | Retested 2026-05-10: `min(A, B)`, `max(A, B)`, and `min(max(X, 0), 100)` all compile cleanly ✅ |
@@ -35,20 +35,20 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-008 | `pop` and `dequeue` proof obligations use unnamed internal... | Compiler | **Fixed** | — | Retested 2026-05-10: `pop Items into Top` and `dequeue Queue into Item` both compile cleanly ✅ |
 | BUG-009 | `for` operator resolves to key type instead of value type | Compiler | **Fixed** | — | Retested 2026-05-10: `Prices for "standard"` now resolves to the lookup value type (`number`) ✅ |
 | BUG-010 | `choice` literal not typed as choice in comparison position | Compiler | **Fixed** | — | Retested 2026-05-10: `Status == "Active"` now contextual-types the literal as a choice value and compiles cleanly ✅ |
-| BUG-011 | State entry/exit hook actions not serialized in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `to Active -> set Note = "..."` not in definition ❌ |
-| BUG-012 | Stateless event handler actions not serialized in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `on Tick -> set Counter = Counter + 1` — rows empty in definition ❌ |
-| BUG-013 | `sqrt(abs(x))` proof obligation uses `<unknown>` — abs()... | Compiler | **Regression** | — | Retested 2026-05-10: `sqrt(X)` now PRE0018 "Expected a sqrt value here, but got 'decimal'" — was Fixed, now broken again ❌ |
+| BUG-011 | State entry/exit hook actions not serialized in MCP... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `to Done -> set Note = "..."` shows as `"stateHooks":[{"stateName":"Done","kind":"entry","actions":["set Note = \"completed\""]}]` ✅ |
+| BUG-012 | Stateless event handler actions not serialized in MCP... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `on Tick -> set Value = Value + 1` shows in rows `"actions":["set Value = Value + 1"]` ✅ |
+| BUG-013 | `sqrt(abs(x))` proof obligation uses `<unknown>` — abs()... | Compiler | **Fixed** | — | Retested 2026-05-10 (round 7): was incorrectly marked Regression — `sqrt(number nonneg)` compiles cleanly ✅; `sqrt(decimal)` is spec-correct type error (use `approximate()`); `sqrt(abs(approximate(decimal_nonneg)))` also compiles ✅ |
 | BUG-014 | `precept_proofs` CollectionEmptyOnMutation recovery hint is... | MCP-docs | **Fixed** | — | Retested 2026-05-10: hint now reads valid "Guard the mutation action with 'when CollectionField.count > 0'" ✅ |
-| BUG-015 | `precept_diagnostic` PRE0083 description covers only... | MCP-docs | Open | — | Retested 2026-05-10: sqrt now has separate SqrtOfNegative fault; PRE0083=DivisionByZero only — verify if PRE0083 still misfires for sqrt |
-| BUG-016 | Guarded rule `when` clause not serialized in MCP definition... | MCP-definition | Open | — | Retested 2026-05-10: `rule Score >= 0 when IsActive because "..."` compiles ✅; `when` guard missing from definition ❌ |
-| BUG-017 | `~string` (case-insensitive string) qualifier lost in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `field Email as ~string` shows as `"type":"string"` — qualifier lost ❌ |
-| BUG-018 | Collection element types lost in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `set of string` shows as `"type":"set"` only — element type lost ❌ |
+| BUG-015 | `precept_diagnostic` PRE0083 description covers only... | MCP-docs | **Fixed** | — | Retested 2026-05-10 (round 7): PRE0083 is DivisionByZero only; `SqrtOfNegative` is a separate related code — sqrt and division are now distinct diagnostics ✅ |
+| BUG-016 | Guarded rule `when` clause not serialized in MCP definition... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `rule Score >= 0 when IsActive because "..."` shows `"when":"IsActive"` in rules output ✅ |
+| BUG-017 | `~string` (case-insensitive string) qualifier lost in MCP... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `field Email as ~string` now shows `"type":"~string"` — qualifier preserved ✅ |
+| BUG-018 | Collection element types lost in MCP definition output | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `set of string` shows as `"type":"set of string"`, `list of string` → `"list of string"`, etc. ✅ |
 | BUG-019 | Typed constants (single-quoted strings) not resolved from... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: typed constants in default/action expression positions parse and compile cleanly ✅ |
 | BUG-020 | Guarded ensures (`when` guard) not parsed in any position | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `in State when G ensure ...` compiles cleanly ✅ |
 | BUG-021 | `append by P`, `enqueue by P` v3 action forms not parsed | Compiler | **Fixed** | — | Retested 2026-05-10: `append Tasks Label by Priority` and `enqueue Jobs Job by Rank` both compile cleanly ✅ |
-| BUG-022 | Event ensures (`on Event ensure`) not serialized in MCP... | MCP-definition | Open | — | Retested 2026-05-10: `on Updated ensure Amount > 0 because "..."` not in definition rules or events ❌ |
-| BUG-023 | `because` clause includes keyword in serialized value | MCP-definition | Open | — | Retested 2026-05-10: `"because":"because \"active requires positive\""` — includes `because` keyword word ❌ |
-| BUG-024 | `omit` declarations not reflected in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `in Active omit Email` not in definition ❌ |
+| BUG-022 | Event ensures (`on Event ensure`) not serialized in MCP... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `on Submit ensure Amount > 0 because "..."` shows in `events[n].constraints[{"kind":"EventPrecondition","expression":"Amount > 0","because":"..."}]` ✅ |
+| BUG-023 | `because` clause includes keyword in serialized value | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `because "value must be non-negative"` now serialized as `"because":"value must be non-negative"` — no keyword prefix ✅ |
+| BUG-024 | `omit` declarations not reflected in MCP definition output | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `in Hidden omit Email` shows in `states[n].omittedFields:["Email"]` ✅ |
 | BUG-025 | Keyword-named member accessors rejected by parser | Compiler | **Fixed** | — | Retested 2026-05-10: `.count`, `.peek` on list/queue/stack all compile ✅ |
 | BUG-026 | `in State modify all readonly` treats `all` as field name | Compiler | **Fixed** | — | Retested 2026-05-10: `in Draft modify all readonly` compiles cleanly ✅ |
 | BUG-027 | `choice of T(...)` type not valid in event arg declarations | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: event args accept `choice of T(...)` via full type parser ✅ |
@@ -56,22 +56,22 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-029 | `InvalidModifierBounds` check not enforced | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 now fires correctly for `min > max` ✅ |
 | BUG-030 | Computed field forward references rejected; wrong error... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: computed forward references compile; cycles emit `CircularComputedField` ✅ |
 | BUG-031 | String interpolation not supported in `reject`, `because`,... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: interpolated `because`/`reject` messages parse cleanly ✅ |
-| BUG-032 | `reject` outcomes not serialized in MCP definition rows | MCP-definition | Open | — | Retested 2026-05-10: `-> reject "msg"` row shows as `{"fromStates":[...],"actions":[]}` — no reject outcome ❌ |
-| BUG-033 | Event arg `optional` modifier not reflected in MCP definition | MCP-definition | Open | — | Retested 2026-05-10: `Submit(Tag as string optional)` shows `{"name":"Tag","type":"string"}` — no isOptional ❌ |
-| BUG-034 | Per-state access mode overrides not in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `in Active modify Score readonly` not in definition ❌ |
-| BUG-035 | Choice element type and member values lost in MCP definition... | MCP-definition | Open | — | Retested 2026-05-10: `choice of string("Low","Medium","High")` shows as `"type":"choice"` only ❌ |
-| BUG-036 | `no transition` and `reject` outcomes indistinguishable in... | MCP-definition | Open | — | Retested 2026-05-10: both show as `{"fromStates":[...],"actions":[]}` with no outcome indicator ❌ |
+| BUG-032 | `reject` outcomes not serialized in MCP definition rows | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `-> reject "msg"` row shows `"outcome":"reject","rejectMessage":"cannot close when locked"` ✅ |
+| BUG-033 | Event arg `optional` modifier not reflected in MCP definition | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `Submit(Note as string optional)` shows `{"name":"Note","type":"string","isOptional":true}` ✅ |
+| BUG-034 | Per-state access mode overrides not in MCP definition output | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `in Draft modify Amount editable` shows in `states[n].accessModes:[{"stateName":"Draft","fieldName":"Amount","mode":"editable"}]` ✅ |
+| BUG-035 | Choice element type and member values lost in MCP definition... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `choice of string("Low","Medium","High")` shows `"type":"choice","choiceElementType":"string","choiceValues":["Low","Medium","High"]` ✅ |
+| BUG-036 | `no transition` and `reject` outcomes indistinguishable in... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): rows now have `"outcome":"reject"` vs `"outcome":"no transition"` vs `"outcome":"transition"` — fully distinguishable ✅ |
 | BUG-037 | `in State modify all` and `in State omit all` both reject... | Compiler | **Fixed** | — | Retested 2026-05-10: `modify all editable` and `omit all` both compile cleanly ✅ |
 | BUG-038 | `InvalidModifierBounds` not enforced for... | Compiler | **Fixed** | — | Retested 2026-05-10: PRE0034 fires for `minlength > maxlength` and `mincount > maxcount` ✅ |
 | BUG-039 | `list.at(N)` method call rejected due to `at` keyword collision | Compiler | **Fixed** | — | Retested 2026-05-10 (round 5): spec updated — `count > 0` proof now documented for `at(N)`; without `notempty` correctly emits PRE0063 ✅; with `notempty` compiles clean ✅ |
 | BUG-040 | `queue.peekby(P)` not implemented | Compiler | **Fixed** | — | Retested 2026-05-10: `Tasks.peekby` on `queue of string by integer` now resolves to the queue key type (`integer`) ✅ |
 | BUG-041 | `UnexpectedNull` runtime fault recovery hint uses invalid... | MCP-docs | **Fixed** | — | Retested 2026-05-10: hint now reads "Add the 'optional' modifier to allow null values, or guard with 'when Field != null' before use" — valid syntax ✅ |
-| BUG-042 | Modifier bound values not serialized in MCP definition output | MCP-definition | Open | — | Retested 2026-05-10: `integer min 0 max 100` shows `"modifiers":["min","max","default"]` — no values ❌ |
-| BUG-043 | String default values include surrounding DSL quotes in... | MCP-definition | Open | — | Retested 2026-05-10: `default "hello"` shows `"defaultValue":"\"hello\""` — includes quotes ❌ |
+| BUG-042 | Modifier bound values not serialized in MCP definition output | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `integer min 0 max 100` shows `"modifiers":["min 0","max 100"]` — values included ✅ |
+| BUG-043 | String default values include surrounding DSL quotes in... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `default "Anonymous"` shows `"defaultValue":"Anonymous"` — no surrounding quotes ✅ |
 | BUG-044 | Guarded state actions (`from State when G -> action`) not... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: guarded state hooks (`to/from State when ... ->`) compile cleanly ✅ |
 | BUG-045 | `ascending`/`descending` modifiers not recognized in log type... | Compiler | **Fixed** | `e68008d0` | Retested 2026-05-10: `log of T by P ascending|descending` parses cleanly ✅ |
 | BUG-046 | CI enforcement not applied to quantifier binding variables | Compiler | **Fixed** | — | Retested 2026-05-10: `each s in Scores (s >= 0)` in ensure compiles cleanly ✅ (prior repro used wrong `rule` syntax) |
-| BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | Open | — | Retested 2026-05-10: `on Tick -> set Counter = Counter + 1` shows `"rows":[]` — actions lost ❌ |
+| BUG-047 | Stateless event hook actions not serialized in MCP definition... | MCP-definition | **Fixed** | — | Retested 2026-05-10 (round 7): `on Tick -> set Value = Value + 1` shows in rows `"actions":["set Value = Value + 1"],"outcome":"no transition"` ✅ |
 | BUG-048 | `by` keyword not recognized in `append`/`enqueue` priority... | Compiler | **Fixed** | — | Retested 2026-05-10: same fix as BUG-021; `enqueue … by` compiles cleanly ✅ |
 | BUG-049 | `insert`/`remove at` actions fail due to `at` keyword ambiguity | Compiler | **Fixed** | — | Retested 2026-05-10: `remove Steps at Position` fixed in `a65c9fed`; `insert Steps NewStep at Position` fixed in `f2d1dece` ✅ |
 | BUG-050 | `dequeue`/`pop` trigger false PRE0083 "Division by zero" | Compiler | **Fixed** | — | Retested 2026-05-10: `dequeue Queue into Item` and `pop Items into Top` compile cleanly with `notempty` ✅ |
@@ -79,9 +79,9 @@ Each entry includes: what the spec says, what the tool reports, and a minimal re
 | BUG-052 | `contains` keyword unusable in expression position | Compiler | **Fixed** | — | Retested 2026-05-10: `Tags contains SearchTag` and string `contains` expressions now type-check cleanly ✅ |
 | BUG-053 | `and`/`or` binary boolean operators fail in all expression positions | Compiler | **Fixed** | — | Retested 2026-05-10: `A and B` / `A or B` now type-check in computed fields and guards ✅ |
 | BUG-054 | `ensure` clause not supported in stateless event hooks | Compiler | **Fixed** | — | Retested 2026-05-10: `on Event ensure BoolExpr because "..."` compiles cleanly ✅ |
-| BUG-055 | PRE0097 `exampleAfter` shows wrong fix — removes `~string` instead of switching to `~startsWith` | MCP-docs | Open | — | Retested 2026-05-10: exampleAfter still changes `~string` → `string` instead of `startsWith` → `~startsWith` ❌ |
-| BUG-056 | PRE0081 false positive fires on stateless-hook-only events in stateful precepts | Compiler | Open | — | Retested 2026-05-10: PRE0081 warning still fires on `Updated` event despite stateless hook ❌ |
-| BUG-057 | `date + period` and `date - period` arithmetic unusable — PRE0113 fires on all period field forms | Compiler | Open | — | Retested 2026-05-10: `StartDate + Offset` (period field) → PRE0113 "requires Date dimension but has unknown" ❌ |
+| BUG-055 | PRE0097 `exampleAfter` shows wrong fix — removes `~string` instead of switching to `~startsWith` | MCP-docs | Open | — | Retested 2026-05-10 (round 7): exampleAfter still shows `field Name as string` (removed `~`) instead of `rule ~startsWith(Name, "Admin")` (changed function). Wrong fix ❌ |
+| BUG-056 | PRE0081 false positive fires on stateless-hook-only events in stateful precepts | Compiler | **Not a Bug** | — | Retested 2026-05-10 (round 7): spec §3.8 line 1600 explicitly says mixing `on E -> actions` handlers with `state` declarations is an error. Use `from any on Event -> action -> no transition` in stateful precepts instead. PRE0081 is correct. |
+| BUG-057 | `period of 'date'` field declarations unsupported, blocking `date + period_field` | Compiler | **Closed** | George | Fixed 2026-05-10: type checker now propagates `TemporalDimension` and `TemporalUnit` qualifiers. `period of 'date'` → `PeriodDimension.Date`; `period in 'days'` → `PeriodDimension.Date`. `date + period_of_date_field` compiles cleanly. 7 regression tests added. |
 
 ---
 
@@ -2878,25 +2878,38 @@ Actual: PRE0081 warns that `Init` can never be fired.
 
 ---
 
-## BUG-057 — `date + period` and `date - period` arithmetic unusable — PRE0113 fires on all forms **[Compiler]**
+## BUG-057 — `period of 'date'` field declarations unsupported, blocking `date + period_field` **[Compiler]**
 
 ### Status
-Open
+**Closed** — Fixed 2026-05-10 by George
+
+### Fix
+Root cause: `TypeChecker.ExtractQualifiers()` had a `qualifier.Axis switch` that handled
+`Currency`, `Unit`, `Dimension`, `FromCurrency`, and `ToCurrency` but fell through to
+`_ => null` for `QualifierAxis.TemporalDimension` and `QualifierAxis.TemporalUnit`, silently
+dropping both qualifier types and returning an empty `DeclaredQualifiers` array.
+
+Fix: added `MapTemporalDimensionQualifier` (maps "date"→`PeriodDimension.Date`,
+"time"→`PeriodDimension.Time`, emits `InvalidTemporalDimensionString` for unknown strings)
+and `MapTemporalUnitQualifier` (looks up unit in `TemporalUnits`, derives dimension from
+`IsCalendarBased`, emits `InvalidTemporalUnitString` for unknown strings). Added both as
+switch arms in `ExtractQualifiers`. Added `DiagnosticCode` entries 117 and 118.
+
+7 regression tests added to `TypeCheckerSymbolTests.cs`.
 
 ### Description
-The `date + period → date` and `date - period → date` operations exist in the operations
-catalog with a proof requirement: "period has date temporal dimension". However, no declaration
-form for `period` fields can satisfy this proof requirement — the proof engine always reports
-PRE0113 "Operand requires Date dimension but has unknown" regardless of qualifiers used.
+The remaining bug is narrower than the original repro: the compiler appears not to support
+declaring a field with type `period of 'date'`. Because that declaration form is unavailable,
+there is no way to write a field whose type satisfies the `date + period → date` /
+`date - period → date` operations' required temporal dimension, so date arithmetic with a
+date-dimensioned period field is impossible to express.
 
 The `precept_types` catalog documents `period` as supporting `in` (TemporalUnit) and `of`
-(TemporalDimension) qualifiers. Neither form satisfies PRE0113:
-- `field P as period writable` → PRE0113 (no qualifier)
-- `field P as period in 'month' writable` → PRE0113 (TemporalUnit qualifier not sufficient)
-- `field P as period of 'date' writable` → PRE0113 (TemporalDimension qualifier not sufficient)
+(TemporalDimension) qualifiers. For this narrowed bug, the important missing capability is
+`field P as period of 'date' ...` in field type position.
 
 Typed constant period literals (`'30 days'`) also fail as expression arguments due to BUG-019
-(PRE0052 "Cannot determine the type").
+(PRE0052 "Cannot determine the type"), but that is separate from this narrowed issue.
 
 The inverse operation `date - date → period` ✅ works correctly (no proof requirement).
 
@@ -2912,7 +2925,7 @@ The inverse operation `date - date → period` ✅ works correctly (no proof req
 
 ### Errors reported
 ```
-PRE0113  Error  Operand 'P' requires Date dimension but has unknown in field '...' computed expression
+PRE0113  Error  Operand 'DatePeriod' requires Date dimension but has unknown in field '...' computed expression
 ```
 
 ### Minimal repro
@@ -2923,11 +2936,20 @@ field StartDate as date writable
 field DatePeriod as period of 'date' writable   # qualifier matches required dimension
 field ExtendedDate as date <- StartDate + DatePeriod
 ```
-Expected: compiles cleanly — `period of 'date'` has the Date temporal dimension.
-Actual: PRE0113 "Operand 'DatePeriod' requires Date dimension but has unknown".
+Expected: compiles cleanly — the field type `period of 'date'` should carry the Date temporal
+dimension into the arithmetic operation.
+Actual: the declaration is not supported as a usable field type; the computed field reports
+PRE0113 "Operand 'DatePeriod' requires Date dimension but has unknown".
 
 ### Workaround
-None known. Date calendar arithmetic with variable periods is entirely blocked. Only
-`date - date → period` (distance, no proof obligation) works.
+Use `datetime + period → datetime` (or `datetime - period → datetime`) instead. That path works,
+but it loses the date-specific constraint that `period of 'date'` is meant to express.
+
+### Historical notes
+
+The original repro used `date + unqualified period`. That part is **not** a bug: the spec requires
+the period operand to have the Date temporal dimension, so a bare `period` is correctly rejected.
+That repro was still useful because it led to the narrowed finding above: even the spec-correct
+`period of 'date'` field form cannot currently be expressed in practice.
 
 
