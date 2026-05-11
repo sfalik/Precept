@@ -102,7 +102,7 @@ public class ProofEngineTests
         => Types.GetMeta(type).Accessors.Single(a => a.Name == name);
 
     private static TypedFieldRef MakeFieldRef(string name, TypeKind type)
-        => new(type, name, false, SourceSpan.Missing);
+        => new(type, name, false, null, SourceSpan.Missing);
 
     private static TypedLiteral MakeLiteral(TypeKind type, object? value)
         => new(type, value, SourceSpan.Missing);

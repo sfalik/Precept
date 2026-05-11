@@ -320,6 +320,62 @@ public class TypeCheckerSymbolTests
     }
 
     [Fact]
+    public void ArgRef_CarriesQualifiers_WhenDeclared()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity of 'mass' default '1 kg'
+            event Measure(a as quantity of 'mass')
+            on Measure -> set Weight = a
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var action = index.EventHandlers.Single().Actions.Single().Should().BeOfType<TypedInputAction>().Which;
+        var argRef = action.InputExpression.Should().BeOfType<TypedArgRef>().Which;
+
+        argRef.DeclaredQualifiers.Should().NotBeNull();
+        var qualifier = argRef.DeclaredQualifiers!.Value.Should().ContainSingle().Which;
+        qualifier.Should().BeOfType<DeclaredQualifierMeta.Dimension>().Which.DimensionName.Should().Be("mass");
+    }
+
+    [Fact]
+    public void FieldRef_CarriesQualifiers_WhenDeclared()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity in 'kg' default '1 kg'
+            field Copy as quantity in 'kg' <- Weight
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var fieldRef = index.FieldsByName["Copy"].ComputedExpression.Should().BeOfType<TypedFieldRef>().Which;
+
+        fieldRef.DeclaredQualifiers.Should().NotBeNull();
+        var qualifier = fieldRef.DeclaredQualifiers!.Value.Should().ContainSingle().Which;
+        var unit = qualifier.Should().BeOfType<DeclaredQualifierMeta.Unit>().Which;
+        unit.UnitCode.Should().Be("kg");
+        unit.DimensionName.Should().Be("mass");
+    }
+
+    [Fact]
+    public void ArgRef_NullQualifiers_WhenUnqualified()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer default 0
+            event SetCount(n as integer)
+            on SetCount -> set Count = n
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var action = index.EventHandlers.Single().Actions.Single().Should().BeOfType<TypedInputAction>().Which;
+        var argRef = action.InputExpression.Should().BeOfType<TypedArgRef>().Which;
+
+        (argRef.DeclaredQualifiers is null || argRef.DeclaredQualifiers.Value.IsEmpty)
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void QuantityInRad_DoesNotDeriveCountQualifierCategory()
     {
         var qualifier = GetUnitQualifier("Angle", "quantity in 'rad'");

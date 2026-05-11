@@ -16,6 +16,9 @@
 - Singular vs plural temporal unit preference comes from the last numeric segment, including compound literals after the most recent `+`.
 - Semantic-token, definition, highlight, references, and rename flows all depend on the same identifier-precise span story; container spans are acceptable only when the semantic site contract explicitly requires them.
 - B4/B5 are not expression-site bugs: qualifier declaration literals must resolve the active qualifier slot from parsed qualifier metadata before any enclosing-field expression fallback runs.
+- B9-B12 Slice 1 touched 6 `TypedArgRef`/`TypedFieldRef` construction sites end-to-end: 5 explicit constructors in `src/` plus the target-typed `MakeFieldRef(...)` helper in `test/Precept.Tests/ProofEngineTests.cs`.
+- Surprise from the Slice 1 audit: no positional `TypedArgRef(...)`/`TypedFieldRef(...)` pattern matches needed updates; the only non-obvious break was the target-typed test helper constructor.
+- For qualifier propagation coverage, `test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs` can validate full-pipeline expression nodes by asserting against `TypedInputAction.InputExpression` from `index.EventHandlers` and `TypedField.ComputedExpression` from `index.FieldsByName`.
 
 ## Historical Summary
 
@@ -23,6 +26,11 @@
 - The canonical decision ledger in `.squad/decisions.md` carries full batch chronology; this history keeps only the durable tooling rules and the newest live context needed for future implementation runs.
 
 ## Recent Updates
+
+### 2026-05-14 — kramer-10 UCUM display labels and tier-1 pruning
+- Added `UcumAtom.PrintSymbol`, parsed UCUM XML `printSymbol` metadata, and surfaced print-symbol labels with name details in quantity completions.
+- Pruned troy/apothecary mass units from tier-1 while keeping `[gr]` because the embedded UCUM XML marks it `class="avoirdupois"`.
+- Quantity hover now shows resolved unit metadata (`code`, `printSymbol`, `name`); validation closed green at 4567/4567 core tests and 221/221 language-server tests.
 
 ### 2026-05-11T05:34:40Z — Frank retriage reopened B4/B5
 - The earlier apostrophe-trigger normalization correctly fixed B1/default-site recovery, but it does **not** fix declaration-side qualifier literals.
@@ -36,6 +44,11 @@
 ### 2026-05-11 — B7 semantic-tokens delta crash fixed
 - Typed-constant span changes now invalidate the cached semantic-token document per URI so OmniSharp falls back to a full refresh only when the typed-constant token layout actually changed.
 - Durable rule: targeted cache invalidation beats global full-refresh mode and beats exception swallowing.
+
+### 2026-05-11T06:00:00Z — B14 semantic-token delta baseline guard
+- Root cause was not UCUM display metadata: OmniSharp's `SemanticTokensDocument` keeps one framework `Id` per document, so stale client `PreviousResultId` values were indistinguishable once `_prevData` had been primed by an earlier delta.
+- `SemanticTokensHandler` now stamps its own per-response client result IDs, tracks the latest `(resultId, document.Id)` per URI, and returns a full semantic-tokens payload whenever the client baseline is stale or typed-constant invalidation swapped the backing document.
+- Regression coverage now proves both stale-result fallback and typed-constant-span fallback; validation closed green at 223/223 language-server tests. Commit: `ef7374dd`.
 
 ### 2026-05-11T02:32:33Z — Modifier-token squiggle precision closed the latest span pass
 - `ParsedModifier` now owns its own span so modifier diagnostics land on the offending keyword instead of the whole field declaration.

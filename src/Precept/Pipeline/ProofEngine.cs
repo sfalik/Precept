@@ -241,7 +241,7 @@ public static class ProofEngine
             || requirement is ModifierRequirement { Subject: SelfSubject }
             || requirement is PresenceProofRequirement { Subject: SelfSubject })
         {
-            return new TypedFieldRef(action.FieldType, action.FieldName, false, action.Span);
+            return new TypedFieldRef(action.FieldType, action.FieldName, false, null, action.Span);
         }
 
         return action switch

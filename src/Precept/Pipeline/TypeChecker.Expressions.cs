@@ -538,7 +538,7 @@ internal static partial class TypeChecker
         foreach (var binding in ctx.QuantifierBindings)
         {
             if (string.Equals(binding.Name, name, StringComparison.Ordinal))
-                return new TypedFieldRef(binding.Type, name, binding.IsCaseInsensitive, id.Span);
+                return new TypedFieldRef(binding.Type, name, binding.IsCaseInsensitive, null, id.Span);
         }
 
         // 2. Event args (second priority)
@@ -546,7 +546,7 @@ internal static partial class TypeChecker
             ctx.CurrentEventArgs.TryGetValue(name, out var arg))
         {
             ctx.ArgReferences.Add(new ArgReference(arg, id.Span));
-            return new TypedArgRef(arg.ResolvedType, arg.EventName, arg.Name, id.Span);
+            return new TypedArgRef(arg.ResolvedType, arg.EventName, arg.Name, arg.DeclaredQualifiers, id.Span);
         }
 
         // 3. Fields (lowest priority)
@@ -569,7 +569,7 @@ internal static partial class TypeChecker
             ctx.FieldReferences.Add(new FieldReference(field, id.Span));
 
             return new TypedFieldRef(field.ResolvedType, field.Name,
-                ctx.CIFields.Contains(field.Name), id.Span);
+                ctx.CIFields.Contains(field.Name), field.DeclaredQualifiers, id.Span);
         }
 
         // Unknown identifier
@@ -1331,7 +1331,7 @@ internal static partial class TypeChecker
             {
                 ctx.EventReferences.Add(new EventReference(ev, eventId.Span));
                 ctx.ArgReferences.Add(new ArgReference(arg, expr.MemberSpan));
-                return new TypedArgRef(arg.ResolvedType, ev.Name, arg.Name, expr.Span);
+                return new TypedArgRef(arg.ResolvedType, ev.Name, arg.Name, arg.DeclaredQualifiers, expr.Span);
             }
 
             ctx.Diagnostics.Add(

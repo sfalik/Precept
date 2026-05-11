@@ -21,6 +21,7 @@ public sealed record TypedFieldRef(
     TypeKind ResultType,
     string FieldName,
     bool IsCaseInsensitive,
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
@@ -29,6 +30,7 @@ public sealed record TypedArgRef(
     TypeKind ResultType,
     string EventName,
     string ArgName,
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
