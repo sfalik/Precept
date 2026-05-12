@@ -65,3 +65,8 @@
 - TryDeriveCompoundElevationQualifiers: extracts currency from left (price), splits compound unit from right (quantity), derives numerator dimension, returns [Currency, Unit(numerator, dim, Derived)].
 - TryResolveCompoundElevationDimension in ProofEngine: works on RIGHT operand only; extracts compound value, splits at /, derives numerator dimension from unit name.
 - 5/5 P3 tests pass; 4910/4910 full suite. PR: https://github.com/sfalik/Precept/pull/142
+
+### 2026-05-12T13:02:45Z — inventory-item header cleanup recorded
+- Removed the stale RC1 / RC2 compiler-blocker comments from `samples/inventory-item.precept`; those blockers are already shipped.
+- BUG-A is now explicitly a sample-side edit: `Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'` still needs Frank's sign-off before George changes the sample.
+- Commit: `b389e74e`.

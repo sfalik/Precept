@@ -147903,3 +147903,223 @@ The document captures the approved decision explicitly near the top:
 - Added 4 regression tests in `test/Precept.Tests/ProofEngineTests.cs` covering same-source symbolic compatibility, different-source incompatibility, template-vs-literal preservation, and null handling.
 - Validation: `dotnet build src/Precept/Precept.csproj --nologo` passed; `dotnet test test/Precept.Tests/Precept.Tests.csproj --nologo --filter "Strategy5_SymbolicQualifierEquivalence"` passed (4/4).
 - Current inventory-item PRE0114 baseline is still 89 in the existing `Precept.Tests` run (`InventoryItem_Sample_PRE0114_Count_Drops_Below_Baseline` remains the lone pre-existing failure; full suite is 4848/4849 passing after the new tests).
+
+### 2026-05-12: Q2 resolved — margin validation rewrite
+
+**By:** Shane (via Copilot)
+**What:** The intent of the margin validation ensure in inventory-item.precept is "revenue per stocking unit must cover average cost per stocking unit." The correct expression is:
+
+`ensure ListPrice / StockingUnitsPerSaleUnit >= AverageCost because "revenue per stocking unit must cover average cost"`
+
+The current `ListPrice * StockingUnitsPerSaleUnit >= AverageCost` is dimensionally wrong (multiplies instead of divides) and does not match the stated intent. The rewrite also has better dimensional alignment: price / count matches the per-unit nature of AverageCost.
+
+**Why:** Shane provided explicit intent clarification — P3 sample fix for inventory-item.precept.
+
+# Decision: P2, P3, P3b Code Review — All Approved
+
+**Date:** 2026-05-12T08:40:00-04:00  
+**By:** Frank  
+**Scope:** Type-algebra proof engine fixes on spike/Precept-V2-Radical
+
+## Summary
+
+Reviewed George's implementations of P2 (symbolic qualifier equality), P3 (price ÷ compound-quantity → price), and P3b (symmetric compound-unit-cancellation for Dimension qualifiers). All three approved with minor notes.
+
+## Findings
+
+### P2 — SourceFieldName approach is architecturally sound
+- Two-tier design (SourceFieldName primary, ExtractQualifierSourcePath fallback) preserves backward compatibility while enabling cross-subtype equality.
+- The SourceFieldName property on DeclaredQualifierMeta base record is the right layer — it avoids per-subtype switches in the proof engine.
+
+### P3 — Catalog hygiene is clean
+- OperationKind.PriceDivideQuantity = 203 follows the numbering convention (appended after LookupAccess = 202).
+- ResultQualifierPolicy.CompoundDimensionElevation and CompoundDimensionElevationRequired QualifierBinding are properly threaded through TypeChecker.Expressions and ProofEngine.
+- TryResolveCompoundElevationDimension correctly operates on the right operand only (the divisor carries the compound unit).
+
+### P3b — Implementation was part of P3, tests are standalone
+- The Dimension fallback in TryGetCompoundUnit shipped in the P3 commit (d4c4048f). P3b commit (79147502) is test-only.
+- ExtractCompoundValue in ProofEngine handles both Unit and Dimension subtypes containing '/'.
+- TryResolveCompoundCancellationUnit is symmetric (tries both operands). TryResolveCompoundElevationDimension is asymmetric (right only). Both are correct for their operations.
+
+## Decision
+
+All three fixes are approved for the spike branch. No blocking issues found. 5496/5496 tests pass.
+
+# Decision: quantity × compound-unit-ratio → quantity (P3b)
+
+**Date:** 2026-05-12T03:52:12.146-04:00  
+**By:** Frank  
+**Status:** Design complete, pending implementation
+
+## Decision
+
+`quantity[A] × quantity[B/A] → quantity[B]` is a first-class language rule, but it does **not** introduce a new operation kind. It completes the existing `QuantityTimesQuantity` catalog member under `ResultQualifierPolicy.CompoundUnitCancellation`.
+
+## What P3b Covers
+
+- `quantity[A] × quantity[B/A] → quantity[B]`
+- The symmetric case `quantity[B/A] × quantity[A] → quantity[B]`
+- Type-checker result derivation for the compound-ratio multiplication result
+- Proof-engine qualifier resolution for the cancellation result when the compound operand appears on either side
+- WAC denominator proof discharge in `samples/inventory-item.precept` once the denominator stops resolving as `<unknown>`
+
+## Why This Is Separate from P3
+
+P3 and P3b are the same algebraic family, but they are not the same catalog problem.
+
+- **P3** adds a new operation: `price ÷ compound-quantity → price`. That requires a new `OperationKind` and a new `ResultQualifierPolicy.CompoundDimensionElevation` because a price preserves currency while changing denominator dimension.
+- **P3b** does not add a new operation. `quantity × quantity` already exists in the catalog. The missing work is completing its cancellation semantics for the `simple × compound-ratio` direction. The existing `CompoundUnitCancellation` policy is the correct metadata shape.
+
+Keeping them separate preserves catalog clarity: P3 is new price algebra; P3b is unfinished quantity algebra.
+
+## How P3b Unblocks PRE0083
+
+The `ReceiveShipment` sample already has `PurchaseQty > 0`. PRE0083 persists because the denominator
+
+`QuantityOnHand + PurchaseQty * StockingUnitsPerPurchaseUnit`
+
+currently resolves to `<unknown>` when `PurchaseQty * StockingUnitsPerPurchaseUnit` fails to reduce to `quantity[StockingUnit]`.
+
+Once P3b lands:
+1. `PurchaseQty [PurchaseUnit] × StockingUnitsPerPurchaseUnit [StockingUnit/PurchaseUnit]` resolves to `quantity[StockingUnit]`.
+2. The full denominator resolves to typed `quantity[StockingUnit]` instead of `<unknown>`.
+3. The existing `money ÷ quantity → price` divisor proof can attach to that typed denominator.
+4. Existing guards/rules (`PurchaseQty > 0`, conversion ratio `> 0`, `QuantityOnHand >= 0`, and the guarded LowStock branch) can discharge the non-zero obligation.
+
+So the PRE0083 root cause is not “missing guard.” It is “missing quantity-side dimensional cancellation.”
+
+## Design Location
+
+Full design appended to `docs/Working/typed-constants-and-proof-coverage-plan.md` as **Part P3b — Type Algebra: quantity × compound-unit-ratio → quantity**.
+
+# Decision: price ÷ compound-quantity → price — Catalog Operation Entry
+
+**Date:** 2026-05-12T03:34:46-04:00  
+**By:** Frank  
+**Status:** Design complete, pending implementation
+
+## Decision
+
+The `price ÷ compound-quantity → price` type algebra operation is implemented as a **catalog operation entry** (`PriceDivideQuantity`) with a new `ResultQualifierPolicy.CompoundDimensionElevation`, not as a structural rule in the type checker.
+
+## Key Design Choice: Catalog vs. Structural Rule
+
+**Catalog entry (chosen):** The operation is domain knowledge about how price and quantity types compose under division. The Operations catalog is the language specification in machine-readable form — this is exactly where typed arithmetic rules belong. The type checker's `ResolveBinaryOp` already dispatches through `Operations.FindCandidates`; adding a catalog entry requires zero changes to the dispatch logic.
+
+**Structural rule (rejected):** Adding a special case in `TryResolveCatalogBinaryWithoutOperation` or a new method in `TypeChecker.Expressions.cs` would hardcode domain knowledge in the pipeline stage — the exact antipattern the catalog architecture exists to prevent. The fact that qualifier propagation needs a new policy is not a reason to bypass the catalog; it's a reason to extend the catalog's metadata vocabulary.
+
+## Why a New ResultQualifierPolicy
+
+`CompoundUnitCancellation` (existing) handles `PriceTimesQuantity → Money`: the dimension cancels entirely, and the result is dimensionless money. `CompoundDimensionElevation` (new) handles `PriceDivideQuantity → Price`: the compound-quantity's denominator cancels, and its numerator **elevates** to become the result price's denominator. The qualifier derivation logic is structurally different — different policy, different proof-engine handler.
+
+## Design Location
+
+Full design appended to `docs/Working/typed-constants-and-proof-coverage-plan.md` as **Part P3 — Type Algebra: price ÷ compound-quantity → price**.
+
+## Relationship to P2
+
+Independent workstreams. P3 fixes PRE0018 (type mismatch: no operation for price ÷ quantity). P2 fixes PRE0114 (qualifier incompatibility for interpolated references). They compose at the proof-engine boundary: P3 produces the result qualifier symbolically; P2 ensures symbolic qualifiers compare correctly. Both are needed for inventory-item.precept's `ensure ListPrice / StockingUnitsPerSaleUnit >= AverageCost` to fully compile.
+
+## Implementation Order
+
+P3-1 through P3-4 (5 slices) can proceed in parallel with P2 slices. P3-5 (regression validation) is blocked on P2 + F4.
+
+# Decision: Symbolic Qualifier Equality — Option B Locked
+
+**Date:** 2026-05-12T03:24:46-04:00  
+**By:** Frank  
+**Status:** Design complete, pending implementation
+
+## Decision
+
+Q1 is **Option B — Symbolic Resolution**. Interpolated qualifier equality is determined by resolving both references to the same semantic field declaration (`SourceFieldName` identity), not by string comparison of template text.
+
+## Design Location
+
+Full design appended to `docs/Working/typed-constants-and-proof-coverage-plan.md` as **Part P2 — Symbolic Qualifier Equality (Proof Engine)**.
+
+## Key Points
+
+1. **Mechanism:** New optional `SourceFieldName` field on `DeclaredQualifierMeta` base record, populated at type-check time (`MapInterpolatedQualifier`) and proof time (`CreateQualifierFromSlotExpression`).
+2. **Cross-subtype:** `QualifiersSymbolicallyEqual` compares `SourceFieldName` across DU subtypes — `ToCurrency` vs `Currency` with same source field → equal. This is critical for F4.
+3. **Fallback:** Existing `ExtractQualifierSourcePath` string extraction remains for qualifiers without `SourceFieldName`.
+4. **Scope:** Field names are unique per precept; no cross-precept or cross-scope qualification needed.
+5. **Prerequisite for F4:** Without P2, the `CurrencyConversionRequired` binding (F4) would resolve a `ToCurrency` qualifier that can never match the target field's `Currency` qualifier by record equality.
+
+## Implementation Order
+
+P2 (5 slices) → F4 (ExchangeRateTimesMoney policy) → F5 (verification)
+
+George implements from the plan doc directly.
+
+# Decision: inventory-item header updated
+
+**Date:** 2026-05-12T09:02:45.968-04:00  
+**By:** George  
+**Scope:** `samples/inventory-item.precept` header comments on `spike/Precept-V2-Radical`
+
+## Summary
+
+Removed the stale ROOT CAUSE 1 / ROOT CAUSE 2 header entries from `samples/inventory-item.precept`. Those compiler blockers are already implemented.
+
+## Current Blocker
+
+BUG-A remains, but the blocker is now sample-side rather than compiler-side: the sample still declares `Rate as exchangerate` without `in '{SupplierCurrency}' to '{CatalogCurrency}'`. That sample edit is pending Frank's sign-off.
+
+## Notes
+
+- Kept the `THIS FILE DOES NOT COMPILE` banner unchanged.
+- Kept the `SAMPLE DESIGN ISSUES` section unchanged.
+- Kept the analysis reference line unchanged.
+- No tests run; comment-only change.
+
+# Kramer — Hover/Color Gap Follow-up
+
+Date: 2026-05-12
+Requested by: Shane
+
+## Completed
+- Wired qualifier hover V3 status text to surface `qualifier resolves from ...` using resolved qualifier metadata, with template simplification for simple interpolated sources like `{StockingUnit.dimension}`.
+- Kept reject hover ahead of generic transition hover, added an implementation comment explaining the precedence rule, and synced `docs/Working/hover-design.md` to the actual resolver order.
+- Added hover regressions for:
+  - guarded rules
+  - initial events
+  - required states
+  - proof-verified transitions
+  - interpolated dimension qualifiers
+  - unit qualifiers
+- Added TextMate grammar regressions for:
+  - field-reference vs event-arg-reference scope split
+  - built-in function scope (`support.function.precept`)
+  - escape-sequence scope (`constant.character.escape.precept`)
+
+## Validation
+- `dotnet build` ✅
+- `dotnet test test/Precept.LanguageServer.Tests/` ✅
+- `dotnet test` ✅
+
+## Notes
+- The final hover behavior now matches Elaine's V3 qualifier example and the resolver-order rationale is explicit in both code and design docs.
+- Commit only the Kramer-owned files for this slice; the repo had unrelated working-tree changes present outside this work.
+
+# Decision: B1 static Dimension-form compound cancellation gap closed
+
+**Date:** 2026-05-12T09:02:45.968-04:00  
+**By:** Soup Nazi  
+**Status:** Implemented and verified
+
+## Decision
+
+Add a proof-engine regression test for the static `quantity of 'each/case'` qualifier form and keep the production path accepting that declaration/default combination.
+
+## What Changed
+
+- Added `CompoundUnit_cancellation_dimension_qualifier_form` to `test/Precept.Tests/ProofEngineTests.cs` beside the existing compound-cancellation regressions.
+- Allowed `MapDimensionQualifier` to accept static compound-ratio strings on the `of` axis when both sides are valid unit atoms.
+- Updated `QuantityValidator` to validate compound-ratio `of 'X/Y'` qualifiers by exact numerator/denominator unit shape instead of collapsing them to a plain dimension.
+- Added `UnitDimensionHelper.TryGetCanonicalCompoundUnitCode` so count atoms such as `each/case` keep their compound identity during validation.
+
+## Verification
+
+- `dotnet test test\Precept.Tests\ --filter "CompoundUnit_cancellation_dimension_qualifier_form"` ✅
+- `dotnet test test\Precept.Tests\` ✅ (4914 passed)

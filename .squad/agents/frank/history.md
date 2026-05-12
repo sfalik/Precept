@@ -29,3 +29,14 @@
 - Kept the work in Part D, not Part C: scalar `money|quantity|price ×|÷ decimal` propagation fixes syntax-reference/test fallout but does not move inventory-item.
 - Locked the metadata-driven approach: `ResultQualifierPolicy.InheritFromQualifiedOperand` → `QualifiedOperandInherited` binding → transitive `ResolveQualifierOnAxis` handling for `TypedBinaryOp` subjects.
 - Durable side effect: nested same-qualifier binary expressions can now resolve qualifiers transitively instead of dying at the inner expression boundary.
+
+### 2026-05-12T08:40:00-04:00 — P2/P3/P3b code review complete
+
+- P2 (SourceFieldName symbolic equality): Approved. Clean two-tier design — SourceFieldName at type-check time, ExtractQualifierSourcePath fallback for legacy. ExtractSourceFieldName correctly handles leading empty TextSegment from parser. Cross-subtype comparison (ToCurrency ↔ Currency) is the F4 critical path and is tested.
+- P3 (PriceDivideQuantity): Approved. New OperationKind=203, ResultQualifierPolicy.CompoundDimensionElevation, CompoundDimensionElevationRequired binding all follow catalog-driven architecture. TryDeriveCompoundElevationQualifiers in TypedConstants and TryResolveCompoundElevationDimension in ProofEngine are correctly asymmetric (right operand only — compound-quantity is always the divisor).
+- P3b (CompoundUnitCancellation Dimension form): Approved. The Dimension fallback in TryGetCompoundUnit was shipped inside the P3 commit, not separately. P3b is test-only — 3 tests validating the `of '{dim}'` form. ExtractCompoundValue in ProofEngine already handles Dimension. Symmetric in both operand orders.
+- Full suite: 5496/5496 tests pass (4913 core + 264 LS + 39 MCP + 280 analyzers). No regressions.
+
+### 2026-05-12T13:02:45Z — inventory-item qualifier edit queued for sign-off
+- George removed the stale RC1 / RC2 inventory-item header comments after the compiler support landed.
+- The remaining BUG-A work is the sample-side `Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'` edit, which is waiting on Frank's approval before it is applied.
