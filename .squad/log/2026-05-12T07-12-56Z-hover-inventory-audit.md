@@ -1,0 +1,3 @@
+# Session Log — hover-inventory-audit
+
+At 2026-05-12T07:12:56Z, Scribe enforced the decisions archive gate, merged **20** inbox decisions into the canonical ledger, recorded the frank-12 / kramer-hover-linebreaks / kramer-audit outcomes, and compacted the Frank and Kramer histories after appending the new cross-agent context. Health: `decisions.md` moved from **988515 bytes** to **1183138 bytes**; `decisions-archive.md` is now **1760379 bytes**; inbox processed **20** files; archived after merge **1** older-than-7-days decision; summarized histories: `.squad/agents/frank/history.md`, `.squad/agents/kramer/history.md`.
