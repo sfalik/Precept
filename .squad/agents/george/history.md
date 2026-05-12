@@ -107,3 +107,18 @@
 - RC-2 is now durably closed: QuantityForms covers Q6/Q7/Q8 (`0 {A}/{B}`, `0 {A}/each`, `0 each/{B}`), while the already-landed price and unit-of-measure compound forms remain the supporting guardrails.
 
 - Validation state recorded from the execution batch: core build clean, typed-constant battery at 102/102, and the broader spike branch unchanged at the known 26 pre-existing failures.
+
+### 2026-05-11T22:34:01Z — D1/D2 AlwaysRejecting and StateAlwaysRejects diagnostics (codes 125, 126)
+
+- Adding a span to a positional record (TypedTransitionRow) requires inserting RowSpan before Syntax (so Syntax stays last, matching the established NameSpan, Syntax positional pattern on TypedState/TypedEvent/TypedField). Only one construction site existed (TypeChecker.NormalizeTransitionRow) so the migration was surgical.
+
+- PRECEPT0024 is why GraphAnalyzer cannot call .Syntax on any Typed* record. The pattern is always: extract span in TypeChecker at construction time, carry it as a named property, use it in GraphAnalyzer via that property. The existing CollectEdgeSpans comment documents this explicitly.
+
+- D1 suppresses D2 by returning the flagged event name set from EmitAlwaysRejecting. Clean output parameter rather than threading mutable shared state through Analyze.
+
+- The wildcard-override logic in EmitStateAlwaysRejects mirrors BuildEdges exactly: build xplicitStateEvents from rows where FromState is not null && StatesByName.ContainsKey && EventsByName.ContainsKey, then for each (state, event) pair prefer explicit rows if any exist, else fall back to wildcard rows.
+
+- TransitionRowOutcome (semantic enum in SemanticIndex.cs) and OutcomeKind (catalog enum in Outcomes.cs) are parallel enums with the same three values. TransitionRowOutcome.Reject is correct inside graph analysis — no new catalog entry needed.
+
+- The 26 pre-existing spike-branch failures (TypeCheckerAssemblyTests + TypeCheckerAssignmentQualifierTests) are invariant across this work. 9 new GraphAnalyzerTests added, all green.
+

@@ -157,6 +157,14 @@ public static class GraphAnalyzer
             }
         }
 
+        // D1: AlwaysRejecting — every row for the event has a reject outcome across all states.
+        // reject is semantically valid only when a non-reject path exists for the same event.
+        var d1FlaggedEvents = EmitAlwaysRejecting(semantics, diagnostics);
+
+        // D2: StateAlwaysRejects — every effective row for (state, event) has a reject outcome,
+        // but the event does have a success path from at least one other state.
+        EmitStateAlwaysRejects(semantics, d1FlaggedEvents, diagnostics);
+
         var graphStates = semantics.States
             .Select(state => new GraphState(
                 Name: state.Name,
@@ -702,6 +710,91 @@ public static class GraphAnalyzer
     private sealed record EventCoverageResult(
         ImmutableArray<EventCoverageEntry> Entries,
         Dictionary<string, ImmutableArray<string>> HandlingStatesByEvent);
+
+    /// <summary>
+    /// D1: Emits <see cref="DiagnosticCode.AlwaysRejecting"/> for every event whose rows
+    /// are all reject outcomes across all states. Returns the set of flagged event names
+    /// so D2 can suppress them.
+    /// </summary>
+    private static HashSet<string> EmitAlwaysRejecting(
+        SemanticIndex semantics,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        var d1FlaggedEvents = new HashSet<string>(StringComparer.Ordinal);
+
+        var rowsByEvent = semantics.TransitionRows
+            .Where(row => semantics.EventsByName.ContainsKey(row.EventName))
+            .GroupBy(row => row.EventName, StringComparer.Ordinal);
+
+        foreach (var group in rowsByEvent)
+        {
+            if (group.Any(row => row.Outcome != TransitionRowOutcome.Reject))
+                continue;
+
+            d1FlaggedEvents.Add(group.Key);
+            foreach (var row in group)
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.AlwaysRejecting,
+                    row.RowSpan,
+                    group.Key));
+            }
+        }
+
+        return d1FlaggedEvents;
+    }
+
+    /// <summary>
+    /// D2: Emits <see cref="DiagnosticCode.StateAlwaysRejects"/> for each (state, event) pair
+    /// where every effective row has a reject outcome, but the event has a non-reject path
+    /// from at least one other state (D1 was not flagged for this event).
+    /// Mirrors <see cref="BuildEdges"/> wildcard-override semantics exactly.
+    /// </summary>
+    private static void EmitStateAlwaysRejects(
+        SemanticIndex semantics,
+        HashSet<string> d1FlaggedEvents,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        var explicitStateEvents = semantics.TransitionRows
+            .Where(row => row.FromState is not null
+                && semantics.StatesByName.ContainsKey(row.FromState)
+                && semantics.EventsByName.ContainsKey(row.EventName))
+            .Select(row => (State: row.FromState!, Event: row.EventName))
+            .ToHashSet();
+
+        foreach (var state in semantics.States)
+        {
+            foreach (var evt in semantics.Events)
+            {
+                if (d1FlaggedEvents.Contains(evt.Name))
+                    continue;
+
+                IEnumerable<TypedTransitionRow> effectiveRows =
+                    explicitStateEvents.Contains((state.Name, evt.Name))
+                        ? semantics.TransitionRows.Where(row =>
+                            row.FromState == state.Name && row.EventName == evt.Name)
+                        : semantics.TransitionRows.Where(row =>
+                            row.FromState is null && row.EventName == evt.Name
+                            && semantics.EventsByName.ContainsKey(row.EventName));
+
+                var effectiveList = effectiveRows.ToList();
+                if (effectiveList.Count == 0)
+                    continue;
+
+                if (!effectiveList.All(row => row.Outcome == TransitionRowOutcome.Reject))
+                    continue;
+
+                foreach (var row in effectiveList)
+                {
+                    diagnostics.Add(Diagnostics.Create(
+                        DiagnosticCode.StateAlwaysRejects,
+                        row.RowSpan,
+                        evt.Name,
+                        state.Name));
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Collects <see cref="RelatedSpan"/> entries for structural violation edges.

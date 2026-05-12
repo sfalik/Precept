@@ -631,4 +631,189 @@ public class GraphAnalyzerTests
         var (index, diagnostics) = TypeCheckerTestHelpers.Check(source);
         return (index, diagnostics, GraphAnalyzer.Analyze(index));
     }
+
+    // ── D1: AlwaysRejecting ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void Analyze_AllRejectRows_EmitsAlwaysRejecting()
+    {
+        var (_, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft initial
+            state Active
+            state Done terminal
+            event Submit
+            event Refuse
+            from Draft on Submit -> transition Active
+            from Active on Submit -> transition Done
+            from Draft on Refuse -> reject "Not allowed"
+            from Active on Refuse -> reject "Still not allowed"
+            """);
+
+        var d1 = graph.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.AlwaysRejecting)).ToList();
+        d1.Should().HaveCount(2);
+        d1.Should().OnlyContain(d => d.Severity == Severity.Warning);
+        d1.Should().OnlyContain(d => d.Message.Contains("Refuse"));
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.StateAlwaysRejects));
+    }
+
+    [Fact]
+    public void Analyze_EventWithAtLeastOneNonRejectRow_DoesNotEmitAlwaysRejecting()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Done terminal
+            event Submit
+            from Draft on Submit -> transition Done
+            """);
+
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.AlwaysRejecting));
+    }
+
+    [Fact]
+    public void Analyze_AlwaysRejecting_IncludesWildcardRows()
+    {
+        var (_, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft initial
+            state Active
+            state Done terminal
+            event Submit
+            event Cancel
+            from Draft on Submit -> transition Active
+            from Active on Submit -> transition Done
+            from any on Cancel -> reject "Cancellation not permitted"
+            """);
+
+        var d1 = graph.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.AlwaysRejecting)).ToList();
+        d1.Should().ContainSingle();
+        d1.Single().Message.Should().Contain("Cancel");
+    }
+
+    [Fact]
+    public void Analyze_AlwaysRejecting_D1SuppressesD2ForSameEvent()
+    {
+        var (_, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft initial
+            state Active
+            state Done terminal
+            event Submit
+            event Refuse
+            from Draft on Submit -> transition Active
+            from Active on Submit -> transition Done
+            from Draft on Refuse -> reject "Not allowed"
+            from Active on Refuse -> reject "Still not allowed"
+            """);
+
+        graph.Diagnostics.Should().NotContain(d =>
+            d.Code == nameof(DiagnosticCode.StateAlwaysRejects) && d.Message.Contains("Refuse"));
+    }
+
+    // ── D2: StateAlwaysRejects ─────────────────────────────────────────────────
+
+    [Fact]
+    public void Analyze_RejectOnlyFromOneState_SuccessPathElsewhere_EmitsStateAlwaysRejects()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Active
+            state Done terminal
+            event Submit
+            from Draft on Submit -> reject "Not ready"
+            from Active on Submit -> transition Done
+            """);
+
+        var d2 = graph.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.StateAlwaysRejects)).ToList();
+        d2.Should().ContainSingle();
+        d2.Single().Severity.Should().Be(Severity.Warning);
+        d2.Single().Message.Should().Contain("Submit");
+        d2.Single().Message.Should().Contain("Draft");
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.AlwaysRejecting));
+    }
+
+    [Fact]
+    public void Analyze_WildcardRejectWithExplicitNonRejectOverride_DoesNotEmitD2ForOverridingState()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Active
+            state Done terminal
+            event Cancel
+            from any on Cancel -> reject "Cannot cancel"
+            from Active on Cancel -> transition Draft
+            """);
+
+        // Active has an explicit non-reject override — no D2 for Active
+        graph.Diagnostics.Should().NotContain(d =>
+            d.Code == nameof(DiagnosticCode.StateAlwaysRejects) && d.Message.Contains("Active"));
+    }
+
+    [Fact]
+    public void Analyze_WildcardRejectCoversMultipleStates_EmitsD2PerState()
+    {
+        var (_, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Workflow
+            state Draft initial
+            state Review
+            state Active
+            state Done terminal
+            event Cancel
+            event Approve
+            from Draft on Approve -> transition Review
+            from Review on Approve -> transition Active
+            from Active on Approve -> transition Done
+            from any on Cancel -> reject "Cannot cancel"
+            from Done on Cancel -> no transition
+            """);
+
+        // Done has an explicit non-reject override for Cancel — no D2 for Done.
+        // Draft, Review, Active get the wildcard reject as their effective row — D2 fires for each.
+        var d2 = graph.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.StateAlwaysRejects)).ToList();
+        d2.Should().HaveCount(3);
+        d2.Should().Contain(d => d.Message.Contains("Draft"));
+        d2.Should().Contain(d => d.Message.Contains("Review"));
+        d2.Should().Contain(d => d.Message.Contains("Active"));
+        d2.Should().NotContain(d => d.Message.Contains("Done"));
+    }
+
+    [Fact]
+    public void Analyze_WildcardNonRejectRow_ProvidesSuccessPathForAllNonOverridingStates_NoD2()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            state Draft initial
+            state Active
+            state Done terminal
+            event Reset
+            from any on Reset -> transition Draft
+            """);
+
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.StateAlwaysRejects));
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.AlwaysRejecting));
+    }
+
+    [Fact]
+    public void Analyze_MultipleGuardedRejectRowsForSameStateEvent_EmitsD2PerRow()
+    {
+        var graph = Analyze("""
+            precept Workflow
+            field Count as number default 0
+            state Draft initial
+            state Active
+            state Done terminal
+            event Submit
+            from Draft on Submit when Count < 0 -> reject "Count negative"
+            from Draft on Submit when Count > 100 -> reject "Count too high"
+            from Active on Submit -> transition Done
+            """);
+
+        // Both guarded reject rows for Draft are the effective rows for (Draft, Submit) — D2 on each.
+        var d2 = graph.Diagnostics.Where(d =>
+            d.Code == nameof(DiagnosticCode.StateAlwaysRejects) && d.Message.Contains("Draft")).ToList();
+        d2.Should().HaveCount(2);
+    }
 }

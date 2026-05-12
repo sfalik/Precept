@@ -341,6 +341,12 @@ public sealed record TypedTransitionRow(
     TransitionRowOutcome Outcome,
     string? RejectReason,
     QualifierBinding? ResultQualifier,
+    /// <summary>
+    /// Span covering the full transition row construct.
+    /// Pre-extracted in <see cref="TypeChecker"/> from <c>construct.Span</c>;
+    /// available in <see cref="GraphAnalyzer"/> without violating PRECEPT0024.
+    /// </summary>
+    SourceSpan RowSpan,
     ParsedConstruct Syntax
 );
 

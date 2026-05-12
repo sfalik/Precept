@@ -1159,6 +1159,7 @@ internal static partial class TypeChecker
                 Outcome: outcome,
                 RejectReason: rejectReason,
                 ResultQualifier: null,
+                RowSpan: construct.Span,
                 Syntax: construct);
         }
         finally

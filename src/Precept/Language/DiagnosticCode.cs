@@ -151,6 +151,16 @@ public enum DiagnosticCode
     /// complete execution paths that bypass the required state entirely.
     /// </summary>
     RequiredStateDoesNotDominateTerminal = 111,
+    /// <summary>
+    /// Every row for this event has a reject outcome — the event can never succeed anywhere.
+    /// If the event is not applicable in any state, remove all rows for it.
+    /// </summary>
+    AlwaysRejecting                    = 125,
+    /// <summary>
+    /// This event always rejects from the specified state, but has a success path from another state.
+    /// If the event has no meaning in this state, remove the row; no row means 'not applicable here'.
+    /// </summary>
+    StateAlwaysRejects                 = 126,
 
     // ── Proof (new codes) ───────────────────────────────────
     /// <summary>A field referenced in a proof obligation does not declare the required modifier.</summary>
