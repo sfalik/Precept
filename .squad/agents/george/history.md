@@ -734,3 +734,18 @@
 - RuleIdentity still has no BecauseText-style author label, so rule contexts remain index-based for now; see .squad/decisions/inbox/george-diagnostic-message-fixes.md.
 
 - Validation: dotnet build src\Precept\Precept.csproj --nologo passed, focused diagnostics/proof/typed-constant coverage passed (818/818), and full Precept.Tests still hits the pre-existing InventoryItem_Sample_PRE0114_Count_Drops_Below_Baseline failure in the dirty workspace (4840/4841 passed).
+
+
+
+### 2026-05-12T00:26:05.896-04:00 — E1 shared ParameterMeta disambiguation landed
+
+
+
+- ProofEngine now resolves QualifierCompatibilityProofRequirement operands directly from TypedBinaryOp.Left / .Right, bypassing the shared-ParameterMeta ambiguity that previously let same-type proofs inspect the right operand twice.
+- PRE0114 diagnostics for qualifier compatibility now pull operand names from the binary-op site, so cross-operand failures report F1 / F2 instead of falling back to <unknown>.
+- Added 5 new regression tests; 7 targeted proof tests pass around the fix, and the cross-currency false positive is now correctly detected by Cross_currency_fields_now_detected.
+- Implementation commit: d549b4a5dc478a571ba639ca67ae483ab0ff9fd3.
+
+
+
+

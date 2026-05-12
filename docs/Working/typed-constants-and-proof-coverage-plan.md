@@ -1,6 +1,6 @@
 # Typed Constants & Proof Coverage Plan
 
-**Status:** Part A — Not Started (Slice 1 ready to implement) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement
+**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — 🔲 Not Started (4 slices, 66 PRE0114)
 
 ### Slice Status Tracker
 
@@ -9,7 +9,7 @@
 | **Part A — Interpolated Typed Constants** | | |
 | 1 | Parser — `ParseInterpolatedTypedConstant()` | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
 | 2 | Type Checker — type-grammar matching | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
-| 2B | Type Checker — compound-unit interpolation (`'{A}/{B}'`) | 🔲 Not Started — **only remaining Part A gap** |
+| 2B | Type Checker — compound-unit interpolation (`'{A}/{B}'`) | ✅ Done (confirmed by frank-4 audit, 2026-05-11) |
 | 3 | Completions — hole-filtered completions | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
 | 4 | Semantic Tokens — hole expression classification | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
 | 5 | Docs/MCP — spec + diagnostic codes | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
@@ -23,6 +23,21 @@
 | 11B | Temporal Price Denominator Type System Extension (G8 + G13 prereq) | ✅ Complete (2026-05-11) |
 | 12 | Temporal Chain Validation (G8 + G13) | 🔲 Not Started — **unblocked by 11B** |
 | 13 | Derivation-Direction Chain Proof Analysis (G15) | ⛔ Closed — No Action Required |
+| **Part C — Inventory-Item Compile Fixes** | | |
+| C1 | Dimension Cancellation in TypeChecker | ✅ Done |
+| C2 | Keyword-as-Member-Name: `.from`/`.to` Accessor Fix | ✅ Done |
+| C3 | Compound Boolean `=`: Ensure Expression Parser Fix | ✅ Done (`4689145f`) |
+| C4 | Proof Engine Interpolated Qualifier Symbolic Equality | ✅ Done (`9040a066`) — PRE0114 73→66 (partial) |
+| **Part D — Test Failure Fixes (Pre-Existing)** | | |
+| D1 | ConflictingModifiers Fixture Fix (TypeCheckerAssemblyTests) | ✅ Done |
+| D2 | ExchangeRate `to` Keyword Qualifier Parser Fix | ✅ Done |
+| D3 | LS Manifest Activation Event | ✅ Done |
+| D4 | Scalar-Op Qualifier Propagation Fix (reframed) | ✅ Done (`01bc5f0e`) — 4831 tests pass (10 new) |
+| **Part E — BUG-A: Inventory-Item PRE0114 Resolution** | | |
+| E1 | Shared ParameterMeta Disambiguation in Qualifier Compatibility Proofs | ✅ Done (`d549b4a5`) — 7 targeted tests pass |
+| E2 | Interpolated Typed Constant Qualifier Extraction | 🔲 Not Started |
+| E3 | Subexpression Qualifier Propagation (Currency + Compound Unit Numerator) | 🔲 Not Started |
+| E4 | Symbolic Qualifier Equivalence for Interpolated Templates | 🔲 Not Started |
 
 
 **Architect:** Frank (frank-16, frank-18, frank-23 revision; proof audit integration 2026-05-11)  
@@ -1617,3 +1632,1475 @@ All proof gap slices (7–12, including 11B) are independent of Part A interpola
 ### Part B — Proof Engine Qualifier Coverage
 - [ ] Shane reviews proof gap audit findings and slice assignments
 - [ ] Priority 1 (Slice 7 — money currency) approved for immediate implementation
+
+### Part C — Inventory-Item Compile Fixes
+- [ ] Shane reviews C2–C4 designs and approves for implementation
+- [ ] C1 (George's in-flight RC-3 work) completes and merges
+
+### Part D — Test Failure Fixes
+- [ ] D1–D4 reviewed and approved for implementation
+
+---
+
+## Part C — Inventory-Item Compile Fixes
+
+**Added:** 2026-05-12  
+**Architect:** Frank  
+**Source:** Deep-dive analysis of `samples/inventory-item.precept` — 4 remaining compiler gaps producing ~80 diagnostics. RC-1 (parser qualifier acceptance) and RC-2 (compound-unit patterns) are tracked in Part A. These slices cover the remaining blockers.  
+**Scope:** 1 TypeChecker extension (dimension cancellation), 1 parser fix (keyword-as-member-name), 1 sample fix + parser diagnostic improvement (`=` vs `==`), 1 ProofEngine extension (arg qualifier resolution for interpolated qualifiers).
+
+All C-slices are independent of Parts A and B (except C1, which extends Part A's type-grammar work). C2–C4 can execute in any order and in parallel.
+
+---
+
+### Slice C1 — Dimension Cancellation in TypeChecker (`qty[A/B] × qty[B] → qty[A]`)
+
+**Status:** 🔄 In Progress (George)  
+**Added:** 2026-05-12  
+**Depends on:** Slice 2B (compound-unit interpolation patterns)  
+**Blocks:** None
+
+**Gap:** The `QuantityTimesQuantity` operation in the Operations catalog (Operations.cs L570–572) is declared with the description "dimensional cancellation" but no implementation exists to compute the result dimension from operand dimensions. When `qty of 'mass/length' × qty of 'length'` is evaluated, the result should be `qty of 'mass'` — the shared denominator dimension cancels against the right operand's dimension. Without this, compound-unit arithmetic in `inventory-item.precept` (conversion factor × purchase quantity) cannot type-check with correct result dimensions.
+
+**Files:**
+
+| File | Change |
+|------|--------|
+| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | Extend `CreateResolvedBinaryOp()` or `ResolveBinaryResultType()` to compute result qualifier when operation is `QuantityTimesQuantity` and both operands carry dimension qualifiers. New helper: dimension string parsing for compound `A/B` forms, cancellation logic. |
+| `src/Precept/Language/Operations.cs` | Add `QualifierChainProofRequirement` or new `DimensionCancellationProofRequirement` to `QuantityTimesQuantity` operation meta to validate denominator compatibility at proof time. |
+| `src/Precept/Pipeline/ProofEngine.cs` | If a new proof requirement type is added, extend `TryQualifierCompatibilityProof()` to handle dimension cancellation matching (denominator of left operand equals dimension of right operand). |
+| `src/Precept/Pipeline/SemanticIndex.cs` | Possibly add `ComputedQualifier` or `CancelledDimensionQualifier` binding subtype if result qualifier identity needs to be tracked through the semantic index. |
+
+**Tests (expected):**
+- `qty of 'mass/length' × qty of 'length'` → result `qty of 'mass'` ✓
+- `qty of 'length' × qty of 'length'` → result `qty of 'length²'` or structural error (design decision pending)
+- `qty of 'mass' × qty of 'length'` (no cancellation possible — independent dimensions) → result dimension behavior TBD
+- Reverse order: `qty of 'length' × qty of 'mass/length'` → result `qty of 'mass'` ✓
+- Mismatched denominator: `qty of 'mass/length' × qty of 'mass'` → proof failure (denominator `length` ≠ `mass`)
+
+**Downstream Impact:**
+- Runtime: N/A (declaration-time only)
+- Tooling: N/A — no completions/semantic-token changes; hover may show computed result dimensions
+- MCP: N/A — no new tool surface
+
+---
+
+### Slice C2 — Keyword-as-Member-Name: `.from`/`.to` Accessor Fix
+
+**Status:** 🔲 Not Started  
+**Added:** 2026-05-12  
+**Depends on:** None  
+**Blocks:** None
+
+#### Root Cause
+
+The `exchangerate` type declares accessors named `from` and `to` (Types.cs, ExchangeRate entry, `FixedReturnAccessor("from", ...)` and `FixedReturnAccessor("to", ...)`). These names collide with keywords `TokenKind.From` (preposition: "exit-gate ensure / transition source") and `TokenKind.To` (preposition: "entry-gate ensure / transition target").
+
+**Parse failure chain:**
+1. **Lexer:** Text `from`/`to` always tokenized as `TokenKind.From`/`TokenKind.To` (keywords, not identifiers). The lexer has no context-sensitivity — `_keywordLookup` maps unconditionally.
+2. **Parser member access:** `ParseMemberAccessOrMethodCall()` (Parser.Expressions.cs L318–340) checks `memberToken.Kind == TokenKind.Identifier || IsMemberNameToken(memberToken.Kind)`.
+3. **`IsMemberNameToken()`** (Parser.Expressions.cs L342–343) delegates to `Parser.KeywordsValidAsMemberName.Contains(kind)`.
+4. **Circular initialization:** `Parser.KeywordsValidAsMemberName` (Parser.cs L30–34) is built by filtering `Tokens.All` for `meta.IsValidAsMemberName`. But `TokenMeta.IsValidAsMemberName` (Token.cs L68) is a **computed property** that reads `Tokens.KeywordsValidAsMemberName` — creating a circular dependency. The catalog-driven checklist (item 7) says "Set `IsValidAsMemberName: true` in `Tokens.GetMeta`" — but `IsValidAsMemberName` is currently a computed property, not a constructor parameter.
+
+**Symptom:** `Rate.from` and `Rate.to` produce PRE0009 ("expected member name") at `samples/inventory-item.precept` lines 173–174.
+
+#### Design
+
+The fix is **catalog-driven** per the checklist (item 7). The circular dependency must be broken by making `IsValidAsMemberName` a **constructor parameter** on `TokenMeta` instead of a computed property.
+
+**Work:**
+
+**A. `src/Precept/Language/Token.cs` — Make `IsValidAsMemberName` a constructor parameter (~3 LOC)**
+
+Change `TokenMeta` record:
+```csharp
+// BEFORE (L68):
+public bool IsValidAsMemberName => Tokens.KeywordsValidAsMemberName.Contains(Kind);
+
+// AFTER:
+bool IsValidAsMemberName = false    // constructor parameter with default
+```
+
+This breaks the circular dependency. `IsValidAsMemberName` becomes catalog metadata set at definition time, not a runtime computation.
+
+**B. `src/Precept/Language/Tokens.cs` — Derive `IsValidAsMemberName` from type accessor metadata (~15 LOC)**
+
+`Tokens.KeywordsValidAsMemberName` (L505–513) already computes the correct set from `Types.All.SelectMany(meta => meta.Accessors)`. The initialization needs to be restructured:
+
+1. Compute the keyword-as-member-name set **first** (eagerly, before `GetMeta` calls need it).
+2. In `GetMeta` for `TokenKind.From` and `TokenKind.To`, set `IsValidAsMemberName: true`.
+
+The cleanest approach: keep `Tokens.KeywordsValidAsMemberName` derived from `Types.All` accessor names (the canonical source), but **also** set `IsValidAsMemberName` on each affected `TokenMeta` entry. This means `GetMeta` entries for `From` and `To` gain `IsValidAsMemberName: true`.
+
+The set `Tokens.KeywordsValidAsMemberName` becomes a **validation/documentation artifact** (confirming which tokens are marked), while the `Parser.KeywordsValidAsMemberName` set drives parser behavior from the per-token metadata.
+
+**Alternatively** (simpler, preferred): Remove `Tokens.KeywordsValidAsMemberName` entirely. Change `Parser.KeywordsValidAsMemberName` to compute directly from type accessors at parser init:
+```csharp
+public static FrozenSet<TokenKind> KeywordsValidAsMemberName { get; } =
+    Types.All
+        .SelectMany(meta => meta.Accessors)
+        .Select(a => a.Name)
+        .Distinct(StringComparer.Ordinal)
+        .Select(name => Tokens.Keywords.TryGetValue(name, out var kind) ? kind : (TokenKind?)null)
+        .Where(kind => kind is not null)
+        .Select(kind => kind!.Value)
+        .ToFrozenSet();
+```
+
+This eliminates the circular dependency entirely: `Parser.KeywordsValidAsMemberName` derives from `Types.All` (accessor names) → `Tokens.Keywords` (text → TokenKind mapping). No dependency on `TokenMeta.IsValidAsMemberName`. The `TokenMeta.IsValidAsMemberName` property then becomes either (a) removed, or (b) set as a parameter in `GetMeta` and used only for non-parser consumers.
+
+**C. No Lexer changes.** The lexer remains context-free. Keywords stay as keywords. The parser handles context-sensitivity.
+
+**D. No Parser changes beyond the set derivation.** `IsMemberNameToken()` and `ParseMemberAccessOrMethodCall()` already work correctly — they just need the set to contain `From` and `To`.
+
+**Files:**
+
+| File | Change | LOC |
+|------|--------|-----|
+| `src/Precept/Language/Token.cs` | Make `IsValidAsMemberName` a constructor parameter (or remove it) | ~3 |
+| `src/Precept/Language/Tokens.cs` | Remove `KeywordsValidAsMemberName` (move derivation to Parser) or keep as validation set | ~5 |
+| `src/Precept/Pipeline/Parser.cs` | Update `KeywordsValidAsMemberName` derivation to use Types.All accessor names directly | ~10 |
+| `samples/inventory-item.precept` | Lines 173–174 should now compile (no sample change needed) | 0 |
+
+**LOC estimate:** ~18 lines changed
+
+**Tests:**
+
+_Parser tests (new):_
+- `Rate.from` where `Rate` is `exchangerate` → parses as `MemberAccessExpression` with member name `"from"` ✓
+- `Rate.to` where `Rate` is `exchangerate` → parses as `MemberAccessExpression` with member name `"to"` ✓
+- `transition Active from Inactive` → `from` still parses as keyword (not confused by member-name allowance) ✓
+- `in Listed ensure ... from SomeState` → `from` in non-member-access position remains a keyword ✓
+- `SomeField.amount` → non-keyword accessor still works ✓
+
+_Type checker tests (new):_
+- `Rate.from` on `exchangerate` field → resolves to `TypeKind.Currency` ✓
+- `Rate.to` on `exchangerate` field → resolves to `TypeKind.Currency` ✓
+- `Rate.from = SupplierCurrency` in ensure → valid currency equality comparison ✓
+
+_Regression tests:_
+- All existing `from`/`to` keyword usages (transition sources, ensure exit-gates) remain valid
+- `KeywordsValidAsMemberName` set contains exactly `{TokenKind.From, TokenKind.To}` (currently — may grow as more types add keyword-named accessors)
+
+**Downstream Impact:**
+- Runtime: N/A — parser change only
+- Tooling: Completions after `.` on exchangerate fields should already include `from`/`to` (they derive from accessor metadata). Verify no regression.
+- MCP: N/A — no tool surface changes. The `precept_language` type accessor output already lists `from`/`to`.
+
+---
+
+### Slice C3 — Compound Boolean `=`: Ensure Expression Parser Fix
+
+**Status:** 🔲 Not Started  
+**Added:** 2026-05-12  
+**Depends on:** None  
+**Blocks:** None
+
+#### Root Cause
+
+This is a **sample file bug, not a compiler bug.** The analysis is definitive:
+
+In `ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand = '0 {StockingUnit}'` (inventory-item.precept L150, L156):
+
+1. Precept uses `=` exclusively for **assignment** (`set Field = Value`). `TokenKind.Assign` is not registered as a binary operator in the `Operators` catalog.
+2. Precept uses `==` for **equality comparison** (`OperatorKind.Equals`, `TokenKind.DoubleEquals`, precedence 30 in Operators.cs).
+3. When the Pratt parser encounters `=` in an expression context, `GetLedBindingPower(TokenKind.Assign)` returns `(-1, -1)` — "not an operator." The parser stops the led loop and returns the partial expression `QuantityOnHand` without consuming the `=` or the right operand.
+4. The orphaned `= '0 {StockingUnit}'` tokens violate slot termination, producing PRE0009.
+
+**This is correct parser behavior.** The language design intentionally separates assignment (`=`) from equality (`==`) to prevent ambiguity between action and expression contexts. The sample file is wrong — it should use `==`.
+
+#### Design
+
+**Two changes:**
+
+**A. Fix the sample file (2 lines)**
+
+`samples/inventory-item.precept` lines 150 and 156: change `= '0 {StockingUnit}'` to `== '0 {StockingUnit}'`.
+
+**B. Add a targeted diagnostic hint when `=` appears in expression context (~15 LOC)**
+
+When the parser encounters `TokenKind.Assign` in expression position (inside `ParseExpression`'s led loop, after `GetLedBindingPower` returns `(-1, -1)`), emit a **hint diagnostic** suggesting `==`:
+
+**File:** `src/Precept/Pipeline/Parser.Expressions.cs`  
+**Method:** `ParseExpression()` (L20–34) or new helper called from the led-loop exit path
+
+After the binding-power check fails and before breaking:
+```csharp
+// In the led loop, when ledBp < 0:
+if (Peek().Kind == TokenKind.Assign)
+{
+    _diagnostics.Add(Language.Diagnostics.Create(
+        DiagnosticCode.AssignmentInExpressionContext, Peek().Span));
+    // Do NOT consume the token — let normal error recovery handle it
+}
+```
+
+**File:** `src/Precept/Language/DiagnosticCode.cs`  
+Add new code: `AssignmentInExpressionContext` (next available code number)
+
+**File:** `src/Precept/Language/Diagnostics.cs` (or wherever diagnostic metadata lives)  
+Message: `"Use '==' for comparison. '=' is the assignment operator (used in 'set' actions)."`  
+Severity: `Error` (not a hint — this is always wrong in expression context)
+
+**Files:**
+
+| File | Change | LOC |
+|------|--------|-----|
+| `samples/inventory-item.precept` | L150, L156: `= '0 {StockingUnit}'` → `== '0 {StockingUnit}'` | 2 |
+| `src/Precept/Pipeline/Parser.Expressions.cs` | Add `TokenKind.Assign` check in led-loop exit path | ~8 |
+| `src/Precept/Language/DiagnosticCode.cs` | Add `AssignmentInExpressionContext` code | 1 |
+| `src/Precept/Language/Diagnostics.cs` | Add diagnostic metadata entry with message and severity | ~5 |
+
+**LOC estimate:** ~16 lines changed
+
+**Tests:**
+
+_Parser tests (new):_
+- `ensure A = B` → emits `AssignmentInExpressionContext` diagnostic with span on `=` ✓
+- `ensure A == B` → no diagnostic, valid comparison ✓
+- `ensure A > B and C = D` → emits `AssignmentInExpressionContext` on the `=` ✓
+- `set Field = Value` → no diagnostic (action context, not expression context) ✓
+
+_Regression tests:_
+- `set X = Y` in action position — still valid, no spurious diagnostic
+- All existing ensure expressions with `==` — unchanged behavior
+- All existing `=` in action slots — unchanged behavior
+
+**Downstream Impact:**
+- Runtime: N/A — diagnostic addition only
+- Tooling: Language server surfaces the new diagnostic code automatically (diagnostics are catalog-derived). Quick-fix action (suggest `==` replacement) is a possible follow-up but out of scope.
+- MCP: New diagnostic code auto-surfaces through `precept_language` diagnostic lookup. No DTO changes.
+
+---
+
+### Slice C4 — Proof Engine Interpolated Qualifier Symbolic Equality (BUG-A)
+
+**Status:** 🔲 Not Started  
+**Added:** 2026-05-12  
+**Depends on:** None (RC-1 already implemented — parser accepts interpolated qualifiers)  
+**Blocks:** None
+
+#### Root Cause
+
+73+ PRE0114 (`UnprovedQualifierCompatibility`) errors in `inventory-item.precept` trace to a single gap: **`ResolveQualifierOnAxis()` in ProofEngine.cs cannot resolve qualifiers from event arguments (`TypedArgRef`).** It only resolves qualifiers from fields (`TypedFieldRef`).
+
+**The failure chain:**
+
+1. **TypeChecker produces correct qualifier metadata.** For `qty as quantity of '{StockingUnit.dimension}'`, `MapInterpolatedQualifier()` (TypeChecker.cs L154–184) creates `DeclaredQualifierMeta.Dimension("{StockingUnit.dimension}")` — the template string preserves the interpolated expression structure. `TypedArgRef` carries these qualifiers in its `DeclaredQualifiers` property (SemanticIndex.cs L29–35).
+
+2. **ProofEngine resolves the subject to `TypedArgRef`.** `ResolveSubject()` (ProofEngine.cs L254–273) correctly maps a `ParamSubject` in a binary operation to the `TypedArgRef` via `ResolveParamInBinaryOp()`.
+
+3. **`GetFieldName()` fails on `TypedArgRef`.** (ProofEngine.cs L315–323) The switch only handles `TypedFieldRef` and `TypedMemberAccess { Object: TypedFieldRef }`. `TypedArgRef` falls through to `_ => null`.
+
+4. **`ResolveQualifierOnAxis()` returns null.** (ProofEngine.cs L945–988) Because `GetFieldName()` returned null (L948–949), the method returns null immediately — no qualifier lookup attempted.
+
+5. **`TryQualifierCompatibilityProof()` fails.** (ProofEngine.cs L878–911) When either side resolves to null, the proof cannot discharge. The obligation remains unresolved, producing PRE0114.
+
+**Key insight:** The qualifier values are **already structurally equal** (both sides carry `Dimension("{StockingUnit.dimension}")` as a string template). The bug is not in qualifier comparison — it's that the engine never gets to compare them because it can't look up arg qualifiers.
+
+**Existing precedent:** `ResolveSourceModifiers()` (ProofEngine.cs L1101–1121) **already handles `TypedArgRef`** for modifier resolution — it pattern-matches on `TypedArgRef`, looks up the event by name, and iterates args. The qualifier resolution path needs the same treatment.
+
+#### Design
+
+**A. Extend `GetFieldName()` to handle `TypedArgRef` (~2 LOC)**
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` L315–323
+
+```csharp
+private static string? GetFieldName(TypedExpression? resolved)
+{
+    return resolved switch
+    {
+        TypedFieldRef fieldRef => fieldRef.FieldName,
+        TypedMemberAccess { Object: TypedFieldRef fieldRef } => fieldRef.FieldName,
+        TypedArgRef argRef => argRef.ArgName,      // ← NEW
+        _ => null
+    };
+}
+```
+
+This gives the proof engine a name to use for arg references in diagnostic messages (replacing `<unknown>` with the actual arg name).
+
+**B. Extend `ResolveQualifierOnAxis()` to resolve arg qualifiers (~20 LOC)**
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` L945–988
+
+After the existing field lookup path (L950), add an arg qualifier resolution path. The structure mirrors `ResolveSourceModifiers()`:
+
+```csharp
+private static DeclaredQualifierMeta? ResolveQualifierOnAxis(
+    ProofSubject subject, QualifierAxis axis, TypedExpression site, SemanticIndex semantics)
+{
+    var resolved = ResolveSubject(subject, site);
+    
+    // ── Path 1: Direct qualifier extraction from TypedArgRef ──
+    // TypedArgRef carries its qualifiers directly (set by TypeChecker from
+    // MapInterpolatedQualifier). No semantic index lookup needed.
+    if (resolved is TypedArgRef argRef && argRef.DeclaredQualifiers is { IsDefaultOrEmpty: false } argQuals)
+    {
+        foreach (var qual in argQuals)
+        {
+            if (qual.Axis == axis)
+                return qual;
+        }
+        // Apply same axis fallbacks as field path (Unit→Dimension, Dimension→TemporalDimension)
+        if (axis == QualifierAxis.Unit)
+        {
+            foreach (var qual in argQuals)
+                if (qual.Axis == QualifierAxis.Dimension) return qual;
+        }
+        if (axis == QualifierAxis.Dimension)
+        {
+            foreach (var qual in argQuals)
+                if (qual.Axis == QualifierAxis.TemporalDimension) return qual;
+        }
+        return null;
+    }
+    
+    // ── Path 2: Existing field lookup path (unchanged) ──
+    var fieldName = GetFieldName(resolved);
+    if (fieldName is null) return null;
+    if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return null;
+    // ... existing field qualifier resolution + fallbacks + implied qualifiers ...
+}
+```
+
+**Why direct extraction instead of semantic index lookup:** `TypedArgRef` already carries `DeclaredQualifiers` (set by the TypeChecker at resolution time). Looking up qualifiers through the semantic index (`EventsByName → Args → DeclaredQualifiers`) would work but is unnecessarily indirect — the qualifiers are already on the expression node. Direct extraction is simpler, more efficient, and consistent with how `TypedArgRef` is used elsewhere in the TypeChecker (e.g., `TypeChecker.Expressions.TypedConstants.cs` L55 pattern-matches `TypedArgRef { DeclaredQualifiers: { } argQualifiers }`).
+
+**C. Qualifier equality for interpolated values: string comparison is sufficient**
+
+Two interpolated qualifier expressions `'{StockingUnit.dimension}'` produce identical `DeclaredQualifierMeta.Dimension("{StockingUnit.dimension}")` records. C# record equality (`leftQualifier == rightQualifier`) compares all fields — `DimensionName`, `Origin`, `Preposition`, and `ProofSatisfactions`. The string comparison on `DimensionName` is exact: `"{StockingUnit.dimension}" == "{StockingUnit.dimension}"`.
+
+For `ExtractComparableValue()`, `Dimension("{StockingUnit.dimension}")` → returns `"{StockingUnit.dimension}"` — the template string itself. `ChainQualifiersMatch` uses `string.Equals(..., Ordinal)`, so two structurally identical interpolated qualifiers compare equal.
+
+**No new subtype or comparison logic is needed.** The existing `DeclaredQualifierMeta` DU subtypes and comparison infrastructure handle interpolated qualifiers correctly — once the qualifiers are actually resolved.
+
+**D. What "symbolic equality" means for interpolated qualifiers**
+
+Two interpolated qualifier expressions are symbolically equal when their **template strings are identical.** The template string is produced by `DescribeInterpolatedQualifier()` (TypeChecker.cs L186–204), which reconstructs the expression as `{FieldName.AccessorName}` or `{FieldName}`. This is a **structural identity** — it compares the names in the source text, not the runtime values.
+
+- `'{StockingUnit.dimension}'` on field A and `'{StockingUnit.dimension}'` on field B → **equal** (same template string)
+- `'{StockingUnit.dimension}'` and `'{PurchaseUnit.dimension}'` → **not equal** (different template strings, even if both happen to reference the same dimension at runtime)
+- `'{StockingUnit.dimension}'` and `'mass'` (literal) → **not equal** (interpolated template ≠ literal value, even if StockingUnit happens to be in the mass dimension)
+
+This is the correct behavior. Precept's proof engine is **conservative**: it proves what is structurally guaranteed, not what might be true at runtime. If an author needs to assert that two different fields have the same dimension, they must use the same interpolation source or a literal.
+
+**Files:**
+
+| File | Change | LOC |
+|------|--------|-----|
+| `src/Precept/Pipeline/ProofEngine.cs` L315–323 | Add `TypedArgRef argRef => argRef.ArgName` to `GetFieldName()` switch | ~2 |
+| `src/Precept/Pipeline/ProofEngine.cs` L945–988 | Add `TypedArgRef` direct qualifier extraction path before field lookup, with axis fallbacks | ~20 |
+
+**LOC estimate:** ~22 lines changed
+
+**Tests:**
+
+_Proof engine tests (new) — all in `test/Precept.Tests/ProofEngine/ProofEngineTests.cs`:_
+
+- **Arg qualifier compatibility — same interpolated qualifier:**
+  `event E(x as quantity of '{F.dimension}')` + `field F as quantity of '{F.dimension}'` + `on E ensure E.x > F` → proof discharges ✓ (both carry `Dimension("{F.dimension}")`)
+
+- **Arg qualifier compatibility — different interpolated qualifier:**
+  `event E(x as quantity of '{A.dimension}')` + `field B as quantity of '{C.dimension}'` + `on E ensure E.x > B` → PRE0114 ✓ (template strings differ)
+
+- **Arg qualifier compatibility — literal vs interpolated:**
+  `event E(x as quantity of '{F.dimension}')` + `field G as quantity of 'mass'` + `on E ensure E.x > G` → PRE0114 ✓ (interpolated template ≠ literal value)
+
+- **Arg qualifier compatibility — interpolated on both args:**
+  `event E(x as quantity of '{F.dimension}', y as quantity of '{F.dimension}')` + binary op involving both → proof discharges ✓
+
+- **Arg currency qualifier:**
+  `event E(p as price in '{Curr}')` + `field Curr as currency` + `on E ensure E.p > TotalCost` where `TotalCost as price in '{Curr}'` → proof discharges ✓
+
+- **Arg with axis fallback (Unit→Dimension):**
+  `event E(q as quantity of '{F.dimension}')` + `field G as quantity in 'kg'` (unit with dimension 'mass') + comparison → axis fallback resolves; proof outcome depends on whether `"{F.dimension}"` equals `"mass"` (it won't — correctly PRE0114)
+
+- **GetFieldName diagnostic message:**
+  When proof fails on an arg reference, diagnostic message should show `"x"` (arg name) not `"<unknown>"`
+
+_Regression tests:_
+- All existing proof engine tests pass (field-only qualifier resolution unchanged)
+- `ResolveSourceModifiers` for `TypedArgRef` — existing modifier resolution still works
+- Field qualifier resolution path (Path 2) is structurally unchanged — verify no regression in field-only comparisons
+
+**Downstream Impact:**
+- Runtime: N/A — proof engine change only (compile-time)
+- Tooling: Better diagnostic messages (arg names instead of `<unknown>`). No semantic-token or completion changes.
+- MCP: N/A — no tool surface changes. Proof obligations are internal.
+
+---
+
+### Part C Dependency Order
+
+```
+C1 (Dimension Cancellation) — depends on Slice 2B (compound-unit forms)
+C2 (Keyword Member Name)    — independent
+C3 (Ensure Equals)          — independent
+C4 (Arg Qualifier Proof)    — independent
+```
+
+C2, C3, and C4 can execute in any order, in parallel, and in parallel with Parts A/B/D. C1 depends on Slice 2B and is already in progress (George).
+
+---
+
+## Part D — Test Failure Fixes (Pre-Existing)
+
+**Added:** 2026-05-11  
+**Architect:** Frank  
+**Source:** `test-results/failure-diagnosis.txt` — 30 pre-existing failures across the test suite, none caused by recent George/RC work.  
+**Scope:** 4 root-cause groups (B1–B4) requiring surgical test/fixture/config fixes. No weakening of validation logic. No pipeline changes.
+
+All D-slices are independent of Parts A, B, and C. They can execute in any order and in parallel with other workstreams.
+
+---
+
+### Slice D1 — B1: ConflictingModifiers Fixture Fix (TypeCheckerAssemblyTests)
+
+**Status:** 🔲 Not Started  
+**Owner:** George  
+**Depends on:** None  
+**Fixes:** 23 failures in `TypeCheckerAssemblyTests` + 1 in `Integration_LoanApplication_FullSample` = **24 total**
+
+**Root Cause Analysis:**
+
+The `Modifiers` catalog correctly declares `Optional` and `Notempty` as mutually exclusive:
+
+- `Modifiers.cs` L61: `Optional` → `MutuallyExclusiveWith: [ModifierKind.Notempty]`
+- `Modifiers.cs` L131: `Notempty` → `MutuallyExclusiveWith: [ModifierKind.Optional]`
+
+The modifier validation in `TypeChecker.Validation.cs` L121–123 correctly emits `DiagnosticCode.ConflictingModifiers` when both appear on the same field/arg. This validation is semantically correct: `optional` permits absence while `notempty` asserts content — a logical contradiction. The `TypeCheckerModifierTests` already contain positive tests proving this validation works as designed (`Field_OptionalAndNotempty_EmitsConflictingModifiers`, `EventArg_OptionalAndNotempty_EmitsConflictingModifiers`, `Field_CollectionOptionalAndNotempty_EmitsConflictingModifiers`).
+
+The problem: two shared test DSL fixtures contain `optional notempty` on event args, which was never valid once modifier conflict validation shipped. The fixtures predate the validation tightening.
+
+**Design Decision:** The validation is correct — we do NOT weaken it. The fixtures must be updated to remove the contradiction.
+
+**Semantic intent of the original fixture:** The fixture author intended "the Note arg is optional, but if provided, must not be empty." This intent is valid but cannot be expressed via contradictory modifiers. In Precept, the correct pattern is: make the arg `optional` (presence semantics) and add an event ensure to validate non-emptiness when present. However, for a test fixture whose purpose is to exercise SemanticIndex completeness and assembly output — not modifier semantics — the simplest correct fix is to drop `notempty` and keep `optional`. The fixture's tests never inspect the Note arg's modifier list; they inspect the assembled SemanticIndex structure.
+
+**Files:**
+
+| File | Change |
+|------|--------|
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssemblyTests.cs` L55 | `Note as string optional notempty` → `Note as string optional` |
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssemblyTests.cs` L502 | `Note as string optional notempty` → `Note as string optional` (LoanApplication integration test) |
+
+**Work:**
+
+1. In the `FullPrecept` constant (L55), change the `Approve` event arg declaration from `Note as string optional notempty` to `Note as string optional`.
+2. In the `Integration_LoanApplication_FullSample` inline DSL (L502), apply the same change.
+3. No other test files require changes — the `ParserCoverageGapTests` uses `optional notempty` in parser-level tests that don't invoke type checking, so they remain valid.
+
+**Tests:** All 24 previously-failing tests should now pass. No new tests needed — the existing `TypeCheckerModifierTests` already validate that `ConflictingModifiers` fires correctly for `optional notempty`.
+
+**Downstream Impact:**
+- Runtime: N/A — no runtime changes
+- Tooling: N/A — no language server changes
+- MCP: N/A — no MCP changes
+
+---
+
+### Slice D2 — B2: ExchangeRate `to` Keyword Qualifier Parser Fix
+
+**Status:** 🔲 Not Started  
+**Owner:** George  
+**Depends on:** None  
+**Fixes:** 3 failures in `TypeCheckerAssignmentQualifierTests`
+
+**Root Cause Analysis:**
+
+The 3 failing exchange rate tests use the syntax `field rate1 as exchangerate from 'USD' to 'EUR'`. However, the canonical qualifier shape for `exchangerate` is:
+
+```
+QS_ExchangeRate = new([
+    new(TokenKind.In,   QualifierAxis.FromCurrency),
+    new(TokenKind.To,   QualifierAxis.ToCurrency),
+]);
+```
+
+The correct DSL syntax is `exchangerate in 'USD' to 'EUR'`, not `exchangerate from 'USD' to 'EUR'`. The `Types` catalog confirms this at `Types.cs` L604: `UsageExample: "field FxRate as exchangerate in 'USD' to 'EUR'"`.
+
+**Why it worked before RC-1:** Before RC-1 tightened parser qualifier position handling, the `from` keyword in `field rate1 as exchangerate from 'USD' to 'EUR'` was being consumed differently — likely as an unrecognized token that the parser skipped past, allowing the `to` qualifier to still match its slot. After RC-1, `from` is now immediately consumed as a construct leader (transition row `from State on Event`), which pulls the parser into transition parsing and causes the `to` keyword to fail with `ExpectedToken`.
+
+**Why these tests use `from` instead of `in`:** The tests were written based on an intuitive reading of exchange rate semantics ("from USD to EUR") rather than the actual qualifier shape. The qualifier shape uses `in` for the source currency — consistent with all other domain types (`money in 'USD'`, `quantity in 'kg'`). The `from` preposition on `exchangerate` is a member accessor (`.from` returns the source currency value), not a qualifier preposition.
+
+**Design Decision:** Fix the test DSL to use the canonical qualifier syntax. This is NOT a parser bug — the parser correctly follows the qualifier shape. The tests had the wrong syntax.
+
+**Interaction with Rec 2 (`.from`/`.to` member access disambiguation):** None. Rec 2 concerns member accessor tokens (`.from`, `.to`) in expressions. This fix concerns qualifier preposition tokens (`in`, `to`) in field type declarations. Different parser paths, different token positions, no shared disambiguation logic.
+
+**Files:**
+
+| File | Change |
+|------|--------|
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` L22 | `exchangerate from 'USD' to 'EUR'` → `exchangerate in 'USD' to 'EUR'` |
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` L23 | same |
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` L40 | same |
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` L41 | same |
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` L58 | same |
+| `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` L59 | same |
+
+**Work:**
+
+In all 3 exchange rate test methods (`ExchangeRate_Assignment_MatchingFromTo_NoDiagnostic`, `ExchangeRate_Assignment_MismatchedFromCurrency_Diagnostic`, `ExchangeRate_Assignment_MismatchedToCurrency_Diagnostic`), replace `from 'XXX' to 'YYY'` with `in 'XXX' to 'YYY'` in every `field ... as exchangerate` declaration. Six line changes total across the three tests.
+
+**Tests:** The 3 previously-failing tests should now pass with their original assertions intact:
+- `MatchingFromTo_NoDiagnostic` — expects clean compile → will compile clean with correct syntax
+- `MismatchedFromCurrency_Diagnostic` — expects `QualifierMismatch` → will now reach qualifier validation and produce the expected mismatch
+- `MismatchedToCurrency_Diagnostic` — expects `QualifierMismatch` → same
+
+**Downstream Impact:**
+- Runtime: N/A — no runtime changes
+- Tooling: N/A — no language server changes
+- MCP: N/A — no MCP changes
+
+---
+
+### Slice D3 — B3: LS Manifest Activation Event
+
+**Status:** 🔲 Not Started  
+**Owner:** Kramer (language server)  
+**Depends on:** None  
+**Fixes:** 1 failure in `Precept.LanguageServer.Tests` — `ExtensionManifestTests.PackageManifest_Activates_WhenAPreceptDocumentOpens`
+
+**Root Cause Analysis:**
+
+The test at `test/Precept.LanguageServer.Tests/ExtensionManifestTests.cs` L40 asserts:
+
+```csharp
+activationEvents.Should().Contain("onLanguage:precept");
+activationEvents.Should().Contain("workspaceContains:**/*.precept");
+```
+
+The current `tools/Precept.VsCode/package.json` L13–15 only declares:
+
+```json
+"activationEvents": [
+    "workspaceContains:**/*.precept"
+]
+```
+
+The `onLanguage:precept` entry is missing. This is a pre-existing config gap — the extension activates when a workspace contains `.precept` files, but NOT when a `.precept` document is opened directly (e.g., `code path/to/file.precept` in a non-workspace context).
+
+**Design Decision:** Add `"onLanguage:precept"` to the `activationEvents` array. This is the standard VS Code pattern for language extensions — both workspace-level and document-level activation should be present.
+
+**Files:**
+
+| File | Change |
+|------|--------|
+| `tools/Precept.VsCode/package.json` L13–15 | Add `"onLanguage:precept"` to `activationEvents` array |
+
+**Work:**
+
+Change the `activationEvents` array from:
+
+```json
+"activationEvents": [
+    "workspaceContains:**/*.precept"
+]
+```
+
+to:
+
+```json
+"activationEvents": [
+    "onLanguage:precept",
+    "workspaceContains:**/*.precept"
+]
+```
+
+One line addition. The `onLanguage:precept` entry triggers activation when any document with the `precept` language ID is opened, matching the language registration in `contributes.languages[0].id = "precept"` (L19). The `workspaceContains` entry remains as a fallback for workspace-level activation before any document is opened.
+
+**Tests:** The 1 previously-failing test (`PackageManifest_Activates_WhenAPreceptDocumentOpens`) should now pass.
+
+**Downstream Impact:**
+- Runtime: N/A
+- Tooling: The extension will now activate on single-file opens in non-workspace contexts — this is correct behavior, not a side effect
+- MCP: N/A
+
+---
+
+### Slice D4 (Reframed) — Scalar-Op Qualifier Propagation Fix
+
+**Status:** 🔲 Not Started — design complete  
+**Owner:** George (core runtime)  
+**Depends on:** None  
+**Fixes:** 1 failure in `Precept.Mcp.Tests` — `LanguageToolTests.Language_SyntaxReferenceMirrorsSourceAndExamplesCompile`
+
+**Naming Decision:** Kept as D4, not renamed to C5. Rationale: Part C is scoped to "inventory-item compile fixes." This fix does NOT resolve any of the remaining 66 PRE0114 in `inventory-item.precept` — those are all from BUG-A (arg qualifier resolution, C4). Part D is "pre-existing test failure fixes." This fixes a pre-existing test failure. The fact that the fix reaches into the compiler doesn't change its classification — it makes it a D-series item whose root cause runs deeper than originally assumed. Creating a new E-series for one item is over-engineering the classification.
+
+#### Root Cause Analysis (Reframed)
+
+The original D4 premise was wrong. `default '0.00 USD/kg'` on a `price` field **already compiles** — the runtime supports compound-unit defaults. The actual failure is in the `FinalCost` computed expression in the same snippet.
+
+**Failing test:** `test/Precept.Mcp.Tests/LanguageToolTests.cs` L380–385 → `Language_SyntaxReferenceMirrorsSourceAndExamplesCompile`
+
+**Failing snippet:** The "Money and quantity typed fields" `CommonPattern` at `src/Precept/Language/SyntaxReference.cs` L244–257:
+
+```precept
+precept ShipmentOrder
+field Weight as quantity of 'mass' default '0 kg'
+field UnitPrice as price in 'USD' of 'mass' default '0.00 USD/kg'
+field TotalCost as money in 'USD' <- Weight * UnitPrice
+field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
+field FinalCost as money in 'USD' <- TotalCost - (TotalCost * DiscountPercent / 100)
+rule DiscountPercent <= 100 because "Discount percent cannot exceed 100%"
+```
+
+**Exact error:** `PRE0114 | Error | Operands '<unknown>' and '<unknown>' have incompatible Currency qualifiers in field 'FinalCost' computed expression`
+
+**Minimal repro (confirmed by direct compile probe):**
+
+```precept
+precept Test
+field TotalCost as money in 'USD' default '10 USD'
+field DiscountPercent as decimal default 0
+field FinalCost as money in 'USD' <- TotalCost - (TotalCost * DiscountPercent / 100)
+```
+
+Same PRE0114. Removing `FinalCost` makes the snippet compile clean.
+
+#### The Bug: Qualifier-Bearing Scalar Ops Drop Qualifiers
+
+Six operations in `src/Precept/Language/Operations.cs` produce a qualifier-bearing result type but carry **no `ResultQualifierPolicy`** and **no `QualifierMatch`**:
+
+| OperationKind | Line | Signature | Missing |
+|---|---|---|---|
+| `MoneyTimesDecimal` | L440 | `money × decimal → money` | No qualifier propagation |
+| `MoneyDivideDecimal` | L444 | `money ÷ decimal → money` | No qualifier propagation |
+| `QuantityTimesDecimal` | L519 | `quantity × decimal → quantity` | No qualifier propagation |
+| `QuantityDivideDecimal` | L523 | `quantity ÷ decimal → quantity` | No qualifier propagation |
+| `PriceTimesDecimal` | L636 | `price × decimal → price` | No qualifier propagation |
+| `PriceDivideDecimal` | L640 | `price ÷ decimal → price` | No qualifier propagation |
+
+All six have `ResultQualifierPolicy: ResultQualifierPolicy.None` (default) and `QualifierMatch: QualifierMatch.Any` (default).
+
+**Consequence:** In `MapQualifierBinding()` (TypeChecker.Expressions.cs L666–677), these operations produce `ResultQualifier = null` on the `TypedBinaryOp`. When that subexpression appears as an operand in an outer operation (e.g., `MoneySubtractMoney` with `QualifierMatch.Same`), the proof engine cannot resolve its qualifier:
+
+1. `TotalCost * DiscountPercent` → resolves as `MoneyTimesDecimal` → `TypedBinaryOp(Money, ResultQualifier: null)`
+2. `result / 100` → resolves as `MoneyDivideDecimal` → `TypedBinaryOp(Money, ResultQualifier: null)`
+3. `TotalCost - result` → resolves as `MoneySubtractMoney` with `QualifierMatch.Same` → `SameQualifierRequired`
+4. Proof engine calls `ResolveQualifierOnAxis()` on the right operand (the inner `TypedBinaryOp`)
+5. `GetFieldName(TypedBinaryOp)` → returns `null` (line 322: `_ => null`)
+6. `ResolveQualifierOnAxis()` returns `null` → proof fails → PRE0114
+
+**The model to follow:** `QuantityTimesQuantity` (L570–573) already carries `ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation`. The type checker and proof engine already handle this via `CompoundUnitCancellationRequired` in `MapQualifierBinding()`.
+
+#### Design
+
+The fix has three layers: catalog metadata, type checker, and proof engine.
+
+**1. New `ResultQualifierPolicy` enum value**
+
+**File:** `src/Precept/Language/Operation.cs` L25–30
+
+Add a new policy value:
+
+```csharp
+public enum ResultQualifierPolicy
+{
+    [Precept.AllowZeroDefault]
+    None,
+    CompoundUnitCancellation,
+    InheritFromQualifiedOperand,
+}
+```
+
+**Semantics:** The result inherits ALL qualifiers from whichever operand carries qualifiers (the typed operand, not the scalar). For `money × decimal`, the `money` operand's currency qualifier flows to the result. For `price × decimal`, the `price` operand's currency AND dimension qualifiers flow.
+
+**Why not `QualifierMatch.Same`?** `Same` means "both operands share the same qualifier and the result inherits it." Scalar operations have only ONE qualifier-bearing operand — the other is `decimal`, which has no qualifiers. `Same` is semantically wrong and would fail the qualifier compatibility proof (decimal has no currency to match).
+
+**2. New `QualifierBinding` subtype**
+
+**File:** `src/Precept/Pipeline/SemanticIndex.cs` L196–205
+
+Add after `CompoundUnitCancellationRequired`:
+
+```csharp
+/// <summary>
+/// Result inherits qualifiers from the qualifier-bearing operand in a scalar operation.
+/// The non-qualifier-bearing operand (e.g., decimal) is transparent to qualifier flow.
+/// </summary>
+public sealed record QualifiedOperandInherited : QualifierBinding;
+```
+
+**3. Update `MapQualifierBinding()`**
+
+**File:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` L666–677
+
+```csharp
+private static QualifierBinding? MapQualifierBinding(BinaryOperationMeta meta)
+{
+    if (meta.ResultQualifierPolicy == ResultQualifierPolicy.CompoundUnitCancellation)
+        return new CompoundUnitCancellationRequired();
+
+    if (meta.ResultQualifierPolicy == ResultQualifierPolicy.InheritFromQualifiedOperand)
+        return new QualifiedOperandInherited();
+
+    return meta.Match switch
+    {
+        QualifierMatch.Same      => new SameQualifierRequired(),
+        QualifierMatch.Different => null,
+        _                        => null,
+    };
+}
+```
+
+**4. Set policy on six scalar operations**
+
+**File:** `src/Precept/Language/Operations.cs`
+
+For each of the six affected operations, add `ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand`:
+
+| OperationKind | Current | Change |
+|---|---|---|
+| `MoneyTimesDecimal` (L440–442) | No policy | Add `ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand` |
+| `MoneyDivideDecimal` (L444–451) | No policy | Same |
+| `QuantityTimesDecimal` (L519–521) | No policy | Same |
+| `QuantityDivideDecimal` (L523–530) | No policy | Same |
+| `PriceTimesDecimal` (L636–638) | No policy | Same |
+| `PriceDivideDecimal` (L640–647) | No policy | Same |
+
+**5. Extend `ResolveQualifierOnAxis()` to handle `TypedBinaryOp` subjects**
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` L946–1010
+
+After the `TypedArgRef` handling (L950–956) and before the `GetFieldName` path (L977), add a new path for `TypedBinaryOp`:
+
+```csharp
+// ── Path: Transitive qualifier resolution through binary operations ──
+// When the resolved subject is a TypedBinaryOp (a subexpression), its
+// ResultQualifier tells us how to derive the result's qualifiers.
+if (resolved is TypedBinaryOp binOp && binOp.ResultQualifier is not null)
+{
+    switch (binOp.ResultQualifier)
+    {
+        case SameQualifierRequired:
+            // Both operands share the qualifier; recurse into either side.
+            // Left is the canonical choice (right would yield the same value).
+            return ResolveQualifierFromExpression(binOp.Left, axis, semantics);
+
+        case QualifiedOperandInherited:
+            // Exactly one operand is qualifier-bearing. Find it by checking
+            // which operand's type is the same as the result type (the typed
+            // operand), not the scalar.
+            var qualifiedOperand = binOp.Left.ResultType == binOp.ResultType
+                ? binOp.Left : binOp.Right;
+            return ResolveQualifierFromExpression(qualifiedOperand, axis, semantics);
+
+        case CompoundUnitCancellationRequired:
+            // Compound cancellation produces a new qualifier computed from
+            // both operands — not inherited from either. Cannot resolve
+            // transitively without the cancellation algorithm. Return null
+            // and let the proof engine handle it through existing paths.
+            return null;
+    }
+}
+```
+
+**6. New helper: `ResolveQualifierFromExpression()`**
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs`
+
+```csharp
+/// <summary>
+/// Resolve a qualifier on an axis from an arbitrary typed expression.
+/// Handles field refs, arg refs, and recursive binary ops.
+/// </summary>
+private static DeclaredQualifierMeta? ResolveQualifierFromExpression(
+    TypedExpression expr, QualifierAxis axis, SemanticIndex semantics)
+{
+    switch (expr)
+    {
+        case TypedArgRef { DeclaredQualifiers: { IsDefaultOrEmpty: false } argQuals }:
+            foreach (var q in argQuals)
+                if (q.Axis == axis) return q;
+            if (axis == QualifierAxis.Unit)
+                foreach (var q in argQuals)
+                    if (q.Axis == QualifierAxis.Dimension) return q;
+            if (axis == QualifierAxis.Dimension)
+                foreach (var q in argQuals)
+                    if (q.Axis == QualifierAxis.TemporalDimension) return q;
+            return null;
+
+        case TypedFieldRef fieldRef:
+            return ResolveFieldQualifier(fieldRef.FieldName, axis, semantics);
+
+        case TypedMemberAccess { Object: TypedFieldRef fieldRef }:
+            return ResolveFieldQualifier(fieldRef.FieldName, axis, semantics);
+
+        case TypedBinaryOp binOp when binOp.ResultQualifier is not null:
+            // Recursive case: nested scalar ops, e.g., (a * b) * c
+            return binOp.ResultQualifier switch
+            {
+                SameQualifierRequired =>
+                    ResolveQualifierFromExpression(binOp.Left, axis, semantics),
+                QualifiedOperandInherited =>
+                    ResolveQualifierFromExpression(
+                        binOp.Left.ResultType == binOp.ResultType ? binOp.Left : binOp.Right,
+                        axis, semantics),
+                _ => null,
+            };
+
+        default:
+            return null;
+    }
+}
+
+/// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
+private static DeclaredQualifierMeta? ResolveFieldQualifier(
+    string fieldName, QualifierAxis axis, SemanticIndex semantics)
+{
+    if (!semantics.FieldsByName.TryGetValue(fieldName, out var field))
+        return null;
+
+    foreach (var q in field.DeclaredQualifiers)
+        if (q.Axis == axis) return q;
+
+    if (axis == QualifierAxis.Unit)
+        foreach (var q in field.DeclaredQualifiers)
+            if (q.Axis == QualifierAxis.Dimension) return q;
+
+    if (axis == QualifierAxis.Dimension)
+        foreach (var q in field.DeclaredQualifiers)
+            if (q.Axis == QualifierAxis.TemporalDimension) return q;
+
+    var typeMeta = Types.GetMeta(field.ResolvedType);
+    foreach (var q in typeMeta.ImpliedQualifiers)
+        if (q.Axis == axis) return q;
+
+    return null;
+}
+```
+
+**Note:** `ResolveFieldQualifier` extracts and deduplicates the field-lookup logic already present in `ResolveQualifierOnAxis`. The existing method can be refactored to delegate to `ResolveFieldQualifier` for the field path — this is an optional cleanup, not a requirement.
+
+#### Impact on `inventory-item.precept`
+
+**None.** The remaining 66 PRE0114 in `inventory-item.precept` are all from BUG-A (arg qualifier resolution via interpolated qualifiers on event arguments). All arithmetic in that file uses typed-operand operations (`quantity × quantity`, `money + money`, `money ÷ quantity`, `price × quantity`, `exchangerate × money`). None involve scalar decimal scaling. C4 is the fix for inventory-item PRE0114, not D4.
+
+#### Test Cases
+
+**A. Direct fix verification (the failing test):**
+
+1. `Language_SyntaxReferenceMirrorsSourceAndExamplesCompile` — currently failing. After fix, the "Money and quantity typed fields" snippet compiles clean because `TotalCost * DiscountPercent` preserves the USD currency qualifier through the subexpression.
+
+**B. New targeted unit tests** (suggested file: `test/Precept.Tests/Pipeline/ScalarOpQualifierPropagationTests.cs`):
+
+| Test | Expression | Expected |
+|---|---|---|
+| `MoneyTimesDecimal_PreservesQualifier` | `field A as money in 'USD' default '10 USD'` / `field B as decimal default 2` / `field C as money in 'USD' <- A * B` | Clean compile |
+| `MoneyDivideDecimal_PreservesQualifier` | Same with `A / B` | Clean compile |
+| `MoneyScaledSubtraction_PreservesQualifier` | `field C as money in 'USD' <- A - (A * B / 100)` | Clean compile (the repro case) |
+| `QuantityTimesDecimal_PreservesQualifier` | `field Q as quantity of 'mass' default '1 kg'` / `field S as decimal default 2` / `field R as quantity of 'mass' <- Q * S` | Clean compile |
+| `QuantityDivideDecimal_PreservesQualifier` | Same with `Q / S` | Clean compile |
+| `PriceTimesDecimal_PreservesQualifier` | `field P as price in 'USD' of 'mass'` / `field S as decimal default 2` / `field R as price in 'USD' of 'mass' <- P * S` | Clean compile |
+| `PriceDivideDecimal_PreservesQualifier` | Same with `P / S` | Clean compile |
+| `ChainedScalarOps_PreservesQualifier` | `field C as money in 'USD' <- A * B * B` (nested scalar ops) | Clean compile |
+| `CrossCurrencyScalarResult_Diagnostic` | `field A as money in 'USD'` / `field B as decimal` / `field C as money in 'EUR' <- A * B` | PRE0114 (correct: USD ≠ EUR) |
+| `BidirectionalScalarOrder` | `field C as money in 'USD' <- B * A` (decimal on left) | Clean compile (BidirectionalLookup) |
+
+**C. Regression anchors:**
+
+- All existing `MoneySubtractMoney`, `MoneyAddMoney`, `QuantityAddQuantity` tests should continue passing — `SameQualifierRequired` is unchanged.
+- All existing `CompoundUnitCancellation` tests — the new code path does NOT touch this binding type.
+- All existing `Language_SyntaxReferenceMirrorsSourceAndExamplesCompile` OTHER patterns — only the "Money and quantity" pattern was failing.
+
+#### Regression Risk
+
+**Low.** The changes are:
+1. Additive enum value — no existing code paths affected
+2. New `QualifierBinding` subtype — existing code doesn't pattern-match it, so it falls through safely
+3. `MapQualifierBinding` gets a new branch before the existing switch — existing branches unchanged
+4. `ResolveQualifierOnAxis` gets a new path for `TypedBinaryOp` — currently returns `null` for all `TypedBinaryOp` subjects, so any change is strictly an improvement (null → resolved qualifier)
+5. The six operation metadata changes add a named parameter that was previously defaulted — the only behavioral change is the `MapQualifierBinding` branch producing a non-null binding instead of null
+
+The one non-trivial risk is that `SameQualifierRequired` on `TypedBinaryOp` subjects now recurses into operands instead of returning null. This is correct behavior (the qualifier IS there), but if there are any tests that expect PRE0114 on nested same-qualifier operations, those tests would start passing. That is a bug fix, not a regression.
+
+#### Files Changed
+
+| File | Change Type | Lines |
+|------|-------------|-------|
+| `src/Precept/Language/Operation.cs` | Add enum value | ~1 LOC |
+| `src/Precept/Pipeline/SemanticIndex.cs` | Add QualifierBinding subtype | ~4 LOC |
+| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | New branch in `MapQualifierBinding` | ~3 LOC |
+| `src/Precept/Language/Operations.cs` | Add `ResultQualifierPolicy` to 6 operations | ~6 LOC (one named param each) |
+| `src/Precept/Pipeline/ProofEngine.cs` | New `TypedBinaryOp` path + helper methods | ~60 LOC |
+| `test/Precept.Tests/Pipeline/ScalarOpQualifierPropagationTests.cs` | New test file | ~150 LOC |
+
+#### Downstream Impact
+
+- **Runtime:** Core fix — catalog metadata + type checker + proof engine. All three layers change.
+- **Tooling:** N/A — no language server, completions, or semantic token changes. The new `QualifierBinding` subtype is internal to the pipeline.
+- **MCP:** The `SyntaxReference` snippet is NOT modified. The snippet becomes correct because the compiler now handles it correctly — the example stays as-is, including `default '0.00 USD/kg'` on `UnitPrice` and the `FinalCost` computed expression.
+
+---
+
+### Part D Dependency Order
+
+```
+D1 (ConflictingModifiers)   — ✅ Done
+D2 (ExchangeRate Qualifiers) — ✅ Done
+D3 (LS Manifest)             — ✅ Done
+D4 (Scalar-Op Qualifier)     — independent of D1–D3 and all C-slices
+```
+
+D4 is the only remaining D-series item. It is independent of all other plan parts. No other slice depends on it. It unblocks no downstream work except the test itself.
+
+---
+
+## Part E — BUG-A: Inventory-Item PRE0114 Resolution
+
+**Added:** 2026-05-12
+**Depends on:** C4 ✅ Done, D4 ✅ Done
+**Blocks:** inventory-item.precept clean compile (modulo the 8 TypeMismatch sample design issues)
+
+### Problem Statement
+
+After C4 (TypedArgRef qualifier resolution) and D4 (scalar-op qualifier propagation), `inventory-item.precept` still produces **66 PRE0114 (`UnprovedQualifierCompatibility`)** errors and **8 PRE0018 (`TypeMismatch`)** errors. The original "BUG-A" label was too coarse — investigation reveals **4 distinct root causes** that interact and must be fixed in sequence.
+
+### Error Census (66 PRE0114)
+
+| Location | Axis | Count | Expression Pattern |
+|----------|------|-------|--------------------|
+| Rules (L123–133) | Unit (7), Currency (7 incl. compound) | 13 | `field >= interpolated_typed_constant` |
+| State ensures (L146–156) | Unit (8), Currency (4) | 12 | `field > constant`, `field * field >= field`, complex boolean |
+| Event ensures (L169–207) | Unit (9), Currency (2) | 11 | `arg > constant`, `arg.accessor == field` |
+| Transition actions (L229–322) | Unit (9), Currency (15), Dimension↔Dimension chain (6) | 30 | `field +/- subexpression`, compound unit arithmetic |
+| **Total** | | **66** | |
+
+### 8 TypeMismatch Errors (Sample Design Issue — Separate)
+
+The ReceiveShipment transitions contain a **grouping bug in the DSL source**, not a compiler bug. The expression:
+```
+ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+```
+parses left-associatively as `((SupplierUnitCost * PurchaseQty) * StockingUnitsPerPurchaseUnit)`, giving `(price × quantity → money) × quantity → TypeMismatch`. The intended grouping `SupplierUnitCost * (PurchaseQty * StockingUnitsPerPurchaseUnit)` yields `price × (quantity × quantity → quantity) → money` which type-checks. The sample needs inner parentheses. This affects L228, L230, L234, L236, L239, L241 (the `TotalInventoryCost` and `AverageCost` set actions in ReceiveShipment transitions). The `set QuantityOnHand` actions (L229, L235, L240) don't involve price multiplication and type-check fine.
+
+**Action:** Fix parenthesization in `samples/inventory-item.precept` as part of E3 or as a standalone cleanup. Not a compiler change.
+
+### Root Cause Analysis
+
+#### RC-1: Shared ParameterMeta Ambiguity in Subject Resolution (Foundational)
+
+**Affects:** All 61 `QualifierCompatibilityProofRequirement` errors (29 Currency + 32 Unit)
+
+**Mechanism:** Every `QualifierCompatibilityProofRequirement` for same-type operations uses the same static `ParameterMeta` instance for both `LeftSubject` and `RightSubject`:
+
+```csharp
+// Operations.cs L961 — both subjects wrap the same PMoney instance
+new QualifierCompatibilityProofRequirement(
+    new ParamSubject(PMoney), new ParamSubject(PMoney),
+    QualifierAxis.Currency, "...")
+```
+
+In `ResolveParamInBinaryOp()` (ProofEngine.cs L275–287), `ReferenceEquals` matches the shared `PMoney` against `bom.Rhs` first (by design, to handle divisor proofs), so **both subjects always resolve to `bin.Right`**. The left operand is never examined.
+
+**Consequence:**
+- When `bin.Right` has a resolvable qualifier (e.g., a field with static `in 'USD'`), both sides get the same qualifier → proof **accidentally passes** (false positive risk — cross-currency arithmetic would not be caught)
+- When `bin.Right` is a typed constant or subexpression with no resolution path, both sides get null → proof fails (the 61 errors we see)
+- Diagnostic messages show `<unknown>` for BOTH operands because `GetFieldName()` can't resolve either (both point to the unresolvable right operand)
+
+**Evidence:** The existing test `Money_plus_money_same_currency_proved` passes only because both sides accidentally resolve to `bin.Right` (F2 with 'USD'), which happens to give the correct answer. If the test had different currencies on F1 vs F2, the proof would pass incorrectly. The `Bare_money_plus_bare_money_obligation_fires` test works correctly by accident because the bare right operand returns null for both sides.
+
+#### RC-2: No Qualifier Resolution Path for TypedInterpolatedTypedConstant
+
+**Affects:** 36 errors (all rules, state ensures, event ensures involving `field/arg >= '...'` comparisons)
+
+**Mechanism:** `ResolveQualifierOnAxis()` and `ResolveQualifierFromExpression()` handle `TypedFieldRef`, `TypedArgRef`, `TypedBinaryOp`, and `TypedMemberAccess`, but have no case for `TypedInterpolatedTypedConstant`. When an interpolated typed constant like `'0 {StockingUnit}'` is the comparison operand, the engine returns null.
+
+The qualifier information IS present in the `TypedInterpolatedTypedConstant.Slots` — each `TypedInterpolationSlot` has an `InterpolationSlotKind` (`Currency`, `Unit`, `NumeratorUnit`, `DenominatorUnit`, etc.) and an `Expression` (typically a `TypedFieldRef` pointing to the qualifier source field). The proof engine just doesn't know how to extract it.
+
+#### RC-3: Missing Qualifier Propagation Through Compound and Cross-Type Operations
+
+**Affects:** 30 transition action errors (15 Currency, 9 Unit, 6 Dimension↔Dimension chain)
+
+**Sub-cause 3a — CompoundUnitCancellationRequired returns null on all axes:**
+
+`ResolveQualifierOnAxis()` (ProofEngine.cs L992–993) returns hard null for `CompoundUnitCancellationRequired` on EVERY axis. But compound unit cancellation only "cancels" the dimension/unit axis — currency is orthogonal and should propagate. For `price × quantity → money`, the result's currency is the price's currency. The engine should find it by recursing into the currency-bearing operand.
+
+The 15 Currency transition errors all involve `quantity × price → money` (PriceTimesQuantity via BidirectionalLookup) where the result feeds into a `money + money` or `money - money` operation. The currency from the price operand (AverageCost or ListPrice) should propagate through.
+
+**Sub-cause 3b — Operations with null ResultQualifier:**
+
+`PriceTimesQuantity` (Operations.cs L610) and `ExchangeRateTimesMoney` (L656) produce qualified results (money with currency) but have no `ResultQualifierPolicy` and no `Match` parameter → `MapQualifierBinding()` returns null → `TypedBinaryOp.ResultQualifier` is null → the binary-op path in `ResolveQualifierOnAxis` is skipped entirely.
+
+These operations need either:
+- A `ResultQualifierPolicy` (for PriceTimesQuantity: the currency comes from the price operand)
+- A null-ResultQualifier fallback in the proof engine that tries operands
+
+**Sub-cause 3c — Compound unit numerator extraction for Unit/Dimension axis:**
+
+The 9 Unit errors and 6 Dimension↔Dimension chain errors involve expressions like `QuantityOnHand + PurchaseQty * StockingUnitsPerPurchaseUnit`. The compound cancellation result's unit is structurally derivable — for `quantity(of PurchaseUnit) × quantity(in StockingUnit/PurchaseUnit)`, the PurchaseUnit denominator cancels, leaving StockingUnit. But extracting the result unit requires parsing the compound unit qualifier string `{StockingUnit}/{PurchaseUnit}` to find the numerator.
+
+#### RC-4: Cross-Axis Symbolic Qualifier Comparison
+
+**Affects:** Residual errors after RC-1/2/3 fixes. Exact count TBD but potentially all 36 typed-constant errors would fail comparison without this.
+
+**Mechanism:** Even with perfect qualifier extraction from both sides, the comparison `leftQualifier == rightQualifier` (record equality) fails when the two sides produce different `DeclaredQualifierMeta` subtypes encoding the same logical constraint:
+
+- Field `QuantityOnHand` has `of '{StockingUnit.dimension}'` → `DeclaredQualifierMeta.Dimension("{StockingUnit.dimension}")`
+- Typed constant `'0 {StockingUnit}'` has Unit slot → would produce `DeclaredQualifierMeta.Unit("{StockingUnit}")`
+- Record equality: `Dimension("{StockingUnit.dimension}") ≠ Unit("{StockingUnit}")` → proof fails
+
+Both qualifiers derive from `StockingUnit`. A unit implies its own dimension. The proof engine needs **symbolic equivalence**: extract the source field from interpolated template strings (e.g., `"{StockingUnit.dimension}"` → `StockingUnit`, `"{StockingUnit}"` → `StockingUnit`) and compare the source fields.
+
+### Implementation Slices
+
+#### Slice E1 — Shared ParameterMeta Disambiguation (RC-1)
+
+**Status:** ✅ Done (`d549b4a5`) — 7 targeted tests pass
+**Depends on:** None
+**Blocks:** E2, E3, E4 (foundational — without this, qualification resolution gives wrong operand)
+
+##### Root Cause
+
+`ResolveParamInBinaryOp()` uses `ReferenceEquals(param, bom.Rhs)` which always matches first for same-type operations because `bom.Lhs` and `bom.Rhs` are the same static `ParameterMeta` instance. Both `QualifierCompatibilityProofRequirement` subjects resolve to `bin.Right`.
+
+##### Design
+
+**Bypass `ResolveSubject` for QualifierCompatibilityProofRequirement — resolve operands directly from the site.**
+
+The `QualifierCompatibilityProofRequirement` semantics are: "the two operands of this binary operation must have compatible qualifiers on the specified axis." The left/right subject distinction is an artifact of the `ParamSubject` representation — the requirement always means "left operand vs. right operand." We can resolve directly from the obligation site.
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` — method `TryQualifierCompatibilityProof()`
+
+```csharp
+private static bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    if (obligation.Requirement is QualifierCompatibilityProofRequirement qcReq)
+    {
+        // ── Direct operand access (E1) ──
+        // Same-type operations use shared ParameterMeta, making
+        // ResolveSubject ambiguous. Access operands directly from the site.
+        if (obligation.Site is not TypedBinaryOp binOp)
+            return false;
+
+        var leftQualifier = ResolveQualifierFromExpression(binOp.Left, qcReq.Axis, semantics);
+        var rightQualifier = ResolveQualifierFromExpression(binOp.Right, qcReq.Axis, semantics);
+
+        if (leftQualifier is null || rightQualifier is null)
+            return false;
+
+        // PeriodDimension.Any guard (unchanged)
+        if (qcReq.Axis == QualifierAxis.TemporalDimension)
+        {
+            if (leftQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any }
+                || rightQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any })
+                return false;
+        }
+
+        return leftQualifier == rightQualifier;
+    }
+
+    // QualifierChainProofRequirement path unchanged (uses different param types, no ambiguity)
+    if (obligation.Requirement is QualifierChainProofRequirement chainReq)
+    {
+        // ... existing code unchanged ...
+    }
+
+    return false;
+}
+```
+
+Also update `CreateDiagnostic` for `QualifierCompatibilityProofRequirement` to extract operand names directly from the site expression:
+
+```csharp
+case QualifierCompatibilityProofRequirement qcReq:
+    var leftName = obligation.Site is TypedBinaryOp qcBin
+        ? GetFieldName(qcBin.Left) ?? "<expression>"
+        : GetFieldName(qcReq.LeftSubject, obligation.Site) ?? "<unknown>";
+    var rightName = obligation.Site is TypedBinaryOp qcBin2
+        ? GetFieldName(qcBin2.Right) ?? "<expression>"
+        : GetFieldName(qcReq.RightSubject, obligation.Site) ?? "<unknown>";
+    return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
+        leftName, rightName, qcReq.Axis.ToString(), $" in {contextDesc}");
+```
+
+##### Test Cases
+
+| Test | Input | Expected |
+|------|-------|----------|
+| `Same_currency_fields_proved` (existing) | `F1 in 'USD' + F2 in 'USD'` | Proved (was accidentally correct, now correct for right reason) |
+| `Cross_currency_fields_now_detected` (NEW) | `F1 in 'USD' + F2 in 'EUR'` | Unresolved, PRE0114 diagnostic |
+| `Bare_money_obligation_fires` (existing) | `F1 bare + F2 bare` | Unresolved (unchanged) |
+| `Operand_names_in_diagnostics` (NEW) | `F1 in 'USD' + F2 in 'EUR'` | Message contains "F1" and "F2" (not `<unknown>`) |
+| `Quantity_same_dimension_proved` (NEW) | `Q1 of 'mass' + Q2 of 'mass'` | Proved |
+| `Quantity_different_dimension_detected` (NEW) | `Q1 of 'mass' + Q2 of 'length'` | Unresolved |
+| `Price_same_qualifiers_proved` (NEW) | `P1 in 'USD' of 'mass' + P2 in 'USD' of 'mass'` | Proved |
+
+**Files changed:** `src/Precept/Pipeline/ProofEngine.cs` (~30 LOC)
+**Test file:** `test/Precept.Tests/ProofEngineTests.cs` (add to existing QualifierCompatibility class, ~80 LOC)
+**Regression risk:** Low. This fixes a silent false positive bug (cross-qualifier same-type operations were accidentally passing). Existing tests pass because they use same-qualifier operands. The new `Cross_currency_fields_now_detected` test validates the fix catches real mismatches.
+
+##### Impact on Inventory-Item PRE0114
+
+**0 errors resolved** by E1 alone. E1 makes resolution correct (left operand → left qualifier, right operand → right qualifier) but the right operands still have no resolution path. E1 is a prerequisite for E2/E3/E4 to function correctly.
+
+---
+
+#### Slice E2 — Interpolated Typed Constant Qualifier Extraction (RC-2)
+
+**Status:** 🔲 Not Started
+**Depends on:** E1
+**Blocks:** None (E4 is needed alongside for symbolic comparison to match)
+
+##### Root Cause
+
+`ResolveQualifierFromExpression()` has no case for `TypedInterpolatedTypedConstant`. The qualifier information is in the slots but the engine can't extract it.
+
+##### Design
+
+**Add a `TypedInterpolatedTypedConstant` case to `ResolveQualifierFromExpression()`** that maps `InterpolationSlotKind` to `QualifierAxis` and creates a `DeclaredQualifierMeta` from the slot expression.
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` — method `ResolveQualifierFromExpression()`
+
+```csharp
+case TypedInterpolatedTypedConstant itc:
+    return ResolveQualifierFromInterpolatedConstant(itc, axis);
+```
+
+New helper:
+
+```csharp
+private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(
+    TypedInterpolatedTypedConstant itc, QualifierAxis axis)
+{
+    // Map InterpolationSlotKind → QualifierAxis
+    InterpolationSlotKind? targetSlot = axis switch
+    {
+        QualifierAxis.Currency => InterpolationSlotKind.Currency,
+        QualifierAxis.Unit => InterpolationSlotKind.Unit,
+        QualifierAxis.Dimension => InterpolationSlotKind.Unit, // fallback: unit implies dimension
+        QualifierAxis.FromCurrency => InterpolationSlotKind.FromCurrency,
+        QualifierAxis.ToCurrency => InterpolationSlotKind.ToCurrency,
+        _ => null,
+    };
+
+    if (targetSlot is null) return null;
+
+    foreach (var slot in itc.Slots)
+    {
+        if (slot.SlotKind == targetSlot)
+            return CreateQualifierFromSlotExpression(slot.Expression, axis);
+    }
+
+    // For compound units ('0 {X}/{Y}'), Currency axis → NumeratorUnit slot
+    if (axis == QualifierAxis.Currency)
+    {
+        foreach (var slot in itc.Slots)
+            if (slot.SlotKind == InterpolationSlotKind.NumeratorUnit)
+                return CreateQualifierFromSlotExpression(slot.Expression, axis);
+    }
+
+    // For compound units, Dimension/Unit axis → DenominatorUnit slot
+    if (axis == QualifierAxis.Unit || axis == QualifierAxis.Dimension)
+    {
+        foreach (var slot in itc.Slots)
+            if (slot.SlotKind == InterpolationSlotKind.DenominatorUnit)
+                return CreateQualifierFromSlotExpression(slot.Expression, axis);
+    }
+
+    return null;
+}
+
+private static DeclaredQualifierMeta? CreateQualifierFromSlotExpression(
+    TypedExpression expr, QualifierAxis axis)
+{
+    var fieldName = expr switch
+    {
+        TypedFieldRef f => f.FieldName,
+        TypedArgRef a => a.ArgName,
+        _ => null,
+    };
+    if (fieldName is null) return null;
+
+    // Create an interpolated qualifier template matching the source field
+    return axis switch
+    {
+        QualifierAxis.Currency => new DeclaredQualifierMeta.Currency($"{{{fieldName}}}"),
+        QualifierAxis.Unit => new DeclaredQualifierMeta.Unit($"{{{fieldName}}}"),
+        QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension($"{{{fieldName}}}"),
+        QualifierAxis.FromCurrency => new DeclaredQualifierMeta.FromCurrency($"{{{fieldName}}}"),
+        QualifierAxis.ToCurrency => new DeclaredQualifierMeta.ToCurrency($"{{{fieldName}}}"),
+        _ => null,
+    };
+}
+```
+
+##### Test Cases
+
+| Test | Input | Expected |
+|------|-------|----------|
+| `Quantity_field_gte_interpolated_constant` | `Q of 'mass' >= '0 kg'` (static constant) | Proved |
+| `Money_field_gte_interpolated_constant` | `M in 'USD' >= '0.00 USD'` (static constant) | Proved |
+| `Price_field_gt_compound_constant` | `P in 'USD' of 'mass' > '0 USD/kg'` | Proved (both axes) |
+| `Cross_currency_constant_detected` | `M in 'USD' >= '0.00 EUR'` | Unresolved (correct: USD ≠ EUR) |
+
+**Files changed:** `src/Precept/Pipeline/ProofEngine.cs` (~50 LOC)
+**Test file:** `test/Precept.Tests/ProofEngineTests.cs` (~60 LOC)
+
+##### Impact on Inventory-Item PRE0114
+
+**Depends on E4 for full effect.** E2 extracts qualifiers from typed constants, but for interpolated constants like `'0 {StockingUnit}'`, the extracted qualifier `Unit("{StockingUnit}")` won't match the field's `Dimension("{StockingUnit.dimension}")` without symbolic comparison (E4). E2 + E4 together resolve **36 errors** (all rules, state ensures, event ensures).
+
+---
+
+#### Slice E3 — Subexpression Qualifier Propagation (RC-3)
+
+**Status:** 🔲 Not Started
+**Depends on:** E1
+**Blocks:** None
+
+##### Root Cause
+
+Three sub-causes prevent qualifier resolution through subexpressions:
+1. `CompoundUnitCancellationRequired` returns null on all axes (ProofEngine.cs L992-993)
+2. `PriceTimesQuantity` has null `ResultQualifier` (no binding declared)
+3. Compound unit numerator extraction not implemented
+
+##### Design
+
+**Part A — Currency propagation through compound operations (~15 LOC)**
+
+For `CompoundUnitCancellationRequired`, currency is orthogonal to the cancelled dimension — propagate it by trying both operands:
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` — methods `ResolveQualifierOnAxis()` and `ResolveQualifierFromExpression()`
+
+```csharp
+case CompoundUnitCancellationRequired:
+    // Currency propagates through compound unit cancellation (orthogonal to dimension)
+    if (axis == QualifierAxis.Currency || axis == QualifierAxis.FromCurrency || axis == QualifierAxis.ToCurrency)
+        return ResolveQualifierFromExpression(binOp.Left, axis, semantics)
+            ?? ResolveQualifierFromExpression(binOp.Right, axis, semantics);
+    return null; // Unit/Dimension axes: result is a derived dimension (see Part C)
+```
+
+**Part B — ResultQualifier for PriceTimesQuantity (~5 LOC per operation)**
+
+Add `ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation` to `PriceTimesQuantity` in the operations catalog. This is semantically correct — the dimension cancels (price's denominator matches quantity's dimension), and currency propagates from the price operand. The existing `CompoundUnitCancellationRequired` binding in `ResolveQualifierOnAxis` + Part A currency propagation handles it.
+
+**File:** `src/Precept/Language/Operations.cs` — `PriceTimesQuantity` entry (L610)
+
+```csharp
+OperationKind.PriceTimesQuantity => new BinaryOperationMeta(
+    kind, OperatorKind.Times, PPrice, PQuantity, TypeKind.Money,
+    "Price × quantity → money (dimensional cancellation)", BidirectionalLookup: true,
+    ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation,  // ← ADD
+    ProofRequirements:
+    [
+        new QualifierChainProofRequirement(...),
+    ]),
+```
+
+Similarly for `PriceTimesPeriod` (L620) and `PriceTimesDuration` (L630) if they appear in expressions that need currency propagation.
+
+**Part C — Compound unit numerator extraction for Unit/Dimension (~30 LOC)**
+
+For compound unit cancellation results on the Unit/Dimension axis, extract the numerator from the compound qualifier string:
+
+```csharp
+case CompoundUnitCancellationRequired:
+    if (axis == QualifierAxis.Currency || ...)
+        // Part A (above)
+    // Unit/Dimension: try compound unit numerator extraction
+    return TryResolveCompoundCancellationUnit(binOp, axis, semantics);
+```
+
+New helper:
+
+```csharp
+private static DeclaredQualifierMeta? TryResolveCompoundCancellationUnit(
+    TypedBinaryOp binOp, QualifierAxis axis, SemanticIndex semantics)
+{
+    // Find the operand with a compound qualifier (contains '/')
+    var leftQ = ResolveQualifierFromExpression(binOp.Left, axis, semantics);
+    var rightQ = ResolveQualifierFromExpression(binOp.Right, axis, semantics);
+
+    // Try to find a compound unit and extract numerator
+    var compoundValue = ExtractCompoundValue(leftQ) ?? ExtractCompoundValue(rightQ);
+    if (compoundValue is null) return null;
+
+    var slashIdx = compoundValue.IndexOf('/');
+    if (slashIdx < 0) return null;
+
+    var numerator = compoundValue[..slashIdx].Trim();
+
+    return axis switch
+    {
+        QualifierAxis.Unit => new DeclaredQualifierMeta.Unit(numerator),
+        QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension(numerator),
+        _ => null,
+    };
+}
+
+private static string? ExtractCompoundValue(DeclaredQualifierMeta? qualifier) => qualifier switch
+{
+    DeclaredQualifierMeta.Unit { UnitCode: var code } when code.Contains('/') => code,
+    DeclaredQualifierMeta.Dimension { DimensionName: var name } when name.Contains('/') => name,
+    _ => null,
+};
+```
+
+**Note on ExchangeRateTimesMoney:** This operation's result currency is the exchange rate's `to` currency, which is fundamentally different from "propagate from an operand." The proof engine would need a new qualifier binding type (`ResultQualifierPolicy.InheritFromOperandAxis` with axis parameters) or rely on the event ensures (`Rate.to == CatalogCurrency`) as runtime constraints. This is **deferred** — the ReceiveShipment expressions are already TypeMismatch-tainted (by the sample grouping bug), so no PRE0114 errors from exchange rate chains appear in the current count.
+
+##### Test Cases
+
+| Test | Input | Expected |
+|------|-------|----------|
+| `PriceTimesQuantity_currency_propagates` (NEW) | `set M = P_usd * Q` where M is `money in 'USD'` | Proved (currency from price) |
+| `CompoundUnit_cancellation_currency_propagates` (NEW) | `set M = Q1 * Q2 * P` with compound units | Proved (currency from price through chain) |
+| `CompoundUnit_numerator_unit_extracted` (NEW) | `set Q = Q_a * Q_compound` where Q_compound is `in '{X}/{Y}'` | Proved (numerator extracted) |
+| `Existing_compound_cancellation_tests` | All existing | Pass (regression) |
+
+**Files changed:** `src/Precept/Pipeline/ProofEngine.cs` (~60 LOC), `src/Precept/Language/Operations.cs` (~3 LOC)
+**Test file:** `test/Precept.Tests/ProofEngineTests.cs` (~80 LOC)
+
+##### Impact on Inventory-Item PRE0114
+
+E1 + E3 resolves **30 transition action errors**:
+- 15 Currency errors (all FulfillOrder, ReturnOrder, RecordShrinkage transitions) — via currency propagation through PriceTimesQuantity
+- 9 Unit errors (ReceiveShipment, FulfillOrder, ReturnOrder quantity arithmetic) — via compound unit numerator extraction
+- 6 Dimension↔Dimension chain errors (FulfillOrder, ReturnOrder cost calculations) — via compound unit numerator providing dimension for chain proofs
+
+---
+
+#### Slice E4 — Symbolic Qualifier Equivalence for Interpolated Templates (RC-4)
+
+**Status:** 🔲 Not Started
+**Depends on:** E1, E2
+**Blocks:** None
+
+##### Root Cause
+
+Record equality `leftQualifier == rightQualifier` fails when both sides reference the same logical constraint through different `DeclaredQualifierMeta` subtypes:
+- `Dimension("{StockingUnit.dimension}")` (from field `of '{StockingUnit.dimension}'`)
+- `Unit("{StockingUnit}")` (from typed constant slot `{StockingUnit}`)
+
+Both derive from `StockingUnit`. A unit implies its own dimension. The proof engine needs symbolic comparison.
+
+##### Design
+
+**Replace `leftQualifier == rightQualifier` with `QualifiersSymbolicallyEqual(left, right)` in `TryQualifierCompatibilityProof` and the chain qualifier comparison.**
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs`
+
+```csharp
+/// <summary>
+/// Compares two qualifier values for symbolic equivalence.
+/// Two interpolated qualifiers are equivalent if they derive from the same source field,
+/// even when they differ in axis subtype (e.g., Dimension("{X.dimension}") ≈ Unit("{X}")).
+/// </summary>
+private static bool QualifiersSymbolicallyEqual(DeclaredQualifierMeta left, DeclaredQualifierMeta right)
+{
+    // Record equality first (covers static qualifiers like Currency("USD") == Currency("USD"))
+    if (left == right) return true;
+
+    // Interpolated template comparison: extract source field and compare
+    var leftSource = ExtractSourceField(left);
+    var rightSource = ExtractSourceField(right);
+    return leftSource is not null && rightSource is not null
+        && string.Equals(leftSource, rightSource, StringComparison.Ordinal);
+}
+
+/// <summary>
+/// Extracts the source field name from an interpolated qualifier template.
+/// "{CatalogCurrency}" → "CatalogCurrency"
+/// "{StockingUnit.dimension}" → "StockingUnit"
+/// Static values (no braces) → null (use record equality instead)
+/// </summary>
+private static string? ExtractSourceField(DeclaredQualifierMeta qualifier)
+{
+    var raw = qualifier switch
+    {
+        DeclaredQualifierMeta.Currency { CurrencyCode: var v } => v,
+        DeclaredQualifierMeta.Unit { UnitCode: var v } => v,
+        DeclaredQualifierMeta.Dimension { DimensionName: var v } => v,
+        DeclaredQualifierMeta.FromCurrency { CurrencyCode: var v } => v,
+        DeclaredQualifierMeta.ToCurrency { CurrencyCode: var v } => v,
+        DeclaredQualifierMeta.TemporalUnit { UnitName: var v } => v,
+        _ => null,
+    };
+
+    if (raw is null || !raw.StartsWith('{') || !raw.EndsWith('}')) return null;
+
+    var inner = raw[1..^1]; // Strip braces
+    var dotIdx = inner.IndexOf('.');
+    return dotIdx >= 0 ? inner[..dotIdx] : inner; // "X.dimension" → "X"
+}
+```
+
+Update the comparison in `TryQualifierCompatibilityProof` (E1 code):
+```csharp
+// Was: return leftQualifier == rightQualifier;
+return QualifiersSymbolicallyEqual(leftQualifier, rightQualifier);
+```
+
+Update the chain qualifier comparison in `ChainQualifiersMatch()`:
+```csharp
+private static bool ChainQualifiersMatch(DeclaredQualifierMeta left, DeclaredQualifierMeta right)
+{
+    // Existing cross-axis string comparison
+    var leftValue = ExtractComparableValue(left);
+    var rightValue = ExtractComparableValue(right);
+    if (leftValue is not null && rightValue is not null
+        && string.Equals(leftValue, rightValue, StringComparison.Ordinal))
+        return true;
+
+    // Symbolic equivalence for interpolated qualifiers
+    return QualifiersSymbolicallyEqual(left, right);
+}
+```
+
+##### Test Cases
+
+| Test | Left Qualifier | Right Qualifier | Expected |
+|------|---------------|-----------------|----------|
+| `Same_template_equal` | `Dimension("{X.dimension}")` | `Dimension("{X.dimension}")` | true (record equality) |
+| `Cross_axis_symbolic_equal` | `Dimension("{X.dimension}")` | `Unit("{X}")` | true (same source "X") |
+| `Different_source_not_equal` | `Dimension("{X.dimension}")` | `Unit("{Y}")` | false |
+| `Static_qualifiers_unchanged` | `Currency("USD")` | `Currency("USD")` | true (record equality) |
+| `Static_vs_interpolated_not_equal` | `Currency("USD")` | `Currency("{C}")` | false (static has no source) |
+| `Compound_numerator_symbolic` | `Dimension("{StockingUnit.dimension}")` | `Unit("{StockingUnit}")` from numerator extraction | true |
+
+**Files changed:** `src/Precept/Pipeline/ProofEngine.cs` (~40 LOC)
+**Test file:** `test/Precept.Tests/ProofEngineTests.cs` (~60 LOC)
+
+##### Impact on Inventory-Item PRE0114
+
+E4 enables E2's extracted qualifiers to match field qualifiers across axis types. Without E4, E2 would extract qualifiers from typed constants but the comparison would fail for interpolated fields (which use dimension templates like `{StockingUnit.dimension}`) vs typed constant units (which produce `{StockingUnit}`).
+
+E1 + E2 + E4 together resolve **36 rule/ensure/event-ensure errors**.
+E1 + E3 + E4 together resolve all **30 transition errors**.
+All four slices together: **66 errors → 0 PRE0114**.
+
+---
+
+### Part E Dependency Order
+
+```
+E1 (Shared ParameterMeta Fix)     — foundational, no dependencies
+  ├→ E2 (Typed Constant Extraction) — depends on E1
+  │    └→ E4 (Symbolic Comparison)  — depends on E2, co-required for typed constant proofs
+  └→ E3 (Subexpression Propagation) — depends on E1
+```
+
+**Recommended implementation order:** E1 → E4 → E2 → E3
+
+Rationale: E1 is foundational. E4 is pure comparison logic with no extraction dependency (can be tested with synthetic qualifier values). E2 needs E4 for its proofs to match. E3 is independent of E2/E4 and can be done in parallel after E1.
+
+### Residual Work After Part E
+
+1. **Sample parenthesization fix** — `samples/inventory-item.precept` ReceiveShipment transitions need inner parentheses to fix the 8 TypeMismatch errors. Not a compiler change.
+2. **ExchangeRate result currency binding** — a new `ResultQualifierPolicy` for `ExchangeRateTimesMoney` that declares "result currency = exchange rate TO currency." Needed when the sample grouping is fixed and exchange rate chains no longer produce TypeMismatch. Can be a follow-up E5 slice or deferred.
+3. **Cross-qualifier false positive audit** — E1 exposes that same-type operations with mismatched qualifiers were silently passing. Audit sample files and tests for latent cross-qualifier bugs that were hidden by the shared ParameterMeta issue.
+
+### File Inventory
+
+| File | E1 | E2 | E3 | E4 | Change Type |
+|------|----|----|----|----|-------------|
+| `src/Precept/Pipeline/ProofEngine.cs` | ✓ | ✓ | ✓ | ✓ | Core fix — proof resolution + comparison |
+| `src/Precept/Language/Operations.cs` | | | ✓ | | Add ResultQualifierPolicy to PriceTimesQuantity |
+| `test/Precept.Tests/ProofEngineTests.cs` | ✓ | ✓ | ✓ | ✓ | New tests in existing qualifier class |
+| `test/Precept.Tests/ProofEngineTypedArgQualifierTests.cs` | | | | | Update baseline assertion (66 → 0) |
+| `samples/inventory-item.precept` | | | ✓* | | Fix ReceiveShipment parenthesization (sample fix) |
+
+\* The sample fix is separate from the compiler work — no diagnostic code changes.
