@@ -746,6 +746,11 @@
 - Added 5 new regression tests; 7 targeted proof tests pass around the fix, and the cross-currency false positive is now correctly detected by Cross_currency_fields_now_detected.
 - Implementation commit: d549b4a5dc478a571ba639ca67ae483ab0ff9fd3.
 
+### 2026-05-12T04:40:27Z — E1 proof-site operand resolution
+- TryQualifierCompatibilityProof must read operands from the TypedBinaryOp site, not ParamSubject, or mismatched qualifiers can bypass PRE0114.
+- PRE0114 operand names should come from that same binary-op site.
 
-
-
+### 2026-05-12T00:40:27.461-04:00 — E4 symbolic qualifier equivalence
+- ProofEngine now routes qualifier compatibility through `QualifiersAreCompatible()`, preserving null handling and the `PeriodDimension.Any` guard while falling back to same-source symbolic template comparison.
+- Interpolated qualifiers derived from the same field path now compare compatible across axis subtype boundaries (for example `Unit("{StockingUnit.unit}")` vs `Dimension("{StockingUnit.dimension}")`), while different-source and template-vs-literal comparisons still fail.
+- Validation: `dotnet build src\Precept\Precept.csproj --nologo` passed; the 4 new `Strategy5_SymbolicQualifierEquivalence*` tests passed; full `Precept.Tests` remains at the same single inventory-item PRE0114 baseline failure (89 PRE0114, 4848/4849 passing).
