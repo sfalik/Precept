@@ -318,7 +318,7 @@ state Draft initial
         markup.Should().Contain("Type: `money` · not nullable · `in USD`");
         markup.Should().Contain("Declared qualifier: `in USD`");
         markup.Should().Contain("Resolved qualifier: `'USD'`");
-        markup.Should().Contain("Qualifier source: declared explicitly on this type");
+        markup.Should().Contain("Qualifier source: Currency declared explicitly on this type");
         markup.Should().Contain("Writable:");
         markup.Should().Contain("`Draft`");
         markup.Should().Contain("`Listed`");
@@ -410,14 +410,16 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnTransitionRow_ShowsProofGapSummary()
+    public void Hover_OnTransitionRow_ShowsGapSummary()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "from Listed on Publish");
 
         markup.Should().Contain("**transition**");
+        markup.Should().Contain("⚠️ Gap · 1 unresolved proof obligation");
         markup.Should().Contain("set ReorderRatio");
         markup.Should().Contain("Graph:");
-        markup.Should().Contain("Proof gap:");
+        markup.Should().Contain("Gap: 1 unresolved obligation");
+        markup.Should().NotContain("Proof gap:");
     }
 
     [Theory]
@@ -490,7 +492,7 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnProofVerifiedTransition_ShowsVerifiedBadge()
+    public void Hover_OnProvenTransition_ShowsProvenBadge()
     {
         const string source = """
             precept VerifiedTransitionHover
@@ -502,7 +504,7 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "from Draft on Submit");
 
-        markup.Should().Contain("✅ **Proof verified**");
+        markup.Should().Contain("✅ Proven · source reachable · target `Done` reachable");
         markup.Should().NotContain("Proof gap:");
     }
 
@@ -536,13 +538,13 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "+");
 
-        markup.Should().Contain("**PRE0114 — Cannot prove Currency qualifier compatibility**");
-        markup.Should().Contain("Verdict: Cannot prove both operands resolve to the same Currency qualifier");
-        markup.Should().Contain("Expression: `(A - B) + C`");
+        markup.Should().Contain("⚠️ `PRE0114` · Can't confirm currencies match");
+        markup.Should().Contain("🔬 `Result` · `(A - B) + C`");
+        markup.Should().Contain("Left `A - B` carries `'USD'` · right `C` carries `'EUR'`");
     }
 
     [Fact]
-    public void Hover_OnProofBearingExpression_ShowsProvedQualifierDetails()
+    public void Hover_OnProofBearingExpression_ShowsProvenQualifierDetails()
     {
         const string source = """
             precept GrossProfitHover
@@ -555,22 +557,20 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "TotalRevenue - TotalReturns", offset: 13);
 
-        markup.Should().Contain("**expression** `(TotalRevenue - TotalReturns)`");
-        markup.Should().Contain("Status: Proved");
-        markup.Should().Contain("Requirement: both operands must resolve to the same Currency qualifier");
-        markup.Should().Contain("Proof chain fields: `CatalogCurrency`");
-        markup.Should().Contain("Result qualifier: `'{CatalogCurrency}'`");
-        markup.Should().Contain("Proof strategy: same-qualifier propagation");
+        markup.Should().Contain("✅ Proven · result keeps `'{CatalogCurrency}'`");
+        markup.Should().Contain("🔬 `TotalRevenue - TotalReturns`");
+        markup.Should().Contain("Left/Right: `'{CatalogCurrency}'` · Result: `'{CatalogCurrency}'`");
+        markup.Should().NotContain("Proved");
     }
 
     [Fact]
-    public void Hover_OnQualifierExpression_ShowsAxisAndCompatibilityChecks()
+    public void Hover_OnQualifierExpression_ShowsCompactQualifierCard()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "money in 'USD'", offset: 9);
 
-        markup.Should().Contain("**qualifier**");
-        markup.Should().Contain("Axis: currency");
-        markup.Should().Contain("Checks: assignments, comparisons, and arithmetic stay currency-compatible");
+        markup.Should().Contain("⚖️ Currency · `'USD'`");
+        markup.Should().Contain("Declared explicitly on this type");
+        markup.Should().Contain("Mixed currencies aren't allowed");
     }
 
     [Fact]
@@ -585,8 +585,9 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "'{StockingUnit.dimension}'", offset: 2);
 
-        markup.Should().Contain("✅ **Proof verified** — qualifier resolves from `StockingUnit`");
-        markup.Should().Contain("Axis: physical dimension");
+        markup.Should().Contain("⚖️ Physical dimension · `'{StockingUnit.dimension}'`");
+        markup.Should().Contain("Resolves from field `StockingUnit`");
+        markup.Should().Contain("Mixed physical dimensions aren't allowed");
     }
 
     [Fact]
@@ -601,8 +602,8 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "'{StockingUnit}'", offset: 2);
 
-        markup.Should().Contain("**qualifier**");
-        markup.Should().Contain("Axis: unit of measure");
+        markup.Should().Contain("⚖️ Unit of measure · `'{StockingUnit}'`");
+        markup.Should().Contain("Resolves from field `StockingUnit`");
     }
 
     [Fact]
@@ -621,7 +622,7 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnQualifierExpression_ShowsResolvedValueSourceAndShape()
+    public void Hover_OnQualifierExpression_ShowsResolvedValueSource()
     {
         const string source = """
             precept CurrencyQualifierHover
@@ -632,9 +633,9 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "'{CatalogCurrency}'", offset: 2);
 
-        markup.Should().Contain("Resolved value: `'{CatalogCurrency}'`");
-        markup.Should().Contain("Resolved source: field `CatalogCurrency`");
-        markup.Should().Contain("Resolved value shape: symbolic currency qualifier");
+        markup.Should().Contain("⚖️ Currency · `'{CatalogCurrency}'`");
+        markup.Should().Contain("Resolves from field `CatalogCurrency`");
+        markup.Should().Contain("Mixed currencies aren't allowed");
     }
 
     private static string GetHoverMarkdown(string source, string needle, int offset = 0, int occurrence = 1)

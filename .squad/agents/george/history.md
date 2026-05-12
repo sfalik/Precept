@@ -100,3 +100,7 @@
 ### 2026-05-12T15:15:10Z — Kramer proof hover implementation shipped
 - Kramer landed Elaine v4 proof hover across three commits: `5ab6030e` (qualifier hover), `516aa6ba` (proof status hover), and `7829e9c6` (proof chain detail).
 - Language-server validation stayed green at `264/264` in `Precept.LanguageServer.Tests`, so George can treat proof-hover routing and cards as shipped editor behavior rather than pending design work.
+
+### 2026-05-12T19:02:04-04:00 — B1 proof-hover blocker fixes landed
+- Reworked `RichHoverFactory` proof-gap qualifier/expression/diagnostic rendering onto compact card output and locked the shared badge vocabulary to `✅ Proven`, `⚡ Enforced`, and `⚠️ Gap`; qualifier declaration hovers now emit the compact `⚖️` card instead of the old forensic dump.
+- Normalized shipped copy from `proved` to `proven` in user-facing hover text, refreshed `HoverHandlerTests` to the compact-card contract, and validated green at `41/41` targeted hover tests plus `269/269` full language-server tests; repo-wide `dotnet test` is still blocked by the unrelated `TypeCheckerTransitionTests.TransitionRow_MultiStateFromList_MultipleUnknownStates_EmitsPerStateDiagnostic` baseline failure (3 `UndeclaredState` diagnostics vs expected 2).
