@@ -1,0 +1,349 @@
+precept InventoryItem
+
+# Ecommerce product inventory demonstrating Precept's full type system:
+# money/price/quantity with dimensional analysis, exchange rate currency conversion,
+# computed P&L via derived fields, choice-typed valuation method, append-only
+# shrinkage audit log, integer price-change counter, and a restock threshold
+# that drives a LowStock state for replenishment alerting.
+#
+# Supports products in any dimension — count (each/cs), length (m/roll/in),
+# mass (kg/bag/g), volume (L/bottle/mL), etc. Each quantity field's dimension
+# is derived dynamically from the associated UoM field via `of '{X.dimension}'`
+# so a product stocked by the roll, purchased by the case, and sold by the inch
+# is handled correctly at the type level.
+#
+# Supplier invoices may be in any currency; an exchange rate converts to the
+# catalog currency at receipt time. The catalog currency itself is configurable
+# per product and locked at listing.
+#
+# THIS FILE DOES NOT COMPILE — it expresses the intended design.
+# Pending compiler issues (spike/Precept-V2-Radical):
+#
+#   ROOT CAUSE 1 (PRE0009, Parser): Interpolated typed constants in field/arg
+#          qualifier positions (`in '...'`, `of '...'`) are rejected by the
+#          parser — it only accepts static typed constants. Affects all
+#          compound-unit field declarations and dimension-qualified fields/args.
+#          FIX: Extend Parser.TryParseQualifiers() to accept TypedConstantStart.
+#
+#   ROOT CAUSE 2 (PRE0052, TypeChecker): Missing compound-unit interpolation
+#          patterns for forms like `'0 {Unit}/{Unit}'` in QuantityForms[].
+#          Affects rules/ensures that bound-check compound-unit quantities.
+#          FIX: Add Q6/Q7/Q8 patterns to TypeChecker.Expressions.cs.
+#
+#   BUG-A (PRE0114): Event arg qualifiers not propagated into expressions —
+#          cannot be verified until ROOT CAUSE 1 ships.
+#
+#   SAMPLE DESIGN ISSUES:
+#          - Lines 137/145: `Sku is set` on non-optional field (PRE0049)
+#          - Lines 140/147: money/price type mismatch in cost comparison (PRE0018)
+#          - Lines 223/229/234: unguarded division by zero in WAC calc (PRE0083)
+#
+# Analysis: .squad/decisions/inbox/frank-inventory-deep-dive.md (2026-05-11)
+
+# ── Product identity ──────────────────────────────────────────────────────────
+
+field Sku as string notempty maxlength 50
+field Description as string optional maxlength 200
+field Supplier as string optional maxlength 100
+
+# ── Currency ──────────────────────────────────────────────────────────────────
+# CatalogCurrency is the currency used for all cost and price fields on this product.
+# Locked at listing alongside the unit system. BUG-C: all money/price fields use
+# interpolated 'in {CatalogCurrency}' once interpolation ships.
+field CatalogCurrency as currency default 'USD'
+
+# Supplier invoices may arrive in a different currency; SupplierCurrency is the
+# default — callers provide an exchangerate on ReceiveShipment to convert.
+field SupplierCurrency as currency default 'USD'
+
+# ValuationMethod is the cost-flow assumption. Currently WAC only; extend by
+# adding members to the choice set. Locked at listing alongside unit system.
+field ValuationMethod as choice of string("WAC") default "WAC"
+
+# ── Units of measure ──────────────────────────────────────────────────────────
+#
+# StockingUnit  — internal storage unit        (e.g., 'each', 'roll', 'g')
+# PurchaseUnit  — supplier ordering unit       (e.g., 'cs', 'kg', 'roll')
+# SaleUnit      — customer-facing unit         (e.g., 'each', 'in', 'oz')
+#
+# Dimension constraints use `of '{X.dimension}'` — derived from the associated
+# UoM field — so the precept works for any dimension family.
+# Conversion ratios are compound-unit quantities so dimensional analysis carries:
+#   PurchaseQty [m, roll] × StockingUnitsPerPurchaseUnit [in/roll] = stocking qty [in]
+# BUG-C: all interpolated qualifiers and defaults require interpolation support.
+
+field StockingUnit as unitofmeasure default 'each'
+field PurchaseUnit as unitofmeasure default 'each'
+field SaleUnit as unitofmeasure default 'each'
+
+# BUG-C
+field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}' default '1 {StockingUnit}/{PurchaseUnit}'
+# BUG-C
+field StockingUnitsPerSaleUnit as quantity in '{StockingUnit}/{SaleUnit}' default '1 {StockingUnit}/{SaleUnit}'
+
+# ── Stock levels ──────────────────────────────────────────────────────────────
+# `of '{StockingUnit.dimension}'` constrains the dimension to match StockingUnit at runtime.
+# BUG-C: interpolated dimension qualifier and default not yet implemented.
+field QuantityOnHand as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}'
+field RestockThreshold as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}'
+
+# ── Pricing and cost ──────────────────────────────────────────────────────────
+# BUG-C: all money/price fields should use 'in {CatalogCurrency}' once interpolation ships.
+field TotalInventoryCost as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+
+# Weighted average cost per stocking unit — purchase side, derived from shipment receipts.
+# Type derivation: TotalInventoryCost / QuantityOnHand → money ÷ quantity → price (spec §3.6).
+field AverageCost as price in '{CatalogCurrency}' of '{StockingUnit.dimension}' default '0 {CatalogCurrency}/{StockingUnit}'
+
+# List price per sale unit — selling side, set explicitly via UpdateListPrice.
+field ListPrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}' default '0 {CatalogCurrency}/{SaleUnit}'
+
+# Realized P&L accumulators — captured per event.
+# TotalRevenue     — Qty × ListPrice per FulfillOrder
+# TotalCostOfGoods — Qty × StockingUnitsPerSaleUnit × AverageCost per FulfillOrder
+# TotalReturns     — reversed revenue from ReturnOrder events
+# TotalShrinkage   — write-off cost from RecordShrinkage events
+field TotalRevenue as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+field TotalCostOfGoods as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+field TotalReturns as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+field TotalShrinkage as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+
+# GrossProfit is derived — the engine keeps it atomically consistent with the accumulators.
+# BUG-C: uses interpolated CatalogCurrency qualifier.
+field GrossProfit as money in '{CatalogCurrency}' <- TotalRevenue - TotalReturns - TotalCostOfGoods - TotalShrinkage
+
+# Number of list-price changes since listing — useful for pricing audit and SLA tracking.
+field PriceChangeCount as integer default 0 nonnegative
+
+# Append-only write-off log — reason captured at every RecordShrinkage event.
+field ShrinkageLog as log of string
+
+# ── Invariants ────────────────────────────────────────────────────────────────
+# BUG-B: quantity vs. typed constant literal comparison not yet working.
+rule QuantityOnHand >= '0 {StockingUnit}' because "Stock on hand cannot go negative"
+rule RestockThreshold >= '0 {StockingUnit}' because "Restock threshold cannot be negative"
+rule TotalInventoryCost >= '0.00 {CatalogCurrency}' because "Total inventory cost must be nonnegative"
+rule TotalRevenue >= '0.00 {CatalogCurrency}' because "Total revenue cannot be negative"
+rule TotalCostOfGoods >= '0.00 {CatalogCurrency}' because "Total cost of goods cannot be negative"
+rule TotalReturns >= '0.00 {CatalogCurrency}' because "Total returns cannot be negative"
+rule TotalShrinkage >= '0.00 {CatalogCurrency}' because "Total shrinkage cannot be negative"
+rule AverageCost >= '0 {CatalogCurrency}/{StockingUnit}' because "Average cost cannot be negative"
+rule ListPrice >= '0 {CatalogCurrency}/{SaleUnit}' because "List price cannot be negative"
+rule StockingUnitsPerPurchaseUnit > '0 {StockingUnit}/{PurchaseUnit}' because "Purchase conversion ratio must be positive"
+rule StockingUnitsPerSaleUnit > '0 {StockingUnit}/{SaleUnit}' because "Sale conversion ratio must be positive"
+
+# ── States ────────────────────────────────────────────────────────────────────
+
+state Unlisted initial
+state Listed
+state LowStock   # stock at or below RestockThreshold — purchase order needed
+state Delisted
+
+# Unit system and catalog currency are locked at listing.
+in Unlisted modify Sku, CatalogCurrency, SupplierCurrency, ValuationMethod, StockingUnit, PurchaseUnit, SaleUnit, StockingUnitsPerPurchaseUnit, StockingUnitsPerSaleUnit editable
+
+in Listed modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
+in Listed ensure Sku is set because "SKU must be assigned before listing"
+in Listed ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
+# Selling below cost is structurally prevented. BUG-A: cross-type comparison.
+in Listed ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
+# BUG-B: quantity and price comparison against typed constant literal.
+in Listed ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand = '0 {StockingUnit}' because "Stocked items must have a positive average cost"
+
+in LowStock modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
+in LowStock ensure Sku is set because "SKU must be assigned"
+in LowStock ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
+in LowStock ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
+# BUG-B
+in LowStock ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand = '0 {StockingUnit}' because "Stocked items must have a positive average cost"
+
+# ── Events ────────────────────────────────────────────────────────────────────
+
+event Publish(Sku as string notempty, Desc as string optional)
+
+# ReceiveShipment: purchase qty in PurchaseUnit; supplier cost in SupplierCurrency
+# converted to CatalogCurrency via Rate (exchangerate, 'from' must match SupplierCurrency).
+# BUG-C: arg defaults need interpolation; BUG-A: event arg qty in ensures/actions.
+event ReceiveShipment(
+    PurchaseQty as quantity of '{PurchaseUnit.dimension}' default '0 {PurchaseUnit}',
+    SupplierUnitCost as money in '{SupplierCurrency}' default '0.00 {SupplierCurrency}',
+    Rate as exchangerate)
+on ReceiveShipment ensure ReceiveShipment.PurchaseQty > '0 {PurchaseUnit}' because "Purchase quantity must be positive"
+on ReceiveShipment ensure ReceiveShipment.SupplierUnitCost > '0.00 {SupplierCurrency}' because "Supplier unit cost must be positive"
+# Rate direction must match: from SupplierCurrency → CatalogCurrency.
+# When BUG-C ships this becomes a compile-time qualifier: Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'
+on ReceiveShipment ensure ReceiveShipment.Rate.from = SupplierCurrency because "Exchange rate must convert from the supplier's currency"
+on ReceiveShipment ensure ReceiveShipment.Rate.to = CatalogCurrency because "Exchange rate must convert to the catalog currency"
+
+# FulfillOrder: sale qty in SaleUnit, converted to StockingUnit on fulfillment.
+# Captured at current ListPrice and AverageCost for P&L accuracy.
+# Transitions to LowStock when stock falls to or below RestockThreshold. BUG-A + BUG-C.
+event FulfillOrder(Qty as quantity of '{SaleUnit.dimension}' default '0 {SaleUnit}')
+on FulfillOrder ensure FulfillOrder.Qty > '0 {SaleUnit}' because "Order quantity must be positive"
+
+# ReturnOrder: reverses a prior sale. Stock re-incremented; revenue reversed at
+# original sale price; COGS reversed at current AverageCost. BUG-A + BUG-C.
+event ReturnOrder(
+    Qty as quantity of '{SaleUnit.dimension}' default '0 {SaleUnit}',
+    OriginalSalePrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}')
+on ReturnOrder ensure ReturnOrder.Qty > '0 {SaleUnit}' because "Return quantity must be positive"
+on ReturnOrder ensure ReturnOrder.OriginalSalePrice > '0 {CatalogCurrency}/{SaleUnit}' because "Original sale price must be positive"
+
+# AdjustInventory: cycle count correction — syncs physical count to system.
+# No P&L impact; TotalInventoryCost is revalued at current WAC. BUG-A + BUG-C.
+event AdjustInventory(
+    Qty as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}',
+    Note as string notempty)
+on AdjustInventory ensure AdjustInventory.Qty >= '0 {StockingUnit}' because "Adjusted quantity cannot be negative"
+
+# RecordShrinkage: books a write-off for damage, expiry, or theft.
+# Decrements stock and accumulates TotalShrinkage — distinct from cycle count. BUG-A + BUG-C.
+event RecordShrinkage(
+    Qty as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}',
+    Reason as string notempty)
+on RecordShrinkage ensure RecordShrinkage.Qty > '0 {StockingUnit}' because "Shrinkage quantity must be positive"
+on RecordShrinkage ensure RecordShrinkage.Qty <= QuantityOnHand because "Cannot write off more than is on hand"
+
+# UpdateListPrice: explicit price change — separate event so price history is traceable.
+event UpdateListPrice(Price as price in '{CatalogCurrency}' of '{SaleUnit.dimension}')
+on UpdateListPrice ensure UpdateListPrice.Price > '0 {CatalogCurrency}/{SaleUnit}' because "List price must be positive"
+
+event Delist(Reason as string optional)
+event Relist
+
+# ── Transitions ───────────────────────────────────────────────────────────────
+
+from Unlisted on Publish
+    -> set Sku = Publish.Sku
+    -> set Description = if Publish.Desc is set then Publish.Desc else Sku
+    -> transition Listed
+
+# ReceiveShipment converts supplier cost to catalog currency via Rate, then updates WAC.
+# Operator chain (spec §3.6):
+#   Rate × (SupplierUnitCost × PurchaseQty × StockingUnitsPerPurchaseUnit)
+#   = exchangerate × money → money  (currency conversion)                  BUG-A
+#   money + money → money           (new total cost)                        BUG-A
+#   quantity × quantity → quantity  (purchase → stocking qty)               BUG-A
+#   quantity + quantity → quantity  (new on-hand)                           BUG-A
+#   money ÷ quantity → price        (new WAC)                               BUG-A
+from Listed on ReceiveShipment
+    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
+    -> set AverageCost = TotalInventoryCost / QuantityOnHand
+    -> no transition
+
+from LowStock on ReceiveShipment when QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit > RestockThreshold
+    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
+    -> set AverageCost = TotalInventoryCost / QuantityOnHand
+    -> transition Listed
+from LowStock on ReceiveShipment
+    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
+    -> set AverageCost = TotalInventoryCost / QuantityOnHand
+    -> no transition
+
+# FulfillOrder: capture P&L at current prices before decrementing stock.
+# Transitions to LowStock when post-fulfillment stock <= RestockThreshold. BUG-A.
+from Listed on FulfillOrder when QuantityOnHand >= FulfillOrder.Qty * StockingUnitsPerSaleUnit and QuantityOnHand - FulfillOrder.Qty * StockingUnitsPerSaleUnit <= RestockThreshold
+    -> set TotalRevenue = TotalRevenue + FulfillOrder.Qty * ListPrice
+    -> set TotalCostOfGoods = TotalCostOfGoods + FulfillOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
+    -> set QuantityOnHand = QuantityOnHand - FulfillOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> transition LowStock
+from Listed on FulfillOrder when QuantityOnHand >= FulfillOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalRevenue = TotalRevenue + FulfillOrder.Qty * ListPrice
+    -> set TotalCostOfGoods = TotalCostOfGoods + FulfillOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
+    -> set QuantityOnHand = QuantityOnHand - FulfillOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> no transition
+from Listed on FulfillOrder
+    -> reject "Insufficient stock to fulfill this order"
+
+from LowStock on FulfillOrder when QuantityOnHand >= FulfillOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalRevenue = TotalRevenue + FulfillOrder.Qty * ListPrice
+    -> set TotalCostOfGoods = TotalCostOfGoods + FulfillOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
+    -> set QuantityOnHand = QuantityOnHand - FulfillOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> no transition
+from LowStock on FulfillOrder
+    -> reject "Insufficient stock to fulfill this order"
+
+# ReturnOrder: reverse revenue at original price; reverse COGS at current WAC.
+# Stock re-incremented and revalued. BUG-A.
+from Listed on ReturnOrder
+    -> set TotalReturns = TotalReturns + ReturnOrder.Qty * ReturnOrder.OriginalSalePrice
+    -> set TotalCostOfGoods = TotalCostOfGoods - ReturnOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
+    -> set QuantityOnHand = QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> no transition
+
+from LowStock on ReturnOrder when QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit > RestockThreshold
+    -> set TotalReturns = TotalReturns + ReturnOrder.Qty * ReturnOrder.OriginalSalePrice
+    -> set TotalCostOfGoods = TotalCostOfGoods - ReturnOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
+    -> set QuantityOnHand = QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> transition Listed
+from LowStock on ReturnOrder
+    -> set TotalReturns = TotalReturns + ReturnOrder.Qty * ReturnOrder.OriginalSalePrice
+    -> set TotalCostOfGoods = TotalCostOfGoods - ReturnOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
+    -> set QuantityOnHand = QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> no transition
+
+# AdjustInventory: cycle count sync — no P&L accumulator impact.
+from Listed on AdjustInventory
+    -> set QuantityOnHand = AdjustInventory.Qty
+    -> set TotalInventoryCost = AdjustInventory.Qty * AverageCost
+    -> no transition
+
+from LowStock on AdjustInventory when AdjustInventory.Qty > RestockThreshold
+    -> set QuantityOnHand = AdjustInventory.Qty
+    -> set TotalInventoryCost = AdjustInventory.Qty * AverageCost
+    -> transition Listed
+from LowStock on AdjustInventory
+    -> set QuantityOnHand = AdjustInventory.Qty
+    -> set TotalInventoryCost = AdjustInventory.Qty * AverageCost
+    -> no transition
+
+# RecordShrinkage: write-off — books cost to TotalShrinkage, appends reason to audit log.
+from Listed on RecordShrinkage when QuantityOnHand - RecordShrinkage.Qty <= RestockThreshold
+    -> set TotalShrinkage = TotalShrinkage + RecordShrinkage.Qty * AverageCost
+    -> set QuantityOnHand = QuantityOnHand - RecordShrinkage.Qty
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> append ShrinkageLog RecordShrinkage.Reason
+    -> transition LowStock
+from Listed on RecordShrinkage
+    -> set TotalShrinkage = TotalShrinkage + RecordShrinkage.Qty * AverageCost
+    -> set QuantityOnHand = QuantityOnHand - RecordShrinkage.Qty
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> append ShrinkageLog RecordShrinkage.Reason
+    -> no transition
+
+from LowStock on RecordShrinkage
+    -> set TotalShrinkage = TotalShrinkage + RecordShrinkage.Qty * AverageCost
+    -> set QuantityOnHand = QuantityOnHand - RecordShrinkage.Qty
+    -> set TotalInventoryCost = QuantityOnHand * AverageCost
+    -> append ShrinkageLog RecordShrinkage.Reason
+    -> no transition
+
+from Listed on UpdateListPrice
+    -> set ListPrice = UpdateListPrice.Price
+    -> set PriceChangeCount = PriceChangeCount + 1
+    -> no transition
+
+from LowStock on UpdateListPrice
+    -> set ListPrice = UpdateListPrice.Price
+    -> set PriceChangeCount = PriceChangeCount + 1
+    -> no transition
+
+from Listed on Delist
+    -> set Description = if Delist.Reason is set then Delist.Reason else Description
+    -> transition Delisted
+
+from LowStock on Delist
+    -> set Description = if Delist.Reason is set then Delist.Reason else Description
+    -> transition Delisted
+
+from Delisted on Relist
+    -> transition Listed

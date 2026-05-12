@@ -1751,6 +1751,15 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 - **Precedent:** NodaTime's arithmetic rules live in the type itself only where the operation is unambiguous and self-contained. For Precept, no business-domain operation is self-contained without domain rule context.
 - **Tradeoff accepted:** `MoneyOperations.Add(a, b, catalog)` is less discoverable than `a + b`. Accepted — the discoverable surface is the DSL, not the CLR API. CLR consumers use DSL-evaluated results, not CLR operator overloads.
 
+### D19. No qualifier inference on derivation operations
+
+- **What:** When `money ÷ period → price`, `money ÷ duration → price`, or `money ÷ quantity → price` derivation operations are evaluated, the result `price` does NOT automatically inherit a temporal dimension qualifier. Derivation results produce bare `price` with only what can be statically determined (currency from money), but temporal dimension is NOT inferred. Authors who need temporal chain proofs on a derived price must assign it to a field explicitly declared with `of 'time'` or `of 'date'`.
+- **Why:** The spec specifies derivation operations produce `price` but is silent on result qualifier propagation. Derivation creates a qualifier relationship; there is no pre-existing constraint to validate. Qualifier inference would be implicit behavior that violates Precept's core design principle of explicit domain contracts. Authors who need temporal dimension chain proofs on a derived price must assign to a field explicitly declared with `of 'time'` or `of 'date'`.
+- **Alternatives rejected:** (A) Auto-infer temporal dimension from the divisor type — rejected because this creates invisible implicit behavior; the type system would be guessing the author's intent. (B) Infer on assignment — rejected because this is assignment validation's job (Slice 10 / `ValidateAssignmentQualifiers`), not a result-type change.
+- **Precedent:** Consistent with how physical derivation works in practice: `money / quantity` produces bare `price` with no denominator dimension inferred. The multiplication-direction chain proofs (`price × period → money`) validate existing declared qualifiers; they do not create new inferred ones.
+- **Tradeoff accepted:** Authors must be explicit about `of 'time'` / `of 'date'` on price fields derived from money/duration. More verbose, but unambiguous.
+- **Scope:** Applies to all three derivation operations: `MoneyDividePeriod`, `MoneyDivideDuration`, `MoneyDivideQuantity`.
+
 ---
 
 ## Relationship to Temporal Type System

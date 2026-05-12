@@ -1,9 +1,8 @@
 precept Test
 
 
-field f1 as quantity of 'length'
-field f2 as quantity of 'mass' default '1 {f1.dimension}'
-
+field f1 as quantity of 'length' default '1 [ft_i]'
+field f2 as quantity of 'mass' default '1 {f1.unit}'
 
 
 field Balance as money in 'USD' default '0.00 USD' nonnegative     # OK — resolves

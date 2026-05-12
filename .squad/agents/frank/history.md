@@ -14,6 +14,14 @@
 
 ## Learnings
 
+### 2026-05-11T21:54:11-04:00 — Deep dive: inventory-item.precept root cause analysis
+- Identified 3 root causes for 161 errors (2 compiler, 1 sample design); rest is cascade.
+- **RC-1 (Parser):** `Parser.TryParseQualifiers()` only accepts `TokenKind.TypedConstant`, rejects `TypedConstantStart`. This gates ALL interpolated qualifiers in field/arg declarations. ~100 cascade errors trace here.
+- **RC-2 (TypeChecker):** Missing compound-unit patterns Q6/Q7/Q8 (`'0 {A}/{B}'` forms) in `QuantityForms[]`. Q5 requires 3 holes but sample uses 2-hole patterns.
+- **Sample bugs:** `is set` on non-optional Sku (PRE0049), money/price type mismatch in cost comparison (PRE0018), unguarded division by zero (PRE0083).
+- **A2B visibility in this file:** ZERO — every benefiting line is blocked by RC-1.
+- Updated sample file header with new bug classification; wrote full analysis to `.squad/decisions/inbox/frank-inventory-deep-dive.md`.
+
 ### 2026-05-11T21:05:25-04:00 — inventory-item.precept coverage analysis
 - Compiled `samples/inventory-item.precept` via `precept_compile`: 125 diagnostics, ~73% are BUG-C or direct cascades from BUG-C (failed interpolation → failed arg parsing → cascade "not declared" errors).
 - **Plan gap found:** compound-unit interpolation (`'{StockingUnit}/{PurchaseUnit}'`) is not covered by any per-type grammar in the plan. The `unitofmeasure` type only defines `U1: H[whole-value]`; quantity Q1–Q4 have no compound-unit patterns. This blocks 4 field declarations and 2 rules.

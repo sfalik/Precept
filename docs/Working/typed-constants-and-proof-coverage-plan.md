@@ -1,6 +1,30 @@
 # Typed Constants & Proof Coverage Plan
 
-**Status:** Awaiting Shane review before Slice 1 (Parser) implementation begins  
+**Status:** Part A — Not Started (Slice 1 ready to implement) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement
+
+### Slice Status Tracker
+
+| Slice | Title | Status |
+|-------|-------|--------|
+| **Part A — Interpolated Typed Constants** | | |
+| 1 | Parser — `ParseInterpolatedTypedConstant()` | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
+| 2 | Type Checker — type-grammar matching | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
+| 2B | Type Checker — compound-unit interpolation (`'{A}/{B}'`) | 🔲 Not Started — **only remaining Part A gap** |
+| 3 | Completions — hole-filtered completions | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
+| 4 | Semantic Tokens — hole expression classification | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
+| 5 | Docs/MCP — spec + diagnostic codes | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
+| 6 | ProofEngine — compositional constraint propagation | ✅ Already Implemented (confirmed by code audit, 2026-05-11) |
+| **Part B — Proof Engine Qualifier Coverage** | | |
+| 7 | Money Currency Enforcement (G1 + G2 + G3) | ✅ Already Implemented |
+| 8 | Qualifier Chain Validation Infrastructure (G4 + G5) | ✅ Already Implemented |
+| 9 | Dimension-Only Field False Positive Fix (G6) | ✅ Already Implemented |
+| 10 | Assignment Expression Qualifier Propagation (G7) | ✅ Already Implemented |
+| 11 | Exchange Rate Assignment Qualifier Validation (G9) | ✅ Already Implemented |
+| 11B | Temporal Price Denominator Type System Extension (G8 + G13 prereq) | ✅ Complete (2026-05-11) |
+| 12 | Temporal Chain Validation (G8 + G13) | 🔲 Not Started — **unblocked by 11B** |
+| 13 | Derivation-Direction Chain Proof Analysis (G15) | ⛔ Closed — No Action Required |
+
+
 **Architect:** Frank (frank-16, frank-18, frank-23 revision; proof audit integration 2026-05-11)  
 **Philosophy grounding:** `docs/philosophy.md` — make invalid configurations structurally impossible  
 **Supersedes:** Previous position-text plan (frank-16/frank-18); standalone `interpolation-plan.md`  
@@ -573,7 +597,7 @@ The valid-form tables above are finite and small (≤ 8 patterns per type). The 
 
 ### Slice 1 — Parser (UNCHANGED from frank-16)
 
-**File:** `src/Precept/Pipeline/Parser.Expressions.cs`  
+**Status:** ✅ Already Implemented (confirmed by code audit, 2026-05-11)  
 **Method:** `ParseInterpolatedTypedConstant()` at ~line 444  
 **Reference:** `ParseInterpolatedString()` at ~lines 399–441
 
@@ -600,6 +624,7 @@ The valid-form tables above are finite and small (≤ 8 patterns per type). The 
 
 ### Slice 2 — Type Checker (REDESIGNED — type-grammar matching)
 
+**Status:** ✅ Already Implemented (confirmed by code audit, 2026-05-11)  
 **Files:**
 - `src/Precept/Pipeline/TypeChecker.Expressions.cs` — new `ResolveInterpolatedTypedConstant()`
 - `src/Precept/Pipeline/SemanticIndex.cs` — new `TypedInterpolatedTypedConstant` record
@@ -691,6 +716,65 @@ _Whole-value forms:_
 - `'{p}'` where `p` is `period` → valid period whole-value
 - `'{c}'` where `c` is `currency` → valid currency whole-value
 - `'{u}'` where `u` is `unitofmeasure` → valid unitofmeasure whole-value
+
+---
+
+### Slice 2B — Type Checker: Compound-Unit Interpolation (`'{A}/{B}'`)
+
+**Status:** Not Started  
+**Added:** 2026-05-11, based on Frank's coverage analysis of `samples/inventory-item.precept`
+
+**Gap:** The current type-grammar table for `unitofmeasure` and `quantity` covers single-hole unit patterns but not compound-unit forms with a `/` separator — e.g., `'{StockingUnit}/{PurchaseUnit}'`. This form appears 4 times in `inventory-item.precept` (field declarations L71, L73; rules L123, L124) and will produce `InvalidInterpolatedTypedConstantForm` after Slice 2 ships unless this extension is added.
+
+**File:** `src/Precept/Pipeline/TypeChecker.Expressions.cs`  
+**Primary change:** Extend `ResolveInterpolatedTypedConstant()` type-grammar tables.
+
+**New patterns to add:**
+
+_For `unitofmeasure`:_
+- `U2: H[numerator-unit] T('/') H[denominator-unit]`
+  - Both holes must resolve to `unitofmeasure`
+  - Text segment must be exactly `'/'`
+  - Dimensional validation: if both source fields have declared dimensions, they may differ (a compound rate unit like `boxes/pallet` is dimensionally valid — it is a ratio of two independent physical dimensions)
+
+_For `quantity`:_
+- `Q5: H[magnitude] T(' ') H[numerator-unit] T('/') H[denominator-unit]`
+  - First hole: integer or decimal (magnitude)
+  - Second/third holes: unitofmeasure
+  - Matches `'{n} {StockingUnit}/{PurchaseUnit}'`
+- `Q6: H[numerator-unit] T('/') H[denominator-unit]` (whole-value rate-unit form)
+  - Both holes: unitofmeasure
+  - Matches `'{StockingUnit}/{PurchaseUnit}'` where the expression represents a compound unit reference rather than a quantity literal
+
+**Slot identity additions:**
+- `SlotIdentity.NumeratorUnit` — unit in numerator position of a compound-unit pattern
+- `SlotIdentity.DenominatorUnit` — unit in denominator position of a compound-unit pattern
+
+**Diagnostic behavior:**
+- Both holes must be `unitofmeasure`; any other type → `InterpolatedTypedConstantHoleTypeMismatch`
+- `string` in either hole → `InterpolatedTypedConstantHoleTypeMismatch` (same as all other holes)
+- No cross-hole dimensional validation for compound-unit patterns — numerator and denominator dimensions are independently declared
+
+**LOC estimate:** ~30 lines new code in the type-grammar table and slot-identity enum; no new diagnostic codes needed (reuses existing codes 121–124).
+
+**Tests:**
+
+_Valid compound-unit forms:_
+- `'{A}/{B}'` where `A`, `B` are `unitofmeasure` → valid unitofmeasure compound
+- `'{n} {A}/{B}'` where `n` is `integer`, `A`, `B` are `unitofmeasure` → valid quantity
+- `'{n} {A}/{B}'` where `n` is `decimal`, `A`, `B` are `unitofmeasure` → valid quantity
+- `'{A}/{B}'` where `A` is `quantity of 'length'`, `B` is `quantity of 'mass'` fields (wrong type — `quantity` not `unitofmeasure`) → `InterpolatedTypedConstantHoleTypeMismatch`
+
+_Invalid hole types:_
+- `'{s}/{B}'` where `s` is `string` → `InterpolatedTypedConstantHoleTypeMismatch`
+- `'{A}/{s}'` where `s` is `string` → `InterpolatedTypedConstantHoleTypeMismatch`
+- `'{n}/{B}'` where `n` is `integer` → `InterpolatedTypedConstantHoleTypeMismatch` (integer not valid in unit slot)
+
+_Structural validity:_
+- `'{A}/{B}/{C}'` for `unitofmeasure` → `InvalidInterpolatedTypedConstantForm` (no 3-hole unit pattern)
+- `'{A}|{B}'` for `unitofmeasure` → `InvalidInterpolatedTypedConstantForm` (pipe is not a valid separator)
+
+**Dependency on Slice 2:** Must be implemented after the core type-grammar matching infrastructure from Slice 2 is in place. This slice extends the grammar tables — it does not change the matching algorithm.
 
 ---
 

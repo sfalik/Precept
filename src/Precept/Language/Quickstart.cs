@@ -101,7 +101,7 @@ public static class QuickstartCatalog
         new(
             "precept_patterns",
             "Call to see compile-verified examples of common multi-construct patterns and anti-patterns before writing your first draft of a precept.",
-            "Returns CommonPatterns (8 verified examples) and AntiPatterns (3 common mistakes with corrections) from the SyntaxReference catalog."),
+            "Returns CommonPatterns (8 verified examples) and AntiPatterns (4 common mistakes with corrections) from the SyntaxReference catalog."),
 
         new(
             "precept_diagnostic",

@@ -331,5 +331,26 @@ public static class SyntaxReference
             from Draft on Complete -> transition Done
             """,
             "Computed fields (declared with '<-') are read-only by definition. Their value is recalculated from the formula whenever A changes. Attempting to 'set' a computed field produces a ComputedFieldNotWritable error."),
+
+        new(
+            "Exhaustive rejection rows",
+            "Adding 'reject' rows for state/event combinations that are simply not applicable in that state. No row is the correct way to say an event has no meaning here — it produces Unmatched and hides the button entirely. 'reject' is for business-rule violations the user could potentially resolve.",
+            """
+            from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650
+                -> transition Approved
+            from Submitted on Approve
+                -> reject "Approval requires strong income coverage and acceptable credit"
+            from Draft on Approve
+                -> reject "Cannot approve an application that has not been submitted"
+            from Approved on Approve
+                -> reject "Application is already approved"
+            """,
+            """
+            from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650
+                -> transition Approved
+            from Submitted on Approve
+                -> reject "Approval requires strong income coverage and acceptable credit"
+            """,
+            "Approve from Draft and from Approved adds rows for events with no meaning in those states — no UI should offer an Approve button there, and no row is the correct way to say so. The only reject that belongs here is the fallback from Submitted when the applicant fails the income and credit check — that is a condition the applicant could potentially remedy. Structurally inapplicable events need no row."),
     ];
 }
