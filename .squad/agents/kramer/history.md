@@ -22,6 +22,12 @@
 
 ## Recent Updates
 
+### 2026-05-12T22:25:28Z — Frank review approved B4’s shape but blocked the next placement step
+
+- Frank’s review of B4 approved `EdgeProofStatus` as the right `StateGraph` projection and approved the shipped regression coverage, so the data shape itself is now durable context.
+- The next fix is architectural, not hover-surface: move proof-status enrichment/domain logic out of `Compiler.cs` orchestration and avoid duplicating edge-expansion knowledge already owned by `GraphAnalyzer`.
+- Elaine’s doc sync also landed, so `docs/Working/hover-design.md` now records the shipped B4 badge vocabulary and the fact that the proof narrative appends to rich state hover instead of introducing a standalone hover kind.
+
 ### 2026-05-12T07:12:56Z — Hover markdown line-break fix landed
 - Changed all 11 `Create*Markdown` builders in `RichHoverFactory.cs` from `string.Join("\n", lines)` to `string.Join("\n\n", lines)` so VS Code renders paragraph breaks instead of a single run-on line.
 - The change shipped in commit `af6e563c`; no hover assertions needed updates because tests already match by substring.

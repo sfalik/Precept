@@ -6,6 +6,34 @@
 
 ---
 
+### 2026-05-12T22:25:28Z: Language docs and README now match shipped comma-list `StateTarget` behavior
+
+**By:** Scribe
+
+**Status:** Merged from Frank's docs-closeout note.
+
+**Merged source:** `frank-s6-docs-done.md`.
+
+- `docs/language/precept-language-spec.md`, `docs/language/precept-grammar.md`, `docs/compiler/parser.md`, `docs/compiler/type-checker.md`, `docs/compiler/name-binder.md`, and `README.md` now describe `StateTarget := Identifier ("," Identifier)* | any` while keeping `EventTarget` single-name.
+- The synced docs now record pure-copy expansion semantics plus per-name span/resolution behavior for comma-list state targets, and the parser docs now describe the shipped variable-offset state-scoped disambiguation scan.
+- `docs/language/catalog-system.md` and `docs/compiler/diagnostic-system.md` were explicitly verified as already accurate for the shipped comma-list subset and needed no further change.
+
+---
+
+### 2026-05-12T22:25:28Z: Language-spec audit locks a targeted cleanup for stale references, overclaimed contracts, and incomplete diagnostic coverage
+
+**By:** Scribe
+
+**Status:** Merged from Frank's audit note.
+
+**Merged source:** `frank-spec-audit.md`.
+
+- Frank confirmed several high-confidence spec defects in `docs/language/precept-language-spec.md`: the dead `docs/PreceptLanguageDesign.md` grounding reference, stale "not yet built" pipeline wording, a vestigial open-questions placeholder, misleading `C48`-style labels, six `ConstructKind` names that do not match code, and an incomplete diagnostic-groups table.
+- The audit also preserves the owner-decision boundary: §0.5 and §0.6 currently overclaim shipped behavior if they are meant to describe only implemented guarantees, and ProofEngine Strategy 6 remains undocumented unless the owner wants it promoted to public documentation.
+- Frank ranked the immediate cleanup around preamble/status accuracy, replacing `C48`-`C52` notation with real diagnostic names, and explicitly qualifying which design-contract items are future or partial.
+
+---
+
 ### 2026-05-12T22:18:18Z: User model directive locks claude-opus-4.7 behind explicit permission while keeping claude-opus-4.6 available under normal rules
 
 **By:** Scribe

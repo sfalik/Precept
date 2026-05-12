@@ -20,6 +20,11 @@
 
 ## Recent Updates
 
+### 2026-05-12T22:25:28Z — B4 as-built hover doc sync recorded
+
+- Updated `docs/Working/hover-design.md` so the working hover spec now records the shipped B4 state-proof narrative as-built, including the `📍`, `✅ Proven`, and `⚠️ Gap` badge vocabulary.
+- Locked the doc boundary that B4 appends to the rich state hover card and does not ship as a standalone hover kind.
+
 ### 2026-05-12T13:52:04Z — Hover color and docs alignment pass recorded
 
 - Confirmed the current field/arg split is the intended design direction and that the remaining gap is documentation drift, not a request to revert implementation.
