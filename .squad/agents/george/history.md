@@ -51,6 +51,9 @@
 
 ## Learnings
 
+- 2026-05-12T11:08:13.750-04:00 — `ResolveQualifierFromInterpolatedConstant` now lives at `src/Precept/Pipeline/ProofEngine.cs:1351`; the G1 fix must run before the denominator-only fallback or compound-unit constants collapse to the denominator slot.
+- 2026-05-12T11:08:13.750-04:00 — The typed constant AST shape is `TypedInterpolatedTypedConstant(Slots, ResultType, Span, StaticMagnitude)` where each `TypedInterpolationSlot` carries an `Expression` plus `SlotKind`; compound unit literals arrive as `NumeratorUnit` + `DenominatorUnit` slots, not a single `Unit` slot.
+- 2026-05-12T11:08:13.750-04:00 — Compound-unit proof coverage now sits in `ProofEngineTypedArgQualifierTests`: `CompoundUnitInterpolatedConstant_ResolvesCompoundUnitQualifier`, `SingleUnitInterpolatedConstant_StillResolvesSingleUnitQualifier`, `CompoundUnitRule_DoesNotEmit_PRE0114`, `CompoundUnitPositivityProof_ClearsDivisionByZero`, and `InventoryItem_Sample_Clears_G1_Diagnostics`.
 - 2026-05-12 — E2 needed `ResolveQualifierFromExpression()` to synthesize `DeclaredQualifierMeta` directly from `TypedInterpolatedTypedConstant` slots; `DeclaredQualifierMeta.Unit` requires both unit and dimension payloads.
 - 2026-05-12 — E3 needed more than currency passthrough. Compound-cancellation dimension proofs must fall back to unit qualifiers and derive numerator dimensions (`kg` → `mass`, `{StockingUnit}` → `{StockingUnit.dimension}`) or nested `Qty * Conv * Price` chains still emit PRE0114.
 - 2026-05-12 — On the current inventory-item worktree, E2/E3 cut PRE0114 from 66 to 16; the remaining ReceiveShipment/GrossProfit fallout is tied to deferred `ExchangeRateTimesMoney` propagation plus separate sample edits outside the parenthesization fix.

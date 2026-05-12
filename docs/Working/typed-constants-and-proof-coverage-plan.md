@@ -1,6 +1,6 @@
 # Typed Constants & Proof Coverage Plan
 
-**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1–F5 designed (pending design decisions Q1/Q2)
+**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1 ✅ Done | F2 ✅ Done | F3 ✅ Done | **F4 reframed** (policy exists; blocked on BUG-C), F5 blocked on BUG-C | Part G — G1 ✅ Done (`cb4fbf57`), G2 blocked on BUG-C
 
 ### Slice Status Tracker
 
@@ -39,11 +39,14 @@
 | E3 | Subexpression Qualifier Propagation (Currency + Compound Unit Numerator) | ✅ Done (`d3f5aa98`) |
 | E4 | Symbolic Qualifier Equivalence for Interpolated Templates | ✅ Done (`d9464ab2`) |
 | **Part F — Sample Completeness Fixes** | | |
-| F1 | Sample Fix: `optional notempty` → `optional` (8 diagnostics, 6 files) | 🔲 Not Started |
-| F2 | Sample Fix: `number` → `decimal` in travel-reimbursement (2 diagnostics) | 🔲 Not Started |
-| F3 | Compiler Fix: Static Typed Constant Qualifier Extraction (9 diagnostics, 4 files) | ⏳ Design decision Q2 pending |
-| F4 | Compiler Fix: ExchangeRateTimesMoney Result Qualifier Policy (27 diagnostics, inventory-item) | ⏳ Design decision Q1 pending |
-| F5 | Verification Pass: Recompile all 30 samples, resolve any residual | 🔲 Blocked on F3 + F4 |
+| F1 | Sample Fix: `optional notempty` → `optional` (8 diagnostics, 6 files) | ✅ Done (no instances in any sample — verified 2026-05-12T11:08:13.750-04:00) |
+| F2 | Sample Fix: `number` → `decimal` in travel-reimbursement (2 diagnostics) | ✅ Done (travel-reimbursement has zero diagnostics — verified 2026-05-12T11:08:13.750-04:00) |
+| F3 | Compiler Fix: Static Typed Constant Qualifier Extraction (9 diagnostics, 4 files) | ✅ Done (compound-unit slot handling confirmed in TypeChecker.Expressions.TypedConstants.cs) |
+| F4 | Compiler Fix: ExchangeRateTimesMoney Result Qualifier Policy (27 diagnostics, inventory-item) | ✅ Policy exists — **reframed**: blocked on BUG-C (unqualified event arg) |
+| F5 | Verification Pass: Recompile all 30 samples, resolve any residual | 🔲 Blocked on BUG-C |
+| **Part G — Inventory-Item Proof Coverage Completion** | | |
+| G1 | Compound-Unit Interpolated Constant Qualifier Construction (RC1 bug fix in E2) | ✅ Done (`cb4fbf57`) |
+| G2 | Compound Expression DivisionByZero Algebraic Proof (ReceiveShipment denominator) | 🔲 Not Started — blocked on BUG-C |
 
 
 **Architect:** Frank (frank-16, frank-18, frank-23 revision; proof audit integration 2026-05-11)  
@@ -3254,93 +3257,30 @@ Add the same `TypedLiteral` branch after the `TypedArgRef` block. The two resolu
 
 ---
 
-### F4 — Compiler Fix: ExchangeRateTimesMoney Result Qualifier Policy
+### F4 — ExchangeRateTimesMoney Result Qualifier Policy (Reframed)
 
-**Type:** Compiler fix (catalog metadata + proof engine)
-**Diagnostics cleared:** Up to 27 in `inventory-item.precept` (pending cascading analysis)
-**Effort:** Large
-**Dependencies:** Design decision Q1 (policy approach); F3 should land first for the static TC qualifier infrastructure
-**Owner:** George
+**Type:** ~~Compiler fix~~ → **Already implemented; blocked on BUG-C**
+**Diagnostics affected:** All ReceiveShipment qualifier diagnostics in `inventory-item.precept` (Currency <unresolved>, FromCurrency↔Currency chain failures)
+**Status:** ✅ Policy exists — remaining diagnostics are a **data problem** (missing event arg qualifier), not a policy problem
 
-**Root cause:** The `ExchangeRateTimesMoney` operation (`Operations.cs:659`) lacks a `ResultQualifierPolicy`. When the proof engine encounters `Rate * money_expr`, it cannot determine the result money's currency qualifier. This cascades:
+**Reframing (2026-05-12 root-cause review):**
 
-1. `QualifierMismatch` (PRE0068) on assignment to `TotalInventoryCost` — the RHS type is correct (`money`) but the qualifier is unresolvable.
-2. `UnprovedQualifierCompatibility` (PRE0114) on same lines — the proof engine can't match the result's currency to the field's declared `'{CatalogCurrency}'`.
-3. `UnprovedQualifierCompatibility` on `Rate` — the chain proof `exchangerate.FromCurrency == money.Currency` fails because the proof engine can't resolve the exchangerate arg's qualifiers through the interpolated qualifier system.
-4. `DivisionByZero` (PRE0083) on `AverageCost` computation — cascading from qualifier resolution failure preventing the proof engine from verifying denominator positivity.
-5. `TypeMismatch` (PRE0018) on L144/151 — cascading from compound-unit dimension resolution with interpolated qualifiers.
+The original F4 description assumed the `CurrencyConversion` `ResultQualifierPolicy` and its proof engine handler were missing. **They are not.** Both exist and work correctly:
 
-**Implementation (assuming Q1 → Option A: `CurrencyConversion` policy):**
+- `Operations.cs:678` — `ExchangeRateTimesMoney` already has `ResultQualifierPolicy: ResultQualifierPolicy.CurrencyConversion`
+- `ProofEngine.cs:1194-1202` — `CurrencyConversionRequired` handler correctly resolves Currency axis by reading the exchangerate operand's `ToCurrency`
+- `ProofEngine.cs:1315-1321` — Same handler in `ResolveQualifierFromExpression`
+- `Operations.cs:681-683` — `QualifierChainProofRequirement` for `FromCurrency↔Currency` exists
 
-**Step 1 — New `QualifierBinding` subtype:**
+**The actual problem:** `Rate as exchangerate` on the ReceiveShipment event (line 156) has **no qualifier declaration**. The `CurrencyConversion` handler calls `ResolveQualifierFromExpression(rateOperand, QualifierAxis.ToCurrency, semantics)` → resolves to the Rate arg → Rate arg has no `ToCurrency` qualifier metadata → returns null → result Currency is `<unresolved>`. Independently, the `FromCurrency↔Currency` chain proof resolves Rate's `FromCurrency` → null → chain proof fails.
 
-```csharp
-// In SemanticIndex.cs (or wherever QualifierBinding subtypes live)
-public sealed record CurrencyConversionRequired : QualifierBinding;
-```
+**Why it can't be fixed without BUG-C:** The Rate arg needs `in '{SupplierCurrency}' to '{CatalogCurrency}'` — interpolated qualifiers on event args. This is BUG-C. The sample's runtime workaround (`ensure Rate.from == SupplierCurrency`, `ensure Rate.to == CatalogCurrency`) cannot be used by the proof engine for compile-time qualifier resolution — ensures are runtime guards, not qualifier declarations.
 
-**Step 2 — New `ResultQualifierPolicy` enum member:**
+**When BUG-C ships:** The existing `CurrencyConversion` policy and proof engine handler handle it automatically. No additional compiler work is needed for F4 beyond BUG-C itself. Rate's `ToCurrency` qualifier will resolve to `{CatalogCurrency}`, the result Currency becomes `{CatalogCurrency}`, and assignment to `TotalInventoryCost (Currency: '{CatalogCurrency}')` passes.
 
-```csharp
-// In Operations.cs or the ResultQualifierPolicy enum
-CurrencyConversion = 3,  // Result currency = exchangerate's ToCurrency
-```
+**Design decision Q1 is resolved:** The question was "which policy approach for ExchangeRateTimesMoney?" — Answer: `CurrencyConversion`, and it's already implemented. Q1 is closed.
 
-**Step 3 — Register on `ExchangeRateTimesMoney`:**
-
-```csharp
-// In Operations.cs:659
-OperationKind.ExchangeRateTimesMoney => new BinaryOperationMeta(
-    kind, OperatorKind.Times, PExchangeRate, PMoney, TypeKind.Money,
-    "ExchangeRate × money → money (currency conversion)", BidirectionalLookup: true,
-    ResultQualifierPolicy: ResultQualifierPolicy.CurrencyConversion,  // NEW
-    ProofRequirements:
-    [
-        new QualifierChainProofRequirement(new ParamSubject(PExchangeRate), QualifierAxis.FromCurrency,
-            new ParamSubject(PMoney), QualifierAxis.Currency,
-            "Exchange rate 'from' currency must match money currency"),
-    ]),
-```
-
-**Step 4 — Map qualifier binding in TypeChecker:**
-
-In `TypeChecker.Expressions.cs`, `MapQualifierBinding()` — add a case for `CurrencyConversion`:
-
-```csharp
-ResultQualifierPolicy.CurrencyConversion =>
-    new CurrencyConversionRequired(),
-```
-
-**Step 5 — Proof engine resolution:**
-
-In `ProofEngine.cs`, `ResolveQualifierFromExpression()` — add a branch in the `TypedBinaryOp` handler:
-
-```csharp
-CurrencyConversionRequired =>
-    axis == QualifierAxis.Currency
-        // Result currency comes from the exchangerate operand's ToCurrency
-        ? ResolveQualifierFromExpression(
-            binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
-            QualifierAxis.ToCurrency, semantics)
-        : null,
-```
-
-Same branch in `ResolveQualifierOnAxis()`.
-
-**Step 6 — Inventory-item residual analysis:**
-
-After F4 lands, recompile `inventory-item.precept`. Expected clearance:
-- 6 QualifierMismatch (PRE0068) on L225/227/231/233/236/238 → cleared (result qualifier now resolved)
-- 6 PRE0114 (Currency) on same lines → cleared
-- 6 PRE0114 (FromCurrency↔Currency chain) → depends on whether event arg qualifier resolution works for the `Rate` arg through interpolated qualifiers
-
-Residual errors (if any) will be diagnosed in F5.
-
-**Tests:**
-
-- `ExchangeRateTimesMoney_ResultCurrencyIsToCurrency` — `exchangerate in 'USD' to 'EUR'` × `money in 'USD'` → result is `money in 'EUR'`.
-- `ExchangeRateTimesMoney_WrongFromCurrency_StillRejected` — `exchangerate in 'GBP' to 'EUR'` × `money in 'USD'` → PRE0114 fires (FromCurrency mismatch).
-- `ExchangeRateTimesMoney_QualifiedOperandInherited_WrongPolicy` — verify that `InheritFromQualifiedOperand` is NOT used (it would give the wrong currency).
+**Previous F4 content is superseded.** Steps 1–6 of the old F4 described work that already exists in the codebase.
 
 ---
 
@@ -3376,30 +3316,363 @@ Residual errors (if any) will be diagnosed in F5.
 F1 (sample: optional notempty)      — independent, immediate
 F2 (sample: number/decimal)         — independent, immediate
 F3 (compiler: static TC qualifier)  — needs Q2 decision
-F4 (compiler: ExchangeRate policy)  — needs Q1 decision; F3 first for infrastructure
-F5 (verification)                   — after F1 + F2 + F3 + F4
+F4 (ExchangeRate policy)            — ✅ policy exists; remaining work = BUG-C (event arg interpolated qualifiers)
+F5 (verification)                   — after F1 + F2 + F3 + G1 + BUG-C
+G1 (compound-unit typed constant)   — independent, immediate
+G2 (compound expr DivisionByZero)   — after G1 + BUG-C
 ```
 
-**Recommended execution order:** F1 → F2 → F3 (after Q2) → F4 (after Q1) → F5
+**Recommended execution order:** F1 → F2 → G1 (immediate, unblocked) → F3 (after Q2) → BUG-C → G2 → F5
 
-F1 and F2 can be done in parallel with the Q1/Q2 design decisions. F3 should land before F4 because the `TypedLiteral` qualifier infrastructure benefits the ExchangeRate path as well.
+F1, F2, and G1 can all be done immediately in parallel. G1 is the highest-value item: it resolves 4 diagnostics on inventory-item directly and unblocks downstream DivisionByZero reasoning.
 
 ### File Inventory
 
-| File | F1 | F2 | F3 | F4 | F5 | Change Type |
-|------|----|----|----|----|-----|-------------|
-| `samples/it-helpdesk-ticket.precept` | ✓ | | | | | Sample fix |
-| `samples/library-book-checkout.precept` | ✓ | | | | | Sample fix |
-| `samples/loan-application.precept` | ✓ | | ✓ | | | Sample fix + cleared by F3 |
-| `samples/maintenance-work-order.precept` | ✓ | | | | | Sample fix |
-| `samples/refund-request.precept` | ✓ | | | | | Sample fix |
-| `samples/travel-reimbursement.precept` | ✓ | ✓ | | | | Sample fix |
-| `samples/apartment-rental-application.precept` | | | ✓ | | | Cleared by F3 |
-| `samples/hiring-pipeline.precept` | | | ✓ | | | Cleared by F3 |
-| `samples/insurance-claim.precept` | | | ✓ | | | Cleared by F3 |
-| `samples/inventory-item.precept` | | | | ✓ | ✓ | Cleared by F4 + verified by F5 |
-| `src/Precept/Pipeline/SemanticIndex.cs` | | | ✓ | ✓ | | TypedLiteral DeclaredQualifiers + CurrencyConversion binding |
-| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | | | ✓ | ✓ | | Populate TypedLiteral qualifiers + MapQualifierBinding |
-| `src/Precept/Pipeline/ProofEngine.cs` | | | ✓ | ✓ | | ResolveQualifierFromExpression + ResolveQualifierOnAxis |
-| `src/Precept/Language/Operations.cs` | | | | ✓ | | ResultQualifierPolicy on ExchangeRateTimesMoney |
-| `test/Precept.Tests/ProofEngineTests.cs` | | | ✓ | ✓ | | New qualifier proof tests |
+| File | F1 | F2 | F3 | F4 | F5 | G1 | G2 | Change Type |
+|------|----|----|----|----|-----|----|----|-------------|
+| `samples/it-helpdesk-ticket.precept` | ✓ | | | | | | | Sample fix |
+| `samples/library-book-checkout.precept` | ✓ | | | | | | | Sample fix |
+| `samples/loan-application.precept` | ✓ | | ✓ | | | | | Sample fix + cleared by F3 |
+| `samples/maintenance-work-order.precept` | ✓ | | | | | | | Sample fix |
+| `samples/refund-request.precept` | ✓ | | | | | | | Sample fix |
+| `samples/travel-reimbursement.precept` | ✓ | ✓ | | | | | | Sample fix |
+| `samples/apartment-rental-application.precept` | | | ✓ | | | | | Cleared by F3 |
+| `samples/hiring-pipeline.precept` | | | ✓ | | | | | Cleared by F3 |
+| `samples/insurance-claim.precept` | | | ✓ | | | | | Cleared by F3 |
+| `samples/inventory-item.precept` | | | | — | ✓ | ✓ | ✓ | Cleared by G1 + BUG-C + G2 |
+| `src/Precept/Pipeline/SemanticIndex.cs` | | | ✓ | — | | | | TypedLiteral DeclaredQualifiers |
+| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | | | ✓ | — | | | | Populate TypedLiteral qualifiers |
+| `src/Precept/Pipeline/ProofEngine.cs` | | | ✓ | — | | ✓ | ✓ | ResolveQualifierFromInterpolatedConstant fix (G1) + compound DivisionByZero (G2) |
+| `test/Precept.Tests/ProofEngineTests.cs` | | | ✓ | — | | ✓ | ✓ | New tests |
+
+---
+
+## Part G — Inventory-Item Proof Coverage Completion
+
+**Added:** 2026-05-12
+**Goal:** Resolve all remaining diagnostics on `samples/inventory-item.precept`
+**Architect:** Frank (exhaustive root-cause review, 2026-05-12)
+
+### Current Diagnostic Census (2026-05-12)
+
+| Lines | Code | Count | Root Cause | Slice |
+|-------|------|-------|------------|-------|
+| 122–123 | PRE0114 (UnprovedQualifierCompatibility, Unit) | 2 | RC1: compound-unit typed constant qualifier construction | **G1** |
+| 137, 142 | PRE0083 (DivisionByZero) | 2 | Cascading from RC1: rule L124 can't prove `StockingUnitsPerSaleUnit > 0` | **G1** (cascade) |
+| 215–229 (×3 rows) | PRE0114 (UnprovedQualifierCompatibility, Currency) | ~6 | RC2: `Rate as exchangerate` has no qualifier → CurrencyConversion result `<unresolved>` | **F4 → BUG-C** |
+| 215–229 (×3 rows) | PRE0114 (UnprovedQualifierCompatibility, FromCurrency↔Currency) | ~3–6 | RC2: `Rate` has no `FromCurrency` → chain proof fails | **F4 → BUG-C** |
+| 215–229 (×3 rows) | PRE0083 (DivisionByZero) | 3 | RC3: compound expression `(QuantityOnHand + PurchaseQty × StockingUnitsPerPurchaseUnit)` can't be proved non-zero | **G2** |
+
+**Total:** ~16–19 diagnostics across 3 root causes.
+
+---
+
+### Root Cause Analysis
+
+#### RC1 — Compound-Unit Interpolated Constant Qualifier Construction Bug
+
+**Slice:** G1
+**Severity:** Blocking — cascades to DivisionByZero on lines 137/142
+**Type:** ProofEngine bug (defect in shipped E2 code)
+
+**What is failing:** Rules on lines 122–123 compare compound-unit quantity fields against compound-unit interpolated typed constants:
+```
+rule StockingUnitsPerPurchaseUnit > '0 {StockingUnit}/{PurchaseUnit}'
+```
+The field `StockingUnitsPerPurchaseUnit` has qualifier `Unit: '{StockingUnit}/{PurchaseUnit}'`. The typed constant `'0 {StockingUnit}/{PurchaseUnit}'` is parsed with `NumeratorUnit = StockingUnit` and `DenominatorUnit = PurchaseUnit` slots.
+
+**Why it fails:** `ResolveQualifierFromInterpolatedConstant()` in `ProofEngine.cs` (line 1338) handles the Unit axis by first searching for a `InterpolationSlotKind.Unit` slot (no match for compound-unit constants — they use NumeratorUnit/DenominatorUnit instead). It then falls through to the DenominatorUnit-only fallback (line 1369–1376), returning `Unit("{PurchaseUnit}", "{PurchaseUnit}")`. The proof then compares:
+- Field: `Unit("{StockingUnit}/{PurchaseUnit}")`
+- Typed constant: `Unit("{PurchaseUnit}")`
+→ **Mismatch.**
+
+The function never checks for the NumeratorUnit+DenominatorUnit compound pair on the Unit axis. It was designed (E2) for simple unit slots and compound-unit fallback to DenominatorUnit alone — but compound-unit constants need both slots composed into `{numerator}/{denominator}`.
+
+**Cascade:** Lines 137 and 142 have `ListPrice / StockingUnitsPerSaleUnit >= AverageCost`. The division generates a `NumericProofRequirement(NotEquals, 0)` on `StockingUnitsPerSaleUnit`. The proof engine looks for evidence from rules/ensures. Rule L124 (`StockingUnitsPerSaleUnit > '0 {StockingUnit}/{SaleUnit}'`) would establish `> 0` which subsumes `!= 0`. But because L124 itself has an unresolved qualifier obligation (same RC1 bug on line 123), the engine can't trust it as evidence. After RC1 fix, L124 compiles clean → `StockingUnitsPerSaleUnit > 0` becomes available → DivisionByZero on L137/L142 clears.
+
+---
+
+#### RC2 — Unqualified ExchangeRate Event Arg (BUG-C Dependency)
+
+**Slice:** F4 (reframed)
+**Severity:** Blocking — affects all ReceiveShipment transition diagnostics
+**Type:** Data problem (missing qualifier), not a policy problem
+**Blocked by:** BUG-C (interpolated qualifiers on event args)
+
+**What is failing:** The `ReceiveShipment` event declares `Rate as exchangerate` (line 156) with no qualifier. The sample intends `in '{SupplierCurrency}' to '{CatalogCurrency}'` but this syntax requires BUG-C.
+
+**Two independent proof failures from the same root cause:**
+
+1. **Currency `<unresolved>` (PRE0114):** The `CurrencyConversionRequired` handler resolves result Currency by calling `ResolveQualifierFromExpression(rateOperand, QualifierAxis.ToCurrency, ...)`. Rate arg has no `ToCurrency` → returns null → result `Currency: <unresolved>` → assignment to `TotalInventoryCost (Currency: '{CatalogCurrency}')` fails qualifier compatibility. Same cascade on `AverageCost`.
+
+2. **FromCurrency↔Currency chain (PRE0114):** The `QualifierChainProofRequirement` on `ExchangeRateTimesMoney` checks `Rate.FromCurrency == money_expr.Currency`. Rate has no `FromCurrency` → left side null → chain proof fails.
+
+**Cannot be fixed without BUG-C:** The proof engine correctly resolves qualifiers from event arg declarations. The problem is the declaration has none. Runtime `ensure` guards (`Rate.from == SupplierCurrency`, `Rate.to == CatalogCurrency`) are not qualifier metadata — they're runtime constraints. Teaching the proof engine to infer qualifiers from ensures would be fragile, non-general, and architecturally wrong.
+
+**When BUG-C ships:** `Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'` → Rate gets `FromCurrency("{SupplierCurrency}")` and `ToCurrency("{CatalogCurrency}")`. The existing `CurrencyConversion` handler resolves `ToCurrency` → `{CatalogCurrency}` → result `Currency: '{CatalogCurrency}'` → assignment passes. The chain proof resolves `FromCurrency("{SupplierCurrency}")` vs `money_expr.Currency` → requires the money expression's currency to match SupplierCurrency (which it does — `SupplierUnitCost in '{SupplierCurrency}'`). The runtime `ensure` guards (lines 159–162) become compile-time guarantees and can be removed.
+
+---
+
+#### RC3 — Compound Expression DivisionByZero (Algebraic Proof Gap)
+
+**Slice:** G2
+**Severity:** Low (co-located with RC2 errors; would surface only after BUG-C + G1 land)
+**Type:** Proof engine limitation — missing compositional algebraic reasoning
+
+**What is failing:** The AverageCost computation divides by a compound expression:
+```
+(QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+```
+The proof engine's `NumericProofRequirement(NotEquals, 0)` resolves the subject to this compound expression. `GetFieldName()` returns null for compound expressions (they're not field references), so `TryCompositionalConstraintProof()`, `TryModifierProof()`, `TryGuardProof()`, and `TryRuleOrEnsureProof()` all decline.
+
+**What the engine would need to prove:** Given:
+- `QuantityOnHand >= 0` (from rule L114)
+- `PurchaseQty > 0` (from event ensure L157)
+- `StockingUnitsPerPurchaseUnit > 0` (from rule L123, after G1 fix)
+
+Therefore: `PurchaseQty * StockingUnitsPerPurchaseUnit > 0`, and `QuantityOnHand + positive > 0`, so the denominator is provably positive.
+
+This requires **algebraic compositional reasoning** that the proof engine doesn't currently support: `nonneg + positive > 0`. The engine would need to:
+1. Decompose the compound expression into its constituent operations
+2. Recursively resolve numeric bounds on each sub-expression
+3. Apply algebraic rules: `a >= 0 ∧ b > 0 → a + b > 0`, `a > 0 ∧ b > 0 → a × b > 0`
+
+**Dependency:** Blocked on G1 (to prove `StockingUnitsPerPurchaseUnit > 0`) AND BUG-C (to establish `PurchaseQty > 0` from the event ensure, which may already work). Even if G1 lands, RC3 diagnostics would remain but be hidden by RC2's qualifier failures on the same lines. RC3 only becomes the last-standing issue after BUG-C ships.
+
+---
+
+### G1 — Compound-Unit Typed Constant Qualifier Construction
+
+**Type:** Compiler fix (proof engine)
+**Diagnostics cleared:** 4 — Lines 122, 123 (2 × PRE0114) + Lines 137, 142 (2 × PRE0083 DivisionByZero, cascade)
+**Effort:** Small
+**Dependencies:** None — **immediately actionable**
+**Owner:** George
+
+#### Root Cause
+
+`ResolveQualifierFromInterpolatedConstant()` in `ProofEngine.cs` (line 1338) handles Unit/Dimension axis lookup for interpolated typed constants. When the constant has `InterpolationSlotKind.NumeratorUnit` and `InterpolationSlotKind.DenominatorUnit` slots (compound-unit constant like `'0 {StockingUnit}/{PurchaseUnit}'`), the function skips the NumeratorUnit and returns only the DenominatorUnit — producing `Unit("{PurchaseUnit}")` instead of the correct `Unit("{StockingUnit}/{PurchaseUnit}")`.
+
+#### Fix
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` — method `ResolveQualifierFromInterpolatedConstant()` (line 1338)
+
+**Before (lines 1369–1376):**
+```csharp
+if (axis == QualifierAxis.Unit || axis == QualifierAxis.Dimension)
+{
+    foreach (var slot in itc.Slots)
+    {
+        if (slot.SlotKind == InterpolationSlotKind.DenominatorUnit)
+            return CreateQualifierFromSlotExpression(slot.Expression, axis);
+    }
+}
+```
+
+**After:** Insert a compound-unit pair check BEFORE the DenominatorUnit-only fallback:
+
+```csharp
+if (axis == QualifierAxis.Unit || axis == QualifierAxis.Dimension)
+{
+    // Compound-unit pair: NumeratorUnit + DenominatorUnit → construct '{num}/{denom}'
+    TypedExpression? numeratorExpr = null;
+    TypedExpression? denominatorExpr = null;
+    foreach (var slot in itc.Slots)
+    {
+        if (slot.SlotKind == InterpolationSlotKind.NumeratorUnit)
+            numeratorExpr = slot.Expression;
+        else if (slot.SlotKind == InterpolationSlotKind.DenominatorUnit)
+            denominatorExpr = slot.Expression;
+    }
+
+    if (numeratorExpr is not null && denominatorExpr is not null)
+    {
+        var numName = GetSlotFieldName(numeratorExpr);
+        var denomName = GetSlotFieldName(denominatorExpr);
+        if (numName is not null && denomName is not null)
+        {
+            var compoundUnit = $"{{{numName}}}/{{{denomName}}}";
+            return axis switch
+            {
+                QualifierAxis.Unit => new DeclaredQualifierMeta.Unit(
+                    compoundUnit, $"{{{numName}.dimension}}/{{{denomName}.dimension}}",
+                    SourceFieldName: numName),
+                QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension(
+                    $"{{{numName}.dimension}}/{{{denomName}.dimension}}",
+                    SourceFieldName: numName),
+                _ => null,
+            };
+        }
+    }
+
+    // Single DenominatorUnit fallback (non-compound case)
+    foreach (var slot in itc.Slots)
+    {
+        if (slot.SlotKind == InterpolationSlotKind.DenominatorUnit)
+            return CreateQualifierFromSlotExpression(slot.Expression, axis);
+    }
+}
+```
+
+Where `GetSlotFieldName` is a helper that extracts the field/arg name:
+```csharp
+private static string? GetSlotFieldName(TypedExpression expr) => expr switch
+{
+    TypedFieldRef f => f.FieldName,
+    TypedArgRef a => a.ArgName,
+    _ => null,
+};
+```
+
+Note: `GetSlotFieldName` may already exist as part of `CreateQualifierFromSlotExpression` — if so, extract and reuse.
+
+#### Test Cases
+
+| Test | Input | Expected |
+|------|-------|----------|
+| `CompoundUnit_FieldVsInterpolatedConstant_SameQualifier` | `field X as quantity in '{A}/{B}'` + `rule X > '0 {A}/{B}'` | 0 PRE0114 (Unit qualifiers match: `{A}/{B}` == `{A}/{B}`) |
+| `CompoundUnit_DifferentNumerator_Detected` | `field X as quantity in '{A}/{B}'` + `rule X > '0 {C}/{B}'` | PRE0114 fires (correct: `{A}/{B}` ≠ `{C}/{B}`) |
+| `CompoundUnit_RuleProvesPositive_DivisionSafe` | `field X as quantity in '{A}/{B}'` + `rule X > '0 {A}/{B}'` + `ensure Y / X >= Z` | 0 PRE0083 (DivisionByZero cleared by rule evidence) |
+| `SimpleUnit_DenominatorFallback_Unchanged` | `field X as price in 'USD' of 'mass'` + `ensure X >= '0 USD/kg'` | Existing behavior unchanged (no regression) |
+
+**Files changed:** `src/Precept/Pipeline/ProofEngine.cs` (~25 LOC)
+**Test file:** `test/Precept.Tests/ProofEngineTests.cs` (~60 LOC)
+**Regression risk:** Low. The new compound-pair check runs before the existing DenominatorUnit fallback. The fallback path is unchanged. Existing tests for simple-unit typed constants are unaffected.
+
+#### Impact on Inventory-Item
+
+After G1:
+- Lines 122–123: **Resolved** — compound-unit qualifier `{StockingUnit}/{PurchaseUnit}` constructed correctly
+- Lines 137, 142: **Resolved** (cascade) — rule L124 now proves `StockingUnitsPerSaleUnit > 0` → DivisionByZero clears
+- ReceiveShipment lines: **No change** — still blocked by RC2 (BUG-C)
+
+**Net: 4 diagnostics cleared, remaining ~12–15 all BUG-C dependent.**
+
+---
+
+### G2 — Compound Expression DivisionByZero Algebraic Proof
+
+**Type:** Compiler enhancement (proof engine — new algebraic reasoning)
+**Diagnostics cleared:** 3 × PRE0083 (DivisionByZero on ReceiveShipment AverageCost denominator)
+**Effort:** Medium–Large
+**Dependencies:** G1 (prerequisite for StockingUnitsPerPurchaseUnit > 0) + BUG-C (prerequisite for PurchaseQty > 0 from event ensure; also, these diagnostics are currently masked by RC2 qualifier failures on the same lines)
+**Owner:** George
+
+#### Root Cause
+
+The AverageCost computation's divisor `(QuantityOnHand + PurchaseQty * StockingUnitsPerPurchaseUnit)` is a compound expression. The proof engine's DivisionByZero proof strategy resolves the divisor subject and calls `GetFieldName()` — which returns null for expressions that aren't field references. All existing proof strategies (`TryModifierProof`, `TryGuardProof`, `TryRuleOrEnsureProof`, `TryCompositionalConstraintProof`) then decline because they require a resolvable field name.
+
+#### Design
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs` — new method `TryAlgebraicNonZeroProof()`
+
+Add a new proof strategy that decomposes binary operation expressions and recursively verifies numeric bounds:
+
+```csharp
+private static bool TryAlgebraicNonZeroProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    if (obligation.Requirement is not NumericProofRequirement
+        { Comparison: OperatorKind.NotEquals, Threshold: 0m })
+        return false;
+
+    var subject = ResolveSubject(obligation.Requirement.Subject, obligation.Site);
+    if (subject is null) return false;
+
+    return TryProvePositive(subject, obligation, semantics);
+}
+```
+
+Core recursive helper:
+```csharp
+private static bool TryProvePositive(TypedExpression expr, ProofObligation ctx, SemanticIndex semantics)
+{
+    // Base case: field/arg reference — check rules, ensures, modifiers for > 0 or >= 0
+    if (expr is TypedFieldRef or TypedArgRef)
+    {
+        var fieldName = GetFieldName(expr);
+        // ... check rules/ensures/modifiers for numeric bounds
+    }
+
+    // Recursive case: binary operation
+    if (expr is TypedBinaryOp binOp)
+    {
+        // Addition: a >= 0 ∧ b > 0 → a + b > 0 (or symmetric)
+        if (IsAdditionOp(binOp.ResolvedOp))
+        {
+            return (TryProveNonnegative(binOp.Left, ...) && TryProvePositive(binOp.Right, ...))
+                || (TryProvePositive(binOp.Left, ...) && TryProveNonnegative(binOp.Right, ...));
+        }
+
+        // Multiplication: a > 0 ∧ b > 0 → a × b > 0
+        if (IsMultiplicationOp(binOp.ResolvedOp))
+        {
+            return TryProvePositive(binOp.Left, ...) && TryProvePositive(binOp.Right, ...);
+        }
+    }
+
+    return false;
+}
+```
+
+**Scope guard:** This reasoning is strictly for DivisionByZero proofs (`NotEquals 0`) and only triggers when simpler strategies fail. The recursion depth is bounded by AST depth (max ~5–6 levels in any real expression). No risk of infinite recursion.
+
+**Note:** This is a significant proof engine enhancement. The exact implementation should be designed carefully with recursion limits and conservative fallbacks. The approach above is the conceptual design — implementation details (helper extraction, bounds tracking, caching) are left to the implementer.
+
+#### Test Cases
+
+| Test | Input | Expected |
+|------|-------|----------|
+| `Addition_NonnegPlusPositive_ProvesNonZero` | `field A >= 0` + `field B > 0` + `ensure X / (A + B) != err` | 0 PRE0083 |
+| `Multiplication_PositiveTimesPositive_ProvesNonZero` | `field A > 0` + `field B > 0` + `ensure X / (A * B) != err` | 0 PRE0083 |
+| `Addition_BothNonneg_StillFails` | `field A >= 0` + `field B >= 0` + `ensure X / (A + B) != err` | PRE0083 fires (correct: 0 + 0 = 0) |
+| `NestedCompound_ReceiveShipmentPattern` | Pattern matching inventory-item: `QoH >= 0`, `PQ > 0`, `SUPP > 0` → `QoH + PQ * SUPP` | 0 PRE0083 |
+
+**Files changed:** `src/Precept/Pipeline/ProofEngine.cs` (~80–120 LOC)
+**Test file:** `test/Precept.Tests/ProofEngineTests.cs` (~80 LOC)
+
+#### Impact on Inventory-Item
+
+After G1 + BUG-C + G2:
+- Lines 215–229 DivisionByZero: **Resolved** (3 × PRE0083 cleared)
+- Combined with BUG-C clearing the Currency/FromCurrency errors: **all ReceiveShipment diagnostics resolved**
+
+---
+
+### Diagnostic-to-Slice Mapping (inventory-item.precept)
+
+Every live diagnostic traces to exactly one slice:
+
+| Line(s) | Diagnostic | Root Cause | Slice | Status |
+|----------|-----------|------------|-------|--------|
+| 122 | PRE0114 Unit mismatch on compound-unit rule | RC1: compound qualifier construction | **G1** | ✅ Fixed by G1 (`cb4fbf57`) |
+| 123 | PRE0114 Unit mismatch on compound-unit rule | RC1: compound qualifier construction | **G1** | ✅ Fixed by G1 (`cb4fbf57`) |
+| 137 | PRE0083 DivisionByZero (StockingUnitsPerSaleUnit) | Cascade from RC1 (rule can't prove > 0) | **G1** | ✅ Fixed by G1 (`cb4fbf57`) |
+| 142 | PRE0083 DivisionByZero (StockingUnitsPerSaleUnit) | Cascade from RC1 (rule can't prove > 0) | **G1** | ✅ Fixed by G1 (`cb4fbf57`) |
+| 215–219 | PRE0114 Currency `<unresolved>` (×2 per row) | RC2: Rate has no qualifier | **BUG-C** | ⏳ Blocked |
+| 215–219 | PRE0114 FromCurrency↔Currency chain failure | RC2: Rate has no FromCurrency | **BUG-C** | ⏳ Blocked |
+| 218 | PRE0083 DivisionByZero (compound denominator) | RC3: algebraic proof gap | **G2** | ⏳ Blocked on G1+BUG-C |
+| 221–225 | PRE0114 Currency `<unresolved>` (×2 per row) | RC2: Rate has no qualifier | **BUG-C** | ⏳ Blocked |
+| 221–225 | PRE0114 FromCurrency↔Currency chain failure | RC2: Rate has no FromCurrency | **BUG-C** | ⏳ Blocked |
+| 224 | PRE0083 DivisionByZero (compound denominator) | RC3: algebraic proof gap | **G2** | ⏳ Blocked on G1+BUG-C |
+| 226–230 | PRE0114 Currency `<unresolved>` (×2 per row) | RC2: Rate has no qualifier | **BUG-C** | ⏳ Blocked |
+| 226–230 | PRE0114 FromCurrency↔Currency chain failure | RC2: Rate has no FromCurrency | **BUG-C** | ⏳ Blocked |
+| 229 | PRE0083 DivisionByZero (compound denominator) | RC3: algebraic proof gap | **G2** | ⏳ Blocked on G1+BUG-C |
+
+### Part G Dependency Graph
+
+```
+G1 (compound-unit qualifier)     — no dependencies, immediately actionable
+  ↓ clears L122-123 (PRE0114) + L137,142 (PRE0083 cascade)
+  ↓ prerequisite for G2
+
+BUG-C (event arg interpolated qualifiers) — external dependency
+  ↓ clears all ReceiveShipment PRE0114 (Currency + FromCurrency↔Currency)
+  ↓ prerequisite for G2
+
+G2 (algebraic DivisionByZero)    — depends on G1 + BUG-C
+  ↓ clears L218, L224, L229 (PRE0083)
+```
+
+**After G1 alone:** 4 diagnostics resolved, ~12–15 remaining (all BUG-C blocked).
+**After G1 + BUG-C:** ~12 diagnostics resolved, 3 remaining (all G2).
+**After G1 + BUG-C + G2:** All diagnostics resolved. inventory-item.precept compiles clean.
