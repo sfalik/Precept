@@ -51,6 +51,8 @@
 
 ## Learnings
 
+- 2026-05-12T13:31:43.877-04:00 — `samples/inventory-item.precept` still carries stale inline `BUG-A`/`BUG-C` commentary even after the top-of-file compile-blocker header is removed; keep header cleanups surgical and record any compile-status mismatch separately instead of broad comment churn.
+- 2026-05-12T13:31:43.877-04:00 — In this workspace, `precept_compile` still reports 15 existing `InventoryItem` diagnostics after the header-only edit, so the brief's "0 diagnostics" claim should be treated as environment/runtime drift until F5 or a follow-up runtime pass confirms otherwise.
 - 2026-05-12 — `ProofEngine.ResolveQualifierFromExpression()` must translate `CurrencyConversionRequired` results from `ToCurrency` back onto the caller's `Currency` axis; nested `Total + Rate * Amt` proofs otherwise compare across axes and emit false PRE0114.
 - 2026-05-12 — `ProofEngine.ExtractQualifierSourcePath()` also needs `FromCurrency` and `ToCurrency` coverage so literal fallback comparison still works when `SourceFieldName` is absent.
 - 2026-05-12 — The inventory-item ReceiveShipment qualifier fallout is cleared at lines 212, 214, 218, 220, 223, and 225; only the G2 denominator PRE0083s remain at 214, 220, and 225.
