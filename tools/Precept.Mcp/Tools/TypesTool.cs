@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
-using Precept.Mcp.Dtos;
 
 namespace Precept.Mcp.Tools;
 
@@ -8,10 +7,7 @@ namespace Precept.Mcp.Tools;
 public static class TypesTool
 {
     [McpServerTool(Name = "precept_types")]
-    [Description("Return the Precept type system reference: all types with traits, widening rules, qualifier shapes, and accessors; all value, state, event, access, and anchor modifiers; and the built-in function catalog. Call when you need to declare field types or apply modifiers.")]
-    public static TypesDto Types()
-    {
-        var lang = LanguageTool.Language();
-        return new(lang.Types, lang.Modifiers, lang.Functions);
-    }
+    [Description("Return the Precept type-system reference as markdown. Use `scope` to keep the payload small: `types`, `modifiers`, `modifiers:value`, `modifiers:state`, `modifiers:event`, `modifiers:access`, `modifiers:anchor`, or `functions`. Omit `scope` only when you need the full catalog.")]
+    public static string Types(string? scope = null)
+        => CatalogFormatters.FormatTypes(scope);
 }

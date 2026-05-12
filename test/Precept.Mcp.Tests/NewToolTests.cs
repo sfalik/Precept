@@ -1,6 +1,5 @@
-using System.Text.Json;
+using System.Text;
 using FluentAssertions;
-using Precept.Language;
 using Precept.Mcp.Tools;
 using Xunit;
 
@@ -8,372 +7,202 @@ namespace Precept.Mcp.Tests;
 
 public class NewToolTests
 {
-    // ── QuickstartTool ───────────────────────────────────────────────────────
-
     [Fact]
-    public void Quickstart_ReturnsExpectedTopLevelShape()
-    {
-        var result = QuickstartTool.Quickstart();
-        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        using var doc = JsonDocument.Parse(json);
-
-        doc.RootElement.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "whatIsPrecept",
-            "coreGuarantee",
-            "coreConcepts",
-            "toolGuide",
-            "minimalExamples");
-    }
-
-    [Fact]
-    public void Quickstart_CoreConceptsMatchCatalog()
+    public void Quickstart_DefaultCall_ReturnsMarkdown()
     {
         var result = QuickstartTool.Quickstart();
 
-        result.WhatIsPrecept.Should().Be(QuickstartCatalog.WhatIsPrecept);
-        result.CoreGuarantee.Should().Be(QuickstartCatalog.CoreGuarantee);
-        result.CoreConcepts.Should().HaveCount(QuickstartCatalog.CoreConcepts.Count);
-        result.CoreConcepts.Select(c => c.Name).Should().Equal(QuickstartCatalog.CoreConcepts.Select(c => c.Name));
-        result.CoreConcepts.Select(c => c.Example).Should().Equal(QuickstartCatalog.CoreConcepts.Select(c => c.Example));
+        result.Should().StartWith("# Precept Quickstart");
+        result.Should().Contain("## Core Concepts");
+        result.Should().Contain("### Minimal lifecycle");
+        result.Should().Contain("precept_quickstart");
     }
 
     [Fact]
-    public void Quickstart_ToolGuideHasEightEntries()
-    {
-        var result = QuickstartTool.Quickstart();
-
-        result.ToolGuide.Should().HaveCount(8);
-        result.ToolGuide.Select(t => t.ToolName).Should().Contain("precept_quickstart");
-        result.ToolGuide.Select(t => t.ToolName).Should().Contain("precept_diagnostic");
-    }
-
-    [Fact]
-    public void Quickstart_MinimalExamplesAreThree()
-    {
-        var result = QuickstartTool.Quickstart();
-
-        result.MinimalExamples.Should().HaveCount(3);
-        result.MinimalExamples[0].Title.Should().NotBeNullOrEmpty();
-        result.MinimalExamples[0].DslSnippet.Should().NotBeNullOrEmpty();
-    }
-
-    // ── SyntaxTool ───────────────────────────────────────────────────────────
-
-    [Fact]
-    public void Syntax_ReturnsExpectedTopLevelShape()
+    public void Syntax_DefaultCall_ReturnsMarkdown()
     {
         var result = SyntaxTool.Syntax();
-        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        using var doc = JsonDocument.Parse(json);
 
-        doc.RootElement.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "constructs",
-            "actions",
-            "outcomes",
-            "operators",
-            "syntaxReference");
+        result.Should().StartWith("# Precept Syntax Reference");
+        result.Should().Contain("## Grammar Rules");
+        result.Should().Contain("## Constructs");
+        result.Should().Contain("## Operators");
+        result.Should().Contain("line-oriented");
     }
 
     [Fact]
-    public void Syntax_ConstructsMirrorConstructCatalog()
-    {
-        var result = SyntaxTool.Syntax();
-        result.Constructs.Select(c => c.Kind).Should().Equal(Constructs.All.Select(c => c.Kind.ToString()));
-    }
-
-    [Fact]
-    public void Syntax_SyntaxReferenceContainsPrecedenceTableAndPatterns()
-    {
-        var result = SyntaxTool.Syntax();
-        result.SyntaxReference.PrecedenceTable.Should().NotBeEmpty();
-        result.SyntaxReference.CommonPatterns.Should().NotBeEmpty();
-        result.SyntaxReference.AntiPatterns.Should().NotBeEmpty();
-    }
-
-    // ── TypesTool ────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void Types_ReturnsExpectedTopLevelShape()
+    public void Types_DefaultCall_ReturnsMarkdown()
     {
         var result = TypesTool.Types();
-        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        using var doc = JsonDocument.Parse(json);
 
-        doc.RootElement.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "types",
-            "modifiers",
-            "functions");
+        result.Should().StartWith("# Precept Type System");
+        result.Should().Contain("## Types");
+        result.Should().Contain("## Modifiers");
+        result.Should().Contain("## Built-in Functions");
+        result.Should().Contain("**money**");
     }
 
     [Fact]
-    public void Types_TypesMirrorTypeCatalog()
+    public void Types_FunctionScope_ReturnsOnlyFunctions()
     {
-        var result = TypesTool.Types();
-        result.Types.Select(t => t.Kind).Should().Equal(Precept.Language.Types.All.Select(t => t.Kind.ToString()));
+        var result = TypesTool.Types("functions");
+
+        result.Should().Contain("Scope: `functions`");
+        result.Should().Contain("## Built-in Functions");
+        result.Should().Contain("**min**");
+        result.Should().NotContain("## Types");
+        result.Should().NotContain("## Modifiers");
     }
 
     [Fact]
-    public void Types_ModifiersContainAllSubgroups()
+    public void Types_ValueModifierScope_ReturnsOnlyValueModifiers()
     {
-        var result = TypesTool.Types();
-        result.Modifiers.Value.Should().NotBeEmpty();
-        result.Modifiers.State.Should().NotBeEmpty();
-        result.Modifiers.Event.Should().NotBeEmpty();
-        result.Modifiers.Access.Should().NotBeEmpty();
-        result.Modifiers.Anchor.Should().NotBeEmpty();
+        var result = TypesTool.Types("modifiers:value");
+
+        result.Should().Contain("Scope: `modifiers:value`");
+        result.Should().Contain("### Value Modifiers");
+        result.Should().Contain("nonnegative");
+        result.Should().NotContain("### State Modifiers");
+        result.Should().NotContain("## Built-in Functions");
+        result.Should().NotContain("## Types");
     }
 
     [Fact]
-    public void Types_FunctionsMirrorFunctionCatalog()
-    {
-        var result = TypesTool.Types();
-        result.Functions.Select(f => f.Kind).Should().Equal(Functions.All.Select(f => f.Kind.ToString()));
-    }
-
-    // ── OperationsTool ───────────────────────────────────────────────────────
-
-    [Fact]
-    public void Operations_ReturnsAllOperationsWhenNoFilter()
+    public void Operations_DefaultCall_ReturnsMarkdown()
     {
         var result = OperationsTool.Operations();
 
-        result.FilteredByCategory.Should().BeNull();
-        result.Operations.Should().HaveCount(Operations.All.Count);
-        result.Count.Should().Be(Operations.All.Count);
-        result.Categories.Should().NotBeEmpty();
+        result.Should().StartWith("# Precept Operations");
+        result.Should().Contain("## Available Categories");
+        result.Should().Contain("## Matching Operations");
+        result.Should().Contain("## Count");
+        result.Should().Contain("`Money`");
     }
 
     [Fact]
-    public void Operations_FilterByCategoryReturnsSubset()
+    public void Operations_CategoryFilter_IsApplied()
     {
-        var result = OperationsTool.Operations("Integer");
+        var result = OperationsTool.Operations("Money");
 
-        result.FilteredByCategory.Should().Be("Integer");
-        result.Operations.Should().NotBeEmpty();
-        result.Operations.Should().AllSatisfy(op =>
-            op.LhsType.Should().BeEquivalentTo("Integer", because: "filtered to Integer category"));
-        result.Count.Should().Be(result.Operations.Length);
+        result.Should().Contain("Filtered by: `Money`");
+        result.Should().Contain("money + money -> money");
+        result.Should().NotContain("Prefer the `category` filter");
     }
 
     [Fact]
-    public void Operations_FilterIsCaseInsensitive()
-    {
-        var lower = OperationsTool.Operations("money");
-        var pascal = OperationsTool.Operations("Money");
-
-        lower.Count.Should().Be(pascal.Count);
-    }
-
-    [Fact]
-    public void Operations_CategoriesListDistinctLhsTypes()
-    {
-        var result = OperationsTool.Operations();
-        result.Categories.Should().OnlyHaveUniqueItems();
-        result.Categories.Should().Contain("Integer");
-        result.Categories.Should().Contain("Money");
-    }
-
-    // ── ProofsTool ───────────────────────────────────────────────────────────
-
-    [Fact]
-    public void Proofs_ReturnsExpectedTopLevelShape()
-    {
-        var result = ProofsTool.Proofs();
-        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        using var doc = JsonDocument.Parse(json);
-
-        doc.RootElement.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "proofRequirements",
-            "runtimeFaults");
-    }
-
-    [Fact]
-    public void Proofs_ProofRequirementsMatchCatalog()
+    public void Proofs_DefaultCall_ReturnsMarkdown()
     {
         var result = ProofsTool.Proofs();
 
-        result.ProofRequirements.Should().HaveCount(ProofRequirements.All.Count);
-        result.ProofRequirements.Select(r => r.Kind).Should().Equal(ProofRequirements.All.Select(r => r.Kind.ToString()));
-
-        var qualComp = result.ProofRequirements.Should().ContainSingle(r => r.Kind == ProofRequirementKind.QualifierCompatibility.ToString()).Subject;
-        qualComp.IsDualSubject.Should().BeTrue();
-
-        var numeric = result.ProofRequirements.Should().ContainSingle(r => r.Kind == ProofRequirementKind.Numeric.ToString()).Subject;
-        numeric.IsDualSubject.Should().BeFalse();
+        result.Should().StartWith("# Precept Proofs and Runtime Faults");
+        result.Should().Contain("## Proof Requirements");
+        result.Should().Contain("## Runtime Faults");
+        result.Should().Contain("**Numeric**");
+        result.Should().Contain("**DivisionByZero**");
     }
 
     [Fact]
-    public void Proofs_RuntimeFaultsMatchFaultsCatalog()
-    {
-        var result = ProofsTool.Proofs();
-
-        result.RuntimeFaults.Should().HaveCount(Faults.All.Count);
-        result.RuntimeFaults.Should().Contain(f => f.Code == "DivisionByZero");
-
-        var divZero = result.RuntimeFaults.Should().ContainSingle(f => f.Code == "DivisionByZero").Subject;
-        divZero.MessageTemplate.Should().NotBeNullOrEmpty();
-        divZero.Severity.Should().Be("Fatal");
-        divZero.RecoveryHint.Should().NotBeNullOrEmpty();
-    }
-
-    // ── PatternsTool ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public void Patterns_ReturnsExpectedTopLevelShape()
+    public void Patterns_DefaultCall_ReturnsMarkdown()
     {
         var result = PatternsTool.Patterns();
-        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        using var doc = JsonDocument.Parse(json);
 
-        doc.RootElement.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "commonPatterns",
-            "antiPatterns");
+        result.Should().StartWith("# Precept Patterns");
+        result.Should().Contain("## Common Patterns");
+        result.Should().Contain("### Guarded transition");
+        result.Should().Contain("## Anti-Patterns");
+        result.Should().Contain("### Exhaustive rejection rows");
     }
 
     [Fact]
-    public void Patterns_CommonPatternsHasEightEntries()
-    {
-        var result = PatternsTool.Patterns();
-        result.CommonPatterns.Should().HaveCount(8);
-        result.CommonPatterns[0].Name.Should().NotBeNullOrEmpty();
-        result.CommonPatterns[0].DslSnippet.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public void Patterns_AntiPatternsHasThreeEntries()
-    {
-        var result = PatternsTool.Patterns();
-        result.AntiPatterns.Should().HaveCount(3);
-        result.AntiPatterns[0].BadSnippet.Should().NotBeNullOrEmpty();
-        result.AntiPatterns[0].GoodSnippet.Should().NotBeNullOrEmpty();
-        result.AntiPatterns[0].WhyItFails.Should().NotBeNullOrEmpty();
-    }
-
-    // ── DiagnosticTool ───────────────────────────────────────────────────────
-
-    [Fact]
-    public void Diagnostic_LookupByCodeNameReturnsEntry()
+    public void Diagnostic_LookupByName_ReturnsMarkdown()
     {
         var result = DiagnosticTool.Diagnostic("UndeclaredField");
 
-        result.Found.Should().BeTrue();
-        result.Error.Should().BeNull();
-        result.Diagnostic.Should().NotBeNull();
-        result.Diagnostic!.Code.Should().Be("UndeclaredField");
-        result.Diagnostic.Stage.Should().Be("Type");
-        result.Diagnostic.Severity.Should().Be("Error");
+        result.Should().StartWith("# Diagnostic UndeclaredField (PRE0017)");
+        result.Should().Contain("## Trigger");
+        result.Should().Contain("## Recovery Steps");
     }
 
     [Fact]
-    public void Diagnostic_LookupByNumericPreCodeReturnsEntry()
+    public void Diagnostic_LookupByPreCode_ReturnsSameEntry()
     {
-        // DiagnosticCode.UndeclaredField = 17
         var result = DiagnosticTool.Diagnostic("PRE0017");
 
-        result.Found.Should().BeTrue();
-        result.Error.Should().BeNull();
-        result.Diagnostic.Should().NotBeNull();
-        result.Diagnostic!.Code.Should().Be("UndeclaredField");
+        result.Should().StartWith("# Diagnostic UndeclaredField (PRE0017)");
+        result.Should().Contain("## Fix Hint");
     }
 
     [Fact]
-    public void Diagnostic_LookupIsCaseInsensitive()
-    {
-        var lower = DiagnosticTool.Diagnostic("undeclaredfield");
-        lower.Found.Should().BeTrue();
-        lower.Diagnostic!.Code.Should().Be("UndeclaredField");
-    }
-
-    [Fact]
-    public void Diagnostic_MissingCodeReturnsMeaningfulError()
+    public void Diagnostic_MissingCode_ReturnsFailureBlock()
     {
         var result = DiagnosticTool.Diagnostic("PRE9999");
 
-        result.Found.Should().BeFalse();
-        result.Diagnostic.Should().BeNull();
-        result.Error.Should().Contain("PRE9999");
+        result.Should().StartWith("# Diagnostic Lookup Failed");
+        result.Should().Contain("Requested: `PRE9999`");
+        result.Should().Contain("UndeclaredField");
     }
 
     [Fact]
-    public void Diagnostic_EmptyCodeReturnsMeaningfulError()
-    {
-        var result = DiagnosticTool.Diagnostic("");
-
-        result.Found.Should().BeFalse();
-        result.Error.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public void Diagnostic_EntryIncludesAllFourNewFields()
-    {
-        var result = DiagnosticTool.Diagnostic("UndeclaredField");
-
-        result.Found.Should().BeTrue();
-        result.Diagnostic!.TriggerCondition.Should().NotBeNullOrEmpty();
-        result.Diagnostic.RecoverySteps.Should().NotBeEmpty();
-        // ExampleBefore / ExampleAfter may be null for some codes but are populated for UndeclaredField
-        // We simply verify the shape is present (nullable is fine)
-    }
-
-    [Fact]
-    public void Diagnostic_UnterminatedStringLiteralHasExamples()
-    {
-        var result = DiagnosticTool.Diagnostic("UnterminatedStringLiteral");
-
-        result.Found.Should().BeTrue();
-        result.Diagnostic!.ExampleBefore.Should().NotBeNullOrEmpty();
-        result.Diagnostic.ExampleAfter.Should().NotBeNullOrEmpty();
-    }
-
-    // ── DomainsTool ──────────────────────────────────────────────────────────
-
-    [Fact]
-    public void Domains_ReturnsExpectedTopLevelShape()
-    {
-        var result = DomainsTool.Domains();
-        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        using var doc = JsonDocument.Parse(json);
-
-        doc.RootElement.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "currencies",
-            "ucumTier1Units",
-            "ucumPrefixes",
-            "dimensions");
-    }
-
-    [Fact]
-    public void Domains_CurrenciesContainUsd()
-    {
-        var result = DomainsTool.Domains();
-        result.Currencies.Should().Contain(c => c.AlphaCode == "USD");
-    }
-
-    [Fact]
-    public void Domains_UcumTier1UnitsNonEmpty()
-    {
-        var result = DomainsTool.Domains();
-        result.UcumTier1Units.Should().NotBeEmpty();
-        result.UcumTier1Units.Should().Contain(u => u.Code == "kg");
-    }
-
-    [Fact]
-    public void Domains_UcumPrefixesContainSiPrefixes()
+    public void Domains_DefaultCall_ReturnsMarkdown()
     {
         var result = DomainsTool.Domains();
 
-        result.UcumPrefixes.Should().NotBeEmpty();
-        result.UcumPrefixes.Should().Contain(p => p.Code == "k" && p.Name == "kilo");
-        result.UcumPrefixes.Should().Contain(p => p.Code == "m" && p.Name == "milli");
-
-        var kilo = result.UcumPrefixes.First(p => p.Code == "k");
-        kilo.Base10Exponent.Should().Be(3);
+        result.Should().StartWith("# Precept Domain Catalog");
+        result.Should().Contain("## Currencies");
+        result.Should().Contain("## UCUM Tier-1 Units");
+        result.Should().Contain("## UCUM Prefixes");
+        result.Should().Contain("## Temporal Units");
+        result.Should().Contain("**USD**");
+        result.Should().Contain("**kg**");
     }
 
     [Fact]
-    public void Domains_DimensionsContainMassAndLength()
+    public void Domains_CurrencyScope_ReturnsOnlyCurrencies()
     {
-        var result = DomainsTool.Domains();
-        result.Dimensions.Should().Contain(d => d.Name == "mass");
-        result.Dimensions.Should().Contain(d => d.Name == "length");
+        var result = DomainsTool.Domains("currencies");
+
+        result.Should().Contain("Scope: `currencies`");
+        result.Should().Contain("## Currencies");
+        result.Should().Contain("**USD**");
+        result.Should().NotContain("## UCUM Tier-1 Units");
+        result.Should().NotContain("## Temporal Units");
+    }
+
+    [Fact]
+    public void Domains_TemporalScope_ReturnsOnlyTemporalUnits()
+    {
+        var result = DomainsTool.Domains("temporal");
+
+        result.Should().Contain("Scope: `temporal`");
+        result.Should().Contain("## Temporal Units");
+        result.Should().Contain("**day / days**");
+        result.Should().NotContain("## Currencies");
+        result.Should().NotContain("## UCUM Tier-1 Units");
+    }
+
+    [Theory]
+    [MemberData(nameof(DefaultCatalogToolOutputs))]
+    public void DefaultCatalogToolOutput_IsNonEmpty(string _, string output)
+    {
+        output.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Theory]
+    [MemberData(nameof(DefaultCatalogToolOutputs))]
+    public void DefaultCatalogToolOutput_StaysUnderSixtyKilobytes(string name, string output)
+    {
+        Encoding.UTF8.GetByteCount(output).Should().BeLessThan(60 * 1024, because: $"{name} should stay within the approved context budget");
+    }
+
+    public static IEnumerable<object[]> DefaultCatalogToolOutputs()
+    {
+        yield return ["quickstart", QuickstartTool.Quickstart()];
+        yield return ["syntax", SyntaxTool.Syntax()];
+        yield return ["types", TypesTool.Types()];
+        yield return ["operations", OperationsTool.Operations()];
+        yield return ["proofs", ProofsTool.Proofs()];
+        yield return ["patterns", PatternsTool.Patterns()];
+        yield return ["diagnostic", DiagnosticTool.Diagnostic("UndeclaredField")];
+        yield return ["domains", DomainsTool.Domains()];
     }
 }

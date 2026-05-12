@@ -11,8 +11,8 @@ public sealed class RecoveryHintTests
     {
         var result = ProofsTool.Proofs();
 
-        var fault = result.RuntimeFaults.Should().ContainSingle(f => f.Code == "CollectionEmptyOnMutation").Subject;
-        fault.RecoveryHint.Should().Be("Guard the action with 'when CollectionField.count > 0' in the transition row guard clause, or apply 'notempty' to the collection field declaration");
+        result.Should().Contain("**CollectionEmptyOnMutation**");
+        result.Should().Contain("Guard the action with 'when CollectionField.count > 0' in the transition row guard clause, or apply 'notempty' to the collection field declaration");
     }
 
     [Fact]
@@ -20,12 +20,9 @@ public sealed class RecoveryHintTests
     {
         var result = DiagnosticTool.Diagnostic("UnguardedCollectionMutation");
 
-        result.Found.Should().BeTrue();
-        result.Diagnostic.Should().NotBeNull();
-        result.Diagnostic!.FixHint.Should().Be("Guard the action with 'when CollectionField.count > 0', or apply 'notempty' to the collection field declaration");
-        result.Diagnostic.RecoverySteps.Should().Equal(
-            "Add 'when CollectionField.count > 0' to the transition row guard before this action",
-            "Or apply 'notempty' to the collection field declaration");
+        result.Should().Contain("Guard the action with 'when CollectionField.count > 0', or apply 'notempty' to the collection field declaration");
+        result.Should().Contain("Add 'when CollectionField.count > 0' to the transition row guard before this action");
+        result.Should().Contain("Or apply 'notempty' to the collection field declaration");
     }
 
     [Fact]
@@ -33,8 +30,8 @@ public sealed class RecoveryHintTests
     {
         var result = ProofsTool.Proofs();
 
-        var fault = result.RuntimeFaults.Should().ContainSingle(f => f.Code == "UnexpectedNull").Subject;
-        fault.RecoveryHint.Should().Be("Add the 'optional' modifier to the field declaration, or guard access with 'when Field is set' before use");
-        fault.RecoveryHint.Should().NotContain("!= null");
+        result.Should().Contain("**UnexpectedNull**");
+        result.Should().Contain("Add the 'optional' modifier to the field declaration, or guard access with 'when Field is set' before use");
+        result.Should().NotContain("!= null");
     }
 }
