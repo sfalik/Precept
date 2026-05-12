@@ -43,8 +43,8 @@ on Renew ensure Renew.ExtraDays > 0 because "Renewal days must be positive"
 event AdvanceDay(DayNumber as number)
 on AdvanceDay ensure AdvanceDay.DayNumber >= 0 because "The day counter cannot be negative"
 
-event ReturnBook(Condition as string optional notempty)
-event ReportLost(Note as string optional notempty)
+event ReturnBook(Condition as string optional)
+event ReportLost(Note as string optional)
 event Shelve
 event ResolveLoss
 
@@ -74,14 +74,14 @@ from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
     -> set FineAmount = AdvanceDay.DayNumber - DueDay
     -> transition Overdue
 from CheckedOut on AdvanceDay
-    -> reject "The day counter must move forward"
+    -> reject "Day {AdvanceDay.DayNumber} is not after the current day {CurrentDay} — the counter must move forward"
 
 from Overdue on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
     -> set CurrentDay = AdvanceDay.DayNumber
     -> set FineAmount = AdvanceDay.DayNumber - DueDay
     -> no transition
 from Overdue on AdvanceDay
-    -> reject "The day counter must move forward"
+    -> reject "Day {AdvanceDay.DayNumber} is not after the current day {CurrentDay} — the counter must move forward"
 
 from CheckedOut on ReturnBook
     -> clear BorrowerId

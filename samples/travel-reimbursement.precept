@@ -14,7 +14,7 @@ field MileageRate as number default 0.67
 field RequestedTotal as number nonnegative <- LodgingTotal + MealsTotal + MileageTotal
 field ApprovedTotal as number default 0 nonnegative
 field FinanceNote as string optional
-rule ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the request"
+rule ApprovedTotal <= RequestedTotal because "Approved total {ApprovedTotal} exceeds the submitted request of {RequestedTotal}"
 
 state Draft initial
 state Submitted
@@ -37,7 +37,7 @@ on Submit ensure Submit.Meals >= 0 because "Meals cannot be negative"
 on Submit ensure Submit.Miles >= 0 because "Mileage cannot be negative"
 on Submit ensure Submit.Rate >= 0 because "Mileage rate cannot be negative"
 
-event Approve(Amount as number, Note as string optional notempty)
+event Approve(Amount as number, Note as string optional)
 on Approve ensure Approve.Amount > 0 because "Approved amounts must be positive"
 
 event Reject(Note as string notempty)
@@ -53,14 +53,14 @@ from Draft on Submit when Submit.Lodging / Submit.Days <= 350
     -> set MileageRate = Submit.Rate
     -> transition Submitted
 from Draft on Submit
-    -> reject "Average lodging per day exceeds the policy cap"
+    -> reject "Average lodging of {Submit.Lodging / Submit.Days} per day exceeds the $350 policy cap ({Submit.Lodging} over {Submit.Days} days)"
 
 from Submitted on Approve when Approve.Amount <= RequestedTotal
     -> set ApprovedTotal = min(Approve.Amount, RequestedTotal)
     -> set FinanceNote = Approve.Note
     -> transition Approved
 from Submitted on Approve
-    -> reject "Finance cannot approve more than the requested total"
+    -> reject "Cannot approve {Approve.Amount} — the submitted total is only {RequestedTotal}"
 from Submitted on Reject
     -> set FinanceNote = Reject.Note
     -> transition Rejected

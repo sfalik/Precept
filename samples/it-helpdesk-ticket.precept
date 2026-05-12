@@ -23,13 +23,13 @@ in New modify Priority editable
 
 event RegisterAgent(AgentName as string notempty)
 event Triage(Title as string notempty, Level as number default 3)
-on Triage ensure Triage.Level >= 1 and Triage.Level <= 5 because "Severity must stay within the supported range"
+on Triage ensure Triage.Level >= 1 and Triage.Level <= 5 because "Severity {Triage.Level} is outside the supported range of 1–5"
 
 event Assign
 event CustomerReply
 event Resolve(Note as string notempty)
 event CloseTicket
-event Reopen(Note as string optional notempty)
+event Reopen(Note as string optional)
 
 from New on RegisterAgent
     -> enqueue AgentQueue RegisterAgent.AgentName

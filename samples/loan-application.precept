@@ -14,8 +14,8 @@ field ExistingDebt as money in 'USD' default '0.00 USD'
 field DecisionNote as string optional
 field DocumentsVerified as boolean default false
 
-rule ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
-rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
+rule ApprovedAmount <= RequestedAmount because "Approved amount {ApprovedAmount} exceeds the submitted request of {RequestedAmount}"
+rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Debt {ExistingDebt} exceeds the 3x income ceiling — maximum is {AnnualIncome * 3.0}"
 
 state Draft initial
 state UnderReview
@@ -41,7 +41,7 @@ on Submit ensure Submit.Income >= '0.00 USD' because "Income cannot be negative"
 on Submit ensure Submit.Debt >= '0.00 USD' because "Debt cannot be negative"
 
 event VerifyDocuments
-event Approve(Amount as money in 'USD', Note as string optional notempty)
+event Approve(Amount as money in 'USD', Note as string optional)
 on Approve ensure Approve.Amount > '0.00 USD' because "Approved amounts must be positive"
 
 event Decline(Note as string notempty)
@@ -64,7 +64,7 @@ from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and An
     -> set DecisionNote = if Approve.Note is set then Approve.Note else if CreditScore >= 750 then "Prime tier — auto-approved" else "Standard tier — approved"
     -> transition Approved
 from UnderReview on Approve
-    -> reject "Approval requires verified documents, strong credit, and affordable debt load"
+    -> reject "Approval requires verified documents (verified: {DocumentsVerified}), credit score 680+ (yours: {CreditScore}), and income at least double existing debt ({AnnualIncome} income vs {ExistingDebt} debt)"
 
 from UnderReview on Decline
     -> set DecisionNote = Decline.Note

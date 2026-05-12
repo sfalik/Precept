@@ -10,7 +10,7 @@ field RequestedAmount as number default 0 nonnegative
 field ApprovedAmount as number default 0 nonnegative
 field ReturnReceived as boolean default false
 field DecisionNote as string optional
-rule ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
+rule ApprovedAmount <= RequestedAmount because "Approved amount {ApprovedAmount} exceeds the submitted request of {RequestedAmount}"
 
 state Draft initial
 state Submitted
@@ -29,12 +29,12 @@ event Submit(
     Reason as string notempty)
 on Submit ensure Submit.Amount > 0 because "The refund amount must be positive"
 
-event Approve(Amount as number, Note as string optional notempty)
+event Approve(Amount as number, Note as string optional)
 on Approve ensure Approve.Amount > 0 because "The approved amount must be positive"
 
 event Decline(Note as string notempty)
 event MarkReturnReceived
-event Cancel(Reason as string optional notempty)
+event Cancel(Reason as string optional)
 
 from Draft on Submit
     -> set OrderId = Submit.OrderNumber
@@ -48,7 +48,7 @@ from Submitted on Approve when Approve.Amount <= RequestedAmount
     -> set DecisionNote = Approve.Note
     -> transition AwaitingReturn
 from Submitted on Approve
-    -> reject "The approved amount cannot exceed the submitted request"
+    -> reject "Cannot approve {Approve.Amount} — the submitted request is only {RequestedAmount}"
 
 from Submitted on Decline
     -> set DecisionNote = Decline.Note

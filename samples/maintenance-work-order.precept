@@ -50,7 +50,7 @@ event RecordProgress(Elapsed as duration)
 on RecordProgress ensure RecordProgress.Elapsed > '0 hours' because "Progress entries must be positive"
 
 event Complete(Note as string notempty)
-event Cancel(Reason as string optional notempty)
+event Cancel(Reason as string optional)
 
 from Draft on Submit
     -> set RequesterName = Submit.Requester
@@ -86,4 +86,4 @@ from InProgress on Complete when not EstimatedDuration is set or ActualDuration 
     -> set CompletionNote = Complete.Note
     -> transition Completed
 from InProgress on Complete
-    -> reject "Work orders that exceed the estimate by more than four hours need review first"
+    -> reject "Actual duration {ActualDuration} exceeds the estimate of {EstimatedDuration} by more than 4 hours — supervisor review required"
