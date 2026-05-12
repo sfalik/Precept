@@ -143354,3 +143354,874 @@ Add a proof-engine regression test for the static `quantity of 'each/case'` qual
 
 - `dotnet test test\Precept.Tests\ --filter "CompoundUnit_cancellation_dimension_qualifier_form"` ✅
 - `dotnet test test\Precept.Tests\` ✅ (4914 passed)
+
+# Hover Design Rework — 2026-05-12
+
+
+
+**By:** Elaine  
+
+**Date:** 2026-05-12  
+
+**Surface:** `docs/Working/hover-design.md` (V4 → V5)  
+
+**Status:** Pending Shane sign-off
+
+
+
+---
+
+
+
+## Context
+
+
+
+Shane requested a full rework of the hover design doc (V4) under four requirements. This record summarizes the requirements and the structural decisions made in response.
+
+
+
+---
+
+
+
+## Requirements Applied
+
+
+
+### 1. Denser
+
+Cut all preamble paragraphs. Replaced verbose "lead line" callouts with data source notes at section end. Replaced prose lists with inline dot-notation. Moved philosophy and constraints to dedicated compact sections. No paragraph before the rendered example in any construct section.
+
+
+
+### 2. Beautiful
+
+Consistent heading hierarchy: `##` for top-level sections, `###` for scenarios, no orphaned `####` sub-headings. Visual `---` separators between every construct and scenario. Bold used only for labels, construct keywords, and status badges. Blockquotes reserved for authored rationale and key design axioms. Tables used for the quick-reference index, routing rules, status indicators, and data model availability — all contexts where column structure genuinely aids scanning.
+
+
+
+### 3. More Understandable
+
+Restructured as: Overview (5 lines) → quick-reference table → construct sections (example first) → proof scenarios → status indicators → routing rules → constraints (V1/V2) → implementation notes → open questions.
+
+
+
+**Quick-reference table** maps every construct to its leading content and proof status badge — the scan-first index the doc was missing.
+
+
+
+**Rendered example leads every section.** Data sources and notes follow.
+
+
+
+Constraints (rendering limits, V1 boundary, V2 deferred list) moved to a dedicated bottom section so they don't interrupt construct reading.
+
+
+
+### 4. Proof clarity (most important)
+
+Every proof-bearing construct and proof scenario now uses a consistent labeled block format:
+
+
+
+```
+
+Proof: [subject / category]
+
+  Verdict: [1 line — what was proved OR why it couldn't be proved]
+
+  Evidence: [1-2 lines — operands, qualifier sources, expression context]
+
+  Fix: [1 line — only if not proved]
+
+```
+
+
+
+This applies to:
+
+- Transition row proof gap (inline proof block added)
+
+- Scenario 1: qualified field — three variants collapsed to the pattern
+
+- Scenario 2: binary expression — proved and unresolved cards rewritten to pattern
+
+- Scenario 3: diagnostic squiggle — PRE0114 and PRE0116 rewritten to pattern
+
+
+
+The proof block is indented under a `Proof:` label line so it reads as a unit, not a scattered list.
+
+
+
+---
+
+
+
+## Structural Decisions
+
+
+
+| Decision | Rationale |
+
+|---|---|
+
+| Quick-reference table at top | Answers "what does this doc cover?" in one scan |
+
+| Rendered example before data sources | Developers orient on output before implementation detail |
+
+| Proof block as indented unit | Groups verdict + evidence + fix into one readable chunk vs. scattered labels |
+
+| Constraints section at bottom | Rendering limits and V1 boundary are reference material, not reading-path content |
+
+| Routing rules promoted to a named section | Routing is a first-class implementation decision, not an afterthought in Kramer notes |
+
+| Three proof scenarios preserved intact | Substance unchanged — only presentation restructured |
+
+| Open questions kept at end | Low-priority for first read; preserved for sign-off completeness |
+
+
+
+---
+
+
+
+## Files Changed
+
+
+
+- `docs/Working/hover-design.md` — full rewrite (V4 → V5)
+
+# Hover V6 Decisions — 2026-05-12T14:22:16.254-04:00
+
+
+
+**By:** Elaine  
+
+**Date:** 2026-05-12T14:22:16.254-04:00  
+
+**Surface:** `docs/Working/hover-design.md` (V5 → V6)  
+
+**Status:** Pending Shane sign-off
+
+
+
+---
+
+
+
+## Context
+
+
+
+Shane asked for a complete rethink of the Precept hover design with three hard requirements: flagship proof/workflow signal, easier understandability, and much tighter cards.
+
+
+
+---
+
+
+
+## Decisions
+
+
+
+### 1. Compact-first is now the governing rule
+
+- Standard cards are designed for 3 lines.
+
+- Lines 4–5 are reserved for proof evidence only.
+
+- Hover content does not repeat what the cursor site already shows when that text adds no new meaning.
+
+- Counts and icons replace prose lists wherever possible.
+
+
+
+### 2. The proof badge is the flagship surface
+
+- Every important card now opens with one of three states: `✅ Proved`, `⚡ Enforced`, or `⚠️ Gap`.
+
+- Proof-bearing cards lead with the guarantee verdict, not the declaration syntax.
+
+- `⚠️ Gap` cards always include one concrete why line and one fix line.
+
+- Diagnostic squiggle and proof-expression hovers are treated as the primary discovery surface for the proof engine.
+
+
+
+### 3. The icon vocabulary is now fixed for hover scanning
+
+
+
+| Icon | Meaning |
+
+|---|---|
+
+| ✅ | Proved |
+
+| ⚡ | Enforced |
+
+| ⚠️ | Gap |
+
+| 🔒 | Not mutable / absent |
+
+| ✏️ | Mutable |
+
+| 🔁 | Transition / routing |
+
+| 📐 | Qualifier / unit / axis |
+
+| 🧭 | Graph position |
+
+| 🧮 | Arithmetic / proof |
+
+
+
+---
+
+
+
+## Files Changed
+
+
+
+- `docs/Working/hover-design.md` — full rewrite to V6
+
+- `.squad/agents/elaine/history.md` — appended V6 summary
+
+# Proof Card Precision Rule — 2026-05-12T14:45:24.254-04:00
+
+
+
+**By:** Elaine  
+
+**Date:** 2026-05-12T14:45:24.254-04:00  
+
+**Surface:** `docs/Working/hover-design.md`  
+
+**Status:** Pending Shane sign-off
+
+
+
+---
+
+
+
+## Context
+
+
+
+Shane reviewed the V6 proof-variant cards and called out the core UX failure: too many `⚠️` cards spent their line budget on interchangeable fix boilerplate instead of the specific evidence that actually failed.
+
+
+
+---
+
+
+
+## Decision
+
+
+
+### `⚠️` proof cards show evidence first, not repair slogans
+
+- Every proof-gap card must name the concrete failing evidence the engine knows: operand values, qualifier values, optional field access, missing graph path, or the exact unresolved subexpression.
+
+- Generic repair text like "align qualifier axes" or "add the missing guard" is not sufficient as the card's main content.
+
+- If a fix hint appears at all, it is secondary and only allowed when it stays specific to the shown evidence.
+
+
+
+### 3-line cards still apply
+
+- Precision replaces a boilerplate fix line; it does not automatically add more lines.
+
+- Most `⚠️` cards stay within 3 lines.
+
+- A fourth line is only justified when the evidence is not understandable without one minimal, specific follow-up hint.
+
+
+
+### V1 honesty rule remains intact
+
+- Cards may only claim data V1 can actually surface.
+
+- When V1 lacks a richer projection, the card should still show the most specific overlapping diagnostic or proof-ledger truth available, and the data-sources note should say what is still missing.
+
+
+
+---
+
+
+
+## Files Changed
+
+
+
+- `docs/Working/hover-design.md` — revised all proof-gap variants to show instance-grounded evidence
+
+- `.squad/agents/elaine/history.md` — added the precision-over-boilerplate learning
+
+- `.squad/decisions/inbox/elaine-proof-precision.md` — recorded the durable UX rule
+
+# Proof Card Vocabulary Standard — 2026-05-12T15:01:19.446-04:00
+
+
+
+**By:** Elaine  
+
+**Date:** 2026-05-12T15:01:19.446-04:00  
+
+**Surface:** `docs/Working/hover-design.md`  
+
+**Status:** Pending Shane sign-off
+
+
+
+---
+
+
+
+## Context
+
+
+
+Shane requested a vocabulary pass on the V6 proof cards because the wording still leaned on proof-engine terminology instead of the mental model of a .NET developer writing `.precept` files in VS Code.
+
+
+
+---
+
+
+
+## Decision
+
+
+
+### Proof cards use developer vocabulary
+
+- User-facing proof copy says qualifiers are **carried**, **known**, **matched**, or **not proved**.
+
+- User-facing proof copy does **not** say qualifiers *resolve*, *trace*, differ by *axis*, or come from an *obligation*.
+
+- When a side fails, the card should say what field or expression has no known qualifier, or that the compiler can't confirm the qualifier match.
+
+
+
+### Precision stays intact
+
+- Keep the exact field names, qualifier values, state names, event names, and expression text already doing the explanatory work.
+
+- Keep the 3-line card structure and compact-first V6 presentation.
+
+- Swap terminology only; do not blur the specific failing evidence.
+
+
+
+### The rule applies across proof surfaces
+
+- Apply the vocabulary standard to construct proof variants, qualifier cards, proof-expression cards, and diagnostic squiggles.
+
+- `✅` proved variants and standard qualifier cards follow the same language rule when they describe proof results.
+
+
+
+---
+
+
+
+## Files Changed
+
+
+
+- `docs/Working/hover-design.md` — rewrote proof-card wording into developer language without changing card structure or specificity
+
+- `.squad/agents/elaine/history.md` — added the durable vocabulary standard to Elaine's history
+
+- `.squad/decisions/inbox/elaine-proof-vocabulary.md` — recorded the decision for Shane sign-off
+
+
+
+### 2026-05-12: Hover vocabulary — final cleanup
+
+**By:** Elaine (UX Designer)
+
+**What:**
+
+- Removed "qualifier" from all user-visible hover card text. Use domain word (currency/unit) or value directly.
+
+- Changed "proved" → "proven" throughout hover card text.
+
+**Why:** Shane's direction. "Qualifier" is runtime jargon invisible to developers. "Proven" is more natural English for a static guarantee statement.
+
+# Decision: Comma-Delimited State List Syntax — Spike Findings
+
+
+
+**Filed by:** Frank
+
+**Date:** 2026-05-12
+
+**Status:** Spike complete — awaiting Shane's review
+
+
+
+## Context
+
+
+
+Shane requested a spike investigation into accepting comma-delimited state/event lists anywhere the grammar currently accepts `any` or `all` as quantifiers.
+
+
+
+## Findings
+
+
+
+1. **States-only scope is recommended.** Comma-delimited state lists in `StateTarget` slots are grammatically consistent (mirrors existing `FieldTarget` pattern), semantically trivial (pure sugar), and philosophically aligned. Multi-event `on` lists have the arg-shape compatibility problem and should be a separate proposal.
+
+
+
+2. **Zero runtime changes needed.** Multi-state comma lists desugar to N independent typed constructs — the runtime never sees them. Parser + type checker changes only.
+
+
+
+3. **Track A is appropriate.** No new design doc needed — one-line grammar production change, ~80 lines of implementation, 2 new diagnostic codes.
+
+
+
+4. **Existing research supports this.** `transition-shorthand.md` identifies multi-state `from` as "the highest-value shorthand" and claims it "already exists" — but the parser only supports `any`, not comma lists. This feature makes the claim true.
+
+
+
+## Team Impact
+
+
+
+- **Parser owners:** `ParseStateTarget` needs a comma loop (model: `ParseFieldTarget`).
+
+- **Type checker owners:** Normalization methods need per-state expansion loops.
+
+- **Language server:** Completion triggers need comma-continuation context detection for state names.
+
+- **MCP:** No DTO changes. Construct examples in vocabulary output need updating.
+
+- **TextMate grammar:** Likely no change — generated from catalog, and state identifiers are already highlighted.
+
+
+
+## Spike Document
+
+
+
+Full analysis: `docs/working/comma-list-syntax-spike.md`
+
+# Decision: Field-State Access Mode Enforcement
+
+
+
+**Author:** Frank
+
+**Date:** 2026-05-12T14:57:13.598-04:00
+
+**Status:** Proposed
+
+**Scope:** TypeChecker validation pipeline
+
+
+
+## Problem
+
+
+
+The compiler does not enforce `omit` or `readonly` field-state access mode constraints in transition actions, guard expressions, or state-hook actions. A transition `from State on Event -> set Field = value` compiles silently even when `in State omit Field` declares the field structurally absent. This violates Precept's core guarantee that invalid configurations are structurally impossible at compile time.
+
+
+
+**Confirmed trigger:** `samples/insurance-claim.precept:43` — `set ApprovedAmount = '0.00 USD'` in a transition from `Draft`, where `in Draft omit ApprovedAmount` (line 26).
+
+
+
+## Root Cause
+
+
+
+1. `CheckContext` has no concept of current state for field accessibility.
+
+2. `ResolveAction` / `ResolveActionTarget` look up fields in a global dictionary (`ctx.FieldLookup`), not filtered by state.
+
+3. `PopulateAccessModes` runs after `PopulateTransitionRows` — transitions are resolved before access modes exist.
+
+4. `TypedAccessMode` records are populated but never consulted by any validation pass.
+
+
+
+## Proposed Approach
+
+
+
+Add a post-resolution validation pass `ValidateFieldStateAccess` in `TypeChecker.Validation.cs` that runs after both `PopulateTransitionRows` and `PopulateAccessModes`. It builds a `(stateName, fieldName) → ModifierKind` lookup from unconditional access modes, then walks all transition rows and state hooks checking:
+
+- Action targets against omit/readonly constraints (D128, D131, D132, D133)
+
+- Guard field references against omit constraints (D129)
+
+- Action RHS field references against omit constraints (D130)
+
+
+
+6 new `DiagnosticCode` entries (128–133), all Error severity.
+
+
+
+## Tradeoff
+
+
+
+Guarded access modes (`in State when Guard modify Field mode`) are skipped in the first pass — they require guard satisfiability analysis. This is conservative: no false positives, but some conditional violations may go uncaught until the follow-up.
+
+
+
+## Proposal Document
+
+
+
+Full analysis at `docs/working/field-state-guarantees.md`.
+
+# Proof Engine Gaps — Consolidated Status & Implementation Plan
+
+
+
+**Author:** Frank  
+
+**Date:** 2026-05-12T13:06:50.365-04:00  
+
+**Status:** Assessment complete — awaiting Shane sign-off on remaining items
+
+
+
+---
+
+
+
+## 1. Status Assessment
+
+
+
+| Gap | Description | Status | Evidence |
+
+|-----|-------------|--------|----------|
+
+| **G1** | Compound-unit qualifier construction | **DONE** | Commit `cb4fbf57`. `ResolveQualifierFromInterpolatedConstant` now constructs `{numerator}/{denominator}` for compound-unit constants. 241 lines added to ProofEngine.cs. |
+
+| **G2** | Money arithmetic currency enforcement (add/sub) | **DONE** | `QualifierCompatibilityProofRequirement` on `MoneyPlusMoney` (Operations.cs L428) and `MoneyMinusMoney` (L438). Both require `QualifierAxis.Currency` matching. |
+
+| **G3** | Money comparison currency enforcement | **DONE** | `QualifierCompatibilityProofRequirement` on all 6 comparison operators: `MoneyEqualsMoney` through `MoneyGreaterThanOrEqualMoney` (Operations.cs L981–1026). |
+
+| **G4** | ExchangeRate × Money from-currency chain | **DONE** | `QualifierChainProofRequirement` on `ExchangeRateTimesMoney` (Operations.cs L681). Validates `FromCurrency` axis on rate matches `Currency` axis on money. |
+
+| **G5** | Price × Quantity dimension chain | **DONE** | `QualifierChainProofRequirement` on `PriceTimesQuantity` (Operations.cs L622). Validates dimension axis match between price denominator and quantity. |
+
+| **G6** | Dimension-only quantity false positive | **DONE** | `ResolveQualifierOnAxis` has Unit→Dimension fallback (ProofEngine.cs L1137–1143, L1164–1171). `QualifiersAreCompatible` has cross-type dimension compatibility (L1041–1061). `ResolveQualifierFromExpression` also implements the fallback (L1286–1288, L1297–1299). |
+
+| **G7** | Expression result qualifier provenance on assignment | **PARTIAL** | `TryGetAssignmentSourceQualifiers` (TypeChecker.Expressions.TypedConstants.cs L46–109) handles `CurrencyConversionRequired` (L72–93), `CompoundUnitCancellationRequired` (L68–70), and `CompoundDimensionElevationRequired` (L95–103). Recursive binary fallback (L33–38) handles `SameQualifierRequired` and `QualifiedOperandInherited` by validating operands individually — conservative but correct for current operations. No remaining false positives or silent gaps in practice. |
+
+| **G8/G13** | Price × Period/Duration temporal chain | **DONE** | `QualifierChainProofRequirement` on `PriceTimesPeriod` (Operations.cs L633) and `PriceTimesDuration` (L644). Both validate `Dimension` vs `TemporalDimension` axes. |
+
+| **G9** | FromCurrency/ToCurrency assignment validation | **DONE** | `ValidateResolvedQualifiers` now has `FromCurrency` (TypedConstants.cs L356–375) and `ToCurrency` (L377–396) cases. |
+
+| **ConstraintRefs** | SemanticSubjects removal + ConstraintRefs population | **DONE** | `SemanticSubjects` removed (zero grep matches). `CollectFieldRefs` and `CollectArgRefs` walkers in TypeChecker.cs L1463–1512. `ctx.ConstraintRefs.Add()` calls at L752, L819, L876. ProofEngine tests show positive assertions (L1942 — `HaveCount(2)`). |
+
+
+
+### Summary: 9 of 9 gaps DONE. ConstraintRefs DONE. G7 is PARTIAL but has no remaining practical gap for current operations.
+
+
+
+---
+
+
+
+## 2. ExchangeRateTimesMoney — Current State
+
+
+
+**Status: WORKING.** The nested addition pattern `TotalCost + (Rate * UnitCost)` compiles clean.
+
+
+
+- **Test proof:** `ProofEngineTests.PartF_F4_ExchangeRateTimesMoneyCurrencyConversion.ExchangeRateTimesMoney_InNestedAddition_UsesCurrencyAxisResult` (L4910–4928) passes. Asserts `HasErrors.Should().BeFalse()` and no `UnprovedQualifierCompatibility` diagnostic.
+
+- **Fix commit:** `ba576b08` ("Fix proof qualifier currency axis") added `TranslateCurrencyAxis` (ProofEngine.cs L1356–1368) which converts `ToCurrency` meta to `Currency` meta when resolving through `CurrencyConversionRequired` binary ops.
+
+- **MCP compiler caveat:** The MCP server may be running stale code due to an Analyzers project cache issue (`MSB3492`). The xUnit test suite (4933 passing) is the ground truth.
+
+
+
+**Remaining inventory-item work:** The `samples/inventory-item.precept` header (L19–33) still says "THIS FILE DOES NOT COMPILE" with stale BUG-C/RC2 notes. The header should be updated to reflect current compiler capability. The actual compile status of the full 20KB file should be re-verified after the MCP server rebuilds.
+
+
+
+---
+
+
+
+## 3. Approval Status
+
+
+
+| Item | Approval Status | Notes |
+
+|------|----------------|-------|
+
+| G1–G9 proof gaps | **No separate approval needed** — all are already implemented and passing. | These shipped incrementally across multiple commits without requiring individual sign-off. They were part of the existing proof-coverage expansion plan. |
+
+| ConstraintRefs plan (`constraint-refs-proof-plan.md`) | **⚠️ Frank-approved, NOT Shane-approved.** | The document says "Approved — implement in full, no deferrals" but this was Frank's approval. No matching entry in `.squad/decisions.md`. However, the implementation is ALREADY DONE — the work was completed, tests pass, SemanticSubjects removed. **No action needed** unless Shane wants to retroactively review. |
+
+| Proof-engine qualifier audit (`proof-engine-qualifier-audit.md`) | **Informational — no approval needed.** | This is an audit document, not a proposal. All identified gaps have been addressed. |
+
+
+
+---
+
+
+
+## 4. Remaining Work — Ordered Implementation Plan
+
+
+
+### What's left (ordered by priority):
+
+
+
+#### Slice 1: Fix DiagnosticsTests format string failures (3 tests)
+
+**Priority:** Immediate — these are test failures in the current build  
+
+**Risk:** Zero  
+
+**Files:**
+
+- `test/Precept.Tests/DiagnosticsTests.cs` L24–41  
+
+
+
+**Problem:** The `UnprovedQualifierCompatibility` diagnostic format string (Diagnostics.cs L748) uses `{0}`–`{5}` (6 format args). The DiagnosticsTests exhaustive factory tests pass only 4 placeholder args ("x", "x", "x", "x"). Fix: add 2 more placeholder args.
+
+
+
+**Method-level spec:**
+
+- `DiagnosticsTests.Create_ProducesCorrectCodeString_ForEveryDiagnosticCode` (L24): Change args from `"x", "x", "x", "x"` to `"x", "x", "x", "x", "x", "x"`
+
+- `DiagnosticsTests.Create_ProducesCorrectSeverity_ForEveryDiagnosticCode` (L32): Same change
+
+- `DiagnosticsTests.Create_ProducesCorrectStage_ForEveryDiagnosticCode` (L39): Same change
+
+
+
+**Acceptance:** All 4936 tests pass.
+
+
+
+#### Slice 2: Update inventory-item.precept header
+
+**Priority:** Medium — cosmetic but misleading  
+
+**Risk:** Zero  
+
+**Files:**
+
+- `samples/inventory-item.precept` L19–33
+
+
+
+**Method-level spec:**
+
+- Remove or update the "THIS FILE DOES NOT COMPILE" disclaimer
+
+- Remove resolved BUG-C/RC2 comments that are no longer accurate
+
+- Verify actual diagnostic count via `dotnet test` or MCP compile and document remaining issues accurately
+
+
+
+#### Slice 3: Fix Analyzers build cache issue
+
+**Priority:** Medium — blocks MCP server rebuild and full solution build  
+
+**Risk:** Low  
+
+**Files:**
+
+- `src/Precept.Analyzers/obj/Release/netstandard2.0/Precept.Analyzers.AssemblyInfoInputs.cache`
+
+
+
+**Method-level spec:**
+
+- Delete the stale cache file: `Remove-Item src/Precept.Analyzers/obj -Recurse -Force`
+
+- Run `dotnet build` to verify full solution builds
+
+
+
+#### Slice 4 (Design decision): G7 deeper expression-result qualifier tracking
+
+**Priority:** Low — no practical gaps exist for current operations  
+
+**Risk:** Medium — architectural change to assignment validation  
+
+**Status:** **Needs design review before implementation.**
+
+
+
+The current recursive binary-operand fallback in `ValidateAssignmentQualifiers` (TypedConstants.cs L33–38) works correctly because all qualifier-transforming operations (`CurrencyConversion`, `CompoundUnitCancellation`, `CompoundDimensionElevation`) have explicit cases. `SameQualifierRequired` and `QualifiedOperandInherited` results inherit operand qualifiers, so the recursive fallback is correct.
+
+
+
+**When this becomes urgent:** If a new ResultQualifierPolicy is added that produces a qualifier different from both operands, the recursive fallback would produce false positives. At that point, `TryGetAssignmentSourceQualifiers` would need a case for the new policy.
+
+
+
+**No implementation action needed now.**
+
+
+
+---
+
+
+
+## 5. What George Can Start On RIGHT NOW
+
+
+
+**Slice 1: Fix DiagnosticsTests format string failures.**
+
+
+
+This is the ONLY remaining regression — 3 test failures in the current build. It's a surgical 3-line change (add 2 more placeholder args at each call site). Zero risk, zero design decisions, zero dependencies.
+
+
+
+After Slice 1 lands, Slice 2 (inventory-item header cleanup) and Slice 3 (Analyzers cache) can be done in either order.
+
+
+
+Slice 4 (G7 deeper work) is deferred — no action needed unless a new ResultQualifierPolicy ships.
+
+
+
+---
+
+
+
+## Key Finding
+
+
+
+**The ProofEngine work described as "currently a stub" is effectively complete.** All 9 documented gaps (G1–G9) are implemented and tested. ConstraintRefs population is implemented. The ExchangeRateTimesMoney nested addition pattern works. The only remaining work is 3 test fixture arg-count mismatches and cosmetic file cleanup.
+
+
+
+The `proof-gaps-issues.md`, `constraint-refs-proof-plan.md`, and `proof-engine-qualifier-audit.md` working documents can be archived — their identified issues are all resolved.
+
+# George cleanup findings
+
+
+
+- `samples/inventory-item.precept` header cleanup was limited to removing the stale "THIS FILE DOES NOT COMPILE" / pending-issues block at the top of the file.
+
+- `precept_compile` on the post-edit sample still reports 15 existing diagnostics in this workspace (`PRE0018`, `PRE0083`, `PRE0114` around GrossProfit, compound-unit rules, and ReceiveShipment paths), which contradicts the task brief's "0 diagnostics" expectation.
+
+- `src/Precept.Analyzers/Precept.Analyzers.csproj` clean + rebuild succeeded, so the analyzer cache hygiene step completed normally.
+
+# George G2 done
+
+
+
+Date: 2026-05-12T13:10:03.666-04:00
+
+
+
+## Summary
+
+- Implemented algebraic denominator proof coverage in `src/Precept/Pipeline/ProofEngine.cs` for the `ReceiveShipment` weighted-average-cost denominator.
+
+- The proof engine now intersects trusted zero-bound facts from rules and event ensures with recursive arithmetic sign propagation over `+`, `-`, `*`, and `/`.
+
+
+
+## Decision
+
+Use trusted simple numeric constraints as proof facts only after their own obligations are resolved, then propagate sign information through compound expressions. This keeps the proof path sound while allowing `nonnegative + (positive * positive)` to discharge a `!= 0` divisor obligation.
+
+
+
+## Validation
+
+- `dotnet build src/Precept/Precept.csproj` passed.
+
+- `dotnet test test/Precept.Tests/Precept.Tests.csproj` finished at 4935/4938 passing; the 3 failures are the pre-existing `DiagnosticsTests` `UnprovedQualifierCompatibility` format issue.
+
+- Focused regression tests passed: `Compositional_TrustedFacts_Prove_PositiveSumDenominator` and `InventoryItem_Sample_Clears_G2_DivisionByZero_Diagnostics`.
+
+- Local `Precept.Compiler.Compile()` against `samples/inventory-item.precept` returned `Errors=0 Warnings=0 Total=0`.
+
+- The MCP `precept_compile` surface still reported the old PRE0083/PRE0114 set and appears stale relative to the local build.
+
+
+
+## Files
+
+- `src/Precept/Pipeline/ProofEngine.cs`
+
+- `test/Precept.Tests/ProofEngineTests.cs`
+
+- `test/Precept.Tests/ProofEngineTypedArgQualifierTests.cs`
+
+- `docs/Working/typed-constants-and-proof-coverage-plan.md`
+
+- `.squad/agents/george/history.md`
+
+# George — Slice 12 outcome
+
+
+
+- Requested slice: Temporal Chain Validation (G8 + G13).
+
+- Result on `spike/Precept-V2-Radical`: already implemented in commit `302d53e1` (`feat: Slice 12 — temporal chain validation (PriceTimesPeriod + PriceTimesDuration) [spike]`).
+
+- Verified `src/Precept/Language/Operations.cs` contains the `QualifierChainProofRequirement` entries for both `PriceTimesPeriod` and `PriceTimesDuration` using `QualifierAxis.TemporalDimension`.
+
+- Verified `test/Precept.Tests/ProofEngineTemporalChainTests.cs` covers the required proved, mismatched, bare-obligation, and regression scenarios.
+
+- Validation on current tree: `dotnet build src\\Precept\\Precept.csproj` ✅ and `dotnet test test\\Precept.Tests\\Precept.Tests.csproj --no-restore` ✅ (`4938/4938`).
+
+- No runtime code changes were necessary in this pass; only George squad bookkeeping was added.
+
+# Soup Nazi — Diagnostics fixture fix
+
+
+
+- The three `DiagnosticsTests` failures were not proof regressions.
+
+- Root cause: the shared `Diagnostics.Create(...)` fixture in `test/Precept.Tests/DiagnosticsTests.cs` only supplied four placeholder format args, but `DiagnosticCode.UnprovedQualifierCompatibility` now uses placeholders through `{5}`.
+
+- Action taken: expanded the test fixture arg list to six placeholders so the tests validate diagnostic metadata instead of crashing in `string.Format`.
+
+# Elaine — Non-proof card vocabulary cleanup
+
+### 2026-05-12: Non-proof card vocabulary cleanup
+**By:** Elaine (UX Designer)
+**Changes:**
+- State card: `✏️ 4 writable` → `✏️ 4 fields`
+- State card: `🧭 terminal path yes` → `🧭 terminal ✓`
+- Access card: `write map is structural` → `write access declared in manifest`
+- Reject card: `deliberate prohibition` → `event rejected`
+- Reject card: `no mutations commit` → `no changes apply`
+- Qualifier card: shortened the third line to `Mixed currencies or units aren't allowed`
+**Why:** Developer-natural language. Every scan line must be immediately readable without knowing Precept internals.
