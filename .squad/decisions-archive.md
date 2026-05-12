@@ -27326,3 +27326,699 @@ George may proceed to Slice 5.
 ---
 
 ---
+
+---
+
+## Archive Batch — 2026-05-12T01:05:25Z
+
+- Active file exceeded threshold; moved decisions older than 2026-05-05T01:05:25Z.
+
+### CI Enforcement Bug Fixes
+
+**Commit:** 7424785
+
+**Bug 1 fix:** `EnforceCIInExpression` in `src/Precept/Pipeline/TypeChecker.cs` — all 5 `Diagnostics.Create` call sites for CI codes 66, 95–98 now pass the CI field name as the `{0}` template argument. Added `GetCIFieldName` helper (line ~2197) that extracts the field name from whichever binary operand is the `~string` `TypedFieldRef`. For function calls (codes 97, 98), extracts directly from `func.Arguments[0]`.
+
+**Bug 2 fix:** Added `PopulateRules` method (~line 945) that iterates `manifest.ByKind[ConstructKind.RuleDeclaration]`, resolves `RuleExpressionSlot.Expression` and `GuardClauseSlot.Expression` via `Resolve()`, wraps `BecauseClauseSlot.Message` as a `TypedLiteral`, and accumulates into `ctx.Rules`. Called from `Check()` after `PopulateEventHandlers`. `BuildPartialSemanticIndex` now emits `ctx.Rules.ToImmutableArray()` instead of `ImmutableArray<TypedRule>.Empty`. `ValidateCIEnforcement` rule traversal (lines 2067–2073) was already correct — it just iterated an empty list.
+
+**Test result:** 3294/3294 total passing (30 CI tests, 22 quantifier tests, 3242 existing)
+
+**R3-ready:** YES
+
+---
+
+### Slice 10 Complete — Ready for R3
+
+**Commit:** 844f00e
+
+**BuildSemanticIndex:** All 16 ImmutableArray primaries + 4 FrozenDictionary secondaries confirmed — populated from CheckContext, no empty stubs remaining.
+
+**D26 assert location:** `TypeChecker.BuildSemanticIndex()`, line ~2245
+
+**ContainsAnyErrorExpression:** Traverses Fields (default+computed), Events (arg defaults), TransitionRows (guard+actions), Rules (condition+guard+message), Ensures (condition+guard+message), AccessModes (guard), StateHooks (guard+actions), EventHandlers (actions). Recursive `ContainsError` walks all composite expression subtypes (binary, unary, function call, member access, conditional, quantifier, interpolated string, list literal, postfix).
+
+**Remaining stubs removed:** `BuildSemanticIndex` was the last `NotImplementedException` stub — now fully implemented.
+
+**Full pipeline order:** PopulateFields → PopulateStates → PopulateEvents → PopulateTransitionRows → PopulateEventHandlers → PopulateRules → ValidateModifiers → ValidateStructural → ValidateCIEnforcement → BuildSemanticIndex
+
+**Test result:** 3294/3294 total, 118 integration tests passing
+
+**NotImplementedException stubs remaining:** None
+
+---
+
+### Slice 8 Complete
+
+**By:** George (for Soup Nazi)
+
+**Commit:** `00ef822`
+
+**EnforceCIConsistency:** `ValidateCIEnforcement` traverses all resolved expression trees in `CheckContext` — field defaults, computed expressions, transition row guards and actions, event handler actions, rule conditions/guards/messages, and ensure conditions/guards/messages. Recursively walks `TypedExpression` DU via `EnforceCIInExpression`.
+
+**CI-required contexts:** A context is CI-required when a `TypedFieldRef` with `IsCaseInsensitive = true` appears as an operand of `==`/`!=`, as the first argument of `startsWith`/`endsWith`, or as the value operand of `contains` on a case-sensitive collection. `IsCaseInsensitive` is set during `ResolveIdentifier` from the `CIFields` HashSet populated in `PopulateFields` when `declared.Type is CITypeReference`.
+
+**DiagnosticCodes used:**
+
+- `CaseInsensitiveFieldRequiresTildeEquals` (66) — `==` with `~string` operand
+
+- `CaseInsensitiveFieldRequiresTildeNotEquals` (95) — `!=` with `~string` operand
+
+- `CaseInsensitiveValueInCaseSensitiveContains` (96) — `contains` with `~string` value in CS collection (dormant: no `contains` OperationKind yet)
+
+- `CaseInsensitiveFieldRequiresTildeStartsWith` (97) — `startsWith(~string, ...)`
+
+- `CaseInsensitiveFieldRequiresTildeEndsWith` (98) — `endsWith(~string, ...)`
+
+
+
+**Valid CI examples for Soup Nazi (should NOT trigger diagnostics):**
+
+```
+
+// ~= and ~!= are fine with ~string
+
+field Email: ~string
+
+when Email ~= "admin@example.com"
+
+when Email ~!= "test@test.com"
+
+
+
+// ~startsWith / ~endsWith are fine
+
+when ~startsWith(Email, "info@")
+
+when ~endsWith(Email, ".com")
+
+
+
+// Regular == on non-CI string is fine
+
+field Name: string
+
+when Name == "Alice"
+
+```
+
+
+
+**Invalid (non-CI in CI context) examples for Soup Nazi (should trigger diagnostics):**
+
+```
+
+// == on ~string → CaseInsensitiveFieldRequiresTildeEquals
+
+field Email: ~string
+
+when Email == "admin@example.com"
+
+
+
+// != on ~string → CaseInsensitiveFieldRequiresTildeNotEquals
+
+when Email != "test@test.com"
+
+
+
+// startsWith on ~string → CaseInsensitiveFieldRequiresTildeStartsWith
+
+when startsWith(Email, "info@")
+
+
+
+// endsWith on ~string → CaseInsensitiveFieldRequiresTildeEndsWith
+
+when endsWith(Email, ".com")
+
+
+
+// Both operand positions checked:
+
+when "admin@example.com" == Email
+
+```
+
+
+
+**Notes:**
+
+- CI tracking lives in `CheckContext.CIFields` (scalar `~string`) and `CheckContext.CIElementCollections` (collections with `~string` elements). Both populated from `CITypeReference` checks in `PopulateFields`.
+
+- The `contains` rule (Rule 3) is structurally implemented but dormant — `IsContainsOperation()` returns `false` because no `OperationKind` entries for `contains` exist yet. When they land, update `IsContainsOperation` to match them.
+
+- To test CI enforcement, declare a field with `~string` type (requires parser CI type support), then use `==`/`!=`/`startsWith`/`endsWith` on that field. The diagnostic fires on the binary op or function call span.
+
+- `TypedFieldRef.IsCaseInsensitive` was previously always `false` — now correctly populated from `CIFields` set. This is a semantic change visible in `SemanticIndex` output.
+
+---
+
+### Slice 9 Complete
+
+**By:** George (for Soup Nazi)
+
+**Commit:** 54fa59b
+
+
+
+**TypedQuantifier:** Triggered by `QuantifierExpression(TokenKind.All|Any|No, bindingName, collection, predicate)`. Resolves collection → extracts ElementType via `GetElementType` → pushes `(bindingName, elementType)` onto `ctx.QuantifierBindings` → resolves predicate with binding in scope → pops binding. Binding variable shadows event args and fields (per §13 Slice 9). Returns `TypedQuantifier(Boolean, bindingName, elementType, collection, predicate, span)`.
+
+
+
+**TypedListLiteral:** Triggered by `ListLiteralExpression([elem1, elem2, ...])`. Resolves each element expression, unifies element types via bidirectional `IsAssignable` widening (e.g., `[1, 2.5]` → Integer widens to Decimal). Empty lists produce `TypedListLiteral(List, Error, [], span)`. Returns `TypedListLiteral(List, unifiedElementType, elements, span)`.
+
+
+
+**QualifierBinding DU:** Not directly used on quantifier/list literal arms. QualifierBinding (InheritedQualifier vs SameQualifierRequired) remains on `TypedBinaryOp.ResultQualifier` and `TypedTransitionRow.ResultQualifier` — quantifier resolution does not produce qualifier bindings; it uses the simpler `QuantifierBindings` stack on CheckContext which is `Stack<(string Name, TypeKind Type)>`.
+
+
+
+**DiagnosticCodes used:**
+
+- `InvalidQuantifierTarget` (102) — collection operand is not a collection field (no ElementType)
+
+- `QuantifierPredicateNotBoolean` (106) — predicate resolves to non-boolean type
+
+- `TypeMismatch` (18) — list literal elements have incompatible types
+
+
+
+**Valid quantifier examples for Soup Nazi:**
+
+- `each x in Tags (x = "active")` — Tags is `set of string`, x binds as string
+
+- `any item in Scores (item > 100)` — Scores is `list of integer`, item binds as integer
+
+- `no entry in Logs (entry.Status = "failed")` — Logs is collection, entry binds as element type
+
+
+
+**Valid list literal examples:**
+
+- `[1, 2, 3]` — inferred ElementType: Integer, ResultType: List
+
+- `["a", "b", "c"]` — inferred ElementType: String, ResultType: List
+
+- `[1, 2.5, 3]` — Integer widens to Decimal, ElementType: Decimal
+
+
+
+**Notes for Soup Nazi:** Quantifier bindings shadow both event args and fields (tested in `QuantifierBindingShadowsEventArg`). The `GetElementType` helper only resolves `TypedFieldRef` receivers via `FieldLookup` — chained collection access (e.g., `each x in obj.Items(...)`) returns null and emits InvalidQuantifierTarget. Empty list literals `[]` are valid but produce Error element type (no inference possible). ConditionalExpression arm remains a stub (Slice TBD).
+
+---
+
+### Slice 5 Restoration Complete
+
+**Commit:** 4e1efd8
+
+**Methods restored:**
+
+- `PopulateTransitionRows` — iterates TransitionRow constructs, calls NormalizeTransitionRow, accumulates into CheckContext
+
+- `PopulateEventHandlers` — iterates EventHandler constructs, calls NormalizeEventHandler, accumulates into CheckContext
+
+- `NormalizeTransitionRow` — resolves from-state, event, guard, action chain, outcome into TypedTransitionRow
+
+- `NormalizeEventHandler` — resolves event, action chain into TypedEventHandler
+
+- `ResolveAction` — dispatches on ParsedAction DU (Assign, CollectionValue, FieldOnly, etc.) into TypedAction
+
+- `ResolveActionTarget` — resolves action target identifier to field name + type
+
+- `ContainsErrorExpression` — D26 assertion helper for transition rows
+
+- `ContainsErrorExpressionInAction` — D26 assertion helper for event handler actions
+
+- `ValidateModifiers` — Slice 7 modifier validation entry point (also lost in overwrite)
+
+- `ValidateFieldModifiers` — per-field/arg modifier applicability, conflicts, subsumption
+
+- `IsTypeApplicable` — modifier ApplicableTo type matching
+
+
+
+**Additional fix:** `BuildPartialSemanticIndex` was returning empty arrays for TransitionRows, EventHandlers, FieldReferences, StateReferences, EventReferences — now wires from CheckContext.
+
+
+
+**Secondary bug fixed:** EventName.ArgName resolution — added early check in `ResolveMemberAccess`: when the target of a `MemberAccessExpression` is an `IdentifierExpression` matching a declared event name, resolve the member against the event's arg declarations and return `TypedArgRef` instead of falling through to normal member access (which would fail with UndeclaredField since event names aren't fields). Per language spec §3.5 Event arg access.
+
+
+
+**Pipeline call order confirmed:**
+
+1. PopulateFields (Slice 1)
+
+2. PopulateStates (Slice 1)
+
+3. PopulateEvents (Slice 1)
+
+4. PopulateTransitionRows (Slice 5)
+
+5. PopulateEventHandlers (Slice 5)
+
+6. ValidateModifiers (Slice 7)
+
+7. ValidateStructural (Slice 6)
+
+8. BuildPartialSemanticIndex
+
+
+
+**Test result:** 3196/3196 passing (26/26 TypeCheckerTransitionTests, 0 regressions)
+
+---
+
+### Slice 1 Test Failure Triage — 2026-05-07
+
+
+
+| Test | Failure Type | Root Cause | Action Taken |
+
+|------|-------------|------------|--------------|
+
+| PriceType_ResolvesToPriceTypeKind | TYPE A | Test used `in 'USD/each'` qualifier syntax; parser doesn't handle BusinessDomain qualifier parsing yet | Fixed — removed qualifier, test now passes |
+
+| ExchangeRateType_ResolvesToExchangeRateTypeKind | TYPE A | Test used `in 'USD' to 'EUR'` qualifier syntax; parser doesn't handle qualifier parsing yet | Fixed — removed qualifier, test now passes |
+
+| QuantityType_ResolvesToQuantityTypeKind | TYPE A | Test used `in 'kg'` qualifier syntax; parser doesn't handle qualifier parsing yet | Fixed — removed qualifier, test now passes |
+
+| MoneyType_ResolvesToMoneyTypeKind | TYPE A | Test used `in 'USD'` qualifier syntax; parser doesn't handle qualifier parsing yet | Fixed — removed qualifier, test now passes |
+
+| LogOfString_ResolvesCollectionWithElementType | TYPE B | `Types.ByToken` maps `TokenKind.LogType` → last-wins is `TypeKind.LogBy` (enum 28), overwriting `TypeKind.Log` (enum 27). `log of string` resolves to LogBy instead of Log. | Documented — parser/ByToken gap |
+
+| QueueOfNumber_ResolvesCollectionWithElementType | TYPE B | `Types.ByToken` maps `TokenKind.QueueType` → last-wins is `TypeKind.QueueBy` (enum 31), overwriting `TypeKind.Queue` (enum 23). `queue of string` resolves to QueueBy instead of Queue. | Documented — parser/ByToken gap |
+
+| EventArgWithNotempty_ModifierPreserved | TYPE B | Parser `ParseArgumentList` (Parser.cs:675–721) parses `Name as Type` only — does not consume modifiers (`notempty`, `optional`) after the type token. Samples use this syntax but it silently fails. | Documented — parser gap |
+
+| EventWithOptionalArg_ArgIsOptional | TYPE B | Same root cause as above — `ParseArgumentList` does not support `optional` modifier on event args. | Documented — parser gap |
+
+---
+
+---
+
+---
+
+---
+
+### TYPE A — Test Bugs Fixed (4 tests)
+
+
+
+All four BusinessDomain type tests included qualifier syntax (`in 'USD'`, `in 'kg'`, `in 'USD/each'`, `in 'USD' to 'EUR'`) that the parser does not yet support. The tests were testing **TypeKind resolution**, not qualifier parsing, so the qualifiers were unnecessary. Removed qualifiers; all four now pass.
+
+
+
+- `MoneyType_ResolvesToMoneyTypeKind` — `field Cost as money in 'USD'` → `field Cost as money`
+
+- `QuantityType_ResolvesToQuantityTypeKind` — `field Weight as quantity in 'kg'` → `field Weight as quantity`
+
+- `PriceType_ResolvesToPriceTypeKind` — `field UnitPrice as price in 'USD/each'` → `field UnitPrice as price`
+
+- `ExchangeRateType_ResolvesToExchangeRateTypeKind` — `field FxRate as exchangerate in 'USD' to 'EUR'` → `field FxRate as exchangerate`
+
+---
+
+---
+
+---
+
+---
+
+### TYPE B — Real Upstream Gaps (4 tests)
+
+
+
+#### Gap 1: `Types.ByToken` dictionary overwrites Log/Queue with LogBy/QueueBy
+
+
+
+**Affected tests:** `LogOfString_ResolvesCollectionWithElementType`, `QueueOfNumber_ResolvesCollectionWithElementType`
+
+
+
+**Root cause:** `Types.ByToken` is a `FrozenDictionary<TokenKind, TypeMeta>`. Both `TypeKind.Log` and `TypeKind.LogBy` use `TokenKind.LogType` as their token. Similarly `TypeKind.Queue` and `TypeKind.QueueBy` share `TokenKind.QueueType`. The `BuildByToken()` loop in `Types.cs:639` iterates `Enum.GetValues<TypeKind>()` — since LogBy (28) comes after Log (27) and QueueBy (31) after Queue (23), the later values overwrite the earlier. Result: `log of string` (without `by`) resolves to `TypeKind.LogBy` instead of `TypeKind.Log`.
+
+
+
+**Fix approach:** `ByToken` should map to the base type (Log/Queue). The parser's `ParseCollectionType` should promote to LogBy/QueueBy only when a `by` clause is present. The promotion logic at Parser.cs:524–530 already exists but never triggers because `ByToken` already returns the `By` variant.
+
+
+
+#### Gap 2: Parser `ParseArgumentList` does not support modifiers on event args
+
+
+
+**Affected tests:** `EventArgWithNotempty_ModifierPreserved`, `EventWithOptionalArg_ArgIsOptional`
+
+
+
+**Root cause:** `ParseArgumentList` (Parser.cs:675–721) parses each arg as `Name as Type` then looks for `,` or `)`. It does not consume modifier keywords (`optional`, `notempty`, `writable`, `nonnegative`) after the type token. When `notempty` or `optional` follows the type, the parser breaks out of the arg loop, leaving the modifier tokens unconsumed and emitting "Expected declaration keyword" errors.
+
+
+
+**Note:** Sample files (e.g. `apartment-rental-application.precept`) use `event Approve(Note as string optional notempty)` — this syntax parses with errors that are currently tolerated. The samples should be verified for diagnostic cleanliness once this gap is fixed.
+
+
+
+**Fix approach:** After consuming the type token in `ParseArgumentList`, loop over modifier tokens (check against `Modifiers.ByToken` or the modifier catalog) and collect them into a modifiers list. The `(string Name, TypeMeta Type)` tuple in the arg list should be expanded to include modifiers.
+
+---
+
+---
+
+---
+
+---
+
+### Recommended next action
+
+
+
+George should fix these 4 TYPE B gaps before Slice 2. The Log/Queue ByToken overwrite is a data-integrity issue that affects any code path using `Types.ByToken` for these types. The event arg modifier gap blocks testing of a feature that's already used in samples. Both are contained fixes in Parser.cs and Types.cs — no TypeChecker changes needed.
+
+
+
+**Current score: 51/55 passing (was 47/55).**
+
+---
+
+### Slice 10 Tests Complete — R3-Ready
+
+**Commit:** 703000a
+
+**Total written:** 32
+
+**Passing:** 32/32
+
+**Full suite:** 3326/3326 (no regressions)
+
+
+
+**D26 coverage:**
+
+- Clean precept (FullPrecept) → no Error diagnostics, invariant trivially satisfied
+
+- Error precept (unknown field ref) → Error diagnostic present, D26 holds
+
+- Multiple errors (2 unknown fields) → ≥2 Error diagnostics captured
+
+- Error severity validation (all errors are Severity.Error)
+
+- Minimal clean precept → no errors
+
+- TrafficLight realistic precept → no errors, invariant holds
+
+
+
+**FrozenDictionary D4 coverage:**
+
+- `FieldsByName["ClaimAmount"]` → correct TypedField with TypeKind.Decimal
+
+- `StatesByName["Approved"]` → correct TypedState
+
+- `EventsByName["Submit"]` → correct TypedEvent with args
+
+- `TryGetValue` on missing keys → returns false (all 3 dictionaries)
+
+- `EnsuresByState` → documented as empty (scoped ensure population not yet wired)
+
+
+
+**Integration test highlights:**
+
+- InsuranceClaim-derived precept: 7 fields, 6 states, 6 events, transitions, rules, access modes
+
+- TrafficLight: 4 fields, 4 states, 3 events, guards, string concatenation actions
+
+- LoanApplication: 5 fields, 4 states, 3 events, rules, guarded transitions
+
+- All StateReferences → valid in StatesByName
+
+- All EventReferences → valid in EventsByName
+
+- All TypedField.ResolvedType → non-Error for clean precepts
+
+- Transition row consistency: source/target states and events all valid
+
+
+
+**Implementation gaps documented (not red — tests assert current behavior):**
+
+- `Ensures` empty: scoped ensure constructs not yet wired into TypeChecker ctx.Ensures
+
+- `AccessModes` empty: scoped access-mode constructs not yet wired
+
+- `ConstraintRefs` empty: constraint ref tracking not yet wired
+
+- `DefaultExpression` null: field default resolution not yet wired (Slice 2+ stub)
+
+- Multi-field modify syntax (`modify X, Y editable`) not supported by parser
+
+- `from any` wildcard transitions not tested (CI tests note: contains OperationKind dormant)
+
+- `rule ... when` conditional rules produce parse errors
+
+- Boolean literal `true`/`false` in set actions produces TypeMismatch
+
+- Multi-arg functions (`min(a, b)`) not supported in action context
+
+
+
+**Any red tests:** None — all 32 pass
+
+**R3-readiness:** YES
+
+---
+
+### Slice 2 Tests Complete — 2026-05-07
+
+**Commit:** d4053c1
+
+**Total tests written:** 46
+
+**Passing:** 46/46
+
+**Any red tests (real gaps):** None
+
+**Coverage notes:**
+
+- Added internal `CreateContext`/`ResolveExpression` test entry points to TypeChecker (already present from Slice 3 commit)
+
+- Event arg tests bypass pre-existing parser gap by manually setting up CurrentEventArgs with TypedArg objects
+
+- Stub arm tests updated to reflect Slice 3 landing (FunctionCall/InterpolatedString/MemberAccess/MethodCall are no longer stubs; tests cover remaining stubs: ConditionalExpression, PostfixOperationExpression, QuantifierExpression)
+
+- Widening tested via IntegerPlusDecimal (bidirectional catalog entry) and IntegerPlusNumber; no real widening-only path exists for scalar types since the catalog is exhaustive with bidirectional entries
+
+- Full suite: 3075 passed, 0 failed
+
+---
+
+### Slice 3 Tests Complete — 2026-05-07
+
+**Commit:** 23edd54
+
+**Total tests written:** 51
+
+**Passing:** 51/51
+
+**Any red tests (real gaps):** None — all 51 green.
+
+**Coverage notes:**
+
+- FunctionCall happy path: 9 tests covering abs, min, trim, floor, now, startsWith, clamp, roundPlaces, and floor-with-widening (integer→decimal). Round multi-overload (Round vs RoundPlaces) tested explicitly.
+
+- FunctionCall errors: 7 tests — UndeclaredFunction, FunctionArityMismatch (too few + too many), TypeMismatch (boolean into abs), ErrorType propagation (single arg + multi-arg), sqrt proof requirements.
+
+- CI variant selection: 4 tests — ~startsWith → TildeStartsWith, ~endsWith → TildeEndsWith, unknown CI function, CI of function without variant (abs). CI enforcement of first-arg ~string deferred to Slice 8 per George's notes.
+
+- MemberAccess happy path: 15 tests via Theory — date (year/month/day/dayOfWeek), string (length), duration (totalDays/totalHours/totalMinutes/totalSeconds), period (years/months/days), time (hour/minute/second), set.count, list.count.
+
+- MemberAccess errors: 5 tests — unknown accessor, accessor on no-accessor type (boolean), accessor on integer, error receiver propagation, resolved accessor return type verification.
+
+- InterpolatedString: 7 tests — field ref hole, multiple holes, text-only, error hole propagation, nested function call hole, multi-hole with one error.
+
+- Structural: 2 tests — TypedFunctionCall carries resolved arguments, TypedMemberAccess carries resolved object.
+
+- Round multi-overload: 1 test — round(decimal) → Round (1-arg), round(decimal, integer) → RoundPlaces (2-arg).
+
+- Full suite: 3126/3126 passing (no regressions).
+
+---
+
+### Slice 4 Tests Complete — 2026-05-07
+
+**Commit:** `1c29fe6`
+
+**Total tests written:** 44
+
+**Passing:** 44/44
+
+**Any red tests (real gaps):** None
+
+**Coverage notes:**
+
+- ClosedSetValidation: Currency (valid×4 + case-insensitive, invalid×3), UnitOfMeasure (valid×3, invalid×2), Dimension (valid×2, invalid×1)
+
+- NodaTimeValidation: Date (valid×3, invalid×3, datetime-as-date×1), Time (valid×3, invalid×3), DateTime (valid×2, invalid×2), Period (valid×3, invalid×2)
+
+- TypedLiteral fallback: string, integer, boolean — confirms non-typed-constant literals stay TypedLiteral
+
+- UnresolvedTypedConstant: null context + Error context both emit diagnostic and return TypedErrorExpression
+
+- Trusted pass-through: type with no ContentValidation (String) accepts any value as TypedTypedConstant
+
+- RegexValidation: no TypeKind currently uses RegexValidation in production, so no test coverage. The code path exists and is tested implicitly via the DU dispatch. If a type gains RegexValidation, add tests.
+
+**Ready for R1:** YES
+
+---
+
+### Slice 5 Tests Complete — 2026-05-07
+
+**Commit:** (see below)
+
+**Total tests written:** 26
+
+**Passing:** 7/26
+
+**Failing (TYPE B — blocked):** 19/26
+
+
+
+**Triage result (George's 7 "pre-existing failures"):**
+
+George's 7 reported failures were **stale binary artifacts**, NOT real failures. After a fresh `dotnet build`, the baseline is **3170/3170 clean** (excluding my new tests). The `--no-build` flag used a DLL from a prior Slice 5 build state that no longer matches HEAD.
+
+
+
+**CRITICAL finding: Slice 5 was overwritten by Slice 6.**
+
+Commit `fe358ef` ("feat: TypeChecker Slice 6 — structural validation") replaced `687d364`'s entire Slice 5 implementation. `PopulateTransitionRows`, `PopulateEventHandlers`, `ResolveAction`, and all related methods were deleted. TransitionRows and EventHandlers are empty stubs at HEAD. See `soup-nazi-slice-5-regression.md` for full details.
+
+
+
+**19 failing tests are TYPE B (known red, not suppressed):**
+
+All 19 test the Slice 5 contract (transition row resolution, guard scope, action targets, event handler normalization, state/event references, D26 invariant). They are correct per George's implementation notes — they will pass when Slice 5 code is restored and merged with Slice 6.
+
+
+
+**7 passing tests:** These verify behavior handled by NameBinder or stages other than PopulateTransitionRows (e.g., unknown event/field diagnostics from NameBinder, clean input producing no errors).
+
+
+
+**R2-readiness:** Slice 5 is NOT ready — implementation was overwritten. Requires merge of `687d364` back into current HEAD.
+
+
+
+**Additionally:** Even the original Slice 5 code (`687d364`) has a bug where `EventName.ArgName` accessors emit `UndeclaredField`. This is a secondary issue — restore first, fix second.
+
+---
+
+### Slice 6 Tests Complete
+
+**Commit:** 78d1774
+
+**Total written:** 17
+
+**Passing:** 17/17
+
+**Any red tests:** None — all 17 green. 2 pre-existing failures in TypeCheckerModifierTests (Slice 7) unrelated.
+
+**R2-readiness for Slice 6:** YES
+
+---
+
+### Slice 7 Tests Complete
+
+**Commit:** 26208fe
+
+**Total written:** 29
+
+**Passing:** 29/29
+
+**Any red tests:** None
+
+**R2-readiness for Slice 7:** YES
+
+
+
+#### Coverage breakdown
+
+- Category 1 (valid modifiers): 7 tests — optional, notempty, nonnegative, writable, positive, ordered, notempty-on-set
+
+- Category 2 (invalid modifier for type): 6 tests — 5 via Theory (boolean/nonneg, string/nonneg, date/positive, boolean/nonzero, integer/ordered) + notempty-on-boolean, minlength-on-integer, maxplaces-on-integer, mincount-on-string, event-arg-type-mismatch
+
+- Category 3 (duplicate + mutual exclusivity): 4 tests — duplicate nonneg, duplicate optional, nonneg+positive conflict, positive+nonneg reversed
+
+- Category 4 (redundant modifier): 4 tests — positive-subsumes-nonneg, positive-subsumes-nonzero, notempty-on-timezone (implied), notempty-on-currency (implied)
+
+- Category 5 (event arg + computed): 4 tests — valid event arg modifier, writable-on-event-arg, computed-field-not-writable, computed-field-without-writable
+
+
+
+#### Notes
+
+- RedundantModifier is Warning severity; tests use raw `Check()` and assert on `d.Code` directly since `CheckExpectingError` filters to Error severity only.
+
+- Event arg syntax is `event Name(ArgName as type modifier)` with transition rows required for clean parse.
+
+- Computed field `writable` modifier must appear before `<-` (modifiers after `<-` expression work for constraint modifiers like `positive`/`nonnegative` but not for `writable`).
+
+- Full suite: 3242/3242 passing — zero regressions.
+
+---
+
+### Slice 8 Tests Complete
+
+**Commit:** 9472824
+
+**Total written:** 30
+
+**Passing:** 30/30
+
+**CI rules covered:**
+
+- Rule 1: CaseInsensitiveFieldRequiresTildeEquals (66) — == with ~string
+
+- Rule 2: CaseInsensitiveFieldRequiresTildeNotEquals (95) — != with ~string
+
+- Rule 3: CaseInsensitiveValueInCaseSensitiveContains (96) — dormant (no contains OperationKind yet)
+
+- Rule 4: CaseInsensitiveFieldRequiresTildeStartsWith (97) — startsWith with ~string
+
+- Rule 5: CaseInsensitiveFieldRequiresTildeEndsWith (98) — endsWith with ~string
+
+**Any red tests:** None — all 30 green. Two TYPE B bugs documented in test comments:
+
+1. `Diagnostics.Create` for CI codes throws `FormatException` in transition guard context — template has `{0}` placeholder but `EnforceCIInExpression` passes no field name argument. Tests assert the throw.
+
+2. Rule condition context does NOT trigger CI enforcement diagnostics (== and != on ~string in rules produce no error). Tests document this coverage gap.
+
+**George's inbox note correction:** CI not-equals operator is `!~`, not `~!=` as stated in george-slice-8-done.md.
+
+**R3-readiness for Slice 8:** NO — blocked by the two TYPE B bugs above (FormatException crash on violation, rules not enforced).
+
+---
+
+### Slice 9 Tests Complete
+
+**Commit:** f14a664
+
+**Total written:** 22
+
+**Passing:** 22/22
+
+**Any red tests:** None from this file. 13 pre-existing reds in TypeCheckerCITests (unrelated).
+
+**R3-readiness for Slice 9:** YES
+
+---
+
+---
+
+---
+
+---

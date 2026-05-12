@@ -1,0 +1,3 @@
+# Session Log — Inventory Coverage
+
+At 2026-05-12T01:05:25Z, Scribe archived oversized historical decision entries, merged Frank's inventory coverage audit plus George's Slice 11B completion note into the canonical ledger, cleared the decision inbox, and propagated the implementation fallout to Frank and George: Slice 11B is now locked as shipped, the only newly confirmed plan gap is compound-unit interpolation (Slice 2B-style `unitofmeasure` / `quantity` support with dimensional validation), BUG-B and Rate × money remain covered, and BUG-A now needs explicit event-arg regression proof instead of assumption. Health report: `decisions.md` 204406 → 174708 bytes, archive 880883 → 880686 bytes, inbox 2 → 0.

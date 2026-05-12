@@ -28,6 +28,10 @@
 
 ## Recent Updates
 
+### 2026-05-12T01:05:25Z — Inventory coverage audit tightened remaining interpolation follow-up
+- `inventory-item.precept` still exposes a compound-unit interpolation gap, so the checker follow-up needs `unitofmeasure` U2 plus quantity compound patterns for forms like `'{StockingUnit}/{PurchaseUnit}'` and `'0 {StockingUnit}/{PurchaseUnit}'`, with dimensional validation of the resulting compound unit.
+- No new proof-engine bug was confirmed: BUG-B remains covered through interpolation plus Slice 9 fallback, while BUG-A now looks like an explicit regression-gap risk once event args parse cleanly.
+
 ### 2026-05-11 — Slice 11B: Temporal Price Denominator Type System Extension
 - Added `ImpliedQualifiers` to `TypeMeta` record; Duration entry carries `TemporalDimension(Time, Baseline)`.
 - Extended `ExtractQualifiers` in TypeChecker: `price of 'time'`/`'date'` routes to `MapTemporalDimensionQualifier`; `quantity of 'time'` still emits `InvalidDimensionString` (type-gated guard).

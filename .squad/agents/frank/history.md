@@ -12,6 +12,16 @@
 - Temporal semantics stay with `duration` / `period`; `quantity of 'time'` remains invalid, while temporal-denominated prices stay on `price of ...`.
 - MCP/public tooling contracts should continue to expose curated projections rather than raw core catalog records.
 
+## Learnings
+
+### 2026-05-11T21:05:25-04:00 — inventory-item.precept coverage analysis
+- Compiled `samples/inventory-item.precept` via `precept_compile`: 125 diagnostics, ~73% are BUG-C or direct cascades from BUG-C (failed interpolation → failed arg parsing → cascade "not declared" errors).
+- **Plan gap found:** compound-unit interpolation (`'{StockingUnit}/{PurchaseUnit}'`) is not covered by any per-type grammar in the plan. The `unitofmeasure` type only defines `U1: H[whole-value]`; quantity Q1–Q4 have no compound-unit patterns. This blocks 4 field declarations and 2 rules.
+- BUG-B is indirectly covered by Part A + Slice 9 axis fallback (Unit→Dimension). No separate slice needed.
+- BUG-A cannot be distinguished from BUG-C cascades in this file — all event args use interpolated qualifiers. Once BUG-C ships, Slice 10 (assignment expression qualifier propagation) should handle the remaining scenarios, but explicit test coverage for args-in-expressions is recommended.
+- Sample file has its own design issues: `SupplierUnitCost` is declared `money` but used as `price` (no `MoneyTimesQuantity` operation exists); `Sku is set` on non-optional field; division by zero on `TotalInventoryCost / QuantityOnHand`.
+- Compound-unit interpolation needs a new slice (Slice 2B or Slice 2 extension) with patterns for `unitofmeasure` and `quantity` compound forms.
+
 ## Recent Updates
 
 ### 2026-05-12T00:50:06Z — Q2 derivation inference ruling recorded
