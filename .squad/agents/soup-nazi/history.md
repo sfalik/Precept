@@ -50,3 +50,8 @@
 ### 2026-05-11T20:03:33Z — ConflictingModifiers coverage recorded
 - The optional+notempty batch is now durably closed with four regression anchors for field, event-arg, and collection conflicts plus a clean `notempty`-alone case.
 - This remains the canonical assertion pattern for modifier-conflict diagnostics: `Check()` plus `ContainSingle` on the dedicated code.
+
+### 2026-05-11T22:05:37.512-04:00 — RC-1 / RC-2 regression anchors added in spike mode
+- Added parser coverage in `test/Precept.Tests/Parser/ParserInterpolatedQualifierTests.cs` using the same slot-inspection pattern as the existing type-reference parser tests: assert `QualifiedTypeReference` capture for interpolated `in` / `of` qualifiers, cover the event-arg path, and keep one malformed-unclosed-brace case pinned to `ExpectedToken`.
+- Added type-checker coverage in `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` using the file's existing `TypeCheckerTestHelpers.Check(...)` + `TypedInterpolatedTypedConstant` assertion style for Q6/Q7/Q8 compound-unit forms in field defaults and rule comparisons.
+- Edge cases locked: compound-unit qualifier holes (`'{A}/{B}'`), mixed static/dynamic unit shapes (`'{A}/each'`, `each/{B}`), combined `price in ... of ...` qualifiers, event-arg qualifier parsing, price rule RHS `'0 {Currency}/{Unit}'`, and the malformed qualifier interpolation that must stay red.

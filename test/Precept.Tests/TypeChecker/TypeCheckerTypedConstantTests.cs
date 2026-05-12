@@ -1359,6 +1359,91 @@ public class TypeCheckerTypedConstantTests
     }
 
     [Fact]
+    public void InterpolatedTypedConstant_CompoundUnitHolesInFieldDefault_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field StockingUnit as unitofmeasure default 'each'
+            field PurchaseUnit as unitofmeasure default 'kg'
+            field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}' default '1 {StockingUnit}/{PurchaseUnit}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
+        index.Fields.Single(f => f.Name == "StockingUnitsPerPurchaseUnit")
+            .DefaultExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_CompoundUnitHolesInRuleExpression_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field StockingUnit as unitofmeasure default 'each'
+            field PurchaseUnit as unitofmeasure default 'kg'
+            field StockingUnitsPerPurchaseUnit as quantity in 'each/kg' default '1 each/kg'
+            rule StockingUnitsPerPurchaseUnit > '0 {StockingUnit}/{PurchaseUnit}' because "Must be positive"
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
+        var comparison = index.Rules.Single().Condition.Should().BeOfType<TypedBinaryOp>().Subject;
+        comparison.Right.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_UnitHoleWithStaticDenominatorInFieldDefault_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field A as unitofmeasure default 'kg'
+            field Conv as quantity in '{A}/each' default '1 {A}/each'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
+        index.Fields.Single(f => f.Name == "Conv")
+            .DefaultExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_StaticNumeratorWithUnitHoleInFieldDefault_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field B as unitofmeasure default 'kg'
+            field Conv as quantity in 'each/{B}' default '1 each/{B}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
+        index.Fields.Single(f => f.Name == "Conv")
+            .DefaultExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_PriceCompoundUnitRuleExpression_ValidPrice()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field Currency as currency default 'USD'
+            field Unit as unitofmeasure default 'kg'
+            field AverageCost as price default '0 USD/kg'
+            rule AverageCost >= '0 {Currency}/{Unit}' because "Non-negative"
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
+        var comparison = index.Rules.Single().Condition.Should().BeOfType<TypedBinaryOp>().Subject;
+        comparison.Right.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Price);
+    }
+
+    [Fact]
     public void InterpolatedTypedConstant_NoExpectedType_EmitsUnresolved()
     {
         // Interpolated typed constant without expected type context → UnresolvedTypedConstant
