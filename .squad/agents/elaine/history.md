@@ -36,6 +36,11 @@
 
 ## Learnings
 
+- Hover docs (and design docs generally) need a quick-reference table at the top before anything else. Developers scan for their construct first; the table answers "is this covered?" in one glance before they read a word of prose.
+- Proof hover content benefits from an indented labeled-block structure (`Proof: [category]` → indented `Verdict/Evidence/Fix`) rather than flat labeled lines. The indentation creates a visual unit so the three pieces read together, not as three separate facts.
+- "Rendered example first, data sources second" is the correct reading order for implementation-facing design docs. The output orients the reader; the source details are reference material.
+- Constraints (rendering limits, V1 boundary, V2 deferred list) belong at the bottom of a hover design doc, not inline with each construct section. Inline placement interrupts reading flow without adding to understanding of the content.
+
 
 
 - `<unknown>` in diagnostics is a UX failure mode, not a fallback. When the proof engine can't resolve an operand name, the diagnostic should fall back to source-text excerpts or honest "cannot identify" language — never identical placeholders that give zero signal.
@@ -142,6 +147,14 @@
 - A working design doc for Shane sign-off has to carry routing rules and data-shape requirements, not just example copy. Hover UX lives or dies on precedence and available proof evidence.
 
 ## Recent Updates
+
+### 2026-05-12T17:23:52Z — Hover design doc reworked to V5
+- Applied Shane's four requirements: denser, beautiful, more understandable, proof clarity.
+- Added quick-reference table at top; moved constraints/V1 boundary to bottom; rendered examples now lead every construct section.
+- All proof-bearing constructs and scenarios now use a consistent `Proof: / Verdict: / Evidence: / Fix:` labeled-block pattern — dense, specific, no padding prose.
+- Decision record filed: `.squad/decisions/inbox/elaine-hover-redesign-2026-05-12.md`.
+
+
 
 ### 2026-05-12T13:52:04Z — Proof diagnostic UX audit is now a shipped team baseline
 - Elaine's audit locked the user-facing bar: proof diagnostics must show real operand / qualifier values, keep structured payloads for AI consumers, and pair human repair guidance with honest uncertainty rather than `<unknown>` placeholders.

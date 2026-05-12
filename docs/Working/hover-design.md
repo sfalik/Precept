@@ -1,52 +1,40 @@
 # Precept Hover Design
 
-**By:** Elaine  
-**Version:** 4  
-**Date:** 2026-05-12  
-**Status:** Revised working draft — proof hover scenarios integrated  
-**Primary surface:** VS Code markdown hover
+**By:** Elaine · **V5** · **2026-05-12** · VS Code markdown hover
 
 ---
 
-## Design Philosophy
+## Overview
 
-Hover is a fast trust surface, not an onboarding tutorial. It should answer three questions in scan order: what this construct means for the business rule, where it applies, and whether Precept proved it, checks it at runtime, or still has an unresolved gap.
+Hover is a fast trust surface. It answers: what this construct means for the business rule, where it applies, and whether Precept **proved** it, **runtime-checks** it, or has an **unresolved gap**.
 
-Lead with governed meaning, not syntax trivia. For constructs that carry authored rationale (`rule`/`ensure` via `because`, `reject` via `RejectReason`), that text leads as a blockquote. For constructs without preserved free-form rationale (`field`, `state`, `event`, `access`, transition rows, qualifiers), lead with type/kind metadata — the most meaningful structural fact available at compile time.
+Lead with governed meaning — `because` rationale as a blockquote where authored, type/kind metadata where not. For proof-bearing constructs, every hover answers: what was proved OR why it couldn't be proved, compactly. Primary reader: technically literate business author comfortable in SQL/Python, already familiar with Precept basics.
 
-Tone should be precise and quiet. Status indicators can be strong, but the surrounding copy should read like a technical advisor: statically confirmed, runtime checked, unverified.
+---
 
-### Proof hover principles
+## Construct Quick Reference
 
-1. **Verdict first, evidence second, fix third** — Every proof hover should answer in this order: what Precept proved or could not prove, what evidence it used, and what the user can do next.
-2. **AI-parseable structure** — Hover content should use a stable labeled order, not dense prose. Preferred label order: `Verdict` or `Status`, `Context`, `Expression` or `Subject`, `Requirement`, evidence lines (`Left operand`, `Right operand`, `Resolved qualifier`, `Qualifier source`, etc.), `Reason`, `Fix`.
-3. **Honest proof language** — If the engine cannot prove something, the hover says **cannot prove** or **unresolved**. It does not overstate certainty with words like **incompatible** unless the engine actually has a proved mismatch verdict.
-4. **Declaration truth and use-site truth are different** — A declaration hover explains the declaration's contract. A diagnostic hover explains the use-site failure. Do not blur them.
-5. **Hover is for quick trust, not a mini spec** — The hover should be rich enough to repair the issue, but still scan in seconds. Short labeled lines beat paragraph explanations.
+| Construct | Leading content | Proof status shown |
+|---|---|---|
+| `field` (stored) | Type · qualifier · access map · governing constraints | ⚡ Runtime checked |
+| `field` (computed) | Type · expression · governing constraints | ⚡ Runtime checked |
+| `rule` | `because` rationale · scope · referenced fields | ⚡ Runtime checked |
+| `state` | Modifiers · reachability · incoming/outgoing · write set | ✅ / ⚠️ |
+| `event` | Arg signature · eligible states | ⚡ Runtime checked |
+| transition row | Guard · actions · graph status · proof block | ✅ / ⚠️ |
+| `ensure` | `because` rationale · anchor type · scope | ⚡ Runtime checked |
+| `access` | Write-set metadata · state coverage | ✅ Proof verified |
+| `omit` | Structural absence · restore states | ✅ Proof verified |
+| `reject` | Reject reason · outcome | ⚡ Runtime checked |
+| qualifier | Resolved value · source · active uses · open issues | Per-use status |
+| qualified field (proof) | Declaration contract · open proof issues | Proof contract status |
+| binary expression (proof) | Operand evidence · result qualifier · verdict | ✅ Proved / ⚠️ Unresolved |
+| diagnostic squiggle | Proof verdict · failure evidence · fix hint | ⚠️ Unresolved / specific |
 
-## Target User Context
+---
 
-The primary reader is a technically literate business author — think analyst comfortable in SQL or Python, using VS Code by choice, and already familiar with Precept basics. They understand terms like type, nullable, constraint, guard, and validation rule. Hover should explain what Precept is doing to their business logic, not teach compiler concepts.
+## 1. `field` (stored)
 
-## VS Code Rendering Constraints
-
-Bold, blockquotes, code spans, and inline emoji render well in VS Code hover markdown. **Do not use tables, HTML, or deep nested lists** — hover width makes these degrade fast. All templates below use only safe markdown patterns.
-
-## V1 / V2 Boundary
-
-**V1 is compile-time only.** The `HoverHandler` receives only the current `Compilation` snapshot (tokens, manifest, symbols, semantics, graph, proof, diagnostics). It does not have access to an executable model, runtime descriptors, or inspect/fire/update projections. Everything in V1 templates must be derivable from compile-time artifacts.
-
-**V2 (deferred):** Runtime preview integration, event-driven mutation reach, "typical effects" summaries, prose proof-gap text, qualifier-usage indexes, and guarded-access final write maps.
-
-## Hover Design by Construct
-
-Examples use `samples/inventory-item.precept`. Each hover should spend its first lines on meaning and status; raw syntax and deeper detail come second.
-
-### 1. `field` declaration (stored)
-
-**Lead line:** Type/qualifier metadata (no free-form description available at compile time).
-
-#### Rendered example
 ```md
 **field** `ListPrice`
 ⚡ **Runtime checked** — enforced on every mutation before commit
@@ -55,21 +43,15 @@ Writable: `Listed`, `LowStock` · Read-only: `Unlisted`, `Delisted`
 Governed by: non-negative rule · positive-in-sellable ensures
 ```
 
-#### Data sources (V1)
-- Type checker: `TypedField.ResolvedType`, `Presence`, `DeclaredQualifiers` — **low cost**
-- Graph analyzer: direct-edit state lists via `SemanticIndex.AccessModes` traversal — **medium cost**
-- Proof engine: governed-by via `ProofLedger.ConstraintInfluence` (`ConstraintInfluenceEntry`) — **medium cost**
-
-#### Deferred to V2
-- Event-driven mutation reach (high cost — requires cross-referencing all transition row actions)
+**Data sources (V1):** type checker (`ResolvedType`, `Presence`, `DeclaredQualifiers`) · graph (`AccessModes` traversal) · proof (`ConstraintInfluenceEntry`)  
+**V2 deferred:** event-driven mutation reach (high cost — requires cross-referencing all transition row actions)
 
 ---
 
-### 1b. `field` declaration (computed)
+## 2. `field` (computed)
 
-Computed fields (declared with `<-`) are never directly writable. Hover suppresses the writable-state map entirely.
+Computed fields (`<-`) are never directly writable — writable-state map suppressed entirely.
 
-#### Rendered example
 ```md
 **computed field** `AverageCost`
 ⚡ **Runtime checked** — recomputed on every mutation before commit
@@ -78,53 +60,39 @@ Computed from: `TotalCost / QuantityOnHand`
 Governed by: non-negative rule
 ```
 
-#### Data sources (V1)
-- Type checker: `TypedField.ResolvedType`, expression AST — **low cost**
-- Proof engine: `ConstraintInfluenceEntry` for governing constraints — **medium cost**
+**Data sources (V1):** type checker (`ResolvedType`, expression AST) · proof (`ConstraintInfluenceEntry`)
 
 ---
 
-### 2. `rule`
+## 3. `rule`
 
-**Lead line:** `because` text (authored rationale preserved in `TypedRule.Message`). ✅ Feasible.
-
-#### Rendered example
 ```md
 **rule** `QuantityOnHand >= '0 {StockingUnit}'`
 > Stock on hand cannot go negative
 ⚡ **Runtime checked** — boolean expression on `QuantityOnHand`
 Scope: global — enforced after every mutation
-If false: the operation is rejected before commit
+If false: operation rejected before commit
 Referenced fields: `QuantityOnHand`
 ```
 
-For guarded rules:
+Guarded variant:
+
 ```md
 **rule** `when InForce: ApprovedAmount <= CoverageLimit`
 > Approved claims cannot exceed coverage while the policy is active
 ⚡ **Runtime checked** — boolean expression on `ApprovedAmount`, `CoverageLimit`
 Scope: global when `InForce`
-If false: the operation is rejected before commit
+If false: operation rejected before commit
 Referenced fields: `ApprovedAmount`, `CoverageLimit`
 ```
 
-#### Data sources (V1)
-- Type checker: expression type and operand compatibility — **low cost**
-- Proof engine: `ProofLedger.Obligations` keyed by `ConstraintContext(RuleIdentity)` — **low cost**
-- Proof engine: `ProofLedger.ConstraintInfluence` → Referenced fields/args — **low cost** (Kramer N9)
-
-#### Implementation notes
-- Use `ConstraintInfluenceEntry` for the "Referenced fields" line, NOT `TypedRule.SemanticSubjects` (currently empty — Kramer N10)
-- Rules are global data truth, not state-partitioned. Never frame scope as "all reachable states"
-- Stateless precepts have no states and rules still hold — the scope line must work without states
+**Data sources (V1):** type checker (expression type, operand compatibility) · proof (`ProofLedger.Obligations` by `ConstraintContext(RuleIdentity)`, `ConstraintInfluence`)  
+**Notes:** Use `ConstraintInfluenceEntry` for referenced fields — NOT `TypedRule.SemanticSubjects` (currently empty, Kramer N10). Rules are global data truth — never frame scope as "all reachable states." Stateless precepts have no states; scope line must work without them.
 
 ---
 
-### 3. `state`
+## 4. `state`
 
-**Lead line:** Modifiers + reachability metadata (no free-form description available at compile time).
-
-#### Rendered example
 ```md
 **state** `LowStock`
 ✅ **Proof verified** — reachable from `Listed`
@@ -135,7 +103,8 @@ Writable here: `RestockThreshold`, `Supplier`, `SupplierCurrency`, `ListPrice`
 Terminal reachable · active ensures: 3 (1 unverified)
 ```
 
-For a state with modifiers:
+With modifiers:
+
 ```md
 **state** `Approved` · `required`
 ✅ **Proof verified** — reachable; every initial→terminal path visits here
@@ -146,20 +115,12 @@ Writable here: `DisbursementDate`, `FinalAmount`
 Terminal reachable · active ensures: 2
 ```
 
-#### Data sources (V1)
-- Graph analyzer: `StateGraph.Edges`, `ReachableStates`, incoming/outgoing transitions — **low cost**
-- Graph analyzer: writable fields via `AccessModes` — **medium cost**
-- Graph analyzer: terminal reachability via dead-end analysis — **medium cost** (derivable but indirect)
-- Proof engine: active ensures by grouping `EnsuresByState` with proof obligations — **medium cost**
-- Manifest: state modifiers (`terminal`, `required`, `irreversible`, `success`, `warning`, `error`) — **low cost**
+**Data sources (V1):** graph (`StateGraph.Edges`, `ReachableStates`, `AccessModes`, dead-end analysis) · proof (`EnsuresByState` + obligations) · manifest (modifiers: `terminal`, `required`, `irreversible`, `success`, `warning`, `error`)
 
 ---
 
-### 4. `event` declaration
+## 5. `event`
 
-**Lead line:** Arg signature + fire eligibility metadata (no free-form description available at compile time).
-
-#### Rendered example
 ```md
 **event** `UpdateListPrice(Price as price)`
 ⚡ **Runtime checked** — args validated before transition
@@ -167,7 +128,8 @@ Can fire from: `Listed`, `LowStock`
 Arg: `Price` is `price` · `in CatalogCurrency` · `of SaleUnit.dimension`
 ```
 
-For an `initial` (constructor) event:
+Constructor variant:
+
 ```md
 **event** `initial CreateItem(Name as text, InitialStock as quantity)`
 ⚡ **Runtime checked** — constructor event (invoked via `CreateInstance`, not `Fire`)
@@ -175,59 +137,45 @@ Arg: `Name` is `text` · not nullable
 Arg: `InitialStock` is `quantity` · `of StockingUnit.dimension`
 ```
 
-#### Data sources (V1)
-- Type checker: `TypedEvent.Args` — types, qualifiers, nullability — **low cost**
-- Graph analyzer: `GraphEvent.HandledInStates` → "Can fire from" — **low cost**
-- Proof engine: event ensure status — **low cost**
-- Manifest: `initial` modifier — **low cost**
-
-#### Deferred to V2
-- "Typical effects" line (requires summarizing actions across all `TransitionRows` and `EventHandlers` — high-cost traversal, not a ready projection; flagged by both Frank N6 and Kramer N3)
+**Data sources (V1):** type checker (`TypedEvent.Args`) · graph (`GraphEvent.HandledInStates`) · proof (event ensure status) · manifest (`initial` modifier)  
+**V2 deferred:** "Typical effects" line — high-cost traversal, no ready projection (Frank N6, Kramer N3)
 
 ---
 
-### 5. `from ... on ... when ... ->` transition row
+## 6. Transition row (`from … on … when … ->`)
 
-**Lead line:** Guard + outcome metadata (no free-form description available at compile time).
-
-#### Rendered example
 ```md
 **transition** `from LowStock on ReceiveShipment when ... -> Listed`
 ⚠️ **Unverified** — row is reachable, but one proof obligation remains
 Guard: `PostShipmentStock > RestockThreshold`
 Actions: `set TotalCost`, `add QuantityOnHand`, `recompute AverageCost`
 Graph: source reachable · target `Listed` reachable
-Proof gap: 1 unresolved obligation (qualifier arithmetic)
+Proof: qualifier arithmetic
+  Verdict: Cannot prove — 1 unresolved obligation
+  Evidence: compound-unit quantity operands in shipment cost path
+  Fix: ensure matching qualifier axes on both sides of the arithmetic
 ```
 
-#### Data sources (V1)
-- Type checker: mutation type-safety, coercions, assignment compatibility — **low cost**
-- Graph analyzer: row reachability, target reachability — **low cost**
-- Proof engine: row-scoped obligations, qualifier constraints — **medium cost**
-- Manifest: guard expression, action order, outcome — **low cost**
-
-#### V1 vs V2 for proof gaps
-- **V1:** Show obligation count and diagnostic code/category (e.g., "1 unresolved obligation (qualifier arithmetic)")
-- **V2 (deferred):** Prose proof-gap text like "compound-unit + currency arithmetic in shipment cost path" — not precomputed, would need diagnostic-driven formatting or a new summarizer (Kramer N4)
+**Data sources (V1):** type checker (mutation type-safety, coercions) · graph (row/target reachability) · proof (row-scoped obligations, qualifier constraints) · manifest (guard, action order, outcome)  
+**V1 note:** show obligation count + diagnostic category. Prose gap text is V2 (Kramer N4).
 
 ---
 
-### 6. `ensure`
+## 7. `ensure`
 
-**Lead line:** `because` text (authored rationale preserved in `TypedEnsure.Message`). ✅ Feasible.
+Scope line varies by anchor type:
 
-**Scope line must distinguish the four anchor types** (Frank N1) — these have fundamentally different enforcement semantics:
+| Anchor | Scope text | Semantics |
+|---|---|---|
+| `in` | `Scope: residency (in Listed)` | Checked while residing in state |
+| `to` | `Scope: entry gate (to Listed)` | Checked on transitions entering state |
+| `from` | `Scope: exit gate (from Listed)` | Checked on transitions leaving state |
+| `on` | `Scope: event args (on Submit)` | Checked when event fires |
 
-| Anchor | Scope line pattern | Semantics |
-|--------|-------------------|-----------|
-| `in` | Scope: residency (`in Listed`) | Checked while residing in state |
-| `to` | Scope: entry gate (`to Listed`) | Checked on transitions entering state |
-| `from` | Scope: exit gate (`from Listed`) | Checked on transitions leaving state |
-| `on` | Scope: event args (`on Submit`) | Checked when event fires |
+*(Table is design reference — not rendered in hover. Hover uses the inline scope text.)*
 
-*(Table above is design reference only — not rendered in hover. Hover uses inline text.)*
+**Residency (`in`):**
 
-#### Rendered example — residency (`in`)
 ```md
 **ensure** `in Listed ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}'`
 > A listed product must have a positive list price
@@ -237,7 +185,8 @@ Referenced fields: `ListPrice`
 Violation rejects the operation
 ```
 
-#### Rendered example — entry gate (`to`)
+**Entry gate (`to`):**
+
 ```md
 **ensure** `to Approved ensure ApprovedAmount <= CoverageLimit`
 > Cannot enter Approved with amount exceeding coverage
@@ -247,7 +196,8 @@ Referenced fields: `ApprovedAmount`, `CoverageLimit`
 Violation rejects the transition
 ```
 
-#### Rendered example — event args (`on`)
+**Event args (`on`):**
+
 ```md
 **ensure** `on Submit ensure Amount > '0 USD'`
 > Submitted amount must be positive
@@ -257,22 +207,15 @@ Referenced args: `Amount`
 Violation rejects the event
 ```
 
-#### Data sources (V1)
-- Type checker: ensure expression type and field references — **low cost**
-- Graph analyzer: states where the ensure is active — **low cost**
-- Proof engine: `ProofLedger.Obligations` keyed by `EnsureIdentity` — **low cost**
-- Proof engine: `ProofLedger.ConstraintInfluence` → Referenced fields/args — **low cost** (Kramer N9)
-
-#### Implementation notes
-- Use `ConstraintInfluenceEntry` for referenced fields/args, NOT `TypedEnsure.SemanticSubjects` (currently empty — Kramer N10)
+**Data sources (V1):** type checker (ensure expression type, references) · graph (active states) · proof (`ProofLedger.Obligations` by `EnsureIdentity`, `ConstraintInfluence`)  
+**Note:** Use `ConstraintInfluenceEntry` for referenced fields/args — NOT `TypedEnsure.SemanticSubjects` (currently empty, Kramer N10).
 
 ---
 
-### 7. `in <State> modify <Field> editable` declaration
+## 8. `access` and `omit`
 
-**Lead line:** Write-set metadata (no free-form description available at compile time).
+**`access` (editable):**
 
-#### Rendered example
 ```md
 **access** `in Listed modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable`
 ✅ **Proof verified** — write map is structural
@@ -280,21 +223,8 @@ Editable here: `RestockThreshold`, `Supplier`, `SupplierCurrency`, `ListPrice`
 Same write set in `LowStock` · locked in `Unlisted`, `Delisted`
 ```
 
-#### Data sources (V1)
-- Type checker: referenced field existence and duplicate safety — **low cost**
-- Graph analyzer: `TypedAccessMode` raw declaration — **low cost**
-- Graph analyzer: same-write-set/locked-state summaries via scanning other access declarations — **medium cost**
+**`omit`:**
 
-#### Limitations (V1)
-- Guarded access: the final state×field write map is NOT materialized today. V1 shows the raw declaration; V2 can add computed effective maps.
-
----
-
-### 7b. `in <State> omit <Field>` declaration
-
-`omit` means the field is **structurally absent** in that state — not just read-only. This is semantically distinct from `editable`/locked access.
-
-#### Rendered example
 ```md
 **omit** `in Unlisted omit ListPrice`
 ✅ **Proof verified** — field is structurally absent in `Unlisted`
@@ -302,17 +232,13 @@ Same write set in `LowStock` · locked in `Unlisted`, `Delisted`
 Restored on transition to: `Listed`, `LowStock`
 ```
 
-#### Data sources (V1)
-- Manifest: omit declaration — **low cost**
-- Graph analyzer: which transitions restore the field (states where it's not omitted) — **medium cost**
+**Data sources (V1):** type checker (field existence, duplicate safety) · graph (`TypedAccessMode`, same-write-set/locked-state summaries, restore-transition scan) · manifest (omit declaration)  
+**V1 limit:** guarded-access final write map not materialized — V1 shows raw declaration only.
 
 ---
 
-### 8. `reject "message"`
+## 9. `reject`
 
-**Lead line:** `RejectReason` (authored text preserved on the reject row). ✅ Feasible.
-
-#### Rendered example
 ```md
 **reject** `from Listed on FulfillOrder -> reject`
 > Insufficient stock to fulfill this order
@@ -320,448 +246,266 @@ Restored on transition to: `Listed`, `LowStock`
 Result: state unchanged · no field mutations commit
 ```
 
-#### Data sources (V1)
-- Manifest: `RejectReason` text — **low cost**
-- Graph analyzer: row reachability — **low cost**
-
-#### V1 vs V2 for row ordering
-- **V1:** Show the reject reason and outcome. Omit the "selected when no earlier guard matches" line — it requires ordered row analysis for the same `(state, event)` pair plus wildcard-row handling, which has no existing projection (Kramer N6).
-- **V2:** Add "Selected when: no earlier `<Event>` row guard matches" once ordered-row analysis is available.
+**Data sources (V1):** manifest (`RejectReason`) · graph (row reachability)  
+**V2 deferred:** "Selected when: no earlier guard matches" — requires ordered-row analysis (Kramer N6).
 
 ---
 
-### 9. Qualifier expressions (`of ...`, `in ...`)
+## 10. Qualifier (`of …`, `in …`)
 
-**Lead line:** Resolved qualifier evidence + active proof usage metadata.
-
-#### Rendered example
 ```md
 **qualifier** `in '{CatalogCurrency}'`
-
 Status: Active in 3 proof-checked uses · 1 unresolved use
 Axis: Currency
 Declared form: `in '{CatalogCurrency}'`
 Resolved value: `'{CatalogCurrency}'`
 Resolved source: field `CatalogCurrency`
 Resolved value shape: symbolic currency qualifier
-
 Compatibility rule:
 - money operands used together must share the same Currency qualifier
 - qualifier-preserving operations keep this qualifier in the result
-
 Open proof issues:
 - computed field `GrossProfit` — PRE0114 on `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
 ```
 
-#### Data sources (V1)
-- `QualifierHoverInfo`: `Axis`, `Span`, `Label`, `OwnerType`, `ResolvedQualifier` — **low cost**
-- Type checker / semantic model: declared qualifier text, resolved qualifier value, symbolic qualifier source — **medium cost**
-- Proof engine: active proof-checked use count, unresolved uses, qualifier-preserving strategy context — **medium cost**
-
-#### Implementation notes
-- Show resolved value, resolved source field, and open proof issues as separate labeled lines — do not collapse them into prose.
-- If unresolved uses exist, do not force an always-positive `Proof verified` tone; this card is a live contract surface, not glossary text.
+**Data sources (V1):** `QualifierHoverInfo` (Axis, Span, Label, OwnerType, ResolvedQualifier) · type checker (declared/resolved qualifier, symbolic source) · proof (active use counts, unresolved uses, qualifier-preserving strategy)  
+**Note:** Show resolved value, source, and open issues as **separate labeled lines** — never collapsed into prose. Do not force a `Proof verified` tone if unresolved uses exist.
 
 ---
 
 ## Proof Hover Scenarios
 
-### Scenario 1: Hovering a qualified field
+### Scenario 1: Qualified field
 
-Example declaration:
-
-```precept
-field TotalRevenue as money in '{CatalogCurrency}'
-```
-
-#### Trigger condition
-The cursor is on a **field identifier** whose declaration includes at least one qualifier.
-
-#### Hover card structure
-Field identity stays first, but a proof block is added directly into the existing field hover.
-
-Recommended order:
-1. field label
-2. status line
-3. type
-4. declared qualifier
-5. resolved qualifier
-6. qualifier source
-7. proof contract
-8. open proof issues summary
-
-#### Recommended base card
+> **Trigger:** cursor on a field identifier with at least one declared qualifier
 
 ```md
 **field** `TotalRevenue`
-
-Status: Proof contract active · No active proof issues
 Type: `money`
-Declared qualifier: `in '{CatalogCurrency}'`
-Resolved qualifier: `'{CatalogCurrency}'`
-Qualifier source: field `CatalogCurrency`
-
-Proof contract:
-- money arithmetic and comparisons require matching Currency qualifiers
-- qualifier-preserving operations keep this qualifier in the result
-
-Open proof issues: none
+Proof: Currency qualifier contract
+  Verdict: Active — no open issues
+  Declared qualifier: `in '{CatalogCurrency}'`
+  Resolved value: `'{CatalogCurrency}'`
+  Qualifier source: field `CatalogCurrency`
 ```
 
-#### Proof status variants
-
-##### Variant A — No active proof issues
-Use when the field participates in proof-relevant operations but there are no unresolved obligations tied to current uses.
+**Variant B — unresolved uses:**
 
 ```md
-Status: Proof contract active · No active proof issues
-Open proof issues: none
+Proof: Currency qualifier contract
+  Verdict: Active — 2 unresolved uses
+  Declared qualifier: `in '{CatalogCurrency}'`
+  Resolved value: `'{CatalogCurrency}'`
+  Qualifier source: field `CatalogCurrency`
+  Open issues: computed field `GrossProfit` · transition `from Draft on Approve`
 ```
 
-##### Variant B — `N` unresolved uses
-Use when current proof diagnostics or unresolved obligations reference this field at one or more use sites.
+**Variant C — proved:**
 
 ```md
-Status: Proof contract active · 2 unresolved uses
-Open proof issues:
-- computed field `GrossProfit`
-- transition `from Draft on Approve -> transition Approved`
+Proof: Currency qualifier contract
+  Verdict: Proved via qualifier-preserving operations
+  Declared qualifier: `in '{CatalogCurrency}'`
+  Resolved value: `'{CatalogCurrency}'`
+  Qualifier source: field `CatalogCurrency`
 ```
 
-##### Variant C — Proved via qualifier-preserving operations
-Use when the field is currently used in proof-bearing expressions that all discharge through a known qualifier-preserving strategy.
+> The field hover tells the user what contract this field carries. The diagnostic hover tells them where that contract failed to prove. Do not show failure tone on the declaration hover unless the declaration itself is the failing span. Do not collapse declared form, resolved value, and source into one sentence.
 
-```md
-Status: Proof contract active · Proved via qualifier-preserving operations
-Open proof issues: none
-```
-
-#### What data is needed from the runtime / semantic model
-- `TypedField.Name`, `ResolvedType`, `DeclaredQualifiers`, `Qualifier`, `NameSpan`
-- declaration syntax snippet for the authored qualifier text
-- resolved qualifier value for the relevant axis
-- symbolic qualifier source, if the qualifier resolves through another field or symbolic path
-- proof-usage summary for this field's current use sites
-- proof strategy labels for proved uses, if surfaced in aggregate form
-
-**Implementation note:** current field hover already has most declaration data. The missing piece is the join from a field declaration to proof-bearing uses and unresolved obligations.
-
-#### What NOT to show
-- do **not** say the field declaration is broken when the failure is only at a use site
-- do **not** show a red-failure tone on the declaration hover unless the declaration itself is the failing span
-- do **not** collapse declared form, resolved value, and source into one sentence
-- do **not** show generic qualifier education text before the field's actual proof contract
-
-> The field hover should tell the user what contract this field carries. The diagnostic hover tells them where that contract failed to prove.
+**Data needed:** `TypedField.Name`, `ResolvedType`, `DeclaredQualifiers`, `Qualifier`, `NameSpan` · resolved qualifier value + symbolic source · proof-usage summary (the missing join from declaration to open obligations).
 
 ---
 
-### Scenario 2: Hovering a binary expression with proof obligations
+### Scenario 2: Binary expression with proof obligations
 
-Example expression:
+> **Trigger:** cursor on operator or operand inside a `TypedBinaryOp` with at least one proof obligation. Target the **smallest proof-bearing binary expression** at the cursor — not the generic operator.
 
-```precept
-GrossProfit <- TotalRevenue - TotalReturns
-```
-
-#### Trigger condition
-The cursor is on an operator or operand inside a `TypedBinaryOp` whose node has at least one proof obligation, or whose span overlaps a proof-stage fault site / diagnostic.
-
-#### Routing rule for this scenario
-The hover should target the **smallest proof-bearing binary expression** at the cursor, not the generic operator metadata.
-
-#### Hover card structure
-Use this order:
-1. expression label
-2. status / verdict
-3. context
-4. requirement
-5. left operand evidence
-6. right operand evidence
-7. result type
-8. result qualifier
-9. proof strategy or failure reason
-10. fix
-
-#### Proved state hover card
+**Proved:**
 
 ```md
 **expression** `(TotalRevenue - TotalReturns)`
-
-Status: Proved
-Context: computed field `GrossProfit`
-Requirement: both operands must resolve to the same Currency qualifier
-Left operand: `TotalRevenue`
-Left qualifier: `'{CatalogCurrency}'`
-Right operand: `TotalReturns`
-Right qualifier: `'{CatalogCurrency}'`
-Result type: `money`
-Result qualifier: `'{CatalogCurrency}'`
-Proof strategy: same-qualifier propagation
+Proof: Currency qualifier propagation
+  Verdict: Proved — same-qualifier propagation
+  Left: `TotalRevenue` · qualifier `'{CatalogCurrency}'`
+  Right: `TotalReturns` · qualifier `'{CatalogCurrency}'`
+  Result type: `money` · qualifier `'{CatalogCurrency}'`
 ```
 
-#### Unproved state hover card
+**Unresolved:**
 
 ```md
 **expression** `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
-
-Status: Unresolved proof obligation
-Context: computed field `GrossProfit`
-Requirement: both operands must resolve to the same Currency qualifier
-Left operand: `(TotalRevenue - TotalReturns)`
-Left qualifier: not proved at this site
-Right operand: `TotalCostOfGoods`
-Right qualifier: `'{CatalogCurrency}'`
-Result type: `money`
-Result qualifier: unresolved
-Reason: qualifier preservation for the left subexpression is not proved here
-Fix: align qualifier sources or use an explicit conversion / explicit intermediate field
+Proof: Currency qualifier propagation
+  Verdict: Cannot prove — left subexpression qualifier not proved at this site
+  Left: `(TotalRevenue - TotalReturns)` · qualifier: not proved here
+  Right: `TotalCostOfGoods` · qualifier `'{CatalogCurrency}'`
+  Result type: `money` · qualifier: unresolved
+  Fix: align qualifier sources or insert an explicit conversion / intermediate field
 ```
 
-#### What data is needed
-- `TypedBinaryOp.Left`
-- `TypedBinaryOp.Right`
-- `TypedBinaryOp.ResultType`
-- `TypedBinaryOp.ResultQualifier`
-- `TypedBinaryOp.ProofRequirements`
-- `TypedBinaryOp.Span`
-- matching `ProofObligation` entry or entries from `ProofLedger`
-- proof disposition and strategy
-- resolved left/right qualifier values at this exact expression site
-- expression context (for example `FieldExpressionContext(TypedField)`)
+> This is the flagship proof card — where the user expects Precept to explain itself. Do not show generic operator help when a proof-bearing `TypedBinaryOp` is present. Do not show only `1 unresolved obligation` — the card must name the requirement and evidence.
 
-**Important nuance:** `ResultQualifier` describes the propagation rule, not necessarily the fully humanized resolved value. The hover needs a resolution step, not just the raw DU case.
-
-#### What NOT to do
-- do not show generic operator help when a proof-bearing `TypedBinaryOp` is present
-- do not show only `1 unresolved obligation`; the card must name the requirement and evidence
-- do not surface raw type-checker object names like `TypedBinaryOp` or `QualifierBinding` in user-facing copy
-
-> The expression hover is the flagship proof card. This is where the user expects Precept to explain itself.
+**Data needed:** `TypedBinaryOp.Left/Right/ResultType/ResultQualifier/ProofRequirements/Span` · matching `ProofObligation` from `ProofLedger` · proof disposition and strategy · resolved left/right qualifier values at this site · expression context (`FieldExpressionContext(TypedField)`)  
+**Note:** `ResultQualifier` describes the propagation rule, not the humanized resolved value — the hover needs a resolution step, not just the raw DU case.
 
 ---
 
-### Scenario 3: Hovering the diagnostic squiggle (`PRE0114` and other proof codes)
+### Scenario 3: Diagnostic squiggle
 
-#### Trigger condition
-The cursor is within the span of a **proof-stage diagnostic**.
+> **Trigger:** cursor within the span of a proof-stage diagnostic. **Diagnostic hover wins over all other hovers at this position.**
 
-#### Design rule
-The squiggle hover must be **richer than the Problems panel**.
+Problems panel gives one-line verdicts for scanning. Hover gives a mini proof card for diagnosis and repair. Never compress proof context into inline parentheses in hover.
 
-- **Problems panel:** one-line verdict for list scanning
-- **Hover:** mini proof card for local diagnosis and repair
-
-#### Formatting rule
-Use labeled multiline fields in hover. Do **not** compress proof context into inline parentheses.
-
-| Surface | Format | Purpose |
-|---|---|---|
-| Problems panel | compact one-line message; inline square-bracket metadata is acceptable | scan many diagnostics quickly |
-| Hover | multiline labeled proof card | understand one proof failure deeply |
-
-#### Complete hover card example — `PRE0114`
+**PRE0114 — Currency qualifier mismatch:**
 
 ```md
 **PRE0114 — Cannot prove Currency qualifier compatibility**
-
-Verdict: Cannot prove both operands resolve to the same Currency qualifier
-Context: computed field `GrossProfit`
-Expression: `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
-Requirement: both operands must resolve to the same Currency qualifier
-Left operand: `(TotalRevenue - TotalReturns)`
-Left qualifier: not proved at this site
-Left qualifier source: unresolved
-Right operand: `TotalCostOfGoods`
-Right qualifier: `'{CatalogCurrency}'`
-Right qualifier source: field `CatalogCurrency`
-Status: unresolved
-Reason: the nested subtraction result is not currently proved qualifier-preserving here
-Fix:
-- make both operands resolve through the same qualifier path
-- or insert an explicit conversion / explicit intermediate field
+Proof: Currency qualifier compatibility
+  Verdict: Cannot prove — nested subtraction result not proved qualifier-preserving here
+  Context: computed field `GrossProfit`
+  Expression: `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
+  Left: `(TotalRevenue - TotalReturns)` · qualifier: unresolved
+  Right: `TotalCostOfGoods` · qualifier `'{CatalogCurrency}'` from field `CatalogCurrency`
+  Fix: align qualifier paths or insert an explicit conversion / intermediate field
 ```
 
-#### Complete hover card example — `PRE0116` (presence requirement)
+**PRE0116 — Presence requirement:**
 
 ```md
 **PRE0116 — Cannot prove presence**
-
-Verdict: Cannot prove `TrackingNumber` is present before this access
-Context: computed field `ShipmentSummary`
-Expression: `TrackingNumber.length`
-Requirement: optional fields must be proved present before access
-Subject: `TrackingNumber`
-Declared presence: optional
-Status: unresolved
-Reason: no guard or earlier assignment proves the field is set on this path
-Fix:
-- guard the usage with `when TrackingNumber is set`
-- initialize the field earlier on every reachable path
-- or remove `optional` if the field should always be present
+Proof: Optional field access guard
+  Verdict: Cannot prove `TrackingNumber` is present before this access
+  Context: computed field `ShipmentSummary`
+  Expression: `TrackingNumber.length`
+  Subject: `TrackingNumber` · declared `optional`
+  Fix: guard with `when TrackingNumber is set`, initialize on all paths, or remove `optional`
 ```
-
-#### Additional design notes
-- Show the diagnostic code in the first line.
-- Use the hover to expand evidence that would be too noisy in the Problems list.
-- If the same span has both a proof diagnostic and generic construct hover, the diagnostic hover wins.
 
 ---
 
 ## Status Indicators
 
-- `✅ Proof verified` — statically established for the hovered construct.
-- `⚡ Runtime checked` — enforced on every mutation before commit, not fully pre-proved.
-- `⚠️ Unverified` — a relevant proof or analysis obligation is still unresolved.
+| Badge | Meaning |
+|---|---|
+| ✅ **Proof verified** | Statically established for the hovered construct |
+| ⚡ **Runtime checked** | Enforced on every mutation before commit — not pre-proved |
+| ⚠️ **Unverified** | A relevant proof or analysis obligation is still unresolved |
 
-Note: "Runtime checked" means enforcement happens at mutation time. Inspection (`Inspect`) is a non-mutating preview — it evaluates constraints but does not enforce (does not reject or commit). Status indicators describe enforcement semantics, not preview behavior.
+> "Runtime checked" describes enforcement at mutation time. `Inspect` is a non-mutating preview — it evaluates constraints but does not enforce. Badges describe enforcement semantics, not preview behavior.
 
 ---
 
-## Implementation Notes for Kramer
+## Routing Rules
 
-### Hover routing / precedence rules
+| Priority | Target | Card returned |
+|---|---|---|
+| 1 | Proof diagnostic span | Diagnostic proof card |
+| 2 | `TypedBinaryOp` with proof obligation | Expression proof card |
+| 3 | Construct declaration span | Rich construct card |
+| 4 | Field identifier with declared qualifier | Field symbol + proof block (combined) |
+| 5 (fallback) | Any other position | Generic operator / function / type card |
 
-Kramer should implement these routing rules explicitly.
+**Routing notes:**
+- Qualifier hover (`TryCreateQualifierHover`) remains the qualifier-syntax entry point, but the card content becomes proof-aware.
+- Qualified-field hover stays **one combined card** — declaration identity and proof contract together.
 
-1. **Proof diagnostic span wins over all other hovers.**  
-   If the position falls within a proof diagnostic span, return the proof diagnostic hover first.
+---
 
-2. **Proof-bearing binary expression wins over generic operator hover.**  
-   If the position is on a `TypedBinaryOp` with an associated proof obligation or proof diagnostic, return the expression proof hover instead of the generic operator hover.
+## Constraints
 
-3. **Qualified-field proof hover supplements field symbol hover.**  
-   If the position is on a field identifier with a declared qualifier, run the field proof augmentation after symbol identification and render one combined field card.
+### Rendering (VS Code)
 
-4. **Qualifier hover is upgraded, not replaced.**  
-   `TryCreateQualifierHover(...)` remains the qualifier-syntax entry point, but the card content becomes proof-aware.
+Bold, blockquotes, code spans, and inline emoji render well. **Do not use tables, HTML, or deep nested lists** — hover width degrades them fast. All templates above use safe markdown patterns only.
 
-#### Recommended routing order
+### V1 Boundary (compile-time only)
 
-| Proposed order | Reason |
-|---|---|
-| Proof diagnostic hover | most specific and most urgent |
-| Proof-bearing expression hover | direct proof explanation at the operator/expression |
-| Rich construct hover | existing rule/ensure/transition/access/omit content |
-| Symbol hover with qualified-field proof block | declaration contract explanation |
-| Generic operator / function / type hover | fallback only when no proof context exists |
+`HoverHandler` receives only the current `Compilation` snapshot. Everything in V1 templates must be derivable from compile-time artifacts.
 
-### Available data (V1 — compile-time only)
-- `SemanticIndex`: fields, states, events, rules, ensures, access modes, transition rows, span-to-construct refs, qualifier bindings.
-- Type-check results: declared type, nullability, coercions, expression compatibility, mutation assignment safety.
-- `StateGraph`: reachability, dead states, incoming/outgoing counts, event coverage, terminal reachability.
-- `ProofLedger` + diagnostics: per-construct status, `ConstraintInfluenceEntry` (not SemanticSubjects), unresolved obligations, related spans.
-- Manifest: modifiers, guard expressions, action sequences, reject reasons, omit declarations.
+**Available in V1:**
+- `SemanticIndex`: fields, states, events, rules, ensures, access modes, transition rows, qualifier bindings
+- Type-check results: declared type, nullability, coercions, mutation assignment safety
+- `StateGraph`: reachability, dead states, transitions, terminal reachability
+- `ProofLedger` + diagnostics: per-construct status, `ConstraintInfluenceEntry`, unresolved obligations
+- Manifest: modifiers, guard expressions, action sequences, reject reasons, omit declarations
 
-### NOT available in V1
-- No executable model or runtime descriptors
-- No inspect/fire/update projections
-- No ordered mutation summaries from evaluator
-- No qualifier-usage index (cross-field qualifier scan)
-- No precomputed prose proof-gap text
-- No guarded-access final write maps
+**Not available in V1:** executable model or runtime descriptors · inspect/fire/update projections · ordered mutation summaries · qualifier-usage index · precomputed prose proof-gap text · guarded-access final write maps
+
+### V2 Deferred
+
+1. Event "typical effects" summary (Frank N6, Kramer N3)
+2. Prose proof-gap text (Kramer N4)
+3. Qualifier "applied to" line — requires usage index (Kramer N7)
+4. Event-driven mutation reach on field hover (Kramer N1)
+5. Reject row ordering context (Kramer N6)
+6. Guarded-access final write maps (Kramer N5)
+7. Runtime preview integration
+
+---
+
+## Implementation Notes (Kramer)
 
 ### Derived projections (V1)
 - `ConstructAtPosition` — resolve hover target
-- `FieldWriteMapByState` — via AccessModes traversal (medium cost)
+- `FieldWriteMapByState` — via `AccessModes` traversal (medium cost)
 - `ConstraintInfluenceSummary` — from `ConstraintInfluenceEntry` (medium cost)
-- `HoverStatusBadge` — from ProofLedger obligations
+- `HoverStatusBadge` — from `ProofLedger.Obligations`
 
-### V1 delivery boundary
-- Markdown only — no rich hover actions
-- All data from `Compilation` snapshot
-- Proof status from `ProofLedger.Obligations` and diagnostics
-- Referenced fields/args from `ConstraintInfluenceEntry`
-- Shape DTOs for V2 extensibility but do not block V1 on runtime integration
+### Helper APIs needed
 
+```csharp
+TryFindProofDiagnosticAtPosition(Compilation, Position, out Diagnostic, out ProofObligation?)
+TryFindProofBearingExpressionAtPosition(Compilation, Position, out TypedExpression, out ImmutableArray<ProofObligation>)
+ResolveQualifierEvidence(TypedExpression, QualifierAxis, Compilation) → (value, source, state)
+GetProofUsesForField(TypedField, Compilation) → open/clean use summary
+HumanizeProofStrategy(ProofStrategy)
+```
 
-### Data model requirements
+> If the ledger cannot provide a truthful `Verdict` or failure explanation, the hover falls back to a precise generic explanation — never invents specificity.
 
-This section is intentionally honest about what appears to exist now versus what likely needs new shaping.
+### Data model availability
 
-#### From `Compilation`
+**From `Compilation`:**
 
-| Need | Current availability | Notes |
-|---|---|---|
-| current token / position context | **Available** via `Compilation.Tokens` | already used by `HoverHandler` |
-| semantic declarations and expressions | **Available** via `Compilation.Semantics` | already used by current hovers |
-| proof ledger | **Available** via `Compilation.Proof` | includes obligations, fault-site links, diagnostics |
-| diagnostics at a span | **Available** via `Compilation.Diagnostics` | `RichHoverFactory.GetDiagnosticsOverlapping(...)` already does overlap filtering |
-| direct helper: proof diagnostic at cursor → matching obligation | **Not exposed as a helper** | today implementation appears to infer by overlapping span/code; a dedicated helper would be safer `[needs George to verify]` |
+| Need | Status |
+|---|---|
+| Token / position context | **Available** — `Compilation.Tokens` |
+| Semantic declarations and expressions | **Available** — `Compilation.Semantics` |
+| Proof ledger | **Available** — `Compilation.Proof` |
+| Diagnostics at a span | **Available** — `RichHoverFactory.GetDiagnosticsOverlapping(...)` |
+| Proof diagnostic at cursor → matching obligation | **Not exposed as helper** — inferred by overlapping span/code; dedicated helper safer `[George verify]` |
 
-#### From `SemanticIndex`
+**From `SemanticIndex`:**
 
-| Need | Current availability | Notes |
-|---|---|---|
-| field declaration qualifiers | **Available** on `TypedField.DeclaredQualifiers` | enough for authored contract |
-| field qualifier behavior | **Available** on `TypedField.Qualifier` | helpful for declaration hover; not the full resolved story |
-| binary expression proof requirements | **Available** on `TypedBinaryOp.ProofRequirements` | direct signal for Scenario 2 |
-| binary result qualifier propagation rule | **Available** on `TypedBinaryOp.ResultQualifier` | needs humanization for hover |
-| smallest expression at cursor | **Available** via `SemanticExpressionLocator.TryFindExpressionAt(...)` | currently used for operator/accessor/function hover |
-| qualifier value resolution for arbitrary expression/site | **Not exposed as a public hover helper** | current proof engine has internal resolution helpers; hover likely needs an extracted/shared resolver `[needs George to verify]` |
-| qualifier usage index: declaration → use sites / open issues | **Not obvious in current model** | may need a derived language-server helper rather than a core-model addition `[needs George to verify]` |
-| symbolic source extraction for qualifier value | **Partially present** | `RichHoverFactory.TryGetQualifierResolvedSource(...)` handles some declaration cases, but expression-site proof hover needs the same answer for operands too |
+| Need | Status |
+|---|---|
+| Field declaration qualifiers | **Available** — `TypedField.DeclaredQualifiers` |
+| Field qualifier behavior | **Available** — `TypedField.Qualifier` |
+| Binary expression proof requirements | **Available** — `TypedBinaryOp.ProofRequirements` |
+| Binary result qualifier propagation rule | **Available** — `TypedBinaryOp.ResultQualifier` (needs humanization) |
+| Smallest expression at cursor | **Available** — `SemanticExpressionLocator.TryFindExpressionAt(...)` |
+| Qualifier value resolution for expression/site | **Not public** — needs extracted resolver `[George verify]` |
+| Qualifier usage index: declaration → use sites | **Not obvious** — may need language-server helper `[George verify]` |
+| Symbolic source extraction for qualifier value | **Partial** — `RichHoverFactory.TryGetQualifierResolvedSource(...)` covers declaration cases; expression-site needs same |
 
-#### From `ProofLedger`
+**From `ProofLedger`:**
 
-| Need | Current availability | Notes |
-|---|---|---|
-| proof obligations with site + context | **Available** on `ProofLedger.Obligations` | includes `Requirement`, `Site`, `Context`, `Disposition`, `Strategy`, `EmittedDiagnostic` |
-| fault-site links | **Available** on `ProofLedger.FaultSiteLinks` | likely useful for diagnostic-hover routing |
-| proof verdict | **Available** as `ProofDisposition` | `Proved` vs `Unresolved` |
-| proof strategy | **Available** as `ProofStrategy?` | good input for proved hovers |
-| explicit unresolved reason text | **Not visible in the current ledger model** | current model appears to give verdict but not a user-ready failure explanation `[needs George to verify]` |
-| stable join between diagnostic hover and exact obligation | **Partially inferable** | probably joinable by span + code + site, but this should be confirmed before implementation `[needs George to verify]` |
-
-#### Minimum helper APIs the hover path likely needs
-
-Recommended helper layer for Kramer:
-- `TryFindProofDiagnosticAtPosition(Compilation compilation, Position position, out Diagnostic diagnostic, out ProofObligation? obligation)`
-- `TryFindProofBearingExpressionAtPosition(Compilation compilation, Position position, out TypedExpression expression, out ImmutableArray<ProofObligation> obligations)`
-- `ResolveQualifierEvidence(TypedExpression expression, QualifierAxis axis, Compilation compilation)` → resolved value, source, resolution state
-- `GetProofUsesForField(TypedField field, Compilation compilation)` → current open/clean use summary
-- `HumanizeProofStrategy(ProofStrategy strategy)`
-
-> If the current core model does not expose enough information for a truthful `Reason:` line, the hover should fall back to a precise generic explanation instead of inventing one.
+| Need | Status |
+|---|---|
+| Proof obligations with site + context | **Available** — `ProofLedger.Obligations` (`Requirement`, `Site`, `Context`, `Disposition`, `Strategy`, `EmittedDiagnostic`) |
+| Fault-site links | **Available** — `ProofLedger.FaultSiteLinks` |
+| Proof verdict | **Available** — `ProofDisposition` (`Proved` / `Unresolved`) |
+| Proof strategy | **Available** — `ProofStrategy?` |
+| Explicit unresolved reason text | **Not visible** — current model gives verdict not user-ready explanation `[George verify]` |
+| Stable diagnostic ↔ obligation join | **Partially inferable** — joinable by span + code + site; confirm before implementation `[George verify]` |
 
 ---
 
-## V2 Aspirations (Deferred)
+## Open Questions
 
-These items are explicitly out of scope for V1 but should inform DTO design:
-
-1. **Event "typical effects" summary** — cross-referencing all transition rows per event (Frank N6, Kramer N3)
-2. **Prose proof-gap text** — natural-language summarization of unresolved obligations (Kramer N4)
-3. **Qualifier "applied to" line** — requires qualifier-usage index (Kramer N7)
-4. **Event-driven mutation reach** on field hover — high-cost traversal (Kramer N1)
-5. **Reject row ordering context** — "selected when no earlier guard matches" (Kramer N6)
-6. **Guarded access final write maps** — not materialized (Kramer N5)
-7. **Runtime preview integration** — fire/inspect/update projections layered onto hover
-
----
-
-## Open Questions for Shane
-
-### General
-
-1. **Inline warnings:** when a construct already has a diagnostic squiggle, should hover repeat the unresolved proof gap inline? My recommendation: yes — one short sentence.
-2. **Status wording:** keep `Proof verified` / `Runtime checked` / `Unverified` as the visible labels, or rename them? My recommendation: keep them.
-3. **V1 boundary:** markdown only, or reserve hooks for richer hover actions later? My recommendation: ship markdown now, but shape DTOs for richer follow-ons.
-4. **Demo mix:** should hover demos intentionally show both `✅` and `⚠️` states? My recommendation: yes — it demonstrates honest status reporting.
-
-### Proof hover
-
-1. **Proved hovers show proof strategy on a dedicated line.**  
-   Example: `Proof strategy: same-qualifier propagation`. This is valuable, but it is more implementation-detail-forward than today's hover tone.
-
-2. **Qualified-field hover stays one combined card rather than splitting into separate symbol and proof cards.**  
-   This keeps declaration identity and proof contract together, but it makes field hover denser.
-
-3. **Qualifier hover shows current open proof issues, not just static qualifier semantics.**  
-   This makes the syntax hover operational, but it does turn a declaration-syntax hover into a program-state summary.
-
-4. **Unresolved proof hovers prefer an honest generic reason over false specificity when the ledger cannot provide a concrete failure explanation.**  
-   Example fallback: `Reason: qualifier preservation is not proved here` rather than guessed internals.
-
-5. **Proof hover wins even when it suppresses otherwise-useful generic operator documentation.**  
-   This is the right UX for proof as a flagship surface, but it is a real routing tradeoff.
+1. **Inline warnings:** when a construct has a diagnostic squiggle, repeat the proof gap inline in hover? Recommendation: yes — one short sentence.
+2. **Status wording:** keep `Proof verified` / `Runtime checked` / `Unverified`? Recommendation: keep.
+3. **V1 boundary:** markdown only, or reserve hooks for richer hover actions? Recommendation: ship markdown now, shape DTOs for follow-on.
+4. **Demo mix:** show both ✅ and ⚠️ states in hover demos? Recommendation: yes — demonstrates honest status reporting.
+5. **Proof strategy line on proved hovers** — `Proof strategy: same-qualifier propagation` is valuable but implementation-forward. Confirm tone with Shane.
+6. **Qualifier hover shows open proof issues**, not just static semantics — turns a declaration-syntax hover operational. Confirm scope.
+7. **Proof hover wins over generic operator docs** — right for proof as flagship surface, but a real routing tradeoff.

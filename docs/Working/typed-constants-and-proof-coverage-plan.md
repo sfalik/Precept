@@ -1,6 +1,6 @@
 # Typed Constants & Proof Coverage Plan
 
-**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1 ✅ Done | F2 ✅ Done | F3 ✅ Done | **F4 reframed** (policy exists; blocked on H1+H2), F5 blocked on H1+H2 | Part G — G1 ✅ Done (`cb4fbf57`), G2 ✅ Done (2026-05-12T13:10:03.666-04:00) | **Part H — BUG-C reframed:** syntax already works; H1 ✅ Done, H2 ✅ Done, H3 ✅ Done
+**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–12 ✅ Done, Slice 11B ✅ Done, Slice 13 ⛔ Closed | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1 ✅ Done | F2 ✅ Done | F3 ✅ Done | F4 ✅ Done | F5 🔲 In Progress | Part G — G1 ✅ Done (`cb4fbf57`), G2 ✅ Done (2026-05-12T13:10:03.666-04:00) | **Part H — BUG-C reframed:** syntax already works; H1 ✅ Done, H2 ✅ Done, H3 ✅ Done
 
 ### Slice Status Tracker
 
@@ -21,7 +21,7 @@
 | 10 | Assignment Expression Qualifier Propagation (G7) | ✅ Already Implemented |
 | 11 | Exchange Rate Assignment Qualifier Validation (G9) | ✅ Already Implemented |
 | 11B | Temporal Price Denominator Type System Extension (G8 + G13 prereq) | ✅ Complete (2026-05-11) |
-| 12 | Temporal Chain Validation (G8 + G13) | 🔲 Not Started — **unblocked by 11B** |
+| 12 | Temporal Chain Validation (G8 + G13) | ✅ Done (`302d53e1`, verified 2026-05-12T13:41:08.101-04:00) |
 | 13 | Derivation-Direction Chain Proof Analysis (G15) | ⛔ Closed — No Action Required |
 | **Part C — Inventory-Item Compile Fixes** | | |
 | C1 | Dimension Cancellation in TypeChecker | ✅ Done |
