@@ -879,12 +879,12 @@ internal static partial class TypeChecker
     private static bool HasKeywordTokenMeta(string text, Func<TokenMeta, bool> predicate) =>
         Tokens.Keywords.TryGetValue(text, out var kind) && predicate(Tokens.GetMeta(kind));
 
-    private readonly record struct ResolvedStateTarget(string? StateName, SourceSpan Span);
+    private readonly record struct ResolvedStateTarget(string StateName, SourceSpan Span, bool IsWildcard);
 
     private static ImmutableArray<ResolvedStateTarget> ResolveStateTargets(StateTargetSlot? stateSlot, CheckContext ctx)
     {
         if (stateSlot is null || stateSlot.StateNames.IsDefaultOrEmpty)
-            return [new ResolvedStateTarget(null, stateSlot?.Span ?? SourceSpan.Missing)];
+            return [new ResolvedStateTarget("any", stateSlot?.Span ?? SourceSpan.Missing, IsWildcard: true)];
 
         var wildcardEntries = ImmutableArray.CreateBuilder<ResolvedStateTarget>();
         for (var i = 0; i < stateSlot.StateNames.Length; i++)
@@ -892,7 +892,7 @@ internal static partial class TypeChecker
             var stateName = stateSlot.StateNames[i];
             var nameSpan = i < stateSlot.NameSpans.Length ? stateSlot.NameSpans[i] : stateSlot.NameSpan;
             if (HasKeywordTokenMeta(stateName, meta => meta.IsStateWildcard))
-                wildcardEntries.Add(new ResolvedStateTarget(null, nameSpan));
+                wildcardEntries.Add(new ResolvedStateTarget(stateName, nameSpan, IsWildcard: true));
         }
 
         if (wildcardEntries.Count > 0)
@@ -921,12 +921,12 @@ internal static partial class TypeChecker
 
             if (ctx.StateLookup.TryGetValue(stateName, out var typedState))
             {
-                builder.Add(new ResolvedStateTarget(typedState.Name, nameSpan));
+                builder.Add(new ResolvedStateTarget(typedState.Name, nameSpan, IsWildcard: false));
                 ctx.StateReferences.Add(new StateReference(typedState, nameSpan));
             }
             else
             {
-                builder.Add(new ResolvedStateTarget(stateName, nameSpan));
+                builder.Add(new ResolvedStateTarget(stateName, nameSpan, IsWildcard: false));
                 ctx.Diagnostics.Add(
                     Diagnostics.Create(DiagnosticCode.UndeclaredState, nameSpan, stateName));
             }
@@ -995,9 +995,7 @@ internal static partial class TypeChecker
             foreach (var resolvedState in resolvedStates)
             {
                 ctx.AccessModes.Add(new TypedAccessMode(
-                    // StateName: resolvedState carries the expanded single name after normalization;
-                    // fall back to stateSlot.StateName (first-element compat) for wildcard rows where no target was resolved.
-                    StateName: resolvedState.StateName ?? stateSlot?.StateName ?? "",
+                    StateName: resolvedState.StateName,
                     FieldName: fieldName,
                     Mode: mode,
                     Guard: guard,
@@ -1045,9 +1043,7 @@ internal static partial class TypeChecker
             {
                 ctx.StateHooks.Add(new TypedStateHook(
                     Scope: scope,
-                    // StateName: resolvedState carries the expanded single name after normalization;
-                    // fall back to stateSlot.StateName (first-element compat) for wildcard rows where no target was resolved.
-                    StateName: resolvedState.StateName ?? stateSlot?.StateName ?? "",
+                    StateName: resolvedState.StateName,
                     Guard: guard,
                     Actions: actions,
                     Syntax: construct));
@@ -1102,9 +1098,9 @@ internal static partial class TypeChecker
         // —— FromState resolution ——
         var stateTargetSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
         var fromStates = ResolveStateTargets(stateTargetSlot, ctx)
-            .Select(state => state.StateName)
+            .Select(state => state.IsWildcard ? (string?)null : state.StateName)
             .ToImmutableArray();
-        // Empty list or wildcard token text → any-state wildcard (D10): FromState stays null, no error
+        // Wildcard entries (IsWildcard) → FromState null = any-state wildcard (D10)
 
         // —— Event resolution ——
         var eventTargetSlot = construct.GetRequiredSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
