@@ -136,7 +136,8 @@ public sealed record TypedTypedConstant(
 public sealed record TypedInterpolatedTypedConstant(
     ImmutableArray<TypedInterpolationSlot> Slots,
     TypeKind ResultType,
-    SourceSpan Span
+    SourceSpan Span,
+    decimal? StaticMagnitude = null
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>A resolved hole expression with its assigned slot identity.</summary>

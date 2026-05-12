@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using FluentAssertions;
 using Precept;
 using Precept.Language;
@@ -21,6 +22,93 @@ public class ProofEngineTypedArgQualifierTests
         var index = TypeCheckerTestHelpers.CheckExpectingClean(source);
         var graph = GraphAnalyzer.Analyze(index);
         return ProofEngine.Prove(index, graph);
+    }
+
+    private static DeclaredQualifierMeta? ResolveInterpolatedConstantQualifier(
+        TypedInterpolatedTypedConstant constant,
+        QualifierAxis axis)
+    {
+        var method = typeof(ProofEngine).GetMethod(
+            "ResolveQualifierFromInterpolatedConstant",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        method.Should().NotBeNull();
+        return (DeclaredQualifierMeta?)method!.Invoke(null, new object?[] { constant, axis });
+    }
+
+    private static TypedInterpolatedTypedConstant GetRuleRightConstant(SemanticIndex index)
+    {
+        index.Rules.Should().ContainSingle();
+        index.Rules[0].Condition.Should().BeOfType<TypedBinaryOp>();
+
+        var comparison = (TypedBinaryOp)index.Rules[0].Condition;
+        comparison.Right.Should().BeOfType<TypedInterpolatedTypedConstant>();
+        return (TypedInterpolatedTypedConstant)comparison.Right;
+    }
+
+    [Fact]
+    public void CompoundUnitInterpolatedConstant_ResolvesCompoundUnitQualifier()
+    {
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Widget
+            field StockingUnit as unitofmeasure default 'each'
+            field SaleUnit as unitofmeasure default 'case'
+            field Ratio as quantity in '{StockingUnit}/{SaleUnit}' default '1 {StockingUnit}/{SaleUnit}'
+            rule Ratio > '0 {StockingUnit}/{SaleUnit}' because "positive"
+            """);
+
+        var qualifier = ResolveInterpolatedConstantQualifier(GetRuleRightConstant(index), QualifierAxis.Unit);
+
+        qualifier.Should().BeEquivalentTo(new DeclaredQualifierMeta.Unit("{StockingUnit}/{SaleUnit}", "{StockingUnit}/{SaleUnit}"));
+    }
+
+    [Fact]
+    public void SingleUnitInterpolatedConstant_StillResolvesSingleUnitQualifier()
+    {
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Widget
+            field SaleUnit as unitofmeasure default 'case'
+            field Qty as quantity in '{SaleUnit}' default '1 {SaleUnit}'
+            rule Qty > '0 {SaleUnit}' because "positive"
+            """);
+
+        var qualifier = ResolveInterpolatedConstantQualifier(GetRuleRightConstant(index), QualifierAxis.Unit);
+
+        qualifier.Should().BeEquivalentTo(new DeclaredQualifierMeta.Unit("{SaleUnit}", "{SaleUnit}", SourceFieldName: "SaleUnit"));
+    }
+
+    [Fact]
+    public void CompoundUnitRule_DoesNotEmit_PRE0114()
+    {
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field StockingUnit as unitofmeasure default 'each'
+            field SaleUnit as unitofmeasure default 'case'
+            field Ratio as quantity in '{StockingUnit}/{SaleUnit}' default '1 {StockingUnit}/{SaleUnit}'
+            rule Ratio > '0 {StockingUnit}/{SaleUnit}' because "positive"
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+    }
+
+    [Fact]
+    public void CompoundUnitPositivityProof_ClearsDivisionByZero()
+    {
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field CatalogCurrency as currency default 'USD'
+            field StockingUnit as unitofmeasure default 'each'
+            field SaleUnit as unitofmeasure default 'case'
+            field ListPrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}' default '24 {CatalogCurrency}/{SaleUnit}'
+            field StockingUnitsPerSaleUnit as quantity in '{StockingUnit}/{SaleUnit}' default '12 {StockingUnit}/{SaleUnit}'
+            field UnitPrice as price in '{CatalogCurrency}' of '{StockingUnit.dimension}' <- ListPrice / StockingUnitsPerSaleUnit
+            rule StockingUnitsPerSaleUnit > '0 {StockingUnit}/{SaleUnit}' because "positive"
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DivisionByZero));
     }
 
     [Fact]
@@ -59,6 +147,19 @@ public class ProofEngineTypedArgQualifierTests
         diagnostic.Message.Should().Contain("UnitCost");
         diagnostic.Message.Should().Contain("Qty");
         diagnostic.Message.Should().NotContain("<unknown>");
+    }
+
+    [Fact]
+    public void InventoryItem_Sample_Clears_G1_Diagnostics()
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesRoot, "inventory-item.precept"));
+        var compilation = Compiler.Compile(source);
+
+        compilation.Diagnostics.Should().NotContain(d =>
+            (d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility)
+                && (d.Span.StartLine == 122 || d.Span.StartLine == 123))
+            || (d.Code == nameof(DiagnosticCode.DivisionByZero)
+                && (d.Span.StartLine == 137 || d.Span.StartLine == 142)));
     }
 
     [Fact]

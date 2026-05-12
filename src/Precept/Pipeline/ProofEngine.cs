@@ -50,6 +50,8 @@ public static class ProofEngine
         // Incorporate forwarding facts before discharge
         IncorporateForwardingFacts(graph.ProofFacts, obligations, semantics);
 
+        var suppressDiagnostics = new bool[obligations.Count];
+
         // Pass 2: Obligation Discharge
         for (int i = 0; i < obligations.Count; i++)
         {
@@ -63,17 +65,27 @@ public static class ProofEngine
             if (ContainsErrorExpression(obligation.Site))
             {
                 obligations[i] = obligation with { Disposition = ProofDisposition.Unresolved };
+                suppressDiagnostics[i] = true;
                 continue;
             }
 
             var (disposition, strategy) = TryDischarge(obligation, semantics);
             obligations[i] = obligation with { Disposition = disposition, Strategy = strategy };
+        }
 
-            if (disposition == ProofDisposition.Unresolved)
-            {
-                diagnostics.Add(CreateDiagnostic(obligation, semantics));
-                faultSiteLinks.Add(CreateFaultSiteLink(obligation));
-            }
+        ApplyTrustedRuleFacts(obligations, suppressDiagnostics, semantics);
+
+        for (int i = 0; i < obligations.Count; i++)
+        {
+            if (suppressDiagnostics[i])
+                continue;
+
+            var obligation = obligations[i];
+            if (obligation.Disposition != ProofDisposition.Unresolved)
+                continue;
+
+            diagnostics.Add(CreateDiagnostic(obligation, semantics));
+            faultSiteLinks.Add(CreateFaultSiteLink(obligation));
         }
 
         var initialStateResults = CheckInitialStateSatisfiability(semantics);
@@ -804,27 +816,28 @@ public static class ProofEngine
     private static bool GuardSubsumes(GuardConstraint guard, NumericProofRequirement requirement, TypedExpression site)
     {
         if (guard.Field != GetFieldName(requirement.Subject, site)) return false;
+        return guard.Value is { } value && NumericConstraintSubsumes(guard.Comparison, value, requirement);
+    }
 
-        return (guard.Comparison, requirement.Comparison) switch
+    private static bool NumericConstraintSubsumes(
+        OperatorKind comparison,
+        decimal value,
+        NumericProofRequirement requirement)
+    {
+        return (comparison, requirement.Comparison) switch
         {
             (OperatorKind.GreaterThan, OperatorKind.NotEquals)
-                when guard.Value == 0 && requirement.Threshold == 0 => true,
+                when value == 0 && requirement.Threshold == 0 => true,
             (OperatorKind.GreaterThan, OperatorKind.GreaterThanOrEqual)
-                when guard.Value >= requirement.Threshold => true,
+                when value >= requirement.Threshold => true,
             (OperatorKind.GreaterThan, OperatorKind.GreaterThan)
-                when guard.Value >= requirement.Threshold => true,
-
+                when value >= requirement.Threshold => true,
             (OperatorKind.GreaterThanOrEqual, OperatorKind.GreaterThanOrEqual)
-                when guard.Value >= requirement.Threshold => true,
-
+                when value >= requirement.Threshold => true,
             (OperatorKind.LessThan, OperatorKind.NotEquals)
-                when guard.Value == 0 && requirement.Threshold == 0 => true,
-
-            // Exact match fallback
-            _ when guard.Comparison == requirement.Comparison
-                && guard.Value == requirement.Threshold => true,
-
-            _ => false
+                when value == 0 && requirement.Threshold == 0 => true,
+            _ when comparison == requirement.Comparison && value == requirement.Threshold => true,
+            _ => false,
         };
     }
 
@@ -1368,14 +1381,49 @@ public static class ProofEngine
 
         if (axis == QualifierAxis.Unit || axis == QualifierAxis.Dimension)
         {
+            TypedInterpolationSlot? numeratorSlot = null;
+            TypedInterpolationSlot? denominatorSlot = null;
+
             foreach (var slot in itc.Slots)
             {
-                if (slot.SlotKind == InterpolationSlotKind.DenominatorUnit)
-                    return CreateQualifierFromSlotExpression(slot.Expression, axis);
+                if (slot.SlotKind == InterpolationSlotKind.NumeratorUnit)
+                    numeratorSlot = slot;
+                else if (slot.SlotKind == InterpolationSlotKind.DenominatorUnit)
+                    denominatorSlot = slot;
             }
+
+            if (TryCreateCompoundQualifier(numeratorSlot, denominatorSlot, axis) is { } compoundQualifier)
+                return compoundQualifier;
+
+            if (denominatorSlot is not null)
+                return CreateQualifierFromSlotExpression(denominatorSlot.Expression, axis);
         }
 
         return null;
+    }
+
+    private static DeclaredQualifierMeta? TryCreateCompoundQualifier(
+        TypedInterpolationSlot? numeratorSlot,
+        TypedInterpolationSlot? denominatorSlot,
+        QualifierAxis axis)
+    {
+        if (numeratorSlot is null || denominatorSlot is null)
+            return null;
+
+        var numeratorQualifier = CreateQualifierFromSlotExpression(numeratorSlot.Expression, axis);
+        var denominatorQualifier = CreateQualifierFromSlotExpression(denominatorSlot.Expression, axis);
+
+        return (numeratorQualifier, denominatorQualifier) switch
+        {
+            (DeclaredQualifierMeta.Unit numerator, DeclaredQualifierMeta.Unit denominator) =>
+                new DeclaredQualifierMeta.Unit(
+                    $"{numerator.UnitCode}/{denominator.UnitCode}",
+                    $"{numerator.DimensionName}/{denominator.DimensionName}"),
+            (DeclaredQualifierMeta.Dimension numerator, DeclaredQualifierMeta.Dimension denominator) =>
+                new DeclaredQualifierMeta.Dimension(
+                    $"{numerator.DimensionName}/{denominator.DimensionName}"),
+            _ => null,
+        };
     }
 
     private static DeclaredQualifierMeta? CreateQualifierFromSlotExpression(
@@ -1581,6 +1629,155 @@ public static class ProofEngine
     /// named field across all transition rows and event handlers. If ANY assignment
     /// to this field is NOT an interpolated typed constant, returns empty (conservative).
     /// </summary>
+    private static void ApplyTrustedRuleFacts(
+        List<ProofObligation> obligations,
+        bool[] suppressDiagnostics,
+        SemanticIndex semantics)
+    {
+        var trustedFacts = CollectTrustedRuleFacts(obligations, suppressDiagnostics, semantics);
+        if (trustedFacts.Count == 0)
+            return;
+
+        for (int i = 0; i < obligations.Count; i++)
+        {
+            if (suppressDiagnostics[i])
+                continue;
+
+            var obligation = obligations[i];
+            if (obligation.Disposition != ProofDisposition.Unresolved)
+                continue;
+            if (obligation.Requirement is not NumericProofRequirement numeric)
+                continue;
+
+            var fieldName = GetFieldName(numeric.Subject, obligation.Site);
+            if (fieldName is null)
+                continue;
+
+            foreach (var fact in trustedFacts)
+            {
+                if (!string.Equals(fact.FieldName, fieldName, StringComparison.Ordinal))
+                    continue;
+                if (!NumericConstraintSubsumes(fact.Comparison, fact.Value, numeric))
+                    continue;
+
+                obligations[i] = obligation with
+                {
+                    Disposition = ProofDisposition.Proved,
+                    Strategy = ProofStrategy.CompositionalConstraint,
+                };
+                break;
+            }
+        }
+    }
+
+    private static List<NumericRuleFact> CollectTrustedRuleFacts(
+        List<ProofObligation> obligations,
+        bool[] suppressDiagnostics,
+        SemanticIndex semantics)
+    {
+        var blockedRules = new HashSet<int>();
+
+        for (int i = 0; i < obligations.Count; i++)
+        {
+            if (suppressDiagnostics[i])
+                continue;
+
+            if (obligations[i] is
+                {
+                    Disposition: ProofDisposition.Unresolved,
+                    Context: ConstraintContext { Constraint: RuleIdentity ruleIdentity },
+                })
+            {
+                blockedRules.Add(ruleIdentity.RuleIndex);
+            }
+        }
+
+        var facts = new List<NumericRuleFact>();
+        for (int i = 0; i < semantics.Rules.Length; i++)
+        {
+            if (blockedRules.Contains(i))
+                continue;
+            if (TryGetNumericRuleFact(semantics.Rules[i], out var fact))
+                facts.Add(fact);
+        }
+
+        return facts;
+    }
+
+    private static bool TryGetNumericRuleFact(TypedRule rule, out NumericRuleFact fact)
+    {
+        fact = default;
+
+        if (rule.Condition is not TypedBinaryOp comparison)
+            return false;
+
+        var comparisonOp = Operations.GetMeta(comparison.ResolvedOp).Op;
+
+        if (comparison.Left is TypedFieldRef leftField && TryGetStaticNumericValue(comparison.Right, out var rightValue))
+        {
+            fact = new NumericRuleFact(leftField.FieldName, comparisonOp, rightValue);
+            return true;
+        }
+
+        if (comparison.Right is TypedFieldRef rightField && TryGetStaticNumericValue(comparison.Left, out var leftValue))
+        {
+            fact = new NumericRuleFact(rightField.FieldName, InvertOp(comparisonOp), leftValue);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetStaticNumericValue(TypedExpression expression, out decimal value)
+    {
+        switch (expression)
+        {
+            case TypedLiteral literal when ToDecimal(literal.Value) is { } literalValue:
+                value = literalValue;
+                return true;
+
+            case TypedTypedConstant typedConstant when TryGetTypedConstantMagnitude(typedConstant.ParsedValue, out var typedConstantValue):
+                value = typedConstantValue;
+                return true;
+
+            case TypedInterpolatedTypedConstant { StaticMagnitude: { } magnitude }:
+                value = magnitude;
+                return true;
+
+            default:
+                value = default;
+                return false;
+        }
+    }
+
+    private static bool TryGetTypedConstantMagnitude(object? parsedValue, out decimal value)
+    {
+        switch (parsedValue)
+        {
+            case decimal direct:
+                value = direct;
+                return true;
+            case int integer:
+                value = integer;
+                return true;
+            case long whole:
+                value = whole;
+                return true;
+            case ValueTuple<decimal, object?> money:
+                value = money.Item1;
+                return true;
+            case ValueTuple<decimal, UcumParsedUnit?> quantity:
+                value = quantity.Item1;
+                return true;
+            case ValueTuple<decimal, object?, UcumParsedUnit?> price:
+                value = price.Item1;
+                return true;
+            default:
+                value = default;
+                return false;
+        }
+    }
+
     private static ImmutableArray<TypedInterpolatedTypedConstant> FindInterpolatedAssignments(
         string fieldName, SemanticIndex semantics)
     {
@@ -2127,6 +2324,8 @@ public static class ProofEngine
     }
 
     private static readonly object UnknownSentinel = new();
+
+    private readonly record struct NumericRuleFact(string FieldName, OperatorKind Comparison, decimal Value);
 
     private static object? EvaluateBinaryOp(OperatorKind op, object? left, object? right)
     {

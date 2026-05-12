@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -883,7 +884,38 @@ internal static partial class TypeChecker
             ValidateUnitSlotDimensionConsistency(slot.Expression, qualifiers, expr.Span, ctx);
         }
 
-        return new TypedInterpolatedTypedConstant(typedSlots.ToImmutable(), targetType, expr.Span);
+        return new TypedInterpolatedTypedConstant(
+            typedSlots.ToImmutable(),
+            targetType,
+            expr.Span,
+            TryExtractStaticMagnitude(segments));
+    }
+
+    private static decimal? TryExtractStaticMagnitude(ImmutableArray<InterpolationSegment> segments)
+    {
+        foreach (var segment in segments)
+        {
+            switch (segment)
+            {
+                case TextSegment { Text: var text } when string.IsNullOrWhiteSpace(text):
+                    continue;
+
+                case HoleSegment:
+                    return null;
+
+                case TextSegment { Text: var text }:
+                {
+                    var trimmed = text.TrimStart();
+                    var end = trimmed.IndexOf(' ');
+                    var token = end >= 0 ? trimmed[..end] : trimmed;
+                    return decimal.TryParse(token, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
+                        ? value
+                        : null;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
