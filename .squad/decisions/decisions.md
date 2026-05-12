@@ -1,851 +1,1785 @@
+# Frank: Scalar-Op Qualifier Propagation Design (D4 Reframed)
+
+**Date:** 2026-05-12
+**Architect:** Frank
+**Context:** D4 reframed from `.squad/decisions/inbox/frank-d4-research.md`
+**Plan update:** `docs/Working/typed-constants-and-proof-coverage-plan.md` § Slice D4 (Reframed)
+
+---
+
+## Decision 1: Naming — Keep D4, Not C5
+
+**Ruling:** D4 (reframed).
+
+**Rationale:**
+
+- Part C = "inventory-item compile fixes." This fix does NOT resolve any `inventory-item.precept` errors. I verified: all 66 remaining PRE0114 in that file trace to BUG-A (arg qualifier resolution), which is C4. The arithmetic in `inventory-item.precept` uses typed-operand operations (qty × qty, money + money, money ÷ qty, price × qty, exchangerate × money). Zero scalar-decimal operations.
+- Part D = "pre-existing test failure fixes." This fixes the `SyntaxReferenceMirrorsSourceAndExamplesCompile` test, which is a pre-existing failure.
+- The fact that the fix reaches into the compiler (catalog metadata, type checker, proof engine) doesn't change the classification. It makes D4 a deeper fix than originally assumed, but its scope and validation are still driven by the test failure.
+- Creating a new E-series for a single item is over-engineering.
+
+**Alternatives rejected:**
+- **C5:** Rejected because Part C scope is `inventory-item.precept`. This fix doesn't touch that file.
+- **New E-series:** Rejected — no other items would join this series. One-item series is organizational noise.
+
+---
+
+## Decision 2: ResultQualifierPolicy for Scalar Ops
+
+**New enum value:** `ResultQualifierPolicy.InheritFromQualifiedOperand`
+
+**Applied to:**
+
+| Operation | Result | Policy |
+|---|---|---|
+| `MoneyTimesDecimal` | money | `InheritFromQualifiedOperand` |
+| `MoneyDivideDecimal` | money | `InheritFromQualifiedOperand` |
+| `QuantityTimesDecimal` | quantity | `InheritFromQualifiedOperand` |
+| `QuantityDivideDecimal` | quantity | `InheritFromQualifiedOperand` |
+| `PriceTimesDecimal` | price | `InheritFromQualifiedOperand` |
+| `PriceDivideDecimal` | price | `InheritFromQualifiedOperand` |
+
+**Semantics:** The result inherits ALL qualifiers from the qualifier-bearing operand. The scalar operand (`decimal`) is transparent to qualifier flow.
+
+**Why not `QualifierMatch.Same`?** `Same` requires BOTH operands to carry matching qualifiers. Decimal has no qualifiers. `Same` is semantically wrong and would cause the proof to fail in a new way.
+
+**Why not reuse `CompoundUnitCancellation`?** That policy computes a NEW qualifier from dimensional cancellation of both operands. Scalar ops don't cancel anything — they pass through the existing qualifier unchanged.
+
+---
+
+## Decision 3: Proof Engine Transitive Resolution
+
+**New capability:** `ResolveQualifierOnAxis()` gains a path for `TypedBinaryOp` subjects. When the resolved subject is a subexpression (not a field or arg), the method inspects `ResultQualifier` to determine how to extract the qualifier transitively:
+
+- `SameQualifierRequired` → recurse into either operand (both carry the same qualifier)
+- `QualifiedOperandInherited` → recurse into the qualifier-bearing operand (the one whose type matches the result type)
+- `CompoundUnitCancellationRequired` → return null (cancellation requires its own resolution path)
+- `null` → return null (no qualifier propagation)
+
+**Architectural constraint:** Recursion is bounded by expression tree depth. In practice, Precept expressions are shallow (field declarations are flat; computed expressions rarely exceed 3–4 levels). Stack overflow is not a realistic risk.
+
+**Important side effect:** This also fixes the general case of `SameQualifierRequired` nested in outer operations. Example: `(MoneyA + MoneyB) - MoneyC` where the inner `+` produces a `TypedBinaryOp` with `SameQualifierRequired`. Previously, the outer `-` could not resolve the inner result's qualifier. Now it can. This is strictly a bug fix — the qualifier was always there, the engine just couldn't see it.
+
+---
+
+## Architectural Constraints
+
+1. **No SyntaxReference modification.** The `UnitPrice default '0.00 USD/kg'` and `FinalCost` expression stay as-is. The fix is in the compiler, not the example. This is the correct disposition: the example is semantically valid DSL; the compiler was wrong to reject it.
+
+2. **Catalog-driven.** The fix adds catalog metadata (`ResultQualifierPolicy` on operation entries). The type checker reads it via `MapQualifierBinding`. The proof engine consumes the `QualifierBinding` DU. No hardcoded operation-kind switches.
+
+3. **No inventory-item impact.** This fix does not move the PRE0114 count in `inventory-item.precept`. Those errors need C4 (arg qualifier resolution). Do not bundle expectations about inventory-item progress with this slice.
+
+---
+
+## Risk Assessment
+
+**Low risk.**
+
+- All changes are additive (new enum value, new DU subtype, new branches for previously-null paths).
+- The six operation metadata changes add a named parameter that was previously defaulted — the only behavioral change is `MapQualifierBinding` returning a non-null binding.
+- `ResolveQualifierOnAxis` currently returns null for all `TypedBinaryOp` subjects. Any change is strictly an improvement.
+- The `SameQualifierRequired` transitive resolution is a bonus fix. If any tests expect PRE0114 on nested same-qualifier operations, those tests were testing a bug. They should be updated to expect success.
+
 # George C4 Done — TypedArgRef qualifier resolution
 
+
+
 **Date:** 2026-05-11T23:29:22.2031046-04:00
+
 **Scope:** C4 / BUG-A in `ProofEngine`
 
+
+
 ## Decision
+
+
 
 Implement the narrow ProofEngine fix for direct event-argument qualifier resolution:
 
+
+
 1. `GetFieldName(TypedExpression?)` now maps `TypedArgRef` to `ArgName` so proof diagnostics can name direct event args.
+
 2. `ResolveQualifierOnAxis()` now checks `TypedArgRef.DeclaredQualifiers` before falling back to `semantics.FieldsByName`, including the existing Unit→Dimension and Dimension→TemporalDimension fallback behavior.
+
+
 
 ## Validation
 
+
+
 - `dotnet build src\Precept\Precept.csproj --nologo` ✅
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo --filter ProofEngineTypedArgQualifierTests` ✅
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` ⚠️ one pre-existing unrelated failure remains in `ParserSlice8Tests.Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` because `AlwaysRejecting` is now emitted as a warning.
+
 - `samples/inventory-item.precept` PRE0114 count dropped from 73 to 66.
 
+
+
 ## Notes
+
+
 
 The focused C4 fix closes the direct `TypedArgRef` blind spot, but the remaining sample PRE0114s still involve composite operand subtrees that resolve to `<unknown>` in diagnostics. Those require follow-up proof-expression/result-qualifier work, not additional direct arg lookup changes.
 
+
+
 # Decision: Slice 2B Is DONE
 
+
+
 **Author:** Frank
+
 **Date:** 2026-05-11T23:01:00-04:00
+
 **Status:** Decided
+
 **Scope:** Slice 2B — Type Checker: Compound-Unit Interpolation
+
+
 
 ## Verdict: DONE ✅
 
+
+
 Slice 2B ("Type Checker — compound-unit interpolation") is **fully implemented**. The plan marks it "🔲 Not Started" but this is stale — the work shipped as part of the RC-2 fix cycle.
 
+
+
 ## Evidence
+
+
 
 ### Type-Grammar Tables (all present)
 
+
+
 File: `src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs`
 
+
+
 **`QuantityForms[]`** (lines 438–448): 8 patterns including compound-unit forms:
+
 - Q5: `H[mag] T(' ') H[numerator-unit] T('/') H[denominator-unit]` — 3-hole compound quantity
+
 - Q6: `H[numerator-unit] T('/') H[denominator-unit]` — 2-hole via `MatchNumericSpace` + `MatchSlash`
+
 - Q7: `H[numerator-unit]` with fixed denominator — `MatchNumericSpace` + `MatchSlashUnit`
+
 - Q8: Fixed numerator + `H[denominator-unit]` — `MatchNumericSpaceUnitSlash` + `MatchEmpty`
+
+
 
 **`PriceForms[]`** (lines 450–468): All 8 patterns P1–P8 present, including 3-hole form P8 (`H[mag] T(' ') H[currency] T('/') H[unit]`).
 
+
+
 **`ExchangeRateForms[]`** (lines 470–488): All 8 patterns X1–X8 present, including 3-hole form X8 (`H[mag] T(' ') H[from-currency] T('/') H[to-currency]`).
+
+
 
 **`UnitOfMeasureForms[]`** (lines 503–509): U1 (whole-value) + U2 (compound `H/H`) + partial-hole variants.
 
+
+
 ### Slot Identity Enum
+
+
 
 `InterpolationSlotKind.NumeratorUnit` and `InterpolationSlotKind.DenominatorUnit` exist in `SemanticIndex.cs` (lines 155–156).
 
+
+
 ### Slot Compatibility
+
+
 
 `IsSlotCompatible()` (line 553) correctly routes `NumeratorUnit`/`DenominatorUnit` → `TypeKind.UnitOfMeasure`.
 
+
+
 ### Diagnostic Codes
 
+
+
 All three codes present in `DiagnosticCode.cs`:
+
 - `InvalidInterpolatedTypedConstantForm = 121`
+
 - `InterpolationNotSupportedForType = 122`
+
 - `InterpolatedTypedConstantHoleTypeMismatch = 123`
+
+
 
 ### Test Coverage
 
+
+
 `TypeCheckerTypedConstantTests.cs` has dedicated tests for every requirement in the Slice 2B plan:
 
+
+
 | Test | Covers |
+
 |------|--------|
+
 | `InterpolatedTypedConstant_CompoundUnit_ValidUnitOfMeasure` | `'{A}/{B}'` valid UOM |
+
 | `InterpolatedTypedConstant_IntegerMagnitudeWithCompoundUnit_ValidQuantity` | `'{n} {A}/{B}'` integer mag |
+
 | `InterpolatedTypedConstant_DecimalMagnitudeWithCompoundUnit_ValidQuantity` | `'{n} {A}/{B}'` decimal mag |
+
 | `InterpolatedTypedConstant_NumericMagnitudeWithCompoundUnitHoles_ValidQuantity` | 3-hole quantity |
+
 | `InterpolatedTypedConstant_QuantityInCompoundUnitSlot_TypeMismatch` | Wrong hole type |
+
 | `InterpolatedTypedConstant_StringInCompoundUnitNumerator_Rejected` | String in numerator |
+
 | `InterpolatedTypedConstant_StringInCompoundUnitDenominator_Rejected` | String in denominator |
+
 | `InterpolatedTypedConstant_IntegerInCompoundUnitSlot_Rejected` | Integer in unit slot |
+
 | `InterpolatedTypedConstant_ThreeHoleCompoundUnit_StructuralError` | `'{A}/{B}/{C}'` rejected |
+
 | `InterpolatedTypedConstant_PipeSeparatedCompoundUnit_StructuralError` | `'{A}|{B}'` rejected |
+
 | `InterpolatedTypedConstant_PriceWithAllHoles_ValidPrice` | P8 form |
+
 | `InterpolatedTypedConstant_PriceWithMagnitudeAndFixedCurrencyUnit_Valid` | P2 form |
+
 | `InterpolatedTypedConstant_NumericMagnitudeWithCurrencyAndUnitHoles_ValidPrice` | P5 form |
+
 | `InterpolatedTypedConstant_ExchangeRateWithFromTo_ValidExchangeRate` | X8 form |
+
 | `InterpolatedTypedConstant_PriceCompoundUnitRuleExpression_ValidPrice` | Price in rule context |
+
 | `InterpolatedTypedConstant_CompoundUnitHolesInFieldDefault_ValidQuantity` | Compound in defaults |
+
 | `InterpolatedTypedConstant_CompoundUnitHolesInRuleExpression_ValidQuantity` | Compound in rules |
+
+
 
 **All 107 typed constant tests pass** (verified via `dotnet test --filter TypeCheckerTypedConstantTests`).
 
+
+
 ## Action Required
+
+
 
 Update the plan's Slice 2B status from "🔲 Not Started" to "✅ Done" in `docs/Working/typed-constants-and-proof-coverage-plan.md`.
 
+
+
 # Inventory-Item Compile Fixes — Part C Architectural Decisions
 
+
+
 **Author:** Frank
+
 **Date:** 2026-05-12T02:53:58Z
+
 **Scope:** 4 slices (C1–C4) added to the typed constants plan as Part C
+
 **Source:** Deep-dive analysis of `samples/inventory-item.precept` remaining compiler errors after RC-1/RC-2
 
+
+
 ---
+
+
 
 ## Decision Summary
 
+
+
 ### D-C1: Dimension cancellation is TypeChecker + ProofEngine work, not parser work
+
+
 
 RC-3 (`qty[A/B] × qty[B] → qty[A]`) requires the TypeChecker to compute result dimensions from operand dimension qualifiers, and the ProofEngine to validate denominator compatibility. George is implementing this. The plan entry documents scope and expected files for tracking completeness.
 
+
+
 ### D-C2: Keyword-as-member-name fix is catalog-driven — break the circular dependency
+
+
 
 **The problem:** `TokenMeta.IsValidAsMemberName` is a computed property that reads `Tokens.KeywordsValidAsMemberName`, while `Parser.KeywordsValidAsMemberName` reads `TokenMeta.IsValidAsMemberName`. Circular dependency prevents `from`/`to` from being registered as valid member names, even though they're declared as accessors on `exchangerate`.
 
+
+
 **The decision:** Break the cycle by deriving `Parser.KeywordsValidAsMemberName` directly from `Types.All` accessor names → `Tokens.Keywords` (text→TokenKind mapping). This is the canonical catalog-driven path: type metadata is the source of truth for which keywords can appear as member names. The `TokenMeta.IsValidAsMemberName` property either becomes a constructor parameter or is removed.
+
+
 
 **Alternative rejected:** Adding a special-case set in the parser. This would violate the catalog-driven architecture — the set must derive from type accessor metadata, not a hand-maintained list.
 
+
+
 **No lexer changes.** The lexer stays context-free. Keywords remain keywords. The parser handles the context-sensitivity (after `.`, certain keywords are valid member names).
+
+
 
 ### D-C3: `=` in expressions is a sample bug, not a compiler bug — add a diagnostic
 
+
+
 **The decision:** The sample file incorrectly uses `=` (assignment) where `==` (equality) is required. The language design intentionally separates these: `=` is for `set` actions, `==` is for comparisons. The parser correctly rejects `=` in expression context.
+
+
 
 **Added value:** A new `AssignmentInExpressionContext` diagnostic code will emit a clear error message directing authors to use `==`. This is a usability improvement, not a language change.
 
+
+
 **Alternative rejected:** Registering `=` as a synonym for `==` in expression context. This would create grammatical ambiguity between action assignment and expression comparison — the exact ambiguity the language design prevents.
+
+
 
 ### D-C4 (BUG-A): ProofEngine arg qualifier resolution — the most architecturally significant fix
 
+
+
 **The problem:** `ResolveQualifierOnAxis()` can only resolve qualifiers from fields (via `semantics.FieldsByName`). Event args (`TypedArgRef`) carry their qualifiers directly on the expression node, but the proof engine never reads them — `GetFieldName()` returns null for `TypedArgRef`, causing the entire resolution to short-circuit.
+
+
 
 **The decision:** Extend `ResolveQualifierOnAxis()` with a **direct extraction path** for `TypedArgRef`. Because `TypedArgRef` already carries `DeclaredQualifiers` (set by the TypeChecker), no semantic index lookup is needed — read the qualifiers directly from the expression node. This mirrors how `ResolveSourceModifiers()` already handles `TypedArgRef` for modifier resolution (ProofEngine.cs L1101–1121).
 
+
+
 **Why direct extraction over semantic index lookup:** The qualifiers are already on the node. Going through `EventsByName → Args → DeclaredQualifiers` would work but is unnecessarily indirect. Direct extraction is simpler, faster, and consistent with existing patterns.
+
+
 
 **Symbolic equality semantics:** Two interpolated qualifier expressions are equal when their template strings are identical (`"{StockingUnit.dimension}" == "{StockingUnit.dimension}"`). This is structural identity, not runtime value equality. The existing record equality and `ExtractComparableValue()` infrastructure handles this correctly — no new comparison logic needed. The proof engine is conservative: it proves what is structurally guaranteed. `'{A.dimension}'` and `'{B.dimension}'` are NOT equal even if A and B happen to share a dimension — the author must use the same source to get a proof.
 
+
+
 **Axis fallbacks apply to args too.** The `Unit→Dimension` and `Dimension→TemporalDimension` fallback chains (already implemented for fields) must also apply to arg qualifier resolution. The implementation mirrors the field path.
+
+
 
 **Impact:** This single change resolves 73+ PRE0114 errors in `inventory-item.precept`. It also improves diagnostic messages by replacing `<unknown>` with actual arg names.
 
+
+
 ---
+
+
 
 ## Architectural Principles Upheld
 
+
+
 1. **Catalog-driven architecture:** C2 derives parser behavior from type accessor metadata. C3 adds a diagnostic through the catalog. No hand-maintained sets or special cases.
+
 2. **No language surface changes:** C2 and C3 don't change the grammar. C4 doesn't change proof semantics — it extends resolution scope.
+
 3. **Conservative proof guarantees:** C4's symbolic equality is structural, not semantic. The proof engine proves what the source text guarantees, not what might be true at runtime.
+
 4. **Existing patterns reused:** C4's `TypedArgRef` handling mirrors `ResolveSourceModifiers()`. C2's accessor-driven set mirrors the original `Tokens.KeywordsValidAsMemberName` intent.
+
+
 
 # Decision: Part D — Pre-Existing Test Failure Fixes (B1–B4)
 
+
+
 **By:** Frank
+
 **Date:** 2026-05-11T22:53:58-04:00
+
 **Context:** Soup Nazi diagnosed 30 pre-existing test failures across 4 root-cause groups. All predate recent George/RC work.
 
+
+
 ---
+
+
 
 ## Key Decisions
 
+
+
 ### B1 — Modifier validation is correct; fixtures updated
+
+
 
 The `Modifiers` catalog correctly declares `Optional` and `Notempty` as mutually exclusive. The `TypeChecker.Validation.cs` enforcement is correct. The `TypeCheckerModifierTests` already validate this behavior with dedicated positive tests.
 
+
+
 The `FullPrecept` and `LoanApplication` test fixtures used `optional notempty` on event args — a combination the type checker now correctly rejects. The fix is to drop `notempty` from those fixtures, not to weaken the validation. The modifier validation represents a genuine semantic contradiction: `optional` (may be absent) + `notempty` (must have content) is incoherent.
+
+
 
 **Decision:** Validation stays. Fixtures updated. 24 tests fixed.
 
+
+
 ### B2 — Exchange rate test syntax was wrong, not the parser
+
+
 
 The 3 exchange rate qualifier tests used `exchangerate from 'USD' to 'EUR'` but the canonical qualifier shape is `exchangerate in 'USD' to 'EUR'` (using `TokenKind.In` for `FromCurrency`, not `TokenKind.From`). The `Types` catalog's own `UsageExample` confirms `in` is correct.
 
+
+
 Before RC-1, the parser's laxer qualifier handling may have tolerated the wrong preposition. After RC-1 tightened things, `from` gets consumed as a construct leader (transition row) instead of a qualifier preposition, causing cascade parse failures.
+
+
 
 **Decision:** Fix the test DSL to use `in` instead of `from`. No parser changes needed.
 
+
+
 **Interaction with Rec 2 (`.from`/`.to` member access):** None. Qualifier prepositions in field declarations (`in`, `to`) and member accessors in expressions (`.from`, `.to`) are different parser paths. The B2 fix touches qualifier syntax; Rec 2 touches expression member access disambiguation. No shared logic.
+
+
 
 ### B3 — Missing activation event is a legitimate config gap
 
+
+
 The VS Code extension's `package.json` was missing `"onLanguage:precept"` in `activationEvents`. Standard VS Code language extensions should declare both workspace-level (`workspaceContains`) and document-level (`onLanguage`) activation. One-line JSON addition.
+
+
 
 ### B4 — Compound-unit typed constant in syntax reference snippet
 
+
+
 The "Money and quantity typed fields" example used `default '0.00 USD/kg'` — a compound-unit price constant that RC-2's tighter validation now rejects. The fix removes the default; the example's teaching purpose (qualified money/price/quantity fields with derivations) is preserved. The default can be restored once Slice 2B (compound-unit interpolation) ships.
 
+
+
 ---
+
+
 
 ## Ownership
 
+
+
 - D1, D2: George (core test fixtures)
+
 - D3: Kramer (language server / VS Code extension)
+
 - D4: Newman (MCP server / syntax reference)
+
+
 
 All four slices are independent and can execute in parallel.
 
+
+
 # George — AlwaysRejecting / StateAlwaysRejects Implementation
 
+
+
 **Date:** 2026-05-11T22:34:01.373-04:00
+
 **Author:** George (Runtime Dev)
+
 **Status:** Implemented — pending Shane commit decision
+
+
 
 ---
 
+
+
 ## Summary
+
+
 
 Implemented two new graph-stage Warning diagnostics: `AlwaysRejecting` (D1, code 125) and `StateAlwaysRejects` (D2, code 126). Both enforce the governing semantic principle: `reject` is only valid when a non-reject path exists for the same event. If no such path exists, every reject row for that event is a semantic lie.
 
+
+
 ---
 
+
+
 ## Decisions Made
+
+
 
 ### D1: Slice ordering and RowSpan prerequisite
 
+
+
 `TypedTransitionRow` required a `SourceSpan RowSpan` property before GraphAnalyzer could anchor diagnostics to row positions. The `RowSpan` was inserted **before** `Syntax` in the positional parameter list — preserving the `NameSpan, Syntax` convention established by `TypedState`, `TypedEvent`, and `TypedField`. The span is extracted in `TypeChecker.NormalizeTransitionRow` from `construct.Span` at row construction time, satisfying PRECEPT0024 (no `.Syntax` access outside TypeChecker).
+
+
 
 ### D2: Suppression via D1 output set
 
+
+
 `EmitAlwaysRejecting` returns the set of D1-flagged event names. `EmitStateAlwaysRejects` checks this set before computing effective rows, avoiding redundant per-state diagnostics on events that are already globally flagged. This is cleaner than threading mutable shared state or re-computing the D1 condition inside D2.
+
+
 
 ### D3: `TransitionRowOutcome` vs catalog
 
+
+
 `TransitionRowOutcome` (semantic enum in `SemanticIndex.cs`) and `OutcomeKind` (catalog enum in `Outcomes.cs`) are parallel enums with identical value set (Transition=1, NoTransition=2, Reject=3). The catalog-driven checklist confirms no new catalog entry is needed: `OutcomeKind` already covers the domain, and `TransitionRowOutcome` is the correct semantic-layer type for GraphAnalyzer comparisons.
+
+
 
 ### D4: Wildcard-override logic mirrors BuildEdges exactly
 
+
+
 `EmitStateAlwaysRejects` rebuilds `explicitStateEvents` using the identical filter as `BuildEdges`:
+
 - `FromState is not null && StatesByName.ContainsKey(FromState) && EventsByName.ContainsKey(EventName)`
+
+
 
 This ensures the same wildcard suppression semantics: explicit rows shadow wildcards per (state, event). A wildcard with a non-reject outcome counts as a success path for all non-overriding states — those states are correctly skipped because their effective row is non-reject.
 
+
+
 ### D5: No extraction of shared helper for explicitStateEvents
+
+
 
 `BuildEdges` is a private static method that returns edges (not the explicitStateEvents set), so the set cannot be reused without refactoring the return type. The recomputation in D2 is a small, bounded LINQ query and avoids introducing a cross-method coupling that would complicate `BuildEdges`. Accepted as intentional duplication within the "don't duplicate logic" constraint — the *logic* is mirrored, not copy-pasted with divergent behavior.
 
+
+
 ---
+
+
 
 ## Open Questions for Frank
 
+
+
 1. **Stateless precepts**: D1 and D2 are currently skipped for stateless precepts (the `if (semantics.States.IsEmpty)` early return). Is this correct? A stateless precept with only reject rows on an event is arguably equally broken. Low priority since stateless precepts have no state-graph semantics.
+
+
 
 2. **Guarded reject rows**: D2 fires when *all effective rows* have Outcome == Reject — including guarded reject rows. A row `from Draft on Submit when Count < 0 -> reject "..."` is still a reject row. Should guarded rows be treated differently (i.e., a guarded reject row might "permit" the event when the guard is false)? Current behavior matches the contract spec literally.
 
+
+
 3. **DiagnosticCode ordinal gaps**: codes 125/126 were assigned but there are gaps between 111 and 117, and between 116 and 119. This is fine (ordinals are not sequential by design), but worth confirming with Frank that 125/126 don't conflict with any planned codes.
 
+
+
 # Post-RC Compile Analysis: inventory-item.precept
+
 **Date:** 2026-05-11T22:28:17-04:00
+
 **Branch:** spike/Precept-V2-Radical (HEAD: f148ca21)
+
 **RC-1:** 956a4893 — parser accept interpolated typed constants in qualifier positions
+
 **RC-2:** 53b2bf62 — TypeChecker Q6/Q7/Q8 compound-unit patterns
+
 **DLL built:** 2026-05-11 22:29 (includes RC-1 + RC-2, pre-refactor-split)
+
 **Tool:** `precept_compile` via MCP (NDJSON framing)
 
+
+
 ---
+
+
 
 ## 1. Error Count
 
+
+
 | Baseline (pre-RC) | Post-RC-1+RC-2 | Delta |
+
 |-------------------|----------------|-------|
+
 | 161               | **105**        | −56   |
 
+
+
 ---
+
+
 
 ## 2. Errors by Diagnostic Code
 
+
+
 | Code    | Count | Expected | Notes |
+
 |---------|-------|----------|-------|
+
 | PRE0009 | 4     | 0        | ⚠ Residual — different lines than RC-1 targeted |
+
 | PRE0018 | 10    | 4        | ⚠ 6 cascade from BUG-A; 4 are sample design issues |
+
 | PRE0052 | 0     | 0        | ✅ **RC-2 eliminated all** |
+
 | PRE0069 | 18    | 0        | 🔴 **SURPRISE — new root cause exposed** |
+
 | PRE0107 | 0     | 0        | ✅ Gone (were cascades from RC-1 parse errors) |
+
 | PRE0017 | 0     | 0        | ✅ Gone (same) |
+
 | PRE0049 | 0     | 3        | ⬛ Hidden behind BUG-A cascade |
+
 | PRE0083 | 0     | 3        | ⬛ Hidden behind BUG-A cascade |
+
 | PRE0114 | 73    | 0        | 🔴 BUG-A scope is much larger than predicted |
 
+
+
 ---
+
+
 
 ## 3. PRE0009 — Are They Gone?
 
+
+
 **No.** 4 remain, but they are **not the same PRE0009s RC-1 targeted.**
+
+
 
 RC-1 fixed lines 71–113 (field/arg qualifier declaration positions, e.g., `field X as quantity in '{Y}'`). Those are gone. Four different PRE0009s are now visible on expression contexts:
 
+
+
 | Line | Column | Context |
+
 |------|--------|---------|
+
 | 150  | 127    | `in Listed ensure ... or QuantityOnHand = '0 {StockingUnit}'` — `=` in compound `and/or` boolean |
+
 | 156  | 129    | Same pattern in LowStock state |
+
 | 173  | 53     | `on ReceiveShipment ensure ReceiveShipment.Rate.from = SupplierCurrency` — `.from` is a keyword |
+
 | 174  | 51     | `on ReceiveShipment ensure ReceiveShipment.Rate.to = CatalogCurrency` — `.to` is a keyword |
 
+
+
 **Root causes for residual PRE0009s:**
+
 - Lines 150/156: `=` equality operator in a compound `A and B or C = D` boolean ensure. Parser may be treating `=` after a multi-term boolean as a declaration assignment rather than comparison. Grammar ambiguity in compound boolean expressions.
+
 - Lines 173/174: `Rate.from` and `Rate.to` — `from` and `to` are reserved keywords in the Precept grammar. Using them as field accessors on `exchangerate` type triggers a parser conflict. Pre-existing limitation.
+
+
 
 These were **masked in the previous compile** because the file failed earlier with PRE0009 cascades from the declaration-level parse errors.
 
+
+
 ---
+
+
 
 ## 4. PRE0052 — Are They Gone?
 
+
+
 **Yes. ✅ Zero PRE0052 errors.** RC-2 successfully added Q6/Q7/Q8 compound-unit patterns to `QuantityForms[]`. Complete elimination.
 
+
+
 ---
+
+
 
 ## 5. What Remains — Match Against Expected Sample Design Issues
 
+
+
 ### Expected: 3× PRE0049 (`is set` on required field)
+
 **Not present.** There is no longer any `Sku is set` expression in the file at the current line positions. The original analysis referenced old line numbers (137/145) from before the file header was extended. The current file only uses `is set` on optional fields (`Publish.Desc`, `Delist.Reason`). **Status: Either the sample bug was edited out, or it no longer occurs at a parseable location due to BUG-A cascade masking it.**
 
+
+
 ### Expected: 4× PRE0018 (money/price type mismatch in cost comparison)
+
 **Partially present — but doubled by cascade.** 10 total PRE0018:
+
 - **Lines 148, 154:** `ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost` — "Expected a money value here, but got 'price'." This is the known sample design issue where `price × dimensionless_quantity` produces `price`, not `money`, so the comparison to `AverageCost` (which is also `price`) fails. This is the expected sample design mismatch.
+
 - **Lines 150, 156:** "Expected a boolean value here, but got 'quantity'" — caused by the PRE0009 parse failure on the `=` operator; the malformed `or` expression yields a `quantity` where a `bool` is expected. Cascade from the residual PRE0009.
+
 - **Lines 228, 230, 234, 236, 239, 241:** "Expected a money value here, but got 'quantity'" — the WAC update expressions in ReceiveShipment transitions. These are BUG-A cascades: because `PurchaseQty` and `StockingUnitsPerPurchaseUnit` have `<unknown>` qualifiers, the type checker computes the product as `quantity` rather than inferring the expected `money` result. Will clear when BUG-A is resolved.
 
+
+
 ### Expected: 3× PRE0083 (division by zero in WAC calc)
+
 **Not present.** The WAC division-by-zero check on `AverageCost = (TotalInventoryCost + ...) / (QuantityOnHand + ...)` is being blocked by BUG-A cascade errors in the same expressions. **The proof engine does not emit PRE0083 when the expression already has qualifier errors.** Will surface when BUG-A is resolved.
 
+
+
 ---
+
+
 
 ## 6. Surprises
 
+
+
 ### 🔴 Surprise 1: PRE0069 — 18 Dimension Mismatch Errors (New Root Cause)
+
+
 
 **These did not exist before RC-1.** They are on transition action lines that were previously blocked from type-checking by the parse errors RC-1 fixed.
 
+
+
 All 18 are the same pattern: dimension cancellation in compound-unit arithmetic is not implemented.
 
+
+
 ```
+
 Line 229: Dimension '{PurchaseUnit.dimension}' does not match declared '{StockingUnit.dimension}' on QuantityOnHand
+
 Line 229: Dimension '{StockingUnit}/{PurchaseUnit}' does not match declared '{StockingUnit.dimension}' on QuantityOnHand
+
 ```
+
+
 
 The expression is: `QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit`
 
+
+
 - `PurchaseQty` is `quantity of '{PurchaseUnit.dimension}'`
+
 - `StockingUnitsPerPurchaseUnit` is `quantity in '{StockingUnit}/{PurchaseUnit}'`
+
 - Expected result of multiplication: `quantity of '{StockingUnit.dimension}'` (PurchaseUnit cancels)
+
 - Actual result computed by TypeChecker: `<retains {PurchaseUnit.dimension} or compound unit>`
+
+
 
 The type checker does not implement **dimensional unit cancellation** for compound-unit quantities. `A × (B/A) = B` is not resolved; the checker treats the result dimension as incompatible with the assignment target.
 
+
+
 **This is a new root cause: RC-3.** The compound-unit patterns Q6/Q7/Q8 (RC-2) covered rule/ensure *comparison* expressions. But the *arithmetic* path (`set X = expr`) for compound-unit products is missing the cancellation rule. 18 errors across 9 lines (2 per line — one for each factor in the product).
 
+
+
 Affected operations:
+
 - `PurchaseQty × StockingUnitsPerPurchaseUnit → QuantityOnHand` (6 errors, 3 lines: ReceiveShipment in Listed and 2 LowStock rows)
+
 - `FulfillOrder.Qty × StockingUnitsPerSaleUnit → QuantityOnHand` (12 errors, 6 lines: FulfillOrder, ReturnOrder transitions)
+
+
 
 ### 🔴 Surprise 2: PRE0114 — 73 Errors, BUG-A is Larger Than Predicted
 
+
+
 The pre-RC analysis estimated BUG-A would cause ~10–20 errors. Actual is 73. The scope extends to:
+
+
 
 1. **All invariant rules (lines 123–133):** Every `rule X >= '0 {Y}'` emits PRE0114 because `X`'s interpolated qualifier (`of '{Y.dimension}'` or `in '{Y}'`) is `<unknown>` at proof time, AND the literal `'0 {Y}'`'s qualifier is also `<unknown>`. Both operands are `<unknown>`, making every qualifier axis check fail.
 
+
+
 2. **All state `ensure` expressions (lines 146–207):** Same issue — interpolated qualifiers in ensure comparisons and event arg declarations both produce `<unknown>` at proof time.
+
+
 
 3. **All transition `set` actions (lines 229–323):** Complex arithmetic expressions with event args whose qualifiers are `<unknown>`.
 
+
+
 **Root cause of the larger-than-expected scope:** RC-1 fixed parser acceptance of interpolated qualifiers in field/arg declarations. The fields and args now *parse* correctly and the type system has their declared types. However, the **proof engine** (qualifier compatibility checker) does not resolve `'{StockingUnit.dimension}'` or `'{CatalogCurrency}'` to actual runtime-bound values. It treats all interpolated qualifier references as `<unknown>` at proof time. This was always the case — but before RC-1, those fields/args failed to parse, so the downstream rules/ensures/actions that referenced them never reached the type-checker. Now they do, exposing the full scope of BUG-A.
+
+
 
 **BUG-A is not just about event arg propagation into expression.** It is about the proof engine's inability to reason about interpolated qualifier identity at all — for fields, literals, event args, and derived values alike.
 
+
+
 ---
+
+
 
 ## 7. Revised Error Taxonomy Post-RC
 
+
+
 | Root Cause | Errors | Codes | Status |
+
 |------------|--------|-------|--------|
+
 | RC-1 fixed ✅ | eliminated ~56 | PRE0009 (decl), PRE0107, PRE0017, some PRE0114 cascades | Done |
+
 | RC-2 fixed ✅ | eliminated all PRE0052 | PRE0052 | Done |
+
 | Residual PRE0009 (RC-1 scope miss) | 4 | PRE0009 | New finding; 2× keyword collision (`.from`/`.to`), 2× boolean `=` ambiguity |
+
 | BUG-A (proof engine interpolated qualifier resolution) | ~73 + hidden | PRE0114, masked PRE0049, masked PRE0083 | Open — full scope now revealed |
+
 | RC-3 (compound unit dimension cancellation) | 18 | PRE0069 | **New root cause** — needs separate fix |
+
 | Sample design issues | ~10 | PRE0018 (4), PRE0049 (hidden), PRE0083 (hidden) | Persist; partially masked |
 
+
+
 ---
+
+
 
 ## 8. Recommendations
 
+
+
 1. **RC-3 is the next compiler fix.** Add dimension cancellation rule to the type checker: `quantity[A/B] × quantity[B] = quantity[A]`. Affects `set` action expressions. Localized to the arithmetic type-derivation path for compound-unit quantities. Separate from the comparison path (RC-2).
+
+
 
 2. **Residual PRE0009 on `.from`/`.to`** are a grammar conflict. `exchangerate.from` and `exchangerate.to` need contextual parsing — these field names collide with `from` and `to` keywords. Needs either a keyword-in-field-accessor allow-list or a tokenizer disambiguation rule.
 
+
+
 3. **PRE0009 on compound boolean `=`** — investigate whether `=` in `A and B or C = D` is being parsed as assignment. Likely a lookahead issue in the `ensure` expression parser when the trailing term starts with an identifier followed by `=`.
+
+
 
 4. **BUG-A scope is confirmed at 73+ errors.** No further action needed at this stage — this is the known open work. The proof engine will need to treat interpolated qualifier expressions as symbolically equal when both sides share the same interpolation root (e.g., both `'{StockingUnit.dimension}'` references are symbolically equal even though the value is runtime-bound).
 
+
+
 5. **PRE0049 and PRE0083 will surface after BUG-A is resolved.** Expect ~6 additional errors when BUG-A is fixed (3× PRE0049, 3× PRE0083). These are sample design issues, not compiler bugs.
 
+
+
 ---
+
+
 
 *Analysis by Frank — 2026-05-11T22:28:17-04:00*
 
+
+
 # TypeChecker.Expressions.cs — 3-Way Partial-Class Split Complete
 
+
+
 **Author:** George
+
 **Date:** 2026-05-11T22:12:11-04:00
+
 **Requested by:** Shane
+
 **Status:** Complete — commit `f148ca21` on `spike/Precept-V2-Radical`
 
+
+
 ---
+
+
 
 ## What Was Done
 
+
+
 Executed Frank's Option B split of `src/Precept/Pipeline/TypeChecker.Expressions.cs` (2348 lines / ~170 KB) into three partial-class files, each under 40 KB.
 
+
+
 ---
+
+
 
 ## Final File Inventory
 
+
+
 | File | Lines | Role |
+
 |------|-------|------|
+
 | `TypeChecker.Expressions.cs` *(trimmed)* | 768 | Core dispatch, literals, binary/unary ops, identifiers, postfix, `IsAssignable` |
+
 | `TypeChecker.Expressions.Callables.cs` *(new)* | 820 | Actions, quantifiers, conditionals, list literals, functions, member access/method calls |
+
 | `TypeChecker.Expressions.TypedConstants.cs` *(new)* | 776 | Assignment qualifier validation + full interpolated typed-constant grammar |
 
+
+
 ---
+
+
 
 ## Physical Relocations Executed
 
+
+
 1. **`IsAssignable`** (11 lines, ex-line 1431) → moved to tail of Core file (after `ResolvePostfixOp`). Called from all three files; now lives in the foundational layer.
+
+
 
 2. **`TryContextRetryOverload`** (87 lines, ex-lines 479–565) → moved from binary-op infrastructure block to Callables, directly before `SelectOverload` which is its only caller.
 
+
+
 ---
+
+
 
 ## Build & Test Results
 
+
+
 - `dotnet build src/Precept/` → **succeeded** (0 errors)
+
 - `dotnet test test/Precept.Tests/` → **Failed: 26, Passed: 4755** — exact match with pre-existing spike-branch baseline. No new failures.
+
+
 
 ---
 
+
+
 ## Notes
 
+
+
 - All four `using` directives (`System.Collections.Frozen`, `System.Collections.Generic`, `System.Collections.Immutable`, `Precept.Language`) were included in all three files. Cross-partial calls are valid in C# and require no duplication.
+
 - The section header comment "Expression resolution — Slice 3: Functions, Accessors, Interpolated Strings" (originally at line 1243) landed in `TypeChecker.Expressions.TypedConstants.cs` alongside `ValidateAssignmentQualifiers`. This is cosmetically mismatched but structurally harmless; it can be updated in a future cleanup pass.
+
 - The file timestamps on the new files were set to the write time (2026-05-11 22:31); git staged them cleanly and the commit went through as `f148ca21`.
+
+
 
 # Kramer — D3 Activation Event Test Modernization
 
+
+
 **Date:** 2026-05-11
+
 **Author:** Kramer (Tooling Dev)
+
 **Status:** Implemented
+
+
 
 ---
 
+
+
 ## Summary
+
+
 
 Updated `test\Precept.LanguageServer.Tests\ExtensionManifestTests.cs` so `PackageManifest_Activates_WhenAPreceptDocumentOpens` now verifies the Precept language contribution under `contributes.languages` instead of expecting the redundant `onLanguage:precept` activation event.
 
+
+
 ---
 
+
+
 ## Decisions Made
+
+
 
 ### D3: Treat language contribution as the activation contract
 
+
+
 VS Code 1.74+ auto-activates extensions for languages declared in `contributes.languages`, so the removed `onLanguage:precept` entry should stay removed. The test now asserts the durable contract (`id: "precept"`) and keeps the valid `workspaceContains:**/*.precept` activation trigger covered.
+
+
 
 ---
 
+
+
 ## Validation
 
+
+
 - Confirmed `tools\Precept.VsCode\package.json` contributes language id `precept` and only keeps `workspaceContains:**/*.precept` in `activationEvents`.
+
 - `dotnet test test\Precept.LanguageServer.Tests\ --no-restore --nologo --filter "PackageManifest_Activates"` ✅
+
+
 
 # George — D1 ConflictingModifiers Fixture Fix
 
+
+
 **Date:** 2026-05-11
+
 **Author:** George (Runtime Dev)
+
 **Status:** Implemented — pending Shane commit decision
 
+
+
 ---
+
+
 
 ## Summary
 
+
+
 Updated the two shared DSL fixtures in `test/Precept.Tests/TypeChecker/TypeCheckerAssemblyTests.cs` so the `Approve` event arg now uses `Note as string optional` instead of the contradictory `optional notempty` combination.
 
+
+
 ---
+
+
 
 ## Decisions Made
 
+
+
 ### D1: Keep `optional`, drop `notempty`
+
+
 
 The `Modifiers` catalog correctly marks `optional` and `notempty` as mutually exclusive. These fixtures predated the tightening and were invalid at the semantic layer, so the right fix is to remove `notempty` while preserving the intended nullable note payload.
 
+
+
 ### D2: Leave parser-only contradictory coverage alone
+
+
 
 `ParserCoverageGapTests` intentionally exercises parser behavior without relying on successful type checking. Those cases remain valid coverage and were not changed.
 
+
+
 ---
+
+
 
 ## Validation
 
+
+
 - `dotnet build src\Precept\Precept.csproj --no-restore` ✅
+
 - Temporary net10 validation harness against the public `Compiler.Compile(...)` API confirmed both updated fixtures (`FullPrecept` and `Integration_LoanApplication_FullSample`) now compile with **0 error diagnostics**.
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` is still blocked in this workspace by unrelated `TypedTransitionRow` constructor compile failures in `ProofLedgerTests.cs` and `ProofEngineTests.cs`.
+
 - Fixture diff is limited to the two requested `Approve` arg declarations.
+
+
 
 # Frank D4 research
 
+
+
 Date: 2026-05-11
+
 Research question: are compound-unit defaults actually unsupported, or is the D4 failure attribution wrong?
 
+
+
 ## Bottom line
+
+
 
 **The D4 premise is wrong.** The runtime **does support** compound-unit defaults like `default '0.00 USD/kg'` on `price` fields.
 
+
+
 The single failing test is real, but it is **not** failing because compound-unit defaults are unsupported. It is failing because the `SyntaxReference` example named **"Money and quantity typed fields"** contains a **different qualifier-propagation bug** in its computed `FinalCost` expression.
 
+
+
 ## Evidence
+
+
 
 ### 1) The exact default under dispute compiles
 
+
+
 Direct compile probe:
 
+
+
 ```precept
+
 precept Test
+
 field UnitPrice as price in 'USD' of 'mass' default '0.00 USD/kg'
+
 ```
 
+
+
 Result: `HasErrors=False`
+
+
 
 This shows the runtime accepts the exact shape in question.
 
+
+
 ### 2) The spec says typed constants resolve in default-value position, and `price` literals are first-class
+
+
 
 `docs/language/precept-language-spec.md`:
 
+
+
 - `default Expr` is the field default form (`:989`)
+
 - typed constants resolve from expression context, including **default value position** (`:1110-1133`)
+
 - `price` typed-constant content is explicitly documented as `<number> <currency>/<unit>` with example `'4.17 USD/each'` (`:1146-1149`)
+
 - `price` and `exchangerate` are first-class business-domain types (`:361-362`)
+
 - `price` supports compound qualification (`in 'USD/kg'`) and `in 'USD' of 'mass'` (`:615`)
+
+
 
 ### 3) The implementation path explicitly supports this
 
+
+
 Field defaults are resolved with the field's expected type and qualifiers:
+
+
 
 - `src/Precept/Pipeline/TypeChecker.cs:475-504`
 
+
+
 Typed constants in that position are validated against the expected field type:
 
+
+
 - `src/Precept/Pipeline/TypeChecker.Expressions.cs:223-253`
+
 - `src/Precept/Language/TypedConstantValidation.cs:5-19`
+
+
 
 For `price`, validation dispatches to `PriceValidator`, which accepts:
 
+
+
 ```csharp
+
 ^([+-]?\d+(?:\.\d+)?)\s+([A-Za-z]{3})/(.+)$
+
 ```
+
+
 
 and validates the currency plus UCUM unit:
 
+
+
 - `src/Precept/Language/PriceValidator.cs:8-31`
+
+
 
 So the runtime path for `default '0.00 USD/kg'` is real, intentional support.
 
+
+
 ### 4) Interpolated compound-unit defaults also compile
+
+
 
 Direct compile probe:
 
+
+
 ```precept
+
 precept Test
+
 field Currency as currency default 'USD'
+
 field Unit as unitofmeasure default 'kg'
+
 field AverageCost as price in '{Currency}' of '{Unit.dimension}' default '0 {Currency}/{Unit}'
+
 ```
+
+
 
 Result: `HasErrors=False`
 
+
+
 This matches the compound-unit default shape already used in `samples/inventory-item.precept`:
 
+
+
 - `samples/inventory-item.precept:96`
+
 - `samples/inventory-item.precept:99`
+
+
 
 ### 5) The failing syntax-reference test is about the whole example compiling
 
+
+
 Actual failing test:
 
+
+
 - `test/Precept.Mcp.Tests/LanguageToolTests.cs:361-392`
+
 - Test name: `Language_SyntaxReferenceMirrorsSourceAndExamplesCompile`
+
+
 
 What it checks:
 
+
+
 - MCP `LanguageTool.Language()` mirrors `SyntaxReference`
+
 - every `CommonPattern` snippet compiles cleanly via `CompileTool.Compile(...)`
+
 - every anti-pattern "good" snippet compiles cleanly too
+
+
 
 Observed failure:
 
+
+
 - failing pattern: **"Money and quantity typed fields"**
+
 - failure message: `syntaxReference pattern 'Money and quantity typed fields' should compile cleanly`
+
+
 
 ### 6) The failing example still fails even if the `UnitPrice` default is removed
 
+
+
 Direct compile probe of the original pattern **without** the disputed default still fails:
 
+
+
 ```precept
+
 precept ShipmentOrder
+
 field Weight as quantity of 'mass' default '0 kg'
+
 field UnitPrice as price in 'USD' of 'mass'
+
 field TotalCost as money in 'USD' <- Weight * UnitPrice
+
 field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
+
 field FinalCost as money in 'USD' <- TotalCost - (TotalCost * DiscountPercent / 100)
+
 rule DiscountPercent <= 100 because "Discount percent cannot exceed 100%"
+
 ```
+
+
 
 Result:
 
+
+
 - `PRE0114 | Error | Operands '<unknown>' and '<unknown>' have incompatible Currency qualifiers in field 'FinalCost' computed expression`
+
+
 
 Direct compile probe of the original pattern **with `FinalCost` removed** succeeds.
 
+
+
 So the problem is **not** the `UnitPrice` default.
+
+
 
 ### 7) The real bug is qualifier propagation in computed expressions
 
+
+
 A simplified repro fails too:
 
+
+
 ```precept
+
 precept Test
+
 field TotalCost as money in 'USD' default '10 USD'
+
 field DiscountPercent as decimal default 0
+
 field FinalCost as money in 'USD' <- TotalCost - (TotalCost * DiscountPercent / 100)
+
 ```
+
+
 
 Result:
 
+
+
 - `PRE0114 | Error | Operands '<unknown>' and '<unknown>' have incompatible Currency qualifiers in field 'FinalCost' computed expression`
+
+
 
 This points at a **qualifier propagation** gap for scaling operations like:
 
+
+
 - `money * decimal -> money`
+
 - `money / decimal -> money`
+
 - likely similar Pattern B cases for `quantity` and `price`
+
+
 
 That aligns with the language docs, which say qualifier-bearing scalar scaling should preserve qualifiers:
 
+
+
 - `docs/language/catalog-system.md:1848-1853`
+
+
 
 But the operation metadata currently does **not** attach a result-qualifier policy to the scaling operations:
 
+
+
 - `src/Precept/Language/Operations.cs:440-446` (`MoneyTimesDecimal`, `MoneyDivideDecimal`)
+
 - `src/Precept/Language/Operations.cs:519-525` (`QuantityTimesDecimal`, `QuantityDivideDecimal`)
+
 - `src/Precept/Language/Operations.cs:636-642` (`PriceTimesDecimal`, `PriceDivideDecimal`)
+
+
 
 Only compound-unit cancellation currently carries an explicit result qualifier policy:
 
+
+
 - `src/Precept/Language/Operation.cs:25-30`
+
 - `src/Precept/Pipeline/TypeChecker.Expressions.cs:666-677`
+
 - `src/Precept/Language/Operations.cs:570-573`
+
+
 
 ## Answer to the deliverable questions
 
+
+
 ### Does the runtime actually support `default '0.00 USD/kg'` on a `price` or `unitprice` field?
+
+
 
 **Yes.** Verified by direct compile, and supported by the default-expression/type-checker/price-validator path.
 
+
+
 ### What is the actual failing test and what does it check?
+
+
 
 **Failing test:** `test/Precept.Mcp.Tests/LanguageToolTests.cs` → `Language_SyntaxReferenceMirrorsSourceAndExamplesCompile`
 
+
+
 It checks that all `SyntaxReference.CommonPatterns` and anti-pattern fix snippets compile cleanly through `CompileTool.Compile(...)`. The failure is on the **"Money and quantity typed fields"** common pattern.
+
+
 
 ### What is the correct fix?
 
+
+
 **Not** "implement compound-unit default support" — that support already exists.
+
+
 
 **Not** "fix the test" — the test is correctly catching that the published example does not compile.
 
+
+
 The right conclusion is:
 
+
+
 1. **Do not remove** `default '0.00 USD/kg'` from `SyntaxReference.cs`.
+
 2. **Keep the test.**
+
 3. **Fix the real bug**: qualifier propagation for computed/scaled qualifier-bearing values (at minimum the money-scaling path exposed by `FinalCost`).
+
+
 
 If you need a temporary docs-only unblock, simplify the syntax-reference example's `FinalCost` expression; but that would be a workaround, not the real fix.
 
+
+
 ### If compound-unit defaults were unsupported, should that be a feature request?
+
+
 
 Not applicable, because they are already supported.
 
+
+
 If anything should be filed, it is a **runtime bug** for qualifier propagation in Pattern-B scalar scaling / related computed-expression qualifier preservation, not a feature request for compound-unit defaults.
+
+
 
 ## Recommended disposition for D4
 
+
+
 **Drop D4 as currently framed.**
+
+
 
 Replace it with something like:
 
+
+
 - **D4 (reframed):** fix qualifier propagation for scalar operations on qualifier-bearing types so syntax-reference money/price examples compile cleanly.
+
+
 
 That matches the actual failure and preserves the correct `UnitPrice` default example.
 
+
+
 # George RC-3 Done
 
+
+
 ## What I found
+
 - The PRE0069 inventory fallout was coming from assignment qualifier validation, not typed-constant form parsing.
+
 - `QuantityTimesQuantity` already existed in the Operations catalog, but the checker still flattened binary expressions to leaf operands during assignment validation.
+
 - That meant `qty[D] * qty[A/D]` compared both leaves directly to the target field and emitted false dimension mismatches instead of validating the product result.
 
+
+
 ## What I changed
+
 - Added `ResultQualifierPolicy.CompoundUnitCancellation` to operation metadata and assigned it to `OperationKind.QuantityTimesQuantity`.
+
 - Added `CompoundUnitCancellationRequired` as the typed-expression qualifier binding emitted for that policy.
+
 - Updated assignment qualifier validation to derive the numerator unit/dimension for cancelling products (`A/B × B -> A` and `B × A/B -> A`) before recursing into child operands.
+
 - Kept the fallback path intact so non-cancelling products still report mismatch diagnostics.
+
 - Added 3 regression checks in `test/Precept.Tests/TypeChecker/TypeCheckerExpressionTests.cs` (2 commutative cancellation rows + 1 non-cancelling guardrail).
 
+
+
 ## PRE0069 count
+
 - Before RC-3 (Frank MCP baseline): 18 PRE0069 diagnostics in `samples/inventory-item.precept`.
+
 - After RC-3 (`precept_compile` via MCP on current workspace): 0 PRE0069 diagnostics.
 
+
+
 ## inventory-item.precept result
+
 - The sample dropped from 105 total diagnostics in Frank's post-RC baseline to 87 now.
+
 - The expected PRE0069 drop landed.
+
 - Remaining MCP diagnostics after RC-3 are: PRE0009 x4, PRE0018 x10, PRE0114 x73.
 
+
+
 ## Validation
+
 - `dotnet build src/Precept/Precept.csproj --no-restore` ✅
+
 - `dotnet test test/Precept.Tests/Precept.Tests.csproj --no-restore` is still blocked by the pre-existing `TypedTransitionRow` constructor fallout in `ProofEngineTests.cs` and `ProofLedgerTests.cs` (same unrelated failure seen at baseline).
+
 - MCP checks run successfully with `precept_ping` + `precept_compile` using the repo-local MCP launcher.
 
+
+
 ## Edge cases
+
 - RC-3 currently targets the intended single-denominator compound-unit form (`A/B × B -> A`, commutative both ways).
+
 - Interpolated unit holes are handled symbolically by deriving `{Unit.dimension}` strings from `{Unit}` placeholders.
+
 - Multi-slash compound units are intentionally left outside RC-3 scope; they still fall back to existing mismatch behavior.
+
+
 
 # George D2 done
 
+
+
 - Updated the three `TypeCheckerAssignmentQualifierTests` exchangerate fixtures from `exchangerate from 'USD' to 'EUR'`-style syntax to the current `exchangerate in 'USD' to 'EUR'` form.
+
 - `dotnet build src\Precept\Precept.csproj --no-restore` passed.
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo --filter "TypeCheckerAssignmentQualifier"` was blocked by pre-existing `TypedTransitionRow` constructor compile errors in `test\Precept.Tests\ProofEngineTests.cs` and `test\Precept.Tests\ProofLedgerTests.cs`, so the three qualifier tests could not be re-run to completion in this workspace.
+
+
 
 # George C3 done
 
+
+
 ## Decision
+
 - `samples/inventory-item.precept` was wrong: the ensure expressions meant equality, not assignment. The sample now uses `==` on the four affected ensure lines.
+
 - The compiler behavior stays unchanged semantically: `=` remains invalid in expression context. Instead, the parser now emits `AssignmentInExpressionContext` with an explicit `use '=='` message and recovers by consuming the right-hand side.
 
+
+
 ## Why
+
 - The previous failure mode surfaced as a confusing downstream parse error on `because`, which hid the real mistake.
+
 - This is a usability fix plus sample cleanup, not a grammar change.
 
+
+
 ## Validation
+
 - `dotnet build src\Precept\Precept.csproj --nologo`
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo --filter "FullyQualifiedName~Precept.Tests.Parser.ParserExpressionTests.Negative_AssignmentInEnsureExpression_EmitsAssignmentInExpressionContext_AndRecoversBecauseClause|FullyQualifiedName~Precept.Tests.DiagnosticsTests.ParseStageCodes_AllHaveParseStage"`
+
 - Compiling `samples/inventory-item.precept` through `Precept.Compiler` shows no `ExpectedToken` or `AssignmentInExpressionContext` diagnostics on sample ensure lines 150, 156, 173, and 174.
 
+
+
 ## Notes
+
 - The full `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` run still fails on two pre-existing unrelated tests: `ParserSlice8Tests.Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` and `ProofEngineTypedArgQualifierTests.InventoryItem_Sample_Has_No_PRE0114_Diagnostics`.
+
+
 
 # George C2 done
 
+
+
 ## What I changed
+
 - Broke the parser-side circular dependency by changing `Parser.KeywordsValidAsMemberName` to reuse `Tokens.KeywordsValidAsMemberName` directly.
+
 - Kept the catalog-derived source of truth intact: `Tokens.KeywordsValidAsMemberName` still derives from `Types.All` accessor names mapped back through `Tokens.Keywords`.
+
 - Added parser/runtime regression coverage for exchangerate keyword accessors so `from` and `to` stay valid after `.` and `FxRate.from` / `FxRate.to` compile cleanly.
 
+
+
 ## Validation
+
 - `dotnet build src\Precept\Precept.csproj --nologo` ✅
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` is still blocked by the pre-existing `TypedTransitionRow` constructor compile failures in `test\Precept.Tests\ProofLedgerTests.cs` and `test\Precept.Tests\ProofEngineTests.cs`.
+
 - Manual compiler validation via the built `Precept.dll` succeeds for a focused `exchangerate` accessor snippet using `FxRate.from` and `FxRate.to`.
 
+
+
 ## inventory-item.precept
+
 - The sample no longer needs a parser-side keyword-member-name special case for `.from` / `.to`; the catalog path resolves them correctly.
+
 - Current manual compile output for the workspace sample shows **0** `ExpectedToken` / PRE0009 diagnostics. Remaining fallout is now semantic-only (`UnprovedQualifierCompatibility x66`, `TypeMismatch x8`).
+
+
 
 # George Bug031 fix
 
+
+
 ## Decision
+
 - Keep the `Bug031` precept source unchanged. The `from Draft on Submit -> reject "Bad amount: {Amount}"` row is intentional regression coverage for interpolated `reject` / `because` parsing.
+
 - Update `Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` to expect exactly one graph warning: `nameof(DiagnosticCode.AlwaysRejecting)` with `Severity.Warning`.
 
+
+
 ## Why
+
 - Since commit `3d658bd6`, the graph analyzer correctly reports `AlwaysRejecting` when every row for an event rejects.
+
 - The old `Diagnostics.Should().BeEmpty()` assertion was stale. Expecting the warning preserves the parser regression test without suppressing a valid analyzer diagnostic.
 
+
+
 ## Validation
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --filter "Bug031" --no-build`
+
 - `dotnet test`
+
 - Result: the filtered Bug031 test passes and `Precept.Tests` is green; the repo-wide run still has 7 unrelated existing failures (2 in `Precept.Mcp.Tests`, 5 in `Precept.LanguageServer.Tests`).
+
+
 
 # D3 research: `onLanguage:precept`
 
+
+
 ## Conclusion
+
 - **VS Code warning correct?** **Yes.** In `tools/Precept.VsCode/package.json`, the extension already contributes language id `precept` under `contributes.languages`.
+
 - VS Code's activation-events docs state: **beginning with VS Code 1.74.0, languages contributed by an extension do not require a matching `onLanguage:<id>` activation event**.
+
 - This extension targets `"vscode": "^1.109.0"`, so the modern behavior applies. Manually adding `"onLanguage:precept"` would be redundant.
 
+
+
 ## Evidence
+
 ### Manifest
+
 `tools/Precept.VsCode/package.json`
+
 - `activationEvents`: only `"workspaceContains:**/*.precept"`
+
 - `contributes.languages[0].id`: `"precept"`
+
+
 
 That means opening a `.precept` file already activates the extension via the contributed language registration.
 
+
+
 ## Failing test
+
 The actual failure is:
+
 - **Project:** `test/Precept.LanguageServer.Tests`
+
 - **Test:** `ExtensionManifestTests.PackageManifest_Activates_WhenAPreceptDocumentOpens`
+
 - **File:** `test/Precept.LanguageServer.Tests/ExtensionManifestTests.cs:32-41`
 
+
+
 Current assertion:
+
 - requires `activationEvents` to contain `"onLanguage:precept"`
+
 - also requires `"workspaceContains:**/*.precept"`
 
+
+
 Observed failure from `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --filter ExtensionManifestTests --nologo`:
+
 - `Expected activationEvents {"workspaceContains:**/*.precept"} to contain "onLanguage:precept".`
 
+
+
 ## Why it fails
+
 The test encodes an outdated VS Code assumption. The manifest is behaving correctly for current VS Code versions; the test is expecting a redundant legacy entry.
 
+
+
 ## Correct fix
+
 **Update the test, do not add `onLanguage:precept` back.**
 
+
+
 Recommended test change:
+
 - stop asserting that `activationEvents` contains `"onLanguage:precept"`
+
 - instead assert:
+
   - `contributes.languages` contains language id `precept`
+
   - `activationEvents` still contains `"workspaceContains:**/*.precept"` if that workspace-level activation remains desired
 
+
+
 ## Bottom line
+
 - **Redundant?** Yes.
+
 - **Root cause of D3 failure?** The test is wrong.
+
 - **Correct remediation?** Update `ExtensionManifestTests`, not `tools/Precept.VsCode/package.json`.
+
+
 
 # Deep Dive Analysis — inventory-item.precept Compile Failures
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
+
+
 
 **Date:** 2026-05-11T21:54:11-04:00
 
+
+
 **Requested By:** Shane
+
+
 
 **Scope:** Root cause analysis of 161 compile errors in `samples/inventory-item.precept`
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -853,31 +1787,63 @@ Recommended test change:
 
 
 
+
+
+
+
 The 161 errors in `samples/inventory-item.precept` stem from **three distinct root causes**, with the remaining errors being cascade noise. The sample file's BUG-A/BUG-B/BUG-C classification is **mostly accurate but incomplete** — there's a previously undocumented parser-level blocker that gates all field qualifier interpolation.
+
+
+
+
 
 
 
 | Root Cause | Error Codes | Count | Layer | Complexity |
 
+
+
 |------------|-------------|-------|-------|------------|
+
+
 
 | **RC-1:** Parser rejects interpolated strings in field/arg qualifiers | PRE0009 | ~20 | Parser | Small fix |
 
+
+
 | **RC-2:** Missing compound-unit patterns in TypeChecker | PRE0052 | ~15 | TypeChecker | Medium |
+
+
 
 | **RC-3:** `is set` on non-optional field | PRE0049 | 2 | TypeChecker | Sample bug |
 
+
+
 | **Cascade:** Undeclared args/fields from failed parsing | PRE0107, PRE0017 | ~50 | — | — |
+
+
 
 | **Cascade:** Qualifier compatibility failures | PRE0114 | ~70 | — | — |
 
+
+
 | **Secondary:** Division by zero in WAC calculation | PRE0083 | 3 | ProofEngine | Sample design |
+
+
 
 | **Secondary:** Type mismatch in cost comparison | PRE0018 | 2 | TypeChecker | Sample design |
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -885,7 +1851,15 @@ The 161 errors in `samples/inventory-item.precept` stem from **three distinct ro
 
 
 
+
+
+
+
 ### RC-1: Parser Does Not Accept Interpolated Strings in Qualifier Positions
+
+
+
+
 
 
 
@@ -893,29 +1867,59 @@ The 161 errors in `samples/inventory-item.precept` stem from **three distinct ro
 
 
 
+
+
+
+
 **The Blocker:**
+
+
+
+
 
 
 
 ```csharp
 
+
+
 // Line 641-647 in Parser.cs
+
+
 
 if (Peek().Kind != TokenKind.TypedConstant)  // ← Only accepts static typed constants!
 
+
+
 {
+
+
 
     _diagnostics.Add(DiagnosticsCatalog.Create(
 
+
+
         DiagnosticCode.ExpectedToken, Peek().Span,
+
+
 
         "typed constant", Peek().Text));
 
+
+
     continue;
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -923,7 +1927,15 @@ The parser's qualifier-parsing method **only** accepts `TokenKind.TypedConstant`
 
 
 
+
+
+
+
 **Affected Constructs:**
+
+
+
+
 
 
 
@@ -931,17 +1943,35 @@ All field/arg declarations with `in '...'` or `of '...'` qualifiers containing i
 
 
 
+
+
+
+
 ```precept
+
+
 
 # These all fail at the parser level — never reach type checker
 
+
+
 field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}'
+
+
 
 field QuantityOnHand as quantity of '{StockingUnit.dimension}'
 
+
+
 event ReceiveShipment(PurchaseQty as quantity of '{PurchaseUnit.dimension}')
 
+
+
 ```
+
+
+
+
 
 
 
@@ -949,7 +1979,15 @@ event ReceiveShipment(PurchaseQty as quantity of '{PurchaseUnit.dimension}')
 
 
 
+
+
+
+
 **Fix Approach (Small):**
+
+
+
+
 
 
 
@@ -957,53 +1995,107 @@ Extend `TryParseQualifiers()` to also accept `TypedConstantStart`:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 if (Peek().Kind == TokenKind.TypedConstant)
 
+
+
 {
+
+
 
     var valueToken = Advance();
 
+
+
     qualifiers.Add(new ParsedQualifier(
 
+
+
         slot.Preposition, slot.Axis,
+
+
 
         valueToken.Text, valueToken.Span));
 
+
+
     lastSpan = valueToken.Span;
 
+
+
 }
+
+
 
 else if (Peek().Kind == TokenKind.TypedConstantStart)
 
+
+
 {
+
+
 
     // Parse as InterpolatedTypedConstantExpression, store in qualifier
 
+
+
     var interpolatedExpr = ParseInterpolatedTypedConstant();
+
+
 
     qualifiers.Add(new ParsedQualifier(
 
+
+
         slot.Preposition, slot.Axis,
+
+
 
         interpolatedExpr));  // Needs ParsedQualifier to accept expression
 
+
+
     lastSpan = interpolatedExpr.Span;
 
+
+
 }
+
+
 
 ```
 
 
 
+
+
+
+
 This requires:
+
+
 
 1. Extend `ParsedQualifier` to hold either a literal string or a `ParsedExpression`
 
+
+
 2. Extend `ParsedTypeReference` to carry the richer qualifier form
 
+
+
 3. Extend TypeChecker to resolve interpolated qualifiers at compile time
+
+
+
+
 
 
 
@@ -1011,7 +2103,15 @@ This requires:
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1019,7 +2119,15 @@ This requires:
 
 
 
+
+
+
+
 **Location:** `TypeChecker.Expressions.cs:1873–1880` — `QuantityForms[]`
+
+
+
+
 
 
 
@@ -1027,17 +2135,35 @@ This requires:
 
 
 
+
+
+
+
 Even if RC-1 is fixed, the TypeChecker's interpolated typed constant resolution lacks patterns for compound units in rule/ensure expressions. The sample file uses patterns like:
+
+
+
+
 
 
 
 ```precept
 
+
+
 rule QuantityOnHand >= '0 {StockingUnit}'           # Pattern: T(num) T(' ') H[unit]
+
+
 
 rule StockingUnitsPerPurchaseUnit > '0 {A}/{B}'     # Pattern: T(num) T(' ') H[unit] T('/') H[unit]
 
+
+
 ```
+
+
+
+
 
 
 
@@ -1045,19 +2171,39 @@ rule StockingUnitsPerPurchaseUnit > '0 {A}/{B}'     # Pattern: T(num) T(' ') H[u
 
 
 
+
+
+
+
 | # | Pattern | Form | Slot Assignments |
+
+
 
 |---|---------|------|------------------|
 
+
+
 | Q1 | `'{x}'` | H[whole-value] | whole-value |
+
+
 
 | Q2 | `'{Wt} kg'` | H[magnitude] T(unit) | magnitude |
 
+
+
 | Q3 | `'5 {Unit}'` | T(num) H[unit] | unit |
+
+
 
 | Q4 | `'{Wt} {Unit}'` | H[magnitude] H[unit] | magnitude, unit |
 
+
+
 | Q5 | `'{M} {N}/{D}'` | H[mag] H[num-unit] T('/') H[denom-unit] | magnitude, numUnit, denomUnit |
+
+
+
+
 
 
 
@@ -1065,15 +2211,31 @@ rule StockingUnitsPerPurchaseUnit > '0 {A}/{B}'     # Pattern: T(num) T(' ') H[u
 
 
 
+
+
+
+
 | # | Pattern | Example | Slot Assignments |
+
+
 
 |---|---------|---------|------------------|
 
+
+
 | Q6 | `T(num) T(' ') H[unit] T('/') H[unit]` | `'0 {A}/{B}'` | numeratorUnit, denominatorUnit |
+
+
 
 | Q7 | `T(num) T(' ') H[unit] T('/') T(unit)` | `'0 {A}/each'` | numeratorUnit |
 
+
+
 | Q8 | `T(num) T(' ') T(unit) T('/') H[unit]` | `'0 each/{B}'` | denominatorUnit |
+
+
+
+
 
 
 
@@ -1081,7 +2243,15 @@ rule StockingUnitsPerPurchaseUnit > '0 {A}/{B}'     # Pattern: T(num) T(' ') H[u
 
 
 
+
+
+
+
 **Fix Approach (Medium):**
+
+
+
+
 
 
 
@@ -1089,45 +2259,91 @@ Add missing forms to `QuantityForms[]` and `UnitOfMeasureForms[]`:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // Add to QuantityForms[] — lines 1873-1880
 
+
+
 // Q6: "0 " H[numerator] "/" H[denominator]
+
+
 
 new([MatchNumericSpace, MatchSlash, MatchEmpty], [InterpolationSlotKind.NumeratorUnit, InterpolationSlotKind.DenominatorUnit]),
 
+
+
 // Q7: "0 " H[numerator] "/each"
+
+
 
 new([MatchNumericSpace, MatchSlashUnit], [InterpolationSlotKind.NumeratorUnit]),
 
+
+
 // Q8: "0 each/" H[denominator]
+
+
 
 new([MatchNumericSpaceUnitSlash, MatchEmpty], [InterpolationSlotKind.DenominatorUnit]),
 
+
+
 ```
+
+
+
+
 
 
 
 Add helper matcher:
 
+
+
 ```csharp
+
+
 
 private static bool MatchNumericSpaceUnitSlash(string text)
 
+
+
 {
+
+
 
     if (!text.EndsWith("/", StringComparison.Ordinal)) return false;
 
+
+
     var content = text[..^1];
+
+
 
     var spaceIdx = content.IndexOf(' ');
 
+
+
     return spaceIdx > 0 && IsNumericLiteral(content[..spaceIdx]) && IsUnitName(content[(spaceIdx + 1)..]);
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -1135,7 +2351,15 @@ private static bool MatchNumericSpaceUnitSlash(string text)
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1143,17 +2367,35 @@ private static bool MatchNumericSpaceUnitSlash(string text)
 
 
 
+
+
+
+
 **3a. `is set` on Non-Optional Field (PRE0049)**
+
+
+
+
 
 
 
 ```precept
 
+
+
 in Listed ensure Sku is set because "SKU must be assigned before listing"  # LINE 137
+
+
 
 in LowStock ensure Sku is set because "SKU must be assigned"               # LINE 145
 
+
+
 ```
+
+
+
+
 
 
 
@@ -1161,7 +2403,15 @@ in LowStock ensure Sku is set because "SKU must be assigned"               # LIN
 
 
 
+
+
+
+
 **Fix:** Remove these ensure clauses. The `notempty` modifier already guarantees Sku has a value.
+
+
+
+
 
 
 
@@ -1169,11 +2419,23 @@ in LowStock ensure Sku is set because "SKU must be assigned"               # LIN
 
 
 
+
+
+
+
 ```precept
+
+
 
 in Listed ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost  # LINE 140
 
+
+
 ```
+
+
+
+
 
 
 
@@ -1181,11 +2443,23 @@ This compares `price × quantity` (yields `money`) against `AverageCost` (which 
 
 
 
+
+
+
+
 **Fix:** Either:
+
+
 
 - Change to `ListPrice >= AverageCost / StockingUnitsPerSaleUnit`  (price vs price), or
 
+
+
 - Change to `ListPrice * StockingUnitsPerSaleUnit >= AverageCost * '{one stocking unit}'` if the intent is money vs money
+
+
+
+
 
 
 
@@ -1193,11 +2467,23 @@ This compares `price × quantity` (yields `money`) against `AverageCost` (which 
 
 
 
+
+
+
+
 ```precept
+
+
 
 -> set AverageCost = TotalInventoryCost / QuantityOnHand  # LINES 223, 229, 234
 
+
+
 ```
+
+
+
+
 
 
 
@@ -1205,17 +2491,35 @@ The proof engine correctly flags that `QuantityOnHand` can be zero after the div
 
 
 
+
+
+
+
 **Fix:** Add a guard or use conditional:
+
+
 
 ```precept
 
+
+
 -> set AverageCost = if QuantityOnHand > '0 {StockingUnit}' then TotalInventoryCost / QuantityOnHand else '0 {CatalogCurrency}/{StockingUnit}'
+
+
 
 ```
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1223,25 +2527,51 @@ The proof engine correctly flags that `QuantityOnHand` can be zero after the div
 
 
 
+
+
+
+
 **Slice A2B** added compound-unit interpolation patterns for `unitofmeasure` (U2: `'{A}/{B}'`) and `quantity` (Q5: `'{M} {A}/{B}'`).
+
+
+
+
 
 
 
 **What A2B Fixed:**
 
+
+
 - U2 pattern: `'{StockingUnit}/{PurchaseUnit}'` as a whole `unitofmeasure` value
+
+
 
 - Q5 pattern: `'{Magnitude} {Numerator}/{Denominator}'` with 3 holes
 
 
 
+
+
+
+
 **What A2B Did NOT Fix:**
+
+
 
 - RC-1 (parser blocker) — A2B is TypeChecker-only, doesn't touch Parser
 
+
+
 - Patterns with numeric prefix + 2 unit holes (`'0 {A}/{B}'`)
 
+
+
 - Field qualifier positions — even if A2B's patterns matched, RC-1 blocks them
+
+
+
+
 
 
 
@@ -1249,7 +2579,15 @@ The proof engine correctly flags that `QuantityOnHand` can be zero after the div
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1257,15 +2595,31 @@ The proof engine correctly flags that `QuantityOnHand` can be zero after the div
 
 
 
+
+
+
+
 | Cascade Type | Trigger | Error Code | Approx Count |
+
+
 
 |--------------|---------|------------|--------------|
 
+
+
 | Arg not declared | Event arg parsing failed (RC-1) | PRE0107 | ~30 |
+
+
 
 | Field not declared | Failed defaults | PRE0017 | ~10 |
 
+
+
 | Qualifier mismatch | Unknown arg type → unknown qualifier | PRE0114 | ~70 |
+
+
+
+
 
 
 
@@ -1273,7 +2627,15 @@ The proof engine correctly flags that `QuantityOnHand` can be zero after the div
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1281,7 +2643,15 @@ The proof engine correctly flags that `QuantityOnHand` can be zero after the div
 
 
 
+
+
+
+
 The sample file header's BUG-A/BUG-B/BUG-C classification needs updating:
+
+
+
+
 
 
 
@@ -1289,7 +2659,15 @@ The sample file header's BUG-A/BUG-B/BUG-C classification needs updating:
 
 
 
+
+
+
+
 Original description: "Event arg unit qualifiers not propagated into set-action or ensure expressions."
+
+
+
+
 
 
 
@@ -1297,7 +2675,15 @@ Original description: "Event arg unit qualifiers not propagated into set-action 
 
 
 
+
+
+
+
 ### BUG-B (PRE0114): Quantity vs Typed Constant Literal — **Covered by Slice 9**
+
+
+
+
 
 
 
@@ -1305,7 +2691,15 @@ Original description: "Quantity field compared against typed constant literal fa
 
 
 
+
+
+
+
 **Status:** This was indirectly covered by Slice 9 (dimension-only field false positive fix). Simple comparisons like `QuantityOnHand >= '0 each'` work today. The remaining failures are compound-unit patterns (RC-2).
+
+
+
+
 
 
 
@@ -1313,17 +2707,35 @@ Original description: "Quantity field compared against typed constant literal fa
 
 
 
+
+
+
+
 Original description: "Interpolated typed constants in quantity/price qualifiers and defaults not yet implemented."
+
+
+
+
 
 
 
 **Status:**
 
+
+
 - Expression-level interpolation (defaults, rules, ensures): **Implemented for simple patterns**
+
+
 
 - Compound-unit patterns: **Missing (RC-2)**
 
+
+
 - Field/arg qualifier interpolation: **Parser blocks (RC-1)**
+
+
+
+
 
 
 
@@ -1331,49 +2743,99 @@ Original description: "Interpolated typed constants in quantity/price qualifiers
 
 
 
+
+
+
+
 ```precept
+
+
 
 # THIS FILE DOES NOT COMPILE — it expresses the intended design.
 
+
+
 # Pending compiler issues (spike/Precept-V2-Radical):
 
+
+
 #
+
+
 
 #   ROOT CAUSE 1 (Parser): Interpolated typed constants in field/arg qualifier
 
+
+
 #          positions (`in '...'`, `of '...'`) are rejected by the parser — it only
+
+
 
 #          accepts static typed constants. Affects all compound-unit fields and
 
+
+
 #          dimension-qualified fields/args.
 
+
+
 #
+
+
 
 #   ROOT CAUSE 2 (TypeChecker): Missing compound-unit interpolation patterns for
 
+
+
 #          forms like `'0 {Unit}/{Unit}'`. Affects rules/ensures that bound-check
+
+
 
 #          compound-unit quantities.
 
+
+
 #
+
+
 
 #   BUG-A (PRE0114): Event arg qualifiers not propagated into expressions —
 
+
+
 #          cannot be verified until RC-1 ships.
+
+
 
 #
 
+
+
 #   SAMPLE ISSUES: Line 137/145 use `is set` on non-optional field; Line 140/147
+
+
 
 #          have money/price type mismatch; Lines 223/229/234 have unguarded
 
+
+
 #          division by zero.
+
+
 
 ```
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1381,11 +2843,23 @@ Original description: "Interpolated typed constants in quantity/price qualifiers
 
 
 
+
+
+
+
 1. **RC-1 (Parser qualifier interpolation)** — Highest impact, unblocks everything
+
+
 
 2. **RC-2 (Missing compound-unit patterns)** — Completes A2B's coverage
 
+
+
 3. **Sample file fixes** — Update header, fix design issues
+
+
+
+
 
 
 
@@ -1393,7 +2867,15 @@ Original description: "Interpolated typed constants in quantity/price qualifiers
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1401,23 +2883,47 @@ Original description: "Interpolated typed constants in quantity/price qualifiers
 
 
 
+
+
+
+
 | File | Change |
+
+
 
 |------|--------|
 
+
+
 | `src/Precept/Pipeline/Parser.cs` | Extend `TryParseQualifiers()` to accept `TypedConstantStart` |
+
+
 
 | `src/Precept/Language/ParsedTypeReference.cs` | Extend `ParsedQualifier` to hold expressions |
 
+
+
 | `src/Precept/Pipeline/TypeChecker.Expressions.cs` | Add missing Q6/Q7/Q8 patterns to `QuantityForms[]` |
 
+
+
 | `samples/inventory-item.precept` | Update header comment, fix design issues |
+
+
 
 | `docs/Working/typed-constants-and-proof-coverage-plan.md` | Add Slice 2C for parser qualifier support |
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1425,27 +2931,55 @@ Original description: "Interpolated typed constants in quantity/price qualifiers
 
 
 
+
+
+
+
 This analysis confirms that the 161 errors are traceable to 3 root causes (2 compiler, 1 sample design) plus cascade noise. The BUG classification needs refinement to distinguish parser-level blockers from TypeChecker pattern gaps.
+
+
+
+
 
 
 
 —Frank
 
+
+
 # Temporal Price Denominator Type System Extension — Slice 12 Unblock
+
+
+
+
 
 
 
 **By:** Frank
 
+
+
 **Date:** 2026-05-11T19:35:20-04:00
 
+
+
 **Status:** Design complete — awaiting review
+
+
 
 **Context:** George blocked on Slice 12 (G8 + G13). Price has no temporal qualifier axis. This design provides the prerequisite type system work.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1453,7 +2987,15 @@ This analysis confirms that the 161 errors are traceable to 3 root causes (2 com
 
 
 
+
+
+
+
 **Price's `of` qualifier accepts temporal dimension values (`'date'`, `'time'`) in addition to physical dimensions (`'mass'`, `'length'`, `'count'`).** No new `per` keyword. No new preposition syntax. The existing `of` preposition on price already means "denominator dimension category" — temporal dimensions are a valid category.
+
+
+
+
 
 
 
@@ -1461,7 +3003,15 @@ The extension is type-gated: only `TypeKind.Price` accepts temporal values on th
 
 
 
+
+
+
+
 Duration gets `ImpliedQualifiers: [TemporalDimension(Time)]` on its `TypeMeta` — encoding "duration is intrinsically time-dimension" as catalog metadata. `ResolveQualifierOnAxis` reads both declared and implied qualifiers.
+
+
+
+
 
 
 
@@ -1469,7 +3019,15 @@ Duration gets `ImpliedQualifiers: [TemporalDimension(Time)]` on its `TypeMeta` �
 
 
 
+
+
+
+
 ## Alternatives Rejected
+
+
+
+
 
 
 
@@ -1477,7 +3035,15 @@ Duration gets `ImpliedQualifiers: [TemporalDimension(Time)]` on its `TypeMeta` �
 
 
 
+
+
+
+
 **Why rejected:** Requires `TokenKind.Per`, token catalog entry, parser changes, completions, grammar regeneration, semantic tokens — a full language surface addition. The `of` preposition already covers the semantic need ("denominator dimension category"). Adding `per` creates two synonymous qualifier forms (`price of 'time'` vs `price per 'hours'`) with subtly different granularity (dimension vs unit) that the type system must reconcile. No other Precept type has dual qualifier prepositions for the same conceptual axis. Violated the uniform qualifier model.
+
+
+
+
 
 
 
@@ -1485,7 +3051,15 @@ Duration gets `ImpliedQualifiers: [TemporalDimension(Time)]` on its `TypeMeta` �
 
 
 
+
+
+
+
 **Why rejected:** Conflates two distinct registries under one axis. Physical dimensions are UCUM-derived strings; temporal dimensions are `PeriodDimension` enum values. Merging them requires either a polymorphic `DeclaredQualifierMeta.Dimension` (breaking the DU principle — each subtype should carry exactly the fields its consumers need) or a union axis that every consumer must pattern-match against. The current design keeps them as separate DU subtypes and bridges them at the comparison layer (`ExtractComparableValue` string comparison). The string values are disjoint by construction — no collision risk.
+
+
+
+
 
 
 
@@ -1493,11 +3067,23 @@ Duration gets `ImpliedQualifiers: [TemporalDimension(Time)]` on its `TypeMeta` �
 
 
 
+
+
+
+
 **Why rejected:** George's original finding. `ResolveQualifierOnAxis` returns null for temporal qualifiers on price → obligation always unresolved → spurious diagnostics on ALL price × period/duration arithmetic. This is the scenario that broke Slice 12.
 
 
 
+
+
+
+
 ## Rationale
+
+
+
+
 
 
 
@@ -1505,7 +3091,15 @@ Price's denominator is polymorphic: physical (kg, each, mg) or temporal (hours, 
 
 
 
+
+
+
+
 The `of` preposition is the natural carrier because it already means "denominator dimension category" on price. `price of 'mass'` says "the denominator is in the mass family." `price of 'time'` says "the denominator is in the time family (hours/minutes/seconds)." Same concept, different domain.
+
+
+
+
 
 
 
@@ -1513,7 +3107,15 @@ The `PeriodDimension.Time` vs `PeriodDimension.Date` distinction maps exactly to
 
 
 
+
+
+
+
 ## Tradeoff Accepted
+
+
+
+
 
 
 
@@ -1521,21 +3123,43 @@ Authors must write `price of 'time'` or `price of 'date'` to enable temporal cha
 
 
 
+
+
+
+
 ## Impact
+
+
+
+
 
 
 
 - **LOC:** ~30 implementation + ~50 tests (Slice 11B), ~8 + ~36 tests (revised Slice 12)
 
+
+
 - **Files:** Type.cs, Types.cs, TypeChecker.cs, ProofEngine.cs, Operations.cs
 
+
+
 - **Breaking:** No existing syntax breaks. New diagnostics appear only when chain requirements are added (Slice 12), and only on operations between qualified operands.
+
+
 
 - **Dependency chain:** Slice 8 → Slice 11B → Slice 12
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1543,23 +3167,47 @@ Authors must write `price of 'time'` or `price of 'date'` to enable temporal cha
 
 
 
+
+
+
+
 This design is complete and ready for implementation. Slice 11B is specified at method-level detail in `docs/Working/typed-constants-and-proof-coverage-plan.md`. George can proceed with implementation once this design is reviewed and the dependency slices (8, 9) are in place.
+
+
 
 # Slice 12 Blocked: Price Has No Temporal Qualifier Axis
 
 
 
+
+
+
+
 **By:** George
+
+
 
 **Date:** 2026-05-11T18:41:49-04:00
 
+
+
 **Status:** 🚫 Blocked — prerequisite missing
+
+
 
 **Context:** Slice 12 (G8 + G13) asks for `QualifierChainProofRequirement` on `PriceTimesPeriod` and `PriceTimesDuration`. Investigation reveals the price type cannot carry temporal denominator information.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1567,19 +3215,39 @@ This design is complete and ready for implementation. Slice 11B is specified at 
 
 
 
+
+
+
+
 The plan assumes `price per 'month'` declares a temporal qualifier axis. In reality:
+
+
+
+
 
 
 
 1. **No `per` preposition exists** — `TokenKind.Per` does not exist in the token catalog.
 
+
+
 2. **Price uses `QS_CurrencyAndDimension`** — `in` → `QualifierAxis.Currency`, `of` → `QualifierAxis.Dimension` (physical). There is no temporal axis on price.
+
+
 
 3. **Period uses `QS_TemporalUnitOrDimension`** — `of` → `QualifierAxis.TemporalDimension`, `in` → `QualifierAxis.TemporalUnit`. These are distinct from price's physical `Dimension` axis.
 
+
+
 4. **Duration has no qualifier shape at all** — it is intrinsically time-dimension, unqualified.
 
+
+
 5. **`ExtractComparableValue` doesn't handle `TemporalDimension` or `TemporalUnit`** — chain comparison returns null for temporal qualifiers.
+
+
+
+
 
 
 
@@ -1587,13 +3255,27 @@ The plan assumes `price per 'month'` declares a temporal qualifier axis. In real
 
 
 
+
+
+
+
 If we add `QualifierChainProofRequirement(PPrice, QualifierAxis.Dimension, PPeriod, QualifierAxis.TemporalDimension, ...)`:
+
+
 
 - Any `price of 'mass' * period of 'date'` would fail because `ExtractComparableValue(TemporalDimension(Date))` returns null.
 
+
+
 - Unqualified price × period would also fail (null left side).
 
+
+
 - This **breaks existing valid operations** — price × period currently compiles clean when both sides are valid.
+
+
+
+
 
 
 
@@ -1601,15 +3283,31 @@ If we add `QualifierChainProofRequirement(PPrice, QualifierAxis.Dimension, PPeri
 
 
 
+
+
+
+
 For temporal chain validation to work, price needs temporal denominator support:
+
+
 
 - Option A: Extend price's qualifier shape to include a temporal axis (e.g., `per` → `QualifierAxis.TemporalUnit`)
 
+
+
 - Option B: Generalize the `Dimension` axis to bridge physical and temporal dimensions
+
+
 
 - Either option requires type system changes beyond ~8 LOC catalog entries.
 
+
+
 - `ExtractComparableValue` also needs `TemporalDimension` and `TemporalUnit` arms.
+
+
+
+
 
 
 
@@ -1617,11 +3315,23 @@ For temporal chain validation to work, price needs temporal denominator support:
 
 
 
+
+
+
+
 Defer Slice 12 until the price type supports temporal denomination. The gap is real (G8/G13 are valid observations) but the fix requires type system work, not just catalog metadata.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -1629,21 +3339,43 @@ Defer Slice 12 until the price type supports temporal denomination. The gap is r
 
 
 
+
+
+
+
 - **No code changes made** — adding incorrect requirements would regress existing valid price × period arithmetic.
+
+
 
 - **Plan Slice 12 LOC estimate of ~8 is wrong** — prerequisite work is ~40-80 LOC across Types.cs, TypeChecker.cs, ProofEngine.cs, and Operations.cs.
 
+
+
 - **Slices 7–11 are unaffected** — they are complete and correct.
+
+
 
 # Slice 6 — ProofEngine Compositional Constraint Propagation (S6) — Complete
 
 
 
+
+
+
+
 **Author:** George
+
+
 
 **Date:** 2026-05-11T22:41:49Z
 
+
+
 **Status:** Complete
+
+
+
+
 
 
 
@@ -1651,17 +3383,35 @@ Defer Slice 12 until the price type supports temporal denomination. The gap is r
 
 
 
+
+
+
+
 - **ProofStrategy.CompositionalConstraint = 6** added to `ProofLedger.cs`.
+
+
 
 - **TryCompositionalConstraintProof** strategy in `ProofEngine.cs` — discharges numeric obligations on fields whose ALL assignment sources are `TypedInterpolatedTypedConstant` nodes where the magnitude (or whole-value) slot source carries a satisfying modifier.
 
+
+
 - **FindInterpolatedAssignments** helper — scans all transition rows and event handlers for interpolated typed constant assignments to a target field. Conservatively returns empty if ANY non-interpolated assignment exists.
+
+
 
 - **GetMagnitudeSlotSource** helper — extracts the magnitude slot expression, falls back to whole-value slot for degenerate `'{x}'` patterns.
 
+
+
 - **ResolveSourceModifiers** helper — resolves modifiers from both `TypedFieldRef` (field declarations) and `TypedArgRef` (event arg declarations).
 
+
+
 - 10 new tests covering: basic nonzero propagation, multi-path intersection, mixed-path conservative failure, non-interpolated mixed decline, whole-value with/without modifier, positive→nonzero subsumption, nonnegative→nonzero non-subsumption, non-numeric obligation decline, and arg-ref modifier resolution.
+
+
+
+
 
 
 
@@ -1669,13 +3419,27 @@ Defer Slice 12 until the price type supports temporal denomination. The gap is r
 
 
 
+
+
+
+
 - **Conservative semantics:** If ANY assignment to the target field is not a `TypedInterpolatedTypedConstant`, S6 declines entirely. No partial path analysis.
+
+
 
 - **Intersection semantics:** ALL assignment paths must satisfy the obligation. One path without modifier coverage → Unresolved.
 
+
+
 - **Reuses existing infrastructure:** `SatisfactionCovers()` for modifier subsumption, `Modifiers.GetMeta()` for satisfaction lookup. No new subsumption logic.
 
+
+
 - **Strategy ordering:** S6 runs after S5 (QualifierCompatibility), before the Unresolved fallback.
+
+
+
+
 
 
 
@@ -1683,21 +3447,43 @@ Defer Slice 12 until the price type supports temporal denomination. The gap is r
 
 
 
+
+
+
+
 - All 193 ProofEngine tests pass (183 existing + 10 new).
 
+
+
 - 26 pre-existing TypeCheckerAssemblyTests failures unrelated to this change.
+
+
 
 # Slice 3 Done — Completions Inside Typed Constant Holes
 
 
 
+
+
+
+
 **Agent:** Kramer
+
+
 
 **Date:** 2026-05-11
 
 
 
+
+
+
+
 ## What was done
+
+
+
+
 
 
 
@@ -1705,39 +3491,79 @@ Added completions for the `{…}` interpolation holes in typed constants (bug I2
 
 
 
+
+
+
+
 ### New helpers in `TypedConstantCollector.cs`
+
+
 
 - `FindInterpolatedAtPosition` — finds the innermost `TypedInterpolatedTypedConstant` whose span contains the cursor, using the same approach as `FindAtPosition`.
 
 
 
+
+
+
+
 ### New helpers in `CompletionHandler.cs`
+
+
 
 - `IsInsideTypedConstantHole` — detects cursor position in a hole by walking the token stream and tracking `inHole` state across `TypedConstantStart`/`TypedConstantMiddle`/`TypedConstantEnd` tokens.
 
+
+
 - `GetHoleIndex` — returns the 0-based index of the hole the cursor is in.
+
+
 
 - `GetHoleItems` — dispatches to slot-filtered completions via the `TypedInterpolatedTypedConstant` semantic model, with a fallback to all fields/args when the model is unavailable (file has errors).
 
+
+
 - `GetHoleItemsForSlot` — maps `InterpolationSlotKind` to filtered field/arg completions.
+
+
 
 - `GetHoleFieldsOfTypes` — returns field and event-arg completion items filtered by a set of `TypeKind` values.
 
 
 
+
+
+
+
 ### Wiring in `GetCompletions`
+
+
 
 Added a check after the existing `IsInsideTypedConstantToken` path: if trigger is null/empty and `IsInsideTypedConstantHole` returns true, route to `GetHoleItems`.
 
 
 
+
+
+
+
 ### Build fix in `Precept.LanguageServer.csproj`
+
+
 
 Added `<GenerateAssemblyInfo>false</GenerateAssemblyInfo>` and `<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>` to fix a pre-existing `CS0579 Duplicate assembly attribute` build error caused by OmniSharp transitively injecting a source generator that emits these attributes.
 
 
 
+
+
+
+
 ## Fix
+
+
+
+
 
 
 
@@ -1745,21 +3571,43 @@ Added `<GenerateAssemblyInfo>false</GenerateAssemblyInfo>` and `<GenerateTargetF
 
 
 
+
+
+
+
 ## Slot → completion type mapping
+
+
+
+
 
 
 
 | `InterpolationSlotKind` | Returns fields/args of type |
 
+
+
 |---|---|
+
+
 
 | `Magnitude` | `Integer`, `Decimal`, `Number` |
 
+
+
 | `Currency`, `FromCurrency`, `ToCurrency` | `Currency` |
+
+
 
 | `Unit` | `UnitOfMeasure` |
 
+
+
 | `WholeValue` | outer typed constant `ResultType` |
+
+
+
+
 
 
 
@@ -1767,17 +3615,35 @@ Added `<GenerateAssemblyInfo>false</GenerateAssemblyInfo>` and `<GenerateTargetF
 
 
 
+
+
+
+
 - `HoleCompletion_Quantity_MagnitudeHole_ShowsNumericFieldsAndArgsOnly`
+
+
 
 - `HoleCompletion_Money_CurrencyHole_ShowsCurrencyFieldsOnly`
 
+
+
 - `HoleCompletion_Quantity_UnitHole_ShowsUnitOfMeasureFieldsOnly`
+
+
 
 - `HoleCompletion_OutsideHole_NormalExpressionCompletions` ← regression guard
 
 
 
+
+
+
+
 ## Results
+
+
+
+
 
 
 
@@ -1785,21 +3651,43 @@ All 4 new tests pass. 229 pass total. 6 pre-existing failures (3 from earlier br
 
 
 
+
+
+
+
 ## Key learning
+
+
+
+
 
 
 
 **Cursor at `{¦identifier}` is inside `TypedConstantStart`'s span** — TypedConstantStart ends AFTER the `{`, so position right after `{` is still "inside" the Start token. `IsInsideTypedConstantHole` only fires when the cursor is past the identifier start, on an `Identifier` token (TypedConstant* check fails → hole check runs). Test placeholders must use `'{Am¦ount}'` (mid-identifier) not `'{¦Amount}'` (start-of-identifier, still inside Start span).
 
+
+
 # Slice 4 Done — Semantic Tokens inside Typed Constant Holes
+
+
+
+
 
 
 
 **Agent:** Kramer
 
+
+
 **Date:** 2026-05-11
 
+
+
 **Commit:** `72aa0c1b`
+
+
+
+
 
 
 
@@ -1807,11 +3695,23 @@ All 4 new tests pass. 229 pass total. 6 pre-existing failures (3 from earlier br
 
 
 
+
+
+
+
 Added `TypedInterpolatedTypedConstant` case to `EnumerateExpressionTree()` in
+
+
 
 `SemanticTokensHandler.cs`. The new case walks each `TypedInterpolationSlot.Expression`
 
+
+
 recursively, mirroring the existing `TypedInterpolatedString` treatment.
+
+
+
+
 
 
 
@@ -1819,21 +3719,43 @@ recursively, mirroring the existing `TypedInterpolatedString` treatment.
 
 
 
+
+
+
+
 **Bug I3 closed.** Without this fix, `TypedFunctionCall` nodes nested inside typed
+
+
 
 constant holes were invisible to `EnumerateTypedExpressions(index).OfType<TypedFunctionCall>()`,
 
+
+
 so no built-in function semantic token was emitted for function calls like `round(Hours)` inside
+
+
 
 `'{round(Hours)} hours'`.
 
 
 
+
+
+
+
 Note: `FieldRef`/`ArgRef` tokens inside holes were already surfaced via `index.FieldReferences` /
+
+
 
 `index.ArgReferences` (populated by `Resolve()` during type-checking). The expression-tree walker
 
+
+
 is the only path for `TypedFunctionCall` tokens.
+
+
+
+
 
 
 
@@ -1841,13 +3763,27 @@ is the only path for `TypedFunctionCall` tokens.
 
 
 
+
+
+
+
 - `IdentifierTokens_FieldRefInsideTypedConstantHole_EmitsFieldNameToken`
+
+
 
 - `IdentifierTokens_ArgRefInsideTypedConstantHole_EmitsArgNameToken`
 
+
+
 - `IdentifierTokens_QualifiedArgRefInsideTypedConstantHole_EmitsArgNameToken`
 
+
+
 - `IdentifierTokens_FunctionCallInsideTypedConstantHole_EmitsFunctionToken` ← regression for I3
+
+
+
+
 
 
 
@@ -1855,21 +3791,43 @@ is the only path for `TypedFunctionCall` tokens.
 
 
 
+
+
+
+
 All 4 new tests pass. 3 pre-existing failures in `SemanticTokensDelta_LoanApplicationSample`,
+
+
 
 `MergedTokens_LoanApplicationSample`, and `PackageManifest_Activates` are unrelated to this slice
 
+
+
 (pre-existing failures from other WIP work on the branch).
+
+
 
 # BUG-057 Spec Analysis
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
+
+
 
 **Date:** 2026-05-10T19:55:32-04:00
 
+
+
 **Status:** Analysis complete
+
+
+
+
 
 
 
@@ -1877,7 +3835,15 @@ All 4 new tests pass. 3 pre-existing failures in `SemanticTokensDelta_LoanApplic
 
 
 
+
+
+
+
 `period of 'date'` is a spec-mandated qualifier form that the parser accepts, the type checker silently drops, and the proof engine then cannot satisfy. This is not a spec gap — the spec explicitly requires it, the catalog models it, and the implementation fails to propagate it.
+
+
+
+
 
 
 
@@ -1885,13 +3851,27 @@ All 4 new tests pass. 3 pre-existing failures in `SemanticTokensDelta_LoanApplic
 
 
 
+
+
+
+
 ### 1. What the spec says (precept-language-spec.md)
+
+
+
+
 
 
 
 **§2.3 Type References (line 963):**
 
+
+
 The grammar production `TypeQualifier := (in | of | to) Expr` applies to all scalar types including `period`. Line 968 confirms: "Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family."
+
+
+
+
 
 
 
@@ -1899,15 +3879,31 @@ The grammar production `TypeQualifier := (in | of | to) Expr` applies to all sca
 
 
 
+
+
+
+
 | Left | Op | Right | Result | Notes |
+
+
 
 |------|----|-------|--------|-------|
 
+
+
 | `date` | `±` | `period of 'date'` | `date` | Unconstrained period → `UnqualifiedPeriodArithmetic`. |
+
+
 
 | `time` | `±` | `period of 'time'` | `time` | Unconstrained period → `UnqualifiedPeriodArithmetic`. |
 
+
+
 | `datetime` | `±` | `period` | `datetime` | Accepts all period components. |
+
+
+
+
 
 
 
@@ -1915,43 +3911,87 @@ The spec explicitly defines `period of 'date'` as the **required** RHS type for 
 
 
 
+
+
+
+
 ### 2. What the type catalog says (Types.cs, Operations.cs)
+
+
+
+
 
 
 
 **Period qualifier shape (Types.cs:34-38):**
 
+
+
 ```
+
+
 
 QS_TemporalUnitOrDimension = new([
 
+
+
     new(TokenKind.In, QualifierAxis.TemporalUnit),
+
+
 
     new(TokenKind.Of, QualifierAxis.TemporalDimension),
 
+
+
 ], InOfExclusive: true);
 
+
+
 ```
+
+
 
 Period supports two qualifier axes: `in '<unit>'` (e.g., `in 'days'`) and `of '<dimension>'` (e.g., `of 'date'`, `of 'time'`). They're mutually exclusive.
 
 
 
+
+
+
+
 **DeclaredQualifierMeta (DeclaredQualifierMeta.cs:54-58):**
+
+
 
 A `TemporalDimension` record exists carrying `PeriodDimension Value` — the exact metadata shape needed to store `of 'date'`.
 
 
 
+
+
+
+
 **Operations catalog (Operations.cs:264-280):**
+
+
 
 `DatePlusPeriod` and `DateMinusPeriod` both carry `DimensionProofRequirement(PeriodDimension.Date)` — the proof engine requires the period operand to have `PeriodDimension.Date`. `TimePlusPeriod`/`TimeMinusPeriod` require `PeriodDimension.Time`.
 
 
 
+
+
+
+
 **PeriodDimension enum (ProofRequirement.cs:66-73):**
 
+
+
 `Any`, `Date`, `Time` — all three values exist.
+
+
+
+
 
 
 
@@ -1959,21 +3999,43 @@ A `TemporalDimension` record exists carrying `PeriodDimension Value` — the exa
 
 
 
+
+
+
+
 | Declaration | Result | Qualifier in output? |
+
+
 
 |-------------|--------|---------------------|
 
+
+
 | `field Offset as period` | ✅ Compiles | No qualifier (correct) |
+
+
 
 | `field Offset as period of 'date'` | ✅ Compiles | **No qualifier (BUG — silently dropped)** |
 
+
+
 | `field Offset as period of 'time'` | ✅ Compiles | **No qualifier (BUG — silently dropped)** |
+
+
 
 | `field Offset as period in 'days'` | ✅ Compiles | **No qualifier (BUG — silently dropped)** |
 
+
+
 | `field Price as money in 'USD'` | ✅ Compiles | `"in 'USD'"` ✅ preserved |
 
+
+
 | `field Weight as quantity in 'kg'` | ✅ Compiles | `"in 'kg'"` ✅ preserved |
+
+
+
+
 
 
 
@@ -1981,19 +4043,39 @@ The period qualifier is parsed without error but **silently discarded** during t
 
 
 
+
+
+
+
 **Arithmetic consequence:**
+
+
+
+
 
 
 
 | Expression | Offset type | Result |
 
+
+
 |------------|-------------|--------|
+
+
 
 | `Start + Offset` (Offset: `period of 'date'`, Start: `date`) | PRE0113: "requires Date dimension but has unknown" | ❌ BUG |
 
+
+
 | `Start + Offset` (Offset: `period`, Start: `date`) | PRE0113: same error | ❌ Correct behavior — unqualified period should fail |
 
+
+
 | `Start + Offset` (Offset: `period`, Start: `datetime`) | ✅ No error | ✅ Correct — datetime accepts all period components |
+
+
+
+
 
 
 
@@ -2001,7 +4083,15 @@ The proof engine correctly requires `PeriodDimension.Date` for `date + period`, 
 
 
 
+
+
+
+
 ### 4. Sample file coverage
+
+
+
+
 
 
 
@@ -2009,7 +4099,15 @@ Zero sample files use any temporal types (date, time, datetime, period, etc.). T
 
 
 
+
+
+
+
 ## Root Cause
+
+
+
+
 
 
 
@@ -2017,7 +4115,15 @@ The parser accepts the `of 'date'` qualifier on `period` (the `QS_TemporalUnitOr
 
 
 
+
+
+
+
 The likely failure point is the type checker's field-type construction: it may not be wiring `DeclaredQualifierMeta.TemporalDimension` into the field's type representation, even though the parser produced the qualifier node and the catalog says it's valid.
+
+
+
+
 
 
 
@@ -2025,17 +4131,35 @@ The likely failure point is the type checker's field-type construction: it may n
 
 
 
+
+
+
+
 **This is a valid implementation bug.** The fix requires:
+
+
+
+
 
 
 
 1. **Type checker** — ensure `period of 'date'` / `period of 'time'` qualifiers are preserved in the field's type representation (same path that works for `money in 'USD'` and `quantity in 'kg'`).
 
+
+
 2. **Proof engine** — once the qualifier is preserved, the existing `DimensionProofRequirement` check should work — it already looks for `PeriodDimension.Date` on the operand. The machinery exists; it just can't see the declaration.
+
+
 
 3. **`period in '<unit>'` qualifiers** — same silent-drop behavior observed for `period in 'days'`. Should be checked/fixed in the same pass.
 
+
+
 4. **MCP DTO** — once the field model carries the qualifier, the MCP serialization should pick it up automatically (it already does for money/quantity).
+
+
+
+
 
 
 
@@ -2043,21 +4167,43 @@ The likely failure point is the type checker's field-type construction: it may n
 
 
 
+
+
+
+
 | Stage | Change needed? | Why |
+
+
 
 |-------|---------------|-----|
 
+
+
 | Parser | No | Already parses the qualifier correctly |
+
+
 
 | Type checker | **Yes** | Must preserve `TemporalDimension`/`TemporalUnit` qualifiers on period fields |
 
+
+
 | Proof engine | No (probably) | `DimensionProofRequirement` already models the check; just needs input |
+
+
 
 | Graph analyzer | Verify | Check whether qualifier metadata flows through the graph |
 
+
+
 | Runtime evaluator | Verify | Period qualifier may affect runtime validation |
 
+
+
 | MCP DTO | No (probably) | Already serializes qualifiers when present |
+
+
+
+
 
 
 
@@ -2065,7 +4211,15 @@ The likely failure point is the type checker's field-type construction: it may n
 
 
 
+
+
+
+
 **No.** This is not new language surface. The spec already defines `period of 'date'` as valid syntax with defined semantics. The catalog already models the qualifier shape and the proof requirements. This is a bug fix — making the implementation match the spec — not a feature addition.
+
+
+
+
 
 
 
@@ -2073,21 +4227,43 @@ The likely failure point is the type checker's field-type construction: it may n
 
 
 
+
+
+
+
 1. `field X as period of 'date'` — qualifier preserved in compiled definition
+
+
 
 2. `field X as period of 'time'` — qualifier preserved
 
+
+
 3. `field X as period in 'days'` — unit qualifier preserved
+
+
 
 4. `date + period_of_date` — no PRE0113 error
 
+
+
 5. `date + period` (unqualified) — PRE0113 fires correctly (regression anchor)
+
+
 
 6. `time + period_of_time` — no error
 
+
+
 7. `datetime + period` — no error (accepts all — regression anchor)
 
+
+
 8. Sample file with temporal period arithmetic (gap: zero samples today)
+
+
+
+
 
 
 
@@ -2095,15 +4271,31 @@ The likely failure point is the type checker's field-type construction: it may n
 
 
 
+
+
+
+
 Authors cannot express `date + period` arithmetic at all. The only workaround is `datetime + period`, which changes the semantic domain (datetime vs. date) and forces the author to carry unnecessary time components. The spec's temporal arithmetic table has a dead row.
+
+
 
 # BUG-057 slice assessment
 
 
 
+
+
+
+
 Date: 2026-05-10
 
+
+
 Assessor: George (Runtime Dev)
+
+
+
+
 
 
 
@@ -2111,7 +4303,15 @@ Assessor: George (Runtime Dev)
 
 
 
+
+
+
+
 BUG-057 fits best as an addition to **Slice 8 (Parser — Replace Hardcoded Token Sets with Catalog Lookups)**, specifically in the `ParseTypeReference()` / field-type parsing area.
+
+
+
+
 
 
 
@@ -2119,17 +4319,35 @@ BUG-057 fits best as an addition to **Slice 8 (Parser — Replace Hardcoded Toke
 
 
 
+
+
+
+
 - The narrowed bug is no longer about temporal arithmetic semantics in general.
+
+
 
 - The remaining failure is that `field Offset as period of 'date'` appears unsupported in field type position.
 
+
+
 - Slice 8 already owns parser/type-reference surface fixes:
+
+
 
   - BUG-027 expands event-arg type parsing by delegating to full `ParseTypeReference()`.
 
+
+
   - BUG-045 explicitly extends `ParseTypeReference()` for additional type syntax.
 
+
+
 - That makes Slice 8 the closest existing pending slice for adding/supporting `period` temporal-dimension qualifiers on field declarations.
+
+
+
+
 
 
 
@@ -2137,11 +4355,23 @@ BUG-057 fits best as an addition to **Slice 8 (Parser — Replace Hardcoded Toke
 
 
 
+
+
+
+
 - **Slice 9** is about operator result typing and modifier validation, not declaration syntax.
+
+
 
 - **Slice 11** is about proof-obligation derivation, but the narrowed bug says the required field type cannot be declared in the first place.
 
+
+
 - There is no existing pending slice dedicated to temporal arithmetic beyond operator/proof behavior, and this issue is upstream of both.
+
+
+
+
 
 
 
@@ -2149,7 +4379,15 @@ BUG-057 fits best as an addition to **Slice 8 (Parser — Replace Hardcoded Toke
 
 
 
+
+
+
+
 Add BUG-057 to Slice 8 as a parser/type-reference support item for qualified `period` field types.
+
+
+
+
 
 
 
@@ -2157,9 +4395,19 @@ If implementation later shows the parser already accepts the syntax and the qual
 
 
 
+
+
+
+
 1. **Slice 8** for field-type syntax acceptance / TypeRef construction
 
+
+
 2. **Follow-on type-checker or proof slice** for preserving the `date` temporal dimension through semantic resolution
+
+
+
+
 
 
 
@@ -2167,43 +4415,87 @@ Based on the narrowed bug statement and the current plan text, though, **Slice 8
 
 
 
+
+
+
+
 # Newman t2-12 complete
+
+
+
+
 
 
 
 ## Commit
 
+
+
 - `5f79fc7a` — `feat(t2-12): MCP DTO audit — sync DTOs to catalog growth`
+
+
+
+
 
 
 
 ## What changed
 
+
+
 - Synced `CompileToolDtos.cs` to the audited compile contract: state hooks, event ensures, rule guards, row outcomes/reject messages, state omit/access details, event arg optionality, and choice metadata are now represented.
+
+
 
 - Rewired `CompileTool.cs` to populate every added DTO field from the real semantic/construct surfaces already present in core (`SemanticIndex`, `ConstructManifest`, and catalog metadata).
 
+
+
 - Fixed compile rendering gaps: `~string`, structural collection type names, valued modifiers, stripped `because` keyword/message quotes, and string default values.
 
+
+
 - Added focused MCP definition regression tests covering each DTO sync item.
+
+
 
 - Updated `docs/tooling/mcp.md` (the current MCP design doc surface in-repo) to match the shipped `precept_compile` contract.
 
 
 
+
+
+
+
 ## Validation
 
+
+
 - `dotnet test test/Precept.Mcp.Tests/` → 74 passed
+
+
 
 - `dotnet test test/Precept.Tests/` → 3925 passed
 
 
 
+
+
+
+
 ## Notes
+
+
 
 - `docs/McpServerDesign.md` is not present in this repo; `docs/tooling/mcp.md` is the active design-contract document that was updated in the same pass.
 
+
+
 # Elaine — samples when-guard audit
+
+
+
+
 
 
 
@@ -2211,21 +4503,43 @@ Date: 2026-05-10
 
 
 
+
+
+
+
 ## Notable findings
+
+
+
+
 
 
 
 - The sample corpus had five stale user-facing examples with `when` in the wrong place:
 
+
+
   - `samples/insurance-claim.precept`: guarded AccessMode, StateEnsure, and EventEnsure
+
+
 
   - `samples/loan-application.precept`: guarded StateEnsure and AccessMode
 
+
+
 - The corpus also lacked a positive guarded StateAction example, so I added a minimal one in `samples/event-registration.precept` (`to Confirmed when AmountDue > 0 -> set AmountDue = 0`).
+
+
 
 - After the content update, the Precept compile/diagnostic path available in-session still reports parse errors on the corrected pre-verb forms. That suggests a temporary drift between the approved language surface and the current parser/tooling on this branch.
 
+
+
 - Related ledger note: `.squad/decisions.md` line 52 still says access mode remains post-adjective "today," which now reads stale against the final audit/design direction being applied to samples.
+
+
+
+
 
 
 
@@ -2233,9 +4547,19 @@ Date: 2026-05-10
 
 
 
+
+
+
+
 Users learn the DSL from samples first. If samples, design docs, and parser behavior disagree on guard position, authors lose trust quickly and copy the wrong pattern into real definitions.
 
+
+
 # Frank doc collision audit
+
+
+
+
 
 
 
@@ -2243,53 +4567,107 @@ Date: 2026-05-10T15:07:23.325-04:00
 
 
 
+
+
+
+
 ## Scope
+
+
 
 - `docs/language/precept-language-spec.md`
 
+
+
 - `docs/language/catalog-system.md`
+
+
 
 - `docs/language/precept-grammar.md`
 
 
 
+
+
+
+
 ## Findings
+
+
 
 - The SupportsPreVerbWhenGuard elimination survived in all three docs: `SupportsPreVerbWhenGuard` is absent, access mode grammar uses pre-verb `when`, and state/event ensure grammar remains pre-verb.
 
+
+
 - No live post-verb access-mode or ensure syntax remained in grammar/example sections.
 
+
+
 - No duplicate access-mode rules or duplicate `ConstructMeta` shape blocks were found.
+
+
 
 - One coherence break remained in `docs/language/catalog-system.md`: the Constructs catalog inventory still said `ConstructKind` had 11 members and its member list omitted `OmitDeclaration`, contradicting the language spec, grammar reference, and source enum.
 
 
 
+
+
+
+
 ## Fix applied
 
+
+
 - Updated `docs/language/catalog-system.md` to say `ConstructKind` has 12 members.
+
+
 
 - Restored `OmitDeclaration` to the documented Constructs member list.
 
 
 
+
+
+
+
 ## Outcome
 
+
+
 The three language docs now agree on the final slot-driven, pre-verb-guard model and the Constructs inventory is internally consistent again.
+
+
 
 # Decision: Grammar Doc Comprehensive Review Findings
 
 
 
+
+
+
+
 **Date:** 2026-05-10
 
+
+
 **Author:** Frank (Lead/Architect)
+
+
 
 **Context:** Comprehensive line-by-line review of `docs/language/precept-grammar.md`
 
 
 
+
+
+
+
 ## Decision
+
+
+
+
 
 
 
@@ -2297,7 +4675,15 @@ The grammar doc has 8 factual errors, 6 warnings, and 3 minor issues. No code ch
 
 
 
+
+
+
+
 ## Key Findings
+
+
+
+
 
 
 
@@ -2305,7 +4691,15 @@ The grammar doc has 8 factual errors, 6 warnings, and 3 minor issues. No code ch
 
 
 
+
+
+
+
 2. **Computed-field anatomy is structurally wrong** — the diagram shows ModifierList trailing AFTER ComputeExpression, but the actual slot order (and all sample files) have modifiers BEFORE `<-`.
+
+
+
+
 
 
 
@@ -2313,7 +4707,15 @@ The grammar doc has 8 factual errors, 6 warnings, and 3 minor issues. No code ch
 
 
 
+
+
+
+
 4. **ExpressionForms count is wrong** — "13" should be "14" in the catalogs table (line 722).
+
+
+
+
 
 
 
@@ -2321,7 +4723,15 @@ The grammar doc has 8 factual errors, 6 warnings, and 3 minor issues. No code ch
 
 
 
+
+
+
+
 Apply the 16 fixes listed in the priority fix list (see full report at `docs/working/frank-grammar-comprehensive-review-2026-05-10.md`). All are doc-only edits to `precept-grammar.md`. No code investigation needed.
+
+
+
+
 
 
 
@@ -2329,23 +4739,47 @@ Apply the 16 fixes listed in the priority fix list (see full report at `docs/wor
 
 
 
+
+
+
+
 The grammar doc is a design reference for people working ON the language. Factual errors in slot sequences and family details will cause implementors to write incorrect parser tests, produce wrong MCP output, or design new constructs with wrong assumptions about guard positions.
+
+
 
 # Decision: Remove `SupportsPostActionEnsure` — Grammar Integrity Fix
 
 
 
+
+
+
+
 **Date:** 2026-05-10T15:32:08-04:00
+
+
 
 **Author:** Frank (Lead/Architect)
 
+
+
 **Status:** Ready for implementation
+
+
 
 **Audit:** `docs/working/frank-grammar-spec-audit-2026-05-10.md`
 
 
 
+
+
+
+
 ## Decision
+
+
+
+
 
 
 
@@ -2353,17 +4787,35 @@ Remove the `SupportsPostActionEnsure` boolean flag from `ConstructMeta` and all 
 
 
 
+
+
+
+
 ## Key Findings
+
+
+
+
 
 
 
 1. **The bug is isolated.** No other `Supports*` flags or out-of-band parser behaviors exist. The parser architecture is clean otherwise.
 
+
+
 2. **7 files, ~25 lines affected.** Removal is surgical.
+
+
 
 3. **The language spec documents the bad form** (line 861–869) and must be corrected simultaneously.
 
+
+
 4. **Grammar doc has pre-existing `when` guard gaps** for 3 constructs (EventEnsure, StateEnsure, StateAction). These are doc-only fixes unrelated to the bug, but should be addressed in the same pass.
+
+
+
+
 
 
 
@@ -2371,21 +4823,43 @@ Remove the `SupportsPostActionEnsure` boolean flag from `ConstructMeta` and all 
 
 
 
+
+
+
+
 1. `src/Precept/Language/Construct.cs` — remove parameter
+
+
 
 2. `src/Precept/Language/Constructs.cs` — remove from EventHandler entry
 
+
+
 3. `src/Precept/Pipeline/Parser.cs` — delete injection block
+
+
 
 4. `test/Precept.Tests/Parser/ParserSlice8Tests.cs` — delete test
 
+
+
 5. `test/Precept.Tests/CatalogCapability/ConstructCatalogCapabilityTests.cs` — delete test
+
+
 
 6. `test/Precept.Tests/Language/Track2PhaseAConstructCatalogTests.cs` — delete test
 
+
+
 7. `docs/language/precept-language-spec.md` — remove `("ensure" BoolExpr)?` from stateless hook grammar
 
+
+
 8. `docs/language/catalog-system.md` — remove from ConstructMeta shape documentation
+
+
+
+
 
 
 
@@ -2393,7 +4867,15 @@ Remove the `SupportsPostActionEnsure` boolean flag from `ConstructMeta` and all 
 
 
 
+
+
+
+
 ## Gap
+
+
+
+
 
 
 
@@ -2401,7 +4883,15 @@ Remove the `SupportsPostActionEnsure` boolean flag from `ConstructMeta` and all 
 
 
 
+
+
+
+
 ## Why it matters
+
+
+
+
 
 
 
@@ -2409,11 +4899,23 @@ The approved final audit (`docs/Working/frank-when-guard-audit-4-final.md`) and 
 
 
 
+
+
+
+
 - no GuardPolicy enum
+
+
 
 - no construct-level pre-verb guard boolean
 
+
+
 - AccessMode guard is pre-verb: `in State when Guard modify Field editable`
+
+
+
+
 
 
 
@@ -2421,27 +4923,55 @@ Leaving the older decision text in the active ledger will misdirect future doc a
 
 
 
+
+
+
+
 ## Requested follow-up
+
+
+
+
 
 
 
 Reconcile `.squad/decisions.md` so the active canonical entry reflects the final slot-list decision and no longer states that access mode is post-adjective.
 
+
+
 # Decision: Eliminate GuardPolicy — Slot List IS the Metadata
+
+
+
+
 
 
 
 **Author:** Frank — Lead/Architect
 
+
+
 **Date:** 2026-05-10T13:16:47-04:00
 
+
+
 **Status:** Final recommendation
+
+
 
 **Supersedes:** `frank-when-guard-revised.md` (2-member GuardPolicy enum proposal)
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2449,7 +4979,15 @@ Reconcile `.squad/decisions.md` so the active canonical entry reflects the final
 
 
 
+
+
+
+
 **`SupportsPreVerbWhenGuard` is deleted from `ConstructMeta`. No `GuardPolicy` enum is created. The guard's position in the slot list is the only metadata.**
+
+
+
+
 
 
 
@@ -2457,7 +4995,15 @@ Pre-verb guard constructs (StateEnsure, StateAction, EventEnsure, AccessMode) ge
 
 
 
+
+
+
+
 `ParseScopedConstruct` is refactored from a 3-phase protocol (anchor → flag-gated injection → disambig + remaining slots) to a single unified loop that walks all slots in order, consuming the disambiguation keyword at the natural boundary.
+
+
+
+
 
 
 
@@ -2465,7 +5011,15 @@ Pre-verb guard constructs (StateEnsure, StateAction, EventEnsure, AccessMode) ge
 
 
 
+
+
+
+
 My prior analysis was wrong. I said putting the guard in the slot list "requires rearchitecting how `ParseScopedConstruct` walks slots" and called it scope-expanding. Having read the actual parser code:
+
+
+
+
 
 
 
@@ -2473,7 +5027,15 @@ My prior analysis was wrong. I said putting the guard in the slot list "requires
 
 
 
+
+
+
+
 2. **The refactor is a simplification.** The current 3-phase code (~77 lines with flag-gated injection) becomes a single loop (~45 lines, zero flags). Net code reduction.
+
+
+
+
 
 
 
@@ -2481,21 +5043,43 @@ My prior analysis was wrong. I said putting the guard in the slot list "requires
 
 
 
+
+
+
+
 ## What Changes
+
+
+
+
 
 
 
 | File | Change |
 
+
+
 |------|--------|
+
+
 
 | `Construct.cs` | Remove `SupportsPreVerbWhenGuard` parameter |
 
+
+
 | `Constructs.cs` | Add 3 per-construct guard slot instances; update 4 construct slot lists; remove 3 `SupportsPreVerbWhenGuard: true` |
+
+
 
 | `Parser.cs` | Replace `ParseScopedConstruct` with unified loop |
 
+
+
 | Tests | Delete flag-assertion tests; add slot-position tests |
+
+
+
+
 
 
 
@@ -2503,7 +5087,15 @@ My prior analysis was wrong. I said putting the guard in the slot list "requires
 
 
 
+
+
+
+
 Shane's directive: *"If `when` is always pre-verb, the slot list itself should encode that position. No separate metadata flag or enum is needed; the slot list IS the metadata."*
+
+
+
+
 
 
 
@@ -2511,27 +5103,55 @@ That's exactly what this achieves. Zero metadata flags. Zero enums. The catalog-
 
 
 
+
+
+
+
 ## Full Analysis
+
+
+
+
 
 
 
 See `docs/Working/frank-when-guard-audit-2.md` for the complete analysis including construct-by-construct verification, refactored parser code, and file change inventory.
 
+
+
 # Decision: When-Guard Catalog Shape — Revised (PostVerb Eliminated)
+
+
+
+
 
 
 
 **Author:** Frank — Lead/Architect
 
+
+
 **Date:** 2026-05-10T13:15:46-04:00
 
+
+
 **Status:** Recommendation — awaiting owner decision
+
+
 
 **Supersedes:** Prior 4-member `GuardPolicy` proposal (frank-when-guard-audit-2.md)
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2539,7 +5159,15 @@ See `docs/Working/frank-when-guard-audit-2.md` for the complete analysis includi
 
 
 
+
+
+
+
 > **PostVerb guard position is NOT supported. Full stop. `when` is always pre-verb or absent.**
+
+
+
+
 
 
 
@@ -2547,7 +5175,15 @@ This eliminates `PostVerb` from the design space permanently.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2555,7 +5191,15 @@ This eliminates `PostVerb` from the design space permanently.
 
 
 
+
+
+
+
 **Yes, but it collapses from 4 members to 2.**
+
+
+
+
 
 
 
@@ -2563,7 +5207,15 @@ With PostVerb gone, the prior proposal had `None`, `SlotWalk`, `PreVerb`. Here's
 
 
 
+
+
+
+
 ### `None` — is explicit prohibition needed?
+
+
+
+
 
 
 
@@ -2571,7 +5223,15 @@ No. A construct without a `GuardClause` in its slot list AND without `GuardPolic
 
 
 
+
+
+
+
 ### `SlotWalk` — is it distinct from "just walking the slot list"?
+
+
+
+
 
 
 
@@ -2579,7 +5239,15 @@ No. `SlotWalk` means "the guard is in the slot list and the parser walks it in n
 
 
 
+
+
+
+
 ### `PreVerb` — is it the only real policy?
+
+
+
+
 
 
 
@@ -2587,47 +5255,95 @@ Yes. `PreVerb` is the only value that triggers parser behavior different from de
 
 
 
+
+
+
+
 ### Conclusion: 2-member enum
+
+
+
+
 
 
 
 ```csharp
 
+
+
 public enum GuardPolicy
+
+
 
 {
 
+
+
     /// <summary>
+
+
 
     /// Guard is either absent or declared in the slot list — parsed via normal slot walk.
 
+
+
     /// Whether the construct actually supports a guard is determined by whether a
+
+
 
     /// <see cref="ConstructSlotKind.GuardClause"/> slot appears in the slot list.
 
+
+
     /// </summary>
+
+
 
     SlotDriven = 0,
 
 
 
+
+
+
+
     /// <summary>
+
+
 
     /// Guard is injected between anchor (slot[0]) and the disambiguation token.
 
+
+
     /// The guard is NOT declared in the slot list — the parser synthesizes it at
+
+
 
     /// parse time using the construct's disambiguation tokens as terminators.
 
+
+
     /// Surface syntax: <c>&lt;scope&gt; &lt;target&gt; when &lt;guard&gt; &lt;verb&gt; ...</c>
+
+
 
     /// </summary>
 
+
+
     PreVerb,
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -2635,17 +5351,35 @@ public enum GuardPolicy
 
 
 
+
+
+
+
 1. **Naming.** `GuardPolicy.PreVerb` says what it IS. `SupportsPreVerbWhenGuard = true` is a double-positive sentence fragment. The enum names the concept; the bool describes a capability.
+
+
 
 2. **Default semantics.** `SlotDriven = 0` is the natural default — you only specify the property when the construct deviates. A bool with `false` as default means every construct silently opts out, but the opt-out has no name.
 
+
+
 3. **Extensibility without breaking.** If a future construct needs a guard in a novel position (unlikely but possible), adding an enum member is additive. Renaming a boolean or adding a second boolean is not.
+
+
 
 4. **The bool name is a lie for slot-walk constructs.** `SupportsPreVerbWhenGuard = false` for Rule and TransitionRow implies "doesn't support when guard" — but they do, via slot walk. The name confuses absence-of-guard with absence-of-injection. The enum eliminates this ambiguity.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2653,7 +5387,15 @@ public enum GuardPolicy
 
 
 
+
+
+
+
 ### TransitionRow
+
+
+
+
 
 
 
@@ -2661,15 +5403,31 @@ public enum GuardPolicy
 
 
 
+
+
+
+
 - Guard is slot[2]: `[StateTarget, EventTarget, GuardClause, ActionChain, Outcome]`
+
+
 
 - TransitionRow is `RoutingFamily.StateScoped`, parsed via `ParseScopedConstruct`
 
+
+
 - Slot[0] (StateTarget) is the anchor. After disambiguation, slots[1..] are walked: EventTarget, then GuardClause, then ActionChain, then Outcome.
+
+
 
 - The guard is in the slot list, parsed in normal slot-walk order. **This is `SlotDriven`.**
 
+
+
 - No injection, no special protocol. The parser doesn't know or care that slot[2] is a guard — it's just the next slot.
+
+
+
+
 
 
 
@@ -2677,17 +5435,35 @@ public enum GuardPolicy
 
 
 
+
+
+
+
 `rule amount > 0 when someCondition because "reason"`
+
+
+
+
 
 
 
 - Guard is slot[1]: `[RuleExpression, GuardClause, BecauseClause]`
 
+
+
 - Rule is `RoutingFamily.Direct`, parsed via `ParseConstruct` (not `ParseScopedConstruct` at all)
+
+
 
 - The guard is in the slot list, parsed in normal order. **This is `SlotDriven`.**
 
+
+
 - Rule has no verb, no disambiguation token, no scope keyword. The `when` after the expression is just the next slot with `TerminationTokens: [TokenKind.Because, TokenKind.Arrow]`.
+
+
+
+
 
 
 
@@ -2695,11 +5471,23 @@ public enum GuardPolicy
 
 
 
+
+
+
+
 Both collapse to `SlotDriven` (the default). Neither needs the `GuardPolicy` property specified. They work today, they'll work after the change. No slot list changes needed.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2707,7 +5495,15 @@ Both collapse to `SlotDriven` (the default). Neither needs the `GuardPolicy` pro
 
 
 
+
+
+
+
 Evaluating the four options Shane listed:
+
+
+
+
 
 
 
@@ -2715,11 +5511,23 @@ Evaluating the four options Shane listed:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 public enum GuardPolicy { SlotDriven = 0, PreVerb }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -2727,19 +5535,39 @@ On `ConstructMeta`: replace `SupportsPreVerbWhenGuard: bool` with `GuardPolicy: 
 
 
 
+
+
+
+
 Parser code:
+
+
 
 ```csharp
 
+
+
 if (meta.GuardPolicy == GuardPolicy.PreVerb && Peek().Kind == TokenKind.When)
+
+
 
 {
 
+
+
     // inject guard — identical to current code body
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -2747,7 +5575,15 @@ if (meta.GuardPolicy == GuardPolicy.PreVerb && Peek().Kind == TokenKind.When)
 
 
 
+
+
+
+
 ### Option B: Collapse to boolean `SupportsWhenGuard: bool`
+
+
+
+
 
 
 
@@ -2755,7 +5591,15 @@ Parser code: `if (meta.SupportsWhenGuard && Peek().Kind == TokenKind.When)` — 
 
 
 
+
+
+
+
 **Verdict:** Functional but semantically impoverished. The bool says what the parser DOES, not what the construct's grammar MEANS.
+
+
+
+
 
 
 
@@ -2763,7 +5607,15 @@ Parser code: `if (meta.SupportsWhenGuard && Peek().Kind == TokenKind.When)` — 
 
 
 
+
+
+
+
 This requires putting the guard IN the slot list for pre-verb constructs (at slot[1], before the disambiguation token). Then `ParseScopedConstruct` checks: "is the next slot a GuardClause? If so, parse it before consuming the disambiguation token."
+
+
+
+
 
 
 
@@ -2771,7 +5623,15 @@ Problem: the parser currently walks `Slots[1..]` AFTER consuming the disambiguat
 
 
 
+
+
+
+
 **Verdict:** Pure but scope-expanding. Requires rearchitecting how `ParseScopedConstruct` walks slots. Not the right scope for this fix.
+
+
+
+
 
 
 
@@ -2779,7 +5639,15 @@ Problem: the parser currently walks `Slots[1..]` AFTER consuming the disambiguat
 
 
 
+
+
+
+
 Rename nothing. Add `SupportsPreVerbWhenGuard: true` to AccessMode, remove its `SlotGuardClause` from the slot list.
+
+
+
+
 
 
 
@@ -2787,11 +5655,23 @@ Rename nothing. Add `SupportsPreVerbWhenGuard: true` to AccessMode, remove its `
 
 
 
+
+
+
+
 ### Final answer: Option A.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2799,25 +5679,51 @@ Rename nothing. Add `SupportsPreVerbWhenGuard: true` to AccessMode, remove its `
 
 
 
+
+
+
+
 ### Before → After for all 6 when-using constructs
+
+
+
+
 
 
 
 | Construct | Slots (before) | GuardPolicy (before) | Slots (after) | GuardPolicy (after) | Changed? |
 
+
+
 |-----------|---------------|---------------------|--------------|--------------------|-|
+
+
 
 | **Rule** | `[RuleExpr, GuardClause, BecauseClause]` | `SupportsPreVerbWhenGuard: false` (default) | `[RuleExpr, GuardClause, BecauseClause]` | `SlotDriven` (default) | No change |
 
+
+
 | **TransitionRow** | `[StateTarget, EventTarget, GuardClause, ActionChain, Outcome]` | `SupportsPreVerbWhenGuard: false` (default) | `[StateTarget, EventTarget, GuardClause, ActionChain, Outcome]` | `SlotDriven` (default) | No change |
+
+
 
 | **StateEnsure** | `[StateTarget, EnsureClause, OptBecauseClause]` | `SupportsPreVerbWhenGuard: true` | `[StateTarget, EnsureClause, OptBecauseClause]` | `PreVerb` | Flag → enum |
 
+
+
 | **StateAction** | `[StateTarget, ActionChain]` | `SupportsPreVerbWhenGuard: true` | `[StateTarget, ActionChain]` | `PreVerb` | Flag → enum |
+
+
 
 | **EventEnsure** | `[EventTarget, EnsureClause, OptBecauseClause]` | `SupportsPreVerbWhenGuard: true` | `[EventTarget, EnsureClause, OptBecauseClause]` | `PreVerb` | Flag → enum |
 
+
+
 | **AccessMode** | `[StateTarget, FieldTarget, AccessModeKeyword, **GuardClause**]` | (none — guard was last slot) | `[StateTarget, FieldTarget, AccessModeKeyword]` | `PreVerb` | **Slot removed + policy added** |
+
+
+
+
 
 
 
@@ -2825,25 +5731,51 @@ Rename nothing. Add `SupportsPreVerbWhenGuard: true` to AccessMode, remove its `
 
 
 
+
+
+
+
 | Construct | GuardPolicy | Reason |
+
+
 
 |-----------|-------------|--------|
 
+
+
 | PreceptHeader | `SlotDriven` (default, no guard slot) | File-level declaration |
+
+
 
 | FieldDeclaration | `SlotDriven` (default, no guard slot) | Type structure |
 
+
+
 | StateDeclaration | `SlotDriven` (default, no guard slot) | Existence declaration |
+
+
 
 | EventDeclaration | `SlotDriven` (default, no guard slot) | Existence declaration |
 
+
+
 | OmitDeclaration | `SlotDriven` (default, no guard slot) | Unconditional exclusion |
+
+
 
 | EventHandler | `SlotDriven` (default, no guard slot) | Stateless hook |
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2851,77 +5783,155 @@ Rename nothing. Add `SupportsPreVerbWhenGuard: true` to AccessMode, remove its `
 
 
 
+
+
+
+
 ```csharp
+
+
 
 private void ParseScopedConstruct(ConstructMeta meta)
 
+
+
 {
 
+
+
     var startToken = Advance(); // consume leading keyword
+
+
 
     var slots = new List<SlotValue>();
 
 
 
+
+
+
+
     // Slots[0] = anchor (StateTarget or EventTarget)
+
+
 
     if (meta.Slots.Count > 0)
 
+
+
     {
+
+
 
         var anchorValue = ParseSlotValue(meta.Slots[0], meta);
 
+
+
         if (meta.Slots[0].IsRequired || anchorValue.Span != SourceSpan.Missing)
+
+
 
             slots.Add(anchorValue);
 
+
+
     }
+
+
+
+
 
 
 
     // ── CHANGED: GuardPolicy enum replaces SupportsPreVerbWhenGuard bool ──
 
+
+
     if (meta.GuardPolicy == GuardPolicy.PreVerb && Peek().Kind == TokenKind.When)
+
+
 
     {
 
+
+
         var guardSlot = ParseGuardClause(new ConstructSlot(
+
+
 
             ConstructSlotKind.GuardClause,
 
+
+
             IsRequired: false,
+
+
 
             TerminationTokens: meta.Entries
 
+
+
                 .SelectMany(entry => entry.DisambiguationTokens ?? [])
 
+
+
                 .Distinct()
+
+
 
                 .ToArray()));
 
 
 
+
+
+
+
         if (guardSlot.Span != SourceSpan.Missing)
 
+
+
             slots.Add(guardSlot);
+
+
 
     }
 
 
 
+
+
+
+
     // Consume disambiguation keyword (not a slot)
 
+
+
     // ... (unchanged from current code)
+
+
+
+
 
 
 
     // Walk remaining slots (Slots[1..])
 
+
+
     // ... (unchanged from current code)
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -2929,7 +5939,15 @@ The change is exactly ONE token: `meta.SupportsPreVerbWhenGuard` → `meta.Guard
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2937,23 +5955,47 @@ The change is exactly ONE token: `meta.SupportsPreVerbWhenGuard` → `meta.Guard
 
 
 
+
+
+
+
 **Before (post-verb — ELIMINATED):**
 
+
+
 ```
+
+
 
 in Draft modify Amount editable when IsOwner
 
+
+
 ```
+
+
+
+
 
 
 
 **After (pre-verb — consistent with governing principle):**
 
+
+
 ```
+
+
 
 in Draft when IsOwner modify Amount editable
 
+
+
 ```
+
+
+
+
 
 
 
@@ -2961,7 +6003,15 @@ This is a **breaking change** to `.precept` files. No current sample files use g
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -2969,19 +6019,39 @@ This is a **breaking change** to `.precept` files. No current sample files use g
 
 
 
+
+
+
+
 ### Source
+
+
+
+
 
 
 
 | File | Change |
 
+
+
 |------|--------|
+
+
 
 | `src/Precept/Language/Construct.cs` | Add `GuardPolicy` enum (2 members: `SlotDriven`, `PreVerb`). Replace `SupportsPreVerbWhenGuard` parameter with `GuardPolicy GuardPolicy = GuardPolicy.SlotDriven`. |
 
+
+
 | `src/Precept/Language/Constructs.cs` | StateEnsure, StateAction, EventEnsure: replace `SupportsPreVerbWhenGuard: true` with `GuardPolicy: GuardPolicy.PreVerb`. AccessMode: add `GuardPolicy: GuardPolicy.PreVerb`, remove `SlotGuardClause` from slot list. Update description string for AccessMode to reflect new syntax. |
 
+
+
 | `src/Precept/Pipeline/Parser.cs` line 280 | `meta.SupportsPreVerbWhenGuard` → `meta.GuardPolicy == GuardPolicy.PreVerb` |
+
+
+
+
 
 
 
@@ -2989,15 +6059,31 @@ This is a **breaking change** to `.precept` files. No current sample files use g
 
 
 
+
+
+
+
 | File | Change |
+
+
 
 |------|--------|
 
+
+
 | `test/Precept.Tests/Language/Track2PhaseAConstructCatalogTests.cs` | Replace `SupportsPreVerbWhenGuard` assertions with `GuardPolicy` assertions. |
+
+
 
 | `test/Precept.Tests/CatalogCapability/ConstructCatalogCapabilityTests.cs` | Replace `SupportsPreVerbWhenGuard` assertions with `GuardPolicy` assertions. Add AccessMode guard-policy test. |
 
+
+
 | Parser test file(s) | Add parse tests for `in Draft when IsOwner modify Amount editable`. Verify old post-verb form produces a diagnostic. |
+
+
+
+
 
 
 
@@ -3005,15 +6091,31 @@ This is a **breaking change** to `.precept` files. No current sample files use g
 
 
 
+
+
+
+
 | File | Change |
+
+
 
 |------|--------|
 
+
+
 | `docs/language/precept-language-spec.md` | Fix ensure grammar (lines 855–856) to show pre-verb guard. Fix access mode grammar (lines 897–903) to show pre-verb guard. |
+
+
 
 | `docs/language/catalog-system.md` | Replace `SupportsPreVerbWhenGuard` schema entry with `GuardPolicy` enum documentation. |
 
+
+
 | `docs/Working/precept-toolchain-plan.md` | Update references to `SupportsPreVerbWhenGuard`. |
+
+
+
+
 
 
 
@@ -3021,15 +6123,31 @@ This is a **breaking change** to `.precept` files. No current sample files use g
 
 
 
+
+
+
+
 | Surface | Impact |
+
+
 
 |---------|--------|
 
+
+
 | MCP `precept_language` | `SupportsPreVerbWhenGuard` disappears from construct JSON, replaced by `GuardPolicy` string. DTO update in `tools/Precept.Mcp/Tools/`. |
+
+
 
 | LS completions | `when` suggestion for access mode moves from post-keyword to post-state-target position. |
 
+
+
 | LS semantic tokens / grammar | No impact — `when` keyword matching is not construct-specific. |
+
+
+
+
 
 
 
@@ -3037,11 +6155,23 @@ This is a **breaking change** to `.precept` files. No current sample files use g
 
 
 
+
+
+
+
 No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -3049,27 +6179,55 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 | Question | Answer |
+
+
 
 |----------|--------|
 
+
+
 | Does `GuardPolicy` still make sense? | Yes — as a 2-member enum, not 4. |
+
+
 
 | Does it collapse to a boolean? | Functionally yes, semantically no. The enum names the concept space (`SlotDriven` vs `PreVerb`), whereas a bool names a capability. |
 
+
+
 | Is `SlotWalk` needed as a separate member? | No — it's indistinguishable from "no special policy" at the parser level. Merged into `SlotDriven`. |
+
+
 
 | Is `None` needed as explicit prohibition? | No — absence of guard slot + default `SlotDriven` = no guard. Structural absence is sufficient. |
 
+
+
 | Where do TransitionRow and Rule fall? | `SlotDriven` (the default). Their guards are in the slot list, parsed normally. No policy annotation needed. |
 
+
+
 | What changes for AccessMode? | Guard moves from last slot (post-verb) to pre-verb injection. `SlotGuardClause` removed from slot list. `GuardPolicy: PreVerb` added. Surface syntax changes. |
+
+
 
 | Is this the smallest correct change? | Yes. One new 2-member enum, one parser token change, one slot list edit (AccessMode). Everything else is renaming `SupportsPreVerbWhenGuard` → `GuardPolicy`. |
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -3077,33 +6235,67 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 | Alternative | Reason |
+
+
 
 |-------------|--------|
 
+
+
 | 4-member enum (`None/SlotWalk/PreVerb/PostVerb`) | PostVerb is eliminated. `None` and `SlotWalk` are both "no special parser behavior" — distinction is phantom. |
+
+
 
 | 3-member enum (`None/SlotWalk/PreVerb`) | `None` vs `SlotWalk` distinction is not actionable by the parser. Both mean "walk the slot list." |
 
+
+
 | Boolean (`SupportsWhenGuard` or `InjectsPreVerbGuard`) | Functional but semantically flat. Doesn't name the concept space. Misleading for slot-walk constructs. |
+
+
 
 | Drop metadata entirely (slot position convention) | Requires rearchitecting `ParseScopedConstruct` to distinguish pre-disambiguation vs post-disambiguation slots. Correct direction but wrong scope. |
 
+
+
 | Keep existing bool, just add AccessMode | Perpetuates the naming smell. We're here to fix the metadata shape, not patch it. |
+
+
 
 # BUG-020 Committed — George Runtime Dev
 
 
 
+
+
+
+
 **Date:** 2026-05-10T15:32:08-04:00
 
+
+
 **Author:** George (Runtime Dev)
+
+
 
 **Branch:** Precept-V2-Radical
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -3111,25 +6303,51 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 | SHA | Scope | What it covers |
+
+
 
 |-----|-------|----------------|
 
+
+
 | `b5dc7c3e` | Core implementation | Removed `SupportsPreVerbWhenGuard` from `Construct.cs`, `Constructs.cs`, `Parser.cs`. The `when` guard is now a proper slot in the slot-walk rather than a special-cased pre-verb flag. |
+
+
 
 | `ec068569` | Tests | Updated 13 existing test files and added `Track2PhaseAToolchainRegressionTests.cs` (new). Covers parser, proof engine, slot ordering, catalog capability, language server, and MCP tool tests. |
 
+
+
 | `eb225f8a` | Docs | Grammar doc (`precept-grammar.md`), language spec (`precept-language-spec.md`), catalog system doc (`catalog-system.md`) updated to reflect the slot-walk `when`-guard semantics. |
+
+
 
 | `4a6cb93f` | Samples | Updated `Test.precept`, `event-registration.precept`, `insurance-claim.precept`, `loan-application.precept` to use canonical `when`-guard slot syntax. |
 
+
+
 | `103c3be1` | Working docs | Frank's 4 when-guard audit files (new) + `precept-toolchain-bugs.md` and `precept-toolchain-plan.md` updated. |
+
+
 
 | `078dbe32` | Squad history | Agent history files for Elaine, Frank, George, Soup Nazi updated for BUG-020 session. |
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -3137,19 +6355,39 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 | Project | Passed | Failed |
+
+
 
 |---------|--------|--------|
 
+
+
 | Precept.Tests | 3,894 | 0 |
+
+
 
 | Precept.Analyzers.Tests | 280 | 0 |
 
+
+
 | Precept.LanguageServer.Tests | 157 | 0 |
+
+
 
 | Precept.Mcp.Tests | 60 | 0 |
 
+
+
 | **Total** | **4,391** | **0** |
+
+
+
+
 
 
 
@@ -3157,23 +6395,47 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 ## Surprises / Notes
+
+
+
+
 
 
 
 - No test failures at any stage. Pre-commit run of `Precept.Tests` showed 3,894 passing; full suite confirmed all 4,391 green after commits.
 
+
+
 - One pre-existing LF/CRLF warning on `ParserExpressionTests.cs` — cosmetic, not a bug.
 
+
+
 - Two pre-existing VSTHRD warnings in `LanguageServer.Tests` — unrelated to BUG-020, not introduced by this work.
+
+
 
 # Decision: SupportsPostActionEnsure Removed
 
 
 
+
+
+
+
 **Author:** George (Runtime Dev)
 
+
+
 **Date:** 2026-05-10
+
+
+
+
 
 
 
@@ -3181,9 +6443,19 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 - **Code:** `c1572613` — fix(parser): remove SupportsPostActionEnsure — EventHandler cannot have trailing ensure (BUG)
 
+
+
 - **Tests:** `5be86341` — test: delete SupportsPostActionEnsure tests — feature removed (BUG)
+
+
+
+
 
 
 
@@ -3191,23 +6463,47 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
+
+
+
+
 All 4 test projects pass:
+
+
+
+
 
 
 
 | Project | Passed |
 
+
+
 |---------|--------|
+
+
 
 | Precept.Tests | 3891 |
 
+
+
 | Precept.LanguageServer.Tests | 157 |
+
+
 
 | Precept.Analyzers.Tests | 280 |
 
+
+
 | Precept.Mcp.Tests | 60 |
 
+
+
 | **Total** | **4388** |
+
+
+
+
 
 
 
@@ -3215,13 +6511,27 @@ All 4 test projects pass:
 
 
 
+
+
+
+
 The `on` family now has mutually exclusive routing:
+
+
+
+
 
 
 
 - `on EventName ensure ...` → `EventEnsure` — guard-only path
 
+
+
 - `on EventName -> ...` → `EventHandler` — action path
+
+
+
+
 
 
 
@@ -3229,7 +6539,15 @@ The `on` family now has mutually exclusive routing:
 
 
 
+
+
+
+
 The fix: removed the `bool SupportsPostActionEnsure` parameter from `ConstructMeta`, removed its usage in the `EventHandler` catalog entry, and deleted the conditional slot-injection block in `ParseScopedConstruct`. Three test methods that asserted the now-deleted behavior were also removed.
+
+
+
+
 
 
 
@@ -3237,65 +6555,131 @@ The fix: removed the `bool SupportsPostActionEnsure` parameter from `ConstructMe
 
 
 
+
+
+
+
 ## What changed
+
+
 
 - Removed `SupportsPreVerbWhenGuard` from `ConstructMeta` in `src/Precept/Language/Construct.cs`.
 
+
+
 - Added three shared pre-verb guard slot instances in `src/Precept/Language/Constructs.cs`:
+
+
 
   - `SlotPreVerbGuardEnsure` terminating at `ensure`
 
+
+
   - `SlotPreVerbGuardArrow` terminating at `->`
+
+
 
   - `SlotPreVerbGuardModify` terminating at `modify`
 
+
+
 - Rewired scoped construct slot lists so guard position is encoded directly in metadata:
+
+
 
   - `StateEnsure`: `[StateTarget, GuardClause, EnsureClause, BecauseClause?]`
 
+
+
   - `StateAction`: `[StateTarget, GuardClause, ActionChain]`
+
+
 
   - `EventEnsure`: `[EventTarget, GuardClause, EnsureClause, BecauseClause?]`
 
+
+
   - `AccessMode`: `[StateTarget, GuardClause, FieldTarget, AccessModeKeyword]`
+
+
 
 - Updated `AccessMode` description/example to the new pre-verb surface syntax: `in Draft when IsOwner modify Amount editable`.
 
+
+
 - Replaced `Parser.ParseScopedConstruct`'s old 3-phase protocol with a single loop that:
+
+
 
   - walks slots in order,
 
+
+
   - consumes disambiguation tokens at the natural slot boundary,
+
+
 
   - keeps the existing `->` exception so `ActionChain` still owns arrow consumption,
 
+
+
   - removes all synthesized guard injection.
+
+
 
 - Synced language docs (`catalog-system.md`, `precept-language-spec.md`, `precept-grammar.md`) so they describe slot-driven guard placement and pre-verb guarded access mode syntax.
 
 
 
+
+
+
+
 ## Why
+
+
 
 The guard position is already expressible in the ordered slot list plus per-slot termination tokens. Keeping a separate boolean on `ConstructMeta` duplicated catalog truth and forced parser special-casing. After this change, the catalog is authoritative again: constructs that support pre-verb guards declare them as real slots, and the parser is just a generic slot walker with family disambiguation.
 
 
 
+
+
+
+
 ## Validation
+
+
 
 - `dotnet build .\src\Precept\Precept.csproj --nologo` ✅
 
+
+
 - `dotnet test .\test\Precept.Tests\Precept.Tests.csproj --nologo` ❌ 24 failing tests, all in stale expectations around removed `SupportsPreVerbWhenGuard`, old slot orders/counts, old post-verb guarded `AccessMode` syntax, plus the pre-existing BUG-019 typed-constant failure.
+
+
 
 - Runtime spot-checks via `Precept.Compiler.Compile(...)`:
 
+
+
   - guarded `AccessMode` ✅
+
+
 
   - guarded `EventEnsure` ✅
 
+
+
   - guarded `StateAction` ✅
 
+
+
   - guarded `StateEnsure` ✅ (after giving the sample a satisfiable default)
+
+
+
+
 
 
 
@@ -3303,25 +6687,51 @@ The guard position is already expressible in the ordered slot list plus per-slot
 
 
 
+
+
+
+
 ## Gap
+
+
 
 `test\Precept.LanguageServer.Tests` and `test\Precept.Mcp.Tests` currently have no explicit regression coverage for the `SupportsPreVerbWhenGuard` removal or the AccessMode syntax move to pre-verb `when`.
 
 
 
+
+
+
+
 ## Why it matters
+
+
 
 The Precept.Tests batch now locks the catalog/parser/runtime-facing slot shape, but the agent-facing projections are still unguarded:
 
+
+
 - MCP construct JSON should stop projecting `SupportsPreVerbWhenGuard`.
+
+
 
 - Any LS completion/context tests that reason about AccessMode guard position should prove `when` is offered before `modify`, not after `editable`.
 
 
 
+
+
+
+
 ## Suggested follow-up
 
+
+
 Add one MCP surface test for dropped construct metadata and one LS completion/parser-context regression for `in Draft when IsOwner modify Amount editable`.
+
+
+
+
 
 
 
@@ -3333,7 +6743,23 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
+
+
+
+
 **By:** George
+
+
+
+
+
+
+
+
 
 
 
@@ -3349,7 +6775,19 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
+
+
+
+
 - Completed the full typed-literal system plan in slice order: embedded ISO 4217 + UCUM data, XML-backed currency/UCUM loaders, temporal and UCUM parsers, typed-constant validation framework, domain validators, `TypeMeta.ContentValidation` wiring, TypeChecker migration, canonical doc sync, and retirement of superseded working docs.
+
+
+
+
 
 
 
@@ -3357,7 +6795,15 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
 - `unitofmeasure` now validates through the shared UCUM subsystem and `currency` through the XML-backed `CurrencyCatalog`; temporal typed constants share the canonical parser stack in `src/Precept/Language/Time/`.
+
+
+
+
 
 
 
@@ -3365,7 +6811,15 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
 - Known boundary left explicit by the plan: `src/Precept/Runtime/Measures/Unit.cs`, `MeasureDimension.cs`, and `UnitFactory.cs` are intentional runtime stubs for future measure arithmetic work.
+
+
+
+
 
 
 
@@ -3373,7 +6827,15 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
 **By:** Shane
+
+
+
+
 
 
 
@@ -3381,9 +6843,23 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
 **Why:** Moving them to a standalone layer would hollow out what "Data" means. The family definition was too restrictive.
 
+
+
 # Decision: Field and Arg as Standalone Companion Tokens
+
+
+
+
+
+
+
+
 
 
 
@@ -3395,7 +6871,15 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
 **Date:** 2026-05-09
+
+
+
+
 
 
 
@@ -3407,7 +6891,23 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
+
+
+
+
+
+
+
+
 ## Context
+
+
+
+
+
+
+
+
 
 
 
@@ -3423,7 +6923,23 @@ The field/arg color proposal needed a paradigm answer: where do `--field` (#A5B4
 
 
 
+
+
+
+
+
+
+
+
 Three options evaluated:
+
+
+
+
+
+
+
+
 
 
 
@@ -3435,7 +6951,15 @@ Three options evaluated:
 
 
 
+
+
+
+
 2. **Add to Data family** (Shane's suggestion) — keep field/arg in Data, let color do the alignment. Problem: Data is hue-coherent at ~215° slate. Adding 239° indigo and 195° cyan creates a 3-hue family that contradicts its visual identity.
+
+
+
+
 
 
 
@@ -3447,7 +6971,23 @@ Three options evaluated:
 
 
 
+
+
+
+
+
+
+
+
 ## Decision
+
+
+
+
+
+
+
+
 
 
 
@@ -3463,7 +7003,19 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 - Five families stay unchanged (Structure 3 tones, State 1, Event 1, Data **2** tones, Rule 1).
+
+
+
+
 
 
 
@@ -3471,7 +7023,15 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
 - New spec sub-section "Companion Tokens" after the five family cards, before supporting colors.
+
+
+
+
 
 
 
@@ -3479,7 +7039,19 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
 - No axis layer. No family stretching. Colors unchanged from the original proposal.
+
+
+
+
+
+
+
+
 
 
 
@@ -3495,7 +7067,19 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 - Families are hue-coherent by design principle. Adding foreign hues breaks the visual contract.
+
+
+
+
 
 
 
@@ -3503,9 +7087,23 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
 - The companion concept is extensible if future tokens need the same pattern (e.g., a guard-name color near Rule).
 
+
+
 # george-currencycatalog-implemented
+
+
+
+
+
+
+
+
 
 
 
@@ -3517,7 +7115,15 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
 **Date:** 2026-05-09T10:41:11Z
+
+
+
+
 
 
 
@@ -3529,7 +7135,23 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -3545,7 +7167,19 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 ### New: `src/Precept/Language/CurrencyCatalog.cs`
+
+
+
+
 
 
 
@@ -3553,7 +7187,15 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
 - `CurrencyCatalog` — public static class with `All: FrozenDictionary<string, CurrencyEntry>` keyed by alpha code, `StringComparer.OrdinalIgnoreCase`
+
+
+
+
 
 
 
@@ -3565,7 +7207,19 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 ### Modified: `src/Precept/Language/Types.cs`
+
+
+
+
 
 
 
@@ -3573,7 +7227,15 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
 - Updated: `CurrencyValidation` now derives `AllowedValues` from `CurrencyCatalog.All.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase)`
+
+
+
+
 
 
 
@@ -3585,7 +7247,23 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -3601,7 +7279,19 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 - **162 currency entries** in `CurrencyCatalog.All`
+
+
+
+
 
 
 
@@ -3609,11 +7299,23 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
 - Removed: HRK (Croatian Kuna — withdrawn from List One when Croatia adopted EUR, Jan 2023)
 
 
 
+
+
+
+
 - Added (7 new X-codes): XBA (955), XBB (956), XBC (957), XBD (958), XDR (960), XSU (994), XUA (965)
+
+
+
+
 
 
 
@@ -3625,7 +7327,23 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -3641,11 +7359,27 @@ Option 3: standalone companion tokens.
 
 
 
+
+
+
+
+
+
+
+
 ### Fund code MinorUnit = -1 for N/A
 
 
 
+
+
+
+
 ISO 4217 lists certain codes with `N/A` for minor units. Convention: `MinorUnit = -1`. Applies to:
+
+
+
+
 
 
 
@@ -3657,7 +7391,19 @@ XBA, XBB, XBC, XBD (bond market units), XDR (SDR/Special Drawing Right), XSU (Su
 
 
 
+
+
+
+
+
+
+
+
 ### Supranational codes with real minor units use their published values
+
+
+
+
 
 
 
@@ -3669,7 +7415,19 @@ XAF (0), XOF (0), XPF (0) — zero decimal places. XCD (2) — two decimal place
 
 
 
+
+
+
+
+
+
+
+
 ### HRK removed (not just noted)
+
+
+
+
 
 
 
@@ -3681,7 +7439,19 @@ Croatia's ISO withdrawal is permanent. Keeping a withdrawn code in the catalog w
 
 
 
+
+
+
+
+
+
+
+
 ### Precious metals excluded (XAU, XAG, XPT, XPD)
+
+
+
+
 
 
 
@@ -3693,11 +7463,31 @@ Per Shane's resolved Q1 decision: commodities, not currencies. One-line addition
 
 
 
+
+
+
+
+
+
+
+
 ### XTS (testing), XXX (no currency) excluded
 
 
 
+
+
+
+
 Per gap analysis. Standard practice.
+
+
+
+
+
+
+
+
 
 
 
@@ -3713,7 +7503,23 @@ Per gap analysis. Standard practice.
 
 
 
+
+
+
+
+
+
+
+
 ## Validation
+
+
+
+
+
+
+
+
 
 
 
@@ -3725,7 +7531,15 @@ Per gap analysis. Standard practice.
 
 
 
+
+
+
+
 - `dotnet test test/Precept.Tests/` — 3646 passed, 1 skipped (`CurrencyCatalogSyncTests` — skipped correctly as ISO 4217 XML is not present)
+
+
+
+
 
 
 
@@ -3733,7 +7547,15 @@ Per gap analysis. Standard practice.
 
 
 
+
+
+
+
 ### 2026-05-09T09:34:41: User directive
+
+
+
+
 
 
 
@@ -3741,11 +7563,23 @@ Per gap analysis. Standard practice.
 
 
 
+
+
+
+
 **What:** Always include a running tally of in-flight agent threads when multiple work streams are active. Format: emoji + agent name + one-line status (running/done/blocked). Keep it updated every response.
 
 
 
+
+
+
+
 **Why:** User request — captured for team memory
+
+
+
+
 
 
 
@@ -3757,7 +7591,19 @@ Per gap analysis. Standard practice.
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
 
 
 
@@ -3769,7 +7615,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ## Already Enrolled
+
+
+
+
 
 
 
@@ -3777,7 +7635,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - Coverage is complete across all 14 `ExpressionFormKind` members from `src/Precept/Language/ExpressionForms.cs:8-37`:
+
+
+
+
 
 
 
@@ -3785,7 +7651,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `UnaryOperation` → `ParseUnaryOperation` (`125-134`)
+
+
+
+
 
 
 
@@ -3793,7 +7667,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `Grouped` → `ParseGrouped` (`205-213`)
+
+
+
+
 
 
 
@@ -3801,7 +7683,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `Conditional` → `ParseConditional` (`240-253`)
+
+
+
+
 
 
 
@@ -3809,7 +7699,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `CIFunctionCall` → `ParseCIFunctionCall` (`273-284`)
+
+
+
+
 
 
 
@@ -3817,7 +7715,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `PostfixOperation` → `ParsePostfixIs` (`326-356`)
+
+
+
+
 
 
 
@@ -3825,11 +7731,27 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `InterpolatedString` → `ParseInterpolatedString` (`378-421`)
 
 
 
+
+
+
+
 - This is the canonical PRECEPT0019 shape: one parser-local catalog (`ExpressionFormKind`), one handler family, and method-level ownership per member.
+
+
+
+
+
+
+
+
 
 
 
@@ -3845,7 +7767,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ### 1. Enroll now
+
+
+
+
 
 
 
@@ -3853,7 +7787,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Catalog Enum**: `OutcomeArgumentKind` (discovered during audit in `src/Precept/Language/Outcomes.cs:19-32`)
+
+
+
+
 
 
 
@@ -3861,7 +7803,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `ParseOutcomeIdentifierArg` (`606-620`)
+
+
+
+
 
 
 
@@ -3869,7 +7819,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `ParseOutcomeSecondaryToken` (`638-652`)
+
+
+
+
 
 
 
@@ -3877,7 +7835,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Feasibility**: High. The method-per-member pattern already exists for 3 of the 4 members. The only obstacle is `OutcomeArgumentKind.None`: it needs an explicit handler method (even if that method deliberately throws until a no-arg outcome ships) so PRECEPT0019 can force deliberate ownership of the member.
+
+
+
+
 
 
 
@@ -3889,7 +7855,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ### 2. Enroll after refactor
+
+
+
+
 
 
 
@@ -3897,7 +7875,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Catalog Enum**: `ActionSyntaxShape` (`src/Precept/Language/Action.cs:30-50`)
+
+
+
+
 
 
 
@@ -3905,11 +7891,23 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Coverage gap risk**: Medium-high. If a new `ActionSyntaxShape` member is added, the default branch returns `MalformedAction` (`1001-1005`). That is worse than an honest compile failure: the parser degrades into recovery output rather than forcing the new syntax shape to be implemented deliberately.
 
 
 
+
+
+
+
 - **Feasibility**: Medium. The current analyzer needs method-level annotations, so `ParseActionByShape` must be split into per-shape methods (`ParseAssignValueAction`, `ParseCollectionValueAction`, etc.) and then annotated.
+
+
+
+
 
 
 
@@ -3921,7 +7919,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ### 3. Do not enroll with PRECEPT0019; use a different mechanism
+
+
+
+
 
 
 
@@ -3929,7 +7939,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Catalog Enum**: `ProofRequirementKind`
+
+
+
+
 
 
 
@@ -3937,7 +7955,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - strategy 1 numeric-only literal proof (`ProofEngine.cs:334-360`)
+
+
+
+
 
 
 
@@ -3945,7 +7971,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - guard-path proof branches (`526-536`)
+
+
+
+
 
 
 
@@ -3953,7 +7987,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - fault-link construction (`907-920`)
+
+
+
+
 
 
 
@@ -3961,7 +8003,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Feasibility**: Low for PRECEPT0019 specifically. The analyzer is class-level and only requires that some method in the class is annotated for each member. That would not guarantee that every independent dispatch family (`TryDeclarationAttributeProof`, `CreateDiagnostic`, `CreateFaultSiteLink`, etc.) handles every kind. With the current analyzer shape, enrollment would create false confidence.
+
+
+
+
 
 
 
@@ -3973,7 +8023,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ### 4. Do not enroll with PRECEPT0019; make the logic catalog-driven instead
+
+
+
+
 
 
 
@@ -3981,7 +8043,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Catalog Enum**: `FunctionKind`, `OperationKind`, `ConstraintKind`, `ModifierKind`
+
+
+
+
 
 
 
@@ -3989,7 +8059,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - CI enforcement hardcodes specific `OperationKind` values (`TypeChecker.Validation.cs:334-358`) and specific `FunctionKind` values (`365-380`)
+
+
+
+
 
 
 
@@ -3997,7 +8075,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - access-mode normalization hardcodes `TokenKind.Editable -> ModifierKind.Write` and fallback-to-read (`589-594`)
+
+
+
+
 
 
 
@@ -4005,11 +8091,23 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Coverage gap risk**: Medium. These sites can silently mis-handle future surface additions because they use subset logic with fallback arms.
 
 
 
+
+
+
+
 - **Feasibility**: Low for PRECEPT0019. These are not “handle every member of the enum” sites. They either care about a small semantic subset of a much larger enum, or they are token-to-catalog mappings.
+
+
+
+
 
 
 
@@ -4021,7 +8119,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ### 5. No current candidate
+
+
+
+
 
 
 
@@ -4029,7 +8139,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Assessment**: No PRECEPT0019 recommendation today. Both files are still largely runtime stubs/TODOs (`src/Precept/Runtime/Evaluator.cs`, `src/Precept/Runtime/Precept.cs`), so there is not yet a stable handwritten enum/member dispatch surface worth enrolling.
+
+
+
+
 
 
 
@@ -4041,7 +8159,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ## Already Covered by Other Analyzers
+
+
+
+
 
 
 
@@ -4049,7 +8179,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `TypeKind` → `Types.GetMeta` (`src/Precept/Language/Types.cs:301-725`)
+
+
+
+
 
 
 
@@ -4057,7 +8195,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `OperatorKind` → `Operators.GetMeta` (`Operators.cs:15-156`)
+
+
+
+
 
 
 
@@ -4065,7 +8211,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `ModifierKind` → `Modifiers.GetMeta` (`Modifiers.cs:46-309`)
+
+
+
+
 
 
 
@@ -4073,7 +8227,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `ActionKind` → `Actions.GetMeta` (`Actions.cs:66-205`)
+
+
+
+
 
 
 
@@ -4081,7 +8243,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `DiagnosticCode` → `Diagnostics.GetMeta` (`Diagnostics.cs:37-438`)
+
+
+
+
 
 
 
@@ -4089,7 +8259,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `ExpressionFormKind` → `ExpressionForms.GetMeta` (`ExpressionForms.cs:81-104`)
+
+
+
+
 
 
 
@@ -4097,7 +8275,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - `FaultCode` ↔ `DiagnosticCode` statically-preventable mapping is enforced by **PRECEPT0002** (`src/Precept.Analyzers/Precept0002FaultCodeMustHaveStaticallyPreventable.cs`)
+
+
+
+
 
 
 
@@ -4105,7 +8291,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
 - **Proof requirement metadata placement/identity already has targeted analyzer coverage**:
+
+
+
+
 
 
 
@@ -4113,7 +8307,15 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
   - proof-subject placement validity → **PRECEPT0006**
+
+
+
+
 
 
 
@@ -4125,7 +8327,19 @@ The audit found one clear PRECEPT0019 expansion that is both valuable and implem
 
 
 
+
+
+
+
+
+
+
+
 ## Catalog-Driven (Correct — No Enrollment Needed)
+
+
+
+
 
 
 
@@ -4137,7 +8351,19 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 - **Lexer / TokenKind**
+
+
+
+
 
 
 
@@ -4145,7 +8371,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - operator recognition uses `Tokens.TwoCharOperators`, `Tokens.SingleCharOperators`, `Tokens.TwoCharOperatorStarters` (`736-760`)
+
+
+
+
 
 
 
@@ -4153,7 +8387,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - the only switch is on internal `LexerMode` (`157-168`), not on `TokenKind`
+
+
+
+
 
 
 
@@ -4161,7 +8403,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - top-level construct routing is driven by `Constructs.ByLeadingToken` and `DisambiguationEntry.DisambiguationTokens` (`Parser.cs:138-179`)
+
+
+
+
 
 
 
@@ -4169,7 +8419,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - types via `Types.ByToken` (`Parser.cs:396-422`, `544-570`)
+
+
+
+
 
 
 
@@ -4177,7 +8435,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - action verbs via `Actions.ByTokenKind` (`843-861`)
+
+
+
+
 
 
 
@@ -4185,7 +8451,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
 - **TypeChecker / OperationKind, FunctionKind, ActionKind, TypeKind**
+
+
+
+
 
 
 
@@ -4193,7 +8467,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - functions via `Functions.FindByName` + overload metadata (`1031-1145`)
+
+
+
+
 
 
 
@@ -4201,7 +8483,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - member/method accessors via `Types.GetMeta(receiver.ResultType).Accessors` (`1199-1240`, `1255-1312`)
+
+
+
+
 
 
 
@@ -4209,7 +8499,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - state modifier semantics are read from `StateModifierMeta` (`GraphAnalyzer.cs:595-603`)
+
+
+
+
 
 
 
@@ -4217,7 +8515,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
 - **ProofEngine / OperationKind, FunctionKind, ModifierKind**
+
+
+
+
 
 
 
@@ -4225,7 +8531,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - declaration proof reads `Modifiers.GetMeta` and proof satisfactions (`399-407`)
+
+
+
+
 
 
 
@@ -4237,7 +8551,19 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 ## Structural Obstacles
+
+
+
+
 
 
 
@@ -4245,7 +8571,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - The engine has multiple independent proof-kind dispatch families. Class-level coverage would only prove that each kind is handled somewhere, not everywhere it must be handled.
+
+
+
+
 
 
 
@@ -4253,7 +8587,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
 - **`ActionSyntaxShape` needs method extraction before PRECEPT0019 can help.**
+
+
+
+
 
 
 
@@ -4261,7 +8603,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
 - **`OutcomeArgumentKind.None` is a currently-unused member.**
+
+
+
+
 
 
 
@@ -4269,7 +8619,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
 - **Several TypeChecker sites are really missing indexes/metadata, not PRECEPT0019.**
+
+
+
+
 
 
 
@@ -4277,7 +8635,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - access-mode and anchor mapping are handwritten (`589-594`, `652-656`) even though `Modifiers.GetMeta` already knows access and anchor semantics.
+
+
+
+
 
 
 
@@ -4285,11 +8651,23 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
 - **CI enforcement is subset dispatch, not full-enum dispatch.**
 
 
 
+
+
+
+
   - `TypeChecker.Validation` only cares about CI-sensitive operations/functions, not every `OperationKind` / `FunctionKind` member.
+
+
+
+
 
 
 
@@ -4301,7 +8679,19 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 ## Phase 3 Assessment
+
+
+
+
 
 
 
@@ -4313,7 +8703,19 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 - **`ConstraintKind`**
+
+
+
+
 
 
 
@@ -4321,7 +8723,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - `Constraints.GetMeta` is fully explicit and ends in `_ => throw`, not discard fallback (`src/Precept/Language/Constraints.cs:13-21`)
+
+
+
+
 
 
 
@@ -4329,7 +8739,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
   - Enum lives in `src/Precept/Language/ProofRequirementKind.cs:6-24`
+
+
+
+
 
 
 
@@ -4341,9 +8759,27 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 **Verdict:** add both names to `CatalogAnalysisHelpers.CatalogEnumNames` now. There are no remaining `_ =>` discard-arm blockers in the catalog `GetMeta` switches. The current blocker is only the stale TODO comment, not the code.
 
+
+
 # ProofEngine Architecture Audit — Findings
+
+
+
+
+
+
+
+
 
 
 
@@ -4355,7 +8791,15 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
 **By:** Frank (Lead/Architect)
+
+
+
+
 
 
 
@@ -4367,7 +8811,23 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -4383,7 +8843,23 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 ### FIX-1: `IsSubtractionOp` uses string-based enum name matching (VIOLATION)
+
+
+
+
+
+
+
+
 
 
 
@@ -4399,7 +8875,19 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -4407,7 +8895,15 @@ private static bool IsSubtractionOp(OperationKind op)
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -4415,7 +8911,15 @@ private static bool IsSubtractionOp(OperationKind op)
 
 
 
+
+
+
+
     return name.Contains("Minus", StringComparison.Ordinal);
+
+
+
+
 
 
 
@@ -4423,7 +8927,19 @@ private static bool IsSubtractionOp(OperationKind op)
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -4439,7 +8955,23 @@ The Operations catalog already carries `BinaryOperationMeta.Op == OperatorKind.M
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -4455,7 +8987,23 @@ The Operations catalog already carries `BinaryOperationMeta.Op == OperatorKind.M
 
 
 
+
+
+
+
+
+
+
+
 **Location:** `ProofEngine.cs` lines 883–889
+
+
+
+
+
+
+
+
 
 
 
@@ -4467,7 +9015,15 @@ The Operations catalog already carries `BinaryOperationMeta.Op == OperatorKind.M
 
 
 
+
+
+
+
 PresenceProofRequirement presence =>
+
+
+
+
 
 
 
@@ -4479,11 +9035,31 @@ PresenceProofRequirement presence =>
 
 
 
+
+
+
+
+
+
+
+
 _ => Diagnostics.Create(DiagnosticCode.DivisionByZero, ...)  // WRONG
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -4499,7 +9075,23 @@ Unresolved presence obligations and unknown requirement types both fall through 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -4515,7 +9107,23 @@ Unresolved presence obligations and unknown requirement types both fall through 
 
 
 
+
+
+
+
+
+
+
+
 **Location:** `ProofEngine.cs` lines 919, 926
+
+
+
+
+
+
+
+
 
 
 
@@ -4527,7 +9135,15 @@ Unresolved presence obligations and unknown requirement types both fall through 
 
 
 
+
+
+
+
 _ => DiagnosticCode.DivisionByZero     // line 919 — catch-all
+
+
+
+
 
 
 
@@ -4535,7 +9151,19 @@ _ => FaultCode.DivisionByZero          // line 926 — catch-all
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -4551,7 +9179,23 @@ Same issue as FIX-2 — the fault site link defaults to `DivisionByZero` for any
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -4567,7 +9211,23 @@ Same issue as FIX-2 — the fault site link defaults to `DivisionByZero` for any
 
 
 
+
+
+
+
+
+
+
+
 Neither the design doc's diagnostic table (§9) nor `DiagnosticCode.cs` defines a presence-specific proof diagnostic code. The diagnostic table at line 1577 of the spec lists codes 82–84 and 112–115 but has no entry for "optional field used without proving it is set." This is the root cause of FIX-2 and FIX-3.
+
+
+
+
+
+
+
+
 
 
 
@@ -4583,7 +9243,23 @@ Neither the design doc's diagnostic table (§9) nor `DiagnosticCode.cs` defines 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -4599,7 +9275,23 @@ Neither the design doc's diagnostic table (§9) nor `DiagnosticCode.cs` defines 
 
 
 
+
+
+
+
+
+
+
+
 ### GAP-1: Design doc pseudocode vs. implementation minor discrepancies
+
+
+
+
+
+
+
+
 
 
 
@@ -4611,7 +9303,19 @@ Neither the design doc's diagnostic table (§9) nor `DiagnosticCode.cs` defines 
 
 
 
+
+
+
+
 2. **Strategy 2 modifier walk** — spec pseudocode omits `ImpliedModifiers`; implementation correctly includes them via `.Concat(attributeField.ImpliedModifiers)`. Spec prose at line 826 correctly states this, but pseudocode at line 729 doesn't. Minor spec consistency issue.
+
+
+
+
+
+
+
+
 
 
 
@@ -4627,7 +9331,19 @@ Neither the design doc's diagnostic table (§9) nor `DiagnosticCode.cs` defines 
 
 
 
+
+
+
+
+
+
+
+
 Spec signature: `GuardRelationImpliesObligation(guard, expr, requirement)` (3 params).
+
+
+
+
 
 
 
@@ -4639,9 +9355,27 @@ Implementation signature: `GuardRelationImpliesObligation(guard, expr, exprLeftF
 
 
 
+
+
+
+
+
+
+
+
 The implementation pre-resolves field names and passes them as arguments. Functionally equivalent, slightly different shape. Spec should be updated if a spec-update pass occurs.
 
+
+
 # Design Ruling: ProofEngine × ProofRequirementKind Exhaustiveness Mechanism
+
+
+
+
+
+
+
+
 
 
 
@@ -4653,7 +9387,15 @@ The implementation pre-resolves field names and passes them as arguments. Functi
 
 
 
+
+
+
+
 **Date:** 2026-05-09
+
+
+
+
 
 
 
@@ -4661,7 +9403,19 @@ The implementation pre-resolves field names and passes them as arguments. Functi
 
 
 
+
+
+
+
 **Requested by:** Shane (no deferrals, right solution not easiest)
+
+
+
+
+
+
+
+
 
 
 
@@ -4677,7 +9431,23 @@ The implementation pre-resolves field names and passes them as arguments. Functi
 
 
 
+
+
+
+
+
+
+
+
 ## Context
+
+
+
+
+
+
+
+
 
 
 
@@ -4693,7 +9463,23 @@ The PRECEPT0019 audit identified `ProofEngine × ProofRequirementKind` as a real
 
 
 
+
+
+
+
+
+
+
+
 Shane's directive: find the architecturally correct enforcement mechanism. No deferrals.
+
+
+
+
+
+
+
+
 
 
 
@@ -4709,7 +9495,23 @@ Shane's directive: find the architecturally correct enforcement mechanism. No de
 
 
 
+
+
+
+
+
+
+
+
 ### Dispatch Families in ProofEngine
+
+
+
+
+
+
+
+
 
 
 
@@ -4725,7 +9527,23 @@ I count **seven** sites that operate on `ProofRequirement` subtypes. They fall i
 
 
 
+
+
+
+
+
+
+
+
 **Category A — Must-Be-Exhaustive (2 families):**
+
+
+
+
+
+
+
+
 
 
 
@@ -4741,7 +9559,23 @@ I count **seven** sites that operate on `ProofRequirement` subtypes. They fall i
 
 
 
+
+
+
+
+
+
+
+
 2. **`CreateFaultSiteLink`** (line 900–917) — switch statement over `obligation.Requirement` with explicit type-pattern arms for all 5 subtypes, followed by `throw`. Every requirement kind MUST produce a fault-site link.
+
+
+
+
+
+
+
+
 
 
 
@@ -4757,7 +9591,23 @@ I count **seven** sites that operate on `ProofRequirement` subtypes. They fall i
 
 
 
+
+
+
+
+
+
+
+
 3. **`TryLiteralProof`** (Strategy 1, line 334) — handles only `NumericProofRequirement`. By design: only numeric requirements can be discharged by literal comparison.
+
+
+
+
+
+
+
+
 
 
 
@@ -4773,7 +9623,23 @@ I count **seven** sites that operate on `ProofRequirement` subtypes. They fall i
 
 
 
+
+
+
+
+
+
+
+
 5. **`TryGuardInPathProof`** (Strategy 3, line 511) — handles `NumericProofRequirement`, `PresenceProofRequirement`. By design: guard decomposition only produces numeric and presence constraints.
+
+
+
+
+
+
+
+
 
 
 
@@ -4789,7 +9655,23 @@ I count **seven** sites that operate on `ProofRequirement` subtypes. They fall i
 
 
 
+
+
+
+
+
+
+
+
 7. **`TryQualifierCompatibilityProof`** (Strategy 5, line 779) — handles only `QualifierCompatibilityProofRequirement`. By design: this is the dedicated dual-subject strategy.
+
+
+
+
+
+
+
+
 
 
 
@@ -4805,7 +9687,23 @@ I count **seven** sites that operate on `ProofRequirement` subtypes. They fall i
 
 
 
+
+
+
+
+
+
+
+
 The strategies are organized by **proof technique**, not by **requirement kind**. A single strategy handles multiple kinds (Strategy 2 handles 4 of 5), and the same kind is handled by multiple strategies (Numeric is attempted by Strategies 1, 2, 3, and 4). This is the correct decomposition. The strategies chain via `TryDischarge` (line 316–330): each returns false for inapplicable kinds, and the loop tries the next strategy.
+
+
+
+
+
+
+
+
 
 
 
@@ -4821,7 +9719,23 @@ If no strategy can discharge an obligation, it stays `Unresolved`. That is **saf
 
 
 
+
+
+
+
+
+
+
+
 ### What PRECEPT0025 Actually Covers Today
+
+
+
+
+
+
+
+
 
 
 
@@ -4837,7 +9751,23 @@ If no strategy can discharge an obligation, it stays `Unresolved`. That is **saf
 
 
 
+
+
+
+
+
+
+
+
 1. **PRECEPT0025 only covers switch expressions** — it registers for `OperationKind.SwitchExpression` (line 55). The two must-be-exhaustive families (`CreateDiagnostic`, `CreateFaultSiteLink`) use switch **statements**. PRECEPT0025 does not see them.
+
+
+
+
+
+
+
+
 
 
 
@@ -4853,7 +9783,23 @@ If no strategy can discharge an obligation, it stays `Unresolved`. That is **saf
 
 
 
+
+
+
+
+
+
+
+
 3. **PRECEPT0025 doesn't force switches to exist** — if someone adds a new method that processes obligations without switching, nothing fires. (This is acceptable for strategies — see below.)
+
+
+
+
+
+
+
+
 
 
 
@@ -4869,7 +9815,23 @@ If no strategy can discharge an obligation, it stays `Unresolved`. That is **saf
 
 
 
+
+
+
+
+
+
+
+
 `TreatWarningsAsErrors` is `true` in `Precept.csproj`. C# emits CS8509 for non-exhaustive switch expressions, which would become a compile error. But C# cannot prove exhaustiveness for abstract type hierarchies — even with all subtypes sealed, the base type is not itself sealed. The developer would need `_ => throw new InvalidOperationException(...)` as the final arm. PRECEPT0025 would flag that `_ =>` pattern as prohibited.
+
+
+
+
+
+
+
+
 
 
 
@@ -4885,7 +9847,23 @@ This is a genuine tension: C# requires a discard for type-pattern exhaustiveness
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -4901,7 +9879,23 @@ This is a genuine tension: C# requires a discard for type-pattern exhaustiveness
 
 
 
+
+
+
+
+
+
+
+
 ### The Mechanism
+
+
+
+
+
+
+
+
 
 
 
@@ -4917,7 +9911,19 @@ A new Roslyn analyzer, **PRECEPT0026**, that enforces **subtype completeness** f
 
 
 
+
+
+
+
+
+
+
+
 1. **Detect** any switch expression or switch statement whose discriminant type inherits from a `[CatalogDU]`-marked abstract record.
+
+
+
+
 
 
 
@@ -4925,11 +9931,27 @@ A new Roslyn analyzer, **PRECEPT0026**, that enforces **subtype completeness** f
 
 
 
+
+
+
+
 3. **Enumerate** all type-pattern arms in the switch.
 
 
 
+
+
+
+
 4. **Report an error** for each sealed subtype that has no corresponding type-pattern arm.
+
+
+
+
+
+
+
+
 
 
 
@@ -4945,7 +9967,23 @@ A new Roslyn analyzer, **PRECEPT0026**, that enforces **subtype completeness** f
 
 
 
+
+
+
+
+
+
+
+
 ### What This Enforces — Precisely
+
+
+
+
+
+
+
+
 
 
 
@@ -4961,7 +9999,19 @@ When a 6th `ProofRequirement` subtype is added:
 
 
 
+
+
+
+
+
+
+
+
 - **`CreateDiagnostic`**: PRECEPT0026 fires — "missing arm for `NewSubtype`." Compile error. Developer must add an explicit `case NewSubtype:` arm with the correct diagnostic code. ✅
+
+
+
+
 
 
 
@@ -4969,7 +10019,19 @@ When a 6th `ProofRequirement` subtype is added:
 
 
 
+
+
+
+
 - **Strategy methods**: No switch exists. PRECEPT0026 doesn't fire. The new kind is not discharged by any existing strategy. The obligation stays `Unresolved`. `CreateDiagnostic` fires (guaranteed exhaustive by PRECEPT0026). **Correct conservative behavior.** ✅
+
+
+
+
+
+
+
+
 
 
 
@@ -4985,7 +10047,19 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
+
+
+
+
 - **PRECEPT0025** prevents wildcards from silently absorbing new subtypes (no `_ =>` or `default:` that hides a missing arm).
+
+
+
+
 
 
 
@@ -4993,7 +10067,19 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
 - Together: every subtype has exactly one explicit arm, new subtypes produce compile errors at every switch site, and no wildcard provides false safety.
+
+
+
+
+
+
+
+
 
 
 
@@ -5009,7 +10095,19 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
+
+
+
+
 1. **New analyzer file**: `src/Precept.Analyzers/Precept0026CatalogDUCompleteness.cs`
+
+
+
+
 
 
 
@@ -5017,11 +10115,27 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
    - Reuse `CatalogAnalysisHelpers` and PRECEPT0025's `FindCatalogDUBase` pattern (extract to shared helper or duplicate — the walk logic is 10 lines).
 
 
 
+
+
+
+
    - To enumerate sealed subtypes: scan `compilation.GetSymbolsWithName()` or walk the DU base's containing assembly for types that inherit from it and are sealed. The subtypes are always in the same assembly as the base (Precept.dll).
+
+
+
+
+
+
+
+
 
 
 
@@ -5037,7 +10151,23 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
+
+
+
+
 3. **Tests**: Add analyzer tests in `test/Precept.Analyzers.Tests/` for both PRECEPT0026 and the PRECEPT0025 extension.
+
+
+
+
+
+
+
+
 
 
 
@@ -5053,7 +10183,23 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
+
+
+
+
 ### Annotation Surface
+
+
+
+
+
+
+
+
 
 
 
@@ -5069,7 +10215,23 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -5085,7 +10247,23 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
+
+
+
+
 ### Option 1 — Reorganize ProofEngine into one handler type per ProofRequirementKind
+
+
+
+
+
+
+
+
 
 
 
@@ -5101,7 +10279,23 @@ Combined with existing PRECEPT0025:
 
 
 
+
+
+
+
+
+
+
+
 The five proof strategies are organized by *proof technique* — literal comparison, declaration attribute inspection, guard path analysis, flow narrowing, qualifier compatibility. This is the correct axis because:
+
+
+
+
+
+
+
+
 
 
 
@@ -5113,11 +10307,27 @@ The five proof strategies are organized by *proof technique* — literal compari
 
 
 
+
+
+
+
 - Multiple strategies attempt the same kind (Numeric is tried by Strategies 1, 2, 3, and 4).
 
 
 
+
+
+
+
 - The strategies compose in a chain: try each technique until one succeeds.
+
+
+
+
+
+
+
+
 
 
 
@@ -5133,7 +10343,23 @@ Splitting by kind would scatter proof logic across 5 handler classes. Strategy 2
 
 
 
+
+
+
+
+
+
+
+
 Worse: it solves the wrong problem. The must-be-exhaustive families (`CreateDiagnostic`, `CreateFaultSiteLink`) are already single-site switches — splitting them gains nothing. The strategies are intentionally partial — forcing per-kind handlers gives false confidence that each handler is complete when its partiality is the design intent.
+
+
+
+
+
+
+
+
 
 
 
@@ -5149,7 +10375,23 @@ This option would also destroy the natural test surface. The current tests verif
 
 
 
+
+
+
+
+
+
+
+
 ### Option 3 — Use PRECEPT0025 ([CatalogDU]) directly
+
+
+
+
+
+
+
+
 
 
 
@@ -5165,7 +10407,23 @@ This option would also destroy the natural test surface. The current tests verif
 
 
 
+
+
+
+
+
+
+
+
 1. **Switch statements are invisible.** PRECEPT0025 registers for `OperationKind.SwitchExpression` only. The two must-be-exhaustive families use switch statements. PRECEPT0025 doesn't see them.
+
+
+
+
+
+
+
+
 
 
 
@@ -5181,7 +10439,23 @@ This option would also destroy the natural test surface. The current tests verif
 
 
 
+
+
+
+
+
+
+
+
 3. **C# tension.** If switch statements were converted to expressions (to enter PRECEPT0025's scope), C# requires `_ => throw` for type-pattern exhaustiveness on non-sealed bases (CS8509 + TreatWarningsAsErrors). PRECEPT0025 would then flag that required `_ =>` as prohibited. The two rules conflict.
+
+
+
+
+
+
+
+
 
 
 
@@ -5197,7 +10471,23 @@ PRECEPT0025 is a necessary complement to PRECEPT0026, not a substitute for it. T
 
 
 
+
+
+
+
+
+
+
+
 ### Option 2 (as originally framed) — Family-level method annotation
+
+
+
+
+
+
+
+
 
 
 
@@ -5213,6 +10503,14 @@ PRECEPT0025 is a necessary complement to PRECEPT0026, not a substitute for it. T
 
 
 
+
+
+
+
+
+
+
+
 PRECEPT0026 achieves the same guarantee without any annotations. Every switch over a `[CatalogDU]` type is automatically checked. The enforcement is structural (inherent in the switch + DU type), not declarative (requiring developers to remember to annotate). Structural enforcement is always preferred — it cannot be forgotten.
 
 
@@ -5221,7 +10519,23 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -5237,7 +10551,19 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 1. **PRECEPT0026 doesn't force switches to exist.** If someone adds a new method that processes proof obligations via `if/else` chains or individual `is` type checks instead of a switch, PRECEPT0026 doesn't fire. This is acceptable because:
+
+
+
+
 
 
 
@@ -5245,11 +10571,27 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
    - The must-be-exhaustive sites (`CreateDiagnostic`, `CreateFaultSiteLink`) are already switches and there's no architectural reason to add more must-be-exhaustive sites.
 
 
 
+
+
+
+
    - Code review remains the backstop for architectural patterns that analyzers can't enforce.
+
+
+
+
+
+
+
+
 
 
 
@@ -5265,7 +10607,23 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 3. **PRECEPT0025 extension to switch statements requires adapting pattern-matching logic.** Switch statement case clauses (`ISwitchCaseOperation`) have a different IOperation shape than switch expression arms (`ISwitchExpressionArmOperation`). The adaptation is mechanical but needs careful testing. A `default:` case in a switch statement is represented differently than `_ =>` in a switch expression.
+
+
+
+
+
+
+
+
 
 
 
@@ -5281,7 +10639,23 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -5297,7 +10671,23 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 - **George** builds PRECEPT0026 and the PRECEPT0025 switch-statement extension. He owns the analyzer infrastructure, just shipped PRECEPT0025, and has the Roslyn IOperation expertise. This is pure analyzer work — no runtime changes.
+
+
+
+
+
+
+
+
 
 
 
@@ -5313,7 +10703,23 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 - **Estimated scope**: ~150 lines of analyzer code for PRECEPT0026, ~30 lines of adaptation for the PRECEPT0025 extension, plus test coverage. Small, focused, no structural risk.
+
+
+
+
+
+
+
+
 
 
 
@@ -5329,7 +10735,23 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -5345,7 +10767,19 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 - Every sealed DU subtype has an explicit arm in every switch.
+
+
+
+
 
 
 
@@ -5353,7 +10787,15 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
 - New subtypes produce compile errors at every must-be-exhaustive site.
+
+
+
+
 
 
 
@@ -5365,7 +10807,19 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
+
+
+
+
+
+
+
+
 This is the right solution because it enforces the actual safety property (every switch is complete) at the actual enforcement boundary (each switch independently) without distorting the engine's natural decomposition (strategies by technique, not by kind).
+
+
+
+
 
 
 
@@ -5377,7 +10831,23 @@ This is the right solution because it enforces the actual safety property (every
 
 
 
+
+
+
+
+
+
+
+
 ## Verdict
+
+
+
+
+
+
+
+
 
 
 
@@ -5393,6 +10863,14 @@ This is the right solution because it enforces the actual safety property (every
 
 
 
+
+
+
+
+
+
+
+
 `SetType` is already the type-position token. The catalog should use it.
 
 
@@ -5401,7 +10879,23 @@ This is the right solution because it enforces the actual safety property (every
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
+
+
+
+
 
 
 
@@ -5417,11 +10911,27 @@ The current metadata is internally contradictory.
 
 
 
+
+
+
+
+
+
+
+
 - `TokenKind.Set` carries **single-valued** visual metadata: `TextMateScope = "keyword.other.action.precept"` and `SemanticTokenType = "keyword"`.
 
 
 
+
+
+
+
 - The same entry also claims `TokenCategory.Type`.
+
+
+
+
 
 
 
@@ -5433,7 +10943,19 @@ The current metadata is internally contradictory.
 
 
 
+
+
+
+
+
+
+
+
 A token cannot honestly be both:
+
+
+
+
 
 
 
@@ -5441,7 +10963,19 @@ A token cannot honestly be both:
 
 
 
+
+
+
+
 - a type-keyword token for the same single metadata fields.
+
+
+
+
+
+
+
+
 
 
 
@@ -5457,7 +10991,23 @@ That is exactly why `TokenKind.SetType` exists.
 
 
 
+
+
+
+
+
+
+
+
 The design already has the right separation:
+
+
+
+
+
+
+
+
 
 
 
@@ -5469,11 +11019,27 @@ The design already has the right separation:
 
 
 
+
+
+
+
 - **Parser reinterprets** `Set` as `SetType` in type position
 
 
 
+
+
+
+
 - **Types.ByToken** maps both `Set` and `SetType` to the same `TypeMeta`
+
+
+
+
+
+
+
+
 
 
 
@@ -5489,7 +11055,23 @@ That is the architecture. The dual-use surface word is modeled as **two token ki
 
 
 
+
+
+
+
+
+
+
+
 ### Why not B
+
+
+
+
+
+
+
+
 
 
 
@@ -5505,7 +11087,23 @@ Option B makes the tests lie down and accept a bad catalog. It forces consumers 
 
 
 
+
+
+
+
+
+
+
+
 ### Why not C
+
+
+
+
+
+
+
+
 
 
 
@@ -5521,7 +11119,23 @@ Option C paints action-position `set` as a type everywhere. That is worse. The g
 
 
 
+
+
+
+
+
+
+
+
 ## Architectural rule this locks
+
+
+
+
+
+
+
+
 
 
 
@@ -5537,7 +11151,23 @@ Option C paints action-position `set` as a type everywhere. That is worse. The g
 
 
 
+
+
+
+
+
+
+
+
 If a surface word is context-disambiguated into a separate parser token kind, the context-specific role belongs on the disambiguated token kind (`SetType`), not back on the lexer token (`Set`).
+
+
+
+
+
+
+
+
 
 
 
@@ -5553,7 +11183,23 @@ Corollary: consumers that mean **“what type keywords are valid here?”** shou
 
 
 
+
+
+
+
+
+
+
+
 ## Exact code changes required
+
+
+
+
+
+
+
+
 
 
 
@@ -5569,7 +11215,23 @@ Corollary: consumers that mean **“what type keywords are valid here?”** shou
 
 
 
+
+
+
+
+
+
+
+
 Change `TokenKind.Set` from:
+
+
+
+
+
+
+
+
 
 
 
@@ -5585,7 +11247,23 @@ Change `TokenKind.Set` from:
 
 
 
+
+
+
+
+
+
+
+
 To:
+
+
+
+
+
+
+
+
 
 
 
@@ -5601,7 +11279,23 @@ To:
 
 
 
+
+
+
+
+
+
+
+
 Also update the description/comment so it no longer claims the token itself is the type token. Suggested intent:
+
+
+
+
+
+
+
+
 
 
 
@@ -5617,7 +11311,23 @@ Also update the description/comment so it no longer claims the token itself is t
 
 
 
+
+
+
+
+
+
+
+
 Leave these unchanged:
+
+
+
+
+
+
+
+
 
 
 
@@ -5629,7 +11339,15 @@ Leave these unchanged:
 
 
 
+
+
+
+
 - `TokenKind.Set.SemanticTokenType = "keyword"`
+
+
+
+
 
 
 
@@ -5637,11 +11355,27 @@ Leave these unchanged:
 
 
 
+
+
+
+
 - parser disambiguation logic
 
 
 
+
+
+
+
 - `Types.ByToken` alias behavior
+
+
+
+
+
+
+
+
 
 
 
@@ -5657,7 +11391,23 @@ If `Cat_ActType` becomes unused, delete it.
 
 
 
+
+
+
+
+
+
+
+
 ### 2. `test/Precept.Tests/TokensTests.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -5673,7 +11423,23 @@ Replace the old invariant:
 
 
 
+
+
+
+
+
+
+
+
 - `GetMeta_SetToken_HasBothActionAndTypeCategories`
+
+
+
+
+
+
+
+
 
 
 
@@ -5689,7 +11455,19 @@ With the correct split-role assertions:
 
 
 
+
+
+
+
+
+
+
+
 - `Set` **contains** `TokenCategory.Action`
+
+
+
+
 
 
 
@@ -5697,11 +11475,27 @@ With the correct split-role assertions:
 
 
 
+
+
+
+
 - `SetType` **contains** `TokenCategory.Type`
 
 
 
+
+
+
+
 - `SetType` **does not contain** `TokenCategory.Action`
+
+
+
+
+
+
+
+
 
 
 
@@ -5717,11 +11511,31 @@ Do **not** add exceptions to:
 
 
 
+
+
+
+
+
+
+
+
 - `TypeKeywords_HaveStorageTypeScope`
 
 
 
+
+
+
+
 - `TypeKeywords_HaveTypeSemanticTokenType`
+
+
+
+
+
+
+
+
 
 
 
@@ -5737,7 +11551,23 @@ Those sweeps should remain generic. After the catalog fix, they pass naturally.
 
 
 
+
+
+
+
+
+
+
+
 ### 3. `test/Precept.LanguageServer.Tests/PreceptAnalyzerCompletionTests.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -5753,11 +11583,31 @@ Two drift tests currently use `PreceptTokenMeta.GetByCategory(TokenCategory.Type
 
 
 
+
+
+
+
+
+
+
+
 - `AllTypeTokens_AppearInTypeItems`
 
 
 
+
+
+
+
 - `AllScalarTypeTokens_AppearInScalarTypeItems`
+
+
+
+
+
+
+
+
 
 
 
@@ -5773,7 +11623,23 @@ That source is architecturally wrong for `set` once the catalog is corrected.
 
 
 
+
+
+
+
+
+
+
+
 Update those tests to derive expected type symbols from the **Types catalog** instead:
+
+
+
+
+
+
+
+
 
 
 
@@ -5785,7 +11651,15 @@ Update those tests to derive expected type symbols from the **Types catalog** in
 
 
 
+
+
+
+
 - exclude non-surface types like `Error` and `StateRef`
+
+
+
+
 
 
 
@@ -5793,7 +11667,19 @@ Update those tests to derive expected type symbols from the **Types catalog** in
 
 
 
+
+
+
+
 - keep the existing scalar-only exclusion for collection-only types (`set`, `queue`, `stack`)
+
+
+
+
+
+
+
+
 
 
 
@@ -5809,7 +11695,23 @@ This preserves the real invariant: **type completions must track the type system
 
 
 
+
+
+
+
+
+
+
+
 ### 4. `docs/language/precept-language-spec.md`
+
+
+
+
+
+
+
+
 
 
 
@@ -5825,7 +11727,19 @@ Sync the wording so the spec matches the corrected catalog model:
 
 
 
+
+
+
+
+
+
+
+
 - In the **action keyword** table, `Set` should be described as the action token.
+
+
+
+
 
 
 
@@ -5833,7 +11747,19 @@ Sync the wording so the spec matches the corrected catalog model:
 
 
 
+
+
+
+
 - In §1.6, make the modeling explicit: the surface word `set` is dual-use, but the token model is `Set` (lexer) + `SetType` (parser-synthesized type alias), not one dual-category token.
+
+
+
+
+
+
+
+
 
 
 
@@ -5849,7 +11775,23 @@ Sync the wording so the spec matches the corrected catalog model:
 
 
 
+
+
+
+
+
+
+
+
 ### Must update
+
+
+
+
+
+
+
+
 
 
 
@@ -5861,7 +11803,19 @@ Sync the wording so the spec matches the corrected catalog model:
 
 
 
+
+
+
+
   - replace the dual-category invariant test
+
+
+
+
+
+
+
+
 
 
 
@@ -5877,11 +11831,31 @@ Sync the wording so the spec matches the corrected catalog model:
 
 
 
+
+
+
+
+
+
+
+
 - `test/Precept.LanguageServer.Tests/PreceptAnalyzerCompletionTests.cs`
 
 
 
+
+
+
+
   - move type-vocabulary expectations from token-category sweeps to `Types`
+
+
+
+
+
+
+
+
 
 
 
@@ -5897,11 +11871,31 @@ Sync the wording so the spec matches the corrected catalog model:
 
 
 
+
+
+
+
+
+
+
+
 - `TypeKeywords_HaveStorageTypeScope`
 
 
 
+
+
+
+
 - `TypeKeywords_HaveTypeSemanticTokenType`
+
+
+
+
+
+
+
+
 
 
 
@@ -5917,7 +11911,23 @@ If those need an exemption, the catalog is still wrong.
 
 
 
+
+
+
+
+
+
+
+
 ## Downstream impact
+
+
+
+
+
+
+
+
 
 
 
@@ -5933,7 +11943,23 @@ If those need an exemption, the catalog is still wrong.
 
 
 
+
+
+
+
+
+
+
+
 No new behavior is required for this fix.
+
+
+
+
+
+
+
+
 
 
 
@@ -5949,7 +11975,23 @@ No new behavior is required for this fix.
 
 
 
+
+
+
+
+
+
+
+
 If we later want **context-sensitive** type coloring for `set` in `set of string`, that is a separate tooling enhancement. It must be solved with context-aware grammar/semantic-token logic, not by lying in `TokenKind.Set` metadata.
+
+
+
+
+
+
+
+
 
 
 
@@ -5965,7 +12007,23 @@ If we later want **context-sensitive** type coloring for `set` in `set of string
 
 
 
+
+
+
+
+
+
+
+
 Same conclusion.
+
+
+
+
+
+
+
+
 
 
 
@@ -5981,7 +12039,23 @@ The documented lexical semantic-token pass reads `Compilation.Tokens` + `TokenMe
 
 
 
+
+
+
+
+
+
+
+
 ### MCP
+
+
+
+
+
+
+
+
 
 
 
@@ -5997,11 +12071,31 @@ The documented lexical semantic-token pass reads `Compilation.Tokens` + `TokenMe
 
 
 
+
+
+
+
+
+
+
+
 - `Set` is the action token
 
 
 
+
+
+
+
 - `SetType` is the type token
+
+
+
+
+
+
+
+
 
 
 
@@ -6017,7 +12111,23 @@ The actual type vocabulary remains intact through `Types` and `Types.ByToken`.
 
 
 
+
+
+
+
+
+
+
+
 ## Bottom line
+
+
+
+
+
+
+
+
 
 
 
@@ -6033,9 +12143,27 @@ The fix is not to carve out an exception and not to repaint `Set` as a type.
 
 
 
+
+
+
+
+
+
+
+
 The fix is to stop claiming that the lexer token `Set` is a type token when the architecture already has `SetType` for that job.
 
+
+
 # TypeChecker Catalog-Driven Metadata Design
+
+
+
+
+
+
+
+
 
 
 
@@ -6047,11 +12175,23 @@ The fix is to stop claiming that the lexer token `Set` is a type token when the 
 
 
 
+
+
+
+
 **Date:** 2026-05-09
 
 
 
+
+
+
+
 **Source:** PRECEPT0019 audit § "Do not enroll with PRECEPT0019; make the logic catalog-driven instead"
+
+
+
+
 
 
 
@@ -6063,7 +12203,23 @@ The fix is to stop claiming that the lexer token `Set` is a type token when the 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -6079,6 +12235,14 @@ The fix is to stop claiming that the lexer token `Set` is a type token when the 
 
 
 
+
+
+
+
+
+
+
+
 The PRECEPT0019 audit identified 4 hardcoded dispatch sites in TypeChecker that switch on specific `OperationKind`/`FunctionKind`/`TokenKind` values when the behavior should be derived from catalog metadata. This spec defines the exact metadata additions and TypeChecker refactors for each site.
 
 
@@ -6087,7 +12251,23 @@ The PRECEPT0019 audit identified 4 hardcoded dispatch sites in TypeChecker that 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -6103,7 +12283,23 @@ The PRECEPT0019 audit identified 4 hardcoded dispatch sites in TypeChecker that 
 
 
 
+
+
+
+
+
+
+
+
 ### Problem
+
+
+
+
+
+
+
+
 
 
 
@@ -6119,7 +12315,19 @@ The PRECEPT0019 audit identified 4 hardcoded dispatch sites in TypeChecker that 
 
 
 
+
+
+
+
+
+
+
+
 - **Rule 1:** `bin.ResolvedOp == OperationKind.StringEqualsString` → emit `CaseInsensitiveFieldRequiresTildeEquals`
+
+
+
+
 
 
 
@@ -6127,7 +12335,15 @@ The PRECEPT0019 audit identified 4 hardcoded dispatch sites in TypeChecker that 
 
 
 
+
+
+
+
 - **Rule 3:** `IsContainsOperation(bin.ResolvedOp)` → emit `CaseInsensitiveValueInCaseSensitiveContains` (currently no-op — placeholder returns `false`)
+
+
+
+
 
 
 
@@ -6135,7 +12351,19 @@ The PRECEPT0019 audit identified 4 hardcoded dispatch sites in TypeChecker that 
 
 
 
+
+
+
+
 - **Rule 5:** `func.ResolvedFunction == FunctionKind.EndsWith` → emit `CaseInsensitiveFieldRequiresTildeEndsWith`
+
+
+
+
+
+
+
+
 
 
 
@@ -6151,7 +12379,23 @@ Each rule is a separate `if`/`else if` branch that tests a specific enum value. 
 
 
 
+
+
+
+
+
+
+
+
 ### Metadata Change: `BinaryOperationMeta`
+
+
+
+
+
+
+
+
 
 
 
@@ -6167,7 +12411,23 @@ Each rule is a separate `if`/`else if` branch that tests a specific enum value. 
 
 
 
+
+
+
+
+
+
+
+
 Add two optional parameters to `BinaryOperationMeta`:
+
+
+
+
+
+
+
+
 
 
 
@@ -6179,7 +12439,15 @@ Add two optional parameters to `BinaryOperationMeta`:
 
 
 
+
+
+
+
 public sealed record BinaryOperationMeta(
+
+
+
+
 
 
 
@@ -6187,7 +12455,15 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
     OperatorKind Op,
+
+
+
+
 
 
 
@@ -6195,7 +12471,15 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
     ParameterMeta Rhs,
+
+
+
+
 
 
 
@@ -6203,7 +12487,15 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
     string Description,
+
+
+
+
 
 
 
@@ -6211,7 +12503,15 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
     QualifierMatch Match = QualifierMatch.Any,
+
+
+
+
 
 
 
@@ -6219,7 +12519,15 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
     bool HasCIVariant = false,                    // ← NEW
+
+
+
+
 
 
 
@@ -6227,7 +12535,15 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
     : OperationMeta(Kind, Op, Result, Description)
+
+
+
+
 
 
 
@@ -6239,11 +12555,31 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
+
+
+
+
 - **`HasCIVariant`** — `true` when a case-insensitive counterpart exists for this operation. Mirrors the existing `FunctionMeta.HasCIVariant` field.
 
 
 
+
+
+
+
 - **`CIDiagnosticCode`** — the diagnostic to emit when this case-sensitive operation is used with a `~string` field. `null` when `HasCIVariant` is `false`.
+
+
+
+
+
+
+
+
 
 
 
@@ -6259,7 +12595,23 @@ public sealed record BinaryOperationMeta(
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/Function.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -6275,7 +12627,19 @@ Add one optional parameter:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -6283,7 +12647,15 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
     FunctionKind Kind,
+
+
+
+
 
 
 
@@ -6291,7 +12663,15 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
     string Description,
+
+
+
+
 
 
 
@@ -6299,7 +12679,15 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
     FunctionCategory Category,
+
+
+
+
 
 
 
@@ -6307,7 +12695,15 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
     string? SnippetTemplate = null,
+
+
+
+
 
 
 
@@ -6315,7 +12711,15 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
     bool HasCIVariant = false,
+
+
+
+
 
 
 
@@ -6323,7 +12727,15 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
     bool IsMessagePosition = false,
+
+
+
+
 
 
 
@@ -6331,7 +12743,19 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -6347,7 +12771,23 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
+
+
+
+
 ### Catalog Value Assignments
+
+
+
+
+
+
+
+
 
 
 
@@ -6363,7 +12803,19 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
+
+
+
+
 | OperationKind | HasCIVariant | CIDiagnosticCode |
+
+
+
+
 
 
 
@@ -6371,7 +12823,15 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
 | `StringEqualsString` | `true` | `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals` |
+
+
+
+
 
 
 
@@ -6379,7 +12839,19 @@ public sealed record FunctionMeta(
 
 
 
+
+
+
+
 | All other `BinaryOperationMeta` entries | `false` (default) | `null` (default) |
+
+
+
+
+
+
+
+
 
 
 
@@ -6395,7 +12867,23 @@ When `contains` operations land in the future, they will set `HasCIVariant: true
 
 
 
+
+
+
+
+
+
+
+
 **`Functions.cs` — `GetMeta` switch:**
+
+
+
+
+
+
+
+
 
 
 
@@ -6407,7 +12895,15 @@ When `contains` operations land in the future, they will set `HasCIVariant: true
 
 
 
+
+
+
+
 |---|---|---|
+
+
+
+
 
 
 
@@ -6415,7 +12911,15 @@ When `contains` operations land in the future, they will set `HasCIVariant: true
 
 
 
+
+
+
+
 | `EndsWith` | `true` (already set) | `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith` |
+
+
+
+
 
 
 
@@ -6427,7 +12931,23 @@ When `contains` operations land in the future, they will set `HasCIVariant: true
 
 
 
+
+
+
+
+
+
+
+
 ### TypeChecker Change
+
+
+
+
+
+
+
+
 
 
 
@@ -6443,7 +12963,19 @@ When `contains` operations land in the future, they will set `HasCIVariant: true
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -6451,7 +12983,15 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
     if (bin.ResolvedOp == OperationKind.StringEqualsString &&
+
+
+
+
 
 
 
@@ -6459,7 +12999,15 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
     {
+
+
+
+
 
 
 
@@ -6467,7 +13015,15 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
             DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals, bin.Span, ...));
+
+
+
+
 
 
 
@@ -6475,11 +13031,23 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
     else if (bin.ResolvedOp == OperationKind.StringNotEqualsString && ...)
 
 
 
+
+
+
+
     { ... }
+
+
+
+
 
 
 
@@ -6487,11 +13055,27 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
     { ... }
 
 
 
+
+
+
+
     // ... recurse ...
+
+
+
+
+
+
+
+
 
 
 
@@ -6503,11 +13087,23 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
     if (func.ResolvedFunction == FunctionKind.StartsWith && ...)
 
 
 
+
+
+
+
     { ... }
+
+
+
+
 
 
 
@@ -6515,7 +13111,15 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
     { ... }
+
+
+
+
 
 
 
@@ -6523,7 +13127,19 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -6539,7 +13155,19 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -6547,7 +13175,15 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
     if (Operations.GetMeta(bin.ResolvedOp) is BinaryOperationMeta
+
+
+
+
 
 
 
@@ -6555,7 +13191,15 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
         (IsCIExpression(bin.Left) || IsCIExpression(bin.Right)))
+
+
+
+
 
 
 
@@ -6563,7 +13207,15 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
         var ciFieldName = GetCIFieldName(bin.Left, bin.Right);
+
+
+
+
 
 
 
@@ -6571,7 +13223,15 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
     }
+
+
+
+
 
 
 
@@ -6579,11 +13239,27 @@ case TypedBinaryOp bin:
 
 
 
+
+
+
+
     EnforceCIInExpression(bin.Right, ctx);
 
 
 
+
+
+
+
     break;
+
+
+
+
+
+
+
+
 
 
 
@@ -6595,7 +13271,15 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
     var funcMeta = Functions.GetMeta(func.ResolvedFunction);
+
+
+
+
 
 
 
@@ -6603,7 +13287,15 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
         func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
+
+
+
+
 
 
 
@@ -6611,7 +13303,15 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
         var ciFieldName = ((TypedFieldRef)func.Arguments[0]).FieldName;
+
+
+
+
 
 
 
@@ -6619,7 +13319,15 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
     }
+
+
+
+
 
 
 
@@ -6627,7 +13335,15 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
         EnforceCIInExpression(arg, ctx);
+
+
+
+
 
 
 
@@ -6635,7 +13351,19 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -6651,7 +13379,23 @@ case TypedFunctionCall func:
 
 
 
+
+
+
+
+
+
+
+
 ### New Index
+
+
+
+
+
+
+
+
 
 
 
@@ -6667,7 +13411,23 @@ None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` cal
 
 
 
+
+
+
+
+
+
+
+
 ### Test Coverage
+
+
+
+
+
+
+
+
 
 
 
@@ -6679,7 +13439,15 @@ None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` cal
 
 
 
+
+
+
+
    - `Operations.GetMeta(OperationKind.StringEqualsString)` returns `BinaryOperationMeta` with `HasCIVariant == true` and `CIDiagnosticCode == DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`
+
+
+
+
 
 
 
@@ -6687,7 +13455,15 @@ None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` cal
 
 
 
+
+
+
+
    - `Functions.GetMeta(FunctionKind.StartsWith).CIDiagnosticCode == DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith`
+
+
+
+
 
 
 
@@ -6695,7 +13471,15 @@ None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` cal
 
 
 
+
+
+
+
    - Verify all `BinaryOperationMeta` entries with `HasCIVariant == false` also have `CIDiagnosticCode == null` (consistency)
+
+
+
+
 
 
 
@@ -6707,7 +13491,23 @@ None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` cal
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -6723,7 +13523,23 @@ None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` cal
 
 
 
+
+
+
+
+
+
+
+
 ### Problem
+
+
+
+
+
+
+
+
 
 
 
@@ -6739,7 +13555,19 @@ None required. The existing `Operations.GetMeta()` and `Functions.GetMeta()` cal
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -6747,7 +13575,15 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -6755,7 +13591,15 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
     TokenKind.To   => ConstraintKind.StateEntry,
+
+
+
+
 
 
 
@@ -6763,7 +13607,15 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
     _              => ConstraintKind.StateResident, // fallback
+
+
+
+
 
 
 
@@ -6771,7 +13623,19 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -6787,7 +13651,23 @@ This is a token→constraint mapping that belongs in catalog metadata.
 
 
 
+
+
+
+
+
+
+
+
 ### Metadata Change: `ConstraintMeta.StateAnchored`
+
+
+
+
+
+
+
+
 
 
 
@@ -6803,7 +13683,23 @@ This is a token→constraint mapping that belongs in catalog metadata.
 
 
 
+
+
+
+
+
+
+
+
 Add a `LeadingToken` property to the `StateAnchored` abstract record:
+
+
+
+
+
+
+
+
 
 
 
@@ -6815,7 +13711,15 @@ Add a `LeadingToken` property to the `StateAnchored` abstract record:
 
 
 
+
+
+
+
 public abstract record StateAnchored(
+
+
+
+
 
 
 
@@ -6823,7 +13727,15 @@ public abstract record StateAnchored(
 
 
 
+
+
+
+
     string Description,
+
+
+
+
 
 
 
@@ -6831,11 +13743,27 @@ public abstract record StateAnchored(
 
 
 
+
+
+
+
     : ConstraintMeta(Kind, Description);
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -6851,7 +13779,19 @@ Update the three sealed subtypes:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -6859,11 +13799,23 @@ public sealed record StateResident()
 
 
 
+
+
+
+
     : StateAnchored(ConstraintKind.StateResident,
 
 
 
+
+
+
+
         "State residency — enforced while in state",
+
+
+
+
 
 
 
@@ -6875,7 +13827,19 @@ public sealed record StateResident()
 
 
 
+
+
+
+
+
+
+
+
 public sealed record StateEntry()
+
+
+
+
 
 
 
@@ -6883,7 +13847,15 @@ public sealed record StateEntry()
 
 
 
+
+
+
+
         "State entry — enforced on transition into state",
+
+
+
+
 
 
 
@@ -6895,7 +13867,19 @@ public sealed record StateEntry()
 
 
 
+
+
+
+
+
+
+
+
 public sealed record StateExit()
+
+
+
+
 
 
 
@@ -6903,7 +13887,15 @@ public sealed record StateExit()
 
 
 
+
+
+
+
         "State exit — enforced on transition out of state",
+
+
+
+
 
 
 
@@ -6911,7 +13903,19 @@ public sealed record StateExit()
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -6927,7 +13931,23 @@ public sealed record StateExit()
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/Constraints.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -6943,7 +13963,19 @@ Add a `FrozenDictionary<TokenKind, ConstraintKind>` index:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -6951,7 +13983,15 @@ Add a `FrozenDictionary<TokenKind, ConstraintKind>` index:
 
 
 
+
+
+
+
 /// O(1) lookup from leading token kind to state-anchored constraint kind.
+
+
+
+
 
 
 
@@ -6959,7 +13999,15 @@ Add a `FrozenDictionary<TokenKind, ConstraintKind>` index:
 
 
 
+
+
+
+
 /// construct's leading token without an inline switch.
+
+
+
+
 
 
 
@@ -6967,7 +14015,15 @@ Add a `FrozenDictionary<TokenKind, ConstraintKind>` index:
 
 
 
+
+
+
+
 /// </summary>
+
+
+
+
 
 
 
@@ -6975,7 +14031,15 @@ public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
 
 
 
+
+
+
+
     All.OfType<ConstraintMeta.StateAnchored>()
+
+
+
+
 
 
 
@@ -6983,7 +14047,19 @@ public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -6999,7 +14075,23 @@ public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
 
 
 
+
+
+
+
+
+
+
+
 ### Catalog Value Assignments
+
+
+
+
+
+
+
+
 
 
 
@@ -7011,7 +14103,15 @@ public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
 
 
 
+
+
+
+
 |---|---|
+
+
+
+
 
 
 
@@ -7019,11 +14119,27 @@ public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
 
 
 
+
+
+
+
 | `TokenKind.To` | `ConstraintKind.StateEntry` |
 
 
 
+
+
+
+
 | `TokenKind.From` | `ConstraintKind.StateExit` |
+
+
+
+
+
+
+
+
 
 
 
@@ -7039,7 +14155,23 @@ public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
 
 
 
+
+
+
+
+
+
+
+
 **Before:**
+
+
+
+
+
+
+
+
 
 
 
@@ -7051,7 +14183,15 @@ public static FrozenDictionary<TokenKind, ConstraintKind> ByToken { get; } =
 
 
 
+
+
+
+
 var constraintKind = construct.LeadingTokenKind switch
+
+
+
+
 
 
 
@@ -7059,7 +14199,15 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
     TokenKind.In   => ConstraintKind.StateResident,
+
+
+
+
 
 
 
@@ -7067,7 +14215,15 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
     TokenKind.From => ConstraintKind.StateExit,
+
+
+
+
 
 
 
@@ -7075,11 +14231,27 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
 };
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7095,7 +14267,19 @@ var constraintKind = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -7103,7 +14287,15 @@ var constraintKind = Constraints.ByToken.TryGetValue(construct.LeadingTokenKind,
 
 
 
+
+
+
+
     ? ck
+
+
+
+
 
 
 
@@ -7111,7 +14303,19 @@ var constraintKind = Constraints.ByToken.TryGetValue(construct.LeadingTokenKind,
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7127,11 +14331,27 @@ var constraintKind = Constraints.ByToken.TryGetValue(construct.LeadingTokenKind,
 
 
 
+
+
+
+
+
+
+
+
 1. **Index completeness** — `Constraints.ByToken` contains exactly 3 entries: `In`, `To`, `From`
 
 
 
+
+
+
+
 2. **Round-trip** — for each entry, `Constraints.ByToken[token]` matches the `LeadingToken` on the corresponding `ConstraintMeta.StateAnchored` subtype
+
+
+
+
 
 
 
@@ -7143,7 +14363,23 @@ var constraintKind = Constraints.ByToken.TryGetValue(construct.LeadingTokenKind,
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -7159,7 +14395,23 @@ var constraintKind = Constraints.ByToken.TryGetValue(construct.LeadingTokenKind,
 
 
 
+
+
+
+
+
+
+
+
 ### Problem
+
+
+
+
+
+
+
+
 
 
 
@@ -7175,7 +14427,19 @@ var constraintKind = Constraints.ByToken.TryGetValue(construct.LeadingTokenKind,
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -7183,7 +14447,15 @@ ModifierKind mode = modeSlot?.AccessMode switch
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -7191,7 +14463,15 @@ ModifierKind mode = modeSlot?.AccessMode switch
 
 
 
+
+
+
+
     _                  => ModifierKind.Read,
+
+
+
+
 
 
 
@@ -7199,7 +14479,19 @@ ModifierKind mode = modeSlot?.AccessMode switch
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7215,7 +14507,23 @@ The `Modifiers` catalog already contains `AccessModifierMeta` entries that map t
 
 
 
+
+
+
+
+
+
+
+
 ### Metadata Change
+
+
+
+
+
+
+
+
 
 
 
@@ -7227,7 +14535,15 @@ The `Modifiers` catalog already contains `AccessModifierMeta` entries that map t
 
 
 
+
+
+
+
 - `Kind` (the `ModifierKind` — `Write`, `Read`, `Omit`)
+
+
+
+
 
 
 
@@ -7235,7 +14551,19 @@ The `Modifiers` catalog already contains `AccessModifierMeta` entries that map t
 
 
 
+
+
+
+
 - `IsPresent`, `IsWritable` (semantic flags)
+
+
+
+
+
+
+
+
 
 
 
@@ -7251,6 +14579,14 @@ The metadata shape is complete. What is missing is an **index** to look up by to
 
 
 
+
+
+
+
+
+
+
+
 ### New Index: `Modifiers.ByAccessToken`
 
 
@@ -7259,7 +14595,23 @@ The metadata shape is complete. What is missing is an **index** to look up by to
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/Modifiers.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -7275,7 +14627,19 @@ Add alongside `ByFieldToken` and `ByStateToken`:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -7283,7 +14647,15 @@ Add alongside `ByFieldToken` and `ByStateToken`:
 
 
 
+
+
+
+
 /// O(1) lookup from token kind to access modifier metadata.
+
+
+
+
 
 
 
@@ -7291,7 +14663,15 @@ Add alongside `ByFieldToken` and `ByStateToken`:
 
 
 
+
+
+
+
 /// <see cref="AccessModifierMeta"/> without a hardcoded switch.
+
+
+
+
 
 
 
@@ -7299,7 +14679,15 @@ Add alongside `ByFieldToken` and `ByStateToken`:
 
 
 
+
+
+
+
 /// </summary>
+
+
+
+
 
 
 
@@ -7307,7 +14695,15 @@ public static FrozenDictionary<TokenKind, AccessModifierMeta> ByAccessToken { ge
 
 
 
+
+
+
+
     All.OfType<AccessModifierMeta>()
+
+
+
+
 
 
 
@@ -7315,7 +14711,19 @@ public static FrozenDictionary<TokenKind, AccessModifierMeta> ByAccessToken { ge
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7331,7 +14739,23 @@ public static FrozenDictionary<TokenKind, AccessModifierMeta> ByAccessToken { ge
 
 
 
+
+
+
+
+
+
+
+
 Index is auto-derived from existing catalog entries. Contents:
+
+
+
+
+
+
+
+
 
 
 
@@ -7343,7 +14767,15 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
 |---|---|
+
+
+
+
 
 
 
@@ -7351,11 +14783,27 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
 | `TokenKind.Readonly` | `ModifierKind.Read` |
 
 
 
+
+
+
+
 | `TokenKind.Omit` | `ModifierKind.Omit` |
+
+
+
+
+
+
+
+
 
 
 
@@ -7371,7 +14819,23 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
+
+
+
+
 **Before:**
+
+
+
+
+
+
+
+
 
 
 
@@ -7383,7 +14847,15 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
 var modeSlot = construct.GetSlot<AccessModeSlot>(ConstructSlotKind.AccessModeKeyword);
+
+
+
+
 
 
 
@@ -7391,7 +14863,15 @@ ModifierKind mode = modeSlot?.AccessMode switch
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -7399,7 +14879,15 @@ ModifierKind mode = modeSlot?.AccessMode switch
 
 
 
+
+
+
+
     _                  => ModifierKind.Read,
+
+
+
+
 
 
 
@@ -7407,7 +14895,19 @@ ModifierKind mode = modeSlot?.AccessMode switch
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7423,7 +14923,19 @@ ModifierKind mode = modeSlot?.AccessMode switch
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -7431,7 +14943,15 @@ var modeSlot = construct.GetSlot<AccessModeSlot>(ConstructSlotKind.AccessModeKey
 
 
 
+
+
+
+
 ModifierKind mode = modeSlot?.AccessMode is { } accessToken
+
+
+
+
 
 
 
@@ -7439,7 +14959,15 @@ ModifierKind mode = modeSlot?.AccessMode is { } accessToken
 
 
 
+
+
+
+
     ? accessMeta.Kind
+
+
+
+
 
 
 
@@ -7447,7 +14975,19 @@ ModifierKind mode = modeSlot?.AccessMode is { } accessToken
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7463,11 +15003,27 @@ ModifierKind mode = modeSlot?.AccessMode is { } accessToken
 
 
 
+
+
+
+
+
+
+
+
 1. **Index completeness** — `Modifiers.ByAccessToken` contains exactly 3 entries: `Editable`, `Readonly`, `Omit`
 
 
 
+
+
+
+
 2. **Value correctness** — `ByAccessToken[TokenKind.Editable].Kind == ModifierKind.Write`, `ByAccessToken[TokenKind.Readonly].Kind == ModifierKind.Read`, `ByAccessToken[TokenKind.Omit].Kind == ModifierKind.Omit`
+
+
+
+
 
 
 
@@ -7479,7 +15035,23 @@ ModifierKind mode = modeSlot?.AccessMode is { } accessToken
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -7495,7 +15067,23 @@ ModifierKind mode = modeSlot?.AccessMode is { } accessToken
 
 
 
+
+
+
+
+
+
+
+
 ### Problem
+
+
+
+
+
+
+
+
 
 
 
@@ -7511,7 +15099,19 @@ ModifierKind mode = modeSlot?.AccessMode is { } accessToken
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -7519,7 +15119,15 @@ var scope = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -7527,7 +15135,15 @@ var scope = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
     _              => AnchorScope.OnEntry, // 'to' and fallback
+
+
+
+
 
 
 
@@ -7535,7 +15151,19 @@ var scope = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7551,7 +15179,23 @@ The `Modifiers` catalog already contains `AnchorModifierMeta` entries that carry
 
 
 
+
+
+
+
+
+
+
+
 ### Metadata Change
+
+
+
+
+
+
+
+
 
 
 
@@ -7563,7 +15207,15 @@ The `Modifiers` catalog already contains `AnchorModifierMeta` entries that carry
 
 
 
+
+
+
+
 - `Kind` (`ModifierKind` — `In`, `To`, `From`)
+
+
+
+
 
 
 
@@ -7571,11 +15223,27 @@ The `Modifiers` catalog already contains `AnchorModifierMeta` entries that carry
 
 
 
+
+
+
+
 - `Scope` (`AnchorScope` — `InState`, `OnEntry`, `OnExit`)
 
 
 
+
+
+
+
 - `Target` (`AnchorTarget` — `Ensure`, `StateAction`)
+
+
+
+
+
+
+
+
 
 
 
@@ -7591,6 +15259,14 @@ The metadata is complete.
 
 
 
+
+
+
+
+
+
+
+
 ### New Index: `Modifiers.ByAnchorToken`
 
 
@@ -7599,7 +15275,23 @@ The metadata is complete.
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/Modifiers.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -7615,7 +15307,19 @@ Add alongside the other indexes:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -7623,7 +15327,15 @@ Add alongside the other indexes:
 
 
 
+
+
+
+
 /// O(1) lookup from token kind to anchor modifier metadata.
+
+
+
+
 
 
 
@@ -7631,7 +15343,15 @@ Add alongside the other indexes:
 
 
 
+
+
+
+
 /// <see cref="AnchorModifierMeta"/> (which carries <see cref="AnchorScope"/>)
+
+
+
+
 
 
 
@@ -7639,7 +15359,15 @@ Add alongside the other indexes:
 
 
 
+
+
+
+
 /// Mirrors <see cref="ByFieldToken"/>, <see cref="ByStateToken"/>, and
+
+
+
+
 
 
 
@@ -7647,7 +15375,15 @@ Add alongside the other indexes:
 
 
 
+
+
+
+
 /// </summary>
+
+
+
+
 
 
 
@@ -7655,7 +15391,15 @@ public static FrozenDictionary<TokenKind, AnchorModifierMeta> ByAnchorToken { ge
 
 
 
+
+
+
+
     All.OfType<AnchorModifierMeta>()
+
+
+
+
 
 
 
@@ -7663,7 +15407,19 @@ public static FrozenDictionary<TokenKind, AnchorModifierMeta> ByAnchorToken { ge
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7679,7 +15435,23 @@ public static FrozenDictionary<TokenKind, AnchorModifierMeta> ByAnchorToken { ge
 
 
 
+
+
+
+
+
+
+
+
 Index is auto-derived from existing catalog entries. Contents:
+
+
+
+
+
+
+
+
 
 
 
@@ -7691,7 +15463,15 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
 |---|---|---|
+
+
+
+
 
 
 
@@ -7699,11 +15479,27 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
 | `TokenKind.To` | `ModifierKind.To` | `AnchorScope.OnEntry` |
 
 
 
+
+
+
+
 | `TokenKind.From` | `ModifierKind.From` | `AnchorScope.OnExit` |
+
+
+
+
+
+
+
+
 
 
 
@@ -7719,7 +15515,23 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
+
+
+
+
 **Before:**
+
+
+
+
+
+
+
+
 
 
 
@@ -7731,7 +15543,15 @@ Index is auto-derived from existing catalog entries. Contents:
 
 
 
+
+
+
+
 var scope = construct.LeadingTokenKind switch
+
+
+
+
 
 
 
@@ -7739,7 +15559,15 @@ var scope = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
     TokenKind.From => AnchorScope.OnExit,
+
+
+
+
 
 
 
@@ -7747,11 +15575,27 @@ var scope = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
 };
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7767,7 +15611,19 @@ var scope = construct.LeadingTokenKind switch
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -7775,7 +15631,15 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
     ? anchorMeta.Scope
+
+
+
+
 
 
 
@@ -7783,7 +15647,19 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -7799,11 +15675,27 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
+
+
+
+
 1. **Index completeness** — `Modifiers.ByAnchorToken` contains exactly 3 entries: `In`, `To`, `From`
 
 
 
+
+
+
+
 2. **Value correctness** — `ByAnchorToken[TokenKind.From].Scope == AnchorScope.OnExit`, `ByAnchorToken[TokenKind.To].Scope == AnchorScope.OnEntry`, `ByAnchorToken[TokenKind.In].Scope == AnchorScope.InState`
+
+
+
+
 
 
 
@@ -7815,7 +15707,23 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -7831,7 +15739,23 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
+
+
+
+
 ### Are these 4 sites independent?
+
+
+
+
+
+
+
+
 
 
 
@@ -7847,7 +15771,19 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
+
+
+
+
 | Site | Catalog File(s) Modified | TypeChecker File Modified | Location |
+
+
+
+
 
 
 
@@ -7855,7 +15791,15 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
 | 1 | `Operation.cs`, `Operations.cs`, `Function.cs`, `Functions.cs` | `TypeChecker.Validation.cs` | lines 328–438 |
+
+
+
+
 
 
 
@@ -7863,11 +15807,27 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
 | 3 | `Modifiers.cs` (index only) | `TypeChecker.cs` | lines 589–594 |
 
 
 
+
+
+
+
 | 4 | `Modifiers.cs` (index only) | `TypeChecker.cs` | lines 652–656 |
+
+
+
+
+
+
+
+
 
 
 
@@ -7883,7 +15843,23 @@ var scope = Modifiers.ByAnchorToken.TryGetValue(construct.LeadingTokenKind, out 
 
 
 
+
+
+
+
+
+
+
+
 ### Recommended Slicing
+
+
+
+
+
+
+
+
 
 
 
@@ -7899,7 +15875,19 @@ Kramer can implement all 4 in parallel. If he prefers sequential slices for clea
 
 
 
+
+
+
+
+
+
+
+
 1. **Slice A:** Sites 3 + 4 together (both are `Modifiers.cs` index additions — smallest, simplest, no record shape changes)
+
+
+
+
 
 
 
@@ -7907,7 +15895,19 @@ Kramer can implement all 4 in parallel. If he prefers sequential slices for clea
 
 
 
+
+
+
+
 3. **Slice C:** Site 1 (`Operation.cs` + `Function.cs` record shape changes + `Operations.cs`/`Functions.cs` value assignments + `TypeChecker.Validation.cs` refactor — largest, most lines touched)
+
+
+
+
+
+
+
+
 
 
 
@@ -7923,7 +15923,23 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -7939,7 +15955,19 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
+
+
+
+
 | File | Change Type | What |
+
+
+
+
 
 
 
@@ -7947,7 +15975,15 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
 | `src/Precept/Language/Operation.cs` | Record shape | Add `HasCIVariant`, `CIDiagnosticCode` to `BinaryOperationMeta` |
+
+
+
+
 
 
 
@@ -7955,7 +15991,15 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
 | `src/Precept/Language/Function.cs` | Record shape | Add `CIDiagnosticCode` to `FunctionMeta` |
+
+
+
+
 
 
 
@@ -7963,7 +16007,15 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
 | `src/Precept/Language/Constraint.cs` | Record shape | Add `LeadingToken` to `StateAnchored` and 3 sealed subtypes |
+
+
+
+
 
 
 
@@ -7971,7 +16023,15 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
 | `src/Precept/Language/Modifiers.cs` | New indexes (×2) | `ByAccessToken`, `ByAnchorToken` |
+
+
+
+
 
 
 
@@ -7979,7 +16039,15 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
 | `src/Precept/Pipeline/TypeChecker.cs` | Refactor (×3) | Lines 449–456, 589–594, 652–656 become catalog lookups |
+
+
+
+
 
 
 
@@ -7991,7 +16059,19 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
+
+
+
+
 - Enrolled `Precept.Pipeline.Parser.ParserState` in PRECEPT0019 for `OutcomeArgumentKind` alongside the existing `ExpressionFormKind` enrollment.
+
+
+
+
 
 
 
@@ -7999,7 +16079,15 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
 - Added `ParseOutcomeNoArg` for `OutcomeArgumentKind.None` and wired it into `ParseOutcome`. Decision: recover with `DiagnosticCode.ExpectedOutcome` + `MalformedOutcome` instead of throwing. Rationale: no cataloged outcome currently uses the no-arg shape, so the parser should claim ownership while preserving the normal parse diagnostic/recovery path if that shape is ever reached before a real surface feature ships.
+
+
+
+
 
 
 
@@ -8007,13 +16095,31 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
   - `dotnet build src\Precept\Precept.csproj` is currently blocked by a pre-existing `PRECEPT0025` in `src\Precept\Pipeline\ProofEngine.cs` (left untouched per instruction).
+
+
+
+
 
 
 
   - Targeted binary test run after compiling `Precept.dll` with analyzers disabled: `Precept.Tests` = 3629 passed / 2 failed (`TokensTests` only), `Precept.Analyzers.Tests` = 272 passed / 0 failed.
 
+
+
 # George — PRECEPT0025 Done
+
+
+
+
+
+
+
+
 
 
 
@@ -8025,7 +16131,15 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
 **Task:** Implement PRECEPT0025 — CatalogDU Wildcard Prohibition
+
+
+
+
 
 
 
@@ -8037,7 +16151,23 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -8053,7 +16183,23 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
+
+
+
+
+
+
+
+
 PRECEPT0025 catches the class of bug that caused diagnostic code 116 (`UnprovedPresenceRequirement`) to be unreachable: when a new sealed subtype is added to an abstract record hierarchy (a catalog DU), a `_ =>` wildcard arm in a downstream type-pattern switch silently absorbs it instead of forcing an explicit branch.
+
+
+
+
+
+
+
+
 
 
 
@@ -8069,7 +16215,19 @@ The analyzer registers on `SwitchExpression` operations. For each switch:
 
 
 
+
+
+
+
+
+
+
+
 1. It walks the switch value's type hierarchy looking for a type carrying `[CatalogDU]`.
+
+
+
+
 
 
 
@@ -8077,7 +16235,15 @@ The analyzer registers on `SwitchExpression` operations. For each switch:
 
 
 
+
+
+
+
    - A discard pattern (`_ =>`)
+
+
+
+
 
 
 
@@ -8085,7 +16251,15 @@ The analyzer registers on `SwitchExpression` operations. For each switch:
 
 
 
+
+
+
+
    - A type pattern over the abstract base (`SomeDUBase =>`)
+
+
+
+
 
 
 
@@ -8093,7 +16267,19 @@ The analyzer registers on `SwitchExpression` operations. For each switch:
 
 
 
+
+
+
+
 3. Suppressed in test files (file path contains `.Tests`) to allow partial scaffolded switches.
+
+
+
+
+
+
+
+
 
 
 
@@ -8109,7 +16295,23 @@ The diagnostic message names the `[CatalogDU]` abstract base type and instructs 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -8125,7 +16327,23 @@ The diagnostic message names the `[CatalogDU]` abstract base type and instructs 
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/CatalogDUAttribute.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -8137,7 +16355,15 @@ The diagnostic message names the `[CatalogDU]` abstract base type and instructs 
 
 
 
+
+
+
+
 [AttributeUsage(AttributeTargets.Class)]
+
+
+
+
 
 
 
@@ -8145,7 +16371,19 @@ public sealed class CatalogDUAttribute : Attribute { }
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -8161,7 +16399,23 @@ The attribute lives in `src/Precept/Language/` alongside other catalog attribute
 
 
 
+
+
+
+
+
+
+
+
 ### `[CatalogDU]` types applied so far
+
+
+
+
+
+
+
+
 
 
 
@@ -8177,7 +16431,23 @@ None yet. **See the open item below.**
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -8193,7 +16463,23 @@ None yet. **See the open item below.**
 
 
 
+
+
+
+
+
+
+
+
 The task called for applying `[CatalogDU]` to the `ProofRequirement` abstract record. I investigated and found that Kramer's fix is **partially complete**:
+
+
+
+
+
+
+
+
 
 
 
@@ -8205,7 +16491,15 @@ The task called for applying `[CatalogDU]` to the `ProofRequirement` abstract re
 
 
 
+
+
+
+
 - ✅ `PresenceProofRequirement => ...` was added to `CreateFaultSiteLink`
+
+
+
+
 
 
 
@@ -8213,7 +16507,19 @@ The task called for applying `[CatalogDU]` to the `ProofRequirement` abstract re
 
 
 
+
+
+
+
 - ❌ The `_ => DiagnosticCode.DivisionByZero` fallback arm in `CreateFaultSiteLink` is **still present** (dead code)
+
+
+
+
+
+
+
+
 
 
 
@@ -8229,7 +16535,23 @@ If I applied `[CatalogDU]` to `ProofRequirement` now, PRECEPT0025 would fire on 
 
 
 
+
+
+
+
+
+
+
+
 **Action needed from Kramer:** Remove the two dead `_ =>` arms from `CreateDiagnostic` and `CreateFaultSiteLink` in `ProofEngine.cs`. Once removed, apply `[CatalogDU]` to `ProofRequirement` in `src/Precept/Language/ProofRequirement.cs`. The attribute placement is straightforward:
+
+
+
+
+
+
+
+
 
 
 
@@ -8241,7 +16563,15 @@ If I applied `[CatalogDU]` to `ProofRequirement` now, PRECEPT0025 would fire on 
 
 
 
+
+
+
+
 [CatalogDU]
+
+
+
+
 
 
 
@@ -8249,7 +16579,19 @@ public abstract record ProofRequirement(ProofRequirementKind Kind, string Descri
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -8265,6 +16607,14 @@ After that, PRECEPT0025 will guard all future switches over `ProofRequirement` s
 
 
 
+
+
+
+
+
+
+
+
 Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `ProofRequirementMeta`, `ProofSatisfaction`, `SatisfactionProjection`, `NumericBoundSource`, `DimensionSource`, `ConstraintMeta`, `ObligationContext` (if it's a DU).
 
 
@@ -8273,7 +16623,23 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -8289,7 +16655,23 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
+
+
+
+
 **Enabled:** Both `ConstraintKind` and `ProofRequirementKind` are now in `CatalogEnumNames` in `CatalogAnalysisHelpers.cs`.
+
+
+
+
+
+
+
+
 
 
 
@@ -8305,6 +16687,14 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
+
+
+
+
 **Why it was previously deferred:** The TODO was written before Kramer's Phase 2 completion. At the time, some members may have been missing from the GetMeta switches. Now they are all covered.
 
 
@@ -8313,7 +16703,23 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -8329,7 +16735,23 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
+
+
+
+
 9 tests added in `test/Precept.Analyzers.Tests/Precept0025Tests.cs`:
+
+
+
+
+
+
+
+
 
 
 
@@ -8341,7 +16763,15 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
 |------|----------------|
+
+
+
+
 
 
 
@@ -8349,7 +16779,15 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
 | TP2: `DeclarationPattern_OverAbstractBase_Reports` | `Shape x =>` fires |
+
+
+
+
 
 
 
@@ -8357,7 +16795,15 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
 | TP4: `SwitchOverDerivedType_WalksHierarchyAndReports` | Walks base hierarchy to find `[CatalogDU]` |
+
+
+
+
 
 
 
@@ -8365,7 +16811,15 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
 | TN2: `DiscardArm_OverNonCatalogDUType_NoDiagnostic` | Non-`[CatalogDU]` type is ignored |
+
+
+
+
 
 
 
@@ -8373,11 +16827,27 @@ Other catalog DU bases worth tagging in a follow-on pass: `ProofSubject`, `Proof
 
 
 
+
+
+
+
 | TN4: `DiscardArm_OnEnum_NoDiagnostic` | Enum switches are not affected |
 
 
 
+
+
+
+
 | TN5: `DiscardArm_InTestFile_Suppressed` | File path `.Tests` suppression works |
+
+
+
+
+
+
+
+
 
 
 
@@ -8393,7 +16863,23 @@ Full suite: 272/272 analyzer tests pass. Main Precept tests: 3629/3631 (2 pre-ex
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -8409,7 +16895,23 @@ Full suite: 272/272 analyzer tests pass. Main Precept tests: 3629/3631 (2 pre-ex
 
 
 
+
+
+
+
+
+
+
+
 The analyzer uses type hierarchy walking (`FindCatalogDUBase`) rather than checking only the exact switch expression type. This means a switch over a concrete subtype (`Circle c => ...`) is also governed if `Circle`'s base `Shape` has `[CatalogDU]`. This is intentional — it prevents the pattern `new List<Circle> { ... }.Select(...) switch { Circle => ..., _ => ... }` from slipping through.
+
+
+
+
+
+
+
+
 
 
 
@@ -8421,7 +16923,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 # George — PRECEPT0025 / PRECEPT0026 closeout
+
+
+
+
+
+
+
+
 
 
 
@@ -8437,7 +16951,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - Added `PRECEPT0026` in `src/Precept.Analyzers/Precept0026CatalogDUCompleteness.cs`.
+
+
+
+
 
 
 
@@ -8445,7 +16971,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Walks the discriminant type upward to the `[CatalogDU]` base.
+
+
+
+
 
 
 
@@ -8453,7 +16987,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Reports one error per missing sealed subtype arm.
+
+
+
+
 
 
 
@@ -8461,7 +17003,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Now covers switch statements as well as switch expressions.
+
+
+
+
 
 
 
@@ -8469,11 +17019,27 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Flags abstract-base pattern clauses in switch statements the same way it already flags catch-all arms in switch expressions.
 
 
 
+
+
+
+
 - Added analyzer coverage in `test/Precept.Analyzers.Tests/Precept0025Tests.cs` and new `test/Precept.Analyzers.Tests/Precept0026Tests.cs`.
+
+
+
+
+
+
+
+
 
 
 
@@ -8489,7 +17055,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - Extracted shared CatalogDU infrastructure into `CatalogAnalysisHelpers`:
+
+
+
+
 
 
 
@@ -8497,7 +17075,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `[CatalogDU]` base discovery
+
+
+
+
 
 
 
@@ -8505,7 +17091,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - subtype inheritance test
+
+
+
+
 
 
 
@@ -8513,7 +17107,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Base-type catch-alls are still rejected by `PRECEPT0025`.
+
+
+
+
 
 
 
@@ -8521,7 +17123,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Added `AnalyzerTestHelper.AnalyzeWithFilePathAsync<TAnalyzer>` so both analyzers can verify `.Tests` suppression without duplicating compilation harness code.
+
+
+
+
+
+
+
+
 
 
 
@@ -8537,7 +17151,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - `dotnet test test\Precept.Analyzers.Tests\Precept.Analyzers.Tests.csproj --no-build -q`
+
+
+
+
 
 
 
@@ -8545,7 +17171,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build -q`
+
+
+
+
 
 
 
@@ -8553,7 +17187,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `dotnet test --no-build -q`
+
+
+
+
 
 
 
@@ -8561,7 +17203,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Failures are pre-existing `Precept.LanguageServer.Tests` stub / not-implemented failures.
+
+
+
+
 
 
 
@@ -8569,7 +17219,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Still blocked by pre-existing `Precept.LanguageServer.Tests` compile errors unrelated to PRECEPT0025 / PRECEPT0026.
+
+
+
+
 
 
 
@@ -8581,7 +17239,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Sites fixed
+
+
+
+
 
 
 
@@ -8589,11 +17259,23 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Site 2: constraint-kind synthesis from leading tokens in `src/Precept/Pipeline/TypeChecker.cs`
 
 
 
+
+
+
+
 - Site 3: access-mode normalization in `src/Precept/Pipeline/TypeChecker.cs`
+
+
+
+
 
 
 
@@ -8605,7 +17287,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Catalog shape changes
+
+
+
+
 
 
 
@@ -8613,7 +17307,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `FunctionMeta` now carries `CIDiagnosticCode`.
+
+
+
+
 
 
 
@@ -8621,7 +17323,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Catalog values assigned per spec:
+
+
+
+
 
 
 
@@ -8629,7 +17339,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `OperationKind.StringNotEqualsString` → `HasCIVariant: true`, `CIDiagnosticCode: CaseInsensitiveFieldRequiresTildeNotEquals`
+
+
+
+
 
 
 
@@ -8637,7 +17355,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `FunctionKind.EndsWith` → `CIDiagnosticCode: CaseInsensitiveFieldRequiresTildeEndsWith`
+
+
+
+
 
 
 
@@ -8649,7 +17375,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## New indexes
+
+
+
+
 
 
 
@@ -8657,7 +17395,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `Modifiers.ByAccessToken : FrozenDictionary<TokenKind, AccessModifierMeta>`
+
+
+
+
 
 
 
@@ -8669,7 +17415,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Validation
+
+
+
+
 
 
 
@@ -8677,7 +17435,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `dotnet build src\Precept\Precept.csproj -p:BuildProjectReferences=false`
+
+
+
+
 
 
 
@@ -8685,11 +17451,23 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build`
 
 
 
+
+
+
+
 - Final `Precept.Tests` count: **3646 passed / 0 failed**.
+
+
+
+
 
 
 
@@ -8701,7 +17479,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Deviations from Frank's spec
+
+
+
+
 
 
 
@@ -8709,7 +17499,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Validation used targeted `Precept`/`Precept.Tests` builds because solution-level validation is currently blocked by pre-existing unrelated failures:
+
+
+
+
 
 
 
@@ -8717,7 +17515,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `dotnet test --no-build -q` reports a missing `Precept.Analyzers.Tests.dll` and 194 pre-existing `Precept.LanguageServer.Tests` failures.
+
+
+
+
 
 
 
@@ -8729,7 +17535,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## What I split
+
+
+
+
 
 
 
@@ -8737,11 +17555,23 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Moved each existing `ActionSyntaxShape` switch arm into its own annotated handler method.
 
 
 
+
+
+
+
 - Added `[HandlesCatalogExhaustively(typeof(ActionSyntaxShape))]` to `ParserState` alongside the existing class-level coverage attributes.
+
+
+
+
 
 
 
@@ -8753,7 +17583,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Final handler method names
+
+
+
+
 
 
 
@@ -8761,7 +17603,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `ParseCollectionValueAction`
+
+
+
+
 
 
 
@@ -8769,7 +17619,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `ParseFieldOnlyAction`
+
+
+
+
 
 
 
@@ -8777,7 +17635,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `ParseInsertAtAction`
+
+
+
+
 
 
 
@@ -8785,7 +17651,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `ParsePutKeyValueAction`
+
+
+
+
 
 
 
@@ -8797,11 +17671,27 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Default arm decision
 
 
 
+
+
+
+
 - Kept the `default:` recovery arm returning `MalformedAction`.
+
+
+
+
 
 
 
@@ -8813,7 +17703,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Verification notes
+
+
+
+
 
 
 
@@ -8821,7 +17723,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `dotnet build` succeeded, but not clean: 2 pre-existing `VSTHRD200` warnings in `tools/Precept.LanguageServer/LanguageServerStubs.cs`.
+
+
+
+
 
 
 
@@ -8829,7 +17739,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~Precept.Tests.ActionsTests|FullyQualifiedName~Precept.Tests.Parser.ActionChainTests"` passed: 64/64.
+
+
+
+
 
 
 
@@ -8837,11 +17755,23 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Current shared workspace:
 
 
 
+
+
+
+
   - Root `dotnet build` is blocked by unrelated in-progress changes outside this slice (LanguageServer and analyzer compile failures already present in the working tree), so the requested clean 0-warning/0-error root validation could not be reproduced safely without disturbing other users' work.
+
+
+
+
 
 
 
@@ -8853,7 +17783,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Decision
+
+
+
+
 
 
 
@@ -8865,7 +17807,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
 
 
 
@@ -8877,7 +17831,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ## Files changed
+
+
+
+
 
 
 
@@ -8885,7 +17851,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `src/Precept/Language/DiagnosticCode.cs`
+
+
+
+
 
 
 
@@ -8893,7 +17867,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `src/Precept/Pipeline/ProofEngine.cs`
+
+
+
+
 
 
 
@@ -8901,7 +17883,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `test/Precept.Tests/ProofEngineTests.cs`
+
+
+
+
 
 
 
@@ -8913,7 +17903,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - Removed the dead `ProofRequirement` catch-all from `CreateDiagnostic` in `src/Precept/Pipeline/ProofEngine.cs` by switching explicitly over the five concrete requirement subtypes. `PresenceProofRequirement` now routes to `DiagnosticCode.UnprovedPresenceRequirement`, and numeric requirements share `GetNumericRequirementDiagnosticCode(...)`.
+
+
+
+
 
 
 
@@ -8921,7 +17923,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Applied `[CatalogDU]` to `ProofRequirement` in `src/Precept/Language/ProofRequirement.cs` and removed the remaining wildcard-bearing `ProofRequirement` switch expression in `ProofEngine.cs` so PRECEPT0025 stays quiet.
+
+
+
+
 
 
 
@@ -8929,7 +17939,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - `dotnet build src/Precept/Precept.csproj` ✅ clean (0 errors, 0 warnings)
+
+
+
+
 
 
 
@@ -8937,7 +17955,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
     - `Precept.Tests`: 3629 passed, 2 failed (`TokensTests`)
+
+
+
+
 
 
 
@@ -8945,7 +17971,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
     - `Precept.Mcp.Tests`: 7 passed
+
+
+
+
 
 
 
@@ -8953,7 +17987,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 # Kramer note — `set` token catalog fix
+
+
+
+
+
+
+
+
 
 
 
@@ -8969,7 +18015,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - `src/Precept/Language/Tokens.cs`
+
+
+
+
 
 
 
@@ -8977,7 +18035,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Removed `Cat_ActType`; `TokenKind.Set` was its only remaining use.
+
+
+
+
 
 
 
@@ -8985,7 +18051,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Replaced the old dual-category `Set` assertion with two split-role tests:
+
+
+
+
 
 
 
@@ -8993,7 +18067,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
     - `SetType` has `Type`, not `Action`
+
+
+
+
 
 
 
@@ -9001,7 +18083,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
   - Updated `AllTypeTokens_AppearInTypeItems` and `AllScalarTypeTokens_AppearInScalarTypeItems` to derive expected type vocabulary from `Types.All` instead of `TokenCategory.Type` sweeps.
+
+
+
+
 
 
 
@@ -9009,11 +18099,27 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `docs/language/precept-language-spec.md`
 
 
 
+
+
+
+
   - Synced the spec to the split model: `set` is the lexer action token, `SetType` is the parser-synthesized type-position alias, and the model is `Set` + `SetType`, not one dual-category token.
+
+
+
+
+
+
+
+
 
 
 
@@ -9029,7 +18135,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ### Before
+
+
+
+
 
 
 
@@ -9037,7 +18155,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `Precept.Analyzers.Tests`: 272 passed, 0 failed
+
+
+
+
 
 
 
@@ -9045,7 +18171,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `Precept.LanguageServer.Tests`: 3 passed, 194 failed
+
+
+
+
 
 
 
@@ -9057,7 +18191,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 ### After
+
+
+
+
 
 
 
@@ -9065,7 +18211,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `Precept.Analyzers.Tests`: 272 passed, 0 failed
+
+
+
+
 
 
 
@@ -9073,11 +18227,27 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - `Precept.LanguageServer.Tests`: 3 passed, 194 failed (unchanged pre-existing stub failures)
 
 
 
+
+
+
+
 - Total: 3911 passed, 194 failed (4105 total)
+
+
+
+
+
+
+
+
 
 
 
@@ -9093,7 +18263,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - `dotnet build`
+
+
+
+
 
 
 
@@ -9105,11 +18287,31 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 `Cat_ActType` was removed.
 
 
 
+
+
+
+
 # Newman — `precept_compile` implementation complete
+
+
+
+
+
+
+
+
 
 
 
@@ -9125,7 +18327,19 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - Added `..\..\src\Precept\Precept.csproj` as a direct `ProjectReference` from `tools/Precept.Mcp/Precept.Mcp.csproj` so the MCP tool can call `Compiler.Compile` and map `Compilation` output without duplicating runtime logic.
+
+
+
+
 
 
 
@@ -9133,7 +18347,15 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Diagnostic codes are serialized as `PRE####` by parsing `Diagnostic.Code` back to `DiagnosticCode` and formatting the enum value numerically; `Severity.Info` is projected as `Hint` to match the MCP contract.
+
+
+
+
 
 
 
@@ -9141,11 +18363,27 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
 - Field qualifier text is reconstructed from explicit `DeclaredQualifiers` metadata rather than from `TypedField.Qualifier`, because the latter models propagation semantics, not the authored declaration surface.
 
 
 
+
+
+
+
 - Precept name comes from the parsed `PreceptHeader` construct via `ConstructManifest`, not from a mirrored MCP-side naming cache.
+
+
+
+
+
+
+
+
 
 
 
@@ -9161,11 +18399,31 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 - Event arg and field type strings are currently emitted as resolved type keywords (`string`, `number`, `choice`, etc.); the current DTO contract does not yet expose full structural type detail for collection/keyed/choice domains.
 
 
 
+
+
+
+
 - The current `CompileResultDto` contract does not surface proof-ledger details, access modes, state hooks, or choice-option arrays at top level. Those remain future contract-expansion work if the spec tightens around them.
+
+
+
+
+
+
+
+
 
 
 
@@ -9181,7 +18439,23 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
+
+
+
+
+
+
+
+
 Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
+
+
+
+
+
+
+
+
 
 
 
@@ -9193,7 +18467,15 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 2. field projection (`Name`, `TypeName`, `IsOptional`, `IsWritable`, `Modifiers`)
+
+
+
+
 
 
 
@@ -9201,7 +18483,15 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 4. diagnostic code formatting as `PRE####`
+
+
+
+
 
 
 
@@ -9209,11 +18499,27 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 6. stateless precept detection
 
 
 
+
+
+
+
 7. rule projection
+
+
+
+
+
+
+
+
 
 
 
@@ -9229,7 +18535,19 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
+
+
+
+
 - `dotnet build tools\Precept.Mcp\Precept.Mcp.csproj` ✅
+
+
+
+
 
 
 
@@ -9237,9 +18555,23 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` ⚠️ unrelated existing failures in `TokensTests` (`TypeKeywords_HaveStorageTypeScope`, `TypeKeywords_HaveTypeSemanticTokenType`)
 
+
+
 # Soup-Nazi — ProofEngine gap closeout
+
+
+
+
+
+
+
+
 
 
 
@@ -9251,7 +18583,15 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 - Code 116 dependency: resolved in this branch by wiring `DiagnosticCode.UnprovedPresenceRequirement` through diagnostics + ProofEngine, so the new presence diagnostic test compiles and passes.
+
+
+
+
 
 
 
@@ -9259,9 +18599,23 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 - Validation: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~ProofEngineTests"` passed 173/173. Full `dotnet test test/Precept.Tests/` still has the pre-existing two `TokensTests` failures about `Set` keyword type scoping/token type.
 
+
+
 # ProofEngine Test Coverage Gap Report
+
+
+
+
+
+
+
+
 
 
 
@@ -9273,7 +18627,15 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 **Date:** 2026-05-09
+
+
+
+
 
 
 
@@ -9281,7 +18643,15 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 **Files audited against:**
+
+
+
+
 
 
 
@@ -9289,7 +18659,15 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
 - `src/Precept/Language/ProofRequirement.cs`
+
+
+
+
 
 
 
@@ -9301,7 +18679,23 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9317,6 +18711,14 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
+
+
+
+
+
+
+
+
 The 158-test suite is broad and structurally sound. Pass 1 (obligation collection), error-tainted suppression, forwarding facts, initial-state satisfiability, and Strategies 1–3 all have credible positive + negative test coverage. However, five areas have zero or near-zero coverage of their success paths, and several specific behavior paths in the implementation are never exercised.
 
 
@@ -9325,7 +18727,23 @@ The 158-test suite is broad and structurally sound. Pass 1 (obligation collectio
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9341,7 +18759,23 @@ The 158-test suite is broad and structurally sound. Pass 1 (obligation collectio
 
 
 
+
+
+
+
+
+
+
+
 ### Priority 1 — Critical (uncovered success paths in shipped code)
+
+
+
+
+
+
+
+
 
 
 
@@ -9353,7 +18787,15 @@ The 158-test suite is broad and structurally sound. Pass 1 (obligation collectio
 
 
 
+
+
+
+
 Every Strategy 4 test asserts that `FlowNarrowing` does NOT fire or that the obligation is `Unresolved`. The strategy IS implemented (`TryFlowNarrowingProof`, lines 682–715 of ProofEngine.cs). The triple table in the design doc (PE-G14) specifies 8 positive cases (e.g., `A > B` guard + `A - B` expression → `result > 0` proved). Not one of these is tested with `obligation.Strategy == ProofStrategy.FlowNarrowing`.
+
+
+
+
 
 
 
@@ -9365,11 +18807,27 @@ Every Strategy 4 test asserts that `FlowNarrowing` does NOT fire or that the obl
 
 
 
+
+
+
+
+
+
+
+
 **Gap 2 — Diagnostic code 112 (UnprovedModifierRequirement) never fires.**
 
 
 
+
+
+
+
 `Diagnostic_UnprovedModifierRequirement_HasCode112` only verifies the enum integer value. No test causes a `ModifierRequirement` to fail all strategies and emit the diagnostic. The `CreateDiagnostic` and `CreateFaultSiteLink` arms for `ModifierRequirement` are dead code from a test perspective.
+
+
+
+
 
 
 
@@ -9381,11 +18839,27 @@ Every Strategy 4 test asserts that `FlowNarrowing` does NOT fire or that the obl
 
 
 
+
+
+
+
+
+
+
+
 **Gap 3 — Diagnostic code 113 (UnprovedDimensionRequirement) never fires.**
 
 
 
+
+
+
+
 Same pattern as Gap 2. The `DimensionProofRequirement` arm in `TryDeclarationAttributeProof` (lines 368–373) and the corresponding `CreateDiagnostic` arm are never reached by any test.
+
+
+
+
 
 
 
@@ -9397,11 +18871,27 @@ Same pattern as Gap 2. The `DimensionProofRequirement` arm in `TryDeclarationAtt
 
 
 
+
+
+
+
+
+
+
+
 **Gap 4 — Diagnostic code 114 (UnprovedQualifierCompatibility) never fires via DSL.**
 
 
 
+
+
+
+
 All Strategy 5 tests are metadata record equality checks. No test compiles DSL source that generates a `QualifierCompatibilityProofRequirement` and runs it through `ProofEngine.Prove`. The `ResolveQualifierOnAxis` function and the `leftQualifier == rightQualifier` comparison are never exercised end-to-end.
+
+
+
+
 
 
 
@@ -9413,11 +18903,27 @@ All Strategy 5 tests are metadata record equality checks. No test compiles DSL s
 
 
 
+
+
+
+
+
+
+
+
 **Gap 5 — PresenceProofRequirement end-to-end path never exercised.**
 
 
 
+
+
+
+
 No test exercises `PresenceProofRequirement` from DSL compilation through strategy dispatch to outcome. All presence tests are metadata shape assertions. The strategy 2 presence-discharge path (reading `DeclaredPresenceMeta.Guaranteed`) and the strategy 3 presence-guard path (reading `IsPresenceCheck`) are both untested at the DSL level.
+
+
+
+
 
 
 
@@ -9429,7 +18935,23 @@ No test exercises `PresenceProofRequirement` from DSL compilation through strate
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9445,11 +18967,27 @@ No test exercises `PresenceProofRequirement` from DSL compilation through strate
 
 
 
+
+
+
+
+
+
+
+
 **Gap 6 — `count(collection) > 0` guard pattern is untested.**
 
 
 
+
+
+
+
 `ExtractGuardConstraintsCore` has specific handling for `TypedFunctionCall(Count, [TypedFieldRef])` comparisons (lines ~581–587 of ProofEngine.cs). `Strategy3_CountGuard_DischargesCollectionNonEmpty` actually uses a plain `D > 0` guard, not a collection count guard. The count-function guard branch is dead code from a test perspective.
+
+
+
+
 
 
 
@@ -9461,11 +18999,27 @@ No test exercises `PresenceProofRequirement` from DSL compilation through strate
 
 
 
+
+
+
+
+
+
+
+
 **Gap 7 — `collection.count > 0` member-accessor guard pattern is untested.**
 
 
 
+
+
+
+
 `ExtractGuardConstraintsCore` handles `TypedMemberAccess { Object: TypedFieldRef, ResolvedAccessor: "count" }` comparisons separately. No test exercises this path.
+
+
+
+
 
 
 
@@ -9477,11 +19031,27 @@ No test exercises `PresenceProofRequirement` from DSL compilation through strate
 
 
 
+
+
+
+
+
+
+
+
 **Gap 8 — `field is set` TypedPostfixOp guard pattern is untested.**
 
 
 
+
+
+
+
 `ExtractGuardConstraintsCore` handles `TypedPostfixOp { IsNegated: false, Operand: TypedFieldRef }` → `IsPresenceCheck: true` (lines ~592–594). `Strategy3_IsSetGuard_DischargesPresenceRequirement` uses `D != 0`, not `D is set`. The `is set` postfix operator guard path is never tested.
+
+
+
+
 
 
 
@@ -9493,11 +19063,27 @@ No test exercises `PresenceProofRequirement` from DSL compilation through strate
 
 
 
+
+
+
+
+
+
+
+
 **Gap 9 — StateHookContext + guard path in Strategy 3 is untested.**
 
 
 
+
+
+
+
 Strategy 3 reads guards from both `TransitionRowContext` and `StateHookContext`. The `StateHookContext` arm is exercised only in `CollectObligations_StateHookWithDivision_CreatesStateHookContext`, which does not test guard-based proof. No test has a state hook with a guard and a proof obligation.
+
+
+
+
 
 
 
@@ -9509,11 +19095,27 @@ Strategy 3 reads guards from both `TransitionRowContext` and `StateHookContext`.
 
 
 
+
+
+
+
+
+
+
+
 **Gap 10 — RHS-before-LHS regression anchor for same-type division.**
 
 
 
+
+
+
+
 The `ResolveParamInBinaryOp` fix (checking Rhs before Lhs) was motivated by shared `ParameterMeta` instances on same-type binary operations. All existing tests use `integer / number` to avoid the ambiguity. There is no `number / number` test that would fail if Lhs were checked before Rhs.
+
+
+
+
 
 
 
@@ -9525,7 +19127,23 @@ The `ResolveParamInBinaryOp` fix (checking Rhs before Lhs) was motivated by shar
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9541,7 +19159,19 @@ The `ResolveParamInBinaryOp` fix (checking Rhs before Lhs) was motivated by shar
 
 
 
+
+
+
+
+
+
+
+
 **Gap 11 — Forwarding facts do not assert diagnostic absence.**
+
+
+
+
 
 
 
@@ -9553,11 +19183,27 @@ Tests in Slice 12 verify `obligation.Disposition == ProofDisposition.Proved` for
 
 
 
+
+
+
+
+
+
+
+
 **Gap 12 — `PresenceProofRequirement` fallthrough in `CreateDiagnostic`.**
 
 
 
+
+
+
+
 The `CreateDiagnostic` method maps `PresenceProofRequirement` to `DiagnosticCode.DivisionByZero` (lines 883–886 of ProofEngine.cs). This is likely a placeholder or bug — presence failures should not emit a `DivisionByZero` diagnostic. No test exercises this branch, so the mapping is unverified and potentially wrong.
+
+
+
+
 
 
 
@@ -9569,11 +19215,27 @@ The `CreateDiagnostic` method maps `PresenceProofRequirement` to `DiagnosticCode
 
 
 
+
+
+
+
+
+
+
+
 **Gap 13 — Multiple simultaneous obligations on the same field.**
 
 
 
+
+
+
+
 No test has a single expression generating more than one proof obligation (e.g., `sqrt(X / D)` which would generate both a `!= 0` and a `>= 0` obligation). The proof engine should handle multiple obligations in the same site correctly.
+
+
+
+
 
 
 
@@ -9585,11 +19247,27 @@ No test has a single expression generating more than one proof obligation (e.g.,
 
 
 
+
+
+
+
+
+
+
+
 **Gap 14 — Wildcard transitions (`from * on E`).**
 
 
 
+
+
+
+
 No test uses wildcard transitions with proof obligations. The forwarding-fact suppression logic reads `trc.Row.FromState` and guards with `if (fromState is null) continue` for wildcard rows. This null guard path is untested.
+
+
+
+
 
 
 
@@ -9601,7 +19279,19 @@ No test uses wildcard transitions with proof obligations. The forwarding-fact su
 
 
 
+
+
+
+
+
+
+
+
 **Gap 15 — Proof spanning multiple states (same field, different transition rows).**
+
+
+
+
 
 
 
@@ -9613,7 +19303,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9629,7 +19335,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 | Strategy | Positive (Proved) Tests | Negative (Unresolved) Tests | Status |
+
+
+
+
 
 
 
@@ -9637,7 +19355,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | S1 Literal | 4 (literal divisors, literal sqrt args) | 3 (zero literal, negative sqrt, non-literal) | ✅ Covered |
+
+
+
+
 
 
 
@@ -9645,11 +19371,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | S3 GuardInPath | 7 (!=0, >0, <0, negated, inverted, hook-skipped) | 3 (no guard, EventHandler, OR guard) | ✅ Covered |
 
 
 
+
+
+
+
 | S4 FlowNarrowing | **0** | 10+ (all cases document strategy NOT firing) | ❌ **MISSING positive case** |
+
+
+
+
 
 
 
@@ -9661,7 +19399,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9677,7 +19431,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 | Code | Fires-Case Tested | Suppressed-Case Tested | Status |
+
+
+
+
 
 
 
@@ -9685,7 +19451,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | DivisionByZero (83) | ✅ | ✅ | Covered |
+
+
+
+
 
 
 
@@ -9693,7 +19467,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | UnprovedModifierRequirement (112) | ❌ (enum value only) | N/A | **MISSING** |
+
+
+
+
 
 
 
@@ -9701,7 +19483,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | UnprovedQualifierCompatibility (114) | ❌ (enum value only) | N/A | **MISSING** |
+
+
+
+
 
 
 
@@ -9713,7 +19503,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9729,7 +19535,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 | Fix | Test | Status |
+
+
+
+
 
 
 
@@ -9737,11 +19555,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | Forwarding-fact suppression sets `Proved` | `ForwardingFacts_UnreachableState_ObligationsVacuouslyProved` | ✅ Covered |
 
 
 
+
+
+
+
 | Strategy 2 null guard (non-field-ref subject) | `GetFieldName_NonFieldRef_ReturnsNull`, `Strategy4_AGreaterThanB_SubtractionSqrtProved` | ✅ Implicitly covered |
+
+
+
+
 
 
 
@@ -9753,7 +19583,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9769,7 +19615,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 | Subtype | Exercised? |
+
+
+
+
 
 
 
@@ -9777,7 +19635,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | TransitionRowContext | ✅ |
+
+
+
+
 
 
 
@@ -9785,7 +19651,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | StateHookContext | ✅ (obligation collection only; no guard-path test) |
+
+
+
+
 
 
 
@@ -9793,7 +19667,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | ConstraintContext (EnsureIdentity) | ✅ |
+
+
+
+
 
 
 
@@ -9805,7 +19687,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9821,7 +19719,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 | Outcome | Tested? |
+
+
+
+
 
 
 
@@ -9829,11 +19739,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 | Proved | ✅ |
 
 
 
+
+
+
+
 | Unresolved | ✅ |
+
+
+
+
 
 
 
@@ -9845,7 +19767,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9861,7 +19799,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 - **Total tests:** 158
+
+
+
+
 
 
 
@@ -9869,7 +19819,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
   - S1 Literal: ~7 tests
+
+
+
+
 
 
 
@@ -9877,7 +19835,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
   - S3 GuardInPath: ~14 tests
+
+
+
+
 
 
 
@@ -9885,7 +19851,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
   - S5 QualifierCompatibility: ~9 tests (ALL metadata-level, no DSL proof)
+
+
+
+
 
 
 
@@ -9893,7 +19867,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 - **Negative cases (proof fails/unresolved):** ~45
+
+
+
+
 
 
 
@@ -9901,7 +19883,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 - **Metadata/structural:** ~30
+
+
+
+
 
 
 
@@ -9913,7 +19903,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -9929,7 +19935,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 1. **Strategy 4 positive proof** (Gap 1) — Without this, Strategy 4's success path is completely untested. Any regression in `TryFlowNarrowingProof` or `GuardRelationImpliesObligation` is invisible.
+
+
+
+
 
 
 
@@ -9937,7 +19955,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 3. **Strategy 5 DSL-level test** (Gap 4, overlap) — Strategy 5 logic (`ResolveQualifierOnAxis`, `leftQualifier == rightQualifier`) is never exercised via the pipeline.
+
+
+
+
 
 
 
@@ -9945,7 +19971,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 5. **`count()` and `collection.count` guard patterns** (Gaps 6, 7) — Implemented guard extraction branches are dead.
+
+
+
+
 
 
 
@@ -9953,7 +19987,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 7. **StateHookContext guard → Strategy 3** (Gap 9) — Code path implemented, untested.
+
+
+
+
 
 
 
@@ -9961,13 +20003,31 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 9. **Forwarding facts + diagnostic absence assertion** (Gap 11) — Tests verify disposition but not diagnostic list.
+
+
+
+
 
 
 
 10. **`PresenceProofRequirement` → `DivisionByZero` mapping in CreateDiagnostic** (Gap 12) — Potential bug, no test catches it.
 
+
+
 # Message-position catalog metadata closed
+
+
+
+
+
+
+
+
 
 
 
@@ -9979,7 +20039,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 **Sources:** `.squad/decisions/inbox/george-is-message-position.md`, `.squad/decisions/inbox/kramer-grammar-gen-message-position.md`
+
+
+
+
 
 
 
@@ -9991,7 +20059,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -10007,7 +20091,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ## Decisions
+
+
+
+
+
+
+
+
 
 
 
@@ -10019,7 +20119,15 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 2. `TokenKind.Because` and `TokenKind.Reject` are the only current token entries that opt into `IsMessagePosition`.
+
+
+
+
 
 
 
@@ -10027,7 +20135,19 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 4. The grammar generator must read `Tokens.All.Where(m => m.IsMessagePosition)` and `Functions.All.Where(f => f.IsMessagePosition)` when building `messageStrings` patterns.
+
+
+
+
+
+
+
+
 
 
 
@@ -10043,13 +20163,35 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 - George added the metadata fields plus token flags; build and tests passed; commits `105a42a7` and `315b00c9`.
+
+
+
+
 
 
 
 - Kramer wired the generator, removed the stale TODO, regenerated `precept.tmLanguage.json`, and verified a zero-diff output; commit `7f3842fd`.
 
+
+
 # ProofEngine Design Decisions — PE-G1, PE-G2, PE-G3
+
+
+
+
+
+
+
+
 
 
 
@@ -10061,11 +20203,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
 **Author:** Frank
 
 
 
+
+
+
+
 **Resolves:** PE-G1 (three unhandled obligation kinds), PE-G2 (ProofDischarges catalog prereq), PE-G3 (ProofLedger divergence)
+
+
+
+
 
 
 
@@ -10077,7 +20231,23 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -10093,7 +20263,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -10109,7 +20295,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Obligation:** "The period operand must have the required time dimension (Date or Time) for the arithmetic operation to be semantically valid."
+
+
+
+
+
+
+
+
 
 
 
@@ -10125,7 +20327,19 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Catalog usage:** `Operations.cs` lines 248, 257, 275, 284 — four temporal arithmetic entries:
+
+
+
+
 
 
 
@@ -10133,7 +20347,19 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
 - `TimePlusPeriod` / `TimeMinusPeriod` → require `PeriodDimension.Time`
+
+
+
+
+
+
+
+
 
 
 
@@ -10149,7 +20375,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), extended to read qualifier bindings.**
+
+
+
+
+
+
+
+
 
 
 
@@ -10161,7 +20403,15 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
 - Qualifier value `"date"` → satisfies `PeriodDimension.Date`
+
+
+
+
 
 
 
@@ -10169,7 +20419,15 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
 - `PeriodDimension.Any` → always satisfied (any temporal dimension)
+
+
+
+
 
 
 
@@ -10181,7 +20439,19 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Alternatives rejected:**
+
+
+
+
 
 
 
@@ -10189,7 +20459,19 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
 - _Pre-discharge by TypeChecker_: Would violate the catalog-driven architecture. The type checker stamps requirements, the proof engine discharges them. The type checker's job is operation selection and requirement attachment, not requirement evaluation.
+
+
+
+
+
+
+
+
 
 
 
@@ -10205,6 +20487,14 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `DimensionProofRequirement` branch to `TryModifierProof` that reads the subject field's qualifier binding on `QualifierAxis.TemporalDimension` and compares against `RequiredDimension`. Add to the Strategy 2 coverage table.
 
 
@@ -10213,7 +20503,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -10229,7 +20535,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Obligation:** "The field operand must declare the required modifier (e.g., `ordered`) for the operation to be valid."
+
+
+
+
+
+
+
+
 
 
 
@@ -10245,7 +20567,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Catalog usage:** `Operations.cs` lines 760, 768, 776, 784 — four choice ordinal comparison entries (`ChoiceLessThan`, `ChoiceGreaterThan`, `ChoiceLessThanOrEqual`, `ChoiceGreaterThanOrEqual`) all declare `ModifierRequirement(PChoice, ModifierKind.Ordered, ...)`. Both operands share the same `PChoice` parameter reference, so the requirement applies to all matching operand positions.
+
+
+
+
+
+
+
+
 
 
 
@@ -10261,7 +20599,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 **Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), via direct modifier presence check.**
+
+
+
+
+
+
+
+
 
 
 
@@ -10277,7 +20631,23 @@ Deep source analysis of the five `ProofRequirementKind` values, the Operations c
 
 
 
+
+
+
+
+
+
+
+
 This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries map modifiers → numeric/presence requirements they discharge (e.g., `positive` discharges `> 0`). `ModifierRequirement` is the inverse: it asserts that a specific modifier must be present on the field. Strategy 2 handles both paths:
+
+
+
+
+
+
+
+
 
 
 
@@ -10289,7 +20659,19 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 2. **Modifier presence path** (for `ModifierRequirement`): "Does this field have the required modifier?"
+
+
+
+
+
+
+
+
 
 
 
@@ -10301,11 +20683,27 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 - _Pre-discharge by TypeChecker_: Same rationale as PE-G1a — type checker stamps requirements, proof engine discharges them.
 
 
 
+
+
+
+
 - _Always a type error (Option C)_: Wrong — `ordered` is an optional modifier on choice fields. Not having it isn't a type error; it's a proof failure for ordinal operations specifically.
+
+
+
+
+
+
+
+
 
 
 
@@ -10321,6 +20719,14 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 **Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `ModifierRequirement` branch that checks `field.Modifiers.Contains(requirement.Required)`. Add to the Strategy 2 coverage table.
 
 
@@ -10329,7 +20735,23 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -10345,7 +20767,23 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 **Obligation:** "Two operands in a binary operation must have matching qualifier values on the specified axis (e.g., both `quantity in 'kg'` or both `money in 'USD'`)."
+
+
+
+
+
+
+
+
 
 
 
@@ -10361,7 +20799,19 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 **Catalog usage:** Extensively used in `Operations.cs`:
+
+
+
+
 
 
 
@@ -10369,11 +20819,27 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 - **Price arithmetic** (lines 557–570, 977–1023): Both `QualifierAxis.Unit` AND `QualifierAxis.Currency` — operands must match on both axes
 
 
 
+
+
+
+
 - **Money arithmetic**: `QualifierAxis.Currency` (via `QualifierMatch.Same` entries)
+
+
+
+
+
+
+
+
 
 
 
@@ -10389,7 +20855,23 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 **Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), extended to read qualifier bindings on both operand fields.**
+
+
+
+
+
+
+
+
 
 
 
@@ -10401,7 +20883,15 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 1. Resolves both subjects (`LeftSubject`, `RightSubject`) to their respective fields
+
+
+
+
 
 
 
@@ -10409,11 +20899,23 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 3. If both fields have explicit qualifiers on that axis AND the values match → discharged
 
 
 
+
+
+
+
 4. If either field lacks a qualifier on that axis → **unresolved** (cannot prove compatibility without declared qualifiers)
+
+
+
+
 
 
 
@@ -10425,7 +20927,19 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 **Alternatives rejected:**
+
+
+
+
 
 
 
@@ -10433,11 +20947,27 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 - _Always a type error_: Wrong — the type checker intentionally defers this to the proof engine. Making it a type error would duplicate logic and violate the catalog-driven obligation model.
 
 
 
+
+
+
+
 - _Runtime-only check_: Wrong — qualifier values are declaration-time constants (string literals in `in 'USD'`, `in 'kg'`). They're always statically knowable. Deferring to runtime would miss a guaranteed-provable obligation.
+
+
+
+
+
+
+
+
 
 
 
@@ -10453,6 +20983,14 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 **Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `QualifierCompatibilityProofRequirement` branch that resolves both subjects, reads their qualifier bindings on the specified axis, and compares values. Add to the Strategy 2 coverage table. Update Strategy 2's name from "Modifier Proof" to "Declaration Attribute Proof" to reflect its expanded scope.
 
 
@@ -10461,7 +20999,23 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -10477,7 +21031,23 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
+
+
+
+
 ## 1. ProofDischarge Record Type
+
+
+
+
+
+
+
+
 
 
 
@@ -10489,7 +21059,15 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 /// <summary>
+
+
+
+
 
 
 
@@ -10497,7 +21075,15 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 /// Read by Strategy 2 of the proof engine — no per-modifier switch needed.
+
+
+
+
 
 
 
@@ -10505,7 +21091,15 @@ This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries
 
 
 
+
+
+
+
 public sealed record ProofDischarge(
+
+
+
+
 
 
 
@@ -10513,7 +21107,15 @@ public sealed record ProofDischarge(
 
 
 
+
+
+
+
     OperatorKind? Comparison,              // for Numeric: the comparison operator
+
+
+
+
 
 
 
@@ -10521,7 +21123,15 @@ public sealed record ProofDischarge(
 
 
 
+
+
+
+
                                            //   null = read from modifier's HasValue parameter
+
+
+
+
 
 
 
@@ -10529,7 +21139,19 @@ public sealed record ProofDischarge(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -10545,7 +21167,23 @@ public sealed record ProofDischarge(
 
 
 
+
+
+
+
+
+
+
+
 ## 2. FieldModifierMeta Update
+
+
+
+
+
+
+
+
 
 
 
@@ -10561,7 +21199,19 @@ Add `ProofDischarges` property to the existing `FieldModifierMeta` record in `Mo
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -10569,7 +21219,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierKind Kind,
+
+
+
+
 
 
 
@@ -10577,7 +21235,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     string Description,
+
+
+
+
 
 
 
@@ -10585,7 +21251,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     TypeTarget[] ApplicableTo,
+
+
+
+
 
 
 
@@ -10593,7 +21267,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierKind[] Subsumes = default!,
+
+
+
+
 
 
 
@@ -10601,7 +21283,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     string? HoverDescription = null,
+
+
+
+
 
 
 
@@ -10609,7 +21299,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     string? SnippetTemplate = null,
+
+
+
+
 
 
 
@@ -10617,7 +21315,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith)
+
+
+
+
 
 
 
@@ -10625,7 +21331,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+
+
+
+
 
 
 
@@ -10633,11 +21347,27 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 }
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -10653,7 +21383,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 | Modifier | `ProofDischarges` value | Rationale |
+
+
+
+
 
 
 
@@ -10661,7 +21403,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `positive` | `[ProofDischarge(Numeric, GreaterThan, 0)]` | Field > 0 — subsumes `!= 0` and `>= 0` via `DischargeCovers` subsumption logic |
+
+
+
+
 
 
 
@@ -10669,7 +21419,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `nonzero` | `[ProofDischarge(Numeric, NotEquals, 0)]` | Field ≠ 0 |
+
+
+
+
 
 
 
@@ -10677,7 +21435,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `min(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | Field ≥ N where N is modifier parameter |
+
+
+
+
 
 
 
@@ -10685,7 +21451,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `minlength(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | String length ≥ N |
+
+
+
+
 
 
 
@@ -10693,11 +21467,27 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `mincount(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | Collection count ≥ N |
 
 
 
+
+
+
+
 | `maxcount(N)` | `[ProofDischarge(Numeric, LessThanOrEqual, null)]` | Collection count ≤ N |
+
+
+
+
+
+
+
+
 
 
 
@@ -10713,7 +21503,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 | Modifier | Why empty |
+
+
+
+
 
 
 
@@ -10721,7 +21523,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `optional` | Does not *discharge* a proof obligation — its absence is what guarantees presence. Strategy 2 handles presence via the non-optional check, not via ProofDischarge. |
+
+
+
+
 
 
 
@@ -10729,7 +21539,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `default(expr)` | Provides initial value — does not establish a runtime bound. |
+
+
+
+
 
 
 
@@ -10737,7 +21555,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `writable` | Access control, not a value constraint. |
+
+
+
+
+
+
+
+
 
 
 
@@ -10753,7 +21583,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 **New file: `src/Precept/Language/ProofDischarge.cs`.**
+
+
+
+
+
+
+
+
 
 
 
@@ -10769,7 +21615,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ## 5. Catalog Architecture Compliance
+
+
+
+
+
+
+
+
 
 
 
@@ -10785,11 +21647,27 @@ Verified against `docs/language/catalog-system.md`:
 
 
 
+
+
+
+
+
+
+
+
 - **ProofDischarges is catalog metadata.** It declares what a modifier *means* for the proof system. The proof engine reads it — it does not compute it. This is exactly the metadata-driven architecture: domain knowledge lives in the catalog, pipeline stages are generic readers.
 
 
 
+
+
+
+
 - **No per-modifier switch in the proof engine.** Strategy 2 iterates `field.Modifiers`, reads `Modifiers.GetMeta(kind).ProofDischarges`, and calls `DischargeCovers`. No `ModifierKind.Positive => ...` switches anywhere in `ProofEngine.cs`.
+
+
+
+
 
 
 
@@ -10801,7 +21679,23 @@ Verified against `docs/language/catalog-system.md`:
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -10817,7 +21711,23 @@ Verified against `docs/language/catalog-system.md`:
 
 
 
+
+
+
+
+
+
+
+
 ## New Record Types Needed
+
+
+
+
+
+
+
+
 
 
 
@@ -10833,7 +21743,23 @@ The spec's §5 Output defines 8 types. Current source has only `ProofLedger(Immu
 
 
 
+
+
+
+
+
+
+
+
 ## 1. `ProofObligation` — `Pipeline/ProofLedger.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -10845,7 +21771,15 @@ The spec's §5 Output defines 8 types. Current source has only `ProofLedger(Immu
 
 
 
+
+
+
+
 public sealed record ProofObligation(
+
+
+
+
 
 
 
@@ -10853,7 +21787,15 @@ public sealed record ProofObligation(
 
 
 
+
+
+
+
     TypedExpression Site,
+
+
+
+
 
 
 
@@ -10861,7 +21803,15 @@ public sealed record ProofObligation(
 
 
 
+
+
+
+
     ProofStrategy? Strategy,
+
+
+
+
 
 
 
@@ -10869,11 +21819,27 @@ public sealed record ProofObligation(
 
 
 
+
+
+
+
 );
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -10889,7 +21855,23 @@ Dependencies: `ProofRequirement` (Language), `TypedExpression` (Pipeline/Semanti
 
 
 
+
+
+
+
+
+
+
+
 ## 2. `ProofDisposition` enum — `Pipeline/ProofLedger.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -10901,11 +21883,27 @@ Dependencies: `ProofRequirement` (Language), `TypedExpression` (Pipeline/Semanti
 
 
 
+
+
+
+
 public enum ProofDisposition { Proved, Unresolved }
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -10921,7 +21919,19 @@ public enum ProofDisposition { Proved, Unresolved }
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -10929,7 +21939,15 @@ public enum ProofStrategy
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -10937,7 +21955,15 @@ public enum ProofStrategy
 
 
 
+
+
+
+
     DeclarationAttribute,  // renamed from "Modifier" — covers modifiers, qualifiers, dimensions
+
+
+
+
 
 
 
@@ -10945,7 +21971,15 @@ public enum ProofStrategy
 
 
 
+
+
+
+
     FlowNarrowing
+
+
+
+
 
 
 
@@ -10953,7 +21987,19 @@ public enum ProofStrategy
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -10969,7 +22015,23 @@ public enum ProofStrategy
 
 
 
+
+
+
+
+
+
+
+
 ## 4. `FaultSiteLink` — `Pipeline/ProofLedger.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -10981,7 +22043,15 @@ public enum ProofStrategy
 
 
 
+
+
+
+
 public sealed record FaultSiteLink(
+
+
+
+
 
 
 
@@ -10989,7 +22059,15 @@ public sealed record FaultSiteLink(
 
 
 
+
+
+
+
     FaultCode FaultCode,
+
+
+
+
 
 
 
@@ -10997,7 +22075,15 @@ public sealed record FaultSiteLink(
 
 
 
+
+
+
+
     SourceSpan Site
+
+
+
+
 
 
 
@@ -11005,7 +22091,19 @@ public sealed record FaultSiteLink(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -11021,7 +22119,23 @@ Dependencies: `FaultCode` (Language)
 
 
 
+
+
+
+
+
+
+
+
 ## 5. `ConstraintInfluenceEntry` — `Pipeline/ProofLedger.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -11033,7 +22147,15 @@ Dependencies: `FaultCode` (Language)
 
 
 
+
+
+
+
 public sealed record ConstraintInfluenceEntry(
+
+
+
+
 
 
 
@@ -11041,11 +22163,23 @@ public sealed record ConstraintInfluenceEntry(
 
 
 
+
+
+
+
     ImmutableArray<string> ReferencedFields,
 
 
 
+
+
+
+
     ImmutableArray<EventArgReference> ReferencedArgs
+
+
+
+
 
 
 
@@ -11057,11 +22191,31 @@ public sealed record ConstraintInfluenceEntry(
 
 
 
+
+
+
+
+
+
+
+
 public sealed record EventArgReference(string EventName, string ArgName);
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -11077,7 +22231,23 @@ Dependencies: `ConstraintIdentity` (Pipeline/SemanticIndex.cs — shared type, a
 
 
 
+
+
+
+
+
+
+
+
 ## 6. `InitialStateSatisfiabilityResult` — `Pipeline/ProofLedger.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -11089,7 +22259,15 @@ Dependencies: `ConstraintIdentity` (Pipeline/SemanticIndex.cs — shared type, a
 
 
 
+
+
+
+
 public sealed record InitialStateSatisfiabilityResult(
+
+
+
+
 
 
 
@@ -11097,7 +22275,15 @@ public sealed record InitialStateSatisfiabilityResult(
 
 
 
+
+
+
+
     bool IsSatisfiable,
+
+
+
+
 
 
 
@@ -11105,7 +22291,19 @@ public sealed record InitialStateSatisfiabilityResult(
 
 
 
+
+
+
+
 );
+
+
+
+
+
+
+
+
 
 
 
@@ -11117,7 +22315,15 @@ public sealed record UnsatisfiedConstraint(
 
 
 
+
+
+
+
     ConstraintIdentity Constraint,
+
+
+
+
 
 
 
@@ -11125,11 +22331,27 @@ public sealed record UnsatisfiedConstraint(
 
 
 
+
+
+
+
 );
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -11145,7 +22367,19 @@ public sealed record UnsatisfiedConstraint(
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -11153,7 +22387,15 @@ public sealed record ProofLedger(
 
 
 
+
+
+
+
     ImmutableArray<ProofObligation> Obligations,
+
+
+
+
 
 
 
@@ -11161,7 +22403,15 @@ public sealed record ProofLedger(
 
 
 
+
+
+
+
     ImmutableArray<ConstraintInfluenceEntry> ConstraintInfluence,
+
+
+
+
 
 
 
@@ -11169,7 +22419,15 @@ public sealed record ProofLedger(
 
 
 
+
+
+
+
     ImmutableArray<Diagnostic> Diagnostics
+
+
+
+
 
 
 
@@ -11177,7 +22435,19 @@ public sealed record ProofLedger(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -11193,7 +22463,23 @@ public sealed record ProofLedger(
 
 
 
+
+
+
+
+
+
+
+
 **Rationale:** The spec was written after the catalog architecture was established and correctly reflects what the Precept Builder needs from the proof engine:
+
+
+
+
+
+
+
+
 
 
 
@@ -11205,7 +22491,15 @@ public sealed record ProofLedger(
 
 
 
+
+
+
+
 - `FaultSiteLinks` — consumed by Precept Builder Pass 4 for `FaultSiteAnnotation` planting
+
+
+
+
 
 
 
@@ -11213,11 +22507,27 @@ public sealed record ProofLedger(
 
 
 
+
+
+
+
 - `InitialStateResults` — consumed by diagnostics (unsatisfiable initial state is a compile-time error)
 
 
 
+
+
+
+
 - `Diagnostics` — merged into the final diagnostic stream
+
+
+
+
+
+
+
+
 
 
 
@@ -11233,7 +22543,23 @@ None of these fields are overengineered. Each has a concrete downstream consumer
 
 
 
+
+
+
+
+
+
+
+
 **One revision:** The `ConstraintIdentity` subtypes in the spec differ from the source. The **source is correct** (it's the implemented, tested shape). The spec must be updated:
+
+
+
+
+
+
+
+
 
 
 
@@ -11245,7 +22571,15 @@ None of these fields are overengineered. Each has a concrete downstream consumer
 
 
 
+
+
+
+
 |---|---|---|
+
+
+
+
 
 
 
@@ -11253,7 +22587,19 @@ None of these fields are overengineered. Each has a concrete downstream consumer
 
 
 
+
+
+
+
 | `EnsureIdentity(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)` | `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)` | **Source wins** — `AnchorName` collapses state/event discrimination. The `ConstraintKind` already indicates whether the anchor is a state or event. |
+
+
+
+
+
+
+
+
 
 
 
@@ -11269,7 +22615,23 @@ None of these fields are overengineered. Each has a concrete downstream consumer
 
 
 
+
+
+
+
+
+
+
+
 All new types go in `Pipeline/ProofLedger.cs` alongside the `ProofLedger` record. This follows the existing pattern: `SemanticIndex.cs` contains both the index record and all its constituent types (`TypedField`, `TypedState`, `TypedTransitionRow`, etc.). Putting `ProofObligation`, `FaultSiteLink`, etc. in `ProofLedger.cs` keeps the proof engine's output contract in one file.
+
+
+
+
+
+
+
+
 
 
 
@@ -11285,7 +22647,23 @@ Exception: `ProofDischarge` goes in `Language/ProofDischarge.cs` (catalog metada
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -11301,6 +22679,14 @@ Exception: `ProofDischarge` goes in `Language/ProofDischarge.cs` (catalog metada
 
 
 
+
+
+
+
+
+
+
+
 ## SIG-1: Missing `AllTypedExpressions` API on `SemanticIndex`
 
 
@@ -11309,7 +22695,23 @@ Exception: `ProofDischarge` goes in `Language/ProofDischarge.cs` (catalog metada
 
 
 
+
+
+
+
+
+
+
+
 **Verdict: SPEC UPDATE NEEDED**
+
+
+
+
+
+
+
+
 
 
 
@@ -11325,6 +22727,14 @@ The spec's Pass 1 pseudocode (line 967) iterates `semantics.AllTypedExpressions`
 
 
 
+
+
+
+
+
+
+
+
 ## SIG-2: `ConstraintIdentity` shape mismatch
 
 
@@ -11333,7 +22743,23 @@ The spec's Pass 1 pseudocode (line 967) iterates `semantics.AllTypedExpressions`
 
 
 
+
+
+
+
+
+
+
+
 **Verdict: SPEC UPDATE NEEDED**
+
+
+
+
+
+
+
+
 
 
 
@@ -11349,6 +22775,14 @@ Covered in PE-G3 above. The spec's `ConstraintIdentity` subtypes have fields tha
 
 
 
+
+
+
+
+
+
+
+
 ## SIG-3: Unspecified `FindEnclosingTransitionRow` helper
 
 
@@ -11357,7 +22791,23 @@ Covered in PE-G3 above. The spec's `ConstraintIdentity` subtypes have fields tha
 
 
 
+
+
+
+
+
+
+
+
 **Verdict: ACCEPT AS-IS**
+
+
+
+
+
+
+
+
 
 
 
@@ -11373,6 +22823,14 @@ This is a straightforward lookup: given a `TypedExpression`, find which `TypedTr
 
 
 
+
+
+
+
+
+
+
+
 ## SIG-4: Unspecified `ResolveSubject` helper
 
 
@@ -11381,7 +22839,23 @@ This is a straightforward lookup: given a `TypedExpression`, find which `TypedTr
 
 
 
+
+
+
+
+
+
+
+
 **Verdict: ACCEPT AS-IS**
+
+
+
+
+
+
+
+
 
 
 
@@ -11397,7 +22871,23 @@ This is a straightforward lookup: given a `TypedExpression`, find which `TypedTr
 
 
 
+
+
+
+
+
+
+
+
 ## SIG-5: Underspecified initial-state satisfiability
+
+
+
+
+
+
+
+
 
 
 
@@ -11413,7 +22903,23 @@ This is a straightforward lookup: given a `TypedExpression`, find which `TypedTr
 
 
 
+
+
+
+
+
+
+
+
 The spec says to check whether initial-state constraints are satisfiable given default field values. This requires evaluating default expressions against constraint expressions — essentially a mini-evaluator at compile time. The spec's description (lines 866–883) is correct in intent but implementation is blocked pending the type checker's expression resolution engine being fully operational (as the spec itself notes on line 883). **Owner: spec author + implementer, post-TypeChecker completion.**
+
+
+
+
+
+
+
+
 
 
 
@@ -11429,7 +22935,23 @@ The spec says to check whether initial-state constraints are satisfiable given d
 
 
 
+
+
+
+
+
+
+
+
 **Verdict: ACCEPT AS-IS**
+
+
+
+
+
+
+
+
 
 
 
@@ -11445,7 +22967,23 @@ Collection non-empty obligations are declared in catalog metadata (`TypeAccessor
 
 
 
+
+
+
+
+
+
+
+
 ## SIG-7: Guard decomposition rules
+
+
+
+
+
+
+
+
 
 
 
@@ -11461,7 +22999,23 @@ Collection non-empty obligations are declared in catalog metadata (`TypeAccessor
 
 
 
+
+
+
+
+
+
+
+
 The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)` but does not define the decomposition rules for complex guard expressions. The spec should specify:
+
+
+
+
+
+
+
+
 
 
 
@@ -11473,11 +23027,27 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
 2. **Supported atomic forms:** `field OP literal`, `count(collection) > 0`, `collection.count > 0`, `field is set`, `field is not set`.
 
 
 
+
+
+
+
 3. **Unsupported forms:** Function calls (other than `count`), nested expressions, field-vs-field comparisons (those are Strategy 4).
+
+
+
+
+
+
+
+
 
 
 
@@ -11493,7 +23063,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -11509,7 +23095,19 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 1. **§7 Strategy 2 — Rename and expand scope.** Rename from "Modifier Proof" to "Declaration Attribute Proof." Add three new branches to `TryModifierProof` (renamed to `TryDeclarationAttributeProof`):
+
+
+
+
 
 
 
@@ -11517,11 +23115,27 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
    - `DimensionProofRequirement` → read `TypedField.Qualifier` on `QualifierAxis.TemporalDimension`, compare to `RequiredDimension`
 
 
 
+
+
+
+
    - `QualifierCompatibilityProofRequirement` → resolve both subjects, read qualifier bindings on specified axis, compare values
+
+
+
+
+
+
+
+
 
 
 
@@ -11537,7 +23151,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 3. **§7 Strategy 2 — Update `ProofDischarge` pseudocode.** Show `DischargeCovers` handling nullable `Threshold` (reads from modifier parameter for `HasValue` modifiers).
+
+
+
+
+
+
+
+
 
 
 
@@ -11553,7 +23183,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 5. **§5 Output — Update `ProofStrategy` enum.** Rename `Modifier` to `DeclarationAttribute`.
+
+
+
+
+
+
+
+
 
 
 
@@ -11569,7 +23215,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 7. **§9 — Add `AllTypedExpressions` note.** Document that `SemanticIndex` requires a traversal method/property to enumerate all typed expressions across all declaration kinds.
+
+
+
+
+
+
+
+
 
 
 
@@ -11585,7 +23247,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -11601,7 +23279,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 1. **Add `ProofDischarge.cs`** — new file in `src/Precept/Language/` containing the `ProofDischarge` record type.
+
+
+
+
+
+
+
+
 
 
 
@@ -11617,7 +23311,19 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 3. **Update `Modifiers.cs` entries** — populate `ProofDischarges` on 10 modifier entries:
+
+
+
+
 
 
 
@@ -11625,7 +23331,15 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
    - `Positive`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThan, 0)]`
+
+
+
+
 
 
 
@@ -11633,7 +23347,15 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
    - `Notempty`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThan, 0)]`
+
+
+
+
 
 
 
@@ -11641,7 +23363,15 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
    - `Max`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+
+
+
+
 
 
 
@@ -11649,7 +23379,15 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
    - `Maxlength`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+
+
+
+
 
 
 
@@ -11657,7 +23395,19 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
    - `Maxcount`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+
+
+
+
+
+
+
+
 
 
 
@@ -11673,7 +23423,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -11689,7 +23455,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 - **Strategy 2 rename to "Declaration Attribute Proof"**: This broadens Strategy 2's scope from modifier-only to all field declaration attributes (modifiers, qualifiers, dimensions). The alternative is keeping the name "Modifier Proof" and adding separate subroutines for qualifier/dimension checks under the same strategy. The rename is more honest but changes the spec vocabulary. Shane should confirm the rename is acceptable.
+
+
+
+
+
+
+
+
 
 
 
@@ -11705,9 +23487,27 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 - **SIG-5 initial-state satisfiability deferral**: This is marked as blocked pending TypeChecker expression evaluation. Should it be deferred entirely from the proof engine's initial implementation scope, or should a minimal version (literals-only default values against simple comparison constraints) be included in the first implementation?
 
+
+
 # Shane Sign-Off — ProofEngine Design Decisions
+
+
+
+
+
+
+
+
 
 
 
@@ -11719,7 +23519,19 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
 **Source:** Direct conversation with Shane
+
+
+
+
+
+
+
+
 
 
 
@@ -11735,7 +23547,23 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
+
+
+
+
+
+
+
+
 **Approved:** Rename Strategy 2 from "Modifier Proof" to "Declaration Attribute Proof."
+
+
+
+
+
+
+
+
 
 
 
@@ -11751,7 +23579,23 @@ Strategy 2's expanded scope (modifiers, qualifier bindings, and temporal dimensi
 
 
 
+
+
+
+
+
+
+
+
 ## Decision 2 — Unqualified Period Behavior: Permissive ✅
+
+
+
+
+
+
+
+
 
 
 
@@ -11767,7 +23611,23 @@ Strategy 2's expanded scope (modifiers, qualifier bindings, and temporal dimensi
 
 
 
+
+
+
+
+
+
+
+
 When a `period` field has no `TemporalDimension` qualifier (no `period of 'date'` or `period of 'time'`), the `DimensionProofRequirement` is considered **satisfied** rather than unresolved. This is the permissive choice — authors are not forced to qualify period fields for temporal arithmetic to be proven safe.
+
+
+
+
+
+
+
+
 
 
 
@@ -11783,7 +23643,23 @@ When a `period` field has no `TemporalDimension` qualifier (no `period of 'date'
 
 
 
+
+
+
+
+
+
+
+
 Shane raised the question: "why not just use the evaluator?" instead of a mini-evaluator at compile time.
+
+
+
+
+
+
+
+
 
 
 
@@ -11795,7 +23671,15 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
 1. Does the evaluator depend on compiled Compiler-stage output, or can it operate on SemanticIndex?
+
+
+
+
 
 
 
@@ -11803,7 +23687,15 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
 3. What are the architectural implications of using the evaluator for initial-state satisfiability?
+
+
+
+
 
 
 
@@ -11815,7 +23707,19 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
+
+
+
+
 **Status:** Blocked on Frank deep dive. No implementation decision authorized yet.
+
+
+
+
 
 
 
@@ -11827,7 +23731,23 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
+
+
+
+
 **Reviewer:** Elaine (UX Designer)
+
+
+
+
+
+
+
+
 
 
 
@@ -11843,7 +23763,23 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
+
+
+
+
 **Verdict:** APPROVED-WITH-CONCERNS
+
+
+
+
+
+
+
+
 
 
 
@@ -11859,7 +23795,23 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
+
+
+
+
 1. **Parser section needs shape specificity.** The section explains the parser's *philosophy* (source-faithful, recovery-aware) but doesn't give an implementer enough to know what SyntaxTree nodes to define. Missing: error recovery node shape, concrete node inventory or shape sketch, and explicit contract for how malformed input is represented. A parser design doc author would need to invent these from scratch.
+
+
+
+
+
+
+
+
 
 
 
@@ -11875,7 +23827,23 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
+
+
+
+
 3. **"How it serves the guarantee" paragraphs become formulaic.** Useful for Lexer through Graph Analyzer. By Proof Engine and Lowering, the pattern is predictable and the content is restating the opening sentence. Recommendation: fold the guarantee connection into the stage's opening paragraph for §8–§10 and drop the separate labeled paragraph.
+
+
+
+
+
+
+
+
 
 
 
@@ -11891,6 +23859,14 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
+
+
+
+
+
+
+
+
 The rewrite succeeds. §1 opens with a problem statement and architectural commitment, not an inventory. Per-stage sections lead with design decisions. The philosophy-first framing is consistent throughout. This is a design document, not a reference manual.
 
 
@@ -11899,7 +23875,23 @@ The rewrite succeeds. §1 opens with a problem statement and architectural commi
 
 
 
+
+
+
+
+
+
+
+
 ## Decision
+
+
+
+
+
+
+
+
 
 
 
@@ -11915,15 +23907,7 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 
----
 
-
-
-
-
-
-
----
 
 
 
@@ -11932,6 +23916,40 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+
 
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
 
@@ -11941,7 +23959,23 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 
+
+
+
+
+
+
+
+
 **Reviewer:** Frank (Lead Architect)
+
+
+
+
+
+
+
+
 
 
 
@@ -11957,7 +23991,23 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 
+
+
+
+
+
+
+
+
 **Document:** `docs/working/combined-design-v2.md`
+
+
+
+
+
+
+
+
 
 
 
@@ -11973,7 +24023,23 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -11989,6 +24055,14 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 
+
+
+
+
+
+
+
+
 The document is architecturally sound and well-structured. It reads as a unified design explanation rooted in philosophy, not a defense of two separate systems. The pipeline is coherent, the artifact boundaries are clean, and the lowered executable model is concrete enough to implement against. The concerns below are real design gaps that will cost us if we hit them mid-implementation rather than addressing them now.
 
 
@@ -11997,7 +24071,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12013,7 +24103,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 1. **The proof strategy set is closed but its coverage boundary is unstated.** The doc lists four strategies (literal, modifier, guard-in-path, flow narrowing) and says "any obligation outside this set is unresolvable." But it never states what percentage of real-world proof obligations these four strategies can discharge. If most `ProofRequirement` instances in practice require cross-field reasoning (e.g., `ApprovedAmount <= RequestedAmount`), then the four strategies are a beautiful design that rejects most real programs. The doc should include a coverage analysis against the sample corpus — even an informal one — so implementers know whether the strategy set is right-sized or whether a fifth strategy (e.g., relational pair narrowing) is needed before v1.
+
+
+
+
+
+
+
+
 
 
 
@@ -12029,7 +24135,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 3. **The `Create` without initial event path evaluates `always` + `in <initial>` — but default values may not satisfy `in <initial>` constraints.** The doc doesn't specify whether this is a compile-time guarantee (the proof engine should catch it) or a runtime domain outcome. The static-reasoning research (C3) says this is a known check, but the combined design doesn't thread it through the proof/fault chain. An author who writes `field X as number default 0` and `in Draft ensure X > 5` gets no compile-time warning in the current design — only a runtime `EventConstraintsFailed` on create. That violates the prevention promise.
+
+
+
+
+
+
+
+
 
 
 
@@ -12045,7 +24167,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12061,7 +24199,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 1. **No error recovery strategy for the parser.** The doc says `SyntaxTree` preserves "recovery shape for broken programs" and mentions "missing-node representation," but there is no recovery algorithm specified. Panic-mode? Synchronization tokens? The parser recovery strategy directly affects LS quality — a bad recovery model means completions and diagnostics degrade on every keystroke. This is a design decision, not an implementation detail, and it should be locked before the parser is built.
+
+
+
+
+
+
+
+
 
 
 
@@ -12077,7 +24231,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 3. **No serialization contract for `Version`.** The doc specifies `Restore` as the reconstitution path, but never specifies what the caller provides. What is the serialization shape of a `Version`? Is it `(stateName, fieldValues)`? `(stateDescriptor, slotArray)`? The host application needs a defined contract for what to persist and what to hand back to `Restore`. Without it, every host will invent its own serialization and we'll get impedance mismatches.
+
+
+
+
+
+
+
+
 
 
 
@@ -12093,6 +24263,14 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 5. **No observability hooks.** The doc specifies structured outcomes and inspections, but no tracing, logging, or metric emission points. For a production runtime, host applications need to observe: which events fired, which constraints failed, how long evaluation took, which proof strategies were used. These hooks shape the evaluator's internal architecture — bolting them on later means refactoring the evaluator.
 
 
@@ -12101,7 +24279,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12117,7 +24311,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 1. **The proof engine should guarantee initial-state satisfiability at compile time.** The research base (static-reasoning-expansion.md, C3/C4/C5) already describes per-field interval analysis. The combined design should commit to a concrete compile-time guarantee: *if default field values and initial-state constraints are both statically known, the proof engine verifies satisfiability and emits a diagnostic if no valid initial configuration exists.* This is unique among DSL runtimes — no validator, state machine library, or rules engine provides this. It's the proof engine's signature contribution and it's achievable with the bounded strategy set already designed.
+
+
+
+
+
+
+
+
 
 
 
@@ -12133,7 +24343,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 3. **The executable model should be a compiled decision table, not a tree walk.** The doc says lowering produces "lowered expression nodes and action plans" but doesn't specify the execution model. For Precept's small, closed expression language, the optimal model is a flat evaluation plan — precomputed slot references, operation opcodes, and result slots — not a recursive tree interpreter. Think of it as a register-based bytecode where "registers" are field slots. This makes evaluation predictable-time, cache-friendly, and trivially serializable for inspection. The doc should commit to "flat evaluation plan" as the executable model shape and explicitly reject tree-walking.
+
+
+
+
+
+
+
+
 
 
 
@@ -12149,6 +24375,14 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 5. **The constraint evaluation matrix should surface "why not" explanations as structured data.** When `Fire` returns `Rejected` or `EventConstraintsFailed`, the outcome carries `ConstraintViolation` objects. But the doc doesn't specify whether violations carry *explanation depth* — just the failing expression text, or also the evaluated field values, the guard that scoped the constraint, and the specific sub-expression that failed. For AI legibility, violations should carry structured explanation: `{ constraint, expression, evaluatedValues: { field: value }, guardContext?, failingSubExpression? }`. This is cheap to compute during evaluation and transforms MCP from "it failed" to "it failed because X was 3 and the constraint requires X > 5."
 
 
@@ -12157,7 +24391,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12173,7 +24423,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 1. **The `SyntaxTree` vs `TypedModel` anti-mirroring rules are over-specified for a doc at this level.** Four numbered rules about what `TypedModel` must not do, plus a seven-item "required inventory" — this is component-level design specification embedded in an architecture document. The architectural decision (they are separate artifacts with separate jobs) is correct and should stay. The implementation contract should move to a parser/type-checker-specific design doc that the implementer reads when building those stages.
+
+
+
+
+
+
+
+
 
 
 
@@ -12189,7 +24455,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12205,7 +24487,23 @@ The document is architecturally sound and well-structured. It reads as a unified
 
 
 
+
+
+
+
+
+
+
+
 ## 1. Add a proof coverage analysis against the sample corpus.
+
+
+
+
+
+
+
+
 
 
 
@@ -12221,7 +24519,23 @@ Run the four proof strategies against every `ProofRequirement` that would arise 
 
 
 
+
+
+
+
+
+
+
+
 ## 2. Specify the parser error recovery strategy.
+
+
+
+
+
+
+
+
 
 
 
@@ -12237,7 +24551,23 @@ Lock one of: (a) panic-mode with synchronization at declaration keywords, (b) to
 
 
 
+
+
+
+
+
+
+
+
 ## 3. Commit to a flat evaluation plan as the executable model.
+
+
+
+
+
+
+
+
 
 
 
@@ -12253,7 +24583,23 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12269,15 +24615,7 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 
----
 
-
-
-
-
-
-
----
 
 
 
@@ -12286,6 +24624,40 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+
 
 # Decision: Combined Design v2 Comprehensive Revision Pass
 
@@ -12295,7 +24667,23 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 
+
+
+
+
+
+
+
+
 **By:** Frank
+
+
+
+
+
+
+
+
 
 
 
@@ -12311,6 +24699,14 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 
+
+
+
+
+
+
+
+
 **Status:** Applied
 
 
@@ -12319,7 +24715,23 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -12335,7 +24747,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 ## What Changed
+
+
+
+
+
+
+
+
 
 
 
@@ -12351,7 +24779,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - Navigation guide ("How to read this document") after status block
+
+
+
+
+
+
+
+
 
 
 
@@ -12367,7 +24811,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - TypeChecker: anti-pattern for per-construct check methods
+
+
+
+
+
+
+
+
 
 
 
@@ -12383,7 +24843,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - Compilation snapshot: no-incremental-compilation model, contract digest hash, definition versioning gap
+
+
+
+
+
+
+
+
 
 
 
@@ -12399,7 +24875,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - Runtime: Restore recomputation order, structured "why not" violations
+
+
+
+
+
+
+
+
 
 
 
@@ -12415,7 +24907,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - **Precept Innovations callouts** in every major section (§2–§14), 2–4 bullets each
+
+
+
+
+
+
+
+
 
 
 
@@ -12431,7 +24939,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - **§13 MCP integration** — tool inventory, thin-wrapper principle, AI-first design, catalog-derived vocabulary
+
+
+
+
+
+
+
+
 
 
 
@@ -12447,7 +24971,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - Former §12 (LS integration) renumbered to §14
+
+
+
+
+
+
+
+
 
 
 
@@ -12463,7 +25003,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - Formulaic guarantee paragraphs folded into stage openings for §8–§10
+
+
+
+
+
+
+
+
 
 
 
@@ -12479,7 +25035,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - Parser error recovery: construct-level panic mode with `MissingNode` + `SkippedTokens`
+
+
+
+
+
+
+
+
 
 
 
@@ -12495,7 +25067,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - Incremental compilation: "re-run everything" is the intended model (64KB ceiling)
+
+
+
+
+
+
+
+
 
 
 
@@ -12511,6 +25099,14 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 - `ConstraintActivation`: should be cataloged (language-surface knowledge)
 
 
@@ -12519,7 +25115,23 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12535,6 +25147,14 @@ Applied all team review feedback (Frank design review, George technical accuracy
 
 
 
+
+
+
+
+
+
+
+
 Invert D3: make `write` the universal default for (field, state) pairs. Add a `readonly` modifier on field declarations to permanently lock fields from ever being written in any state. Eliminate root-level `write` declarations entirely.
 
 
@@ -12543,7 +25163,23 @@ Invert D3: make `write` the universal default for (field, state) pairs. Add a `r
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12559,7 +25195,23 @@ Invert D3: make `write` the universal default for (field, state) pairs. Add a `r
 
 
 
+
+
+
+
+
+
+
+
 **Yes. Fundamentally.**
+
+
+
+
+
+
+
+
 
 
 
@@ -12575,7 +25227,23 @@ D3 as specified (§2.2 Access Mode, composition rule 1) states: "D3 is the unive
 
 
 
+
+
+
+
+
+
+
+
 This is a **closed-world access model**. Nothing is writable unless explicitly opened. The omission failure mode is safe: if an author forgets to declare a `write`, the field is locked in that state. The author must take a deliberate action — writing the `write` keyword — to open the attack surface.
+
+
+
+
+
+
+
+
 
 
 
@@ -12591,7 +25259,23 @@ The proposal inverts this to an **open-world access model**. Everything is writa
 
 
 
+
+
+
+
+
+
+
+
 This is the firewall-rule principle. Good security defaults to DENY; you add ALLOW exceptions. D3 defaults to DENY (read-only) and authors add ALLOW exceptions (`write`). The proposal defaults to ALLOW (writable) and authors add DENY exceptions (`readonly`). In a **governance** language — one whose entire identity is built on "invalid configurations are structurally impossible" (Principle 1: Prevention, not detection) — the conservative default is non-negotiable.
+
+
+
+
+
+
+
+
 
 
 
@@ -12607,7 +25291,23 @@ This is the firewall-rule principle. Good security defaults to DENY; you add ALL
 
 
 
+
+
+
+
+
+
+
+
 The sample set confirms that the conservative default reflects real domain proportions:
+
+
+
+
+
+
+
+
 
 
 
@@ -12623,7 +25323,23 @@ The sample set confirms that the conservative default reflects real domain propo
 
 
 
+
+
+
+
+
+
+
+
 - **Stateful precepts with 1–2 write declarations:** `crosswalk-signal` (1), `clinic-appointment-scheduling` (1), `building-access-badge-request` (1), `insurance-claim` (2), `maintenance-work-order` (1), `refund-request` (1), `subscription-cancellation-retention` (1), `event-registration` (2), `it-helpdesk-ticket` (1), `utility-outage-report` (1), `vehicle-service-appointment` (1). The typical pattern is opening 1–3 fields in 1–2 states. The remaining (field, state) pairs — the overwhelming majority — stay protected by D3.
+
+
+
+
+
+
+
+
 
 
 
@@ -12639,7 +25355,23 @@ The sample set confirms that the conservative default reflects real domain propo
 
 
 
+
+
+
+
+
+
+
+
 The verbosity cost of the current model is 1–2 lines per precept. The safety cost of the proposed model is an invisible, unbounded expansion of the mutation surface whenever an author omits a `readonly` marker.
+
+
+
+
+
+
+
+
 
 
 
@@ -12655,7 +25387,23 @@ The verbosity cost of the current model is 1–2 lines per precept. The safety c
 
 
 
+
+
+
+
+
+
+
+
 - **Principle 1 (Prevention, not detection):** The proposal turns field-level access control from structurally prevented to structurally permitted. An author who omits `readonly` on a field that should be locked has created a governance gap. Under D3, the same omission creates no gap.
+
+
+
+
+
+
+
+
 
 
 
@@ -12671,7 +25419,23 @@ The verbosity cost of the current model is 1–2 lines per precept. The safety c
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12687,7 +25451,23 @@ The verbosity cost of the current model is 1–2 lines per precept. The safety c
 
 
 
+
+
+
+
+
+
+
+
 **It creates a semantic inconsistency.**
+
+
+
+
+
+
+
+
 
 
 
@@ -12703,7 +25483,23 @@ Computed fields (`field Tax as number -> Subtotal * TaxRate`) are already implic
 
 
 
+
+
+
+
+
+
+
+
 Under the proposal, the access defaults would be:
+
+
+
+
+
+
+
+
 
 
 
@@ -12719,7 +25515,23 @@ Under the proposal, the access defaults would be:
 
 
 
+
+
+
+
+
+
+
+
 |---|---|---|
+
+
+
+
+
+
+
+
 
 
 
@@ -12735,7 +25547,23 @@ Under the proposal, the access defaults would be:
 
 
 
+
+
+
+
+
+
+
+
 | Stored field (with `readonly`) | write → overridden to read | read |
+
+
+
+
+
+
+
+
 
 
 
@@ -12751,7 +25579,23 @@ Under the proposal, the access defaults would be:
 
 
 
+
+
+
+
+
+
+
+
 The computed field's access mode would be inconsistent with the declared default. A stored field and a computed field would have different effective defaults despite the language claiming "write is the default." The author would need to understand that computed fields are a hidden exception to the stated default — undermining Principle 4 (inspectability) and Principle 5 (keyword-anchored readability).
+
+
+
+
+
+
+
+
 
 
 
@@ -12767,6 +25611,14 @@ Under D3, the picture is consistent:
 
 
 
+
+
+
+
+
+
+
+
 | Field kind | D3 default | Actual access |
 
 
@@ -12775,7 +25627,23 @@ Under D3, the picture is consistent:
 
 
 
+
+
+
+
+
+
+
+
 |---|---|---|
+
+
+
+
+
+
+
+
 
 
 
@@ -12791,7 +25659,23 @@ Under D3, the picture is consistent:
 
 
 
+
+
+
+
+
+
+
+
 | Stored field (with `write`) | read → overridden to write | write |
+
+
+
+
+
+
+
+
 
 
 
@@ -12807,7 +25691,23 @@ Under D3, the picture is consistent:
 
 
 
+
+
+
+
+
+
+
+
 All fields default to read. Computed fields are naturally aligned with the default. Stored fields that need to be writable are explicitly opened. There is no inconsistency to explain.
+
+
+
+
+
+
+
+
 
 
 
@@ -12823,7 +25723,23 @@ Adding `readonly` as a modifier also creates a redundancy question: should `read
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12839,7 +25755,23 @@ Adding `readonly` as a modifier also creates a redundancy question: should `read
 
 
 
+
+
+
+
+
+
+
+
 **Yes. It weakens it materially.**
+
+
+
+
+
+
+
+
 
 
 
@@ -12855,7 +25787,23 @@ In a stateful precept under D3, the audit question "which fields can a user dire
 
 
 
+
+
+
+
+
+
+
+
 Under the proposal, the same question is answered by: "every field, minus those marked `readonly` on the field declaration, minus those restricted by `in S read` or `in S omit` declarations." This is an **open-world audit** requiring cross-referencing the field declarations (for `readonly` markers), the state-scoped access declarations (for per-state restrictions), and computing the difference. The mental model is subtraction from a universal set rather than enumeration of an explicit set.
+
+
+
+
+
+
+
+
 
 
 
@@ -12871,6 +25819,14 @@ For a governance language — one where the point is to make the access contract
 
 
 
+
+
+
+
+
+
+
+
 This matters especially for AI consumers. Precept's Principle 3 (deterministic semantics) and Principle 5 (keyword-anchored readability) are designed partly for AI legibility. A closed-world access model is easier for AI agents to reason about: "find all `write` declarations" is a simple, complete query. "Find all fields, subtract `readonly` fields, subtract per-state restrictions" is a compositional query with a higher error surface.
 
 
@@ -12879,7 +25835,23 @@ This matters especially for AI consumers. Precept's Principle 3 (deterministic s
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12895,7 +25867,23 @@ This matters especially for AI consumers. Precept's Principle 3 (deterministic s
 
 
 
+
+
+
+
+
+
+
+
 ## The `readonly` keyword itself is misaligned
+
+
+
+
+
+
+
+
 
 
 
@@ -12911,7 +25899,23 @@ This matters especially for AI consumers. Precept's Principle 3 (deterministic s
 
 
 
+
+
+
+
+
+
+
+
 ## Root-level `write` elimination is a false economy
+
+
+
+
+
+
+
+
 
 
 
@@ -12927,7 +25931,23 @@ The proposal motivates itself partly by eliminating root-level `write` declarati
 
 
 
+
+
+
+
+
+
+
+
 - `write BaseFee, DiscountPercent, MinimumCharge` in `fee-schedule` — the `write` keyword positively documents the author's intent. Reading it, you know immediately which fields are editable. The comment above it ("Only pricing levers are editable; TaxRate and CurrencyCode are locked") is restating what the `write` declaration already says.
+
+
+
+
+
+
+
+
 
 
 
@@ -12943,6 +25963,14 @@ The proposal motivates itself partly by eliminating root-level `write` declarati
 
 
 
+
+
+
+
+
+
+
+
 The `write` keyword carries semantic weight as a positive assertion. Replacing it with the absence of `readonly` loses that signal.
 
 
@@ -12951,7 +25979,23 @@ The `write` keyword carries semantic weight as a positive assertion. Replacing i
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -12967,7 +26011,23 @@ The `write` keyword carries semantic weight as a positive assertion. Replacing i
 
 
 
+
+
+
+
+
+
+
+
 The proposal inverts Precept's conservative access posture from closed-world (safe by default, explicitly opened) to open-world (exposed by default, explicitly restricted). This:
+
+
+
+
+
+
+
+
 
 
 
@@ -12983,7 +26043,23 @@ The proposal inverts Precept's conservative access posture from closed-world (sa
 
 
 
+
+
+
+
+
+
+
+
 2. **Creates an access-default inconsistency** between stored and computed fields.
+
+
+
+
+
+
+
+
 
 
 
@@ -12999,7 +26075,23 @@ The proposal inverts Precept's conservative access posture from closed-world (sa
 
 
 
+
+
+
+
+
+
+
+
 4. **Imports programming-language semantics** (`readonly`) into a domain-configuration language.
+
+
+
+
+
+
+
+
 
 
 
@@ -13015,7 +26107,23 @@ The proposal inverts Precept's conservative access posture from closed-world (sa
 
 
 
+
+
+
+
+
+
+
+
 D3 is philosophically correct, empirically well-calibrated to real domain proportions, and consistent with the governance identity. It should not be inverted.
+
+
+
+
+
+
+
+
 
 
 
@@ -13031,7 +26139,23 @@ D3 is philosophically correct, empirically well-calibrated to real domain propor
 
 
 
+
+
+
+
+
+
+
+
 If the underlying concern is verbosity in stateless precepts that happen to have mostly-writable fields, there are narrower solutions that preserve D3:
+
+
+
+
+
+
+
+
 
 
 
@@ -13047,7 +26171,23 @@ If the underlying concern is verbosity in stateless precepts that happen to have
 
 
 
+
+
+
+
+
+
+
+
 - If a `write all except F1, F2` syntax were needed, it could be evaluated without inverting the default. The exception list would still be a positive declaration against a positively-declared baseline.
+
+
+
+
+
+
+
+
 
 
 
@@ -13063,15 +26203,7 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
----
 
-
-
-
-
-
-
----
 
 
 
@@ -13080,10 +26212,54 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+
+
+
 
 
 
 # Full Architecture Review — spike/Precept-V2
+
+
+
+
+
+
+
+
 
 
 
@@ -13099,7 +26275,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 **Branch:** `spike/Precept-V2`
+
+
+
+
+
+
+
+
 
 
 
@@ -13115,7 +26307,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 **Build:** ✅ Clean (1 pre-existing RS1030 warning in PRECEPT0013)
+
+
+
+
+
+
+
+
 
 
 
@@ -13131,7 +26339,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13147,7 +26371,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 ## Files Reviewed
+
+
+
+
+
+
+
+
 
 
 
@@ -13163,7 +26403,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 - `src/Precept/Language/HandlesCatalogMemberAttribute.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -13179,7 +26435,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 - `src/Precept/Pipeline/Parser.cs` (class marker on `ParseSession`)
+
+
+
+
+
+
+
+
 
 
 
@@ -13195,7 +26467,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 - `src/Precept/Pipeline/GraphAnalyzer.cs` (class marker + 11 member annotations)
+
+
+
+
+
+
+
+
 
 
 
@@ -13211,7 +26499,23 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
+
+
+
+
+
+
+
+
 The annotation bridge is clean and catalog-agnostic as specified. The class marker accepts `Type catalogEnum` — any enum can opt in. Method markers use `object kind` for call-site type safety without analyzer rewrites.
+
+
+
+
+
+
+
+
 
 
 
@@ -13227,7 +26531,23 @@ PRECEPT0019 correctly:
 
 
 
+
+
+
+
+
+
+
+
 - Extracts `typeof(T)` from the class marker
+
+
+
+
+
+
+
+
 
 
 
@@ -13243,7 +26563,23 @@ PRECEPT0019 correctly:
 
 
 
+
+
+
+
+
+
+
+
 - Resolves method marker arguments by matching `arg.Type` against the catalog enum
+
+
+
+
+
+
+
+
 
 
 
@@ -13259,7 +26595,23 @@ PRECEPT0019 correctly:
 
 
 
+
+
+
+
+
+
+
+
 - Is registered as `DiagnosticSeverity.Error` (was previously Warning, promoted per Slice 26)
+
+
+
+
+
+
+
+
 
 
 
@@ -13275,7 +26627,23 @@ Parser coverage: `ParseSession` (ref partial struct) has both `ParseExpression` 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13291,7 +26659,23 @@ Parser coverage: `ParseSession` (ref partial struct) has both `ParseExpression` 
 
 
 
+
+
+
+
+
+
+
+
 ## PRECEPT0020 — Operators Token Collision
+
+
+
+
+
+
+
+
 
 
 
@@ -13307,7 +26691,23 @@ Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.
 
 
 
+
+
+
+
+
+
+
+
 - Scope to `OperatorKind` switches via `TryGetCatalogSwitchKind`
+
+
+
+
+
+
+
+
 
 
 
@@ -13323,7 +26723,23 @@ Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.
 
 
 
+
+
+
+
+
+
+
+
 - Extract token kind via `Tokens.GetMeta(TokenKind.X)` invocation walking
+
+
+
+
+
+
+
+
 
 
 
@@ -13339,7 +26755,23 @@ Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.
 
 
 
+
+
+
+
+
+
+
+
 ## PRECEPT0021 — Tokens Duplicate Text
+
+
+
+
+
+
+
+
 
 
 
@@ -13355,7 +26787,23 @@ Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.
 
 
 
+
+
+
+
+
+
+
+
 - Uses `ResolveStringConstant` which handles nameof, const fields, and string literals
+
+
+
+
+
+
+
+
 
 
 
@@ -13371,7 +26819,23 @@ Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.
 
 
 
+
+
+
+
+
+
+
+
 ## PRECEPT0022 — Operators Inline Token Reference
+
+
+
+
+
+
+
+
 
 
 
@@ -13387,7 +26851,23 @@ Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.
 
 
 
+
+
+
+
+
+
+
+
 - Clean single-purpose analyzer — no false-positive risk from DU subtype checks
+
+
+
+
+
+
+
+
 
 
 
@@ -13403,7 +26883,23 @@ Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.
 
 
 
+
+
+
+
+
+
+
+
 Three sub-rules:
+
+
+
+
+
+
+
+
 
 
 
@@ -13419,7 +26915,23 @@ Three sub-rules:
 
 
 
+
+
+
+
+
+
+
+
 - **0023b:** SingleTokenOp vs MultiTokenOp lead-token collision. Cross-checks single/multi dictionaries post-loop. Correct.
+
+
+
+
+
+
+
+
 
 
 
@@ -13435,7 +26947,23 @@ Three sub-rules:
 
 
 
+
+
+
+
+
+
+
+
 ## CatalogAnalysisHelpers
+
+
+
+
+
+
+
+
 
 
 
@@ -13451,7 +26979,23 @@ Shared infrastructure is well-factored:
 
 
 
+
+
+
+
+
+
+
+
 - `TryGetCatalogSwitchKind` correctly guards scope (method named "GetMeta", in `Precept.Language`, known enum type)
+
+
+
+
+
+
+
+
 
 
 
@@ -13467,7 +27011,23 @@ Shared infrastructure is well-factored:
 
 
 
+
+
+
+
+
+
+
+
 - `UnwrapConversions` handles implicit conversion chains
+
+
+
+
+
+
+
+
 
 
 
@@ -13483,7 +27043,23 @@ Shared infrastructure is well-factored:
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13499,7 +27075,23 @@ Shared infrastructure is well-factored:
 
 
 
+
+
+
+
+
+
+
+
 ## GAP-A: `when` guard on StateEnsure/EventEnsure
+
+
+
+
+
+
+
+
 
 
 
@@ -13515,7 +27107,23 @@ Shared infrastructure is well-factored:
 
 
 
+
+
+
+
+
+
+
+
 - Check if `stashedGuard` exists (pre-ensure guard from outer dispatch)
+
+
+
+
+
+
+
+
 
 
 
@@ -13531,7 +27139,23 @@ Shared infrastructure is well-factored:
 
 
 
+
+
+
+
+
+
+
+
 - Guard comes **after** the condition expression, before `because` — matches spec §2.2
+
+
+
+
+
+
+
+
 
 
 
@@ -13547,7 +27171,23 @@ Shared infrastructure is well-factored:
 
 
 
+
+
+
+
+
+
+
+
 Verified via `ExpressionBoundaryTokens` and the Pratt loop's natural termination on boundary tokens. The parser correctly stops expression parsing when it encounters modifier keywords because they're in `ExpressionBoundaryTokens` via `Constructs.LeadingTokens`. No explicit handling needed — clean by construction.
+
+
+
+
+
+
+
+
 
 
 
@@ -13563,7 +27203,23 @@ Verified via `ExpressionBoundaryTokens` and the Pratt loop's natural termination
 
 
 
+
+
+
+
+
+
+
+
 Two complementary fixes:
+
+
+
+
+
+
+
+
 
 
 
@@ -13579,7 +27235,23 @@ Two complementary fixes:
 
 
 
+
+
+
+
+
+
+
+
 2. `ParseAtom` — `case TokenKind.Min: case TokenKind.Max:` falls through to identifier/function-call handling
+
+
+
+
+
+
+
+
 
 
 
@@ -13595,7 +27267,23 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 ## is/is-not-set, method call, list literal, TypedConstant
+
+
+
+
+
+
+
+
 
 
 
@@ -13611,7 +27299,23 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 - Method call: Detects `LeftParen` following `MemberAccessExpression` at binding power 90. Correct.
+
+
+
+
+
+
+
+
 
 
 
@@ -13627,6 +27331,14 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 - TypedConstant/InterpolatedTypedConstant: Both handled in `ParseAtom` correctly.
 
 
@@ -13635,7 +27347,23 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13651,7 +27379,23 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 ## Members (11 total — correct)
+
+
+
+
+
+
+
+
 
 
 
@@ -13667,7 +27411,23 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 6. MemberAccess, 7. Conditional, 8. FunctionCall, 9. MethodCall, 10. ListLiteral,
+
+
+
+
+
+
+
+
 
 
 
@@ -13683,7 +27443,23 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 ## Metadata Shape
+
+
+
+
+
+
+
+
 
 
 
@@ -13699,7 +27475,23 @@ Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)
 
 
 
+
+
+
+
+
+
+
+
 ## Coverage Tests
+
+
+
+
+
+
+
+
 
 
 
@@ -13715,7 +27507,23 @@ Two test classes provide layered enforcement:
 
 
 
+
+
+
+
+
+
+
+
 - `Tests.Language.ExpressionFormCoverageTests` — Layer 2: count, GetMeta completeness, HoverDocs, IsLeftDenotation, LeadTokens contract
+
+
+
+
+
+
+
+
 
 
 
@@ -13731,7 +27539,23 @@ Two test classes provide layered enforcement:
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13747,7 +27571,23 @@ Two test classes provide layered enforcement:
 
 
 
+
+
+
+
+
+
+
+
 Clean discriminated union:
+
+
+
+
+
+
+
+
 
 
 
@@ -13763,7 +27603,23 @@ Clean discriminated union:
 
 
 
+
+
+
+
+
+
+
+
 - `MultiTokenOp` carries `IReadOnlyList<TokenMeta> Tokens` with `LeadToken => Tokens[0]`
+
+
+
+
+
+
+
+
 
 
 
@@ -13779,7 +27635,23 @@ Clean discriminated union:
 
 
 
+
+
+
+
+
+
+
+
 - `ByTokenSequence` FrozenDictionary indexed by `(TokenKind, TokenKind?, TokenKind?)` — covers MultiTokenOp
+
+
+
+
+
+
+
+
 
 
 
@@ -13795,6 +27667,14 @@ Clean discriminated union:
 
 
 
+
+
+
+
+
+
+
+
 Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multiplication level. This is correct per spec §2.1 — presence checks bind tighter than comparisons but at the same level as multiplicative arithmetic.
 
 
@@ -13803,7 +27683,23 @@ Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multipli
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13819,7 +27715,23 @@ Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multipli
 
 
 
+
+
+
+
+
+
+
+
 - Property added to `TokenMeta` record with `bool IsValidAsMemberName = false` default
+
+
+
+
+
+
+
+
 
 
 
@@ -13835,7 +27747,23 @@ Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multipli
 
 
 
+
+
+
+
+
+
+
+
 - `Parser.KeywordsValidAsMemberName` derived from `Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet()`
+
+
+
+
+
+
+
+
 
 
 
@@ -13851,7 +27779,23 @@ Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multipli
 
 
 
+
+
+
+
+
+
+
+
 - Tests: `TokenMetaMemberNameTests` covers true/false/theory cases
+
+
+
+
+
+
+
+
 
 
 
@@ -13867,7 +27811,23 @@ Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multipli
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13883,7 +27843,23 @@ Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multipli
 
 
 
+
+
+
+
+
+
+
+
 Three partial files with clean responsibility separation:
+
+
+
+
+
+
+
+
 
 
 
@@ -13899,7 +27875,23 @@ Three partial files with clean responsibility separation:
 
 
 
+
+
+
+
+
+
+
+
 - `Parser.Declarations.cs` — construct parsers (state ensure, event ensure, access mode, omit, transition row, outcomes, action statements)
+
+
+
+
+
+
+
+
 
 
 
@@ -13915,6 +27907,14 @@ Three partial files with clean responsibility separation:
 
 
 
+
+
+
+
+
+
+
+
 No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `ParseSession` in `Parser.cs`; the `HandlesCatalogMember` annotations are distributed across `Parser.Expressions.cs` methods. This is correct — the ref partial struct spans files.
 
 
@@ -13923,7 +27923,23 @@ No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `Pa
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13939,7 +27955,23 @@ No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `Pa
 
 
 
+
+
+
+
+
+
+
+
 `docs/language/catalog-system.md` § Exhaustiveness Enforcement Strategies:
+
+
+
+
+
+
+
+
 
 
 
@@ -13955,7 +27987,23 @@ No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `Pa
 
 
 
+
+
+
+
+
+
+
+
 - Decision rule table is clear and actionable
+
+
+
+
+
+
+
+
 
 
 
@@ -13971,6 +28019,14 @@ No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `Pa
 
 
 
+
+
+
+
+
+
+
+
 - Consumer table for current CS8509 sites is accurate (`ConstructKind`, `ActionKind`, etc.)
 
 
@@ -13979,7 +28035,23 @@ No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `Pa
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -13995,7 +28067,23 @@ No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `Pa
 
 
 
+
+
+
+
+
+
+
+
 ## Blockers
+
+
+
+
+
+
+
+
 
 
 
@@ -14011,7 +28099,23 @@ None.
 
 
 
+
+
+
+
+
+
+
+
 ## Guidance
+
+
+
+
+
+
+
+
 
 
 
@@ -14027,7 +28131,23 @@ None.
 
 
 
+
+
+
+
+
+
+
+
 - **G2:** [`src/Precept.Analyzers/CatalogAnalysisHelpers.cs:57-62`] `CatalogEnumNames` is missing `ConstraintKind` and `ProofRequirementKind`. Both have `GetMeta` switches in `Precept.Language`. Currently their switches use discard arms (`_ =>`), so PRECEPT0007 would flag them anyway if they were included. When those catalogs drop the discard arm (expected in Phase 3), they should be added to `CatalogEnumNames` to enable PRECEPT0007 coverage. Track this as a Phase 3 prerequisite.
+
+
+
+
+
+
+
+
 
 
 
@@ -14043,7 +28163,23 @@ None.
 
 
 
+
+
+
+
+
+
+
+
 ## Observations
+
+
+
+
+
+
+
+
 
 
 
@@ -14059,7 +28195,23 @@ None.
 
 
 
+
+
+
+
+
+
+
+
 - **O2:** The `contains` chaining test (Slice 18) correctly validates `NonAssociativeComparison` diagnostic for `a contains b contains c` via the Pratt loop's non-associativity detection in lines 113-126 of `Parser.Expressions.cs`. Binding power 40 is correct per catalog.
+
+
+
+
+
+
+
+
 
 
 
@@ -14075,6 +28227,14 @@ None.
 
 
 
+
+
+
+
+
+
+
+
 - **O4:** `ExpressionFormKind` is enumerated 1–11 (no zero slot). This is consistent with the other catalog enums that use `PRECEPT0018SemanticEnumZeroSlot` to enforce meaningful zero absence.
 
 
@@ -14083,7 +28243,23 @@ None.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -14099,7 +28275,23 @@ None.
 
 
 
+
+
+
+
+
+
+
+
 The annotation bridge architecture is sound, catalog-agnostic, and correctly enforced at `DiagnosticSeverity.Error`. The four new analyzers (PRECEPT0020–0023) cover real invariants that would otherwise manifest as startup crashes. Parser fixes are correct and well-tested. The ExpressionFormKind catalog and OperatorMeta DU are structurally complete. Documentation is accurate. The 3 guidance items are naming clarity and forward-looking hygiene — none block merge.
+
+
+
+
+
+
+
+
 
 
 
@@ -14115,6 +28307,14 @@ This branch is ready to merge to main.
 
 
 
+
+
+
+
+
+
+
+
 ---
 
 
@@ -14123,7 +28323,17 @@ This branch is ready to merge to main.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
 
 # **CRITICAL GAPS**
 
@@ -14133,9 +28343,27 @@ This branch is ready to merge to main.
 
 
 
+
+
+
+
+
+
+
+
 The parser suite is green, but it is **not** comprehensive enough to support type-checker development safely. The biggest holes are the full type-reference surface, full action syntax surface, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), event-arg richness, interpolation, and specific parser diagnostic-code assertions. Right now, too many tests stop at “a slot exists” or “the parser did not crash.” That is not enough. No soup for unanchored parser behavior.
 
+
+
 # TypeChecker B1/B2/B3 Blockers — Fixed
+
+
+
+
+
+
+
+
 
 
 
@@ -14147,11 +28375,23 @@ The parser suite is green, but it is **not** comprehensive enough to support typ
 
 
 
+
+
+
+
 **Date:** 2026-05-08T07:00:00-04:00
 
 
 
+
+
+
+
 **Status:** Complete — all three R3 blockers resolved, tests green
+
+
+
+
 
 
 
@@ -14163,7 +28403,23 @@ The parser suite is green, but it is **not** comprehensive enough to support typ
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -14179,7 +28435,23 @@ The parser suite is green, but it is **not** comprehensive enough to support typ
 
 
 
+
+
+
+
+
+
+
+
 ## B3: MissingExpression D26 gap (5 LOC)
+
+
+
+
+
+
+
+
 
 
 
@@ -14195,7 +28467,23 @@ The parser suite is green, but it is **not** comprehensive enough to support typ
 
 
 
+
+
+
+
+
+
+
+
 No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the closest existing Error-severity TC code.
+
+
+
+
+
+
+
+
 
 
 
@@ -14211,7 +28499,19 @@ No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the
 
 
 
+
+
+
+
+
+
+
+
 `ResolveFieldExpressions()` resolves default and computed expressions on `TypedField` entries:
+
+
+
+
 
 
 
@@ -14219,7 +28519,15 @@ No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the
 
 
 
+
+
+
+
 - Computed expressions from `ComputeExpressionSlot` on the field's `Syntax`
+
+
+
+
 
 
 
@@ -14227,7 +28535,15 @@ No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the
 
 
 
+
+
+
+
 - `FieldScopeMode.PriorFieldsOnly` enforces forward-reference prohibition
+
+
+
+
 
 
 
@@ -14235,7 +28551,19 @@ No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the
 
 
 
+
+
+
+
 - Event arg defaults left as null (DeclaredArg carries only ModifierKind, not values)
+
+
+
+
+
+
+
+
 
 
 
@@ -14251,7 +28579,19 @@ No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the
 
 
 
+
+
+
+
+
+
+
+
 Four new normalization methods following the established `manifest.ByKind` + Resolve + accumulate pattern:
+
+
+
+
 
 
 
@@ -14259,7 +28599,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `PopulateAccessModes()` — state/field reference resolution, Editable→Write / Readonly→Read mapping, optional guard
+
+
+
+
 
 
 
@@ -14267,7 +28615,19 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `PopulateEditDeclarations()` — D24 placeholder using ConstructKind.OmitDeclaration, field targets recorded
+
+
+
+
+
+
+
+
 
 
 
@@ -14283,7 +28643,19 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
+
+
+
+
 - `ParsedConstruct.LeadingTokenKind` — added `TokenKind?` to the positional record (2 parser sites updated) for anchor scope determination
+
+
+
+
 
 
 
@@ -14291,7 +28663,19 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - 17 tests updated to match new diagnostic emission and populated accumulators
+
+
+
+
+
+
+
+
 
 
 
@@ -14307,7 +28691,23 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
+
+
+
+
 ## Validation
+
+
+
+
+
+
+
+
 
 
 
@@ -14319,11 +28719,27 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - Tests: 3342 Precept.Tests + 263 Precept.Analyzers.Tests — all passing
 
 
 
+
+
+
+
 - D26 assert: no fires on any test or sample file
+
+
+
+
+
+
+
+
 
 
 
@@ -14339,7 +28755,19 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
+
+
+
+
 - **Qualifier binding** on TypedField — needs parser-level qualifier slot on field constructs (future work)
+
+
+
+
 
 
 
@@ -14347,9 +28775,23 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - **DiagnosticCode.TypeMismatch reuse** for MissingExpression — Frank may want a dedicated code in the future
 
+
+
 # Precept TextMate Grammar — Authoritative Specification
+
+
+
+
+
+
+
+
 
 
 
@@ -14361,7 +28803,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 **Author:** Frank
+
+
+
+
 
 
 
@@ -14373,7 +28823,19 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
+
+
+
+
 **Source material reviewed:**
+
+
+
+
 
 
 
@@ -14381,7 +28843,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `design/system/semantic-visual-system-notes.md` — supplementary notes
+
+
+
+
 
 
 
@@ -14389,7 +28859,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `design/brand/brand-decisions.md` — brand palette and typography locked direction
+
+
+
+
 
 
 
@@ -14397,7 +28875,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `src/Precept/Language/Tokens.cs` (515 lines) — complete token catalog with TextMateScope assignments
+
+
+
+
 
 
 
@@ -14405,7 +28891,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `src/Precept/Language/Types.cs` — type catalog (37.4 KB)
+
+
+
+
 
 
 
@@ -14413,7 +28907,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `src/Precept/Language/Modifiers.cs` (260 lines) — 29 modifier kinds across 5 DU subtypes
+
+
+
+
 
 
 
@@ -14421,7 +28923,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `src/Precept/Language/Actions.cs` (222 lines) — 15 action kinds
+
+
+
+
 
 
 
@@ -14429,7 +28939,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `src/Precept/Language/Operators.cs` (206 lines) — 21 operator kinds
+
+
+
+
 
 
 
@@ -14437,7 +28955,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `src/Precept/Language/Constructs.cs` (199 lines) — 12 construct kinds
+
+
+
+
 
 
 
@@ -14445,7 +28971,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `src/Precept/Language/FunctionKind.cs` — function enum
+
+
+
+
 
 
 
@@ -14453,7 +28987,15 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - `tools/Precept.GrammarGen/Program.cs` (537 lines) — grammar generator scaffold
+
+
+
+
 
 
 
@@ -14461,7 +29003,19 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
 - All 28 `.precept` sample files in `samples/`
+
+
+
+
+
+
+
+
 
 
 
@@ -14477,7 +29031,23 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
+
+
+
+
+
+
+
+
 ## Executive Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -14493,7 +29063,23 @@ The hand-authored `precept.tmLanguage.json` is **severely incomplete and stale**
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -14509,7 +29095,23 @@ The hand-authored `precept.tmLanguage.json` is **severely incomplete and stale**
 
 
 
+
+
+
+
+
+
+
+
 The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families plus comments. TextMate scopes must enable theme rules to target each family independently. The catalog (`Tokens.cs`) already assigns a `TextMateScope` to every token. This table maps visual system roles to catalog scopes and notes misalignments.
+
+
+
+
+
+
+
+
 
 
 
@@ -14521,7 +29123,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 |---|-------------|------------|------------|--------------------------|-------|
+
+
+
+
 
 
 
@@ -14529,7 +29139,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 2 | Structure · Grammar | `#6366F1` | normal | `keyword.control.precept` | Prepositions and control flow: `in`, `to`, `from`, `on`, `of`, `into`, `when`, `if`, `then`, `else`, `by`, `at`, `for` |
+
+
+
+
 
 
 
@@ -14537,7 +29155,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 4 | Structure · Grammar (outcomes) | `#6366F1` | normal | `keyword.other.outcome.precept` | Outcome keywords: `transition`, `no`, `reject` |
+
+
+
+
 
 
 
@@ -14545,7 +29171,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 6 | Structure · Grammar (quantifiers) | `#6366F1` | normal | `keyword.other.quantifier.precept` | Quantifiers: `all`, `any`, `each` |
+
+
+
+
 
 
 
@@ -14553,7 +29187,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 8 | Structure · Grammar (operators) | `#6366F1` | normal | `keyword.operator.precept`, `keyword.operator.arrow.precept` | Symbol operators (`==`, `!=`, `~=`, `!~`, `>=`, `<=`, `>`, `<`, `=`, `+`, `-`, `*`, `/`, `%`) and arrows (`->`, `<-`) |
+
+
+
+
 
 
 
@@ -14561,7 +29203,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 10 | Structure · Grammar (membership) | `#6366F1` | normal | `keyword.operator.membership.precept` | Membership: `contains`, `is` |
+
+
+
+
 
 
 
@@ -14569,7 +29219,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 12 | Events | `#30B8E8` | normal (italic if constrained — semantic tokens only) | `entity.name.function.event.precept` | Event names in declarations, `on` targets, dot-access prefix |
+
+
+
+
 
 
 
@@ -14577,7 +29235,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 14 | Data · Types | `#9AA8B5` | normal | `storage.type.precept` | All type keywords. Also `storage.modifier.state.precept` for state modifiers (separate from types but same visual family in brand) |
+
+
+
+
 
 
 
@@ -14585,7 +29251,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 16 | Rules · Messages | `#FBBF24` | normal | `string.quoted.double.message.precept` | **ONLY** in `because "msg"` and `reject "msg"` positions. Must be distinguished from regular `string.quoted.double.precept` |
+
+
+
+
 
 
 
@@ -14593,7 +29267,15 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 18 | State modifiers | (brand: same as types) | normal | `storage.modifier.state.precept` | `terminal`, `required`, `irreversible`, `success`, `warning`, `error` |
+
+
+
+
 
 
 
@@ -14601,11 +29283,27 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
 | 20 | Punctuation | `#6366F1` | normal | `punctuation.precept`, `punctuation.separator.comma.precept`, `punctuation.accessor.precept` | `.`, `,`, `(`, `)`, `[`, `]` |
 
 
 
+
+
+
+
 | 21 | Member names | (brand: data names) | normal | `keyword.other.precept` | Special member accessors: `countof`, `peekby` |
+
+
+
+
+
+
+
+
 
 
 
@@ -14621,7 +29319,23 @@ The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families 
 
 
 
+
+
+
+
+
+
+
+
 The brand decisions doc (`brand-decisions.md`) lists specific keywords under "Structure · Semantic" that the catalog assigns to different scope categories:
+
+
+
+
+
+
+
+
 
 
 
@@ -14633,7 +29347,15 @@ The brand decisions doc (`brand-decisions.md`) lists specific keywords under "St
 
 
 
+
+
+
+
 |---------|-----------|--------------|------------|
+
+
+
+
 
 
 
@@ -14641,7 +29363,15 @@ The brand decisions doc (`brand-decisions.md`) lists specific keywords under "St
 
 
 
+
+
+
+
 | `set` | Structure · Semantic (bold) | `storage.type.precept` (dual-use: action AND type) | **Catalog wins.** `set` is context-dependent — TextMate can't distinguish action vs type usage. Semantic tokens handle this. |
+
+
+
+
 
 
 
@@ -14649,7 +29379,15 @@ The brand decisions doc (`brand-decisions.md`) lists specific keywords under "St
 
 
 
+
+
+
+
 | `when` | Structure · Semantic (bold) | `keyword.control.precept` | **Catalog wins.** Control flow keyword. |
+
+
+
+
 
 
 
@@ -14657,7 +29395,19 @@ The brand decisions doc (`brand-decisions.md`) lists specific keywords under "St
 
 
 
+
+
+
+
 | `nullable` | Structure · Grammar | RETIRED | **Remove from brand doc.** Replaced by `optional`. |
+
+
+
+
+
+
+
+
 
 
 
@@ -14673,7 +29423,23 @@ The brand decisions doc (`brand-decisions.md`) lists specific keywords under "St
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -14689,7 +29455,23 @@ The brand decisions doc (`brand-decisions.md`) lists specific keywords under "St
 
 
 
+
+
+
+
+
+
+
+
 Complete enumeration of every token/construct type from the catalog, with canonical TextMateScope.
+
+
+
+
+
+
+
+
 
 
 
@@ -14705,7 +29487,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -14713,7 +29507,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Precept | `precept` | TokenKind.Precept (=1) |
+
+
+
+
 
 
 
@@ -14721,7 +29523,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | State | `state` | TokenKind.State (=3) |
+
+
+
+
 
 
 
@@ -14729,7 +29539,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Rule | `rule` | TokenKind.Rule (=5) |
+
+
+
+
 
 
 
@@ -14737,7 +29555,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | As | `as` | TokenKind.As (=7) |
+
+
+
+
 
 
 
@@ -14745,7 +29571,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Optional | `optional` | TokenKind.Optional (=9) |
+
+
+
+
 
 
 
@@ -14753,7 +29587,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Because | `because` | TokenKind.Because (=11) |
+
+
+
+
 
 
 
@@ -14761,11 +29603,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Ascending | `ascending` | TokenKind.Ascending (=130) |
 
 
 
+
+
+
+
 | Descending | `descending` | TokenKind.Descending (=131) |
+
+
+
+
+
+
+
+
 
 
 
@@ -14781,7 +29639,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -14789,7 +29659,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | In | `in` | TokenKind.In (=13) |
+
+
+
+
 
 
 
@@ -14797,7 +29675,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | From | `from` | TokenKind.From (=15) |
+
+
+
+
 
 
 
@@ -14805,7 +29691,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Of | `of` | TokenKind.Of (=17) |
+
+
+
+
 
 
 
@@ -14813,7 +29707,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | When | `when` | TokenKind.When (=19) |
+
+
+
+
 
 
 
@@ -14821,7 +29723,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Then | `then` | TokenKind.Then (=21) |
+
+
+
+
 
 
 
@@ -14829,7 +29739,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | By | `by` | TokenKind.By (=128) |
+
+
+
+
 
 
 
@@ -14837,7 +29755,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | For | `for` | TokenKind.For (=136) |
+
+
+
+
+
+
+
+
 
 
 
@@ -14853,7 +29783,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -14861,7 +29803,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Add | `add` | TokenKind.Add (=24) |
+
+
+
+
 
 
 
@@ -14869,7 +29819,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Enqueue | `enqueue` | TokenKind.Enqueue (=26) |
+
+
+
+
 
 
 
@@ -14877,7 +29835,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Push | `push` | TokenKind.Push (=28) |
+
+
+
+
 
 
 
@@ -14885,7 +29851,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Clear | `clear` | TokenKind.Clear (=30) |
+
+
+
+
 
 
 
@@ -14893,11 +29867,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Insert | `insert` | TokenKind.Insert (=133) |
 
 
 
+
+
+
+
 | Put | `put` | TokenKind.Put (=134) |
+
+
+
+
+
+
+
+
 
 
 
@@ -14913,7 +29903,23 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 ## 2.4 Keywords — Outcomes (`keyword.other.outcome.precept`)
+
+
+
+
+
+
+
+
 
 
 
@@ -14925,7 +29931,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 |-------|------|--------|
+
+
+
+
 
 
 
@@ -14933,11 +29947,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | No | `no` | TokenKind.No (=32) |
 
 
 
+
+
+
+
 | Reject | `reject` | TokenKind.Reject (=33) |
+
+
+
+
+
+
+
+
 
 
 
@@ -14953,7 +29983,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -14961,7 +30003,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Modify | `modify` | TokenKind.Modify (=34) |
+
+
+
+
 
 
 
@@ -14969,11 +30019,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Editable | `editable` | TokenKind.Editable (=36) |
 
 
 
+
+
+
+
 | Omit | `omit` | TokenKind.Omit (=37) |
+
+
+
+
+
+
+
+
 
 
 
@@ -14989,7 +30055,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -14997,7 +30075,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | And | `and` | TokenKind.And (=38) |
+
+
+
+
 
 
 
@@ -15005,7 +30091,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Not | `not` | TokenKind.Not (=40) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15021,7 +30119,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -15029,11 +30139,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Contains | `contains` | TokenKind.Contains (=41) |
 
 
 
+
+
+
+
 | Is | `is` | TokenKind.Is (=42) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15049,7 +30175,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -15057,7 +30195,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | All | `all` | TokenKind.All (=43) |
+
+
+
+
 
 
 
@@ -15065,7 +30211,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Each | `each` | TokenKind.Each (=135) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15081,7 +30239,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -15089,7 +30259,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Terminal | `terminal` | TokenKind.Terminal (=45) |
+
+
+
+
 
 
 
@@ -15097,7 +30275,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Irreversible | `irreversible` | TokenKind.Irreversible (=47) |
+
+
+
+
 
 
 
@@ -15105,11 +30291,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Warning | `warning` | TokenKind.Warning (=49) |
 
 
 
+
+
+
+
 | Error | `error` | TokenKind.Error (=50) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15125,7 +30327,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Source |
+
+
+
+
 
 
 
@@ -15133,7 +30347,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Nonnegative | `nonnegative` | TokenKind.Nonnegative (=51) |
+
+
+
+
 
 
 
@@ -15141,7 +30363,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Nonzero | `nonzero` | TokenKind.Nonzero (=53) |
+
+
+
+
 
 
 
@@ -15149,7 +30379,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Min | `min` | TokenKind.Min (=55) |
+
+
+
+
 
 
 
@@ -15157,7 +30395,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Minlength | `minlength` | TokenKind.Minlength (=57) |
+
+
+
+
 
 
 
@@ -15165,7 +30411,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Mincount | `mincount` | TokenKind.Mincount (=59) |
+
+
+
+
 
 
 
@@ -15173,11 +30427,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Maxplaces | `maxplaces` | TokenKind.Maxplaces (=61) |
 
 
 
+
+
+
+
 | Ordered | `ordered` | TokenKind.Ordered (=62) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15193,7 +30463,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Family | Source |
+
+
+
+
 
 
 
@@ -15201,7 +30483,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | StringType | `string` | Scalar | TokenKind.StringType (=63) |
+
+
+
+
 
 
 
@@ -15209,7 +30499,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | IntegerType | `integer` | Scalar | TokenKind.IntegerType (=65) |
+
+
+
+
 
 
 
@@ -15217,7 +30515,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | NumberType | `number` | Scalar | TokenKind.NumberType (=67) |
+
+
+
+
 
 
 
@@ -15225,7 +30531,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Set | `set` | Collection | TokenKind.Set (=23) — dual-use |
+
+
+
+
 
 
 
@@ -15233,7 +30547,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | StackType | `stack` | Collection | TokenKind.StackType (=71) |
+
+
+
+
 
 
 
@@ -15241,7 +30563,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | ListType | `list` | Collection | TokenKind.ListType (=125) |
+
+
+
+
 
 
 
@@ -15249,7 +30579,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | LookupType | `lookup` | Collection | TokenKind.LookupType (=127) |
+
+
+
+
 
 
 
@@ -15257,7 +30595,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | TimeType | `time` | Temporal | TokenKind.TimeType (=73) |
+
+
+
+
 
 
 
@@ -15265,7 +30611,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | DurationType | `duration` | Temporal | TokenKind.DurationType (=75) |
+
+
+
+
 
 
 
@@ -15273,7 +30627,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | TimezoneType | `timezone` | Temporal | TokenKind.TimezoneType (=77) |
+
+
+
+
 
 
 
@@ -15281,7 +30643,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | DateTimeType | `datetime` | Temporal | TokenKind.DateTimeType (=79) |
+
+
+
+
 
 
 
@@ -15289,7 +30659,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | CurrencyType | `currency` | Business | TokenKind.CurrencyType (=81) |
+
+
+
+
 
 
 
@@ -15297,7 +30675,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | UnitOfMeasureType | `unitofmeasure` | Business | TokenKind.UnitOfMeasureType (=83) |
+
+
+
+
 
 
 
@@ -15305,11 +30691,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | PriceType | `price` | Business | TokenKind.PriceType (=85) |
 
 
 
+
+
+
+
 | ExchangeRateType | `exchangerate` | Business | TokenKind.ExchangeRateType (=86) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15325,7 +30727,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Scope | Description |
+
+
+
+
 
 
 
@@ -15333,7 +30747,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | True (`true`) | `constant.language.boolean.precept` | Boolean literal |
+
+
+
+
 
 
 
@@ -15341,7 +30763,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | NumberLiteral | `constant.numeric.precept` | Integer and decimal numbers |
+
+
+
+
 
 
 
@@ -15349,7 +30779,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | TypedConstant | `string.quoted.single.precept` | Single-quoted typed constants (`'USD'`, `'kg'`) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15365,7 +30807,23 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 ## 2.13 Symbol Operators (`keyword.operator.precept`)
+
+
+
+
+
+
+
+
 
 
 
@@ -15377,7 +30835,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 |-------|------|-------------|
+
+
+
+
 
 
 
@@ -15385,7 +30851,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | NotEquals | `!=` | Inequality |
+
+
+
+
 
 
 
@@ -15393,7 +30867,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | CaseInsensitiveNotEquals | `!~` | Case-insensitive not-equals |
+
+
+
+
 
 
 
@@ -15401,7 +30883,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | GreaterThanOrEqual | `>=` | Comparison |
+
+
+
+
 
 
 
@@ -15409,7 +30899,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | GreaterThan | `>` | Comparison |
+
+
+
+
 
 
 
@@ -15417,7 +30915,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Assign | `=` | Assignment |
+
+
+
+
 
 
 
@@ -15425,7 +30931,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Minus | `-` | Subtraction/negation |
+
+
+
+
 
 
 
@@ -15433,11 +30947,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Slash | `/` | Division |
 
 
 
+
+
+
+
 | Percent | `%` | Modulo |
+
+
+
+
+
+
+
+
 
 
 
@@ -15453,7 +30983,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Description |
+
+
+
+
 
 
 
@@ -15461,11 +31003,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Arrow | `->` | Action chain / outcome separator |
 
 
 
+
+
+
+
 | BackArrow | `<-` | Computed field derivation |
+
+
+
+
+
+
+
+
 
 
 
@@ -15481,7 +31039,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Description |
+
+
+
+
 
 
 
@@ -15489,7 +31059,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Dot | `.` | Member access |
+
+
+
+
 
 
 
@@ -15497,7 +31075,15 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | LeftParen | `(` | Open paren |
+
+
+
+
 
 
 
@@ -15505,11 +31091,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | LeftBracket | `[` | Open bracket |
 
 
 
+
+
+
+
 | RightBracket | `]` | Close bracket |
+
+
+
+
+
+
+
+
 
 
 
@@ -15525,7 +31127,19 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 | Token | Text | Description |
+
+
+
+
 
 
 
@@ -15533,11 +31147,27 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
 | Countof | `countof` | Bag element count accessor |
 
 
 
+
+
+
+
 | Peekby | `peekby` | Priority queue ordering-key peek |
+
+
+
+
+
+
+
+
 
 
 
@@ -15553,7 +31183,23 @@ Complete enumeration of every token/construct type from the catalog, with canoni
 
 
 
+
+
+
+
+
+
+
+
 Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer keywords. In TextMate, they match as generic identifiers unless a function-call pattern highlights them. The grammar SHOULD have a pattern for known function names followed by `(`.
+
+
+
+
+
+
+
+
 
 
 
@@ -15565,7 +31211,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 |----------|------|
+
+
+
+
 
 
 
@@ -15573,7 +31227,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Max | `max` |
+
+
+
+
 
 
 
@@ -15581,7 +31243,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Clamp | `clamp` |
+
+
+
+
 
 
 
@@ -15589,7 +31259,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Ceil | `ceil` |
+
+
+
+
 
 
 
@@ -15597,7 +31275,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Round | `round` |
+
+
+
+
 
 
 
@@ -15605,7 +31291,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Pow | `pow` |
+
+
+
+
 
 
 
@@ -15613,7 +31307,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Trim | `trim` |
+
+
+
+
 
 
 
@@ -15621,7 +31323,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | EndsWith | `endsWith` |
+
+
+
+
 
 
 
@@ -15629,7 +31339,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | ToUpper | `toUpper` |
+
+
+
+
 
 
 
@@ -15637,7 +31355,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Right | `right` |
+
+
+
+
 
 
 
@@ -15645,7 +31371,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | Now | `now` |
+
+
+
+
 
 
 
@@ -15653,7 +31387,19 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | ~endsWith | `~endsWith` (CI variant) |
+
+
+
+
+
+
+
+
 
 
 
@@ -15669,7 +31415,19 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 | # | ConstructKind | Leading Token(s) | Disambiguation | Example |
+
+
+
+
 
 
 
@@ -15677,7 +31435,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | 1 | PreceptHeader | `precept` | — | `precept LoanApplication` |
+
+
+
+
 
 
 
@@ -15685,7 +31451,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | 3 | StateDeclaration | `state` | — | `state Draft initial, Submitted, Approved terminal success` |
+
+
+
+
 
 
 
@@ -15693,7 +31467,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | 5 | RuleDeclaration | `rule` | — | `rule amount > 0 because "..."` |
+
+
+
+
 
 
 
@@ -15701,7 +31483,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | 7 | StateEnsure | `in`/`to`/`from` + `ensure` | Disambiguated by `ensure` | `in Approved ensure amount > 0 because "..."` |
+
+
+
+
 
 
 
@@ -15709,7 +31499,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | 9 | OmitDeclaration | `in` + `omit` | Disambiguated by `omit` | `in Draft omit InternalNotes` |
+
+
+
+
 
 
 
@@ -15717,7 +31515,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | 11 | EventEnsure | `on` + `ensure` | Disambiguated by `ensure` | `on Submit ensure Amount > 0 because "..."` |
+
+
+
+
 
 
 
@@ -15729,7 +31535,23 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -15745,7 +31567,23 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 ## 3.1 Coverage Gap Table
+
+
+
+
+
+
+
+
 
 
 
@@ -15757,7 +31595,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 |---|---------------------------|:---:|------------------|-------------|
+
+
+
+
 
 
 
@@ -15765,7 +31611,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G2 | `ensure` keyword | ❌ NO | — | Missing entirely. Used in StateEnsure, EventEnsure constructs. |
+
+
+
+
 
 
 
@@ -15773,7 +31627,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G4 | `writable` keyword | ❌ NO | — | Missing. New field modifier (B4). |
+
+
+
+
 
 
 
@@ -15781,7 +31643,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G6 | `readonly` keyword | ❌ NO | — | Missing. Access mode adjective (B4). |
+
+
+
+
 
 
 
@@ -15789,7 +31659,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G8 | `omit` keyword (construct) | ❌ NO | — | Missing. Omit declaration construct. |
+
+
+
+
 
 
 
@@ -15797,7 +31675,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G10 | Type keywords: `integer`, `decimal`, `choice` | ❌ NO | — | L373-377 only has `string\|number\|boolean\|set\|queue\|stack`. |
+
+
+
+
 
 
 
@@ -15805,7 +31691,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G12 | Business-domain types (7): `money` through `exchangerate` | ❌ NO | — | All 7 business types missing. |
+
+
+
+
 
 
 
@@ -15813,7 +31707,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G14 | Constraint keywords (12): `nonnegative` through `ordered` | ❌ NO | — | None present in grammar. |
+
+
+
+
 
 
 
@@ -15821,7 +31723,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G16 | Quantifier `each` | ❌ NO | — | Missing. |
+
+
+
+
 
 
 
@@ -15829,7 +31739,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G18 | Control `then` | ❌ NO | — | Missing from L358 (has `if`/`else` but not `then`). |
+
+
+
+
 
 
 
@@ -15837,7 +31755,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G20 | Operators: `~=`, `!~`, `~` | ❌ NO | — | Case-insensitive operators missing from L413-429. |
+
+
+
+
 
 
 
@@ -15845,7 +31771,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G22 | Parenthesized event args | ❌ NO | — | `event Name(Arg as type)` syntax not matched. Grammar uses retired `with` syntax (L148-188). |
+
+
+
+
 
 
 
@@ -15853,7 +31787,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G24 | StateEnsure construct | ❌ NO | — | No pattern for `in/to/from State ensure Expr because "msg"`. |
+
+
+
+
 
 
 
@@ -15861,7 +31803,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G26 | AccessMode construct | ❌ NO | — | No pattern for `in State modify Field editable`. |
+
+
+
+
 
 
 
@@ -15869,7 +31819,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G28 | StateAction construct | ❌ NO | — | No pattern for `to/from State -> action chain`. |
+
+
+
+
 
 
 
@@ -15877,7 +31835,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G30 | Computed field syntax | ❌ NO | — | `field X as type <- expr` not specifically highlighted. `<-` is in `arrowOperator` but no construct pattern. |
+
+
+
+
 
 
 
@@ -15885,7 +31851,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G32 | Parentheses/brackets | Partial | `punctuation.precept` | Parentheses exist in code but no explicit grammar pattern matches `(` or `)`. |
+
+
+
+
 
 
 
@@ -15893,11 +31867,27 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | G34 | Ascending/descending | ❌ NO | — | Sort order modifiers missing. |
 
 
 
+
+
+
+
 | G35 | `is set` / `is not set` operators | ❌ NO | — | Multi-token presence operators not highlighted. |
+
+
+
+
+
+
+
+
 
 
 
@@ -15913,7 +31903,19 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 | # | Pattern | Line | Issue |
+
+
+
+
 
 
 
@@ -15921,7 +31923,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | S1 | `declarationKeywords` → `nullable` | L366 | STALE. Should be `optional`. `nullable` is not in TokenKind. |
+
+
+
+
 
 
 
@@ -15929,7 +31939,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | S3 | `declarationKeywords` → `with` | L366 | STALE. `with` is not in TokenKind. Retired event-arg syntax. |
+
+
+
+
 
 
 
@@ -15937,7 +31955,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | S5 | `booleanNull` → `null` | L436 | STALE. `null` is not a keyword in the token catalog. Precept uses `is set`/`is not set`. |
+
+
+
+
 
 
 
@@ -15945,7 +31971,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | S7 | `invariantStatement` | L276-286 | STALE. Uses `invariant` keyword. Should be `rule`. |
+
+
+
+
 
 
 
@@ -15953,11 +31987,27 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | S9 | `controlKeywords` mix | L356-361 | INCORRECT. Mixes declaration keywords (`precept`, `state`, `event`) with control flow (`if`, `when`). Should use catalog-derived scope groups. |
 
 
 
+
+
+
+
 | S10 | `actionKeywords` mix | L380-385 | INCORRECT. Mixes actions (`set`, `add`), prepositions (`into`), membership (`contains`), and logical operators (`and`, `or`, `not`) into one scope. |
+
+
+
+
+
+
+
+
 
 
 
@@ -15973,7 +32023,19 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 | # | Token | Grammar Scope | Catalog Scope | Visual System Role |
+
+
+
+
 
 
 
@@ -15981,7 +32043,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E1 | `precept` | `keyword.control.precept` (L359) | `keyword.declaration.precept` | Structure · Semantic |
+
+
+
+
 
 
 
@@ -15989,7 +32059,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E3 | `event` | `keyword.control.precept` (L359) | `keyword.declaration.precept` | Structure · Semantic |
+
+
+
+
 
 
 
@@ -15997,7 +32075,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E5 | `as` | `keyword.other.precept` (L366) | `keyword.declaration.precept` | Structure · Semantic |
+
+
+
+
 
 
 
@@ -16005,7 +32091,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E7 | `default` | `keyword.other.precept` (L366) | `keyword.declaration.precept` | Structure · Semantic |
+
+
+
+
 
 
 
@@ -16013,7 +32107,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E9 | `contains` | `keyword.other.precept` (L383) | `keyword.operator.membership.precept` | Membership |
+
+
+
+
 
 
 
@@ -16021,7 +32123,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E11 | `all`, `any` | `keyword.control.precept` (L359) | `keyword.other.quantifier.precept` | Quantifier |
+
+
+
+
 
 
 
@@ -16029,7 +32139,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E13 | `set` (action) | `keyword.other.precept` (L383) | `storage.type.precept` | Dual-use |
+
+
+
+
 
 
 
@@ -16037,11 +32155,27 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | E15 | `reject` | `keyword.other.precept` (L394/L68) | `keyword.other.outcome.precept` | Outcome |
 
 
 
+
+
+
+
 | E16 | `edit` | `keyword.other.precept` (L367) | Not a TokenKind! | `edit` appears in root-edit pattern but is not in the token catalog. The construct is `RuleDeclaration`, not `edit`. Actually, `edit` is used for `rootEditDeclaration` — but the TokenKind enum doesn't have an Edit token. Checking... `edit` may be a stale surface concept. The Constructs catalog does not have a root-level `edit` construct. This needs verification. |
+
+
+
+
+
+
+
+
 
 
 
@@ -16057,7 +32191,23 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -16073,7 +32223,23 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 ## 4.1 Generator Strengths
+
+
+
+
+
+
+
+
 
 
 
@@ -16085,11 +32251,27 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 2. **Typed constants** (L134-146): Handles single-quoted `'...'` strings. Hand-authored grammar doesn't. ✓
 
 
 
+
+
+
+
 3. **Collection member access** (L453-470): Includes `countof` and `peekby`. ✓
+
+
+
+
+
+
+
+
 
 
 
@@ -16105,7 +32287,19 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 | # | Language Construct / Feature | Generator Pattern? | Correct Scope? | Gap |
+
+
+
+
 
 
 
@@ -16113,7 +32307,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG1 | Message strings (`because "msg"`, `reject "msg"`) | ❌ NO | — | **Critical.** Visual system reserves gold for message payloads. Without this, all strings get `string.quoted.double.precept` — no visual interrupt for rules. |
+
+
+
+
 
 
 
@@ -16121,7 +32323,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG3 | State modifiers beyond `initial` | ❌ NO | — | `stateDeclaration` (L180-215) only matches `initial`. Missing: `terminal`, `required`, `irreversible`, `success`, `warning`, `error`. These ARE emitted as catalog keywords under `storage.modifier.state.precept`, but the structural pattern doesn't recognize them in state declaration context. |
+
+
+
+
 
 
 
@@ -16129,7 +32339,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG5 | StateEnsure constructs | ❌ NO | — | No `in/to/from State ensure Expr because "msg"` pattern. |
+
+
+
+
 
 
 
@@ -16137,7 +32355,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG7 | AccessMode construct | ❌ NO | — | No `in State modify Field editable/readonly` pattern. |
+
+
+
+
 
 
 
@@ -16145,7 +32371,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG9 | StateAction construct | ❌ NO | — | No `to/from State -> action chain` pattern. |
+
+
+
+
 
 
 
@@ -16153,7 +32387,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG11 | Computed field declaration | ❌ NO | — | No `field X as type <- expr` structural pattern. |
+
+
+
+
 
 
 
@@ -16161,7 +32403,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG13 | Choice type with options | ❌ NO | — | `choice of string("a","b","c")` not matched. |
+
+
+
+
 
 
 
@@ -16169,7 +32419,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG15 | `no transition` compound keyword | ❌ NO | — | Two-word outcome not specially highlighted. The individual words are catalog-derived, but the compound meaning is lost. |
+
+
+
+
 
 
 
@@ -16177,7 +32435,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG17 | `ScopeToRepositoryKey` naming | — | — | Appends "Keywords" to scope, producing confusing repo keys like `keyword.declaration.preceptKeywords`. Should use descriptive names (e.g., `declarationKeywords`). |
+
+
+
+
 
 
 
@@ -16185,7 +32451,15 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
 | GG19 | `fieldCollectionDeclaration` scope error | — | ❌ Wrong | L296: Uses `keyword.declaration.precept` for `field` keyword but the repo key in catalog patterns uses the same scope. Creates conflict with `keyword.declaration.preceptKeywords` repo entry — both claim `keyword.declaration.precept`. |
+
+
+
+
 
 
 
@@ -16197,7 +32471,23 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -16213,7 +32503,23 @@ Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer k
 
 
 
+
+
+
+
+
+
+
+
 ## Spec Section 1: Scope Vocabulary
+
+
+
+
+
+
+
+
 
 
 
@@ -16229,7 +32535,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 | # | TextMate Scope | Semantic Meaning | Visual System Role | Brand Color |
+
+
+
+
 
 
 
@@ -16237,7 +32555,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S1 | `comment.line.number-sign.precept` | Line comment starting with `#` | Comments | `#9096A6` italic |
+
+
+
+
 
 
 
@@ -16245,7 +32571,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S3 | `keyword.control.precept` | Prepositions and control flow | Structure · Grammar | `#6366F1` normal |
+
+
+
+
 
 
 
@@ -16253,7 +32587,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S5 | `keyword.other.outcome.precept` | Transition, rejection, no-transition outcomes | Structure · Grammar | `#6366F1` normal |
+
+
+
+
 
 
 
@@ -16261,7 +32603,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S7 | `keyword.other.quantifier.precept` | Universal/existential quantifiers | Structure · Grammar | `#6366F1` normal |
+
+
+
+
 
 
 
@@ -16269,7 +32619,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S9 | `keyword.operator.logical.precept` | `and`, `or`, `not` | Structure · Grammar | `#6366F1` normal |
+
+
+
+
 
 
 
@@ -16277,7 +32635,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S11 | `keyword.operator.precept` | Symbol operators (`==`, `!=`, `+`, `-`, etc.) | Structure · Grammar | `#6366F1` normal |
+
+
+
+
 
 
 
@@ -16285,7 +32651,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S13 | `storage.type.precept` | Type keywords (all scalar, temporal, business, collection types) | Data · Types | `#9AA8B5` normal |
+
+
+
+
 
 
 
@@ -16293,7 +32667,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S15 | `entity.name.type.state.precept` | State names | States | `#A898F5` normal |
+
+
+
+
 
 
 
@@ -16301,7 +32683,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S17 | `entity.name.precept.message.precept` | Precept name (in header) | Identity | `#A898F5` normal |
+
+
+
+
 
 
 
@@ -16309,7 +32699,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S19 | `variable.parameter.precept` | Event argument names (in declarations) | Data · Names | `#B0BEC5` normal |
+
+
+
+
 
 
 
@@ -16317,7 +32715,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S21 | `variable.other.precept` | Catch-all identifier reference | Data · Names | `#B0BEC5` normal |
+
+
+
+
 
 
 
@@ -16325,7 +32731,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S23 | `constant.language.boolean.precept` | `true`, `false` | Data · Values | `#84929F` normal |
+
+
+
+
 
 
 
@@ -16333,7 +32747,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S25 | `string.quoted.double.message.precept` | Message strings in `because`/`reject` | Rules · Messages | `#FBBF24` normal |
+
+
+
+
 
 
 
@@ -16341,7 +32763,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S27 | `constant.character.escape.precept` | Escape sequences in strings | Data · Values | `#84929F` normal |
+
+
+
+
 
 
 
@@ -16349,7 +32779,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S29 | `punctuation.separator.comma.precept` | Comma separator (in lists) | Structure · Grammar | `#6366F1` normal |
+
+
+
+
 
 
 
@@ -16357,7 +32795,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S31 | `keyword.other.precept` | Special member names (`countof`, `peekby`) | Data · Names | `#B0BEC5` normal |
+
+
+
+
 
 
 
@@ -16365,7 +32811,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S33 | `meta.declaration.precept.precept` | Precept header construct (meta) | — | — |
+
+
+
+
 
 
 
@@ -16373,7 +32827,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S35 | `meta.declaration.event.precept` | Event declaration construct (meta) | — | — |
+
+
+
+
 
 
 
@@ -16381,7 +32843,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S37 | `meta.transition.header.precept` | Transition row header (meta) | — | — |
+
+
+
+
 
 
 
@@ -16389,7 +32859,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S39 | `meta.ensure.event.precept` | Event ensure construct (meta) | — | — |
+
+
+
+
 
 
 
@@ -16397,7 +32875,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S41 | `meta.omit.precept` | Omit declaration construct (meta) | — | — |
+
+
+
+
 
 
 
@@ -16405,7 +32891,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S43 | `meta.handler.event.precept` | Event handler construct (meta) | — | — |
+
+
+
+
 
 
 
@@ -16413,7 +32907,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S45 | `meta.message.precept` | Message string context (meta) | — | — |
+
+
+
+
 
 
 
@@ -16421,7 +32923,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S47 | `meta.transition.target.precept` | Transition target (meta) | — | — |
+
+
+
+
 
 
 
@@ -16429,7 +32939,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 | S49 | `meta.collection-member.precept` | Collection.property access (meta) | — | — |
+
+
+
+
+
+
+
+
 
 
 
@@ -16445,7 +32967,23 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 ## 2.1 Comment
+
+
+
+
+
+
+
+
 
 
 
@@ -16457,7 +32995,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Type:** `match`
+
+
+
+
 
 
 
@@ -16465,11 +33011,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Regex:** `#.*$`
 
 
 
+
+
+
+
 - **Covers:** Line comments
+
+
+
+
+
+
+
+
 
 
 
@@ -16485,7 +33047,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `messageStrings`
+
+
+
+
 
 
 
@@ -16493,7 +33067,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** captures `keyword.declaration.precept` for keyword, `string.quoted.double.message.precept` for message
+
+
+
+
 
 
 
@@ -16501,7 +33083,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Regex pattern 2:** `\b(reject)(\s+)("(?:\\.|[^"\\])*")`
+
+
+
+
 
 
 
@@ -16509,11 +33099,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Priority:** MUST precede generic `strings` pattern to prevent message strings from being consumed as regular strings
 
 
 
+
+
+
+
 - **Visual system:** This is the **only** pattern that produces `string.quoted.double.message.precept` — the gold visual interrupt
+
+
+
+
+
+
+
+
 
 
 
@@ -16529,7 +33135,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `strings`
+
+
+
+
 
 
 
@@ -16537,7 +33155,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `string.quoted.double.precept`
+
+
+
+
 
 
 
@@ -16545,11 +33171,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Inner pattern:** `constant.character.escape.precept` for `\\.`
 
 
 
+
+
+
+
 - **Covers:** All non-message double-quoted strings
+
+
+
+
+
+
+
+
 
 
 
@@ -16565,7 +33207,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `typedConstants`
+
+
+
+
 
 
 
@@ -16573,7 +33227,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `string.quoted.single.precept`
+
+
+
+
 
 
 
@@ -16581,7 +33243,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** Single-quoted typed constants (`'USD'`, `'kg'`, `'2026-01-15'`)
+
+
+
+
+
+
+
+
 
 
 
@@ -16597,7 +33271,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `preceptHeader`
+
+
+
+
 
 
 
@@ -16605,7 +33291,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.declaration.precept.precept`
+
+
+
+
 
 
 
@@ -16613,11 +33307,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:** `2` → `keyword.declaration.precept`, `4` → `entity.name.precept.message.precept`
 
 
 
+
+
+
+
 - **Covers:** `precept LoanApplication`
+
+
+
+
+
+
+
+
 
 
 
@@ -16633,7 +33343,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `stateDeclaration`
+
+
+
+
 
 
 
@@ -16641,7 +33363,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.declaration.state.precept`
+
+
+
+
 
 
 
@@ -16649,7 +33379,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:** `2` → `keyword.declaration.precept`, `4` → sub-patterns:
+
+
+
+
 
 
 
@@ -16657,7 +33395,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - State names: `\b[A-Za-z_][A-Za-z0-9_]*\b` → `entity.name.type.state.precept`
+
+
+
+
 
 
 
@@ -16665,11 +33411,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `state Draft initial, Submitted, Approved terminal success`
 
 
 
+
+
+
+
 - **Critical change from current:** Must recognize ALL 7 state modifiers, not just `initial`
+
+
+
+
+
+
+
+
 
 
 
@@ -16685,7 +33447,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `eventDeclaration`
+
+
+
+
 
 
 
@@ -16693,7 +33467,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.declaration.event.precept`
+
+
+
+
 
 
 
@@ -16701,7 +33483,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -16709,7 +33499,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → sub-patterns for event names (`entity.name.function.event.precept`) and commas
+
+
+
+
 
 
 
@@ -16717,7 +33515,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
     - `initial` keyword → `keyword.declaration.precept`
+
+
+
+
 
 
 
@@ -16725,7 +33531,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
     - `as` keyword → `keyword.declaration.precept`
+
+
+
+
 
 
 
@@ -16733,7 +33547,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
     - Constraint keywords → include `#constraintKeywords`
+
+
+
+
 
 
 
@@ -16741,7 +33563,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
     - Commas → `punctuation.separator.comma.precept`
+
+
+
+
 
 
 
@@ -16749,11 +33579,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `event Submit(Applicant as string notempty, Amount as number)`
 
 
 
+
+
+
+
 - **Critical change:** Replaces stale `eventWithArgsDeclaration` (used `with` syntax)
+
+
+
+
+
+
+
+
 
 
 
@@ -16769,7 +33615,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `fieldScalarDeclaration`
+
+
+
+
 
 
 
@@ -16777,7 +33635,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.field-declaration.precept`
+
+
+
+
 
 
 
@@ -16785,7 +33651,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -16793,7 +33667,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → field names (`variable.other.field.precept`) + commas
+
+
+
+
 
 
 
@@ -16801,7 +33683,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `8` → `storage.type.precept`
+
+
+
+
 
 
 
@@ -16809,11 +33699,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** All scalar field declarations including temporal and business-domain types
 
 
 
+
+
+
+
 - **Note:** Type name list MUST be derived from the catalog (`Tokens.All` where category is `Type` and text is not null)
+
+
+
+
+
+
+
+
 
 
 
@@ -16829,7 +33735,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `fieldCollectionDeclaration`
+
+
+
+
 
 
 
@@ -16837,7 +33755,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.field-declaration.precept`
+
+
+
+
 
 
 
@@ -16845,7 +33771,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -16853,7 +33787,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → field names + commas
+
+
+
+
 
 
 
@@ -16861,7 +33803,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `8` → `storage.type.precept` (collection type)
+
+
+
+
 
 
 
@@ -16869,7 +33819,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `12` → `storage.type.precept` (inner type, with optional `~` prefix)
+
+
+
+
 
 
 
@@ -16877,7 +33835,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `field Tags as set of string`, `field Items as bag of ~string`
+
+
+
+
+
+
+
+
 
 
 
@@ -16893,7 +33863,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `computedFieldDeclaration`
+
+
+
+
 
 
 
@@ -16901,7 +33883,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.computed-field.precept`
+
+
+
+
 
 
 
@@ -16909,11 +33899,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Note:** This is hard to capture in a single regex because the `<-` can appear after optional modifiers. Recommend a separate pattern that matches `<-` preceded by field context, or handle via the existing field declaration patterns plus the arrow operator pattern.
 
 
 
+
+
+
+
 - **Alternative approach:** The `<-` operator is already in the catalog. The constraint keywords and type keywords are already catalog-derived. A computed field declaration is just a field declaration that happens to contain `<-`. The structural pattern can be the same as `fieldScalarDeclaration` if the tail sub-patterns include the `<-` operator and expression patterns.
+
+
+
+
+
+
+
+
 
 
 
@@ -16929,7 +33935,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `rootEditDeclaration`
+
+
+
+
 
 
 
@@ -16937,11 +33955,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.declaration.edit.root.precept`
 
 
 
+
+
+
+
 **Status:** **NEEDS VERIFICATION.** The `edit` keyword is not in the `TokenKind` enum. No sample file uses root-level `edit`. This pattern may be stale. If confirmed stale, remove. If still valid, add `edit` to TokenKind.
+
+
+
+
+
+
+
+
 
 
 
@@ -16957,7 +33991,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `fromOnHeader`
+
+
+
+
 
 
 
@@ -16965,7 +34011,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.transition.header.precept`
+
+
+
+
 
 
 
@@ -16973,7 +34027,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -16981,7 +34043,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → `entity.name.type.state.precept` (source state(s)) — `any` should get `keyword.other.quantifier.precept`
+
+
+
+
 
 
 
@@ -16989,7 +34059,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `8` → `entity.name.function.event.precept` (event name)
+
+
+
+
 
 
 
@@ -16997,7 +34075,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Note:** `any` in state position should get quantifier scope, not state scope. Needs sub-pattern.
+
+
+
+
+
+
+
+
 
 
 
@@ -17013,7 +34103,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `stateEnsure`
+
+
+
+
 
 
 
@@ -17021,7 +34123,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.ensure.state.precept`
+
+
+
+
 
 
 
@@ -17029,7 +34139,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17037,7 +34155,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → `entity.name.type.state.precept` (state name) — `any` → `keyword.other.quantifier.precept`
+
+
+
+
 
 
 
@@ -17045,7 +34171,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `in Approved ensure amount > 0 because "..."`
+
+
+
+
+
+
+
+
 
 
 
@@ -17061,7 +34199,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `eventEnsure`
+
+
+
+
 
 
 
@@ -17069,7 +34219,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.ensure.event.precept`
+
+
+
+
 
 
 
@@ -17077,7 +34235,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17085,7 +34251,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → `entity.name.function.event.precept` (event name)
+
+
+
+
 
 
 
@@ -17093,7 +34267,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `on Submit ensure Amount > 0 because "..."`
+
+
+
+
+
+
+
+
 
 
 
@@ -17109,7 +34295,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `accessMode`
+
+
+
+
 
 
 
@@ -17117,7 +34315,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.access-mode.precept`
+
+
+
+
 
 
 
@@ -17125,7 +34331,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17133,7 +34347,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → `entity.name.type.state.precept` (state name)
+
+
+
+
 
 
 
@@ -17141,7 +34363,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `8` → `variable.other.field.precept` (field names) or `keyword.other.quantifier.precept` (`all`)
+
+
+
+
 
 
 
@@ -17149,7 +34379,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `in Draft modify Amount editable`, `in UnderReview modify AdjusterName editable when not FraudFlag`
+
+
+
+
+
+
+
+
 
 
 
@@ -17165,7 +34407,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `omitDeclaration`
+
+
+
+
 
 
 
@@ -17173,7 +34427,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.omit.precept`
+
+
+
+
 
 
 
@@ -17181,7 +34443,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17189,7 +34459,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → `entity.name.type.state.precept`
+
+
+
+
 
 
 
@@ -17197,11 +34475,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `8` → `variable.other.field.precept`
 
 
 
+
+
+
+
 - **Covers:** `in Draft omit InternalNotes`
+
+
+
+
+
+
+
+
 
 
 
@@ -17217,7 +34511,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `stateAction`
+
+
+
+
 
 
 
@@ -17225,7 +34531,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.action.state.precept`
+
+
+
+
 
 
 
@@ -17233,7 +34547,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17241,7 +34563,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → `entity.name.type.state.precept` (state name)
+
+
+
+
 
 
 
@@ -17249,11 +34579,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `to Confirmed -> set PaymentReceived = true`
 
 
 
+
+
+
+
 - **Note:** Must precede `stateEnsure` in pattern order since both start with `to`/`from`. Disambiguated by `->` vs `ensure`.
+
+
+
+
+
+
+
+
 
 
 
@@ -17269,7 +34615,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `eventHandler`
+
+
+
+
 
 
 
@@ -17277,7 +34635,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.handler.event.precept`
+
+
+
+
 
 
 
@@ -17285,7 +34651,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17293,7 +34667,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `4` → `entity.name.function.event.precept` (event name)
+
+
+
+
 
 
 
@@ -17301,11 +34683,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `on UpdateName -> set name = newName` (stateless precepts)
 
 
 
+
+
+
+
 - **Note:** Must precede `eventEnsure` in pattern order since both start with `on`.
+
+
+
+
+
+
+
+
 
 
 
@@ -17321,7 +34719,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `ruleDeclaration`
+
+
+
+
 
 
 
@@ -17329,7 +34739,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.rule.precept`
+
+
+
+
 
 
 
@@ -17337,7 +34755,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:** `2` → `keyword.declaration.precept`
+
+
+
+
 
 
 
@@ -17345,7 +34771,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Note:** Only needs to capture the `rule` keyword. The rest of the line is handled by included patterns (operators, identifiers, message strings, etc.)
+
+
+
+
+
+
+
+
 
 
 
@@ -17361,7 +34799,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `transitionTarget`
+
+
+
+
 
 
 
@@ -17369,7 +34819,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.transition.target.precept`
+
+
+
+
 
 
 
@@ -17377,7 +34835,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17385,11 +34851,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `3` → `entity.name.type.state.precept`
 
 
 
+
+
+
+
 - **Covers:** `transition Approved`
+
+
+
+
+
+
+
+
 
 
 
@@ -17405,7 +34887,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `noTransition`
+
+
+
+
 
 
 
@@ -17413,7 +34907,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** (captures only)
+
+
+
+
 
 
 
@@ -17421,7 +34923,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17429,11 +34939,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `3` → `keyword.other.outcome.precept`
 
 
 
+
+
+
+
 - **Covers:** `no transition`
+
+
+
+
+
+
+
+
 
 
 
@@ -17449,7 +34975,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `eventArgReference`
+
+
+
+
 
 
 
@@ -17457,7 +34995,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** `meta.event-arg-ref.precept`
+
+
+
+
 
 
 
@@ -17465,7 +35011,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17473,7 +35027,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `2` → `punctuation.accessor.precept`
+
+
+
+
 
 
 
@@ -17481,11 +35043,27 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Covers:** `Submit.Amount`, `Approve.Note`
 
 
 
+
+
+
+
 - **Note:** This pattern is ambiguous — it also matches `Collection.count`. The `collectionMemberAccess` pattern must precede this one.
+
+
+
+
+
+
+
+
 
 
 
@@ -17501,7 +35079,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `collectionMemberAccess`
+
+
+
+
 
 
 
@@ -17509,7 +35099,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Regex:** `\b([A-Za-z_][A-Za-z0-9_]*)(\.)(\bcount|countof|min|max|peek|peekby\b)`
+
+
+
+
 
 
 
@@ -17517,7 +35115,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `1` → `variable.other.field.precept` (collection field name)
+
+
+
+
 
 
 
@@ -17525,7 +35131,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `3` → `variable.other.property.precept` (member name)
+
+
+
+
 
 
 
@@ -17533,7 +35147,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Priority:** Must precede `eventArgReference` to prevent `Collection.count` from being highlighted as event.arg.
+
+
+
+
+
+
+
+
 
 
 
@@ -17549,7 +35175,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `functionCalls`
+
+
+
+
 
 
 
@@ -17557,7 +35195,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 **Scope:** (captures only)
+
+
+
+
 
 
 
@@ -17565,7 +35211,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Captures:**
+
+
+
+
 
 
 
@@ -17573,7 +35227,15 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
   - `2` → `punctuation.precept`
+
+
+
+
 
 
 
@@ -17581,7 +35243,19 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
 - **Note:** Function name list MUST be derived from `Functions.All` (via the function catalog). CI variants `~startsWith` and `~endsWith` need a separate pattern: `(~)(startsWith|endsWith)(\s*\()`.
+
+
+
+
+
+
+
+
 
 
 
@@ -17597,7 +35271,23 @@ Every TextMate scope used in the Precept grammar, with semantic meaning and visu
 
 
 
+
+
+
+
+
+
+
+
 These are generated automatically by reading `Tokens.All`, grouping by `TextMateScope`, and emitting one alternation pattern per scope. The generator already does this (L38-77 of `Program.cs`).
+
+
+
+
+
+
+
+
 
 
 
@@ -17613,7 +35303,19 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
+
+
+
+
 | Key | Scope | Tokens |
+
+
+
+
 
 
 
@@ -17621,7 +35323,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `declarationKeywords` | `keyword.declaration.precept` | `as`, `ascending`, `because`, `default`, `descending`, `ensure`, `event`, `field`, `initial`, `optional`, `precept`, `rule`, `state`, `writable` |
+
+
+
+
 
 
 
@@ -17629,7 +35339,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `actionKeywords` | `keyword.other.action.precept` | `add`, `append`, `clear`, `dequeue`, `enqueue`, `insert`, `pop`, `push`, `put`, `remove` |
+
+
+
+
 
 
 
@@ -17637,7 +35355,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `accessModeKeywords` | `keyword.other.access-mode.precept` | `editable`, `modify`, `omit`, `readonly` |
+
+
+
+
 
 
 
@@ -17645,7 +35371,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `membershipOperators` | `keyword.operator.membership.precept` | `contains`, `is` |
+
+
+
+
 
 
 
@@ -17653,7 +35387,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `stateModifiers` | `storage.modifier.state.precept` | `error`, `irreversible`, `required`, `success`, `terminal`, `warning` |
+
+
+
+
 
 
 
@@ -17661,7 +35403,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `typeKeywords` | `storage.type.precept` | `bag`, `boolean`, `choice`, `currency`, `date`, `datetime`, `decimal`, `dimension`, `duration`, `exchangerate`, `instant`, `integer`, `list`, `log`, `lookup`, `money`, `number`, `period`, `price`, `quantity`, `queue`, `set`, `stack`, `string`, `time`, `timezone`, `unitofmeasure`, `zoneddatetime` |
+
+
+
+
 
 
 
@@ -17669,7 +35419,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `symbolOperators` | `keyword.operator.precept` | `!=`, `!~`, `%`, `*`, `+`, `-`, `/`, `<`, `<=`, `==`, `>`, `>=`, `=`, `~`, `~=` |
+
+
+
+
 
 
 
@@ -17677,7 +35435,19 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 | `memberNameKeywords` | `keyword.other.precept` | `countof`, `peekby` |
+
+
+
+
+
+
+
+
 
 
 
@@ -17693,7 +35463,19 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `numbers`
+
+
+
+
 
 
 
@@ -17701,11 +35483,27 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 **Scope:** `constant.numeric.precept`
 
 
 
+
+
+
+
 - **Regex:** `\b\d+(?:\.\d+)?\b`
+
+
+
+
+
+
+
+
 
 
 
@@ -17721,7 +35519,19 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `punctuation`
+
+
+
+
 
 
 
@@ -17729,11 +35539,27 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 **Scope:** `punctuation.precept`
 
 
 
+
+
+
+
 - **Regex:** `[()[\].,]` (individual captures for finer scoping optional)
+
+
+
+
+
+
+
+
 
 
 
@@ -17749,7 +35575,19 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
+
+
+
+
 - **Key:** `identifierReference`
+
+
+
+
 
 
 
@@ -17757,7 +35595,15 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 **Scope:** `variable.other.precept`
+
+
+
+
 
 
 
@@ -17765,7 +35611,19 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
 - **Priority:** LAST in pattern order. This is the catch-all.
+
+
+
+
+
+
+
+
 
 
 
@@ -17781,7 +35639,23 @@ These are generated automatically by reading `Tokens.All`, grouping by `TextMate
 
 
 
+
+
+
+
+
+
+
+
 Ordered from most-specific to least-specific to prevent false matches.
+
+
+
+
+
+
+
+
 
 
 
@@ -17793,7 +35667,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -17801,7 +35683,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#comment" },
+
+
+
+
 
 
 
@@ -17809,7 +35699,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#strings" },
+
+
+
+
 
 
 
@@ -17817,7 +35715,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#preceptHeader" },
+
+
+
+
 
 
 
@@ -17825,7 +35731,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#eventDeclaration" },
+
+
+
+
 
 
 
@@ -17833,7 +35747,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#fieldScalarDeclaration" },
+
+
+
+
 
 
 
@@ -17841,7 +35763,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#stateAction" },
+
+
+
+
 
 
 
@@ -17849,7 +35779,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#eventHandler" },
+
+
+
+
 
 
 
@@ -17857,7 +35795,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#accessMode" },
+
+
+
+
 
 
 
@@ -17865,7 +35811,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#fromOnHeader" },
+
+
+
+
 
 
 
@@ -17873,7 +35827,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#transitionTarget" },
+
+
+
+
 
 
 
@@ -17881,7 +35843,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#collectionMemberAccess" },
+
+
+
+
 
 
 
@@ -17889,7 +35859,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#arrowOperators" },
+
+
+
+
 
 
 
@@ -17897,7 +35875,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#logicalOperators" },
+
+
+
+
 
 
 
@@ -17905,7 +35891,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#stateModifiers" },
+
+
+
+
 
 
 
@@ -17913,7 +35907,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#typeKeywords" },
+
+
+
+
 
 
 
@@ -17921,7 +35923,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#controlKeywords" },
+
+
+
+
 
 
 
@@ -17929,7 +35939,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#outcomeKeywords" },
+
+
+
+
 
 
 
@@ -17937,7 +35955,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#quantifierKeywords" },
+
+
+
+
 
 
 
@@ -17945,7 +35971,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#booleanLiterals" },
+
+
+
+
 
 
 
@@ -17953,7 +35987,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
     { "include": "#punctuation" },
+
+
+
+
 
 
 
@@ -17961,11 +36003,23 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
   ]
 
 
 
+
+
+
+
 }
+
+
+
+
 
 
 
@@ -17977,7 +36031,19 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
+
+
+
+
 **Ordering rationale:**
+
+
+
+
 
 
 
@@ -17985,7 +36051,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
 2. Message strings before regular strings — `because "msg"` must get gold scope before `"msg"` gets consumed as a regular string
+
+
+
+
 
 
 
@@ -17993,7 +36067,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
 4. Construct-level patterns (most-specific) — declaration headers capture entire lines with contextual scoping
+
+
+
+
 
 
 
@@ -18001,7 +36083,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
 6. `eventHandler` before `eventEnsure` — both start with `on`, disambiguated by `->` vs `ensure`
+
+
+
+
 
 
 
@@ -18009,7 +36099,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
 8. Dot-access patterns — `collectionMemberAccess` before `eventArgReference` to prevent `F.count` → event scope
+
+
+
+
 
 
 
@@ -18017,7 +36115,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
 10. Operator patterns — arrows first (longest match), then symbol, then keyword operators
+
+
+
+
 
 
 
@@ -18025,7 +36131,15 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
 12. Literals and numbers
+
+
+
+
 
 
 
@@ -18037,7 +36151,23 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18053,7 +36183,23 @@ Ordered from most-specific to least-specific to prevent false matches.
 
 
 
+
+
+
+
+
+
+
+
 ## Gaps in the hand-authored grammar (35 items from audit section 3.1, G1–G35)
+
+
+
+
+
+
+
+
 
 
 
@@ -18069,7 +36215,19 @@ See Section 3.1 above for the complete gap table. Summary of critical gaps:
 
 
 
+
+
+
+
+
+
+
+
 1. **35 missing language constructs/tokens** (G1–G35)
+
+
+
+
 
 
 
@@ -18077,7 +36235,19 @@ See Section 3.1 above for the complete gap table. Summary of critical gaps:
 
 
 
+
+
+
+
 3. **16 scope assignment errors** (E1–E16) — tokens assigned to wrong semantic category
+
+
+
+
+
+
+
+
 
 
 
@@ -18093,7 +36263,23 @@ See Section 3.1 above for the complete gap table. Summary of critical gaps:
 
 
 
+
+
+
+
+
+
+
+
 See Section 4.2 above. Summary of critical gaps:
+
+
+
+
+
+
+
+
 
 
 
@@ -18105,7 +36291,15 @@ See Section 4.2 above. Summary of critical gaps:
 
 
 
+
+
+
+
 2. **GG2: Stale event arg syntax** — uses `with` instead of parenthesized args
+
+
+
+
 
 
 
@@ -18113,11 +36307,23 @@ See Section 4.2 above. Summary of critical gaps:
 
 
 
+
+
+
+
 4. **GG14: Stale `assert` keyword** — should be `ensure`
 
 
 
+
+
+
+
 5. **GG17: Bad repo key naming** — confusing scope-suffixed names
+
+
+
+
 
 
 
@@ -18129,7 +36335,23 @@ See Section 4.2 above. Summary of critical gaps:
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18145,7 +36367,23 @@ See Section 4.2 above. Summary of critical gaps:
 
 
 
+
+
+
+
+
+
+
+
 Numbered list keyed to spec entries above.
+
+
+
+
+
+
+
+
 
 
 
@@ -18161,7 +36399,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 1. **Add `messageStrings` pattern (Spec §2.2).** This is the single most important pattern for visual system compliance. Without it, message payloads are indistinguishable from regular strings — destroying the gold visual interrupt that the brand mandates. Emit TWO match patterns: one for `because "..."`, one for `reject "..."`. Captures must assign `keyword.declaration.precept` to the keyword and `string.quoted.double.message.precept` to the string.
+
+
+
+
+
+
+
+
 
 
 
@@ -18177,7 +36431,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 3. **Expand `stateDeclaration` to recognize all 7 state modifiers (Spec §2.6).** Current pattern (L180-215) only matches `initial`. Add sub-patterns for `terminal`, `required`, `irreversible`, `success`, `warning`, `error` with scope `storage.modifier.state.precept`.
+
+
+
+
+
+
+
+
 
 
 
@@ -18193,7 +36463,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 5. **Add `ruleDeclaration` pattern (Spec §2.19).** Match `rule` keyword at line start.
+
+
+
+
+
+
+
+
 
 
 
@@ -18209,7 +36495,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 7. **Add `omitDeclaration` pattern (Spec §2.16).** Match `in State omit Field`.
+
+
+
+
+
+
+
+
 
 
 
@@ -18225,7 +36527,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 9. **Add `eventHandler` pattern (Spec §2.18).** Match `on Event -> action chain`.
+
+
+
+
+
+
+
+
 
 
 
@@ -18241,7 +36559,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 11. **Add `functionCalls` pattern (Spec §2.24).** Match known function names followed by `(`. Derive function name list from `Functions.All` catalog.
+
+
+
+
+
+
+
+
 
 
 
@@ -18257,7 +36591,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 13. **Fix broken `$ref` in `eventWithArgsDeclaration` (GG18).** L244 uses `["$ref"]` which TextMate doesn't support. Replace with `["include"]`.
+
+
+
+
+
+
+
+
 
 
 
@@ -18273,7 +36623,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 15. **Expand `fieldCollectionDeclaration` to include all collection types (Spec §2.9).** Current pattern (L293) includes `set|queue|stack|bag|list|log|lookup` ✓. Inner type list needs expansion to include `integer`, `decimal`.
+
+
+
+
+
+
+
+
 
 
 
@@ -18289,7 +36655,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 ## Should-Fix (improves correctness and visual system alignment)
+
+
+
+
+
+
+
+
 
 
 
@@ -18305,7 +36687,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 18. **Add `punctuation` patterns for parentheses and brackets (Spec §2.27).** Explicit patterns for `(`, `)`, `[`, `]` with `punctuation.precept`.
+
+
+
+
+
+
+
+
 
 
 
@@ -18321,7 +36719,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 20. **Add `computedFieldDeclaration` context (Spec §2.10).** At minimum, the `<-` operator pattern is sufficient. Consider whether a dedicated structural pattern is needed.
+
+
+
+
+
+
+
+
 
 
 
@@ -18337,7 +36751,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 ## Won't-Fix in Grammar (semantic tokens only)
+
+
+
+
+
+
+
+
 
 
 
@@ -18353,7 +36783,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 23. **Context-dependent `set` scoping.** `set` as action verb vs collection type. TextMate can't disambiguate. Semantic tokens handle this.
+
+
+
+
+
+
+
+
 
 
 
@@ -18369,7 +36815,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18385,7 +36847,23 @@ Numbered list keyed to spec entries above.
 
 
 
+
+
+
+
+
+
+
+
 The following items in `design/brand/brand-decisions.md` need updating to match catalog reality:
+
+
+
+
+
+
+
+
 
 
 
@@ -18397,7 +36875,15 @@ The following items in `design/brand/brand-decisions.md` need updating to match 
 
 
 
+
+
+
+
 2. Remove `write` from the Structure · Semantic keyword list (retired B4)
+
+
+
+
 
 
 
@@ -18405,7 +36891,15 @@ The following items in `design/brand/brand-decisions.md` need updating to match 
 
 
 
+
+
+
+
 4. Add `ensure` to Structure · Semantic keyword list
+
+
+
+
 
 
 
@@ -18413,11 +36907,27 @@ The following items in `design/brand/brand-decisions.md` need updating to match 
 
 
 
+
+
+
+
 6. Add `optional` to Structure · Semantic keyword list (or Grammar — decision needed)
 
 
 
+
+
+
+
 7. The brand doc's 2-tier keyword split (Semantic vs Grammar) doesn't map 1:1 to the catalog's 14-category scope model. Consider updating the brand doc to reference catalog categories or accept that the theme mediates between the two.
+
+
+
+
+
+
+
+
 
 
 
@@ -18433,7 +36943,23 @@ The following items in `design/brand/brand-decisions.md` need updating to match 
 
 
 
+
+
+
+
+
+
+
+
 For the visual system to work as designed, the VS Code theme must include rules mapping scopes to colors and styles:
+
+
+
+
+
+
+
+
 
 
 
@@ -18445,7 +36971,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -18453,7 +36987,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
     "textMateRules": [
+
+
+
+
 
 
 
@@ -18461,7 +37003,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "keyword.control.precept", "settings": { "foreground": "#6366F1" } },
+
+
+
+
 
 
 
@@ -18469,7 +37019,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "keyword.other.outcome.precept", "settings": { "foreground": "#6366F1" } },
+
+
+
+
 
 
 
@@ -18477,7 +37035,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "keyword.other.quantifier.precept", "settings": { "foreground": "#6366F1" } },
+
+
+
+
 
 
 
@@ -18485,7 +37051,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "keyword.operator.logical.precept", "settings": { "foreground": "#6366F1" } },
+
+
+
+
 
 
 
@@ -18493,7 +37067,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "keyword.operator.precept", "settings": { "foreground": "#6366F1" } },
+
+
+
+
 
 
 
@@ -18501,7 +37083,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "keyword.other.precept", "settings": { "foreground": "#B0BEC5" } },
+
+
+
+
 
 
 
@@ -18509,7 +37099,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "storage.modifier.state.precept", "settings": { "foreground": "#9AA8B5" } },
+
+
+
+
 
 
 
@@ -18517,7 +37115,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "entity.name.function.event.precept", "settings": { "foreground": "#30B8E8" } },
+
+
+
+
 
 
 
@@ -18525,7 +37131,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "variable.other.field.precept", "settings": { "foreground": "#B0BEC5" } },
+
+
+
+
 
 
 
@@ -18533,7 +37147,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "variable.other.property.precept", "settings": { "foreground": "#B0BEC5" } },
+
+
+
+
 
 
 
@@ -18541,7 +37163,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "support.function.precept", "settings": { "foreground": "#B0BEC5" } },
+
+
+
+
 
 
 
@@ -18549,7 +37179,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "constant.language.boolean.precept", "settings": { "foreground": "#84929F" } },
+
+
+
+
 
 
 
@@ -18557,7 +37195,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "string.quoted.double.message.precept", "settings": { "foreground": "#FBBF24" } },
+
+
+
+
 
 
 
@@ -18565,7 +37211,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "comment.line.number-sign.precept", "settings": { "foreground": "#9096A6", "fontStyle": "italic" } },
+
+
+
+
 
 
 
@@ -18573,7 +37227,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
       { "scope": "punctuation.separator.comma.precept", "settings": { "foreground": "#6366F1" } },
+
+
+
+
 
 
 
@@ -18581,7 +37243,15 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
     ]
+
+
+
+
 
 
 
@@ -18589,11 +37259,27 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
 }
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -18609,7 +37295,23 @@ For the visual system to work as designed, the VS Code theme must include rules 
 
 
 
+
+
+
+
+
+
+
+
 The grammar generator MUST derive all keyword lists, type names, function names, operator symbols, and constraint keywords from the catalog source of truth (`Tokens.All`, `Functions.All`, etc.). No hardcoded token sets in the generator. If a new keyword is added to the catalog, the generator's output must automatically include it without manual changes.
+
+
+
+
+
+
+
+
 
 
 
@@ -18625,7 +37327,23 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18635,7 +37353,17 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 *End of specification.*
 
+
+
 # ProofEngine Spec — Pre-Implementation Gap Analysis
+
+
+
+
+
+
+
+
 
 
 
@@ -18647,11 +37375,23 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 **Author:** Frank
 
 
 
+
+
+
+
 **Commit reviewed:** `79c340357aee4e54520a539dca8208bc734e3606`
+
+
+
+
 
 
 
@@ -18663,7 +37403,19 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
+
+
+
+
 **Spec files reviewed:**
+
+
+
+
 
 
 
@@ -18671,11 +37423,23 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `docs/compiler/graph-analyzer.md`
 
 
 
+
+
+
+
 - `docs/compiler/type-checker.md`
+
+
+
+
 
 
 
@@ -18687,7 +37451,19 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
+
+
+
+
 **Source files reviewed:**
+
+
+
+
 
 
 
@@ -18695,7 +37471,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Pipeline/ProofLedger.cs` (stub)
+
+
+
+
 
 
 
@@ -18703,7 +37487,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Pipeline/GraphAnalyzer.cs`
+
+
+
+
 
 
 
@@ -18711,7 +37503,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Pipeline/Compilation.cs`
+
+
+
+
 
 
 
@@ -18719,7 +37519,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Language/ProofRequirement.cs`
+
+
+
+
 
 
 
@@ -18727,7 +37535,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Language/ProofRequirements.cs`
+
+
+
+
 
 
 
@@ -18735,7 +37551,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Language/Diagnostics.cs`
+
+
+
+
 
 
 
@@ -18743,7 +37567,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Language/Faults.cs`
+
+
+
+
 
 
 
@@ -18751,7 +37583,15 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
 - `src/Precept/Language/Modifiers.cs`
+
+
+
+
 
 
 
@@ -18763,7 +37603,23 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18779,6 +37635,14 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
+
+
+
+
+
+
+
+
 The ProofEngine spec is architecturally strong — the two-pass design, four-strategy discharge model, proof/fault chain, and catalog-driven obligation instantiation are well-conceived. However, the spec has **three blocking gaps** and **seven significant gaps** that prevent implementation from starting cleanly. The most critical issue: the spec defines five `ProofRequirementKind` values but only describes discharge strategies for two of them (Numeric and Presence). `DimensionProofRequirement`, `ModifierRequirement`, and `QualifierCompatibilityProofRequirement` are defined in the DU but have zero strategy coverage — an implementer would have to invent discharge logic from scratch. Additionally, the `FieldModifierMeta.ProofDischarges` property the spec declares as "canonical" (CC#5 resolved) does not exist in the source code, and the output type `ProofLedger` described in the spec is materially different from the stub in source.
 
 
@@ -18787,7 +37651,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18803,6 +37683,14 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ## [BLOCKING] Gaps
 
 
@@ -18811,7 +37699,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18823,7 +37727,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** BLOCKING
+
+
+
+
 
 
 
@@ -18831,7 +37743,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec defines five `ProofRequirementKind` subtypes in §6 (lines 348–389): `Numeric`, `Presence`, `Dimension`, `Modifier`, and `QualifierCompatibility`. The four strategies (Literal, Modifier, GuardInPath, FlowNarrowing) only describe discharge predicates for `NumericProofRequirement` and `PresenceProofRequirement`. The remaining three kinds are completely absent:
+
+
+
+
 
 
 
@@ -18839,7 +37759,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - **`ModifierRequirement`** — "field must declare required modifier (e.g. `ordered`)." No strategy covers this. Logically Strategy 2 (Modifier Proof) should handle it, but the Strategy 2 pseudocode (lines 536–569) only reads `FieldModifierMeta.ProofDischarges`, not `ModifierRequirement.Required` directly. The mapping is unspecified.
+
+
+
+
 
 
 
@@ -18847,7 +37775,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Why it matters:** An implementer would have to guess how to handle 3 of 5 obligation kinds. Two implementers would write different code. This is the definition of a blocking ambiguity.
+
+
+
+
 
 
 
@@ -18855,11 +37791,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   1. Which strategy discharges it (existing or new), OR
 
 
 
+
+
+
+
   2. That it is always discharged by the type checker and never reaches the proof engine as an unresolved obligation, OR
+
+
+
+
 
 
 
@@ -18871,7 +37819,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
   Likely answers based on code analysis:
+
+
+
+
 
 
 
@@ -18879,7 +37839,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `ModifierRequirement`: Likely checked by seeing if the field has `ModifierKind.Required` in its `Modifiers` array. Add this to Strategy 2 pseudocode.
+
+
+
+
 
 
 
@@ -18891,7 +37859,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18903,11 +37887,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** BLOCKING
 
 
 
+
+
+
+
 - **Location:** `proof-engine.md` §7 Strategy 2, lines 505–572, especially the CC#5 resolution box at line 571
+
+
+
+
 
 
 
@@ -18919,7 +37915,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
   The Strategy 2 pseudocode depends entirely on `meta.ProofDischarges` for its discharge logic (line 551: `foreach (var discharge in meta.ProofDischarges)`). Without this property, Strategy 2 cannot be implemented as specified.
+
+
+
+
 
 
 
@@ -18927,7 +37935,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   (a) Add the property to the catalog first (design + implementation work), or
+
+
+
+
 
 
 
@@ -18935,7 +37951,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   Both are design decisions that must be made before coding starts.
+
+
+
+
 
 
 
@@ -18947,7 +37971,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -18959,7 +37999,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** BLOCKING
+
+
+
+
 
 
 
@@ -18967,11 +38015,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec defines `ProofLedger` with five fields:
 
 
 
+
+
+
+
   ```csharp
+
+
+
+
 
 
 
@@ -18979,7 +38039,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
       ImmutableArray<ProofObligation> Obligations,
+
+
+
+
 
 
 
@@ -18987,7 +38055,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
       ImmutableArray<ConstraintInfluenceEntry> ConstraintInfluence,
+
+
+
+
 
 
 
@@ -18995,7 +38071,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
       ImmutableArray<Diagnostic> Diagnostics
+
+
+
+
 
 
 
@@ -19003,7 +38087,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   ```
+
+
+
+
 
 
 
@@ -19011,7 +38103,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   ```csharp
+
+
+
+
 
 
 
@@ -19019,7 +38119,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   ```
+
+
+
+
 
 
 
@@ -19027,7 +38135,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `ProofObligation`
+
+
+
+
 
 
 
@@ -19035,7 +38151,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `ProofStrategy` (enum)
+
+
+
+
 
 
 
@@ -19043,7 +38167,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `ConstraintInfluenceEntry`
+
+
+
+
 
 
 
@@ -19051,11 +38183,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `InitialStateSatisfiabilityResult`
 
 
 
+
+
+
+
   - `UnsatisfiedConstraint`
+
+
+
+
 
 
 
@@ -19067,11 +38211,27 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
   The `Compilation` record in `Compilation.cs` consumes `ProofLedger` but only reads `Diagnostics` — it has no field for `FaultSiteLinks` or `ConstraintInfluence`.
 
 
 
+
+
+
+
 - **Why it matters:** The implementer must create ~10 new record types and expand the ProofLedger shape before any meaningful work begins. The spec needs to be explicit about whether these types are created as part of the ProofEngine implementation or as a prerequisite.
+
+
+
+
 
 
 
@@ -19083,7 +38243,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19099,7 +38275,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19111,7 +38303,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** SIGNIFICANT
+
+
+
+
 
 
 
@@ -19119,7 +38319,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec's Pass 1 pseudocode (line 968) references `semantics.AllTypedExpressions`:
+
+
+
+
 
 
 
@@ -19127,7 +38335,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   foreach (var expr in semantics.AllTypedExpressions)
+
+
+
+
 
 
 
@@ -19135,7 +38351,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   No such property exists on `SemanticIndex`. The `SemanticIndex` record exposes `TransitionRows`, `Rules`, `Ensures`, `StateHooks`, `EventHandlers` — but no aggregated expression enumeration surface.
+
+
+
+
 
 
 
@@ -19143,7 +38367,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Suggested resolution:** Replace `AllTypedExpressions` with an explicit list of walk targets:
+
+
+
+
 
 
 
@@ -19151,7 +38383,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `Rules` → `Condition` expressions
+
+
+
+
 
 
 
@@ -19159,7 +38399,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `StateHooks` → `Actions[].ProofRequirements`
+
+
+
+
 
 
 
@@ -19167,7 +38415,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - Computed fields → `ComputedExpression` (if proof-relevant)
+
+
+
+
+
+
+
+
 
 
 
@@ -19183,7 +38443,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19195,7 +38471,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** SIGNIFICANT
+
+
+
+
 
 
 
@@ -19203,11 +38487,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec defines:
 
 
 
+
+
+
+
   ```csharp
+
+
+
+
 
 
 
@@ -19215,11 +38511,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   public sealed record EnsureIdentity(ConstraintKind Kind, string? AnchorState, string? AnchorEvent, int Index) : ConstraintIdentity;
 
 
 
+
+
+
+
   ```
+
+
+
+
 
 
 
@@ -19227,7 +38535,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   ```csharp
+
+
+
+
 
 
 
@@ -19235,7 +38551,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   public sealed record EnsureIdentity(ConstraintKind Kind, string? AnchorName, int EnsureIndex) : ConstraintIdentity;
+
+
+
+
 
 
 
@@ -19243,7 +38567,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   Differences:
+
+
+
+
 
 
 
@@ -19251,11 +38583,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   2. `EnsureIdentity`: spec has `(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)`, source has `(ConstraintKind, string? AnchorName, int EnsureIndex)` — spec separates state/event anchors into two nullable fields; source uses a single `AnchorName`.
 
 
 
+
+
+
+
 - **Why it matters:** The `ConstraintInfluenceEntry` output uses `ConstraintIdentity`. If the implementer follows the spec shapes, they'll create types that conflict with existing ones. If they follow the source shapes, the spec's `EventArgReference` resolution logic may not work as described.
+
+
+
+
 
 
 
@@ -19267,7 +38611,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19279,11 +38639,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** SIGNIFICANT
 
 
 
+
+
+
+
 - **Location:** `proof-engine.md` §7 Strategy 3, line 625; Strategy 4, line 722
+
+
+
+
 
 
 
@@ -19295,7 +38667,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
   This is non-trivial because:
+
+
+
+
 
 
 
@@ -19303,7 +38687,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   2. The proof engine would need to either build an expression→row index in Pass 1, or walk `TransitionRows[].Actions` looking for expression identity matches.
+
+
+
+
 
 
 
@@ -19311,7 +38703,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Why it matters:** This is critical path logic for the two guard-based strategies. The spec's pseudocode uses it as a black box, but its implementation drives the data structure design of Pass 1.
+
+
+
+
 
 
 
@@ -19323,7 +38723,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19335,7 +38751,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** SIGNIFICANT
+
+
+
+
 
 
 
@@ -19343,11 +38767,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** Strategy 1 calls `ResolveSubject(numeric.Subject, obligation.Site)` and Strategy 2 calls `GetFieldName(obligation.Requirement.Subject, obligation.Site)`. Neither is defined. Given the `ProofSubject` DU:
 
 
 
+
+
+
+
   - `ParamSubject(ParameterMeta Parameter)` — how do you resolve a parameter to a concrete expression node from the obligation site? The `ParameterMeta` has object identity, but how does one locate the corresponding argument expression in a `TypedFunctionCall` or operand in a `TypedBinaryOp`?
+
+
+
+
 
 
 
@@ -19359,7 +38795,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
   The spec says `ParamSubject` "must be reference-equal to one of the `ParameterMeta` instances in the containing overload's `Parameters` list" (ProofRequirement.cs, line 16), which gives identity, but the resolution logic from identity to expression is missing.
+
+
+
+
 
 
 
@@ -19367,11 +38815,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Suggested resolution:** Add a `ResolveSubject` pseudocode section that handles both `ParamSubject` and `SelfSubject`:
 
 
 
+
+
+
+
   - `ParamSubject`: For `TypedFunctionCall`, match `Parameter` identity against `ResolvedFunction`'s overload `Parameters` list to find the positional index, then return `Arguments[index]`. For `TypedBinaryOp`, match against `ResolvedOp`'s operation metadata parameters.
+
+
+
+
 
 
 
@@ -19383,7 +38843,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19395,7 +38871,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** SIGNIFICANT
+
+
+
+
 
 
 
@@ -19403,7 +38887,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec says: "For each constraint condition, check whether default field values satisfy it." This is vague. Specifically:
+
+
+
+
 
 
 
@@ -19411,7 +38903,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   2. How are "default field values" determined? Fields with `default` expressions have typed defaults in `TypedField.DefaultExpression`. Fields without defaults — what is their default? `0` for numeric? `""` for string? `null` for optional? The spec doesn't define the default value model.
+
+
+
+
 
 
 
@@ -19419,7 +38919,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   4. The spec says to check `ensure in Draft: ...`. But the `ConstraintKind.StateResident` anchor means "while in state", not "at entry". Is entry a special case of residency? Does entry use `ConstraintKind.StateEntry` anchors instead?
+
+
+
+
 
 
 
@@ -19427,7 +38935,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Why it matters:** This check is one of the three output surfaces of the proof engine (alongside obligation discharge and constraint influence). Without clear semantics, the implementer must make design decisions that should be in the spec.
+
+
+
+
 
 
 
@@ -19435,7 +38951,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - State which fields are relevant (all fields? only fields referenced by initial-scope constraints?)
+
+
+
+
 
 
 
@@ -19443,11 +38967,27 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - State whether initial event arguments are considered (probably not — they're runtime values)
 
 
 
+
+
+
+
   - Define which constraint scopes are checked (`in`, `to`, both?)
+
+
+
+
+
+
+
+
 
 
 
@@ -19463,7 +39003,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 **PE-G9: No diagnostic code for collection-empty proof failures**
+
+
+
+
 
 
 
@@ -19471,7 +39023,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Location:** `proof-engine.md` §7 "Collection Non-Empty Proof", lines 885–899; `DiagnosticCode.cs`
+
+
+
+
 
 
 
@@ -19479,7 +39039,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - 82: `UnsatisfiableGuard` (Warning)
+
+
+
+
 
 
 
@@ -19487,7 +39055,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - 84: `SqrtOfNegative` (Error)
+
+
+
+
+
+
+
+
 
 
 
@@ -19503,7 +39083,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
   The `FaultCode` enum has `CollectionEmptyOnAccess = 9` with `[StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]` — linking to the type-checker code, not a proof code.
+
+
+
+
 
 
 
@@ -19511,11 +39103,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Suggested resolution:** Clarify which pipeline stage owns collection non-empty safety:
 
 
 
+
+
+
+
   - If the type checker already emits `UnguardedCollectionAccess`/`UnguardedCollectionMutation` for all cases, the proof engine should NOT create duplicate obligations. Remove collection non-empty from the proof engine spec.
+
+
+
+
 
 
 
@@ -19527,7 +39131,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19539,7 +39159,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** SIGNIFICANT
+
+
+
+
 
 
 
@@ -19547,7 +39175,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** Strategy 3 calls `ExtractGuardConstraints(row.Guard)` to decompose a `TypedExpression` guard into simple constraint forms. The spec lists supported patterns (line 599–608) but doesn't specify:
+
+
+
+
 
 
 
@@ -19555,7 +39191,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   2. What happens with negation? `when not (A == 0)` — is this recognized as `A != 0`?
+
+
+
+
 
 
 
@@ -19563,7 +39207,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   4. Does the proof engine look inside `TypedConditional` (if/then/else) for guard constraints?
+
+
+
+
 
 
 
@@ -19571,7 +39223,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Suggested resolution:** Specify that `ExtractGuardConstraints`:
+
+
+
+
 
 
 
@@ -19579,11 +39239,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - Does NOT decompose `or` disjunctions — the proof engine cannot use a disjunct because either branch might be false
 
 
 
+
+
+
+
   - Handles simple negation by inverting the comparison operator
+
+
+
+
 
 
 
@@ -19595,7 +39267,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19611,7 +39299,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19623,7 +39327,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** ADVISORY
+
+
+
+
 
 
 
@@ -19631,11 +39343,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec references "Precept Builder" as a consumer of `FaultSiteLinks` and `ConstraintInfluence`, and references `precept-builder.md §Pass 4` (line 218, 236, 250). No `precept-builder.md` file exists in `docs/compiler/`. The consumer contract for `ProofLedger` is described in the proof engine spec but has no counterpart in any builder spec.
 
 
 
+
+
+
+
 - **Why it matters:** The proof engine's output shape is driven by what the builder consumes. Without a builder spec, the output shape is hypothetical — it could change when the builder is designed. Implementation risk is moderate: the proof engine can be built to the spec, but the builder may require changes.
+
+
+
+
 
 
 
@@ -19647,7 +39371,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19659,7 +39399,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** ADVISORY
+
+
+
+
 
 
 
@@ -19667,7 +39415,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The pseudocode calls `CreateDiagnostic(obligation)` but doesn't specify how the diagnostic message template parameters `{0}`, `{1}` are populated. The existing diagnostic entries in `Diagnostics.cs` have:
+
+
+
+
 
 
 
@@ -19675,7 +39431,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   - `SqrtOfNegative`: `"sqrt() requires a non-negative value, but '{0}' can be negative when {1}"` — same question.
+
+
+
+
 
 
 
@@ -19683,7 +39447,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Why it matters:** Without knowing what fills the template parameters, test authors can't assert diagnostic messages. This is a testability gap.
+
+
+
+
 
 
 
@@ -19695,7 +39467,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19707,7 +39495,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** ADVISORY
+
+
+
+
 
 
 
@@ -19715,7 +39511,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec doesn't say whether the proof engine should short-circuit if the `SemanticIndex` or `StateGraph` already contain errors. Looking at the existing pipeline in `Compiler.cs`, every stage runs unconditionally — the proof engine receives its inputs regardless of upstream errors. But:
+
+
+
+
 
 
 
@@ -19723,11 +39527,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   2. If the `StateGraph` has structural violation diagnostics (unreachable states), does the proof engine suppress obligations for those states? (The spec addresses this via `ReachabilityFact`, but doesn't address the case where the _graph analyzer itself_ emitted errors.)
 
 
 
+
+
+
+
 - **Why it matters:** Without clarity, the implementer might crash on `TypedErrorExpression` nodes.
+
+
+
+
 
 
 
@@ -19739,7 +39555,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19751,7 +39583,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** ADVISORY
+
+
+
+
 
 
 
@@ -19759,11 +39599,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The function `GuardRelationImpliesObligation` is described as "a simple pattern match on (guard.Op, expression.Op, requirement.Comparison) triples — not a solver" and provides three example triples. But the complete triple set is not enumerated. The spec gives examples but not an exhaustive table.
 
 
 
+
+
+
+
 - **Why it matters:** An implementer would need to enumerate all valid triples. Given the bounded operator set, this is a finite list — but it's work the spec should contain.
+
+
+
+
 
 
 
@@ -19775,7 +39627,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19787,7 +39655,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** ADVISORY
+
+
+
+
 
 
 
@@ -19795,7 +39671,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The graph analyzer has explicit stateless-precept handling (emitting vacuous `TerminalCompletenessFact` and `DeadEndStateFact`). The proof engine spec doesn't address stateless precepts. Stateless precepts have `EventHandlers` instead of `TransitionRows` and no state machine. Questions:
+
+
+
+
 
 
 
@@ -19803,7 +39687,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
   2. Do Strategies 3/4 (guard-based) apply to event handlers? (Event handlers don't have guards — `TypedEventHandler` has no `Guard` field.)
+
+
+
+
 
 
 
@@ -19811,7 +39703,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Why it matters:** If the implementer ignores stateless precepts, proof obligations on event handler actions would be silently missed.
+
+
+
+
 
 
 
@@ -19823,7 +39723,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19835,7 +39751,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** ADVISORY
+
+
+
+
 
 
 
@@ -19843,11 +39767,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** CC#6 says the builder "matches against `ProofLedger.FaultSiteLinks` by `ProofObligation.Site` identity." But `TypedExpression` is a record — C# record equality is structural, not referential. The spec doesn't say whether `Site` matching uses reference equality or structural equality. For records, structural equality means two independently-created `TypedBinaryOp` nodes with identical fields would match — which could cause false positives.
 
 
 
+
+
+
+
 - **Why it matters:** If the builder or proof engine relies on reference identity, the implementer must ensure the same `TypedExpression` object instance is used in both the `ProofObligation` and the builder's walk. If structural equality is fine, no action needed.
+
+
+
+
 
 
 
@@ -19859,7 +39795,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19875,7 +39827,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19887,7 +39855,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** DOC-ONLY
+
+
+
+
 
 
 
@@ -19895,7 +39871,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The Strategy 1 pseudocode uses `OperatorKind.NotEquals`, `OperatorKind.GreaterThan`, etc. Need to verify these match the actual `OperatorKind` enum values in source. Minor naming discrepancies between spec pseudocode and source enum members would cause confusion during implementation.
+
+
+
+
 
 
 
@@ -19907,7 +39891,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19919,7 +39919,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Severity:** DOC-ONLY
+
+
+
+
 
 
 
@@ -19927,7 +39935,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 - **Description:** The spec references Precept's error accumulation principle but doesn't cite the canonical name or doc location. Other pipeline stage docs reference `diagnostic-system.md §Error Accumulation`.
+
+
+
+
 
 
 
@@ -19939,7 +39955,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -19955,7 +39987,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ## GraphAnalyzer → ProofEngine
+
+
+
+
+
+
+
+
 
 
 
@@ -19971,7 +40019,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 2. **EventCoverageFact consumption is vague.** The spec says the proof engine "uses coverage gaps to reason about guard completeness: in states where an event is handled, are the guards sufficient?" (line 909). This is hand-wavy. What does "guard completeness" mean for the proof engine? Is the proof engine checking that guards on transition rows cover all possible field value ranges? That's a significantly harder problem than the spec's other strategies suggest. **Overlaps with PE-G1 (underspecified algorithm).** The EventCoverageFact consumption should be clarified — likely it's just a structural record, not an active proof check.
+
+
+
+
+
+
+
+
 
 
 
@@ -19987,7 +40051,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ## ProofEngine → Runtime (via Precept Builder)
+
+
+
+
+
+
+
+
 
 
 
@@ -20003,6 +40083,14 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 5. **`FaultSiteAnnotation` is described in the spec but does not exist in source.** The source has `FaultSiteDescriptor` in `Runtime/Descriptors.cs` with a different shape: `FaultSiteDescriptor(FaultCode, DiagnosticCode PreventedBy, int SourceLine)`. The spec's `FaultSiteAnnotation` has `(FaultCode Code, DiagnosticCode PreventedBy, SourceSpan Site)` — `SourceSpan` vs `int SourceLine`. These may be different types (builder-time vs runtime), but the relationship is unspecified.
 
 
@@ -20011,7 +40099,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -20027,7 +40131,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 1. **PE-G2 is the primary catalog violation.** `FieldModifierMeta.ProofDischarges` is described as catalog metadata but doesn't exist. The spec correctly identifies this as catalog-driven (Strategy 2 reads `meta.ProofDischarges` from the catalog), but the catalog hasn't been updated. **BLOCKING.**
+
+
+
+
+
+
+
+
 
 
 
@@ -20043,6 +40163,14 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 3. **`ProofRequirementMeta` catalog is correctly implemented.** The `ProofRequirements.cs` catalog with `GetMeta()` switch and `All` enumeration matches the catalog pattern. **No issue.**
 
 
@@ -20051,7 +40179,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -20067,7 +40211,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 | Code | Name | Stage | Severity | Registered in `DiagnosticCode.cs` | Registered in `Diagnostics.cs` | `PreventsFault` | Status |
+
+
+
+
 
 
 
@@ -20075,7 +40231,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 | 82 | `UnsatisfiableGuard` | Proof | Warning | ✅ | ✅ | — | Complete |
+
+
+
+
 
 
 
@@ -20083,7 +40247,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 | 84 | `SqrtOfNegative` | Proof | Error | ✅ | ✅ | `FaultCode.SqrtOfNegative` | Complete |
+
+
+
+
+
+
+
+
 
 
 
@@ -20099,7 +40275,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 **Missing diagnostic gap:** Collection non-empty proof failures have no proof-stage diagnostic code (PE-G9). Depending on resolution of PE-G9, additional codes may be needed.
+
+
+
+
+
+
+
+
 
 
 
@@ -20115,7 +40307,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -20131,7 +40339,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 **NOT READY** — three BLOCKING gaps prevent implementation from starting.
+
+
+
+
+
+
+
+
 
 
 
@@ -20147,7 +40371,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 1. **PE-G1:** Three of five `ProofRequirementKind` values have no discharge strategy. The implementer cannot write discharge logic for `Dimension`, `Modifier`, or `QualifierCompatibility` obligations without spec guidance.
+
+
+
+
 
 
 
@@ -20155,7 +40391,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 3. **PE-G3:** Output type `ProofLedger` and ~10 supporting record types don't exist. Shape declarations must be created before coding begins.
+
+
+
+
+
+
+
+
 
 
 
@@ -20171,7 +40419,19 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 4. **PE-G4:** `AllTypedExpressions` doesn't exist — Pass 1 walk targets must be enumerated.
+
+
+
+
 
 
 
@@ -20179,7 +40439,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 6. **PE-G6:** `FindEnclosingTransitionRow` must be specified.
+
+
+
+
 
 
 
@@ -20187,11 +40455,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 8. **PE-G8:** Initial-state satisfiability needs a concrete algorithm.
 
 
 
+
+
+
+
 9. **PE-G9:** Collection non-empty proof ownership must be decided (type checker vs proof engine).
+
+
+
+
 
 
 
@@ -20203,7 +40483,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -20219,7 +40515,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 1. **Resolve PE-G1** — For each of `Dimension`, `Modifier`, `QualifierCompatibility`: state which strategy handles it, or state that the type checker resolves it before proof. This is a design decision, not an implementation detail.
+
+
+
+
+
+
+
+
 
 
 
@@ -20235,7 +40547,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 3. **Update spec for PE-G3** — Add a "Slice 0: Shape declarations" section listing all new types to create. The implementer should create these in a build-green commit before any logic.
+
+
+
+
+
+
+
+
 
 
 
@@ -20251,7 +40579,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 5. **Update spec for PE-G5** — Align `ConstraintIdentity` shapes with source implementation.
+
+
+
+
+
+
+
+
 
 
 
@@ -20267,7 +40611,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 7. **Specify initial-state satisfiability algorithm (PE-G8)** — Define the default value model and which constraint scopes are checked.
+
+
+
+
+
+
+
+
 
 
 
@@ -20283,7 +40643,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 9. **Add stateless precept handling section (PE-G15)** — Small but prevents a class of missed-obligation bugs.
+
+
+
+
+
+
+
+
 
 
 
@@ -20295,7 +40671,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 **By:** Shane (via Copilot)
+
+
+
+
 
 
 
@@ -20303,9 +40687,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 **Why:** User directive — G1/G2 prework is in the same category as G3 (structural definitions, not engine logic). Prework can proceed immediately after design is finalized; engine implementation is a separate phase.
 
+
+
 # PE-G1 Detailed Analysis — Frank
+
+
+
+
+
+
+
+
 
 
 
@@ -20317,7 +40715,15 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
+
+
+
+
 
 
 
@@ -20329,7 +40735,23 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -20345,7 +40767,23 @@ All three unhandled `ProofRequirementKind` values are **live** — they have rea
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -20361,7 +40799,23 @@ All three unhandled `ProofRequirementKind` values are **live** — they have rea
 
 
 
+
+
+
+
+
+
+
+
 **Determination: B — Strategy 2 (Declaration Attribute Proof) handles this.**
+
+
+
+
+
+
+
+
 
 
 
@@ -20377,7 +40831,19 @@ All three unhandled `ProofRequirementKind` values are **live** — they have rea
 
 
 
+
+
+
+
+
+
+
+
 **Callers (4 sites in `Operations.cs`):**
+
+
+
+
 
 
 
@@ -20385,7 +40851,15 @@ All three unhandled `ProofRequirementKind` values are **live** — they have rea
 
 
 
+
+
+
+
 - `DateMinusPeriod` (line 257): `DimensionProofRequirement(PPeriod, PeriodDimension.Date, ...)`
+
+
+
+
 
 
 
@@ -20393,7 +40867,19 @@ All three unhandled `ProofRequirementKind` values are **live** — they have rea
 
 
 
+
+
+
+
 - `TimeMinusPeriod` (line 284): `DimensionProofRequirement(PPeriod, PeriodDimension.Time, ...)`
+
+
+
+
+
+
+
+
 
 
 
@@ -20409,7 +40895,23 @@ All four attach the requirement to binary operations where one operand is a `per
 
 
 
+
+
+
+
+
+
+
+
 **TypeChecker behavior:** The TypeChecker (`TypeChecker.Expressions.cs` lines 479–519) resolves binary operations by type matching via `TryResolveBinaryWithWidening`. It resolves `Date + Period → DatePlusPeriod` purely on type structure, stamps `result.ProofRequirements` onto the `TypedBinaryOp` (line 504), and does NOT validate period dimensions. The `Qualifier` field on `TypedField` is even set to `null` with a `// Slice 2+` comment (TypeChecker.cs line 121), confirming qualifier resolution is future work.
+
+
+
+
+
+
+
+
 
 
 
@@ -20425,7 +40927,19 @@ All four attach the requirement to binary operations where one operand is a `per
 
 
 
+
+
+
+
+
+
+
+
 1. Resolve the proof subject to an expression node.
+
+
+
+
 
 
 
@@ -20433,7 +40947,15 @@ All four attach the requirement to binary operations where one operand is a `per
 
 
 
+
+
+
+
    - **Field reference:** Read the field's resolved qualifier on the `TemporalDimension` axis (once qualifier resolution ships). Map to `PeriodDimension`.
+
+
+
+
 
 
 
@@ -20441,11 +40963,27 @@ All four attach the requirement to binary operations where one operand is a `per
 
 
 
+
+
+
+
    - **Unqualified/unknown:** Treat as `PeriodDimension.Any` (per Shane's locked decision on permissive unqualified periods).
 
 
 
+
+
+
+
 3. Discharge condition: `resolvedDimension == PeriodDimension.Any || resolvedDimension == requirement.RequiredDimension`.
+
+
+
+
+
+
+
+
 
 
 
@@ -20461,7 +40999,23 @@ All four attach the requirement to binary operations where one operand is a `per
 
 
 
+
+
+
+
+
+
+
+
 **Why not a new strategy:** The dimension check reads a declaration-site attribute (the period's qualifier/dimension). This is exactly what Strategy 2 does — read field declaration metadata to discharge an obligation. No new strategy machinery is needed.
+
+
+
+
+
+
+
+
 
 
 
@@ -20477,6 +41031,14 @@ All four attach the requirement to binary operations where one operand is a `per
 
 
 
+
+
+
+
+
+
+
+
 Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
 
 
@@ -20485,7 +41047,19 @@ Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
 
 
 
+
+
+
+
+
+
+
+
 ```
+
+
+
+
 
 
 
@@ -20493,7 +41067,15 @@ Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
 
 
 
+
+
+
+
 if (obligation.Requirement is DimensionProofRequirement dimReq)
+
+
+
+
 
 
 
@@ -20501,7 +41083,15 @@ if (obligation.Requirement is DimensionProofRequirement dimReq)
 
 
 
+
+
+
+
     var dimension = ResolvePeriodDimension(subject, semantics);
+
+
+
+
 
 
 
@@ -20509,7 +41099,15 @@ if (obligation.Requirement is DimensionProofRequirement dimReq)
 
 
 
+
+
+
+
     return dimension == PeriodDimension.Any || dimension == dimReq.RequiredDimension;
+
+
+
+
 
 
 
@@ -20517,7 +41115,19 @@ if (obligation.Requirement is DimensionProofRequirement dimReq)
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -20533,7 +41143,23 @@ Add to §6 `DimensionProofRequirement` description: "Discharged by Strategy 2 (D
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -20549,7 +41175,23 @@ Add to §6 `DimensionProofRequirement` description: "Discharged by Strategy 2 (D
 
 
 
+
+
+
+
+
+
+
+
 **Determination: B — Strategy 2 (Declaration Attribute Proof) handles this.**
+
+
+
+
+
+
+
+
 
 
 
@@ -20565,7 +41207,19 @@ Add to §6 `DimensionProofRequirement` description: "Discharged by Strategy 2 (D
 
 
 
+
+
+
+
+
+
+
+
 **Callers (4 sites in `Operations.cs`):**
+
+
+
+
 
 
 
@@ -20573,7 +41227,15 @@ Add to §6 `DimensionProofRequirement` description: "Discharged by Strategy 2 (D
 
 
 
+
+
+
+
 - `ChoiceGreaterThanChoice` (line 768): same
+
+
+
+
 
 
 
@@ -20581,7 +41243,19 @@ Add to §6 `DimensionProofRequirement` description: "Discharged by Strategy 2 (D
 
 
 
+
+
+
+
 - `ChoiceGreaterThanOrEqualChoice` (line 784): same
+
+
+
+
+
+
+
+
 
 
 
@@ -20597,7 +41271,23 @@ All four attach the requirement to ordinal comparison operations on `choice` fie
 
 
 
+
+
+
+
+
+
+
+
 **TypeChecker behavior:** The TypeChecker resolves `Choice < Choice → ChoiceLessThanChoice` by type matching. It stamps the `ModifierRequirement` onto the `TypedBinaryOp` (line 504). It does NOT check whether the choice field has the `ordered` modifier — the modifiers are resolved on `TypedField` (TypeChecker.cs lines 99–117) but never cross-referenced against operation requirements.
+
+
+
+
+
+
+
+
 
 
 
@@ -20613,7 +41303,19 @@ All four attach the requirement to ordinal comparison operations on `choice` fie
 
 
 
+
+
+
+
+
+
+
+
 1. Resolve the proof subject to a field name.
+
+
+
+
 
 
 
@@ -20621,7 +41323,19 @@ All four attach the requirement to ordinal comparison operations on `choice` fie
 
 
 
+
+
+
+
 3. Discharge condition: `field.Modifiers.Contains(requirement.Required)` OR `field.ImpliedModifiers.Contains(requirement.Required)`.
+
+
+
+
+
+
+
+
 
 
 
@@ -20637,6 +41351,14 @@ This is simpler than the `ProofDischarges` lookup path. The `ProofDischarges` me
 
 
 
+
+
+
+
+
+
+
+
 **Both arms coexist in Strategy 2.** The `ProofDischarges` path handles: "modifier presence implies numeric/presence bound" (e.g., `positive` → `> 0`). The `ModifierRequirement` path handles: "field must have this modifier" (e.g., `ordered` for choice comparison). Same strategy, two predicate shapes.
 
 
@@ -20645,7 +41367,23 @@ This is simpler than the `ProofDischarges` lookup path. The `ProofDischarges` me
 
 
 
+
+
+
+
+
+
+
+
 ## Concrete answer for the spec
+
+
+
+
+
+
+
+
 
 
 
@@ -20661,7 +41399,19 @@ Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
 
 
 
+
+
+
+
+
+
+
+
 ```
+
+
+
+
 
 
 
@@ -20669,7 +41419,15 @@ Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
 
 
 
+
+
+
+
 if (obligation.Requirement is ModifierRequirement modReq)
+
+
+
+
 
 
 
@@ -20677,11 +41435,23 @@ if (obligation.Requirement is ModifierRequirement modReq)
 
 
 
+
+
+
+
     var fieldName = GetFieldName(modReq.Subject, obligation.Site);
 
 
 
+
+
+
+
     if (fieldName is null) return false;
+
+
+
+
 
 
 
@@ -20693,7 +41463,19 @@ if (obligation.Requirement is ModifierRequirement modReq)
 
 
 
+
+
+
+
+
+
+
+
     // Direct modifier check — does the field's declaration include the required modifier?
+
+
+
+
 
 
 
@@ -20701,7 +41483,15 @@ if (obligation.Requirement is ModifierRequirement modReq)
 
 
 
+
+
+
+
         || field.ImpliedModifiers.Contains(modReq.Required);
+
+
+
+
 
 
 
@@ -20709,7 +41499,19 @@ if (obligation.Requirement is ModifierRequirement modReq)
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -20725,7 +41527,23 @@ Add to §6 `ModifierRequirement` description: "Discharged by Strategy 2 (Declara
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -20741,7 +41559,23 @@ Add to §6 `ModifierRequirement` description: "Discharged by Strategy 2 (Declara
 
 
 
+
+
+
+
+
+
+
+
 **Determination: C — A new strategy (Strategy 5: Qualifier Compatibility Proof) is required.**
+
+
+
+
+
+
+
+
 
 
 
@@ -20757,7 +41591,19 @@ Add to §6 `ModifierRequirement` description: "Discharged by Strategy 2 (Declara
 
 
 
+
+
+
+
+
+
+
+
 **Callers (24+ sites in `Operations.cs`):**
+
+
+
+
 
 
 
@@ -20765,7 +41611,19 @@ Add to §6 `ModifierRequirement` description: "Discharged by Strategy 2 (Declara
 
 
 
+
+
+
+
 - Price arithmetic (lines 557–559, 568–570, 977–1034): `QualifierAxis.Unit` AND `QualifierAxis.Currency` — operands must share both unit and currency qualifiers
+
+
+
+
+
+
+
+
 
 
 
@@ -20781,7 +41639,23 @@ All use `new ParamSubject(PQuantity)` or `new ParamSubject(PPrice)` for BOTH `Le
 
 
 
+
+
+
+
+
+
+
+
 **TypeChecker behavior:** The TypeChecker disambiguates binary operation candidates using `QualifierMatch.Same` as the default assumption (TypeChecker.Expressions.cs line 576). The comment at line 573 explicitly says: "ProofEngine will verify qualifier compatibility at deeper analysis." The TypeChecker defers this check to the proof engine by design.
+
+
+
+
+
+
+
+
 
 
 
@@ -20797,7 +41671,19 @@ All use `new ParamSubject(PQuantity)` or `new ParamSubject(PPrice)` for BOTH `Le
 
 
 
+
+
+
+
+
+
+
+
 1. **Strategy 1 (Literal Proof):** Operates on a single subject's literal value. Does not handle dual subjects. Does not read qualifier metadata.
+
+
+
+
 
 
 
@@ -20805,11 +41691,27 @@ All use `new ParamSubject(PQuantity)` or `new ParamSubject(PPrice)` for BOTH `Le
 
 
 
+
+
+
+
 3. **Strategy 3 (Guard-in-Path):** Guards don't establish qualifier relationships. A `when` clause says things like `when Quantity > 0`, not `when FieldA.unit == FieldB.unit`.
 
 
 
+
+
+
+
 4. **Strategy 4 (Flow Narrowing):** Same limitation as Strategy 3 — handles relational constraints between field values, not qualifier compatibility.
+
+
+
+
+
+
+
+
 
 
 
@@ -20825,7 +41727,23 @@ All use `new ParamSubject(PQuantity)` or `new ParamSubject(PPrice)` for BOTH `Le
 
 
 
+
+
+
+
+
+
+
+
 Shape:
+
+
+
+
+
+
+
+
 
 
 
@@ -20837,7 +41755,15 @@ Shape:
 
 
 
+
+
+
+
 // Strategy 5: Qualifier Compatibility Proof — Discharge Predicate
+
+
+
+
 
 
 
@@ -20845,7 +41771,15 @@ Shape:
 
 
 
+
+
+
+
 // Reads: Both subjects' resolved qualifier bindings from SemanticIndex
+
+
+
+
 
 
 
@@ -20857,7 +41791,19 @@ Shape:
 
 
 
+
+
+
+
+
+
+
+
 bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex semantics)
+
+
+
+
 
 
 
@@ -20865,11 +41811,27 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
     if (obligation.Requirement is not QualifierCompatibilityProofRequirement qcReq)
 
 
 
+
+
+
+
         return false;
+
+
+
+
+
+
+
+
 
 
 
@@ -20881,7 +41843,15 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
     var leftQualifier = ResolveQualifierOnAxis(qcReq.LeftSubject, qcReq.Axis, obligation.Site, semantics);
+
+
+
+
 
 
 
@@ -20893,11 +41863,27 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
+
+
+
+
     // 2. If either qualifier is unresolved (unqualified field), cannot prove — Unresolved
 
 
 
+
+
+
+
     if (leftQualifier is null || rightQualifier is null)
+
+
+
+
 
 
 
@@ -20909,7 +41895,19 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
+
+
+
+
     // 3. Compare: both must have the same qualifier value on the specified axis
+
+
+
+
 
 
 
@@ -20917,7 +41915,15 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
 }
+
+
+
+
 
 
 
@@ -20929,7 +41935,19 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
+
+
+
+
 **Inputs required:**
+
+
+
+
 
 
 
@@ -20937,11 +41955,27 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
 - `QualifierCompatibilityProofRequirement.Axis` — the `QualifierAxis` to compare on (Unit, Currency, etc.)
 
 
 
+
+
+
+
 - Resolved qualifier bindings from `SemanticIndex` — requires qualifier resolution to be implemented (currently `Qualifier: null` in TypeChecker, Slice 2+ dependency)
+
+
+
+
+
+
+
+
 
 
 
@@ -20957,7 +41991,23 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 
 
+
+
+
+
+
+
+
+
 ## Concrete answer for the spec
+
+
+
+
+
+
+
+
 
 
 
@@ -20973,11 +42023,27 @@ Add new §7.5 to `proof-engine.md`:
 
 
 
+
+
+
+
+
+
+
+
 > **Strategy 5: Qualifier Compatibility Proof**
 
 
 
+
+
+
+
 >
+
+
+
+
 
 
 
@@ -20985,7 +42051,15 @@ Add new §7.5 to `proof-engine.md`:
 
 
 
+
+
+
+
 >
+
+
+
+
 
 
 
@@ -20993,7 +42067,15 @@ Add new §7.5 to `proof-engine.md`:
 
 
 
+
+
+
+
 >
+
+
+
+
 
 
 
@@ -21001,7 +42083,15 @@ Add new §7.5 to `proof-engine.md`:
 
 
 
+
+
+
+
 > - `quantity of 'kg' + quantity of 'kg'` → both Unit qualifiers match → discharged
+
+
+
+
 
 
 
@@ -21009,7 +42099,15 @@ Add new §7.5 to `proof-engine.md`:
 
 
 
+
+
+
+
 > - `quantity + quantity` (unqualified) → cannot prove → Unresolved → diagnostic
+
+
+
+
 
 
 
@@ -21017,7 +42115,19 @@ Add new §7.5 to `proof-engine.md`:
 
 
 
+
+
+
+
 > **Dependency:** Requires qualifier resolution in the TypeChecker (currently Slice 2+ future work). Until qualifier resolution ships, all `QualifierCompatibilityProofRequirement` obligations produce `Unresolved` — the correct conservative behavior.
+
+
+
+
+
+
+
+
 
 
 
@@ -21033,7 +42143,23 @@ Add to §6 `QualifierCompatibilityProofRequirement` description: "Discharged by 
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -21049,7 +42175,23 @@ Add to §6 `QualifierCompatibilityProofRequirement` description: "Discharged by 
 
 
 
+
+
+
+
+
+
+
+
 ## §6 — ProofRequirementKind subtypes (lines 348–389)
+
+
+
+
+
+
+
+
 
 
 
@@ -21065,7 +42207,23 @@ After each subtype's existing description, add the discharge strategy reference:
 
 
 
+
+
+
+
+
+
+
+
 1. **Line ~374 (DimensionProofRequirement):** Add: "Discharged by Strategy 2 (Declaration Attribute Proof). Reads the subject's resolved period dimension — from field qualifier for field references, from literal temporal unit for literals. `PeriodDimension.Any` permissively satisfies any dimension requirement."
+
+
+
+
+
+
+
+
 
 
 
@@ -21081,7 +42239,23 @@ After each subtype's existing description, add the discharge strategy reference:
 
 
 
+
+
+
+
+
+
+
+
 3. **Line ~389 (QualifierCompatibilityProofRequirement):** Add: "Discharged by Strategy 5 (Qualifier Compatibility Proof). The only dual-subject requirement kind — requires a dedicated strategy that compares two subjects' qualifier bindings. Depends on qualifier resolution in the TypeChecker."
+
+
+
+
+
+
+
+
 
 
 
@@ -21097,7 +42271,23 @@ After each subtype's existing description, add the discharge strategy reference:
 
 
 
+
+
+
+
+
+
+
+
 Expand the `TryModifierProof` function to include the two new arms (DimensionProofRequirement and ModifierRequirement) in addition to the existing ProofDischarges loop. Rename if desired to `TryDeclarationAttributeProof` to match the locked rename.
+
+
+
+
+
+
+
+
 
 
 
@@ -21113,7 +42303,23 @@ Expand the `TryModifierProof` function to include the two new arms (DimensionPro
 
 
 
+
+
+
+
+
+
+
+
 Add the full Strategy 5: Qualifier Compatibility Proof section as specified above.
+
+
+
+
+
+
+
+
 
 
 
@@ -21129,6 +42335,14 @@ Add the full Strategy 5: Qualifier Compatibility Proof section as specified abov
 
 
 
+
+
+
+
+
+
+
+
 Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
 
 
@@ -21137,7 +42351,23 @@ Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -21153,7 +42383,23 @@ Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
 
 
 
+
+
+
+
+
+
+
+
 ## No new catalog changes required for ModifierRequirement or DimensionProofRequirement
+
+
+
+
+
+
+
+
 
 
 
@@ -21165,7 +42411,19 @@ Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
 
 
 
+
+
+
+
 - `DimensionProofRequirement` reads the field's resolved qualifier (future Slice 2+ work) and literal temporal units. No new catalog property needed — it reads existing type metadata.
+
+
+
+
+
+
+
+
 
 
 
@@ -21181,7 +42439,19 @@ Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
 
 
 
+
+
+
+
+
+
+
+
 - The `QualifierAxis` enum already exists in `Type.cs` (line 39).
+
+
+
+
 
 
 
@@ -21189,7 +42459,19 @@ Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
 
 
 
+
+
+
+
 - What's missing: `TypedField.Qualifier` is currently `null` (TypeChecker.cs line 121). Qualifier resolution must ship before Strategy 5 can discharge obligations. Until then, all qualifier compatibility obligations are correctly `Unresolved`.
+
+
+
+
+
+
+
+
 
 
 
@@ -21205,6 +42487,14 @@ Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
 
 
 
+
+
+
+
+
+
+
+
 The `FieldModifierMeta.ProofDischarges` property (PE-G2) is needed for the "modifier discharges numeric/presence bound" arm of Strategy 2. The two new arms (DimensionProofRequirement, ModifierRequirement) do NOT depend on `ProofDischarges` — they use different predicate shapes. PE-G2 remains a blocking prerequisite only for Strategy 2's original `ProofDischarges` path.
 
 
@@ -21213,7 +42503,23 @@ The `FieldModifierMeta.ProofDischarges` property (PE-G2) is needed for the "modi
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -21229,7 +42535,19 @@ The `FieldModifierMeta.ProofDischarges` property (PE-G2) is needed for the "modi
 
 
 
+
+
+
+
+
+
+
+
 | Requirement Kind | Determination | Strategy | Blocking dependency? |
+
+
+
+
 
 
 
@@ -21237,7 +42555,15 @@ The `FieldModifierMeta.ProofDischarges` property (PE-G2) is needed for the "modi
 
 
 
+
+
+
+
 | `DimensionProofRequirement` | **B** — existing strategy handles it | Strategy 2 (Declaration Attribute Proof) | No (literal path works now; field path needs qualifier resolution) |
+
+
+
+
 
 
 
@@ -21245,7 +42571,19 @@ The `FieldModifierMeta.ProofDischarges` property (PE-G2) is needed for the "modi
 
 
 
+
+
+
+
 | `QualifierCompatibilityProofRequirement` | **C** — new strategy required | **Strategy 5** (Qualifier Compatibility Proof) | Yes — depends on qualifier resolution (Slice 2+) |
+
+
+
+
+
+
+
+
 
 
 
@@ -21261,7 +42599,19 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
+
+
+
+
 ## 2026-05-08T21:22:17Z: PE-G1 resolved — Shane sign-off
+
+
+
+
 
 
 
@@ -21269,7 +42619,15 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
 **DimensionProofRequirement:** Strategy 2 (new arm)
+
+
+
+
 
 
 
@@ -21277,7 +42635,15 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
 **QualifierCompatibilityProofRequirement:** Strategy 5 (new strategy, stubbed until qualifier resolution)
+
+
+
+
 
 
 
@@ -21285,9 +42651,23 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
 **Gap analysis updated:** docs/Working/frank-proof-engine-gap-analysis.md — PE-G1 marked RESOLVED
 
+
+
 # PE-G2 Analysis — ProofDischarge + FieldModifierMeta.ProofDischarges
+
+
+
+
+
+
+
+
 
 
 
@@ -21299,11 +42679,27 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
 
 
 
+
+
+
+
 **Status:** Ready for Shane sign-off
+
+
+
+
+
+
+
+
 
 
 
@@ -21319,7 +42715,19 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
+
+
+
+
 1. `FieldModifierMeta` currently exposes `Kind`, `Token`, `Description`, `Category`, `ApplicableTo`, `HasValue`, `Subsumes`, `HoverDescription`, `UsageExample`, `SnippetTemplate`, `DesugarsToRule`, and `MutuallyExclusiveWith`; there is no `ProofDischarges` constructor parameter or property in source today. (`src/Precept/Language/Modifier.cs:116-133`)
+
+
+
+
 
 
 
@@ -21327,7 +42735,15 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
 3. `NumericProofRequirement` already fixes `Kind` to `ProofRequirementKind.Numeric` and carries the actual proof payload as `(Subject, Comparison, Threshold, Description)`. The kind metadata is separately recoverable through `ProofRequirements.GetMeta(kind)`. `ProofDischarge` therefore does **not** need a redundant `ProofRequirementKind` field. (`src/Precept/Language/ProofRequirement.cs:41-53`, `src/Precept/Language/ProofRequirements.cs:13-19`)
+
+
+
+
 
 
 
@@ -21335,7 +42751,15 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
    - `Operations.cs` emits only `OperatorKind.NotEquals, 0m` obligations at every numeric site. (`src/Precept/Language/Operations.cs:100`, `src/Precept/Language/Operations.cs:109`, `src/Precept/Language/Operations.cs:131`, `src/Precept/Language/Operations.cs:140`, `src/Precept/Language/Operations.cs:162`, `src/Precept/Language/Operations.cs:171`, `src/Precept/Language/Operations.cs:193`, `src/Precept/Language/Operations.cs:202`, `src/Precept/Language/Operations.cs:224`, `src/Precept/Language/Operations.cs:233`, `src/Precept/Language/Operations.cs:335`, `src/Precept/Language/Operations.cs:344`, `src/Precept/Language/Operations.cs:353`, `src/Precept/Language/Operations.cs:418`, `src/Precept/Language/Operations.cs:428`, `src/Precept/Language/Operations.cs:438`, `src/Precept/Language/Operations.cs:447`, `src/Precept/Language/Operations.cs:456`, `src/Precept/Language/Operations.cs:465`, `src/Precept/Language/Operations.cs:497`, `src/Precept/Language/Operations.cs:507`, `src/Precept/Language/Operations.cs:517`, `src/Precept/Language/Operations.cs:526`, `src/Precept/Language/Operations.cs:535`, `src/Precept/Language/Operations.cs:595`, `src/Precept/Language/Operations.cs:613`)
+
+
+
+
 
 
 
@@ -21343,7 +42767,15 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
    - `Types.cs` and `Actions.cs` emit `OperatorKind.GreaterThan, 0m` and one `OperatorKind.GreaterThanOrEqual, 0m` against collection cardinality (`SelfSubject(CollectionCountAccessor)`). (`src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Types.cs:166-288`, `src/Precept/Language/Actions.cs:92-100`, `src/Precept/Language/Actions.cs:110-118`, `src/Precept/Language/Actions.cs:145-166`, `src/Precept/Language/Actions.cs:189-198`)
+
+
+
+
 
 
 
@@ -21351,11 +42783,27 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
 6. Valued modifiers are parsed and preserved as `ParsedModifier(ModifierKind Kind, ParsedExpression? Value)` on `DeclaredField`, but `TypedField.Modifiers` keeps only `ModifierKind`. The original field syntax is still retained on `TypedField.Syntax`, and `ParsedConstruct.GetSlot<T>()` can recover the `ModifierListSlot`. Therefore parametric discharges (`min`, `max`, `mincount`, etc.) must encode “threshold comes from the modifier value,” not a fixed decimal stored in catalog metadata. (`src/Precept/Pipeline/SlotValue.cs:26-30`, `src/Precept/Pipeline/SymbolTable.cs:54-62`, `src/Precept/Pipeline/TypeChecker.cs:99-102`, `src/Precept/Pipeline/SemanticIndex.cs:239-253`, `src/Precept/Pipeline/ParsedConstruct.cs:20-29`)
 
 
 
+
+
+
+
 7. Existing spec text is not implementable as written: both `proof-engine.md` and `catalog-system.md` currently model `ProofDischarge` as `(ProofRequirementKind, OperatorKind?, decimal?)`, which cannot represent (a) whether the discharge applies to the field value vs cardinality and (b) whether the threshold is fixed vs modifier-sourced. (`docs/compiler/proof-engine.md:517-607`, `docs/compiler/proof-engine.md:1179-1203`, `docs/language/catalog-system.md:1298-1324`)
+
+
+
+
+
+
+
+
 
 
 
@@ -21371,7 +42819,23 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
+
+
+
+
+
+
+
+
 ## Recommendation
+
+
+
+
+
+
+
+
 
 
 
@@ -21387,7 +42851,19 @@ Use a single top-level `ProofDischarge` record with a **narrow subject discrimin
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -21395,7 +42871,15 @@ public enum ProofDischargeSubject
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -21403,11 +42887,27 @@ public enum ProofDischargeSubject
 
 
 
+
+
+
+
     Cardinality = 2,
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -21419,11 +42919,23 @@ public sealed record ProofDischarge(
 
 
 
+
+
+
+
     ProofDischargeSubject Subject,
 
 
 
+
+
+
+
     OperatorKind Comparison,
+
+
+
+
 
 
 
@@ -21435,7 +42947,19 @@ public sealed record ProofDischarge(
 
 
 
+
+
+
+
+
+
+
+
 public abstract record ProofDischargeThreshold
+
+
+
+
 
 
 
@@ -21443,7 +42967,15 @@ public abstract record ProofDischargeThreshold
 
 
 
+
+
+
+
     public sealed record Fixed(decimal Value) : ProofDischargeThreshold;
+
+
+
+
 
 
 
@@ -21451,11 +42983,27 @@ public abstract record ProofDischargeThreshold
 
 
 
+
+
+
+
 }
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -21471,7 +43019,19 @@ public abstract record ProofDischargeThreshold
 
 
 
+
+
+
+
+
+
+
+
 - **No `ProofRequirementKind`:** `FieldModifierMeta.ProofDischarges` is only for Strategy-2 numeric declaration proofs, and `NumericProofRequirement` already fixes `Kind = Numeric`; storing the kind again is redundant metadata. (`src/Precept/Language/ProofRequirement.cs:41-53`, `src/Precept/Language/ProofRequirements.cs:13-19`)
+
+
+
+
 
 
 
@@ -21479,11 +43039,27 @@ public abstract record ProofDischargeThreshold
 
 
 
+
+
+
+
 - **Needs a threshold source, not just a threshold value:** fixed modifiers (`positive`, `nonnegative`, `nonzero`, `notempty`) prove against `0m`; valued modifiers (`min`, `max`, `mincount`, etc.) must read the declaration’s own value expression. (`src/Precept/Language/Modifiers.cs:61-145`, `src/Precept/Pipeline/SlotValue.cs:26-30`, `src/Precept/Pipeline/TypeChecker.cs:99-102`)
 
 
 
+
+
+
+
 - **DU only where shape actually varies:** the only shape variation is threshold source (`Fixed(decimal)` vs `ModifierValue()`), so the DU belongs there. The top-level discharge row is still the same shape for every modifier: subject axis + comparison + threshold source.
+
+
+
+
+
+
+
+
 
 
 
@@ -21499,7 +43075,23 @@ public abstract record ProofDischargeThreshold
 
 
 
+
+
+
+
+
+
+
+
 ## Recommendation
+
+
+
+
+
+
+
+
 
 
 
@@ -21515,7 +43107,19 @@ Use the same small-array pattern the language catalogs already use for proof met
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -21523,7 +43127,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierKind Kind,
+
+
+
+
 
 
 
@@ -21531,7 +43143,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     string Description,
+
+
+
+
 
 
 
@@ -21539,7 +43159,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     TypeTarget[] ApplicableTo,
+
+
+
+
 
 
 
@@ -21547,7 +43175,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierKind[] Subsumes = default!,
+
+
+
+
 
 
 
@@ -21555,7 +43191,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     string? HoverDescription = null,
+
+
+
+
 
 
 
@@ -21563,7 +43207,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     string? SnippetTemplate = null,
+
+
+
+
 
 
 
@@ -21571,7 +43223,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierKind[]? MutuallyExclusiveWith = null)
+
+
+
+
 
 
 
@@ -21579,7 +43239,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -21587,7 +43255,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     public ProofDischarge[] ProofDischarges { get; init; } = ProofDischarges ?? [];
+
+
+
+
 
 
 
@@ -21595,7 +43271,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -21611,7 +43299,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 - Strategy 2’s access pattern is a tiny linear scan: `foreach (var discharge in meta.ProofDischarges)`. There is no key lookup to justify `FrozenSet<>`. (`docs/compiler/proof-engine.md:586-593`)
+
+
+
+
 
 
 
@@ -21619,7 +43319,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 - `FieldModifierMeta` already uses arrays for other tiny metadata bags (`ApplicableTo`, `Subsumes`, `MutuallyExclusiveWith`). (`src/Precept/Language/Modifier.cs:116-133`)
+
+
+
+
+
+
+
+
 
 
 
@@ -21635,7 +43347,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ## Recommended population
+
+
+
+
+
+
+
+
 
 
 
@@ -21647,7 +43375,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 |---|---|---:|---|
+
+
+
+
 
 
 
@@ -21655,7 +43391,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `nonnegative` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.Fixed(0m))` | Yes | Directly matches current `sqrt` / integer-`pow` proof obligations. (`src/Precept/Language/Modifiers.cs:61-67`, `src/Precept/Language/Functions.cs:163-188`) |
+
+
+
+
 
 
 
@@ -21663,7 +43407,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `notempty` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.GreaterThan, new ProofDischargeThreshold.Fixed(0m))` | Yes | This is a cardinality fact, not a presence fact. It discharges current collection `.count > 0` obligations and, via subsumption, `.count >= 0` obligations. (`src/Precept/Language/Modifiers.cs:85-90`, `src/Precept/Language/ModifierKind.cs:21-22`, `src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Actions.cs:92-100`) |
+
+
+
+
 
 
 
@@ -21671,7 +43423,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `max(N)` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Semantically correct upper-bound metadata; current source does not emit any `<=` numeric obligations yet, but this belongs in the catalog because `max` is a first-class declaration of that bound. (`src/Precept/Language/Modifiers.cs:105-110`) |
+
+
+
+
 
 
 
@@ -21679,7 +43439,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `maxcount(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Semantically correct upper-bound metadata for future cardinality upper-bound obligations. (`src/Precept/Language/Modifiers.cs:133-138`) |
+
+
+
+
 
 
 
@@ -21687,7 +43455,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | `maxlength(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Current source has no string-cardinality upper-bound proof emitters, but catalog truth should still declare the bound. (`src/Precept/Language/Modifiers.cs:119-124`) |
+
+
+
+
+
+
+
+
 
 
 
@@ -21703,7 +43483,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 - `optional` — presence/nullability is not modeled by the current numeric discharge path. (`src/Precept/Language/Modifiers.cs:49-53`, `src/Precept/Language/ProofRequirement.cs:56-63`)
+
+
+
+
 
 
 
@@ -21711,7 +43503,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 - `default` — initialization expression, not a declaration-time proof bound. (`src/Precept/Language/Modifiers.cs:92-96`)
+
+
+
+
 
 
 
@@ -21719,7 +43519,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 - `writable` — access-mode/editability semantics, not proof discharge. (`src/Precept/Language/Modifiers.cs:147-151`)
+
+
+
+
+
+
+
+
 
 
 
@@ -21735,7 +43547,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 1. **Replace the flat `ProofDischarge(ProofRequirementKind, OperatorKind?, decimal?)` snippet** in Strategy 2 and Decision 5 with the subject-aware + threshold-source shape above. The current doc shape cannot represent cardinality-vs-field-value or modifier-sourced thresholds. (`docs/compiler/proof-engine.md:517-537`, `docs/compiler/proof-engine.md:1188-1193`)
+
+
+
+
 
 
 
@@ -21743,7 +43567,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 3. **Teach the pseudocode to compare the discharge subject axis** (`FieldValue` vs `Cardinality`) against the resolved requirement subject. The current pseudocode only compares requirement kind/comparison/threshold, which is insufficient. (`docs/compiler/proof-engine.md:542-607`, `src/Precept/Language/Types.cs:153-154`)
+
+
+
+
 
 
 
@@ -21751,7 +43583,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 5. **Iterate both declared and implied modifiers** when doing declaration-attribute proof. Strategy 2 text already says it reads “modifier-implied metadata,” but the pseudocode currently walks only `attributeField.Modifiers`. (`docs/compiler/proof-engine.md:485-487`, `docs/compiler/proof-engine.md:586-590`, `src/Precept/Pipeline/SemanticIndex.cs:244-245`, `src/Precept/Language/Types.cs:458-460`, `src/Precept/Language/Types.cs:525-529`, `src/Precept/Language/Types.cs:554-562`, `src/Precept/Language/Types.cs:565-574`)
+
+
+
+
 
 
 
@@ -21759,7 +43599,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 7. **Remove the “resolved in source” language until code lands.** The doc currently claims CC#5 is already canonical/in source, but the actual `FieldModifierMeta` shape still lacks the property. (`docs/compiler/proof-engine.md:609-611`, `src/Precept/Language/Modifier.cs:116-133`)
+
+
+
+
+
+
+
+
 
 
 
@@ -21775,7 +43627,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 | Decision | Recommendation | Rationale |
+
+
+
+
 
 
 
@@ -21783,7 +43647,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | 1. `ProofDischarge` shape | Use `ProofDischarge(ProofDischargeSubject Subject, OperatorKind Comparison, ProofDischargeThreshold Threshold)` with `ProofDischargeThreshold.Fixed(decimal)` / `ModifierValue()`; do **not** store `ProofRequirementKind`. | Numeric declaration proof needs subject axis + comparison + threshold source, and only the threshold source has shape variation. |
+
+
+
+
 
 
 
@@ -21791,9 +43663,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 | 3. Population entries | Populate all bound-establishing field modifiers now: live rows for `positive`, `nonnegative`, `nonzero`, `notempty`, `min`, `mincount`; semantically complete dormant rows for `max`, `maxcount`, `minlength`, and `maxlength`. | This keeps modifier meaning catalog-declared instead of consumer-hardcoded and prevents the next proof-engine feature from reopening the same metadata gap. |
 
+
+
 # PE-G2 Broader Design Review — Should `ProofDischarge` cover all requirement kinds?
+
+
+
+
+
+
+
+
 
 
 
@@ -21805,7 +43691,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
+
+
+
+
 
 
 
@@ -21813,7 +43707,19 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 **Trigger:** Shane challenged the narrow numeric-only `ProofDischarge` scope — asking whether a broader DU covering all three Strategy 2 proof requirement kinds would be more coherent.
+
+
+
+
+
+
+
+
 
 
 
@@ -21829,7 +43735,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 The narrow numeric-only `ProofDischarge` shape from the prior analysis is the architecturally correct design. A broader DU would add structural complexity with zero information gain — two of the three subtypes would either be tautological or permanently empty.
+
+
+
+
+
+
+
+
 
 
 
@@ -21845,7 +43767,23 @@ The narrow numeric-only `ProofDischarge` shape from the prior analysis is the ar
 
 
 
+
+
+
+
+
+
+
+
 The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind` enum value to apply per-member behavior?"* If yes, that behavior belongs in catalog metadata. Let me apply this test rigorously to each Strategy 2 arm.
+
+
+
+
+
+
+
+
 
 
 
@@ -21861,7 +43799,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 **Current design:** Strategy 2 reads `FieldModifierMeta.ProofDischarges` and calls `DischargeCovers(discharge, requirement)`. The proof engine never switches on `ModifierKind`. It iterates the discharge array generically. Domain knowledge (which modifiers establish which bounds) lives entirely in catalog metadata entries.
+
+
+
+
+
+
+
+
 
 
 
@@ -21877,7 +43831,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 ## Arm 2: `ModifierRequirement` — Direct presence check ✅ Already generic machinery
+
+
+
+
+
+
+
+
 
 
 
@@ -21893,7 +43863,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 **Does it switch on a `ModifierKind` value to apply per-member behavior?** No. It doesn't switch on *which* modifier is required. The `Required` value comes from the obligation itself (emitted by the Operations catalog — e.g., choice ordering operations emit `ModifierRequirement(Subject, ModifierKind.Ordered, ...)`). The proof engine simply checks: "does the field have it?" This is structurally identical to `list.Contains(item)` — the most generic possible predicate.
+
+
+
+
+
+
+
+
 
 
 
@@ -21909,7 +43895,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 **Is there any modifier whose proof-discharge relationship to `ModifierRequirement` is non-obvious or non-identity?** No. The subsumption relationship (`positive` subsumes `nonzero`) exists only in numeric bound semantics. For modifier presence, `ordered` is `ordered` — there is no "modifier A implies modifier B is present" relationship that would benefit from catalog declaration.
+
+
+
+
+
+
+
+
 
 
 
@@ -21925,7 +43927,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 ## Arm 3: `DimensionProofRequirement` — Period dimension resolution ✅ Different knowledge source
+
+
+
+
+
+
+
+
 
 
 
@@ -21941,7 +43959,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 **Does this involve modifier metadata at all?** No. Period dimension is a property of the *type system* (qualifier on a `period` field or unit on a period literal), not a property of any modifier. The dimension data lives in `TypedField`'s qualifier metadata and in period literal units — neither of which are modifiers.
+
+
+
+
+
+
+
+
 
 
 
@@ -21957,7 +43991,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 **Would `ProofDischarge.Dimension(PeriodDimension.Date)` entries on any `FieldModifierMeta` have entries?** Zero entries. No modifier in the catalog establishes a period dimension. This subtype would be permanently empty — a shape that exists but is never populated.
+
+
+
+
+
+
+
+
 
 
 
@@ -21973,7 +44023,23 @@ The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind
 
 
 
+
+
+
+
+
+
+
+
 ## 3. Why the broader DU fails the architecture test
+
+
+
+
+
+
+
+
 
 
 
@@ -21989,7 +44055,19 @@ The proposed broader DU:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -21997,7 +44075,15 @@ public abstract record ProofDischarge {
 
 
 
+
+
+
+
     public sealed record Numeric(...) : ProofDischarge;
+
+
+
+
 
 
 
@@ -22005,7 +44091,15 @@ public abstract record ProofDischarge {
 
 
 
+
+
+
+
     public sealed record Dimension(PeriodDimension Dimension) : ProofDischarge;
+
+
+
+
 
 
 
@@ -22013,7 +44107,19 @@ public abstract record ProofDischarge {
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -22029,7 +44135,19 @@ Fails on three counts:
 
 
 
+
+
+
+
+
+
+
+
 | Criterion | Result |
+
+
+
+
 
 
 
@@ -22037,7 +44155,15 @@ Fails on three counts:
 
 
 
+
+
+
+
 | **Does it eliminate hardcoded per-member logic from the proof engine?** | No. The `ModifierRequirement` arm has no per-member logic to eliminate — `Contains` is generic. The `DimensionProofRequirement` arm reads from the type system, not modifiers. |
+
+
+
+
 
 
 
@@ -22045,7 +44171,19 @@ Fails on three counts:
 
 
 
+
+
+
+
 | **Does it have the right shape variation? (DU only where shapes actually differ)** | No. Two of three arms would be degenerate: `ModifierPresence` restates what the modifier already is; `Dimension` has zero inhabitants. DU arms with zero or tautological members are structural noise, not shape variation. |
+
+
+
+
+
+
+
+
 
 
 
@@ -22061,11 +44199,31 @@ The metadata-driven principle says: *catalog what IS domain knowledge.* But not 
 
 
 
+
+
+
+
+
+
+
+
 - **"The `ordered` modifier proves `ordered` is present"** is not domain knowledge — it's a logical tautology.
 
 
 
+
+
+
+
 - **"Period dimension comes from the type qualifier"** is not modifier domain knowledge — it's type-system domain knowledge that lives in a different catalog surface.
+
+
+
+
+
+
+
+
 
 
 
@@ -22081,7 +44239,23 @@ Cataloging these would violate the principle's corollary: catalogs carry *meanin
 
 
 
+
+
+
+
+
+
+
+
 ## 4. What makes the Strategy 2 arms NOT hardcoded per-member knowledge
+
+
+
+
+
+
+
+
 
 
 
@@ -22097,7 +44271,19 @@ The metadata-driven principle targets a specific smell: `kind switch { FooKind.B
 
 
 
+
+
+
+
+
+
+
+
 | Arm | What it switches on | Why it's not the smell |
+
+
+
+
 
 
 
@@ -22105,7 +44291,15 @@ The metadata-driven principle targets a specific smell: `kind switch { FooKind.B
 
 
 
+
+
+
+
 | **NumericProofRequirement** | Nothing — iterates `ProofDischarges[]` generically | Catalog-driven loop, no per-modifier branching |
+
+
+
+
 
 
 
@@ -22113,7 +44307,19 @@ The metadata-driven principle targets a specific smell: `kind switch { FooKind.B
 
 
 
+
+
+
+
 | **DimensionProofRequirement** | `PeriodDimension` enum — but this comparison is `resolved == required`, not a per-member behavior switch | Reads dimension from type metadata and compares to requirement. No per-dimension branching logic. `dimension == PeriodDimension.Any \|\| dimension == dimReq.RequiredDimension` is a universal pattern (wildcard + exact match), not per-member dispatch |
+
+
+
+
+
+
+
+
 
 
 
@@ -22129,7 +44335,23 @@ The proof engine switches on **requirement subtype** (`is DimensionProofRequirem
 
 
 
+
+
+
+
+
+
+
+
 ## 5. Decision summary
+
+
+
+
+
+
+
+
 
 
 
@@ -22141,7 +44363,15 @@ The proof engine switches on **requirement subtype** (`is DimensionProofRequirem
 
 
 
+
+
+
+
 |---|---|---|---|
+
+
+
+
 
 
 
@@ -22149,7 +44379,19 @@ The proof engine switches on **requirement subtype** (`is DimensionProofRequirem
 
 
 
+
+
+
+
 | Strategy 2 arm structure | Keep three dedicated arms: (1) ProofDischarges catalog loop for `NumericProofRequirement`, (2) `Contains` check for `ModifierRequirement`, (3) dimension resolution for `DimensionProofRequirement` | Each arm reads from a different metadata surface. Unifying them into a single `ProofDischarges` loop would force modifier and dimension knowledge into the wrong catalog surface (`FieldModifierMeta`) where it doesn't naturally belong. | Strategy 2 has three code paths instead of one. But each path is ~3-5 lines of generic machinery. Simplicity of the unified loop is illusory — it would push complexity into tautological or empty catalog entries. |
+
+
+
+
+
+
+
+
 
 
 
@@ -22165,9 +44407,27 @@ The proof engine switches on **requirement subtype** (`is DimensionProofRequirem
 
 
 
+
+
+
+
+
+
+
+
 Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior PE-G2 analysis. The broader DU is architecturally weaker, not stronger — it would catalog non-knowledge (tautologies and empty sets) in pursuit of a false uniformity. The current three-arm Strategy 2 design is the correct metadata-driven architecture because each arm reads from the *right* metadata source for its proof obligation kind.
 
+
+
 # PE-G2 Full Design — `ProofSatisfaction` and all five requirement kinds
+
+
+
+
+
+
+
+
 
 
 
@@ -22179,11 +44439,27 @@ Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
 
 
 
+
+
+
+
 **Status:** Complete design for implementation — no deferrals
+
+
+
+
+
+
+
+
 
 
 
@@ -22199,7 +44475,23 @@ Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior
 
 
 
+
+
+
+
+
+
+
+
 Shane is right. The broader design must be finished now, not postponed.
+
+
+
+
+
+
+
+
 
 
 
@@ -22215,7 +44507,19 @@ The correct architecture is:
 
 
 
+
+
+
+
+
+
+
+
 1. **Rename** `ProofDischarge` → `ProofSatisfaction`.
+
+
+
+
 
 
 
@@ -22223,7 +44527,15 @@ The correct architecture is:
 
 
 
+
+
+
+
 3. **Add a positive presence carrier** so Presence proof does not depend on the absence of `optional`.
+
+
+
+
 
 
 
@@ -22231,7 +44543,19 @@ The correct architecture is:
 
 
 
+
+
+
+
 5. **Keep direct modifier membership as the canonical `ModifierRequirement` path.** Do not duplicate `ordered proves ordered` into metadata rows.
+
+
+
+
+
+
+
+
 
 
 
@@ -22247,7 +44571,23 @@ That yields one proof metadata vocabulary, but not one carrier. The carriers are
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -22263,7 +44603,19 @@ That yields one proof metadata vocabulary, but not one carrier. The carriers are
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/ProofRequirement.cs`
+
+
+
+
 
 
 
@@ -22275,7 +44627,19 @@ That yields one proof metadata vocabulary, but not one carrier. The carriers are
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -22287,7 +44651,19 @@ namespace Precept.Language;
 
 
 
+
+
+
+
+
+
+
+
 public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
+
+
+
+
 
 
 
@@ -22295,7 +44671,15 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
     public sealed record Numeric(
+
+
+
+
 
 
 
@@ -22303,11 +44687,23 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
         OperatorKind Comparison,
 
 
 
+
+
+
+
         NumericBoundSource Bound)
+
+
+
+
 
 
 
@@ -22319,7 +44715,19 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Presence()
+
+
+
+
 
 
 
@@ -22331,11 +44739,27 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Dimension(
 
 
 
+
+
+
+
         DimensionSource Source)
+
+
+
+
 
 
 
@@ -22347,11 +44771,27 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Modifier(
 
 
 
+
+
+
+
         ModifierKind RequiredModifier)
+
+
+
+
 
 
 
@@ -22363,7 +44803,19 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record QualifierCompatibility(
+
+
+
+
 
 
 
@@ -22371,11 +44823,27 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
         : ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -22387,7 +44855,15 @@ public abstract record SatisfactionProjection
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -22395,11 +44871,27 @@ public abstract record SatisfactionProjection
 
 
 
+
+
+
+
     public sealed record Accessor(string Name) : SatisfactionProjection;
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -22411,7 +44903,15 @@ public abstract record NumericBoundSource
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -22419,11 +44919,27 @@ public abstract record NumericBoundSource
 
 
 
+
+
+
+
     public sealed record DeclarationValue() : NumericBoundSource;
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -22435,7 +44951,15 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -22443,7 +44967,15 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
     public sealed record DeclaredTemporalDimension() : DimensionSource;
+
+
+
+
 
 
 
@@ -22451,7 +44983,19 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -22467,7 +45011,19 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
+
+
+
+
 - **Numeric** needs a projection plus a bound source.
+
+
+
+
 
 
 
@@ -22475,11 +45031,23 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
 - **Dimension** needs a dimension source, because the satisfied dimension may come from the carrier entry.
 
 
 
+
+
+
+
 - **Modifier** exists in the DU for vocabulary completeness, but current implementation does **not** need populated rows.
+
+
+
+
 
 
 
@@ -22491,7 +45059,23 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -22507,7 +45091,23 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/Modifier.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -22519,7 +45119,15 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
 public sealed record FieldModifierMeta(
+
+
+
+
 
 
 
@@ -22527,7 +45135,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     TokenMeta Token,
+
+
+
+
 
 
 
@@ -22535,7 +45151,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierCategory Category,
+
+
+
+
 
 
 
@@ -22543,7 +45167,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     bool HasValue = false,
+
+
+
+
 
 
 
@@ -22551,7 +45183,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     ProofSatisfaction[]? ProofSatisfactions = null,
+
+
+
+
 
 
 
@@ -22559,7 +45199,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     string? UsageExample = null,
+
+
+
+
 
 
 
@@ -22567,7 +45215,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     bool DesugarsToRule = false,
+
+
+
+
 
 
 
@@ -22575,7 +45231,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith)
+
+
+
+
 
 
 
@@ -22583,7 +45247,15 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
     public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+
+
+
+
 
 
 
@@ -22591,11 +45263,27 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
 }
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -22611,7 +45299,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -22627,7 +45331,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ## 4.1 What fact satisfies `PresenceProofRequirement`?
+
+
+
+
+
+
+
+
 
 
 
@@ -22643,7 +45363,23 @@ public sealed record FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 That is the positive fact the proof engine needs. The absence of `optional` is not the carrier. The compiler must normalize that absence into a positive declaration fact.
+
+
+
+
+
+
+
+
 
 
 
@@ -22659,7 +45395,23 @@ That is the positive fact the proof engine needs. The absence of `optional` is n
 
 
 
+
+
+
+
+
+
+
+
 **Carrier:** new declaration-attached metadata type `DeclaredPresenceMeta`.
+
+
+
+
+
+
+
+
 
 
 
@@ -22675,7 +45427,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
+
+
+
+
 - `PresenceProofRequirement` is about **nullability / absence semantics**, not numeric bounds.
+
+
+
+
 
 
 
@@ -22683,7 +45447,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
 - The engine needs a **positive**, normalized fact on every field and arg.
+
+
+
+
+
+
+
+
 
 
 
@@ -22699,7 +45475,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/DeclaredPresence.cs`
+
+
+
+
 
 
 
@@ -22711,7 +45499,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -22723,7 +45523,19 @@ namespace Precept.Language;
 
 
 
+
+
+
+
+
+
+
+
 public abstract record DeclaredPresenceMeta(
+
+
+
+
 
 
 
@@ -22731,11 +45543,23 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
     ProofSatisfaction[]? ProofSatisfactions = null)
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -22747,7 +45571,19 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Guaranteed()
+
+
+
+
 
 
 
@@ -22755,7 +45591,15 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
             "Value is structurally present on every instance",
+
+
+
+
 
 
 
@@ -22767,7 +45611,19 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Optional()
+
+
+
+
 
 
 
@@ -22775,7 +45631,15 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
             "Value may be absent");
+
+
+
+
 
 
 
@@ -22783,7 +45647,19 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -22799,7 +45675,19 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
+
+
+
+
 | Carrier member | `ProofSatisfactions` | Meaning |
+
+
+
+
 
 
 
@@ -22807,11 +45695,27 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
 | `DeclaredPresenceMeta.Guaranteed` | `new ProofSatisfaction.Presence()` | Required field / required arg / computed field value is always present |
 
 
 
+
+
+
+
 | `DeclaredPresenceMeta.Optional` | _none_ | Presence must be proven by guard, not declaration |
+
+
+
+
+
+
+
+
 
 
 
@@ -22827,7 +45731,23 @@ public abstract record DeclaredPresenceMeta(
 
 
 
+
+
+
+
+
+
+
+
 The type checker must attach one `DeclaredPresenceMeta` to every `TypedField` and `TypedArg`:
+
+
+
+
+
+
+
+
 
 
 
@@ -22839,7 +45759,19 @@ The type checker must attach one `DeclaredPresenceMeta` to every `TypedField` an
 
 
 
+
+
+
+
 - otherwise → `new DeclaredPresenceMeta.Guaranteed()`
+
+
+
+
+
+
+
+
 
 
 
@@ -22855,7 +45787,23 @@ That is the full answer. Presence proof becomes positive metadata, not absence-c
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -22871,7 +45819,23 @@ That is the full answer. Presence proof becomes positive metadata, not absence-c
 
 
 
+
+
+
+
+
+
+
+
 ## 5.1 What fact satisfies `DimensionProofRequirement`?
+
+
+
+
+
+
+
+
 
 
 
@@ -22887,7 +45851,23 @@ That is the full answer. Presence proof becomes positive metadata, not absence-c
 
 
 
+
+
+
+
+
+
+
+
 Examples:
+
+
+
+
+
+
+
+
 
 
 
@@ -22899,7 +45879,15 @@ Examples:
 
 
 
+
+
+
+
 - `period of 'time'` → `Time`
+
+
+
+
 
 
 
@@ -22907,7 +45895,19 @@ Examples:
 
 
 
+
+
+
+
 - unqualified `period` → baseline `Any` (per Shane’s already-locked permissive decision)
+
+
+
+
+
+
+
+
 
 
 
@@ -22923,7 +45923,23 @@ Examples:
 
 
 
+
+
+
+
+
+
+
+
 **Fact:** the declaration resolves to a concrete qualifier binding on the required axis.
+
+
+
+
+
+
+
+
 
 
 
@@ -22939,7 +45955,19 @@ Examples:
 
 
 
+
+
+
+
+
+
+
+
 - `money in 'USD'` → `Currency = USD`
+
+
+
+
 
 
 
@@ -22947,7 +45975,19 @@ Examples:
 
 
 
+
+
+
+
 - `price in 'USD/each'` → `Currency = USD`, `Unit = each`, derived `Dimension = count`
+
+
+
+
+
+
+
+
 
 
 
@@ -22963,7 +46003,23 @@ Examples:
 
 
 
+
+
+
+
+
+
+
+
 **Carrier:** new normalized declaration-attached metadata type `DeclaredQualifierMeta`.
+
+
+
+
+
+
+
+
 
 
 
@@ -22979,7 +46035,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
+
+
+
+
 - `TypeMeta.QualifierShape` describes **allowed slots**, not the declaration’s chosen value.
+
+
+
+
 
 
 
@@ -22987,7 +46055,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
 - The proof engine needs **resolved per-axis values**, including derived ones.
+
+
+
+
+
+
+
+
 
 
 
@@ -23003,7 +46083,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
+
+
+
+
 **File:** `src/Precept/Language/DeclaredQualifierMeta.cs`
+
+
+
+
 
 
 
@@ -23015,7 +46107,19 @@ Why this is the right carrier:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -23027,7 +46131,19 @@ namespace Precept.Language;
 
 
 
+
+
+
+
+
+
+
+
 public enum QualifierOrigin
+
+
+
+
 
 
 
@@ -23035,7 +46151,15 @@ public enum QualifierOrigin
 
 
 
+
+
+
+
     Explicit = 1,
+
+
+
+
 
 
 
@@ -23043,11 +46167,27 @@ public enum QualifierOrigin
 
 
 
+
+
+
+
     Baseline = 3,
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -23059,7 +46199,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
     QualifierAxis Axis,
+
+
+
+
 
 
 
@@ -23067,7 +46215,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
     TokenKind? Preposition,
+
+
+
+
 
 
 
@@ -23075,7 +46231,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -23087,7 +46251,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Currency(
+
+
+
+
 
 
 
@@ -23095,7 +46271,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         QualifierOrigin Origin = QualifierOrigin.Explicit,
+
+
+
+
 
 
 
@@ -23103,7 +46287,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         ProofSatisfaction[]? ProofSatisfactions = null)
+
+
+
+
 
 
 
@@ -23115,7 +46307,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Unit(
+
+
+
+
 
 
 
@@ -23123,7 +46327,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         string DimensionName,
+
+
+
+
 
 
 
@@ -23131,11 +46343,23 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         TokenKind? Preposition = TokenKind.In,
 
 
 
+
+
+
+
         ProofSatisfaction[]? ProofSatisfactions = null)
+
+
+
+
 
 
 
@@ -23147,7 +46371,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Dimension(
+
+
+
+
 
 
 
@@ -23155,7 +46391,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         QualifierOrigin Origin = QualifierOrigin.Explicit,
+
+
+
+
 
 
 
@@ -23163,7 +46407,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         ProofSatisfaction[]? ProofSatisfactions = null)
+
+
+
+
 
 
 
@@ -23175,7 +46427,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record FromCurrency(
+
+
+
+
 
 
 
@@ -23183,7 +46447,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         QualifierOrigin Origin = QualifierOrigin.Explicit,
+
+
+
+
 
 
 
@@ -23191,7 +46463,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         ProofSatisfaction[]? ProofSatisfactions = null)
+
+
+
+
 
 
 
@@ -23203,7 +46483,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record ToCurrency(
+
+
+
+
 
 
 
@@ -23211,7 +46503,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         QualifierOrigin Origin = QualifierOrigin.Explicit,
+
+
+
+
 
 
 
@@ -23219,7 +46519,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         ProofSatisfaction[]? ProofSatisfactions = null)
+
+
+
+
 
 
 
@@ -23231,7 +46539,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Timezone(
+
+
+
+
 
 
 
@@ -23239,7 +46559,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         QualifierOrigin Origin = QualifierOrigin.Explicit,
+
+
+
+
 
 
 
@@ -23247,7 +46575,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         ProofSatisfaction[]? ProofSatisfactions = null)
+
+
+
+
 
 
 
@@ -23259,7 +46595,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record TemporalDimension(
+
+
+
+
 
 
 
@@ -23267,7 +46615,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         QualifierOrigin Origin = QualifierOrigin.Explicit,
+
+
+
+
 
 
 
@@ -23275,7 +46631,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         ProofSatisfaction[]? ProofSatisfactions = null)
+
+
+
+
 
 
 
@@ -23287,7 +46651,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
     public sealed record TemporalUnit(
+
+
+
+
 
 
 
@@ -23295,7 +46671,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         PeriodDimension DerivedDimension,
+
+
+
+
 
 
 
@@ -23303,7 +46687,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         TokenKind? Preposition = TokenKind.In,
+
+
+
+
 
 
 
@@ -23311,7 +46703,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
         : DeclaredQualifierMeta(QualifierAxis.TemporalUnit, Origin, Preposition, ProofSatisfactions);
+
+
+
+
 
 
 
@@ -23319,7 +46719,19 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -23335,7 +46747,23 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ## 5.5.1 `DimensionProofRequirement`
+
+
+
+
+
+
+
+
 
 
 
@@ -23347,7 +46775,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 |---|---|---|
+
+
+
+
 
 
 
@@ -23355,11 +46791,27 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalDimension(Any, Origin: Baseline, Preposition: null)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` | unqualified `period` baseline fact |
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalUnit(...)` | _none directly_ | normalize to a second derived `TemporalDimension` entry |
+
+
+
+
+
+
+
+
 
 
 
@@ -23375,7 +46827,23 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ## 5.5.2 `QualifierCompatibilityProofRequirement`
+
+
+
+
+
+
+
+
 
 
 
@@ -23387,7 +46855,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 |---|---|
+
+
+
+
 
 
 
@@ -23395,7 +46871,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.Unit` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Unit)` |
+
+
+
+
 
 
 
@@ -23403,7 +46887,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.FromCurrency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.FromCurrency)` |
+
+
+
+
 
 
 
@@ -23411,7 +46903,15 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.Timezone` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Timezone)` |
+
+
+
+
 
 
 
@@ -23419,11 +46919,27 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalDimension` with `Value != PeriodDimension.Any` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.TemporalDimension)` |
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalDimension` with `Value == PeriodDimension.Any` | _none_ |
+
+
+
+
+
+
+
+
 
 
 
@@ -23439,7 +46955,23 @@ public abstract record DeclaredQualifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ## 5.6 Normalization rules
+
+
+
+
+
+
+
+
 
 
 
@@ -23455,7 +46987,19 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
+
+
+
+
 ## `money`
+
+
+
+
 
 
 
@@ -23467,11 +47011,27 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
+
+
+
+
 ## `quantity`
 
 
 
+
+
+
+
 - `quantity in 'kg'` → `Unit("kg", "mass")` **plus** derived `Dimension("mass", Origin: Derived, Preposition: TokenKind.In)`
+
+
+
+
 
 
 
@@ -23483,11 +47043,27 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
+
+
+
+
 ## `price`
 
 
 
+
+
+
+
 - `price in 'USD/each'` → `Currency("USD")` + `Unit("each", "count")` + derived `Dimension("count", Origin: Derived, Preposition: TokenKind.In)`
+
+
+
+
 
 
 
@@ -23499,7 +47075,19 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
+
+
+
+
 ## `exchange rate`
+
+
+
+
 
 
 
@@ -23511,7 +47099,19 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
+
+
+
+
 ## `period`
+
+
+
+
 
 
 
@@ -23519,7 +47119,15 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
 - `period of 'time'` → `TemporalDimension(PeriodDimension.Time)`
+
+
+
+
 
 
 
@@ -23527,11 +47135,27 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
 - `period in 'hours'` → `TemporalUnit("hours", PeriodDimension.Time)` + derived `TemporalDimension(PeriodDimension.Time, Origin: Derived, Preposition: TokenKind.In)`
 
 
 
+
+
+
+
 - unqualified `period` → baseline `TemporalDimension(PeriodDimension.Any, Origin: Baseline, Preposition: null)`
+
+
+
+
+
+
+
+
 
 
 
@@ -23547,7 +47171,23 @@ The type checker must normalize a declaration’s qualifier surface into zero or
 
 
 
+
+
+
+
+
+
+
+
 To make the carriers usable, the semantic model must attach them to declarations.
+
+
+
+
+
+
+
+
 
 
 
@@ -23559,7 +47199,19 @@ To make the carriers usable, the semantic model must attach them to declarations
 
 
 
+
+
+
+
 - `TypedArg` gains `DeclaredPresenceMeta Presence` and `ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers`
+
+
+
+
+
+
+
+
 
 
 
@@ -23575,7 +47227,23 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -23591,7 +47259,23 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 ## 6.1 `NumericProofRequirement`
+
+
+
+
+
+
+
+
 
 
 
@@ -23603,11 +47287,27 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 **Carrier:** existing `FieldModifierMeta`.
 
 
 
+
+
+
+
 **New carrier type required:** no.
+
+
+
+
+
+
+
+
 
 
 
@@ -23623,7 +47323,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 | Modifier | `ProofSatisfactions` |
+
+
+
+
 
 
 
@@ -23631,7 +47343,15 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `positive` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThan, new NumericBoundSource.Constant(0m))` |
+
+
+
+
 
 
 
@@ -23639,7 +47359,15 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `nonzero` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.NotEquals, new NumericBoundSource.Constant(0m))` |
+
+
+
+
 
 
 
@@ -23647,7 +47375,15 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `min(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+
+
+
+
 
 
 
@@ -23655,7 +47391,15 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `minlength(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("length"), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+
+
+
+
 
 
 
@@ -23663,11 +47407,27 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `mincount(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("count"), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.DeclarationValue())` |
 
 
 
+
+
+
+
 | `maxcount(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("count"), OperatorKind.LessThanOrEqual, new NumericBoundSource.DeclarationValue())` |
+
+
+
+
+
+
+
+
 
 
 
@@ -23683,6 +47443,14 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 **Important completeness note:** the proof engine must read **effective modifiers** = declared modifiers + `TypeMeta.ImpliedModifiers`. That is how `timezone`, `currency`, `unitofmeasure`, and `dimension` inherit `notempty` proof facts without duplicating them on `TypeMeta`.
 
 
@@ -23691,7 +47459,23 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -23707,7 +47491,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 **Satisfying fact:** the declaration is guaranteed present.
+
+
+
+
 
 
 
@@ -23715,7 +47511,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 **New carrier type required:** yes — defined above.
+
+
+
+
+
+
+
+
 
 
 
@@ -23731,7 +47539,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 | Carrier member | `ProofSatisfactions` |
+
+
+
+
 
 
 
@@ -23739,11 +47559,27 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `DeclaredPresenceMeta.Guaranteed` | `new ProofSatisfaction.Presence()` |
 
 
 
+
+
+
+
 | `DeclaredPresenceMeta.Optional` | _none_ |
+
+
+
+
+
+
+
+
 
 
 
@@ -23759,7 +47595,23 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -23775,7 +47627,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 **Satisfying fact:** the declaration resolves to a temporal-dimension fact.
+
+
+
+
 
 
 
@@ -23783,7 +47647,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 **New carrier type required:** yes — defined above.
+
+
+
+
+
+
+
+
 
 
 
@@ -23799,7 +47675,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 | Carrier member | `ProofSatisfactions` |
+
+
+
+
 
 
 
@@ -23807,7 +47695,15 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Date, ...)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` |
+
+
+
+
 
 
 
@@ -23815,7 +47711,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Any, Origin: Baseline, Preposition: null, ...)` | `new ProofSatisfaction.Dimension(new DimensionSource.DeclaredTemporalDimension())` |
+
+
+
+
+
+
+
+
 
 
 
@@ -23831,7 +47739,23 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -23847,7 +47771,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 **Satisfying fact:** the field declaration’s normalized modifier set contains the required modifier.
+
+
+
+
 
 
 
@@ -23855,7 +47791,19 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
 **New carrier type required:** no.
+
+
+
+
+
+
+
+
 
 
 
@@ -23871,7 +47819,23 @@ The existing `QualifierBinding` type in `SemanticIndex.cs` is **not** this carri
 
 
 
+
+
+
+
+
+
+
+
 **Keep direct membership as the canonical path. Do not populate modifier self-rows.**
+
+
+
+
+
+
+
+
 
 
 
@@ -23887,7 +47851,19 @@ Why:
 
 
 
+
+
+
+
+
+
+
+
 1. `Contains(requiredModifier)` is already **generic machinery**.
+
+
+
+
 
 
 
@@ -23895,11 +47871,27 @@ Why:
 
 
 
+
+
+
+
 3. Adding `ProofSatisfaction.Modifier(ModifierKind.Ordered)` to `ordered` is tautological duplication: the modifier membership is already the fact.
 
 
 
+
+
+
+
 4. Duplicating identity into metadata creates drift risk with zero gain.
+
+
+
+
+
+
+
+
 
 
 
@@ -23915,7 +47907,23 @@ Why:
 
 
 
+
+
+
+
+
+
+
+
 **None.** `ProofSatisfaction.Modifier` stays in the DU for vocabulary completeness, but no current catalog member needs to populate it.
+
+
+
+
+
+
+
+
 
 
 
@@ -23931,7 +47939,23 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -23947,7 +47971,19 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
+
+
+
+
 **Satisfying fact:** both declarations resolve to concrete bindings on the same axis and those bindings compare equal.
+
+
+
+
 
 
 
@@ -23955,7 +47991,19 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
 **New carrier type required:** yes — defined above.
+
+
+
+
+
+
+
+
 
 
 
@@ -23971,7 +48019,19 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
+
+
+
+
 | Carrier member | `ProofSatisfactions` |
+
+
+
+
 
 
 
@@ -23979,7 +48039,15 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.Currency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Currency)` |
+
+
+
+
 
 
 
@@ -23987,7 +48055,15 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.Dimension` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.Dimension)` |
+
+
+
+
 
 
 
@@ -23995,7 +48071,15 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.ToCurrency` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.ToCurrency)` |
+
+
+
+
 
 
 
@@ -24003,7 +48087,15 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalUnit` | `new ProofSatisfaction.QualifierCompatibility(QualifierAxis.TemporalUnit)` |
+
+
+
+
 
 
 
@@ -24011,7 +48103,19 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
 | `DeclaredQualifierMeta.TemporalDimension` where `Value` is `Any` | _none_ |
+
+
+
+
+
+
+
+
 
 
 
@@ -24027,7 +48131,23 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -24043,7 +48163,23 @@ That is architecturally correct, not a shortcut.
 
 
 
+
+
+
+
+
+
+
+
 These are the exact rows that must appear on the relevant modifier catalog entries.
+
+
+
+
+
+
+
+
 
 
 
@@ -24055,7 +48191,15 @@ These are the exact rows that must appear on the relevant modifier catalog entri
 
 
 
+
+
+
+
 ModifierKind.Positive => new FieldModifierMeta(
+
+
+
+
 
 
 
@@ -24063,7 +48207,15 @@ ModifierKind.Positive => new FieldModifierMeta(
 
 
 
+
+
+
+
     "Value > 0",
+
+
+
+
 
 
 
@@ -24071,7 +48223,15 @@ ModifierKind.Positive => new FieldModifierMeta(
 
 
 
+
+
+
+
     Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero],
+
+
+
+
 
 
 
@@ -24079,7 +48239,15 @@ ModifierKind.Positive => new FieldModifierMeta(
 
 
 
+
+
+
+
     [
+
+
+
+
 
 
 
@@ -24087,7 +48255,15 @@ ModifierKind.Positive => new FieldModifierMeta(
 
 
 
+
+
+
+
             new SatisfactionProjection.SelfValue(),
+
+
+
+
 
 
 
@@ -24095,7 +48271,15 @@ ModifierKind.Positive => new FieldModifierMeta(
 
 
 
+
+
+
+
             new NumericBoundSource.Constant(0m)),
+
+
+
+
 
 
 
@@ -24103,11 +48287,23 @@ ModifierKind.Positive => new FieldModifierMeta(
 
 
 
+
+
+
+
     HoverDescription: "The field's value must be strictly greater than zero. Implies nonnegative and nonzero.",
 
 
 
+
+
+
+
     DesugarsToRule: true,
+
+
+
+
 
 
 
@@ -24119,7 +48315,19 @@ ModifierKind.Positive => new FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ModifierKind.Nonnegative => new FieldModifierMeta(
+
+
+
+
 
 
 
@@ -24127,7 +48335,15 @@ ModifierKind.Nonnegative => new FieldModifierMeta(
 
 
 
+
+
+
+
     "Value ≥ 0",
+
+
+
+
 
 
 
@@ -24135,7 +48351,15 @@ ModifierKind.Nonnegative => new FieldModifierMeta(
 
 
 
+
+
+
+
     ProofSatisfactions:
+
+
+
+
 
 
 
@@ -24143,7 +48367,15 @@ ModifierKind.Nonnegative => new FieldModifierMeta(
 
 
 
+
+
+
+
         new ProofSatisfaction.Numeric(
+
+
+
+
 
 
 
@@ -24151,7 +48383,15 @@ ModifierKind.Nonnegative => new FieldModifierMeta(
 
 
 
+
+
+
+
             OperatorKind.GreaterThanOrEqual,
+
+
+
+
 
 
 
@@ -24159,7 +48399,15 @@ ModifierKind.Nonnegative => new FieldModifierMeta(
 
 
 
+
+
+
+
     ],
+
+
+
+
 
 
 
@@ -24167,7 +48415,15 @@ ModifierKind.Nonnegative => new FieldModifierMeta(
 
 
 
+
+
+
+
     DesugarsToRule: true,
+
+
+
+
 
 
 
@@ -24179,7 +48435,19 @@ ModifierKind.Nonnegative => new FieldModifierMeta(
 
 
 
+
+
+
+
+
+
+
+
 ModifierKind.Nonzero => new FieldModifierMeta(
+
+
+
+
 
 
 
@@ -24187,7 +48455,15 @@ ModifierKind.Nonzero => new FieldModifierMeta(
 
 
 
+
+
+
+
     "Value ≠ 0",
+
+
+
+
 
 
 
@@ -24195,7 +48471,15 @@ ModifierKind.Nonzero => new FieldModifierMeta(
 
 
 
+
+
+
+
     ProofSatisfactions:
+
+
+
+
 
 
 
@@ -24203,7 +48487,15 @@ ModifierKind.Nonzero => new FieldModifierMeta(
 
 
 
+
+
+
+
         new ProofSatisfaction.Numeric(
+
+
+
+
 
 
 
@@ -24211,7 +48503,15 @@ ModifierKind.Nonzero => new FieldModifierMeta(
 
 
 
+
+
+
+
             OperatorKind.NotEquals,
+
+
+
+
 
 
 
@@ -24219,7 +48519,15 @@ ModifierKind.Nonzero => new FieldModifierMeta(
 
 
 
+
+
+
+
     ],
+
+
+
+
 
 
 
@@ -24227,7 +48535,19 @@ ModifierKind.Nonzero => new FieldModifierMeta(
 
 
 
+
+
+
+
     DesugarsToRule: true),
+
+
+
+
+
+
+
+
 
 
 
@@ -24239,7 +48559,15 @@ ModifierKind.Notempty => new FieldModifierMeta(
 
 
 
+
+
+
+
     kind, Tokens.GetMeta(TokenKind.Notempty),
+
+
+
+
 
 
 
@@ -24247,7 +48575,15 @@ ModifierKind.Notempty => new FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierCategory.Structural, StringAndCollectionTypes,
+
+
+
+
 
 
 
@@ -24255,11 +48591,23 @@ ModifierKind.Notempty => new FieldModifierMeta(
 
 
 
+
+
+
+
     [
 
 
 
+
+
+
+
         new ProofSatisfaction.Numeric(
+
+
+
+
 
 
 
@@ -24267,11 +48615,23 @@ ModifierKind.Notempty => new FieldModifierMeta(
 
 
 
+
+
+
+
             OperatorKind.GreaterThan,
 
 
 
+
+
+
+
             new NumericBoundSource.Constant(0m)),
+
+
+
+
 
 
 
@@ -24279,7 +48639,15 @@ ModifierKind.Notempty => new FieldModifierMeta(
 
 
 
+
+
+
+
             new SatisfactionProjection.Accessor("count"),
+
+
+
+
 
 
 
@@ -24287,7 +48655,15 @@ ModifierKind.Notempty => new FieldModifierMeta(
 
 
 
+
+
+
+
             new NumericBoundSource.Constant(0m)),
+
+
+
+
 
 
 
@@ -24295,11 +48671,27 @@ ModifierKind.Notempty => new FieldModifierMeta(
 
 
 
+
+
+
+
     HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time.",
 
 
 
+
+
+
+
     DesugarsToRule: true),
+
+
+
+
+
+
+
+
 
 
 
@@ -24311,7 +48703,15 @@ ModifierKind.Min => new FieldModifierMeta(
 
 
 
+
+
+
+
     kind, Tokens.GetMeta(TokenKind.Min),
+
+
+
+
 
 
 
@@ -24319,7 +48719,15 @@ ModifierKind.Min => new FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierCategory.Structural, NumericTypes, HasValue: true,
+
+
+
+
 
 
 
@@ -24327,7 +48735,15 @@ ModifierKind.Min => new FieldModifierMeta(
 
 
 
+
+
+
+
     [
+
+
+
+
 
 
 
@@ -24335,7 +48751,15 @@ ModifierKind.Min => new FieldModifierMeta(
 
 
 
+
+
+
+
             new SatisfactionProjection.SelfValue(),
+
+
+
+
 
 
 
@@ -24343,7 +48767,15 @@ ModifierKind.Min => new FieldModifierMeta(
 
 
 
+
+
+
+
             new NumericBoundSource.DeclarationValue()),
+
+
+
+
 
 
 
@@ -24351,11 +48783,27 @@ ModifierKind.Min => new FieldModifierMeta(
 
 
 
+
+
+
+
     HoverDescription: "The field's value must be at least this minimum. Enforced on every assignment.",
 
 
 
+
+
+
+
     DesugarsToRule: true),
+
+
+
+
+
+
+
+
 
 
 
@@ -24367,7 +48815,15 @@ ModifierKind.Max => new FieldModifierMeta(
 
 
 
+
+
+
+
     kind, Tokens.GetMeta(TokenKind.Max),
+
+
+
+
 
 
 
@@ -24375,7 +48831,15 @@ ModifierKind.Max => new FieldModifierMeta(
 
 
 
+
+
+
+
     ModifierCategory.Structural, NumericTypes, HasValue: true,
+
+
+
+
 
 
 
@@ -24383,7 +48847,15 @@ ModifierKind.Max => new FieldModifierMeta(
 
 
 
+
+
+
+
     [
+
+
+
+
 
 
 
@@ -24391,7 +48863,15 @@ ModifierKind.Max => new FieldModifierMeta(
 
 
 
+
+
+
+
             new SatisfactionProjection.SelfValue(),
+
+
+
+
 
 
 
@@ -24399,7 +48879,15 @@ ModifierKind.Max => new FieldModifierMeta(
 
 
 
+
+
+
+
             new NumericBoundSource.DeclarationValue()),
+
+
+
+
 
 
 
@@ -24407,7 +48895,15 @@ ModifierKind.Max => new FieldModifierMeta(
 
 
 
+
+
+
+
     HoverDescription: "The field's value must be at most this maximum. Enforced on every assignment.",
+
+
+
+
 
 
 
@@ -24415,7 +48911,19 @@ ModifierKind.Max => new FieldModifierMeta(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -24431,7 +48939,19 @@ And for completeness:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -24439,7 +48959,15 @@ ModifierKind.Minlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ProofSatisfactions:
+
+
+
+
 
 
 
@@ -24447,7 +48975,15 @@ ModifierKind.Minlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
         new ProofSatisfaction.Numeric(
+
+
+
+
 
 
 
@@ -24455,7 +48991,15 @@ ModifierKind.Minlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
             OperatorKind.GreaterThanOrEqual,
+
+
+
+
 
 
 
@@ -24463,7 +49007,19 @@ ModifierKind.Minlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ], ...),
+
+
+
+
+
+
+
+
 
 
 
@@ -24475,7 +49031,15 @@ ModifierKind.Maxlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ProofSatisfactions:
+
+
+
+
 
 
 
@@ -24483,7 +49047,15 @@ ModifierKind.Maxlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
         new ProofSatisfaction.Numeric(
+
+
+
+
 
 
 
@@ -24491,7 +49063,15 @@ ModifierKind.Maxlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
             OperatorKind.LessThanOrEqual,
+
+
+
+
 
 
 
@@ -24499,7 +49079,19 @@ ModifierKind.Maxlength => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ], ...),
+
+
+
+
+
+
+
+
 
 
 
@@ -24511,7 +49103,15 @@ ModifierKind.Mincount => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ProofSatisfactions:
+
+
+
+
 
 
 
@@ -24519,7 +49119,15 @@ ModifierKind.Mincount => new FieldModifierMeta(...
 
 
 
+
+
+
+
         new ProofSatisfaction.Numeric(
+
+
+
+
 
 
 
@@ -24527,7 +49135,15 @@ ModifierKind.Mincount => new FieldModifierMeta(...
 
 
 
+
+
+
+
             OperatorKind.GreaterThanOrEqual,
+
+
+
+
 
 
 
@@ -24535,7 +49151,19 @@ ModifierKind.Mincount => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ], ...),
+
+
+
+
+
+
+
+
 
 
 
@@ -24547,7 +49175,15 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ProofSatisfactions:
+
+
+
+
 
 
 
@@ -24555,7 +49191,15 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
         new ProofSatisfaction.Numeric(
+
+
+
+
 
 
 
@@ -24563,7 +49207,15 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
             OperatorKind.LessThanOrEqual,
+
+
+
+
 
 
 
@@ -24571,7 +49223,15 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
     ], ...),
+
+
+
+
 
 
 
@@ -24583,7 +49243,23 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -24599,7 +49275,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 1. **`src/Precept/Language/ProofRequirement.cs`**
+
+
+
+
 
 
 
@@ -24611,7 +49299,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 2. **`src/Precept/Language/DeclaredPresence.cs`** *(new)*
+
+
+
+
 
 
 
@@ -24623,7 +49323,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 3. **`src/Precept/Language/DeclaredQualifierMeta.cs`** *(new)*
+
+
+
+
 
 
 
@@ -24635,7 +49347,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 4. **`src/Precept/Language/Modifier.cs`**
+
+
+
+
 
 
 
@@ -24647,7 +49371,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 5. **`src/Precept/Language/Modifiers.cs`**
+
+
+
+
 
 
 
@@ -24659,7 +49395,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 6. **`src/Precept/Language/Types.cs`**
+
+
+
+
 
 
 
@@ -24671,7 +49419,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 7. **`src/Precept/Pipeline/ParsedTypeReference.cs`**
+
+
+
+
 
 
 
@@ -24683,7 +49443,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 8. **`src/Precept/Pipeline/Parser.cs`**
+
+
+
+
 
 
 
@@ -24695,7 +49467,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 9. **`src/Precept/Pipeline/SymbolTable.cs`**
+
+
+
+
 
 
 
@@ -24707,7 +49491,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 10. **`src/Precept/Pipeline/SemanticIndex.cs`**
+
+
+
+
 
 
 
@@ -24719,7 +49515,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 11. **`src/Precept/Pipeline/TypeChecker.cs`**
+
+
+
+
 
 
 
@@ -24731,7 +49539,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 12. **`src/Precept/Pipeline/TypeChecker.Expressions.cs`**
+
+
+
+
 
 
 
@@ -24743,7 +49563,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 13. **`src/Precept/Pipeline/ProofEngine.cs`**
+
+
+
+
 
 
 
@@ -24755,7 +49587,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 14. **`docs/compiler/proof-engine.md`**
+
+
+
+
 
 
 
@@ -24767,7 +49611,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 15. **`docs/language/catalog-system.md`**
+
+
+
+
 
 
 
@@ -24779,7 +49635,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 16. **`docs/language/precept-language-spec.md`**
+
+
+
+
 
 
 
@@ -24791,7 +49659,23 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -24807,7 +49691,23 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
+
+
+
+
 **None.** The design choices that matter have now been made in the design itself:
+
+
+
+
+
+
+
+
 
 
 
@@ -24819,7 +49719,15 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
 - Dimension and qualifier compatibility use normalized declaration qualifier facts.
+
+
+
+
 
 
 
@@ -24827,7 +49735,19 @@ ModifierKind.Maxcount => new FieldModifierMeta(...
 
 
 
+
+
+
+
 - Unqualified `period` keeps Shane’s already-locked permissive `Any` behavior for dimension proof only.
+
+
+
+
+
+
+
+
 
 
 
@@ -24843,7 +49763,23 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 ## 2026-05-08: PE-G2 ProofSatisfaction design — LOCKED
+
+
+
+
+
+
+
+
 
 
 
@@ -24855,7 +49791,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 **What:** Full no-deferral PE-G2 design approved. All 5 ProofRequirementKind subtypes fully specified with carriers.
+
+
+
+
 
 
 
@@ -24863,7 +49807,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 - `ProofDischarge` renamed to `ProofSatisfaction` (DU, 5 subtypes + 3 supporting DUs)
+
+
+
+
 
 
 
@@ -24871,7 +49823,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 - New `DeclaredQualifierMeta` carrier type defined (7 subtypes, all qualifier axes)
+
+
+
+
 
 
 
@@ -24879,7 +49839,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 - `TypedField` and `TypedArg` gain `Presence` + `DeclaredQualifiers` properties
+
+
+
+
 
 
 
@@ -24887,7 +49855,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 - `notempty` carries TWO satisfaction rows: Accessor("length") AND Accessor("count")
+
+
+
+
 
 
 
@@ -24895,13 +49871,31 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 - Implementation checklist: 16 files in dependency order (see frank-pe-g2-full-design.md)
+
+
+
+
 
 
 
 **Why:** ProofEngine requires positive carrier facts for all 5 requirement kinds. Absence-checking is fragile and non-canonical.
 
+
+
 # PE-G2 Rename Analysis — `ProofDischarge` → `ProofSatisfaction`
+
+
+
+
+
+
+
+
 
 
 
@@ -24913,11 +49907,27 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
 
 
 
+
+
+
+
 **Status:** Recommendation for Shane
+
+
+
+
+
+
+
+
 
 
 
@@ -24933,7 +49943,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 1. `FieldModifierMeta` is currently a field-modifier-specific catalog record with no proof metadata property today. (`src/Precept/Language/Modifier.cs:116-133`)
+
+
+
+
 
 
 
@@ -24941,7 +49963,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 3. Strategy 2 in `docs/compiler/proof-engine.md` currently uses `ProofDischarge` as if it were a catalog row on `FieldModifierMeta`, but the documented flat shape is too narrow and the name reads like a runtime act, not catalog metadata. (`docs/compiler/proof-engine.md:517-610`)
+
+
+
+
 
 
 
@@ -24949,7 +49979,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 5. The earlier narrow design failed because it tried to make *all* Strategy-2 proof knowledge live on `FieldModifierMeta`. Shane’s correction is right: the type itself should be broad enough for all proof-requirement kinds, but that does **not** mean every requirement kind naturally belongs on `FieldModifierMeta`.
+
+
+
+
+
+
+
+
 
 
 
@@ -24965,7 +50007,23 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 ## Rename
+
+
+
+
+
+
+
+
 
 
 
@@ -24977,7 +50035,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
 - **Property:** `ProofDischarges` → `ProofSatisfactions`
+
+
+
+
+
+
+
+
 
 
 
@@ -24993,7 +50063,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 1. **It names the catalog fact, not the engine action.**
+
+
+
+
 
 
 
@@ -25001,7 +50083,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
    - A catalog entry does not perform a discharge; it declares that a declaration attribute **satisfies** a proof-requirement shape.
+
+
+
+
 
 
 
@@ -25013,7 +50103,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 2. **It scales cleanly beyond modifier-based numeric bounds.**
+
+
+
+
 
 
 
@@ -25021,7 +50123,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
    - `ProofSatisfaction` names the general relation: “this declaration-attached fact satisfies this class of proof requirement.”
+
+
+
+
 
 
 
@@ -25033,7 +50143,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 3. **It mirrors existing proof vocabulary cleanly.**
+
+
+
+
 
 
 
@@ -25041,7 +50163,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
    - `ProofSatisfaction` = catalog-declared fact that can satisfy it.
+
+
+
+
 
 
 
@@ -25049,7 +50179,15 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
    - `ProofLedger` = result ledger.
+
+
+
+
 
 
 
@@ -25061,7 +50199,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 4. **It is less misleading to a cold implementer.**
+
+
+
+
 
 
 
@@ -25069,7 +50219,19 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
    - `meta.ProofDischarges` invites the wrong question: “what exactly is being discharged here, and when?”
+
+
+
+
+
+
+
+
 
 
 
@@ -25085,7 +50247,23 @@ There is nothing here that requires another deferral ceremony.
 
 
 
+
+
+
+
+
+
+
+
 ## Verdict
+
+
+
+
+
+
+
+
 
 
 
@@ -25101,7 +50279,23 @@ Use a **DU** rooted in `ProofRequirementKind`, with subtype payloads that mirror
 
 
 
+
+
+
+
+
+
+
+
 ## Recommended sketch
+
+
+
+
+
+
+
+
 
 
 
@@ -25113,7 +50307,19 @@ Use a **DU** rooted in `ProofRequirementKind`, with subtype payloads that mirror
 
 
 
+
+
+
+
 namespace Precept.Language;
+
+
+
+
+
+
+
+
 
 
 
@@ -25125,7 +50331,15 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -25133,7 +50347,15 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
         SatisfactionProjection Projection,
+
+
+
+
 
 
 
@@ -25141,7 +50363,15 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
         NumericBoundSource Bound)
+
+
+
+
 
 
 
@@ -25153,7 +50383,19 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Presence()
+
+
+
+
 
 
 
@@ -25165,11 +50407,27 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Dimension(
 
 
 
+
+
+
+
         DimensionSource RequiredDimension)
+
+
+
+
 
 
 
@@ -25181,11 +50439,27 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record Modifier(
 
 
 
+
+
+
+
         ModifierKind RequiredModifier)
+
+
+
+
 
 
 
@@ -25197,7 +50471,19 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
+
+
+
+
     public sealed record QualifierCompatibility(
+
+
+
+
 
 
 
@@ -25205,11 +50491,27 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 
 
+
+
+
+
         : ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -25221,7 +50523,15 @@ public abstract record SatisfactionProjection
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -25229,11 +50539,27 @@ public abstract record SatisfactionProjection
 
 
 
+
+
+
+
     public sealed record Accessor(string Name) : SatisfactionProjection;
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -25245,7 +50571,15 @@ public abstract record NumericBoundSource
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -25253,11 +50587,27 @@ public abstract record NumericBoundSource
 
 
 
+
+
+
+
     public sealed record DeclarationValue() : NumericBoundSource;
 
 
 
+
+
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -25269,7 +50619,15 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
 {
+
+
+
+
 
 
 
@@ -25277,7 +50635,15 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
     public sealed record DeclaredTemporalDimension() : DimensionSource;
+
+
+
+
 
 
 
@@ -25285,7 +50651,19 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -25301,7 +50679,23 @@ public abstract record DimensionSource
 
 
 
+
+
+
+
+
+
+
+
 ## A. Why DU, not flat record
+
+
+
+
+
+
+
+
 
 
 
@@ -25317,7 +50711,19 @@ Because the five proof-requirement kinds do **not** share one metadata shape:
 
 
 
+
+
+
+
+
+
+
+
 - **Numeric** needs a projection (`self value` vs accessor such as `count`/`length`), a comparison, and a bound source.
+
+
+
+
 
 
 
@@ -25325,7 +50731,15 @@ Because the five proof-requirement kinds do **not** share one metadata shape:
 
 
 
+
+
+
+
 - **Dimension** needs a period-dimension source.
+
+
+
+
 
 
 
@@ -25333,7 +50747,19 @@ Because the five proof-requirement kinds do **not** share one metadata shape:
 
 
 
+
+
+
+
 - **QualifierCompatibility** needs a `QualifierAxis`.
+
+
+
+
+
+
+
+
 
 
 
@@ -25349,7 +50775,19 @@ A flat record would immediately collapse into something like:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -25357,7 +50795,19 @@ A flat record would immediately collapse into something like:
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -25373,7 +50823,23 @@ That is exactly the catalog anti-pattern the architecture doc forbids: one recor
 
 
 
+
+
+
+
+
+
+
+
 The DU is the correct design because:
+
+
+
+
+
+
+
+
 
 
 
@@ -25385,7 +50851,15 @@ The DU is the correct design because:
 
 
 
+
+
+
+
 - exhaustiveness is compiler-enforced,
+
+
+
+
 
 
 
@@ -25393,7 +50867,19 @@ The DU is the correct design because:
 
 
 
+
+
+
+
 - future `ProofRequirementKind` additions force explicit metadata-shape handling.
+
+
+
+
+
+
+
+
 
 
 
@@ -25409,7 +50895,23 @@ The DU is the correct design because:
 
 
 
+
+
+
+
+
+
+
+
 The earlier flat `ProofDischarge(RequirementKind, Comparison, Threshold)` shape is wrong even before broadening because numeric satisfactions are not all about the field’s raw value.
+
+
+
+
+
+
+
+
 
 
 
@@ -25425,11 +50927,31 @@ Examples already in source:
 
 
 
+
+
+
+
+
+
+
+
 - `positive`, `nonnegative`, `nonzero`, `min`, `max` establish bounds on the **field value**.
 
 
 
+
+
+
+
 - non-empty collection proof obligations target `SelfSubject(CollectionCountAccessor)` — that is a bound on an **accessor projection** (`count`), not on the raw field value. (`src/Precept/Language/Types.cs:153-154`, `src/Precept/Language/Types.cs:163-288`, `src/Precept/Language/Actions.cs:98-196`)
+
+
+
+
+
+
+
+
 
 
 
@@ -25445,7 +50967,23 @@ Without `Projection`, `notempty` is under-specified.
 
 
 
+
+
+
+
+
+
+
+
 ## C. Why `Numeric` needs `BoundSource`
+
+
+
+
+
+
+
+
 
 
 
@@ -25461,7 +50999,23 @@ Without `Projection`, `notempty` is under-specified.
 
 
 
+
+
+
+
+
+
+
+
 ## D. Why `Dimension` needs `DimensionSource`
+
+
+
+
+
+
+
+
 
 
 
@@ -25477,11 +51031,31 @@ If the broader model is real, dimension satisfactions cannot assume every carrie
 
 
 
+
+
+
+
+
+
+
+
 - A future qualifier-based carrier would want: “read the declared temporal-dimension qualifier and compare it to the obligation.”
 
 
 
+
+
+
+
 - A constant arm still belongs in the shape because a future dedicated declaration attribute could hardcode a specific period dimension.
+
+
+
+
+
+
+
+
 
 
 
@@ -25497,7 +51071,23 @@ If the broader model is real, dimension satisfactions cannot assume every carrie
 
 
 
+
+
+
+
+
+
+
+
 **Recommendation:** define `ProofSatisfaction` in `src/Precept/Language/ProofRequirement.cs` directly alongside `ProofRequirement` and `ProofRequirementMeta`.
+
+
+
+
+
+
+
+
 
 
 
@@ -25513,7 +51103,19 @@ Why:
 
 
 
+
+
+
+
+
+
+
+
 1. It is the declarative inverse of `ProofRequirement`; they belong in the same proof-domain vocabulary file.
+
+
+
+
 
 
 
@@ -25521,7 +51123,19 @@ Why:
 
 
 
+
+
+
+
 3. A separate file is defensible later if the proof domain gets much larger, but today splitting it would make the proof model harder to read, not easier.
+
+
+
+
+
+
+
+
 
 
 
@@ -25537,7 +51151,23 @@ Why:
 
 
 
+
+
+
+
+
+
+
+
 For `FieldModifierMeta`, the property should be:
+
+
+
+
+
+
+
+
 
 
 
@@ -25549,11 +51179,27 @@ For `FieldModifierMeta`, the property should be:
 
 
 
+
+
+
+
 ProofSatisfaction[]? ProofSatisfactions = null
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -25569,7 +51215,19 @@ materialized as the usual array property:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -25577,7 +51235,19 @@ public ProofSatisfaction[] ProofSatisfactions { get; init; } = ProofSatisfaction
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -25593,7 +51263,23 @@ public ProofSatisfaction[] ProofSatisfactions { get; init; } = ProofSatisfaction
 
 
 
+
+
+
+
+
+
+
+
 These are the **minimal canonical rows**. Stronger numeric facts should be listed once and weaker obligations should be covered by generic numeric subsumption logic in the proof engine.
+
+
+
+
+
+
+
+
 
 
 
@@ -25605,7 +51291,15 @@ These are the **minimal canonical rows**. Stronger numeric facts should be liste
 
 
 
+
+
+
+
 |---|---|---|
+
+
+
+
 
 
 
@@ -25613,7 +51307,15 @@ These are the **minimal canonical rows**. Stronger numeric facts should be liste
 
 
 
+
+
+
+
 | `nonnegative` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.GreaterThanOrEqual, new NumericBoundSource.Constant(0m))` | Directly expresses `value >= 0`. |
+
+
+
+
 
 
 
@@ -25621,7 +51323,15 @@ These are the **minimal canonical rows**. Stronger numeric facts should be liste
 
 
 
+
+
+
+
 | `notempty` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.Accessor("count"), OperatorKind.GreaterThan, new NumericBoundSource.Constant(0m))` | Covers the current live non-empty collection obligations (`collection.count > 0`). |
+
+
+
+
 
 
 
@@ -25629,7 +51339,19 @@ These are the **minimal canonical rows**. Stronger numeric facts should be liste
 
 
 
+
+
+
+
 | `max(N)` | `new ProofSatisfaction.Numeric(new SatisfactionProjection.SelfValue(), OperatorKind.LessThanOrEqual, new NumericBoundSource.DeclarationValue())` | The upper bound comes from the declaration instance’s `max` value. |
+
+
+
+
+
+
+
+
 
 
 
@@ -25645,7 +51367,23 @@ These are the **minimal canonical rows**. Stronger numeric facts should be liste
 
 
 
+
+
+
+
+
+
+
+
 `notempty` semantically spans **string length** and **collection count** in the modifier catalog. (`src/Precept/Language/Modifiers.cs:85-90`)
+
+
+
+
+
+
+
+
 
 
 
@@ -25661,7 +51399,19 @@ So there are two coherent options:
 
 
 
+
+
+
+
+
+
+
+
 1. **Current-proof-surface option (minimal today):** keep only the `Accessor("count")` row because that is what current proof obligations actually emit.
+
+
+
+
 
 
 
@@ -25673,7 +51423,19 @@ So there are two coherent options:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -25681,7 +51443,15 @@ new ProofSatisfaction.Numeric(
 
 
 
+
+
+
+
     new SatisfactionProjection.Accessor("length"),
+
+
+
+
 
 
 
@@ -25689,11 +51459,27 @@ new ProofSatisfaction.Numeric(
 
 
 
+
+
+
+
     new NumericBoundSource.Constant(0m))
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -25709,7 +51495,23 @@ The architecture document says completeness beats current-consumer demand. On th
 
 
 
+
+
+
+
+
+
+
+
 ## 5. Which catalog entry types should carry this property?
+
+
+
+
+
+
+
+
 
 
 
@@ -25725,7 +51527,23 @@ This is the part that must stay disciplined. The **type** is broad. The **proper
 
 
 
+
+
+
+
+
+
+
+
 Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfactions` onto every `*Meta` record.” That would be cargo-cult abstraction. The right question is: **which catalog entry kinds naturally represent declaration-attached facts that can satisfy proof requirements?**
+
+
+
+
+
+
+
+
 
 
 
@@ -25741,7 +51559,19 @@ Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfaction
 
 
 
+
+
+
+
+
+
+
+
 | Requirement kind | Natural declaration-attached satisfier | Existing catalog entry type that should carry `ProofSatisfactions` now? | Notes |
+
+
+
+
 
 
 
@@ -25749,7 +51579,15 @@ Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfaction
 
 
 
+
+
+
+
 | `NumericProofRequirement` | Field modifiers that establish bounds (`positive`, `min`, `notempty`, etc.) | **Yes — `FieldModifierMeta`** | This is the original and still-correct home for modifier-established numeric facts. |
+
+
+
+
 
 
 
@@ -25757,7 +51595,15 @@ Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfaction
 
 
 
+
+
+
+
 | `DimensionProofRequirement` | A declaration attribute that fixes a period’s temporal dimension | **No existing carrier today** | The satisfier is the field/arg’s **declared temporal qualifier**, not a field modifier. Current catalogs do not expose qualifier values as first-class top-level entries, so there is nowhere honest to hang this property yet. |
+
+
+
+
 
 
 
@@ -25765,7 +51611,19 @@ Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfaction
 
 
 
+
+
+
+
 | `QualifierCompatibilityProofRequirement` | A declaration attribute that pins a qualifier value on an axis | **No existing carrier today** | The satisfier is a resolved qualifier binding (`currency`, `unit`, etc.) on the field declaration, not a modifier. Again, current catalogs do not expose qualifier values as their own catalog entry type. |
+
+
+
+
+
+
+
+
 
 
 
@@ -25781,7 +51639,23 @@ Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfaction
 
 
 
+
+
+
+
+
+
+
+
 ## `FieldModifierMeta`
+
+
+
+
+
+
+
+
 
 
 
@@ -25797,7 +51671,23 @@ Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfaction
 
 
 
+
+
+
+
+
+
+
+
 ## `TypeMeta`
+
+
+
+
+
+
+
+
 
 
 
@@ -25813,7 +51703,23 @@ Do **not** read “usable on any catalog entry” as “stamp `ProofSatisfaction
 
 
 
+
+
+
+
+
+
+
+
 Reason: a type entry like `money`, `quantity`, or `period` does not itself establish the concrete qualifier value that satisfies a proof. The proof-relevant value lives on the field declaration (`in 'USD'`, `of 'mass'`, `of 'date'`, etc.), not on the generic type catalog row.
+
+
+
+
+
+
+
+
 
 
 
@@ -25829,7 +51735,23 @@ Also: `TypeMeta` already has `ImpliedModifiers`. If a type implies a modifier an
 
 
 
+
+
+
+
+
+
+
+
 That is the catalog-driven answer: **derive, don’t duplicate.**
+
+
+
+
+
+
+
+
 
 
 
@@ -25845,7 +51767,23 @@ That is the catalog-driven answer: **derive, don’t duplicate.**
 
 
 
+
+
+
+
+
+
+
+
 **No.** These declare **proof requirements**, not declaration satisfactions. They are obligation emitters, not satisfier carriers.
+
+
+
+
+
+
+
+
 
 
 
@@ -25861,7 +51799,23 @@ That is the catalog-driven answer: **derive, don’t duplicate.**
 
 
 
+
+
+
+
+
+
+
+
 **Yes — when it exists.**
+
+
+
+
+
+
+
+
 
 
 
@@ -25877,7 +51831,23 @@ The broader design exposes a real architectural gap: qualifier-bound proof facts
 
 
 
+
+
+
+
+
+
+
+
 Today that surface does not exist. Do not fake it by smearing qualifier-instance semantics onto `TypeMeta`.
+
+
+
+
+
+
+
+
 
 
 
@@ -25893,7 +51863,19 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
+
+
+
+
 | Decision | Recommendation | Why |
+
+
+
+
 
 
 
@@ -25901,7 +51883,15 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
 | Rename | `ProofDischarge` → `ProofSatisfaction` | Names the catalog relation, not the runtime act; scales across all requirement kinds. |
+
+
+
+
 
 
 
@@ -25909,7 +51899,15 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
 | Shape | **DU** keyed by `ProofRequirementKind` | Requirement shapes differ materially; flat nullable record would violate catalog architecture. |
+
+
+
+
 
 
 
@@ -25917,11 +51915,27 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
 | Current carrier | `FieldModifierMeta` | This is the honest current home for declaration-attached numeric facts, and optionally modifier-presence facts if Shane wants full uniformity. |
 
 
 
+
+
+
+
 | Other current carriers | None | Presence/dimension/qualifier-compatibility do not have honest existing top-level catalog entry types yet. |
+
+
+
+
+
+
+
+
 
 
 
@@ -25937,11 +51951,27 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
+
+
+
+
 1. **Uniformity vs fast path for `ModifierRequirement`:**
 
 
 
+
+
+
+
    - Should `ordered`/etc. also be represented as `ProofSatisfaction.Modifier(...)` rows for full conceptual symmetry?
+
+
+
+
 
 
 
@@ -25953,11 +51983,27 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
+
+
+
+
 2. **Qualifier metadata gap:**
 
 
 
+
+
+
+
    - Does Shane want the broader design to stop at the reusable `ProofSatisfaction` type for now?
+
+
+
+
 
 
 
@@ -25969,11 +52015,27 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
+
+
+
+
 3. **Projection identity for accessor-based numeric satisfactions:**
 
 
 
+
+
+
+
    - Is `Accessor("count")` / `Accessor("length")` acceptable as the first version?
+
+
+
+
 
 
 
@@ -25985,11 +52047,27 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
+
+
+
+
 4. **`notempty` completeness:**
 
 
 
+
+
+
+
    - Should we declare both `count > 0` and `length > 0` now for catalog completeness?
+
+
+
+
 
 
 
@@ -26001,9 +52079,27 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
+
+
+
+
+
+
+
+
 That is the decision. `ProofDischarge` is the wrong name. The right name is `ProofSatisfaction`, and the right shape is a proof-kind DU that is broad in **type design** but disciplined in **property placement**.
 
+
+
 # Decision: PE-G4 through PE-G18 — All ProofEngine Gaps Resolved
+
+
+
+
+
+
+
+
 
 
 
@@ -26015,7 +52111,15 @@ That is the decision. `ProofDischarge` is the wrong name. The right name is `Pro
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
+
+
+
+
 
 
 
@@ -26023,7 +52127,19 @@ That is the decision. `ProofDischarge` is the wrong name. The right name is `Pro
 
 
 
+
+
+
+
 **Directive:** Shane's explicit mandate — define everything now so implementation can begin
+
+
+
+
+
+
+
+
 
 
 
@@ -26039,7 +52155,23 @@ That is the decision. `ProofDischarge` is the wrong name. The right name is `Pro
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -26055,7 +52187,23 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## Decisions Made
+
+
+
+
+
+
+
+
 
 
 
@@ -26067,7 +52215,15 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
 **Decision:** Do NOT add `AllTypedExpressions` to SemanticIndex. Use explicit walk-target enumeration in a private `CollectObligations` method.
+
+
+
+
 
 
 
@@ -26079,11 +52235,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G5: Source Shapes Are Canonical
 
 
 
+
+
+
+
 **Decision:** `RuleIdentity(int RuleIndex)` and `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)` are correct. Spec must match source.
+
+
+
+
 
 
 
@@ -26095,11 +52267,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G6: ObligationContext DU Replaces FindEnclosingTransitionRow
 
 
 
+
+
+
+
 **Decision:** New `ObligationContext` DU (5 subtypes). Context attached at instantiation time (O(1)), not discovered via post-hoc search. `ProofObligation` gains `Context` field.
+
+
+
+
 
 
 
@@ -26111,11 +52299,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G7: ResolveSubject Fully Defined
 
 
 
+
+
+
+
 **Decision:** `ResolveSubject` uses reference-equality parameter lookup against `Operations.GetMeta()` / `Functions.GetOverloads()` parameter lists. `GetFieldName` extracts field name from resolved expression.
+
+
+
+
 
 
 
@@ -26127,11 +52331,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G8: Full Satisfiability Algorithm
 
 
 
+
+
+
+
 **Decision:** Bounded constant folding: find initial state → collect `StateResident` ensures → build default value environment → substitute and fold → report violations for `false` results, conservative pass for `Unknown`. Initial event args NOT considered. Guarded ensures skipped.
+
+
+
+
 
 
 
@@ -26143,11 +52363,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G9: Type Checker Owns Collection Diagnostics
 
 
 
+
+
+
+
 **Decision:** The type checker owns `UnguardedCollectionAccess` (63) and `UnguardedCollectionMutation` (64). The proof engine processes collection non-empty obligations as ordinary `NumericProofRequirement(count > 0)` through standard strategies. No new proof-stage diagnostic code needed for collections.
+
+
+
+
 
 
 
@@ -26159,11 +52395,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G10: Full Guard Decomposition Rules
 
 
 
+
+
+
+
 **Decision:** AND-conjunctions decompose recursively. OR-disjunctions do NOT decompose. Simple negation inverts comparison operators. Conditionals and quantifiers are not decomposed. Operator inversion and negation inversion tables provided.
+
+
+
+
 
 
 
@@ -26175,11 +52427,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G11: Builder Contract Defined
 
 
 
+
+
+
+
 **Decision:** Three consumption patterns: (1) `FaultSiteLinks` → `FaultSiteDescriptor` backstops, (2) `ConstraintInfluence` → `ConstraintInfluenceMap` runtime artifact, (3) `InitialStateResults` → compile-time gate. `ConstraintInfluenceMap` type defined.
+
+
+
+
 
 
 
@@ -26191,11 +52459,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G12: Diagnostic Formatting Table
 
 
 
+
+
+
+
 **Decision:** Template parameters defined for all three existing proof diagnostics. Four new diagnostic codes allocated (96–99).
+
+
+
+
 
 
 
@@ -26207,11 +52491,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G13: Error-Tainted Obligation Suppression
 
 
 
+
+
+
+
 **Decision:** Obligations with `TypedErrorExpression` in their site or resolved subject suppress proof diagnostic emission. `ContainsErrorExpression` recursive helper defined.
+
+
+
+
 
 
 
@@ -26223,11 +52523,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G14: Exhaustive Guard Relation Triple Table
 
 
 
+
+
+
+
 **Decision:** 12-entry table covering all valid `(guard.Op, expr.Op, requirement)` combinations. Strategy 4 limited to subtraction only. Division explicitly excluded.
+
+
+
+
 
 
 
@@ -26239,11 +52555,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G15: Stateless Precept Handling
 
 
 
+
+
+
+
 **Decision:** Proof engine runs for ALL precepts. Strategies 1, 2, 5 apply to stateless precepts. Strategies 3, 4 do not (no guards). Initial-state satisfiability skipped. No special-casing needed.
+
+
+
+
 
 
 
@@ -26255,11 +52587,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G16: Reference Identity for Site Matching
 
 
 
+
+
+
+
 **Decision:** `ProofObligation.Site` uses reference equality via `ReferenceEqualityComparer.Instance`. Proof engine must NOT copy expression nodes.
+
+
+
+
 
 
 
@@ -26271,7 +52619,19 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G17: Operator Names Verified
+
+
+
+
 
 
 
@@ -26283,11 +52643,31 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 ## PE-G18: Diagnostic System Cross-Reference
 
 
 
+
+
+
+
 **Decision:** Add cross-references to `diagnostic-system.md` and `Compiler.cs` in proof engine spec §9.
+
+
+
+
+
+
+
+
 
 
 
@@ -26303,7 +52683,19 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 | Type | File | Purpose |
+
+
+
+
 
 
 
@@ -26311,7 +52703,15 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
 | `ObligationContext` (abstract) | `ProofLedger.cs` | DU base for obligation context |
+
+
+
+
 
 
 
@@ -26319,7 +52719,15 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
 | `ConstraintContext` | `ProofLedger.cs` | Obligation in a rule/ensure condition |
+
+
+
+
 
 
 
@@ -26327,11 +52735,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
 | `EventHandlerContext` | `ProofLedger.cs` | Obligation in an event handler |
 
 
 
+
+
+
+
 | `FieldExpressionContext` | `ProofLedger.cs` | Obligation in a field expression |
+
+
+
+
+
+
+
+
 
 
 
@@ -26347,7 +52771,19 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 | Code | Name | Stage | Severity |
+
+
+
+
 
 
 
@@ -26355,7 +52791,15 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
 | 96 | `UnprovedModifierRequirement` | Proof | Error |
+
+
+
+
 
 
 
@@ -26363,11 +52807,27 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
 | 98 | `UnprovedQualifierCompatibility` | Proof | Error |
 
 
 
+
+
+
+
 | 99 | `UnsatisfiableInitialState` | Proof | Error |
+
+
+
+
+
+
+
+
 
 
 
@@ -26383,7 +52843,23 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 14 corrections to `docs/compiler/proof-engine.md` — detailed in `frank-pe-g4-to-g18-resolution.md`.
+
+
+
+
+
+
+
+
 
 
 
@@ -26399,7 +52875,23 @@ All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zer
 
 
 
+
+
+
+
+
+
+
+
 None. All gaps resolved within existing architectural boundaries. No product surface or philosophy changes.
+
+
+
+
+
+
+
+
 
 
 
@@ -26415,7 +52907,23 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
+
+
+
+
 `docs/Working/inbox/frank-pe-g4-to-g18-resolution.md`
+
+
+
+
+
+
+
+
 
 
 
@@ -26431,11 +52939,27 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
+
+
+
+
 **By:** Frank (Lead/Architect)
 
 
 
+
+
+
+
 **Artifact:** `docs/Working/frank-pe-implementation-plan.md`
+
+
+
+
 
 
 
@@ -26447,7 +52971,19 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
+
+
+
+
 **Key findings during planning:**
+
+
+
+
 
 
 
@@ -26455,7 +52991,15 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
 - ProofLedger.cs already has the full G3 shape (ProofObligation, FaultSiteLink, etc.) but is missing ObligationContext — added in Prework Slice P6.
+
+
+
+
 
 
 
@@ -26463,7 +53007,15 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
 - FieldModifierMeta has no ProofSatisfactions property — added in Prework Slice P4 with all 10 modifier entries populated.
+
+
+
+
 
 
 
@@ -26475,11 +53027,31 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
+
+
+
+
 **Phase 1 (Prework):** 8 slices creating structural shapes, catalog metadata, and diagnostic codes. ~37 tests. No behavioral changes — build stays green.
 
 
 
+
+
+
+
 **Phase 2 (Engine):** 13 slices implementing the full two-pass engine with all 5 strategies, error suppression, diagnostics, constraint influence, initial-state satisfiability, forwarding fact consumption, and stateless precept handling. ~97 tests.
+
+
+
+
+
+
+
+
 
 
 
@@ -26495,9 +53067,27 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
+
+
+
+
 **Ready for:** George to execute once Shane approves.
 
+
+
 # Decision: ProofEngine Spec Complete — All 18 Gaps Resolved
+
+
+
+
+
+
+
+
 
 
 
@@ -26509,11 +53099,27 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
 
 
 
+
+
+
+
 **Status:** Approved by Shane — implementation may proceed
+
+
+
+
+
+
+
+
 
 
 
@@ -26529,7 +53135,23 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -26545,7 +53167,23 @@ All 18 ProofEngine gaps (PE-G1 through PE-G18) are now RESOLVED and incorporated
 
 
 
+
+
+
+
+
+
+
+
 ## Resolution Timeline
+
+
+
+
+
+
+
+
 
 
 
@@ -26557,7 +53195,15 @@ All 18 ProofEngine gaps (PE-G1 through PE-G18) are now RESOLVED and incorporated
 
 
 
+
+
+
+
 - **PE-G2** (ProofSatisfaction DU): Resolved 2026-05-08 — full DU with 5 subtypes + 3 supporting DUs, carrier types defined
+
+
+
+
 
 
 
@@ -26565,7 +53211,19 @@ All 18 ProofEngine gaps (PE-G1 through PE-G18) are now RESOLVED and incorporated
 
 
 
+
+
+
+
 - **PE-G4–G18** (remaining 15 gaps): Resolved 2026-05-08 per Shane's no-deferral mandate, spec corrections applied same day
+
+
+
+
+
+
+
+
 
 
 
@@ -26581,7 +53239,23 @@ All 18 ProofEngine gaps (PE-G1 through PE-G18) are now RESOLVED and incorporated
 
 
 
+
+
+
+
+
+
+
+
 ## ObligationContext DU (PE-G6) — 5 subtypes
+
+
+
+
+
+
+
+
 
 
 
@@ -26593,7 +53267,15 @@ All 18 ProofEngine gaps (PE-G1 through PE-G18) are now RESOLVED and incorporated
 
 
 
+
+
+
+
 public abstract record ObligationContext;
+
+
+
+
 
 
 
@@ -26601,7 +53283,15 @@ public sealed record TransitionRowContext(TypedTransitionRow Row) : ObligationCo
 
 
 
+
+
+
+
 public sealed record ConstraintContext(ConstraintIdentity Constraint) : ObligationContext;
+
+
+
+
 
 
 
@@ -26609,7 +53299,15 @@ public sealed record StateHookContext(TypedStateHook Hook) : ObligationContext;
 
 
 
+
+
+
+
 public sealed record EventHandlerContext(TypedEventHandler Handler) : ObligationContext;
+
+
+
+
 
 
 
@@ -26617,7 +53315,19 @@ public sealed record FieldExpressionContext(TypedField Field) : ObligationContex
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -26633,7 +53343,23 @@ Added to `ProofObligation` as a `Context` field — set at Pass 1 instantiation 
 
 
 
+
+
+
+
+
+
+
+
 ## New Diagnostic Codes
+
+
+
+
+
+
+
+
 
 
 
@@ -26645,7 +53371,15 @@ Added to `ProofObligation` as a `Context` field — set at Pass 1 instantiation 
 
 
 
+
+
+
+
 |------|------|----------|
+
+
+
+
 
 
 
@@ -26653,7 +53387,15 @@ Added to `ProofObligation` as a `Context` field — set at Pass 1 instantiation 
 
 
 
+
+
+
+
 | 97 | `UnprovedDimensionRequirement` | Error |
+
+
+
+
 
 
 
@@ -26661,7 +53403,19 @@ Added to `ProofObligation` as a `Context` field — set at Pass 1 instantiation 
 
 
 
+
+
+
+
 | 99 | `UnsatisfiableInitialState` | Error |
+
+
+
+
+
+
+
+
 
 
 
@@ -26677,7 +53431,23 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
+
+
+
+
 ## Key Design Decisions Locked
+
+
+
+
+
+
+
+
 
 
 
@@ -26689,7 +53459,15 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
 2. **Source shapes canonical** for ConstraintIdentity (PE-G5)
+
+
+
+
 
 
 
@@ -26697,7 +53475,15 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
 4. **Reference-equality parameter lookup** for subject resolution (PE-G7)
+
+
+
+
 
 
 
@@ -26705,7 +53491,15 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
 6. **Type checker owns collection diagnostics** (PE-G9)
+
+
+
+
 
 
 
@@ -26713,7 +53507,15 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
 8. **Builder proof-consumption contract** with 3 consumption patterns (PE-G11)
+
+
+
+
 
 
 
@@ -26721,7 +53523,15 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
 10. **12-entry exhaustive guard relation triple table**, subtraction-only (PE-G14)
+
+
+
+
 
 
 
@@ -26729,7 +53539,19 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
 12. **ReferenceEqualityComparer.Instance** for site identity matching (PE-G16)
+
+
+
+
+
+
+
+
 
 
 
@@ -26745,7 +53567,19 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
+
+
+
+
 - `docs/compiler/proof-engine.md` — canonical spec, all corrections applied
+
+
+
+
 
 
 
@@ -26753,7 +53587,19 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
 - `docs/Working/inbox/frank-pe-g4-to-g18-resolution.md` — source material (retained as rationale record)
+
+
+
+
+
+
+
+
 
 
 
@@ -26769,7 +53615,23 @@ These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diag
 
 
 
+
+
+
+
+
+
+
+
 Implementation may proceed. The spec is production-quality — no implementer should need to make design decisions. Shape declarations (Slice 0), obligation instantiation, strategy dispatch, and diagnostic emission are all fully specified.
+
+
+
+
+
+
+
+
 
 
 
@@ -26781,7 +53643,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 **By:** George (requested by Shane)
+
+
+
+
 
 
 
@@ -26789,7 +53659,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 **Why:** Grammar generator gap — modifiers that desugar to rules were gold-highlighted in the old hand-authored grammar but this was not carried over to the catalog-driven generator.
+
+
+
+
 
 
 
@@ -26801,7 +53679,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 ## 2026-05-08: PE-G3 ProofLedger output types implemented
+
+
+
+
 
 
 
@@ -26809,7 +53699,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 **What:** Expanded `src/Precept/Pipeline/ProofLedger.cs` from the single-field stub to the full approved PE-G3 shape: `ProofLedger`, `ProofObligation`, `ProofDisposition`, `ProofStrategy`, `FaultSiteLink`, `FaultSiteAnnotation`, `ConstraintInfluenceEntry`, `EventArgReference`, `InitialStateSatisfiabilityResult`, and `UnsatisfiedConstraint`.
+
+
+
+
 
 
 
@@ -26817,7 +53715,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 **Files created:** `.squad/decisions/inbox/george-pe-g3-implemented.md`
+
+
+
+
 
 
 
@@ -26829,11 +53735,27 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 ## 2026-05-08T23:21:03.236-04:00: Phase 1 proof-engine prework closed
 
 
 
+
+
+
+
 **By:** George (requested by Shane)
+
+
+
+
 
 
 
@@ -26845,7 +53767,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 **Commits:**
+
+
+
+
 
 
 
@@ -26853,7 +53787,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - P2 `161eb1fa` — `feat(proof-engine): P2 — DeclaredPresenceMeta carrier type`
+
+
+
+
 
 
 
@@ -26861,7 +53803,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - P4 `5d6945c4` — `feat(proof-engine): P4 — FieldModifierMeta.ProofSatisfactions catalog metadata`
+
+
+
+
 
 
 
@@ -26869,11 +53819,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - P6 `445c3127` — `feat(proof-engine): P6 — ObligationContext DU on ProofObligation`
 
 
 
+
+
+
+
 - P7 `247ba37f` — `feat(proof-engine): P7 — diagnostic codes 112-115 for proof stage`
+
+
+
+
 
 
 
@@ -26885,7 +53847,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 **Files touched (high-signal):**
+
+
+
+
 
 
 
@@ -26893,7 +53867,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - Tests: `test/Precept.Tests/ProofRequirementTests.cs`, `test/Precept.Tests/ModifiersTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerExpressionTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerQuantifierTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs`, `test/Precept.Tests/ProofLedgerTests.cs`, `test/Precept.Tests/DiagnosticsTests.cs`
+
+
+
+
 
 
 
@@ -26905,7 +53887,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 **Validation:**
+
+
+
+
 
 
 
@@ -26913,11 +53907,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - Final `dotnet test -nologo` summary: 3910 total, 3714 passed, 196 failed.
 
 
 
+
+
+
+
 - Final `dotnet build -nologo` succeeded.
+
+
+
+
 
 
 
@@ -26929,7 +53935,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 **Surprises / deviations:**
+
+
+
+
 
 
 
@@ -26937,11 +53955,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - The spec's proof diagnostic ordinals were stale; the implementation correctly used 112-115 instead of 96-99.
 
 
 
+
+
+
+
 - `docs/compiler/proof-engine.md` already carried a large unrelated branch diff, so the P8 doc commit necessarily rode on top of a broader proof-engine doc sync instead of a tiny isolated ordinal-only patch.
+
+
+
+
 
 
 
@@ -26953,7 +53983,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 **Tricky construction sites:**
+
+
+
+
 
 
 
@@ -26961,11 +54003,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - Manual `TypedArg` scaffolds in `test/Precept.Tests/TypeChecker/TypeCheckerExpressionTests.cs`
 
 
 
+
+
+
+
 - Manual `TypedArg` scaffolds in `test/Precept.Tests/TypeChecker/TypeCheckerQuantifierTests.cs`
+
+
+
+
 
 
 
@@ -26977,7 +54031,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 **Phase 2 handoff:**
+
+
+
+
 
 
 
@@ -26985,13 +54051,31 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - Phase 2 can assume proof-bearing modifiers already declare satisfactions, semantic symbols expose presence/qualifier carriers, obligations can record context, and proof-stage diagnostics 112-115 are reserved with metadata.
+
+
+
+
 
 
 
 - `ProofEngine.cs` remains the behavioral frontier; Phase 2 should implement runtime-neutral proof analysis against the new carriers rather than reshaping these types again.
 
+
+
 # ProofEngine Phase 2 Closeout
+
+
+
+
+
+
+
+
 
 
 
@@ -27003,11 +54087,27 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 **Date:** 2026-05-08T23:45:00Z
 
 
 
+
+
+
+
 **Task:** ProofEngine Phase 2 — Full Engine Implementation (S1–S13)
+
+
+
+
+
+
+
+
 
 
 
@@ -27023,7 +54123,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 | Slice | Commit | Description |
+
+
+
+
 
 
 
@@ -27031,11 +54143,27 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 | S1–S12 | `46c9a4d4` | Full engine implementation — obligation collection, five strategies, error suppression, diagnostics, constraint influence, initial-state satisfiability, forwarding fact consumption |
 
 
 
+
+
+
+
 | S13 | `36618ef9` | Stateless handling verification + documentation sync |
+
+
+
+
+
+
+
+
 
 
 
@@ -27051,7 +54179,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 - **Build:** Green, 0 warnings, 0 errors
+
+
+
+
 
 
 
@@ -27059,7 +54199,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - **Baseline preserved:** No regressions introduced
+
+
+
+
+
+
+
+
 
 
 
@@ -27075,7 +54227,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 1. **Combined commit:** Slices S1–S12 were implemented in a single pass and committed together rather than individually. The code structure follows the slice boundaries internally, but the git history has 2 commits instead of 13. Rationale: the implementation was written holistically for correctness across slice boundaries, and incremental commits would have required artificial intermediate states.
+
+
+
+
+
+
+
+
 
 
 
@@ -27091,7 +54259,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 3. **SourceSpan.Empty vs SourceSpan.Missing:** Spec pseudocode used `SourceSpan.Empty` but the actual API is `SourceSpan.Missing`.
+
+
+
+
+
+
+
+
 
 
 
@@ -27107,7 +54291,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 5. **BinaryOperationMeta.Left/Right vs Lhs/Rhs:** Spec pseudocode used `.Left`/`.Right` but actual properties are `.Lhs`/`.Rhs`.
+
+
+
+
+
+
+
+
 
 
 
@@ -27123,7 +54323,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 - No functional surprises — the spec was thorough and all 18 gaps were pre-resolved by Frank.
+
+
+
+
 
 
 
@@ -27131,7 +54343,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - `SatisfactionCovers` subsumption logic required careful accessor-name matching for `notempty`'s dual satisfaction rows.
+
+
+
+
+
+
+
+
 
 
 
@@ -27147,7 +54371,19 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 - Soup Nazi's ProofEngine test suite can exercise all five strategies
+
+
+
+
 
 
 
@@ -27155,9 +54391,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 - Language Server proof diagnostics are now live
 
+
+
 # ProofEngine Phase 2 — Post-commit bugfixes
+
+
+
+
+
+
+
+
 
 
 
@@ -27169,7 +54419,15 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
 **Author:** George
+
+
+
+
 
 
 
@@ -27181,7 +54439,23 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
+
+
+
+
+
+
+
+
 ## Summary
+
+
+
+
+
+
+
+
 
 
 
@@ -27197,7 +54471,23 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 ## Fixes
+
+
+
+
+
+
+
+
 
 
 
@@ -27213,7 +54503,23 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 **Root cause:** Shared `ParameterMeta` instances (e.g., `PNumber`) are used for both `Lhs` and `Rhs` of binary operations in the Operations catalog. `ReferenceEquals` matched `Lhs` first, resolving the divisor proof requirement to the numerator instead of the divisor.
+
+
+
+
+
+
+
+
 
 
 
@@ -27229,7 +54535,23 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 ## 2. Discharge loop — skip already-proved obligations
+
+
+
+
+
+
+
+
 
 
 
@@ -27245,7 +54567,23 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 **Fix:** Added `if (obligation.Disposition == ProofDisposition.Proved) continue;` at the top of the discharge loop.
+
+
+
+
+
+
+
+
 
 
 
@@ -27261,7 +54599,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 - 158/158 ProofEngineTests passing
+
+
+
+
 
 
 
@@ -27273,7 +54623,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 ## 2026-05-08: DesugarsToRule wired into grammar generator
+
+
+
+
 
 
 
@@ -27281,11 +54643,23 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 **What:** Generator now reads Modifiers.All.Where(m => m.DesugarsToRule) to emit gold-colored TextMate patterns for rule-desugaring modifiers.
 
 
 
+
+
+
+
 **Scope used:** `keyword.other.grammar.precept`
+
+
+
+
 
 
 
@@ -27297,7 +54671,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 ## 2026-05-08: VS Code extension packaging bundles the client entrypoint with esbuild
+
+
+
+
 
 
 
@@ -27305,7 +54691,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 **What:** Added an esbuild production bundle that writes the extension client to `tools/Precept.VsCode/out/extension.js`, moved VSIX packaging onto `vscode:prepublish`, and removed `node_modules/**` from the `.vscodeignore` allowlist so npm dependencies no longer ship raw.
+
+
+
+
 
 
 
@@ -27313,9 +54707,23 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 **Rationale:** Keeping `npm run compile` as plain `tsc` preserves the existing development loop, while `npm run bundle` becomes the production-only path that inlines `vscode-languageclient` and other client dependencies without bundling the .NET language server.
 
+
+
 # Soup Nazi — ProofEngine Phase 2 tests done
+
+
+
+
+
+
+
+
 
 
 
@@ -27327,7 +54735,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 **Scope:** `test/Precept.Tests/ProofEngineTests.cs`
+
+
+
+
+
+
+
+
 
 
 
@@ -27343,7 +54763,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 - S1 Obligation collection — 7 required tests
+
+
+
+
 
 
 
@@ -27351,7 +54783,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - S3 Literal proof — 6 required tests
+
+
+
+
 
 
 
@@ -27359,7 +54799,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - S5 Guard-in-path proof — 11 required tests
+
+
+
+
 
 
 
@@ -27367,7 +54815,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - S7 Qualifier compatibility — 5 required tests
+
+
+
+
 
 
 
@@ -27375,7 +54831,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - S9 Diagnostics + fault links — 11 required tests
+
+
+
+
 
 
 
@@ -27383,7 +54847,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - S11 Initial-state satisfiability — 8 required tests
+
+
+
+
 
 
 
@@ -27391,7 +54863,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - S13 Stateless + integration — 9 required tests
+
+
+
+
 
 
 
@@ -27399,7 +54879,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - **Discovered `ProofEngineTests` total on branch:** 158 tests (required-name inventory plus supplemental coverage already in the file)
+
+
+
+
+
+
+
+
 
 
 
@@ -27415,7 +54907,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 - `dotnet build test/Precept.Tests/ --nologo` **passed**.
+
+
+
+
 
 
 
@@ -27423,7 +54927,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - Focused run after authoring: `dotnet test test/Precept.Tests/ --nologo --no-build --filter FullyQualifiedName~ProofEngineTests` ran **158** tests with **153 passed / 5 failed**.
+
+
+
+
+
+
+
+
 
 
 
@@ -27439,7 +54955,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 1. `Slice12_ProofForwardingFacts.ForwardingFacts_UnreachableState_ObligationsVacuouslyProved`
+
+
+
+
 
 
 
@@ -27447,7 +54975,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 3. `RequiredNameInventory.ForwardingFacts_UnreachableState_SuppressesObligations`
+
+
+
+
 
 
 
@@ -27455,7 +54991,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 5. `RequiredNameInventory.GetFieldName_NonFieldRef_ReturnsNull`
+
+
+
+
+
+
+
+
 
 
 
@@ -27471,7 +55019,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 - Forwarding-fact suppression is still red on the current branch: obligations marked proved during forwarding-fact incorporation end up unresolved by the end of `ProofEngine.Prove`.
+
+
+
+
 
 
 
@@ -27479,7 +55039,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - Several proof behaviors (especially qualifier compatibility and flow narrowing) needed manual `SemanticIndex` construction because the public DSL surface does not express every proof-shape directly.
+
+
+
+
+
+
+
+
 
 
 
@@ -27495,7 +55067,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 - Operand metadata identity matters: `integer / number` and `number / number` do not stress subject resolution the same way because catalog parameter instances differ.
+
+
+
+
 
 
 
@@ -27503,11 +55087,27 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.
 
 
 
+
+
+
+
 # Soup Nazi review — `precept_language`
+
+
+
+
+
+
+
+
 
 
 
@@ -27523,7 +55123,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 ## Scope
+
+
+
+
 
 
 
@@ -27531,7 +55143,15 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
 - Repo spec source for this tool is `docs/tooling/mcp.md` (`precept_language` section). `docs/McpServerDesign.md` is not present.
+
+
+
+
 
 
 
@@ -27543,7 +55163,19 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
+
+
+
+
+
+
+
+
 ## Why blocked
+
+
+
+
 
 
 
@@ -27555,7 +55187,19 @@ Original coverage was not sufficient.
 
 
 
+
+
+
+
+
+
+
+
 Missing or weak before remediation:
+
+
+
+
 
 
 
@@ -27563,7 +55207,15 @@ Missing or weak before remediation:
 
 
 
+
+
+
+
 - No assertion that every top-level catalog section is present and populated through the response shape.
+
+
+
+
 
 
 
@@ -27571,7 +55223,15 @@ Missing or weak before remediation:
 
 
 
+
+
+
+
 - No modifier subgroup completeness check for `field`, `state`, `event`, `access`, and `anchor`.
+
+
+
+
 
 
 
@@ -27579,7 +55239,15 @@ Missing or weak before remediation:
 
 
 
+
+
+
+
 - No representative field-mapping checks for tokens, types, modifiers, actions, constructs, or diagnostics.
+
+
+
+
 
 
 
@@ -27591,7 +55259,19 @@ Missing or weak before remediation:
 
 
 
+
+
+
+
+
+
+
+
 ## Remediation shipped
+
+
+
+
 
 
 
@@ -27599,7 +55279,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - serialized schema shape
+
+
+
+
 
 
 
@@ -27607,7 +55295,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - modifier subgroup completeness plus subtype-specific mapping anchors
+
+
+
+
 
 
 
@@ -27615,7 +55311,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - fire-pipeline exact order
+
+
+
+
 
 
 
@@ -27627,7 +55331,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Validation
+
+
+
+
 
 
 
@@ -27635,7 +55351,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - `dotnet test --no-build -q -m:1 /nr:false` → **baseline repo still red: 194 failures**.
+
+
+
+
 
 
 
@@ -27643,7 +55367,13 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
   - No failure implicated `LanguageTool` or the new MCP tests.
+
+
 
 # ISO 4217 refresh workflow conversion
 
@@ -27653,7 +55383,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 **Date:** 2026-05-09
+
+
+
+
 
 
 
@@ -27665,7 +55407,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Decision
+
+
+
+
 
 
 
@@ -27673,11 +55427,23 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - Download the XML into `src/Precept/Data/Iso4217/list-one.xml` using the live SIX endpoint at `iso-currrency/lists/list-one.xml`; the older `iso-4217/lists/list-one.xml` path currently returns 404.
 
 
 
+
+
+
+
 - Treat `src/Precept/Data/` as developer-downloaded reference data, not committed source.
+
+
+
+
 
 
 
@@ -27689,7 +55455,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
 
 
 
@@ -27697,11 +55475,21 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - The live upstream URL has drifted, so the refresh path must follow the currently published SIX source rather than a stale historical endpoint.
 
 
 
+
+
+
+
 - Optional local reference data should strengthen developer validation without turning absent downloads into red CI.
+
+
 
 # Qualifier completion honesty and Tier 1 UOM breadth
 
@@ -27711,7 +55499,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 **Date:** 2026-05-09
+
+
+
+
 
 
 
@@ -27723,11 +55523,27 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Decision
 
 
 
+
+
+
+
 - When a type/preposition pair is structurally invalid, show no qualifier-value completions; guide the user back to the correct preposition instead of suggesting misleading values.
+
+
+
+
 
 
 
@@ -27739,7 +55555,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
 
 
 
@@ -27747,9 +55575,23 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - Missing legitimate units damages trust faster than a somewhat longer filtered completion list.
 
+
+
 # UCUM / ISO 4217 implementation gap remediation shape
+
+
+
+
+
+
+
+
 
 
 
@@ -27761,11 +55603,27 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 **Merged from:** `frank-ucum-iso-gap.md`
 
 
 
+
+
+
+
 **Status:** Draft — pending Shane sign-off
+
+
+
+
+
+
+
+
 
 
 
@@ -27777,7 +55635,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 1. Replace the flat currency-code set with a structured `CurrencyCatalog` entry shape (`AlphaCode`, `NumericCode`, `Name`, `MinorUnit`) so money fields can derive implicit precision correctly.
+
+
+
+
 
 
 
@@ -27785,11 +55651,23 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 3. Keep the current `ClosedSetValidation` DU shape until the grammar parser ships; add the future grammar-aware validation as a new subtype instead of churning the existing surface now.
 
 
 
+
+
+
+
 4. Audit the dimension registry back to the curated v1 spec set and remove premature entries; `time` and `count` stay open questions for Shane.
+
+
+
+
 
 
 
@@ -27801,7 +55679,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
 
 
 
@@ -27809,9 +55699,23 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - `FrozenSet<string>` cannot carry the metadata required for money semantics or future catalog-driven tooling.
 
+
+
 # Field and arg semantic colors
+
+
+
+
+
+
+
+
 
 
 
@@ -27823,7 +55727,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 **Merged from:** `elaine-field-arg-colors.md`
+
+
+
+
 
 
 
@@ -27835,7 +55747,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Decision
+
+
+
+
 
 
 
@@ -27843,7 +55767,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - Formalize arg names as semantic token `--arg` using `#9AD8E8`, a lifted cyan companion to event color.
+
+
+
+
 
 
 
@@ -27855,7 +55787,19 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
 
 
 
@@ -27863,7 +55807,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 - The companion-token pattern is an axis relationship, not a change to the existing 1–3 shade paradigm.
+
+
+
+
 
 
 
@@ -27871,7 +55823,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 **By:** Shane (via Copilot)
+
+
+
+
 
 
 
@@ -27879,9 +55839,23 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 **Why:** User request — captured for team memory
 
+
+
 # Decision: Currency Symbol Data Strategy
+
+
+
+
+
+
+
+
 
 
 
@@ -27893,7 +55867,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 **Date:** 2026-05-09T12:44:09-04:00
+
+
+
+
 
 
 
@@ -27901,7 +55883,15 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
 **Scope:** CurrencyEntry symbol field, data ownership, maintenance strategy
+
+
+
+
 
 
 
@@ -27913,7 +55903,23 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -27929,7 +55935,23 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
+
+
+
+
+
+
+
+
 Add a `Symbol` property to `CurrencyEntry` and populate it from a private static dictionary in `CurrencyCatalog.cs`, merged at load time when the XML loader constructs entries.
+
+
+
+
+
+
+
+
 
 
 
@@ -27945,7 +55967,23 @@ Add a `Symbol` property to `CurrencyEntry` and populate it from a private static
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
+
+
+
+
 
 
 
@@ -27961,11 +55999,31 @@ The data layer decision established a clear first-party / third-party boundary:
 
 
 
+
+
+
+
+
+
+
+
 - **Third-party (ISO 4217):** AlphaCode, NumericCode, Name, MinorUnit → lives in `list-one.xml`, loaded at runtime
 
 
 
+
+
+
+
 - **First-party (Precept-owned):** Symbol → lives in C# source code
+
+
+
+
+
+
+
+
 
 
 
@@ -27981,7 +56039,23 @@ Currency symbols are Precept augmentation data. They are not in the ISO 4217 sta
 
 
 
+
+
+
+
+
+
+
+
 The practical case is equally clear:
+
+
+
+
+
+
+
+
 
 
 
@@ -27993,11 +56067,27 @@ The practical case is equally clear:
 
 
 
+
+
+
+
 - Currency symbols are among the most stable data in existence. The dollar sign has been `$` for 232 years.
 
 
 
+
+
+
+
 - A static dictionary of ~40 entries is trivially reviewable, trivially maintainable, and adds zero infrastructure.
+
+
+
+
+
+
+
+
 
 
 
@@ -28013,7 +56103,23 @@ The practical case is equally clear:
 
 
 
+
+
+
+
+
+
+
+
 **Option 1 (Separate XML file):** Over-engineers a ~40-entry lookup. Introduces a new embedded resource, a new XML schema, a new parser path, and a maintenance surface — all for data that changes less than once per decade. Also misclassifies first-party data by putting it in the `Data/` directory alongside third-party reference data.
+
+
+
+
+
+
+
+
 
 
 
@@ -28029,7 +56135,23 @@ The practical case is equally clear:
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -28045,7 +56167,19 @@ The practical case is equally clear:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -28053,7 +56187,15 @@ public sealed record CurrencyEntry(
 
 
 
+
+
+
+
     string AlphaCode,    // e.g. "USD"         — from ISO 4217
+
+
+
+
 
 
 
@@ -28061,7 +56203,15 @@ public sealed record CurrencyEntry(
 
 
 
+
+
+
+
     string Name,         // e.g. "US Dollar"   — from ISO 4217
+
+
+
+
 
 
 
@@ -28069,7 +56219,15 @@ public sealed record CurrencyEntry(
 
 
 
+
+
+
+
     string Symbol        // e.g. "$"           — Precept-owned augmentation; defaults to AlphaCode
+
+
+
+
 
 
 
@@ -28077,7 +56235,19 @@ public sealed record CurrencyEntry(
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -28093,7 +56263,23 @@ public sealed record CurrencyEntry(
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -28109,7 +56295,23 @@ public sealed record CurrencyEntry(
 
 
 
+
+
+
+
+
+
+
+
 In `CurrencyCatalog.cs`, after the XML loader parses `list-one.xml`:
+
+
+
+
+
+
+
+
 
 
 
@@ -28121,7 +56323,15 @@ In `CurrencyCatalog.cs`, after the XML loader parses `list-one.xml`:
 
 
 
+
+
+
+
 // Precept-owned augmentation: currency display symbols.
+
+
+
+
 
 
 
@@ -28129,7 +56339,15 @@ In `CurrencyCatalog.cs`, after the XML loader parses `list-one.xml`:
 
 
 
+
+
+
+
 // and common financial usage. Currencies without an entry here use their
+
+
+
+
 
 
 
@@ -28137,7 +56355,15 @@ In `CurrencyCatalog.cs`, after the XML loader parses `list-one.xml`:
 
 
 
+
+
+
+
 private static readonly FrozenDictionary<string, string> Symbols =
+
+
+
+
 
 
 
@@ -28145,7 +56371,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
     {
+
+
+
+
 
 
 
@@ -28153,7 +56387,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["AMD"] = "֏",    ["ARS"] = "$",    ["AUD"] = "A$",
+
+
+
+
 
 
 
@@ -28161,7 +56403,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["BDT"] = "৳",    ["BGN"] = "лв",   ["BHD"] = ".د.ب",
+
+
+
+
 
 
 
@@ -28169,7 +56419,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["BRL"] = "R$",   ["BSD"] = "B$",   ["BTN"] = "Nu.",
+
+
+
+
 
 
 
@@ -28177,7 +56435,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["CAD"] = "C$",   ["CDF"] = "FC",   ["CHF"] = "CHF",
+
+
+
+
 
 
 
@@ -28185,7 +56451,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["CRC"] = "₡",    ["CUP"] = "₱",    ["CZK"] = "Kč",
+
+
+
+
 
 
 
@@ -28193,7 +56467,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["EGP"] = "E£",   ["ERN"] = "Nfk",  ["ETB"] = "Br",
+
+
+
+
 
 
 
@@ -28201,7 +56483,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["GBP"] = "£",    ["GEL"] = "₾",    ["GHS"] = "GH₵",
+
+
+
+
 
 
 
@@ -28209,7 +56499,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["HKD"] = "HK$",  ["HNL"] = "L",    ["HUF"] = "Ft",
+
+
+
+
 
 
 
@@ -28217,7 +56515,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["IQD"] = "ع.د",  ["IRR"] = "﷼",    ["ISK"] = "kr",
+
+
+
+
 
 
 
@@ -28225,7 +56531,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["KES"] = "KSh",  ["KGS"] = "сом",  ["KHR"] = "៛",
+
+
+
+
 
 
 
@@ -28233,7 +56547,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["KYD"] = "CI$",  ["KZT"] = "₸",    ["LAK"] = "₭",
+
+
+
+
 
 
 
@@ -28241,7 +56563,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["MAD"] = "MAD",  ["MDL"] = "L",    ["MGA"] = "Ar",
+
+
+
+
 
 
 
@@ -28249,7 +56579,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["MOP"] = "MOP$", ["MRU"] = "UM",   ["MUR"] = "₨",
+
+
+
+
 
 
 
@@ -28257,7 +56595,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["MYR"] = "RM",   ["MZN"] = "MT",   ["NAD"] = "N$",
+
+
+
+
 
 
 
@@ -28265,7 +56611,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["NPR"] = "Rs",   ["NZD"] = "NZ$",  ["OMR"] = "ر.ع.",
+
+
+
+
 
 
 
@@ -28273,7 +56627,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["PHP"] = "₱",    ["PKR"] = "₨",    ["PLN"] = "zł",
+
+
+
+
 
 
 
@@ -28281,7 +56643,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["RSD"] = "din.", ["RUB"] = "₽",    ["RWF"] = "FRw",
+
+
+
+
 
 
 
@@ -28289,7 +56659,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["SDG"] = "ج.س.", ["SEK"] = "kr",   ["SGD"] = "S$",
+
+
+
+
 
 
 
@@ -28297,7 +56675,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["SRD"] = "SRD",  ["SSP"] = "SS£",  ["STN"] = "Db",
+
+
+
+
 
 
 
@@ -28305,7 +56691,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["THB"] = "฿",    ["TJS"] = "SM",   ["TMT"] = "T",
+
+
+
+
 
 
 
@@ -28313,7 +56707,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["TTD"] = "TT$",  ["TWD"] = "NT$",  ["TZS"] = "TSh",
+
+
+
+
 
 
 
@@ -28321,7 +56723,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["UYU"] = "$U",   ["UZS"] = "сўм",  ["VES"] = "Bs.S",
+
+
+
+
 
 
 
@@ -28329,7 +56739,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["XAF"] = "FCFA", ["XCD"] = "EC$",  ["XOF"] = "CFA",
+
+
+
+
 
 
 
@@ -28337,7 +56755,15 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
         ["ZMW"] = "ZK",
+
+
+
+
 
 
 
@@ -28345,7 +56771,19 @@ private static readonly FrozenDictionary<string, string> Symbols =
 
 
 
+
+
+
+
 ```
+
+
+
+
+
+
+
+
 
 
 
@@ -28361,7 +56799,19 @@ The XML loader merges at construction time:
 
 
 
+
+
+
+
+
+
+
+
 ```csharp
+
+
+
+
 
 
 
@@ -28369,7 +56819,15 @@ var symbol = Symbols.GetValueOrDefault(alphaCode, alphaCode);
 
 
 
+
+
+
+
 return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
+
+
+
+
 
 
 
@@ -28381,7 +56839,23 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -28397,7 +56871,19 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
+
+
+
+
 - **Who updates symbols:** Any developer, via a normal PR editing the `Symbols` dictionary.
+
+
+
+
 
 
 
@@ -28405,7 +56891,15 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
 - **Review:** Trivially reviewable — it's a string-to-string dictionary in C#.
+
+
+
+
 
 
 
@@ -28417,7 +56911,23 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -28433,7 +56943,19 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
+
+
+
+
 1. **`CurrencyEntry` gains a `Symbol` property.** The plan said "record shape unchanged" — this is now a 5-field record instead of 4.
+
+
+
+
 
 
 
@@ -28441,7 +56963,15 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
 3. **Tests add symbol coverage:** verify `USD.Symbol == "$"`, `EUR.Symbol == "€"`, `JPY.Symbol == "¥"`, and that currencies without explicit symbols use their alpha code (e.g., `XDR.Symbol == "XDR"`).
+
+
+
+
 
 
 
@@ -28453,7 +56983,23 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -28469,7 +57015,23 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
+
+
+
+
+
+
+
+
 > "Is this part of a complete description of Precept?"
+
+
+
+
+
+
+
+
 
 
 
@@ -28481,7 +57043,19 @@ Currency symbols are NOT part of the language specification. They are display/fo
 
 
 
+
+
+
+
 # Decision: ISO 4217 / UCUM Data Layer — Embedded XML, Lazy Load
+
+
+
+
+
+
+
+
 
 
 
@@ -28493,7 +57067,15 @@ Currency symbols are NOT part of the language specification. They are display/fo
 
 
 
+
+
+
+
 |---|---|
+
+
+
+
 
 
 
@@ -28501,11 +57083,23 @@ Currency symbols are NOT part of the language specification. They are display/fo
 
 
 
+
+
+
+
 | Date | 2026-05-09T12:45:00-04:00 |
 
 
 
+
+
+
+
 | Status | Proposed (supersedes `frank-ucum-data-layer.md`) |
+
+
+
+
 
 
 
@@ -28517,7 +57111,23 @@ Currency symbols are NOT part of the language specification. They are display/fo
 
 
 
+
+
+
+
+
+
+
+
 ## Recommendation
+
+
+
+
+
+
+
+
 
 
 
@@ -28533,7 +57143,23 @@ Currency symbols are NOT part of the language specification. They are display/fo
 
 
 
+
+
+
+
+
+
+
+
 ## What IS Catalog Metadata vs. What Is Reference Data
+
+
+
+
+
+
+
+
 
 
 
@@ -28549,7 +57175,23 @@ Shane's question cuts to the bone and the answer is clear.
 
 
 
+
+
+
+
+
+
+
+
 The catalog system doc defines the test: *"if I enumerated every catalog's `All` property, would I have a complete description of Precept?"* Enumerating ISO 4217 codes does not describe Precept — it describes ISO 4217. Enumerating UCUM atoms does not describe Precept — it describes UCUM.
+
+
+
+
+
+
+
+
 
 
 
@@ -28561,7 +57203,15 @@ What IS catalog metadata:
 
 
 
+
+
+
+
 - `TypeMeta` for `currency` (the Precept type — its traits, qualifiers, accessors, content validation shape)
+
+
+
+
 
 
 
@@ -28569,11 +57219,23 @@ What IS catalog metadata:
 
 
 
+
+
+
+
 - `TypeMeta` for `quantity`, `price`, `exchangerate` (Precept types that consume currency/unit data)
 
 
 
+
+
+
+
 - The `ContentValidation` DU subtype that says "validate currency constants against ISO 4217"
+
+
+
+
 
 
 
@@ -28585,7 +57247,19 @@ What IS catalog metadata:
 
 
 
+
+
+
+
+
+
+
+
 What is NOT catalog metadata:
+
+
+
+
 
 
 
@@ -28593,11 +57267,27 @@ What is NOT catalog metadata:
 
 
 
+
+
+
+
 - The ~300 UCUM atoms (code, dimension vector, scale factor, prefixability)
 
 
 
+
+
+
+
 - The ~24 UCUM SI prefixes
+
+
+
+
+
+
+
+
 
 
 
@@ -28613,7 +57303,23 @@ These are **external, authoritative, versioned reference databases** that Precep
 
 
 
+
+
+
+
+
+
+
+
 My earlier decision conflated "consumers need typed C# records" with "those records must be source-level generated C#." Both statements are not equivalent. Consumers need `FrozenDictionary<string, CurrencyEntry>` and `FrozenDictionary<string, UcumAtom>`. They do not care whether those collections were populated from a generated `.g.cs` file or from an embedded XML resource parsed once at process startup.
+
+
+
+
+
+
+
+
 
 
 
@@ -28629,7 +57335,23 @@ My earlier decision conflated "consumers need typed C# records" with "those reco
 
 
 
+
+
+
+
+
+
+
+
 I argued that NodaTime's embedded-resource pattern "solves a distribution problem Precept doesn't have." That framing was too narrow. The embedded-resource pattern solves a *classification* problem: it keeps external reference data out of source-level language definition code. NodaTime doesn't generate C# arrays of timezone rules — not because of distribution, but because timezone rules aren't NodaTime's language. They're external data NodaTime consumes. The same principle applies here.
+
+
+
+
+
+
+
+
 
 
 
@@ -28645,7 +57367,23 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
+
+
+
+
 **Embedded XML, lazy load.**
+
+
+
+
+
+
+
+
 
 
 
@@ -28657,7 +57395,15 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
 - `CurrencyCatalog.cs` becomes a loader, not a data file. It exposes the same `FrozenDictionary<string, CurrencyEntry> All` property, but populates it by parsing the embedded `list-one.xml` on first access via `Lazy<T>`.
+
+
+
+
 
 
 
@@ -28665,11 +57411,27 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
 - `refresh-iso4217.js` simplifies: it downloads the XML and writes it to `src/Precept/Data/Iso4217/list-one.xml`. Done. No codegen step.
 
 
 
+
+
+
+
 - The exclusion logic (precious metals, fund codes, test codes) moves into the loader's XML-parsing filter — same rules, same result, declarative in one place.
+
+
+
+
+
+
+
+
 
 
 
@@ -28685,7 +57447,23 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
+
+
+
+
 ## Specific Answer for UCUM
+
+
+
+
+
+
+
+
 
 
 
@@ -28701,7 +57479,19 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
+
+
+
+
 - `ucum-essence.xml` ships as an embedded resource in `src/Precept/Data/Ucum/`.
+
+
+
+
 
 
 
@@ -28709,7 +57499,15 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
 - The UCUM parser (`UcumParser.cs`) consumes these typed records at parse time — the consumer API is identical to what the codegen approach would have provided.
+
+
+
+
 
 
 
@@ -28717,7 +57515,19 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
 - `refresh-ucum.js` downloads `ucum-essence.xml` to `src/Precept/Data/Ucum/`. Done.
+
+
+
+
+
+
+
+
 
 
 
@@ -28733,7 +57543,23 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
+
+
+
+
 ## Consistency Ruling
+
+
+
+
+
+
+
+
 
 
 
@@ -28749,7 +57575,19 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
+
+
+
+
 1. Authoritative XML in `src/Precept/Data/{Standard}/` as an embedded resource.
+
+
+
+
 
 
 
@@ -28757,11 +57595,27 @@ I argued that NodaTime's embedded-resource pattern "solves a distribution proble
 
 
 
+
+
+
+
 3. A refresh script in `tools/scripts/` that downloads the latest upstream XML. No codegen. No generated files.
 
 
 
+
+
+
+
 4. Consumers see `FrozenDictionary<string, T>` — they never know or care that it came from XML.
+
+
+
+
+
+
+
+
 
 
 
@@ -28777,7 +57631,23 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
+
+
+
+
 ## Tradeoff Accepted
+
+
+
+
+
+
+
+
 
 
 
@@ -28793,11 +57663,27 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
+
+
+
+
 - **No reviewable C# diff on data updates.** When ISO 4217 or UCUM publishes a new version, the commit diff shows XML changes, not C# changes. XML diffs are less readable than C# record-array diffs. This is a real cost — but it is the correct cost. The alternative (codegen) purchases readable diffs by misclassifying reference data as source code.
 
 
 
+
+
+
+
 - **First-access latency.** There is a one-time XML parsing cost on first use. For 159 currencies: negligible. For ~300 UCUM atoms with dimension vectors: still negligible (sub-millisecond for in-memory XML parsing of a small embedded resource). If this ever becomes measurable — it won't — the `Lazy<T>` can be replaced with eager initialization in a static constructor. The consumer API doesn't change.
+
+
+
+
 
 
 
@@ -28809,7 +57695,23 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
+
+
+
+
 ## Impact on the Plan
+
+
+
+
+
+
+
+
 
 
 
@@ -28825,7 +57727,19 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
+
+
+
+
 1. **`CurrencyCatalog.cs` becomes a loader.** Delete the 159-entry array. Add embedded-resource XML parsing into `CurrencyEntry` records with a `Lazy<FrozenDictionary<string, CurrencyEntry>>` backing field. Same public API.
+
+
+
+
 
 
 
@@ -28833,7 +57747,15 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
 3. **UCUM data layer builds the same way.** `UcumAtomCatalog.cs` is a loader over embedded `ucum-essence.xml`, not a generated file. No `generate-ucum-catalog.js` script needed. Only `refresh-ucum.js` (XML download).
+
+
+
+
 
 
 
@@ -28841,7 +57763,19 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
 5. **Test coverage must validate the embedded resources.** Catalog sync tests parse the embedded XML and verify record counts, required fields, and known entries.
+
+
+
+
+
+
+
+
 
 
 
@@ -28857,7 +57791,19 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
+
+
+
+
 - The typed record shapes (`CurrencyEntry`, `UcumAtom`, `UcumPrefix`, `DimensionVector`) — identical.
+
+
+
+
 
 
 
@@ -28865,7 +57811,15 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
 - The UCUM parser architecture — unchanged, it still reads from `UcumAtomCatalog.All`.
+
+
+
+
 
 
 
@@ -28873,7 +57827,15 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
 - The refresh scripts' download logic — unchanged.
+
+
+
+
 
 
 
@@ -28885,7 +57847,19 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
+
+
+
+
 | Property | Value |
+
+
+
+
 
 
 
@@ -28893,7 +57867,15 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
 | Author | Frank (Lead/Architect) |
+
+
+
+
 
 
 
@@ -28901,11 +57883,27 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
 | Scope | `docs/Working/frank-typed-literal-framework.md` — Q5 addition and gap audit |
 
 
 
+
+
+
+
 | Grounding | `docs/runtime/runtime-api.md`, `docs/compiler/literal-system.md`, `docs/language/catalog-system.md`, `src/Precept/Language/Types.cs`, `src/Precept/Language/Type.cs` |
+
+
+
+
+
+
+
+
 
 
 
@@ -28921,7 +57919,23 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
+
+
+
+
+
+
+
+
 ### D1: Restore reuses `TypeRuntimeMeta.ReadJson` — no separate deserialization contract
+
+
+
+
+
+
+
+
 
 
 
@@ -28937,7 +57951,23 @@ The `Precept.Restore(string?, JsonElement)` path uses the same `TypeRuntimeMeta.
 
 
 
+
+
+
+
+
+
+
+
 **Rationale:** All three runtime JSON ingress paths (Fire, Update, Restore) convert `JsonElement` → `PreceptValue` for the same type registry. Creating a separate delegate would duplicate the parser registrations without adding value.
+
+
+
+
+
+
+
+
 
 
 
@@ -28949,11 +57979,27 @@ The `Precept.Restore(string?, JsonElement)` path uses the same `TypeRuntimeMeta.
 
 
 
+
+
+
+
 - Separate `RestoreJson` delegate on `TypeRuntimeMeta` — rejected because the parsing logic is identical; only the caller context differs.
 
 
 
+
+
+
+
 - Reusing `TypedConstantValidation.Validate` at Restore time — rejected for the same reasons it was rejected for Fire in Q4 (wrong input format, wrong error model, DSL syntax vs JSON wire format).
+
+
+
+
+
+
+
+
 
 
 
@@ -28969,7 +58015,23 @@ The `Precept.Restore(string?, JsonElement)` path uses the same `TypeRuntimeMeta.
 
 
 
+
+
+
+
+
+
+
+
 ### D2: Round-trip fidelity is the only forward-compatibility guarantee
+
+
+
+
+
+
+
+
 
 
 
@@ -28985,7 +58047,23 @@ The `Precept.Restore(string?, JsonElement)` path uses the same `TypeRuntimeMeta.
 
 
 
+
+
+
+
+
+
+
+
 ### D3: 15 gaps identified — 2 Blockers, 13 Advisory
+
+
+
+
+
+
+
+
 
 
 
@@ -29001,11 +58079,31 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
+
+
+
+
 1. **G1 — CLR type mapping contradiction:** `runtime-api.md` maps temporal types to System types (DateOnly, TimeOnly, DateTimeOffset); the proposal maps them to NodaTime types. Requires a locked decision on the public CLR mapping.
 
 
 
+
+
+
+
 2. **G2 — Restore absent from consumer matrices:** Q1/Q2 consumer matrices don't mention the Restore path. Q5 covers the architecture but the matrices need cross-references.
+
+
+
+
+
+
+
+
 
 
 
@@ -29021,7 +58119,23 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
+
+
+
+
 ## Cross-References
+
+
+
+
+
+
+
+
 
 
 
@@ -29033,7 +58147,15 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
 - Runtime API (Restore design): `docs/runtime/runtime-api.md` § Restoration
+
+
+
+
 
 
 
@@ -29041,11 +58163,23 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
 - Catalog system (metadata-driven principle): `docs/language/catalog-system.md` § Architectural Identity
 
 
 
+
+
+
+
 - UCUM gap analysis: `docs/Working/frank-ucum-iso-gap.md`
+
+
+
+
 
 
 
@@ -29057,7 +58191,19 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
+
+
+
+
 | Property | Value |
+
+
+
+
 
 
 
@@ -29065,7 +58211,15 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
 | Author | Frank (Lead/Architect) |
+
+
+
+
 
 
 
@@ -29073,7 +58227,19 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
 | Scope | Plan synthesis from 4 Working docs into a single executable implementation plan |
+
+
+
+
+
+
+
+
 
 
 
@@ -29089,7 +58255,19 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
+
+
+
+
 - **12 slices** ordered by dependency
+
+
+
+
 
 
 
@@ -29097,11 +58275,23 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
 - Slices 5–9 are the framework core (DU update, framework types, validators, TypeMeta entries, TypeChecker migration)
 
 
 
+
+
+
+
 - Slice 10 is runtime stubs (independent)
+
+
+
+
 
 
 
@@ -29113,7 +58303,19 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
+
+
+
+
+
+
+
+
 Key ordering decisions:
+
+
+
+
 
 
 
@@ -29121,7 +58323,15 @@ Key ordering decisions:
 
 
 
+
+
+
+
 - Temporal parser is fully independent of UCUM — they can execute in parallel
+
+
+
+
 
 
 
@@ -29129,7 +58339,19 @@ Key ordering decisions:
 
 
 
+
+
+
+
 - TypeChecker migration is the last code slice — it proves everything works end-to-end before doc updates
+
+
+
+
+
+
+
+
 
 
 
@@ -29145,7 +58367,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
+
+
+
+
 1. **G15 resolution:** The Working docs proposed a `QuantityDomain` enum on a single `QuantityValidation` subtype. The plan resolves this with four separate DU subtypes (`MoneyValidation`, `QuantityValidation`, `PriceValidation`, `ExchangeRateValidation`) — more catalog-idiomatic.
+
+
+
+
+
+
+
+
 
 
 
@@ -29161,7 +58399,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
+
+
+
+
 3. **`stateref` disposition:** The Working docs flagged this as advisory gap G8 but didn't resolve it. The plan adds a disposition note in `literal-system.md`: stateref validation is a name-binder concern, not a domain parser. It does not use ContentValidation.
+
+
+
+
+
+
+
+
 
 
 
@@ -29177,7 +58431,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
+
+
+
+
 ## Canonical Docs Requiring More Updates Than Expected
+
+
+
+
+
+
+
+
 
 
 
@@ -29193,7 +58463,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
+
+
+
+
 - **`literal-system.md`** has three open questions to close, a content validation table to add, and the Restore consumer matrix entry. More than a simple sync.
+
+
+
+
+
+
+
+
 
 
 
@@ -29205,7 +58491,19 @@ Key ordering decisions:
 
 
 
+
+
+
+
 # Decision: UCUM Data Layer Strategy — Build-Time Codegen
+
+
+
+
+
+
+
+
 
 
 
@@ -29217,7 +58515,15 @@ Key ordering decisions:
 
 
 
+
+
+
+
 |---|---|
+
+
+
+
 
 
 
@@ -29225,11 +58531,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
 | Date | 2026-05-09T12:12:35-04:00 |
 
 
 
+
+
+
+
 | Status | Locked |
+
+
+
+
 
 
 
@@ -29241,7 +58559,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
+
+
+
+
 ## Recommendation
+
+
+
+
+
+
+
+
 
 
 
@@ -29257,7 +58591,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
+
+
+
+
 ## Rationale
+
+
+
+
+
+
+
+
 
 
 
@@ -29273,7 +58623,23 @@ Key ordering decisions:
 
 
 
+
+
+
+
+
+
+
+
 The UCUM atom table is consumed at **compile time** — by the type checker, the language server, and MCP vocabulary projection — not just at runtime. Every one of these consumers needs:
+
+
+
+
+
+
+
+
 
 
 
@@ -29285,7 +58651,15 @@ The UCUM atom table is consumed at **compile time** — by the type checker, the
 
 
 
+
+
+
+
 - prefixability flags (for longest-match prefix parsing),
+
+
+
+
 
 
 
@@ -29293,11 +58667,27 @@ The UCUM atom table is consumed at **compile time** — by the type checker, the
 
 
 
+
+
+
+
 - scale factors (for exact conversion metadata),
 
 
 
+
+
+
+
 - tier classification (for LS completions and MCP discovery).
+
+
+
+
+
+
+
+
 
 
 
@@ -29313,7 +58703,23 @@ This data must be available as typed, frozen, statically-analyzable C# structure
 
 
 
+
+
+
+
+
+
+
+
 ### 2. Catalog-driven architecture demands typed metadata records
+
+
+
+
+
+
+
+
 
 
 
@@ -29329,7 +58735,23 @@ The non-negotiable architectural principle is: **catalogs are the language speci
 
 
 
+
+
+
+
+
+
+
+
 A `UcumAtom` record with `DimensionVector`, `ExactScale`, `IsPrefixable`, `Tier`, and `DisplayName` properties is catalog metadata. An XML element is a serialization format. The catalog architecture requires the former. The XML is a provenance artifact — the upstream source from which the catalog is refreshed — not the runtime truth.
+
+
+
+
+
+
+
+
 
 
 
@@ -29345,7 +58767,23 @@ A `UcumAtom` record with `DimensionVector`, `ExactScale`, `IsPrefixable`, `Tier`
 
 
 
+
+
+
+
+
+
+
+
 `CurrencyCatalog.cs` + `refresh-iso4217.js` + `src/Precept/Data/Iso4217/list-one.xml` is the established pattern:
+
+
+
+
+
+
+
+
 
 
 
@@ -29357,7 +58795,15 @@ A `UcumAtom` record with `DimensionVector`, `ExactScale`, `IsPrefixable`, `Tier`
 
 
 
+
+
+
+
 2. A refresh script downloads the latest upstream source.
+
+
+
+
 
 
 
@@ -29365,7 +58811,19 @@ A `UcumAtom` record with `DimensionVector`, `ExactScale`, `IsPrefixable`, `Tier`
 
 
 
+
+
+
+
 4. Consumers reference the C# catalog directly — no file I/O, no parsing, no lazy initialization.
+
+
+
+
+
+
+
+
 
 
 
@@ -29381,7 +58839,23 @@ UCUM should follow the identical pattern. The only difference is scale: UCUM has
 
 
 
+
+
+
+
+
+
+
+
 ### 4. NodaTime's TZDB pattern is wrong for this use case
+
+
+
+
+
+
+
+
 
 
 
@@ -29397,7 +58871,19 @@ NodaTime embeds `Noda.TimeZoneData.nzd` and parses it lazily because:
 
 
 
+
+
+
+
+
+
+
+
 - The IANA timezone database changes frequently (multiple releases per year).
+
+
+
+
 
 
 
@@ -29405,7 +58891,19 @@ NodaTime embeds `Noda.TimeZoneData.nzd` and parses it lazily because:
 
 
 
+
+
+
+
 - Timezone data is enormous and used selectively at runtime.
+
+
+
+
+
+
+
+
 
 
 
@@ -29421,7 +58919,19 @@ None of these conditions hold for UCUM in Precept:
 
 
 
+
+
+
+
+
+
+
+
 - UCUM `ucum-essence.xml` is versioned and stable — the atom table changes on the order of years, not months.
+
+
+
+
 
 
 
@@ -29429,11 +58939,27 @@ None of these conditions hold for UCUM in Precept:
 
 
 
+
+
+
+
 - The atom table is small (~300 entries) and used exhaustively at compile time.
 
 
 
+
+
+
+
 - Lazy initialization introduces a failure mode (malformed XML, missing resource) that would surface as a compiler crash rather than a build error.
+
+
+
+
+
+
+
+
 
 
 
@@ -29449,7 +58975,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ## Key Tradeoff
+
+
+
+
+
+
+
+
 
 
 
@@ -29465,7 +59007,19 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 - UCUM updates are rare and deliberate.
+
+
+
+
 
 
 
@@ -29473,7 +59027,19 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
 - The checked-in `.g.cs` file makes diffs reviewable — you can see exactly which atoms changed.
+
+
+
+
+
+
+
+
 
 
 
@@ -29489,7 +59055,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### Build NOW (in the typed-literal spike)
+
+
+
+
+
+
+
+
 
 
 
@@ -29501,7 +59083,15 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
 - `tools/scripts/generate-ucum-catalog.js` — reads the XML, emits `UcumAtomCatalog.g.cs` and `UcumPrefixCatalog.g.cs` into `src/Precept/Language/Ucum/`.
+
+
+
+
 
 
 
@@ -29509,7 +59099,19 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
 - The `UcumParser` consumes the generated catalog directly — no XML, no lazy init, no embedded resources.
+
+
+
+
+
+
+
+
 
 
 
@@ -29525,13 +59127,35 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 - `docs/language/business-domain-types.md` should document the refresh/codegen workflow once it ships.
+
+
+
+
 
 
 
 - The data pipeline pattern (XML provenance → codegen script → frozen C# catalog) should be recorded as the canonical pattern for any future external-standard integration.
 
+
+
 # UCUM Data Layer → Evaluator Gap Analysis
+
+
+
+
+
+
+
+
 
 
 
@@ -29543,11 +59167,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
 
 
 
+
+
+
+
 **Requested by:** Shane
+
+
+
+
 
 
 
@@ -29559,7 +59195,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -29575,7 +59227,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### 1. Dimensional Analysis — SUFFICIENT
+
+
+
+
+
+
+
+
 
 
 
@@ -29591,7 +59259,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### 2. Unit Conversion — SUFFICIENT
+
+
+
+
+
+
+
+
 
 
 
@@ -29607,7 +59291,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### 3. Unit Multiplication/Division — SUFFICIENT
+
+
+
+
+
+
+
+
 
 
 
@@ -29623,7 +59323,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### 4. Canonical Form — SUFFICIENT
+
+
+
+
+
+
+
+
 
 
 
@@ -29639,7 +59355,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### 5. Prefixed Unit Handling — SUFFICIENT
+
+
+
+
+
+
+
+
 
 
 
@@ -29655,7 +59387,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### 6. Annotation Handling — GAP
+
+
+
+
+
+
+
+
 
 
 
@@ -29671,7 +59419,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 `UcumAtom` carries `string? AnnotationClass`, and the parser AST includes `UcumAnnotatedNode`. The `DimensionCatalog` entry for `count` says "(0,0,0,0,0,0,0) — dimensionless with approved count annotations." But the plan does not specify:
+
+
+
+
+
+
+
+
 
 
 
@@ -29683,7 +59447,19 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
 - **Annotation equality semantics.** UCUM says annotations are for display only and do not affect dimensional analysis. The plan should explicitly state this: annotations are preserved for display but ignored in `DimensionVector` comparison and `UcumExactFactor` computation.
+
+
+
+
+
+
+
+
 
 
 
@@ -29699,7 +59475,23 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 ### 7. Derived Unit Chains — GAP
+
+
+
+
+
+
+
+
 
 
 
@@ -29715,7 +59507,19 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
+
+
+
+
+
+
+
+
 UCUM `ucum-essence.xml` defines units in two categories:
+
+
+
+
 
 
 
@@ -29723,7 +59527,19 @@ UCUM `ucum-essence.xml` defines units in two categories:
 
 
 
+
+
+
+
 - **Defined units** (everything else): `N`, `J`, `Pa`, `Hz`, `L`, `[degF]`, etc. — these are defined as expressions of other units. E.g., `N` = `kg.m/s^2`, `J` = `N.m` = `kg.m^2/s^2`, `L` = `dm^3`.
+
+
+
+
+
+
+
+
 
 
 
@@ -29739,11 +59555,31 @@ The plan says `UcumAtom` has `DimensionVector Vector` and `UcumExactFactor Scale
 
 
 
+
+
+
+
+
+
+
+
 1. **Loader resolves at load time** — the XML loader recursively resolves each defined unit's expression down to fundamental SI components and stores the fully resolved `Vector` and `Scale` on `UcumAtom`. This means `N` gets Vector=(1,1,-2,0,0,0,0) and Scale=1 (already in SI). This is the correct approach.
 
 
 
+
+
+
+
 2. **Store definition expression and resolve later** — stores `N`'s definition as `kg.m/s^2` and resolves on demand.
+
+
+
+
+
+
+
+
 
 
 
@@ -29759,7 +59595,23 @@ The plan implicitly assumes option 1 (since `UcumAtom.Vector` and `UcumAtom.Scal
 
 
 
+
+
+
+
+
+
+
+
 **Fix required in:** `docs/Working/typed-literal-system-plan.md`, Slice 1d — add explicit note: "The XML loader resolves each defined unit's `<value>` expression transitively into fundamental SI components. `UcumAtom.Vector` and `UcumAtom.Scale` represent the fully resolved SI-relative values, not the raw definition expression. This requires the loader to parse unit definition expressions using the same grammar as the UCUM parser (Slice 3), which creates a bootstrap dependency: the loader must either (a) include a minimal expression resolver for the `<value Unit="..." UNIT="...">` attributes, or (b) depend on the full `UcumParser` from Slice 3."
+
+
+
+
+
+
+
+
 
 
 
@@ -29775,7 +59627,23 @@ The plan implicitly assumes option 1 (since `UcumAtom.Vector` and `UcumAtom.Scal
 
 
 
+
+
+
+
+
+
+
+
 ### 8. Interning and Identity — GAP
+
+
+
+
+
+
+
+
 
 
 
@@ -29791,7 +59659,23 @@ The plan implicitly assumes option 1 (since `UcumAtom.Vector` and `UcumAtom.Scal
 
 
 
+
+
+
+
+
+
+
+
 `UcumParsedUnit` has `SourceText`, `CanonicalCode`, `Vector`, `Scale`, and `UsedAtoms`. The runtime stubs (Slice 10) include `UnitFactory` which "converts parsed units into interned runtime `Unit` instances." But the plan does not specify:
+
+
+
+
+
+
+
+
 
 
 
@@ -29803,7 +59687,19 @@ The plan implicitly assumes option 1 (since `UcumAtom.Vector` and `UcumAtom.Scal
 
 
 
+
+
+
+
 - **The plan explicitly asked George to implement `Unit` as a stub.** That's correct for pre-work scope, but the `UcumParsedUnit` record shape must be confirmed sufficient to produce a stable interning key later. Currently it is — `(Vector, Scale)` is a mathematically complete identity for physical units — but this needs to be documented as the intended key, with `SourceText`/`CanonicalCode` as display properties only.
+
+
+
+
+
+
+
+
 
 
 
@@ -29819,7 +59715,23 @@ The plan implicitly assumes option 1 (since `UcumAtom.Vector` and `UcumAtom.Scal
 
 
 
+
+
+
+
+
+
+
+
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -29835,7 +59747,23 @@ The plan implicitly assumes option 1 (since `UcumAtom.Vector` and `UcumAtom.Scal
 
 
 
+
+
+
+
+
+
+
+
 **The data layer is architecturally sufficient but has 3 gaps that need plan amendments before implementation begins.**
+
+
+
+
+
+
+
+
 
 
 
@@ -29851,7 +59779,19 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
+
+
+
+
 | # | Area | Verdict | Severity |
+
+
+
+
 
 
 
@@ -29859,7 +59799,15 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
 | 1 | Dimensional analysis | SUFFICIENT | — |
+
+
+
+
 
 
 
@@ -29867,7 +59815,15 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
 | 3 | Unit multiplication/division | SUFFICIENT | — |
+
+
+
+
 
 
 
@@ -29875,7 +59831,15 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
 | 5 | Prefixed unit handling | SUFFICIENT | — |
+
+
+
+
 
 
 
@@ -29883,7 +59847,15 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
 | 7 | Derived unit chains | GAP | **Medium** — loader must transitively resolve defined units; creates bootstrap dependency between Slice 1d and Slice 3 that needs resolution |
+
+
+
+
 
 
 
@@ -29895,7 +59867,19 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
+
+
+
+
 **Recommendation:** Amend the plan with the 3 fixes above before George begins Slice 1d. The derived unit chain gap (#7) is the most important — it affects loader design and slice dependency ordering.
+
+
+
+
 
 
 
@@ -29907,7 +59891,19 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
+
+
+
+
 **By:** Shane (via Copilot)
+
+
+
+
 
 
 
@@ -29915,9 +59911,23 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
 **Why:** User directive — concept no longer exists; open item is stale.
 
+
+
 # Modifier coloring regression anchor
+
+
+
+
+
+
+
+
 
 
 
@@ -29929,7 +59939,15 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
 - Context: `default` inside field declarations was falling through to the generic `#grammarKeywords` TextMate include, which the extension theme renders gold. `as` already had a declaration capture, but the suite had no regression anchor proving that declaration syntax stays off the gold lane.
+
+
+
+
 
 
 
@@ -29937,21 +59955,43 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
+
+
+
+
 - Rationale: This bug is structural TextMate ordering, not token-catalog truth. A grammar-file regression test is the honest place to catch it.
+
+
+
+
 
 
 
 - Anchor files: `test\Precept.Tests\Language\TextMateGrammarTests.cs`, `tools\Precept.GrammarGen\Program.cs`, `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json`
 
+
+
 # Triage: BUG-039 — `at` proof obligation
 
+
+
 **Date:** 2026-05-10T09:33:43.989-04:00
+
+
 
 **Verdict:** A — Proof obligation is CORRECT; the spec has two documentation gaps
 
 
 
+
+
+
+
 ## Analysis
+
+
+
+
 
 
 
@@ -29959,7 +59999,15 @@ The catalog (`Types.cs`) declares a `NumericProofRequirement` (`count > 0`) on *
 
 
 
+
+
+
+
 This is correct language policy for three reasons:
+
+
+
+
 
 
 
@@ -29967,7 +60015,15 @@ This is correct language policy for three reasons:
 
 
 
+
+
+
+
 2. **Return type `T` describes the success type, not the precondition.** The accessor returning `T` (not `T optional`) means "when the operation succeeds, you get a definite `T`." It does NOT mean "the operation always succeeds." The precondition (non-empty) is a separate concern.
+
+
+
+
 
 
 
@@ -29975,7 +60031,15 @@ This is correct language policy for three reasons:
 
 
 
+
+
+
+
 ## Decision
+
+
+
+
 
 
 
@@ -29983,7 +60047,15 @@ This is correct language policy for three reasons:
 
 
 
+
+
+
+
 1. **Accessor table (§3.5):** The "Proof" column must be filled in for all element-returning accessors. Every accessor that carries a `ProofRequirement` in the catalog should show `count > 0` in the Proof column. Specifically: `set.min`, `set.max`, `queue.peek`, `queue by P.peek`, `queue by P.peekby`, `stack.peek`, `list.first`, `list.last`, `list.at`, `log.first`, `log.last`, `log.at`, `log by P.first`, `log by P.last`, `log by P.at`.
+
+
+
+
 
 
 
@@ -29991,7 +60063,15 @@ This is correct language policy for three reasons:
 
 
 
+
+
+
+
 **No proof engine changes.** The engine behavior is correct as-is. PRE0063 fires appropriately and the `notempty` modifier already discharges the obligation (the proof engine walks modifiers generically — this already works for `at`).
+
+
+
+
 
 
 
@@ -29999,27 +60079,55 @@ This is correct language policy for three reasons:
 
 
 
+
+
+
+
 The same decision applies uniformly. All element-returning accessors already carry the proof requirement in the catalog:
+
+
+
+
 
 
 
 | Accessor | Collection types | Proof requirement | Status |
 
+
+
 |----------|-----------------|-------------------|--------|
+
+
 
 | `min` | set | `count > 0` | ✓ In catalog, missing from spec Proof column |
 
+
+
 | `max` | set | `count > 0` | ✓ In catalog, missing from spec Proof column |
+
+
 
 | `peek` | queue, stack, queue by P | `count > 0` | ✓ In catalog, missing from spec Proof column |
 
+
+
 | `peekby` | queue by P | `count > 0` | ✓ In catalog, missing from spec Proof column, missing from notempty list |
+
+
 
 | `first` | list, log, log by P | `count > 0` | ✓ In catalog, missing from spec Proof column |
 
+
+
 | `last` | list, log, log by P | `count > 0` | ✓ In catalog, missing from spec Proof column |
 
+
+
 | `at` | list, log, log by P | `count > 0` | ✓ In catalog, missing from spec Proof column, missing from notempty list |
+
+
+
+
 
 
 
@@ -30027,7 +60135,15 @@ The engine is consistent. The spec is not. Fix the spec.
 
 
 
+
+
+
+
 ## Downstream impact
+
+
+
+
 
 
 
@@ -30035,27 +60151,55 @@ The engine is consistent. The spec is not. Fix the spec.
 
 
 
+
+
+
+
 **Spec update:** Frank or whoever updates the spec should fill in the Proof column and expand the `notempty` discharge list. This is a documentation-only change — no runtime behavior changes.
+
+
+
+
 
 
 
 **Test coverage:** A contract test confirming that every accessor with `ProofRequirements` appears in the spec's Proof column would prevent future drift. This is optional but recommended.
 
+
+
 # Decision: TokenMeta Boolean Flag Shape
+
+
+
+
 
 
 
 **Author:** Frank (Lead/Architect)
 
+
+
 **Date:** 2026-05-10T09:22:38.840-04:00
 
+
+
 **Requested by:** Shane
+
+
 
 **Status:** Recommendation — awaiting owner sign-off
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30063,35 +60207,71 @@ The engine is consistent. The spec is not. Fix the spec.
 
 
 
+
+
+
+
 George added five boolean fields to `TokenMeta` in Track 2 slice t2-1:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 bool IsAccessModeAdjective = false,
+
+
 
 bool IsStateWildcard = false,
 
+
+
 bool IsFieldBroadcast = false,
+
+
 
 bool IsFunctionCallLeader = false,
 
+
+
 bool IsMessagePosition = false
 
+
+
 ```
+
+
+
+
 
 
 
 Plus two alias properties:
 
+
+
 ```csharp
+
+
 
 public bool IsBroadcastFieldTarget => IsFieldBroadcast;
 
+
+
 public bool IsAlsoBuiltinFunction => IsFunctionCallLeader;
 
+
+
 ```
+
+
+
+
 
 
 
@@ -30099,7 +60279,15 @@ Shane asks: are flat bools the right catalog shape, or is there a more principle
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30107,7 +60295,15 @@ Shane asks: are flat bools the right catalog shape, or is there a more principle
 
 
 
+
+
+
+
 ### What these flags actually express
+
+
+
+
 
 
 
@@ -30115,19 +60311,39 @@ After tracing every consumer, these five flags decompose into **three distinct s
 
 
 
+
+
+
+
 | Flag | Consumers | What it really means |
+
+
 
 |------|-----------|---------------------|
 
+
+
 | `IsStateWildcard` | Parser (`ParseStateTarget`), NameBinder, TypeChecker | This keyword token is valid in a **state-name position** despite not being an identifier |
+
+
 
 | `IsFieldBroadcast` | Parser (`ParseFieldTarget`), NameBinder, TypeChecker | This keyword token is valid in a **field-name position** despite not being an identifier |
 
+
+
 | `IsFunctionCallLeader` | Parser.Expressions (`ParsePrimaryExpression`) | This keyword token can **lead a function call** (`keyword(args)`) despite not being an identifier |
+
+
 
 | `IsAccessModeAdjective` | `Tokens.AccessModeAdjectives` derived set (no direct pipeline consumer found) | This keyword participates in access-mode modifier grammar |
 
+
+
 | `IsMessagePosition` | GrammarGen (TextMate generation), MCP DTO | This token's trailing string argument gets the `string.quoted.double.message.precept` scope |
+
+
+
+
 
 
 
@@ -30135,7 +60351,15 @@ After tracing every consumer, these five flags decompose into **three distinct s
 
 
 
+
+
+
+
 These are **not** "lazy one-off bools" in the pejorative sense. Each one expresses a genuine per-member fact about a token — "does this keyword play role X in the grammar?" That is exactly the kind of per-member metadata that belongs in the Tokens catalog rather than in parser `if` chains (catalog-system.md § "if something is domain knowledge, it is metadata").
+
+
+
+
 
 
 
@@ -30143,19 +60367,39 @@ The flags *replaced* hardcoded parser `if (kind == TokenKind.All || kind == Toke
 
 
 
+
+
+
+
 ### Why a `[Flags] enum TokenRole` is NOT the right answer
+
+
+
+
 
 
 
 A flags enum would look like:
 
+
+
 ```csharp
+
+
 
 [Flags]
 
+
+
 enum TokenRole { None = 0, StateWildcard = 1, FieldBroadcast = 2, FunctionCallLeader = 4, ... }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -30163,7 +60407,15 @@ This is **worse** than flat bools for this case:
 
 
 
+
+
+
+
 1. **These are not a single dimension.** `IsMessagePosition` is a grammar-generation concern. `IsAccessModeAdjective` is a modifier-grammar concern. `IsStateWildcard` and `IsFieldBroadcast` are name-position concerns. `IsFunctionCallLeader` is an expression-grammar concern. Jamming them into one bitfield conflates unrelated axes and makes the API surface *less* self-documenting.
+
+
+
+
 
 
 
@@ -30171,7 +60423,15 @@ This is **worse** than flat bools for this case:
 
 
 
+
+
+
+
 3. **No consumer iterates "all roles" as a set.** Each consumer checks exactly one flag. A flags enum adds indirection with no composability benefit.
+
+
+
+
 
 
 
@@ -30179,17 +60439,35 @@ This is **worse** than flat bools for this case:
 
 
 
+
+
+
+
 The alias properties are the real code smell:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 public bool IsBroadcastFieldTarget => IsFieldBroadcast;  // same thing, different name
+
+
 
 public bool IsAlsoBuiltinFunction => IsFunctionCallLeader;  // same thing, different name
 
+
+
 ```
+
+
+
+
 
 
 
@@ -30197,21 +60475,43 @@ This means the primary field names were chosen for the catalog-definition site (
 
 
 
+
+
+
+
 The fix: **pick one name per flag and use it everywhere.** The correct name is the one that reads naturally at the consumer site, since that's where understanding matters most:
+
+
+
+
 
 
 
 | Current primary | Current alias | Recommended single name | Rationale |
 
+
+
 |---|---|---|---|
 
+
+
 | `IsFieldBroadcast` | `IsBroadcastFieldTarget` | `IsFieldBroadcast` | The primary name is clear — it says what the token IS. The alias adds no precision. Kill the alias. |
+
+
 
 | `IsFunctionCallLeader` | `IsAlsoBuiltinFunction` | `IsFunctionCallLeader` | The primary name accurately describes the grammar role. `IsAlsoBuiltinFunction` is misleading — it conflates syntactic role (can lead a function-call expression) with semantic identity (is a built-in function). These tokens are keywords that ALSO accept function-call syntax, but they are not "builtin functions" in the `Functions` catalog sense. Kill the alias. |
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30219,19 +60519,39 @@ The fix: **pick one name per flag and use it everywhere.** The correct name is t
 
 
 
+
+
+
+
 ### Shape: Keep flat bools. Kill aliases.
+
+
+
+
 
 
 
 The five flat boolean fields are the correct catalog shape for this metadata. They are:
 
+
+
 - Per-member domain knowledge ✓
+
+
 
 - Consumed by pipeline stages that would otherwise hardcode per-member behavior ✓
 
+
+
 - Independent axes (not a single dimension that a flags enum would model) ✓
 
+
+
 - Self-documenting at both definition and consumption sites ✓
+
+
+
+
 
 
 
@@ -30239,7 +60559,15 @@ The five flat boolean fields are the correct catalog shape for this metadata. Th
 
 
 
+
+
+
+
 1. **Remove `IsBroadcastFieldTarget`.** It is a pure alias for `IsFieldBroadcast`. Update the one consumer in tests that references it to use `IsFieldBroadcast` directly.
+
+
+
+
 
 
 
@@ -30247,7 +60575,15 @@ The five flat boolean fields are the correct catalog shape for this metadata. Th
 
 
 
+
+
+
+
 3. **Remove both alias entries from `Track2PhaseATokenCatalogTests.cs`** that reference `IsBroadcastFieldTarget` and `IsAlsoBuiltinFunction`.
+
+
+
+
 
 
 
@@ -30255,7 +60591,15 @@ The five flat boolean fields are the correct catalog shape for this metadata. Th
 
 
 
+
+
+
+
 ### Why not "revisit later"
+
+
+
+
 
 
 
@@ -30263,7 +60607,15 @@ The aliases should be killed now. They are the only structural problem, and they
 
 
 
+
+
+
+
 ### Severity: Fix before merge, not blocking spike
+
+
+
+
 
 
 
@@ -30271,7 +60623,15 @@ This is a "clean it up in the current slice" item. It does not require architect
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30279,17 +60639,35 @@ This is a "clean it up in the current slice" item. It does not require architect
 
 
 
+
+
+
+
 Per `docs/contributing/catalog-driven-checklist.md`:
+
+
+
+
 
 
 
 - ✅ Per-member behavior lives in catalog metadata, not in parser switch/if chains
 
+
+
 - ✅ No parallel keyword lists — `AccessModeAdjectives` FrozenSet is derived from `Tokens.All.Where(m => m.IsAccessModeAdjective)`
+
+
 
 - ✅ No flags enum needed — these are independent axes, not a single dimension
 
+
+
 - ⚠️ Alias properties violate "derive, never duplicate" — two names for one fact is a parallel copy
+
+
+
+
 
 
 
@@ -30297,11 +60675,23 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **By:** George
 
 
 
+
+
+
+
 **Status:** Complete
+
+
+
+
 
 
 
@@ -30309,11 +60699,23 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 - Implemented the documentation-only follow-through from the BUG-039 triage already recorded in this ledger.
+
+
 
 - Proof column filled for all element-returning collection accessors with `count > 0`.
 
+
+
 - `notempty` discharge list updated to include `.at` and `.peekby`.
+
+
+
+
 
 
 
@@ -30321,7 +60723,15 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **By:** Shane (via Copilot)
+
+
+
+
 
 
 
@@ -30329,15 +60739,31 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **Merged sources:** `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\copilot-directive-no-deferrals.md`, `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\copilot-directive-t2-2-scope.md`
+
+
+
+
 
 
 
 - No deferrals inside this slice: if the cleanup is architecturally correct and fits the current slice, ship it now. Frank owns defer-vs-now scope calls rather than escalating them back to Shane.
 
+
+
 - For t2-2 specifically, operand roles are in scope now. `ActionSyntaxSlot.Role` must be a typed `ActionSlotRole` enum (`Target`, `Value`, `Key`, `Index`, `IntoTarget`, `OrderingKey`, `OrderingCapture`), not a freeform string.
 
+
+
 - `IntoSupported` is removed in Slice A; slot optionality and `ActionShapeMeta` are the source of truth. Type-checker consumption of slot roles still belongs to Slice 9.
+
+
+
+
 
 
 
@@ -30345,11 +60771,23 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **By:** George
 
 
 
+
+
+
+
 **Status:** Complete
+
+
+
+
 
 
 
@@ -30357,13 +60795,27 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 - Added the typed `ActionSlotRole` enum with explicit 1-based values and moved `ActionSyntaxSlot.Role` off freeform strings.
+
+
 
 - Added `ActionSyntaxSlot` and `ActionShapeMeta`, including pre-computed `SeparatorTokens`, plus exhaustive `Actions.GetShapeMeta()` coverage for all 9 `ActionSyntaxShape` values.
 
+
+
 - Removed `IntoSupported` from `ActionMeta`; consumers now derive into support from slot metadata, and `CollectionIntoBy`'s final slot is correctly modeled as `OrderingCapture` rather than `OrderingKey`.
 
+
+
 - Coverage was added or updated in `ActionCatalogTests`, `ActionsTests`, `LanguageToolTests`, and the MCP mapping/tests. Validation closed green at 4322 total tests (3827 + 59 + 156 + 280).
+
+
+
+
 
 
 
@@ -30371,11 +60823,23 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **By:** George
 
 
 
+
+
+
+
 **Status:** Complete
+
+
+
+
 
 
 
@@ -30383,13 +60847,27 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 - `ParseActionTarget` now accepts shape-specific `FrozenSet<TokenKind>` separators from `Actions.GetShapeMeta(meta.SyntaxShape).SeparatorTokens`; the shared hardcoded `{=, into, by, at}` union is gone.
+
+
 
 - `ParseActionByShape` computes separators once and threads them through all 9 action-shape parse methods so target termination stays catalog-driven.
 
+
+
 - Added `ParseActionTargetTests.cs` with 8 tests (4 catalog property + 4 behavioral parser coverage), while preserving the known `CollectionValueBy`/`RemoveAtIndex` parser-unreachable boundary as catalog-level coverage.
 
+
+
 - Validation closed green at 4050/4050 tests. Commit: `fb525df0`.
+
+
+
+
 
 
 
@@ -30397,11 +60875,23 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **By:** George
 
 
 
+
+
+
+
 **Status:** Complete
+
+
+
+
 
 
 
@@ -30409,13 +60899,27 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 - All 7 parser shape methods now derive required and optional separator tokens from `Actions.GetShapeMeta(ActionSyntaxShape.X).Slots[n].PrecedingSeparator` instead of hardcoded `TokenKind.By`, `TokenKind.At`, `TokenKind.Into`, or `TokenKind.Assign`.
+
+
 
 - Added 6 `ActionChainTests` cases covering insert/dequeue/put behavior plus catalog-property checks for the secondary shapes that remain parser-unreachable via `Actions.ByTokenKind`.
 
+
+
 - Validation stayed green at 4056/4056 tests (3841 `Precept.Tests` + 156 language-server + 59 MCP). Commit: `ef6fedcb`.
 
+
+
 - t2-2 is durably closed across BUG-021, BUG-048, and BUG-049.
+
+
+
+
 
 
 
@@ -30423,7 +60927,15 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **By:** Frank, George
+
+
+
+
 
 
 
@@ -30431,17 +60943,39 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 **Merged sources:** `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\frank-bug049a-design-review.md`, `C:\Users\Shane.Falik\source\repos\precept-architecture\.squad\decisions\inbox\george-slice2e-done.md`
+
+
+
+
 
 
 
 - Frank approved `FixedReturnAccessor.ReturnNonnegative` as the correct Strategy 2 abstraction and required both same-slice follow-through items: unify `CollectionCountAccessor` as the single shared accessor instance and document the pre-existing `FunctionReturnSatisfies` discharge path alongside the new accessor discharge.
 
+
+
 - George completed Slice 2E accordingly: `ReturnNonnegative` now lives on `FixedReturnAccessor`, action proof requirements reuse `Types.CollectionCountAccessor`, and `TryDeclarationAttributeProof` short-circuits `>= 0` obligations for intrinsically non-negative accessor returns.
+
+
 
 - `docs/compiler/proof-engine.md` Strategy 2 now documents both intrinsic return-value discharge paths, and 3 regression tests lock the BUG-049a fix.
 
+
+
 - Validation passed via `dotnet build src\Precept\Precept.csproj` and `dotnet test test\Precept.Tests\Precept.Tests.csproj`, closing at 3857 passing tests. Commits: `f2d1dece` (fix) and `e826e4bd` (tracking).
+
+
+
+
+
+
+
+
 
 
 
@@ -30453,15 +60987,31 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 - Batch scope: t2-13, t2-14, t2-15, BUG-057 fix.
+
+
 
 - Commits: `617d175f`, `7a4c2e31`, `65fad947`, `2763a433`, `78779818`, `c0d0e059`.
 
+
+
 - Final validation after the batch: Core `4,531` passing; MCP `105` passing.
+
+
 
 - Merged inbox files: `.squad/decisions/inbox/newman-t2-13-complete.md`, `.squad/decisions/inbox/soup-nazi-t2-14-complete.md`, `.squad/decisions/inbox/soup-nazi-t2-15-complete.md`, `.squad/decisions/inbox/george-bug057-fix.md`
 
+
+
 - Missing inbox files skipped: `.squad/decisions/inbox/frank-bug057-spec-analysis.md`
+
+
+
+
 
 
 
@@ -30469,27 +61019,55 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 # Newman t2-13 complete
+
+
+
+
 
 
 
 - Commit: `617d175f`
 
+
+
 - Scope: corrected catalog-driven MCP recovery guidance in `src/Precept/Language/Faults.cs` and `src/Precept/Language/Diagnostics.cs`; `ProofsTool` and `DiagnosticTool` remain thin catalog projections.
+
+
 
 - BUG-014: `CollectionEmptyOnMutation` now tells consumers to use a `when Field.count > 0` row guard or the `notempty` field modifier.
 
+
+
 - BUG-015: the current runtime's collection-mutation diagnostic entry (`UnguardedCollectionMutation`) now exposes the same count-guard / `notempty` guidance through `precept_diagnostic`.
+
+
 
 - BUG-041: `UnexpectedNull` now uses `when Field is set` guidance instead of invalid `!= null` syntax.
 
+
+
 - Regression coverage: added `test/Precept.Mcp.Tests/RecoveryHintTests.cs`.
+
+
 
 - Validation: `dotnet test test\Precept.Mcp.Tests\` -> 77 passed; `dotnet test test\Precept.Tests\` -> 3925 passed.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30497,17 +61075,35 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 # Soup Nazi — t2-14 complete
+
+
+
+
 
 
 
 - Slice: 14 — Test Layer — Catalog Capability Tests
 
+
+
 - Completed: 2026-05-10
+
+
 
 - Test commit: `7a4c2e31`
 
+
+
 - Validation: `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore -m:1 /nr:false --nologo` passed at 4471/4471 (baseline 3925; +546 tests)
+
+
+
+
 
 
 
@@ -30515,17 +61111,35 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 - Added reflection-based `[Theory]` + `[MemberData]` coverage in `test\Precept.Tests\CatalogTests\` for operators, outcomes, modifiers, types, and diagnostics.
+
+
 
 - Adapted assertions to the catalog surface that exists in source today:
 
+
+
   - operator symbols derive from `Token` / `Tokens`
+
+
 
   - modifier keywords derive from `Token.Text`
 
+
+
   - type serialization names currently come from `DisplayName` when `SerializedName` is absent
 
+
+
   - diagnostic recovery guidance currently comes from `RecoverySteps` / `FixHint` when `RecoveryHint` is absent
+
+
+
+
 
 
 
@@ -30533,33 +61147,67 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 - Every new test is catalog-driven, so adding a new member without filling required metadata now fails the suite.
+
+
 
 - No skipped tests were required; the assertions adapt to the shipped catalog shapes instead of assuming plan-era property names.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
 ### Merged from `.squad/decisions/inbox/soup-nazi-t2-15-complete.md`
 
+
+
 # t2-15 Completion Record — Pipeline Stage Unit Tests (Catalog-Aware)
+
+
+
+
 
 
 
 **Author:** Soup Nazi (test engineer)
 
+
+
 **Date:** 2026-05-11
 
+
+
 **Branch:** Precept-V2-Radical
+
+
 
 **Slice:** 15 of 16 (Track 2)
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30567,9 +61215,19 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
+
+
+
+
 Slice 15 adds catalog-aware pipeline stage unit tests to lock in the bug fixes from Slices 8–12.
 
+
+
 Five new test files were created covering the Parser, NameBinder, and MCP layers.
+
+
+
+
 
 
 
@@ -30577,15 +61235,31 @@ Five new test files were created covering the Parser, NameBinder, and MCP layers
 
 
 
+
+
+
+
 | Project | Before | After | New Tests |
+
+
 
 |---------|--------|-------|-----------|
 
+
+
 | `Precept.Tests` | 4,471 | 4,531 | +60 |
+
+
 
 | `Precept.Mcp.Tests` | 77 | 105 | +28 |
 
+
+
 | **Total** | **4,548** | **4,636** | **+88** |
+
+
+
+
 
 
 
@@ -30593,19 +61267,39 @@ Five new test files were created covering the Parser, NameBinder, and MCP layers
 
 
 
+
+
+
+
 | File | Tests | Pipeline Stage | Key Behaviors |
+
+
 
 |------|-------|---------------|---------------|
 
+
+
 | `test/Precept.Tests/Parser/StateTargetTests.cs` | 14 | Parser | `IsStateWildcard`/`IsFieldBroadcast` catalog metadata; `from any`, `to any`, `modify all`, `omit all` parser recognition; full compilation round-trips |
+
+
 
 | `test/Precept.Tests/Parser/MemberAccessTests.cs` | 12 | Parser | `IsValidAsMemberName` for `at`, `peekby`, `min`, `max`; `KeywordsValidAsMemberName` set coverage; `list.at(N)`, `peekby`, `set.min/max` compilation |
 
+
+
 | `test/Precept.Tests/NameBinder/ForwardReferenceTests.cs` | 15 | NameBinder | Topological sort (single/chain/diamond forward refs); cycle detection (direct/self/indirect); `DefaultForwardReference` for non-computed defaults |
+
+
 
 | `test/Precept.Mcp.Tests/DefinitionProjectionTests.cs` | 18 | MCP | `EnsureDto.Kind` (StateResident/EventPrecondition); `EnsureDto.Anchor`; `StateHookDto` entry/exit; `EventArgDto` required/optional; `PreceptDefinitionDto` structural fields |
 
+
+
 | `test/Precept.Mcp.Tests/OutcomeKindProjectionTests.cs` | 14 | MCP | `OutcomeMeta.SerializedKind` catalog values; transition/no-transition/reject row DTO projection; wildcard row `FromStates`; guard expression projection |
+
+
+
+
 
 
 
@@ -30613,23 +61307,47 @@ Five new test files were created covering the Parser, NameBinder, and MCP layers
 
 
 
+
+
+
+
 These bugs are now regression-protected by the new tests:
+
+
+
+
 
 
 
 - **BUG-001** — `any` state wildcard: `IsStateWildcard` catalog + compilation
 
+
+
 - **BUG-025** — Keyword-named accessors (`at`, `peekby`, `min`, `max`): `IsValidAsMemberName` + compilation
+
+
 
 - **BUG-026/BUG-037** — `modify all` / `omit all` broadcast: `IsFieldBroadcast` catalog + compilation
 
+
+
 - **BUG-030** — Computed field forward references: topological sort tests
+
+
 
 - **BUG-032/BUG-036** — Outcome field in transition row DTOs: `SerializedKind` round-trip tests
 
+
+
 - **BUG-039** — `list.at(N)` rejected: member access parser test
 
+
+
 - **CircularComputedField** — Cycle detection: direct, self, indirect, message content
+
+
+
+
 
 
 
@@ -30637,43 +61355,87 @@ These bugs are now regression-protected by the new tests:
 
 
 
+
+
+
+
 - All 88 new tests pass with zero failures.
+
+
 
 - Existing 4,548 tests remain green — no regressions.
 
+
+
 - Guarded state ensures (`in State ensure X when Y`) were intentionally not tested; BUG-020
+
+
 
   may still be partially unfixed at the language-server level. The `EnsureDto.Guard` null
 
+
+
   case is tested via the unguarded ensure path instead.
+
+
 
 - Files specified in the plan as "already exist" (ActionChainTests, StateWildcardTests,
 
+
+
   BroadcastFieldTargetTests, ComputedFieldTests, OperatorTypingTests, ModifierValidationTests,
 
+
+
   CollectionMutationProofTests, FunctionReturnProofTests) were confirmed present and not
+
+
 
   recreated.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
 ### Merged from `.squad/decisions/inbox/george-bug057-fix.md`
 
+
+
 # BUG-057 Fix Record — George
+
+
+
+
 
 
 
 **Date:** 2026-05-10
 
+
+
 **Branch:** Precept-V2-Radical
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30681,47 +61443,95 @@ These bugs are now regression-protected by the new tests:
 
 
 
+
+
+
+
 **File:** `src/Precept/Pipeline/TypeChecker.cs`
+
+
 
 **Method:** `ExtractQualifiers()` (line ~149)
 
 
 
+
+
+
+
 The `qualifier.Axis switch` inside `ExtractQualifiers` handled:
+
+
 
 - `QualifierAxis.Currency` → `MapCurrencyQualifier`
 
+
+
 - `QualifierAxis.Unit` → `MapUnitQualifier`
+
+
 
 - `QualifierAxis.Dimension` → `MapDimensionQualifier`
 
+
+
 - `QualifierAxis.FromCurrency` → `MapFromCurrencyQualifier`
 
+
+
 - `QualifierAxis.ToCurrency` → `MapToCurrencyQualifier`
+
+
 
 - `_ => null` ← **bug: TemporalDimension and TemporalUnit fell here**
 
 
 
+
+
+
+
 `null` results were filtered out, so `period of 'date'` and `period in 'days'`
 
+
+
 qualifiers were silently discarded. The `TypedField.DeclaredQualifiers` array
+
+
 
 came back empty for these qualifier types.
 
 
 
+
+
+
+
 The `ProofEngine.ResolvePeriodDimension()` correctly reads `DeclaredQualifierMeta.TemporalDimension`
+
+
 
 and `DeclaredQualifierMeta.TemporalUnit` from `DeclaredQualifiers` — but since the type checker
 
+
+
 never populated them, resolution returned `null`, and `DimensionProofRequirement` for
+
+
 
 `DatePlusPeriod` could never be satisfied → PRE0113.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30729,41 +61539,83 @@ never populated them, resolution returned `null`, and `DimensionProofRequirement
 
 
 
+
+
+
+
 **`src/Precept/Language/DiagnosticCode.cs`**
 
+
+
 - Added `InvalidTemporalDimensionString = 117` — emitted when `period of '...'` value is not "date" or "time"
+
+
 
 - Added `InvalidTemporalUnitString = 118` — emitted when `period in '...'` value is not a recognized temporal unit
 
 
 
+
+
+
+
 **`src/Precept/Language/Diagnostics.cs`**
+
+
 
 - Added `GetMeta` entries for codes 117 and 118 with category `Temporal`, full trigger conditions, recovery steps, and examples
 
 
 
+
+
+
+
 **`src/Precept/Pipeline/TypeChecker.cs`**
+
+
 
 - Added two switch arms to `ExtractQualifiers`:
 
+
+
   - `QualifierAxis.TemporalDimension => MapTemporalDimensionQualifier(qualifier, ctx)`
+
+
 
   - `QualifierAxis.TemporalUnit      => MapTemporalUnitQualifier(qualifier, ctx)`
 
+
+
 - Added `MapTemporalDimensionQualifier`: maps "date" → `PeriodDimension.Date`, "time" → `PeriodDimension.Time`; emits `InvalidTemporalDimensionString` for unknown strings (fallback: `PeriodDimension.Any`)
+
+
 
 - Added `MapTemporalUnitQualifier`: looks up value in `TemporalUnits.TryGet`; derives dimension from `entry.IsCalendarBased` (true → `PeriodDimension.Date`, false → `PeriodDimension.Time`); emits `InvalidTemporalUnitString` for unknown strings (fallback: `PeriodDimension.Any`)
 
 
 
+
+
+
+
 The fix follows the exact same pattern as the existing mappers (`MapCurrencyQualifier`,
+
+
 
 `MapUnitQualifier`, etc.) — catalog-driven, no hardcoded parallel lists.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30771,27 +61623,55 @@ The fix follows the exact same pattern as the existing mappers (`MapCurrencyQual
 
 
 
+
+
+
+
 **`test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs`** — 7 new `[Fact]` tests:
+
+
+
+
 
 
 
 1. `PeriodOfDate_QualifierPreservedInSemanticIndex` — verifies `period of 'date'` → `TemporalDimension(PeriodDimension.Date)` in DeclaredQualifiers
 
+
+
 2. `PeriodOfTime_QualifierPreservedInSemanticIndex` — verifies `period of 'time'` → `TemporalDimension(PeriodDimension.Time)`
+
+
 
 3. `PeriodInDays_QualifierPreservedInSemanticIndex` — verifies `period in 'days'` → `TemporalUnit("days", PeriodDimension.Date)`
 
+
+
 4. `PeriodInHours_QualifierPreservedInSemanticIndex` — verifies `period in 'hours'` → `TemporalUnit("hours", PeriodDimension.Time)`
+
+
 
 5. `PeriodOfDate_AllowsDatePlusPeriodOperation_NoDiagnostic` — verifies `date + period_of_date_field` compiles clean (no PRE0113)
 
+
+
 6. `PeriodOfInvalidString_EmitsInvalidTemporalDimensionStringDiagnostic` — validates error for `period of 'week'`
+
+
 
 7. `PeriodInInvalidUnit_EmitsInvalidTemporalUnitStringDiagnostic` — validates error for `period in 'fortnights'`
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30799,31 +61679,63 @@ The fix follows the exact same pattern as the existing mappers (`MapCurrencyQual
 
 
 
+
+
+
+
 - `src/Precept/Precept.csproj`: builds cleanly, 0 errors, 0 warnings
+
+
 
 - `test/Precept.Tests`: 4,515 pre-existing tests pass + 7 new tests = 4,522 pass (excluding pre-existing compile error in `StateTargetTests.cs` introduced by another squad member, confirmed pre-existing via `git stash`)
 
+
+
 - `test/Precept.Mcp.Tests`: 77/77 pass ✅
+
+
 
 - `test/Precept.LanguageServer.Tests`: 157/157 pass ✅
 
 
 
+
+
+
+
 No regressions introduced.
+
+
 
 # Decision: Numeric Range Modifiers Apply to `money`, `quantity`, and `price`
 
 
 
+
+
+
+
 **By:** Frank
 
+
+
 **Date:** 2026-05-10 (finalized 2026-05-10 after Shane's bound-form ruling)
+
+
 
 **Status:** FINALIZED — implementation brief complete, ready for Kramer
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30831,11 +61743,23 @@ No regressions introduced.
 
 
 
+
+
+
+
 This is a **spec gap that propagated correctly into the catalog and TypeChecker**. The catalog and TypeChecker are not bugs — they faithfully implement the spec. The spec is wrong.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30843,7 +61767,15 @@ This is a **spec gap that propagated correctly into the catalog and TypeChecker*
 
 
 
+
+
+
+
 ### 1. Spec (line 1498)
+
+
+
+
 
 
 
@@ -30851,17 +61783,35 @@ The modifier validation table explicitly lists:
 
 
 
+
+
+
+
 | Modifier | Applicable to | Error when applied to |
+
+
 
 |---|---|---|
 
+
+
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, **domain** |
+
+
 
 | `positive` | (same) | (same) |
 
+
+
 | `nonzero` | (same) | (same) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number` | everything else |
+
+
+
+
 
 
 
@@ -30869,21 +61819,43 @@ The modifier validation table explicitly lists:
 
 
 
+
+
+
+
 ### 2. Catalog (`Modifiers.cs`)
+
+
+
+
 
 
 
 ```csharp
 
+
+
 private static readonly TypeTarget[] NumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
 ];
 
+
+
 ```
+
+
+
+
 
 
 
@@ -30891,7 +61863,15 @@ No `Money`. No `Quantity`. The catalog correctly implements the (wrong) spec. Th
 
 
 
+
+
+
+
 ### 3. TypeChecker — applicability and bound parsing
+
+
+
+
 
 
 
@@ -30899,7 +61879,15 @@ No `Money`. No `Quantity`. The catalog correctly implements the (wrong) spec. Th
 
 
 
+
+
+
+
 `ValidateModifierBounds` is called for cross-validation when both `min` and `max` are present. It uses `TryGetComparableModifierValue` which accepts only `NumberLiteral` or `-NumberLiteral` patterns; for anything else it returns `null` and **silently skips the cross-check**. No error is emitted.
+
+
+
+
 
 
 
@@ -30907,7 +61895,15 @@ No `Money`. No `Quantity`. The catalog correctly implements the (wrong) spec. Th
 
 
 
+
+
+
+
 ### 4. Parser — valued modifier expressions
+
+
+
+
 
 
 
@@ -30915,7 +61911,15 @@ The parser's `ParseModifierList` calls `ParseExpression(0, ...)` for valued modi
 
 
 
+
+
+
+
 ### 5. ProofEngine — `DeclarationValue` is already conservative
+
+
+
+
 
 
 
@@ -30923,7 +61927,15 @@ The `ProofSatisfaction.Numeric(SelfValue, >=, DeclarationValue)` proof obligatio
 
 
 
+
+
+
+
 ### 6. Runtime evaluator
+
+
+
+
 
 
 
@@ -30931,7 +61943,15 @@ The `ProofSatisfaction.Numeric(SelfValue, >=, DeclarationValue)` proof obligatio
 
 
 
+
+
+
+
 ### 7. Contradiction in Constructs.cs
+
+
+
+
 
 
 
@@ -30939,11 +61959,23 @@ The `ProofSatisfaction.Numeric(SelfValue, >=, DeclarationValue)` proof obligatio
 
 
 
+
+
+
+
 ```
+
+
 
 "field amount as money nonnegative"
 
+
+
 ```
+
+
+
+
 
 
 
@@ -30951,7 +61983,15 @@ This is the canonical field declaration example displayed in completions, hover,
 
 
 
+
+
+
+
 ### 8. `nonpositive` / `negative` — not in the language
+
+
+
+
 
 
 
@@ -30959,7 +61999,15 @@ They don't exist. There is no `ModifierKind.Nonpositive` or `ModifierKind.Negati
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30967,7 +62015,15 @@ They don't exist. There is no `ModifierKind.Nonpositive` or `ModifierKind.Negati
 
 
 
+
+
+
+
 The zero-bound insight stands unchanged: `nonnegative`, `positive`, `nonzero` all compare against the **universal zero**. Currency dimension is irrelevant to the zero predicate.
+
+
+
+
 
 
 
@@ -30975,7 +62031,15 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 1. **Different literal form**: False. The parser already accepts typed constants (`'100.00 USD'`) in modifier value positions — `TypedConstant` is in `ExpressionStartTokens`. There is no parser change required.
+
+
+
+
 
 
 
@@ -30983,11 +62047,23 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 3. **Currency-consistency enforcement is unresolved**: True but overstated as a blocker. Currency-mismatch detection for `min '100.00 EUR'` on `money in 'USD'` requires adding a `Resolve()` call for `min`/`max` bound values in the TypeChecker — the same 3-line pattern already used for `default` modifier values. This is a small, contained addition, not a "separate larger feature." And it should be done for correctness on ALL types, not just money.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -30995,7 +62071,15 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 **`nonnegative`, `positive`, and `nonzero` SHALL apply to `money` and `quantity` fields.**
+
+
+
+
 
 
 
@@ -31003,7 +62087,15 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 Rationale for inclusion: The bound form already parses. `DeclarationValue` is already conservative in the proof engine. Adding `Resolve()` calls for `min`/`max` bounds in the TypeChecker enables currency-mismatch detection via the existing `QualifierMatch.Same` path — the same mechanism that catches currency mismatches in binary expressions. The alleged structural barrier was a fiction arising from not reading the code carefully enough.
+
+
+
+
 
 
 
@@ -31011,7 +62103,15 @@ Rationale for inclusion: The bound form already parses. `DeclarationValue` is al
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -31019,7 +62119,15 @@ Rationale for inclusion: The bound form already parses. `DeclarationValue` is al
 
 
 
+
+
+
+
 ### A. Modifiers.cs
+
+
+
+
 
 
 
@@ -31027,35 +62135,71 @@ Split the current `NumericTypes` into two applicability arrays:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // For zero-bound modifiers (amount-only comparison): integer, decimal, number, money, quantity
 
+
+
 private static readonly TypeTarget[] ZeroBoundNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money),   new(TypeKind.Quantity),
 
+
+
 ];
+
+
+
+
 
 
 
 // For ranged bound modifiers (min/max) — also includes money/quantity (bound is a typed constant)
 
+
+
 private static readonly TypeTarget[] RangedNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money),   new(TypeKind.Quantity),
 
+
+
 ];
 
+
+
 ```
+
+
+
+
 
 
 
@@ -31063,15 +62207,31 @@ Update the modifier entries:
 
 
 
+
+
+
+
 - `ModifierKind.Nonnegative` → `ZeroBoundNumericTypes`
+
+
 
 - `ModifierKind.Positive`    → `ZeroBoundNumericTypes`
 
+
+
 - `ModifierKind.Nonzero`     → `ZeroBoundNumericTypes`
+
+
 
 - `ModifierKind.Min`         → `RangedNumericTypes`
 
+
+
 - `ModifierKind.Max`         → `RangedNumericTypes`
+
+
+
+
 
 
 
@@ -31079,7 +62239,15 @@ Update the modifier entries:
 
 
 
+
+
+
+
 ### B. TypeChecker.cs — resolve min/max bound expressions
+
+
+
+
 
 
 
@@ -31087,35 +62255,71 @@ Add `Resolve()` calls for `min`/`max` modifier bound values, using the same patt
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // After resolving default, resolve min/max bounds against the field type
 
+
+
 foreach (var boundKind in new[] { ModifierKind.Min, ModifierKind.Max })
+
+
 
 {
 
+
+
     var boundMod = declared.Modifiers.FirstOrDefault(m => m.Kind == boundKind);
+
+
 
     if (boundMod?.Value is not null and not MissingExpression)
 
+
+
     {
+
+
 
         ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
 
+
+
         ctx.CurrentFieldIndex = i;
+
+
 
         Resolve(boundMod.Value, ctx, typedField.ResolvedType); // type-checks currency match
 
+
+
         ctx.CurrentScope = FieldScopeMode.AllFields;
+
+
 
         ctx.CurrentFieldIndex = -1;
 
+
+
     }
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -31123,7 +62327,15 @@ This is what catches `min '100.00 EUR'` on `money in 'USD'` — the `Resolve` ca
 
 
 
+
+
+
+
 ### C. precept-language-spec.md (line ~1498)
+
+
+
+
 
 
 
@@ -31131,17 +62343,35 @@ Update the Modifier validation table:
 
 
 
+
+
+
+
 | Modifier | Applicable to | Error when applied to |
+
+
 
 |---|---|---|
 
+
+
 | `nonnegative` | `integer`, `decimal`, `number`, `money`, `quantity` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate` |
+
+
 
 | `positive` | (same as nonnegative) | (same as above) |
 
+
+
 | `nonzero` | (same as nonnegative) | (same as above) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number`, `money`, `quantity` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate` |
+
+
+
+
 
 
 
@@ -31149,7 +62379,15 @@ Remove the original note explaining why `min`/`max` excluded domain types. Repla
 
 
 
+
+
+
+
 > **`min`/`max` on `money`/`quantity` fields:** The bound value must be a typed constant matching the field's declared unit — `field Balance as money in 'USD' min '100.00 USD'`. The TypeChecker validates the bound's currency against the field's declared currency. A mismatched currency (e.g., `min '100.00 EUR'` on a `money in 'USD'` field) is a `TypeMismatch` error.
+
+
+
+
 
 
 
@@ -31157,39 +62395,79 @@ Remove the original note explaining why `min`/`max` excluded domain types. Repla
 
 
 
+
+
+
+
 Required regression anchors:
 
 
 
+
+
+
+
 ```
+
+
 
 field X as money in 'USD' nonnegative             → 0 errors
 
+
+
 field X as money in 'USD' positive                → 0 errors
+
+
 
 field X as money in 'USD' nonzero                 → 0 errors
 
+
+
 field X as quantity in 'kg' nonnegative           → 0 errors
+
+
 
 field X as quantity in 'kg' positive              → 0 errors
 
+
+
 field X as money in 'USD' min '100.00 USD'        → 0 errors
+
+
 
 field X as money in 'USD' max '500.00 USD'        → 0 errors
 
+
+
 field X as money in 'USD' min '100.00 USD' max '500.00 USD'  → 0 errors
+
+
 
 field X as quantity in 'kg' min '1.0 kg'          → 0 errors
 
+
+
 field X as money in 'USD' min '100.00 EUR'        → TypeMismatch (currency mismatch)
+
+
 
 field X as money in 'USD' min 100                 → TypeMismatch (plain number is not money)
 
+
+
 ```
+
+
+
+
 
 
 
 ---
+
+
+
+
 
 
 
@@ -31197,11 +62475,23 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 `ValidateModifierBounds` checks that `min < max` when both are declared. `TryGetComparableModifierValue` currently handles only `NumberLiteral` — for money/quantity typed constants it returns `null` and the ordering check is silently skipped. This means `field Balance as money in 'USD' min '500.00 USD' max '100.00 USD'` (min > max) emits no error. This gap pre-exists for any non-standard literal form and can be addressed in a follow-up by adding typed-constant parsing to `TryGetComparableModifierValue` or by materializing a typed bound comparison in the TypeChecker. It is NOT a blocker for this change — the ordering check is a usability convenience, not a correctness requirement.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -31209,15 +62499,31 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 - `TypeChecker.Validation.cs` — the `IsTypeApplicable` logic is correct; it reads from the catalog; `ValidateModifierBounds` gracefully skips non-NumberLiteral bounds
+
+
 
 - `ProofEngine.cs` — `DeclarationValue` is already conservative for all types; no change needed
 
+
+
 - `Constructs.cs` — the usage example `"field amount as money nonnegative"` is already correct; this decision makes the catalog agree with it
+
+
 
 - `Types.cs` — no trait changes needed
 
+
+
 - `Parser.cs` — `TypedConstant` is already in `ExpressionStartTokens`; modifier value positions already accept typed constants
+
+
+
+
 
 
 
@@ -31225,17 +62531,35 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 ## Shane's Ruling: Bound Form and Convertibility (2026-05-10)
+
+
+
+
 
 
 
 > "Same domain type, with matching currency/unit — or a convertible unit. e.g. `in 'kg' max '100 lbs'` should be ok."
 
+
+
 > "Plain numeric literals like `min 0 max 1000` are NOT valid for business domain types — the bound must carry its unit/currency."
 
 
 
+
+
+
+
 **Bound form:** Typed constants are required. `min '100.00 USD'`, `min '1.0 kg'`, `min '100 lbs'`. Plain integer or decimal literals (`min 0`, `max 1000`) are compile errors on `money`, `quantity`, and `price` fields.
+
+
+
+
 
 
 
@@ -31243,7 +62567,15 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 **Convertibility for `money`:** The bound's currency must be the same ISO 4217 code as the field's declared currency. `field Balance as money in 'USD' min '100.00 EUR'` is a compile error. There is no compile-time exchange rate, so cross-currency bounds have no defined comparison semantics.
+
+
+
+
 
 
 
@@ -31251,11 +62583,23 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 ---
 
 
 
+
+
+
+
 ## Convertibility Check Mechanism — Code Investigation
+
+
+
+
 
 
 
@@ -31263,7 +62607,15 @@ The existing type system was audited against the "same dimension, convertible un
 
 
 
+
+
+
+
 **`QualifierMatch.Same`** (in the `Operation.cs` enum) is used in binary operations to signal qualifier compatibility. It is a **proof-engine concept**, not a type-checker enforcement point. `DisambiguateCandidates` returns the `Same` entry and creates a `SameQualifierRequired` qualifier binding — this is verified by the proof engine at analysis time, NOT by the type checker at resolve time. Therefore, calling `Resolve()` on a modifier bound expression does NOT automatically invoke `QualifierMatch.Same` enforcement.
+
+
+
+
 
 
 
@@ -31271,11 +62623,23 @@ The existing type system was audited against the "same dimension, convertible un
 
 
 
+
+
+
+
 **`DimensionCategoryMismatch`** (diagnostic code 69) is already declared in `DiagnosticCode.cs` and has a catalog entry in `Diagnostics.cs`. It is never currently emitted. Kramer should use it for the cross-dimension bound error on `quantity` fields.
 
 
 
+
+
+
+
 **`MoneyValidator.Validate(rawText)`** returns a `TypedConstantParseResult` whose `Value` is `(decimal amount, string canonicalCurrencyCode)`. The currency code is directly extractable.
+
+
+
+
 
 
 
@@ -31283,7 +62647,15 @@ The existing type system was audited against the "same dimension, convertible un
 
 
 
+
+
+
+
 **`TypedTypedConstant.ParsedValue`** (in `SemanticIndex.cs`) carries the `object?` from the validator's result. Kramer can cast this to the appropriate tuple type after the `Resolve()` call succeeds.
+
+
+
+
 
 
 
@@ -31291,23 +62663,47 @@ The existing type system was audited against the "same dimension, convertible un
 
 
 
+
+
+
+
 **`TypedConstantValidation.Validate`** with `Money` content validation rejects UCUM unit strings (e.g., `'100 kg'` fails money format — currency must be 3-letter ISO 4217). Similarly, `Quantity` content validation rejects pure currency codes as UCUM units (e.g., `'100 USD'` as a quantity fails UCUM parsing — USD is not a UCUM expression). So the "wrong domain type" case (e.g., `min '100 kg'` on a `money` field) is caught by content validation → `InvalidTypedConstantContent`, before the qualifier check runs.
+
+
+
+
 
 
 
 **New code needed:** A `ValidateMinMaxBoundQualifier(TypedTypedConstant, TypedField, SourceSpan, CheckContext)` helper in `TypeChecker.cs` that:
 
+
+
 1. For `money` fields: extracts the currency code from `ParsedValue`, compares to `typedField.DeclaredQualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault()?.CurrencyCode`. Emits `TypeMismatch` on mismatch.
+
+
 
 2. For `quantity` fields with a `Unit` qualifier: extracts `UcumParsedUnit` from `ParsedValue`, calls `DeriveUnitDimensionName(unit)`, compares to `typedField.DeclaredQualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault()?.DimensionName`. Emits `DimensionCategoryMismatch` on mismatch. Empty dimension names (dimensionless units, `count`) skip the check — no restriction.
 
+
+
 3. For `quantity` fields with a `Dimension` qualifier: the bound's dimension name must match `typedField.DeclaredQualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault()?.DimensionName`. Emits `DimensionCategoryMismatch` on mismatch.
+
+
 
 4. `price` bound qualifier check: **OUT OF SCOPE** for this PR — the bound form for price (currency AND denominator unit) is more complex; leave price out of the qualifier check for now even though `price` goes into `RangedNumericTypes`.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -31315,19 +62711,39 @@ The existing type system was audited against the "same dimension, convertible un
 
 
 
+
+
+
+
 | Modifier | `integer` | `decimal` | `number` | `money` | `quantity` | `price` | `exchangerate` |
+
+
 
 |----------|-----------|-----------|----------|---------|------------|---------|----------------|
 
+
+
 | `nonnegative` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant — implicit positive) |
+
+
 
 | `positive` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant) |
 
+
+
 | `nonzero` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant) |
+
+
 
 | `min` | ✓ plain number | ✓ plain number | ✓ plain number | ✓ typed constant, same currency | ✓ typed constant, same dimension | ✓ typed constant, no qualifier check this PR | ✗ (ordering undefined) |
 
+
+
 | `max` | ✓ plain number | ✓ plain number | ✓ plain number | ✓ typed constant, same currency | ✓ typed constant, same dimension | ✓ typed constant, no qualifier check this PR | ✗ (ordering undefined) |
+
+
+
+
 
 
 
@@ -31335,7 +62751,15 @@ The existing type system was audited against the "same dimension, convertible un
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -31343,7 +62767,15 @@ The existing type system was audited against the "same dimension, convertible un
 
 
 
+
+
+
+
 ### A. `src/Precept/Language/Modifiers.cs`
+
+
+
+
 
 
 
@@ -31351,55 +62783,111 @@ Replace the single `NumericTypes` array with two applicability arrays:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // Zero-bound modifiers — compare against the universal zero; unit/currency is irrelevant
 
+
+
 private static readonly TypeTarget[] ZeroBoundNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
     new(TypeKind.ExchangeRate), // implicit positive — declaring is valid, not an error
 
+
+
 ];
+
+
+
+
 
 
 
 // Ranged bound modifiers — require typed-constant bounds; undefined for exchangerate
 
+
+
 private static readonly TypeTarget[] RangedNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
 ];
+
+
 
 ```
 
 
 
+
+
+
+
 Wire to modifier catalog entries:
+
+
 
 - `ModifierKind.Nonnegative` → `ZeroBoundNumericTypes`
 
+
+
 - `ModifierKind.Positive`    → `ZeroBoundNumericTypes`
+
+
 
 - `ModifierKind.Nonzero`     → `ZeroBoundNumericTypes`
 
+
+
 - `ModifierKind.Min`         → `RangedNumericTypes`
+
+
 
 - `ModifierKind.Max`         → `RangedNumericTypes`
 
 
 
+
+
+
+
 ### B. `src/Precept/Pipeline/TypeChecker.cs` — `ResolveFieldExpressions`
+
+
+
+
 
 
 
@@ -31407,73 +62895,147 @@ After the existing `default` modifier resolution block (lines ~445–462), add m
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // —— Min/Max bound expressions ——
 
+
+
 foreach (var boundKind in (ReadOnlySpan<ModifierKind>)[ModifierKind.Min, ModifierKind.Max])
+
+
 
 {
 
+
+
     var boundMod = declared.Modifiers.FirstOrDefault(m => m.Kind == boundKind);
+
+
 
     if (boundMod?.Value is not null and not MissingExpression)
 
+
+
     {
+
+
 
         ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
 
+
+
         ctx.CurrentFieldIndex = i;
+
+
 
         var resolved = Resolve(boundMod.Value, ctx, typedField.ResolvedType);
 
+
+
         ctx.CurrentScope = FieldScopeMode.AllFields;
+
+
 
         ctx.CurrentFieldIndex = -1;
 
 
 
+
+
+
+
         // Bound resolved without content error — check type and qualifier match
+
+
 
         if (resolved is not TypedErrorExpression)
 
+
+
         {
+
+
 
             if (resolved.ResultType != typedField.ResolvedType)
 
+
+
             {
+
+
 
                 // Plain numeric literal (or other wrong type) used as bound for a domain type
 
+
+
                 ctx.Diagnostics.Add(Diagnostics.Create(
+
+
 
                     DiagnosticCode.TypeMismatch, boundMod.Value.Span,
 
+
+
                     Types.GetMeta(resolved.ResultType).DisplayName,
+
+
 
                     Types.GetMeta(typedField.ResolvedType).DisplayName));
 
+
+
             }
+
+
 
             else if (resolved is TypedTypedConstant typedConst)
 
+
+
             {
+
+
 
                 // Typed-constant bound: validate qualifier compatibility
 
+
+
                 ValidateMinMaxBoundQualifier(typedConst, typedField, boundMod.Value.Span, ctx);
+
+
 
             }
 
+
+
         }
+
+
 
         // TypedErrorExpression: Resolve already emitted InvalidTypedConstantContent or similar
 
+
+
     }
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -31481,159 +63043,319 @@ foreach (var boundKind in (ReadOnlySpan<ModifierKind>)[ModifierKind.Min, Modifie
 
 
 
+
+
+
+
 Add alongside the other `Map*Qualifier` and `DeriveUnitDimensionName` helpers:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 /// <summary>
+
+
 
 /// Validates that a <see cref="TypedTypedConstant"/> used as a min/max modifier bound
 
+
+
 /// is qualifier-compatible with the field's declared qualifier.
+
+
 
 /// For money: bound currency must match field currency.
 
+
+
 /// For quantity with unit: bound unit must be in the same dimension as the field unit.
+
+
 
 /// For quantity with dimension: bound unit dimension must match the declared dimension.
 
+
+
 /// Price qualifier check is deferred to a follow-up PR.
+
+
 
 /// </summary>
 
+
+
 private static void ValidateMinMaxBoundQualifier(
+
+
 
     TypedTypedConstant boundConst,
 
+
+
     TypedField typedField,
+
+
 
     SourceSpan boundSpan,
 
+
+
     CheckContext ctx)
+
+
 
 {
 
+
+
     switch (typedField.ResolvedType)
+
+
 
     {
 
+
+
         case TypeKind.Money:
+
+
 
         {
 
+
+
             if (boundConst.ParsedValue is not (decimal, string boundCurrency))
+
+
 
                 return;
 
+
+
             var fieldCurrency = typedField.DeclaredQualifiers
+
+
 
                 .OfType<DeclaredQualifierMeta.Currency>()
 
+
+
                 .FirstOrDefault()?.CurrencyCode;
+
+
 
             if (fieldCurrency is not null &&
 
+
+
                 !string.Equals(boundCurrency, fieldCurrency, StringComparison.OrdinalIgnoreCase))
+
+
 
             {
 
+
+
                 ctx.Diagnostics.Add(Diagnostics.Create(
+
+
 
                     DiagnosticCode.TypeMismatch, boundSpan,
 
+
+
                     $"money in '{boundCurrency}'",
+
+
 
                     $"money in '{fieldCurrency}'"));
 
+
+
             }
+
+
 
             break;
 
+
+
         }
+
+
+
+
 
 
 
         case TypeKind.Quantity:
 
+
+
         {
+
+
 
             if (boundConst.ParsedValue is not (decimal, Precept.Language.Ucum.UcumParsedUnit boundUnit))
 
+
+
                 return;
+
+
 
             var boundDimension = DeriveUnitDimensionName(boundUnit);
 
 
 
+
+
+
+
             // Check against declared unit qualifier
+
+
 
             var unitQualifier = typedField.DeclaredQualifiers
 
+
+
                 .OfType<DeclaredQualifierMeta.Unit>()
+
+
 
                 .FirstOrDefault();
 
+
+
             if (unitQualifier is not null &&
+
+
 
                 !string.IsNullOrEmpty(unitQualifier.DimensionName) &&
 
+
+
                 !string.IsNullOrEmpty(boundDimension) &&
+
+
 
                 !string.Equals(boundDimension, unitQualifier.DimensionName, StringComparison.OrdinalIgnoreCase))
 
+
+
             {
+
+
 
                 ctx.Diagnostics.Add(Diagnostics.Create(
 
+
+
                     DiagnosticCode.DimensionCategoryMismatch, boundSpan,
+
+
 
                     boundDimension, unitQualifier.DimensionName, typedField.Name));
 
+
+
             }
+
+
+
+
 
 
 
             // Check against declared dimension qualifier (quantity of 'mass')
 
+
+
             var dimQualifier = typedField.DeclaredQualifiers
+
+
 
                 .OfType<DeclaredQualifierMeta.Dimension>()
 
+
+
                 .FirstOrDefault();
+
+
 
             if (dimQualifier is not null &&
 
+
+
                 !string.IsNullOrEmpty(dimQualifier.DimensionName) &&
+
+
 
                 !string.IsNullOrEmpty(boundDimension) &&
 
+
+
                 !string.Equals(boundDimension, dimQualifier.DimensionName, StringComparison.OrdinalIgnoreCase))
+
+
 
             {
 
+
+
                 ctx.Diagnostics.Add(Diagnostics.Create(
+
+
 
                     DiagnosticCode.DimensionCategoryMismatch, boundSpan,
 
+
+
                     boundDimension, dimQualifier.DimensionName, typedField.Name));
+
+
 
             }
 
+
+
             break;
+
+
 
         }
 
+
+
         // Price: bound qualifier check deferred — compound unit/currency form requires
+
+
 
         // separate design. Price accepts any valid price-typed constant for now.
 
+
+
     }
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -31641,7 +63363,15 @@ private static void ValidateMinMaxBoundQualifier(
 
 
 
+
+
+
+
 ### D. `docs/language/business-domain-types.md`
+
+
+
+
 
 
 
@@ -31649,15 +63379,31 @@ private static void ValidateMinMaxBoundQualifier(
 
 
 
+
+
+
+
 Replace the current row:
+
+
 
 > Bound constant `N` must be the same domain type as the field, with matching unit/currency. Blocked for `exchangerate`...
 
 
 
+
+
+
+
 With:
 
+
+
 > Bound constant `N` must be a typed constant of the same domain type as the field. **For `money`:** bound currency must exactly match the field's declared currency (`'100.00 EUR'` on `money in 'USD'` is a compile error). **For `quantity`:** bound unit must be in the same physical dimension as the field's declared unit — a different unit in the same dimension is valid ("`100 lbs`" on `quantity in 'kg'` is valid — both mass). **For `price`:** bound must be a typed price constant; full qualifier validation is a follow-on. Plain numeric literals (`min 0`) are rejected for all domain types. Blocked for `exchangerate`.
+
+
+
+
 
 
 
@@ -31665,35 +63411,71 @@ With:
 
 
 
+
+
+
+
 Line 385 — `money` Constraints:
 
+
+
 ```
+
+
 
 **Constraints:** `in '<currency>'`, `optional`, `default '...'`, `nonnegative`, `positive`, `nonzero`, `min '<decimal> <currency>'`, `max '<decimal> <currency>'`. The `maxplaces` constraint overrides the ISO 4217 default when needed. Bounds must use a typed constant in the field's declared currency.
 
+
+
 ```
+
+
+
+
 
 
 
 Line 550 — `quantity` Constraints:
 
+
+
 ```
+
+
 
 **Constraints:** `in '<unit>'`, `of '<dimension>'`, `optional`, `default '...'`, `nonnegative`, `positive`, `nonzero`, `min '<decimal> <unit>'`, `max '<decimal> <unit>'`. Bounds must use a typed constant; the bound unit must be in the same physical dimension as the field's declared unit (different units within the same dimension are valid — e.g., `lbs` for a `kg` field).
 
+
+
 ```
+
+
+
+
 
 
 
 Line 779 — `price` Constraints:
 
+
+
 Add `positive`, `nonnegative`, `nonzero`, `min '<decimal> <currency>/<unit>'`, `max '<decimal> <currency>/<unit>'`.
+
+
+
+
 
 
 
 **Constraint interaction example** (wherever `min 0 max 1000` appears on a quantity field):
 
+
+
 Change to `min '0 kg' max '1000 kg'` and add a note: "Bounds are typed constants. Plain numeric literals are not valid for business domain types."
+
+
+
+
 
 
 
@@ -31701,55 +63483,111 @@ Change to `min '0 kg' max '1000 kg'` and add a note: "Bounds are typed constants
 
 
 
+
+
+
+
 Replace the current rows:
 
+
+
 ```
+
+
 
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
 
+
+
 | `positive` | (same as nonnegative) | (same as above) |
+
+
 
 | `nonzero` | (same as nonnegative) | (same as above) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number` | `string`, `boolean`, collections |
 
+
+
 ```
+
+
+
+
 
 
 
 With:
 
+
+
 ```
+
+
 
 | `nonnegative` | `integer`, `decimal`, `number`, `money`, `quantity`, `price`, `exchangerate` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension` |
 
+
+
 | `positive` | (same as nonnegative) | (same as above) |
+
+
 
 | `nonzero` | (same as nonnegative) | (same as above) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number`, `money`, `quantity`, `price` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `exchangerate` |
 
+
+
 ```
+
+
+
+
 
 
 
 Add a new note below the table:
 
+
+
 > **`min`/`max` on `money`/`quantity`/`price` fields:** The bound must be a typed constant matching the field's domain type — `field Balance as money in 'USD' min '100.00 USD'`. Plain numeric literals are rejected. For `money`, the bound currency must match the field's declared currency. For `quantity`, the bound unit must be in the same physical dimension as the field's declared unit — different units within the same dimension are valid. For `price`, the bound must be a price-typed constant; full qualifier enforcement is a follow-on. `exchangerate` does not support `min`/`max` (ordering is undefined); use `positive` instead.
+
+
+
+
 
 
 
 Also update the summary column descriptions on lines 306–308:
 
+
+
 - Line 306: `nonnegative` — change "Number/integer constraint" to "Numeric constraint (including money, quantity, price, exchangerate)"
 
+
+
 - Line 307: `positive` — same
+
+
 
 - Line 308: `nonzero` — same
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -31757,11 +63595,23 @@ Also update the summary column descriptions on lines 306–308:
 
 
 
+
+
+
+
 `ValidateModifierBounds` in `TypeChecker.Validation.cs` checks that `min < max` when both are declared. `TryGetComparableModifierValue` handles only `NumberLiteral`; for typed constants it returns `null` and the ordering check is silently skipped. `field Balance as money in 'USD' min '500.00 USD' max '100.00 USD'` (min > max) emits no error. This gap pre-exists for any non-numeric literal form. It is NOT a blocker — the ordering check is a usability convenience, not a correctness requirement. Address in a follow-up.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -31769,15 +63619,31 @@ Also update the summary column descriptions on lines 306–308:
 
 
 
+
+
+
+
 - `TypeChecker.Validation.cs` — `IsTypeApplicable` reads from the catalog and will automatically allow the new types once `Modifiers.cs` is updated; `ValidateModifierBounds` already gracefully skips non-NumberLiteral bounds
+
+
 
 - `ProofEngine.cs` — `DeclarationValue` is already conservative for all types; no change needed
 
+
+
 - `Constructs.cs` — the usage example `"field amount as money nonnegative"` is already correct; this decision makes the catalog agree with it
+
+
 
 - `Types.cs` — no trait changes needed
 
+
+
 - `Parser.cs` — `TypedConstant` is already in `ExpressionStartTokens`; modifier value positions already accept typed constants
+
+
+
+
 
 
 
@@ -31785,7 +63651,15 @@ Also update the summary column descriptions on lines 306–308:
 
 
 
+
+
+
+
 ## Implementation Brief for Kramer
+
+
+
+
 
 
 
@@ -31793,7 +63667,15 @@ This section provides complete, unambiguous implementation guidance. No further 
 
 
 
+
+
+
+
 ### Slice 1: Catalog change — `Modifiers.cs` (no TypeChecker changes yet)
+
+
+
+
 
 
 
@@ -31801,65 +63683,131 @@ This section provides complete, unambiguous implementation guidance. No further 
 
 
 
+
+
+
+
 1. Rename or split the existing `NumericTypes` array into two:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 private static readonly TypeTarget[] ZeroBoundNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
     new(TypeKind.ExchangeRate),
 
+
+
 ];
+
+
+
+
 
 
 
 private static readonly TypeTarget[] RangedNumericTypes =
 
+
+
 [
+
+
 
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
 
+
+
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
 ];
+
+
 
 ```
 
 
 
+
+
+
+
 2. Update modifier entries:
 
+
+
    - `ModifierKind.Nonnegative`, `ModifierKind.Positive`, `ModifierKind.Nonzero` → `ZeroBoundNumericTypes`
+
+
 
    - `ModifierKind.Min`, `ModifierKind.Max` → `RangedNumericTypes`
 
 
 
+
+
+
+
 **Tests after Slice 1 (before TypeChecker changes):**
+
+
 
 - `field X as money in 'USD' nonnegative` → 0 errors (was `InvalidModifierForType`)
 
+
+
 - `field X as money in 'USD' positive` → 0 errors
+
+
 
 - `field X as money in 'USD' nonzero` → 0 errors
 
+
+
 - `field X as quantity in 'kg' nonnegative` → 0 errors
+
+
 
 - `field X as price in 'USD/each' positive` → 0 errors
 
+
+
 - `field X as exchangerate in 'USD' to 'EUR' positive` → 0 errors (redundant but not error)
+
+
 
 - `field X as money in 'USD' min '100.00 USD'` → 0 errors for applicability (bound not type-checked yet)
 
+
+
 - `field X as exchangerate in 'USD' to 'EUR' min '1.0 USD/EUR'` → `InvalidModifierForType` (exchangerate not in `RangedNumericTypes`)
+
+
+
+
 
 
 
@@ -31867,7 +63815,15 @@ private static readonly TypeTarget[] RangedNumericTypes =
 
 
 
+
+
+
+
 **File:** `src/Precept/Pipeline/TypeChecker.cs` — method `ResolveFieldExpressions`
+
+
+
+
 
 
 
@@ -31875,7 +63831,15 @@ After the existing `default` modifier resolution block (find: `ctx.Fields[i] = c
 
 
 
+
+
+
+
 Also add the `ValidateMinMaxBoundQualifier` private static method to `TypeChecker.cs` as described in section C. Verify the `UcumParsedUnit` fully-qualified name by checking the `using` directives in `TypeChecker.cs` or adding the appropriate using.
+
+
+
+
 
 
 
@@ -31883,41 +63847,83 @@ Also add the `ValidateMinMaxBoundQualifier` private static method to `TypeChecke
 
 
 
+
+
+
+
 Valid cases (0 errors):
+
+
 
 1. `field Balance as money in 'USD' min '100.00 USD'` → 0 errors
 
+
+
 2. `field Balance as money in 'USD' max '500.00 USD'` → 0 errors
+
+
 
 3. `field Balance as money in 'USD' min '100.00 USD' max '500.00 USD'` → 0 errors
 
+
+
 4. `field Weight as quantity in 'kg' min '1.0 kg'` → 0 errors
 
+
+
 5. `field Weight as quantity in 'kg' max '100 lbs'` → 0 errors (lbs is mass — convertible)
+
+
 
 6. `field Distance as quantity of 'length' max '100 m'` → 0 errors (m is length — matches declared dimension)
 
 
 
+
+
+
+
 Error cases:
+
+
 
 7. `field Balance as money in 'USD' min '100.00 EUR'` → `TypeMismatch` (currency mismatch: EUR vs USD)
 
+
+
 8. `field Balance as money in 'USD' min 100` → `TypeMismatch` (integer ≠ money)
+
+
 
 9. `field Weight as quantity in 'kg' max '100 m'` → `DimensionCategoryMismatch` (length ≠ mass)
 
+
+
 10. `field Weight as quantity in 'kg' max 50` → `TypeMismatch` (integer ≠ quantity)
+
+
 
 11. `field Weight as quantity in 'kg' max '100 USD'` → `InvalidTypedConstantContent` (USD is not a UCUM unit — caught by QuantityValidator before qualifier check)
 
 
 
+
+
+
+
 Regression (must still pass):
+
+
 
 12. `field Amount as integer min 0 max 100` → 0 errors (existing behavior preserved)
 
+
+
 13. `field Rate as decimal min 0.0 max 1.0` → 0 errors (existing behavior preserved)
+
+
+
+
 
 
 
@@ -31925,11 +63931,23 @@ Regression (must still pass):
 
 
 
+
+
+
+
 **Files to update in the same PR:**
+
+
 
 1. `docs/language/business-domain-types.md` — per section D above: D16 table row, money/quantity/price Constraints rows, constraint interaction example
 
+
+
 2. `docs/language/precept-language-spec.md` — per section E above: modifier applicability table and note, summary column descriptions at lines 306–308
+
+
+
+
 
 
 
@@ -31937,33 +63955,67 @@ Regression (must still pass):
 
 
 
+
+
+
+
 **IN SCOPE:**
+
+
 
 - Modifiers.cs applicability arrays (all 5 modifiers, 4 domain types)
 
+
+
 - TypeChecker.cs min/max bound resolution via `Resolve()`
+
+
 
 - TypeChecker.cs qualifier check: currency for money, dimension for quantity
 
+
+
 - Diagnostics: `TypeMismatch` for wrong type or currency mismatch; `DimensionCategoryMismatch` for wrong dimension
+
+
 
 - Doc sync: D16, individual Constraints rows (money, quantity, price), modifier table in spec
 
 
 
+
+
+
+
 **OUT OF SCOPE for this PR:**
+
+
 
 - Runtime enforcement (evaluator is `throw new NotImplementedException()`)
 
+
+
 - `exchangerate` min/max (ordering undefined by D2 — permanently blocked)
+
+
 
 - Price bound qualifier check (compound unit/currency — follow-on)
 
+
+
 - `min < max` ordering check for typed-constant bounds (follow-up)
+
+
 
 - Language-server `RedundantModifier` warning for explicit `positive` on `exchangerate`
 
+
+
 - Any changes to `ValidateModifierBounds` / `TryGetComparableModifierValue`
+
+
+
+
 
 
 
@@ -31971,7 +64023,15 @@ Regression (must still pass):
 
 
 
+
+
+
+
 ## Addendum: Cross-check against `docs/language/business-domain-types.md` (Archived)
+
+
+
+
 
 
 
@@ -31979,7 +64039,15 @@ This addendum was written before Shane's bound-form ruling. The open question ("
 
 
 
+
+
+
+
 The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-bound inclusion — are captured in the final decision above.
+
+
+
+
 
 
 
@@ -31987,7 +64055,15 @@ The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -31995,7 +64071,15 @@ The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-
 
 
 
+
+
+
+
 **D16 (the master governing design decision in that doc) explicitly resolves the question:**
+
+
+
+
 
 
 
@@ -32003,7 +64087,15 @@ The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-
 
 
 
+
+
+
+
 > **`min N`/`max N` field constraints** → `money`, `quantity`, `price`. **Blocked for `exchangerate`** — these constraints require `>=`/`<=` ordering, which is undefined for `exchangerate`; use `positive` instead.
+
+
+
+
 
 
 
@@ -32011,7 +64103,15 @@ The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-
 
 
 
+
+
+
+
 This is fully consistent with the revised decision's core claim: the modifiers apply to `money` and `quantity`. D16 was the authoritative place to look and confirms the conclusion.
+
+
+
+
 
 
 
@@ -32019,11 +64119,23 @@ The individual type **Constraints rows** in the spec already list `nonnegative` 
 
 
 
+
+
+
+
 The `exchangerate` section explicitly says: _"Implicit constraint: `positive` — zero and negative exchange rates are always invalid configurations (D16 Corollary 2). Declaring `positive` or `nonzero` explicitly is redundant."_ — meaning `positive`/`nonzero` are syntactically valid on `exchangerate`, just redundant.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32031,7 +64143,15 @@ The `exchangerate` section explicitly says: _"Implicit constraint: `positive` �
 
 
 
+
+
+
+
 **Two gaps in scope the revised decision missed:**
+
+
+
+
 
 
 
@@ -32039,15 +64159,31 @@ The `exchangerate` section explicitly says: _"Implicit constraint: `positive` �
 
 
 
+
+
+
+
 D16 includes `price` in both the zero-bound modifier row ("all four") and the `min N`/`max N` row (`money`, `quantity`, `price`). The constraint interaction example shows:
+
+
+
+
 
 
 
 ```precept
 
+
+
 field UnitPrice as price in 'USD/each' positive maxplaces 4
 
+
+
 ```
+
+
+
+
 
 
 
@@ -32055,45 +64191,91 @@ The revised decision deferred `price`/`exchangerate` as "natural follow-ons." Bu
 
 
 
+
+
+
+
 **Revised applicability arrays:**
+
+
+
+
 
 
 
 ```csharp
 
+
+
 // Zero-bound modifiers (nonnegative, positive, nonzero): money, quantity, price, exchangerate
+
+
 
 private static readonly TypeTarget[] ZeroBoundNumericTypes =
 
+
+
 [
+
+
 
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
 
+
+
     new(TypeKind.Money),   new(TypeKind.Quantity), new(TypeKind.Price),
+
+
 
     new(TypeKind.ExchangeRate),   // implicit positive — declaring is redundant but valid, not an error
 
+
+
 ];
+
+
+
+
 
 
 
 // Ranged bound modifiers (min/max): money, quantity, price only — NOT exchangerate
 
+
+
 private static readonly TypeTarget[] RangedNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money),   new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
 ];
+
+
 
 ```
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32101,7 +64283,15 @@ private static readonly TypeTarget[] RangedNumericTypes =
 
 
 
+
+
+
+
 D16 says bounds must be "the same domain type as the field, with matching unit/currency." This implies `min '100.00 USD' max '500.00 USD'` for `money` and `min '0 kg' max '1000 kg'` for `quantity`.
+
+
+
+
 
 
 
@@ -32109,11 +64299,23 @@ But the spec's constraint interaction example (the canonical illustration sectio
 
 
 
+
+
+
+
 ```precept
+
+
 
 field Weight as quantity in 'kg' min 0 max 1000
 
+
+
 ```
+
+
+
+
 
 
 
@@ -32121,13 +64323,27 @@ Plain integers — not typed constants. This is a **direct conflict between D16'
 
 
 
+
+
+
+
 Possible resolutions:
+
+
 
 - The example is aspirational shorthand and should use typed constants per D16.
 
+
+
 - Plain integer bounds are accepted as "magnitude-only" shorthand for `quantity` and `money` (the unit is inherited from the field's `in` declaration, and the bound is evaluated as a dimensionally-agnostic magnitude comparison).
 
+
+
 - Zero is universal and `min 0` is always valid; `max 1000` as a plain integer is the ambiguous case.
+
+
+
+
 
 
 
@@ -32135,11 +64351,23 @@ Possible resolutions:
 
 
 
+
+
+
+
 **Recommendation:** Clarify the bound form in D16 or add a note to the constraint interaction example. Until resolved, implement typed-constant bounds as described — it's the stricter interpretation and can be loosened later.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32147,7 +64375,15 @@ Possible resolutions:
 
 
 
+
+
+
+
 The spec needs the following additions to align with D16 (which is already in the doc):
+
+
+
+
 
 
 
@@ -32155,7 +64391,15 @@ The spec needs the following additions to align with D16 (which is already in th
 
 
 
+
+
+
+
 2. **`quantity` Constraints row (line 550):** Add `positive`, `nonzero`, `min '<typed-constant-or-integer>'`, `max '<typed-constant-or-integer>'` (resolve the plain-integer tension before wording this).
+
+
+
+
 
 
 
@@ -32163,7 +64407,15 @@ The spec needs the following additions to align with D16 (which is already in th
 
 
 
+
+
+
+
 4. **The constraint interaction example (line ~1454):** Resolve the `min 0 max 1000` tension — either change it to `min '0 kg' max '1000 kg'` (to match D16), or add a note explaining that plain integer bounds are valid as magnitude-only shorthand.
+
+
+
+
 
 
 
@@ -32171,11 +64423,23 @@ The spec needs the following additions to align with D16 (which is already in th
 
 
 
+
+
+
+
 These are doc-only fixes — the D16 design decision already specifies the correct behavior. The individual type sections just haven't been synced to it.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32183,7 +64447,15 @@ These are doc-only fixes — the D16 design decision already specifies the corre
 
 
 
+
+
+
+
 **One blocker before implementation:**
+
+
+
+
 
 
 
@@ -32191,7 +64463,15 @@ The `min`/`max` bound form for `quantity` and `money` fields is ambiguous betwee
 
 
 
+
+
+
+
 **Scope expansion confirmed by spec:**
+
+
+
+
 
 
 
@@ -32199,7 +64479,15 @@ The `min`/`max` bound form for `quantity` and `money` fields is ambiguous betwee
 
 
 
+
+
+
+
 **No further design decisions needed** beyond resolving the bound-form tension. The spec confirms the core direction: `positive`, `nonnegative`, `nonzero`, `min`, `max` on `money`, `quantity`, and `price` is the correct and spec-sanctioned design.
+
+
+
+
 
 
 
@@ -32207,55 +64495,111 @@ The `min`/`max` bound form for `quantity` and `money` fields is ambiguous betwee
 
 
 
+
+
+
+
 - **Timestamp:** 2026-05-11T02:20:00Z
+
+
 
 - **Requester:** Shane
 
 
 
+
+
+
+
 ## Diagnosis
+
+
 
 - The remaining live overlaps were **not** the qualified arg path anymore: `TypedArg.Span` already carries the arg-name span and qualified arg refs already use `expr.MemberSpan` / `ar.Site.Length == arg.Name.Length`.
 
+
+
 - The real malformed tokens in the live samples came from two broader semantic reference sites:
 
+
+
   - `TransitionOutcome.Span` covered `-> transition StateName`, so the emitted state token started at the arrow and overlapped both the arrow token and `transition` keyword.
+
+
 
   - `FieldTargetSlot.Span` covered comma-separated field lists in access-mode / omit surfaces, so the first field reference token spanned the whole list and overlapped following punctuation / tokens.
 
 
 
+
+
+
+
 ## Decision
+
+
 
 - Keep the defensive merge hardening in `ProjectMergedTokens`: filter invalid coordinates/lengths before sorting and deduplicate by `(Line, Character)` instead of `(Line, Character, Length)`.
 
+
+
 - Fix the upstream semantic sites so the emitted tokens are correct before they reach OmniSharp:
+
+
 
   - add name-site spans on target slots,
 
+
+
   - add `TransitionOutcome.StateSpan`,
+
+
 
   - use those precise spans in NameBinder + TypeChecker reference/diagnostic emission.
 
 
 
+
+
+
+
 ## Validation
+
+
 
 - `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore --verbosity minimal` → **165 passed**.
 
+
+
 - `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --no-restore --verbosity minimal` → **succeeded**.
 
+
+
 - Post-fix sample inspection: `loan-application.precept` overlaps = 0, `building-access-badge-request.precept` overlaps = 0.
+
+
 
 # Decision: Numeric Range Modifiers Apply to `money`, `quantity`, and `price`
 
 
 
+
+
+
+
 **By:** Frank
+
+
 
 **Date:** 2026-05-10 (finalized 2026-05-10 after Shane's bound-form ruling)
 
+
+
 **Status:** FINALIZED — implementation brief complete, ready for Kramer
+
+
+
+
 
 
 
@@ -32263,7 +64607,15 @@ The `min`/`max` bound form for `quantity` and `money` fields is ambiguous betwee
 
 
 
+
+
+
+
 ## Root Cause
+
+
+
+
 
 
 
@@ -32271,7 +64623,15 @@ This is a **spec gap that propagated correctly into the catalog and TypeChecker*
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32279,7 +64639,15 @@ This is a **spec gap that propagated correctly into the catalog and TypeChecker*
 
 
 
+
+
+
+
 ### 1. Spec (line 1498)
+
+
+
+
 
 
 
@@ -32287,17 +64655,35 @@ The modifier validation table explicitly lists:
 
 
 
+
+
+
+
 | Modifier | Applicable to | Error when applied to |
+
+
 
 |---|---|---|
 
+
+
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, **domain** |
+
+
 
 | `positive` | (same) | (same) |
 
+
+
 | `nonzero` | (same) | (same) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number` | everything else |
+
+
+
+
 
 
 
@@ -32305,21 +64691,43 @@ The modifier validation table explicitly lists:
 
 
 
+
+
+
+
 ### 2. Catalog (`Modifiers.cs`)
+
+
+
+
 
 
 
 ```csharp
 
+
+
 private static readonly TypeTarget[] NumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
 ];
 
+
+
 ```
+
+
+
+
 
 
 
@@ -32327,7 +64735,15 @@ No `Money`. No `Quantity`. The catalog correctly implements the (wrong) spec. Th
 
 
 
+
+
+
+
 ### 3. TypeChecker — applicability and bound parsing
+
+
+
+
 
 
 
@@ -32335,7 +64751,15 @@ No `Money`. No `Quantity`. The catalog correctly implements the (wrong) spec. Th
 
 
 
+
+
+
+
 `ValidateModifierBounds` is called for cross-validation when both `min` and `max` are present. It uses `TryGetComparableModifierValue` which accepts only `NumberLiteral` or `-NumberLiteral` patterns; for anything else it returns `null` and **silently skips the cross-check**. No error is emitted.
+
+
+
+
 
 
 
@@ -32343,7 +64767,15 @@ No `Money`. No `Quantity`. The catalog correctly implements the (wrong) spec. Th
 
 
 
+
+
+
+
 ### 4. Parser — valued modifier expressions
+
+
+
+
 
 
 
@@ -32351,7 +64783,15 @@ The parser's `ParseModifierList` calls `ParseExpression(0, ...)` for valued modi
 
 
 
+
+
+
+
 ### 5. ProofEngine — `DeclarationValue` is already conservative
+
+
+
+
 
 
 
@@ -32359,7 +64799,15 @@ The `ProofSatisfaction.Numeric(SelfValue, >=, DeclarationValue)` proof obligatio
 
 
 
+
+
+
+
 ### 6. Runtime evaluator
+
+
+
+
 
 
 
@@ -32367,7 +64815,15 @@ The `ProofSatisfaction.Numeric(SelfValue, >=, DeclarationValue)` proof obligatio
 
 
 
+
+
+
+
 ### 7. Contradiction in Constructs.cs
+
+
+
+
 
 
 
@@ -32375,11 +64831,23 @@ The `ProofSatisfaction.Numeric(SelfValue, >=, DeclarationValue)` proof obligatio
 
 
 
+
+
+
+
 ```
+
+
 
 "field amount as money nonnegative"
 
+
+
 ```
+
+
+
+
 
 
 
@@ -32387,7 +64855,15 @@ This is the canonical field declaration example displayed in completions, hover,
 
 
 
+
+
+
+
 ### 8. `nonpositive` / `negative` — not in the language
+
+
+
+
 
 
 
@@ -32395,7 +64871,15 @@ They don't exist. There is no `ModifierKind.Nonpositive` or `ModifierKind.Negati
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32403,7 +64887,15 @@ They don't exist. There is no `ModifierKind.Nonpositive` or `ModifierKind.Negati
 
 
 
+
+
+
+
 The zero-bound insight stands unchanged: `nonnegative`, `positive`, `nonzero` all compare against the **universal zero**. Currency dimension is irrelevant to the zero predicate.
+
+
+
+
 
 
 
@@ -32411,7 +64903,15 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 1. **Different literal form**: False. The parser already accepts typed constants (`'100.00 USD'`) in modifier value positions — `TypedConstant` is in `ExpressionStartTokens`. There is no parser change required.
+
+
+
+
 
 
 
@@ -32419,11 +64919,23 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 3. **Currency-consistency enforcement is unresolved**: True but overstated as a blocker. Currency-mismatch detection for `min '100.00 EUR'` on `money in 'USD'` requires adding a `Resolve()` call for `min`/`max` bound values in the TypeChecker — the same 3-line pattern already used for `default` modifier values. This is a small, contained addition, not a "separate larger feature." And it should be done for correctness on ALL types, not just money.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32431,7 +64943,15 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 **`nonnegative`, `positive`, and `nonzero` SHALL apply to `money` and `quantity` fields.**
+
+
+
+
 
 
 
@@ -32439,7 +64959,15 @@ My original claim that `min`/`max` on `money` required "a different literal form
 
 
 
+
+
+
+
 Rationale for inclusion: The bound form already parses. `DeclarationValue` is already conservative in the proof engine. Adding `Resolve()` calls for `min`/`max` bounds in the TypeChecker enables currency-mismatch detection via the existing `QualifierMatch.Same` path — the same mechanism that catches currency mismatches in binary expressions. The alleged structural barrier was a fiction arising from not reading the code carefully enough.
+
+
+
+
 
 
 
@@ -32447,7 +64975,15 @@ Rationale for inclusion: The bound form already parses. `DeclarationValue` is al
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32455,7 +64991,15 @@ Rationale for inclusion: The bound form already parses. `DeclarationValue` is al
 
 
 
+
+
+
+
 ### A. Modifiers.cs
+
+
+
+
 
 
 
@@ -32463,35 +65007,71 @@ Split the current `NumericTypes` into two applicability arrays:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // For zero-bound modifiers (amount-only comparison): integer, decimal, number, money, quantity
 
+
+
 private static readonly TypeTarget[] ZeroBoundNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money),   new(TypeKind.Quantity),
 
+
+
 ];
+
+
+
+
 
 
 
 // For ranged bound modifiers (min/max) — also includes money/quantity (bound is a typed constant)
 
+
+
 private static readonly TypeTarget[] RangedNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money),   new(TypeKind.Quantity),
 
+
+
 ];
 
+
+
 ```
+
+
+
+
 
 
 
@@ -32499,15 +65079,31 @@ Update the modifier entries:
 
 
 
+
+
+
+
 - `ModifierKind.Nonnegative` → `ZeroBoundNumericTypes`
+
+
 
 - `ModifierKind.Positive`    → `ZeroBoundNumericTypes`
 
+
+
 - `ModifierKind.Nonzero`     → `ZeroBoundNumericTypes`
+
+
 
 - `ModifierKind.Min`         → `RangedNumericTypes`
 
+
+
 - `ModifierKind.Max`         → `RangedNumericTypes`
+
+
+
+
 
 
 
@@ -32515,7 +65111,15 @@ Update the modifier entries:
 
 
 
+
+
+
+
 ### B. TypeChecker.cs — resolve min/max bound expressions
+
+
+
+
 
 
 
@@ -32523,35 +65127,71 @@ Add `Resolve()` calls for `min`/`max` modifier bound values, using the same patt
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // After resolving default, resolve min/max bounds against the field type
 
+
+
 foreach (var boundKind in new[] { ModifierKind.Min, ModifierKind.Max })
+
+
 
 {
 
+
+
     var boundMod = declared.Modifiers.FirstOrDefault(m => m.Kind == boundKind);
+
+
 
     if (boundMod?.Value is not null and not MissingExpression)
 
+
+
     {
+
+
 
         ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
 
+
+
         ctx.CurrentFieldIndex = i;
+
+
 
         Resolve(boundMod.Value, ctx, typedField.ResolvedType); // type-checks currency match
 
+
+
         ctx.CurrentScope = FieldScopeMode.AllFields;
+
+
 
         ctx.CurrentFieldIndex = -1;
 
+
+
     }
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -32559,7 +65199,15 @@ This is what catches `min '100.00 EUR'` on `money in 'USD'` — the `Resolve` ca
 
 
 
+
+
+
+
 ### C. precept-language-spec.md (line ~1498)
+
+
+
+
 
 
 
@@ -32567,17 +65215,35 @@ Update the Modifier validation table:
 
 
 
+
+
+
+
 | Modifier | Applicable to | Error when applied to |
+
+
 
 |---|---|---|
 
+
+
 | `nonnegative` | `integer`, `decimal`, `number`, `money`, `quantity` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate` |
+
+
 
 | `positive` | (same as nonnegative) | (same as above) |
 
+
+
 | `nonzero` | (same as nonnegative) | (same as above) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number`, `money`, `quantity` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate` |
+
+
+
+
 
 
 
@@ -32585,7 +65251,15 @@ Remove the original note explaining why `min`/`max` excluded domain types. Repla
 
 
 
+
+
+
+
 > **`min`/`max` on `money`/`quantity` fields:** The bound value must be a typed constant matching the field's declared unit — `field Balance as money in 'USD' min '100.00 USD'`. The TypeChecker validates the bound's currency against the field's declared currency. A mismatched currency (e.g., `min '100.00 EUR'` on a `money in 'USD'` field) is a `TypeMismatch` error.
+
+
+
+
 
 
 
@@ -32593,35 +65267,71 @@ Remove the original note explaining why `min`/`max` excluded domain types. Repla
 
 
 
+
+
+
+
 Required regression anchors:
 
 
 
+
+
+
+
 ```
+
+
 
 field X as money in 'USD' nonnegative             → 0 errors
 
+
+
 field X as money in 'USD' positive                → 0 errors
+
+
 
 field X as money in 'USD' nonzero                 → 0 errors
 
+
+
 field X as quantity in 'kg' nonnegative           → 0 errors
+
+
 
 field X as quantity in 'kg' positive              → 0 errors
 
+
+
 field X as money in 'USD' min '100.00 USD'        → 0 errors
+
+
 
 field X as money in 'USD' max '500.00 USD'        → 0 errors
 
+
+
 field X as money in 'USD' min '100.00 USD' max '500.00 USD'  → 0 errors
+
+
 
 field X as quantity in 'kg' min '1.0 kg'          → 0 errors
 
+
+
 field X as money in 'USD' min '100.00 EUR'        → TypeMismatch (currency mismatch)
+
+
 
 field X as money in 'USD' min 100                 → TypeMismatch (plain number is not money)
 
+
+
 ```
+
+
+
+
 
 
 
@@ -32629,7 +65339,15 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 ## Known Gap: min/max cross-check for domain-typed bounds
+
+
+
+
 
 
 
@@ -32637,7 +65355,15 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32645,19 +65371,39 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 - `TypeChecker.Validation.cs` — the `IsTypeApplicable` logic is correct; it reads from the catalog; `ValidateModifierBounds` gracefully skips non-NumberLiteral bounds
+
+
 
 - `ProofEngine.cs` — `DeclarationValue` is already conservative for all types; no change needed
 
+
+
 - `Constructs.cs` — the usage example `"field amount as money nonnegative"` is already correct; this decision makes the catalog agree with it
 
+
+
 - `Types.cs` — no trait changes needed
+
+
 
 - `Parser.cs` — `TypedConstant` is already in `ExpressionStartTokens`; modifier value positions already accept typed constants
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32665,11 +65411,23 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 > *(Original ruling 2026-05-10):* "Same domain type, with matching currency/unit — or a convertible unit. e.g. `in 'kg' max '100 lbs'` should be ok."
+
+
 
 > *(Revised 2026-05-10):* "`in 'kg' max '100 lbs'` — NOT accepted. `of 'weight' max '100 lbs'` — accepted. The bound-matching rule is keyed on the qualifier kind: if the field is pinned to a specific unit (`in`), the bound must be the exact same unit; if the field is locked to a dimension category (`of`), the bound may be any convertible unit within that dimension."
 
+
+
 > "Plain numeric literals like `min 0 max 1000` are NOT valid for business domain types — the bound must carry its unit/currency."
+
+
+
+
 
 
 
@@ -32677,13 +65435,27 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 **Convertibility for `quantity` (revised 2026-05-10):** The check is keyed on the **qualifier kind**, not a global convertibility policy:
+
+
+
+
 
 
 
 - **`in '<unit>'` (pinned unit — `DeclaredQualifierMeta.Unit`):** The bound must use the **exact same unit**. `field Weight as quantity in 'kg' max '100 lbs'` is a **compile error** — the field is pinned to `kg`; `lbs` is rejected even though both are mass. Diagnostic: `QualifierMismatch` (code 68). Rationale: `in` declares an exact unit contract; allowing a different unit implies a runtime conversion the compiler cannot guarantee.
 
+
+
 - **`of '<dimension>'` (dimension category — `DeclaredQualifierMeta.Dimension`):** Any unit in the declared dimension is valid. `field Weight as quantity of 'mass' max '100 lbs'` is valid — `lbs` is a mass unit. `field Weight as quantity of 'mass' max '100 m'` is an error — `m` (length) is outside the declared dimension. Diagnostic: `DimensionCategoryMismatch` (code 69).
+
+
+
+
 
 
 
@@ -32691,11 +65463,23 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 **Spec update:** The constraint interaction example in `business-domain-types.md` that shows `min 0 max 1000` on a quantity field is wrong shorthand. It must be corrected to `min '0 kg' max '1000 kg'` per this ruling.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32703,7 +65487,15 @@ field X as money in 'USD' min 100                 → TypeMismatch (plain number
 
 
 
+
+
+
+
 The existing type system was audited against the unit-matching requirement for modifier bounds. Key findings:
+
+
+
+
 
 
 
@@ -32711,7 +65503,15 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 **`DeclaredQualifierMeta.Unit`** (in `DeclaredQualifierMeta.cs`) carries both `UnitCode` (e.g., `"kg"`) and `DimensionName` (e.g., `"mass"`). The preposition is `TokenKind.In`. This is produced when a field is declared with `in '<unit>'`.
+
+
+
+
 
 
 
@@ -32719,7 +65519,15 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 **`UcumParsedUnit`** (in `Precept.Language.Ucum`) carries `CanonicalCode` (the UCUM canonical unit code, e.g., `"kg"`) and other fields. For the exact-unit check on `Unit` qualifier fields, `boundUnit.CanonicalCode` is compared to `unitQualifier.UnitCode`.
+
+
+
+
 
 
 
@@ -32727,7 +65535,15 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 **`DimensionCategoryMismatch`** (diagnostic code 69): "Dimension '{0}' does not match the declared category '{1}' on field '{2}'". This is the appropriate code for cross-dimension mismatch on `Dimension` qualifier fields (Path B). Already declared — not yet emitted anywhere; this becomes its first emission site.
+
+
+
+
 
 
 
@@ -32735,7 +65551,15 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 **`QuantityValidator.Validate(rawText, ...)`** returns a `TypedConstantParseResult` whose `Value` is `(decimal amount, UcumParsedUnit unit)`. The `UcumParsedUnit` carries `CanonicalCode` for exact-unit comparison and can be passed to `DeriveUnitDimensionName(unit)` to get the dimension name.
+
+
+
+
 
 
 
@@ -32743,7 +65567,15 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 **`ResolveNumericLiteral`** with `expectedType = TypeKind.Money` (or `Quantity`): `IsAssignable(Integer, Money)` returns false (Integer widens to Decimal and Number only). Therefore, `Resolve(NumberLiteral, ctx, TypeKind.Money)` yields `TypedLiteral(TypeKind.Integer, ...)`, whose `ResultType` (Integer) ≠ field type (Money). An explicit post-resolve type mismatch check is needed to catch plain-number bounds.
+
+
+
+
 
 
 
@@ -32751,19 +65583,39 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 **New code needed:** A `ValidateMinMaxBoundQualifier(TypedTypedConstant, TypedField, SourceSpan, CheckContext)` helper in `TypeChecker.cs` that:
+
+
 
 1. For `money` fields: extracts the currency code from `ParsedValue`, compares to `typedField.DeclaredQualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault()?.CurrencyCode`. Emits `TypeMismatch` on mismatch.
 
+
+
 2. For `quantity` fields with a `Unit` qualifier (`in 'kg'`, `DeclaredQualifierMeta.Unit`): compares `boundUnit.CanonicalCode` to `unitQualifier.UnitCode` (exact match). Emits `QualifierMismatch` (code 68) on mismatch — a convertible-but-different unit (e.g., `lbs` on `in 'kg'`) is rejected. Fields with an empty `UnitCode` (dimensionless/count) skip the check.
 
+
+
 3. For `quantity` fields with a `Dimension` qualifier (`of 'mass'`, `DeclaredQualifierMeta.Dimension`): calls `DeriveUnitDimensionName(boundUnit)` and compares to `dimQualifier.DimensionName`. Any unit in the declared dimension is valid; different dimension → `DimensionCategoryMismatch` (code 69).
+
+
 
 4. `price` bound qualifier check: **OUT OF SCOPE** for this PR — the bound form for price (currency AND denominator unit) is more complex; leave price out of the qualifier check for now even though `price` goes into `RangedNumericTypes`.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32771,19 +65623,39 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 | Modifier | `integer` | `decimal` | `number` | `money` | `quantity` | `price` | `exchangerate` |
+
+
 
 |----------|-----------|-----------|----------|---------|------------|---------|----------------|
 
+
+
 | `nonnegative` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant — implicit positive) |
+
+
 
 | `positive` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant) |
 
+
+
 | `nonzero` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (redundant) |
+
+
 
 | `min` | ✓ plain number | ✓ plain number | ✓ plain number | ✓ typed constant, same currency | ✓ typed constant; exact unit if `in`, same dimension if `of` | ✓ typed constant, no qualifier check this PR | ✗ (ordering undefined) |
 
+
+
 | `max` | ✓ plain number | ✓ plain number | ✓ plain number | ✓ typed constant, same currency | ✓ typed constant; exact unit if `in`, same dimension if `of` | ✓ typed constant, no qualifier check this PR | ✗ (ordering undefined) |
+
+
+
+
 
 
 
@@ -32791,7 +65663,15 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32799,7 +65679,15 @@ The existing type system was audited against the unit-matching requirement for m
 
 
 
+
+
+
+
 ### A. `src/Precept/Language/Modifiers.cs`
+
+
+
+
 
 
 
@@ -32807,51 +65695,103 @@ Replace the single `NumericTypes` array with two applicability arrays:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // Zero-bound modifiers — compare against the universal zero; unit/currency is irrelevant
 
+
+
 private static readonly TypeTarget[] ZeroBoundNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
     new(TypeKind.ExchangeRate), // implicit positive — declaring is valid, not an error
 
+
+
 ];
+
+
+
+
 
 
 
 // Ranged bound modifiers — require typed-constant bounds; undefined for exchangerate
 
+
+
 private static readonly TypeTarget[] RangedNumericTypes =
+
+
 
 [
 
+
+
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
+
+
 
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
 ];
+
+
 
 ```
 
 
 
+
+
+
+
 Wire to modifier catalog entries:
+
+
 
 - `ModifierKind.Nonnegative` → `ZeroBoundNumericTypes`
 
+
+
 - `ModifierKind.Positive`    → `ZeroBoundNumericTypes`
+
+
 
 - `ModifierKind.Nonzero`     → `ZeroBoundNumericTypes`
 
+
+
 - `ModifierKind.Min`         → `RangedNumericTypes`
 
+
+
 - `ModifierKind.Max`         → `RangedNumericTypes`
+
+
+
+
 
 
 
@@ -32859,7 +65799,15 @@ Wire to modifier catalog entries:
 
 
 
+
+
+
+
 After the existing `default` modifier resolution block (find: `ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };`), add the min/max resolution loop as described in the Convertibility Check section above.
+
+
+
+
 
 
 
@@ -32867,7 +65815,15 @@ Also add the `ValidateMinMaxBoundQualifier` private static method to `TypeChecke
 
 
 
+
+
+
+
 ### C. `docs/language/business-domain-types.md`
+
+
+
+
 
 
 
@@ -32875,15 +65831,31 @@ Also add the `ValidateMinMaxBoundQualifier` private static method to `TypeChecke
 
 
 
+
+
+
+
 Replace the current row:
+
+
 
 > Bound constant `N` must be the same domain type as the field, with matching unit/currency. Blocked for `exchangerate`...
 
 
 
+
+
+
+
 With:
 
+
+
 > Bound constant `N` must be a typed constant of the same domain type as the field. **For `money`:** bound currency must exactly match the field's declared currency (`'100.00 EUR'` on `money in 'USD'` is a compile error). **For `quantity`:** the rule is keyed on qualifier kind. **`in '<unit>'` (pinned unit):** bound must use the exact same unit — `'100 lbs'` on `quantity in 'kg'` is a compile error. **`of '<dimension>'` (dimension category):** any unit in the declared dimension is valid — `'100 lbs'` on `quantity of 'mass'` is valid. **For `price`:** bound must be a typed price constant; full qualifier validation is a follow-on. Plain numeric literals (`min 0`) are rejected for all domain types. Blocked for `exchangerate`.
+
+
+
+
 
 
 
@@ -32891,35 +65863,71 @@ With:
 
 
 
+
+
+
+
 `money` Constraints:
 
+
+
 ```
+
+
 
 **Constraints:** `in '<currency>'`, `optional`, `default '...'`, `nonnegative`, `positive`, `nonzero`, `min '<decimal> <currency>'`, `max '<decimal> <currency>'`. The `maxplaces` constraint overrides the ISO 4217 default when needed. Bounds must use a typed constant in the field's declared currency.
 
+
+
 ```
+
+
+
+
 
 
 
 `quantity` Constraints:
 
+
+
 ```
+
+
 
 **Constraints:** `in '<unit>'`, `of '<dimension>'`, `optional`, `default '...'`, `nonnegative`, `positive`, `nonzero`, `min '<decimal> <unit>'`, `max '<decimal> <unit>'`. Bounds must use a typed constant. **For `in '<unit>'` fields:** bound must be the exact same unit (e.g., `'1.0 kg'` for `in 'kg'`; `'100 lbs'` is a compile error). **For `of '<dimension>'` fields:** bound unit must be in the declared dimension; convertible units are valid (e.g., `'100 lbs'` for `of 'mass'`).
 
+
+
 ```
+
+
+
+
 
 
 
 `price` Constraints:
 
+
+
 Add `positive`, `nonnegative`, `nonzero`, `min '<decimal> <currency>/<unit>'`, `max '<decimal> <currency>/<unit>'`.
+
+
+
+
 
 
 
 **Constraint interaction example** (wherever `min 0 max 1000` appears on a quantity field):
 
+
+
 Change to `min '0 kg' max '1000 kg'` and add a note: "Bounds are typed constants. Plain numeric literals are not valid for business domain types."
+
+
+
+
 
 
 
@@ -32927,45 +65935,91 @@ Change to `min '0 kg' max '1000 kg'` and add a note: "Bounds are typed constants
 
 
 
+
+
+
+
 Replace:
 
+
+
 ```
+
+
 
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
 
+
+
 | `positive` | (same as nonnegative) | (same as above) |
+
+
 
 | `nonzero` | (same as nonnegative) | (same as above) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number` | `string`, `boolean`, collections |
 
+
+
 ```
+
+
+
+
 
 
 
 With:
 
+
+
 ```
+
+
 
 | `nonnegative` | `integer`, `decimal`, `number`, `money`, `quantity`, `price`, `exchangerate` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension` |
 
+
+
 | `positive` | (same as nonnegative) | (same as above) |
+
+
 
 | `nonzero` | (same as nonnegative) | (same as above) |
 
+
+
 | `min` / `max` | `integer`, `decimal`, `number`, `money`, `quantity`, `price` | `string`, `boolean`, `choice`, collections, temporal, `currency`, `unitofmeasure`, `dimension`, `exchangerate` |
 
+
+
 ```
+
+
+
+
 
 
 
 Add a note below the table:
 
+
+
 > **`min`/`max` on `money`/`quantity`/`price` fields:** The bound must be a typed constant matching the field's domain type. For `money`, the bound currency must match the field's declared currency. For `quantity`, the bound-matching rule is keyed on qualifier kind: `in '<unit>'` (pinned unit) requires the exact same unit; `of '<dimension>'` (dimension category) allows any unit in that dimension. For `price`, the bound must be a price-typed constant; full qualifier enforcement is a follow-on. `exchangerate` does not support `min`/`max` (ordering is undefined); use `positive` instead.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32973,11 +66027,23 @@ Add a note below the table:
 
 
 
+
+
+
+
 `ValidateModifierBounds` in `TypeChecker.Validation.cs` checks that `min < max` when both are declared. `TryGetComparableModifierValue` handles only `NumberLiteral`; for typed constants it returns `null` and the ordering check is silently skipped. `field Balance as money in 'USD' min '500.00 USD' max '100.00 USD'` (min > max) emits no error. This gap pre-exists for any non-numeric literal form. It is NOT a blocker — the ordering check is a usability convenience, not a correctness requirement. Address in a follow-up.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -32985,19 +66051,39 @@ Add a note below the table:
 
 
 
+
+
+
+
 - `TypeChecker.Validation.cs` — `IsTypeApplicable` reads from the catalog and will automatically allow the new types once `Modifiers.cs` is updated; `ValidateModifierBounds` already gracefully skips non-NumberLiteral bounds
+
+
 
 - `ProofEngine.cs` — `DeclarationValue` is already conservative for all types; no change needed
 
+
+
 - `Constructs.cs` — the usage example `"field amount as money nonnegative"` is already correct; this decision makes the catalog agree with it
 
+
+
 - `Types.cs` — no trait changes needed
+
+
 
 - `Parser.cs` — `TypedConstant` is already in `ExpressionStartTokens`; modifier value positions already accept typed constants
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -33005,7 +66091,15 @@ Add a note below the table:
 
 
 
+
+
+
+
 This section provides complete, unambiguous implementation guidance. No further design questions need to be raised. Implement in this order.
+
+
+
+
 
 
 
@@ -33013,7 +66107,15 @@ This section provides complete, unambiguous implementation guidance. No further 
 
 
 
+
+
+
+
 **File:** `src/Precept/Language/Modifiers.cs`
+
+
+
+
 
 
 
@@ -33021,61 +66123,123 @@ This section provides complete, unambiguous implementation guidance. No further 
 
 
 
+
+
+
+
 ```csharp
+
+
 
 private static readonly TypeTarget[] ZeroBoundNumericTypes =
 
+
+
 [
+
+
 
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
 
+
+
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
+
+
 
     new(TypeKind.ExchangeRate),
 
+
+
 ];
+
+
+
+
 
 
 
 private static readonly TypeTarget[] RangedNumericTypes =
 
+
+
 [
+
+
 
     new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
 
+
+
     new(TypeKind.Money), new(TypeKind.Quantity), new(TypeKind.Price),
 
+
+
 ];
+
+
 
 ```
 
 
 
+
+
+
+
 2. Update modifier entries:
 
+
+
    - `ModifierKind.Nonnegative`, `ModifierKind.Positive`, `ModifierKind.Nonzero` → `ZeroBoundNumericTypes`
+
+
 
    - `ModifierKind.Min`, `ModifierKind.Max` → `RangedNumericTypes`
 
 
 
+
+
+
+
 **Tests after Slice 1 (before TypeChecker changes):**
+
+
 
 - `field X as money in 'USD' nonnegative` → 0 errors (was `InvalidModifierForType`)
 
+
+
 - `field X as money in 'USD' positive` → 0 errors
+
+
 
 - `field X as money in 'USD' nonzero` → 0 errors
 
+
+
 - `field X as quantity in 'kg' nonnegative` → 0 errors
+
+
 
 - `field X as price in 'USD/each' positive` → 0 errors
 
+
+
 - `field X as exchangerate in 'USD' to 'EUR' positive` → 0 errors (redundant but not error)
+
+
 
 - `field X as money in 'USD' min '100.00 USD'` → 0 errors for applicability (bound not type-checked yet)
 
+
+
 - `field X as exchangerate in 'USD' to 'EUR' min '1.0 USD/EUR'` → `InvalidModifierForType` (exchangerate not in `RangedNumericTypes`)
+
+
+
+
 
 
 
@@ -33083,7 +66247,15 @@ private static readonly TypeTarget[] RangedNumericTypes =
 
 
 
+
+
+
+
 **File:** `src/Precept/Pipeline/TypeChecker.cs` — method `ResolveFieldExpressions`
+
+
+
+
 
 
 
@@ -33091,73 +66263,147 @@ After the existing `default` modifier resolution block (find: `ctx.Fields[i] = c
 
 
 
+
+
+
+
 ```csharp
+
+
 
 // —— Min/Max bound expressions ——
 
+
+
 foreach (var boundKind in (ReadOnlySpan<ModifierKind>)[ModifierKind.Min, ModifierKind.Max])
+
+
 
 {
 
+
+
     var boundMod = declared.Modifiers.FirstOrDefault(m => m.Kind == boundKind);
+
+
 
     if (boundMod?.Value is not null and not MissingExpression)
 
+
+
     {
+
+
 
         ctx.CurrentScope = FieldScopeMode.PriorFieldsOnly;
 
+
+
         ctx.CurrentFieldIndex = i;
+
+
 
         var resolved = Resolve(boundMod.Value, ctx, typedField.ResolvedType);
 
+
+
         ctx.CurrentScope = FieldScopeMode.AllFields;
+
+
 
         ctx.CurrentFieldIndex = -1;
 
 
 
+
+
+
+
         // Bound resolved without content error — check type and qualifier match
+
+
 
         if (resolved is not TypedErrorExpression)
 
+
+
         {
+
+
 
             if (resolved.ResultType != typedField.ResolvedType)
 
+
+
             {
+
+
 
                 // Plain numeric literal (or other wrong type) used as bound for a domain type
 
+
+
                 ctx.Diagnostics.Add(Diagnostics.Create(
+
+
 
                     DiagnosticCode.TypeMismatch, boundMod.Value.Span,
 
+
+
                     Types.GetMeta(resolved.ResultType).DisplayName,
+
+
 
                     Types.GetMeta(typedField.ResolvedType).DisplayName));
 
+
+
             }
+
+
 
             else if (resolved is TypedTypedConstant typedConst)
 
+
+
             {
+
+
 
                 // Typed-constant bound: validate qualifier compatibility
 
+
+
                 ValidateMinMaxBoundQualifier(typedConst, typedField, boundMod.Value.Span, ctx);
+
+
 
             }
 
+
+
         }
+
+
 
         // TypedErrorExpression: Resolve already emitted InvalidTypedConstantContent or similar
 
+
+
     }
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -33165,159 +66411,319 @@ Also add the `ValidateMinMaxBoundQualifier` private static method alongside the 
 
 
 
+
+
+
+
 ```csharp
+
+
 
 /// <summary>
 
+
+
 /// Validates that a <see cref="TypedTypedConstant"/> used as a min/max modifier bound
+
+
 
 /// is qualifier-compatible with the field's declared qualifier.
 
+
+
 /// For money: bound currency must match field currency.
+
+
 
 /// For quantity with unit qualifier (in): bound unit must exactly match the field's pinned unit (QualifierMismatch if not).
 
+
+
 /// For quantity with dimension qualifier (of): bound unit must be in the same dimension (DimensionCategoryMismatch if not).
+
+
 
 /// Price qualifier check is deferred to a follow-up PR.
 
+
+
 /// </summary>
+
+
 
 private static void ValidateMinMaxBoundQualifier(
 
+
+
     TypedTypedConstant boundConst,
+
+
 
     TypedField typedField,
 
+
+
     SourceSpan boundSpan,
+
+
 
     CheckContext ctx)
 
+
+
 {
+
+
 
     switch (typedField.ResolvedType)
 
+
+
     {
+
+
 
         case TypeKind.Money:
 
+
+
         {
+
+
 
             if (boundConst.ParsedValue is not (decimal, string boundCurrency))
 
+
+
                 return;
+
+
 
             var fieldCurrency = typedField.DeclaredQualifiers
 
+
+
                 .OfType<DeclaredQualifierMeta.Currency>()
+
+
 
                 .FirstOrDefault()?.CurrencyCode;
 
+
+
             if (fieldCurrency is not null &&
+
+
 
                 !string.Equals(boundCurrency, fieldCurrency, StringComparison.OrdinalIgnoreCase))
 
+
+
             {
+
+
 
                 ctx.Diagnostics.Add(Diagnostics.Create(
 
+
+
                     DiagnosticCode.TypeMismatch, boundSpan,
+
+
 
                     $"money in '{boundCurrency}'",
 
+
+
                     $"money in '{fieldCurrency}'"));
+
+
 
             }
 
+
+
             break;
 
+
+
         }
+
+
+
+
 
 
 
         case TypeKind.Quantity:
 
+
+
         {
 
+
+
             if (boundConst.ParsedValue is not (decimal, Precept.Language.Ucum.UcumParsedUnit boundUnit))
+
+
 
                 return;
 
 
 
+
+
+
+
             // Path A: field is pinned to a specific unit ('in') — bound must be the exact same unit
+
+
 
             var unitQualifier = typedField.DeclaredQualifiers
 
+
+
                 .OfType<DeclaredQualifierMeta.Unit>()
+
+
 
                 .FirstOrDefault();
 
+
+
             if (unitQualifier is not null &&
+
+
 
                 !string.IsNullOrEmpty(unitQualifier.UnitCode) &&
 
+
+
                 !string.Equals(boundUnit.CanonicalCode, unitQualifier.UnitCode, StringComparison.OrdinalIgnoreCase))
+
+
 
             {
 
+
+
                 ctx.Diagnostics.Add(Diagnostics.Create(
+
+
 
                     DiagnosticCode.QualifierMismatch, boundSpan,
 
+
+
                     unitQualifier.UnitCode, typedField.Name));
+
+
 
                 break; // Unit and Dimension qualifiers are mutually exclusive; no need to check Path B
 
+
+
             }
+
+
+
+
 
 
 
             // Path B: field is constrained to a dimension category ('of') — bound must be in that dimension
 
+
+
             var dimQualifier = typedField.DeclaredQualifiers
+
+
 
                 .OfType<DeclaredQualifierMeta.Dimension>()
 
+
+
                 .FirstOrDefault();
+
+
 
             if (dimQualifier is not null &&
 
+
+
                 !string.IsNullOrEmpty(dimQualifier.DimensionName))
+
+
 
             {
 
+
+
                 var boundDimension = DeriveUnitDimensionName(boundUnit);
+
+
 
                 if (!string.IsNullOrEmpty(boundDimension) &&
 
+
+
                     !string.Equals(boundDimension, dimQualifier.DimensionName, StringComparison.OrdinalIgnoreCase))
+
+
 
                 {
 
+
+
                     ctx.Diagnostics.Add(Diagnostics.Create(
+
+
 
                         DiagnosticCode.DimensionCategoryMismatch, boundSpan,
 
+
+
                         boundDimension, dimQualifier.DimensionName, typedField.Name));
+
+
 
                 }
 
+
+
             }
+
+
 
             break;
 
+
+
         }
+
+
 
         // Price: bound qualifier check deferred — compound unit/currency form requires
 
+
+
         // separate design. Price accepts any valid price-typed constant for now.
+
+
 
     }
 
+
+
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -33325,49 +66731,99 @@ private static void ValidateMinMaxBoundQualifier(
 
 
 
+
+
+
+
 **Tests after Slice 2:**
+
+
+
+
 
 
 
 Valid cases (0 errors):
 
+
+
 1. `field Balance as money in 'USD' min '100.00 USD'` → 0 errors
+
+
 
 2. `field Balance as money in 'USD' max '500.00 USD'` → 0 errors
 
+
+
 3. `field Balance as money in 'USD' min '100.00 USD' max '500.00 USD'` → 0 errors
+
+
 
 4. `field Weight as quantity in 'kg' min '1.0 kg'` → 0 errors
 
+
+
 5. `field Weight as quantity of 'mass' max '100 lbs'` → 0 errors (`lbs` is mass — valid for `of 'mass'` dimension qualifier)
+
+
 
 6. `field Distance as quantity of 'length' max '100 m'` → 0 errors (m is length — matches declared dimension)
 
 
 
+
+
+
+
 Error cases:
+
+
 
 7. `field Balance as money in 'USD' min '100.00 EUR'` → `TypeMismatch` (currency mismatch: EUR vs USD)
 
+
+
 8. `field Balance as money in 'USD' min 100` → `TypeMismatch` (integer ≠ money)
+
+
 
 9. `field Weight as quantity in 'kg' max '100 m'` → `QualifierMismatch` (m ≠ kg; field pinned with `in`)
 
+
+
 10. `field Weight as quantity in 'kg' max 50` → `TypeMismatch` (integer ≠ quantity)
+
+
 
 11. `field Weight as quantity in 'kg' max '100 USD'` → `InvalidTypedConstantContent` (USD is not a UCUM unit — caught by QuantityValidator before qualifier check)
 
+
+
 12. `field Weight as quantity in 'kg' max '100 lbs'` → `QualifierMismatch` (field pinned to `kg` with `in`; `lbs` rejected even though same mass dimension)
+
+
 
 13. `field Weight as quantity of 'mass' max '100 m'` → `DimensionCategoryMismatch` (length ≠ mass; dimension qualifier path)
 
 
 
+
+
+
+
 Regression (must still pass):
+
+
 
 14. `field Amount as integer min 0 max 100` → 0 errors (existing behavior preserved)
 
+
+
 15. `field Rate as decimal min 0.0 max 1.0` → 0 errors (existing behavior preserved)
+
+
+
+
 
 
 
@@ -33375,11 +66831,23 @@ Regression (must still pass):
 
 
 
+
+
+
+
 **Files to update in the same PR:**
+
+
 
 1. `docs/language/business-domain-types.md` — per section C above: D16 table row, money/quantity/price Constraints rows, constraint interaction example
 
+
+
 2. `docs/language/precept-language-spec.md` — per section D above: modifier applicability table and note
+
+
+
+
 
 
 
@@ -33387,35 +66855,71 @@ Regression (must still pass):
 
 
 
+
+
+
+
 **IN SCOPE:**
+
+
 
 - Modifiers.cs applicability arrays (all 5 modifiers, 4 domain types)
 
+
+
 - TypeChecker.cs min/max bound resolution via `Resolve()`
 
+
+
 - TypeChecker.cs qualifier check: currency for money; **exact unit** (`QualifierMismatch` code 68) for `quantity in '<unit>'`; **same dimension** (`DimensionCategoryMismatch` code 69) for `quantity of '<dimension>'`
+
+
 
 - Doc sync: D16, individual Constraints rows (money, quantity, price), modifier table in spec
 
 
 
+
+
+
+
 **OUT OF SCOPE for this PR:**
+
+
 
 - Runtime enforcement (evaluator is `throw new NotImplementedException()`)
 
+
+
 - `exchangerate` min/max (ordering undefined by D2 — permanently blocked)
+
+
 
 - Price bound qualifier check (compound unit/currency — follow-on)
 
+
+
 - `min < max` ordering check for typed-constant bounds (follow-up)
 
+
+
 - Language-server `RedundantModifier` warning for explicit `positive` on `exchangerate`
+
+
 
 - Any changes to `ValidateModifierBounds` / `TryGetComparableModifierValue`
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -33423,7 +66927,15 @@ Regression (must still pass):
 
 
 
+
+
+
+
 The open bound-form question ("plain integer vs typed constant") has been resolved: typed constants are required. The spec's `min 0 max 1000` example is wrong shorthand and must be corrected per Slice 3.
+
+
+
+
 
 
 
@@ -33431,7 +66943,15 @@ The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-
 
 
 
+
+
+
+
 **What D16 confirms:**
+
+
+
+
 
 
 
@@ -33439,57 +66959,115 @@ The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-
 
 
 
+
+
+
+
 > **`min N`/`max N` field constraints** → `money`, `quantity`, `price`. **Blocked for `exchangerate`** — these constraints require `>=`/`<=` ordering, which is undefined for `exchangerate`; use `positive` instead.
+
+
+
+
 
 
 
 > **Bound form requirement (as refined by Shane):** Typed constant of the same domain type. For `quantity`: exact unit for `in` fields; same dimension for `of` fields.
 
+
+
 # Kramer — nonnegative modifier span fix
+
+
+
+
 
 
 
 ## Decision
 
+
+
 - Modifier diagnostics should anchor to the specific modifier token, not the enclosing field declaration span.
 
+
+
 - `ParsedModifier` now carries its own `SourceSpan`, computed from the modifier token (or token + value expression for valued modifiers).
+
+
 
 - `TypeChecker.ValidateValueModifiers(...)` now emits `InvalidModifierForType` and related modifier diagnostics on `modifier.Span`.
 
 
 
+
+
+
+
 ## Why
+
+
 
 Shane reported that `field Amount as money in 'USD' nonnegative` underlined the whole declaration instead of just `nonnegative`. The parser/type-checker seam needed per-modifier span data so the language server could project a token-precise squiggle.
 
 
 
+
+
+
+
 ## Validation
+
+
 
 - `dotnet test test/Precept.Tests/ --filter "FieldDeclaration_WithModifier_ParsedModifierSpan_MatchesKeywordToken" --nologo --verbosity minimal`
 
+
+
 - `dotnet test test/Precept.LanguageServer.Tests/ --nologo --verbosity minimal`
+
+
 
 - `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --nologo --verbosity minimal`
 
+
+
 - Note: `dotnet test test/Precept.Tests/ --nologo --verbosity minimal` still reports an unrelated existing failure in `ArgReferenceTests.TypeChecker_ArgReference_SiteSpanMatchesSource`.
+
+
 
 # Decision: B9–B12 Triage — Type Checker Quantity Validation Gaps
 
 
 
+
+
+
+
 **Author:** Frank
+
+
 
 **Date:** 2026-05-11T01:58:19.194-04:00
 
+
+
 **Status:** Proposed
+
+
 
 **Scope:** Type checker — assignment and default value validation
 
 
 
+
+
+
+
 ## Context
+
+
+
+
 
 
 
@@ -33497,7 +67075,15 @@ B9, B10, B11, and B12 are four bugs that all manifest as the type checker silent
 
 
 
+
+
+
+
 ## Root Cause Analysis
+
+
+
+
 
 
 
@@ -33505,7 +67091,15 @@ Three structural gaps combine to produce all four bugs:
 
 
 
+
+
+
+
 ### Gap 1: No post-resolution assignment validation (B9, B10, B11, B12)
+
+
+
+
 
 
 
@@ -33513,7 +67107,15 @@ Three structural gaps combine to produce all four bugs:
 
 
 
+
+
+
+
 ### Gap 2: QuantityValidator is dimension-blind (B10, B11)
+
+
+
+
 
 
 
@@ -33521,7 +67123,15 @@ Three structural gaps combine to produce all four bugs:
 
 
 
+
+
+
+
 ### Gap 3: Expression nodes strip qualifier metadata (B12)
+
+
+
+
 
 
 
@@ -33529,7 +67139,15 @@ Three structural gaps combine to produce all four bugs:
 
 
 
+
+
+
+
 ## Fix Strategy
+
+
+
+
 
 
 
@@ -33537,7 +67155,15 @@ Three structural gaps combine to produce all four bugs:
 
 
 
+
+
+
+
 In `ResolveAction`'s `AssignAction` case, after resolving the value expression, check `!IsAssignable(value.ResultType, fieldType)` and emit `DiagnosticCode.TypeMismatch`. Same check in `ResolveFieldExpressions` for defaults. This catches type-level mismatches (integer → quantity) immediately.
+
+
+
+
 
 
 
@@ -33545,7 +67171,15 @@ In `ResolveAction`'s `AssignAction` case, after resolving the value expression, 
 
 
 
+
+
+
+
 Thread the target field's `DeclaredQualifiers` into `ResolveTypedConstant` → `QuantityValidator.Validate` via the existing `TypedConstantContext` parameter. After UCUM validation succeeds, derive the literal's dimension via `DeriveUnitDimensionName` and compare against the declared dimension. Emit `DimensionCategoryMismatch` on mismatch.
+
+
+
+
 
 
 
@@ -33553,7 +67187,15 @@ Thread the target field's `DeclaredQualifiers` into `ResolveTypedConstant` → `
 
 
 
+
+
+
+
 Extend `TypedArgRef` and `TypedFieldRef` to carry `DeclaredQualifiers` (nullable/optional). Populate from `TypedArg.DeclaredQualifiers` and `TypedField.DeclaredQualifiers` respectively during identifier resolution. The post-resolution assignment check then compares qualifier dimensions, not just type kinds.
+
+
+
+
 
 
 
@@ -33561,11 +67203,23 @@ Extend `TypedArgRef` and `TypedFieldRef` to carry `DeclaredQualifiers` (nullable
 
 
 
+
+
+
+
 1. Layer 1 first — smallest change, highest impact (fixes B9, partially B10/B11 at type level)
+
+
 
 2. Layer 2 second — validator enhancement (completes B10, B11)
 
+
+
 3. Layer 3 last — structural expression tree change (fixes B12, enables future qualifier-aware analysis)
+
+
+
+
 
 
 
@@ -33573,17 +67227,35 @@ Layers 1 and 2 can ship independently. Layer 3 is a prerequisite for any future 
 
 
 
+
+
+
+
 ## Diagnostic Codes
+
+
+
+
 
 
 
 All required codes already exist:
 
+
+
 - `TypeMismatch` (PRE0018) — for B9 (integer → quantity)
+
+
 
 - `DimensionCategoryMismatch` (PRE0069) — for B10, B11, B12
 
+
+
 - `QualifierMismatch` (PRE0068) — for B12 (if we want a more specific diagnostic than DimensionCategoryMismatch)
+
+
+
+
 
 
 
@@ -33591,15 +67263,31 @@ No new diagnostic codes needed.
 
 
 
+
+
+
+
 ## Risk Assessment
+
+
+
+
 
 
 
 - **Layer 1:** Low risk. Additive guard with error-type suppression already in `IsAssignable`.
 
+
+
 - **Layer 2:** Medium risk. Plumbing change through the validation pipeline — `TypedConstantContext` needs to carry `DeclaredQualifiers`.
 
+
+
 - **Layer 3:** Medium-high risk. Structural change to expression tree model. All expression tree consumers need audit. However, data is additive and nullable.
+
+
+
+
 
 
 
@@ -33607,7 +67295,15 @@ No new diagnostic codes needed.
 
 
 
+
+
+
+
 These fixes apply equally to `money` fields — a `money in 'USD'` field with `set amount = '100 EUR'` has the same gap. The architectural fix is type-agnostic; it should be implemented generically, not quantity-specific.
+
+
+
+
 
 
 
@@ -33615,41 +67311,83 @@ These fixes apply equally to `money` fields — a `money in 'USD'` field with `s
 
 
 
+
+
+
+
 ## Summary
 
+
+
 - Fixed the `textDocument/semanticTokens/full/delta` crash that surfaced as `ArgumentOutOfRangeException` inside OmniSharp's `SemanticTokensDocument.GetSemanticTokensEdits()`.
+
+
 
 - Commit: `ef7374dd` (`fix(semantic-tokens): prevent delta crash on ImmutableArray out-of-range`).
 
 
 
+
+
+
+
 ## What I found
+
+
 
 - The framework keeps a single `SemanticTokensDocument.Id` for the lifetime of each cached document.
 
+
+
 - That means the stock delta path cannot distinguish "latest client baseline" from "older client baseline" once a delta request has already primed `_prevData`.
 
+
+
 - A later delta request with an older `PreviousResultId` could therefore diff against stale cached token data and hand `ImmutableArray.Create(...)` an invalid slice.
+
+
 
 - This was not introduced by the UCUM display-label work; `SemanticTokensHandler` does not read `UcumAtom`, `PrintSymbol`, or quantity-completion metadata.
 
 
 
+
+
+
+
 ## Decision
 
+
+
 - Keep semantic-token delta support enabled, but stop trusting the framework's fixed document ID as the client-visible result ID.
+
+
 
 - Stamp a fresh result ID on every full and delta response, track the latest `(clientResultId, frameworkDocumentId)` per URI, and fall back to a full response whenever the client's delta baseline is stale or the typed-constant invalidation path replaced the framework document.
 
 
 
+
+
+
+
 ## Validation
+
+
 
 - `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server`
 
+
+
 - `dotnet test test/Precept.LanguageServer.Tests/`
 
+
+
 - Added handler-level regression tests covering stale result IDs and typed-constant span changes.
+
+
+
+
 
 
 
@@ -33657,79 +67395,159 @@ These fixes apply equally to `money` fields — a `money in 'USD'` field with `s
 
 
 
+
+
+
+
 ## What changed
+
+
 
 - Added `PrintSymbol` to `src/Precept/Language/Ucum/UcumAtom.cs`.
 
+
+
 - Updated `src/Precept/Language/Ucum/UcumAtomCatalog.cs` to carry `PrintSymbol`, parse it from the embedded UCUM XML (`printSymbol` is stored as a child element in this snapshot, with attribute fallback), and prune troy/apothecary mass units from tier-1.
+
+
 
 - Updated `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs` so quantity-unit completions use `printSymbol ?? code` for `Label`, `Name` for `Detail`, and the UCUM code for insertion/sorting.
 
+
+
 - Updated `tools/Precept.LanguageServer/Handlers/HoverHandler.cs` so quantity/unit typed-constant hover shows resolved unit metadata.
+
+
 
 - Updated tracker/tests/MCP description in:
 
+
+
   - `docs/Working/completions-bugs.md`
+
+
 
   - `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`
 
+
+
   - `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs`
+
+
 
   - `test/Precept.Tests/Language/UcumCatalogDriftTests.cs`
 
+
+
   - `test/Precept.Tests/Language/Ucum/UcumCatalogTests.cs`
+
+
 
   - `tools/Precept.Mcp/Tools/DomainsTool.cs`
 
 
 
+
+
+
+
 ## Grain (`[gr]`)
 
+
+
 - Kept `[gr]` in tier-1.
+
+
 
 - Reason: `src/Precept/Data/Ucum/ucum-essence.xml` classifies `[gr]` as `class="avoirdupois"`, not `apoth`.
 
 
 
+
+
+
+
 ## Print symbols found
 
+
+
 - `[lb_av]` -> `lb`
+
+
 
 - `[oz_av]` -> `oz`
 
 
 
+
+
+
+
 ## Final validation
+
+
 
 - `dotnet build src/Precept/Precept.csproj` ✅
 
+
+
 - `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server` ✅
 
+
+
 - `dotnet test test/Precept.Tests/` -> 4567 passed
+
+
 
 - `dotnet test test/Precept.LanguageServer.Tests/` -> 221 passed
 
 
 
+
+
+
+
 ## Issues encountered
+
+
 
 - The embedded UCUM snapshot stores `printSymbol` as an XML element for these units, so parsing needed element support instead of attribute-only handling.
 
+
+
 - Quote-trigger completions still append the closing quote in the existing completion postprocess path; the unit code remains the inserted UCUM payload prefix used for sorting and slot completion behavior.
+
+
 
 # Decision: Dimension-Unit Consistency Validation in Interpolation Plan
 
 
 
+
+
+
+
 **By:** Frank
 
+
+
 **Date:** 2026-05-11
+
+
 
 **Directive:** Shane explicitly rejected deferral. The dimension-to-unit consistency gap is addressed in the interpolation plan.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -33737,7 +67555,15 @@ These fixes apply equally to `money` fields — a `money in 'USD'` field with `s
 
 
 
+
+
+
+
 When an interpolated typed constant's unit slot is filled by `f1.unit` where `f1` is `quantity of 'length'` and the target field is `quantity of 'mass'`, the slot compatibility check accepts the expression (it's `unitofmeasure`) but does not verify dimension consistency. This produces a dimensionally incoherent quantity that compiles clean.
+
+
+
+
 
 
 
@@ -33745,7 +67571,15 @@ When an interpolated typed constant's unit slot is filled by `f1.unit` where `f1
 
 
 
+
+
+
+
 **Not Option A** (type system enrichment): `TypedMemberAccess` stores only `TypeKind ResultType`. Adding qualified return types would require a new concept (`TypedUnitOfMeasure(dimension: "length")` or a general qualified-type wrapper) that permeates the type system. The cost is disproportionate — the check can be done structurally with ~25 lines because the dimension information is already available on the receiver's `DeclaredQualifiers`.
+
+
+
+
 
 
 
@@ -33753,11 +67587,23 @@ When an interpolated typed constant's unit slot is filled by `f1.unit` where `f1
 
 
 
+
+
+
+
 **Option B works because:** After `ResolveMemberAccess()` produces a `TypedMemberAccess`, the AST already contains:
+
+
 
 - `ResolvedAccessor` — a `FixedReturnAccessor` with `ReturnsQualifier: QualifierAxis.Unit`
 
+
+
 - `Object` — the receiver expression (e.g., `TypedFieldRef` or `TypedArgRef`) carrying `DeclaredQualifiers`
+
+
+
+
 
 
 
@@ -33765,7 +67611,15 @@ The dimension is extractable from `DeclaredQualifiers` using the same logic alre
 
 
 
+
+
+
+
 ## Static Typed Constant Dimension Validation
+
+
+
+
 
 
 
@@ -33773,15 +67627,31 @@ The dimension is extractable from `DeclaredQualifiers` using the same logic alre
 
 
 
+
+
+
+
 ## New Diagnostic
+
+
+
+
 
 
 
 - **Code:** `DimensionMismatchInUnitSlot = 124`
 
+
+
 - **Message:** `"Unit from '{sourceFieldName}' has dimension '{sourceDimension}' but target field '{targetFieldName}' requires dimension '{targetDimension}'."`
 
+
+
 - **Emitted by:** Slice 2's `ResolveInterpolatedTypedConstant()`, step 9
+
+
+
+
 
 
 
@@ -33789,7 +67659,15 @@ The dimension is extractable from `DeclaredQualifiers` using the same logic alre
 
 
 
+
+
+
+
 Slice 2 gains ~25 lines of dimension-checking code and ~9 additional tests. Total Slice 2 LOC estimate: ~200 lines (was implicitly ~175 before this addition).
+
+
+
+
 
 
 
@@ -33797,23 +67675,47 @@ Slice 2 gains ~25 lines of dimension-checking code and ~9 additional tests. Tota
 
 
 
+
+
+
+
 - **Currency qualifier mismatch in interpolated slots** — analogous gap on `QualifierAxis.Currency`, tracked separately. The structural pattern match would be identical but on a different axis.
 
+
+
 - **Temporal dimension consistency for duration/period unit slots** — temporal units are a closed-set literal namespace, not physical UCUM dimensions. Different check, narrow surface, out of scope.
+
+
 
 # Decision: Dimension-Qualified Unit Slot Compatibility is a Real Gap — Deferred as Separate Issue
 
 
 
+
+
+
+
 **By:** Frank
 
+
+
 **Date:** 2026-05-11T17:28:00-04:00
+
+
 
 **Context:** Shane's example — `field f2 as quantity of 'mass' default '1 {f1.unit}'` where `f1 as quantity of 'length'`
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -33821,57 +67723,115 @@ Slice 2 gains ~25 lines of dimension-checking code and ~9 additional tests. Tota
 
 
 
+
+
+
+
 ### 1. Type Resolution: `f1.unit` Is Plain `unitofmeasure` — No Dimension Qualifier
+
+
+
+
 
 
 
 **Source:** `src/Precept/Language/Types.cs:533`
 
+
+
 ```csharp
+
+
 
 new FixedReturnAccessor("unit", TypeKind.UnitOfMeasure, "Unit of measure", ReturnsQualifier: QualifierAxis.Unit)
 
+
+
 ```
+
+
+
+
 
 
 
 **Source:** `src/Precept/Pipeline/TypeChecker.Expressions.cs:1648-1658` (`ResolveAccessorReturnType`)
 
+
+
 ```csharp
+
+
 
 return accessor switch
 
+
+
 {
+
+
 
     FixedReturnAccessor f => f.Returns,  // Returns TypeKind.UnitOfMeasure — no qualifier
 
+
+
     ...
+
+
 
 };
 
+
+
 ```
+
+
+
+
 
 
 
 **Source:** `src/Precept/Pipeline/SemanticIndex.cs:73-79` (`TypedMemberAccess` record)
 
+
+
 ```csharp
+
+
 
 public sealed record TypedMemberAccess(
 
+
+
     TypeKind ResultType,         // Just the enum — no qualifier metadata
+
+
 
     TypedExpression Object,
 
+
+
     TypeAccessor ResolvedAccessor,
+
+
 
     ImmutableArray<ProofRequirement> ProofRequirements,
 
+
+
     SourceSpan Span
+
+
 
 ) : TypedExpression(ResultType, Span);
 
+
+
 ```
+
+
+
+
 
 
 
@@ -33879,7 +67839,15 @@ public sealed record TypedMemberAccess(
 
 
 
+
+
+
+
 ### 2. Pipeline Stage Analysis: No Stage Currently Catches This
+
+
+
+
 
 
 
@@ -33887,7 +67855,15 @@ public sealed record TypedMemberAccess(
 
 
 
+
+
+
+
 **Slice 6 (ProofEngine):** Explicitly numeric-only. Does not handle dimension or qualifier obligations. Would not fire.
+
+
+
+
 
 
 
@@ -33895,7 +67871,15 @@ public sealed record TypedMemberAccess(
 
 
 
+
+
+
+
 **Result: The mismatch is undetectable with the current type system and the interpolation plan as written.** The compiler will accept `field f2 as quantity of 'mass' default '1 {f1.unit}'` without error, and at runtime `f2` will hold a quantity with a length unit tagged to a mass dimension — dimensionally incoherent.
+
+
+
+
 
 
 
@@ -33903,7 +67887,15 @@ public sealed record TypedMemberAccess(
 
 
 
+
+
+
+
 The plan explicitly excludes this class of check:
+
+
+
+
 
 
 
@@ -33911,7 +67903,15 @@ The plan explicitly excludes this class of check:
 
 
 
+
+
+
+
 And the S6 rationale says:
+
+
+
+
 
 
 
@@ -33919,13 +67919,27 @@ And the S6 rationale says:
 
 
 
+
+
+
+
 That rationale is **correct for the qualifier obligation discharge case** (is `f2`'s dimension valid? — yes, S5 answers from declaration). But it **does not cover the slot-to-declaration compatibility case** (is the unit being injected into `f2`'s unit slot dimensionally consistent with `f2`'s declared dimension?). These are different questions:
+
+
+
+
 
 
 
 - **S5 question:** "Does `f2` have a valid dimension declaration?" → Yes (mass).
 
+
+
 - **Unasked question:** "Is the expression in `f2`'s unit slot producing a unit from a dimension compatible with `f2`'s declaration?" → Not checked anywhere.
+
+
+
+
 
 
 
@@ -33933,39 +67947,79 @@ That rationale is **correct for the qualifier obligation discharge case** (is `f
 
 
 
+
+
+
+
 Two possible approaches:
+
+
+
+
 
 
 
 **Option A — Dimension-qualified `unitofmeasure` return type (type system enrichment):**
 
+
+
 - `f1.unit` would resolve to something like `TypeKind.UnitOfMeasure` with a `DimensionQualifier = "length"` annotation.
 
+
+
 - The slot compatibility check in Slice 2 would verify that a `unitofmeasure` expression's dimension qualifier matches the target quantity's declared dimension.
+
+
 
 - **Cost:** Requires a new concept of "qualified return types" on accessors — `TypedMemberAccess` would need to carry qualifier metadata, not just `TypeKind`. This is a significant type system extension touching `SemanticIndex`, `TypeChecker.Expressions`, and every consumer of `TypedMemberAccess`.
 
 
 
+
+
+
+
 **Option B — Dimensional slot validation in Slice 2 (lighter, accessor-specific):**
+
+
 
 - When Slice 2 matches a `unitofmeasure`-typed expression in a unit slot, check whether the expression is a `TypedMemberAccess` with `ReturnsQualifier == QualifierAxis.Unit` on a receiver whose field declaration carries a dimension qualifier.
 
+
+
 - If so, compare the receiver field's declared dimension against the target type's declared dimension.
+
+
 
 - **Cost:** ~20 LOC in the slot validation step. Requires access to the field lookup to read the receiver's qualifiers. Only works for direct `.unit` access on fields — not for arbitrary `unitofmeasure` expressions passed through variables.
 
 
 
+
+
+
+
 **Option C — Proof obligation on dimension consistency (new proof strategy):**
 
+
+
 - A new proof strategy (S7?) that fires when an interpolated constant assigns to a field with a declared dimension, checking whether slot sources carry compatible dimension qualifiers.
+
+
 
 - **Cost:** New strategy, new proof requirement type. Overlaps with S5 in uncomfortable ways.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -33973,7 +68027,15 @@ Two possible approaches:
 
 
 
+
+
+
+
 **This is a real gap.** It contradicts the philosophy. A length unit in a mass quantity is exactly the kind of invalid configuration Precept is built to prevent.
+
+
+
+
 
 
 
@@ -33981,7 +68043,15 @@ Two possible approaches:
 
 
 
+
+
+
+
 1. **The gap is not unique to interpolation.** The same mismatch is undetectable for `set f2 = '1 [ft_i]'` (static constant where the user wrote a length unit for a mass field) — that's an existing content-validation gap in static typed constants, not an interpolation-specific issue. The interpolation plan should not be the vehicle for fixing a pre-existing dimensional consistency problem.
+
+
+
+
 
 
 
@@ -33989,7 +68059,15 @@ Two possible approaches:
 
 
 
+
+
+
+
 3. **Option B (the cheapest fix) only catches one specific pattern** — `.unit` accessor on a dimension-declared field injected into a different-dimension unit slot. It misses `string` holes carrying wrong units, `unitofmeasure` fields with the wrong dimension, and all indirect paths. Partial detection without the type system enrichment (Option A) would give false confidence.
+
+
+
+
 
 
 
@@ -33997,7 +68075,15 @@ Two possible approaches:
 
 
 
+
+
+
+
 **Action:** File a separate issue: "Dimension-to-unit consistency validation for quantity/price fields." Scope it to cover static and interpolated typed constants, define whether it requires type system enrichment (qualified return types) or a lighter accessor-provenance check, and design it as a unified validation pass rather than a bolt-on to S6 or S2.
+
+
+
+
 
 
 
@@ -34005,7 +68091,15 @@ The interpolation plan's S6 scope boundary holds. This is not an S6 gap — it's
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34013,29 +68107,59 @@ The interpolation plan's S6 scope boundary holds. This is not an S6 gap — it's
 
 
 
+
+
+
+
 - The current interpolation plan does NOT catch dimension-incompatible unit slot assignments.
+
+
 
 - This is acknowledged as a real philosophy gap but is **not** in scope for the current plan.
 
+
+
 - A separate issue should be filed for dimension-to-unit consistency validation.
+
+
 
 - The S6 "no dimension propagation" rationale remains architecturally correct for its stated purpose (obligation discharge from declarations). The gap is in slot validation, not in proof propagation.
 
+
+
 - The `string` exception precedent means the system already accepts some dimensional runtime-deferral. Extending compile-time checks is desirable but is a distinct feature with its own design space.
+
+
 
 # Fix: `quantity of ` completion bug
 
 
 
+
+
+
+
 **Date:** 2026-05-11
 
+
+
 **Author:** Kramer
+
+
 
 **Status:** Implemented
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34043,11 +68167,23 @@ The interpolation plan's S6 scope boundary holds. This is not an S6 gap — it's
 
 
 
+
+
+
+
 After typing `field f1 as quantity of ` and pressing space, VS Code showed type-keyword completions (`bag`, `boolean`, `choice`, `currency`, …). These are wrong: `quantity of` is a qualifier preposition expecting a dimension typed constant like `'mass'`, not a type keyword.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34055,13 +68191,27 @@ After typing `field f1 as quantity of ` and pressing space, VS Code showed type-
 
 
 
+
+
+
+
 `IsTypePositionContext` in `tools/Precept.LanguageServer/SlotContext.cs` tested only two conditions:
+
+
+
+
 
 
 
 1. The previous significant token is `of`
 
+
+
 2. The enclosing construct has a `TypeExpression` slot
+
+
+
+
 
 
 
@@ -34069,19 +68219,39 @@ A field declaration (`field f1 as quantity of ...`) satisfies both, so `GetCurso
 
 
 
+
+
+
+
 The problem: `of` plays two distinct roles in type expressions:
+
+
+
+
 
 
 
 | Context | Role | Expects |
 
+
+
 |---------|------|---------|
+
+
 
 | `set of `, `list of `, `bag of `, `queue of ` | collection element-type preposition | type keyword → `InTypePosition` ✓ |
 
+
+
 | `choice of ` | choice element-type preposition | type keyword → `InTypePosition` ✓ |
 
+
+
 | `quantity of `, `price of `, `period of ` | qualifier preposition | typed constant (e.g. `'mass'`) → NOT `InTypePosition` |
+
+
+
+
 
 
 
@@ -34089,7 +68259,15 @@ The original code could not distinguish them.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34097,13 +68275,27 @@ The original code could not distinguish them.
 
 
 
+
+
+
+
 Extended `IsTypePositionContext` with `tokens` + `tokenIndex` parameters. The method now looks at the token immediately before `of` and resolves it against `Types.ByToken`. It returns `true` only when the preceding type is:
+
+
+
+
 
 
 
 - `TypeCategory.Collection` (set, list, bag, queue, log, lookup, …), OR
 
+
+
 - `TypeKind.Choice`
+
+
+
+
 
 
 
@@ -34111,11 +68303,23 @@ All other types (BusinessDomain, Temporal, Scalar with qualifier shapes) return 
 
 
 
+
+
+
+
 This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kind` from catalog metadata — no per-type identity hardcoding.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34123,19 +68327,39 @@ This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kin
 
 
 
+
+
+
+
 - `tools/Precept.LanguageServer/SlotContext.cs` — updated `IsTypePositionContext` signature and logic; updated call site in `TryGetSpecializedContext`
+
+
 
 - `test/Precept.LanguageServer.Tests/SlotContextResolverTests.cs` — added 3 tests:
 
+
+
   - `GetCursorContext_ChoiceElementTypeAfterOf_ReturnsInTypePosition` (regression anchor for `choice of`)
 
+
+
   - `GetCursorContext_QuantityDimensionQualifierAfterOf_DoesNotReturnInTypePosition` (the bug case)
+
+
 
   - Existing `GetCursorContext_CollectionInnerTypeAfterOf_ReturnsInTypePosition` still passes
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34143,7 +68367,15 @@ This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kin
 
 
 
+
+
+
+
 `set of ` and `list of ` were NOT broken — confirmed by the existing test and the fix logic (`TypeCategory.Collection` → still returns `InTypePosition`).
+
+
+
+
 
 
 
@@ -34151,7 +68383,15 @@ This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kin
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34159,17 +68399,35 @@ This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kin
 
 
 
+
+
+
+
 After `quantity of ` (no typed constant yet), completions are now empty. Ideally a follow-up could offer dimension name suggestions via a new `InQualifierPosition` context with `GetDimensionItems()` — but that requires catalog-driven qualifier-site detection and is a separate improvement.
+
+
 
 # Decision: Plan Renamed and Expanded
 
 
 
+
+
+
+
 **Author:** Frank
+
+
 
 **Date:** 2026-05-11
 
+
+
 **Status:** Recorded
+
+
+
+
 
 
 
@@ -34177,7 +68435,15 @@ After `quantity of ` (no typed constant yet), completions are now empty. Ideally
 
 
 
+
+
+
+
 `docs/Working/interpolation-plan.md` → `docs/Working/typed-constants-and-proof-coverage-plan.md`
+
+
+
+
 
 
 
@@ -34185,13 +68451,27 @@ After `quantity of ` (no typed constant yet), completions are now empty. Ideally
 
 
 
+
+
+
+
 The plan outgrew "interpolation" — it now covers two workstreams:
+
+
+
+
 
 
 
 1. **Typed constant interpolation** (Part A, Slices 1–6): parser → type checker → completions → semantic tokens → docs → proof engine for `'{x} kg'`, `'{Amt} {Curr}'`, and related forms.
 
+
+
 2. **Proof engine qualifier coverage** (Part B, Slices 7–12): 14 gaps identified in the exhaustive qualifier-proof audit, 10 gaps addressed by 6 new slices, ~167 LOC, ~38 tests.
+
+
+
+
 
 
 
@@ -34199,35 +68479,71 @@ The plan outgrew "interpolation" — it now covers two workstreams:
 
 
 
+
+
+
+
 ## What Was Added
+
+
+
+
 
 
 
 - **Executive summary** of audit findings (currency axis enforcement failure, root cause = catalog metadata gap, architecture sound)
 
+
+
 - **Full audit matrix** — 7 tables covering dimension, currency, exchange rate, numeric, compound, string, and temporal qualifiers
+
+
 
 - **Gap inventory** — G1–G14 with ID, category, scenario, status, fix location, LOC estimate
 
+
+
 - **6 new implementation slices** (Slices 7–12) matching the existing slice format:
+
+
 
   - Slice 7: Money Currency Enforcement (G1+G2+G3) — ~20 LOC, ~8 tests
 
+
+
   - Slice 8: Qualifier Chain Validation Infrastructure (G4+G5) — ~54 LOC, ~10 tests
+
+
 
   - Slice 9: Dimension-Only Field False Positive Fix (G6) — ~15 LOC, ~4 tests
 
+
+
   - Slice 10: Assignment Expression Qualifier Propagation (G7) — ~50 LOC, ~8 tests
+
+
 
   - Slice 11: Exchange Rate Assignment Qualifier Validation (G9) — ~20 LOC, ~4 tests
 
+
+
   - Slice 12: Temporal Chain Validation (G8+G13) — ~8 LOC, ~4 tests (depends on Slice 8)
+
+
 
 - **Test coverage assessment** and **architecture assessment** sections
 
+
+
 - **Proof gap dependency order** — all independent except Slice 12 → Slice 8
 
+
+
 - **Updated gates** — separate approval tracks for Part A and Part B
+
+
+
+
 
 
 
@@ -34235,7 +68551,15 @@ The plan outgrew "interpolation" — it now covers two workstreams:
 
 
 
+
+
+
+
 **S1–S5 architecture is sound.** All 14 gaps trace to catalog metadata omissions, not structural engine defects. No new strategy tier needed — only catalog entries, one axis fallback (~15 LOC), one new DU subtype (~10 LOC), and one assignment proof obligation (~50 LOC). The proof engine faithfully processes what the catalog declares. The catalog was simply silent.
+
+
+
+
 
 
 
@@ -34243,19 +68567,39 @@ The plan outgrew "interpolation" — it now covers two workstreams:
 
 
 
+
+
+
+
 `docs/Working/typed-constants-and-proof-coverage-plan.md` is now the canonical implementation document for **both** interpolation typed constants AND proof engine qualifier coverage. The old `interpolation-plan.md` has been deleted. The source audit documents (`proof-engine-qualifier-audit.md`, `proof-gaps-issues.md`) remain as reference.
+
+
 
 # Decision: Proof Engine Qualifier Audit Findings
 
 
 
+
+
+
+
 **Author:** Frank
+
+
 
 **Date:** 2026-05-11
 
+
+
 **Status:** Findings delivered — implementation priorities established
 
+
+
 **Scope:** Exhaustive qualifier × proof engine interaction audit
+
+
+
+
 
 
 
@@ -34263,7 +68607,15 @@ The plan outgrew "interpolation" — it now covers two workstreams:
 
 
 
+
+
+
+
 ### Finding 1: Currency axis has near-total enforcement failure on money operations
+
+
+
+
 
 
 
@@ -34271,7 +68623,15 @@ The plan outgrew "interpolation" — it now covers two workstreams:
 
 
 
+
+
+
+
 **Impact:** `money in 'USD' + money in 'EUR'` compiles clean. Direct philosophy violation.
+
+
+
+
 
 
 
@@ -34279,17 +68639,35 @@ The plan outgrew "interpolation" — it now covers two workstreams:
 
 
 
+
+
+
+
 ### Finding 2: Cross-type qualifier chain validation does not exist
+
+
+
+
 
 
 
 Three operations require that a qualifier on one type matches a qualifier on a DIFFERENT type:
 
+
+
 - `ExchangeRateTimesMoney`: rate's `from` currency must match money's currency
+
+
 
 - `PriceTimesQuantity`: price's per-unit dimension must match quantity's dimension
 
+
+
 - `PriceTimesPeriod`/`PriceTimesDuration`: price's temporal denominator must match the temporal operand
+
+
+
+
 
 
 
@@ -34297,7 +68675,15 @@ The current `QualifierCompatibilityProofRequirement` only supports same-axis equ
 
 
 
+
+
+
+
 **Impact:** Currency conversion with wrong currencies compiles clean. Dimensional cancellation with incompatible dimensions compiles clean.
+
+
+
+
 
 
 
@@ -34305,7 +68691,15 @@ The current `QualifierCompatibilityProofRequirement` only supports same-axis equ
 
 
 
+
+
+
+
 ### Finding 3: Dimension-only fields produce false positives on Unit-axis operations
+
+
+
+
 
 
 
@@ -34313,7 +68707,15 @@ Fields declared as `quantity of 'mass'` (Dimension axis) fail proof when operati
 
 
 
+
+
+
+
 **Impact:** Valid programs rejected. Users forced to declare explicit units even when dimension-level granularity is sufficient.
+
+
+
+
 
 
 
@@ -34321,7 +68723,15 @@ Fields declared as `quantity of 'mass'` (Dimension axis) fail proof when operati
 
 
 
+
+
+
+
 ## Architectural Recommendations
+
+
+
+
 
 
 
@@ -34329,7 +68739,15 @@ Fields declared as `quantity of 'mass'` (Dimension axis) fail proof when operati
 
 
 
+
+
+
+
 2. **One new proof requirement subtype is needed:** `QualifierChainProofRequirement` for cross-type qualifier validation. This extends the existing DU pattern.
+
+
+
+
 
 
 
@@ -34337,17 +68755,35 @@ Fields declared as `quantity of 'mass'` (Dimension axis) fail proof when operati
 
 
 
+
+
+
+
 4. **Priority order for implementation:**
+
+
 
    - P1: G1-G3 (money currency enforcement) — 20 LOC, zero risk
 
+
+
    - P2: G6 (dimension-only false positive fix) — 15 LOC, unblocks valid programs
+
+
 
    - P3: G4-G5 (cross-type chain validation) — 50 LOC infrastructure
 
+
+
    - P4: G7 (expression qualifier propagation) — 40-60 LOC, deeper change
 
+
+
    - P5: G9 (ValidateAssignmentQualifiers missing cases) — 20 LOC
+
+
+
+
 
 
 
@@ -34355,7 +68791,15 @@ Fields declared as `quantity of 'mass'` (Dimension axis) fail proof when operati
 
 
 
+
+
+
+
 ## Implications for Existing Work
+
+
+
+
 
 
 
@@ -34363,25 +68807,51 @@ The interpolation plan (docs/Working/interpolation-plan.md) is unaffected. The d
 
 
 
+
+
+
+
 ## Risk Assessment
+
+
+
+
 
 
 
 G1-G3 (money currency enforcement) is the only gap that could be classified as a **shipped regression risk** — if users rely on the current silent acceptance of cross-currency arithmetic, adding enforcement would be a breaking change. However, since the behavior is semantically invalid (adding USD + EUR is meaningless), this is correctly classified as a bug fix, not a behavioral change.
 
+
+
 # UX Review — AlwaysRejecting (D1) + StateAlwaysRejects (D2)
+
+
+
+
 
 
 
 **Reviewer:** Elaine (UX Designer)
 
+
+
 **Date:** 2026-05-11
+
+
 
 **Source:** Frank's contracts `frank-always-rejecting-v2.md` and `frank-per-state-always-rejecting.md`
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34389,21 +68859,43 @@ G1-G3 (money currency enforcement) is the only gap that could be classified as a
 
 
 
+
+
+
+
 I pulled the language server source before writing a single finding. Here is what each `DiagnosticMeta` field actually renders to:
+
+
+
+
 
 
 
 | Field | Where it surfaces |
 
+
+
 |---|---|
+
+
 
 | `message` | VS Code hover tooltip + Problems panel — **primary surface** |
 
+
+
 | `FixHint` | Code Action lightbulb → `precept.showFixHint` command (with examples) |
+
+
 
 | `RecoverySteps` | **Not surfaced anywhere in the LS.** Dead metadata from a UX perspective. |
 
+
+
 | `ExampleBefore/After` | Shown via the `showFixHint` command after the author discovers and clicks the lightbulb |
+
+
+
+
 
 
 
@@ -34411,7 +68903,15 @@ This matters: the `message` field is doing more work than Frank's design acknowl
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34419,11 +68919,23 @@ This matters: the `message` field is doing more work than Frank's design acknowl
 
 
 
+
+
+
+
 **Verdict: NEEDS CHANGES**
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34431,25 +68943,51 @@ This matters: the `message` field is doing more work than Frank's design acknowl
 
 
 
+
+
+
+
 **G1 — Squiggle placement is correct.**
+
+
 
 Each reject row is independently wrong and independently actionable. Per-row anchoring means the author sees the squiggle exactly where the bad row is. This is right.
 
 
 
+
+
+
+
 **G2 — Scope is clear.**
+
+
 
 "Anywhere in this precept" is plain language and accurately scopes the check to the global case. The author reading this knows they need to look at the whole precept, not just this row.
 
 
 
+
+
+
+
 **G3 — FixHint Code Action is strong.**
+
+
 
 `"Remove this row — if the event should never succeed, remove all its reject rows. If it should sometimes succeed, add a transition or no-transition row for the success case."` plus ExampleBefore/ExampleAfter is exactly the right level of guidance. This will save authors real time.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34457,15 +68995,31 @@ Each reject row is independently wrong and independently actionable. Per-row anc
 
 
 
+
+
+
+
 Current:
+
+
 
 > `"Event '{0}' always rejects — no transition for '{0}' ever succeeds in this precept; ..."`
 
 
 
+
+
+
+
 Rendered:
 
+
+
 > `Event 'Delete' always rejects — no transition for 'Delete' ever succeeds in this precept; ...`
+
+
+
+
 
 
 
@@ -34473,7 +69027,15 @@ The second use of the event name adds nothing. The author already knows we're ta
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34481,11 +69043,23 @@ The second use of the event name adds nothing. The author already knows we're ta
 
 
 
+
+
+
+
 In the Precept DSL, `transition` is a keyword: `-> transition TargetState`. An author who reads "no transition for 'Delete' ever succeeds" might correctly parse this as "no `-> transition` row succeeds" — which is almost right — but misses that a `-> no transition` row *also* counts as a success path (per the contract). The word "transition" here is doing double duty as a DSL keyword and an abstract concept. Use "success path" or "row" instead.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34493,21 +69067,43 @@ In the Precept DSL, `transition` is a keyword: `-> transition TargetState`. An a
 
 
 
+
+
+
+
 This phrase appears verbatim in both D1 and D2. I understand what Frank means semantically. The author probably does too. But "fix toward" is not idiomatic English — we say "fix," "fix up," "work toward," not "fix toward." It reads like a translation. Minor but distracting.
+
+
+
+
 
 
 
 Alternatives that preserve the meaning:
 
+
+
 - "but no success case exists" (cleaner, less abstract)
 
+
+
 - "but there is no path that unblocks" (preserves the implied blocking meaning)
+
+
 
 - "but there is no case where it can succeed" (explicit, plain)
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34515,7 +69111,15 @@ Alternatives that preserve the meaning:
 
 
 
+
+
+
+
 D1's message is purely diagnostic. D2's message ends with: "remove the row — no row means 'not applicable here'". That inline action guidance is D2's strongest UX feature.
+
+
+
+
 
 
 
@@ -34523,11 +69127,23 @@ D1's message tells the author *what is wrong* but not *what to do*. The FixHint 
 
 
 
+
+
+
+
 D2's pattern of ending the message with a brief action pointer is the right pattern. D1 should follow it.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34535,39 +69151,79 @@ D2's pattern of ending the message with a brief action pointer is the right patt
 
 
 
+
+
+
+
 **Current:**
 
+
+
 ```
+
+
 
 "Event '{0}' always rejects — no transition for '{0}' ever succeeds in this precept; 'reject' implies fixability, but there is nothing to fix toward"
 
+
+
 ```
+
+
+
+
 
 
 
 **Proposed:**
 
+
+
 ```
+
+
 
 "Event '{0}' always rejects — no success path for this event exists anywhere in this precept; 'reject' implies a fixable situation, but no such path exists. Remove this row, or add a row where this event can succeed"
 
+
+
 ```
+
+
+
+
 
 
 
 Changes:
 
+
+
 - Removes redundant second `'{0}'`
+
+
 
 - Replaces "no transition for '{0}' ever succeeds" → "no success path for this event exists anywhere" (removes keyword ambiguity)
 
+
+
 - Replaces "there is nothing to fix toward" → "no such path exists" (fixes the awkward phrasing)
+
+
 
 - Adds brief action guidance at end to align with D2 pattern (since RecoverySteps are never shown)
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34575,11 +69231,23 @@ Changes:
 
 
 
+
+
+
+
 **Verdict: NEEDS CHANGES**
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34587,25 +69255,51 @@ Changes:
 
 
 
+
+
+
+
 **G1 — Squiggle placement is correct for both explicit and wildcard rows.**
+
+
 
 For explicit rows (`from Draft on Approve -> reject`), the squiggle lands directly on the offending row and the message names the state. The connection is immediate. For wildcard rows, the squiggle anchors to `from any on E -> reject` and the state name in the message tells the author which state is affected. Both cases work.
 
 
 
+
+
+
+
 **G2 — Inline action guidance is the right pattern.**
+
+
 
 D2's message ends with "remove the row — no row means 'not applicable here'". This is the most important UX feature of the two diagnostics. The author has everything they need in the hover without clicking the lightbulb. This should also be adopted by D1 (C4 above).
 
 
 
+
+
+
+
 **G3 — "no row means 'not applicable here'" correctly explains Unmatched semantics.**
+
+
 
 A Precept author who doesn't know that the absence of a row means "not applicable" would be confused by "remove the row" as the prescription. This inline explanation earns its place in the message. It's necessary.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34613,15 +69307,31 @@ A Precept author who doesn't know that the absence of a row means "not applicabl
 
 
 
+
+
+
+
 Current:
+
+
 
 > `"Event '{0}' has no success path from '{1}' — every row for this event from '{1}' rejects; 'reject' implies fixability, but there is nothing to fix toward from '{1}'."`
 
 
 
+
+
+
+
 Rendered:
 
+
+
 > `Event 'Approve' has no success path from 'Draft' — every row for this event from 'Draft' rejects; 'reject' implies fixability, but there is nothing to fix toward from 'Draft'.`
+
+
+
+
 
 
 
@@ -34629,7 +69339,15 @@ The state name echoes three times in a single sentence. The author's eye keeps s
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34637,11 +69355,23 @@ The state name echoes three times in a single sentence. The author's eye keeps s
 
 
 
+
+
+
+
 "every row...rejects" is odd subject-verb agreement and not how developers read diagnostics. "every row...has a Reject outcome" would be more precise but still jargony. Better: "all rows reject" or simply drop this clause — the phrase "no success path" already says everything it's saying.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34649,13 +69379,27 @@ The state name echoes three times in a single sentence. The author's eye keeps s
 
 
 
+
+
+
+
 The message:
+
+
 
 1. Diagnoses: "no success path from 'Draft'"
 
+
+
 2. Explains the semantic principle: "'reject' implies fixability, but nothing to fix toward"
 
+
+
 3. Prescribes: "remove the row — no row means 'not applicable here'"
+
+
+
+
 
 
 
@@ -34663,11 +69407,23 @@ All three are correct and necessary. But at ~175 characters, this will be trunca
 
 
 
+
+
+
+
 The prescription is the most actionable part. It should not be the part that gets truncated.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34675,7 +69431,15 @@ The prescription is the most actionable part. It should not be the part that get
 
 
 
+
+
+
+
 For `from any on Approve -> reject` covering N states, the author sees N Problems panel entries all pointing to the same line. Each entry differs only in the state name `{1}`.
+
+
+
+
 
 
 
@@ -34683,7 +69447,15 @@ Frank's rationale (each state is independently wrong and independently actionabl
 
 
 
+
+
+
+
 I'm not asking to change the implementation design — the semantic correctness argument wins. But I want this flagged as a known UX debt with a proposed future path:
+
+
+
+
 
 
 
@@ -34691,7 +69463,15 @@ I'm not asking to change the implementation design — the semantic correctness 
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34699,9 +69479,19 @@ I'm not asking to change the implementation design — the semantic correctness 
 
 
 
+
+
+
+
 D1 message: "Event '{0}' always rejects"
 
+
+
 D2 message: "Event '{0}' has no success path from '{1}'"
+
+
+
+
 
 
 
@@ -34709,11 +69499,23 @@ The author who sees both in the Problems panel has to read carefully to understa
 
 
 
+
+
+
+
 If D2 led with "Event '{0}' always rejects from '{1}'" the parallel structure immediately communicates scope:
+
+
 
 - D1: always rejects *(global)*
 
+
+
 - D2: always rejects from 'Draft' *(state-scoped)*
+
+
+
+
 
 
 
@@ -34721,7 +69523,15 @@ The author recognizes the pattern and immediately understands the scope differen
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34729,7 +69539,15 @@ The author recognizes the pattern and immediately understands the scope differen
 
 
 
+
+
+
+
 The message prescribes "remove this row" as the action. But there is no quick-fix code action that actually does the removal. The author must manually identify the row, place the cursor, and delete it.
+
+
+
+
 
 
 
@@ -34737,7 +69555,15 @@ For a directive this specific ("remove this row"), a code action is table stakes
 
 
 
+
+
+
+
 This is not blocking implementation of the diagnostic itself. But I'd push back on "this is enough" until the code action exists. The diagnosis says "remove this" and then makes the author do it manually. That's friction I wouldn't ship.
+
+
+
+
 
 
 
@@ -34745,7 +69571,15 @@ This is not blocking implementation of the diagnostic itself. But I'd push back 
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34753,39 +69587,79 @@ This is not blocking implementation of the diagnostic itself. But I'd push back 
 
 
 
+
+
+
+
 **Current:**
 
+
+
 ```
+
+
 
 "Event '{0}' has no success path from '{1}' — every row for this event from '{1}' rejects; 'reject' implies fixability, but there is nothing to fix toward from '{1}'. If this event has no meaning in '{1}', remove the row — no row means 'not applicable here'"
 
+
+
 ```
+
+
+
+
 
 
 
 **Proposed:**
 
+
+
 ```
+
+
 
 "Event '{0}' always rejects from '{1}' — 'reject' implies a fixable blocking condition, but no success path exists from this state. Remove this row if this event has no meaning here — no row means 'not applicable in this state'"
 
+
+
 ```
+
+
+
+
 
 
 
 Changes:
 
+
+
 - `'{1}` appears once (down from three)
+
+
 
 - Leads with "always rejects from '{1}'" — parallel vocabulary to D1 for immediate scope differentiation
 
+
+
 - Drops "every row for this event from '{1}' rejects" — redundant once the lead phrase establishes the diagnosis
+
+
 
 - Replaces "there is nothing to fix toward from '{1}'" with "no success path exists from this state" — cleaner, drops the state-name echo
 
+
+
 - Shortens "If this event has no meaning in '{1}', remove the row" → "Remove this row if this event has no meaning here" — tighter, drops the third state-name echo
 
+
+
 - Replaces "not applicable here" → "not applicable in this state" — slightly more explicit about what "here" means
+
+
+
+
 
 
 
@@ -34793,7 +69667,15 @@ Character count: ~165 (vs ~175). Marginal improvement. The real gain is the redu
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34801,7 +69683,15 @@ Character count: ~165 (vs ~175). Marginal improvement. The real gain is the redu
 
 
 
+
+
+
+
 **X1 — "fix toward" appears in both messages. Replace consistently.**
+
+
+
+
 
 
 
@@ -34809,7 +69699,15 @@ Wherever "fix toward" appears, replace with "no success case exists" or "no path
 
 
 
+
+
+
+
 **X2 — RecoverySteps are never surfaced. They are documentation metadata, not UX metadata.**
+
+
+
+
 
 
 
@@ -34817,7 +69715,15 @@ The LS has no handler for RecoverySteps. They are valuable as spec documentation
 
 
 
+
+
+
+
 **X3 — D2's inline action guidance is the stronger pattern. D1 should match.**
+
+
+
+
 
 
 
@@ -34825,7 +69731,15 @@ D2 tells you what to do in the message. D1 doesn't. The FixHint is only one clic
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34833,15 +69747,31 @@ D2 tells you what to do in the message. D1 doesn't. The FixHint is only one clic
 
 
 
+
+
+
+
 | Diagnostic | Code Action | Priority |
+
+
 
 |---|---|---|
 
+
+
 | D2 (StateAlwaysRejects) | "Remove this row" — deletes the offending row | High — the message directs the author here; make it one click |
+
+
 
 | D1 (AlwaysRejecting) | "Remove all reject rows for this event" — deletes every reject row for the event group | Medium — more complex (multi-row edit), but highly valuable for the pattern |
 
+
+
 | Both | FixHint code action already present — verify it renders correctly with ExampleBefore/ExampleAfter for these new codes | Required — confirm before shipping |
+
+
+
+
 
 
 
@@ -34849,17 +69779,35 @@ D2 tells you what to do in the message. D1 doesn't. The FixHint is only one clic
 
 
 
+
+
+
+
 ## Summary
+
+
+
+
 
 
 
 | Diagnostic | Verdict | Blockers | Key Changes |
 
+
+
 |---|---|---|---|
+
+
 
 | D1 AlwaysRejecting | **NEEDS CHANGES** | None | Remove event name repetition; fix "transition" ambiguity; fix "fix toward" phrasing; add brief action guidance to message |
 
+
+
 | D2 StateAlwaysRejects | **NEEDS CHANGES** | None | Reduce state name repetition (3→1); adopt parallel "always rejects from" vocabulary; tighten message length; file companion issue for "Remove this row" code action |
+
+
+
+
 
 
 
@@ -34867,21 +69815,43 @@ Neither is blocked. Both need message text revisions before the implementation P
 
 
 
+
+
+
+
 The wildcard N-warnings-per-row situation is accepted but flagged as UX debt with a recommended consolidation path for a future issue.
+
+
 
 # Design Review: AlwaysRejecting Compiler Diagnostic
 
 
 
+
+
+
+
 **Reviewer:** Frank (Lead/Architect)
 
+
+
 **Date:** 2026-05-11
+
+
 
 **Verdict:** NEEDS CHANGES
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34889,11 +69859,23 @@ The wildcard N-warnings-per-row situation is accepted but flagged as UX debt wit
 
 
 
+
+
+
+
 **NEEDS CHANGES.** The core logic is sound. The four design questions have clear answers. But there are two concrete blocking defects the proposal did not catch, and one answer missing entirely (Q4). Fix these before implementation starts.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34901,9 +69883,19 @@ The wildcard N-warnings-per-row situation is accepted but flagged as UX debt wit
 
 
 
+
+
+
+
 The proposal says: *"currently highest is 119."*
 
+
+
 That is **wrong**.
+
+
+
+
 
 
 
@@ -34911,21 +69903,43 @@ The actual sequence in `DiagnosticCode.cs`:
 
 
 
+
+
+
+
 | Code | Value | Stage |
+
+
 
 |------|-------|-------|
 
+
+
 | `StructuralSinkState` | 119 | Graph |
+
+
 
 | `ConflictingModifiers` | 120 | Type |
 
+
+
 | `InvalidInterpolatedTypedConstantForm` | 121 | Type |
+
+
 
 | `InterpolationNotSupportedForType` | 122 | Type |
 
+
+
 | `InterpolatedTypedConstantHoleTypeMismatch` | 123 | Type |
 
+
+
 | `DimensionMismatchInUnitSlot` | 124 | Type |
+
+
+
+
 
 
 
@@ -34933,11 +69947,23 @@ Highest assigned ordinal is **124**. Next available is **125**.
 
 
 
+
+
+
+
 **Required fix:** `AlwaysRejecting = 125`.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34945,15 +69971,31 @@ Highest assigned ordinal is **124**. Next available is **125**.
 
 
 
+
+
+
+
 The GraphAnalyzer cannot use `row.Syntax.Span` — PRECEPT0024 (`Precept0024AntiMirroringEnforcement`) is an enforced Roslyn analyzer that fires on any `.Syntax` access on a `Typed*` record outside the TypeChecker. This isn't a style note; it is a build error. There is already a comment in `GraphAnalyzer.cs` documenting exactly this constraint at the `CollectEdgeSpans` method.
+
+
+
+
 
 
 
 `TypedTransitionRow` has **no `RowSpan: SourceSpan` field**. Without it, there is no span available in GraphAnalyzer to anchor the diagnostic to the offending row. The implementor will either:
 
+
+
 - Take a build error from PRECEPT0024 (accessing `.Syntax.Span` directly), or
 
+
+
 - Anchor the diagnostic to the state's `NameSpan` or the event's `NameSpan`, which is the wrong location (points at the declaration, not the row).
+
+
+
+
 
 
 
@@ -34961,11 +70003,23 @@ The GraphAnalyzer cannot use `row.Syntax.Span` — PRECEPT0024 (`Precept0024Anti
 
 
 
+
+
+
+
 This is not optional. Any implementation that skips this will either fail to build or produce a warning pointing at the wrong location in the source.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -34973,7 +70027,15 @@ This is not optional. Any implementation that skips this will either fail to bui
 
 
 
+
+
+
+
 ### Q1: Is grouping at SemanticIndex level correct?
+
+
+
+
 
 
 
@@ -34981,7 +70043,15 @@ This is not optional. Any implementation that skips this will either fail to bui
 
 
 
+
+
+
+
 ### Q2: Should the check suppress when the group also contains guarded rows?
+
+
+
+
 
 
 
@@ -34989,7 +70059,15 @@ This is not optional. Any implementation that skips this will either fail to bui
 
 
 
+
+
+
+
 The proposed condition is: **exactly one row**, guard null, outcome Reject. If the group contains any guarded row (e.g., `from Submitted on Approve when coverage >= 0.8 -> transition Approved`), then the group count is ≥ 2 and the check does not fire. The bare-reject row is the legitimate fallback for that guarded success path. The "exactly one" condition is the suppression — no special case needed.
+
+
+
+
 
 
 
@@ -34997,7 +70075,15 @@ Do not add a separate "suppress when any row in group has a guard" branch. The c
 
 
 
+
+
+
+
 ### Q3: Should it fire when ALL rows in a group have Reject outcome?
+
+
+
+
 
 
 
@@ -35005,7 +70091,15 @@ Do not add a separate "suppress when any row in group has a guard" branch. The c
 
 
 
+
+
+
+
 Multiple reject rows — some guarded, some not — represent discriminated rejection logic (different rejection reasons under different conditions). The compiler cannot distinguish intentional discriminated rejection from the exhaustive-rejection smell. The smell is specifically the **lone, unguarded, sole-row reject**, which signals "this event has no meaning here" written as if it were a business-rule violation. That shape is unambiguous. Everything else is not.
+
+
+
+
 
 
 
@@ -35013,7 +70107,15 @@ Multiple reject rows — some guarded, some not — represent discriminated reje
 
 
 
+
+
+
+
 **No.** This question's answer was missing from the proposal entirely. It must be answered before implementation.
+
+
+
+
 
 
 
@@ -35021,11 +70123,23 @@ Multiple reject rows — some guarded, some not — represent discriminated reje
 
 
 
+
+
+
+
 1. `from any on Foo -> reject "reason"` is a meaningful default fallback for all states without specific handling — it is not structurally inapplicable the way a lone per-state reject is.
+
+
 
 2. GraphAnalyzer expands wildcard rows into per-state edges during `BuildEdges`. If the check operated on the expanded form, one wildcard row could generate one warning per state, producing a pile of false-positive spam.
 
+
+
 3. The semantic question "is this event applicable in ANY state?" is already covered by `UnhandledEvent`. The `AlwaysRejecting` check addresses only explicit per-state rejections.
+
+
+
+
 
 
 
@@ -35033,7 +70147,15 @@ Multiple reject rows — some guarded, some not — represent discriminated reje
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35041,7 +70163,15 @@ Multiple reject rows — some guarded, some not — represent discriminated reje
 
 
 
+
+
+
+
 ### `TypedTransitionRow` — add `RowSpan`
+
+
+
+
 
 
 
@@ -35049,33 +70179,67 @@ In `SemanticIndex.cs`, add `SourceSpan RowSpan` to `TypedTransitionRow` (after `
 
 
 
+
+
+
+
 ```csharp
+
+
 
 public sealed record TypedTransitionRow(
 
+
+
     string? FromState,
+
+
 
     string EventName,
 
+
+
     string? TargetState,
+
+
 
     TypedExpression? Guard,
 
+
+
     ImmutableArray<TypedAction> Actions,
+
+
 
     TransitionRowOutcome Outcome,
 
+
+
     string? RejectReason,
+
+
 
     QualifierBinding? ResultQualifier,
 
+
+
     SourceSpan RowSpan,       // ← new: extracted at TypeChecker time
+
+
 
     ParsedConstruct Syntax    // ← PRECEPT0024: TypeChecker-only
 
+
+
 );
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35083,25 +70247,51 @@ public sealed record TypedTransitionRow(
 
 
 
+
+
+
+
 Add in the `// ── Graph ──` section, after `RequiredStateDoesNotDominateTerminal = 111`:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 /// <summary>
+
+
 
 /// A (state, event) pair has exactly one transition row, it is unguarded, and its outcome is Reject.
 
+
+
 /// This is the exhaustive-rejection anti-pattern — no row is the correct way to say an event
+
+
 
 /// has no meaning in this state (Unmatched → button hidden in UI).
 
+
+
 /// </summary>
+
+
 
 AlwaysRejecting = 125,
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35109,41 +70299,83 @@ AlwaysRejecting = 125,
 
 
 
+
+
+
+
 Place after `RequiredStateDoesNotDominateTerminal`:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 DiagnosticCode.AlwaysRejecting => new(
+
+
 
     nameof(DiagnosticCode.AlwaysRejecting),
 
+
+
     DiagnosticStage.Graph,
+
+
 
     Severity.Warning,
 
+
+
     "Event '{0}' from state '{1}' always rejects — consider removing the row; no row means 'not applicable here'",
+
+
 
     DiagnosticCategory.Structure,
 
+
+
     FixHint: "Remove this row — having no row for a state/event pair means 'not applicable here' (Unmatched, button hidden in UI). Use 'reject' only for business-rule violations the user could potentially remedy.",
+
+
 
     TriggerCondition: "A (state, event) pair has exactly one transition row, it has no guard, and its outcome is Reject. This matches the exhaustive-rejection anti-pattern: the author is using reject to mean 'not applicable here' rather than omitting the row.",
 
+
+
     RecoverySteps: [
+
+
 
         "Remove the reject row for this state/event pair",
 
+
+
         "Use 'reject' only when the user could change something to make the event succeed"
+
+
 
     ],
 
+
+
     ExampleBefore: "precept Example\nstate Draft initial\nstate Done terminal\nevent Approve\nfrom Draft on Approve -> reject \"Cannot approve a draft\"\nfrom Draft on Approve -> transition Done",
+
+
 
     ExampleAfter: "precept Example\nstate Draft initial\nstate Done terminal\nevent Approve\nfrom Draft on Approve -> transition Done"),
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35151,65 +70383,131 @@ DiagnosticCode.AlwaysRejecting => new(
 
 
 
+
+
+
+
 Locate in `Analyze()` alongside the `UnhandledEvent` block. Add after it:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 // AlwaysRejecting: a (state, event) pair with exactly one unguarded reject row.
+
+
 
 // This is the exhaustive-rejection anti-pattern — the correct encoding for
 
+
+
 // "not applicable in this state" is no row at all (Unmatched).
+
+
 
 // Exclude from-any wildcards (FromState == null) — those are legitimate defaults.
 
+
+
 var rowsByStateEvent = semantics.TransitionRows
+
+
 
     .Where(row => row.FromState != null
 
+
+
         && semantics.StatesByName.ContainsKey(row.FromState)
+
+
 
         && semantics.EventsByName.ContainsKey(row.EventName))
 
+
+
     .GroupBy(row => (row.FromState!, row.EventName),
+
+
 
         StringComparer.Ordinal.ToTupleComparer());  // or ToLookup, see below
 
 
 
+
+
+
+
 foreach (var group in rowsByStateEvent)
+
+
 
 {
 
+
+
     if (group.Count() == 1)
+
+
 
     {
 
+
+
         var row = group.Single();
+
+
 
         if (row.Guard is null && row.Outcome == TransitionRowOutcome.Reject)
 
+
+
         {
+
+
 
             diagnostics.Add(Diagnostics.Create(
 
+
+
                 DiagnosticCode.AlwaysRejecting,
+
+
 
                 row.RowSpan,
 
+
+
                 row.EventName,
+
+
 
                 row.FromState!));
 
+
+
         }
+
+
 
     }
 
+
+
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35217,7 +70515,15 @@ Note: `GroupBy` with a tuple key requires a custom `IEqualityComparer` or use `T
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35225,7 +70531,15 @@ Note: `GroupBy` with a tuple key requires a custom `IEqualityComparer` or use `T
 
 
 
+
+
+
+
 **No new catalog entry required.**
+
+
+
+
 
 
 
@@ -35233,7 +70547,15 @@ The anti-pattern is already captured in `SyntaxReference.cs` (the MCP documentat
 
 
 
+
+
+
+
 The `DiagnosticCategory.Structure` classification is correct.
+
+
+
+
 
 
 
@@ -35241,7 +70563,15 @@ No MCP tool DTOs require changes from this diagnostic addition alone, but verify
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35249,35 +70579,71 @@ No MCP tool DTOs require changes from this diagnostic addition alone, but verify
 
 
 
+
+
+
+
 | # | What | File | Blocking? |
+
+
 
 |---|------|------|-----------|
 
+
+
 | 1 | `AlwaysRejecting = 125` (not 120) | `DiagnosticCode.cs` | Yes — wrong number produces collisions |
+
+
 
 | 2 | Add `SourceSpan RowSpan` to `TypedTransitionRow` + populate in TypeChecker | `SemanticIndex.cs`, `TypeChecker.cs` | Yes — PRECEPT0024 build error otherwise |
 
+
+
 | 3 | Filter `FromState != null` before grouping | `GraphAnalyzer.cs` | Yes — wildcard rows must be excluded |
+
+
 
 | 4 | All four Q&A answers incorporated above | all affected files | Yes |
 
 
 
+
+
+
+
 The implementation is not approved to start until defects 1–3 are reflected in the implementation plan.
+
+
 
 # Design Review (Revised): AlwaysRejecting Compiler Diagnostic — v2
 
 
 
+
+
+
+
 **Reviewer:** Frank (Lead/Architect)
 
+
+
 **Date:** 2026-05-11
+
+
 
 **Verdict:** APPROVED — Implementation contract revised under Shane's governing principle
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35285,29 +70651,59 @@ The implementation is not approved to start until defects 1–3 are reflected in
 
 
 
+
+
+
+
 Shane's pushback on Q3 and Q4 is accepted. The v1 contract derived the check from a structural shape observation ("exactly one unguarded reject row for a (State, Event) pair"). That was wrong — it was a heuristic, not a principle. Shane supplied the principle. I re-derived from it.
+
+
+
+
 
 
 
 **The governing invariant (accepted as authoritative):**
 
+
+
 > `reject` is semantically valid only when a non-reject path exists for the same event somewhere in the precept.
+
+
 
 > If no success path exists for the event anywhere, every reject row for that event is a semantic lie: it implies fixability but there is nothing to fix toward.
 
 
 
+
+
+
+
 This produces a different check than v1 in three material ways:
+
+
 
 1. Grouping key changes: per-Event, not per (State, Event).
 
+
+
 2. `from any` rows are INCLUDED, not excluded.
+
+
 
 3. The criterion changes from "exactly one unguarded" to "zero success paths for the event anywhere."
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35315,7 +70711,15 @@ This produces a different check than v1 in three material ways:
 
 
 
+
+
+
+
 Lines 334–385 of `SyntaxReference.cs` confirm the principle is present in the documentation. The "Good" example retains the `from Submitted on Approve -> reject "..."` row because `-> transition Approved` (a success path) exists for event `Approve`. The explanation is correct at the level of the governing principle.
+
+
+
+
 
 
 
@@ -35323,7 +70727,15 @@ Lines 334–385 of `SyntaxReference.cs` confirm the principle is present in the 
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35331,7 +70743,15 @@ Lines 334–385 of `SyntaxReference.cs` confirm the principle is present in the 
 
 
 
+
+
+
+
 ### 1. Grouping Strategy
+
+
+
+
 
 
 
@@ -35339,15 +70759,31 @@ Group `semantics.TransitionRows` by `EventName` alone. No state dimension. Inclu
 
 
 
+
+
+
+
 ```csharp
+
+
 
 var rowsByEvent = semantics.TransitionRows
 
+
+
     .Where(row => semantics.EventsByName.ContainsKey(row.EventName))
+
+
 
     .ToLookup(row => row.EventName, StringComparer.Ordinal);
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35355,7 +70791,15 @@ Pre-filter to rows whose EventName is a known event (mirrors the `UnhandledEvent
 
 
 
+
+
+
+
 ### 2. Success-Path Test
+
+
+
+
 
 
 
@@ -35363,21 +70807,43 @@ For each event group: does any row have `Outcome != TransitionRowOutcome.Reject`
 
 
 
+
+
+
+
 ```csharp
 
+
+
 bool hasSuccessPath = group.Any(row => row.Outcome != TransitionRowOutcome.Reject);
+
+
 
 ```
 
 
 
+
+
+
+
 **What counts as a success path:**
+
+
 
 - `TransitionRowOutcome.Transition` — yes.
 
+
+
 - `TransitionRowOutcome.NoTransition` — yes. The event fires and the entity stays in state; that is a valid, non-rejecting outcome.
 
+
+
 - `TransitionRowOutcome.Reject` — never a success path.
+
+
+
+
 
 
 
@@ -35385,7 +70851,15 @@ bool hasSuccessPath = group.Any(row => row.Outcome != TransitionRowOutcome.Rejec
 
 
 
+
+
+
+
 **Empty group:** If a declared event has no transition rows at all, the group is empty and `hasSuccessPath` is false — but `group` is also empty, so no `AlwaysRejecting` warnings emit (the inner foreach has nothing to iterate). `UnhandledEvent` already covers this case and the two diagnostics do not overlap.
+
+
+
+
 
 
 
@@ -35393,7 +70867,15 @@ bool hasSuccessPath = group.Any(row => row.Outcome != TransitionRowOutcome.Rejec
 
 
 
+
+
+
+
 When `hasSuccessPath` is false: emit `AlwaysRejecting` for **every row in the group** (each reject row for the event). One diagnostic per offending row, anchored to `row.RowSpan`.
+
+
+
+
 
 
 
@@ -35401,35 +70883,71 @@ Rationale: each row is independently incorrect and independently actionable. Emi
 
 
 
+
+
+
+
 ```csharp
+
+
 
 foreach (var group in rowsByEvent)
 
+
+
 {
+
+
 
     if (!group.Any(row => row.Outcome != TransitionRowOutcome.Reject))
 
+
+
     {
+
+
 
         foreach (var row in group)
 
+
+
         {
+
+
 
             diagnostics.Add(Diagnostics.Create(
 
+
+
                 DiagnosticCode.AlwaysRejecting,
+
+
 
                 row.RowSpan,
 
+
+
                 row.EventName));
+
+
 
         }
 
+
+
     }
+
+
 
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35437,7 +70955,15 @@ foreach (var group in rowsByEvent)
 
 
 
+
+
+
+
 `TypedTransitionRow.FromState == null` identifies wildcard (any-state) rows — confirmed by the doc comment on that field: *"A `null` value means the row fires in any source state."*
+
+
+
+
 
 
 
@@ -35445,7 +70971,15 @@ Under the governing principle: `from any on E -> reject "..."` with no success p
 
 
 
+
+
+
+
 **The v1 instruction to filter out null-FromState rows is REVERSED.** Do NOT `.Where(row => row.FromState != null)` in the grouping. Include all rows.
+
+
+
+
 
 
 
@@ -35453,7 +70987,15 @@ The wildcard expansion concern from v1 (one wildcard → many per-state warnings
 
 
 
+
+
+
+
 ### 5. Message Template
+
+
+
+
 
 
 
@@ -35461,11 +71003,23 @@ Single message, one format arg (event name only):
 
 
 
+
+
+
+
 ```
+
+
 
 "Event '{0}' always rejects — no transition for '{0}' ever succeeds in this precept; 'reject' implies fixability, but there is nothing to fix toward"
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35473,41 +71027,83 @@ State name is omitted from the message. The squiggle anchors to the row, which g
 
 
 
+
+
+
+
 Full `DiagnosticMeta` entry in `Diagnostics.cs` (place after `RequiredStateDoesNotDominateTerminal`):
+
+
+
+
 
 
 
 ```csharp
 
+
+
 DiagnosticCode.AlwaysRejecting => new(
+
+
 
     nameof(DiagnosticCode.AlwaysRejecting),
 
+
+
     DiagnosticStage.Graph,
+
+
 
     Severity.Warning,
 
+
+
     "Event '{0}' always rejects — no transition for '{0}' ever succeeds in this precept; 'reject' implies fixability, but there is nothing to fix toward",
+
+
 
     DiagnosticCategory.Structure,
 
+
+
     FixHint: "Remove this row — if the event should never succeed, remove all its reject rows. If it should sometimes succeed, add a transition or no-transition row for the success case.",
+
+
 
     TriggerCondition: "An event has transition rows in the precept, but every row for that event has a Reject outcome. There is no state, no guard condition, no path under which this event succeeds. The reject rows imply that success is possible but blocked; that claim is false.",
 
+
+
     RecoverySteps: [
+
+
 
         "Add a transition or 'no transition' row for this event in at least one state where it should succeed",
 
+
+
         "Or remove all reject rows for this event if it should never be fireable at all (and remove the event declaration if appropriate)"
+
+
 
     ],
 
+
+
     ExampleBefore: "precept Example\nstate Draft initial\nstate Done terminal\nevent Delete\nfrom Draft on Delete -> reject \"Cannot delete a draft\"\nfrom Done on Delete -> reject \"Cannot delete a completed item\"",
+
+
 
     ExampleAfter: "precept Example\nstate Draft initial\nstate Done terminal\nevent Delete\nfrom Draft on Delete -> transition Done"),
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35515,25 +71111,51 @@ DiagnosticCode.AlwaysRejecting => new(
 
 
 
+
+
+
+
 **`AlwaysRejecting = 125`** — unchanged from v1 defect 1. Highest assigned ordinal is 124 (`DimensionMismatchInUnitSlot`). Next available is 125. Place in the `// ── Graph ──` section after `RequiredStateDoesNotDominateTerminal = 111`:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 /// <summary>
+
+
 
 /// An event has transition rows in the precept, but every row for that event has a Reject
 
+
+
 /// outcome — no success path exists anywhere. 'reject' implies fixability; if no success
+
+
 
 /// path exists, the reject rows are semantic lies.
 
+
+
 /// </summary>
+
+
 
 AlwaysRejecting = 125,
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35541,17 +71163,35 @@ AlwaysRejecting = 125,
 
 
 
+
+
+
+
 B2 (add `SourceSpan RowSpan` to `TypedTransitionRow`, populated in TypeChecker) is **still a blocking prerequisite**. Nothing has changed here:
+
+
+
+
 
 
 
 - PRECEPT0024 (`Precept0024AntiMirroringEnforcement`) is a Roslyn enforcer that fires a build error on `.Syntax` access outside the TypeChecker.
 
+
+
 - GraphAnalyzer must use `row.RowSpan`, not `row.Syntax.Span`.
+
+
 
 - The span target is still **per-row** — we emit per-row warnings, so per-row span is correct.
 
+
+
 - There is no span migration to per-event. The event's `NameSpan` is the wrong anchor — it points at the declaration, not the offending row.
+
+
+
+
 
 
 
@@ -35559,33 +71199,67 @@ B2 (add `SourceSpan RowSpan` to `TypedTransitionRow`, populated in TypeChecker) 
 
 
 
+
+
+
+
 ```csharp
+
+
 
 public sealed record TypedTransitionRow(
 
+
+
     string? FromState,
+
+
 
     string EventName,
 
+
+
     string? TargetState,
+
+
 
     TypedExpression? Guard,
 
+
+
     ImmutableArray<TypedAction> Actions,
+
+
 
     TransitionRowOutcome Outcome,
 
+
+
     string? RejectReason,
+
+
 
     QualifierBinding? ResultQualifier,
 
+
+
     SourceSpan RowSpan,       // ← new: extracted at TypeChecker time, not via .Syntax
+
+
 
     ParsedConstruct Syntax    // ← PRECEPT0024: TypeChecker-only
 
+
+
 );
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35593,7 +71267,15 @@ Populate in `TypeChecker.NormalizeTransitionRow` at the point of `TypedTransitio
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35601,21 +71283,43 @@ Populate in `TypeChecker.NormalizeTransitionRow` at the point of `TypedTransitio
 
 
 
+
+
+
+
 | # | What | File(s) | Blocking? | Changed from v1? |
+
+
 
 |---|------|---------|-----------|-----------------|
 
+
+
 | 1 | `AlwaysRejecting = 125` in Graph section | `DiagnosticCode.cs` | Yes | No (same fix) |
+
+
 
 | 2 | Add `SourceSpan RowSpan` to `TypedTransitionRow`; populate in TypeChecker | `SemanticIndex.cs`, `TypeChecker.cs` | Yes | No (same fix) |
 
+
+
 | 3 | Grouping by Event (not State/Event); include from-any rows; success-path test | `GraphAnalyzer.cs` | Yes | **Yes — full rewrite of v1 check logic** |
+
+
 
 | 4 | New message template (single arg: event name) | `Diagnostics.cs` | Yes | **Yes — state name removed** |
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35623,21 +71327,43 @@ Populate in `TypeChecker.NormalizeTransitionRow` at the point of `TypedTransitio
 
 
 
+
+
+
+
 **Catches:**
+
+
 
 - `from any on E -> reject "..."` with no success path for E anywhere.
 
+
+
 - Multiple per-state reject rows for E, none with a non-reject outcome anywhere in the precept.
+
+
 
 - Mixed guarded/unguarded reject rows for E when no row for E is non-reject.
 
 
 
+
+
+
+
 **Does not catch (out of scope):**
+
+
 
 - Per-state reject rows where a success path exists in ANOTHER state (the SyntaxReference "Bad" example: `from Draft on Approve -> reject` when `Approve` has a success path from `Submitted`). That is a per-state local check and belongs in a separate diagnostic. `AlwaysRejecting` is the event-global foundation.
 
+
+
 - Events with no rows at all — that is `UnhandledEvent`.
+
+
+
+
 
 
 
@@ -35645,7 +71371,15 @@ Populate in `TypeChecker.NormalizeTransitionRow` at the point of `TypedTransitio
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35653,11 +71387,23 @@ Populate in `TypeChecker.NormalizeTransitionRow` at the point of `TypedTransitio
 
 
 
+
+
+
+
 Add after the `UnhandledEvent` block (which already iterates `semantics.Events`). These two checks are thematically adjacent — both detect "this event can never succeed" conditions, from different angles.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35665,21 +71411,43 @@ Add after the `UnhandledEvent` block (which already iterates `semantics.Events`)
 
 
 
+
+
+
+
 No MCP DTO changes required for this diagnostic addition alone. Verify `LanguageTool.cs`'s static `FirePipeline` array if it enumerates pipeline stages (Graph stage already present; no new stage introduced).
+
+
 
 # Design Contract: StateAlwaysRejects Compiler Diagnostic (D2)
 
 
 
+
+
+
+
 **Author:** Frank (Lead/Architect)
 
+
+
 **Date:** 2026-05-11
+
+
 
 **Status:** CONTRACT — Pending implementation
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35687,11 +71455,23 @@ No MCP DTO changes required for this diagnostic addition alone. Verify `Language
 
 
 
+
+
+
+
 > `reject` is semantically valid only when a non-reject path exists for the same event.
+
+
 
 > `reject` tells the user: "you can't do this *right now* — but if you fix X, you can."
 
+
+
 > If no such path exists, `reject` is a lie: it implies fixability but there is nothing to fix toward.
+
+
+
+
 
 
 
@@ -35699,7 +71479,15 @@ D1 (`AlwaysRejecting = 125`) enforces this globally: the event has no success pa
 
 
 
+
+
+
+
 D2 (`StateAlwaysRejects = 126`) enforces this locally: the event has no success path from **this specific state**.
+
+
+
+
 
 
 
@@ -35707,17 +71495,35 @@ The SyntaxReference "Bad" example (lines 334–385 of `SyntaxReference.cs`) is t
 
 
 
+
+
+
+
 ```
+
+
 
 from Draft on Approve
 
+
+
     -> reject "Cannot approve an application that has not been submitted"
+
+
 
 from Approved on Approve
 
+
+
     -> reject "Application is already approved"
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35725,7 +71531,15 @@ from Approved on Approve
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35733,7 +71547,15 @@ from Approved on Approve
 
 
 
+
+
+
+
 **`StateAlwaysRejects = 126`**
+
+
+
+
 
 
 
@@ -35741,29 +71563,59 @@ D1 (`AlwaysRejecting`) claimed 125. 126 is the next available ordinal. Place in 
 
 
 
+
+
+
+
 ```csharp
+
+
 
 /// <summary>
 
+
+
 /// An event has rows from a specific source state, but every effective outcome
+
+
 
 /// for that event from that state is a Reject — no success path exists locally.
 
+
+
 /// 'reject' implies fixability; if the event has no meaning in this state, the
+
+
 
 /// row is a semantic lie. Use Diagnostic 1 (AlwaysRejecting) for the event-global
 
+
+
 /// case; this fires only when a global success path exists elsewhere.
+
+
 
 /// </summary>
 
+
+
 StateAlwaysRejects = 126,
+
+
 
 ```
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35771,7 +71623,15 @@ StateAlwaysRejects = 126,
 
 
 
+
+
+
+
 **`StateAlwaysRejects`**
+
+
+
+
 
 
 
@@ -35779,19 +71639,39 @@ Rationale: `AlwaysRejecting` (D1) is an event-level predicate — the event alwa
 
 
 
+
+
+
+
 Rejected alternatives:
+
+
 
 - `LocalAlwaysRejecting` — "local" is vague; state scope is more precise.
 
+
+
 - `AlwaysRejectingInState` — awkward gerund trailing a prepositional phrase.
 
+
+
 - `UnapplicableRejectRow` — describes the symptom (the row), not the violation (the state/event pair has no success path). Also "unapplicable" is non-standard English.
+
+
 
 - `EventNotApplicableInState` — more of a documentation term than a diagnostic code name.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35799,7 +71679,15 @@ Rejected alternatives:
 
 
 
+
+
+
+
 ### Grouping Key
+
+
+
+
 
 
 
@@ -35807,13 +71695,27 @@ D2 groups by **(FromState, EventName)** — but `from any` rows have `FromState 
 
 
 
+
+
+
+
 **Override rule (mirrors `BuildEdges`):**
+
+
 
 - For state S and event E:
 
+
+
   - If explicit rows exist (`FromState == S`, `EventName == E`) → those are the **effective rows** for (S, E). Wildcard rows are suppressed for this pair.
 
+
+
   - If no explicit rows exist for (S, E) → wildcard rows (`FromState == null`, `EventName == E`) are the **effective rows** for (S, E).
+
+
+
+
 
 
 
@@ -35821,7 +71723,15 @@ This is not a reinvention — it is the same override semantics already implemen
 
 
 
+
+
+
+
 ### `from any` Rows in D2
+
+
+
+
 
 
 
@@ -35829,11 +71739,23 @@ A `from any on E -> reject "..."` wildcard row does NOT suppress D2 per-state. I
 
 
 
+
+
+
+
 A `from any on E -> reject` row with no other success path for E in any state would fire D1. D2 is suppressed in that case (see Q5). So by the time D2 evaluates the wildcard row, D1 has already cleared and a success path exists somewhere. The wildcard reject still fires D2 for each state where it is the effective row and no local success path exists.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35841,15 +71763,31 @@ A `from any on E -> reject` row with no other success path for E in any state wo
 
 
 
+
+
+
+
 For the effective rows of (S, E): does any row have `Outcome != TransitionRowOutcome.Reject`?
+
+
+
+
 
 
 
 ```csharp
 
+
+
 bool hasLocalSuccessPath = effectiveRows.Any(row => row.Outcome != TransitionRowOutcome.Reject);
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35857,15 +71795,31 @@ Same rule as D1. No per-state nuance:
 
 
 
+
+
+
+
 - `TransitionRowOutcome.Transition` — success path. ✓
 
+
+
 - `TransitionRowOutcome.NoTransition` — success path. The event fires and the entity stays in state; that is a valid non-rejecting outcome. ✓
+
+
 
 - `TransitionRowOutcome.Reject` — never a success path. ✗
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35873,7 +71827,15 @@ Same rule as D1. No per-state nuance:
 
 
 
+
+
+
+
 **D2 must not fire for any (S, E) pair where D1 has already fired for event E.**
+
+
+
+
 
 
 
@@ -35881,25 +71843,51 @@ D1 fires when event E has no success path anywhere in the precept. In that case,
 
 
 
+
+
+
+
 **Application point:** Before entering the (state, event) loop, compute the set of events that D1 will flag:
+
+
+
+
 
 
 
 ```csharp
 
+
+
 var d1FlaggedEvents = semantics.TransitionRows
+
+
 
     .Where(row => semantics.EventsByName.ContainsKey(row.EventName))
 
+
+
     .ToLookup(row => row.EventName, StringComparer.Ordinal)
+
+
 
     .Where(group => !group.Any(row => row.Outcome != TransitionRowOutcome.Reject))
 
+
+
     .Select(group => group.Key)
+
+
 
     .ToHashSet(StringComparer.Ordinal);
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35907,17 +71895,35 @@ Then in the D2 loop:
 
 
 
+
+
+
+
 ```csharp
+
+
 
 if (d1FlaggedEvents.Contains(eventName))
 
+
+
 {
+
+
 
     continue; // D1 covers this; suppress D2
 
+
+
 }
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35925,7 +71931,15 @@ This is applied before the per-(state, event) effective-row computation. The set
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35933,7 +71947,15 @@ This is applied before the per-(state, event) effective-row computation. The set
 
 
 
+
+
+
+
 **One warning per (offending effective row, state) pair.** The effective rows for a (state, event) pair are at most the explicit rows for that pair OR the wildcard rows (not both). Each effective reject row gets a warning anchored to `row.RowSpan`, with the state name injected into the message.
+
+
+
+
 
 
 
@@ -35941,7 +71963,15 @@ This is applied before the per-(state, event) effective-row computation. The set
 
 
 
+
+
+
+
 **Wildcard rows** (`FromState == null`) as effective rows for (S, E): a single wildcard row may emit warnings for multiple states (one per state that does not override it). All warnings anchor to the same wildcard row's `RowSpan`. The message includes the state name to distinguish them. This is accepted as correct: each (state, event) pair is independently problematic and independently actionable.
+
+
+
+
 
 
 
@@ -35949,7 +71979,15 @@ The author sees: squiggles on the wildcard row for each state it covers without 
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -35957,15 +71995,31 @@ The author sees: squiggles on the wildcard row for each state it covers without 
 
 
 
+
+
+
+
 Two format args: `{0}` = event name, `{1}` = state name.
 
 
 
+
+
+
+
 ```
+
+
 
 "Event '{0}' has no success path from '{1}' — every row for this event from '{1}' rejects; 'reject' implies fixability, but there is nothing to fix toward from '{1}'. If this event has no meaning in '{1}', remove the row — no row means 'not applicable here'"
 
+
+
 ```
+
+
+
+
 
 
 
@@ -35973,69 +72027,139 @@ Full `DiagnosticMeta` entry in `Diagnostics.cs` (place after `AlwaysRejecting`):
 
 
 
+
+
+
+
 ```csharp
+
+
 
 DiagnosticCode.StateAlwaysRejects => new(
 
+
+
     nameof(DiagnosticCode.StateAlwaysRejects),
+
+
 
     DiagnosticStage.Graph,
 
+
+
     Severity.Warning,
+
+
 
     "Event '{0}' has no success path from '{1}' — every row for this event from '{1}' rejects; 'reject' implies fixability, but there is nothing to fix toward from '{1}'. If this event has no meaning in '{1}', remove the row — no row means 'not applicable here'",
 
+
+
     DiagnosticCategory.Structure,
+
+
 
     FixHint: "Remove this row. If the event should never succeed from this state, there is nothing to reject — no row is the correct expression of 'not applicable here'. If the event should sometimes succeed from this state, add a transition or no-transition row for the success case.",
 
+
+
     TriggerCondition: "An event has effective rows from a specific source state (explicit rows, or wildcard rows where no explicit override exists), but every effective row for that event from that state has a Reject outcome. A global success path exists in another state (otherwise AlwaysRejecting would have fired), but none exists locally from this state.",
+
+
 
     RecoverySteps: [
 
+
+
         "Remove the reject row — 'not applicable' is expressed by having no row at all",
+
+
 
         "Or add a transition or 'no transition' row for this event from this state if the event should be able to succeed here"
 
+
+
     ],
+
+
 
     ExampleBefore: """
 
+
+
         from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650
+
+
 
             -> transition Approved
 
+
+
         from Submitted on Approve
 
+
+
             -> reject "Approval requires strong income coverage and acceptable credit"
+
+
 
         from Draft on Approve
 
+
+
             -> reject "Cannot approve an application that has not been submitted"
+
+
 
         from Approved on Approve
 
+
+
             -> reject "Application is already approved"
+
+
 
         """,
 
+
+
     ExampleAfter: """
+
+
 
         from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650
 
+
+
             -> transition Approved
+
+
 
         from Submitted on Approve
 
+
+
             -> reject "Approval requires strong income coverage and acceptable credit"
 
+
+
         """),
+
+
 
 ```
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36043,11 +72167,23 @@ DiagnosticCode.StateAlwaysRejects => new(
 
 
 
+
+
+
+
 **No new fields required.** D2 uses `row.RowSpan` (the same field already required by D1, added to `TypedTransitionRow` in B2 of the D1 contract). For the message, the state name is available from the iteration context — it is either `row.FromState` (explicit rows) or the loop variable (wildcard expansion). No additional span or field is needed.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36055,7 +72191,15 @@ DiagnosticCode.StateAlwaysRejects => new(
 
 
 
+
+
+
+
 **A `from any on E -> transition X` row counts as a local success path for every state that does not have an explicit (state, E) override.**
+
+
+
+
 
 
 
@@ -36063,21 +72207,43 @@ This follows directly from the BuildEdges override rule. If state S has no expli
 
 
 
+
+
+
+
 If state S has an explicit `from S on E -> reject "..."` row, that explicit row overrides the wildcard. The effective rows for (S, E) are the explicit rows only. If they are all Reject, `hasLocalSuccessPath` is false. D2 fires for (S, E) regardless of the wildcard success path in other states.
+
+
+
+
 
 
 
 Summary:
 
+
+
 - `from any on E -> transition X` + no explicit (S, E) rows → D2 suppressed for S. ✓
 
+
+
 - `from any on E -> transition X` + explicit `from S on E -> reject` → wildcard overridden; D2 fires for S. ✓
+
+
 
 - `from any on E -> reject` + no explicit (S, E) rows → wildcard reject is the effective row; D2 fires for S (if D1 did not fire for E). ✓
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36085,109 +72251,219 @@ Summary:
 
 
 
+
+
+
+
 Place after the `UnhandledEvent` block and the `AlwaysRejecting` block in `GraphAnalyzer.Analyze()`. The `AlwaysRejecting` block already computes `d1FlaggedEvents` as a byproduct (or D2 can re-derive it as shown in Q5).
+
+
+
+
 
 
 
 ```csharp
 
+
+
 // ── StateAlwaysRejects (D2) ──────────────────────────────────────────────────
+
+
 
 // For each (state, event) pair: compute effective rows (explicit if any, else
 
+
+
 // wildcard). If all effective rows are Reject and D1 did not fire for this
+
+
 
 // event, emit StateAlwaysRejects for each offending row.
 
 
 
+
+
+
+
 // Build the explicit (state, event) coverage set (mirrors BuildEdges logic)
+
+
 
 var explicitStateEventRows = semantics.TransitionRows
 
+
+
     .Where(row => row.FromState is not null && semantics.EventsByName.ContainsKey(row.EventName))
+
+
 
     .ToLookup(row => (row.FromState!, row.EventName), row => row);
 
 
 
+
+
+
+
 var wildcardRowsByEvent = semantics.TransitionRows
 
+
+
     .Where(row => row.FromState is null && semantics.EventsByName.ContainsKey(row.EventName))
+
+
 
     .ToLookup(row => row.EventName, StringComparer.Ordinal);
 
 
 
+
+
+
+
 foreach (var state in semantics.States)
+
+
 
 {
 
+
+
     foreach (var evt in semantics.Events)
+
+
 
     {
 
+
+
         if (d1FlaggedEvents.Contains(evt.Name))
+
+
 
         {
 
+
+
             continue;
 
+
+
         }
+
+
+
+
 
 
 
         var explicitRows = explicitStateEventRows[(state.Name, evt.Name)].ToList();
 
+
+
         var effectiveRows = explicitRows.Count > 0
 
+
+
             ? explicitRows
+
+
 
             : wildcardRowsByEvent[evt.Name].ToList();
 
 
 
+
+
+
+
         if (effectiveRows.Count == 0)
+
+
 
         {
 
+
+
             continue; // No rows — not applicable; UnhandledEvent covers zero-row events
 
+
+
         }
+
+
+
+
 
 
 
         if (!effectiveRows.Any(row => row.Outcome != TransitionRowOutcome.Reject))
 
+
+
         {
+
+
 
             foreach (var row in effectiveRows)
 
+
+
             {
+
+
 
                 diagnostics.Add(Diagnostics.Create(
 
+
+
                     DiagnosticCode.StateAlwaysRejects,
+
+
 
                     row.RowSpan,
 
+
+
                     evt.Name,
+
+
 
                     state.Name));
 
+
+
             }
+
+
 
         }
 
+
+
     }
 
+
+
 }
+
+
 
 ```
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36195,17 +72471,35 @@ foreach (var state in semantics.States)
 
 
 
+
+
+
+
 | Event E condition | D1 fires? | D2 fires? |
+
+
 
 |---|---|---|
 
+
+
 | No rows for E at all | No (UnhandledEvent fires instead) | No |
+
+
 
 | All rows for E are Reject (globally) | **Yes** | No (suppressed by d1FlaggedEvents) |
 
+
+
 | Some rows for E are non-Reject; (S, E) effective rows all Reject | No | **Yes** |
 
+
+
 | Some rows for E are non-Reject; (S, E) has at least one non-Reject | No | No |
+
+
+
+
 
 
 
@@ -36213,7 +72507,15 @@ Disjoint by construction.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36221,37 +72523,75 @@ Disjoint by construction.
 
 
 
+
+
+
+
 | # | What | File(s) | Blocking? |
+
+
 
 |---|------|---------|-----------|
 
+
+
 | 1 | `StateAlwaysRejects = 126` in Graph section | `DiagnosticCode.cs` | Yes |
+
+
 
 | 2 | `DiagnosticMeta` entry for `StateAlwaysRejects` | `Diagnostics.cs` | Yes |
 
+
+
 | 3 | D2 check logic with wildcard override semantics and D1 suppression | `GraphAnalyzer.cs` | Yes |
+
+
 
 | 4 | `RowSpan` on `TypedTransitionRow` (already required by D1/B2) | `SemanticIndex.cs`, `TypeChecker.cs` | Yes (shared with D1) |
 
 
 
+
+
+
+
 No MCP DTO changes required. No new pipeline stage. Graph stage already present in `FirePipeline`.
+
+
 
 # TypeChecker.Expressions.cs — Partial-Class Split Analysis
 
 
 
+
+
+
+
 **Author:** Frank
+
+
 
 **Date:** 2026-05-11T22:12:11-04:00
 
+
+
 **Requested by:** Shane
+
+
 
 **Status:** Analysis only — no file changes made
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36259,13 +72599,27 @@ No MCP DTO changes required. No new pipeline stage. Graph stage already present 
 
 
 
+
+
+
+
 `src/Precept/Pipeline/TypeChecker.Expressions.cs` is **104 KB / 2344 lines**.
+
+
 
 Goal: split into 2–3 partial classes, each under ~40 KB, along genuine semantic boundaries so agents (particularly George working on typed-constant follow-up) can load one part without crowding out other files.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36273,41 +72627,83 @@ Goal: split into 2–3 partial classes, each under ~40 KB, along genuine semanti
 
 
 
+
+
+
+
 Full read of the file, section by section. All line counts are inclusive.
+
+
+
+
 
 
 
 | # | Region | Lines | Approx KB | Key methods |
 
+
+
 |---|--------|-------|-----------|-------------|
+
+
 
 | R1 | CollectFieldRefs (tree-walker) | 1–57 (57) | 2.5 | `CollectFieldRefs` |
 
+
+
 | R2 | Core `Resolve()` dispatcher + error sentinels | 59–131 (73) | 3.2 | `Resolve`, `ResolveMissing`, `ResolveUnknownExpression` |
+
+
 
 | R3 | Literal + non-interpolated typed constant | 133–263 (131) | 5.8 | `ResolveLiteral`, `IsChoiceLiteralToken`, `ResolveChoiceLiteral`, `ResolveNumericLiteral`, `ResolveTypedConstant` |
 
+
+
 | R4 | Binary-op infrastructure + context retry | 265–563 (299) | 13.2 | `TryContextRetryBinaryOp`, `CreateResolvedBinaryOp`, `CreateSyntheticBinaryOp`, `ResolveBinaryResultType`, `ResolveUnaryResultType`, `RetryChoiceComparisonLiterals`, `TryResolveCatalogBinaryWithoutOperation`, `TryResolveContainsOperandTypes`, `TryResolveLookupOperandTypes`, `TryGetContainsCandidateTypes`, **`TryContextRetryOverload`** |
+
+
 
 | R5 | Identifier resolution | 565–617 (53) | 2.3 | `ResolveIdentifier` |
 
+
+
 | R6 | Operator resolution | 619–796 (178) | 7.9 | `ResolveBinaryOp`, `TryResolveBinaryWithWidening`, `DisambiguateCandidates`, `MapQualifierBinding`, `ResolveUnaryOp` |
+
+
 
 | R7 | Postfix (`is set` / `is not set`) | 798–842 (45) | 2.0 | `ResolvePostfixOp` |
 
+
+
 | R8 | Action resolution | 844–1079 (236) | 10.4 | `ResolveAction`, `ResolveActionTarget` |
+
+
 
 | R9 | Quantifier / Conditional / List | 1081–1240 (160) | 7.1 | `ResolveQuantifier`, `ResolveConditional`, `ResolveListLiteral` |
 
+
+
 | R10 | Assignment qualifier validation | 1246–1428 (183) | 8.1 | `ValidateAssignmentQualifiers`, `ExtractLeafOperands` |
+
+
 
 | R11 | `IsAssignable` | 1430–1440 (11) | 0.5 | `IsAssignable` |
 
+
+
 | R12 | Function call resolution | 1442–1589 (148) | 6.5 | `ResolveFunctionCall`, `ResolveCIFunctionCall`, `SelectOverload` |
+
+
 
 | R13 | Member access / method call / accessor helpers | 1591–1767 (177) | 7.8 | `ResolveMemberAccess`, `ResolveMethodCall`, `ResolveAccessorReturnType`, `GetElementType`, `GetKeyType`, `IsCaseInsensitiveCollectionElement` |
 
+
+
 | R14 | Interpolated typed-constant grammar (Slice 2) | 1768–2344 (577) | 25.5 | Form tables (`MoneyForms`…`TemporalSingleForms`), text matchers, `GetFormsForType`, `IsSlotCompatible`, `TryMatchForm`, `TryMatchTemporalCompound`, `ResolveInterpolatedTypedConstant`, `ValidateUnitSlotDimensionConsistency`, `ResolveInterpolatedString` |
+
+
+
+
 
 
 
@@ -36315,7 +72711,15 @@ Full read of the file, section by section. All line counts are inclusive.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36323,19 +72727,39 @@ Full read of the file, section by section. All line counts are inclusive.
 
 
 
+
+
+
+
 ### Recommended option — Option B (best size balance)
+
+
+
+
 
 
 
 | Proposed file | Semantic scope | Regions | Approx lines | Approx KB | Key methods |
 
+
+
 |---------------|---------------|---------|-------------|-----------|-------------|
+
+
 
 | `TypeChecker.Expressions.cs` *(trimmed, keep name)* | Core expression dispatch, literals, identifiers, binary/unary operators, postfix, `IsAssignable` | R1–R7, R11 (+ R11 relocated) | ~766 | ~34 KB | `CollectFieldRefs`, `Resolve`, `ResolveLiteral`, `ResolveTypedConstant`, `TryContextRetryBinaryOp`, `ResolveBinaryOp`, `TryResolveBinaryWithWidening`, `DisambiguateCandidates`, `ResolveUnaryOp`, `ResolveIdentifier`, `ResolvePostfixOp`, `IsAssignable` |
 
+
+
 | `TypeChecker.Expressions.Callables.cs` *(new)* | Actions, quantifiers, conditionals, list literals, functions, member access/method calls | R8, R9, R12, R13, + `TryContextRetryOverload` (relocated from R4) | ~810 | ~36 KB | `ResolveAction`, `ResolveActionTarget`, `ResolveQuantifier`, `ResolveConditional`, `ResolveListLiteral`, `ResolveFunctionCall`, `SelectOverload`, `TryContextRetryOverload`, `ResolveMemberAccess`, `ResolveMethodCall`, `ResolveAccessorReturnType`, `GetElementType`, `GetKeyType` |
 
+
+
 | `TypeChecker.Expressions.TypedConstants.cs` *(new)* | Assignment qualifier validation + full interpolated typed-constant grammar (Slice 2) | R10, R14 | ~760 | ~34 KB | `ValidateAssignmentQualifiers`, `ExtractLeafOperands`, all `MatchXxx` text matchers, `*Forms` arrays, `GetFormsForType`, `IsSlotCompatible`, `TryMatchForm`, `TryMatchTemporalCompound`, `ResolveInterpolatedTypedConstant`, `ValidateUnitSlotDimensionConsistency`, `ResolveInterpolatedString` |
+
+
+
+
 
 
 
@@ -36343,7 +72767,15 @@ All three files fit under the 40 KB target. The split respects genuine semantic 
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36351,29 +72783,59 @@ All three files fit under the 40 KB target. The split respects genuine semantic 
 
 
 
+
+
+
+
 Three helpers need attention:
+
+
+
+
 
 
 
 **`IsAssignable` (lines 1430–1440, 11 lines)**
 
+
+
 Called from binary-op code, function/overload selection, collection-check helpers, action assignment validation, list-literal unification, and member-access argument validation — i.e., from all three proposed files. Its physical location (after `ExtractLeafOperands`) is misleading. It belongs in `TypeChecker.Expressions.cs` (Core), ideally at the end of the file so the other two partials can call it without concern. Requires a 10-line physical relocation, but the call sites do not change.
+
+
+
+
 
 
 
 **`TryContextRetryOverload` (lines 477–563, 87 lines)**
 
+
+
 Currently embedded inside the binary-op infrastructure block (R4), but its summary doc says "function overload resolution" and its only call site is `SelectOverload` at line 1550. Semantically it belongs in `TypeChecker.Expressions.Callables.cs` alongside `SelectOverload`. Without relocation it stays in the Core file and is a conceptual odd-one-out in that file. Relocation is a pure move — no logic change needed.
+
+
+
+
 
 
 
 **`ValidateAssignmentQualifiers` + `ExtractLeafOperands` (lines 1246–1428)**
 
+
+
 Called from `ResolveAction` (line 887). Placing them in `TypeChecker.Expressions.TypedConstants.cs` means they live in a different partial from their primary caller — perfectly legal in C# partial classes, and the qualifier-domain coupling to typed-constant validation justifies it. The alternative (placing them in Callables alongside actions) also works but yields a Callables file over 40 KB (~44 KB). The TypedConstants placement is preferred for thematic coherence and size compliance.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36381,13 +72843,27 @@ Called from `ResolveAction` (line 887). Placing them in `TypeChecker.Expressions
 
 
 
+
+
+
+
 **Option B with two minor physical relocations:**
+
+
+
+
 
 
 
 1. Move `IsAssignable` to the tail of the Core file (from line 1430 to after `ResolvePostfixOp`, ~line 843).
 
+
+
 2. Move `TryContextRetryOverload` to `TypeChecker.Expressions.Callables.cs` alongside `SelectOverload`.
+
+
+
+
 
 
 
@@ -36395,11 +72871,23 @@ This gives three files with clean semantic identities and no file over 36 KB:
 
 
 
+
+
+
+
 - **Core** = "what are expressions and how do their types resolve" — the foundation layer that everything else calls into.
+
+
 
 - **Callables** = "how do callable forms (actions, functions, member access, quantifiers) resolve" — the mid-layer that calls into Core.
 
+
+
 - **TypedConstants** = "how do typed constants and interpolated typed constants validate" — the highest-specificity layer, the area George needs for compound-unit and RC follow-up work.
+
+
+
+
 
 
 
@@ -36407,11 +72895,23 @@ An agent loading `TypeChecker.Expressions.TypedConstants.cs` gets 34 KB of inter
 
 
 
+
+
+
+
 The split preserves all existing calling conventions. No method signatures change. No logic changes. All three files use `internal static partial class TypeChecker`.
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36419,17 +72919,35 @@ The split preserves all existing calling conventions. No method signatures chang
 
 
 
+
+
+
+
 **Risk level: None (clean).**
+
+
+
+
 
 
 
 George-RC1 and RC-2 are both committed to `spike/Precept-V2-Radical`:
 
+
+
 - `53b2bf62` — RC-2 compound-unit Q6/Q7/Q8 patterns in `QuantityForms` (the forms that would move to `TypeChecker.Expressions.TypedConstants.cs`)
+
+
 
 - `01313e6e` — Slice A2B compound-unit U2/Q5 forms
 
+
+
 - `82a92056` — Slice 2 full type-grammar matching (the bulk of what becomes the TypedConstants file)
+
+
+
+
 
 
 
@@ -36437,7 +72955,15 @@ George-RC1 and RC-2 are both committed to `spike/Precept-V2-Radical`:
 
 
 
+
+
+
+
 Shane's concern about "George-RC1 still running" appears to reflect the state as of the task's issue date, but the evidence in git is that both RC-1 (parser, completed as Slice 1) and RC-2 (TypeChecker, committed as `53b2bf62`) are clean. **The split can be executed immediately with no conflict risk.** The compound-unit `QuantityForms` entries (the core RC-2 additions at lines 1880–1890) will simply land in `TypeChecker.Expressions.TypedConstants.cs` as part of the split.
+
+
+
+
 
 
 
@@ -36445,7 +72971,15 @@ The one scenario to watch: if George has a background agent session open that ha
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36453,17 +72987,35 @@ The one scenario to watch: if George has a background agent session open that ha
 
 
 
+
+
+
+
 If the team prefers only 2 partials:
+
+
+
+
 
 
 
 | File | Scope | Approx lines | Approx KB |
 
+
+
 |------|-------|-------------|-----------|
+
+
 
 | `TypeChecker.Expressions.cs` | Core + Callables (R1–R13 + helpers) | ~1767 | ~78 KB |
 
+
+
 | `TypeChecker.Expressions.TypedConstants.cs` | Interpolated TC grammar (R10 + R14) | ~760 | ~34 KB |
+
+
+
+
 
 
 
@@ -36471,7 +73023,15 @@ This misses the 40 KB target for the Core+Callables file (~78 KB) but still halv
 
 
 
+
+
+
+
 ---
+
+
+
+
 
 
 
@@ -36479,7 +73039,15 @@ This misses the 40 KB target for the Core+Callables file (~78 KB) but still halv
 
 
 
+
+
+
+
 The **3-file Option B split** is the cleanest path: Core / Callables / TypedConstants, each ~34–36 KB, along genuine semantic seams that align with who reads what and when. Two small physical relocations are needed (`IsAssignable`, `TryContextRetryOverload`) but no logic changes. Merge conflict risk is zero given the current committed state.
+
+
+
+
 
 
 
@@ -36487,59 +73055,119 @@ The **3-file Option B split** is the cleanest path: Core / Callables / TypedCons
 
 
 
+
+
+
+
 **Recorded:** 2026-05-11T22:05:37.512-04:00
 
+
+
 **Agent:** George
+
+
 
 **Task:** RC-1 — Extend Parser to Accept Interpolated Typed Constants in Field/Arg Qualifier Positions
 
 
 
+
+
+
+
 ## Outcome
+
+
 
 - `TryParseQualifiers()` now accepts both static typed constants and interpolated typed constants in qualifier positions.
 
+
+
 - `ParsedQualifier` now preserves qualifier-site interpolation as structured parser data instead of flattening everything to a literal string.
+
+
 
 - The type checker now resolves interpolated qualifier forms against qualifier-expected types before emitting declared qualifier metadata, which unblocks field and event-arg qualifier parsing for inventory-style declarations.
 
 
 
+
+
+
+
 ## Implementation
+
+
 
 - In `src/Precept/Pipeline/ParsedTypeReference.cs`, replaced the flat `ParsedQualifier` record with a literal/interpolated DU shape.
 
+
+
 - In `src/Precept/Pipeline/Parser.cs`, extended `TryParseQualifiers()` to accept `TokenKind.TypedConstantStart` and route it through `ParseInterpolatedTypedConstant()`.
+
+
 
 - In `src/Precept/Pipeline/Parser.Expressions.cs`, tightened `ParseInterpolatedTypedConstant()` to return `InterpolatedTypedConstantExpression` directly.
 
+
+
 - In `src/Precept/Pipeline/TypeChecker.cs`, split literal qualifier mapping from interpolated qualifier mapping, resolved interpolated qualifier expressions with qualifier-appropriate expected types, and preserved placeholder qualifier identities for downstream comparison paths.
+
+
 
 - In `src/Precept/Pipeline/TypeChecker.Expressions.cs`, patched the two coupled follow-ons exposed by qualifier parsing:
 
+
+
   - proactive/context-retry handling for interpolated typed constants in binary expressions
+
+
 
   - one-hole `unitofmeasure` compound forms (`'{A}/each'`, `'each/{B}'`)
 
 
 
+
+
+
+
 ## Validation
+
+
 
 - `dotnet build .\src\Precept\Precept.csproj --nologo` ✅
 
+
+
 - `dotnet test .\test\Precept.Tests\Precept.Tests.csproj --nologo --no-build` ⚠️ back to the known spike baseline: 26 pre-existing failures, 4755 passed, 4781 total
 
+
+
 - Targeted qualifier/interpolation regression battery ✅ (15 passed)
+
+
 
 - Rebuilt compiler API check on `samples\inventory-item.precept` ✅ no `PRE0009` diagnostics in the qualifier-declaration window (lines 71-104 context; concrete declaration/arg sites 80-109 and 166-207)
 
 
 
+
+
+
+
 ## Notes
+
+
 
 - The MCP `precept_compile` session in this CLI run continued to report stale parser output, then disconnected when I forced a server refresh. I treated the rebuilt public `Precept.Compiler` API as the authoritative fallback for final sample validation.
 
+
+
 - Remaining sample errors are still the expected RC-2 / BUG-A / sample-design follow-ons, not parser-site PRE0009 at the interpolated qualifier declarations.
+
+
+
+
 
 
 
@@ -36547,57 +73175,115 @@ The **3-file Option B split** is the cleanest path: Core / Callables / TypedCons
 
 
 
+
+
+
+
 **Recorded:** 2026-05-11T22:05:37.512-04:00
 
+
+
 **Agent:** George
+
+
 
 **Task:** RC-2 — Add Missing Compound-Unit TypeChecker Patterns
 
 
 
+
+
+
+
 ## Outcome
+
+
 
 - `QuantityForms` was missing the numeric-prefixed compound-unit variants for `'0 {A}/{B}'`, `'0 {A}/each'`, and `'0 each/{B}'`.
 
+
+
 - Added Q6/Q7/Q8 support in `src/Precept/Pipeline/TypeChecker.Expressions.cs`.
 
+
+
 - `UnitOfMeasureForms` already contained the plain compound-unit form `'{A}/{B}'`, so no additional UoM grammar change was needed.
+
+
 
 - `PriceForms` already contained the `'0 {Currency}/{Unit}'` shape used by `AverageCost` and `ListPrice`, so no runtime price-form change was needed.
 
 
 
+
+
+
+
 ## Implementation
+
+
 
 - Added `MatchNumericSpaceUnitSlash()` for numeric-prefix + fixed numerator + denominator-hole matching.
 
+
+
 - Extended `QuantityForms` with the three missing compound-unit entries:
+
+
 
   - Q6: `'0 {A}/{B}'`
 
+
+
   - Q7: `'0 {A}/each'`
 
+
+
   - Q8: `'0 each/{B}'`
+
+
 
 - Added regression coverage in `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` for Q6/Q7/Q8 and for the existing price form `'0 {c}/{u}'`.
 
 
 
+
+
+
+
 ## Validation
+
+
 
 - `dotnet build .\src\Precept\Precept.csproj --nologo` ✅
 
+
+
 - `dotnet test .\test\Precept.Tests\Precept.Tests.csproj --nologo --filter "FullyQualifiedName~TypeCheckerTypedConstantTests" --verbosity minimal` ✅ (102 passed)
+
+
 
 - `dotnet test .\test\Precept.Tests\Precept.Tests.csproj --nologo --verbosity minimal` ⚠️ still at the known spike baseline: 26 pre-existing failures, 4740 passed, 4766 total
 
 
 
+
+
+
+
 ## Notes
+
+
 
 - The remaining failures are the same pre-existing spike-branch failures already observed before RC-2 (ConflictingModifiers + parser/assignment qualifier fallout), not regressions from this change.
 
+
+
 - This closes the quantity-side PRE0052 form gap for compound-unit literals with fixed numeric prefixes while leaving the already-supported price and unit-of-measure forms untouched.
+
+
+
+
 
 
 
@@ -36605,49 +73291,99 @@ The **3-file Option B split** is the cleanest path: Core / Callables / TypedCons
 
 
 
+
+
+
+
 - Date: 2026-05-11T21:26:23.861-04:00
+
+
 
 - Added patterns:
 
+
+
   - `unitofmeasure`: `'{A}/{B}'` via `UnitOfMeasureForms` using `NumeratorUnit` + `DenominatorUnit`.
+
+
 
   - `quantity`: `'{n} {A}/{B}'` via `QuantityForms` using `Magnitude` + `NumeratorUnit` + `DenominatorUnit`.
 
+
+
 - Files and methods changed:
+
+
 
   - `src/Precept/Pipeline/SemanticIndex.cs` — extended `InterpolationSlotKind` with `NumeratorUnit` and `DenominatorUnit`.
 
+
+
   - `src/Precept/Pipeline/TypeChecker.Expressions.cs` — extended `QuantityForms`, added `UnitOfMeasureForms`, routed `GetFormsForType(TypeKind.UnitOfMeasure)` to the new table, widened `IsSlotCompatible(...)`, widened `SlotCompatibleTypesDescription(...)`, and widened `ResolveInterpolatedTypedConstant(...)` hole expected-type mapping for the new slot kinds.
+
+
 
   - `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` — added 9 compound-unit interpolation tests covering valid forms, hole mismatches, and structural errors.
 
+
+
 - Validation:
+
+
 
   - `dotnet build src/Precept/Precept.csproj` succeeded.
 
+
+
   - `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter FullyQualifiedName~TypeCheckerTypedConstantTests --nologo` passed (98/98).
 
+
+
   - Broader `TypeChecker` filter still reports pre-existing spike-branch failures unrelated to Slice A2B.
+
+
 
 # George Slice 12 Complete
 
 
 
+
+
+
+
 - Date: 2026-05-11T21:23:24.768-04:00
+
+
 
 - Added `QualifierChainProofRequirement` entries to `PriceTimesPeriod` and `PriceTimesDuration` in `src/Precept/Language/Operations.cs`.
 
+
+
 - Added `test/Precept.Tests/ProofEngineTemporalChainTests.cs` with 12 scenarios covering proved temporal matches, mismatches, bare-operand obligation firing, and regressions for `price * decimal` and `price ± price`.
+
+
 
 - Findings:
 
+
+
   - `duration` cancellation now proves only for `price` fields whose denominator resolves to temporal `time` (explicit `of 'time'` or the duration implied qualifier on the RHS).
+
+
 
   - `price of 'date' * duration` correctly remains unresolved because duration only carries implied `TemporalDimension(Time)`.
 
+
+
   - `dotnet test test/Precept.Tests/` still reports 26 pre-existing failures on `spike/Precept-V2-Radical`; no new failures were introduced by Slice 12.
 
+
+
 # Soup Nazi RC Test Batch
+
+
+
+
 
 
 
@@ -36655,44 +73391,89 @@ Date: 2026-05-11T22:05:37.512-04:00
 
 
 
+
+
+
+
 ## Files modified
 
+
+
 - `test/Precept.Tests/Parser/ParserInterpolatedQualifierTests.cs` (new)
+
+
 
 - `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` (modified)
 
 
 
+
+
+
+
 ## Test count
+
+
 
 - 11 new tests total
 
+
+
 - RC-1 parser tests: 6
+
+
 
 - RC-2 type-checker tests: 5
 
 
 
+
+
+
+
 ## Expected status
 
+
+
 - Before RC-1 + RC-2 land: 10 new tests are expected red and 1 malformed-qualifier guard test is expected green.
+
+
 
 - After RC-1 + RC-2 land: all 11 tests should pass.
 
 
 
+
+
+
+
 ## Current suite outcome
+
+
 
 - `dotnet test test/Precept.Tests/` baseline before this batch: 26 failing tests.
 
+
+
 - `dotnet test test/Precept.Tests/` after this batch: 36 failing tests.
+
+
 
 - Net effect from this batch: +10 failing tests, which matches the intended red coverage for the missing parser and type-checker fixes.
 
 
 
+
+
+
+
 ## Notes
+
+
 
 - RC-1 coverage locks interpolated qualifier parsing for field declarations, event args, combined `in` + `of`, and the malformed unclosed-brace regression.
 
+
+
 - RC-2 coverage locks Q6/Q7/Q8 compound-unit forms in field defaults and rule RHS expressions, plus the price compound-unit rule form.
+
