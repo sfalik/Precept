@@ -422,6 +422,7 @@ public static class Operations
         OperationKind.MoneyPlusMoney => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PMoney, PMoney, TypeKind.Money,
             "Money + money → money (same currency required)",
+            Match: QualifierMatch.Same,
             ProofRequirements:
             [
                 new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
@@ -431,6 +432,7 @@ public static class Operations
         OperationKind.MoneyMinusMoney => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PMoney, PMoney, TypeKind.Money,
             "Money − money → money (same currency required)",
+            Match: QualifierMatch.Same,
             ProofRequirements:
             [
                 new QualifierCompatibilityProofRequirement(new ParamSubject(PMoney), new ParamSubject(PMoney), QualifierAxis.Currency,
@@ -503,6 +505,7 @@ public static class Operations
         OperationKind.QuantityPlusQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PQuantity, PQuantity, TypeKind.Quantity,
             "Quantity + quantity → quantity (same dimension required)",
+            Match: QualifierMatch.Same,
             ProofRequirements:
             [
                 new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
@@ -512,6 +515,7 @@ public static class Operations
         OperationKind.QuantityMinusQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PQuantity, PQuantity, TypeKind.Quantity,
             "Quantity − quantity → quantity (same dimension required)",
+            Match: QualifierMatch.Same,
             ProofRequirements:
             [
                 new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
@@ -588,6 +592,7 @@ public static class Operations
         OperationKind.PricePlusPrice => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PPrice, PPrice, TypeKind.Price,
             "Price + price → price (same currency and unit required)",
+            Match: QualifierMatch.Same,
             ProofRequirements:
             [
                 new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
@@ -599,6 +604,7 @@ public static class Operations
         OperationKind.PriceMinusPrice => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PPrice, PPrice, TypeKind.Price,
             "Price − price → price (same currency and unit required)",
+            Match: QualifierMatch.Same,
             ProofRequirements:
             [
                 new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,

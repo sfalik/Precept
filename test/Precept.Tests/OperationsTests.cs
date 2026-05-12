@@ -316,16 +316,24 @@ public class OperationsTests
             .Where(m => m.Match != QualifierMatch.Any)
             .ToList();
 
-        // Arithmetic: 4 (money/money Same/Different, quantity/quantity Same/Different)
+        // Arithmetic: 10 (money +/- same, money/money Same/Different,
+        //                quantity +/- same, quantity/quantity Same/Different,
+        //                price +/- same)
         // Comparison: 6 money + 6 quantity + 6 price + 2 exchangerate = 20
-        // Total: 24
-        nonAny.Should().HaveCount(24);
+        // Total: 30
+        nonAny.Should().HaveCount(30);
 
-        // Verify the 4 arithmetic entries are present
+        // Verify the arithmetic entries are present
+        nonAny.Should().Contain(m => m.Kind == OperationKind.MoneyPlusMoney);
+        nonAny.Should().Contain(m => m.Kind == OperationKind.MoneyMinusMoney);
         nonAny.Should().Contain(m => m.Kind == OperationKind.MoneyDivideMoneySameCurrency);
         nonAny.Should().Contain(m => m.Kind == OperationKind.MoneyDivideMoneyCrossCurrency);
+        nonAny.Should().Contain(m => m.Kind == OperationKind.QuantityPlusQuantity);
+        nonAny.Should().Contain(m => m.Kind == OperationKind.QuantityMinusQuantity);
         nonAny.Should().Contain(m => m.Kind == OperationKind.QuantityDivideQuantitySameDimension);
         nonAny.Should().Contain(m => m.Kind == OperationKind.QuantityDivideQuantityCrossDimension);
+        nonAny.Should().Contain(m => m.Kind == OperationKind.PricePlusPrice);
+        nonAny.Should().Contain(m => m.Kind == OperationKind.PriceMinusPrice);
     }
 
     // ── Bidirectional lookup ────────────────────────────────────────────────────

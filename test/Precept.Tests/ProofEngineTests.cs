@@ -4587,6 +4587,88 @@ public class ProofEngineTests
             compilation.HasErrors.Should().BeFalse();
             compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         }
+
+        [Fact]
+        public void GrossProfit_pattern_chained_money_subtraction_with_symbolic_currency_proves()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field CatalogCurrency as currency default 'USD'
+                field TotalRevenue as money in '{CatalogCurrency}' default '10.00 {CatalogCurrency}'
+                field TotalReturns as money in '{CatalogCurrency}' default '1.00 {CatalogCurrency}'
+                field TotalCostOfGoods as money in '{CatalogCurrency}' default '2.00 {CatalogCurrency}'
+                field GrossProfit as money in '{CatalogCurrency}' <- (TotalRevenue - TotalReturns) - TotalCostOfGoods
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void Left_associated_money_addition_with_symbolic_currency_proves()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field CatalogCurrency as currency default 'USD'
+                field A as money in '{CatalogCurrency}' default '10.00 {CatalogCurrency}'
+                field B as money in '{CatalogCurrency}' default '1.00 {CatalogCurrency}'
+                field C as money in '{CatalogCurrency}' default '2.00 {CatalogCurrency}'
+                field Total as money in '{CatalogCurrency}' <- A + B + C
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void Chained_quantity_subtraction_with_symbolic_dimension_proves()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field StockingUnit as unitofmeasure default 'kg'
+                field A as quantity of '{StockingUnit.dimension}' default '10 {StockingUnit}'
+                field B as quantity of '{StockingUnit.dimension}' default '1 {StockingUnit}'
+                field C as quantity of '{StockingUnit.dimension}' default '2 {StockingUnit}'
+                field Remaining as quantity of '{StockingUnit.dimension}' <- (A - B) - C
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void QualifierCompatibility_diagnostic_describes_subexpressions_and_values()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field A as money in 'USD' default '10.00 USD'
+                field B as money in 'USD' default '1.00 USD'
+                field C as money in 'EUR' default '2.00 EUR'
+                field Result as money <- (A - B) + C
+                """);
+
+            var diagnostic = compilation.Diagnostics
+                .Single(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+
+            diagnostic.Message.Should().Contain("(A - B)");
+            diagnostic.Message.Should().Contain("Currency: 'USD'");
+            diagnostic.Message.Should().Contain("Currency: 'EUR'");
+            diagnostic.Message.Should().NotContain("<expression>");
+            diagnostic.Message.Should().NotContain("<unknown>");
+        }
+
+        [Theory]
+        [InlineData(OperationKind.MoneyPlusMoney)]
+        [InlineData(OperationKind.MoneyMinusMoney)]
+        [InlineData(OperationKind.QuantityPlusQuantity)]
+        [InlineData(OperationKind.QuantityMinusQuantity)]
+        [InlineData(OperationKind.PricePlusPrice)]
+        [InlineData(OperationKind.PriceMinusPrice)]
+        public void Same_qualifier_arithmetic_operations_declare_match_same(OperationKind operationKind)
+        {
+            ((BinaryOperationMeta)Operations.GetMeta(operationKind)).Match
+                .Should().Be(QualifierMatch.Same);
+        }
     }
 
     public class PartF_F3_StaticTypedConstantQualifierExtraction

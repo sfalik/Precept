@@ -71,7 +71,7 @@ public static class ProofEngine
 
             if (disposition == ProofDisposition.Unresolved)
             {
-                diagnostics.Add(CreateDiagnostic(obligation));
+                diagnostics.Add(CreateDiagnostic(obligation, semantics));
                 faultSiteLinks.Add(CreateFaultSiteLink(obligation));
             }
         }
@@ -321,6 +321,85 @@ public static class ProofEngine
             TypedMemberAccess { Object: TypedFieldRef fieldRef } => fieldRef.FieldName,
             _ => null
         };
+    }
+
+    private static string DescribeSubject(ProofSubject subject, TypedExpression site)
+        => DescribeExpression(ResolveSubject(subject, site));
+
+    private static string DescribeQualifiedSubject(
+        ProofSubject subject,
+        TypedExpression site,
+        QualifierAxis axis,
+        SemanticIndex semantics)
+        => DescribeQualifiedExpression(ResolveSubject(subject, site), axis, semantics);
+
+    private static string DescribeQualifiedExpression(TypedExpression? expr, QualifierAxis axis, SemanticIndex semantics)
+    {
+        var label = DescribeExpression(expr);
+        var qualifier = expr is null ? null : ResolveQualifierFromExpression(expr, axis, semantics);
+        return $"{label} ({axis}: {DescribeQualifier(qualifier)})";
+    }
+
+    private static string DescribeExpression(TypedExpression? expr) => expr switch
+    {
+        TypedFieldRef fieldRef => fieldRef.FieldName,
+        TypedArgRef argRef => argRef.ArgName,
+        TypedMemberAccess memberAccess => $"{DescribeExpression(memberAccess.Object)}.{memberAccess.ResolvedAccessor.Name}",
+        TypedBinaryOp binaryOp => $"({DescribeExpression(binaryOp.Left)} {DescribeOperator(binaryOp.ResolvedOp)} {DescribeExpression(binaryOp.Right)})",
+        TypedUnaryOp unaryOp => $"{DescribeOperator(unaryOp.ResolvedOp)}{DescribeExpression(unaryOp.Operand)}",
+        TypedFunctionCall functionCall => $"{functionCall.ResolvedFunction}(...)",
+        TypedLiteral { Value: null } => "<value>",
+        TypedLiteral literal => $"'{literal.Value}'",
+        TypedTypedConstant typedConstant => $"'{typedConstant.RawText}'",
+        TypedInterpolatedTypedConstant => "<typed constant>",
+        TypedInterpolatedString => "<string>",
+        TypedConditional => "<conditional>",
+        TypedQuantifier quantifier => $"{quantifier.BindingName} in {DescribeExpression(quantifier.Collection)}",
+        TypedListLiteral => "<list>",
+        TypedPostfixOp postfixOp => $"{DescribeExpression(postfixOp.Operand)} is{(postfixOp.IsNegated ? " not" : string.Empty)} set",
+        TypedErrorExpression => "<error>",
+        null => "<unresolved>",
+        _ => "<subexpression>"
+    };
+
+    private static string DescribeOperator(OperationKind operationKind)
+    {
+        var op = Operators.GetMeta(Operations.GetMeta(operationKind).Op);
+        return op switch
+        {
+            SingleTokenOp single when !string.IsNullOrWhiteSpace(single.Token.Text) => single.Token.Text!,
+            MultiTokenOp multi => string.Join(" ", multi.Tokens.Select(t => t.Text ?? t.Kind.ToString())),
+            _ => op.Kind.ToString()
+        };
+    }
+
+    private static string DescribeQualifier(DeclaredQualifierMeta? qualifier)
+    {
+        if (qualifier is null)
+            return "<unresolved>";
+
+        var value = qualifier switch
+        {
+            DeclaredQualifierMeta.Currency currency => currency.CurrencyCode,
+            DeclaredQualifierMeta.Unit unit => unit.UnitCode,
+            DeclaredQualifierMeta.Dimension dimension => dimension.DimensionName,
+            DeclaredQualifierMeta.FromCurrency fromCurrency => fromCurrency.CurrencyCode,
+            DeclaredQualifierMeta.ToCurrency toCurrency => toCurrency.CurrencyCode,
+            DeclaredQualifierMeta.Timezone timezone => timezone.TimezoneId,
+            DeclaredQualifierMeta.TemporalUnit temporalUnit => temporalUnit.UnitName,
+            DeclaredQualifierMeta.TemporalDimension temporalDimension => temporalDimension.Value switch
+            {
+                PeriodDimension.Date => "date",
+                PeriodDimension.Time => "time",
+                PeriodDimension.Any => "any",
+                _ => temporalDimension.Value.ToString()
+            },
+            _ => null
+        };
+
+        return string.IsNullOrWhiteSpace(value)
+            ? "<unresolved>"
+            : $"'{value}'";
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -1596,7 +1675,7 @@ public static class ProofEngine
     //  S9 — Diagnostic Emission and FaultSiteLink Production
     // ════════════════════════════════════════════════════════════════════════════
 
-    private static Diagnostic CreateDiagnostic(ProofObligation obligation)
+    private static Diagnostic CreateDiagnostic(ProofObligation obligation, SemanticIndex semantics)
     {
         var contextDesc = FormatContextDescription(obligation.Context);
         var usageSuffix = FormatUsageContextSuffix(obligation.Context);
@@ -1608,18 +1687,18 @@ public static class ProofEngine
 
             case NumericProofRequirement numeric:
                 return Diagnostics.Create(GetNumericRequirementDiagnosticCode(obligation, numeric), obligation.Site.Span,
-                    GetFieldName(numeric.Subject, obligation.Site) ?? "<unknown>",
+                    DescribeSubject(numeric.Subject, obligation.Site),
                     contextDesc);
 
             case ModifierRequirement modReq:
                 return Diagnostics.Create(DiagnosticCode.UnprovedModifierRequirement, obligation.Site.Span,
-                    GetFieldName(modReq.Subject, obligation.Site) ?? "<unknown>",
+                    DescribeSubject(modReq.Subject, obligation.Site),
                     modReq.Required.ToString(),
                     usageSuffix);
 
             case DimensionProofRequirement dimReq:
                 return Diagnostics.Create(DiagnosticCode.UnprovedDimensionRequirement, obligation.Site.Span,
-                    GetFieldName(dimReq.Subject, obligation.Site) ?? "<unknown>",
+                    DescribeSubject(dimReq.Subject, obligation.Site),
                     FormatPeriodDimension(dimReq.RequiredDimension),
                     usageSuffix);
 
@@ -1627,13 +1706,13 @@ public static class ProofEngine
                 string leftName, rightName;
                 if (obligation.Site is TypedBinaryOp qcBin)
                 {
-                    leftName = GetFieldName(qcBin.Left) ?? "<expression>";
-                    rightName = GetFieldName(qcBin.Right) ?? "<expression>";
+                    leftName = DescribeQualifiedExpression(qcBin.Left, qcReq.Axis, semantics);
+                    rightName = DescribeQualifiedExpression(qcBin.Right, qcReq.Axis, semantics);
                 }
                 else
                 {
-                    leftName = GetFieldName(qcReq.LeftSubject, obligation.Site) ?? "<unknown>";
-                    rightName = GetFieldName(qcReq.RightSubject, obligation.Site) ?? "<unknown>";
+                    leftName = DescribeQualifiedSubject(qcReq.LeftSubject, obligation.Site, qcReq.Axis, semantics);
+                    rightName = DescribeQualifiedSubject(qcReq.RightSubject, obligation.Site, qcReq.Axis, semantics);
                 }
 
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
@@ -1644,14 +1723,14 @@ public static class ProofEngine
 
             case QualifierChainProofRequirement chainReq:
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
-                    GetFieldName(chainReq.LeftSubject, obligation.Site) ?? "<unknown>",
-                    GetFieldName(chainReq.RightSubject, obligation.Site) ?? "<unknown>",
+                    DescribeSubject(chainReq.LeftSubject, obligation.Site),
+                    DescribeSubject(chainReq.RightSubject, obligation.Site),
                     $"{chainReq.LeftAxis}↔{chainReq.RightAxis}",
                     usageSuffix);
 
             case PresenceProofRequirement presence:
                 return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,
-                    GetFieldName(presence.Subject, obligation.Site) ?? "<unknown>",
+                    DescribeSubject(presence.Subject, obligation.Site),
                     usageSuffix);
         }
 
@@ -1671,7 +1750,7 @@ public static class ProofEngine
                 diagnostic = Diagnostics.Create(
                     DiagnosticCode.UnguardedCollectionAccess,
                     obligation.Site.Span,
-                    GetFieldName(access.Object) ?? "<unknown>",
+                    DescribeExpression(access.Object),
                     access.ResolvedAccessor.Name);
                 return true;
 
