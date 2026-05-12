@@ -1,6 +1,6 @@
 # Typed Constants & Proof Coverage Plan
 
-**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — 🔲 Not Started (4 slices, 66 PRE0114)
+**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done, E2–E3 🔲 Not Started (66 PRE0114 pending extraction/propagation)
 
 ### Slice Status Tracker
 
@@ -37,7 +37,7 @@
 | E1 | Shared ParameterMeta Disambiguation in Qualifier Compatibility Proofs | ✅ Done (`d549b4a5`) — 7 targeted tests pass |
 | E2 | Interpolated Typed Constant Qualifier Extraction | 🔲 Not Started |
 | E3 | Subexpression Qualifier Propagation (Currency + Compound Unit Numerator) | 🔲 Not Started |
-| E4 | Symbolic Qualifier Equivalence for Interpolated Templates | 🔲 Not Started |
+| E4 | Symbolic Qualifier Equivalence for Interpolated Templates | ✅ Done (`d9464ab2`) |
 
 
 **Architect:** Frank (frank-16, frank-18, frank-23 revision; proof audit integration 2026-05-11)  
@@ -2965,9 +2965,9 @@ E1 + E3 resolves **30 transition action errors**:
 
 #### Slice E4 — Symbolic Qualifier Equivalence for Interpolated Templates (RC-4)
 
-**Status:** 🔲 Not Started
-**Depends on:** E1, E2
-**Blocks:** None
+**Status:** ✅ Done (`d9464ab2`)
+**Depends on:** E1
+**Blocks:** E2, E3 (full effect)
 
 ##### Root Cause
 
