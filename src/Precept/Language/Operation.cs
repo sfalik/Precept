@@ -32,6 +32,11 @@ public enum ResultQualifierPolicy
     /// (e.g., money × decimal → money with same qualifier).
     /// </summary>
     InheritFromQualifiedOperand,
+    /// <summary>
+    /// Result currency is the exchangerate's ToCurrency.
+    /// Used by <c>ExchangeRateTimesMoney</c>.
+    /// </summary>
+    CurrencyConversion,
 }
 
 /// <summary>

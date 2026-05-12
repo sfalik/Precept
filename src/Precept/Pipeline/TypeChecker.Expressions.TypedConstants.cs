@@ -68,6 +68,24 @@ internal static partial class TypeChecker
                 when TryDeriveCompoundUnitCancellationQualifier(binary, out qualifiers):
                 return true;
 
+            case TypedBinaryOp { ResultQualifier: CurrencyConversionRequired } binary:
+                // Result currency is the ToCurrency of the exchangerate operand
+                var rateOperand = binary.Left.ResultType == TypeKind.ExchangeRate
+                    ? binary.Left : binary.Right;
+                if (TryGetAssignmentSourceQualifiers(rateOperand, out var rateQuals))
+                {
+                    foreach (var q in rateQuals)
+                    {
+                        if (q is DeclaredQualifierMeta.ToCurrency { CurrencyCode: var toCurr })
+                        {
+                            qualifiers = [new DeclaredQualifierMeta.Currency(toCurr)];
+                            return true;
+                        }
+                    }
+                }
+                qualifiers = default;
+                return false;
+
             default:
                 qualifiers = default;
                 return false;

@@ -242,7 +242,7 @@ internal static partial class TypeChecker
 
         // Type has no content validation — treat as a plain typed constant (trusted)
         if (cv is null)
-            return new TypedTypedConstant(targetType, rawText, rawText, lit.Span);
+            return new TypedTypedConstant(targetType, rawText, rawText, null, lit.Span);
 
         var typedConstantContext = qualifiers is not null
             ? new TypedConstantContext(DeclaredQualifiers: qualifiers)
@@ -250,7 +250,10 @@ internal static partial class TypeChecker
         var result = TypedConstantValidation.Validate(cv, rawText, targetType, typedConstantContext);
 
         if (result.IsValid)
-            return new TypedTypedConstant(targetType, rawText, result.Value, lit.Span);
+        {
+            var declaredQualifiers = ExtractQualifiersFromParsedValue(targetType, result.Value);
+            return new TypedTypedConstant(targetType, rawText, result.Value, declaredQualifiers, lit.Span);
+        }
 
         foreach (var _ in result.Diagnostics)
         {
@@ -262,7 +265,41 @@ internal static partial class TypeChecker
         return new TypedErrorExpression(lit.Span);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
+    /// <summary>
+    /// Extract qualifier metadata from the validated parsed value of a typed constant.
+    /// Returns qualifiers for Money (currency), Quantity (unit), and Price (currency + unit);
+    /// returns null for types that carry no structured qualifier identity.
+    /// </summary>
+    private static ImmutableArray<DeclaredQualifierMeta>? ExtractQualifiersFromParsedValue(
+        TypeKind type, object? parsedValue)
+    {
+        switch (type)
+        {
+            case TypeKind.Money:
+                if (parsedValue is ValueTuple<decimal, object?>(_, CurrencyEntry moneyCurrency))
+                    return [new DeclaredQualifierMeta.Currency(moneyCurrency.AlphaCode)];
+                break;
+            case TypeKind.Quantity:
+                if (parsedValue is ValueTuple<decimal, UcumParsedUnit?>(_, UcumParsedUnit quantityUnit))
+                    return [new DeclaredQualifierMeta.Unit(
+                        quantityUnit.CanonicalCode,
+                        UnitDimensionHelper.DeriveUnitDimensionName(quantityUnit))];
+                break;
+            case TypeKind.Price:
+                if (parsedValue is ValueTuple<decimal, object?, UcumParsedUnit?>(_, CurrencyEntry priceCurrency, UcumParsedUnit priceUnit))
+                    return
+                    [
+                        new DeclaredQualifierMeta.Currency(priceCurrency.AlphaCode),
+                        new DeclaredQualifierMeta.Unit(
+                            priceUnit.CanonicalCode,
+                            UnitDimensionHelper.DeriveUnitDimensionName(priceUnit)),
+                    ];
+                break;
+        }
+        return null;
+    }
+
+
     //  Context retry for binary operations (Slice 4)
     // ════════════════════════════════════════════════════════════════════════
 
@@ -670,6 +707,9 @@ internal static partial class TypeChecker
 
         if (meta.ResultQualifierPolicy == ResultQualifierPolicy.InheritFromQualifiedOperand)
             return new QualifiedOperandInherited();
+
+        if (meta.ResultQualifierPolicy == ResultQualifierPolicy.CurrencyConversion)
+            return new CurrencyConversionRequired();
 
         return meta.Match switch
         {

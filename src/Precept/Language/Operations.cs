@@ -659,6 +659,7 @@ public static class Operations
         OperationKind.ExchangeRateTimesMoney => new BinaryOperationMeta(
             kind, OperatorKind.Times, PExchangeRate, PMoney, TypeKind.Money,
             "ExchangeRate × money → money (currency conversion)", BidirectionalLookup: true,
+            ResultQualifierPolicy: ResultQualifierPolicy.CurrencyConversion,
             ProofRequirements:
             [
                 new QualifierChainProofRequirement(new ParamSubject(PExchangeRate), QualifierAxis.FromCurrency,

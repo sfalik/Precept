@@ -124,6 +124,7 @@ public sealed record TypedTypedConstant(
     TypeKind ResultType,
     string RawText,
     object? ParsedValue,
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
@@ -209,6 +210,12 @@ public sealed record CompoundUnitCancellationRequired : QualifierBinding;
 /// The non-qualifier-bearing operand (e.g., decimal) is transparent to qualifier flow.
 /// </summary>
 public sealed record QualifiedOperandInherited : QualifierBinding;
+
+/// <summary>
+/// Result currency is the ToCurrency of the exchangerate operand.
+/// Used for <c>ExchangeRateTimesMoney</c> currency conversion operations.
+/// </summary>
+public sealed record CurrencyConversionRequired : QualifierBinding;
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ActionSecondaryRole enum (D5)

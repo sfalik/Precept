@@ -937,7 +937,35 @@ public static class ProofEngine
             }
         }
 
-        return leftQualifier == rightQualifier || QualifiersSymbolicallyEqual(leftQualifier, rightQualifier);
+        if (leftQualifier == rightQualifier || QualifiersSymbolicallyEqual(leftQualifier, rightQualifier))
+            return true;
+
+        // Cross-type dimension compatibility: Unit(code, dim) and Dimension(dim) denote the same
+        // dimension at different levels of specificity (e.g., a dimension-only price field vs a
+        // unit-qualified typed constant). Consider them compatible if their dimension names agree.
+        if (axis == QualifierAxis.Unit || axis == QualifierAxis.Dimension)
+        {
+            string? leftDim = leftQualifier switch
+            {
+                DeclaredQualifierMeta.Unit { DimensionName: var d } => d,
+                DeclaredQualifierMeta.Dimension { DimensionName: var d } => d,
+                _ => null,
+            };
+            string? rightDim = rightQualifier switch
+            {
+                DeclaredQualifierMeta.Unit { DimensionName: var d } => d,
+                DeclaredQualifierMeta.Dimension { DimensionName: var d } => d,
+                _ => null,
+            };
+            if (leftDim is not null && rightDim is not null
+                && !string.IsNullOrEmpty(leftDim)
+                && string.Equals(leftDim, rightDim, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool QualifiersSymbolicallyEqual(DeclaredQualifierMeta left, DeclaredQualifierMeta right)
@@ -1023,6 +1051,33 @@ public static class ProofEngine
             }
         }
 
+        if (resolved is TypedTypedConstant { DeclaredQualifiers: { } tcQualifiers })
+        {
+            foreach (var qual in tcQualifiers)
+            {
+                if (qual.Axis == axis)
+                    return qual;
+            }
+
+            if (axis == QualifierAxis.Unit)
+            {
+                foreach (var qual in tcQualifiers)
+                {
+                    if (qual.Axis == QualifierAxis.Dimension)
+                        return qual;
+                }
+            }
+
+            if (axis == QualifierAxis.Dimension)
+            {
+                foreach (var qual in tcQualifiers)
+                {
+                    if (qual.Axis == QualifierAxis.TemporalDimension)
+                        return qual;
+                }
+            }
+        }
+
         // Transitive qualifier resolution through binary operations:
         // When the resolved subject is a TypedBinaryOp (a subexpression), its
         // ResultQualifier tells us how to derive the result's qualifiers.
@@ -1048,6 +1103,16 @@ public static class ProofEngine
                     }
 
                     return TryResolveCompoundCancellationUnit(binOp, axis, semantics);
+
+                case CurrencyConversionRequired:
+                    if (axis == QualifierAxis.Currency)
+                    {
+                        // Result currency = exchangerate operand's ToCurrency
+                        return ResolveQualifierFromExpression(
+                            binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
+                            QualifierAxis.ToCurrency, semantics);
+                    }
+                    return null;
             }
         }
 
@@ -1113,6 +1178,17 @@ public static class ProofEngine
                         if (q.Axis == QualifierAxis.TemporalDimension) return q;
                 return null;
 
+            case TypedTypedConstant { DeclaredQualifiers: { IsDefaultOrEmpty: false } tcQuals }:
+                foreach (var q in tcQuals)
+                    if (q.Axis == axis) return q;
+                if (axis == QualifierAxis.Unit)
+                    foreach (var q in tcQuals)
+                        if (q.Axis == QualifierAxis.Dimension) return q;
+                if (axis == QualifierAxis.Dimension)
+                    foreach (var q in tcQuals)
+                        if (q.Axis == QualifierAxis.TemporalDimension) return q;
+                return null;
+
             case TypedFieldRef fieldRef:
                 return ResolveFieldQualifier(fieldRef.FieldName, axis, semantics);
 
@@ -1138,6 +1214,13 @@ public static class ProofEngine
                             ? ResolveQualifierFromExpression(binOp.Left, axis, semantics)
                                 ?? ResolveQualifierFromExpression(binOp.Right, axis, semantics)
                             : TryResolveCompoundCancellationUnit(binOp, axis, semantics),
+                    CurrencyConversionRequired =>
+                        axis == QualifierAxis.Currency
+                            // Result currency = exchangerate operand's ToCurrency
+                            ? ResolveQualifierFromExpression(
+                                binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
+                                QualifierAxis.ToCurrency, semantics)
+                            : null,
                     _ => null,
                 };
 

@@ -4550,4 +4550,127 @@ public class ProofEngineTests
             compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         }
     }
+
+    public class PartF_F3_StaticTypedConstantQualifierExtraction
+    {
+        [Fact]
+        public void MoneyFieldVsStaticTypedConstant_QualifierProved()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Balance as money in 'USD' default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                on Submit ensure Balance > '0.00 USD' because "Balance must be positive"
+                from Draft on Submit -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void QuantityFieldVsStaticTypedConstant_QualifierProved()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Weight as quantity in 'kg' default '0 kg' writable
+                state Draft initial
+                event Submit
+                on Submit ensure Weight > '0 kg' because "Weight must be positive"
+                from Draft on Submit -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void PriceFieldVsStaticTypedConstant_QualifierProved()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field P as price in 'USD' of 'mass' default '1 USD/kg' writable
+                state Draft initial
+                event Submit
+                on Submit ensure P > '0 USD/kg' because "Price must be positive"
+                from Draft on Submit -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void CrossCurrencyStaticConstant_StillRejected()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Balance as money in 'USD' default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                on Submit ensure Balance > '0.00 EUR' because "Balance must be positive"
+                from Draft on Submit -> no transition
+                """);
+
+            compilation.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+    }
+
+    public class PartF_F4_ExchangeRateTimesMoneyCurrencyConversion
+    {
+        [Fact]
+        public void ExchangeRateTimesMoney_ResultCurrencyIsToCurrency()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Rate as exchangerate in 'USD' to 'EUR' default '1.1 USD/EUR' writable
+                field Amount as money in 'USD' default '0.00 USD' writable
+                field Converted as money in 'EUR' default '0.00 EUR' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Converted = Rate * Amount -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void ExchangeRateTimesMoney_WrongFromCurrency_StillRejected()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Rate as exchangerate in 'GBP' to 'EUR' default '1.2 GBP/EUR' writable
+                field Amount as money in 'USD' default '0.00 USD' writable
+                field Converted as money in 'EUR' default '0.00 EUR' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Converted = Rate * Amount -> no transition
+                """);
+
+            compilation.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void ExchangeRateTimesMoney_QualifiedOperandInherited_WrongPolicy()
+        {
+            // Verify CurrencyConversion policy is used, not InheritFromQualifiedOperand.
+            // With InheritFromQualifiedOperand the result would inherit the money's currency (USD),
+            // so assigning to an EUR field would fail. With CurrencyConversion the result is EUR
+            // (the ToCurrency), so assigning to EUR succeeds.
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Rate as exchangerate in 'USD' to 'EUR' default '1.1 USD/EUR' writable
+                field Amount as money in 'USD' default '0.00 USD' writable
+                field Converted as money in 'EUR' default '0.00 EUR' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Converted = Rate * Amount -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.QualifierMismatch));
+        }
+    }
 }
