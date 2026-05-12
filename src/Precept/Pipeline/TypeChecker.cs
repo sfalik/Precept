@@ -709,7 +709,11 @@ internal static partial class TypeChecker
             var becauseSlot = construct.GetRequiredSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause);
             var message = new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span);
 
-            ctx.Rules.Add(new TypedRule(condition, guard, message, ImmutableArray<string>.Empty, construct));
+            ctx.Rules.Add(new TypedRule(condition, guard, message, construct));
+            ctx.ConstraintRefs.Add(new ConstraintFieldRefs(
+                new RuleIdentity(ctx.Rules.Count - 1),
+                CollectFieldRefs(condition).Distinct().ToImmutableArray(),
+                CollectArgRefs(condition).Distinct().ToImmutableArray()));
         }
     }
 
@@ -772,8 +776,11 @@ internal static partial class TypeChecker
                     Condition: condition,
                     Guard: null,
                     Message: message,
-                    SemanticSubjects: ImmutableArray<string>.Empty,
                     Syntax: construct));
+                ctx.ConstraintRefs.Add(new ConstraintFieldRefs(
+                    new EnsureIdentity(constraintKind, anchorState, ctx.Ensures.Count - 1),
+                    CollectFieldRefs(condition).Distinct().ToImmutableArray(),
+                    CollectArgRefs(condition).Distinct().ToImmutableArray()));
             }
         }
 
@@ -826,8 +833,11 @@ internal static partial class TypeChecker
                         Condition: condition,
                         Guard: null,
                         Message: message,
-                        SemanticSubjects: ImmutableArray<string>.Empty,
                         Syntax: construct));
+                    ctx.ConstraintRefs.Add(new ConstraintFieldRefs(
+                        new EnsureIdentity(ConstraintKind.EventPrecondition, anchorEvent, ctx.Ensures.Count - 1),
+                        CollectFieldRefs(condition).Distinct().ToImmutableArray(),
+                        CollectArgRefs(condition).Distinct().ToImmutableArray()));
                 }
                 finally
                 {
@@ -1404,6 +1414,64 @@ internal static partial class TypeChecker
         TypedInterpolatedTypedConstant itc => itc.Slots.Any(s => ContainsError(s.Expression)),
         TypedListLiteral list => list.Elements.Any(ContainsError),
         TypedPostfixOp post => ContainsError(post.Operand),
-        _ => false, // TypedFieldRef, TypedArgRef, TypedLiteral, TypedTypedConstant — leaf nodes
+        _ => false, // TypedFieldRef, TypedArgRef, TypedLiteral, TypedTypedConstant
+    };
+
+    /// <summary>
+    /// Recursively collects all <see cref="TypedFieldRef.FieldName"/> values from an expression tree.
+    /// Deduplicate results at the call site with <c>.Distinct()</c>.
+    /// </summary>
+    private static IEnumerable<string> CollectFieldRefs(TypedExpression? expr) => expr switch
+    {
+        null                                => [],
+        TypedFieldRef f                     => [f.FieldName],
+        TypedArgRef                         => [],
+        TypedLiteral                        => [],
+        TypedBinaryOp bin                   => CollectFieldRefs(bin.Left).Concat(CollectFieldRefs(bin.Right)),
+        TypedUnaryOp un                     => CollectFieldRefs(un.Operand),
+        TypedFunctionCall fn                => fn.Arguments.SelectMany(CollectFieldRefs),
+        TypedMemberAccess ma                => CollectFieldRefs(ma.Object),
+        TypedConditional cond               => CollectFieldRefs(cond.Condition)
+                                                  .Concat(CollectFieldRefs(cond.ThenBranch))
+                                                  .Concat(CollectFieldRefs(cond.ElseBranch)),
+        TypedQuantifier q                   => CollectFieldRefs(q.Collection).Concat(CollectFieldRefs(q.Predicate)),
+        TypedInterpolatedString interp      => interp.Segments
+                                                  .OfType<TypedHoleSegment>()
+                                                  .SelectMany(s => CollectFieldRefs(s.Expression)),
+        TypedTypedConstant                  => [],
+        TypedInterpolatedTypedConstant itc  => itc.Slots.SelectMany(s => CollectFieldRefs(s.Expression)),
+        TypedListLiteral list               => list.Elements.SelectMany(CollectFieldRefs),
+        TypedPostfixOp post                 => CollectFieldRefs(post.Operand),
+        TypedErrorExpression                => [],
+        TypedExpression                     => [],
+    };
+
+    /// <summary>
+    /// Recursively collects all <see cref="TypedArgRef.ArgName"/> values from an expression tree.
+    /// Deduplicate results at the call site with <c>.Distinct()</c>.
+    /// </summary>
+    private static IEnumerable<string> CollectArgRefs(TypedExpression? expr) => expr switch
+    {
+        null                                => [],
+        TypedFieldRef                       => [],
+        TypedArgRef a                       => [a.ArgName],
+        TypedLiteral                        => [],
+        TypedBinaryOp bin                   => CollectArgRefs(bin.Left).Concat(CollectArgRefs(bin.Right)),
+        TypedUnaryOp un                     => CollectArgRefs(un.Operand),
+        TypedFunctionCall fn                => fn.Arguments.SelectMany(CollectArgRefs),
+        TypedMemberAccess ma                => CollectArgRefs(ma.Object),
+        TypedConditional cond               => CollectArgRefs(cond.Condition)
+                                                  .Concat(CollectArgRefs(cond.ThenBranch))
+                                                  .Concat(CollectArgRefs(cond.ElseBranch)),
+        TypedQuantifier q                   => CollectArgRefs(q.Collection).Concat(CollectArgRefs(q.Predicate)),
+        TypedInterpolatedString interp      => interp.Segments
+                                                  .OfType<TypedHoleSegment>()
+                                                  .SelectMany(s => CollectArgRefs(s.Expression)),
+        TypedTypedConstant                  => [],
+        TypedInterpolatedTypedConstant itc  => itc.Slots.SelectMany(s => CollectArgRefs(s.Expression)),
+        TypedListLiteral list               => list.Elements.SelectMany(CollectArgRefs),
+        TypedPostfixOp post                 => CollectArgRefs(post.Operand),
+        TypedErrorExpression                => [],
+        TypedExpression                     => [],
     };
 }
