@@ -212,6 +212,7 @@ public class DiagnosticsTests
         DiagnosticCode.UnexpectedKeyword,
         DiagnosticCode.NonAssociativeComparison,
         DiagnosticCode.InvalidCallTarget,
+        DiagnosticCode.AssignmentInExpressionContext,
         DiagnosticCode.EmptyChoice,
         DiagnosticCode.ChoiceMissingElementType,
         DiagnosticCode.ChoiceElementTypeMismatch,

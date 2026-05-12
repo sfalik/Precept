@@ -13,6 +13,11 @@
 
 
 ## Learnings
+### 2026-05-12T00:30:00-04:00 — C3 assignment-in-expression diagnostic
+
+- A lone `=` inside Pratt expression parsing never binds as an expression operator, so the parser used to stop early and let the next slot report a misleading `ExpectedToken` on `because`. Catch `TokenKind.Assign` in expression parsing, emit the dedicated parse diagnostic there, and consume the RHS for recovery.
+- Recovery should return `MissingExpression`, not a fake binary op: that keeps downstream stages structurally intact while preserving the language rule that `=` is only for `set` actions and `==` is the comparison surface.
+
 ### 2026-05-12T00:20:02-04:00 — C2 .from/.to keyword member-name cycle
 
 - The safe derivation path is `Types.All` accessor names → `Tokens.Keywords` → `Tokens.KeywordsValidAsMemberName`; the parser must consume that frozen set directly instead of rebuilding it through `TokenMeta.IsValidAsMemberName` during static initialization.

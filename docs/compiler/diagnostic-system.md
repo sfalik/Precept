@@ -147,7 +147,7 @@ public enum DiagnosticCode
     UnrecognizedTypedConstantEscape    =   7,
     UnescapedBraceInLiteral            =   8,
 
-    // ── Parse (8 codes) ──────────────────────────────────
+    // ── Parse (9 codes) ──────────────────────────────────
     ExpectedToken                      =   9,
     NonAssociativeComparison           =  10,
     UnexpectedKeyword                  =  11,
@@ -156,6 +156,7 @@ public enum DiagnosticCode
     EventHandlerDoesNotSupportGuard    =  14,
     PreEventGuardNotAllowed            =  15,
     ExpectedOutcome                    =  16,
+    AssignmentInExpressionContext      = 127,
 
     // ── Type (core) ──────────────────────────────────────
     UndeclaredField                    =  17,

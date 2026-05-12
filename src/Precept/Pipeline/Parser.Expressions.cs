@@ -23,6 +23,9 @@ public static partial class Parser
 
             while (!terminates() && !IsAtEnd)
             {
+                if (Peek().Kind == TokenKind.Assign)
+                    return RecoverAssignmentInExpressionContext(left, terminates);
+
                 var (ledBp, _) = GetLedBindingPower(Peek().Kind);
                 if (ledBp < 0 || ledBp < minBp)
                     break;
@@ -31,6 +34,19 @@ public static partial class Parser
             }
 
             return left;
+        }
+
+        private ParsedExpression RecoverAssignmentInExpressionContext(ParsedExpression left, Func<bool> terminates)
+        {
+            var assignToken = Advance();
+            _diagnostics.Add(Language.Diagnostics.Create(
+                DiagnosticCode.AssignmentInExpressionContext, assignToken.Span));
+
+            if (terminates() || IsAtEnd)
+                return new MissingExpression(SourceSpan.Covering(left.Span, assignToken.Span));
+
+            var right = ParseExpression(0, terminates);
+            return new MissingExpression(SourceSpan.Covering(left.Span, right.Span));
         }
 
         // ── Null denotation (nud) ───────────────────────────────────────────────
@@ -91,6 +107,12 @@ public static partial class Parser
                 // ── CI function call: ~functionName(...) ─────────────────
                 case TokenKind.Tilde:
                     return ParseCIFunctionCall(terminates);
+
+                case TokenKind.Assign:
+                    _diagnostics.Add(Language.Diagnostics.Create(
+                        DiagnosticCode.AssignmentInExpressionContext, token.Span));
+                    Advance();
+                    return new MissingExpression(token.Span);
 
                 default:
                     // Error recovery — emit a diagnostic and produce a placeholder

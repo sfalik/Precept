@@ -147,13 +147,13 @@ in Listed ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed 
 # Selling below cost is structurally prevented. BUG-A: cross-type comparison.
 in Listed ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
 # BUG-B: quantity and price comparison against typed constant literal.
-in Listed ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand = '0 {StockingUnit}' because "Stocked items must have a positive average cost"
+in Listed ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand == '0 {StockingUnit}' because "Stocked items must have a positive average cost"
 
 in LowStock modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
 in LowStock ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
 in LowStock ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
 # BUG-B
-in LowStock ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand = '0 {StockingUnit}' because "Stocked items must have a positive average cost"
+in LowStock ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand == '0 {StockingUnit}' because "Stocked items must have a positive average cost"
 
 # ── Events ────────────────────────────────────────────────────────────────────
 
@@ -170,8 +170,8 @@ on ReceiveShipment ensure ReceiveShipment.PurchaseQty > '0 {PurchaseUnit}' becau
 on ReceiveShipment ensure ReceiveShipment.SupplierUnitCost > '0.00 {SupplierCurrency}/{StockingUnit}' because "Supplier unit cost must be positive"
 # Rate direction must match: from SupplierCurrency → CatalogCurrency.
 # When BUG-C ships this becomes a compile-time qualifier: Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'
-on ReceiveShipment ensure ReceiveShipment.Rate.from = SupplierCurrency because "Exchange rate must convert from the supplier's currency"
-on ReceiveShipment ensure ReceiveShipment.Rate.to = CatalogCurrency because "Exchange rate must convert to the catalog currency"
+on ReceiveShipment ensure ReceiveShipment.Rate.from == SupplierCurrency because "Exchange rate must convert from the supplier's currency"
+on ReceiveShipment ensure ReceiveShipment.Rate.to == CatalogCurrency because "Exchange rate must convert to the catalog currency"
 
 # FulfillOrder: sale qty in SaleUnit, converted to StockingUnit on fulfillment.
 # Captured at current ListPrice and AverageCost for P&L accuracy.

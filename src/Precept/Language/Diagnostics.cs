@@ -144,6 +144,17 @@ public static class Diagnostics
             RecoverySteps: ["Add '-> transition TargetState' to move to another state", "Or '-> no transition' to stay in the current state", "Or '-> reject \"reason\"' to fail the event"],
             ExampleBefore: "precept Example\nfield X as number default 0\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete -> set X = 1",
             ExampleAfter: "precept Example\nfield X as number default 0\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete -> set X = 1 -> transition Done"),
+        DiagnosticCode.AssignmentInExpressionContext => new(
+            nameof(DiagnosticCode.AssignmentInExpressionContext),
+            DiagnosticStage.Parse,
+            Severity.Error,
+            "'=' is assignment and cannot be used inside an expression — use '==' for equality",
+            DiagnosticCategory.Structure,
+            FixHint: "Replace '=' with '==' when you mean to compare two values",
+            TriggerCondition: "The assignment token '=' appears inside an expression such as a rule, ensure, guard, or computed field. In Precept, '=' is only valid in 'set' actions; comparisons use '=='.",
+            RecoverySteps: ["Replace '=' with '==' for equality comparison", "Use '=' only in '-> set Field = Value' actions"],
+            ExampleBefore: "precept Example\nin Listed ensure QuantityOnHand = '0 each' because \"check\"",
+            ExampleAfter: "precept Example\nin Listed ensure QuantityOnHand == '0 each' because \"check\""),
 
         // ── Type ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UndeclaredField                => new(nameof(DiagnosticCode.UndeclaredField),                DiagnosticStage.Type,  Severity.Error,   "Field '{0}' is not declared",                                                                                                          DiagnosticCategory.Naming,

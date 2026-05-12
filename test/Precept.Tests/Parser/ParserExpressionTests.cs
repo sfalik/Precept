@@ -1192,6 +1192,18 @@ public class ParserExpressionTests
     }
 
     [Fact]
+    public void Negative_AssignmentInEnsureExpression_EmitsAssignmentInExpressionContext_AndRecoversBecauseClause()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("in Draft ensure amount = 0 because \"msg\""));
+
+        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.AssignmentInExpressionContext));
+
+        var ensure = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.StateEnsure);
+        ensure.GetRequiredSlot<EnsureClauseSlot>(ConstructSlotKind.EnsureClause).Expression.Should().BeOfType<MissingExpression>();
+        ensure.GetRequiredSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause).Message.Should().Be("msg");
+    }
+
+    [Fact]
     public void Negative_UnknownFunctionName_StillProducesFunctionCallExpression()
     {
         var expression = GetRuleExpression("rule mystery(amount) because \"msg\"");

@@ -30,6 +30,10 @@ public enum DiagnosticCode
     EventHandlerDoesNotSupportGuard    =  14,
     PreEventGuardNotAllowed            =  15,
     ExpectedOutcome                    =  16,
+    /// <summary>
+    /// The assignment token '=' appears inside an expression, where only comparison '==' is valid.
+    /// </summary>
+    AssignmentInExpressionContext      = 127,
 
     // ── Type ─────────────────────────────────────────────
     UndeclaredField                    =  17,
