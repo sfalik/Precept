@@ -60,7 +60,7 @@ from AwaitingApproval on ApproveEstimate when RecommendedServices.count == Appro
     -> set InvoiceTotal = ApproveEstimate.EstimateTotal
     -> transition InService
 from AwaitingApproval on ApproveEstimate
-    -> reject "The approved count must match the recommended services still on the estimate"
+    -> reject "Approved count {ApproveEstimate.ApprovedCount} does not match the {RecommendedServices.count} services currently on the estimate"
 
 from InService on FinishService
     -> transition ReadyForPickup

@@ -22,7 +22,7 @@ state Declined terminal
 
 in Draft modify ApplicantName, MonthlyIncome, RequestedRent, CreditScore, HouseholdSize editable
 
-in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
+in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Monthly income {MonthlyIncome} does not meet the 3x rent requirement — {RequestedRent * 3} needed"
 in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
 
 event Submit
@@ -42,7 +42,7 @@ from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScor
     -> set ReviewerNote = Approve.Note
     -> transition Approved
 from Submitted on Approve
-    -> reject "Approval requires strong income coverage, acceptable credit, and a manageable household size"
+    -> reject "Approval requires income of at least {RequestedRent * 3} (yours: {MonthlyIncome}), credit score 650 or higher (yours: {CreditScore}), and household size under 8 (yours: {HouseholdSize})"
 from Submitted on Decline
     -> set ReviewerNote = Decline.Note
     -> transition Declined

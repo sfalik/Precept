@@ -6,7 +6,7 @@ precept TravelReimbursement
 # RequestedTotal is a computed field — always equal to the sum of its components.
 
 field EmployeeName as string optional
-field TripDays as number default 1 positive
+field TripDays as decimal default 1 positive
 field LodgingTotal as decimal default 0
 field MealsTotal as decimal default 0
 field MileageTotal as decimal default 0 maxplaces 2
@@ -26,7 +26,7 @@ in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an appro
 
 event Submit(
     Employee as string notempty,
-    Days as number,
+    Days as decimal,
     Lodging as decimal,
     Meals as decimal,
     Miles as number,

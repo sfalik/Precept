@@ -26,7 +26,7 @@ in Closed ensure ShippingLabelSent because "Closed cases must have a return labe
 to ReadyToReturn -> set ShippingLabelSent = true
 
 event Submit(Customer as string notempty, Product as string notempty, Serial as string notempty)
-event Approve(Note as string optional notempty)
+event Approve(Note as string optional)
 event Deny(Note as string notempty)
 event StartRepair
 event LogRepairStep(StepName as string notempty)

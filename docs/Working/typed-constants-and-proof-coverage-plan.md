@@ -1,6 +1,6 @@
 # Typed Constants & Proof Coverage Plan
 
-**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`)
+**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1–F5 designed (pending design decisions Q1/Q2)
 
 ### Slice Status Tracker
 
@@ -38,6 +38,12 @@
 | E2 | Interpolated Typed Constant Qualifier Extraction | ✅ Done (`8785d753`) |
 | E3 | Subexpression Qualifier Propagation (Currency + Compound Unit Numerator) | ✅ Done (`d3f5aa98`) |
 | E4 | Symbolic Qualifier Equivalence for Interpolated Templates | ✅ Done (`d9464ab2`) |
+| **Part F — Sample Completeness Fixes** | | |
+| F1 | Sample Fix: `optional notempty` → `optional` (8 diagnostics, 6 files) | 🔲 Not Started |
+| F2 | Sample Fix: `number` → `decimal` in travel-reimbursement (2 diagnostics) | 🔲 Not Started |
+| F3 | Compiler Fix: Static Typed Constant Qualifier Extraction (9 diagnostics, 4 files) | ⏳ Design decision Q2 pending |
+| F4 | Compiler Fix: ExchangeRateTimesMoney Result Qualifier Policy (27 diagnostics, inventory-item) | ⏳ Design decision Q1 pending |
+| F5 | Verification Pass: Recompile all 30 samples, resolve any residual | 🔲 Blocked on F3 + F4 |
 
 
 **Architect:** Frank (frank-16, frank-18, frank-23 revision; proof audit integration 2026-05-11)  
@@ -3104,3 +3110,296 @@ Rationale: E1 is foundational. E4 is pure comparison logic with no extraction de
 | `samples/inventory-item.precept` | | | ✓* | | Fix ReceiveShipment parenthesization (sample fix) |
 
 \* The sample fix is separate from the compiler work — no diagnostic code changes.
+
+---
+
+## Part F — Sample Completeness Fixes
+
+**Goal:** All 30 `.precept` sample files compile with zero diagnostics.
+
+**Scope:** 46 diagnostics across 10 files, traced to 4 root causes.
+
+**Architect:** Frank (frank-sample-completeness analysis, 2026-05-12)
+
+**Design decisions required:** Q1 (ExchangeRateTimesMoney policy), Q2 (TypedLiteral node shape) — filed in `.squad/decisions/inbox/frank-sample-errors-design-questions.md`
+
+**Complete error inventory:** `.squad/decisions/inbox/frank-sample-errors-analysis.md`
+
+---
+
+### F1 — Sample Fix: `optional notempty` → `optional`
+
+**Type:** Sample fix
+**Diagnostics cleared:** 8 × PRE0120 (ConflictingModifiers)
+**Effort:** Small
+**Dependencies:** None
+**Owner:** Any team member
+
+**Root cause:** The `notempty` modifier requires a value to be non-empty when present. The `optional` modifier allows a field/arg to be absent. These are mutually exclusive — if a value is absent, the `notempty` check is meaningless. The type checker correctly rejects this combination.
+
+**Fix:** In each file, change `optional notempty` to just `optional` on the affected event arg declarations. The author's intent is that the argument is optional — when provided, string validation handles content requirements at the application layer, not the contract level.
+
+**Affected files and lines:**
+
+| File | Line | Current | Fix |
+|------|------|---------|-----|
+| `samples/it-helpdesk-ticket.precept` | 32 | `Note as string optional notempty` | `Note as string optional` |
+| `samples/library-book-checkout.precept` | 46 | `Condition as string optional notempty` | `Condition as string optional` |
+| `samples/library-book-checkout.precept` | 47 | (second arg) `optional notempty` | `optional` |
+| `samples/loan-application.precept` | 44 | `Note as string optional notempty` | `Note as string optional` |
+| `samples/maintenance-work-order.precept` | 53 | `Reason as string optional notempty` | `Reason as string optional` |
+| `samples/refund-request.precept` | 32 | `Note as string optional notempty` | `Note as string optional` |
+| `samples/refund-request.precept` | 37 | `Note as string optional notempty` | `Note as string optional` |
+| `samples/travel-reimbursement.precept` | 40 | `Note as string optional notempty` | `Note as string optional` |
+
+**Validation:** After edit, each file's PRE0120 count drops to 0. No other diagnostics should change (the modifier fix is independent of qualifier/type errors).
+
+---
+
+### F2 — Sample Fix: `number` → `decimal` Type Mismatch in travel-reimbursement
+
+**Type:** Sample fix
+**Diagnostics cleared:** 2 × PRE0018 (TypeMismatch)
+**Effort:** Small
+**Dependencies:** None
+**Owner:** Any team member
+
+**Root cause:** `travel-reimbursement.precept` declares fields `LodgingTotal` and `MealsTotal` as `decimal` (L10–11), but the `Submit` event declares args `Lodging` and `Meals` as `number` (L30–31). The transition `set LodgingTotal = Submit.Lodging` assigns `number` to `decimal` — a type mismatch. The types are not interchangeable in Precept's type system.
+
+**Fix:** Change the `Submit` event arg types from `number` to `decimal`:
+
+```
+// Before (L30-31):
+Lodging as number,
+Meals as number,
+
+// After:
+Lodging as decimal,
+Meals as decimal,
+```
+
+**Affected file:** `samples/travel-reimbursement.precept` lines 30–31
+
+**Validation:** PRE0018 count drops from 2 to 0. The `RequestedTotal` computed field (`LodgingTotal + MealsTotal + MileageTotal`) remains valid since all three are `decimal`. No cascading changes needed — the ensures on `Submit.Lodging` and `Submit.Meals` remain valid for `decimal`.
+
+---
+
+### F3 — Compiler Fix: Static Typed Constant Qualifier Extraction
+
+**Type:** Compiler fix (proof engine)
+**Diagnostics cleared:** 9 × PRE0114 (UnprovedQualifierCompatibility) across 4 files
+**Effort:** Medium
+**Dependencies:** Design decision Q2 (TypedLiteral node shape)
+**Owner:** George
+
+**Root cause:** The proof engine cannot extract qualifiers from static typed constant literals in comparison expressions. When evaluating `MonthlyIncome > '0.00 USD'`, the proof engine resolves `MonthlyIncome`'s `Currency(USD)` qualifier from the field declaration but returns `null` for the typed constant `'0.00 USD'` — because `ResolveQualifierFromExpression()` has no branch for `TypedLiteral` nodes.
+
+**Affected files (samples cleared by this fix):**
+- `samples/apartment-rental-application.precept` — 2 errors cleared
+- `samples/hiring-pipeline.precept` — 1 error cleared
+- `samples/insurance-claim.precept` — 1 error cleared
+- `samples/loan-application.precept` — 5 errors cleared
+
+**Implementation:**
+
+**Step 1 — Extend `TypedLiteral` node** (pending Q2 decision):
+
+```csharp
+// In SemanticIndex.cs — add DeclaredQualifiers to TypedLiteral
+public sealed record TypedLiteral(
+    TypeKind ResultType,
+    object? Value,
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,  // NEW — populated for typed constants only
+    SourceSpan Span
+) : TypedExpression(ResultType, Span);
+```
+
+**Step 2 — Populate qualifiers in type checker:**
+
+In `TypeChecker.Expressions.cs`, wherever `TypedLiteral` is created for a typed constant resolution (the branch that handles `TokenKind.TypedConstant`), extract qualifiers from the `TypedConstantParseResult` (which already carries `DeclaredQualifiers`) and pass them to the `TypedLiteral` constructor.
+
+Method: `ResolveLiteral()` in `TypeChecker.Expressions.cs` — the `TypedConstant` branch that creates the `TypedLiteral` node for static typed constants.
+
+**Step 3 — Add proof engine branch:**
+
+In `ProofEngine.cs`, `ResolveQualifierFromExpression()` (line ~1100), add a branch before the `default` case:
+
+```csharp
+case TypedLiteral { DeclaredQualifiers: { IsDefaultOrEmpty: false } litQuals }:
+    foreach (var q in litQuals)
+        if (q.Axis == axis) return q;
+    if (axis == QualifierAxis.Unit)
+        foreach (var q in litQuals)
+            if (q.Axis == QualifierAxis.Dimension) return q;
+    if (axis == QualifierAxis.Dimension)
+        foreach (var q in litQuals)
+            if (q.Axis == QualifierAxis.TemporalDimension) return q;
+    return null;
+```
+
+This mirrors the existing `TypedArgRef` branch at line 1105.
+
+**Step 4 — Also update `ResolveQualifierOnAxis()`** (line ~995):
+
+Add the same `TypedLiteral` branch after the `TypedArgRef` block. The two resolution methods serve different proof paths (compatibility vs chain), and both need the new branch.
+
+**Tests:**
+
+- Add `MoneyFieldVsStaticTypedConstant_QualifierProved` test — `field X as money in 'USD'` + `ensure X > '0.00 USD'` → 0 PRE0114.
+- Add `QuantityFieldVsStaticTypedConstant_QualifierProved` test — same pattern for quantity.
+- Add `PriceFieldVsStaticTypedConstant_QualifierProved` test — `price in 'USD' of 'mass'` vs `'0 USD/kg'`.
+- Add `CrossCurrencyStaticConstant_StillRejected` test — `field X as money in 'USD'` + `ensure X > '0.00 EUR'` → PRE0114 still fires (currencies don't match).
+
+**Regression:** All existing proof engine tests must pass unchanged. The new qualifier extraction only adds resolution paths — it never removes them.
+
+---
+
+### F4 — Compiler Fix: ExchangeRateTimesMoney Result Qualifier Policy
+
+**Type:** Compiler fix (catalog metadata + proof engine)
+**Diagnostics cleared:** Up to 27 in `inventory-item.precept` (pending cascading analysis)
+**Effort:** Large
+**Dependencies:** Design decision Q1 (policy approach); F3 should land first for the static TC qualifier infrastructure
+**Owner:** George
+
+**Root cause:** The `ExchangeRateTimesMoney` operation (`Operations.cs:659`) lacks a `ResultQualifierPolicy`. When the proof engine encounters `Rate * money_expr`, it cannot determine the result money's currency qualifier. This cascades:
+
+1. `QualifierMismatch` (PRE0068) on assignment to `TotalInventoryCost` — the RHS type is correct (`money`) but the qualifier is unresolvable.
+2. `UnprovedQualifierCompatibility` (PRE0114) on same lines — the proof engine can't match the result's currency to the field's declared `'{CatalogCurrency}'`.
+3. `UnprovedQualifierCompatibility` on `Rate` — the chain proof `exchangerate.FromCurrency == money.Currency` fails because the proof engine can't resolve the exchangerate arg's qualifiers through the interpolated qualifier system.
+4. `DivisionByZero` (PRE0083) on `AverageCost` computation — cascading from qualifier resolution failure preventing the proof engine from verifying denominator positivity.
+5. `TypeMismatch` (PRE0018) on L144/151 — cascading from compound-unit dimension resolution with interpolated qualifiers.
+
+**Implementation (assuming Q1 → Option A: `CurrencyConversion` policy):**
+
+**Step 1 — New `QualifierBinding` subtype:**
+
+```csharp
+// In SemanticIndex.cs (or wherever QualifierBinding subtypes live)
+public sealed record CurrencyConversionRequired : QualifierBinding;
+```
+
+**Step 2 — New `ResultQualifierPolicy` enum member:**
+
+```csharp
+// In Operations.cs or the ResultQualifierPolicy enum
+CurrencyConversion = 3,  // Result currency = exchangerate's ToCurrency
+```
+
+**Step 3 — Register on `ExchangeRateTimesMoney`:**
+
+```csharp
+// In Operations.cs:659
+OperationKind.ExchangeRateTimesMoney => new BinaryOperationMeta(
+    kind, OperatorKind.Times, PExchangeRate, PMoney, TypeKind.Money,
+    "ExchangeRate × money → money (currency conversion)", BidirectionalLookup: true,
+    ResultQualifierPolicy: ResultQualifierPolicy.CurrencyConversion,  // NEW
+    ProofRequirements:
+    [
+        new QualifierChainProofRequirement(new ParamSubject(PExchangeRate), QualifierAxis.FromCurrency,
+            new ParamSubject(PMoney), QualifierAxis.Currency,
+            "Exchange rate 'from' currency must match money currency"),
+    ]),
+```
+
+**Step 4 — Map qualifier binding in TypeChecker:**
+
+In `TypeChecker.Expressions.cs`, `MapQualifierBinding()` — add a case for `CurrencyConversion`:
+
+```csharp
+ResultQualifierPolicy.CurrencyConversion =>
+    new CurrencyConversionRequired(),
+```
+
+**Step 5 — Proof engine resolution:**
+
+In `ProofEngine.cs`, `ResolveQualifierFromExpression()` — add a branch in the `TypedBinaryOp` handler:
+
+```csharp
+CurrencyConversionRequired =>
+    axis == QualifierAxis.Currency
+        // Result currency comes from the exchangerate operand's ToCurrency
+        ? ResolveQualifierFromExpression(
+            binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
+            QualifierAxis.ToCurrency, semantics)
+        : null,
+```
+
+Same branch in `ResolveQualifierOnAxis()`.
+
+**Step 6 — Inventory-item residual analysis:**
+
+After F4 lands, recompile `inventory-item.precept`. Expected clearance:
+- 6 QualifierMismatch (PRE0068) on L225/227/231/233/236/238 → cleared (result qualifier now resolved)
+- 6 PRE0114 (Currency) on same lines → cleared
+- 6 PRE0114 (FromCurrency↔Currency chain) → depends on whether event arg qualifier resolution works for the `Rate` arg through interpolated qualifiers
+
+Residual errors (if any) will be diagnosed in F5.
+
+**Tests:**
+
+- `ExchangeRateTimesMoney_ResultCurrencyIsToCurrency` — `exchangerate in 'USD' to 'EUR'` × `money in 'USD'` → result is `money in 'EUR'`.
+- `ExchangeRateTimesMoney_WrongFromCurrency_StillRejected` — `exchangerate in 'GBP' to 'EUR'` × `money in 'USD'` → PRE0114 fires (FromCurrency mismatch).
+- `ExchangeRateTimesMoney_QualifiedOperandInherited_WrongPolicy` — verify that `InheritFromQualifiedOperand` is NOT used (it would give the wrong currency).
+
+---
+
+### F5 — Verification Pass: Recompile All Samples
+
+**Type:** Verification
+**Diagnostics cleared:** Any residual after F1–F4
+**Effort:** Small (diagnosis) to Medium (if additional fixes needed)
+**Dependencies:** F1 + F2 + F3 + F4 all complete
+**Owner:** Any team member
+
+**Process:**
+
+1. Recompile all 30 `.precept` sample files.
+2. Confirm 20 clean files remain clean (no regressions).
+3. Confirm F1 target files (6 files, 8 PRE0120) now compile clean.
+4. Confirm F2 target file (travel-reimbursement, 2 PRE0018) now compiles clean.
+5. Confirm F3 target files (4 files, 9 PRE0114) now compile clean.
+6. Confirm F4 target file (inventory-item, 27 errors) — count remaining diagnostics.
+7. Any residual diagnostics get individually diagnosed and resolved as F5a, F5b, etc.
+
+**Expected residual areas (may need attention after F4):**
+
+- `inventory-item.precept` L127/128 — compound-unit interpolated quantity qualifier matching in rule comparisons. If `ResolveQualifierFromExpression` for `TypedInterpolatedTypedConstant` doesn't handle compound-unit `NumeratorUnit`/`DenominatorUnit` slots correctly for the Unit axis, these may persist.
+- `inventory-item.precept` L108 — GrossProfit computed field subtraction chain with interpolated `'{CatalogCurrency}'` qualifiers. Depends on whether E4 symbolic equivalence handles multi-hop binary operation chains.
+- `inventory-item.precept` L144/151 — price ÷ quantity comparison with interpolated dimension qualifiers. May require compound-unit cancellation improvements.
+
+---
+
+### Dependency Graph
+
+```
+F1 (sample: optional notempty)      — independent, immediate
+F2 (sample: number/decimal)         — independent, immediate
+F3 (compiler: static TC qualifier)  — needs Q2 decision
+F4 (compiler: ExchangeRate policy)  — needs Q1 decision; F3 first for infrastructure
+F5 (verification)                   — after F1 + F2 + F3 + F4
+```
+
+**Recommended execution order:** F1 → F2 → F3 (after Q2) → F4 (after Q1) → F5
+
+F1 and F2 can be done in parallel with the Q1/Q2 design decisions. F3 should land before F4 because the `TypedLiteral` qualifier infrastructure benefits the ExchangeRate path as well.
+
+### File Inventory
+
+| File | F1 | F2 | F3 | F4 | F5 | Change Type |
+|------|----|----|----|----|-----|-------------|
+| `samples/it-helpdesk-ticket.precept` | ✓ | | | | | Sample fix |
+| `samples/library-book-checkout.precept` | ✓ | | | | | Sample fix |
+| `samples/loan-application.precept` | ✓ | | ✓ | | | Sample fix + cleared by F3 |
+| `samples/maintenance-work-order.precept` | ✓ | | | | | Sample fix |
+| `samples/refund-request.precept` | ✓ | | | | | Sample fix |
+| `samples/travel-reimbursement.precept` | ✓ | ✓ | | | | Sample fix |
+| `samples/apartment-rental-application.precept` | | | ✓ | | | Cleared by F3 |
+| `samples/hiring-pipeline.precept` | | | ✓ | | | Cleared by F3 |
+| `samples/insurance-claim.precept` | | | ✓ | | | Cleared by F3 |
+| `samples/inventory-item.precept` | | | | ✓ | ✓ | Cleared by F4 + verified by F5 |
+| `src/Precept/Pipeline/SemanticIndex.cs` | | | ✓ | ✓ | | TypedLiteral DeclaredQualifiers + CurrencyConversion binding |
+| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | | | ✓ | ✓ | | Populate TypedLiteral qualifiers + MapQualifierBinding |
+| `src/Precept/Pipeline/ProofEngine.cs` | | | ✓ | ✓ | | ResolveQualifierFromExpression + ResolveQualifierOnAxis |
+| `src/Precept/Language/Operations.cs` | | | | ✓ | | ResultQualifierPolicy on ExchangeRateTimesMoney |
+| `test/Precept.Tests/ProofEngineTests.cs` | | | ✓ | ✓ | | New qualifier proof tests |

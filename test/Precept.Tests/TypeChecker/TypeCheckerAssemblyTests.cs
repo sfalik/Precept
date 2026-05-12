@@ -52,7 +52,7 @@ public class TypeCheckerAssemblyTests
 
         event RequestDocument(Name as string notempty)
         event AssignAdjuster(Name as string notempty)
-        event Approve(Amount as decimal, Note as string optional notempty)
+        event Approve(Amount as decimal, Note as string optional)
         on Approve ensure Approve.Amount > 0 because "Approved claim amounts must be positive"
 
         event Deny(Note as string notempty)
@@ -499,7 +499,7 @@ public class TypeCheckerAssemblyTests
                 Score as number)
             on Submit ensure Submit.Amount > 0 because "Loan requests must be positive"
 
-            event Approve(Amount as number, Note as string optional notempty)
+            event Approve(Amount as number, Note as string optional)
             on Approve ensure Approve.Amount > 0 because "Approved amounts must be positive"
 
             event Decline(Note as string notempty)

@@ -41,8 +41,7 @@ from OnShelf on Checkout
 
 # When the item is available, the first hold can be promoted immediately.
 from OnShelf on PlaceHold
-    -> enqueue HoldQueue PlaceHold.PatronId
-    -> dequeue HoldQueue into PromotedPatron
+    -> set PromotedPatron = PlaceHold.PatronId
     -> transition HoldReady
 
 from CheckedOut on PlaceHold

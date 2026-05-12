@@ -46,7 +46,7 @@ from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1
     -> push ReminderLog SendReminder.Note
     -> set ReminderCount = ReminderCount + 1
     -> set LastReminderDay = CurrentDay
-    -> set LastReminderNote = ReminderLog.peek
+    -> set LastReminderNote = SendReminder.Note
     -> no transition
 from AwaitingPickup on SendReminder
     -> reject "Reminders can only be sent once per day"

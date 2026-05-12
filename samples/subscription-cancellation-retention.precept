@@ -29,7 +29,7 @@ on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent > 0 because "Save offers m
 on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
 
 event AcceptOffer
-event DeclineOffer(Note as string optional notempty)
+event DeclineOffer(Note as string optional)
 
 from Active on RequestCancellation
     -> set SubscriberName = RequestCancellation.Name
