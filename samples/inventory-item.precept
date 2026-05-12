@@ -19,19 +19,10 @@ precept InventoryItem
 # THIS FILE DOES NOT COMPILE — it expresses the intended design.
 # Pending compiler issues (spike/Precept-V2-Radical):
 #
-#   ROOT CAUSE 1 (PRE0009, Parser): Interpolated typed constants in field/arg
-#          qualifier positions (`in '...'`, `of '...'`) are rejected by the
-#          parser — it only accepts static typed constants. Affects all
-#          compound-unit field declarations and dimension-qualified fields/args.
-#          FIX: Extend Parser.TryParseQualifiers() to accept TypedConstantStart.
-#
-#   ROOT CAUSE 2 (PRE0052, TypeChecker): Missing compound-unit interpolation
-#          patterns for forms like `'0 {Unit}/{Unit}'` in QuantityForms[].
-#          Affects rules/ensures that bound-check compound-unit quantities.
-#          FIX: Add Q6/Q7/Q8 patterns to TypeChecker.Expressions.cs.
-#
-#   BUG-A (PRE0114): Event arg qualifiers not propagated into expressions —
-#          cannot be verified until ROOT CAUSE 1 ships.
+#   BUG-A (PRE0114): The compiler now supports the required interpolated
+#          qualifier form, but this sample still declares `Rate as exchangerate`
+#          without `in '{SupplierCurrency}' to '{CatalogCurrency}'`. That sample
+#          edit is pending Frank's sign-off.
 #
 #   SAMPLE DESIGN ISSUES:
 #          - Lines 137/145: `Sku is set` on non-optional field (PRE0049)

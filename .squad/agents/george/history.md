@@ -48,6 +48,7 @@
 - 2026-05-12 — On the current inventory-item worktree, E2/E3 cut PRE0114 from 66 to 16; the remaining ReceiveShipment/GrossProfit fallout is tied to deferred `ExchangeRateTimesMoney` propagation plus separate sample edits outside the parenthesization fix.
 - 2026-05-12 — P2: `ParseInterpolatedTypedConstant()` always prepends a leading `TextSegment("")` before the first hole. A pure qualifier like `'{CatalogCurrency}'` yields `[TextSegment(""), HoleSegment(...)]`. List-patterns matching `[HoleSegment {...}]` silently miss this; iterate and skip empty TextSegments instead.
 - 2026-05-12 — P2: When co-running agents share the filesystem, use `git add <specific-files>` (not `git add -A`) to isolate your commit from other agents' working tree changes.
+- 2026-05-12 — Sample headers can go stale after runtime/parser fixes land; when a blocker moves from compiler support to sample authoring, update the sample comment to name the remaining sample-side edit instead of leaving obsolete root-cause notes.
 
 ### 2026-05-12T05:04:03Z — E2 and E3 completed
 - Typed interpolated constant qualifier extraction (E2, `8785d753`) and subexpression / compound-unit qualifier propagation (E3, `d3f5aa98`) landed, with `f4db093e` fixing the ReceiveShipment parenthesization follow-up.
