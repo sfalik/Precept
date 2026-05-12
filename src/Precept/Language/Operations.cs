@@ -610,6 +610,7 @@ public static class Operations
         OperationKind.PriceTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PQuantity, TypeKind.Money,
             "Price × quantity → money (dimensional cancellation)", BidirectionalLookup: true,
+            ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation,
             ProofRequirements:
             [
                 new QualifierChainProofRequirement(new ParamSubject(PPrice), QualifierAxis.Dimension,
@@ -620,6 +621,7 @@ public static class Operations
         OperationKind.PriceTimesPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PPeriod, TypeKind.Money,
             "Price × period → money (time-denominator cancellation)", BidirectionalLookup: true,
+            ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation,
             ProofRequirements:
             [
                 new QualifierChainProofRequirement(new ParamSubject(PPrice), QualifierAxis.Dimension,
@@ -630,6 +632,7 @@ public static class Operations
         OperationKind.PriceTimesDuration => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PDuration, TypeKind.Money,
             "Price × duration → money (hours/min/sec cancellation)", BidirectionalLookup: true,
+            ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation,
             ProofRequirements:
             [
                 new QualifierChainProofRequirement(new ParamSubject(PPrice), QualifierAxis.Dimension,

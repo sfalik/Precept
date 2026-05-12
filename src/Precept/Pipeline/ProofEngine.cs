@@ -1039,7 +1039,15 @@ public static class ProofEngine
                     return ResolveQualifierFromExpression(qualifiedOperand, axis, semantics);
 
                 case CompoundUnitCancellationRequired:
-                    return null;
+                    if (axis == QualifierAxis.Currency
+                        || axis == QualifierAxis.FromCurrency
+                        || axis == QualifierAxis.ToCurrency)
+                    {
+                        return ResolveQualifierFromExpression(binOp.Left, axis, semantics)
+                            ?? ResolveQualifierFromExpression(binOp.Right, axis, semantics);
+                    }
+
+                    return TryResolveCompoundCancellationUnit(binOp, axis, semantics);
             }
         }
 
@@ -1123,6 +1131,13 @@ public static class ProofEngine
                         ResolveQualifierFromExpression(
                             binOp.Left.ResultType == binOp.ResultType ? binOp.Left : binOp.Right,
                             axis, semantics),
+                    CompoundUnitCancellationRequired =>
+                        axis == QualifierAxis.Currency
+                        || axis == QualifierAxis.FromCurrency
+                        || axis == QualifierAxis.ToCurrency
+                            ? ResolveQualifierFromExpression(binOp.Left, axis, semantics)
+                                ?? ResolveQualifierFromExpression(binOp.Right, axis, semantics)
+                            : TryResolveCompoundCancellationUnit(binOp, axis, semantics),
                     _ => null,
                 };
 
@@ -1196,6 +1211,73 @@ public static class ProofEngine
             QualifierAxis.ToCurrency => new DeclaredQualifierMeta.ToCurrency($"{{{fieldName}}}"),
             _ => null,
         };
+    }
+
+    private static DeclaredQualifierMeta? TryResolveCompoundCancellationUnit(
+        TypedBinaryOp binOp, QualifierAxis axis, SemanticIndex semantics)
+    {
+        var leftQualifier = axis == QualifierAxis.Dimension
+            ? ResolveQualifierFromExpression(binOp.Left, QualifierAxis.Unit, semantics)
+                ?? ResolveQualifierFromExpression(binOp.Left, axis, semantics)
+            : ResolveQualifierFromExpression(binOp.Left, axis, semantics);
+
+        var rightQualifier = axis == QualifierAxis.Dimension
+            ? ResolveQualifierFromExpression(binOp.Right, QualifierAxis.Unit, semantics)
+                ?? ResolveQualifierFromExpression(binOp.Right, axis, semantics)
+            : ResolveQualifierFromExpression(binOp.Right, axis, semantics);
+
+        var compoundValue = ExtractCompoundValue(leftQualifier) ?? ExtractCompoundValue(rightQualifier);
+        if (compoundValue is null)
+            return null;
+
+        var slashIndex = compoundValue.IndexOf('/');
+        if (slashIndex < 0)
+            return null;
+
+        var numerator = compoundValue[..slashIndex].Trim();
+        if (!TryDeriveCompoundNumeratorDimension(numerator, out var numeratorDimension))
+            return null;
+
+        return axis switch
+        {
+            QualifierAxis.Unit => new DeclaredQualifierMeta.Unit(numerator, numeratorDimension, QualifierOrigin.Derived),
+            QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension(numeratorDimension, QualifierOrigin.Derived),
+            _ => null,
+        };
+    }
+
+    private static string? ExtractCompoundValue(DeclaredQualifierMeta? qualifier) => qualifier switch
+    {
+        DeclaredQualifierMeta.Unit { UnitCode: var code } when code.Contains('/') => code,
+        DeclaredQualifierMeta.Dimension { DimensionName: var name } when name.Contains('/') => name,
+        _ => null,
+    };
+
+    private static bool TryDeriveCompoundNumeratorDimension(string unitCode, out string dimensionName)
+    {
+        if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(unitCode))
+        {
+            dimensionName = "count";
+            return true;
+        }
+
+        if (unitCode.StartsWith("{", StringComparison.Ordinal)
+            && unitCode.EndsWith("}", StringComparison.Ordinal)
+            && unitCode.IndexOf('/') < 0)
+        {
+            dimensionName = $"{unitCode[..^1]}.dimension}}";
+            return true;
+        }
+
+        var result = UcumParser.Parse(unitCode);
+        if (result.IsValid)
+        {
+            dimensionName = UnitDimensionHelper.DeriveUnitDimensionName(result.Unit!);
+            return !string.IsNullOrWhiteSpace(dimensionName);
+        }
+
+        dimensionName = string.Empty;
+        return false;
     }
 
     /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>

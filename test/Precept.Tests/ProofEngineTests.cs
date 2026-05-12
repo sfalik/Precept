@@ -4478,4 +4478,76 @@ public class ProofEngineTests
                 .Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         }
     }
+
+    public class PartE_E3_SubexpressionQualifierPropagation
+    {
+        [Fact]
+        public void PriceTimesQuantity_currency_propagates()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field P as price in 'USD' of 'mass' default '5 USD/kg' writable
+                field Q as quantity of 'mass' default '2 kg' writable
+                field M as money in 'USD' default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set M = P * Q -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void CompoundUnit_cancellation_currency_propagates()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Qty as quantity in 'each' default '2 each' writable
+                field Conv as quantity in 'kg/each' default '3 kg/each' writable
+                field P as price in 'USD' of 'mass' default '5 USD/kg' writable
+                field M as money in 'USD' default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set M = Qty * Conv * P -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void CompoundUnit_numerator_unit_extracted()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Qty as quantity in 'each' default '2 each' writable
+                field Conv as quantity in 'kg/each' default '3 kg/each' writable
+                field Result as quantity in 'kg' default '0 kg' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Qty * Conv -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void Existing_compound_cancellation_tests_regression()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Qty as quantity in 'each' default '2 each' writable
+                field Conv as quantity in 'kg/each' default '3 kg/each' writable
+                field Result as quantity in 'kg' default '0 kg' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Conv * Qty -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+    }
 }
