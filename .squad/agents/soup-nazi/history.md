@@ -35,6 +35,7 @@
 - Skip a clean-path test only when the existing test has the exact method name required; a different name means add it, even if the body is near-identical, because the charter regression name is the anchor.
 
 - Conflicting-modifier tests for event args need a minimal but valid lifecycle (initial state, at least one non-initial state, and a matching transition) or the precept will fail for structural reasons, masking the modifier diagnostic.
+- Exhaustiveness-style `Diagnostics.Create(...)` fixture tests must supply enough placeholder args for the highest index used by any current message template; proof diagnostics now reach `{5}`, so a stale four-arg fixture throws before the metadata assertion runs.
 
 
 

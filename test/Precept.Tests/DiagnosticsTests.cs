@@ -21,8 +21,8 @@ public class DiagnosticsTests
     [MemberData(nameof(AllDiagnosticCodes))]
     public void Create_ProducesCorrectCodeString_ForEveryDiagnosticCode(DiagnosticCode code)
     {
-        // Supply 4 placeholder args so string.Format never throws for any template.
-        var diagnostic = Diagnostics.Create(code, SourceSpan.Missing, "x", "x", "x", "x");
+        // Supply 6 placeholder args so string.Format never throws for any current template.
+        var diagnostic = Diagnostics.Create(code, SourceSpan.Missing, "x", "x", "x", "x", "x", "x");
         diagnostic.Code.Should().Be(Diagnostics.GetMeta(code).Code);
     }
 
@@ -30,7 +30,7 @@ public class DiagnosticsTests
     [MemberData(nameof(AllDiagnosticCodes))]
     public void Create_ProducesCorrectSeverity_ForEveryDiagnosticCode(DiagnosticCode code)
     {
-        var diagnostic = Diagnostics.Create(code, SourceSpan.Missing, "x", "x", "x", "x");
+        var diagnostic = Diagnostics.Create(code, SourceSpan.Missing, "x", "x", "x", "x", "x", "x");
         diagnostic.Severity.Should().Be(Diagnostics.GetMeta(code).Severity);
     }
 
@@ -38,7 +38,7 @@ public class DiagnosticsTests
     [MemberData(nameof(AllDiagnosticCodes))]
     public void Create_ProducesCorrectStage_ForEveryDiagnosticCode(DiagnosticCode code)
     {
-        var diagnostic = Diagnostics.Create(code, SourceSpan.Missing, "x", "x", "x", "x");
+        var diagnostic = Diagnostics.Create(code, SourceSpan.Missing, "x", "x", "x", "x", "x", "x");
         diagnostic.Stage.Should().Be(Diagnostics.GetMeta(code).Stage);
     }
 
