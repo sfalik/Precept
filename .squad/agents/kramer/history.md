@@ -87,3 +87,9 @@
 ### 2026-05-11T02:32:33Z — Modifier-token squiggle precision closed the latest span pass
 - `ParsedModifier` now owns its own span so modifier diagnostics land on the offending keyword instead of the whole field declaration.
 - The broader span program stays intact: identifier-precise semantic ranges upstream, exact-range dedup and invalid-coordinate filtering as downstream safety rails.
+
+### 2026-05-12T00:01:51Z — Tooling context for temporal price denominators
+- Frank's temporal design keeps the surface on `price of ...`; tooling should special-case temporal suggestions there (`'time'`, `'date'`) without teaching a new `per` keyword.
+- `quantity of 'time'` remains a hard type error, so completion/recovery paths must not suggest temporal dimensions for quantity qualifiers.
+- `duration` picks up implied temporal-dimension metadata via `TypeMeta.ImpliedQualifiers`; any MCP/tooling projections that surface type metadata should carry that implied-qualifier shape instead of baking in duration-only heuristics.
+

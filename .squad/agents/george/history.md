@@ -79,3 +79,10 @@
 ### 2026-05-11T23:43:07Z — Slice 12 handoff and sample fallout recorded
 - Frank completed the unblock design for Slice 12: temporal price denominators stay on `of`, duration gains implied temporal-dimension qualifiers, and Strategy 5 needs Dimension→TemporalDimension comparison support.
 - Cross-agent inventory analysis says `samples/inventory-item.precept` will need follow-up on binary-chain qualifier propagation, ensure-expression coverage, and bare `unitofmeasure` semantics.
+
+### 2026-05-12T00:01:51Z — Temporal price denominator design locked for Slice 12
+- Frank validated the additive path: temporal price denomination stays on the existing `of` qualifier (`price of 'time'`, `price of 'date'`), so no new `per` keyword or separate grammar branch is needed.
+- `quantity of 'time'` remains invalid; temporal semantics still route through `duration` / `period`, and `duration` should surface implied temporal-dimension metadata through `TypeMeta.ImpliedQualifiers` rather than checker hardcoding.
+- Slice 12 follow-through needs comparison/proof support for Dimension→TemporalDimension fallback and must keep chain validation gated to price fields that explicitly carry the new temporal `of` qualifier.
+- Shane follow-ups remain open on `quantity in 's'` hinting, `money ÷ duration -> price` inference, and `period ×/÷ integer` operator support.
+

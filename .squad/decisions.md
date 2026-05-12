@@ -6,6 +6,22 @@
 
 ---
 
+### 2026-05-12T00:01:51Z: Temporal price denominators stay on `price of ...`; `quantity of 'time'` remains invalid
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-temporal-type-system-design.md`.
+
+- Frank validated the Slice 11B direction without widening the grammar surface: temporal price denomination stays on the existing `of` preposition, so `price of 'time'` and `price of 'date'` are the additive path and no `per` keyword is introduced.
+- The earlier UCUM rule remains intact: `quantity of 'time'` stays a type error even though UCUM temporal atoms remain available for compound units; authors should use `duration` or `period` for temporal semantics instead of adding `time` to `DimensionCatalog`.
+- `duration` should advertise its temporal meaning through `TypeMeta.ImpliedQualifiers` so the proof/comparison pipeline can consume implied temporal-dimension metadata rather than hardcoded duration cases.
+- Existing `quantity × duration` and `quantity × period` arithmetic stays valid without new proof obligations; Slice 12 chain validation should activate only for price fields that actually declare a temporal `of` qualifier.
+- Open questions parked for Shane: whether `quantity in 's'` should emit a hint toward `duration`, whether `money ÷ duration -> price` should infer a temporal denominator automatically, and whether `period ×/÷ integer` should ship as a separate follow-up.
+
+---
+
 ### 2026-05-11T20:25:57Z: DTO-free MCP catalog exposure stays off the public contract path
 
 **By:** Scribe
