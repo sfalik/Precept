@@ -129,3 +129,20 @@
 ### 2026-05-12T13:02:45Z — B1 regression closed in proof suite
 - Added `CompoundUnit_cancellation_dimension_qualifier_form` to `test/Precept.Tests/ProofEngineTests.cs` and verified the static `quantity of 'each/case'` qualifier path stays green.
 - Production fix keeps compound-ratio `of 'X/Y'` qualifiers on the exact numerator/denominator shape instead of collapsing them to a plain dimension. Commit: `232426e9`.
+
+### 2026-05-12T17:56:47-04:00 — HoverHandlerTests surface audit: all 5 failures already resolved
+
+- Arrived to find 44/44 HoverHandlerTests passing (was 36/5 at Kramer B5 observation). No changes required; documented the repair history.
+- All 5 failures were **implementation bugs**, not stale expectations: the tests correctly described the locked V6 design; the implementation was behind.
+  - `af6e563c` — `"\n"` → `"\n\n"` join separator in 6 card builders (field/state/event/argument/rule/ensure). Single-newline collapses in VS Code hover; the multi-section `Contain` assertions failed on run-on card output.
+  - `0ef4b8d0` — wired qualifier `SourceFieldName` / resolved-source into the stored-field card.
+  - `5ab6030e` — added qualifier axis/checks/exchange-rate card content; extended stored-field test.
+  - `516aa6ba` — added proof-aware hover routing (gap card on transitions, proof-diagnostic span winner, proof-bearing subexpression card).
+  - `7829e9c6` — proof-chain chained-expression hover details.
+- Full suite green: 44 hover, 272 LanguageServer, 4938 core.
+- Badge vocabulary and "proven" (not "proved") wording consistent throughout all 44 tests. Design contract held.
+
+### 2026-05-12T18:01:17.648-04:00 — Hover baseline verified clean after B1
+
+- Verified `HoverHandlerTests` at 44/44 passing with `Precept.LanguageServer.Tests` 272/272 and core `Precept.Tests` 4938/4938. No test edits, disables, or skips were needed in this pass.
+- Recorded the five earlier hover failures as already-fixed implementation bugs: markdown paragraph joining, qualifier source plumbing, qualifier axis/checks output, transition proof-gap routing, and proof-chain details.

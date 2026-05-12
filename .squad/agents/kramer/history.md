@@ -35,3 +35,14 @@
 ### 2026-05-12T15:15:10Z — George shipped G1 compound-unit qualifier repair
 - George fixed `ResolveQualifierFromInterpolatedConstant` in `ProofEngine.cs` so interpolated compound-unit constants resolve the full `{A}/{B}` qualifier string before the denominator fallback path.
 - Commit `cb4fbf57` plus docs/history follow-up `1ee54bdb` cleared the RC1 PRE0114 and cascading DivisionByZero fallout in `samples/inventory-item.precept`, leaving only BUG-C / later proof work outside Kramers hover scope.
+
+### 2026-05-12T17:45:51-04:00 — B1 compact proof-gap cards landed
+- Reworked the proof diagnostic/expression builders in `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` to emit the badge-first compact cards from `docs/Working/hover-design.md` instead of verbose `Status:` / `Reason:` blocks.
+- Added compact evidence formatting so qualifier gaps now read inline (`Left ... has no known ... · right ... carries ...`), presence cards render the optional/access reason on one line, and proved expression cards collapse to clean 3-line summaries.
+- Updated `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs` for the new PRE0114 / PRE0116 / proved-expression card text, including direct formatter coverage for the presence card path; validation passed with `dotnet test test\\Precept.LanguageServer.Tests\\Precept.LanguageServer.Tests.csproj` and `dotnet test test\\Precept.Tests\\Precept.Tests.csproj`.
+
+### 2026-05-12T18:01:17.648-04:00 — Hover B1 landed; B2/B3 follow-up active
+
+- B1 compact proof-gap cards are shipped in `RichHoverFactory.cs`; hover proof diagnostics and proof-expression cards now use the badge-first compact format from `docs/Working/hover-design.md`, with updated `HoverHandlerTests` and green LS/core suites (272/272, 4938/4938).
+- Frank’s follow-up ruling is now the active V1 contract for the next pass: fix construct routing before generic token help, keep guarded access out of mutability counts/state lists, and defer the state-card missing-path narrative.
+- Kramer-2 is currently applying the B2/B3 routing + mutability honesty changes in `HoverHandler.cs` and `RichHoverFactory.cs`.
