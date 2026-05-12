@@ -20,6 +20,20 @@
 
 ---
 
+### 2026-05-12T22:39:45Z: Field-state guarantees v2 will enforce structural access violations in the TypeChecker and conditional access through proof obligations
+
+**By:** Scribe
+
+**Status:** Merged from Frank's late inbox note.
+
+**Merged source:** `frank-field-state-v2.md`.
+
+- Enforcement is now explicitly split by certainty: omit/unconditional-readonly violations stay in a new TypeChecker validation pass, while guarded-editability checks become a new `ProofRequirementKind.AccessCondition` path in the ProofEngine.
+- `FieldTargetSlot` must become multi-name so access-mode and omit declarations stop dropping fields 2..N from comma-separated targets, and omit declarations should feed `ctx.AccessModes` as `ModifierKind.Omit` rather than living on a disconnected enforcement surface.
+- The design also locks the diagnostic envelope for this work: activate existing D42/D43 declaration checks and add D130-D134 for structural write/read failures plus unproved access conditions.
+
+---
+
 ### 2026-05-12T22:25:28Z: Language-spec audit locks a targeted cleanup for stale references, overclaimed contracts, and incomplete diagnostic coverage
 
 **By:** Scribe
@@ -31,6 +45,18 @@
 - Frank confirmed several high-confidence spec defects in `docs/language/precept-language-spec.md`: the dead `docs/PreceptLanguageDesign.md` grounding reference, stale "not yet built" pipeline wording, a vestigial open-questions placeholder, misleading `C48`-style labels, six `ConstructKind` names that do not match code, and an incomplete diagnostic-groups table.
 - The audit also preserves the owner-decision boundary: §0.5 and §0.6 currently overclaim shipped behavior if they are meant to describe only implemented guarantees, and ProofEngine Strategy 6 remains undocumented unless the owner wants it promoted to public documentation.
 - Frank ranked the immediate cleanup around preamble/status accuracy, replacing `C48`-`C52` notation with real diagnostic names, and explicitly qualifying which design-contract items are future or partial.
+
+---
+
+### 2026-05-12T22:18:18Z: Construct metadata now describes `StateTarget` as a single state, `any`, or a comma-delimited state list
+
+**By:** Scribe
+
+**Status:** Merged from George's manifest closeout; inbox artifact was absent, so the ledger was updated directly from the spawn manifest.
+
+- `src/Precept/Language/ConstructSlot.cs:18` now documents `ConstructSlotKind.StateTarget` as accepting a state name, `any`, or a comma-delimited list of state names.
+- `src/Precept/Language/Constructs.cs:29` now gives the shared `SlotStateTarget` description the same list-capable wording, keeping catalog-facing construct metadata aligned with the shipped parser and type-checker behavior.
+- George reported the S5 catalog wording pass complete and confirmed the validation build passed.
 
 ---
 
