@@ -655,6 +655,16 @@ public static class Operations
                     "Divisor must be non-zero"),
             ]),
 
+        OperationKind.PriceDivideQuantity => new BinaryOperationMeta(
+            kind, OperatorKind.Divide, PPrice, PQuantity, TypeKind.Price,
+            "Price ÷ compound-quantity → price (dimension elevation)",
+            ResultQualifierPolicy: ResultQualifierPolicy.CompoundDimensionElevation,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PQuantity), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
+
         // ── Business: exchangerate ──────────────────────────────────
         OperationKind.ExchangeRateTimesMoney => new BinaryOperationMeta(
             kind, OperatorKind.Times, PExchangeRate, PMoney, TypeKind.Money,

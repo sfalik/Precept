@@ -91,6 +91,17 @@ internal static partial class TypeChecker
                 qualifiers = [];
                 return true;
 
+            case TypedBinaryOp { ResultQualifier: CompoundDimensionElevationRequired } elevBinary:
+                // Result is price: currency from price (left), unit elevation from compound-quantity numerator (right).
+                if (TryDeriveCompoundElevationQualifiers(elevBinary, out var elevQualifiers))
+                {
+                    qualifiers = elevQualifiers;
+                    return true;
+                }
+                // Cannot resolve qualifiers -- suppress false mismatch.
+                qualifiers = [];
+                return true;
+
             default:
                 qualifiers = default;
                 return false;
@@ -110,6 +121,37 @@ internal static partial class TypeChecker
 
         qualifiers = default;
         return false;
+    }
+
+    private static bool TryDeriveCompoundElevationQualifiers(
+        TypedBinaryOp binary,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
+    {
+        // Currency inherits from price (left operand)
+        if (!TryGetAssignmentSourceQualifiers(binary.Left, out var priceQuals))
+        {
+            qualifiers = default;
+            return false;
+        }
+
+        var currency = priceQuals.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+
+        // Elevation unit: numerator of compound-quantity (right operand)
+        if (!TryGetCompoundUnit(binary.Right, out var compoundUnit)
+            || !TrySplitCompoundUnit(compoundUnit.UnitCode, out var numeratorUnit, out _)
+            || !TryDeriveUnitDimensionName(numeratorUnit, out var numeratorDimension))
+        {
+            qualifiers = default;
+            return false;
+        }
+
+        var resultUnit = new DeclaredQualifierMeta.Unit(
+            numeratorUnit, numeratorDimension, QualifierOrigin.Derived);
+
+        qualifiers = currency is not null
+            ? [currency, resultUnit]
+            : [resultUnit];
+        return true;
     }
 
     private static bool TryMatchCompoundUnitCancellation(
@@ -169,11 +211,21 @@ internal static partial class TypeChecker
             return false;
 
         var unit = qualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault();
-        if (unit is null || unit.UnitCode.IndexOf('/') <= 0)
-            return false;
+        if (unit is not null && unit.UnitCode.IndexOf('/') > 0)
+        {
+            compoundUnit = unit;
+            return true;
+        }
 
-        compoundUnit = unit;
-        return true;
+        // Also accept compound-dimension qualifiers (e.g. 'of "each/case"' → Dimension("each/case"))
+        var dim = qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+        if (dim is not null && dim.DimensionName.IndexOf('/') > 0)
+        {
+            compoundUnit = new DeclaredQualifierMeta.Unit(dim.DimensionName, dim.DimensionName, dim.Origin);
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TrySplitCompoundUnit(string unitCode, out string numeratorUnit, out string denominatorUnit)

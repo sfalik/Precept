@@ -578,14 +578,14 @@ public class OperationsTests
     public void Binary_Count()
     {
         // 85 arithmetic + 104 comparison + 4 logical/membership pseudo-ops = 193 binary
-        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(193);
+        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(194);
     }
 
     [Fact]
     public void Total_Count()
     {
         // 9 unary + 193 binary = 202 total
-        Operations.All.Should().HaveCount(202);
+        Operations.All.Should().HaveCount(203);
     }
 
     // ── Proof Requirements ──────────────────────────────────────────────────────

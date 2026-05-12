@@ -129,6 +129,7 @@ public enum OperationKind
     PriceTimesDuration                       =  89,
     PriceTimesDecimal                        =  90,
     PriceDivideDecimal                       =  91,
+    PriceDivideQuantity                      = 203,
 
     // ── Business: exchangerate ──────────────────────────────────────
     ExchangeRateTimesMoney                   =  92,

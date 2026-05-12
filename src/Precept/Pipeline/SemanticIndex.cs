@@ -218,6 +218,13 @@ public sealed record QualifiedOperandInherited : QualifierBinding;
 /// </summary>
 public sealed record CurrencyConversionRequired : QualifierBinding;
 
+/// <summary>
+/// Proof that price divided by compound-quantity needs dimension elevation resolution.
+/// The price's denominator dimension must match the compound-quantity's denominator dimension,
+/// and the result carries the compound-quantity's numerator unit.
+/// </summary>
+public sealed record CompoundDimensionElevationRequired : QualifierBinding;
+
 // ════════════════════════════════════════════════════════════════════════════
 //  ActionSecondaryRole enum (D5)
 // ════════════════════════════════════════════════════════════════════════════

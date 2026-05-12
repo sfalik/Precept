@@ -711,6 +711,9 @@ internal static partial class TypeChecker
         if (meta.ResultQualifierPolicy == ResultQualifierPolicy.CurrencyConversion)
             return new CurrencyConversionRequired();
 
+        if (meta.ResultQualifierPolicy == ResultQualifierPolicy.CompoundDimensionElevation)
+            return new CompoundDimensionElevationRequired();
+
         return meta.Match switch
         {
             QualifierMatch.Same      => new SameQualifierRequired(),

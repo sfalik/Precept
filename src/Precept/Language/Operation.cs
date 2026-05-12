@@ -37,6 +37,13 @@ public enum ResultQualifierPolicy
     /// Used by <c>ExchangeRateTimesMoney</c>.
     /// </summary>
     CurrencyConversion,
+
+    /// <summary>
+    /// Result is price: currency inherited from price (left operand),
+    /// unit dimension elevated from compound-quantity numerator (right operand).
+    /// Used by <c>PriceDivideQuantity</c>.
+    /// </summary>
+    CompoundDimensionElevation,
 }
 
 /// <summary>
