@@ -4406,4 +4406,76 @@ public class ProofEngineTests
             obligation.Strategy.Should().Be(ProofStrategy.CompositionalConstraint);
         }
     }
+
+    public class PartE_E2_InterpolatedTypedConstantQualifierExtraction
+    {
+        [Fact]
+        public void Quantity_field_gte_interpolated_constant()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Unit as unitofmeasure default 'kg'
+                field Q as quantity of '{Unit.dimension}' default '1 {Unit}'
+                rule Q >= '0 {Unit}' because "nonnegative"
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Unit })
+                .Should().ContainSingle()
+                .Which.Disposition.Should().Be(ProofDisposition.Proved);
+        }
+
+        [Fact]
+        public void Money_field_gte_interpolated_constant()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Currency as currency default 'USD'
+                field M as money in '{Currency}' default '1.00 {Currency}'
+                rule M >= '0.00 {Currency}' because "nonnegative"
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Currency })
+                .Should().ContainSingle()
+                .Which.Disposition.Should().Be(ProofDisposition.Proved);
+        }
+
+        [Fact]
+        public void Price_field_gt_compound_constant()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Currency as currency default 'USD'
+                field Unit as unitofmeasure default 'kg'
+                field P as price in '{Currency}' of '{Unit.dimension}' default '1 {Currency}/{Unit}'
+                rule P > '0 {Currency}/{Unit}' because "positive"
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement)
+                .Should().HaveCount(2)
+                .And.AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
+        }
+
+        [Fact]
+        public void Cross_currency_constant_detected()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Currency as currency default 'USD'
+                field OtherCurrency as currency default 'EUR'
+                field M as money in '{Currency}' default '1.00 {Currency}'
+                rule M >= '0.00 {OtherCurrency}' because "cross-currency stays unresolved"
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Currency })
+                .Should().ContainSingle()
+                .Which.Disposition.Should().Be(ProofDisposition.Unresolved);
+
+            ledger.Diagnostics
+                .Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+    }
 }

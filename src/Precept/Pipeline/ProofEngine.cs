@@ -1111,6 +1111,9 @@ public static class ProofEngine
             case TypedMemberAccess { Object: TypedFieldRef fieldRef2 }:
                 return ResolveFieldQualifier(fieldRef2.FieldName, axis, semantics);
 
+            case TypedInterpolatedTypedConstant itc:
+                return ResolveQualifierFromInterpolatedConstant(itc, axis);
+
             case TypedBinaryOp binOp when binOp.ResultQualifier is not null:
                 return binOp.ResultQualifier switch
                 {
@@ -1126,6 +1129,73 @@ public static class ProofEngine
             default:
                 return null;
         }
+    }
+
+    private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(
+        TypedInterpolatedTypedConstant itc, QualifierAxis axis)
+    {
+        InterpolationSlotKind? targetSlot = axis switch
+        {
+            QualifierAxis.Currency => InterpolationSlotKind.Currency,
+            QualifierAxis.Unit => InterpolationSlotKind.Unit,
+            QualifierAxis.Dimension => InterpolationSlotKind.Unit,
+            QualifierAxis.FromCurrency => InterpolationSlotKind.FromCurrency,
+            QualifierAxis.ToCurrency => InterpolationSlotKind.ToCurrency,
+            _ => null,
+        };
+
+        if (targetSlot is null)
+            return null;
+
+        foreach (var slot in itc.Slots)
+        {
+            if (slot.SlotKind == targetSlot)
+                return CreateQualifierFromSlotExpression(slot.Expression, axis);
+        }
+
+        if (axis == QualifierAxis.Currency)
+        {
+            foreach (var slot in itc.Slots)
+            {
+                if (slot.SlotKind == InterpolationSlotKind.NumeratorUnit)
+                    return CreateQualifierFromSlotExpression(slot.Expression, axis);
+            }
+        }
+
+        if (axis == QualifierAxis.Unit || axis == QualifierAxis.Dimension)
+        {
+            foreach (var slot in itc.Slots)
+            {
+                if (slot.SlotKind == InterpolationSlotKind.DenominatorUnit)
+                    return CreateQualifierFromSlotExpression(slot.Expression, axis);
+            }
+        }
+
+        return null;
+    }
+
+    private static DeclaredQualifierMeta? CreateQualifierFromSlotExpression(
+        TypedExpression expr, QualifierAxis axis)
+    {
+        var fieldName = expr switch
+        {
+            TypedFieldRef f => f.FieldName,
+            TypedArgRef a => a.ArgName,
+            _ => null,
+        };
+
+        if (fieldName is null)
+            return null;
+
+        return axis switch
+        {
+            QualifierAxis.Currency => new DeclaredQualifierMeta.Currency($"{{{fieldName}}}"),
+            QualifierAxis.Unit => new DeclaredQualifierMeta.Unit($"{{{fieldName}}}", $"{{{fieldName}}}"),
+            QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension($"{{{fieldName}}}"),
+            QualifierAxis.FromCurrency => new DeclaredQualifierMeta.FromCurrency($"{{{fieldName}}}"),
+            QualifierAxis.ToCurrency => new DeclaredQualifierMeta.ToCurrency($"{{{fieldName}}}"),
+            _ => null,
+        };
     }
 
     /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
