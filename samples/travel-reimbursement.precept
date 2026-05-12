@@ -27,8 +27,8 @@ in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an appro
 event Submit(
     Employee as string notempty,
     Days as number,
-    Lodging as number,
-    Meals as number,
+    Lodging as decimal,
+    Meals as decimal,
     Miles as number,
     Rate as number default 0.67)
 on Submit ensure Submit.Days > 0 because "Trip days must be positive"
