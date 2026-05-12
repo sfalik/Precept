@@ -22,6 +22,7 @@ public class ProofLedgerTests
             Outcome: TransitionRowOutcome.NoTransition,
             RejectReason: null,
             ResultQualifier: null,
+            RowSpan: SourceSpan.Missing,
             Syntax: SyntaxFor(ConstructKind.TransitionRow));
 
     private static TypedField CreateField()

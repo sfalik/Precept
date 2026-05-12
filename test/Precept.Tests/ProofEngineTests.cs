@@ -142,6 +142,7 @@ public class ProofEngineTests
             TransitionRowOutcome.NoTransition,
             null,
             null,
+            SourceSpan.Missing,
             MakeSyntax(ConstructKind.TransitionRow));
 
     private static TypedStateHook MakeStateHook(string stateName, TypedExpression? guard, params TypedAction[] actions)

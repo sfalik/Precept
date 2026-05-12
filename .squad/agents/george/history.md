@@ -147,4 +147,10 @@
 
 - The 26 pre-existing spike-branch failures (TypeCheckerAssemblyTests + TypeCheckerAssignmentQualifierTests) are invariant across this work. 9 new GraphAnalyzerTests added, all green.
 
+### 2026-05-11T23:29:22.2031046-04:00 — C4 TypedArgRef qualifier resolution
+
+- `ProofEngine.ResolveQualifierOnAxis()` can resolve direct `TypedArgRef` qualifiers without going through `semantics.FieldsByName`; the direct arg path needs the same Unit→Dimension and Dimension→TemporalDimension fallback rules as the field path.
+- `GetFieldName()` also has to recognize `TypedArgRef` so PRE0114 messages stop collapsing direct arg diagnostics to `<unknown>`.
+- On `samples/inventory-item.precept`, the C4 fix dropped PRE0114 from 73 to 66. The remaining `<unknown>` PRE0114s are attached to composite operand subtrees, not direct arg refs, so they belong to follow-up proof-expression work rather than this narrow arg-resolution gap.
+
 

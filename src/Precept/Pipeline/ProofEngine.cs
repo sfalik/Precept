@@ -317,6 +317,7 @@ public static class ProofEngine
         return resolved switch
         {
             TypedFieldRef fieldRef => fieldRef.FieldName,
+            TypedArgRef argRef => argRef.ArgName,
             TypedMemberAccess { Object: TypedFieldRef fieldRef } => fieldRef.FieldName,
             _ => null
         };
@@ -945,7 +946,35 @@ public static class ProofEngine
     private static DeclaredQualifierMeta? ResolveQualifierOnAxis(
         ProofSubject subject, QualifierAxis axis, TypedExpression site, SemanticIndex semantics)
     {
-        var fieldName = GetFieldName(subject, site);
+        var resolved = ResolveSubject(subject, site);
+        if (resolved is TypedArgRef { DeclaredQualifiers: { } argQualifiers })
+        {
+            foreach (var qual in argQualifiers)
+            {
+                if (qual.Axis == axis)
+                    return qual;
+            }
+
+            if (axis == QualifierAxis.Unit)
+            {
+                foreach (var qual in argQualifiers)
+                {
+                    if (qual.Axis == QualifierAxis.Dimension)
+                        return qual;
+                }
+            }
+
+            if (axis == QualifierAxis.Dimension)
+            {
+                foreach (var qual in argQualifiers)
+                {
+                    if (qual.Axis == QualifierAxis.TemporalDimension)
+                        return qual;
+                }
+            }
+        }
+
+        var fieldName = GetFieldName(resolved);
         if (fieldName is null) return null;
         if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return null;
 
