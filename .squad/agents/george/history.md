@@ -57,3 +57,10 @@
 - Added `SourceFieldName string?` to `DeclaredQualifierMeta` (base + 8 subtypes); populated in `MapInterpolatedQualifier` via `ExtractSourceFieldName` helper and in `CreateQualifierFromSlotExpression` directly from field name.
 - `QualifiersSymbolicallyEqual` now uses `SourceFieldName` as primary criterion before `ExtractQualifierSourcePath` fallback, enabling cross-subtype equality (ToCurrency == Currency when same source field).
 - 8/8 P2 tests pass. PR: https://github.com/sfalik/Precept/pull/141
+
+### 2026-05-12 — P3: price / compound-quantity -> price type algebra
+- Added OperationKind.PriceDivideQuantity = 203, ResultQualifierPolicy.CompoundDimensionElevation, and PriceDivideQuantity catalog entry.
+- QualifierChainProofRequirement cannot be used for compound-unit fields declared with in 'Y/X' syntax: these fields store only a Unit qualifier, not Dimension. ResolveQualifierOnAxis(..., QualifierAxis.Dimension, ...) returns null for them, causing chain proofs to always fail. The dimension constraint is enforced implicitly via result-qualifier propagation and assignment qualifier checks instead.
+- TryDeriveCompoundElevationQualifiers: extracts currency from left (price), splits compound unit from right (quantity), derives numerator dimension, returns [Currency, Unit(numerator, dim, Derived)].
+- TryResolveCompoundElevationDimension in ProofEngine: works on RIGHT operand only; extracts compound value, splits at /, derives numerator dimension from unit name.
+- 5/5 P3 tests pass; 4910/4910 full suite. PR: https://github.com/sfalik/Precept/pull/142
