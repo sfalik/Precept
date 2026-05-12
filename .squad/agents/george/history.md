@@ -46,7 +46,14 @@
 - 2026-05-12 — E2 needed `ResolveQualifierFromExpression()` to synthesize `DeclaredQualifierMeta` directly from `TypedInterpolatedTypedConstant` slots; `DeclaredQualifierMeta.Unit` requires both unit and dimension payloads.
 - 2026-05-12 — E3 needed more than currency passthrough. Compound-cancellation dimension proofs must fall back to unit qualifiers and derive numerator dimensions (`kg` → `mass`, `{StockingUnit}` → `{StockingUnit.dimension}`) or nested `Qty * Conv * Price` chains still emit PRE0114.
 - 2026-05-12 — On the current inventory-item worktree, E2/E3 cut PRE0114 from 66 to 16; the remaining ReceiveShipment/GrossProfit fallout is tied to deferred `ExchangeRateTimesMoney` propagation plus separate sample edits outside the parenthesization fix.
+- 2026-05-12 — P2: `ParseInterpolatedTypedConstant()` always prepends a leading `TextSegment("")` before the first hole. A pure qualifier like `'{CatalogCurrency}'` yields `[TextSegment(""), HoleSegment(...)]`. List-patterns matching `[HoleSegment {...}]` silently miss this; iterate and skip empty TextSegments instead.
+- 2026-05-12 — P2: When co-running agents share the filesystem, use `git add <specific-files>` (not `git add -A`) to isolate your commit from other agents' working tree changes.
 
 ### 2026-05-12T05:04:03Z — E2 and E3 completed
 - Typed interpolated constant qualifier extraction (E2, `8785d753`) and subexpression / compound-unit qualifier propagation (E3, `d3f5aa98`) landed, with `f4db093e` fixing the ReceiveShipment parenthesization follow-up.
 - On the current inventory-item.precept worktree, PRE0114 fell from 66 to 16; the remaining 16 are deferred exchange-rate / GrossProfit fallout rather than regressions in the shipped slices.
+
+### 2026-05-12 — P2: Symbolic Qualifier Equality via SourceFieldName
+- Added `SourceFieldName string?` to `DeclaredQualifierMeta` (base + 8 subtypes); populated in `MapInterpolatedQualifier` via `ExtractSourceFieldName` helper and in `CreateQualifierFromSlotExpression` directly from field name.
+- `QualifiersSymbolicallyEqual` now uses `SourceFieldName` as primary criterion before `ExtractQualifierSourcePath` fallback, enabling cross-subtype equality (ToCurrency == Currency when same source field).
+- 8/8 P2 tests pass. PR: https://github.com/sfalik/Precept/pull/141
