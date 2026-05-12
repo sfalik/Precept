@@ -184,6 +184,13 @@ public class DiagnosticsTests
         Diagnostics.GetMeta(DiagnosticCode.UnprovedPresenceRequirement).Stage.Should().Be(DiagnosticStage.Proof);
     }
 
+    [Theory]
+    [MemberData(nameof(UpdatedMessageTemplates))]
+    public void UpdatedDiagnostics_ExposeApprovedMessageTemplates(DiagnosticCode code, string expectedTemplate)
+    {
+        Diagnostics.GetMeta(code).MessageTemplate.Should().Be(expectedTemplate);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     public static TheoryData<DiagnosticCode> AllDiagnosticCodes()
@@ -193,6 +200,19 @@ public class DiagnosticsTests
             data.Add(code);
         return data;
     }
+
+    public static TheoryData<DiagnosticCode, string> UpdatedMessageTemplates => new()
+    {
+        { DiagnosticCode.FunctionArgConstraintViolation, "Argument {0} to '{1}' is not valid — {2}" },
+        { DiagnosticCode.CollectionOperationOnScalar, "'{0}' requires a collection, but '{2}' is a single value — change '{2}' to a set, list, or queue" },
+        { DiagnosticCode.InvalidTypedConstantContent, "'{0}' is not a valid {1} — check the expected format for {1} values" },
+        { DiagnosticCode.UnprovedModifierRequirement, "Field '{0}' requires '{1}' — add '{1}' to its declaration{2}" },
+        { DiagnosticCode.UnprovedDimensionRequirement, "Field '{0}' needs a '{1}' dimension qualifier — add 'of {1}' to the field declaration{2}" },
+        { DiagnosticCode.UnprovedPresenceRequirement, "'{0}' is optional and may be empty here — guard with 'when {0} is set' or remove 'optional'{1}" },
+        { DiagnosticCode.InvalidInterpolatedTypedConstantForm, "'{0}' doesn't match a recognized pattern for this type — check the expected format (e.g. '{{amount}} USD' for money)" },
+        { DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch, "'{{{1}}}' expects a {2} value, but the expression is {0} — use a compatible field or literal" },
+        { DiagnosticCode.DimensionMismatchInUnitSlot, "'{0}' measures {1}, but this field requires {2} — use a unit from the '{2}' dimension" },
+    };
 
     public static TheoryData<DiagnosticCode> LexCodes => new()
     {

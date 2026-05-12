@@ -252,11 +252,11 @@ internal static partial class TypeChecker
         if (result.IsValid)
             return new TypedTypedConstant(targetType, rawText, result.Value, lit.Span);
 
-        foreach (var diagnostic in result.Diagnostics)
+        foreach (var _ in result.Diagnostics)
         {
             ctx.Diagnostics.Add(
                 Diagnostics.Create(DiagnosticCode.InvalidTypedConstantContent, lit.Span,
-                    rawText, diagnostic.Message));
+                    rawText, meta.DisplayName));
         }
 
         return new TypedErrorExpression(lit.Span);

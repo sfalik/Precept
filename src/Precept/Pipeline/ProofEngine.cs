@@ -1262,6 +1262,7 @@ public static class ProofEngine
     private static Diagnostic CreateDiagnostic(ProofObligation obligation)
     {
         var contextDesc = FormatContextDescription(obligation.Context);
+        var usageSuffix = FormatUsageContextSuffix(obligation.Context);
 
         switch (obligation.Requirement)
         {
@@ -1277,33 +1278,32 @@ public static class ProofEngine
                 return Diagnostics.Create(DiagnosticCode.UnprovedModifierRequirement, obligation.Site.Span,
                     GetFieldName(modReq.Subject, obligation.Site) ?? "<unknown>",
                     modReq.Required.ToString(),
-                    $" in {contextDesc}");
+                    usageSuffix);
 
             case DimensionProofRequirement dimReq:
                 return Diagnostics.Create(DiagnosticCode.UnprovedDimensionRequirement, obligation.Site.Span,
                     GetFieldName(dimReq.Subject, obligation.Site) ?? "<unknown>",
-                    dimReq.RequiredDimension.ToString(),
-                    "unknown",
-                    $" in {contextDesc}");
+                    FormatPeriodDimension(dimReq.RequiredDimension),
+                    usageSuffix);
 
             case QualifierCompatibilityProofRequirement qcReq:
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
                     GetFieldName(qcReq.LeftSubject, obligation.Site) ?? "<unknown>",
                     GetFieldName(qcReq.RightSubject, obligation.Site) ?? "<unknown>",
                     qcReq.Axis.ToString(),
-                    $" in {contextDesc}");
+                    usageSuffix);
 
             case QualifierChainProofRequirement chainReq:
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
                     GetFieldName(chainReq.LeftSubject, obligation.Site) ?? "<unknown>",
                     GetFieldName(chainReq.RightSubject, obligation.Site) ?? "<unknown>",
                     $"{chainReq.LeftAxis}↔{chainReq.RightAxis}",
-                    $" in {contextDesc}");
+                    usageSuffix);
 
             case PresenceProofRequirement presence:
                 return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,
                     GetFieldName(presence.Subject, obligation.Site) ?? "<unknown>",
-                    $" in {contextDesc}");
+                    usageSuffix);
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
@@ -1375,17 +1375,49 @@ public static class ProofEngine
 
     private static string FormatContextDescription(ObligationContext context) => context switch
     {
-        TransitionRowContext trc => $"event '{trc.Row.EventName}' in state '{trc.Row.FromState ?? "*"}'",
+        TransitionRowContext trc => $"on event '{trc.Row.EventName}' from state '{trc.Row.FromState ?? "*"}'",
         EventHandlerContext ehc => $"event handler '{ehc.Handler.EventName}'",
-        StateHookContext shc => $"state hook in '{shc.Hook.StateName}'",
+        StateHookContext shc => $"state hook for '{shc.Hook.StateName}'",
         ConstraintContext cc => cc.Constraint switch
         {
             RuleIdentity ri => $"rule at index {ri.RuleIndex}",
-            EnsureIdentity ei => $"ensure in {ei.AnchorName ?? "global"}",
+            EnsureIdentity { AnchorName: { } anchorName } => $"ensure for '{anchorName}'",
+            EnsureIdentity => "global ensure",
             _ => "constraint"
         },
         FieldExpressionContext fec => $"field '{fec.Field.Name}' computed expression",
         _ => "unknown context"
+    };
+
+    private static string FormatUsageContextSuffix(ObligationContext context)
+    {
+        var usageDescription = FormatUsageContextDescription(context);
+        return usageDescription == "here"
+            ? " (used here)"
+            : $" (used {usageDescription})";
+    }
+
+    private static string FormatUsageContextDescription(ObligationContext context) => context switch
+    {
+        TransitionRowContext trc => $"on event '{trc.Row.EventName}' from state '{trc.Row.FromState ?? "*"}'",
+        EventHandlerContext ehc => $"in event handler '{ehc.Handler.EventName}'",
+        StateHookContext shc => $"in state hook for '{shc.Hook.StateName}'",
+        ConstraintContext cc => cc.Constraint switch
+        {
+            RuleIdentity ri => $"while evaluating rule at index {ri.RuleIndex}",
+            EnsureIdentity { AnchorName: { } anchorName } => $"while evaluating ensure for '{anchorName}'",
+            EnsureIdentity => "while evaluating the global ensure",
+            _ => "here"
+        },
+        FieldExpressionContext fec => $"in the computed expression for field '{fec.Field.Name}'",
+        _ => "here"
+    };
+
+    private static string FormatPeriodDimension(PeriodDimension dimension) => dimension switch
+    {
+        PeriodDimension.Date => "date",
+        PeriodDimension.Time => "time",
+        _ => dimension.ToString().ToLowerInvariant(),
     };
 
     private static FaultSiteLink CreateFaultSiteLink(ProofObligation obligation)

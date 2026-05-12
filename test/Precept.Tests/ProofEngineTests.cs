@@ -994,8 +994,10 @@ public class ProofEngineTests
 
             obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
             obligation.Strategy.Should().BeNull();
-            ledger.Diagnostics.Should().Contain(d =>
+
+            var diagnostic = ledger.Diagnostics.Single(d =>
                 d.Code == nameof(DiagnosticCode.UnprovedPresenceRequirement));
+            diagnostic.Message.Should().Be("'OptionalText' is optional and may be empty here — guard with 'when OptionalText is set' or remove 'optional' (used on event 'Submit' from state 'Draft')");
         }
 
         [Fact]
@@ -1779,8 +1781,10 @@ public class ProofEngineTests
 
             obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
             obligation.Strategy.Should().BeNull();
-            ledger.Diagnostics.Should().Contain(d =>
+
+            var diagnostic = ledger.Diagnostics.Single(d =>
                 d.Code == nameof(DiagnosticCode.UnprovedModifierRequirement));
+            diagnostic.Message.Should().Be("Field 'Offset' requires 'Nonzero' — add 'Nonzero' to its declaration (used on event 'Advance' from state 'Draft')");
         }
 
         [Fact]
@@ -1812,8 +1816,10 @@ public class ProofEngineTests
 
             obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
             obligation.Strategy.Should().BeNull();
-            ledger.Diagnostics.Should().Contain(d =>
+
+            var diagnostic = ledger.Diagnostics.Single(d =>
                 d.Code == nameof(DiagnosticCode.UnprovedDimensionRequirement));
+            diagnostic.Message.Should().Be("Field 'Offset' needs a 'date' dimension qualifier — add 'of date' to the field declaration (used on event 'Advance' from state 'Draft')");
         }
 
         [Fact]

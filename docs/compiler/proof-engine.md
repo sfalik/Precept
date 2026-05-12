@@ -1609,13 +1609,13 @@ Template parameter population for proof-stage diagnostics:
 | `DivisionByZero` (83) | `"Division by zero: '{0}' can be zero when {1}"` | Field name (from `GetFieldName`) | Context description | — | — |
 | `SqrtOfNegative` (84) | `"sqrt() requires a non-negative value, but '{0}' can be negative when {1}"` | Field name | Context description | — | — |
 | `UnsatisfiableGuard` (82) | `"The condition '{0}' on event '{1}' can never be true when {2}"` | Guard expression text | Event name | State name or `"any state"` | — |
-| `UnprovedModifierRequirement` (112) | `"Field '{0}' must have modifier '{1}' but it is not declared{2}"` | Field name | Required modifier name | Context description | — |
-| `UnprovedDimensionRequirement` (113) | `"Operand '{0}' requires {1} dimension but has {2}{3}"` | Operand field name | Required dimension | Actual dimension | Context |
-| `UnprovedQualifierCompatibility` (114) | `"Operands '{0}' and '{1}' have incompatible {2} qualifiers{3}"` | Left operand | Right operand | Qualifier axis | Context |
+| `UnprovedModifierRequirement` (112) | `"Field '{0}' requires '{1}' — add '{1}' to its declaration{2}"` | Field name | Required modifier name | Usage suffix | — |
+| `UnprovedDimensionRequirement` (113) | `"Field '{0}' needs a '{1}' dimension qualifier — add 'of {1}' to the field declaration{2}"` | Field name | Required dimension | Usage suffix | — |
+| `UnprovedQualifierCompatibility` (114) | `"Operands '{0}' and '{1}' have incompatible {2} qualifiers{3}"` | Left operand | Right operand | Qualifier axis | Usage suffix |
 | `UnsatisfiableInitialState` (115) | `"Initial state '{0}' cannot be satisfied: constraint '{1}' fails with default values"` | Initial state name | Constraint description | — | — |
-| `UnprovedPresenceRequirement` (116) | `"Field '{0}' must be present but its presence cannot be guaranteed{1}"` | Field name | Context description | — | — |
+| `UnprovedPresenceRequirement` (116) | `"'{0}' is optional and may be empty here — guard with 'when {0} is set' or remove 'optional'{1}"` | Field name | Usage suffix | — | — |
 
-**Context description format:** `"event '{EventName}' in state '{FromState}'"` for transition rows. `"state hook '{Scope}' on '{StateName}'"` for state hooks. `"event handler '{EventName}'"` for event handlers. `"rule at index {RuleIndex}"` for rules. `"ensure in {AnchorName}"` for ensures.
+**Context description format:** `"on event '{EventName}' from state '{FromState}'"` for transition rows. Proof-usage suffixes render as `"(used on event ...)"` for transition rows, `"(used in event handler ...)"` for event handlers, `"(used in state hook for ...)"` for state hooks, and `"(used while evaluating ...)"` for rule/ensure contexts.
 
 **Field name resolution:** Use `GetFieldName(requirement.Subject, obligation.Site)`. If the subject resolves to a field, use the field name. If resolution fails, use `"<unknown>"`.
 

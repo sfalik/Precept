@@ -370,3 +370,12 @@
 - Applied policy to 6 operations: MoneyTimesDecimal, MoneyDivideDecimal, QuantityTimesDecimal, QuantityDivideDecimal, PriceTimesDecimal, PriceDivideDecimal
 - 10 new tests added, all 4831 tests pass
 - Commits:  1bc5f0e (fix), 73c11e51 (docs/records)
+
+
+### 2026-05-12T00:08:32.997-04:00 — Elaine diagnostic message fixes landed
+
+- Updated the audited proof/type diagnostic templates in src/Precept/Language/Diagnostics.cs, rewired proof-context suffix rendering in src/Precept/Pipeline/ProofEngine.cs, and corrected InvalidTypedConstantContent emission so {1} is the target type display name instead of an arbitrary validator message.
+
+- RuleIdentity still has no BecauseText-style author label, so rule contexts remain index-based for now; see .squad/decisions/inbox/george-diagnostic-message-fixes.md.
+
+- Validation: dotnet build src\Precept\Precept.csproj --nologo passed, focused diagnostics/proof/typed-constant coverage passed (818/818), and full Precept.Tests still hits the pre-existing InventoryItem_Sample_PRE0114_Count_Drops_Below_Baseline failure in the dirty workspace (4840/4841 passed).

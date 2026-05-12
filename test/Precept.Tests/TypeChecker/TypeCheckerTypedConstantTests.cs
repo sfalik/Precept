@@ -108,8 +108,9 @@ public class TypeCheckerTypedConstantTests
         var result = Resolve(TypedConstant(code), ctx, TypeKind.Currency);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+        var diagnostic = ctx.Diagnostics.Should().ContainSingle().Which;
+        diagnostic.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+        diagnostic.Message.Should().Contain("currency").And.Contain("expected format");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -501,8 +502,9 @@ public class TypeCheckerTypedConstantTests
                 -> set m = '{x} {y} {z}'
             """);
 
-        diagnostics.Should().Contain(d =>
+        var diagnostic = diagnostics.Single(d =>
             d.Code == nameof(DiagnosticCode.InvalidInterpolatedTypedConstantForm));
+        diagnostic.Message.Should().Contain("recognized pattern").And.Contain("{amount} USD");
     }
 
     [Fact]
@@ -579,8 +581,9 @@ public class TypeCheckerTypedConstantTests
                 -> set q = '{b} kg'
             """);
 
-        diagnostics.Should().Contain(d =>
+        var diagnostic = diagnostics.Single(d =>
             d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+        diagnostic.Message.Should().Contain("{magnitude}").And.Contain("boolean");
     }
 
     [Fact]
@@ -1168,8 +1171,9 @@ public class TypeCheckerTypedConstantTests
                 -> set target = '1 {f1.unit}'
             """);
 
-        diagnostics.Should().Contain(d =>
+        var diagnostic = diagnostics.Single(d =>
             d.Code == nameof(DiagnosticCode.DimensionMismatchInUnitSlot));
+        diagnostic.Message.Should().Contain("f1").And.Contain("length").And.Contain("mass");
     }
 
     [Fact]
