@@ -18,6 +18,20 @@
 
 ---
 
+### 2026-05-12T23:25:25Z: Final comma-list `StateTarget` spike redesign is approved with proposal-wording follow-up
+
+**By:** Scribe
+
+**Status:** Merged from Frank's final spike review.
+
+**Merged source:** `frank-final-spike-review.md`.
+
+- Frank approved commits `53d68d51` and `cf3c6a81`: `ResolvedStateTarget` now carries explicit wildcard truth inside the TypeChecker, while `NormalizeTransitionRow` remains the intentional compatibility boundary that projects wildcard rows back to `TypedTransitionRow.FromState = null`.
+- The review confirmed the spike stayed metadata-disciplined where it matters: wildcard detection remains token-metadata-driven, runtime/graph/proof behavior stays unchanged, and comma-list expansion remains pure syntactic sugar with first-match preservation plus strengthened regression coverage.
+- Follow-up is proposal hardening, not implementation repair: the formal issue should defend the wildcard compatibility boundary, stay honest about the localized hand-shaped parser grammar scan, and strengthen locked decisions `D3`/`D4` with rejected alternatives, accepted tradeoffs, and explicit research/corpus grounding.
+
+---
+
 ### 2026-05-12T23:02:04Z: Field-state guarantees v2 stays approved only after omit-state resolution, broadcast compatibility, and the real test matrix are locked
 
 **By:** Scribe
