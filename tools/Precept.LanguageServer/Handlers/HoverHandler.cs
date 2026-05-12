@@ -52,16 +52,6 @@ internal sealed class HoverHandler : IHoverHandler
             return proofHover;
         }
 
-        if (TryCreateTypeHover(compilation, token.Value, out var typeHover))
-        {
-            return typeHover;
-        }
-
-        if (TryCreateActionHover(token.Value, out var actionHover))
-        {
-            return actionHover;
-        }
-
         if (TryCreateTypedConstantHover(compilation.Semantics, position, out var constantHover))
         {
             return constantHover;
@@ -72,9 +62,24 @@ internal sealed class HoverHandler : IHoverHandler
             return stateHover;
         }
 
+        if (TryCreateFieldDeclarationHover(compilation, token.Value, position, out var fieldDeclarationHover))
+        {
+            return fieldDeclarationHover;
+        }
+
         if (RichHoverFactory.TryCreateHover(compilation, position, token.Value, out var richHover))
         {
             return richHover;
+        }
+
+        if (TryCreateTypeHover(compilation, token.Value, out var typeHover))
+        {
+            return typeHover;
+        }
+
+        if (TryCreateActionHover(token.Value, out var actionHover))
+        {
+            return actionHover;
         }
 
         if (TryCreateOperatorHover(compilation, position, token.Value, out var operatorHover))
@@ -165,6 +170,28 @@ internal sealed class HoverHandler : IHoverHandler
 
         hover = RichHoverFactory.CreateStateHover(compilation, state, token.Span);
         return true;
+    }
+
+    private static bool TryCreateFieldDeclarationHover(Compilation compilation, Token token, Position position, out Hover hover)
+    {
+        hover = null!;
+        if (!Types.ByToken.ContainsKey(token.Kind))
+        {
+            return false;
+        }
+
+        foreach (var field in compilation.Semantics.Fields)
+        {
+            if (!Contains(field.Syntax.Span, position))
+            {
+                continue;
+            }
+
+            hover = RichHoverFactory.CreateFieldHover(compilation, field, field.Syntax.Span);
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryCreateTypeHover(Compilation compilation, Token token, out Hover hover)

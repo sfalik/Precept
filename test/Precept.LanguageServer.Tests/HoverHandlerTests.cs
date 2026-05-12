@@ -190,7 +190,7 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnSetInTypePosition_UsesTypeHover()
+    public void Hover_OnSetInFieldDeclaration_RoutesToFieldCardBeforeTypeHover()
     {
         var compilation = Precept.Compiler.Compile("""
             precept LoanApplication
@@ -204,9 +204,9 @@ state Draft initial
         hover.Should().NotBeNull();
         hover!.Contents.HasMarkupContent.Should().BeTrue();
         var markup = hover.Contents.MarkupContent!;
-        markup.Value.Should().Contain("set");
-        markup.Value.Should().Contain("unordered collection", because: "set in type position should show type description");
-        markup.Value.Should().NotContain("Field assignment", because: "action description must not appear in type hover");
+        markup.Value.Should().Contain("**field `Tags`**");
+        markup.Value.Should().Contain("Type: `set of string`");
+        markup.Value.Should().NotStartWith("**set**");
     }
 
     [Fact]
@@ -270,22 +270,17 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnCollectionType_UsesTypeHoverDescription()
+    public void Hover_OnMoneyTypeInFieldDeclaration_RoutesToFieldCardBeforeTypeHover()
     {
-        var compilation = Precept.Compiler.Compile(RichHoverSource);
-        var setToken = compilation.Tokens.Tokens.Single(token =>
-            token.Kind == Precept.Language.TokenKind.Set
-            && token.Span.StartLine == 2);
+        var markup = GetHoverMarkdown(HoverV3Source, "money", occurrence: 1);
 
-        var hover = HoverHandler.CreateHover(compilation, new Position(setToken.Span.StartLine - 1, setToken.Span.StartColumn - 1));
-
-        hover.Should().NotBeNull();
-        hover!.Contents.MarkupContent!.Value.Should().Contain("set");
-        hover.Contents.MarkupContent.Value.Should().Contain("unordered collection of unique elements");
+        markup.Should().Contain("**field `Price`**");
+        markup.Should().Contain("Type: `money` · not nullable · `in USD`");
+        markup.Should().NotStartWith("**money**");
     }
 
     [Fact]
-    public void Hover_OnActionVerb_UsesActionHoverDescription()
+    public void Hover_OnActionVerbInTransition_RoutesToTransitionCardBeforeActionHelp()
     {
         var compilation = Precept.Compiler.Compile(RichHoverSource);
         var addToken = compilation.Tokens.Tokens.Single(token => token.Kind == Precept.Language.TokenKind.Add);
@@ -293,8 +288,9 @@ state Draft initial
         var hover = HoverHandler.CreateHover(compilation, new Position(addToken.Span.StartLine - 1, addToken.Span.StartColumn - 1));
 
         hover.Should().NotBeNull();
-        hover!.Contents.MarkupContent!.Value.Should().Contain("add");
-        hover.Contents.MarkupContent.Value.Should().Contain("Adds an element to a set or bag field.");
+        hover!.Contents.MarkupContent!.Value.Should().Contain("**transition**");
+        hover.Contents.MarkupContent.Value.Should().Contain("Actions:");
+        hover.Contents.MarkupContent.Value.Should().NotStartWith("**add**");
     }
 
     [Fact]
@@ -364,6 +360,25 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnGloballyWritableField_OmittedStateRemainsLocked()
+    {
+        const string source = """
+            precept MutabilityHover
+            field Price as money in 'USD' writable
+            state Draft initial
+            state Hidden terminal
+            event Hide
+            from Draft on Hide -> transition Hidden
+            in Hidden omit Price
+            """;
+
+        var markup = GetHoverMarkdown(source, "Price as money");
+
+        markup.Should().Contain("✏️ `Draft` (unconditional)");
+        markup.Should().Contain("🔒 `Hidden`");
+    }
+
+    [Fact]
     public void Hover_OnComputedField_ShowsExpressionAndSuppressesWriteMap()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "AverageQuantity as number");
@@ -417,6 +432,26 @@ state Draft initial
         markup.Should().Contain("`Archive`");
         markup.Should().Contain("Writable here:");
         markup.Should().Contain("active ensures: 1");
+    }
+
+    [Fact]
+    public void Hover_OnState_OmittedGloballyWritableFieldsAreExcludedFromWritableSummary()
+    {
+        const string source = """
+            precept MutabilityHover
+            field Price as money in 'USD' writable
+            state Draft initial
+            state Hidden terminal
+            event Hide
+            from Draft on Hide -> transition Hidden
+            in Hidden omit Price
+            """;
+
+        var markup = GetHoverMarkdown(source, "Hidden terminal");
+
+        markup.Should().Contain("**state `Hidden`**");
+        markup.Should().Contain("Writable here: *none*");
+        markup.Should().NotContain("`Price`", because: "omitted fields are structurally absent, not writable");
     }
 
     [Fact]
