@@ -507,6 +507,62 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnQualifiedField_ShowsUnresolvedProofUseSummary()
+    {
+        const string source = """
+            precept FieldProofHover
+            field A as money in 'USD'
+            field B as money in 'USD'
+            field C as money in 'EUR'
+            field Result as money <- (A - B) + C
+            """;
+
+        var markup = GetHoverMarkdown(source, "A as money");
+
+        markup.Should().Contain("Status: Proof contract active · 1 unresolved use");
+        markup.Should().Contain("Open proof issues: computed field `Result`");
+    }
+
+    [Fact]
+    public void Hover_OnProofDiagnosticSpan_WinsOverOperatorHover()
+    {
+        const string source = """
+            precept ProofDiagnosticHover
+            field A as money in 'USD'
+            field B as money in 'USD'
+            field C as money in 'EUR'
+            field Result as money <- (A - B) + C
+            """;
+
+        var markup = GetHoverMarkdown(source, "+");
+
+        markup.Should().Contain("**PRE0114 — Cannot prove Currency qualifier compatibility**");
+        markup.Should().Contain("Verdict: Cannot prove both operands resolve to the same Currency qualifier");
+        markup.Should().Contain("Expression: `(A - B) + C`");
+    }
+
+    [Fact]
+    public void Hover_OnProofBearingExpression_ShowsProvedQualifierDetails()
+    {
+        const string source = """
+            precept GrossProfitHover
+            field CatalogCurrency as currency default 'USD'
+            field TotalRevenue as money in '{CatalogCurrency}' default '10.00 {CatalogCurrency}'
+            field TotalReturns as money in '{CatalogCurrency}' default '1.00 {CatalogCurrency}'
+            field TotalCostOfGoods as money in '{CatalogCurrency}' default '2.00 {CatalogCurrency}'
+            field GrossProfit as money in '{CatalogCurrency}' <- (TotalRevenue - TotalReturns) - TotalCostOfGoods
+            """;
+
+        var markup = GetHoverMarkdown(source, "TotalRevenue - TotalReturns", offset: 13);
+
+        markup.Should().Contain("**expression** `(TotalRevenue - TotalReturns)`");
+        markup.Should().Contain("Status: Proved");
+        markup.Should().Contain("Requirement: both operands must resolve to the same Currency qualifier");
+        markup.Should().Contain("Result qualifier: `'{CatalogCurrency}'`");
+        markup.Should().Contain("Proof strategy: same-qualifier propagation");
+    }
+
+    [Fact]
     public void Hover_OnQualifierExpression_ShowsAxisAndCompatibilityChecks()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "money in 'USD'", offset: 9);

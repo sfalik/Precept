@@ -12,6 +12,22 @@ namespace Precept.LanguageServer.Handlers;
 
 internal static class RichHoverFactory
 {
+    internal static bool TryCreateProofHover(Compilation compilation, Position position, Token token, out Hover hover)
+    {
+        if (TryCreateProofDiagnosticHover(compilation, position, out hover))
+        {
+            return true;
+        }
+
+        if (TryCreateProofExpressionHover(compilation, position, out hover))
+        {
+            return true;
+        }
+
+        hover = null!;
+        return false;
+    }
+
     internal static bool TryCreateHover(Compilation compilation, Position position, Token token, out Hover hover)
     {
         if (TryCreateRuleHover(compilation, position, out hover))
@@ -202,6 +218,674 @@ internal static class RichHoverFactory
         return symbolHover is not null;
     }
 
+    private static bool TryCreateProofDiagnosticHover(Compilation compilation, Position position, out Hover hover)
+    {
+        var diagnostics = compilation.Diagnostics
+            .Where(diagnostic => diagnostic.Stage == DiagnosticStage.Proof
+                && diagnostic.Severity is Severity.Warning or Severity.Error
+                && SymbolNavigation.Contains(diagnostic.Span, position))
+            .OrderBy(diagnostic => GetSpanWidth(diagnostic.Span))
+            .ToImmutableArray();
+        if (diagnostics.IsEmpty)
+        {
+            hover = null!;
+            return false;
+        }
+
+        var diagnostic = diagnostics[0];
+        var obligation = FindProofObligationForDiagnostic(compilation, diagnostic, position);
+        var span = obligation?.Site.Span ?? diagnostic.Span;
+        hover = MakeHover(CreateProofDiagnosticMarkdown(compilation, diagnostic, obligation), span);
+        return true;
+    }
+
+    private static bool TryCreateProofExpressionHover(Compilation compilation, Position position, out Hover hover)
+    {
+        var obligations = compilation.Proof.Obligations
+            .Where(obligation => obligation.Site is TypedBinaryOp
+                && SymbolNavigation.Contains(obligation.Site.Span, position))
+            .OrderBy(obligation => GetSpanWidth(obligation.Site.Span))
+            .ToImmutableArray();
+        if (obligations.IsEmpty)
+        {
+            hover = null!;
+            return false;
+        }
+
+        var site = (TypedBinaryOp)obligations[0].Site;
+        var siteObligations = compilation.Proof.Obligations
+            .Where(obligation => obligation.Site.Span == site.Span)
+            .ToImmutableArray();
+        var primary = SelectPrimaryProofObligation(siteObligations);
+        if (primary is null)
+        {
+            hover = null!;
+            return false;
+        }
+
+        hover = MakeHover(CreateProofExpressionMarkdown(compilation, site, primary), site.Span);
+        return true;
+    }
+
+    private static ProofObligation? FindProofObligationForDiagnostic(Compilation compilation, PreceptDiagnostic diagnostic, Position position)
+    {
+        if (Enum.TryParse<PreceptDiagnosticCode>(diagnostic.Code, out var diagnosticCode))
+        {
+            var fromLinks = compilation.Proof.FaultSiteLinks
+                .Where(link => link.DiagnosticCode == diagnosticCode && SymbolNavigation.Contains(link.Site, position))
+                .Select(link => link.Obligation)
+                .OrderBy(obligation => GetSpanWidth(obligation.Site.Span))
+                .FirstOrDefault();
+            if (fromLinks is not null)
+            {
+                return fromLinks;
+            }
+
+            return compilation.Proof.Obligations
+                .Where(obligation => obligation.EmittedDiagnostic == diagnosticCode && Overlaps(obligation.Site.Span, diagnostic.Span))
+                .OrderBy(obligation => GetSpanWidth(obligation.Site.Span))
+                .FirstOrDefault();
+        }
+
+        return null;
+    }
+
+    private static ProofObligation? SelectPrimaryProofObligation(ImmutableArray<ProofObligation> obligations) => obligations
+        .OrderByDescending(obligation => obligation.Disposition == ProofDisposition.Unresolved)
+        .ThenByDescending(obligation => obligation.Requirement is QualifierCompatibilityProofRequirement or QualifierChainProofRequirement)
+        .ThenBy(obligation => GetSpanWidth(obligation.Site.Span))
+        .FirstOrDefault();
+
+    private static string CreateProofDiagnosticMarkdown(Compilation compilation, PreceptDiagnostic diagnostic, ProofObligation? obligation)
+    {
+        if (obligation is null || !Enum.TryParse<PreceptDiagnosticCode>(diagnostic.Code, out var diagnosticCode))
+        {
+            return CreateGenericProofDiagnosticMarkdown(diagnostic);
+        }
+
+        return obligation.Requirement switch
+        {
+            QualifierCompatibilityProofRequirement qualifierCompatibility => CreateQualifierProofDiagnosticMarkdown(compilation, diagnosticCode, obligation, qualifierCompatibility),
+            QualifierChainProofRequirement qualifierChain => CreateQualifierChainProofDiagnosticMarkdown(compilation, diagnosticCode, obligation, qualifierChain),
+            PresenceProofRequirement presence => CreatePresenceProofDiagnosticMarkdown(compilation, diagnosticCode, obligation, presence),
+            _ => CreateGenericProofDiagnosticMarkdown(compilation, diagnosticCode, diagnostic, obligation),
+        };
+    }
+
+    private static string CreateProofExpressionMarkdown(Compilation compilation, TypedBinaryOp expression, ProofObligation obligation) => obligation.Requirement switch
+    {
+        QualifierCompatibilityProofRequirement qualifierCompatibility => CreateQualifierProofExpressionMarkdown(compilation, expression, obligation, qualifierCompatibility),
+        QualifierChainProofRequirement qualifierChain => CreateQualifierChainProofExpressionMarkdown(compilation, expression, obligation, qualifierChain),
+        _ => CreateGenericProofExpressionMarkdown(compilation, expression, obligation),
+    };
+
+    private static string CreateQualifierProofDiagnosticMarkdown(
+        Compilation compilation,
+        PreceptDiagnosticCode diagnosticCode,
+        ProofObligation obligation,
+        QualifierCompatibilityProofRequirement requirement)
+    {
+        var expression = obligation.Site as TypedBinaryOp;
+        var axisName = GetQualifierDisplayName(requirement.Axis);
+        var lines = new List<string>
+        {
+            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove {axisName} qualifier compatibility**",
+            $"Verdict: Cannot prove both operands resolve to the same {axisName} qualifier",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            $"Requirement: both operands must resolve to the same {axisName} qualifier",
+        };
+
+        if (expression is not null)
+        {
+            AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.Axis, obligation, includeResultLines: true);
+        }
+
+        lines.Add("Status: unresolved");
+        lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression?.Left, expression?.Right, requirement.Axis)}");
+        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+        return string.Join("\n\n", lines);
+    }
+
+    private static string CreateQualifierChainProofDiagnosticMarkdown(
+        Compilation compilation,
+        PreceptDiagnosticCode diagnosticCode,
+        ProofObligation obligation,
+        QualifierChainProofRequirement requirement)
+    {
+        var expression = obligation.Site as TypedBinaryOp;
+        var lines = new List<string>
+        {
+            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove qualifier compatibility**",
+            $"Verdict: Cannot prove the required qualifier chain across this expression",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            $"Requirement: {DescribeQualifierChainRequirement(requirement)}",
+        };
+
+        if (expression is not null)
+        {
+            AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.LeftAxis, obligation, includeResultLines: false, leftAxis: requirement.LeftAxis, rightAxis: requirement.RightAxis);
+        }
+
+        lines.Add("Status: unresolved");
+        lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression?.Left, expression?.Right, requirement.LeftAxis)}");
+        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+        return string.Join("\n\n", lines);
+    }
+
+    private static string CreatePresenceProofDiagnosticMarkdown(
+        Compilation compilation,
+        PreceptDiagnosticCode diagnosticCode,
+        ProofObligation obligation,
+        PresenceProofRequirement requirement)
+    {
+        var subjectExpression = ResolveProofSubjectExpression(requirement.Subject, obligation.Site);
+        var subject = subjectExpression is null ? DescribeProofSite(compilation, obligation.Site) : DescribeProofSite(compilation, subjectExpression);
+        var lines = new List<string>
+        {
+            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove presence**",
+            $"Verdict: Cannot prove `{EscapeInline(subject)}` is present before this access",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            "Requirement: optional fields must be proved present before access",
+            $"Subject: `{EscapeInline(subject)}`",
+        };
+
+        if (TryGetPresenceDescription(subjectExpression, compilation.Semantics, out var presence))
+        {
+            lines.Add($"Declared presence: {presence}");
+        }
+
+        lines.Add("Status: unresolved");
+        lines.Add("Reason: no guard or earlier assignment proves the field is set on this path");
+        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+        return string.Join("\n\n", lines);
+    }
+
+    private static string CreateGenericProofDiagnosticMarkdown(PreceptDiagnostic diagnostic)
+    {
+        var title = diagnostic.Message.Replace("'", "`").Replace("\r", string.Empty).Replace("\n", " ");
+        return string.Join("\n\n", new[]
+        {
+            $"**proof diagnostic** `{EscapeInline(diagnostic.Code)}`",
+            $"Verdict: {title}",
+            "Status: unresolved",
+        });
+    }
+
+    private static string CreateGenericProofDiagnosticMarkdown(Compilation compilation, PreceptDiagnosticCode diagnosticCode, PreceptDiagnostic diagnostic, ProofObligation obligation)
+    {
+        return string.Join("\n\n", new[]
+        {
+            $"**{FormatDiagnosticCode(diagnosticCode)} — {EscapeInline(diagnostic.Message)}**",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            "Status: unresolved",
+            $"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}",
+        });
+    }
+
+    private static string CreateQualifierProofExpressionMarkdown(
+        Compilation compilation,
+        TypedBinaryOp expression,
+        ProofObligation obligation,
+        QualifierCompatibilityProofRequirement requirement)
+    {
+        var axisName = GetQualifierDisplayName(requirement.Axis);
+        var lines = new List<string>
+        {
+            $"**expression** `{EscapeInline(DescribeProofSite(compilation, expression))}`",
+            $"Status: {DescribeProofStatus(obligation)}",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Requirement: both operands must resolve to the same {axisName} qualifier",
+        };
+
+        AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.Axis, obligation, includeResultLines: true);
+
+        if (obligation.Disposition == ProofDisposition.Proved && obligation.Strategy is { } strategy)
+        {
+            lines.Add($"Proof strategy: {HumanizeProofStrategy(strategy)}");
+        }
+        else
+        {
+            lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression.Left, expression.Right, requirement.Axis)}");
+            if (obligation.EmittedDiagnostic is { } diagnosticCode)
+            {
+                lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+            }
+        }
+
+        return string.Join("\n\n", lines);
+    }
+
+    private static string CreateQualifierChainProofExpressionMarkdown(
+        Compilation compilation,
+        TypedBinaryOp expression,
+        ProofObligation obligation,
+        QualifierChainProofRequirement requirement)
+    {
+        var lines = new List<string>
+        {
+            $"**expression** `{EscapeInline(DescribeProofSite(compilation, expression))}`",
+            $"Status: {DescribeProofStatus(obligation)}",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Requirement: {DescribeQualifierChainRequirement(requirement)}",
+        };
+
+        AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.LeftAxis, obligation, includeResultLines: false, leftAxis: requirement.LeftAxis, rightAxis: requirement.RightAxis);
+
+        if (obligation.Disposition == ProofDisposition.Proved && obligation.Strategy is { } strategy)
+        {
+            lines.Add($"Proof strategy: {HumanizeProofStrategy(strategy)}");
+        }
+        else
+        {
+            lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression.Left, expression.Right, requirement.LeftAxis)}");
+            if (obligation.EmittedDiagnostic is { } diagnosticCode)
+            {
+                lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+            }
+        }
+
+        return string.Join("\n\n", lines);
+    }
+
+    private static string CreateGenericProofExpressionMarkdown(Compilation compilation, TypedBinaryOp expression, ProofObligation obligation)
+    {
+        var lines = new List<string>
+        {
+            $"**expression** `{EscapeInline(DescribeProofSite(compilation, expression))}`",
+            $"Status: {DescribeProofStatus(obligation)}",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Requirement: {obligation.Requirement.Description}",
+        };
+
+        if (obligation.Disposition == ProofDisposition.Proved && obligation.Strategy is { } strategy)
+        {
+            lines.Add($"Proof strategy: {HumanizeProofStrategy(strategy)}");
+        }
+        else if (obligation.EmittedDiagnostic is { } diagnosticCode)
+        {
+            lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+        }
+
+        return string.Join("\n\n", lines);
+    }
+
+    private static void AppendQualifierProofEvidenceLines(
+        List<string> lines,
+        Compilation compilation,
+        TypedExpression left,
+        TypedExpression right,
+        QualifierAxis defaultAxis,
+        ProofObligation obligation,
+        bool includeResultLines,
+        QualifierAxis? leftAxis = null,
+        QualifierAxis? rightAxis = null)
+    {
+        var resolvedLeftAxis = leftAxis ?? defaultAxis;
+        var resolvedRightAxis = rightAxis ?? defaultAxis;
+        var leftQualifier = ResolveQualifierFromExpression(left, resolvedLeftAxis, compilation.Semantics);
+        var rightQualifier = ResolveQualifierFromExpression(right, resolvedRightAxis, compilation.Semantics);
+
+        lines.Add($"Left operand: `{EscapeInline(DescribeProofSite(compilation, left))}`");
+        lines.Add($"Left qualifier{(resolvedLeftAxis == defaultAxis ? string.Empty : $" ({GetQualifierDisplayName(resolvedLeftAxis)})")}: {FormatProofQualifierValue(leftQualifier, "not proved at this site")}");
+        lines.Add($"Left qualifier source: {DescribeProofQualifierSource(leftQualifier)}");
+        lines.Add($"Right operand: `{EscapeInline(DescribeProofSite(compilation, right))}`");
+        lines.Add($"Right qualifier{(resolvedRightAxis == defaultAxis ? string.Empty : $" ({GetQualifierDisplayName(resolvedRightAxis)})")}: {FormatProofQualifierValue(rightQualifier, "not proved at this site")}");
+        lines.Add($"Right qualifier source: {DescribeProofQualifierSource(rightQualifier)}");
+
+        if (includeResultLines)
+        {
+            var resultQualifier = ResolveQualifierFromExpression(obligation.Site, defaultAxis, compilation.Semantics);
+            lines.Add($"Result type: `{EscapeInline(FormatType(obligation.Site.ResultType))}`");
+            lines.Add($"Result qualifier: {FormatProofQualifierValue(resultQualifier, "unresolved")}");
+        }
+    }
+
+    private static string DescribeProofStatus(ProofObligation obligation) => obligation.Disposition switch
+    {
+        ProofDisposition.Proved => "Proved",
+        _ => "Unresolved proof obligation",
+    };
+
+    private static string DescribeQualifierChainRequirement(QualifierChainProofRequirement requirement) =>
+        $"left {GetQualifierDisplayName(requirement.LeftAxis)} qualifier and right {GetQualifierDisplayName(requirement.RightAxis)} qualifier must resolve compatibly";
+
+    private static string DescribeProofContext(Compilation compilation, ObligationContext context) => context switch
+    {
+        FieldExpressionContext fieldContext => $"{(fieldContext.Field.IsComputed ? "computed field" : "field")} `{EscapeInline(fieldContext.Field.Name)}`",
+        TransitionRowContext transitionContext => $"transition `{EscapeInline(FormatTransitionHeader(transitionContext.Row))}`",
+        ConstraintContext constraintContext => DescribeConstraint(compilation, constraintContext.Constraint),
+        EventHandlerContext eventHandlerContext => $"event handler `{EscapeInline(eventHandlerContext.Handler.EventName)}`",
+        StateHookContext stateHookContext => $"{stateHookContext.Hook.Scope.ToString().ToLowerInvariant()} hook `{EscapeInline(stateHookContext.Hook.StateName)}`",
+        _ => "proof context",
+    };
+
+    private static string DescribeProofSite(Compilation compilation, TypedExpression expression) => FormatSnippet(compilation, expression.Span);
+
+    private static string ExplainUnresolvedQualifierReason(Compilation compilation, TypedExpression? left, TypedExpression? right, QualifierAxis axis)
+    {
+        if (left is not null && right is not null)
+        {
+            var leftQualifier = ResolveQualifierFromExpression(left, axis, compilation.Semantics);
+            var rightQualifier = ResolveQualifierFromExpression(right, axis, compilation.Semantics);
+            if (leftQualifier is not null && rightQualifier is not null && !AreEquivalentQualifiers(leftQualifier, rightQualifier))
+            {
+                return $"operands resolve to different {GetQualifierAxisName(axis)} qualifiers";
+            }
+
+            if (leftQualifier is null && TryDescribeMissingQualifier(left, axis, compilation, out var leftReason))
+            {
+                return leftReason;
+            }
+
+            if (rightQualifier is null && TryDescribeMissingQualifier(right, axis, compilation, out var rightReason))
+            {
+                return rightReason;
+            }
+        }
+
+        return "qualifier preservation is not proved here";
+    }
+
+    private static bool TryDescribeMissingQualifier(TypedExpression expression, QualifierAxis axis, Compilation compilation, out string reason)
+    {
+        if (expression is TypedBinaryOp)
+        {
+            reason = $"qualifier preservation for `{EscapeInline(DescribeProofSite(compilation, expression))}` is not proved here";
+            return true;
+        }
+
+        if (TryGetFieldFromExpression(expression, compilation.Semantics, out var field)
+            && TryGetQualifierUnresolvedReason(field.ResolvedType, [axis], out var fieldReason))
+        {
+            var trimmed = fieldReason.Replace($"{FormatType(field.ResolvedType)} declaration ", string.Empty, StringComparison.Ordinal);
+            reason = $"field `{EscapeInline(field.Name)}` {trimmed}";
+            return true;
+        }
+
+        if (expression is TypedArgRef argRef)
+        {
+            reason = $"argument `{EscapeInline(argRef.ArgName)}` has no {GetQualifierAnnotationLabel(axis)} annotation";
+            return true;
+        }
+
+        reason = string.Empty;
+        return false;
+    }
+
+    private static bool TryGetPresenceDescription(TypedExpression? subjectExpression, SemanticIndex semantics, out string presence)
+    {
+        if (subjectExpression is TypedFieldRef fieldRef && semantics.FieldsByName.TryGetValue(fieldRef.FieldName, out var field))
+        {
+            presence = field.Presence is DeclaredPresenceMeta.Optional ? "optional" : "not nullable";
+            return true;
+        }
+
+        if (subjectExpression is TypedArgRef argRef)
+        {
+            var arg = semantics.Events.SelectMany(evt => evt.Args).FirstOrDefault(candidate => string.Equals(candidate.Name, argRef.ArgName, StringComparison.Ordinal));
+            if (arg is not null)
+            {
+                presence = arg.Presence is DeclaredPresenceMeta.Optional ? "optional" : "not nullable";
+                return true;
+            }
+        }
+
+        presence = string.Empty;
+        return false;
+    }
+
+    private static string FormatDiagnosticCode(PreceptDiagnosticCode code) => $"PRE{(int)code:0000}";
+
+    private static int GetSpanWidth(SourceSpan span) => span.End - span.Offset;
+
+    private static string FormatProofQualifierValue(DeclaredQualifierMeta? qualifier, string unresolvedText) => qualifier is null
+        ? unresolvedText
+        : FormatResolvedQualifierValue(qualifier);
+
+    private static string DescribeProofQualifierSource(DeclaredQualifierMeta? qualifier)
+    {
+        if (TryDescribeQualifierSource(qualifier, TypeKind.Error, out var source))
+        {
+            return source.DisplayText;
+        }
+
+        return "unresolved";
+    }
+
+    private static string HumanizeProofStrategy(ProofStrategy strategy) => strategy switch
+    {
+        ProofStrategy.QualifierCompatibility => "same-qualifier propagation",
+        ProofStrategy.Literal => "literal proof",
+        ProofStrategy.DeclarationAttribute => "declaration attribute",
+        ProofStrategy.GuardInPath => "guard in path",
+        ProofStrategy.FlowNarrowing => "flow narrowing",
+        ProofStrategy.CompositionalConstraint => "compositional constraint",
+        _ => strategy.ToString(),
+    };
+
+    private static bool AreEquivalentQualifiers(DeclaredQualifierMeta left, DeclaredQualifierMeta right)
+    {
+        if (!string.IsNullOrWhiteSpace(left.SourceFieldName) && !string.IsNullOrWhiteSpace(right.SourceFieldName))
+        {
+            return string.Equals(left.SourceFieldName, right.SourceFieldName, StringComparison.Ordinal);
+        }
+
+        return string.Equals(GetQualifierRawValue(left), GetQualifierRawValue(right), StringComparison.Ordinal);
+    }
+
+    private static TypedExpression? ResolveProofSubjectExpression(ProofSubject subject, TypedExpression site) => subject switch
+    {
+        ParamSubject paramSubject => ResolveParameterExpression(paramSubject.Parameter, site),
+        SelfSubject => site is TypedMemberAccess memberAccess ? memberAccess.Object : site,
+        _ => null,
+    };
+
+    private static TypedExpression? ResolveParameterExpression(ParameterMeta parameter, TypedExpression site)
+    {
+        if (site is TypedBinaryOp binary)
+        {
+            var left = ResolveParameterFromExpression(binary.Left, parameter);
+            return left ?? ResolveParameterFromExpression(binary.Right, parameter);
+        }
+
+        if (site is TypedMemberAccess memberAccess)
+        {
+            return ResolveParameterFromExpression(memberAccess.Object, parameter);
+        }
+
+        return null;
+    }
+
+    private static TypedExpression? ResolveParameterFromExpression(TypedExpression expression, ParameterMeta parameter)
+    {
+        if (parameter.Kind == expression.ResultType)
+        {
+            return expression;
+        }
+
+        return expression switch
+        {
+            TypedBinaryOp binary => ResolveParameterFromExpression(binary.Left, parameter) ?? ResolveParameterFromExpression(binary.Right, parameter),
+            TypedUnaryOp unary => ResolveParameterFromExpression(unary.Operand, parameter),
+            TypedFunctionCall functionCall => functionCall.Arguments.Select(argument => ResolveParameterFromExpression(argument, parameter)).FirstOrDefault(candidate => candidate is not null),
+            TypedMemberAccess memberAccess => ResolveParameterFromExpression(memberAccess.Object, parameter),
+            _ => null,
+        };
+    }
+
+    private static bool TryGetFieldFromExpression(TypedExpression expression, SemanticIndex semantics, out TypedField field)
+    {
+        if (expression is TypedFieldRef fieldRef && semantics.FieldsByName.TryGetValue(fieldRef.FieldName, out field!))
+        {
+            return true;
+        }
+
+        if (expression is TypedMemberAccess { Object: TypedFieldRef owner } && semantics.FieldsByName.TryGetValue(owner.FieldName, out field!))
+        {
+            return true;
+        }
+
+        field = null!;
+        return false;
+    }
+
+    private static DeclaredQualifierMeta? ResolveQualifierFromExpression(TypedExpression expression, QualifierAxis axis, SemanticIndex semantics)
+    {
+        switch (expression)
+        {
+            case TypedFieldRef fieldRef:
+                return ResolveFieldQualifier(fieldRef.FieldName, axis, semantics);
+
+            case TypedArgRef { DeclaredQualifiers: { } argQualifiers }:
+                return ResolveDeclarationQualifier(expression.ResultType, argQualifiers, axis);
+
+            case TypedTypedConstant { DeclaredQualifiers: { } constantQualifiers }:
+                return ResolveDeclarationQualifier(expression.ResultType, constantQualifiers, axis);
+
+            case TypedInterpolatedTypedConstant interpolatedConstant:
+                return ResolveQualifierFromInterpolatedConstant(interpolatedConstant, axis);
+
+            case TypedMemberAccess { ResolvedAccessor: FixedReturnAccessor { ReturnsQualifier: var returnsAxis }, Object: var owner }
+                when returnsAxis != QualifierAxis.None:
+                return ResolveQualifierFromExpression(owner, returnsAxis, semantics);
+
+            case TypedMemberAccess memberAccess:
+                return ResolveQualifierFromExpression(memberAccess.Object, axis, semantics);
+
+            case TypedBinaryOp binary when binary.ResultQualifier is not null:
+                return binary.ResultQualifier switch
+                {
+                    SameQualifierRequired => ResolveQualifierFromExpression(binary.Left, axis, semantics)
+                        ?? ResolveQualifierFromExpression(binary.Right, axis, semantics),
+                    QualifiedOperandInherited => ResolveQualifierFromExpression(
+                        binary.Left.ResultType == binary.ResultType ? binary.Left : binary.Right,
+                        axis,
+                        semantics),
+                    CurrencyConversionRequired when axis == QualifierAxis.Currency => ResolveQualifierFromExpression(
+                        binary.Left.ResultType == TypeKind.ExchangeRate ? binary.Left : binary.Right,
+                        QualifierAxis.ToCurrency,
+                        semantics),
+                    _ => ResolveQualifierFromExpression(binary.Left, axis, semantics)
+                        ?? ResolveQualifierFromExpression(binary.Right, axis, semantics),
+                };
+
+            default:
+                return null;
+        }
+    }
+
+    private static DeclaredQualifierMeta? ResolveFieldQualifier(string fieldName, QualifierAxis axis, SemanticIndex semantics) =>
+        semantics.FieldsByName.TryGetValue(fieldName, out var field)
+            ? ResolveDeclarationQualifier(field.ResolvedType, field.DeclaredQualifiers, axis)
+            : null;
+
+    private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(TypedInterpolatedTypedConstant constant, QualifierAxis axis)
+    {
+        var targetSlot = axis switch
+        {
+            QualifierAxis.Currency => InterpolationSlotKind.Currency,
+            QualifierAxis.Unit or QualifierAxis.Dimension => InterpolationSlotKind.Unit,
+            QualifierAxis.FromCurrency => InterpolationSlotKind.FromCurrency,
+            QualifierAxis.ToCurrency => InterpolationSlotKind.ToCurrency,
+            _ => (InterpolationSlotKind?)null,
+        };
+        if (targetSlot is null)
+        {
+            return null;
+        }
+
+        var slot = constant.Slots.FirstOrDefault(candidate => candidate.SlotKind == targetSlot.Value);
+        return slot is null ? null : CreateQualifierFromSlotExpression(slot.Expression, axis);
+    }
+
+    private static DeclaredQualifierMeta? CreateQualifierFromSlotExpression(TypedExpression expression, QualifierAxis axis)
+    {
+        var fieldName = expression switch
+        {
+            TypedFieldRef fieldRef => fieldRef.FieldName,
+            TypedArgRef argRef => argRef.ArgName,
+            _ => null,
+        };
+        if (fieldName is null)
+        {
+            return null;
+        }
+
+        return axis switch
+        {
+            QualifierAxis.Currency => new DeclaredQualifierMeta.Currency($"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.Unit => new DeclaredQualifierMeta.Unit($"{{{fieldName}}}", $"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension($"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.FromCurrency => new DeclaredQualifierMeta.FromCurrency($"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.ToCurrency => new DeclaredQualifierMeta.ToCurrency($"{{{fieldName}}}", SourceFieldName: fieldName),
+            _ => null,
+        };
+    }
+
+    private static void AppendFieldProofLines(List<string> lines, Compilation compilation, TypedField field)
+    {
+        if (GetRelevantQualifierAxes(field.ResolvedType, field.DeclaredQualifiers).IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var summary = GetFieldProofSummary(compilation, field);
+        lines.Add($"Status: {summary.StatusDetail}");
+        lines.Add(summary.OpenIssueContexts.IsEmpty
+            ? "Open proof issues: none"
+            : $"Open proof issues: {string.Join(" · ", summary.OpenIssueContexts)}");
+    }
+
+    private static FieldProofSummary GetFieldProofSummary(Compilation compilation, TypedField field)
+    {
+        var qualifierUses = compilation.Proof.Obligations
+            .Where(obligation => obligation.Requirement is QualifierCompatibilityProofRequirement or QualifierChainProofRequirement)
+            .Where(obligation => ContainsFieldReference(obligation.Site, field.Name))
+            .ToImmutableArray();
+        if (qualifierUses.IsEmpty)
+        {
+            return new FieldProofSummary("Proof contract active · No active proof issues", ImmutableArray<string>.Empty);
+        }
+
+        var unresolvedContexts = qualifierUses
+            .Where(obligation => obligation.Disposition == ProofDisposition.Unresolved)
+            .Select(obligation => DescribeProofContext(compilation, obligation.Context))
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+        if (!unresolvedContexts.IsEmpty)
+        {
+            return new FieldProofSummary($"Proof contract active · {unresolvedContexts.Length} unresolved use{Pluralize(unresolvedContexts.Length)}", unresolvedContexts);
+        }
+
+        var strategy = qualifierUses
+            .Select(obligation => obligation.Strategy)
+            .FirstOrDefault(candidate => candidate is not null);
+        return strategy is ProofStrategy resolvedStrategy
+            ? new FieldProofSummary($"Proof contract active · Proved via {HumanizeProofStrategy(resolvedStrategy)}", ImmutableArray<string>.Empty)
+            : new FieldProofSummary("Proof contract active · No active proof issues", ImmutableArray<string>.Empty);
+    }
+
+    private static bool ContainsFieldReference(TypedExpression expression, string fieldName) => expression switch
+    {
+        TypedFieldRef fieldRef => string.Equals(fieldRef.FieldName, fieldName, StringComparison.Ordinal),
+        TypedMemberAccess memberAccess => ContainsFieldReference(memberAccess.Object, fieldName),
+        TypedBinaryOp binary => ContainsFieldReference(binary.Left, fieldName) || ContainsFieldReference(binary.Right, fieldName),
+        TypedUnaryOp unary => ContainsFieldReference(unary.Operand, fieldName),
+        TypedFunctionCall functionCall => functionCall.Arguments.Any(argument => ContainsFieldReference(argument, fieldName)),
+        TypedConditional conditional => ContainsFieldReference(conditional.Condition, fieldName)
+            || ContainsFieldReference(conditional.ThenBranch, fieldName)
+            || ContainsFieldReference(conditional.ElseBranch, fieldName),
+        TypedInterpolatedString interpolatedString => interpolatedString.Segments.OfType<TypedHoleSegment>().Any(hole => ContainsFieldReference(hole.Expression, fieldName)),
+        TypedInterpolatedTypedConstant interpolatedConstant => interpolatedConstant.Slots.Any(slot => ContainsFieldReference(slot.Expression, fieldName)),
+        TypedListLiteral listLiteral => listLiteral.Elements.Any(element => ContainsFieldReference(element, fieldName)),
+        TypedPostfixOp postfix => ContainsFieldReference(postfix.Operand, fieldName),
+        _ => false,
+    };
+
     private static string CreateFieldMarkdown(Compilation compilation, TypedField field)
     {
         var status = field.IsComputed
@@ -224,6 +908,7 @@ internal static class RichHoverFactory
         };
 
         AppendFieldQualifierLines(lines, field);
+        AppendFieldProofLines(lines, compilation, field);
 
         if (field.IsComputed && field.ComputedExpression is not null)
         {
@@ -1498,6 +2183,10 @@ internal static class RichHoverFactory
         string DisplayText,
         string? FieldName = null,
         bool IsFieldSource = false);
+
+    private sealed record FieldProofSummary(
+        string StatusDetail,
+        ImmutableArray<string> OpenIssueContexts);
 
     private sealed record FieldWriteMap(
         ImmutableArray<string> WritableStates,

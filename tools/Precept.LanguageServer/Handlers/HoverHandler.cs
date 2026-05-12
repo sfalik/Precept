@@ -47,6 +47,11 @@ internal sealed class HoverHandler : IHoverHandler
             return null;
         }
 
+        if (RichHoverFactory.TryCreateProofHover(compilation, position, token.Value, out var proofHover))
+        {
+            return proofHover;
+        }
+
         if (TryCreateTypeHover(compilation, token.Value, out var typeHover))
         {
             return typeHover;
