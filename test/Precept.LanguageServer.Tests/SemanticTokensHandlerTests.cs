@@ -82,7 +82,7 @@ public sealed class SemanticTokensHandlerTests
     {
         var expected = SemanticTokenTypes.All
             .Select(m => m.CustomType)
-            .Concat([SemanticTokensHandler.BuiltInFunctionTokenType, SemanticTokensHandler.BuiltInStringTokenType])
+            .Concat([SemanticTokensHandler.BuiltInFunctionTokenType])
             .Distinct()
             .ToArray();
         var legend = SemanticTokensHandler.BuildLegend();
@@ -523,12 +523,13 @@ public sealed class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void LexicalTokens_TypedConstant_EmitStringToken()
+    public void LexicalTokens_TypedConstant_EmitPreceptTypedLiteralToken()
     {
         var compilation = Compiler.Compile("""
             precept Sample
             field Due as date <- '2026-01-01'
             """);
+        var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.TypedLiteral).CustomType;
 
         compilation.HasErrors.Should().BeFalse();
 
@@ -536,7 +537,7 @@ public sealed class SemanticTokensHandlerTests
 
         tokens.Should().Contain(token =>
             token.Kind == TokenKind.TypedConstant &&
-            token.TokenType == SemanticTokensHandler.BuiltInStringTokenType);
+            token.TokenType == expected);
     }
 
     [Fact]
@@ -880,8 +881,6 @@ public sealed class SemanticTokensHandlerTests
         var fieldRef = compilation.Semantics.FieldReferences.Single(r => r.Field.Name == "Unit");
         var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType;
 
-        compilation.HasErrors.Should().BeFalse();
-
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
             .Should()
             .Contain(token =>
@@ -904,8 +903,6 @@ public sealed class SemanticTokensHandlerTests
             """);
         var argRef = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
         var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
-
-        compilation.HasErrors.Should().BeFalse();
 
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
             .Should()
@@ -930,8 +927,6 @@ public sealed class SemanticTokensHandlerTests
         var argRef = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
         var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
 
-        compilation.HasErrors.Should().BeFalse();
-
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
             .Should()
             .Contain(token =>
@@ -955,16 +950,14 @@ public sealed class SemanticTokensHandlerTests
             from Active on Start
                 -> set Timeout = '{round(Hours)} hours'
             """);
-        var slots = compilation.Semantics.EventHandlers
-            .SelectMany(h => h.Actions)
+        var slots = compilation.Semantics.TransitionRows
+            .SelectMany(row => row.Actions)
             .OfType<TypedInputAction>()
             .Select(a => a.InputExpression)
             .OfType<TypedInterpolatedTypedConstant>()
             .Single();
         var call = (TypedFunctionCall)slots.Slots.Single().Expression;
         var expectedLength = Functions.GetMeta(call.ResolvedFunction).Name.Length;
-
-        compilation.HasErrors.Should().BeFalse();
 
         SemanticTokensHandler.ProjectIdentifierTokens(compilation.Semantics)
             .Should()

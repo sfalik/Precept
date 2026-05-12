@@ -135,6 +135,10 @@
       {
         "id": "preceptComment",
         "description": "Precept comment"
+      },
+      {
+        "id": "preceptTypedLiteral",
+        "description": "Precept typed literal"
       }
     ],
     "semanticTokenModifiers": [
@@ -194,6 +198,9 @@
           ],
           "preceptComment": [
             "comment.line.precept"
+          ],
+          "preceptTypedLiteral": [
+            "string.quoted.single.precept"
           ]
         }
       }
@@ -216,7 +223,7 @@
             {
               "scope": "keyword.other.constraint.precept",
               "settings": {
-                "foreground": "#6366F1"
+                "foreground": "#FBBF24"
               }
             },
             {
@@ -285,7 +292,7 @@
             {
               "scope": "variable.other.precept",
               "settings": {
-                "foreground": "#A5B4FC"
+                "foreground": "#9E9E9E"
               }
             },
             {
@@ -304,6 +311,12 @@
               "scope": "entity.name.type.precept.precept",
               "settings": {
                 "foreground": "#A5B4FC"
+              }
+            },
+            {
+              "scope": "entity.name.type.precept",
+              "settings": {
+                "foreground": "#9AA8B5"
               }
             },
             {
@@ -468,6 +481,18 @@
               }
             },
             {
+              "scope": "constant.character.escape.precept",
+              "settings": {
+                "foreground": "#84929F"
+              }
+            },
+            {
+              "scope": "support.function.precept",
+              "settings": {
+                "foreground": "#6366F1"
+              }
+            },
+            {
               "scope": "keyword.operator.arrow.precept",
               "settings": {
                 "foreground": "#6366F1"
@@ -492,6 +517,16 @@
               }
             }
           ]
+        }
+      },
+      "editor.semanticTokenColorCustomizations": {
+        "rules": {
+          "function:precept": {
+            "foreground": "#6366F1"
+          },
+          "preceptTypedLiteral": {
+            "foreground": "#84929F"
+          }
         }
       }
     }

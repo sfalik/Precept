@@ -65,6 +65,62 @@ public class ExtensionManifestTests
     }
 
     [Fact]
+    public void PackageManifest_ConstraintKeywords_UseGoldRuleColor()
+    {
+        var settings = GetTextMateRuleSettings("keyword.other.constraint.precept");
+
+        settings.GetProperty("foreground").GetString().Should().Be("#FBBF24");
+    }
+
+    [Fact]
+    public void PackageManifest_TypeKeywords_UseDataTypeColor()
+    {
+        var settings = GetTextMateRuleSettings("entity.name.type.precept");
+
+        settings.GetProperty("foreground").GetString().Should().Be("#9AA8B5");
+    }
+
+    [Fact]
+    public void PackageManifest_BuiltInFunctions_UseOperatorLaneColor()
+    {
+        var settings = GetTextMateRuleSettings("support.function.precept");
+
+        settings.GetProperty("foreground").GetString().Should().Be("#6366F1");
+    }
+
+    [Fact]
+    public void PackageManifest_EscapeSequences_UseDataValueColor()
+    {
+        var settings = GetTextMateRuleSettings("constant.character.escape.precept");
+
+        settings.GetProperty("foreground").GetString().Should().Be("#84929F");
+    }
+
+    [Fact]
+    public void PackageManifest_VariableOtherScope_RemainsNeutralFallback()
+    {
+        var settings = GetTextMateRuleSettings("variable.other.precept");
+
+        settings.GetProperty("foreground").GetString().Should().Be("#9E9E9E");
+    }
+
+    [Fact]
+    public void PackageManifest_FunctionSemanticTokenColor_IsLanguageScoped()
+    {
+        var rule = GetSemanticTokenColorRule("function:precept");
+
+        rule.GetProperty("foreground").GetString().Should().Be("#6366F1");
+    }
+
+    [Fact]
+    public void PackageManifest_TypedLiteralSemanticTokenColor_UsesDataValueLane()
+    {
+        var rule = GetSemanticTokenColorRule("preceptTypedLiteral");
+
+        rule.GetProperty("foreground").GetString().Should().Be("#84929F");
+    }
+
+    [Fact]
     public void PackageManifest_ShowLanguageServerModeCommand_RemainsContributed()
     {
         var commands = GetPackageManifest()
@@ -161,6 +217,15 @@ public class ExtensionManifestTests
             .GetProperty("settings")
             .Clone();
     }
+
+    private static JsonElement GetSemanticTokenColorRule(string selector) =>
+        GetPackageManifest()
+            .GetProperty("contributes")
+            .GetProperty("configurationDefaults")
+            .GetProperty("editor.semanticTokenColorCustomizations")
+            .GetProperty("rules")
+            .GetProperty(selector)
+            .Clone();
 
     private static string[] GetSemanticTokenScopes(string tokenType) =>
         GetPackageManifest()

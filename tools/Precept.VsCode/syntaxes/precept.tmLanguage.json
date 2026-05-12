@@ -163,7 +163,7 @@
     "ruleDesugaringModifiers": {
       "patterns": [
         {
-          "name": "keyword.other.grammar.precept",
+          "name": "keyword.other.constraint.precept",
           "match": "\\b(nonnegative|maxlength|maxplaces|minlength|maxcount|mincount|notempty|positive|nonzero|max|min)\\b"
         }
       ]

@@ -77,6 +77,11 @@ internal sealed class HoverHandler : IHoverHandler
             return accessorHover;
         }
 
+        if (RichHoverFactory.TryCreateHover(compilation, position, token.Value, out var richHover))
+        {
+            return richHover;
+        }
+
         if (token.Value.Kind == TokenKind.Identifier)
         {
             return TryIdentifierHover(compilation.Semantics, token.Value, position);

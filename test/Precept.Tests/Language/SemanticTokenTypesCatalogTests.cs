@@ -9,8 +9,8 @@ namespace Precept.Tests.Language;
 public sealed class SemanticTokenTypesCatalogTests
 {
     [Fact]
-    public void All_ContainsTwelveEntries()
-        => SemanticTokenTypes.All.Should().HaveCount(12);
+    public void All_ContainsThirteenEntries()
+        => SemanticTokenTypes.All.Should().HaveCount(13);
 
     [Fact]
     public void GetMeta_EachKind_ReturnsNonNullEntry()

@@ -115,7 +115,7 @@ Not all grammar patterns can be derived from individual token metadata. Patterns
 |---|---|
 | `comment` | `#` to end-of-line |
 | `messageStrings` | Catalog-derived message-position strings — currently `because "..."` and `reject "..."`; function wiring exists for future flagged built-ins |
-| `ruleDesugaringModifiers` | Catalog-derived modifiers where `ModifierMeta.DesugarsToRule == true`; emitted as `keyword.other.grammar.precept` so they share the normal grammar-keyword lane while still getting a dedicated first-match repository hook |
+| `ruleDesugaringModifiers` | Catalog-derived modifiers where `ModifierMeta.DesugarsToRule == true`; emitted as `keyword.other.constraint.precept` so they stay on the rule/constraint lane while still getting a dedicated first-match repository hook |
 | `strings` | Double-quoted string literal with escape sequences |
 | `typedConstants` | Single-quoted typed constants (`'USD'`, `'kg'`) |
 | `numbers` | Integer and decimal literals |
@@ -174,7 +174,7 @@ No built-in functions currently set `IsMessagePosition`, so today's generated `m
 
 Some field modifiers are surface sugar for rule semantics and still need a dedicated repository subset so the generated grammar can keep their first-match position explicit without inventing a second keyword taxonomy. `ModifierMeta.DesugarsToRule` is the catalog flag for that subset.
 
-With this flag in place, `AddStructuralPatterns()` emits `ruleDesugaringModifiers` from `Modifiers.All.Where(m => m.DesugarsToRule)`, assigns `keyword.other.grammar.precept`, and includes that repository entry before `#constraintKeywords` anywhere modifier patterns are composed. That ordering preserves the catalog-derived subset hook without giving those modifiers a separate gold lane; message strings remain the only gold syntax surface.
+With this flag in place, `AddStructuralPatterns()` emits `ruleDesugaringModifiers` from `Modifiers.All.Where(m => m.DesugarsToRule)`, assigns `keyword.other.constraint.precept`, and includes that repository entry before `#constraintKeywords` anywhere modifier patterns are composed. That ordering preserves the catalog-derived subset hook while keeping rule-desugaring modifiers on the rule/constraint lane.
 
 ---
 

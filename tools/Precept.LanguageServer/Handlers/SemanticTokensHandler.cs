@@ -25,7 +25,6 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
     private static readonly SemanticTokensLegend Legend = BuildLegend();
     internal const string SemanticTokenColorsNotificationName = "precept/semanticTokenColors";
     internal const string BuiltInFunctionTokenType = "function";
-    internal const string BuiltInStringTokenType = "string";
 
     private readonly ConcurrentDictionary<DocumentUri, SemanticTokensDocument> _documents = new();
     private readonly ConcurrentDictionary<DocumentUri, ImmutableArray<LexicalSemanticToken>> _previousTypedConstantTokens = new();
@@ -189,7 +188,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 
             if (IsTypedConstantToken(token.Kind))
             {
-                effectiveTokenType = BuiltInStringTokenType;
+                effectiveTokenType = SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.TypedLiteral).CustomType;
             }
             // Contextual reclassification: 'set' emits the type custom token in type-expression position.
             // SetType.VisualCategory is intentionally null (parser-synthesized; never in the lexer stream),
@@ -397,7 +396,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             TokenTypes = new Container<SemanticTokenType>(
                 SemanticTokenTypesCatalog.All
                     .Select(static m => m.CustomType)
-                    .Concat([BuiltInFunctionTokenType, BuiltInStringTokenType])
+                    .Concat([BuiltInFunctionTokenType])
                     .Distinct()
                     .Select(static tokenType => new SemanticTokenType(tokenType))
                     .ToArray()),

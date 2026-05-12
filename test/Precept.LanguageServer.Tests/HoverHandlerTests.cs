@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,6 +41,42 @@ state Draft initial
     from Draft on AddTag
         -> add Tags "vip"
         -> transition Done
+    """;
+
+    private const string HoverV3Source = """
+    precept HoverSurface
+    field Price as money in 'USD'
+    field Quantity as integer
+    field CatalogCode as string optional
+    field ReorderRatio as number
+    field AverageQuantity as number <- Quantity / 2
+    state Draft initial
+    state Listed
+    state Hidden
+    state Archived terminal
+    event Publish(NewPrice as money in 'USD')
+    event Hide
+    event Reopen
+    event Archive
+    event Cancel(Reason as string)
+    rule Price >= '0 USD' because "price stays non-negative"
+    in Listed ensure Price > '0 USD' because "listed price must stay positive"
+    to Archived ensure CatalogCode is not set because "archived items clear the code"
+    from Listed ensure Quantity > 0 because "leaving listed needs stock"
+    on Publish ensure Publish.NewPrice > '0 USD' because "published price must be positive"
+    in Draft modify CatalogCode, Quantity, Price editable
+    in Listed modify CatalogCode, Quantity, Price editable
+    in Hidden omit CatalogCode
+    from Draft on Publish
+        -> set Price = Publish.NewPrice
+        -> transition Listed
+    from Listed on Publish
+        -> set ReorderRatio = Quantity / Quantity
+        -> transition Listed
+    from Listed on Hide -> transition Hidden
+    from Hidden on Reopen -> transition Draft
+    from Listed on Archive -> transition Archived
+    from Draft on Cancel -> reject "draft items cannot be cancelled"
     """;
 
     [Fact]
@@ -270,5 +307,179 @@ state Draft initial
         hover!.Contents.MarkupContent!.Value.Should().Contain("string.length");
         hover.Contents.MarkupContent.Value.Should().Contain("Character count");
         hover.Contents.MarkupContent.Value.Should().Contain("Returns: `integer`");
+    }
+
+    [Fact]
+    public void Hover_OnStoredField_ShowsWriteMapAndGovernance()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "Price as money");
+
+        markup.Should().Contain("**field `Price`**");
+        markup.Should().Contain("Type: `money` · not nullable · `in USD`");
+        markup.Should().Contain("Writable:");
+        markup.Should().Contain("`Draft`");
+        markup.Should().Contain("`Listed`");
+        markup.Should().Contain("Governed by:");
+        markup.Should().Contain("rule");
+        markup.Should().Contain("ensure");
+    }
+
+    [Fact]
+    public void Hover_OnComputedField_ShowsExpressionAndSuppressesWriteMap()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "AverageQuantity as number");
+
+        markup.Should().Contain("**computed field `AverageQuantity`**");
+        markup.Should().Contain("Computed from:");
+        markup.Should().Contain("Quantity / 2");
+        markup.Should().NotContain("Writable:");
+    }
+
+    [Fact]
+    public void Hover_OnRule_ShowsScopeAndReferencedFields()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "rule Price >=");
+
+        markup.Should().Contain("**rule**");
+        markup.Should().Contain("> price stays non-negative");
+        markup.Should().Contain("Scope: global — enforced after every mutation");
+        markup.Should().Contain("Referenced fields: `Price`");
+    }
+
+    [Fact]
+    public void Hover_OnState_ShowsReachabilityModifiersAndEnsures()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "Archived terminal");
+
+        markup.Should().Contain("**state `Archived`**");
+        markup.Should().Contain("Modifiers: `terminal`");
+        markup.Should().Contain("Incoming:");
+        markup.Should().Contain("`Archive`");
+        markup.Should().Contain("Writable here:");
+        markup.Should().Contain("active ensures: 1");
+    }
+
+    [Fact]
+    public void Hover_OnEvent_ShowsSignatureAndEligibleStates()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "Publish(NewPrice as money");
+
+        markup.Should().Contain("**event `Publish(NewPrice as money in USD)`**");
+        markup.Should().Contain("Can fire from:");
+        markup.Should().Contain("`Draft`");
+        markup.Should().Contain("`Listed`");
+        markup.Should().Contain("Arg: `NewPrice` is `money` · not nullable · `in USD`");
+    }
+
+    [Fact]
+    public void Hover_OnTransitionRow_ShowsProofGapSummary()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "from Listed on Publish");
+
+        markup.Should().Contain("**transition**");
+        markup.Should().Contain("set ReorderRatio");
+        markup.Should().Contain("Graph:");
+        markup.Should().Contain("Proof gap:");
+    }
+
+    [Theory]
+    [InlineData("in Listed ensure", "Scope: residency (`in Listed`)", "Referenced fields: `Price`")]
+    [InlineData("to Archived ensure", "Scope: entry gate (`to Archived`)", "Referenced fields: `CatalogCode`")]
+    [InlineData("from Listed ensure", "Scope: exit gate (`from Listed`)", "Referenced fields: `Quantity`")]
+    [InlineData("on Publish ensure", "Scope: event args (`on Publish`)", "Referenced args: `NewPrice`")]
+    public void Hover_OnEnsure_ShowsAnchorSpecificScope(string needle, string expectedScope, string expectedReference)
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, needle);
+
+        markup.Should().Contain("**ensure**");
+        markup.Should().Contain("> ");
+        markup.Should().Contain(expectedScope);
+        markup.Should().Contain(expectedReference);
+    }
+
+    [Fact]
+    public void Hover_OnEditableAccess_ShowsWriteSetAndPeerStates()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "in Draft modify");
+
+        markup.Should().Contain("**access**");
+        markup.Should().Contain("Editable here:");
+        markup.Should().Contain("`CatalogCode`");
+        markup.Should().Contain("`Quantity`");
+        markup.Should().Contain("`Price`");
+        markup.Should().Contain("Same write set in `Listed`");
+        markup.Should().Contain("locked in");
+    }
+
+    [Fact]
+    public void Hover_OnOmitDeclaration_ShowsRestorationStates()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "in Hidden omit");
+
+        markup.Should().Contain("**omit**");
+        markup.Should().Contain("`CatalogCode` does not exist in this state");
+        markup.Should().Contain("Restored on transition to: `Draft`");
+    }
+
+    [Fact]
+    public void Hover_OnRejectRow_ShowsReasonAndOutcome()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "from Draft on Cancel");
+
+        markup.Should().Contain("**reject**");
+        markup.Should().Contain("> draft items cannot be cancelled");
+        markup.Should().Contain("Result: state unchanged · no field mutations commit");
+    }
+
+    [Fact]
+    public void Hover_OnQualifierExpression_ShowsAxisAndCompatibilityChecks()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "money in 'USD'", offset: 9);
+
+        markup.Should().Contain("**qualifier**");
+        markup.Should().Contain("Axis: currency");
+        markup.Should().Contain("Checks: assignments, comparisons, and arithmetic stay currency-compatible");
+    }
+
+    private static string GetHoverMarkdown(string source, string needle, int offset = 0, int occurrence = 1)
+    {
+        var compilation = Precept.Compiler.Compile(source);
+        var hover = HoverHandler.CreateHover(compilation, PositionOf(source, needle, offset, occurrence));
+
+        hover.Should().NotBeNull();
+        hover!.Contents.MarkupContent.Should().NotBeNull();
+        return hover.Contents.MarkupContent!.Value;
+    }
+
+    private static Position PositionOf(string source, string needle, int offset = 0, int occurrence = 1)
+    {
+        var index = -1;
+        var searchStart = 0;
+        for (var i = 0; i < occurrence; i++)
+        {
+            index = source.IndexOf(needle, searchStart, StringComparison.Ordinal);
+            index.Should().BeGreaterThanOrEqualTo(0, $"expected to find '{needle}' in test source");
+            searchStart = index + needle.Length;
+        }
+
+        index += offset;
+        var line = 0;
+        var character = 0;
+        for (var i = 0; i < index; i++)
+        {
+            if (source[i] == '\n')
+            {
+                line++;
+                character = 0;
+                continue;
+            }
+
+            if (source[i] != '\r')
+            {
+                character++;
+            }
+        }
+
+        return new Position(line, character);
     }
 }

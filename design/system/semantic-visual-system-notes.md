@@ -61,7 +61,7 @@ Modifier rule: modifiers are additive rather than replacement-based. Examples in
 | Structure | Not applicable | Indigo syntax tokens: keywords (`precept`, `state`, `event`, `from…on`, `set`, `transition`) in structure colour — grammar rendered as colour | Indigo framing chrome: container borders, section headers, rail, group labels — ambient structural scaffolding | None |
 | State | State name | Violet mono token in `state StateName { }` declaration | Hard-rect node, violet border, violet mono label — same shape on all runtime surfaces | initial (dot), terminal (double border), constrained (italic label), reachableFromInitial, reachableFromCurrent, current |
 | Event | Event name | Cyan mono token in `on EventName` / `from X on EventName` clause | Directed arc or row with cyan label + directional marker — marker is invariant on all runtime surfaces | transition, self-transition, no-transition, rejected, constraint failure, unmatched |
-| Data | Field name | Data-colour mono token for field name; type annotation in data-t; no value shown (values are runtime-assigned, not authored) | Three-part row: name (data, mono) · type (data-t, mono) · value (data-v, mono) — mono throughout, no carve-outs | editable, constrained (italic name label), violated (dashed border on row), required |
+| Data | Field names, arg names, data types, and data values | Field names and field references use `--field` (`#A5B4FC`); event args and arg-member references use `--arg` (`#9AD8E8`); type annotation stays in data-t; typed literals and other authored values stay in data-v | Three-part row: field name (`--field`, mono) · type (`--data-t`, mono) · value (`--data-v`, mono); event args keep the `--arg` lane on event-scoped runtime surfaces — mono throughout, no carve-outs | editable, constrained (italic name label), violated (dashed border on row), required |
 | Rule | Rule message text (the `because` / `reject` string) | Gold mono token inline in `because "…"` or `reject "…"` clause | Gold message rendered below field or as verdict overlay when rule fires — the message is the visual interrupt | satisfied, violated |
 
 ### Team research synthesis
@@ -74,6 +74,7 @@ Modifier rule: modifiers are additive rather than replacement-based. Examples in
 - The signal system should be treated as a grammar with precedence and combination rules, not just a palette inventory.
 - AI readability and structured inspectability are part of the system contract, especially for runtime and diagnostic surfaces.
 - The user wants the main document to privilege visual embodiment and inspiration over governance framing. Governance and authority concerns should not dominate the main narrative flow.
+- The old unified data-name lane is superseded. Fields name enduring entity shape; args name event-scoped behavioural input. Keeping those signals split improves expression scanability and preserves the structure-axis / behaviour-axis read instead of flattening both into anonymous slate.
 
 ### New context from merged README and philosophy
 
@@ -169,16 +170,25 @@ Visual implication: every structural decision should be judged against whether i
 
 ### Color System
 
-- Section 06 Colors added to the document: authoring palette strip (8 swatches), comments + verdicts + background strip, six concept cells (one per construct family plus comments), four rule channels.
+- Section 06 Colors added to the document: authoring palette strip (9 swatches), comments + verdicts + background strip, six concept cells (one per construct family plus comments), four rule channels.
 - Canonical palette CSS vars locked:
   - `--bg: #040506`, `--panel: #090b0e`, `--panel-2: #0d1014`
   - `--structure-d: #4338CA` (semantic, bold), `--structure: #6366F1` (grammar)
   - `--state: #A898F5`, `--event: #30B8E8`
-  - `--data: #B0BEC5`, `--data-t: #9AA8B5`, `--data-v: #84929F`
+  - `--field: #A5B4FC`, `--arg: #9AD8E8`, `--data-t: #9AA8B5`, `--data-v: #84929F`
   - `--rule: #FBBF24`, `--comment: #9096A6`
   - `--valid: #34D399`, `--violated: #F87171`, `--warn: #FDE047`
-- Token class mapping locked: `.s` (structure grammar), `.sd` (structure semantic, bold), `.st` (state), `.ev` (event), `.da` (data name), `.dt` (data type), `.dv` (data value), `.ru` (rule/message), `.cm` (comment, italic), `.ok` (valid), `.no` (violated), `.so` (data-t tonal).
+- Historical note: the old unified data-name anchor `--data: #B0BEC5` is superseded by the field / arg split and is no longer canonical.
+- Token class mapping locked: `.s` (structure grammar), `.sd` (structure semantic, bold), `.st` (state), `.ev` (event), `.da` (field name / field reference), `.ag` (event arg / arg-member reference), `.dt` (data type), `.dv` (data value), `.ru` (rule/message), `.cm` (comment, italic), `.ok` (valid), `.no` (violated), `.so` (data-t tonal).
 - Label vocabulary rule: no color-name terms in semantic labels. Terms like "amber tone," "rose mark," "emerald callout," "violated tone" are banned. Labels name semantic roles, not color names.
+- Editor token mapping additions locked:
+  - `support.function.precept` → `#6366F1` (`--structure` lane). Built-in functions are language-supplied operations, not user-authored data names; they should read as operation, not operand.
+  - `constant.character.escape.precept` → `#84929F` (`--data-v` lane). Escape sequences stay visually inside the authored literal value rather than becoming a second voice inside the string.
+  - Typed literals such as `'5 {USD}'` and `'10 {kg}'` must stay on the data-value lane at both startup and semantic-token steady state.
+    - TextMate scope: `string.quoted.single.precept` → `#84929F`.
+    - Preferred semantic token: Precept-owned `preceptTypedLiteral` or `preceptString` → `#84929F`.
+    - Acceptable fallback: scoped `string:precept` → `#84929F`.
+    - Not acceptable: leaving typed literals on theme/default string colours.
 
 ### Construct Gallery Redesign
 
@@ -188,7 +198,7 @@ Visual implication: every structural decision should be judged against whether i
   - Structure/Runtime: indigo container frame with nested state rects inside — the perimeter relationship made visible.
   - State/Runtime: four hard-rect state nodes showing all role variants (initial dot, active fill, double border for terminal, italic for constrained).
   - Event/Runtime: three transition rows showing outcome variants (plain, guarded/italic, blocked/dashed-violated).
-  - Data/Runtime: field-table with semantic tonal classes — `.da` name, `.dt` type, `.dv` value. Four rows covering valid, violated/required (constrained italic), editable, locked.
+  - Data/Runtime: field-table with semantic tonal classes — `.da` field name, `.ag` event arg where an event-scoped runtime surface shows one, `.dt` type, `.dv` value. Four rows covering valid, violated/required (constrained italic), editable, locked.
   - Rule/Runtime: three verdict callouts rendered as actual specimens — satisfied (green), violated (red), unmatched (amber).
 - Data table tonal classes corrected: `.dt` for type, `.dv` for value (previously `.so`). Semantically correct; visual output unchanged.
 - Modifier sections now visually demonstrate modifier traits in the chips themselves where possible (e.g. dashed border on blocked chip, italic on guarded chip, double border on terminal chip).
@@ -215,7 +225,7 @@ Visual implication: every structural decision should be judged against whether i
 - "Visually consistent" across runtime surfaces means all four channels are consistent: colour, typography, form, and layout.
 - **Colour**: runtime construct families map to their canonical colour tokens on all surfaces. No surface gets a local palette exception.
 - **Typography**:
-  - Mono for everything the runtime reasons about: state names, event names, field names, field values, rule messages.
+  - Mono for everything the runtime reasons about: state names, event names, field names, event arg labels, field values, rule messages.
   - Sans for ambient context: labels, captions, nav, structural UI text.
   - Italic = constraint pressure on identity label only, all surfaces (no other italic use).
 - **Form**:
@@ -234,7 +244,7 @@ Visual implication: every structural decision should be judged against whether i
   - Structure/Definition: indigo syntax tokens (grammar keywords). Structure/Runtime: indigo framing chrome (borders, headers, rail).
   - State/Definition: violet mono token in declaration. State/Runtime: hard-rect node, violet, mono label — same shape on all runtime surfaces.
   - Event/Definition: cyan mono token in clause. Event/Runtime: directed arc or row with cyan label + directional marker (marker invariant on all runtime surfaces).
-  - Data/Definition: name in data colour, type in data-t, no value (values are runtime-assigned). Data/Runtime: three-part row — name (data) · type (data-t) · value (data-v) — mono throughout.
+  - Data/Definition: field names / field references in `--field`, event args / arg-member references in `--arg`, type in `--data-t`, values in `--data-v`. Fields name enduring entity shape; args name event-scoped behavioural input, so the split improves scanability instead of collapsing both into one slate lane. Data/Runtime: three-part row — field name (`--field`) · type (`--data-t`) · value (`--data-v`) — mono throughout, with event-scoped arg surfaces keeping the `--arg` lane when args are rendered.
   - Rule/Definition: gold mono token in `because`/`reject` clause. Rule/Runtime: gold message as verdict overlay below field when rule fires.
 
 ### Concepts Section Redesign

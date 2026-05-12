@@ -168,7 +168,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
 
     // ── ruleDesugaringModifiers — catalog-derived rule-desugaring subset ──
     // MUST precede generic constraint keyword patterns so catalog-flagged modifiers keep their
-    // dedicated first-match hook without changing the shared grammar-keyword color lane.
+    // dedicated first-match hook while still rendering on the constraint/rule color lane.
     var ruleDesugaringModifierAlt = string.Join("|", Modifiers.All
         .Where(m => m.DesugarsToRule && m.Token.Text is not null)
         .Select(m => Regex.Escape(m.Token.Text!))
@@ -181,7 +181,7 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
     {
         ruleDesugaringModifierPatterns.Add(new JsonObject
         {
-            ["name"] = "keyword.other.grammar.precept",
+            ["name"] = "keyword.other.constraint.precept",
             ["match"] = $"\\b({ruleDesugaringModifierAlt})\\b"
         });
     }

@@ -16,6 +16,7 @@ public enum SemanticTokenTypeKind
     ArgName = 10,
     Message = 11,
     Comment = 12,
+    TypedLiteral = 13,
 }
 
 public sealed record SemanticTokenTypeMeta(
@@ -45,6 +46,7 @@ public static class SemanticTokenTypes
             new(SemanticTokenTypeKind.ArgName, "preceptArgName", "variable.parameter.precept", "Precept argument name", "#9AD8E8", SupportsConstrainedModifier: true),
             new(SemanticTokenTypeKind.Message, "preceptMessage", "string.other.message.precept", "Precept message string", "#FBBF24"),
             new(SemanticTokenTypeKind.Comment, "preceptComment", "comment.line.precept", "Precept comment", "#9096A6", Italic: true),
+            new(SemanticTokenTypeKind.TypedLiteral, "preceptTypedLiteral", "string.quoted.single.precept", "Precept typed literal", "#84929F"),
         }.ToFrozenDictionary(m => m.Kind);
 
     public static SemanticTokenTypeMeta GetMeta(SemanticTokenTypeKind kind) =>

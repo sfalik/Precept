@@ -33,6 +33,16 @@ public sealed class TextMateGrammarTests
             because: "the default override must win before the generic gold grammar fallback runs");
     }
 
+    [Fact]
+    public void RuleDesugaringModifiers_UseConstraintScope()
+        => Grammar["repository"]!
+            .AsObject()["ruleDesugaringModifiers"]!
+            .AsObject()["patterns"]!
+            .AsArray()[0]!
+            .AsObject()["name"]!
+            .GetValue<string>()
+            .Should().Be("keyword.other.constraint.precept");
+
     private static JsonObject LoadGrammar()
     {
         var path = Path.GetFullPath(Path.Combine(

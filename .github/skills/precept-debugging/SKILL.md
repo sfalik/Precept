@@ -78,6 +78,9 @@ If a state constraint fails after a transition, check whether the `set` actions 
 ### Event ensure rejection
 If an `on <Event> ensure ...` fails, the event is rejected before transition logic runs. Check the provided event arguments, not the current state.
 
+### Same-type comparison fails (qualifier mismatch)
+`PriceGreaterThanOrEqualPrice`, `MoneyGreaterThanOrEqualMoney`, and all same-type comparison operators have `qualifierMatch: Same` — both operands must have identical qualifiers (currency AND unit for price; currency for money). Two `price` values with different denominator units (e.g., `price in 'USD' of 'SaleUnit'` vs `price in 'USD' of 'StockingUnit'`) will fail with a type mismatch even though both are `price`. Call `precept_operations` filtered by the operand type and check the `qualifierMatch` field on the failing operator before concluding the types themselves are wrong.
+
 ## Optional State Diagram for Diagnosis
 
 When transition structure is the problem, a focused Mermaid `stateDiagram-v2` can make the bug obvious by revealing shadowed rows or unreachable states.

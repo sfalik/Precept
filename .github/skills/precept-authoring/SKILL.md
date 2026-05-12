@@ -45,7 +45,7 @@ Use these tools when you need authoritative answers while drafting:
 - `precept_syntax` — when you need the syntax for a construct, action chain, operator, or grammar rule.
 - `precept_types` — when declaring field types, choosing modifiers (`optional`, `nonnegative`, `notempty`, `terminal`), or using built-in functions.
 - `precept_domains` — when working with money, quantity, price, or temporal fields. Returns ISO 4217 currencies, UCUM units, SI prefixes, and named physical dimensions.
-- `precept_operations` — when you need to know what operator combinations work for a given type (e.g., `Money + Money`, `Quantity * Number`). Pass a type name as the optional category filter.
+- `precept_operations` — when you need to know what operator combinations work for a given type (e.g., `Money + Money`, `Quantity * Number`). Pass a type name as the optional category filter. For comparison operators (`>=`, `==`, etc.), check the `qualifierMatch` field: `Same` means both operands must have identical qualifiers (currency and unit for `price`; currency for `money`). Two `price` fields with different denominator units cannot be directly compared even though both are `price`.
 - `precept_proofs` — when writing `when` guards or `ensure` constraints. Returns the proof obligation catalog and runtime fault catalog — what the proof engine verifies and what faults to prevent.
 
 ## Step 6: Write the Precept
