@@ -241,23 +241,25 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnFunctionCall_ShowsSignatureAndDescription()
+    public void Hover_OnFunctionCallInsideRule_RoutesToRuleBeforeFunctionHelp()
     {
-        var compilation = Precept.Compiler.Compile(RichHoverSource);
-        var maxToken = compilation.Tokens.Tokens.Single(token => token.Text == "max");
+        var markup = GetHoverMarkdown(RichHoverSource, "max(0, 0)");
 
-        var hover = HoverHandler.CreateHover(compilation, new Position(maxToken.Span.StartLine - 1, maxToken.Span.StartColumn - 1));
-
-        hover.Should().NotBeNull();
-        hover!.Contents.MarkupContent!.Value.Should().Contain("function `max`");
-        hover.Contents.MarkupContent.Value.Should().Contain("max(value as integer, value as integer) -> integer");
-        hover.Contents.MarkupContent.Value.Should().Contain("Returns the larger of two values");
+        markup.Should().Contain("**rule**");
+        markup.Should().Contain("> valid");
+        markup.Should().Contain("Scope: global — enforced after every mutation");
+        markup.Should().NotContain("function `max`");
     }
 
     [Fact]
     public void Hover_OnOperator_UsesOperatorHoverDescription()
     {
-        var compilation = Precept.Compiler.Compile(RichHoverSource);
+        var compilation = Precept.Compiler.Compile("""
+            precept OperatorHover
+            field Quantity as integer default 1
+            field ReorderNeeded as boolean <- Quantity >= 5
+            state Draft initial
+            """);
         var operatorToken = compilation.Tokens.Tokens.Single(token => token.Kind == Precept.Language.TokenKind.GreaterThanOrEqual);
 
         var hover = HoverHandler.CreateHover(compilation, new Position(operatorToken.Span.StartLine - 1, operatorToken.Span.StartColumn - 1));
@@ -298,7 +300,12 @@ state Draft initial
     [Fact]
     public void Hover_OnAccessor_UsesAccessorDescription()
     {
-        var compilation = Precept.Compiler.Compile(RichHoverSource);
+        var compilation = Precept.Compiler.Compile("""
+            precept AccessorHover
+            field Notes as string <- "vip"
+            field NoteLength as integer <- Notes.length
+            state Draft initial
+            """);
         var accessorToken = compilation.Tokens.Tokens.Single(token => token.Text == "length");
 
         var hover = HoverHandler.CreateHover(compilation, new Position(accessorToken.Span.StartLine - 1, accessorToken.Span.StartColumn - 1));
@@ -310,7 +317,7 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnStoredField_ShowsWriteMapGovernanceAndResolvedQualifiers()
+    public void Hover_OnStoredField_ShowsMutabilityGovernanceAndResolvedQualifiers()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Price as money");
 
@@ -319,12 +326,41 @@ state Draft initial
         markup.Should().Contain("Declared qualifier: `in USD`");
         markup.Should().Contain("Resolved qualifier: `'USD'`");
         markup.Should().Contain("Qualifier source: Currency declared explicitly on this type");
-        markup.Should().Contain("Writable:");
+        markup.Should().Contain("✏️");
         markup.Should().Contain("`Draft`");
         markup.Should().Contain("`Listed`");
+        markup.Should().Contain("🔒");
+        markup.Should().Contain("`Hidden`");
+        markup.Should().Contain("`Archived`");
         markup.Should().Contain("Governed by:");
         markup.Should().Contain("rule");
         markup.Should().Contain("ensure");
+    }
+
+    [Fact]
+    public void Hover_OnStoredField_OmitsGuardedAccessFromMutabilitySummary()
+    {
+        const string source = """
+            precept MutabilityHover
+            field Price as money in 'USD'
+            field AllowLateEdit as boolean
+            state Listed initial
+            state LowStock
+            state Unlisted
+            state Delisted terminal
+            in Listed modify Price editable
+            in LowStock modify Price editable
+            in Delisted when AllowLateEdit modify Price editable
+            in Unlisted omit Price
+            event Archive
+            from Listed on Archive -> transition Delisted
+            """;
+
+        var markup = GetHoverMarkdown(source, "Price as money");
+
+        markup.Should().Contain("✏️ `Listed`, `LowStock` (unconditional)");
+        markup.Should().Contain("🔒 `Unlisted`, `Delisted`");
+        markup.Should().NotContain("AllowLateEdit");
     }
 
     [Fact]
@@ -381,6 +417,17 @@ state Draft initial
         markup.Should().Contain("`Archive`");
         markup.Should().Contain("Writable here:");
         markup.Should().Contain("active ensures: 1");
+    }
+
+    [Fact]
+    public void Hover_OnStateReference_InTransitionRow_RoutesToRichStateCard()
+    {
+        var markup = GetHoverMarkdown(HoverV3Source, "from Listed on Archive", offset: 5);
+
+        markup.Should().Contain("**state `Listed`**");
+        markup.Should().Contain("Incoming:");
+        markup.Should().Contain("Outgoing:");
+        markup.Should().NotContain("**transition**");
     }
 
     [Fact]
@@ -469,6 +516,7 @@ state Draft initial
         markup.Should().Contain("**reject**");
         markup.Should().Contain("> draft items cannot be cancelled");
         markup.Should().Contain("Result: state unchanged · no field mutations commit");
+        markup.Should().NotContain("**transition**");
     }
 
     [Fact]
@@ -571,6 +619,7 @@ state Draft initial
         markup.Should().Contain("⚖️ Currency · `'USD'`");
         markup.Should().Contain("Declared explicitly on this type");
         markup.Should().Contain("Mixed currencies aren't allowed");
+        markup.Should().NotContain("**field `Price`**");
     }
 
     [Fact]

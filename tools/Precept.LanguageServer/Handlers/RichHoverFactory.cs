@@ -28,6 +28,18 @@ internal static class RichHoverFactory
         return false;
     }
 
+    internal static Hover CreateFieldHover(Compilation compilation, TypedField field, SourceSpan span) =>
+        MakeHover(CreateFieldMarkdown(compilation, field), span);
+
+    internal static Hover CreateStateHover(Compilation compilation, TypedState state, SourceSpan span) =>
+        MakeHover(CreateStateMarkdown(compilation, state), span);
+
+    internal static Hover CreateEventHover(Compilation compilation, TypedEvent evt, SourceSpan span) =>
+        MakeHover(CreateEventMarkdown(compilation, evt), span);
+
+    internal static Hover CreateArgumentHover(TypedArg arg, SourceSpan span) =>
+        MakeHover(CreateArgumentMarkdown(arg), span);
+
     internal static bool TryCreateHover(Compilation compilation, Position position, Token token, out Hover hover)
     {
         if (TryCreateRuleHover(compilation, position, out hover))
@@ -207,10 +219,10 @@ internal static class RichHoverFactory
 
         Hover? symbolHover = occurrence switch
         {
-            FieldOccurrence field => MakeHover(CreateFieldMarkdown(compilation, field.Field), token.Span),
-            StateOccurrence state => MakeHover(CreateStateMarkdown(compilation, state.State), token.Span),
-            EventOccurrence evt => MakeHover(CreateEventMarkdown(compilation, evt.Event), token.Span),
-            ArgOccurrence arg => MakeHover(CreateArgumentMarkdown(arg.Arg), token.Span),
+            FieldOccurrence field => CreateFieldHover(compilation, field.Field, token.Span),
+            StateOccurrence state => CreateStateHover(compilation, state.State, token.Span),
+            EventOccurrence evt => CreateEventHover(compilation, evt.Event, token.Span),
+            ArgOccurrence arg => CreateArgumentHover(arg.Arg, token.Span),
             _ => null,
         };
 
@@ -978,11 +990,31 @@ internal static class RichHoverFactory
         else if (!compilation.Semantics.States.IsEmpty)
         {
             var writeMap = GetFieldWriteMapByState(compilation, field);
-            lines.Add($"Writable: {FormatCodeList(writeMap.WritableStates)} · Read-only: {FormatCodeList(writeMap.LockedStates)}");
+            if (TryFormatFieldMutabilitySummary(writeMap, out var mutabilitySummary))
+            {
+                lines.Add(mutabilitySummary);
+            }
         }
 
         lines.Add($"Governed by: {FormatConstraintGovernance(compilation, field.Name)}");
         return string.Join("\n\n", lines);
+    }
+
+    private static bool TryFormatFieldMutabilitySummary(FieldWriteMap writeMap, out string summary)
+    {
+        var parts = new List<string>();
+        if (!writeMap.WritableStates.IsDefaultOrEmpty)
+        {
+            parts.Add($"✏️ {FormatCodeList(writeMap.WritableStates)} (unconditional)");
+        }
+
+        if (!writeMap.LockedStates.IsDefaultOrEmpty)
+        {
+            parts.Add($"🔒 {FormatCodeList(writeMap.LockedStates)}");
+        }
+
+        summary = string.Join(" · ", parts);
+        return parts.Count > 0;
     }
 
     private static string CreateStateMarkdown(Compilation compilation, TypedState state)
@@ -1641,7 +1673,8 @@ internal static class RichHoverFactory
         else
         {
             writableStates = accesses
-                .Where(access => access.Mode == ModifierKind.Write
+                .Where(access => !access.IsGuarded
+                    && access.Mode == ModifierKind.Write
                     && access.FieldNames.Contains(field.Name, StringComparer.Ordinal))
                 .Select(access => access.StateName)
                 .Distinct(StringComparer.Ordinal)
@@ -1656,7 +1689,9 @@ internal static class RichHoverFactory
     private static ImmutableArray<string> GetWritableFieldsForState(Compilation compilation, string stateName)
     {
         var accesses = GetAccessDeclarations(compilation)
-            .Where(access => access.Mode == ModifierKind.Write && string.Equals(access.StateName, stateName, StringComparison.Ordinal))
+            .Where(access => !access.IsGuarded
+                && access.Mode == ModifierKind.Write
+                && string.Equals(access.StateName, stateName, StringComparison.Ordinal))
             .SelectMany(access => access.FieldNames)
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
@@ -1688,7 +1723,7 @@ internal static class RichHoverFactory
         }
 
         var label = FormatSnippet(compilation, access.Syntax.Span);
-        return new AccessDeclarationInfo(access.StateName, fieldNames, access.Mode, access.Syntax.Span, label);
+        return new AccessDeclarationInfo(access.StateName, fieldNames, access.Mode, access.Guard is not null, access.Syntax.Span, label);
     }
 
     private static ImmutableArray<OmitDeclarationInfo> GetOmitDeclarations(Compilation compilation) =>
@@ -2267,6 +2302,7 @@ internal static class RichHoverFactory
         string StateName,
         ImmutableArray<string> FieldNames,
         ModifierKind Mode,
+        bool IsGuarded,
         SourceSpan Span,
         string Label);
 

@@ -62,6 +62,21 @@ internal sealed class HoverHandler : IHoverHandler
             return actionHover;
         }
 
+        if (TryCreateTypedConstantHover(compilation.Semantics, position, out var constantHover))
+        {
+            return constantHover;
+        }
+
+        if (TryCreateStateSymbolHover(compilation, token.Value, position, out var stateHover))
+        {
+            return stateHover;
+        }
+
+        if (RichHoverFactory.TryCreateHover(compilation, position, token.Value, out var richHover))
+        {
+            return richHover;
+        }
+
         if (TryCreateOperatorHover(compilation, position, token.Value, out var operatorHover))
         {
             return operatorHover;
@@ -72,24 +87,14 @@ internal sealed class HoverHandler : IHoverHandler
             return functionHover;
         }
 
-        if (TryCreateTypedConstantHover(compilation.Semantics, position, out var constantHover))
-        {
-            return constantHover;
-        }
-
         if (TryCreateAccessorHover(compilation, position, token.Value, out var accessorHover))
         {
             return accessorHover;
         }
 
-        if (RichHoverFactory.TryCreateHover(compilation, position, token.Value, out var richHover))
-        {
-            return richHover;
-        }
-
         if (token.Value.Kind == TokenKind.Identifier)
         {
-            return TryIdentifierHover(compilation.Semantics, token.Value, position);
+            return TryIdentifierHover(compilation, token.Value, position);
         }
 
         if (HasRicherCatalogOwner(compilation, position, token.Value))
@@ -124,29 +129,42 @@ internal sealed class HoverHandler : IHoverHandler
         return null;
     }
 
-    private static Hover? TryIdentifierHover(SemanticIndex semantics, Token token, Position position)
+    private static Hover? TryIdentifierHover(Compilation compilation, Token token, Position position)
     {
+        var semantics = compilation.Semantics;
         if (TryFindArgument(semantics, token.Text, position, out var arg))
         {
-            return MakeHover(CreateArgumentMarkdown(arg), token.Span);
+            return RichHoverFactory.CreateArgumentHover(arg, token.Span);
         }
 
         if (TryFindField(semantics, token.Text, position, out var field))
         {
-            return MakeHover(CreateFieldMarkdown(field), token.Span);
+            return RichHoverFactory.CreateFieldHover(compilation, field, token.Span);
         }
 
         if (TryFindState(semantics, token.Text, position, out var state))
         {
-            return MakeHover(CreateStateMarkdown(state), token.Span);
+            return RichHoverFactory.CreateStateHover(compilation, state, token.Span);
         }
 
         if (TryFindEvent(semantics, token.Text, position, out var evt))
         {
-            return MakeHover(CreateEventMarkdown(evt), token.Span);
+            return RichHoverFactory.CreateEventHover(compilation, evt, token.Span);
         }
 
         return null;
+    }
+
+    private static bool TryCreateStateSymbolHover(Compilation compilation, Token token, Position position, out Hover hover)
+    {
+        hover = null!;
+        if (token.Kind != TokenKind.Identifier || !TryFindState(compilation.Semantics, token.Text, position, out var state))
+        {
+            return false;
+        }
+
+        hover = RichHoverFactory.CreateStateHover(compilation, state, token.Span);
+        return true;
     }
 
     private static bool TryCreateTypeHover(Compilation compilation, Token token, out Hover hover)

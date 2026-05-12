@@ -52,3 +52,9 @@
 - B1 compact proof-gap cards are shipped in `RichHoverFactory.cs`; hover proof diagnostics and proof-expression cards now use the badge-first compact format from `docs/Working/hover-design.md`, with updated `HoverHandlerTests` and green LS/core suites (272/272, 4938/4938).
 - Frank’s follow-up ruling is now the active V1 contract for the next pass: fix construct routing before generic token help, keep guarded access out of mutability counts/state lists, and defer the state-card missing-path narrative.
 - Kramer-2 is currently applying the B2/B3 routing + mutability honesty changes in `HoverHandler.cs` and `RichHoverFactory.cs`.
+
+### 2026-05-12T19:26:05.9065969-04:00 — B2 construct routing + B3 mutability honesty landed
+
+- `HoverHandler.cs` now routes state symbols to the rich state card before generic construct rows can steal them, and it evaluates rich construct hovers before generic operator/function/accessor fallbacks so rule/ensure/transition/reject/access/omit cards win where the spec requires.
+- `RichHoverFactory.cs` now exposes shared rich symbol-card builders for field/state/event/arg paths and filters guarded access declarations out of V1 writable summaries, producing honest field mutability lines with `✏️` unconditional states and `🔒` locked-or-omitted states.
+- `HoverHandlerTests.cs` now covers state-reference routing, reject-over-transition precedence, qualifier-over-symbol routing, guarded-access omission from mutability summaries, and the updated routing expectations; validation passed with `dotnet test test\Precept.LanguageServer.Tests\ --nologo` (271/271) and `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --nologo`.
