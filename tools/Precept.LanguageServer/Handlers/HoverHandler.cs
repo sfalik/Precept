@@ -62,6 +62,11 @@ internal sealed class HoverHandler : IHoverHandler
             return actionHover;
         }
 
+        if (RichHoverFactory.TryCreateConstructHover(compilation, position, out var constructHover))
+        {
+            return constructHover;
+        }
+
         if (TryCreateOperatorHover(compilation, position, token.Value, out var operatorHover))
         {
             return operatorHover;
@@ -82,14 +87,14 @@ internal sealed class HoverHandler : IHoverHandler
             return accessorHover;
         }
 
-        if (RichHoverFactory.TryCreateHover(compilation, position, token.Value, out var richHover))
+        if (RichHoverFactory.TryCreateSupplementalHover(compilation, position, token.Value, out var richHover))
         {
             return richHover;
         }
 
         if (token.Value.Kind == TokenKind.Identifier)
         {
-            return TryIdentifierHover(compilation.Semantics, token.Value, position);
+            return TryIdentifierHover(compilation, token.Value, position);
         }
 
         if (HasRicherCatalogOwner(compilation, position, token.Value))
@@ -124,8 +129,10 @@ internal sealed class HoverHandler : IHoverHandler
         return null;
     }
 
-    private static Hover? TryIdentifierHover(SemanticIndex semantics, Token token, Position position)
+    private static Hover? TryIdentifierHover(Compilation compilation, Token token, Position position)
     {
+        var semantics = compilation.Semantics;
+
         if (TryFindArgument(semantics, token.Text, position, out var arg))
         {
             return MakeHover(CreateArgumentMarkdown(arg), token.Span);
@@ -138,7 +145,7 @@ internal sealed class HoverHandler : IHoverHandler
 
         if (TryFindState(semantics, token.Text, position, out var state))
         {
-            return MakeHover(CreateStateMarkdown(state), token.Span);
+            return RichHoverFactory.CreateStateHover(compilation, state, token.Span);
         }
 
         if (TryFindEvent(semantics, token.Text, position, out var evt))

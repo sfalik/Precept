@@ -46,3 +46,16 @@
 - B1 compact proof-gap cards are shipped in `RichHoverFactory.cs`; hover proof diagnostics and proof-expression cards now use the badge-first compact format from `docs/Working/hover-design.md`, with updated `HoverHandlerTests` and green LS/core suites (272/272, 4938/4938).
 - Frank’s follow-up ruling is now the active V1 contract for the next pass: fix construct routing before generic token help, keep guarded access out of mutability counts/state lists, and defer the state-card missing-path narrative.
 - Kramer-2 is currently applying the B2/B3 routing + mutability honesty changes in `HoverHandler.cs` and `RichHoverFactory.cs`.
+
+### 2026-05-12T18:13:40.534-04:00 — B4 state proof narrative shipped
+
+- Added `EdgeProofStatus` as a first-class `StateGraph` projection and enriched compiled graphs post-proof in `Compiler.cs`, including wildcard-row to graph-edge mapping with explicit-row override parity so state-adjacent proof status stays aligned with `GraphAnalyzer` edge expansion.
+- Updated `RichHoverFactory.cs` state hovers to surface a `📍 … graph position` proof card for incident edges, mark state status unverified when connected edges or ensures have unresolved proof gaps, and routed HoverHandler’s identifier fallback through the rich state hover path.
+- Added core coverage in `test/Precept.Tests/CompilerEdgeProofStatusTests.cs` (proved, unresolved, wildcard override) plus LS coverage in `HoverHandlerTests.cs`; validation passed with `dotnet build`, `dotnet test test\Precept.Tests\`, and `dotnet test test\Precept.LanguageServer.Tests\` (4966 + 281 passing).
+
+### 2026-05-12T18:32:00-04:00 — B2/B3 hover routing and mutability landed
+
+- Reordered `HoverHandler.CreateHover(...)` so construct-span cards now win before operator/function/accessor/typed-constant fallback, while preserving the existing proof-first path, keyword type/action hovers, and identifier-driven symbol routing.
+- Split `RichHoverFactory` into construct vs. supplemental hover helpers and filtered field/state mutability summaries to unconditional `AccessModes` entries only; guarded access no longer inflates writable-state lists or writable-field counts, and ambiguous locked-state complements are suppressed.
+- Updated `docs/Working/hover-design.md` plus `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs` with routing regressions, guarded-access honesty coverage, and the conservative V1 mutability wording.
+- Validation passed with `dotnet build tools\\Precept.LanguageServer\\Precept.LanguageServer.csproj --artifacts-path temp\\dev-language-server --nologo`, `dotnet test test\\Precept.LanguageServer.Tests\\Precept.LanguageServer.Tests.csproj`, and `dotnet test test\\Precept.Tests\\Precept.Tests.csproj`.

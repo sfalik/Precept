@@ -1,12 +1,15 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Precept.Language;
 using Precept.LanguageServer.Handlers;
+using Precept.Pipeline;
 using Xunit;
 
 namespace Precept.LanguageServer.Tests;
@@ -41,6 +44,32 @@ state Draft initial
     from Draft on AddTag
         -> add Tags "vip"
         -> transition Done
+    """;
+
+    private const string TokenFallbackSource = """
+    precept HoverTokenFallback
+    field Notes as string <- "vip"
+    field NoteLength as integer <- Notes.length
+    field RootValue as number <- sqrt(4)
+    field IsPositive as boolean <- 1 >= 0
+    state Draft initial
+    """;
+
+    private const string GuardedAccessSource = """
+    precept GuardedAccessHover
+    field Amount as integer
+    field Notes as string
+    field IsOwner as boolean
+    state Draft initial
+    state Review
+    state Done terminal
+    event Submit
+    event Finish
+    in Draft modify Amount editable
+    in Draft when IsOwner modify Notes editable
+    in Review when IsOwner modify Amount editable
+    from Draft on Submit -> transition Review
+    from Review on Finish -> transition Done
     """;
 
     private const string HoverV3Source = """
@@ -243,21 +272,21 @@ state Draft initial
     [Fact]
     public void Hover_OnFunctionCall_ShowsSignatureAndDescription()
     {
-        var compilation = Precept.Compiler.Compile(RichHoverSource);
-        var maxToken = compilation.Tokens.Tokens.Single(token => token.Text == "max");
+        var compilation = Precept.Compiler.Compile(TokenFallbackSource);
+        var functionToken = compilation.Tokens.Tokens.Single(token => token.Text == "sqrt");
 
-        var hover = HoverHandler.CreateHover(compilation, new Position(maxToken.Span.StartLine - 1, maxToken.Span.StartColumn - 1));
+        var hover = HoverHandler.CreateHover(compilation, new Position(functionToken.Span.StartLine - 1, functionToken.Span.StartColumn - 1));
 
         hover.Should().NotBeNull();
-        hover!.Contents.MarkupContent!.Value.Should().Contain("function `max`");
-        hover.Contents.MarkupContent.Value.Should().Contain("max(value as integer, value as integer) -> integer");
-        hover.Contents.MarkupContent.Value.Should().Contain("Returns the larger of two values");
+        hover!.Contents.MarkupContent!.Value.Should().Contain("function `sqrt`");
+        hover.Contents.MarkupContent.Value.Should().Contain("sqrt(value as number) -> number");
+        hover.Contents.MarkupContent.Value.Should().Contain("Returns the square root as a number");
     }
 
     [Fact]
     public void Hover_OnOperator_UsesOperatorHoverDescription()
     {
-        var compilation = Precept.Compiler.Compile(RichHoverSource);
+        var compilation = Precept.Compiler.Compile(TokenFallbackSource);
         var operatorToken = compilation.Tokens.Tokens.Single(token => token.Kind == Precept.Language.TokenKind.GreaterThanOrEqual);
 
         var hover = HoverHandler.CreateHover(compilation, new Position(operatorToken.Span.StartLine - 1, operatorToken.Span.StartColumn - 1));
@@ -298,7 +327,7 @@ state Draft initial
     [Fact]
     public void Hover_OnAccessor_UsesAccessorDescription()
     {
-        var compilation = Precept.Compiler.Compile(RichHoverSource);
+        var compilation = Precept.Compiler.Compile(TokenFallbackSource);
         var accessorToken = compilation.Tokens.Tokens.Single(token => token.Text == "length");
 
         var hover = HoverHandler.CreateHover(compilation, new Position(accessorToken.Span.StartLine - 1, accessorToken.Span.StartColumn - 1));
@@ -307,6 +336,18 @@ state Draft initial
         hover!.Contents.MarkupContent!.Value.Should().Contain("string.length");
         hover.Contents.MarkupContent.Value.Should().Contain("Character count");
         hover.Contents.MarkupContent.Value.Should().Contain("Returns: `integer`");
+    }
+
+    [Theory]
+    [InlineData("length")]
+    [InlineData(">=")]
+    [InlineData("max")]
+    public void Hover_OnRuleBodyToken_RoutesToRuleCardBeforeTokenFallback(string needle)
+    {
+        var markup = GetHoverMarkdown(RichHoverSource, needle);
+
+        markup.Should().Contain("**rule**");
+        markup.Should().Contain("> valid");
     }
 
     [Fact]
@@ -318,7 +359,7 @@ state Draft initial
         markup.Should().Contain("Type: `money` · not nullable · `in USD`");
         markup.Should().Contain("Declared qualifier: `in USD`");
         markup.Should().Contain("Resolved qualifier: `'USD'`");
-        markup.Should().Contain("Qualifier source: declared explicitly on this type");
+        markup.Should().Contain("Qualifier source: Currency declared explicitly on this type");
         markup.Should().Contain("Writable:");
         markup.Should().Contain("`Draft`");
         markup.Should().Contain("`Listed`");
@@ -336,6 +377,25 @@ state Draft initial
         markup.Should().Contain("Computed from:");
         markup.Should().Contain("Quantity / 2");
         markup.Should().NotContain("Writable:");
+    }
+
+    [Fact]
+    public void Hover_OnStoredField_WithOnlyGuardedWrites_OmitsWriteMap()
+    {
+        var markup = GetHoverMarkdown(GuardedAccessSource, "Notes as string");
+
+        markup.Should().Contain("**field `Notes`**");
+        markup.Should().NotContain("Writable:");
+    }
+
+    [Fact]
+    public void Hover_OnStoredField_WithGuardedWrites_ShowsOnlyUnconditionalStates()
+    {
+        var markup = GetHoverMarkdown(GuardedAccessSource, "Amount as integer");
+
+        markup.Should().Contain("**field `Amount`**");
+        markup.Should().Contain("Writable: `Draft`");
+        markup.Should().NotContain("Writable: `Review`");
     }
 
     [Fact]
@@ -379,8 +439,27 @@ state Draft initial
         markup.Should().Contain("Modifiers: `terminal`");
         markup.Should().Contain("Incoming:");
         markup.Should().Contain("`Archive`");
-        markup.Should().Contain("Writable here:");
+        markup.Should().NotContain("Writable here:");
         markup.Should().Contain("active ensures: 1");
+    }
+
+    [Fact]
+    public void Hover_OnState_WithOnlyGuardedWrites_OmitsWritableSummary()
+    {
+        var markup = GetHoverMarkdown(GuardedAccessSource, "state Review", offset: 6);
+
+        markup.Should().Contain("**state `Review`**");
+        markup.Should().NotContain("Writable here:");
+    }
+
+    [Fact]
+    public void Hover_OnState_WithGuardedAndUnconditionalWrites_ShowsOnlyUnconditionalFields()
+    {
+        var markup = GetHoverMarkdown(GuardedAccessSource, "state Draft", offset: 6);
+
+        markup.Should().Contain("**state `Draft`**");
+        markup.Should().Contain("Writable here: `Amount`");
+        markup.Should().NotContain("`Notes`", because: "guarded write access should not be counted as unconditionally writable");
     }
 
     [Fact]
@@ -536,13 +615,61 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "+");
 
-        markup.Should().Contain("**PRE0114 — Cannot prove Currency qualifier compatibility**");
-        markup.Should().Contain("Verdict: Cannot prove both operands resolve to the same Currency qualifier");
-        markup.Should().Contain("Expression: `(A - B) + C`");
+        markup.Should().Contain("⚠️ `PRE0114` · Can't confirm currencies match");
+        markup.Should().Contain("🔬 `Result` · ");
+        markup.Should().Contain("right `C` carries `'EUR'` — different currency qualifiers");
     }
 
     [Fact]
-    public void Hover_OnProofBearingExpression_ShowsProvedQualifierDetails()
+    public void PresenceProofDiagnosticMarkdown_UsesCompactGapCard()
+    {
+        const string source = """
+            precept PresenceProofHover
+            field TrackingNumber as string optional
+            field ShipmentSummary as integer <- TrackingNumber.length
+            """;
+
+        var compilation = Precept.Compiler.Compile(source);
+        var field = compilation.Semantics.Fields.Single(candidate => candidate.Name == "ShipmentSummary");
+        var requirement = new PresenceProofRequirement(new SelfSubject(), "optional fields must be proved present before access");
+        var obligation = new ProofObligation(
+            requirement,
+            field.ComputedExpression!,
+            new FieldExpressionContext(field),
+            ProofDisposition.Unresolved,
+            null,
+            Precept.Language.DiagnosticCode.UnprovedPresenceRequirement);
+        var method = typeof(RichHoverFactory).GetMethod(
+            "CreatePresenceProofDiagnosticMarkdown",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        var markup = method!.Invoke(null, [compilation, Precept.Language.DiagnosticCode.UnprovedPresenceRequirement, obligation, requirement]) as string;
+
+        markup.Should().NotBeNull();
+        markup.Should().Contain("⚠️ `PRE0116` · Can't confirm presence");
+        markup.Should().Contain("🔬 `ShipmentSummary` · `TrackingNumber.length`");
+        markup.Should().Contain("`TrackingNumber` is optional · `.length` accessed without presence guard");
+    }
+
+    [Fact]
+    public void Hover_OnQualifierChainProofDiagnostic_UsesCompactGapCard()
+    {
+        const string source = """
+            precept QualifierChainDiagnosticHover
+            field Rate as exchangerate
+            field Cost as money in 'EUR'
+            field Converted as money <- Rate * Cost
+            """;
+
+        var markup = GetHoverMarkdown(source, "*");
+
+        markup.Should().Contain("⚠️ `PRE0114` · Can't confirm qualifier chain");
+        markup.Should().Contain("🔬 `Converted` · `Rate * Cost`");
+        markup.Should().Contain("Left `Rate` has no known `Source currency` · right `Cost` carries `'EUR'`");
+    }
+
+    [Fact]
+    public void Hover_OnProofBearingExpression_ShowsCompactProvedQualifierDetails()
     {
         const string source = """
             precept GrossProfitHover
@@ -555,12 +682,28 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "TotalRevenue - TotalReturns", offset: 13);
 
-        markup.Should().Contain("**expression** `(TotalRevenue - TotalReturns)`");
-        markup.Should().Contain("Status: Proved");
-        markup.Should().Contain("Requirement: both operands must resolve to the same Currency qualifier");
-        markup.Should().Contain("Proof chain fields: `CatalogCurrency`");
-        markup.Should().Contain("Result qualifier: `'{CatalogCurrency}'`");
-        markup.Should().Contain("Proof strategy: same-qualifier propagation");
+        markup.Should().Contain("✅ Proven · result keeps `CatalogCurrency`");
+        markup.Should().Contain("🔬 `TotalRevenue - TotalReturns`");
+        markup.Should().Contain("Left/Right: `CatalogCurrency` · Result: `CatalogCurrency`");
+    }
+
+    [Fact]
+    public void Hover_OnQualifierChainExpression_ShowsCompactProvedDetails()
+    {
+        const string source = """
+            precept QualifierChainExpressionHover
+            field SupplierCurrency as currency default 'EUR'
+            field CatalogCurrency as currency default 'USD'
+            field Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'
+            field Cost as money in '{SupplierCurrency}'
+            field Converted as money in '{CatalogCurrency}' <- Rate * Cost
+            """;
+
+        var markup = GetHoverMarkdown(source, "Rate * Cost", offset: 2);
+
+        markup.Should().Contain("✅ Proven · qualifier chain holds");
+        markup.Should().Contain("🔬 `Rate * Cost`");
+        markup.Should().Contain("Left Source currency: `SupplierCurrency` · Right Currency: `SupplierCurrency`");
     }
 
     [Fact]
@@ -570,7 +713,7 @@ state Draft initial
 
         markup.Should().Contain("**qualifier**");
         markup.Should().Contain("Axis: currency");
-        markup.Should().Contain("Checks: assignments, comparisons, and arithmetic stay currency-compatible");
+        markup.Should().Contain("Compatibility rule: assignments, comparisons, and arithmetic stay currency-compatible");
     }
 
     [Fact]
@@ -585,7 +728,7 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "'{StockingUnit.dimension}'", offset: 2);
 
-        markup.Should().Contain("✅ **Proof verified** — qualifier resolves from `StockingUnit`");
+        markup.Should().Contain("✅ **Proof verified** — qualifier resolves from field `StockingUnit`");
         markup.Should().Contain("Axis: physical dimension");
     }
 
@@ -635,6 +778,51 @@ state Draft initial
         markup.Should().Contain("Resolved value: `'{CatalogCurrency}'`");
         markup.Should().Contain("Resolved source: field `CatalogCurrency`");
         markup.Should().Contain("Resolved value shape: symbolic currency qualifier");
+    }
+
+    [Fact]
+    public void Hover_OnState_WithUnprovenEdge_ShowsGraphProofGapCard()
+    {
+        const string source = """
+            precept StateEdgeProofGap
+            field Result as number
+            field Numerator as number
+            field Denominator as number
+            state Draft initial
+            state Approved terminal
+            event Submit
+            from Draft on Submit
+                -> set Result = Numerator / Denominator
+                -> transition Approved
+            """;
+
+        var markup = GetHoverMarkdown(source, "state Draft", offset: 6);
+
+        markup.Should().Contain("📍 Draft graph position");
+        markup.Should().Contain("⚠️ Gap · Draft --Submit--> Approved can't be proven");
+    }
+
+    [Fact]
+    public void Hover_OnState_WithOnlyProvenEdges_ShowsPositiveGraphProofCard()
+    {
+        const string source = """
+            precept StateEdgeProofPositive
+            field Result as number
+            field Numerator as number
+            field Denominator as number
+            state Draft initial
+            state Approved terminal
+            event Submit
+            from Draft on Submit when Denominator != 0
+                -> set Result = Numerator / Denominator
+                -> transition Approved
+            """;
+
+        var markup = GetHoverMarkdown(source, "state Draft", offset: 6);
+
+        markup.Should().Contain("📍 Draft graph position");
+        markup.Should().Contain("✅ Proven · all connected edges satisfy their proof obligations");
+        markup.Should().NotContain("⚠️ Gap ·");
     }
 
     private static string GetHoverMarkdown(string source, string needle, int offset = 0, int occurrence = 1)
