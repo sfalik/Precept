@@ -73475,5 +73475,29 @@ Date: 2026-05-11T22:05:37.512-04:00
 
 
 
-- RC-2 coverage locks Q6/Q7/Q8 compound-unit forms in field defaults and rule RHS expressions, plus the price compound-unit rule form.
-
+- RC-2 coverage locks Q6/Q7/Q8 compound-unit forms in field defaults and rule RHS expressions, plus the price compound-unit rule form.
+
+## Inbox Merge — 2026-05-11
+
+- UX review archived: .squad/decisions/inbox/elaine-diagnostic-message-review.md
+
+### [DECISION-001] D4 Naming — Keep D4, Not C5
+
+Date: 2026-05-12
+Context: D4 reframed from .squad/decisions/inbox/george-d4-complete.md
+Decision: Keep the work under D4 rather than reclassifying it as C5 or creating a new one-item series.
+Rationale: The fix does not resolve inventory-item.precept; it closes a pre-existing test failure, and a new series would add organizational noise.
+
+### [DECISION-002] Scalar Ops Inherit Qualified Operands
+
+Date: 2026-05-12
+Context: Scalar-op qualifier propagation in the compiler pipeline.
+Decision: Add ResultQualifierPolicy.InheritFromQualifiedOperand and apply it to the six scalar decimal ops.
+Rationale: The decimal operand is transparent to qualifier flow; the result should inherit the qualifier-bearing operand unchanged, not require a pairwise qualifier match.
+
+### [DECISION-003] Transitive Qualifier Resolution for Binary Ops
+
+Date: 2026-05-12
+Context: Proof-engine resolution for nested TypedBinaryOp expressions.
+Decision: Extend qualifier resolution so binary-op results can be resolved transitively through their child expressions.
+Rationale: The proof engine must be able to see qualifiers produced by nested operations, including chained scalar ops and existing same-qualifier expressions.

@@ -359,4 +359,14 @@
 
 
 
-- A2B added quantity Q5 (`'{n} {A}/{B}'`) plus a dedicated `UnitOfMeasureForms` compound-unit pattern for `'{A}/{B}'`; quantity Q6 was intentionally not added because the existing quantity whole-value lane is `H[whole-value]`, not a unit-only compound form.
+- A2B added quantity Q5 (`'{n} {A}/{B}'`) plus a dedicated `UnitOfMeasureForms` compound-unit pattern for `'{A}/{B}'`; quantity Q6 was intentionally not added because the existing quantity whole-value lane is `H[whole-value]`, not a unit-only compound form.
+
+### 2026-05-11T23:55:00-04:00 — george-3 D4 scalar-op qualifier propagation fix
+
+- Implemented ResultQualifierPolicy.InheritFromQualifiedOperand enum value
+- Added QualifiedOperandInherited : QualifierBinding record in SemanticIndex.cs
+- Added branch in TypeChecker.Expressions.cs MapQualifierBinding() for new policy
+- Added ResolveQualifierFromExpression() in ProofEngine.cs for transitive resolution
+- Applied policy to 6 operations: MoneyTimesDecimal, MoneyDivideDecimal, QuantityTimesDecimal, QuantityDivideDecimal, PriceTimesDecimal, PriceDivideDecimal
+- 10 new tests added, all 4831 tests pass
+- Commits:  1bc5f0e (fix), 73c11e51 (docs/records)
