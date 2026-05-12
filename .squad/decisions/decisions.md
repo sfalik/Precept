@@ -79,8 +79,8 @@
 - All changes are additive (new enum value, new DU subtype, new branches for previously-null paths).
 - The six operation metadata changes add a named parameter that was previously defaulted — the only behavioral change is `MapQualifierBinding` returning a non-null binding.
 - `ResolveQualifierOnAxis` currently returns null for all `TypedBinaryOp` subjects. Any change is strictly an improvement.
-- The `SameQualifierRequired` transitive resolution is a bonus fix. If any tests expect PRE0114 on nested same-qualifier operations, those tests were testing a bug. They should be updated to expect success.
-
+- The `SameQualifierRequired` transitive resolution is a bonus fix. If any tests expect PRE0114 on nested same-qualifier operations, those tests were testing a bug. They should be updated to expect success.
+
 # George C4 Done — TypedArgRef qualifier resolution
 
 
@@ -123,10 +123,8 @@ Implement the narrow ProofEngine fix for direct event-argument qualifier resolut
 
 
 
-The focused C4 fix closes the direct `TypedArgRef` blind spot, but the remaining sample PRE0114s still involve composite operand subtrees that resolve to `<unknown>` in diagnostics. Those require follow-up proof-expression/result-qualifier work, not additional direct arg lookup changes.
-
-
-
+The focused C4 fix closes the direct `TypedArgRef` blind spot, but the remaining sample PRE0114s still involve composite operand subtrees that resolve to `<unknown>` in diagnostics. Those require follow-up proof-expression/result-qualifier work, not additional direct arg lookup changes.
+
 # Decision: Slice 2B Is DONE
 
 
@@ -271,10 +269,8 @@ All three codes present in `DiagnosticCode.cs`:
 
 
 
-Update the plan's Slice 2B status from "🔲 Not Started" to "✅ Done" in `docs/Working/typed-constants-and-proof-coverage-plan.md`.
-
-
-
+Update the plan's Slice 2B status from "🔲 Not Started" to "✅ Done" in `docs/Working/typed-constants-and-proof-coverage-plan.md`.
+
 # Inventory-Item Compile Fixes — Part C Architectural Decisions
 
 
@@ -383,10 +379,8 @@ RC-3 (`qty[A/B] × qty[B] → qty[A]`) requires the TypeChecker to compute resul
 
 3. **Conservative proof guarantees:** C4's symbolic equality is structural, not semantic. The proof engine proves what the source text guarantees, not what might be true at runtime.
 
-4. **Existing patterns reused:** C4's `TypedArgRef` handling mirrors `ResolveSourceModifiers()`. C2's accessor-driven set mirrors the original `Tokens.KeywordsValidAsMemberName` intent.
-
-
-
+4. **Existing patterns reused:** C4's `TypedArgRef` handling mirrors `ResolveSourceModifiers()`. C2's accessor-driven set mirrors the original `Tokens.KeywordsValidAsMemberName` intent.
+
 # Decision: Part D — Pre-Existing Test Failure Fixes (B1–B4)
 
 
@@ -475,10 +469,8 @@ The "Money and quantity typed fields" example used `default '0.00 USD/kg'` — a
 
 
 
-All four slices are independent and can execute in parallel.
-
-
-
+All four slices are independent and can execute in parallel.
+
 # George — AlwaysRejecting / StateAlwaysRejects Implementation
 
 
@@ -573,10 +565,8 @@ This ensures the same wildcard suppression semantics: explicit rows shadow wildc
 
 
 
-3. **DiagnosticCode ordinal gaps**: codes 125/126 were assigned but there are gaps between 111 and 117, and between 116 and 119. This is fine (ordinals are not sequential by design), but worth confirming with Frank that 125/126 don't conflict with any planned codes.
-
-
-
+3. **DiagnosticCode ordinal gaps**: codes 125/126 were assigned but there are gaps between 111 and 117, and between 116 and 119. This is fine (ordinals are not sequential by design), but worth confirming with Frank that 125/126 don't conflict with any planned codes.
+
 # Post-RC Compile Analysis: inventory-item.precept
 
 **Date:** 2026-05-11T22:28:17-04:00
@@ -873,10 +863,8 @@ The pre-RC analysis estimated BUG-A would cause ~10–20 errors. Actual is 73. T
 
 
 
-*Analysis by Frank — 2026-05-11T22:28:17-04:00*
-
-
-
+*Analysis by Frank — 2026-05-11T22:28:17-04:00*
+
 # TypeChecker.Expressions.cs — 3-Way Partial-Class Split Complete
 
 
@@ -965,10 +953,8 @@ Executed Frank's Option B split of `src/Precept/Pipeline/TypeChecker.Expressions
 
 - The section header comment "Expression resolution — Slice 3: Functions, Accessors, Interpolated Strings" (originally at line 1243) landed in `TypeChecker.Expressions.TypedConstants.cs` alongside `ValidateAssignmentQualifiers`. This is cosmetically mismatched but structurally harmless; it can be updated in a future cleanup pass.
 
-- The file timestamps on the new files were set to the write time (2026-05-11 22:31); git staged them cleanly and the commit went through as `f148ca21`.
-
-
-
+- The file timestamps on the new files were set to the write time (2026-05-11 22:31); git staged them cleanly and the commit went through as `f148ca21`.
+
 # Kramer — D3 Activation Event Test Modernization
 
 
@@ -1019,10 +1005,8 @@ VS Code 1.74+ auto-activates extensions for languages declared in `contributes.l
 
 - Confirmed `tools\Precept.VsCode\package.json` contributes language id `precept` and only keeps `workspaceContains:**/*.precept` in `activationEvents`.
 
-- `dotnet test test\Precept.LanguageServer.Tests\ --no-restore --nologo --filter "PackageManifest_Activates"` ✅
-
-
-
+- `dotnet test test\Precept.LanguageServer.Tests\ --no-restore --nologo --filter "PackageManifest_Activates"` ✅
+
 # George — D1 ConflictingModifiers Fixture Fix
 
 
@@ -1085,10 +1069,8 @@ The `Modifiers` catalog correctly marks `optional` and `notempty` as mutually ex
 
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` is still blocked in this workspace by unrelated `TypedTransitionRow` constructor compile failures in `ProofLedgerTests.cs` and `ProofEngineTests.cs`.
 
-- Fixture diff is limited to the two requested `Approve` arg declarations.
-
-
-
+- Fixture diff is limited to the two requested `Approve` arg declarations.
+
 # Frank D4 research
 
 
@@ -1477,10 +1459,8 @@ Replace it with something like:
 
 
 
-That matches the actual failure and preserves the correct `UnitPrice` default example.
-
-
-
+That matches the actual failure and preserves the correct `UnitPrice` default example.
+
 # George RC-3 Done
 
 
@@ -1543,10 +1523,8 @@ That matches the actual failure and preserves the correct `UnitPrice` default ex
 
 - Interpolated unit holes are handled symbolically by deriving `{Unit.dimension}` strings from `{Unit}` placeholders.
 
-- Multi-slash compound units are intentionally left outside RC-3 scope; they still fall back to existing mismatch behavior.
-
-
-
+- Multi-slash compound units are intentionally left outside RC-3 scope; they still fall back to existing mismatch behavior.
+
 # George D2 done
 
 
@@ -1555,10 +1533,8 @@ That matches the actual failure and preserves the correct `UnitPrice` default ex
 
 - `dotnet build src\Precept\Precept.csproj --no-restore` passed.
 
-- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo --filter "TypeCheckerAssignmentQualifier"` was blocked by pre-existing `TypedTransitionRow` constructor compile errors in `test\Precept.Tests\ProofEngineTests.cs` and `test\Precept.Tests\ProofLedgerTests.cs`, so the three qualifier tests could not be re-run to completion in this workspace.
-
-
-
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo --filter "TypeCheckerAssignmentQualifier"` was blocked by pre-existing `TypedTransitionRow` constructor compile errors in `test\Precept.Tests\ProofEngineTests.cs` and `test\Precept.Tests\ProofLedgerTests.cs`, so the three qualifier tests could not be re-run to completion in this workspace.
+
 # George C3 done
 
 
@@ -1591,10 +1567,8 @@ That matches the actual failure and preserves the correct `UnitPrice` default ex
 
 ## Notes
 
-- The full `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` run still fails on two pre-existing unrelated tests: `ParserSlice8Tests.Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` and `ProofEngineTypedArgQualifierTests.InventoryItem_Sample_Has_No_PRE0114_Diagnostics`.
-
-
-
+- The full `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --nologo` run still fails on two pre-existing unrelated tests: `ParserSlice8Tests.Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` and `ProofEngineTypedArgQualifierTests.InventoryItem_Sample_Has_No_PRE0114_Diagnostics`.
+
 # George C2 done
 
 
@@ -1623,10 +1597,8 @@ That matches the actual failure and preserves the correct `UnitPrice` default ex
 
 - The sample no longer needs a parser-side keyword-member-name special case for `.from` / `.to`; the catalog path resolves them correctly.
 
-- Current manual compile output for the workspace sample shows **0** `ExpectedToken` / PRE0009 diagnostics. Remaining fallout is now semantic-only (`UnprovedQualifierCompatibility x66`, `TypeMismatch x8`).
-
-
-
+- Current manual compile output for the workspace sample shows **0** `ExpectedToken` / PRE0009 diagnostics. Remaining fallout is now semantic-only (`UnprovedQualifierCompatibility x66`, `TypeMismatch x8`).
+
 # George Bug031 fix
 
 
@@ -1653,10 +1625,8 @@ That matches the actual failure and preserves the correct `UnitPrice` default ex
 
 - `dotnet test`
 
-- Result: the filtered Bug031 test passes and `Precept.Tests` is green; the repo-wide run still has 7 unrelated existing failures (2 in `Precept.Mcp.Tests`, 5 in `Precept.LanguageServer.Tests`).
-
-
-
+- Result: the filtered Bug031 test passes and `Precept.Tests` is green; the repo-wide run still has 7 unrelated existing failures (2 in `Precept.Mcp.Tests`, 5 in `Precept.LanguageServer.Tests`).
+
 # D3 research: `onLanguage:precept`
 
 
@@ -1743,10 +1713,8 @@ Recommended test change:
 
 - **Root cause of D3 failure?** The test is wrong.
 
-- **Correct remediation?** Update `ExtensionManifestTests`, not `tools/Precept.VsCode/package.json`.
-
-
-
+- **Correct remediation?** Update `ExtensionManifestTests`, not `tools/Precept.VsCode/package.json`.
+
 # Deep Dive Analysis — inventory-item.precept Compile Failures
 
 
@@ -1947,10 +1915,8 @@ All field/arg declarations with `in '...'` or `of '...'` qualifiers containing i
 
 
 
-```precept
-
-
-
+```precept
+
 # These all fail at the parser level — never reach type checker
 
 
@@ -2747,78 +2713,50 @@ Original description: "Interpolated typed constants in quantity/price qualifiers
 
 
 
-```precept
-
-
-
-# THIS FILE DOES NOT COMPILE — it expresses the intended design.
-
-
-
+```precept
+
+# THIS FILE DOES NOT COMPILE — it expresses the intended design.
+
 # Pending compiler issues (spike/Precept-V2-Radical):
 
 
 
-#
-
-
-
-#   ROOT CAUSE 1 (Parser): Interpolated typed constants in field/arg qualifier
-
-
-
-#          positions (`in '...'`, `of '...'`) are rejected by the parser — it only
-
-
-
-#          accepts static typed constants. Affects all compound-unit fields and
-
-
-
+#
+
+#   ROOT CAUSE 1 (Parser): Interpolated typed constants in field/arg qualifier
+
+#          positions (`in '...'`, `of '...'`) are rejected by the parser — it only
+
+#          accepts static typed constants. Affects all compound-unit fields and
+
 #          dimension-qualified fields/args.
 
 
 
-#
-
-
-
-#   ROOT CAUSE 2 (TypeChecker): Missing compound-unit interpolation patterns for
-
-
-
-#          forms like `'0 {Unit}/{Unit}'`. Affects rules/ensures that bound-check
-
-
-
+#
+
+#   ROOT CAUSE 2 (TypeChecker): Missing compound-unit interpolation patterns for
+
+#          forms like `'0 {Unit}/{Unit}'`. Affects rules/ensures that bound-check
+
 #          compound-unit quantities.
 
 
 
-#
-
-
-
-#   BUG-A (PRE0114): Event arg qualifiers not propagated into expressions —
-
-
-
+#
+
+#   BUG-A (PRE0114): Event arg qualifiers not propagated into expressions —
+
 #          cannot be verified until RC-1 ships.
 
 
 
-#
-
-
-
-#   SAMPLE ISSUES: Line 137/145 use `is set` on non-optional field; Line 140/147
-
-
-
-#          have money/price type mismatch; Lines 223/229/234 have unguarded
-
-
-
+#
+
+#   SAMPLE ISSUES: Line 137/145 use `is set` on non-optional field; Line 140/147
+
+#          have money/price type mismatch; Lines 223/229/234 have unguarded
+
 #          division by zero.
 
 
@@ -2943,10 +2881,8 @@ This analysis confirms that the 161 errors are traceable to 3 root causes (2 com
 
 
 
-—Frank
-
-
-
+—Frank
+
 # Temporal Price Denominator Type System Extension — Slice 12 Unblock
 
 
@@ -3171,10 +3107,8 @@ Authors must write `price of 'time'` or `price of 'date'` to enable temporal cha
 
 
 
-This design is complete and ready for implementation. Slice 11B is specified at method-level detail in `docs/Working/typed-constants-and-proof-coverage-plan.md`. George can proceed with implementation once this design is reviewed and the dependency slices (8, 9) are in place.
-
-
-
+This design is complete and ready for implementation. Slice 11B is specified at method-level detail in `docs/Working/typed-constants-and-proof-coverage-plan.md`. George can proceed with implementation once this design is reviewed and the dependency slices (8, 9) are in place.
+
 # Slice 12 Blocked: Price Has No Temporal Qualifier Axis
 
 
@@ -3351,10 +3285,8 @@ Defer Slice 12 until the price type supports temporal denomination. The gap is r
 
 
 
-- **Slices 7–11 are unaffected** — they are complete and correct.
-
-
-
+- **Slices 7–11 are unaffected** — they are complete and correct.
+
 # Slice 6 — ProofEngine Compositional Constraint Propagation (S6) — Complete
 
 
@@ -3455,10 +3387,8 @@ Defer Slice 12 until the price type supports temporal denomination. The gap is r
 
 
 
-- 26 pre-existing TypeCheckerAssemblyTests failures unrelated to this change.
-
-
-
+- 26 pre-existing TypeCheckerAssemblyTests failures unrelated to this change.
+
 # Slice 3 Done — Completions Inside Typed Constant Holes
 
 
@@ -3663,10 +3593,8 @@ All 4 new tests pass. 229 pass total. 6 pre-existing failures (3 from earlier br
 
 
 
-**Cursor at `{¦identifier}` is inside `TypedConstantStart`'s span** — TypedConstantStart ends AFTER the `{`, so position right after `{` is still "inside" the Start token. `IsInsideTypedConstantHole` only fires when the cursor is past the identifier start, on an `Identifier` token (TypedConstant* check fails → hole check runs). Test placeholders must use `'{Am¦ount}'` (mid-identifier) not `'{¦Amount}'` (start-of-identifier, still inside Start span).
-
-
-
+**Cursor at `{¦identifier}` is inside `TypedConstantStart`'s span** — TypedConstantStart ends AFTER the `{`, so position right after `{` is still "inside" the Start token. `IsInsideTypedConstantHole` only fires when the cursor is past the identifier start, on an `Identifier` token (TypedConstant* check fails → hole check runs). Test placeholders must use `'{Am¦ount}'` (mid-identifier) not `'{¦Amount}'` (start-of-identifier, still inside Start span).
+
 # Slice 4 Done — Semantic Tokens inside Typed Constant Holes
 
 
@@ -3803,10 +3731,8 @@ All 4 new tests pass. 3 pre-existing failures in `SemanticTokensDelta_LoanApplic
 
 
 
-(pre-existing failures from other WIP work on the branch).
-
-
-
+(pre-existing failures from other WIP work on the branch).
+
 # BUG-057 Spec Analysis
 
 
@@ -4275,10 +4201,8 @@ The likely failure point is the type checker's field-type construction: it may n
 
 
 
-Authors cannot express `date + period` arithmetic at all. The only workaround is `datetime + period`, which changes the semantic domain (datetime vs. date) and forces the author to carry unnecessary time components. The spec's temporal arithmetic table has a dead row.
-
-
-
+Authors cannot express `date + period` arithmetic at all. The only workaround is `datetime + period`, which changes the semantic domain (datetime vs. date) and forces the author to carry unnecessary time components. The spec's temporal arithmetic table has a dead row.
+
 # BUG-057 slice assessment
 
 
@@ -4411,14 +4335,8 @@ If implementation later shows the parser already accepts the syntax and the qual
 
 
 
-Based on the narrowed bug statement and the current plan text, though, **Slice 8 is the right first home** rather than creating a standalone temporal-arithmetic slice.
-
-
-
-
-
-
-
+Based on the narrowed bug statement and the current plan text, though, **Slice 8 is the right first home** rather than creating a standalone temporal-arithmetic slice.
+
 # Newman t2-12 complete
 
 
@@ -4487,10 +4405,8 @@ Based on the narrowed bug statement and the current plan text, though, **Slice 8
 
 
 
-- `docs/McpServerDesign.md` is not present in this repo; `docs/tooling/mcp.md` is the active design-contract document that was updated in the same pass.
-
-
-
+- `docs/McpServerDesign.md` is not present in this repo; `docs/tooling/mcp.md` is the active design-contract document that was updated in the same pass.
+
 # Elaine — samples when-guard audit
 
 
@@ -4551,10 +4467,8 @@ Date: 2026-05-10
 
 
 
-Users learn the DSL from samples first. If samples, design docs, and parser behavior disagree on guard position, authors lose trust quickly and copy the wrong pattern into real definitions.
-
-
-
+Users learn the DSL from samples first. If samples, design docs, and parser behavior disagree on guard position, authors lose trust quickly and copy the wrong pattern into real definitions.
+
 # Frank doc collision audit
 
 
@@ -4635,10 +4549,8 @@ Date: 2026-05-10T15:07:23.325-04:00
 
 
 
-The three language docs now agree on the final slot-driven, pre-verb-guard model and the Constructs inventory is internally consistent again.
-
-
-
+The three language docs now agree on the final slot-driven, pre-verb-guard model and the Constructs inventory is internally consistent again.
+
 # Decision: Grammar Doc Comprehensive Review Findings
 
 
@@ -4743,10 +4655,8 @@ Apply the 16 fixes listed in the priority fix list (see full report at `docs/wor
 
 
 
-The grammar doc is a design reference for people working ON the language. Factual errors in slot sequences and family details will cause implementors to write incorrect parser tests, produce wrong MCP output, or design new constructs with wrong assumptions about guard positions.
-
-
-
+The grammar doc is a design reference for people working ON the language. Factual errors in slot sequences and family details will cause implementors to write incorrect parser tests, produce wrong MCP output, or design new constructs with wrong assumptions about guard positions.
+
 # Decision: Remove `SupportsPostActionEnsure` — Grammar Integrity Fix
 
 
@@ -4855,14 +4765,8 @@ Remove the `SupportsPostActionEnsure` boolean flag from `ConstructMeta` and all 
 
 
 
-8. `docs/language/catalog-system.md` — remove from ConstructMeta shape documentation
-
-
-
-
-
-
-
+8. `docs/language/catalog-system.md` — remove from ConstructMeta shape documentation
+
 # Frank — when-guard doc sync gap
 
 
@@ -4935,10 +4839,8 @@ Leaving the older decision text in the active ledger will misdirect future doc a
 
 
 
-Reconcile `.squad/decisions.md` so the active canonical entry reflects the final slot-list decision and no longer states that access mode is post-adjective.
-
-
-
+Reconcile `.squad/decisions.md` so the active canonical entry reflects the final slot-list decision and no longer states that access mode is post-adjective.
+
 # Decision: Eliminate GuardPolicy — Slot List IS the Metadata
 
 
@@ -5115,10 +5017,8 @@ That's exactly what this achieves. Zero metadata flags. Zero enums. The catalog-
 
 
 
-See `docs/Working/frank-when-guard-audit-2.md` for the complete analysis including construct-by-construct verification, refactored parser code, and file change inventory.
-
-
-
+See `docs/Working/frank-when-guard-audit-2.md` for the complete analysis including construct-by-construct verification, refactored parser code, and file change inventory.
+
 # Decision: When-Guard Catalog Shape — Revised (PostVerb Eliminated)
 
 
@@ -6263,10 +6163,8 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
-| Keep existing bool, just add AccessMode | Perpetuates the naming smell. We're here to fix the metadata shape, not patch it. |
-
-
-
+| Keep existing bool, just add AccessMode | Perpetuates the naming smell. We're here to fix the metadata shape, not patch it. |
+
 # BUG-020 Committed — George Runtime Dev
 
 
@@ -6415,10 +6313,8 @@ No sample files use guarded access mode — no sample changes needed.
 
 
 
-- Two pre-existing VSTHRD warnings in `LanguageServer.Tests` — unrelated to BUG-020, not introduced by this work.
-
-
-
+- Two pre-existing VSTHRD warnings in `LanguageServer.Tests` — unrelated to BUG-020, not introduced by this work.
+
 # Decision: SupportsPostActionEnsure Removed
 
 
@@ -6543,14 +6439,8 @@ The `on` family now has mutually exclusive routing:
 
 
 
-The fix: removed the `bool SupportsPostActionEnsure` parameter from `ConstructMeta`, removed its usage in the `EventHandler` catalog entry, and deleted the conditional slot-injection block in `ParseScopedConstruct`. Three test methods that asserted the now-deleted behavior were also removed.
-
-
-
-
-
-
-
+The fix: removed the `bool SupportsPostActionEnsure` parameter from `ConstructMeta`, removed its usage in the `EventHandler` catalog entry, and deleted the conditional slot-injection block in `ParseScopedConstruct`. Three test methods that asserted the now-deleted behavior were also removed.
+
 # George — when-guard elimination
 
 
@@ -6675,14 +6565,8 @@ The guard position is already expressible in the ordered slot list plus per-slot
 
 
 
-  - guarded `StateEnsure` ✅ (after giving the sample a satisfiable default)
-
-
-
-
-
-
-
+  - guarded `StateEnsure` ✅ (after giving the sample a satisfiable default)
+
 # Soup Nazi — when-guard follow-up gap
 
 
@@ -6847,10 +6731,8 @@ Add one MCP surface test for dropped construct metadata and one LS completion/pa
 
 
 
-**Why:** Moving them to a standalone layer would hollow out what "Data" means. The family definition was too restrictive.
-
-
-
+**Why:** Moving them to a standalone layer would hollow out what "Data" means. The family definition was too restrictive.
+
 # Decision: Field and Arg as Standalone Companion Tokens
 
 
@@ -7091,10 +6973,8 @@ Option 3: standalone companion tokens.
 
 
 
-- The companion concept is extensible if future tokens need the same pattern (e.g., a guard-name color near Rule).
-
-
-
+- The companion concept is extensible if future tokens need the same pattern (e.g., a guard-name color near Rule).
+
 # george-currencycatalog-implemented
 
 
@@ -7575,14 +7455,8 @@ Per gap analysis. Standard practice.
 
 
 
-**Why:** User request — captured for team memory
-
-
-
-
-
-
-
+**Why:** User request — captured for team memory
+
 # PRECEPT0019 Exhaustiveness Audit
 
 
@@ -8767,10 +8641,8 @@ These are exactly the places where the catalog already is the source of truth an
 
 
 
-**Verdict:** add both names to `CatalogAnalysisHelpers.CatalogEnumNames` now. There are no remaining `_ =>` discard-arm blockers in the catalog `GetMeta` switches. The current blocker is only the stale TODO comment, not the code.
-
-
-
+**Verdict:** add both names to `CatalogAnalysisHelpers.CatalogEnumNames` now. There are no remaining `_ =>` discard-arm blockers in the catalog `GetMeta` switches. The current blocker is only the stale TODO comment, not the code.
+
 # ProofEngine Architecture Audit — Findings
 
 
@@ -9363,10 +9235,8 @@ Implementation signature: `GuardRelationImpliesObligation(guard, expr, exprLeftF
 
 
 
-The implementation pre-resolves field names and passes them as arguments. Functionally equivalent, slightly different shape. Spec should be updated if a spec-update pass occurs.
-
-
-
+The implementation pre-resolves field names and passes them as arguments. Functionally equivalent, slightly different shape. Spec should be updated if a spec-update pass occurs.
+
 # Design Ruling: ProofEngine × ProofRequirementKind Exhaustiveness Mechanism
 
 
@@ -10815,14 +10685,8 @@ PRECEPT0026 achieves the same guarantee without any annotations. Every switch ov
 
 
 
-This is the right solution because it enforces the actual safety property (every switch is complete) at the actual enforcement boundary (each switch independently) without distorting the engine's natural decomposition (strategies by technique, not by kind).
-
-
-
-
-
-
-
+This is the right solution because it enforces the actual safety property (every switch is complete) at the actual enforcement boundary (each switch independently) without distorting the engine's natural decomposition (strategies by technique, not by kind).
+
 # Frank ruling — `set` / `SetType` token metadata
 
 
@@ -12151,10 +12015,8 @@ The fix is not to carve out an exception and not to repaint `Set` as a type.
 
 
 
-The fix is to stop claiming that the lexer token `Set` is a type token when the architecture already has `SetType` for that job.
-
-
-
+The fix is to stop claiming that the lexer token `Set` is a type token when the architecture already has `SetType` for that job.
+
 # TypeChecker Catalog-Driven Metadata Design
 
 
@@ -16043,14 +15905,8 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
-| `src/Precept/Pipeline/TypeChecker.cs` | Refactor (×3) | Lines 449–456, 589–594, 652–656 become catalog lookups |
-
-
-
-
-
-
-
+| `src/Precept/Pipeline/TypeChecker.cs` | Refactor (×3) | Lines 449–456, 589–594, 652–656 become catalog lookups |
+
 # OutcomeArgumentKind enrollment
 
 
@@ -16107,10 +15963,8 @@ This ordering minimizes merge risk: Slices A and B are trivial, and Slice C (whi
 
 
 
-  - Targeted binary test run after compiling `Precept.dll` with analyzers disabled: `Precept.Tests` = 3629 passed / 2 failed (`TokensTests` only), `Precept.Analyzers.Tests` = 272 passed / 0 failed.
-
-
-
+  - Targeted binary test run after compiling `Precept.dll` with analyzers disabled: `Precept.Tests` = 3629 passed / 2 failed (`TokensTests` only), `Precept.Analyzers.Tests` = 272 passed / 0 failed.
+
 # George — PRECEPT0025 Done
 
 
@@ -16919,14 +16773,8 @@ The analyzer uses type hierarchy walking (`FindCatalogDUBase`) rather than check
 
 
 
-The catch-all declaration pattern check (`IDeclarationPatternOperation where MatchedType == catalogDUBase`) ensures that `ProofRequirement r =>` — a named binding over the abstract base — is treated the same as `_`. Both are structurally equivalent catch-alls.
-
-
-
-
-
-
-
+The catch-all declaration pattern check (`IDeclarationPatternOperation where MatchedType == catalogDUBase`) ensures that `ProofRequirement r =>` — a named binding over the abstract base — is treated the same as `_`. Both are structurally equivalent catch-alls.
+
 # George — PRECEPT0025 / PRECEPT0026 closeout
 
 
@@ -17223,14 +17071,8 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
-  - Still blocked by pre-existing `Precept.LanguageServer.Tests` compile errors unrelated to PRECEPT0025 / PRECEPT0026.
-
-
-
-
-
-
-
+  - Still blocked by pre-existing `Precept.LanguageServer.Tests` compile errors unrelated to PRECEPT0025 / PRECEPT0026.
+
 # George — TypeChecker catalog fixes
 
 
@@ -17519,14 +17361,8 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
-  - `dotnet test --no-build -q` reports a missing `Precept.Analyzers.Tests.dll` and 194 pre-existing `Precept.LanguageServer.Tests` failures.
-
-
-
-
-
-
-
+  - `dotnet test --no-build -q` reports a missing `Precept.Analyzers.Tests.dll` and 194 pre-existing `Precept.LanguageServer.Tests` failures.
+
 # Kramer — ActionSyntaxShape enrollment in PRECEPT0019
 
 
@@ -17767,14 +17603,8 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
-  - Root `dotnet build` is blocked by unrelated in-progress changes outside this slice (LanguageServer and analyzer compile failures already present in the working tree), so the requested clean 0-warning/0-error root validation could not be reproduced safely without disturbing other users' work.
-
-
-
-
-
-
-
+  - Root `dotnet build` is blocked by unrelated in-progress changes outside this slice (LanguageServer and analyzer compile failures already present in the working tree), so the requested clean 0-warning/0-error root validation could not be reproduced safely without disturbing other users' work.
+
 # Kramer — ProofEngine fixes
 
 
@@ -17887,14 +17717,8 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
-- `test/Precept.Tests/ProofEngineTests.cs`
-
-
-
-
-
-
-
+- `test/Precept.Tests/ProofEngineTests.cs`
+
 # Kramer — ProofEngine dead arms removed
 
 
@@ -17983,14 +17807,8 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
-    - `Precept.LanguageServer.Tests`: 194 failed (existing `LanguageServerStubs` / completion stub failures)
-
-
-
-
-
-
-
+    - `Precept.LanguageServer.Tests`: 194 failed (existing `LanguageServerStubs` / completion stub failures)
+
 # Kramer note — `set` token catalog fix
 
 
@@ -18295,14 +18113,8 @@ The catch-all declaration pattern check (`IDeclarationPatternOperation where Mat
 
 
 
-`Cat_ActType` was removed.
-
-
-
-
-
-
-
+`Cat_ActType` was removed.
+
 # Newman — `precept_compile` implementation complete
 
 
@@ -18559,10 +18371,8 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
-- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` ⚠️ unrelated existing failures in `TokensTests` (`TypeKeywords_HaveStorageTypeScope`, `TypeKeywords_HaveTypeSemanticTokenType`)
-
-
-
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` ⚠️ unrelated existing failures in `TokensTests` (`TypeKeywords_HaveStorageTypeScope`, `TypeKeywords_HaveTypeSemanticTokenType`)
+
 # Soup-Nazi — ProofEngine gap closeout
 
 
@@ -18603,10 +18413,8 @@ Added `test/Precept.Mcp.Tests/CompileToolTests.cs` with 7 tests covering:
 
 
 
-- Validation: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~ProofEngineTests"` passed 173/173. Full `dotnet test test/Precept.Tests/` still has the pre-existing two `TokensTests` failures about `Set` keyword type scoping/token type.
-
-
-
+- Validation: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~ProofEngineTests"` passed 173/173. Full `dotnet test test/Precept.Tests/` still has the pre-existing two `TokensTests` failures about `Set` keyword type scoping/token type.
+
 # ProofEngine Test Coverage Gap Report
 
 
@@ -20015,10 +19823,8 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
-10. **`PresenceProofRequirement` → `DivisionByZero` mapping in CreateDiagnostic** (Gap 12) — Potential bug, no test catches it.
-
-
-
+10. **`PresenceProofRequirement` → `DivisionByZero` mapping in CreateDiagnostic** (Gap 12) — Potential bug, no test catches it.
+
 # Message-position catalog metadata closed
 
 
@@ -20179,10 +19985,8 @@ No test verifies correct obligation tracking when the same field is used as a di
 
 
 
-- Kramer wired the generator, removed the stale TODO, regenerated `precept.tmLanguage.json`, and verified a zero-diff output; commit `7f3842fd`.
-
-
-
+- Kramer wired the generator, removed the stale TODO, regenerated `precept.tmLanguage.json`, and verified a zero-diff output; commit `7f3842fd`.
+
 # ProofEngine Design Decisions — PE-G1, PE-G2, PE-G3
 
 
@@ -23495,10 +23299,8 @@ The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)`
 
 
 
-- **SIG-5 initial-state satisfiability deferral**: This is marked as blocked pending TypeChecker expression evaluation. Should it be deferred entirely from the proof engine's initial implementation scope, or should a minimal version (literals-only default values against simple comparison constraints) be included in the first implementation?
-
-
-
+- **SIG-5 initial-state satisfiability deferral**: This is marked as blocked pending TypeChecker expression evaluation. Should it be deferred entirely from the proof engine's initial implementation scope, or should a minimal version (literals-only default values against simple comparison constraints) be included in the first implementation?
+
 # Shane Sign-Off — ProofEngine Design Decisions
 
 
@@ -23715,14 +23517,8 @@ Frank has been tasked with a deep dive on this architectural question. Key quest
 
 
 
-**Status:** Blocked on Frank deep dive. No implementation decision authorized yet.
-
-
-
-
-
-
-
+**Status:** Blocked on Frank deep dive. No implementation decision authorized yet.
+
 # Readability Review: combined-design-v2.md (2026-07-17)
 
 
@@ -23947,10 +23743,8 @@ This doc is ready to serve as the architectural foundation for per-stage design 
 
 
 
----
-
-
-
+---
+
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
 
 
@@ -24655,10 +24449,8 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 
 
----
-
-
-
+---
+
 # Decision: Combined Design v2 Comprehensive Revision Pass
 
 
@@ -26243,14 +26035,8 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 
 
----
-
-
-
-
-
-
-
+---
+
 # Full Architecture Review — spike/Precept-V2
 
 
@@ -28331,10 +28117,8 @@ This branch is ready to merge to main.
 
 
 
----
-
-
-
+---
+
 # **CRITICAL GAPS**
 
 
@@ -28351,10 +28135,8 @@ This branch is ready to merge to main.
 
 
 
-The parser suite is green, but it is **not** comprehensive enough to support type-checker development safely. The biggest holes are the full type-reference surface, full action syntax surface, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), event-arg richness, interpolation, and specific parser diagnostic-code assertions. Right now, too many tests stop at “a slot exists” or “the parser did not crash.” That is not enough. No soup for unanchored parser behavior.
-
-
-
+The parser suite is green, but it is **not** comprehensive enough to support type-checker development safely. The biggest holes are the full type-reference surface, full action syntax surface, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), event-arg richness, interpolation, and specific parser diagnostic-code assertions. Right now, too many tests stop at “a slot exists” or “the parser did not crash.” That is not enough. No soup for unanchored parser behavior.
+
 # TypeChecker B1/B2/B3 Blockers — Fixed
 
 
@@ -28779,10 +28561,8 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 
 
 
-- **DiagnosticCode.TypeMismatch reuse** for MissingExpression — Frank may want a dedicated code in the future
-
-
-
+- **DiagnosticCode.TypeMismatch reuse** for MissingExpression — Frank may want a dedicated code in the future
+
 # Precept TextMate Grammar — Authoritative Specification
 
 
@@ -37351,10 +37131,8 @@ The generator's current approach (L38-77) is architecturally correct for catalog
 
 
 
-*End of specification.*
-
-
-
+*End of specification.*
+
 # ProofEngine Spec — Pre-Implementation Gap Analysis
 
 
@@ -40691,10 +40469,8 @@ The ProofEngine spec is architecturally strong — the two-pass design, four-str
 
 
 
-**Why:** User directive — G1/G2 prework is in the same category as G3 (structural definitions, not engine logic). Prework can proceed immediately after design is finalized; engine implementation is a separate phase.
-
-
-
+**Why:** User directive — G1/G2 prework is in the same category as G3 (structural definitions, not engine logic). Prework can proceed immediately after design is finalized; engine implementation is a separate phase.
+
 # PE-G1 Detailed Analysis — Frank
 
 
@@ -42655,10 +42431,8 @@ Two of three are absorbed into the existing Strategy 2. One requires a fifth str
 
 
 
-**Gap analysis updated:** docs/Working/frank-proof-engine-gap-analysis.md — PE-G1 marked RESOLVED
-
-
-
+**Gap analysis updated:** docs/Working/frank-proof-engine-gap-analysis.md — PE-G1 marked RESOLVED
+
 # PE-G2 Analysis — ProofDischarge + FieldModifierMeta.ProofDischarges
 
 
@@ -43667,10 +43441,8 @@ public sealed record FieldModifierMeta(
 
 
 
-| 3. Population entries | Populate all bound-establishing field modifiers now: live rows for `positive`, `nonnegative`, `nonzero`, `notempty`, `min`, `mincount`; semantically complete dormant rows for `max`, `maxcount`, `minlength`, and `maxlength`. | This keeps modifier meaning catalog-declared instead of consumer-hardcoded and prevents the next proof-engine feature from reopening the same metadata gap. |
-
-
-
+| 3. Population entries | Populate all bound-establishing field modifiers now: live rows for `positive`, `nonnegative`, `nonzero`, `notempty`, `min`, `mincount`; semantically complete dormant rows for `max`, `maxcount`, `minlength`, and `maxlength`. | This keeps modifier meaning catalog-declared instead of consumer-hardcoded and prevents the next proof-engine feature from reopening the same metadata gap. |
+
 # PE-G2 Broader Design Review — Should `ProofDischarge` cover all requirement kinds?
 
 
@@ -44415,10 +44187,8 @@ The proof engine switches on **requirement subtype** (`is DimensionProofRequirem
 
 
 
-Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior PE-G2 analysis. The broader DU is architecturally weaker, not stronger — it would catalog non-knowledge (tautologies and empty sets) in pursuit of a false uniformity. The current three-arm Strategy 2 design is the correct metadata-driven architecture because each arm reads from the *right* metadata source for its proof obligation kind.
-
-
-
+Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior PE-G2 analysis. The broader DU is architecturally weaker, not stronger — it would catalog non-knowledge (tautologies and empty sets) in pursuit of a false uniformity. The current three-arm Strategy 2 design is the correct metadata-driven architecture because each arm reads from the *right* metadata source for its proof obligation kind.
+
 # PE-G2 Full Design — `ProofSatisfaction` and all five requirement kinds
 
 
@@ -49883,10 +49653,8 @@ There is nothing here that requires another deferral ceremony.
 
 
 
-**Why:** ProofEngine requires positive carrier facts for all 5 requirement kinds. Absence-checking is fragile and non-canonical.
-
-
-
+**Why:** ProofEngine requires positive carrier facts for all 5 requirement kinds. Absence-checking is fragile and non-canonical.
+
 # PE-G2 Rename Analysis — `ProofDischarge` → `ProofSatisfaction`
 
 
@@ -52087,10 +51855,8 @@ Today that surface does not exist. Do not fake it by smearing qualifier-instance
 
 
 
-That is the decision. `ProofDischarge` is the wrong name. The right name is `ProofSatisfaction`, and the right shape is a proof-kind DU that is broad in **type design** but disciplined in **property placement**.
-
-
-
+That is the decision. `ProofDischarge` is the wrong name. The right name is `ProofSatisfaction`, and the right shape is a proof-kind DU that is broad in **type design** but disciplined in **property placement**.
+
 # Decision: PE-G4 through PE-G18 — All ProofEngine Gaps Resolved
 
 
@@ -53075,10 +52841,8 @@ None. All gaps resolved within existing architectural boundaries. No product sur
 
 
 
-**Ready for:** George to execute once Shane approves.
-
-
-
+**Ready for:** George to execute once Shane approves.
+
 # Decision: ProofEngine Spec Complete — All 18 Gaps Resolved
 
 
@@ -54063,10 +53827,8 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
-- `ProofEngine.cs` remains the behavioral frontier; Phase 2 should implement runtime-neutral proof analysis against the new carriers rather than reshaping these types again.
-
-
-
+- `ProofEngine.cs` remains the behavioral frontier; Phase 2 should implement runtime-neutral proof analysis against the new carriers rather than reshaping these types again.
+
 # ProofEngine Phase 2 Closeout
 
 
@@ -54395,10 +54157,8 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 
 
-- Language Server proof diagnostics are now live
-
-
-
+- Language Server proof diagnostics are now live
+
 # ProofEngine Phase 2 — Post-commit bugfixes
 
 
@@ -54711,10 +54471,8 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
-**Rationale:** Keeping `npm run compile` as plain `tsc` preserves the existing development loop, while `npm run bundle` becomes the production-only path that inlines `vscode-languageclient` and other client dependencies without bundling the .NET language server.
-
-
-
+**Rationale:** Keeping `npm run compile` as plain `tsc` preserves the existing development loop, while `npm run bundle` becomes the production-only path that inlines `vscode-languageclient` and other client dependencies without bundling the .NET language server.
+
 # Soup Nazi — ProofEngine Phase 2 tests done
 
 
@@ -55091,14 +54849,8 @@ Fixed 5 failing `ProofEngineTests` after Phase 2 (S1–S13) landed.
 
 
 
-- Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.
-
-
-
-
-
-
-
+- Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.
+
 # Soup Nazi review — `precept_language`
 
 
@@ -55371,10 +55123,8 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
-  - No failure implicated `LanguageTool` or the new MCP tests.
-
-
-
+  - No failure implicated `LanguageTool` or the new MCP tests.
+
 # ISO 4217 refresh workflow conversion
 
 
@@ -55487,10 +55237,8 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
-- Optional local reference data should strengthen developer validation without turning absent downloads into red CI.
-
-
-
+- Optional local reference data should strengthen developer validation without turning absent downloads into red CI.
+
 # Qualifier completion honesty and Tier 1 UOM breadth
 
 
@@ -55579,10 +55327,8 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
-- Missing legitimate units damages trust faster than a somewhat longer filtered completion list.
-
-
-
+- Missing legitimate units damages trust faster than a somewhat longer filtered completion list.
+
 # UCUM / ISO 4217 implementation gap remediation shape
 
 
@@ -55703,10 +55449,8 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
-- `FrozenSet<string>` cannot carry the metadata required for money semantics or future catalog-driven tooling.
-
-
-
+- `FrozenSet<string>` cannot carry the metadata required for money semantics or future catalog-driven tooling.
+
 # Field and arg semantic colors
 
 
@@ -55843,10 +55587,8 @@ Expanded `test/Precept.Mcp.Tests/LanguageToolTests.cs` from 12 to 19 tests cover
 
 
 
-**Why:** User request — captured for team memory
-
-
-
+**Why:** User request — captured for team memory
+
 # Decision: Currency Symbol Data Strategy
 
 
@@ -57039,14 +56781,8 @@ return new CurrencyEntry(alphaCode, numericCode, name, minorUnit, symbol);
 
 
 
-Currency symbols are NOT part of the language specification. They are display/formatting augmentation consumed by the evaluator's `FormatString` and the language server's hover/completion. They are first-party *editorial* data — Precept decides which symbols to use — but they are not catalog metadata in the `catalog-system.md` sense. A hardcoded dictionary is the right weight for this: visible in source, trivially maintainable, no infrastructure.
-
-
-
-
-
-
-
+Currency symbols are NOT part of the language specification. They are display/formatting augmentation consumed by the evaluator's `FormatString` and the language server's hover/completion. They are first-party *editorial* data — Precept decides which symbols to use — but they are not catalog metadata in the `catalog-system.md` sense. A hardcoded dictionary is the right weight for this: visible in source, trivially maintainable, no infrastructure.
+
 # Decision: ISO 4217 / UCUM Data Layer — Embedded XML, Lazy Load
 
 
@@ -57831,14 +57567,8 @@ The consumer API is identical under both approaches. The difference is entirely 
 
 
 
-- The refresh scripts' download logic — unchanged.
-
-
-
-
-
-
-
+- The refresh scripts' download logic — unchanged.
+
 # Decision: Typed Literal Framework — Q5 Deserialization + Exhaustive Gap Review
 
 
@@ -58175,14 +57905,8 @@ Full gap review completed against all canonical docs. Two blockers require resol
 
 
 
-- UCUM gap analysis: `docs/Working/frank-ucum-iso-gap.md`
-
-
-
-
-
-
-
+- UCUM gap analysis: `docs/Working/frank-ucum-iso-gap.md`
+
 # Decision: Typed Literal System — Implementation Plan Produced
 
 
@@ -58487,14 +58211,8 @@ Key ordering decisions:
 
 
 
-- **`catalog-system.md`** needs the external reference data distinction — this is an architectural principle that was decided in `frank-data-layer-decision.md` but never flowed back to the canonical catalog doc.
-
-
-
-
-
-
-
+- **`catalog-system.md`** needs the external reference data distinction — this is an architectural principle that was decided in `frank-data-layer-decision.md` but never flowed back to the canonical catalog doc.
+
 # Decision: UCUM Data Layer Strategy — Build-Time Codegen
 
 
@@ -59143,10 +58861,8 @@ The NodaTime pattern solves a distribution problem Precept does not have.
 
 
 
-- The data pipeline pattern (XML provenance → codegen script → frozen C# catalog) should be recorded as the canonical pattern for any future external-standard integration.
-
-
-
+- The data pipeline pattern (XML provenance → codegen script → frozen C# catalog) should be recorded as the canonical pattern for any future external-standard integration.
+
 # UCUM Data Layer → Evaluator Gap Analysis
 
 
@@ -59915,10 +59631,8 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
-**Why:** User directive — concept no longer exists; open item is stale.
-
-
-
+**Why:** User directive — concept no longer exists; open item is stale.
+
 # Modifier coloring regression anchor
 
 
@@ -59967,10 +59681,8 @@ None of the gaps are architectural blockers — they are specification omissions
 
 
 
-- Anchor files: `test\Precept.Tests\Language\TextMateGrammarTests.cs`, `tools\Precept.GrammarGen\Program.cs`, `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json`
-
-
-
+- Anchor files: `test\Precept.Tests\Language\TextMateGrammarTests.cs`, `tools\Precept.GrammarGen\Program.cs`, `tools\Precept.VsCode\syntaxes\precept.tmLanguage.json`
+
 # Triage: BUG-039 — `at` proof obligation
 
 
@@ -60163,10 +59875,8 @@ The engine is consistent. The spec is not. Fix the spec.
 
 
 
-**Test coverage:** A contract test confirming that every accessor with `ProofRequirements` appears in the spec's Proof column would prevent future drift. This is optional but recommended.
-
-
-
+**Test coverage:** A contract test confirming that every accessor with `ProofRequirements` appears in the spec's Proof column would prevent future drift. This is optional but recommended.
+
 # Decision: TokenMeta Boolean Flag Shape
 
 
@@ -61015,14 +60725,8 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
-### Merged from `.squad/decisions/inbox/newman-t2-13-complete.md`
-
-
-
-
-
-
-
+### Merged from `.squad/decisions/inbox/newman-t2-13-complete.md`
+
 # Newman t2-13 complete
 
 
@@ -61071,14 +60775,8 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
-### Merged from `.squad/decisions/inbox/soup-nazi-t2-14-complete.md`
-
-
-
-
-
-
-
+### Merged from `.squad/decisions/inbox/soup-nazi-t2-14-complete.md`
+
 # Soup Nazi — t2-14 complete
 
 
@@ -61171,10 +60869,8 @@ Per `docs/contributing/catalog-driven-checklist.md`:
 
 
 
-### Merged from `.squad/decisions/inbox/soup-nazi-t2-15-complete.md`
-
-
-
+### Merged from `.squad/decisions/inbox/soup-nazi-t2-15-complete.md`
+
 # t2-15 Completion Record — Pipeline Stage Unit Tests (Catalog-Aware)
 
 
@@ -61407,10 +61103,8 @@ These bugs are now regression-protected by the new tests:
 
 
 
-### Merged from `.squad/decisions/inbox/george-bug057-fix.md`
-
-
-
+### Merged from `.squad/decisions/inbox/george-bug057-fix.md`
+
 # BUG-057 Fix Record — George
 
 
@@ -61703,10 +61397,8 @@ The fix follows the exact same pattern as the existing mappers (`MapCurrencyQual
 
 
 
-No regressions introduced.
-
-
-
+No regressions introduced.
+
 # Decision: Numeric Range Modifiers Apply to `money`, `quantity`, and `price`
 
 
@@ -64483,14 +64175,8 @@ The `min`/`max` bound form for `quantity` and `money` fields is ambiguous betwee
 
 
 
-**No further design decisions needed** beyond resolving the bound-form tension. The spec confirms the core direction: `positive`, `nonnegative`, `nonzero`, `min`, `max` on `money`, `quantity`, and `price` is the correct and spec-sanctioned design.
-
-
-
-
-
-
-
+**No further design decisions needed** beyond resolving the bound-form tension. The spec confirms the core direction: `positive`, `nonnegative`, `nonzero`, `min`, `max` on `money`, `quantity`, and `price` is the correct and spec-sanctioned design.
+
 # Kramer — semantic tokens delta fix 2
 
 
@@ -64575,10 +64261,8 @@ The `min`/`max` bound form for `quantity` and `money` fields is ambiguous betwee
 
 
 
-- Post-fix sample inspection: `loan-application.precept` overlaps = 0, `building-access-badge-request.precept` overlaps = 0.
-
-
-
+- Post-fix sample inspection: `loan-application.precept` overlaps = 0, `building-access-badge-request.precept` overlaps = 0.
+
 # Decision: Numeric Range Modifiers Apply to `money`, `quantity`, and `price`
 
 
@@ -66971,10 +66655,8 @@ The spec extensions confirmed by D16 — `price` inclusion, `exchangerate` zero-
 
 
 
-> **Bound form requirement (as refined by Shane):** Typed constant of the same domain type. For `quantity`: exact unit for `in` fields; same dimension for `of` fields.
-
-
-
+> **Bound form requirement (as refined by Shane):** Typed constant of the same domain type. For `quantity`: exact unit for `in` fields; same dimension for `of` fields.
+
 # Kramer — nonnegative modifier span fix
 
 
@@ -67031,10 +66713,8 @@ Shane reported that `field Amount as money in 'USD' nonnegative` underlined the 
 
 
 
-- Note: `dotnet test test/Precept.Tests/ --nologo --verbosity minimal` still reports an unrelated existing failure in `ArgReferenceTests.TypeChecker_ArgReference_SiteSpanMatchesSource`.
-
-
-
+- Note: `dotnet test test/Precept.Tests/ --nologo --verbosity minimal` still reports an unrelated existing failure in `ArgReferenceTests.TypeChecker_ArgReference_SiteSpanMatchesSource`.
+
 # Decision: B9–B12 Triage — Type Checker Quantity Validation Gaps
 
 
@@ -67299,14 +66979,8 @@ No new diagnostic codes needed.
 
 
 
-These fixes apply equally to `money` fields — a `money in 'USD'` field with `set amount = '100 EUR'` has the same gap. The architectural fix is type-agnostic; it should be implemented generically, not quantity-specific.
-
-
-
-
-
-
-
+These fixes apply equally to `money` fields — a `money in 'USD'` field with `set amount = '100 EUR'` has the same gap. The architectural fix is type-agnostic; it should be implemented generically, not quantity-specific.
+
 # Kramer — Semantic tokens delta crash
 
 
@@ -67383,14 +67057,8 @@ These fixes apply equally to `money` fields — a `money in 'USD'` field with `s
 
 
 
-- Added handler-level regression tests covering stale result IDs and typed-constant span changes.
-
-
-
-
-
-
-
+- Added handler-level regression tests covering stale result IDs and typed-constant span changes.
+
 # Kramer — UCUM display follow-up
 
 
@@ -67515,10 +67183,8 @@ These fixes apply equally to `money` fields — a `money in 'USD'` field with `s
 
 
 
-- Quote-trigger completions still append the closing quote in the existing completion postprocess path; the unit code remains the inserted UCUM payload prefix used for sorting and slot completion behavior.
-
-
-
+- Quote-trigger completions still append the closing quote in the existing completion postprocess path; the unit code remains the inserted UCUM payload prefix used for sorting and slot completion behavior.
+
 # Decision: Dimension-Unit Consistency Validation in Interpolation Plan
 
 
@@ -67683,10 +67349,8 @@ Slice 2 gains ~25 lines of dimension-checking code and ~9 additional tests. Tota
 
 
 
-- **Temporal dimension consistency for duration/period unit slots** — temporal units are a closed-set literal namespace, not physical UCUM dimensions. Different check, narrow surface, out of scope.
-
-
-
+- **Temporal dimension consistency for duration/period unit slots** — temporal units are a closed-set literal namespace, not physical UCUM dimensions. Different check, narrow surface, out of scope.
+
 # Decision: Dimension-Qualified Unit Slot Compatibility is a Real Gap — Deferred as Separate Issue
 
 
@@ -68127,10 +67791,8 @@ The interpolation plan's S6 scope boundary holds. This is not an S6 gap — it's
 
 
 
-- The `string` exception precedent means the system already accepts some dimensional runtime-deferral. Extending compile-time checks is desirable but is a distinct feature with its own design space.
-
-
-
+- The `string` exception precedent means the system already accepts some dimensional runtime-deferral. Extending compile-time checks is desirable but is a distinct feature with its own design space.
+
 # Fix: `quantity of ` completion bug
 
 
@@ -68403,10 +68065,8 @@ This is **catalog-driven**: the check uses `TypeMeta.Category` and `TypeMeta.Kin
 
 
 
-After `quantity of ` (no typed constant yet), completions are now empty. Ideally a follow-up could offer dimension name suggestions via a new `InQualifierPosition` context with `GetDimensionItems()` — but that requires catalog-driven qualifier-site detection and is a separate improvement.
-
-
-
+After `quantity of ` (no typed constant yet), completions are now empty. Ideally a follow-up could offer dimension name suggestions via a new `InQualifierPosition` context with `GetDimensionItems()` — but that requires catalog-driven qualifier-site detection and is a separate improvement.
+
 # Decision: Plan Renamed and Expanded
 
 
@@ -68571,10 +68231,8 @@ The plan outgrew "interpolation" — it now covers two workstreams:
 
 
 
-`docs/Working/typed-constants-and-proof-coverage-plan.md` is now the canonical implementation document for **both** interpolation typed constants AND proof engine qualifier coverage. The old `interpolation-plan.md` has been deleted. The source audit documents (`proof-engine-qualifier-audit.md`, `proof-gaps-issues.md`) remain as reference.
-
-
-
+`docs/Working/typed-constants-and-proof-coverage-plan.md` is now the canonical implementation document for **both** interpolation typed constants AND proof engine qualifier coverage. The old `interpolation-plan.md` has been deleted. The source audit documents (`proof-engine-qualifier-audit.md`, `proof-gaps-issues.md`) remain as reference.
+
 # Decision: Proof Engine Qualifier Audit Findings
 
 
@@ -68819,10 +68477,8 @@ The interpolation plan (docs/Working/interpolation-plan.md) is unaffected. The d
 
 
 
-G1-G3 (money currency enforcement) is the only gap that could be classified as a **shipped regression risk** — if users rely on the current silent acceptance of cross-currency arithmetic, adding enforcement would be a breaking change. However, since the behavior is semantically invalid (adding USD + EUR is meaningless), this is correctly classified as a bug fix, not a behavioral change.
-
-
-
+G1-G3 (money currency enforcement) is the only gap that could be classified as a **shipped regression risk** — if users rely on the current silent acceptance of cross-currency arithmetic, adding enforcement would be a breaking change. However, since the behavior is semantically invalid (adding USD + EUR is meaningless), this is correctly classified as a bug fix, not a behavioral change.
+
 # UX Review — AlwaysRejecting (D1) + StateAlwaysRejects (D2)
 
 
@@ -69819,10 +69475,8 @@ Neither is blocked. Both need message text revisions before the implementation P
 
 
 
-The wildcard N-warnings-per-row situation is accepted but flagged as UX debt with a recommended consolidation path for a future issue.
-
-
-
+The wildcard N-warnings-per-row situation is accepted but flagged as UX debt with a recommended consolidation path for a future issue.
+
 # Design Review: AlwaysRejecting Compiler Diagnostic
 
 
@@ -70611,10 +70265,8 @@ No MCP tool DTOs require changes from this diagnostic addition alone, but verify
 
 
 
-The implementation is not approved to start until defects 1–3 are reflected in the implementation plan.
-
-
-
+The implementation is not approved to start until defects 1–3 are reflected in the implementation plan.
+
 # Design Review (Revised): AlwaysRejecting Compiler Diagnostic — v2
 
 
@@ -71415,10 +71067,8 @@ Add after the `UnhandledEvent` block (which already iterates `semantics.Events`)
 
 
 
-No MCP DTO changes required for this diagnostic addition alone. Verify `LanguageTool.cs`'s static `FirePipeline` array if it enumerates pipeline stages (Graph stage already present; no new stage introduced).
-
-
-
+No MCP DTO changes required for this diagnostic addition alone. Verify `LanguageTool.cs`'s static `FirePipeline` array if it enumerates pipeline stages (Graph stage already present; no new stage introduced).
+
 # Design Contract: StateAlwaysRejects Compiler Diagnostic (D2)
 
 
@@ -72555,10 +72205,8 @@ Disjoint by construction.
 
 
 
-No MCP DTO changes required. No new pipeline stage. Graph stage already present in `FirePipeline`.
-
-
-
+No MCP DTO changes required. No new pipeline stage. Graph stage already present in `FirePipeline`.
+
 # TypeChecker.Expressions.cs — Partial-Class Split Analysis
 
 
@@ -73043,14 +72691,8 @@ This misses the 40 KB target for the Core+Callables file (~78 KB) but still halv
 
 
 
-The **3-file Option B split** is the cleanest path: Core / Callables / TypedConstants, each ~34–36 KB, along genuine semantic seams that align with who reads what and when. Two small physical relocations are needed (`IsAssignable`, `TryContextRetryOverload`) but no logic changes. Merge conflict risk is zero given the current committed state.
-
-
-
-
-
-
-
+The **3-file Option B split** is the cleanest path: Core / Callables / TypedConstants, each ~34–36 KB, along genuine semantic seams that align with who reads what and when. Two small physical relocations are needed (`IsAssignable`, `TryContextRetryOverload`) but no logic changes. Merge conflict risk is zero given the current committed state.
+
 # George RC-1 Completion
 
 
@@ -73163,14 +72805,8 @@ The **3-file Option B split** is the cleanest path: Core / Callables / TypedCons
 
 
 
-- Remaining sample errors are still the expected RC-2 / BUG-A / sample-design follow-ons, not parser-site PRE0009 at the interpolated qualifier declarations.
-
-
-
-
-
-
-
+- Remaining sample errors are still the expected RC-2 / BUG-A / sample-design follow-ons, not parser-site PRE0009 at the interpolated qualifier declarations.
+
 # George RC-2 Completion
 
 
@@ -73279,14 +72915,8 @@ The **3-file Option B split** is the cleanest path: Core / Callables / TypedCons
 
 
 
-- This closes the quantity-side PRE0052 form gap for compound-unit literals with fixed numeric prefixes while leaving the already-supported price and unit-of-measure forms untouched.
-
-
-
-
-
-
-
+- This closes the quantity-side PRE0052 form gap for compound-unit literals with fixed numeric prefixes while leaving the already-supported price and unit-of-measure forms untouched.
+
 # George Slice A2B Complete
 
 
@@ -73339,10 +72969,8 @@ The **3-file Option B split** is the cleanest path: Core / Callables / TypedCons
 
 
 
-  - Broader `TypeChecker` filter still reports pre-existing spike-branch failures unrelated to Slice A2B.
-
-
-
+  - Broader `TypeChecker` filter still reports pre-existing spike-branch failures unrelated to Slice A2B.
+
 # George Slice 12 Complete
 
 
@@ -73375,10 +73003,8 @@ The **3-file Option B split** is the cleanest path: Core / Callables / TypedCons
 
 
 
-  - `dotnet test test/Precept.Tests/` still reports 26 pre-existing failures on `spike/Precept-V2-Radical`; no new failures were introduced by Slice 12.
-
-
-
+  - `dotnet test test/Precept.Tests/` still reports 26 pre-existing failures on `spike/Precept-V2-Radical`; no new failures were introduced by Slice 12.
+
 # Soup Nazi RC Test Batch
 
 
@@ -73501,3 +73127,47 @@ Date: 2026-05-12
 Context: Proof-engine resolution for nested TypedBinaryOp expressions.
 Decision: Extend qualifier resolution so binary-op results can be resolved transitively through their child expressions.
 Rationale: The proof engine must be able to see qualifiers produced by nested operations, including chained scalar ops and existing same-qualifier expressions.
+
+# Frank: MCP DTO-Free Working Doc Written
+
+> **Status:** Done  
+> **Date:** 2026-05-12  
+> **Working doc:** `docs/Working/mcp-dto-free-design.md`
+
+---
+
+## Decision
+
+The MCP DTO-free architecture design has been written into the canonical working-doc surface at
+`docs/Working/mcp-dto-free-design.md`.
+
+The document captures the approved decision explicitly near the top:
+
+- **Approach 4 (Hybrid)** is approved.
+- There are **no known programmatic consumers** of catalog-tool JSON.
+- Implementation may proceed.
+- Raw core serialization remains rejected; the contract stays curated.
+
+## Notes
+
+- The inbox design source file `frank-mcp-dto-free-design.md` was intentionally left in place for
+  Scribe to handle.
+- The working doc includes the four evaluated approaches, the approved hybrid recommendation,
+  per-tool contract breakdown, file/LOC impact, implementation phases, and residual risks/open
+  questions.
+
+# George — E1 complete
+
+- What changed: `ProofEngine` now resolves `QualifierCompatibilityProofRequirement` operands directly from the `TypedBinaryOp` site, and PRE0114 diagnostics now read operand names from that site instead of ambiguous `ParamSubject` resolution.
+- New test count: 5 new regression tests added (`Cross_currency_fields_now_detected`, `Operand_names_in_diagnostics`, `Quantity_same_dimension_proved`, `Quantity_different_dimension_detected`, `Price_same_qualifiers_proved`).
+- Validation: 7 targeted proof tests pass; `dotnet build src\\Precept\\Precept.csproj --nologo` passes; full `dotnet test test\\Precept.Tests\\Precept.Tests.csproj --nologo` still has the pre-existing inventory-item baseline failure.
+- Implementation commit SHA: `d549b4a5dc478a571ba639ca67ae483ab0ff9fd3`.
+- Cross-currency false-positive confirmation: `Cross_currency_fields_now_detected` failed before the fix because PRE0114 was missing, and now passes with the cross-currency operation correctly reported as unresolved.
+
+# George E4 done
+
+- Implemented E4 / RC-4 in `src/Precept/Pipeline/ProofEngine.cs` by adding `QualifiersAreCompatible()`, `QualifiersSymbolicallyEqual()`, and source-path extraction for interpolated qualifier templates.
+- `TryQualifierCompatibilityProof()` now falls back to same-source symbolic matching after normal qualifier equality, and `ChainQualifiersMatch()` uses the same symbolic fallback after its comparable-value check.
+- Added 4 regression tests in `test/Precept.Tests/ProofEngineTests.cs` covering same-source symbolic compatibility, different-source incompatibility, template-vs-literal preservation, and null handling.
+- Validation: `dotnet build src/Precept/Precept.csproj --nologo` passed; `dotnet test test/Precept.Tests/Precept.Tests.csproj --nologo --filter "Strategy5_SymbolicQualifierEquivalence"` passed (4/4).
+- Current inventory-item PRE0114 baseline is still 89 in the existing `Precept.Tests` run (`InventoryItem_Sample_PRE0114_Count_Drops_Below_Baseline` remains the lone pre-existing failure; full suite is 4848/4849 passing after the new tests).
