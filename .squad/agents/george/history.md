@@ -51,6 +51,8 @@
 
 ## Learnings
 
+- 2026-05-12T13:35:11.425-04:00 — Slice 12 (`PriceTimesPeriod` + `PriceTimesDuration` temporal chain validation) was already present on `spike/Precept-V2-Radical` in commit `302d53e1`; `Operations.cs` carries both `QualifierChainProofRequirement` entries and `ProofEngineTemporalChainTests` already covers the required temporal-match, mismatch, bare, and regression matrix.
+- 2026-05-12T13:35:11.425-04:00 — For spike follow-through on named slices, check `git log -- <files>` before editing: this branch can already contain the catalog/tests, so the remaining work is verification plus squad bookkeeping rather than duplicate runtime changes.
 - 2026-05-12T13:31:43.877-04:00 — `samples/inventory-item.precept` still carries stale inline `BUG-A`/`BUG-C` commentary even after the top-of-file compile-blocker header is removed; keep header cleanups surgical and record any compile-status mismatch separately instead of broad comment churn.
 - 2026-05-12T13:31:43.877-04:00 — In this workspace, `precept_compile` still reports 15 existing `InventoryItem` diagnostics after the header-only edit, so the brief's "0 diagnostics" claim should be treated as environment/runtime drift until F5 or a follow-up runtime pass confirms otherwise.
 - 2026-05-12 — `ProofEngine.ResolveQualifierFromExpression()` must translate `CurrencyConversionRequired` results from `ToCurrency` back onto the caller's `Currency` axis; nested `Total + Rate * Amt` proofs otherwise compare across axes and emit false PRE0114.
