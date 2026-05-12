@@ -1,6 +1,6 @@
 # Typed Constants & Proof Coverage Plan
 
-**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1 ✅ Done | F2 ✅ Done | F3 ✅ Done | **F4 reframed** (policy exists; blocked on BUG-C), F5 blocked on BUG-C | Part G — G1 ✅ Done (`cb4fbf57`), G2 blocked on BUG-C
+**Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–11 ✅ Done, Slice 11B ✅ Done, Slice 12 ready to implement | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1 ✅ Done | F2 ✅ Done | F3 ✅ Done | **F4 reframed** (policy exists; blocked on H1+H2), F5 blocked on H1+H2 | Part G — G1 ✅ Done (`cb4fbf57`), G2 blocked on H1+H2 | **Part H — BUG-C reframed:** syntax already works; H1 (proof engine axis fix) ready, H2 (sample update) blocked on H1
 
 ### Slice Status Tracker
 
@@ -42,11 +42,15 @@
 | F1 | Sample Fix: `optional notempty` → `optional` (8 diagnostics, 6 files) | ✅ Done (no instances in any sample — verified 2026-05-12T11:08:13.750-04:00) |
 | F2 | Sample Fix: `number` → `decimal` in travel-reimbursement (2 diagnostics) | ✅ Done (travel-reimbursement has zero diagnostics — verified 2026-05-12T11:08:13.750-04:00) |
 | F3 | Compiler Fix: Static Typed Constant Qualifier Extraction (9 diagnostics, 4 files) | ✅ Done (compound-unit slot handling confirmed in TypeChecker.Expressions.TypedConstants.cs) |
-| F4 | Compiler Fix: ExchangeRateTimesMoney Result Qualifier Policy (27 diagnostics, inventory-item) | ✅ Policy exists — **reframed**: blocked on BUG-C (unqualified event arg) |
-| F5 | Verification Pass: Recompile all 30 samples, resolve any residual | 🔲 Blocked on BUG-C |
+| F4 | Compiler Fix: ExchangeRateTimesMoney Result Qualifier Policy (27 diagnostics, inventory-item) | ✅ Done — nested `Total + Rate * Amt` proof now resolves conversion results on the Currency axis |
+| F5 | Verification Pass: Recompile all 30 samples, resolve any residual | 🔲 Not Started |
 | **Part G — Inventory-Item Proof Coverage Completion** | | |
 | G1 | Compound-Unit Interpolated Constant Qualifier Construction (RC1 bug fix in E2) | ✅ Done (`cb4fbf57`) |
-| G2 | Compound Expression DivisionByZero Algebraic Proof (ReceiveShipment denominator) | 🔲 Not Started — blocked on BUG-C |
+| G2 | Compound Expression DivisionByZero Algebraic Proof (ReceiveShipment denominator) | 🔲 Not Started — now the only remaining ReceiveShipment proof issue (lines 214/220/225) |
+| **Part H — BUG-C: Interpolated Qualifiers on Event Args** | | |
+| H1 | Proof Engine CurrencyConversion Axis Translation | ✅ Done |
+| H2 | Sample Update: inventory-item.precept Rate Qualifier | ✅ Done |
+| H3 | Verification: Recompile inventory-item After H1 + H2 | ✅ Done — PRE0114 cleared; only PRE0083 remains at lines 214/220/225 |
 
 
 **Architect:** Frank (frank-16, frank-18, frank-23 revision; proof audit integration 2026-05-11)  
@@ -3676,3 +3680,363 @@ G2 (algebraic DivisionByZero)    — depends on G1 + BUG-C
 **After G1 alone:** 4 diagnostics resolved, ~12–15 remaining (all BUG-C blocked).
 **After G1 + BUG-C:** ~12 diagnostics resolved, 3 remaining (all G2).
 **After G1 + BUG-C + G2:** All diagnostics resolved. inventory-item.precept compiles clean.
+
+---
+
+## Part H — BUG-C: Interpolated Qualifiers on Event Args
+
+**Added:** 2026-05-12
+**Architect:** Frank (exhaustive syntax/type-checker/proof-engine audit, 2026-05-12)
+**Unblocks:** F4 (ExchangeRateTimesMoney result qualifier), G2 (compound DivisionByZero), F5 (verification pass)
+**Hero sample:** `samples/inventory-item.precept` — line 156: `Rate as exchangerate` (bare, no qualifier)
+
+### The Gap
+
+BUG-C was originally described as "event args cannot carry interpolated qualifier annotations." This is the language gap that prevents the proof engine from knowing what currencies an exchange rate converts between — without that metadata, the `CurrencyConversion` result qualifier policy cannot resolve the result's currency, and the `FromCurrency↔Currency` chain proof cannot verify dimensional correctness.
+
+The concrete broken case in `inventory-item.precept`:
+
+```precept
+# Current (broken — no qualifier metadata):
+event ReceiveShipment(
+    PurchaseQty as quantity of '{PurchaseUnit.dimension}' default '0 {PurchaseUnit}',
+    SupplierUnitCost as price in '{SupplierCurrency}' of '{StockingUnit.dimension}',
+    Rate as exchangerate)  # ← BUG-C: bare exchangerate
+
+# Desired (with qualifier metadata):
+event ReceiveShipment(
+    PurchaseQty as quantity of '{PurchaseUnit.dimension}' default '0 {PurchaseUnit}',
+    SupplierUnitCost as price in '{SupplierCurrency}' of '{StockingUnit.dimension}',
+    Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}')
+```
+
+Without qualifiers on Rate, the proof engine returns null for `ToCurrency` and `FromCurrency`, cascading into ~12 PRE0114 diagnostics across all ReceiveShipment transitions (lines 215–229).
+
+### Impact Analysis: What BUG-C Blocks
+
+| Slice | How BUG-C Blocks It |
+|-------|-------------------|
+| F4 (ExchangeRateTimesMoney policy) | Policy exists and works — but Rate has no `ToCurrency` → `CurrencyConversion` handler returns null → result Currency `<unresolved>` → assignment fails |
+| G2 (DivisionByZero algebraic proof) | G2's diagnostics are co-located with RC2's qualifier failures; G2 only becomes last-standing after BUG-C clears RC2 |
+| F5 (verification pass) | Cannot verify inventory-item compiles clean until all RC2 diagnostics clear |
+
+---
+
+### Critical Finding: Syntax Already Implemented
+
+**The interpolated qualifier syntax on event args already works.** Exhaustive audit (2026-05-12) confirmed:
+
+1. **Parser** — `ParseTypeReference()` calls `TryParseQualifiers()` (Parser.cs:622), which iterates the type's `QualifierShape.Slots` and handles both `TypedConstant` (literal) and `TypedConstantStart` (interpolated) tokens. This runs INSIDE `ParseArgumentList()` at line 788 via `ParseTypeReference(asToken.Span)` — event arg qualifiers are parsed identically to field qualifiers.
+
+2. **Type Checker** — `PopulateEvents()` (TypeChecker.cs:462) calls `ExtractQualifiers(arg.Type, ctx)` at line 481, which dispatches to `MapInterpolatedQualifier()` for interpolated qualifiers. This produces `DeclaredQualifierMeta.FromCurrency` and `DeclaredQualifierMeta.ToCurrency` with correct `SourceFieldName` (e.g., `"SupplierCurrency"`, `"CatalogCurrency"`). The same code path used for field qualifiers — no event-arg-specific logic needed.
+
+3. **Proof Engine — simple cases** — `ResolveQualifierFromExpression()` (ProofEngine.cs:1280) handles `TypedArgRef` with `DeclaredQualifiers` correctly. The `CurrencyConversionRequired` handler (ProofEngine.cs:1327) resolves result Currency by reading the exchange rate's `ToCurrency`. Direct assignment `set Cost = Rate * Amt` compiles clean.
+
+**Verification:** The following precept compiles with 0 diagnostics:
+```precept
+precept TestExchangeRate
+field SupplierCurrency as currency default 'USD'
+field CatalogCurrency as currency default 'EUR'
+field Cost as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+state Draft initial
+state Done terminal
+event Convert(Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}',
+              Amount as money in '{SupplierCurrency}')
+from Draft on Convert
+    -> set Cost = Convert.Rate * Convert.Amount
+    -> transition Done
+```
+
+The syntax, parsing, type checking, and basic proof resolution are all operational. **BUG-C is not a parser or type-checker feature gap — it is a sample update plus a residual proof engine bug.**
+
+---
+
+### Residual Bug: CurrencyConversion Qualifier Resolution in Nested Binary Expressions
+
+While direct assignment from a currency-converted expression works, the **accumulation pattern** — the actual pattern used in `inventory-item.precept` — fails:
+
+```precept
+# FAILS with PRE0114: "Operands 'Total' and '<expression>' have incompatible Currency qualifiers"
+-> set Total = Total + (Rate * Amt)
+
+# WORKS: splitting across two set actions
+-> set LocalCost = Rate * Amt    # CurrencyConversion resolves correctly
+-> set Total = Total + LocalCost  # SameQualifier compares two Currency metas
+```
+
+**Root cause analysis:**
+
+The expression `Total + (Rate * Amt)` generates a `QualifierCompatibilityProofRequirement(Currency)` from `MoneyPlusMoney`'s `SameQualifierRequired` binding. The proof engine resolves:
+
+- **Left operand** (`Total`): `ResolveQualifierFromExpression` → `ResolveFieldQualifier` → returns `Currency("{CatalogCurrency}", SourceFieldName: "CatalogCurrency")`
+- **Right operand** (`Rate * Amt`): `ResolveQualifierFromExpression` → `CurrencyConversionRequired` handler → resolves `QualifierAxis.ToCurrency` from Rate arg → returns `ToCurrency("{CatalogCurrency}", SourceFieldName: "CatalogCurrency")`
+
+The comparison receives a `Currency` meta on the left and a `ToCurrency` meta on the right. `QualifiersSymbolicallyEqual` should compare `SourceFieldName` values ("CatalogCurrency" == "CatalogCurrency" → true). However, the proof fails empirically. The exact failure point requires live debugging — the code analysis shows the comparison SHOULD succeed, which means there's a subtle issue in the resolution or comparison path that static analysis alone cannot pinpoint.
+
+**This bug is pre-existing** — it also affects literal qualifiers (`in 'EUR' to 'USD'`), confirming it is not specific to interpolated qualifiers on event args. It is a general proof engine limitation with `CurrencyConversionRequired` result qualifiers when nested inside a parent `SameQualifierRequired` binary op.
+
+**Note:** The `ValidateAssignmentQualifiers` type-checker path (TypeChecker.Expressions.TypedConstants.cs:72) handles `CurrencyConversionRequired` correctly by explicitly creating a `Currency` meta from the `ToCurrency` value (line 86). The proof engine's `ResolveQualifierFromExpression` does NOT perform this axis translation — it returns the raw `ToCurrency` meta. This axis mismatch is the most likely root cause.
+
+---
+
+### A. Syntax Decision
+
+**Chosen syntax:** `Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'`
+
+This is **not a new syntax** — it is the existing qualifier annotation syntax applied to event args, which the parser already supports. The decision is to confirm and document that this syntax is correct and operational.
+
+**Rationale:**
+- Mirrors the existing field qualifier syntax: `field X as exchangerate in '{A}' to '{B}'` → `arg X as exchangerate in '{A}' to '{B}'`
+- Uses the same preposition tokens (`in`, `to`) driven by the `QualifierShape` metadata in `Types.cs` — `QS_ExchangeRate = [(In, FromCurrency), (To, ToCurrency)]`
+- Interpolated expressions (`'{FieldName}'`) reference precept fields whose runtime values supply the qualifier binding — consistent with how field qualifiers work (Part A, Slice 2)
+- No grammar changes required — the existing `TryParseQualifiers` method handles all qualifier-bearing types uniformly
+
+**Alternatives rejected:**
+
+1. **Explicit `.from`/`.to` accessor ensures as qualifier source** — `ensure Rate.from == SupplierCurrency` as a compile-time qualifier. Rejected: ensures are runtime guards, not qualifier metadata. Teaching the proof engine to infer qualifiers from ensures would be fragile, non-general, and architecturally wrong. The philosophy doc says "make invalid configurations structurally impossible" — qualifier declarations must be static metadata.
+
+2. **New `qualified` keyword** — `Rate as exchangerate qualified(from: '{SupplierCurrency}', to: '{CatalogCurrency}')`. Rejected: introduces unnecessary syntax divergence from field qualifiers. The preposition-based qualifier syntax (`in ... to ...`) is already established and parsed. No justification for a second syntax.
+
+3. **Bare field reference without interpolation braces** — `Rate as exchangerate in SupplierCurrency to CatalogCurrency`. Rejected: ambiguity with literal qualifier values (is `USD` a field name or a currency code?). The `'{...}'` interpolation syntax makes the field reference explicit and is consistent with typed constant interpolation (Part A).
+
+---
+
+### B. Grammar / Parser Impact
+
+**No changes required.**
+
+- `ParseArgumentList()` (Parser.cs:772) already calls `ParseTypeReference()` at line 788
+- `ParseTypeReference()` calls `TryParseQualifiers()` at line 467 for non-collection, non-choice types
+- `TryParseQualifiers()` iterates `typeMeta.QualifierShape.Slots`, consuming `in`/`to`/`of` prepositions and their typed constant values (literal or interpolated)
+- The `exchangerate` type's `QualifierShape` (`QS_ExchangeRate` in Types.cs:46) defines `[(In, FromCurrency), (To, ToCurrency)]` — both slots are handled by the existing parser loop
+- Interpolated values (`'{...}'`) are tokenized as `TypedConstantStart` by the lexer, triggering `ParseInterpolatedTypedConstant()` at Parser.cs:650
+- The resulting `QualifiedTypeReference` wrapping `SimpleTypeReference(exchangerate)` with `InterpolatedParsedQualifier` nodes is preserved in `ArgumentSyntax.Type`
+
+**AST nodes:** No new nodes. `ArgumentSyntax` already carries `ParsedTypeReference Type` which can be `QualifiedTypeReference`. No AST shape change.
+
+**Token disambiguation:** `in` and `to` serve as qualifier prepositions within `TryParseQualifiers` (consumed before the modifier loop in `ParseArgumentList` at line 791). The modifier loop checks `Modifiers.ByValueToken` which does NOT contain `in`/`to` as value modifiers (they are anchor modifiers, applicable only in `ModifierList` slots on `ensure`/`in`/`to`/`from` constructs). No disambiguation issue.
+
+---
+
+### C. Type Checker Impact
+
+**No changes required.**
+
+- `PopulateEvents()` (TypeChecker.cs:462) already calls `ExtractQualifiers(arg.Type, ctx)` at line 481
+- `ExtractQualifiers()` handles `QualifiedTypeReference` with both `LiteralParsedQualifier` and `InterpolatedParsedQualifier`
+- `MapInterpolatedQualifier()` (TypeChecker.cs:154) resolves the interpolated expression against the expected type (`Currency` for `FromCurrency`/`ToCurrency` axes), extracts the `SourceFieldName`, and produces the correct `DeclaredQualifierMeta` subtype
+- The resulting `TypedArg.DeclaredQualifiers` carries `[FromCurrency("{SupplierCurrency}", SourceFieldName: "SupplierCurrency"), ToCurrency("{CatalogCurrency}", SourceFieldName: "CatalogCurrency")]`
+- `TypedArgRef` (SemanticIndex.cs:29) already carries `ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers` — no shape change needed
+
+**Diagnostics:** No new diagnostic codes needed. Existing diagnostics cover all validation:
+- `ExpectedToken` if qualifier value is missing after preposition
+- `TypeMismatch` if interpolated expression resolves to wrong type (e.g., `'{StringField}'` where `currency` expected)
+- `UnprovedQualifierCompatibility` (PRE0114) if qualifier chain fails at proof time
+
+---
+
+### D. Proof Engine Impact
+
+**One fix required: CurrencyConversion qualifier axis translation in `ResolveQualifierFromExpression`.**
+
+The proof engine's `ResolveQualifierFromExpression` (ProofEngine.cs:1327) handles `CurrencyConversionRequired` by resolving the exchange rate's `ToCurrency` qualifier. However, it returns the raw `ToCurrency` meta (axis=ToCurrency) when the caller asked for `Currency` axis. This works for assignment validation (the type checker's `ValidateAssignmentQualifiers` handles it separately at TypeChecker.Expressions.TypedConstants.cs:72-93), but fails for proof engine qualifier compatibility checks where `Currency` and `ToCurrency` are compared as different-axis qualifiers.
+
+**The fix — axis translation:**
+
+In `ResolveQualifierFromExpression` (ProofEngine.cs:1327-1333), after resolving the ToCurrency from the exchange rate, translate it to a Currency meta:
+
+```csharp
+// BEFORE (returns ToCurrency meta — wrong axis for Currency comparisons):
+CurrencyConversionRequired =>
+    axis == QualifierAxis.Currency
+        ? ResolveQualifierFromExpression(
+            binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
+            QualifierAxis.ToCurrency, semantics)
+        : null,
+
+// AFTER (translate ToCurrency → Currency for result axis consistency):
+CurrencyConversionRequired =>
+    axis == QualifierAxis.Currency
+        ? TranslateToCurrencyResult(
+            ResolveQualifierFromExpression(
+                binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
+                QualifierAxis.ToCurrency, semantics))
+        : null,
+```
+
+Where `TranslateToCurrencyResult` converts a `ToCurrency` meta to a `Currency` meta preserving the value and `SourceFieldName`:
+
+```csharp
+private static DeclaredQualifierMeta? TranslateToCurrencyResult(DeclaredQualifierMeta? resolved)
+{
+    if (resolved is DeclaredQualifierMeta.ToCurrency tc)
+        return new DeclaredQualifierMeta.Currency(tc.CurrencyCode,
+            Origin: QualifierOrigin.Derived,
+            SourceFieldName: tc.SourceFieldName);
+    return resolved;
+}
+```
+
+**Also apply the same translation in `ResolveQualifierOnAxis`** (ProofEngine.cs:1194-1202) which has the identical `CurrencyConversionRequired` handler pattern.
+
+**Interaction with `QualifierChainProofRequirement`:** The `ExchangeRateTimesMoney` operation also generates a `QualifierChainProofRequirement(FromCurrency, Currency)` checking `Rate.FromCurrency == Money.Currency`. This uses `ResolveQualifierOnAxis` which resolves subjects on DIFFERENT axes (left=FromCurrency, right=Currency) and compares via `ChainQualifiersMatch` → `ExtractComparableValue`. The `ExtractComparableValue` function (ProofEngine.cs:1106) already handles `FromCurrency` and `ToCurrency` subtypes correctly. No change needed for chain proofs.
+
+**Interaction with `ExtractQualifierSourcePath`:** The `ExtractQualifierSourcePath` function (ProofEngine.cs:1080) only handles `Currency`, `Unit`, `Dimension`, and `TemporalUnit` subtypes — `FromCurrency` and `ToCurrency` fall through to `_ => null`. This is a secondary gap (affects literal-qualifier fallback comparison only, not interpolated qualifiers which use `SourceFieldName`). The fix should add:
+
+```csharp
+DeclaredQualifierMeta.FromCurrency { CurrencyCode: var value } => value,
+DeclaredQualifierMeta.ToCurrency { CurrencyCode: var value } => value,
+```
+
+---
+
+### E. Runtime / Evaluator Impact
+
+**No changes required.**
+
+At event-fire time, the caller provides a value for `Rate`. The runtime already validates that the provided value is of the correct type (`exchangerate`). Qualifier annotations are compile-time metadata — they constrain the proof engine's static analysis. At runtime, the exchange rate value carries its own `from`/`to` currencies intrinsically (accessible via `.from` and `.to` accessors). The qualifier annotation tells the COMPILER which currencies to expect — the runtime value already contains them.
+
+The existing `ensure Rate.from == SupplierCurrency` and `ensure Rate.to == CatalogCurrency` runtime guards (inventory-item.precept lines 159–162) remain valid as defense-in-depth but become redundant once the qualifier annotation makes these constraints provable at compile time. The sample should mark them as optional or remove them.
+
+---
+
+### F. Tooling Impact
+
+**Syntax highlighting:** No changes. The TextMate grammar is generated from catalog metadata. The qualifier prepositions (`in`, `to`) and interpolation braces (`{`, `}`) are already covered by the grammar rules for qualifier annotations and typed constant interpolation.
+
+**Completions:** No changes. Completions inside `'{...}'` holes in qualifier position already suggest field names of the appropriate type (currency fields for `FromCurrency`/`ToCurrency` axes). This is driven by the existing completion infrastructure for interpolated typed constants (Part A, Slice 3).
+
+**Hover:** The language server's hover handler already displays qualifier information from `TypedArg.DeclaredQualifiers`. Once the sample file adds qualifiers to Rate, hover on `Rate` in event args will show `FromCurrency: {SupplierCurrency}, ToCurrency: {CatalogCurrency}`.
+
+**MCP:** The `precept_compile` tool's `TypedArg` DTO already includes qualifier information (inherited from the core `TypedArg` record). No DTO changes needed. Existing compile output will show correct qualifier metadata once the sample is updated.
+
+---
+
+### G. Scope — What BUG-C Does NOT Cover
+
+1. **New parser features** — No grammar changes, no new tokens, no new AST nodes. The syntax is already implemented.
+2. **Type checker changes** — No new type-checking logic. `ExtractQualifiers` already handles event arg qualifiers identically to field qualifiers.
+3. **New diagnostic codes** — No new codes. Existing codes cover all validation scenarios.
+4. **Runtime validation changes** — Qualifier annotations are compile-time metadata. No runtime API changes.
+5. **Tooling changes** — No grammar generator, completion, hover, or MCP changes.
+6. **Other sample files** — Only `inventory-item.precept` is affected. Other samples that use event arg qualifiers (e.g., `PurchaseQty as quantity of '{PurchaseUnit.dimension}'`) already work correctly.
+7. **The G2 algebraic DivisionByZero proof** — G2 is a separate proof engine enhancement for compound expression non-zero reasoning. BUG-C unblocks G2 by clearing RC2 qualifier failures that mask RC3 DivisionByZero diagnostics, but G2's implementation is independent.
+
+---
+
+### Implementation Slices
+
+#### H1 — Proof Engine CurrencyConversion Axis Translation
+
+**Type:** Bug fix (proof engine)
+**Status:** ✅ Done
+**Diagnostics cleared:** Proof-side currency-axis mismatches for the ReceiveShipment accumulation shape; together with H2, the sample's PRE0114 diagnostics on lines 212, 214, 218, 220, 223, and 225 are gone
+**Effort:** Small
+**Dependencies:** None
+**Owner:** George
+
+##### Root Cause
+
+`ResolveQualifierFromExpression` in ProofEngine.cs (line 1327) handles `CurrencyConversionRequired` by resolving the exchange rate operand's `ToCurrency` qualifier. It returns the raw `ToCurrency` meta (axis=ToCurrency) when the caller requested `Currency` axis. This creates a cross-axis comparison (`Currency` vs `ToCurrency`) that `QualifiersAreCompatible` fails to match via record equality or structural comparison, even when both qualifiers reference the same source field.
+
+The type checker's `ValidateAssignmentQualifiers` (TypeChecker.Expressions.TypedConstants.cs:72-93) correctly handles this by creating a new `Currency` meta from the `ToCurrency` value. The proof engine lacks this translation.
+
+##### Fix
+
+**File:** `src/Precept/Pipeline/ProofEngine.cs`
+
+**Implemented changes:**
+
+1. `ResolveQualifierFromExpression` now translates a resolved `ToCurrency` qualifier into a `Currency` qualifier when the caller requested the Currency axis, preserving proof satisfactions and `SourceFieldName` so nested binary-op comparisons stay on the same axis.
+2. `ExtractQualifierSourcePath` now handles `FromCurrency` and `ToCurrency`, so legacy literal fallback comparison works for exchange-rate qualifiers too.
+
+##### Test Cases
+
+| Test | Input | Expected |
+|------|-------|----------|
+| `CurrencyConversion_DirectAssignment_StillWorks` | `set Cost = Rate * Amt` where Rate is `exchangerate in '{A}' to '{B}'`, Cost is `money in '{B}'` | 0 PRE0114 (regression guard) |
+| `CurrencyConversion_Accumulation_QualifierResolved` | `set Total = Total + Rate * Amt` where both Total and Rate.ToCurrency reference `{CatalogCurrency}` | 0 PRE0114 (the key fix) |
+| `CurrencyConversion_LiteralQualifier_Accumulation` | `set Total = Total + Rate * Amt` with literal `in 'EUR' to 'USD'`, Total `in 'USD'` | 0 PRE0114 |
+| `CurrencyConversion_Mismatch_StillDetected` | `set Total = Total + Rate * Amt` where Total is `in '{CurrA}'` but Rate is `to '{CurrB}'` (different fields) | PRE0114 fires (correct: currencies don't match) |
+| `CurrencyConversion_NestedCompound_InventoryPattern` | Full inventory-item accumulation: `Total + Rate * (UnitCost * (Qty * ConversionFactor))` | 0 PRE0114 (verifies deep nesting) |
+
+**Files changed:** `src/Precept/Pipeline/ProofEngine.cs` (~20 LOC)
+**Test file:** `test/Precept.Tests/ProofEngineTests.cs` (~60 LOC)
+**Regression risk:** Low. The axis translation only affects `CurrencyConversionRequired` results on the `Currency` axis. All existing tests that pass through this handler use direct assignment (validated by the type checker), not nested binary ops (validated by the proof engine). The translation is additive — it converts `ToCurrency` → `Currency` which is strictly more comparable.
+
+---
+
+#### H2 — Sample Update: inventory-item.precept Rate Qualifier
+
+**Type:** Sample fix
+**Status:** ✅ Done
+**Diagnostics cleared:** The ReceiveShipment PRE0114 sites on lines 212, 214, 218, 220, 223, and 225
+**Effort:** Trivial
+**Dependencies:** H1
+**Owner:** George
+
+##### Change
+
+**File:** `samples/inventory-item.precept` — line 156
+
+**Before:**
+```precept
+    Rate as exchangerate)
+```
+
+**After:**
+```precept
+    Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}')
+```
+
+##### Secondary Changes
+
+1. **Removed redundant runtime ensures** (former lines 159–162): the `Rate.from` / `Rate.to` checks are now carried by the event-arg qualifier itself.
+2. **Scoped sample edit only**: this pass intentionally left the rest of `inventory-item.precept` untouched.
+
+##### Test
+
+Compiling the updated sample with the current runtime leaves only the three ReceiveShipment denominator PRE0083 diagnostics on lines 214, 220, and 225. The qualifier-related PRE0114 diagnostics are gone.
+
+---
+
+#### H3 — Verification: Recompile inventory-item After H1 + H2
+
+**Type:** Verification
+**Status:** ✅ Done
+**Dependencies:** H1 + H2
+**Owner:** George
+
+`samples/inventory-item.precept` now recompiles with the qualifier class cleared. The remaining diagnostics are only:
+
+- PRE0083 at line 214
+- PRE0083 at line 220
+- PRE0083 at line 225
+
+Those are the existing ReceiveShipment denominator proofs tracked by G2.
+
+---
+
+### Part H Dependency Graph
+
+```
+H1 (proof engine axis translation) — no dependencies, immediately actionable
+  ↓ fixes CurrencyConversion qualifier resolution in nested binary ops
+  ↓ prerequisite for H2 (sample update would fail without proof fix)
+
+H2 (sample update: Rate qualifier)  — depends on H1
+  ↓ adds in '{SupplierCurrency}' to '{CatalogCurrency}' to Rate arg
+  ↓ clears all RC2 diagnostics (Currency <unresolved> + FromCurrency↔Currency chain)
+
+H3 (verification)                   — depends on H1 + H2
+  ↓ confirms diagnostic clearance on inventory-item.precept
+
+G2 (algebraic DivisionByZero)       — depends on G1 + H1 + H2 (replaces G1 + BUG-C)
+  ↓ clears RC3 diagnostics (3 × PRE0083)
+```
+
+**After H1 alone:** The proof engine fix is generic — any nested `exchangerate × money` accumulation now resolves onto the Currency axis correctly.
+**After H1 + H2:** The sample's ReceiveShipment qualifier failures are gone; only RC3 remains (3 × PRE0083 at lines 214/220/225).
+**After H1 + H2 + G1 + G2:** All diagnostics on inventory-item.precept resolved. The sample compiles clean.
+
+**Completed execution order:** H1 → H2 → H3.

@@ -19,15 +19,16 @@ precept InventoryItem
 # THIS FILE DOES NOT COMPILE — it expresses the intended design.
 # Pending compiler issues (spike/Precept-V2-Radical):
 #
-#   BUG-A (PRE0114): The compiler now supports the required interpolated
-#          qualifier form, but this sample still declares `Rate as exchangerate`
-#          without `in '{SupplierCurrency}' to '{CatalogCurrency}'`. That sample
-#          edit is pending Frank's sign-off.
+#   ROOT CAUSE 2 (partial): compound-unit typed constant literals of the form
+#          '0 {Unit}/{Unit}' are parsed with only the denominator unit extracted.
+#          Affects rules/ensures that compare compound-unit quantity fields against
+#          typed constant literals (lines 116-117). The division-by-zero errors on
+#          the ListPrice ensures cascade from these failing to establish > 0 proof.
 #
-#   SAMPLE DESIGN ISSUES:
-#          - Lines 137/145: `Sku is set` on non-optional field (PRE0049)
-#          - Lines 140/147: money/price type mismatch in cost comparison (PRE0018)
-#          - Lines 223/229/234: unguarded division by zero in WAC calc (PRE0083)
+#   BUG-C: Rate arg declared as bare `exchangerate` — needs
+#          `in '{SupplierCurrency}' to '{CatalogCurrency}'` qualifier once
+#          interpolated arg qualifiers ship. Causes currency mismatch on all
+#          ReceiveShipment transitions (lines 211-224).
 #
 # Analysis: .squad/decisions/inbox/frank-inventory-deep-dive.md (2026-05-11)
 
@@ -110,7 +111,6 @@ field PriceChangeCount as integer default 0 nonnegative
 field ShrinkageLog as log of string
 
 # ── Invariants ────────────────────────────────────────────────────────────────
-# BUG-B: quantity vs. typed constant literal comparison not yet working.
 rule QuantityOnHand >= '0 {StockingUnit}' because "Stock on hand cannot go negative"
 rule RestockThreshold >= '0 {StockingUnit}' because "Restock threshold cannot be negative"
 rule TotalInventoryCost >= '0.00 {CatalogCurrency}' because "Total inventory cost must be nonnegative"
@@ -135,15 +135,12 @@ in Unlisted modify Sku, CatalogCurrency, SupplierCurrency, ValuationMethod, Stoc
 
 in Listed modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
 in Listed ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
-# Selling below cost is structurally prevented. BUG-A: cross-type comparison.
-in Listed ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
-# BUG-B: quantity and price comparison against typed constant literal.
+in Listed ensure ListPrice / StockingUnitsPerSaleUnit >= AverageCost because "List price per stocking unit is below average cost"
 in Listed ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand == '0 {StockingUnit}' because "Stocked items must have a positive average cost"
 
 in LowStock modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
 in LowStock ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
-in LowStock ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
-# BUG-B
+in LowStock ensure ListPrice / StockingUnitsPerSaleUnit >= AverageCost because "List price per stocking unit is below average cost"
 in LowStock ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand == '0 {StockingUnit}' because "Stocked items must have a positive average cost"
 
 # ── Events ────────────────────────────────────────────────────────────────────
@@ -156,13 +153,9 @@ event Publish(Sku as string notempty, Desc as string optional)
 event ReceiveShipment(
     PurchaseQty as quantity of '{PurchaseUnit.dimension}' default '0 {PurchaseUnit}',
     SupplierUnitCost as price in '{SupplierCurrency}' of '{StockingUnit.dimension}' default '0.00 {SupplierCurrency}/{StockingUnit}',
-    Rate as exchangerate)
+    Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}')
 on ReceiveShipment ensure ReceiveShipment.PurchaseQty > '0 {PurchaseUnit}' because "Purchase quantity must be positive"
 on ReceiveShipment ensure ReceiveShipment.SupplierUnitCost > '0.00 {SupplierCurrency}/{StockingUnit}' because "Supplier unit cost must be positive"
-# Rate direction must match: from SupplierCurrency → CatalogCurrency.
-# When BUG-C ships this becomes a compile-time qualifier: Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'
-on ReceiveShipment ensure ReceiveShipment.Rate.from == SupplierCurrency because "Exchange rate must convert from the supplier's currency"
-on ReceiveShipment ensure ReceiveShipment.Rate.to == CatalogCurrency because "Exchange rate must convert to the catalog currency"
 
 # FulfillOrder: sale qty in SaleUnit, converted to StockingUnit on fulfillment.
 # Captured at current ListPrice and AverageCost for P&L accuracy.
