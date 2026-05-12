@@ -6,6 +6,18 @@
 
 ---
 
+### 2026-05-12T23:33:48Z: Self-loop omit validation intentionally fires both D130 and D133 when `from` and `to` are the same state
+
+**By:** Scribe
+
+**Status:** Merged from `copilot-self-loop-omit-both.md`.
+
+- For a self-loop transition `S -> S`, omitting a field in `S` triggers both D130 and D133 because `ValidateFieldStateAccess` checks the omitted field against both the from-state and the to-state, and both roles resolve to the same state.
+- Self-loops remain a general-case path, not a special case: the engine should keep the uniform from-state D130 check and to-state D133 check rather than suppressing one side when the state identities match.
+- Diagnostic expectations and future regression tests should treat dual reporting on self-loops as intentional behavior, not as a deduplication bug.
+
+---
+
 ### 2026-05-12T23:02:04Z: Field-state guarantees v2 stays approved only after omit-state resolution, broadcast compatibility, and the real test matrix are locked
 
 **By:** Scribe

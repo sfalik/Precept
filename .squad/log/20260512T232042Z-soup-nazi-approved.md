@@ -2,6 +2,8 @@
 
 At 2026-05-12T23:20:42Z, Scribe ran the Soup Nazi approval closeout: archived decision-ledger entries older than 7 days because `decisions.md` exceeded the hard gate, merged the open inbox verdicts into the canonical ledger, deleted the processed inbox files, wrote orchestration records for george-4, george-5, and soup-nazi-1, refreshed the George and Soup Nazi histories with the approved outcome, and recorded the final ledger health after the approval batch landed.
 
+Follow-up note at 2026-05-12T23:33:48Z: merged the self-loop omit ruling into `decisions.md`, locking that an omitted-field write on `S -> S` intentionally fires both D130 and D133 because both from-state and to-state validation paths apply.
+
 ## Health Report
 
 - Decisions size before: 212183 bytes
