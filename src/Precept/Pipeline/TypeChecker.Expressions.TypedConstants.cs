@@ -69,7 +69,11 @@ internal static partial class TypeChecker
                 return true;
 
             case TypedBinaryOp { ResultQualifier: CurrencyConversionRequired } binary:
-                // Result currency is the ToCurrency of the exchangerate operand
+                // Result currency is the ToCurrency of the exchangerate operand.
+                // If the rate has no declared qualifiers (generic exchangerate arg),
+                // the conversion target is unknown at compile time — return true with empty
+                // qualifiers so the recursive fallback does not incorrectly validate the
+                // money operand's source currency against the assignment target.
                 var rateOperand = binary.Left.ResultType == TypeKind.ExchangeRate
                     ? binary.Left : binary.Right;
                 if (TryGetAssignmentSourceQualifiers(rateOperand, out var rateQuals))
@@ -83,8 +87,9 @@ internal static partial class TypeChecker
                         }
                     }
                 }
-                qualifiers = default;
-                return false;
+                // Rate has no ToCurrency qualifier — suppress mismatch.
+                qualifiers = [];
+                return true;
 
             default:
                 qualifiers = default;
