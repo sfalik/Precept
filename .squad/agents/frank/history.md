@@ -46,6 +46,11 @@
 ### 2026-05-11T20:03:33Z — Slice 6 boundary held
 - Slice 6 remains numeric-only, with the single-hole whole-value fallback included and compile-time guarantees preserved.
 
+### 2026-05-12T01:54:11Z — inventory-item deep dive follow-up carried forward
+- RC-1: `Parser.TryParseQualifiers()` is the gating blocker for interpolated qualifier positions because it rejects `TypedConstantStart` in field/arg qualifier slots.
+- RC-2: `QuantityForms[]` still lacks Q6/Q7/Q8 coverage for `'0 {A}/{B}'`-style compound-unit bounds, so A2B remains incomplete for this file's rule shapes.
+- A2B visibility in `samples/inventory-item.precept` is effectively zero until RC-1 lands, because the relevant declarations fail before type-check pattern matching can help.
+
 ## Historical Summary
 
 - Detailed 2026-05-11 research chronology, proof-plan audits, interpolation follow-ons, and temporal-design analysis were compacted into `history-archive.md` during the 2026-05-12T00:50:06Z summarization pass.

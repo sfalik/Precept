@@ -143,7 +143,6 @@ state Delisted
 in Unlisted modify Sku, CatalogCurrency, SupplierCurrency, ValuationMethod, StockingUnit, PurchaseUnit, SaleUnit, StockingUnitsPerPurchaseUnit, StockingUnitsPerSaleUnit editable
 
 in Listed modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
-in Listed ensure Sku is set because "SKU must be assigned before listing"
 in Listed ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
 # Selling below cost is structurally prevented. BUG-A: cross-type comparison.
 in Listed ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
@@ -151,7 +150,6 @@ in Listed ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "Li
 in Listed ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand = '0 {StockingUnit}' because "Stocked items must have a positive average cost"
 
 in LowStock modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
-in LowStock ensure Sku is set because "SKU must be assigned"
 in LowStock ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
 in LowStock ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost because "List price is below average cost"
 # BUG-B
@@ -166,10 +164,10 @@ event Publish(Sku as string notempty, Desc as string optional)
 # BUG-C: arg defaults need interpolation; BUG-A: event arg qty in ensures/actions.
 event ReceiveShipment(
     PurchaseQty as quantity of '{PurchaseUnit.dimension}' default '0 {PurchaseUnit}',
-    SupplierUnitCost as money in '{SupplierCurrency}' default '0.00 {SupplierCurrency}',
+    SupplierUnitCost as price in '{SupplierCurrency}' of '{StockingUnit.dimension}' default '0.00 {SupplierCurrency}/{StockingUnit}',
     Rate as exchangerate)
 on ReceiveShipment ensure ReceiveShipment.PurchaseQty > '0 {PurchaseUnit}' because "Purchase quantity must be positive"
-on ReceiveShipment ensure ReceiveShipment.SupplierUnitCost > '0.00 {SupplierCurrency}' because "Supplier unit cost must be positive"
+on ReceiveShipment ensure ReceiveShipment.SupplierUnitCost > '0.00 {SupplierCurrency}/{StockingUnit}' because "Supplier unit cost must be positive"
 # Rate direction must match: from SupplierCurrency → CatalogCurrency.
 # When BUG-C ships this becomes a compile-time qualifier: Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'
 on ReceiveShipment ensure ReceiveShipment.Rate.from = SupplierCurrency because "Exchange rate must convert from the supplier's currency"
@@ -220,8 +218,8 @@ from Unlisted on Publish
 
 # ReceiveShipment converts supplier cost to catalog currency via Rate, then updates WAC.
 # Operator chain (spec §3.6):
-#   Rate × (SupplierUnitCost × PurchaseQty × StockingUnitsPerPurchaseUnit)
-#   = exchangerate × money → money  (currency conversion)                  BUG-A
+#   Rate × (SupplierUnitCost × (PurchaseQty × StockingUnitsPerPurchaseUnit))
+#   = exchangerate × (price × quantity → money) → money  (unit cost → total cost, currency conversion)  BUG-A
 #   money + money → money           (new total cost)                        BUG-A
 #   quantity × quantity → quantity  (purchase → stocking qty)               BUG-A
 #   quantity + quantity → quantity  (new on-hand)                           BUG-A
@@ -229,18 +227,18 @@ from Unlisted on Publish
 from Listed on ReceiveShipment
     -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
-    -> set AverageCost = TotalInventoryCost / QuantityOnHand
+    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> no transition
 
 from LowStock on ReceiveShipment when QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit > RestockThreshold
     -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
-    -> set AverageCost = TotalInventoryCost / QuantityOnHand
+    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> transition Listed
 from LowStock on ReceiveShipment
     -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
-    -> set AverageCost = TotalInventoryCost / QuantityOnHand
+    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> no transition
 
 # FulfillOrder: capture P&L at current prices before decrementing stock.

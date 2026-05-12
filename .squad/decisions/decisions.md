@@ -1,3 +1,304 @@
+# Deep Dive Analysis — inventory-item.precept Compile Failures
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-11T21:54:11-04:00  
+**Requested By:** Shane  
+**Scope:** Root cause analysis of 161 compile errors in `samples/inventory-item.precept`
+
+---
+
+## Executive Summary
+
+The 161 errors in `samples/inventory-item.precept` stem from **three distinct root causes**, with the remaining errors being cascade noise. The sample file's BUG-A/BUG-B/BUG-C classification is **mostly accurate but incomplete** — there's a previously undocumented parser-level blocker that gates all field qualifier interpolation.
+
+| Root Cause | Error Codes | Count | Layer | Complexity |
+|------------|-------------|-------|-------|------------|
+| **RC-1:** Parser rejects interpolated strings in field/arg qualifiers | PRE0009 | ~20 | Parser | Small fix |
+| **RC-2:** Missing compound-unit patterns in TypeChecker | PRE0052 | ~15 | TypeChecker | Medium |
+| **RC-3:** `is set` on non-optional field | PRE0049 | 2 | TypeChecker | Sample bug |
+| **Cascade:** Undeclared args/fields from failed parsing | PRE0107, PRE0017 | ~50 | — | — |
+| **Cascade:** Qualifier compatibility failures | PRE0114 | ~70 | — | — |
+| **Secondary:** Division by zero in WAC calculation | PRE0083 | 3 | ProofEngine | Sample design |
+| **Secondary:** Type mismatch in cost comparison | PRE0018 | 2 | TypeChecker | Sample design |
+
+---
+
+## Root Cause Analysis
+
+### RC-1: Parser Does Not Accept Interpolated Strings in Qualifier Positions
+
+**Location:** `Parser.cs:625–662` — `TryParseQualifiers()`
+
+**The Blocker:**
+
+```csharp
+// Line 641-647 in Parser.cs
+if (Peek().Kind != TokenKind.TypedConstant)  // ← Only accepts static typed constants!
+{
+    _diagnostics.Add(DiagnosticsCatalog.Create(
+        DiagnosticCode.ExpectedToken, Peek().Span,
+        "typed constant", Peek().Text));
+    continue;
+}
+```
+
+The parser's qualifier-parsing method **only** accepts `TokenKind.TypedConstant` (static typed constants like `'USD'` or `'each'`). When an interpolated typed constant like `'{StockingUnit}/{PurchaseUnit}'` appears in a qualifier position, the lexer produces `TokenKind.TypedConstantStart`, which the parser rejects with PRE0009.
+
+**Affected Constructs:**
+
+All field/arg declarations with `in '...'` or `of '...'` qualifiers containing interpolation:
+
+```precept
+# These all fail at the parser level — never reach type checker
+field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}'
+field QuantityOnHand as quantity of '{StockingUnit.dimension}'
+event ReceiveShipment(PurchaseQty as quantity of '{PurchaseUnit.dimension}')
+```
+
+**Impact:** This is a **gating blocker**. Until fixed, no field or event arg can use interpolated qualifiers. This causes ~50 cascade errors as event args fail to parse → args aren't registered in scope → PRE0107 "Argument not declared" everywhere those args are referenced.
+
+**Fix Approach (Small):**
+
+Extend `TryParseQualifiers()` to also accept `TypedConstantStart`:
+
+```csharp
+if (Peek().Kind == TokenKind.TypedConstant)
+{
+    var valueToken = Advance();
+    qualifiers.Add(new ParsedQualifier(
+        slot.Preposition, slot.Axis,
+        valueToken.Text, valueToken.Span));
+    lastSpan = valueToken.Span;
+}
+else if (Peek().Kind == TokenKind.TypedConstantStart)
+{
+    // Parse as InterpolatedTypedConstantExpression, store in qualifier
+    var interpolatedExpr = ParseInterpolatedTypedConstant();
+    qualifiers.Add(new ParsedQualifier(
+        slot.Preposition, slot.Axis,
+        interpolatedExpr));  // Needs ParsedQualifier to accept expression
+    lastSpan = interpolatedExpr.Span;
+}
+```
+
+This requires:
+1. Extend `ParsedQualifier` to hold either a literal string or a `ParsedExpression`
+2. Extend `ParsedTypeReference` to carry the richer qualifier form
+3. Extend TypeChecker to resolve interpolated qualifiers at compile time
+
+**Estimated Complexity:** 2-3 hours — small parser change + data structure extension.
+
+---
+
+### RC-2: Missing Compound-Unit Patterns in TypeChecker
+
+**Location:** `TypeChecker.Expressions.cs:1873–1880` — `QuantityForms[]`
+
+**The Problem:**
+
+Even if RC-1 is fixed, the TypeChecker's interpolated typed constant resolution lacks patterns for compound units in rule/ensure expressions. The sample file uses patterns like:
+
+```precept
+rule QuantityOnHand >= '0 {StockingUnit}'           # Pattern: T(num) T(' ') H[unit]
+rule StockingUnitsPerPurchaseUnit > '0 {A}/{B}'     # Pattern: T(num) T(' ') H[unit] T('/') H[unit]
+```
+
+**Current QuantityForms Array (from code audit):**
+
+| # | Pattern | Form | Slot Assignments |
+|---|---------|------|------------------|
+| Q1 | `'{x}'` | H[whole-value] | whole-value |
+| Q2 | `'{Wt} kg'` | H[magnitude] T(unit) | magnitude |
+| Q3 | `'5 {Unit}'` | T(num) H[unit] | unit |
+| Q4 | `'{Wt} {Unit}'` | H[magnitude] H[unit] | magnitude, unit |
+| Q5 | `'{M} {N}/{D}'` | H[mag] H[num-unit] T('/') H[denom-unit] | magnitude, numUnit, denomUnit |
+
+**Missing Patterns for Compound Units:**
+
+| # | Pattern | Example | Slot Assignments |
+|---|---------|---------|------------------|
+| Q6 | `T(num) T(' ') H[unit] T('/') H[unit]` | `'0 {A}/{B}'` | numeratorUnit, denominatorUnit |
+| Q7 | `T(num) T(' ') H[unit] T('/') T(unit)` | `'0 {A}/each'` | numeratorUnit |
+| Q8 | `T(num) T(' ') T(unit) T('/') H[unit]` | `'0 each/{B}'` | denominatorUnit |
+
+**Impact:** PRE0052 errors on rule expressions that use compound-unit interpolation. The pattern matching fails because no form matches `'0 {StockingUnit}/{PurchaseUnit}'`.
+
+**Fix Approach (Medium):**
+
+Add missing forms to `QuantityForms[]` and `UnitOfMeasureForms[]`:
+
+```csharp
+// Add to QuantityForms[] — lines 1873-1880
+// Q6: "0 " H[numerator] "/" H[denominator]
+new([MatchNumericSpace, MatchSlash, MatchEmpty], [InterpolationSlotKind.NumeratorUnit, InterpolationSlotKind.DenominatorUnit]),
+// Q7: "0 " H[numerator] "/each"
+new([MatchNumericSpace, MatchSlashUnit], [InterpolationSlotKind.NumeratorUnit]),
+// Q8: "0 each/" H[denominator]
+new([MatchNumericSpaceUnitSlash, MatchEmpty], [InterpolationSlotKind.DenominatorUnit]),
+```
+
+Add helper matcher:
+```csharp
+private static bool MatchNumericSpaceUnitSlash(string text)
+{
+    if (!text.EndsWith("/", StringComparison.Ordinal)) return false;
+    var content = text[..^1];
+    var spaceIdx = content.IndexOf(' ');
+    return spaceIdx > 0 && IsNumericLiteral(content[..spaceIdx]) && IsUnitName(content[(spaceIdx + 1)..]);
+}
+```
+
+**Estimated Complexity:** 2-3 hours — pattern additions + tests.
+
+---
+
+### RC-3: Sample File Design Issues (Not Compiler Bugs)
+
+**3a. `is set` on Non-Optional Field (PRE0049)**
+
+```precept
+in Listed ensure Sku is set because "SKU must be assigned before listing"  # LINE 137
+in LowStock ensure Sku is set because "SKU must be assigned"               # LINE 145
+```
+
+`Sku` is declared as `string notempty maxlength 50` — it's **required**, not optional. The `is set` check is meaningless on a required field.
+
+**Fix:** Remove these ensure clauses. The `notempty` modifier already guarantees Sku has a value.
+
+**3b. Type Mismatch in Cost Comparison (PRE0018)**
+
+```precept
+in Listed ensure ListPrice * StockingUnitsPerSaleUnit >= AverageCost  # LINE 140
+```
+
+This compares `price × quantity` (yields `money`) against `AverageCost` (which is `price`). The types don't match for comparison.
+
+**Fix:** Either:
+- Change to `ListPrice >= AverageCost / StockingUnitsPerSaleUnit`  (price vs price), or
+- Change to `ListPrice * StockingUnitsPerSaleUnit >= AverageCost * '{one stocking unit}'` if the intent is money vs money
+
+**3c. Division by Zero in WAC Calculation (PRE0083)**
+
+```precept
+-> set AverageCost = TotalInventoryCost / QuantityOnHand  # LINES 223, 229, 234
+```
+
+The proof engine correctly flags that `QuantityOnHand` can be zero after the division. The sample lacks a guard.
+
+**Fix:** Add a guard or use conditional:
+```precept
+-> set AverageCost = if QuantityOnHand > '0 {StockingUnit}' then TotalInventoryCost / QuantityOnHand else '0 {CatalogCurrency}/{StockingUnit}'
+```
+
+---
+
+## A2B Assessment: What It Actually Fixed
+
+**Slice A2B** added compound-unit interpolation patterns for `unitofmeasure` (U2: `'{A}/{B}'`) and `quantity` (Q5: `'{M} {A}/{B}'`).
+
+**What A2B Fixed:**
+- U2 pattern: `'{StockingUnit}/{PurchaseUnit}'` as a whole `unitofmeasure` value
+- Q5 pattern: `'{Magnitude} {Numerator}/{Denominator}'` with 3 holes
+
+**What A2B Did NOT Fix:**
+- RC-1 (parser blocker) — A2B is TypeChecker-only, doesn't touch Parser
+- Patterns with numeric prefix + 2 unit holes (`'0 {A}/{B}'`)
+- Field qualifier positions — even if A2B's patterns matched, RC-1 blocks them
+
+**A2B Visibility in This File:** ZERO. Every line that would benefit from A2B is blocked by RC-1 or missing patterns.
+
+---
+
+## Cascade Analysis
+
+| Cascade Type | Trigger | Error Code | Approx Count |
+|--------------|---------|------------|--------------|
+| Arg not declared | Event arg parsing failed (RC-1) | PRE0107 | ~30 |
+| Field not declared | Failed defaults | PRE0017 | ~10 |
+| Qualifier mismatch | Unknown arg type → unknown qualifier | PRE0114 | ~70 |
+
+**Rule of Thumb:** Fix RC-1 first. That will eliminate ~100 cascade errors immediately.
+
+---
+
+## Updated Bug Classification
+
+The sample file header's BUG-A/BUG-B/BUG-C classification needs updating:
+
+### BUG-A (PRE0114): Event Arg Qualifiers in Expressions — **Partially Blocked**
+
+Original description: "Event arg unit qualifiers not propagated into set-action or ensure expressions."
+
+**Status:** Cannot be accurately assessed until RC-1 is fixed. All event args with interpolated qualifiers fail to parse, so their qualifier propagation is never tested. Once RC-1 ships, Slice 10 (assignment expression qualifier propagation) should handle this — but needs explicit testing.
+
+### BUG-B (PRE0114): Quantity vs Typed Constant Literal — **Covered by Slice 9**
+
+Original description: "Quantity field compared against typed constant literal fails qualifier resolution."
+
+**Status:** This was indirectly covered by Slice 9 (dimension-only field false positive fix). Simple comparisons like `QuantityOnHand >= '0 each'` work today. The remaining failures are compound-unit patterns (RC-2).
+
+### BUG-C: Interpolated Typed Constants — **Partially Implemented, Blocked by RC-1**
+
+Original description: "Interpolated typed constants in quantity/price qualifiers and defaults not yet implemented."
+
+**Status:** 
+- Expression-level interpolation (defaults, rules, ensures): **Implemented for simple patterns**
+- Compound-unit patterns: **Missing (RC-2)**
+- Field/arg qualifier interpolation: **Parser blocks (RC-1)**
+
+**Recommended Header Update:**
+
+```precept
+# THIS FILE DOES NOT COMPILE — it expresses the intended design.
+# Pending compiler issues (spike/Precept-V2-Radical):
+#
+#   ROOT CAUSE 1 (Parser): Interpolated typed constants in field/arg qualifier
+#          positions (`in '...'`, `of '...'`) are rejected by the parser — it only
+#          accepts static typed constants. Affects all compound-unit fields and
+#          dimension-qualified fields/args.
+#
+#   ROOT CAUSE 2 (TypeChecker): Missing compound-unit interpolation patterns for
+#          forms like `'0 {Unit}/{Unit}'`. Affects rules/ensures that bound-check
+#          compound-unit quantities.
+#
+#   BUG-A (PRE0114): Event arg qualifiers not propagated into expressions —
+#          cannot be verified until RC-1 ships.
+#
+#   SAMPLE ISSUES: Line 137/145 use `is set` on non-optional field; Line 140/147
+#          have money/price type mismatch; Lines 223/229/234 have unguarded
+#          division by zero.
+```
+
+---
+
+## Recommended Fix Order
+
+1. **RC-1 (Parser qualifier interpolation)** — Highest impact, unblocks everything
+2. **RC-2 (Missing compound-unit patterns)** — Completes A2B's coverage
+3. **Sample file fixes** — Update header, fix design issues
+
+**Total Estimated Work:** 4-6 hours for RC-1 + RC-2. Sample fixes are author decisions, not compiler work.
+
+---
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/Precept/Pipeline/Parser.cs` | Extend `TryParseQualifiers()` to accept `TypedConstantStart` |
+| `src/Precept/Language/ParsedTypeReference.cs` | Extend `ParsedQualifier` to hold expressions |
+| `src/Precept/Pipeline/TypeChecker.Expressions.cs` | Add missing Q6/Q7/Q8 patterns to `QuantityForms[]` |
+| `samples/inventory-item.precept` | Update header comment, fix design issues |
+| `docs/Working/typed-constants-and-proof-coverage-plan.md` | Add Slice 2C for parser qualifier support |
+
+---
+
+## Sign-Off
+
+This analysis confirms that the 161 errors are traceable to 3 root causes (2 compiler, 1 sample design) plus cascade noise. The BUG classification needs refinement to distinguish parser-level blockers from TypeChecker pattern gaps.
+
+—Frank
+
 # Temporal Price Denominator Type System Extension — Slice 12 Unblock
 
 **By:** Frank  
