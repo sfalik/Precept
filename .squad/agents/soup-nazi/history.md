@@ -56,8 +56,9 @@
 
 ## Recent Updates
 
+### 2026-05-12T23:20:42Z — George's blocker closeout and redesign re-review approved
 
-
+- Re-review of commits `53d68d51` and `cf3c6a81` found `0 blockers / 2 good findings`: B1-B5 are closed, the explicit-wildcard `ResolvedStateTarget` redesign is structurally correct, and the spike is ready to merge.
 
 ### 2026-05-12T23:02:04Z — Comma-list spike review kept parser/test closure blocked
 

@@ -19,6 +19,11 @@
 
 ## Recent Updates
 
+### 2026-05-12T23:20:42Z — Soup Nazi re-review approved the comma-list closeout
+
+- Commit `53d68d51` closed B1-B5 plus N1 with parser AST coverage, stronger expansion and guard-clone assertions, multi-unknown-state fan-out coverage, and the corrected `4969` core-test count in the spike doc.
+- Commit `cf3c6a81` replaced the `ResolvedStateTarget` null-sentinel with explicit `IsWildcard`; Soup Nazi re-reviewed both commits and approved them with `0 blockers / 2 good findings`.
+
 ### 2026-05-12T23:02:04Z — B1 proof-hover blocker fixes are the current hover baseline
 
 - Commit `c2a38a56` moved qualifier/proof hovers onto the compact-card contract, locked the shared badge vocabulary to `✅ Proven`, `⚡ Enforced`, and `⚠️ Gap`, and normalized shipped copy from `proved` to `proven`.
