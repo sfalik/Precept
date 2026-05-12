@@ -327,7 +327,6 @@ public sealed record TypedRule(
     TypedExpression Condition,
     TypedExpression? Guard,
     TypedExpression Message,
-    ImmutableArray<string> SemanticSubjects,  // field names referenced
     ParsedConstruct Syntax
 );
 
@@ -338,7 +337,6 @@ public sealed record TypedEnsure(
     TypedExpression Condition,
     TypedExpression? Guard,
     TypedExpression Message,
-    ImmutableArray<string> SemanticSubjects,
     ParsedConstruct Syntax
 );
 
@@ -959,7 +957,7 @@ The type checker dispatches on `ConstructKind` enum values via exhaustive switch
 
 ### Implementation Plan (COMPLETED)
 
-Implementation complete. All 10 slices shipped, plus B1 (field expression resolution), B2 (ensure/access-mode/state-hook/edit-declaration normalization), and B3 (D26 MissingExpression diagnostic). Remaining open items: W1 (SemanticSubjects extraction), W2 (NodaTime dispatch refactor — non-blocking), G1–G3 (catalog-driven opportunities — low priority).
+Implementation complete. All 10 slices shipped, plus B1 (field expression resolution), B2 (ensure/access-mode/state-hook/edit-declaration normalization), and B3 (D26 MissingExpression diagnostic). W1 and W4 are resolved: `SemanticSubjects` was removed and `ConstraintRefs` is populated via expression-tree walkers in `PopulateRules` / `PopulateEnsures`. Remaining open items: W2 (NodaTime dispatch refactor — non-blocking), G1–G3 (catalog-driven opportunities — low priority).
 
 **Pre-Slice 0: Shape Commit (unblocks everything)**
 - All `TypedField`, `TypedState`, `TypedEvent`, `TypedArg` record definitions

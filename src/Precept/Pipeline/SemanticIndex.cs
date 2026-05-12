@@ -38,7 +38,8 @@ public sealed record TypedArgRef(
 public sealed record TypedLiteral(
     TypeKind ResultType,
     object? Value,
-    SourceSpan Span
+    SourceSpan Span,
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers = null
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>A resolved binary operation with its catalog-selected operation kind.</summary>
@@ -374,7 +375,6 @@ public sealed record TypedRule(
     TypedExpression Condition,
     TypedExpression? Guard,
     TypedExpression Message,
-    ImmutableArray<string> SemanticSubjects,
     ParsedConstruct Syntax
 );
 
@@ -386,7 +386,6 @@ public sealed record TypedEnsure(
     TypedExpression Condition,
     TypedExpression? Guard,
     TypedExpression Message,
-    ImmutableArray<string> SemanticSubjects,
     ParsedConstruct Syntax
 );
 

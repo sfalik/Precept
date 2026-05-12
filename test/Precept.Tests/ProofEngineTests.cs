@@ -1913,10 +1913,11 @@ public class ProofEngineTests
                 rule Amount >= 0 because "Amount must be nonneg"
                 """);
 
-            // NOTE: ConstraintRefs is never populated by the TypeChecker; ProjectConstraintInfluence
-            // always returns empty. These assertions document the current (unimplemented) behavior.
-            ledger.ConstraintInfluence.Should().BeEmpty(
-                because: "ConstraintRefs is not yet populated by the TypeChecker");
+            var entry = ledger.ConstraintInfluence.Should().ContainSingle().Which;
+            entry.Constraint.Should().BeOfType<RuleIdentity>()
+                .Which.RuleIndex.Should().Be(0);
+            entry.ReferencedFields.Should().Equal("Amount");
+            entry.ReferencedArgs.Should().BeEmpty();
         }
 
         [Fact]
@@ -1938,10 +1939,15 @@ public class ProofEngineTests
                 rule B >= 0 because "B must be nonneg"
                 """);
 
-            // NOTE: ConstraintRefs is never populated by the TypeChecker; ProjectConstraintInfluence
-            // always returns empty regardless of how many rules are declared.
-            ledger.ConstraintInfluence.Should().BeEmpty(
-                because: "ConstraintRefs is not yet populated by the TypeChecker");
+            ledger.ConstraintInfluence.Should().HaveCount(2);
+            ledger.ConstraintInfluence[0].Constraint.Should().BeOfType<RuleIdentity>()
+                .Which.RuleIndex.Should().Be(0);
+            ledger.ConstraintInfluence[0].ReferencedFields.Should().Equal("A");
+            ledger.ConstraintInfluence[0].ReferencedArgs.Should().BeEmpty();
+            ledger.ConstraintInfluence[1].Constraint.Should().BeOfType<RuleIdentity>()
+                .Which.RuleIndex.Should().Be(1);
+            ledger.ConstraintInfluence[1].ReferencedFields.Should().Equal("B");
+            ledger.ConstraintInfluence[1].ReferencedArgs.Should().BeEmpty();
         }
 
         [Fact]
@@ -1953,10 +1959,8 @@ public class ProofEngineTests
                 rule X > 0 because "test"
                 """);
 
-            // NOTE: ConstraintRefs is never populated by the TypeChecker; ProjectConstraintInfluence
-            // always returns empty — RuleIdentity entries are never produced.
-            ledger.ConstraintInfluence.Should().BeEmpty(
-                because: "ConstraintRefs is not yet populated by the TypeChecker");
+            ledger.ConstraintInfluence.Should().ContainSingle()
+                .Which.Constraint.Should().BeOfType<RuleIdentity>();
         }
 
         [Fact]
@@ -1970,10 +1974,9 @@ public class ProofEngineTests
                 rule B > 0 because "second rule"
                 """);
 
-            // NOTE: ConstraintRefs is never populated by the TypeChecker; ProjectConstraintInfluence
-            // always returns empty — no RuleIdentity entries are produced in declaration order.
-            ledger.ConstraintInfluence.Should().BeEmpty(
-                because: "ConstraintRefs is not yet populated by the TypeChecker");
+            ledger.ConstraintInfluence.Should().HaveCount(2);
+            ledger.ConstraintInfluence.Select(entry => ((RuleIdentity)entry.Constraint).RuleIndex)
+                .Should().Equal(0, 1);
         }
     }
 
@@ -2461,9 +2464,15 @@ public class ProofEngineTests
 
             ledger.Obligations.Should().NotBeEmpty(because: "Y/D creates an obligation");
             ledger.FaultSiteLinks.Should().NotBeEmpty(because: "unresolved obligation creates fault site link");
-            // NOTE: ConstraintInfluence is always empty — ConstraintRefs not yet populated by TypeChecker.
-            ledger.ConstraintInfluence.Should().BeEmpty(
-                because: "ConstraintRefs is not yet populated by the TypeChecker");
+            ledger.ConstraintInfluence.Should().HaveCount(2);
+            var ensureInfluence = ledger.ConstraintInfluence.Single(entry => entry.Constraint is EnsureIdentity);
+            ensureInfluence.Constraint.Should().Be(new EnsureIdentity(ConstraintKind.StateResident, "Draft", 0));
+            ensureInfluence.ReferencedFields.Should().Equal("X");
+            ensureInfluence.ReferencedArgs.Should().BeEmpty();
+            var ruleInfluence = ledger.ConstraintInfluence.Single(entry => entry.Constraint is RuleIdentity);
+            ruleInfluence.Constraint.Should().Be(new RuleIdentity(0));
+            ruleInfluence.ReferencedFields.Should().Equal("X");
+            ruleInfluence.ReferencedArgs.Should().BeEmpty();
             ledger.InitialStateResults.Should().NotBeEmpty(because: "state Draft is initial");
             ledger.Diagnostics.Should().NotBeEmpty(because: "unresolved obligation emits diagnostic");
         }
@@ -3462,17 +3471,18 @@ public class ProofEngineTests
         [Fact]
         public void ConstraintInfluence_EnsureWithArgRef_ResolvesToEventArgReference()
         {
-            // ConstraintRefs is not yet populated by the TypeChecker; influence is always empty.
-            // This test documents expected behavior when arg refs appear in state ensures.
             var ledger = Prove("""
                 precept Widget
-                field Amount as number default 0 nonnegative
+                field Total as number default 0 nonnegative
                 state Draft initial
-                in Draft ensure Amount >= 0 because "Amount must be nonneg"
+                event Submit(SubmittedAmount as number)
+                on Submit ensure SubmittedAmount >= 0 because "Submitted amount must be nonneg"
                 """);
 
-            ledger.ConstraintInfluence.Should().BeEmpty(
-                because: "ConstraintRefs is not yet populated; arg ref influence is not yet projected");
+            var entry = ledger.ConstraintInfluence.Should().ContainSingle().Which;
+            entry.Constraint.Should().Be(new EnsureIdentity(ConstraintKind.EventPrecondition, "Submit", 0));
+            entry.ReferencedFields.Should().BeEmpty();
+            entry.ReferencedArgs.Should().Equal(new EventArgReference("Submit", "SubmittedAmount"));
         }
 
         [Fact]
@@ -3488,17 +3498,28 @@ public class ProofEngineTests
         [Fact]
         public void ConstraintInfluence_MultipleConstraints_AllProjected()
         {
-            // cf. ConstraintInfluence_MultipleRules_AllProjected
             var ledger = Prove("""
                 precept Widget
                 field A as number default 0 nonnegative
                 field B as number default 0 nonnegative
+                state Draft initial
                 rule A >= 0 because "A must be nonneg"
+                in Draft ensure B >= 0 because "B must be nonneg"
+                event Submit
                 rule B >= 0 because "B must be nonneg"
                 """);
 
-            ledger.ConstraintInfluence.Should().BeEmpty(
-                because: "ConstraintRefs is not yet populated regardless of how many constraints exist");
+            ledger.ConstraintInfluence.Should().HaveCount(3);
+            var firstRuleInfluence = ledger.ConstraintInfluence.Single(entry => entry.Constraint is RuleIdentity { RuleIndex: 0 });
+            firstRuleInfluence.ReferencedFields.Should().Equal("A");
+            firstRuleInfluence.ReferencedArgs.Should().BeEmpty();
+            var ensureInfluence = ledger.ConstraintInfluence.Single(entry => entry.Constraint is EnsureIdentity);
+            ensureInfluence.Constraint.Should().Be(new EnsureIdentity(ConstraintKind.StateResident, "Draft", 0));
+            ensureInfluence.ReferencedFields.Should().Equal("B");
+            ensureInfluence.ReferencedArgs.Should().BeEmpty();
+            var secondRuleInfluence = ledger.ConstraintInfluence.Single(entry => entry.Constraint is RuleIdentity { RuleIndex: 1 });
+            secondRuleInfluence.ReferencedFields.Should().Equal("B");
+            secondRuleInfluence.ReferencedArgs.Should().BeEmpty();
         }
 
         // ── InitialStateSatisfiability additional ─────────────────────────────

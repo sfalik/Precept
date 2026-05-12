@@ -1315,7 +1315,7 @@ ImmutableArray<ConstraintInfluenceEntry> ProjectConstraintInfluence(SemanticInde
 }
 ```
 
-> **Design note:** `SemanticIndex.ConstraintRefs` carries `ImmutableArray<string> ReferencedArgs` (bare arg names), while `ConstraintInfluenceEntry.ReferencedArgs` carries `ImmutableArray<EventArgReference>` (event-qualified). The proof engine resolves this by looking up which event owns each arg name via `SemanticIndex.EventsByName`. If a future TypeChecker change populates `ConstraintFieldRefs` with event-qualified arg references directly, the proof engine projection simplifies to a 1:1 copy.
+> **Implementation note:** `SemanticIndex.ConstraintRefs` carries `ImmutableArray<string> ReferencedArgs` (bare arg names), while `ConstraintInfluenceEntry.ReferencedArgs` carries `ImmutableArray<EventArgReference>` (event-qualified). The proof engine resolves this by looking up which event owns each arg name via `SemanticIndex.EventsByName`. If a future TypeChecker change populates `ConstraintFieldRefs` with event-qualified arg references directly, the proof engine projection simplifies to a 1:1 copy.
 
 The Precept Builder consumes these entries and reorganizes them into a `ConstraintInfluenceMap` — a precomputed artifact that enables AI agents to reason causally: "which fields affect which constraints?"
 
