@@ -6,6 +6,65 @@
 
 ---
 
+### 2026-05-12T22:18:18Z: User model directive locks claude-opus-4.7 behind explicit permission while keeping claude-opus-4.6 available under normal rules
+
+**By:** Scribe
+
+**Status:** Merged from Shane's directive notes.
+
+**Merged sources:** `copilot-directive-opus47.md`, `copilot-directive-opus46-ok.md`.
+
+- The hard rule is now durable team memory: no one uses `claude-opus-4.7` unless Shane explicitly authorizes it for the session or task.
+- The clarification also locks the non-ban boundary: `claude-opus-4.6` remains available for complex work under the existing model-selection policy and is not part of the prohibition.
+- Model-selection guidance should therefore treat the directive as a surgical ban on `claude-opus-4.7`, not a general no-opus policy.
+
+---
+
+### 2026-05-12T22:18:18Z: Comma-delimited state-target lists now ship end-to-end across parser, type checker, normalization, and diagnostics
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, and reconciled across George's S1/S2/S3/S4 notes.
+
+**Merged sources:** `george-s1-parser-done.md`, `george-s2-tc-done.md`, `george-s3s4-done.md`.
+
+- `ParseStateTarget()` now accepts `any` or comma-delimited state-name lists, preserves per-name spans, and parser disambiguation scans past those lists before resolving state-scoped constructs.
+- Transition-row normalization expands one typed row per named source state while preserving undeclared names as explicit per-name diagnostics instead of collapsing them into wildcard semantics.
+- The remaining state-target normalization passes are now aligned: ensures, access modes, and state hooks each expand per state-list entry, while omit declarations stay unchanged because they do not consume `StateTargetSlot`.
+- Two dedicated diagnostics close the authoring contract: `StateListContainsWildcard` rejects mixed named-state plus `any` lists, and `DuplicateStateInList` warns on duplicate names before deduplicated expansion proceeds.
+
+---
+
+### 2026-05-12T22:18:18Z: Canonical samples now demonstrate comma-list state syntax only where semantics stay identical
+
+**By:** Scribe
+
+**Status:** Merged from Frank's sample-closeout note.
+
+**Merged source:** `frank-s7-samples-done.md`.
+
+- `samples/hiring-pipeline.precept`, `samples/it-helpdesk-ticket.precept`, and `samples/utility-outage-report.precept` now use comma-list source states for the pure-copy transitions George's runtime/parser work actually supports.
+- Frank deliberately left rows expanded anywhere guards, actions, or outcomes diverged, preserving the spike ruling that comma lists are syntactic sugar for identical rows rather than a semantic broadening of transition behavior.
+- Validation for the three edited samples stayed clean through VS Code diagnostics even though MCP `precept_compile` was unavailable during the pass.
+
+---
+
+### 2026-05-12T22:18:18Z: Hover V1 now routes construct cards first, reports only unconditional mutability truth, and exposes graph-edge proof gaps through StateGraph metadata
+
+**By:** Scribe
+
+**Status:** Merged and deduplicated from Kramer's hover-closeout notes.
+
+**Merged sources:** `kramer-b2-b3-routing-and-mutability.md`, `kramer-b4-edge-proof-status.md`, `elaine-b4-design-doc-update.md`.
+
+- `HoverHandler.cs` now lets construct-span cards beat generic operator/function/accessor fallbacks while preserving the existing proof-first behavior and identifier-driven symbol hovers where they are still the honest trigger surface.
+- `RichHoverFactory.cs` now limits writable counts and state mutability summaries to unconditional `AccessModes`, omitting guarded access from V1 mutability claims instead of synthesizing misleading read-only complements.
+- `StateGraph` now carries edge proof-status metadata projected from unresolved transition proof obligations, allowing state hover to explain unproven graph edges without re-joining proof data inside the language server.
+- `docs/Working/hover-design.md` is now synced to the shipped B4 state-proof narrative, including the `📍` / `✅ Proven` / `⚠️ Gap` badge vocabulary and the fact that B4 appends to the rich state hover instead of shipping as a standalone hover kind.
+- Kramer's B2/B3/B4 validation stayed green on the full build plus core and language-server test suites (`4966` core tests, `281` LS tests).
+
+---
+
 ### 2026-05-12T15:15:10Z: Proof hover spec is now consolidated into `docs/Working/hover-design.md`
 
 **By:** Scribe
@@ -8260,66 +8319,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
-### 2026-05-05T15:32:50Z: Value-types investigation reconciled to authoritative docs; `DateRange` deferred and `date` stays `NodaTime.LocalDate`
-
-
-
-
-
-
-
-**By:** Frank
-
-
-
-
-
-
-
-**Status:** Merged, inbox cleared (1 file).
-
-
-
-
-
-
-
-**Merged sources:** `frank-value-types-reconciliation.md`.
-
-
-
-
-
-
-
-- `docs/working/precept-value-types-investigation.md` now aligns with `docs/language/temporal-type-system.md` and `docs/language/business-domain-types.md` across §§1–§14.
-
-
-
-
-
-
-
-- §7.4 `DateRange` is no longer treated as a confirmed type: the temporal type system explicitly defers date-interval / daterange support, so the investigation now records it as deferred rather than adopted.
-
-
-
-
-
-
-
-- The backing type for `date` is confirmed as `NodaTime.LocalDate`, and the earlier `DateOnly` / dual-public-surface claim was removed because the locked temporal design exposes NodaTime directly.
-
-
-
-
-
-
-
-- All remaining sections were verified as consistent; the only follow-up tensions left for Shane are the DX-layer well-known-constants surface and the authoritative `currency` accessor doc lag.
-
----
-
 ### 2026-05-11T22:41:49Z: Proof Engine Qualifier Coverage — Part B (Slices 7+8+9)
 
 
@@ -8497,3 +8496,4 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - MCP type-catalog output now serializes implied qualifiers, and George locked the implementation with 13 new Slice 11B tests. Slice 12 can proceed on top of the completed temporal denominator substrate.
 
 - Tooling follow-up remains open for Kramer: `price of ...` completions should offer `'time'` and `'date'` alongside physical dimensions.
+

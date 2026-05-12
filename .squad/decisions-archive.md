@@ -28022,3 +28022,73 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 ---
 
 ---
+
+---
+
+## Archive Batch — 2026-05-12T22:18:18Z (repair pass)
+
+- Archived the one remaining active decision entry older than the 7-day hard-gate cutoff after the initial merge pass missed it due to timestamp parsing drift.
+- Cutoff applied: 2026-05-05T22:18:18Z.
+- Entries moved this repair: 1.
+
+---
+
+### 2026-05-05T15:32:50Z: Value-types investigation reconciled to authoritative docs; `DateRange` deferred and `date` stays `NodaTime.LocalDate`
+
+
+
+
+
+
+
+**By:** Frank
+
+
+
+
+
+
+
+**Status:** Merged, inbox cleared (1 file).
+
+
+
+
+
+
+
+**Merged sources:** `frank-value-types-reconciliation.md`.
+
+
+
+
+
+
+
+- `docs/working/precept-value-types-investigation.md` now aligns with `docs/language/temporal-type-system.md` and `docs/language/business-domain-types.md` across §§1–§14.
+
+
+
+
+
+
+
+- §7.4 `DateRange` is no longer treated as a confirmed type: the temporal type system explicitly defers date-interval / daterange support, so the investigation now records it as deferred rather than adopted.
+
+
+
+
+
+
+
+- The backing type for `date` is confirmed as `NodaTime.LocalDate`, and the earlier `DateOnly` / dual-public-surface claim was removed because the locked temporal design exposes NodaTime directly.
+
+
+
+
+
+
+
+- All remaining sections were verified as consistent; the only follow-up tensions left for Shane are the DX-layer well-known-constants surface and the authoritative `currency` accessor doc lag.
+
+---
