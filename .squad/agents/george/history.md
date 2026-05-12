@@ -122,3 +122,9 @@
 - Exact text-segment matching is delegate-based, not token-based: separator checks happen through `TextMatch` functions over `TextSegment.Text`, and the slash separator is the literal `MatchSlash(string text) => text == "/"` check. Literal spaces in mixed forms still use exact inline checks like `(string s) => s == " "`.
 - A2B added quantity Q5 (`'{n} {A}/{B}'`) plus a dedicated `UnitOfMeasureForms` compound-unit pattern for `'{A}/{B}'`; quantity Q6 was intentionally not added because the existing quantity whole-value lane is `H[whole-value]`, not a unit-only compound form.
 
+
+### 2026-05-11T22:05:37.512-04:00 — RC-2 compound-unit interpolation patterns completed
+- `TypeChecker.Expressions.cs` already had `UnitOfMeasureForms` U2 (`'{A}/{B}'`) and `PriceForms` P5 (`'0 {Currency}/{Unit}'`), so the regression was isolated to `QuantityForms` missing the numeric-prefixed compound-unit variants.
+- Added quantity forms for `'0 {A}/{B}'`, `'0 {A}/each'`, and `'0 each/{B}'`, plus a `MatchNumericSpaceUnitSlash()` matcher for the fixed-numerator/denominator-hole shape.
+- Added regression tests for all three quantity forms and a price guardrail test for `'0 {Currency}/{Unit}'`; targeted typed-constant tests now pass, and the full test project still only shows the pre-existing 26 spike-branch failures.
+- Surprise: A2B had already landed the plain `unitofmeasure` compound form and the price grammar needed by `AverageCost`/`ListPrice`; only the quantity table lagged behind.

@@ -1855,6 +1855,13 @@ internal static partial class TypeChecker
         var slashIdx = rest.IndexOf('/');
         return slashIdx > 0 && IsCurrencyCode(rest[..slashIdx]) && IsUnitName(rest[(slashIdx + 1)..]);
     }
+    private static bool MatchNumericSpaceUnitSlash(string text)
+    {
+        if (!text.EndsWith("/", StringComparison.Ordinal)) return false;
+        var content = text[..^1];
+        var spaceIdx = content.IndexOf(' ');
+        return spaceIdx > 0 && IsNumericLiteral(content[..spaceIdx]) && IsUnitName(content[(spaceIdx + 1)..]);
+    }
 
     // ── Per-type valid form tables (segment-aware) ────────────────────────
 
@@ -1877,6 +1884,9 @@ internal static partial class TypeChecker
         new([MatchNumericSpace, MatchEmpty], [InterpolationSlotKind.Unit]),
         new([MatchEmpty, (string s) => s == " ", MatchEmpty], [InterpolationSlotKind.Magnitude, InterpolationSlotKind.Unit]),
         new([MatchEmpty, (string s) => s == " ", MatchSlash, MatchEmpty], [InterpolationSlotKind.Magnitude, InterpolationSlotKind.NumeratorUnit, InterpolationSlotKind.DenominatorUnit]),
+        new([MatchNumericSpace, MatchSlash, MatchEmpty], [InterpolationSlotKind.NumeratorUnit, InterpolationSlotKind.DenominatorUnit]),
+        new([MatchNumericSpace, MatchSlashUnit], [InterpolationSlotKind.NumeratorUnit]),
+        new([MatchNumericSpaceUnitSlash, MatchEmpty], [InterpolationSlotKind.DenominatorUnit]),
     ];
 
     private static readonly SegmentForm[] PriceForms =

@@ -752,6 +752,64 @@ public class TypeCheckerTypedConstantTests
     }
 
     [Fact]
+    public void InterpolatedTypedConstant_NumericMagnitudeWithCompoundUnitHoles_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity
+            field a as unitofmeasure
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '0 {a}/{b}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_NumericMagnitudeWithNumeratorHoleAndFixedDenominator_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity
+            field a as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '0 {a}/each'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_NumericMagnitudeWithFixedNumeratorAndDenominatorHole_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '0 each/{b}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
     public void InterpolatedTypedConstant_QuantityInCompoundUnitSlot_TypeMismatch()
     {
         var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
@@ -1271,6 +1329,26 @@ public class TypeCheckerTypedConstantTests
             event Go initial
             on Go
                 -> set p = '{n} USD/kg'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "p");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Price);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_NumericMagnitudeWithCurrencyAndUnitHoles_ValidPrice()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field p as price
+            field c as currency
+            field u as unitofmeasure
+            event Go initial
+            on Go
+                -> set p = '0 {c}/{u}'
             """);
 
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
