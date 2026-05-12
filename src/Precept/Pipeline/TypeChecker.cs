@@ -172,15 +172,50 @@ internal static partial class TypeChecker
         }
 
         var template = DescribeInterpolatedQualifier(qualifier.Expression);
+        var sourceFieldName = ExtractSourceFieldName(qualifier.Expression);
         return qualifier.Axis switch
         {
-            QualifierAxis.Currency          => new DeclaredQualifierMeta.Currency(template),
-            QualifierAxis.Unit              => new DeclaredQualifierMeta.Unit(template, template),
-            QualifierAxis.Dimension         => new DeclaredQualifierMeta.Dimension(template),
-            QualifierAxis.FromCurrency      => new DeclaredQualifierMeta.FromCurrency(template),
-            QualifierAxis.ToCurrency        => new DeclaredQualifierMeta.ToCurrency(template),
+            QualifierAxis.Currency          => new DeclaredQualifierMeta.Currency(template, SourceFieldName: sourceFieldName),
+            QualifierAxis.Unit              => new DeclaredQualifierMeta.Unit(template, template, SourceFieldName: sourceFieldName),
+            QualifierAxis.Dimension         => new DeclaredQualifierMeta.Dimension(template, SourceFieldName: sourceFieldName),
+            QualifierAxis.FromCurrency      => new DeclaredQualifierMeta.FromCurrency(template, SourceFieldName: sourceFieldName),
+            QualifierAxis.ToCurrency        => new DeclaredQualifierMeta.ToCurrency(template, SourceFieldName: sourceFieldName),
             _                               => null,
         };
+    }
+
+    /// <summary>
+    /// Extracts the source field name from an interpolated qualifier expression for use in
+    /// SourceFieldName-based symbolic equality (P2, Option B). Returns the root identifier
+    /// for single-hole and member-access forms; null for multi-hole or complex expressions.
+    /// </summary>
+    private static string? ExtractSourceFieldName(InterpolatedTypedConstantExpression expression)
+    {
+        // The parser always produces a leading TextSegment (the text before the first hole, which
+        // is typically empty for pure qualifier expressions like '{CatalogCurrency}'). We skip empty
+        // TextSegments and look for exactly one HoleSegment carrying a simple identifier or member access.
+        string? fieldName = null;
+        foreach (var segment in expression.Segments)
+        {
+            switch (segment)
+            {
+                case TextSegment { Text: "" }:
+                    // Empty prefix/suffix from the parser — safe to ignore
+                    break;
+                case HoleSegment { Expression: IdentifierExpression id } when fieldName is null:
+                    // Single-hole: '{CatalogCurrency}' → "CatalogCurrency"
+                    fieldName = id.Name;
+                    break;
+                case HoleSegment { Expression: MemberAccessExpression { Target: IdentifierExpression root } } when fieldName is null:
+                    // Member access: '{StockingUnit.dimension}' → "StockingUnit"
+                    fieldName = root.Name;
+                    break;
+                default:
+                    // Multi-hole, non-empty text content, or complex expression — cannot extract a single field name
+                    return null;
+            }
+        }
+        return fieldName;
     }
 
     private static string DescribeInterpolatedQualifier(InterpolatedTypedConstantExpression expression)

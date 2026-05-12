@@ -4637,6 +4637,144 @@ public class ProofEngineTests
             compilation.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  P2 — Symbolic Qualifier Equality via SourceFieldName
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Tests for the P2 SourceFieldName-based symbolic equality mechanism.
+    /// Covers direct QualifiersSymbolicallyEqual comparisons and integration paths
+    /// through MapInterpolatedQualifier and CreateQualifierFromSlotExpression.
+    /// </summary>
+    public class PartP2_SymbolicQualifierEqualityViaSourceFieldName
+    {
+        // ── Direct symbolic equality ──────────────────────────────────────────
+
+        [Fact]
+        public void SymbolicEquality_SameSourceField_AreEqual()
+        {
+            var left  = new DeclaredQualifierMeta.Currency("{CatalogCurrency}", SourceFieldName: "CatalogCurrency");
+            var right = new DeclaredQualifierMeta.Currency("{CatalogCurrency}", SourceFieldName: "CatalogCurrency");
+
+            ProofEngine.QualifiersSymbolicallyEqualForTest(left, right)
+                .Should().BeTrue(because: "same SourceFieldName on same subtype must compare as equal");
+        }
+
+        [Fact]
+        public void SymbolicEquality_DifferentSourceFields_AreNotEqual()
+        {
+            var left  = new DeclaredQualifierMeta.Currency("{CatalogCurrency}",  SourceFieldName: "CatalogCurrency");
+            var right = new DeclaredQualifierMeta.Currency("{SupplierCurrency}", SourceFieldName: "SupplierCurrency");
+
+            ProofEngine.QualifiersSymbolicallyEqualForTest(left, right)
+                .Should().BeFalse(because: "different SourceFieldName values must not compare as equal");
+        }
+
+        [Fact]
+        public void SymbolicEquality_CrossSubtype_SameSourceField()
+        {
+            // Critical F4 path: ToCurrency and Currency with the same source field must be equal.
+            var toCurrency = new DeclaredQualifierMeta.ToCurrency("{CatalogCurrency}", SourceFieldName: "CatalogCurrency");
+            var currency   = new DeclaredQualifierMeta.Currency("{CatalogCurrency}",   SourceFieldName: "CatalogCurrency");
+
+            ProofEngine.QualifiersSymbolicallyEqualForTest(toCurrency, currency)
+                .Should().BeTrue(because: "cross-subtype comparison via SourceFieldName is the F4 critical path");
+
+            ProofEngine.QualifiersSymbolicallyEqualForTest(currency, toCurrency)
+                .Should().BeTrue(because: "cross-subtype comparison must be symmetric");
+        }
+
+        [Fact]
+        public void SymbolicEquality_NullSourceField_FallsBackToStringExtraction()
+        {
+            // Legacy qualifiers without SourceFieldName fall back to ExtractQualifierSourcePath.
+            var left  = new DeclaredQualifierMeta.Currency("{CatalogCurrency}");
+            var right = new DeclaredQualifierMeta.Currency("{CatalogCurrency}");
+
+            ProofEngine.QualifiersSymbolicallyEqualForTest(left, right)
+                .Should().BeTrue(because: "fallback string extraction still works when SourceFieldName is null");
+        }
+
+        [Fact]
+        public void SymbolicEquality_MemberAccess_ExtractsRootField()
+        {
+            // Member-access forms share SourceFieldName "StockingUnit" — both root and dotted template equal.
+            var left  = new DeclaredQualifierMeta.Unit("{StockingUnit.dimension}", "{StockingUnit.dimension}", SourceFieldName: "StockingUnit");
+            var right = new DeclaredQualifierMeta.Unit("{StockingUnit}",           "{StockingUnit}",           SourceFieldName: "StockingUnit");
+
+            ProofEngine.QualifiersSymbolicallyEqualForTest(left, right)
+                .Should().BeTrue(because: "member-access and bare-identifier forms share the same root SourceFieldName");
+        }
+
+        // ── MapInterpolatedQualifier integration ──────────────────────────────
+
+        [Fact]
+        public void InterpolatedQualifier_MapInterpolatedQualifier_PopulatesSourceFieldName()
+        {
+            // Parse + type-check a precept with a single-hole currency qualifier.
+            // The resulting DeclaredQualifierMeta.Currency must have SourceFieldName == "CatalogCurrency".
+            var (index, _) = TypeCheckerTestHelpers.Check("""
+                precept Widget
+                field CatalogCurrency as currency default 'USD' writable
+                field Balance as money in '{CatalogCurrency}' default '0.00 USD' writable
+                state Draft initial
+                """);
+
+            var balanceField = index.FieldsByName["Balance"];
+            var currencyQualifier = balanceField.DeclaredQualifiers
+                .OfType<DeclaredQualifierMeta.Currency>()
+                .FirstOrDefault();
+
+            currencyQualifier.Should().NotBeNull(because: "Balance must carry a Currency qualifier");
+            currencyQualifier!.SourceFieldName.Should().Be("CatalogCurrency",
+                because: "MapInterpolatedQualifier must populate SourceFieldName from the single-hole identifier");
+        }
+
+        [Fact]
+        public void InterpolatedQualifier_MemberAccess_PopulatesRootAsSourceFieldName()
+        {
+            // Dot-path qualifier '{StockingUnit.dimension}' on a quantity field's 'in' axis
+            // produces a Unit qualifier (not Dimension — 'of' preposition is Dimension axis).
+            // SourceFieldName must be "StockingUnit" (root of the member-access expression).
+            var (index, _) = TypeCheckerTestHelpers.Check("""
+                precept Widget
+                field StockingUnit as unitofmeasure default 'kg' writable
+                field Weight as quantity in '{StockingUnit}' default '0 kg' writable
+                state Draft initial
+                """);
+
+            var weightField = index.FieldsByName["Weight"];
+            var unitQualifier = weightField.DeclaredQualifiers
+                .OfType<DeclaredQualifierMeta.Unit>()
+                .FirstOrDefault();
+
+            unitQualifier.Should().NotBeNull(because: "Weight must carry a Unit qualifier");
+            unitQualifier!.SourceFieldName.Should().Be("StockingUnit",
+                because: "MapInterpolatedQualifier must populate SourceFieldName from the single-hole identifier");
+        }
+
+        // ── CreateQualifierFromSlotExpression integration ─────────────────────
+
+        [Fact]
+        public void InterpolatedQualifier_CreateQualifierFromSlotExpression_PopulatesSourceFieldName()
+        {
+            // A typed constant like '0.00 {CatalogCurrency}' triggers CreateQualifierFromSlotExpression.
+            // Verified indirectly: proof resolves PRE0114 only if SourceFieldName is populated on both sides.
+            var ledger = Prove("""
+                precept Widget
+                field CatalogCurrency as currency default 'USD'
+                field Balance as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+                rule Balance >= '0.00 {CatalogCurrency}' because "Balance must be nonnegative"
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Currency })
+                .Should().ContainSingle()
+                .Which.Disposition.Should().Be(ProofDisposition.Proved,
+                    because: "CreateQualifierFromSlotExpression must populate SourceFieldName enabling symbolic equality");
+        }
+    }
 
     public class PartF_F4_ExchangeRateTimesMoneyCurrencyConversion
     {

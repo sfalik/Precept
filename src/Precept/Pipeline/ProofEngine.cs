@@ -970,6 +970,11 @@ public static class ProofEngine
 
     private static bool QualifiersSymbolicallyEqual(DeclaredQualifierMeta left, DeclaredQualifierMeta right)
     {
+        // Primary: SourceFieldName populated at type-check time — cross-subtype capable
+        if (left.SourceFieldName is { } lsf && right.SourceFieldName is { } rsf)
+            return string.Equals(lsf, rsf, StringComparison.Ordinal);
+
+        // Fallback: structural path extraction for legacy/non-interpolated qualifiers
         var leftSourcePath = ExtractQualifierSourcePath(left);
         var rightSourcePath = ExtractQualifierSourcePath(right);
         return leftSourcePath is not null
@@ -1113,6 +1118,17 @@ public static class ProofEngine
                             QualifierAxis.ToCurrency, semantics);
                     }
                     return null;
+
+                case CompoundDimensionElevationRequired:
+                    if (axis == QualifierAxis.Currency
+                        || axis == QualifierAxis.FromCurrency
+                        || axis == QualifierAxis.ToCurrency)
+                    {
+                        // Currency inherits from price (left operand)
+                        return ResolveQualifierFromExpression(binOp.Left, axis, semantics);
+                    }
+                    // Unit/Dimension: elevated from compound-quantity numerator (right operand)
+                    return TryResolveCompoundElevationDimension(binOp, axis, semantics);
             }
         }
 
@@ -1221,6 +1237,14 @@ public static class ProofEngine
                                 binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
                                 QualifierAxis.ToCurrency, semantics)
                             : null,
+                    CompoundDimensionElevationRequired =>
+                        axis == QualifierAxis.Currency
+                        || axis == QualifierAxis.FromCurrency
+                        || axis == QualifierAxis.ToCurrency
+                            // Currency inherits from price (left operand)
+                            ? ResolveQualifierFromExpression(binOp.Left, axis, semantics)
+                            // Unit/Dimension: elevated from compound-quantity numerator
+                            : TryResolveCompoundElevationDimension(binOp, axis, semantics),
                     _ => null,
                 };
 
@@ -1287,11 +1311,11 @@ public static class ProofEngine
 
         return axis switch
         {
-            QualifierAxis.Currency => new DeclaredQualifierMeta.Currency($"{{{fieldName}}}"),
-            QualifierAxis.Unit => new DeclaredQualifierMeta.Unit($"{{{fieldName}}}", $"{{{fieldName}}}"),
-            QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension($"{{{fieldName}}}"),
-            QualifierAxis.FromCurrency => new DeclaredQualifierMeta.FromCurrency($"{{{fieldName}}}"),
-            QualifierAxis.ToCurrency => new DeclaredQualifierMeta.ToCurrency($"{{{fieldName}}}"),
+            QualifierAxis.Currency => new DeclaredQualifierMeta.Currency($"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.Unit => new DeclaredQualifierMeta.Unit($"{{{fieldName}}}", $"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension($"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.FromCurrency => new DeclaredQualifierMeta.FromCurrency($"{{{fieldName}}}", SourceFieldName: fieldName),
+            QualifierAxis.ToCurrency => new DeclaredQualifierMeta.ToCurrency($"{{{fieldName}}}", SourceFieldName: fieldName),
             _ => null,
         };
     }
@@ -1310,6 +1334,35 @@ public static class ProofEngine
             : ResolveQualifierFromExpression(binOp.Right, axis, semantics);
 
         var compoundValue = ExtractCompoundValue(leftQualifier) ?? ExtractCompoundValue(rightQualifier);
+        if (compoundValue is null)
+            return null;
+
+        var slashIndex = compoundValue.IndexOf('/');
+        if (slashIndex < 0)
+            return null;
+
+        var numerator = compoundValue[..slashIndex].Trim();
+        if (!TryDeriveCompoundNumeratorDimension(numerator, out var numeratorDimension))
+            return null;
+
+        return axis switch
+        {
+            QualifierAxis.Unit => new DeclaredQualifierMeta.Unit(numerator, numeratorDimension, QualifierOrigin.Derived),
+            QualifierAxis.Dimension => new DeclaredQualifierMeta.Dimension(numeratorDimension, QualifierOrigin.Derived),
+            _ => null,
+        };
+    }
+
+    private static DeclaredQualifierMeta? TryResolveCompoundElevationDimension(
+        TypedBinaryOp binOp, QualifierAxis axis, SemanticIndex semantics)
+    {
+        // Right operand is compound-quantity[Y/X]; elevation produces the numerator Y.
+        var rightQualifier = axis == QualifierAxis.Dimension
+            ? ResolveQualifierFromExpression(binOp.Right, QualifierAxis.Unit, semantics)
+                ?? ResolveQualifierFromExpression(binOp.Right, axis, semantics)
+            : ResolveQualifierFromExpression(binOp.Right, axis, semantics);
+
+        var compoundValue = ExtractCompoundValue(rightQualifier);
         if (compoundValue is null)
             return null;
 
@@ -1883,6 +1936,12 @@ public static class ProofEngine
         DeclaredQualifierMeta? rightQualifier,
         QualifierAxis axis) =>
         QualifiersAreCompatible(leftQualifier, rightQualifier, axis);
+
+    /// <summary>Exposes <see cref="QualifiersSymbolicallyEqual"/> for unit testing.</summary>
+    internal static bool QualifiersSymbolicallyEqualForTest(
+        DeclaredQualifierMeta left,
+        DeclaredQualifierMeta right) =>
+        QualifiersSymbolicallyEqual(left, right);
 
     /// <summary>
     /// Returns the first implied qualifier matching <paramref name="axis"/> for <paramref name="type"/>.
