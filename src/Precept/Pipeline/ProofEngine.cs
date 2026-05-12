@@ -886,18 +886,7 @@ public static class ProofEngine
             var leftQualifier = ResolveQualifierFromExpression(binOp.Left, qcReq.Axis, semantics);
             var rightQualifier = ResolveQualifierFromExpression(binOp.Right, qcReq.Axis, semantics);
 
-            if (leftQualifier is null || rightQualifier is null)
-                return false;
-
-            // PeriodDimension.Any does NOT satisfy qualifier compatibility (locked decision)
-            if (qcReq.Axis == QualifierAxis.TemporalDimension)
-            {
-                if (leftQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any }
-                    || rightQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any })
-                    return false;
-            }
-
-            return leftQualifier == rightQualifier;
+            return QualifiersAreCompatible(leftQualifier, rightQualifier, qcReq.Axis);
         }
 
         if (obligation.Requirement is QualifierChainProofRequirement chainReq)
@@ -922,8 +911,65 @@ public static class ProofEngine
     {
         var leftValue = ExtractComparableValue(left);
         var rightValue = ExtractComparableValue(right);
-        return leftValue is not null && rightValue is not null
-            && string.Equals(leftValue, rightValue, StringComparison.Ordinal);
+        if (leftValue is not null && rightValue is not null
+            && string.Equals(leftValue, rightValue, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return QualifiersSymbolicallyEqual(left, right);
+    }
+
+    private static bool QualifiersAreCompatible(
+        DeclaredQualifierMeta? leftQualifier,
+        DeclaredQualifierMeta? rightQualifier,
+        QualifierAxis axis)
+    {
+        if (leftQualifier is null || rightQualifier is null)
+            return false;
+
+        if (axis == QualifierAxis.TemporalDimension)
+        {
+            if (leftQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any }
+                || rightQualifier is DeclaredQualifierMeta.TemporalDimension { Value: PeriodDimension.Any })
+            {
+                return false;
+            }
+        }
+
+        return leftQualifier == rightQualifier || QualifiersSymbolicallyEqual(leftQualifier, rightQualifier);
+    }
+
+    private static bool QualifiersSymbolicallyEqual(DeclaredQualifierMeta left, DeclaredQualifierMeta right)
+    {
+        var leftSourcePath = ExtractQualifierSourcePath(left);
+        var rightSourcePath = ExtractQualifierSourcePath(right);
+        return leftSourcePath is not null
+            && rightSourcePath is not null
+            && string.Equals(leftSourcePath, rightSourcePath, StringComparison.Ordinal);
+    }
+
+    private static string? ExtractQualifierSourcePath(DeclaredQualifierMeta qualifier)
+    {
+        var raw = qualifier switch
+        {
+            DeclaredQualifierMeta.Currency { CurrencyCode: var value } => value,
+            DeclaredQualifierMeta.Unit { UnitCode: var value } => value,
+            DeclaredQualifierMeta.Dimension { DimensionName: var value } => value,
+            DeclaredQualifierMeta.TemporalUnit { UnitName: var value } => value,
+            _ => null,
+        };
+
+        if (string.IsNullOrEmpty(raw)
+            || raw[0] != '{'
+            || raw[^1] != '}')
+        {
+            return null;
+        }
+
+        var inner = raw[1..^1];
+        var dotIndex = inner.IndexOf('.');
+        return dotIndex >= 0 ? inner[..dotIndex] : inner;
     }
 
     /// <summary>
@@ -1595,6 +1641,13 @@ public static class ProofEngine
     /// <summary>Exposes <see cref="ExtractComparableValue"/> for unit testing.</summary>
     internal static string? ExtractComparableValueForTest(DeclaredQualifierMeta qualifier) =>
         ExtractComparableValue(qualifier);
+
+    /// <summary>Exposes qualifier compatibility comparisons for unit testing.</summary>
+    internal static bool QualifiersAreCompatibleForTest(
+        DeclaredQualifierMeta? leftQualifier,
+        DeclaredQualifierMeta? rightQualifier,
+        QualifierAxis axis) =>
+        QualifiersAreCompatible(leftQualifier, rightQualifier, axis);
 
     /// <summary>
     /// Returns the first implied qualifier matching <paramref name="axis"/> for <paramref name="type"/>.

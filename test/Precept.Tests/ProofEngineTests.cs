@@ -3275,6 +3275,47 @@ public class ProofEngineTests
         }
 
         [Fact]
+        public void Strategy5_SymbolicQualifierEquivalence_SameSourceAcrossAxes_IsCompatible()
+        {
+            var left = new DeclaredQualifierMeta.Unit("{StockingUnit.unit}", "{StockingUnit.dimension}");
+            var right = new DeclaredQualifierMeta.Dimension("{StockingUnit.dimension}");
+
+            ProofEngine.QualifiersAreCompatibleForTest(left, right, QualifierAxis.Unit)
+                .Should().BeTrue(because: "both qualifiers derive from the same source field path");
+        }
+
+        [Fact]
+        public void Strategy5_SymbolicQualifierEquivalence_DifferentSources_IsIncompatible()
+        {
+            var left = new DeclaredQualifierMeta.Unit("{StockingUnit.unit}", "{StockingUnit.dimension}");
+            var right = new DeclaredQualifierMeta.Dimension("{PurchaseUnit.dimension}");
+
+            ProofEngine.QualifiersAreCompatibleForTest(left, right, QualifierAxis.Unit)
+                .Should().BeFalse(because: "different source field paths must not compare as equal");
+        }
+
+        [Fact]
+        public void Strategy5_SymbolicQualifierEquivalence_TemplateVsLiteral_RemainsIncompatible()
+        {
+            var left = new DeclaredQualifierMeta.Currency("USD");
+            var right = new DeclaredQualifierMeta.Currency("{CatalogCurrency}");
+
+            ProofEngine.QualifiersAreCompatibleForTest(left, right, QualifierAxis.Currency)
+                .Should().BeFalse(because: "static qualifiers should still rely on record equality");
+        }
+
+        [Fact]
+        public void Strategy5_SymbolicQualifierEquivalence_Null_RemainsIncompatible()
+        {
+            var right = new DeclaredQualifierMeta.Dimension("{StockingUnit.dimension}");
+
+            ProofEngine.QualifiersAreCompatibleForTest(null, right, QualifierAxis.Unit)
+                .Should().BeFalse(because: "missing qualifiers must remain unresolved");
+            ProofEngine.QualifiersAreCompatibleForTest(right, null, QualifierAxis.Unit)
+                .Should().BeFalse(because: "missing qualifiers must remain unresolved");
+        }
+
+        [Fact]
         public void Strategy5_UnqualifiedFields_Unresolved()
         {
             // cf. Strategy5_UnqualifiedFields_Engine_RunsWithoutError
