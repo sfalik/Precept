@@ -441,7 +441,7 @@ public static partial class Parser
         }
 
         [HandlesCatalogMember(ExpressionFormKind.InterpolatedTypedConstant)]
-        private ParsedExpression ParseInterpolatedTypedConstant()
+        private InterpolatedTypedConstantExpression ParseInterpolatedTypedConstant()
         {
             var startToken = Advance(); // consume TypedConstantStart
             var segments = ImmutableArray.CreateBuilder<InterpolationSegment>();

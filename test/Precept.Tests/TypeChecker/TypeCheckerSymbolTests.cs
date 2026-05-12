@@ -358,6 +358,59 @@ public class TypeCheckerSymbolTests
     }
 
     [Fact]
+    public void TypedField_CarriesInterpolatedUnitQualifier_WhenDeclared()
+    {
+        var precept = """
+            precept Widget
+            field StockingUnit as unitofmeasure default 'each'
+            field PurchaseUnit as unitofmeasure default 'each'
+            field Ratio as quantity in '{StockingUnit}/{PurchaseUnit}'
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var qualifier = index.Fields.Single(f => f.Name == "Ratio")
+            .DeclaredQualifiers.Should().ContainSingle().Which;
+        var unit = qualifier.Should().BeOfType<DeclaredQualifierMeta.Unit>().Which;
+        unit.UnitCode.Should().Be("{StockingUnit}/{PurchaseUnit}");
+        unit.DimensionName.Should().Be("{StockingUnit}/{PurchaseUnit}");
+    }
+
+    [Fact]
+    public void TypedField_CarriesInterpolatedDimensionQualifier_WhenDeclared()
+    {
+        var precept = """
+            precept Widget
+            field StockingUnit as unitofmeasure default 'each'
+            field QuantityOnHand as quantity of '{StockingUnit.dimension}'
+            state Open initial
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var qualifier = index.Fields.Single(f => f.Name == "QuantityOnHand")
+            .DeclaredQualifiers.Should().ContainSingle().Which;
+        qualifier.Should().BeOfType<DeclaredQualifierMeta.Dimension>()
+            .Which.DimensionName.Should().Be("{StockingUnit.dimension}");
+    }
+
+    [Fact]
+    public void TypedArg_CarriesInterpolatedDimensionQualifier_WhenDeclared()
+    {
+        var precept = """
+            precept Widget
+            field StockingUnit as unitofmeasure default 'each'
+            state Open initial
+            event Receive(qty as quantity of '{StockingUnit.dimension}')
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var qualifier = index.Events.Single(e => e.Name == "Receive").Args.Single()
+            .DeclaredQualifiers.Should().ContainSingle().Which;
+        qualifier.Should().BeOfType<DeclaredQualifierMeta.Dimension>()
+            .Which.DimensionName.Should().Be("{StockingUnit.dimension}");
+    }
+
+    [Fact]
     public void ArgRef_NullQualifiers_WhenUnqualified()
     {
         var precept = """

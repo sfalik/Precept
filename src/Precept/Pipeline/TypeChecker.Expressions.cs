@@ -267,9 +267,10 @@ internal static partial class TypeChecker
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Attempt to re-resolve a literal operand with <paramref name="expectedType"/> context
+    /// Attempt to re-resolve a literal-like operand with <paramref name="expectedType"/> context
     /// when bottom-up binary operation resolution fails. This handles cases like
-    /// <c>amount &gt; 100</c> where <c>amount: money</c> and <c>100</c> needs to be re-resolved as money.
+    /// <c>amount &gt; 100</c> where <c>amount: money</c> and <c>100</c> needs to be re-resolved as money,
+    /// plus interpolated typed constants whose target type is only known from the other operand.
     /// </summary>
     private static TypedExpression? TryContextRetryBinaryOp(
         BinaryOperationExpression bin,
@@ -278,15 +279,13 @@ internal static partial class TypeChecker
         OperatorMeta opMeta,
         CheckContext ctx)
     {
-        // Only retry if exactly one operand is a bare literal
-        bool leftIsLiteral = bin.Left is LiteralExpression;
-        bool rightIsLiteral = bin.Right is LiteralExpression;
+        bool leftNeedsContext = NeedsContextRetry(bin.Left);
+        bool rightNeedsContext = NeedsContextRetry(bin.Right);
 
-        if (!leftIsLiteral && !rightIsLiteral)
+        if (!leftNeedsContext && !rightNeedsContext)
             return null;
 
-        // Try retrying the literal side with the other side's type as context
-        if (rightIsLiteral && !leftIsLiteral)
+        if (rightNeedsContext && !leftNeedsContext)
         {
             var retried = Resolve(bin.Right, ctx, left.ResultType);
             if (retried is not TypedErrorExpression && retried.ResultType != right.ResultType)
@@ -299,7 +298,7 @@ internal static partial class TypeChecker
             }
         }
 
-        if (leftIsLiteral && !rightIsLiteral)
+        if (leftNeedsContext && !rightNeedsContext)
         {
             var retried = Resolve(bin.Left, ctx, right.ResultType);
             if (retried is not TypedErrorExpression && retried.ResultType != left.ResultType)
@@ -314,6 +313,9 @@ internal static partial class TypeChecker
 
         return null;
     }
+
+    private static bool NeedsContextRetry(ParsedExpression expression) => expression is LiteralExpression { LiteralKind: TokenKind.TypedConstant }
+        or InterpolatedTypedConstantExpression;
 
     private static TypedBinaryOp CreateResolvedBinaryOp(
         SourceSpan span,
@@ -636,19 +638,18 @@ internal static partial class TypeChecker
         var left = Resolve(bin.Left, ctx);
         var leftDiagEnd = ctx.Diagnostics.Count;
 
-        // Proactive context propagation: when the right operand is a typed constant,
+        // Proactive context propagation: when the right operand is a typed or interpolated typed constant,
         // use the left operand's resolved type as expectedType context.
-        // Typed constants require type context to resolve — without it they emit PRE0052.
-        var right = (bin.Right is LiteralExpression { LiteralKind: TokenKind.TypedConstant } && left is not TypedErrorExpression)
+        var right = (NeedsContextRetry(bin.Right) && left is not TypedErrorExpression)
             ? Resolve(bin.Right, ctx, left.ResultType)
             : Resolve(bin.Right, ctx);
 
-        // Symmetric: retry left-side typed constants with right's type as context.
+        // Symmetric: retry left-side typed/interpolated typed constants with right's type as context.
         if (left is TypedErrorExpression
-            && bin.Left is LiteralExpression { LiteralKind: TokenKind.TypedConstant }
+            && NeedsContextRetry(bin.Left)
             && right is not TypedErrorExpression)
         {
-            // Remove the stale PRE0052 diagnostic from the failed initial resolution
+            // Remove the stale unresolved-type diagnostic from the failed initial resolution.
             if (leftDiagEnd > leftDiagStart)
                 ctx.Diagnostics.RemoveRange(leftDiagStart, leftDiagEnd - leftDiagStart);
             left = Resolve(bin.Left, ctx, right.ResultType);
@@ -1838,6 +1839,7 @@ internal static partial class TypeChecker
     }
     private static bool MatchSlashCurrency(string text) => text.StartsWith("/", StringComparison.Ordinal) && IsCurrencyCode(text[1..]);
     private static bool MatchSlashUnit(string text) => text.StartsWith("/", StringComparison.Ordinal) && IsUnitName(text[1..]);
+    private static bool MatchUnitSlash(string text) => text.EndsWith("/", StringComparison.Ordinal) && IsUnitName(text[..^1]);
     private static bool MatchSlash(string text) => text == "/";
     private static bool MatchNumericSpaceCurrencySlash(string text)
     {
@@ -1946,6 +1948,8 @@ internal static partial class TypeChecker
     [
         new([MatchEmpty, MatchEmpty], [InterpolationSlotKind.WholeValue]),
         new([MatchEmpty, MatchSlash, MatchEmpty], [InterpolationSlotKind.NumeratorUnit, InterpolationSlotKind.DenominatorUnit]),
+        new([MatchEmpty, MatchSlashUnit], [InterpolationSlotKind.NumeratorUnit]),
+        new([MatchUnitSlash, MatchEmpty], [InterpolationSlotKind.DenominatorUnit]),
     ];
 
     private static readonly SegmentForm[] TemporalSingleForms =

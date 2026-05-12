@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Text;
 using NodaTime;
 using NodaTime.Text;
 using Precept.Language;
@@ -118,21 +119,11 @@ internal static partial class TypeChecker
         var builder = ImmutableArray.CreateBuilder<DeclaredQualifierMeta>(qualified.Qualifiers.Length);
         foreach (var qualifier in qualified.Qualifiers)
         {
-            DeclaredQualifierMeta? meta = qualifier.Axis switch
+            DeclaredQualifierMeta? meta = qualifier switch
             {
-                QualifierAxis.Currency         => MapCurrencyQualifier(qualifier, ctx),
-                QualifierAxis.Unit             => MapUnitQualifier(qualifier, ctx),
-                // Temporal dimension names ("date", "time") on price's 'of' axis → temporal denomination.
-                // Guard prevents quantity of 'time' silently producing temporal metadata.
-                QualifierAxis.Dimension when typeRef.ResolvedKind == TypeKind.Price
-                                            && qualifier.Value is "date" or "time"
-                                            => MapTemporalDimensionQualifier(qualifier, ctx),
-                QualifierAxis.Dimension        => MapDimensionQualifier(qualifier, ctx),
-                QualifierAxis.FromCurrency     => MapFromCurrencyQualifier(qualifier, ctx),
-                QualifierAxis.ToCurrency       => MapToCurrencyQualifier(qualifier, ctx),
-                QualifierAxis.TemporalDimension => MapTemporalDimensionQualifier(qualifier, ctx),
-                QualifierAxis.TemporalUnit      => MapTemporalUnitQualifier(qualifier, ctx),
-                _                              => null,
+                LiteralParsedQualifier literal => MapLiteralQualifier(literal, typeRef, ctx),
+                InterpolatedParsedQualifier interpolated => MapInterpolatedQualifier(interpolated, ctx),
+                _ => null,
             };
             if (meta is not null)
                 builder.Add(meta);
@@ -140,52 +131,134 @@ internal static partial class TypeChecker
         return builder.ToImmutable();
     }
 
-    private static DeclaredQualifierMeta.Currency MapCurrencyQualifier(ParsedQualifier q, CheckContext ctx)
+    private static DeclaredQualifierMeta? MapLiteralQualifier(
+        LiteralParsedQualifier qualifier,
+        ParsedTypeReference typeRef,
+        CheckContext ctx) => qualifier.Axis switch
     {
-        if (!CurrencyCatalog.All.ContainsKey(q.Value))
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, q.ValueSpan, q.Value));
-        return new DeclaredQualifierMeta.Currency(q.Value);
-    }
+        QualifierAxis.Currency          => MapCurrencyQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        QualifierAxis.Unit              => MapUnitQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        // Temporal dimension names ("date", "time") on price's 'of' axis → temporal denomination.
+        // Guard prevents quantity of 'time' silently producing temporal metadata.
+        QualifierAxis.Dimension when typeRef.ResolvedKind == TypeKind.Price
+                                     && qualifier.Value is "date" or "time"
+                                     => MapTemporalDimensionQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        QualifierAxis.Dimension         => MapDimensionQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        QualifierAxis.FromCurrency      => MapFromCurrencyQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        QualifierAxis.ToCurrency        => MapToCurrencyQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        QualifierAxis.TemporalDimension => MapTemporalDimensionQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        QualifierAxis.TemporalUnit      => MapTemporalUnitQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        _                               => null,
+    };
 
-    private static DeclaredQualifierMeta.Unit MapUnitQualifier(ParsedQualifier q, CheckContext ctx)
+    private static DeclaredQualifierMeta? MapInterpolatedQualifier(
+        InterpolatedParsedQualifier qualifier,
+        CheckContext ctx)
     {
-        if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(q.Value))
-            return new DeclaredQualifierMeta.Unit(q.Value, "count");
-
-        var result = UcumParser.Parse(q.Value);
-        if (!result.IsValid)
+        var expectedType = qualifier.Axis switch
         {
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidUnitString, q.ValueSpan, q.Value));
-            return new DeclaredQualifierMeta.Unit(q.Value, "");
+            QualifierAxis.Currency or QualifierAxis.FromCurrency or QualifierAxis.ToCurrency => TypeKind.Currency,
+            QualifierAxis.Unit => TypeKind.UnitOfMeasure,
+            QualifierAxis.Dimension => TypeKind.Dimension,
+            QualifierAxis.Timezone => TypeKind.Timezone,
+            _ => (TypeKind?)null,
+        };
+
+        if (expectedType is { } targetType)
+        {
+            var resolved = Resolve(qualifier.Expression, ctx, targetType);
+            if (resolved is TypedErrorExpression)
+                return null;
         }
 
-        return new DeclaredQualifierMeta.Unit(q.Value, UnitDimensionHelper.DeriveUnitDimensionName(result.Unit!));
+        var template = DescribeInterpolatedQualifier(qualifier.Expression);
+        return qualifier.Axis switch
+        {
+            QualifierAxis.Currency          => new DeclaredQualifierMeta.Currency(template),
+            QualifierAxis.Unit              => new DeclaredQualifierMeta.Unit(template, template),
+            QualifierAxis.Dimension         => new DeclaredQualifierMeta.Dimension(template),
+            QualifierAxis.FromCurrency      => new DeclaredQualifierMeta.FromCurrency(template),
+            QualifierAxis.ToCurrency        => new DeclaredQualifierMeta.ToCurrency(template),
+            _                               => null,
+        };
     }
 
-    private static DeclaredQualifierMeta.Dimension MapDimensionQualifier(ParsedQualifier q, CheckContext ctx)
+    private static string DescribeInterpolatedQualifier(InterpolatedTypedConstantExpression expression)
     {
-        if (!DimensionCatalog.All.ContainsKey(q.Value))
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidDimensionString, q.ValueSpan, q.Value));
-        return new DeclaredQualifierMeta.Dimension(q.Value);
+        var builder = new StringBuilder();
+        foreach (var segment in expression.Segments)
+        {
+            switch (segment)
+            {
+                case TextSegment text:
+                    builder.Append(text.Text);
+                    break;
+                case HoleSegment hole:
+                    builder.Append('{');
+                    builder.Append(DescribeQualifierHole(hole.Expression));
+                    builder.Append('}');
+                    break;
+            }
+        }
+        return builder.ToString();
     }
 
-    private static DeclaredQualifierMeta.FromCurrency MapFromCurrencyQualifier(ParsedQualifier q, CheckContext ctx)
+    private static string DescribeQualifierHole(ParsedExpression expression) => expression switch
     {
-        if (!CurrencyCatalog.All.ContainsKey(q.Value))
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, q.ValueSpan, q.Value));
-        return new DeclaredQualifierMeta.FromCurrency(q.Value);
+        IdentifierExpression identifier => identifier.Name,
+        MemberAccessExpression member => $"{DescribeQualifierHole(member.Target)}.{member.MemberName}",
+        GroupedExpression grouped => $"({DescribeQualifierHole(grouped.Inner)})",
+        UnaryOperationExpression unary => $"{unary.Operator.ToString().ToLowerInvariant()} {DescribeQualifierHole(unary.Operand)}",
+        LiteralExpression literal => literal.Text,
+        _ => expression.Kind.ToString(),
+    };
+
+    private static DeclaredQualifierMeta.Currency MapCurrencyQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
+    {
+        if (!CurrencyCatalog.All.ContainsKey(value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, valueSpan, value));
+        return new DeclaredQualifierMeta.Currency(value);
     }
 
-    private static DeclaredQualifierMeta.ToCurrency MapToCurrencyQualifier(ParsedQualifier q, CheckContext ctx)
+    private static DeclaredQualifierMeta.Unit MapUnitQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
     {
-        if (!CurrencyCatalog.All.ContainsKey(q.Value))
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, q.ValueSpan, q.Value));
-        return new DeclaredQualifierMeta.ToCurrency(q.Value);
+        if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(value))
+            return new DeclaredQualifierMeta.Unit(value, "count");
+
+        var result = UcumParser.Parse(value);
+        if (!result.IsValid)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidUnitString, valueSpan, value));
+            return new DeclaredQualifierMeta.Unit(value, "");
+        }
+
+        return new DeclaredQualifierMeta.Unit(value, UnitDimensionHelper.DeriveUnitDimensionName(result.Unit!));
     }
 
-    private static DeclaredQualifierMeta.TemporalDimension MapTemporalDimensionQualifier(ParsedQualifier q, CheckContext ctx)
+    private static DeclaredQualifierMeta.Dimension MapDimensionQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
     {
-        var dimension = q.Value switch
+        if (!DimensionCatalog.All.ContainsKey(value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidDimensionString, valueSpan, value));
+        return new DeclaredQualifierMeta.Dimension(value);
+    }
+
+    private static DeclaredQualifierMeta.FromCurrency MapFromCurrencyQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
+    {
+        if (!CurrencyCatalog.All.ContainsKey(value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, valueSpan, value));
+        return new DeclaredQualifierMeta.FromCurrency(value);
+    }
+
+    private static DeclaredQualifierMeta.ToCurrency MapToCurrencyQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
+    {
+        if (!CurrencyCatalog.All.ContainsKey(value))
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, valueSpan, value));
+        return new DeclaredQualifierMeta.ToCurrency(value);
+    }
+
+    private static DeclaredQualifierMeta.TemporalDimension MapTemporalDimensionQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
+    {
+        var dimension = value switch
         {
             "date" => (PeriodDimension?)PeriodDimension.Date,
             "time" => (PeriodDimension?)PeriodDimension.Time,
@@ -193,21 +266,21 @@ internal static partial class TypeChecker
         };
         if (dimension is null)
         {
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalDimensionString, q.ValueSpan, q.Value));
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalDimensionString, valueSpan, value));
             return new DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Any);
         }
         return new DeclaredQualifierMeta.TemporalDimension(dimension.Value);
     }
 
-    private static DeclaredQualifierMeta.TemporalUnit MapTemporalUnitQualifier(ParsedQualifier q, CheckContext ctx)
+    private static DeclaredQualifierMeta.TemporalUnit MapTemporalUnitQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
     {
-        if (!TemporalUnits.TryGet(q.Value, out var entry))
+        if (!TemporalUnits.TryGet(value, out var entry))
         {
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalUnitString, q.ValueSpan, q.Value));
-            return new DeclaredQualifierMeta.TemporalUnit(q.Value, PeriodDimension.Any);
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalUnitString, valueSpan, value));
+            return new DeclaredQualifierMeta.TemporalUnit(value, PeriodDimension.Any);
         }
         var dimension = entry.IsCalendarBased ? PeriodDimension.Date : PeriodDimension.Time;
-        return new DeclaredQualifierMeta.TemporalUnit(q.Value, dimension);
+        return new DeclaredQualifierMeta.TemporalUnit(value, dimension);
     }
 
     /// <summary>

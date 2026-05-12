@@ -638,19 +638,29 @@ public static partial class Parser
 
                 Advance(); // consume preposition ('in' / 'of' / 'to')
 
-                if (Peek().Kind != TokenKind.TypedConstant)
+                if (Peek().Kind == TokenKind.TypedConstant)
                 {
-                    _diagnostics.Add(DiagnosticsCatalog.Create(
-                        DiagnosticCode.ExpectedToken, Peek().Span,
-                        "typed constant", Peek().Text));
+                    var valueToken = Advance();
+                    qualifiers.Add(new LiteralParsedQualifier(
+                        slot.Preposition, slot.Axis,
+                        valueToken.Text, valueToken.Span));
+                    lastSpan = valueToken.Span;
                     continue;
                 }
 
-                var valueToken = Advance();
-                qualifiers.Add(new ParsedQualifier(
-                    slot.Preposition, slot.Axis,
-                    valueToken.Text, valueToken.Span));
-                lastSpan = valueToken.Span;
+                if (Peek().Kind == TokenKind.TypedConstantStart)
+                {
+                    var expression = ParseInterpolatedTypedConstant();
+                    qualifiers.Add(new InterpolatedParsedQualifier(
+                        slot.Preposition, slot.Axis,
+                        expression, expression.Span));
+                    lastSpan = expression.Span;
+                    continue;
+                }
+
+                _diagnostics.Add(DiagnosticsCatalog.Create(
+                    DiagnosticCode.ExpectedToken, Peek().Span,
+                    "typed constant", Peek().Text));
             }
 
             if (qualifiers.Count == 0)

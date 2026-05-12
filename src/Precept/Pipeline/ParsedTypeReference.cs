@@ -88,11 +88,30 @@ public sealed record QualifiedTypeReference(
     : ParsedTypeReference(Span);
 
 /// <summary>
-/// A single parsed qualifier: the preposition keyword, the axis it fills, the literal
-/// value (text inside the typed-constant delimiters), and the span of the value token.
+/// A single parsed qualifier: the preposition keyword, the axis it fills, and the source
+/// span of the qualifier value token or interpolated expression.
 /// </summary>
-public sealed record ParsedQualifier(
+public abstract record ParsedQualifier(
+    TokenKind Preposition,
+    QualifierAxis Axis,
+    SourceSpan ValueSpan);
+
+/// <summary>
+/// A qualifier backed by a literal typed constant token.
+/// </summary>
+public sealed record LiteralParsedQualifier(
     TokenKind Preposition,
     QualifierAxis Axis,
     string Value,
-    SourceSpan ValueSpan);
+    SourceSpan ValueSpan)
+    : ParsedQualifier(Preposition, Axis, ValueSpan);
+
+/// <summary>
+/// A qualifier backed by an interpolated typed constant expression.
+/// </summary>
+public sealed record InterpolatedParsedQualifier(
+    TokenKind Preposition,
+    QualifierAxis Axis,
+    InterpolatedTypedConstantExpression Expression,
+    SourceSpan ValueSpan)
+    : ParsedQualifier(Preposition, Axis, ValueSpan);

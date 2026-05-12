@@ -75,11 +75,11 @@ public class ParserInterpolatedQualifierTests
     }
 
     [Fact]
-    public void Field_MalformedInterpolatedQualifier_EmitsExpectedToken()
+    public void Field_MalformedInterpolatedQualifier_EmitsLexerDiagnostics()
     {
         var tokens = Lexer.Lex("field Bad as money in '{Currency'");
         var manifest = Pipeline.Parser.Parse(tokens);
 
-        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnterminatedInterpolation));
     }
 }
