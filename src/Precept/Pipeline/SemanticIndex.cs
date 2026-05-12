@@ -201,6 +201,9 @@ public sealed record InheritedQualifier(string FieldName) : QualifierBinding;
 /// <summary>Both operands must carry the same qualifier; the result inherits it.</summary>
 public sealed record SameQualifierRequired : QualifierBinding;
 
+/// <summary>A quantity product cancels a compound-unit denominator and inherits the numerator unit.</summary>
+public sealed record CompoundUnitCancellationRequired : QualifierBinding;
+
 // ════════════════════════════════════════════════════════════════════════════
 //  ActionSecondaryRole enum (D5)
 // ════════════════════════════════════════════════════════════════════════════

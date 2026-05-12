@@ -19,6 +19,17 @@ public enum QualifierMatch
 }
 
 /// <summary>
+/// How a binary operation's result qualifier is derived when the result carries
+/// structured qualifier identity beyond raw <see cref="QualifierMatch"/>.
+/// </summary>
+public enum ResultQualifierPolicy
+{
+    [Precept.AllowZeroDefault]
+    None,
+    CompoundUnitCancellation,
+}
+
+/// <summary>
 /// Base metadata for a typed operator combination. Discriminated union:
 /// <see cref="UnaryOperationMeta"/> and <see cref="BinaryOperationMeta"/>.
 /// </summary>
@@ -49,7 +60,8 @@ public sealed record BinaryOperationMeta(
     QualifierMatch Match = QualifierMatch.Any,
     ProofRequirement[]? ProofRequirements = null,
     bool HasCIVariant = false,
-    DiagnosticCode? CIDiagnosticCode = null)
+    DiagnosticCode? CIDiagnosticCode = null,
+    ResultQualifierPolicy ResultQualifierPolicy = ResultQualifierPolicy.None)
     : OperationMeta(Kind, Op, Result, Description)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>

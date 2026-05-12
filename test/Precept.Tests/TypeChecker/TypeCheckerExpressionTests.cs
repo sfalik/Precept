@@ -1227,6 +1227,52 @@ public class TypeCheckerExpressionTests
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
 
+    [Theory]
+    [InlineData("Receive.PurchaseQty * StockingUnitsPerPurchaseUnit")]
+    [InlineData("StockingUnitsPerPurchaseUnit * Receive.PurchaseQty")]
+    public void SetAction_CompoundUnitCancellation_DropsDimensionMismatch(string quantityExpression)
+    {
+        var precept = $$"""
+            precept Widget
+            field QuantityOnHand as quantity of 'count' default '0 each'
+            field StockingUnitsPerPurchaseUnit as quantity in 'each/kg' default '1 each/kg'
+            state Open initial
+            event Receive(PurchaseQty as quantity in 'kg')
+            from Open on Receive
+                -> set QuantityOnHand = QuantityOnHand + {{quantityExpression}}
+                -> no transition
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().NotContain(nameof(DiagnosticCode.DimensionCategoryMismatch));
+    }
+
+    [Fact]
+    public void SetAction_NonCancellingCompoundUnitMultiplication_EmitsDimensionMismatch()
+    {
+        var precept = """
+            precept Widget
+            field QuantityOnHand as quantity of 'count' default '0 each'
+            field StockingUnitsPerPurchaseUnit as quantity in 'each/kg' default '1 each/kg'
+            state Open initial
+            event Receive(PurchaseQty as quantity in 'L')
+            from Open on Receive
+                -> set QuantityOnHand = QuantityOnHand + Receive.PurchaseQty * StockingUnitsPerPurchaseUnit
+                -> no transition
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().Contain(nameof(DiagnosticCode.DimensionCategoryMismatch));
+    }
+
     [Fact]
     public void SetAction_USDToEURField_EmitsQualifierMismatch()
     {

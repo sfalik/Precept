@@ -569,7 +569,8 @@ public static class Operations
 
         OperationKind.QuantityTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PQuantity, TypeKind.Quantity,
-            "Quantity × quantity → quantity (dimensional cancellation)"),
+            "Quantity × quantity → quantity (dimensional cancellation)",
+            ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation),
 
         OperationKind.QuantityTimesPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PPeriod, TypeKind.Quantity,

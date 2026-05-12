@@ -12,7 +12,12 @@
 
 
 
-## Learnings
+## Learnings
+### 2026-05-11T22:47:57-04:00 — RC-3 compound-unit cancellation
+
+- QuantityTimesQuantity already advertised dimensional cancellation in the operations catalog, but assignment qualifier validation still flattened binary trees to raw leaves. That emitted false PRE0069s on qty[D] * qty[A/D] because both operands were compared directly to the target field.
+- The fix was to add an operation-level CompoundUnitCancellation result-qualifier policy and derive the numerator unit/dimension before recursing into child operands.
+- Interpolated compound-unit qualifiers stay symbolic ({StockingUnit}/{PurchaseUnit}), so RC-3 cancellation has to derive {Unit.dimension} symbolically instead of pretending runtime qualifier values are available during type checking.
 
 
 

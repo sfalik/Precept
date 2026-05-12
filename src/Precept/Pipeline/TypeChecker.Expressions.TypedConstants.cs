@@ -23,30 +23,186 @@ internal static partial class TypeChecker
         if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
             return;
 
-        // Binary/unary expressions: validate each qualified leaf operand against the target.
-        // Scalar operands (no qualifiers) are skipped — e.g. `set usdField = usdField * 2` is valid.
-        if (value is TypedBinaryOp or TypedUnaryOp)
+        if (TryGetAssignmentSourceQualifiers(value, out var sourceQualifiers))
         {
-            foreach (var leaf in ExtractLeafOperands(value))
-            {
-                ValidateAssignmentQualifiers(leaf, fieldName, targetQualifiers, valueSpan, ctx);
-            }
+            ValidateResolvedQualifiers(sourceQualifiers, fieldName, targetQualifiers, valueSpan, ctx);
             return;
         }
 
-        ImmutableArray<DeclaredQualifierMeta>? sourceQualifiers = value switch
+        if (value is TypedBinaryOp binary)
         {
-            TypedFieldRef { DeclaredQualifiers: { } fieldQualifiers } => fieldQualifiers,
-            TypedArgRef { DeclaredQualifiers: { } argQualifiers } => argQualifiers,
-            TypedTypedConstant
+            ValidateAssignmentQualifiers(binary.Left, fieldName, targetQualifiers, valueSpan, ctx);
+            ValidateAssignmentQualifiers(binary.Right, fieldName, targetQualifiers, valueSpan, ctx);
+            return;
+        }
+
+        if (value is TypedUnaryOp unary)
+        {
+            ValidateAssignmentQualifiers(unary.Operand, fieldName, targetQualifiers, valueSpan, ctx);
+        }
+    }
+
+    private static bool TryGetAssignmentSourceQualifiers(
+        TypedExpression value,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
+    {
+        switch (value)
+        {
+            case TypedFieldRef { DeclaredQualifiers: { } fieldQualifiers } when !fieldQualifiers.IsDefaultOrEmpty:
+                qualifiers = fieldQualifiers;
+                return true;
+
+            case TypedArgRef { DeclaredQualifiers: { } argQualifiers } when !argQualifiers.IsDefaultOrEmpty:
+                qualifiers = argQualifiers;
+                return true;
+
+            case TypedTypedConstant
             {
                 ResultType: TypeKind.Money,
                 ParsedValue: ValueTuple<decimal, object?> (_, CurrencyEntry currency)
-            } => [new DeclaredQualifierMeta.Currency(currency.AlphaCode)],
-            _ => null,
-        };
+            }:
+                qualifiers = [new DeclaredQualifierMeta.Currency(currency.AlphaCode)];
+                return true;
 
-        if (sourceQualifiers is not { } qualifiers || qualifiers.IsDefaultOrEmpty)
+            case TypedBinaryOp { ResultQualifier: CompoundUnitCancellationRequired } binary
+                when TryDeriveCompoundUnitCancellationQualifier(binary, out qualifiers):
+                return true;
+
+            default:
+                qualifiers = default;
+                return false;
+        }
+    }
+
+    private static bool TryDeriveCompoundUnitCancellationQualifier(
+        TypedBinaryOp binary,
+        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
+    {
+        if (TryMatchCompoundUnitCancellation(binary.Left, binary.Right, out var resultUnit)
+            || TryMatchCompoundUnitCancellation(binary.Right, binary.Left, out resultUnit))
+        {
+            qualifiers = [resultUnit];
+            return true;
+        }
+
+        qualifiers = default;
+        return false;
+    }
+
+    private static bool TryMatchCompoundUnitCancellation(
+        TypedExpression standaloneQuantity,
+        TypedExpression compoundQuantity,
+        out DeclaredQualifierMeta.Unit resultUnit)
+    {
+        if (!TryGetQuantityDimensionName(standaloneQuantity, out var standaloneDimension)
+            || !TryGetCompoundUnit(compoundQuantity, out var compoundUnit)
+            || !TrySplitCompoundUnit(compoundUnit.UnitCode, out var numeratorUnit, out var denominatorUnit)
+            || !TryDeriveUnitDimensionName(denominatorUnit, out var denominatorDimension)
+            || !string.Equals(standaloneDimension, denominatorDimension, StringComparison.OrdinalIgnoreCase)
+            || !TryDeriveUnitDimensionName(numeratorUnit, out var numeratorDimension))
+        {
+            resultUnit = null!;
+            return false;
+        }
+
+        resultUnit = new DeclaredQualifierMeta.Unit(
+            numeratorUnit,
+            numeratorDimension,
+            QualifierOrigin.Derived,
+            compoundUnit.Preposition,
+            compoundUnit.ProofSatisfactions);
+        return true;
+    }
+
+    private static bool TryGetQuantityDimensionName(TypedExpression value, out string dimensionName)
+    {
+        if (TryGetAssignmentSourceQualifiers(value, out var qualifiers))
+        {
+            var resolvedDimension = qualifiers
+                .OfType<DeclaredQualifierMeta.Dimension>()
+                .Select(q => q.DimensionName)
+                .FirstOrDefault()
+                ?? qualifiers
+                    .OfType<DeclaredQualifierMeta.Unit>()
+                    .Select(q => q.DimensionName)
+                    .FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(resolvedDimension))
+            {
+                dimensionName = resolvedDimension;
+                return true;
+            }
+        }
+
+        dimensionName = string.Empty;
+        return false;
+    }
+
+    private static bool TryGetCompoundUnit(TypedExpression value, out DeclaredQualifierMeta.Unit compoundUnit)
+    {
+        compoundUnit = null!;
+
+        if (!TryGetAssignmentSourceQualifiers(value, out var qualifiers))
+            return false;
+
+        var unit = qualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault();
+        if (unit is null || unit.UnitCode.IndexOf('/') <= 0)
+            return false;
+
+        compoundUnit = unit;
+        return true;
+    }
+
+    private static bool TrySplitCompoundUnit(string unitCode, out string numeratorUnit, out string denominatorUnit)
+    {
+        var slashIndex = unitCode.IndexOf('/');
+        if (slashIndex <= 0 || slashIndex != unitCode.LastIndexOf('/'))
+        {
+            numeratorUnit = string.Empty;
+            denominatorUnit = string.Empty;
+            return false;
+        }
+
+        numeratorUnit = unitCode[..slashIndex];
+        denominatorUnit = unitCode[(slashIndex + 1)..];
+        return numeratorUnit.Length > 0 && denominatorUnit.Length > 0;
+    }
+
+    private static bool TryDeriveUnitDimensionName(string unitCode, out string dimensionName)
+    {
+        if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(unitCode))
+        {
+            dimensionName = "count";
+            return true;
+        }
+
+        if (unitCode.StartsWith("{", StringComparison.Ordinal)
+            && unitCode.EndsWith("}", StringComparison.Ordinal)
+            && unitCode.IndexOf('/') < 0)
+        {
+            dimensionName = $"{unitCode[..^1]}.dimension}}";
+            return true;
+        }
+
+        var result = UcumParser.Parse(unitCode);
+        if (result.IsValid)
+        {
+            dimensionName = UnitDimensionHelper.DeriveUnitDimensionName(result.Unit!);
+            return !string.IsNullOrWhiteSpace(dimensionName);
+        }
+
+        dimensionName = string.Empty;
+        return false;
+    }
+
+    private static void ValidateResolvedQualifiers(
+        ImmutableArray<DeclaredQualifierMeta> qualifiers,
+        string fieldName,
+        ImmutableArray<DeclaredQualifierMeta> targetQualifiers,
+        SourceSpan valueSpan,
+        CheckContext ctx)
+    {
+        if (qualifiers.IsDefaultOrEmpty)
             return;
 
         foreach (var targetQualifier in targetQualifiers)
@@ -163,34 +319,6 @@ internal static partial class TypeChecker
                     break;
                 }
             }
-        }
-    }
-
-    /// <summary>
-    /// Recursively extracts non-expression leaf operands from a binary/unary expression tree.
-    /// For <see cref="TypedBinaryOp"/>, yields leaves from both sides.
-    /// For <see cref="TypedUnaryOp"/>, yields leaves from the operand.
-    /// All other typed expressions are yielded as leaves directly.
-    /// </summary>
-    private static IEnumerable<TypedExpression> ExtractLeafOperands(TypedExpression expression)
-    {
-        switch (expression)
-        {
-            case TypedBinaryOp binary:
-                foreach (var leaf in ExtractLeafOperands(binary.Left))
-                    yield return leaf;
-                foreach (var leaf in ExtractLeafOperands(binary.Right))
-                    yield return leaf;
-                break;
-
-            case TypedUnaryOp unary:
-                foreach (var leaf in ExtractLeafOperands(unary.Operand))
-                    yield return leaf;
-                break;
-
-            default:
-                yield return expression;
-                break;
         }
     }
 

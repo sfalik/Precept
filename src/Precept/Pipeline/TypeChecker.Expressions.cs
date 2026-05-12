@@ -663,12 +663,18 @@ internal static partial class TypeChecker
     /// Map a <see cref="BinaryOperationMeta"/>'s qualifier match to the corresponding
     /// <see cref="QualifierBinding"/> for the typed expression result.
     /// </summary>
-    private static QualifierBinding? MapQualifierBinding(BinaryOperationMeta meta) => meta.Match switch
+    private static QualifierBinding? MapQualifierBinding(BinaryOperationMeta meta)
     {
-        QualifierMatch.Same      => new SameQualifierRequired(),
-        QualifierMatch.Different => null, // different-qualifier operations produce unqualified results
-        _                        => null, // QualifierMatch.Any — no qualifier constraint
-    };
+        if (meta.ResultQualifierPolicy == ResultQualifierPolicy.CompoundUnitCancellation)
+            return new CompoundUnitCancellationRequired();
+
+        return meta.Match switch
+        {
+            QualifierMatch.Same      => new SameQualifierRequired(),
+            QualifierMatch.Different => null, // different-qualifier operations produce unqualified results
+            _                        => null, // QualifierMatch.Any — no qualifier constraint
+        };
+    }
 
     /// <summary>
     /// Resolve a unary operation expression. Resolves the operand, propagates ErrorType (D13),
