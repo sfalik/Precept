@@ -232,7 +232,7 @@ internal static class RichHoverFactory
         }
 
         lines.Add($"Governed by: {FormatConstraintGovernance(compilation, field.Name)}");
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateStateMarkdown(Compilation compilation, TypedState state)
@@ -274,7 +274,7 @@ internal static class RichHoverFactory
             $"{(terminalReachable ? "Terminal reachable" : "No terminal path")} · active ensures: {activeEnsures.Length}{(unverifiedEnsures > 0 ? $" ({unverifiedEnsures} unverified)" : string.Empty)}",
         };
 
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateEventMarkdown(Compilation compilation, TypedEvent evt)
@@ -313,10 +313,10 @@ internal static class RichHoverFactory
             lines.Add($"Arg: `{EscapeInline(arg.Name)}` is {FormatTypeSummary(arg.ResolvedType, arg.ElementType, null, arg.DeclaredQualifiers, arg.Presence)}");
         }
 
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
-    private static string CreateArgumentMarkdown(TypedArg arg) => string.Join("\n", new[]
+    private static string CreateArgumentMarkdown(TypedArg arg) => string.Join("\n\n", new[]
     {
         $"**argument `{EscapeInline(arg.Name)}`**",
         $"Event: `{EscapeInline(arg.EventName)}`",
@@ -347,7 +347,7 @@ internal static class RichHoverFactory
             : $"Scope: global when `{EscapeInline(FormatSnippet(compilation, rule.Guard.Span))}`");
         lines.Add("If false: the operation is rejected before commit");
         AppendConstraintInfluenceLines(lines, influence);
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateEnsureMarkdown(Compilation compilation, TypedEnsure ensure, EnsureIdentity identity)
@@ -377,7 +377,7 @@ internal static class RichHoverFactory
         lines.Add($"Scope: {GetEnsureScopeLine(ensure)}");
         AppendConstraintInfluenceLines(lines, influence);
         lines.Add($"Violation rejects {GetEnsureViolationTarget(ensure)}");
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateTransitionMarkdown(Compilation compilation, TypedTransitionRow row)
@@ -405,7 +405,7 @@ internal static class RichHoverFactory
             lines.Add($"Proof gap: {proofGapCount} unresolved obligation{Pluralize(proofGapCount)} ({string.Join(", ", categories)})");
         }
 
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateRejectMarkdown(Compilation compilation, TypedTransitionRow row)
@@ -423,7 +423,7 @@ internal static class RichHoverFactory
 
         lines.Add(FormatStatus(status));
         lines.Add("Result: state unchanged · no field mutations commit");
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateAccessMarkdown(Compilation compilation, AccessDeclarationInfo access)
@@ -450,7 +450,7 @@ internal static class RichHoverFactory
             $"Same write set in {FormatCodeList(sameWriteSetStates)} · locked in {FormatCodeList(lockedStates)}",
         };
 
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateOmitMarkdown(Compilation compilation, OmitDeclarationInfo omit)
@@ -472,7 +472,7 @@ internal static class RichHoverFactory
             $"Restored on transition to: {FormatCodeList(restoredStates)}",
         };
 
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateQualifierMarkdown(Compilation compilation, QualifierHoverInfo info)
@@ -488,7 +488,7 @@ internal static class RichHoverFactory
             "Mismatch: incompatible combinations are rejected",
         };
 
-        return string.Join("\n", lines);
+        return string.Join("\n\n", lines);
     }
 
     private static HoverStatusBadge BuildConstraintStatus(
