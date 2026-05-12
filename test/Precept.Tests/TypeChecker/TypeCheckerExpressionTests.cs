@@ -1273,6 +1273,84 @@ public class TypeCheckerExpressionTests
             .Should().Contain(nameof(DiagnosticCode.DimensionCategoryMismatch));
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  11b. P3b — Symmetric quantity × compound-unit-ratio → quantity
+    //       (interpolated qualifier form used in inventory-item.precept)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// P3b core: quantity[PurchaseUnit] × quantity[StockingUnit/PurchaseUnit]
+    /// should resolve without DimensionCategoryMismatch in both operand orders.
+    /// Uses the interpolated form from inventory-item.precept.
+    /// </summary>
+    [Theory]
+    [InlineData("Receive.PurchaseQty * StockingUnitsPerPurchaseUnit")]
+    [InlineData("StockingUnitsPerPurchaseUnit * Receive.PurchaseQty")]
+    public void SetAction_CompoundUnitCancellation_InterpolatedDimensionQualifier_NoDimensionMismatch(
+        string quantityExpression)
+    {
+        // PurchaseQty uses 'of' axis (Dimension qualifier, interpolated).
+        // StockingUnitsPerPurchaseUnit uses 'in' axis with compound unit
+        // (Unit qualifier with '/').  The denominator dimension of the
+        // compound unit should cancel against PurchaseQty's dimension.
+        var precept = $$"""
+            precept Widget
+            field PurchaseUnit as dimension
+            field StockingUnit as unit
+            field QuantityOnHand as quantity in '{StockingUnit}' default '0 each'
+            field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}' default '1 each/kg'
+            state Open initial
+            event Receive(PurchaseQty as quantity of '{PurchaseUnit.dimension}')
+            from Open on Receive
+                -> set QuantityOnHand = QuantityOnHand + {{quantityExpression}}
+                -> no transition
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().NotContain(nameof(DiagnosticCode.DimensionCategoryMismatch),
+                because: "compound denominator dimension cancels against PurchaseQty's dimension");
+    }
+
+    /// <summary>
+    /// P3b: WAC denominator formula — QuantityOnHand + PurchaseQty * StockingUnitsPerPurchaseUnit
+    /// should resolve cleanly so the proof engine can discharge the non-zero divisor obligation.
+    /// Regression guard against PRE0083 false-firing due to &lt;unknown&gt; quantity type.
+    /// </summary>
+    [Fact]
+    public void SetAction_WacDenominator_CompoundCancellation_CompilesClean()
+    {
+        var precept = """
+            precept InventoryItem
+            field PurchaseUnit as dimension
+            field StockingUnit as unit
+            field QuantityOnHand as quantity in '{StockingUnit}' default '0 each'
+            field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}' default '1 each/kg'
+            field WeightedAvgCost as price in 'USD' in '{StockingUnit}' default 'USD 0.00/each'
+            state Active initial
+            event Receive(PurchaseQty as quantity of '{PurchaseUnit.dimension}', PurchaseCost as money in 'USD')
+            from Active on Receive
+                -> set WeightedAvgCost = (WeightedAvgCost * QuantityOnHand + Receive.PurchaseCost)
+                                       / (QuantityOnHand + Receive.PurchaseQty * StockingUnitsPerPurchaseUnit)
+                -> set QuantityOnHand = QuantityOnHand + Receive.PurchaseQty * StockingUnitsPerPurchaseUnit
+                -> no transition
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        // The denominator (QuantityOnHand + PurchaseQty * StockingUnitsPerPurchaseUnit) must
+        // resolve to quantity, not <unknown>, so PRE0083 is not falsely fired.
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().NotContain(nameof(DiagnosticCode.DivisionByZero),
+                because: "WAC denominator must resolve to a typed quantity so the proof engine " +
+                         "can check the ensures clause rather than emit a false PRE0083");
+    }
+
     [Fact]
     public void SetAction_USDToEURField_EmitsQualifierMismatch()
     {
