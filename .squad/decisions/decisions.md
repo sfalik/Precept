@@ -19520,3 +19520,23 @@ Key observation: the badge vocabulary and "proven" wording are consistent throug
 ## No Changes Required
 
 All tests pass. No test was updated, disabled, or skipped. Soup Nazi's role here is inspection and documentation — the bakers already cleaned the kitchen.
+
+# George S2 type-checker done
+
+- Timestamp: 2026-05-12T18:04:32.430-04:00
+- Methods changed:
+  - `src/Precept/Pipeline/TypeChecker.cs:679-685` — `PopulateTransitionRows()` now consumes the normalized row collection and preserves source-order insertion with `AddRange()`.
+  - `src/Precept/Pipeline/TypeChecker.cs:1084-1237` — `NormalizeTransitionRow()` now returns `ImmutableArray<TypedTransitionRow>` and expands `StateTargetSlot.StateNames` into one typed row per state target.
+- Expansion implementation:
+  - Used an indexed `for` loop over `StateTargetSlot.StateNames` to resolve each source-state name with its matching `NameSpans[i]`.
+  - Resolved the shared event target, guard, action chain, and outcome exactly once, then used a `foreach` loop over the resolved `fromStates` array to materialize N independent `TypedTransitionRow` copies.
+  - Wildcard / empty-list behavior stays as a single `FromState = null` row.
+  - Undeclared named states still emit `UndeclaredState`, but the emitted row keeps the spelled state name instead of collapsing to wildcard `null`.
+- Test coverage:
+  - `test/Precept.Tests/TypeChecker/TypeCheckerTransitionTests.cs:50-69` — added `TransitionRow_MultiStateFromList_ExpandsIntoIndependentRows`.
+  - `test/Precept.Tests/TypeChecker/TypeCheckerTransitionTests.cs:90-106` — added `TransitionRow_MultiStateFromList_EmitsPerNameDiagnostics`.
+  - `test/Precept.Tests/TypeChecker/TypeCheckerTransitionTests.cs:72-87` — tightened `UnknownFromState_EmitsUndeclaredState` to lock the preserved source-state name.
+- Test delta:
+  - Baseline: `dotnet build src\Precept\Precept.csproj` succeeded; `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` = 4938 passed, 0 failed.
+  - After S2: `dotnet build src\Precept\Precept.csproj` succeeded; `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` = 4940 passed, 0 failed.
+
