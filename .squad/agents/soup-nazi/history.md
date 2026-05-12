@@ -30,12 +30,17 @@
 
 - Modifier and domain-type follow-up gaps should be recorded as explicit passing anchors when the shipped implementation intentionally preserves pre-existing behavior.
 
-- When a new diagnostic covers modifier-modifier mutual exclusivity, use `Check()` + `ContainSingle` (not `CheckExpectingError`) so the test enforces exactly one diagnostic — avoiding false passes where the target code appears alongside an unexpected error.
+- When `FieldTargetSlot` changes from single-name to multi-name, every test that asserts `.FieldName.Should().Be("all")` on a broadcast path will break — the broadcast path must have a stable identity contract (`IsBroadcast` property or equivalent) before any consuming test can be written or migrated.
+- `DiagnosticsTests.cs TypeCodes` and `ProofCodes` lists are exhaustiveness traps: new diagnostic codes added to the enum are picked up by `AllDiagnosticCodes` automatically but silently omitted from the stage-group theory tests unless hand-added. Always add new codes to these lists in the same commit that adds them to `DiagnosticCode.cs`.
+- When a design has open questions about diagnostic multiplicity (wildcard rows, self-loops, OR disjuncts), do not write the affected tests until the behavior is decided — a test written on a false assumption will green immediately and lock the wrong behavior.
 
 - Skip a clean-path test only when the existing test has the exact method name required; a different name means add it, even if the body is near-identical, because the charter regression name is the anchor.
 
 - Conflicting-modifier tests for event args need a minimal but valid lifecycle (initial state, at least one non-initial state, and a matching transition) or the precept will fail for structural reasons, masking the modifier diagnostic.
 - Exhaustiveness-style `Diagnostics.Create(...)` fixture tests must supply enough placeholder args for the highest index used by any current message template; proof diagnostics now reach `{5}`, so a stale four-arg fixture throws before the metadata assertion runs.
+- Comma-list `StateTarget` coverage is not review-ready unless the parser suite itself pins two-name lists, three-plus-name lists, whitespace variants, and trailing-comma failure; type-checker-only anchors are not an acceptable substitute for parser behavior.
+- Multi-state expansion tests must assert cloned semantics, not just counts: guard/action/outcome payloads and per-name `UndeclaredState` fan-out need explicit anchors or real bugs can hide behind "have count" assertions.
+- Commit-level test-count claims must be checked against `dotnet test` output; this spike advertises `4966` core tests, but the current `Precept.Tests` run reports `4962`.
 
 
 
@@ -52,6 +57,12 @@
 ## Recent Updates
 
 
+
+
+### 2026-05-12T23:02:04Z — Comma-list spike review kept parser/test closure blocked
+
+- Recorded the remaining review gate on commit `a63d88b4`: parser AST coverage for 2-name/3+-name/whitespace/trailing-comma cases, semantic-clone assertions on expanded rows, and explicit multi-unknown-state diagnostic fan-out.
+- Locked the count-integrity rule for this spike: published core-suite totals must match real `dotnet test` output, and the current tester anchor is `4962`, not the previously cited `4966`.
 
 ### 2026-05-11T01:38:51Z — Span-refactor fallout batch restored suite health
 
@@ -141,6 +152,13 @@
   - `7829e9c6` — proof-chain chained-expression hover details.
 - Full suite green: 44 hover, 272 LanguageServer, 4938 core.
 - Badge vocabulary and "proven" (not "proved") wording consistent throughout all 44 tests. Design contract held.
+
+### 2026-05-12T18:55:39-04:00 — v2 field-state guarantees test plan reviewed
+
+- Assessed all four slices of the v2 plan. Found 31 missing test cases across parser, type checker, proof engine, and regressions. Revised total: ~74 (plan claimed ~43).
+- Top 3 risks: (1) broadcast `.FieldName == "all"` contract breaks in 5 currently-green tests when `FieldTargetSlot` goes multi-field; (2) `DiagnosticsTests.cs` `TypeCodes`/`ProofCodes` lists are exhaustiveness traps that silently exclude D130–D134; (3) event handler validation has zero test coverage despite being an explicit design concern.
+- Identified 5 open design questions that block test writing: broadcast identity contract, field baseline for D132, OR-disjunct access condition diagnostic, wildcard-row diagnostic multiplicity, and self-loop dual-diagnostic behavior.
+- Filed findings to `.squad/decisions/inbox/soup-nazi-v2-test-review.md`.
 
 ### 2026-05-12T18:01:17.648-04:00 — Hover baseline verified clean after B1
 

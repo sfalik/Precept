@@ -6,6 +6,62 @@
 
 ---
 
+### 2026-05-12T23:02:04Z: Field-state guarantees v2 stays approved only after omit-state resolution, broadcast compatibility, and the real test matrix are locked
+
+**By:** Scribe
+
+**Status:** Merged and reconciled from Frank's design review and Soup Nazi's test-plan audit.
+
+**Merged sources:** `frank-v2-design-review.md`, `soup-nazi-v2-test-review.md`.
+
+- Implementation cannot start until omit declarations resolve `StateTarget` before unifying into `AccessModes`, `NameBinder` iterates every field in a multi-field target, and broadcast compatibility keeps a stable `all` identity instead of collapsing `.FieldName` to null.
+- The structural/conditional split, pipeline ordering, and D130-D134 envelope remain approved, but the plan's real test surface is much larger than advertised: event handlers, wildcard/self-loop multiplicity, diagnostics stage lists, and broadcast regressions all need explicit anchors.
+- Open questions that still block exact tests are now durable team memory: D132 baseline semantics for unmentioned fields, OR-disjunct handling in access conditions, wildcard diagnostic multiplicity, and self-loop D130/D133 double-report behavior.
+
+---
+
+### 2026-05-12T23:02:04Z: Comma-list `StateTarget` spike is architecturally approved, but parser/test closure and count reconciliation remain open
+
+**By:** Scribe
+
+**Status:** Merged and reconciled from Frank's spike review and Soup Nazi's test-gap audit.
+
+**Merged sources:** `frank-spike-review.md`, `soup-nazi-spike-review-gaps.md`.
+
+- Frank approved commit `a63d88b4` on architecture: parser disambiguation stays catalog-derived, `ResolveStateTargets` remains the single normalization path, expansion is pure-copy, and the grammar already accepts comma lists.
+- The follow-up gate is test completeness, not design shape: parser AST coverage still needs 2-name, 3+-name, whitespace, and trailing-comma anchors, and expansion coverage must assert cloned guard/action/outcome semantics plus multi-unknown-state diagnostic fan-out.
+- Published validation counts must match real output; the durable tester note is that current `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build --nologo` reports `4962`, so any `4966` claim needs reconciliation before handoff.
+
+---
+
+### 2026-05-12T23:02:04Z: George's B1 hover fix pass landed the compact-card contract and cleared the targeted language-server suites
+
+**By:** Scribe
+
+**Status:** Merged from George's hover-fix closeout note.
+
+**Merged source:** `george-b1-fixes.md`.
+
+- Commit `c2a38a56` replaced verbose proof-gap hover blocks with the compact qualifier/proof cards, locked the shared badge vocabulary to `✅ Proven`, `⚡ Enforced`, and `⚠️ Gap`, and normalized shipped copy from `proved` to `proven`.
+- `HoverHandler.cs` required no routing change; the fix stayed inside `RichHoverFactory.cs` and matching `HoverHandlerTests.cs` expectations.
+- Validation closed green at `41/41` `HoverHandlerTests` and `269/269` full language-server tests, while repo-wide `dotnet test` still hits the unrelated multi-unknown-state baseline in `TypeCheckerTransitionTests`.
+
+---
+
+### 2026-05-12T23:02:04Z: Hover B1 review locked the compact-card proof-hover contract before the fix pass
+
+**By:** Scribe
+
+**Status:** Merged from Frank's pre-fix blocked review.
+
+**Merged source:** `frank-b1-review.md`.
+
+- Frank's blocker list made the contract explicit: qualifier proof diagnostics, qualifier proof expressions, and qualifier declarations all had to use the compact 3-line card shapes from `docs/Working/hover-design.md` instead of the older forensic sections.
+- The review also locked the exact wording surface: `✅ Proven`, `⚡ Enforced`, `⚠️ Gap`, plus `proven` instead of `proved`, with transition hover using `Gap:` rather than `Proof gap:`.
+- Routing itself was not the problem: proof-first dispatch in `HoverHandler` and the rich proof/qualifier precedence inside `RichHoverFactory` were already judged structurally correct; the rendered copy and stale red tests were the blocked surface.
+
+---
+
 ### 2026-05-12T22:25:28Z: Language docs and README now match shipped comma-list `StateTarget` behavior
 
 **By:** Scribe
