@@ -35,6 +35,7 @@
 - B9/B10/B11/B12 are all fixed as of Slice 5: B9 via Slice 2, B10 via Slices 3+4, B11 via Slices 4+5, and B12 via Slice 3.
 - Semantic-token invalidation has two caches, not one: when typed-constant span changes force a new `SemanticTokensDocument`, clear both `_documents` and `_latestResults` or the next delta request can reuse a stale null-baseline identity and crash inside OmniSharp diffing.
 - `EnumerateExpressionTree` must include a `TypedInterpolatedTypedConstant` case that walks `slot.Expression` for every slot — same pattern as `TypedInterpolatedString` over `TypedHoleSegment`. Without it, `TypedFunctionCall` nodes inside typed constant holes are invisible to the `OfType<TypedFunctionCall>()` scan and get no built-in function semantic token. Note: `FieldRef`/`ArgRef` tokens inside holes already surface correctly via `index.FieldReferences`/`index.ArgReferences` (populated by `Resolve()` during type-checking); the expression-tree walker is only needed for function-call tokens.
+- VS Code 1.74+ auto-activates extensions for contributed languages, so extension manifest tests should assert `contributes.languages[].id == "precept"` rather than expecting a redundant `onLanguage:precept` activation event; keep non-redundant triggers like `workspaceContains:**/*.precept` covered separately.
 
 ## Historical Summary
 

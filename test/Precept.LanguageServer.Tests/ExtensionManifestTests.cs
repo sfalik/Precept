@@ -31,13 +31,19 @@ public class ExtensionManifestTests
     [Fact]
     public void PackageManifest_Activates_WhenAPreceptDocumentOpens()
     {
-        var activationEvents = GetPackageManifest()
+        var packageManifest = GetPackageManifest();
+        var languages = packageManifest
+            .GetProperty("contributes")
+            .GetProperty("languages")
+            .EnumerateArray()
+            .ToArray();
+        var activationEvents = packageManifest
             .GetProperty("activationEvents")
             .EnumerateArray()
             .Select(static item => item.GetString())
             .ToArray();
 
-        activationEvents.Should().Contain("onLanguage:precept");
+        languages.Should().Contain(language => language.GetProperty("id").GetString() == "precept");
         activationEvents.Should().Contain("workspaceContains:**/*.precept");
     }
 
