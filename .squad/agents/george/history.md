@@ -14,7 +14,31 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 - Owns code-level feasibility, parser/runtime implementation detail, and architecture-to-code translation across checker, analyzer, and tooling surfaces.
+
+
+
+
+
+
+
+
 
 
 
@@ -30,7 +54,23 @@
 
 
 
+
+
+
+
+
+
+
+
 - Diagnostic additions should be semantically precise; do not overload unrelated codes when the compiler contract changes shape.
+
+
+
+
+
+
+
+
 
 
 
@@ -54,23 +94,51 @@
 
 
 
-## Learnings
-
-### 2026-05-12T03:45:15Z — D4 scalar-op qualifier propagation
-
-- Six scalar operations (`*Decimal`, `/Decimal` for money, quantity, price) were missing `ResultQualifierPolicy`, causing their `TypedBinaryOp` results to carry `ResultQualifier: null`. When these appeared as operands in qualifier-checked operations (e.g., `MoneySubtractMoney`), the proof engine couldn't resolve their qualifiers → false PRE0114.
-
-- The fix adds `InheritFromQualifiedOperand` policy + `QualifiedOperandInherited` binding + transitive resolution in `ResolveQualifierOnAxis()`. The key insight: `ResolveQualifierFromExpression()` must recurse through nested `TypedBinaryOp` nodes to handle chained scalar ops like `A * B * B`.
-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Learnings
+
+### 2026-05-12T03:45:15Z — D4 scalar-op qualifier propagation
+
+- Six scalar operations (`*Decimal`, `/Decimal` for money, quantity, price) were missing `ResultQualifierPolicy`, causing their `TypedBinaryOp` results to carry `ResultQualifier: null`. When these appeared as operands in qualifier-checked operations (e.g., `MoneySubtractMoney`), the proof engine couldn't resolve their qualifiers → false PRE0114.
+
+- The fix adds `InheritFromQualifiedOperand` policy + `QualifiedOperandInherited` binding + transitive resolution in `ResolveQualifierOnAxis()`. The key insight: `ResolveQualifierFromExpression()` must recurse through nested `TypedBinaryOp` nodes to handle chained scalar ops like `A * B * B`.
+
 - Divide tests need the divisor field to carry `nonzero` modifier, not just `default 2` — the proof engine doesn't infer non-zero from default values alone.
+
+
 
 ### 2026-05-12T00:30:00-04:00 — C3 assignment-in-expression diagnostic
 
 
 
+
+
+
+
 - A lone `=` inside Pratt expression parsing never binds as an expression operator, so the parser used to stop early and let the next slot report a misleading `ExpectedToken` on `because`. Catch `TokenKind.Assign` in expression parsing, emit the dedicated parse diagnostic there, and consume the RHS for recovery.
 
+
+
 - Recovery should return `MissingExpression`, not a fake binary op: that keeps downstream stages structurally intact while preserving the language rule that `=` is only for `set` actions and `==` is the comparison surface.
+
+
+
+
 
 
 
@@ -78,9 +146,19 @@
 
 
 
+
+
+
+
 - The safe derivation path is `Types.All` accessor names → `Tokens.Keywords` → `Tokens.KeywordsValidAsMemberName`; the parser must consume that frozen set directly instead of rebuilding it through `TokenMeta.IsValidAsMemberName` during static initialization.
 
+
+
 - The current workspace compile for `samples/inventory-item.precept` shows no `ExpectedToken` / PRE0009 fallout; remaining inventory diagnostics are now downstream proof/type issues, not the keyword-member-access cycle.
+
+
+
+
 
 
 
@@ -88,9 +166,19 @@
 
 
 
+
+
+
+
 - `exchangerate` qualifier declarations now use `in '<from-currency>' to '<to-currency>'`; stale `from` fixtures in type-checker tests drift out of sync with the language surface.
 
+
+
 - Targeted D2 validation was partially blocked by pre-existing `TypedTransitionRow` constructor compile failures in `ProofEngineTests.cs` and `ProofLedgerTests.cs`, so core build passed but the filtered `TypeCheckerAssignmentQualifier` test run could not complete in this workspace.
+
+
+
+
 
 
 
@@ -98,9 +186,19 @@
 
 
 
+
+
+
+
 - `optional` and `notempty` are enforced as mutually exclusive by modifier metadata, so stale shared type-checker fixtures can cascade into many semantic failures at once.
 
+
+
 - When a broad assembly-style test fixture starts failing after validation tightening, fix the shared DSL fixture first; parser-only coverage can keep contradictory modifier combinations as long as it intentionally stops before type checking.
+
+
+
+
 
 
 
@@ -108,11 +206,35 @@
 
 
 
+
+
+
+
 - QuantityTimesQuantity already advertised dimensional cancellation in the operations catalog, but assignment qualifier validation still flattened binary trees to raw leaves. That emitted false PRE0069s on qty[D] * qty[A/D] because both operands were compared directly to the target field.
+
+
 
 - The fix was to add an operation-level CompoundUnitCancellation result-qualifier policy and derive the numerator unit/dimension before recursing into child operands.
 
+
+
 - Interpolated compound-unit qualifiers stay symbolic ({StockingUnit}/{PurchaseUnit}), so RC-3 cancellation has to derive {Unit.dimension} symbolically instead of pretending runtime qualifier values are available during type checking.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -144,7 +266,31 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 - Pre-existing spike branch failures (26 tests in `TypeCheckerAssemblyTests` + `TypeCheckerAssignmentQualifierTests`) produce `ExpectedToken` parser errors unrelated to type checker work. Always baseline before claiming new failures.
+
+
+
+
+
+
+
+
 
 
 
@@ -160,7 +306,23 @@
 
 
 
+
+
+
+
+
+
+
+
 - `typeRef.ResolvedKind` on a `QualifiedTypeReference` delegates to `InnerType.ResolvedKind` — no need to unbox manually; the property dispatch covers it.
+
+
+
+
+
+
+
+
 
 
 
@@ -176,7 +338,31 @@
 
 
 
+
+
+
+
+
+
+
+
 - Adding `internal static` test entry points to private ProofEngine helpers (behind `InternalsVisibleTo`) is the established pattern and keeps tests exercising real code paths without overexposing the API.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -208,6 +394,22 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 - Mutual-exclusion metadata must be symmetric; PRECEPT0011c makes one-way declarations non-buildable.
 
 
@@ -216,7 +418,23 @@
 
 
 
+
+
+
+
+
+
+
+
 - Interpolation remains feasible, but Slice 2 is the dominant cost center and binder plus multiple LS walkers must ship with it to avoid checker/tooling drift.
+
+
+
+
+
+
+
+
 
 
 
@@ -240,8 +458,29 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Historical Summary
+
 - 2026-05-12T03:35:43Z summarization pass moved older recent-update detail into `history-archive.md`; the live history now keeps only current guidance and the newest cross-agent handoffs.
+
+
+
+
 
 
 
@@ -253,29 +492,69 @@
 
 
 
+
+
+
+
+
+
+
+
 - `.squad/decisions.md` remains the canonical chronology; this file now keeps only current implementation guidance and the newest merged outcomes.
+
+
+
+
 
 
 
 - 2026-05-11 implementation-detail updates for Slice 11B, Slice 1, Slices 6/10/11/12, A2B, and early inventory fallout were compacted into `history-archive.md` during the 2026-05-12T02:12:11Z summarization pass.
 
+
+
 ## Recent Updates
+
+### 2026-05-12T04:29:05Z — Diagnostic message fixes recorded
+- George's commit `4535aaa6` closed the message-template batch from Elaine's audit.
+- Targeted validation stayed green at `818/818`, and the proof-context wording cleanup now lives in the durable record.
 
 ### 2026-05-12T03:35:43Z — Bug031 warning expectation landed
 
+
+
 - Background fix completed in commit `e73e13d7`: `Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` now expects the graph-stage `AlwaysRejecting` warning instead of an empty diagnostic set.
 
+
+
 - The `Bug031` precept source stays unchanged because the all-reject transition row remains intentional regression coverage for interpolated `reject` / `because` parsing.
+
+
 
 ### 2026-05-12T03:31:55Z — Bug031 warning expectation synced
 
 
 
+
+
+
+
 - `Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` now expects one `AlwaysRejecting` graph warning instead of an empty diagnostic set; the DSL fixture stays unchanged because the always-reject transition is intentional coverage for interpolated `reject` / `because` parsing.
+
+
 
 - Validation: filtered `Bug031` passes after rebuild (`dotnet test test\Precept.Tests\Precept.Tests.csproj --filter "Bug031" --no-build`), `Precept.Tests` is green in the full run, and repo-wide `dotnet test` still hits 7 unrelated existing failures (2 MCP, 5 language-server semantic-token tests).
 
+
+
 ### 2026-05-11T23:43:07Z — Slice 12 handoff and sample fallout recorded
+
+
+
+
+
+
+
+
 
 
 
@@ -291,9 +570,27 @@
 
 
 
+
+
+
+
+
+
+
+
 - Cross-agent inventory analysis says `samples/inventory-item.precept` will need follow-up on binary-chain qualifier propagation, ensure-expression coverage, and bare `unitofmeasure` semantics.
 
+
+
 ### 2026-05-12T00:01:51Z — Temporal price denominator design locked for Slice 12
+
+
+
+
+
+
+
+
 
 
 
@@ -309,7 +606,23 @@
 
 
 
+
+
+
+
+
+
+
+
 - `quantity of 'time'` remains invalid; temporal semantics still route through `duration` / `period`, and `duration` should surface implied temporal-dimension metadata through `TypeMeta.ImpliedQualifiers` rather than checker hardcoding.
+
+
+
+
+
+
+
+
 
 
 
@@ -325,9 +638,27 @@
 
 
 
+
+
+
+
+
+
+
+
 - Shane follow-ups remain open on `quantity in 's'` hinting, `money ÷ duration -> price` inference, and `period ×/÷ integer` operator support.
 
+
+
 ### 2026-05-11T21:26:23.861-04:00 — Slice A2B compound-unit interpolation landed
+
+
+
+
+
+
+
+
 
 
 
@@ -343,7 +674,23 @@
 
 
 
+
+
+
+
+
+
+
+
 - Slot identity lives in `src/Precept/Pipeline/SemanticIndex.cs` as `InterpolationSlotKind` (the plan still calls it `SlotIdentity`). Slice A2B added `NumeratorUnit` and `DenominatorUnit` there.
+
+
+
+
+
+
+
+
 
 
 
@@ -359,23 +706,31 @@
 
 
 
-- A2B added quantity Q5 (`'{n} {A}/{B}'`) plus a dedicated `UnitOfMeasureForms` compound-unit pattern for `'{A}/{B}'`; quantity Q6 was intentionally not added because the existing quantity whole-value lane is `H[whole-value]`, not a unit-only compound form.
-
-### 2026-05-11T23:55:00-04:00 — george-3 D4 scalar-op qualifier propagation fix
-
-- Implemented ResultQualifierPolicy.InheritFromQualifiedOperand enum value
-- Added QualifiedOperandInherited : QualifierBinding record in SemanticIndex.cs
-- Added branch in TypeChecker.Expressions.cs MapQualifierBinding() for new policy
-- Added ResolveQualifierFromExpression() in ProofEngine.cs for transitive resolution
-- Applied policy to 6 operations: MoneyTimesDecimal, MoneyDivideDecimal, QuantityTimesDecimal, QuantityDivideDecimal, PriceTimesDecimal, PriceDivideDecimal
-- 10 new tests added, all 4831 tests pass
-- Commits:  1bc5f0e (fix), 73c11e51 (docs/records)
-
-
-### 2026-05-12T00:08:32.997-04:00 — Elaine diagnostic message fixes landed
-
-- Updated the audited proof/type diagnostic templates in src/Precept/Language/Diagnostics.cs, rewired proof-context suffix rendering in src/Precept/Pipeline/ProofEngine.cs, and corrected InvalidTypedConstantContent emission so {1} is the target type display name instead of an arbitrary validator message.
-
-- RuleIdentity still has no BecauseText-style author label, so rule contexts remain index-based for now; see .squad/decisions/inbox/george-diagnostic-message-fixes.md.
-
-- Validation: dotnet build src\Precept\Precept.csproj --nologo passed, focused diagnostics/proof/typed-constant coverage passed (818/818), and full Precept.Tests still hits the pre-existing InventoryItem_Sample_PRE0114_Count_Drops_Below_Baseline failure in the dirty workspace (4840/4841 passed).
+
+
+
+
+
+
+
+
+- A2B added quantity Q5 (`'{n} {A}/{B}'`) plus a dedicated `UnitOfMeasureForms` compound-unit pattern for `'{A}/{B}'`; quantity Q6 was intentionally not added because the existing quantity whole-value lane is `H[whole-value]`, not a unit-only compound form.
+
+### 2026-05-11T23:55:00-04:00 — george-3 D4 scalar-op qualifier propagation fix
+
+- Implemented ResultQualifierPolicy.InheritFromQualifiedOperand enum value
+- Added QualifiedOperandInherited : QualifierBinding record in SemanticIndex.cs
+- Added branch in TypeChecker.Expressions.cs MapQualifierBinding() for new policy
+- Added ResolveQualifierFromExpression() in ProofEngine.cs for transitive resolution
+- Applied policy to 6 operations: MoneyTimesDecimal, MoneyDivideDecimal, QuantityTimesDecimal, QuantityDivideDecimal, PriceTimesDecimal, PriceDivideDecimal
+- 10 new tests added, all 4831 tests pass
+- Commits:  1bc5f0e (fix), 73c11e51 (docs/records)
+
+
+### 2026-05-12T00:08:32.997-04:00 — Elaine diagnostic message fixes landed
+
+- Updated the audited proof/type diagnostic templates in src/Precept/Language/Diagnostics.cs, rewired proof-context suffix rendering in src/Precept/Pipeline/ProofEngine.cs, and corrected InvalidTypedConstantContent emission so {1} is the target type display name instead of an arbitrary validator message.
+
+- RuleIdentity still has no BecauseText-style author label, so rule contexts remain index-based for now; see .squad/decisions/inbox/george-diagnostic-message-fixes.md.
+
+- Validation: dotnet build src\Precept\Precept.csproj --nologo passed, focused diagnostics/proof/typed-constant coverage passed (818/818), and full Precept.Tests still hits the pre-existing InventoryItem_Sample_PRE0114_Count_Drops_Below_Baseline failure in the dirty workspace (4840/4841 passed).
