@@ -13,6 +13,16 @@
 
 
 ## Learnings
+### 2026-05-11T23:20:02.837-04:00 — D2 exchangerate qualifier fixture sync
+
+- `exchangerate` qualifier declarations now use `in '<from-currency>' to '<to-currency>'`; stale `from` fixtures in type-checker tests drift out of sync with the language surface.
+- Targeted D2 validation was partially blocked by pre-existing `TypedTransitionRow` constructor compile failures in `ProofEngineTests.cs` and `ProofLedgerTests.cs`, so core build passed but the filtered `TypeCheckerAssignmentQualifier` test run could not complete in this workspace.
+
+### 2026-05-11 — D1 conflicting-modifier fixture cleanup
+
+- `optional` and `notempty` are enforced as mutually exclusive by modifier metadata, so stale shared type-checker fixtures can cascade into many semantic failures at once.
+- When a broad assembly-style test fixture starts failing after validation tightening, fix the shared DSL fixture first; parser-only coverage can keep contradictory modifier combinations as long as it intentionally stops before type checking.
+
 ### 2026-05-11T22:47:57-04:00 — RC-3 compound-unit cancellation
 
 - QuantityTimesQuantity already advertised dimensional cancellation in the operations catalog, but assignment qualifier validation still flattened binary trees to raw leaves. That emitted false PRE0069s on qty[D] * qty[A/D] because both operands were compared directly to the target field.
@@ -126,4 +136,5 @@
 - TransitionRowOutcome (semantic enum in SemanticIndex.cs) and OutcomeKind (catalog enum in Outcomes.cs) are parallel enums with the same three values. TransitionRowOutcome.Reject is correct inside graph analysis — no new catalog entry needed.
 
 - The 26 pre-existing spike-branch failures (TypeCheckerAssemblyTests + TypeCheckerAssignmentQualifierTests) are invariant across this work. 9 new GraphAnalyzerTests added, all green.
+
 

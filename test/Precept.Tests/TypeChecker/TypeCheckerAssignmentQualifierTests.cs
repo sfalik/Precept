@@ -19,8 +19,8 @@ public class TypeCheckerAssignmentQualifierTests
     {
         var precept = """
             precept FxTest
-            field rate1 as exchangerate from 'USD' to 'EUR'
-            field rate2 as exchangerate from 'USD' to 'EUR'
+            field rate1 as exchangerate in 'USD' to 'EUR'
+            field rate2 as exchangerate in 'USD' to 'EUR'
             state Open initial
             state Closed
             event Sync
@@ -37,8 +37,8 @@ public class TypeCheckerAssignmentQualifierTests
     {
         var precept = """
             precept FxTest
-            field rate1 as exchangerate from 'USD' to 'EUR'
-            field rate2 as exchangerate from 'GBP' to 'EUR'
+            field rate1 as exchangerate in 'USD' to 'EUR'
+            field rate2 as exchangerate in 'GBP' to 'EUR'
             state Open initial
             state Closed
             event Sync
@@ -55,8 +55,8 @@ public class TypeCheckerAssignmentQualifierTests
     {
         var precept = """
             precept FxTest
-            field rate1 as exchangerate from 'USD' to 'EUR'
-            field rate2 as exchangerate from 'USD' to 'GBP'
+            field rate1 as exchangerate in 'USD' to 'EUR'
+            field rate2 as exchangerate in 'USD' to 'GBP'
             state Open initial
             state Closed
             event Sync
