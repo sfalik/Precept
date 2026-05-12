@@ -468,3 +468,528 @@ throws away the DTO forest, renders catalog/reference material as markdown, and 
 contracts only for diagnostics and future runtime workflow data.
 
 That is the durable working design.
+
+---
+
+## Implementation Plan
+
+This section turns the approved design into the concrete Newman execution plan. Treat the 8 focused
+catalog tools plus `precept_compile` as the public contract surface. `LanguageTool.cs` is no longer
+the architectural center; it is either a temporary migration aid or a dead file.
+
+### Phase 1 — Catalog Tools (`LanguageTool.cs` exit plan)
+
+#### Mechanical rule for all 8 tools
+
+Change the public signatures first, then rewire the bodies:
+
+- `QuickstartTool.Quickstart()` — `QuickstartDto` -> `string`
+- `SyntaxTool.Syntax()` — `SyntaxDto` -> `string`
+- `TypesTool.Types()` — `TypesDto` -> `string`
+- `OperationsTool.Operations(string? category = null)` — `OperationsResultDto` -> `string`
+- `ProofsTool.Proofs()` — `ProofsDto` -> `string`
+- `PatternsTool.Patterns()` — `PatternsDto` -> `string`
+- `DiagnosticTool.Diagnostic(string code)` — `DiagnosticLookupResultDto` -> `string`
+- `DomainsTool.Domains()` — `DomainsDto` -> `string`
+
+Do **not** keep routing these tools through `LanguageTool.Language()`. That preserves the DTO forest
+behind a markdown facade and defeats the entire point of the redesign. Each focused tool should read
+its own catalog inputs directly and hand them to a formatter.
+
+#### `CatalogFormatters.cs` design
+
+Add a new formatter module at:
+
+- `tools/Precept.Mcp/Formatters/CatalogFormatters.cs`
+
+Use one internal static class with a consistent signature pattern: catalog data in, markdown out.
+Keep the tools thin and keep all rendering rules in one place.
+
+```csharp
+namespace Precept.Mcp.Formatters;
+
+internal static class CatalogFormatters
+{
+    public static string FormatQuickstart();
+
+    public static string FormatSyntax(
+        IReadOnlyList<ConstructMeta> constructs,
+        IReadOnlyList<ActionMeta> actions,
+        IReadOnlyList<OutcomeMeta> outcomes,
+        IReadOnlyList<OperatorMeta> operators);
+
+    public static string FormatTypes(
+        IReadOnlyList<TypeMeta> types,
+        IReadOnlyList<ModifierMeta> modifiers,
+        IReadOnlyList<FunctionMeta> functions);
+
+    public static string FormatOperations(
+        IReadOnlyList<OperationMeta> operations,
+        string? category = null);
+
+    public static string FormatProofs(
+        IReadOnlyList<ProofRequirementMeta> proofRequirements,
+        IReadOnlyList<FaultMeta> runtimeFaults);
+
+    public static string FormatPatterns();
+    public static string FormatDiagnostic(DiagnosticMeta diagnostic);
+    public static string FormatDiagnosticNotFound(string code);
+
+    public static string FormatDomains(
+        IReadOnlyCollection<CurrencyEntry> currencies,
+        IReadOnlyList<UcumAtom> units,
+        IReadOnlyCollection<UcumPrefix> prefixes,
+        IReadOnlyCollection<DimensionCatalog.DimensionAlias> dimensions,
+        IReadOnlyList<TemporalUnits.TemporalUnitEntry> temporalUnits);
+}
+```
+
+Implementation guidance:
+
+- Build strings with `StringBuilder`.
+- Standardize headings: `# Tool Title`, then `##` major sections, then `###` per-entry sections.
+- Prefer bullet lists for per-entry metadata and tables only for dense comparison sets.
+- Add small shared helpers inside the same file for repeated rendering:
+  - `AppendSection(StringBuilder sb, string heading)`
+  - `RenderQualifierShape(QualifierShape? shape)`
+  - `RenderProofRequirements(IReadOnlyList<ProofRequirement> requirements)`
+  - `RenderDimensionVector(DimensionVector vector)`
+  - `RenderScale(UcumExactFactor factor)`
+  - `JoinOrNone(IEnumerable<string> values)`
+- Keep catalog ordering stable: use the native declaration order for `*.All`, and only sort where the
+  current code already sorts (`CurrencyCatalog.All.Values.OrderBy(...)`, `DimensionCatalog.All.Values.OrderBy(...)`,
+  `UcumPrefixCatalog.All.Values.OrderBy(p => p.Order)`).
+
+#### `precept_quickstart`
+
+- **Current -> new:** `QuickstartDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/QuickstartTool.cs`
+- **Read from:** `QuickstartCatalog.WhatIsPrecept`, `QuickstartCatalog.CoreGuarantee`,
+  `QuickstartCatalog.CoreConcepts`, `QuickstartCatalog.ToolGuide`, `QuickstartCatalog.MinimalExamples`
+- **Formatter output:**
+  - `# Precept Quickstart`
+  - `## What Precept Is`
+  - `## Core Guarantee`
+  - `## Core Concepts` with one `###` subsection per concept containing name, summary, example
+  - `## Tool Guide` with one bullet per tool: when to call it, what it returns
+  - `## Minimal Examples` with one `###` subsection per example and a fenced `precept` code block
+- **DTO deletions:** `QuickstartDto`, `CoreConceptDto`, `ToolGuideDto`, `MinimalExampleDto`
+  from `tools/Precept.Mcp/Dtos/NewToolDtos.cs`
+
+#### `precept_syntax`
+
+- **Current -> new:** `SyntaxDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/SyntaxTool.cs`
+- **Read from:** `Constructs.All`, `Actions.All`, `Outcomes.All`, `Operators.All`, `SyntaxReference`
+- **Formatter output:**
+  - `# Precept Syntax Reference`
+  - `## Grammar Rules` using `SyntaxReference.GrammarModel`, `CommentSyntax`, `IdentifierRules`,
+    `StringLiteralRules`, `NumberLiteralRules`, `WhitespaceRules`, `NullNarrowing`,
+    `TypedConstantRules`, `ExpressionRules`
+  - `## Operator Precedence` using `SyntaxReference.PrecedenceTable`
+  - `## Conventional Order` using `SyntaxReference.ConventionalOrder`
+  - `## Constructs` with one `###` subsection per construct: name, kind, description, usage example,
+    primary leading token, allowed scopes, slot list, disambiguation entries, routing family,
+    modifier domain, snippet template when present
+  - `## Actions` with one `###` subsection per action: keyword, description, applicable targets,
+    allowed constructs, syntax shape, value requirement, into support, primary action kind,
+    proof requirements, hover/usage/snippet metadata
+  - `## Outcomes` with one `###` subsection per outcome: leading token, argument kind,
+    description, example
+  - `## Operators` with one `###` subsection per operator: rendered tokens, arity,
+    associativity, precedence, family, keyword flag, description, usage example
+- **DTO deletions:** `SyntaxDto` from `NewToolDtos.cs`; `ConstructCatalogEntryDto`,
+  `ConstructSlotDto`, `DisambiguationEntryDto`, `ActionCatalogEntryDto`, `OutcomeDto`,
+  `OperatorCatalogEntryDto`, `SyntaxReferenceDto`, `CommonPatternDto`, `AntiPatternDto`
+  from `tools/Precept.Mcp/Dtos/LanguageToolDtos.cs`
+
+#### `precept_types`
+
+- **Current -> new:** `TypesDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/TypesTool.cs`
+- **Read from:** `Types.All`, `Modifiers.All`, `Functions.All`
+- **Formatter output:**
+  - `# Precept Type System`
+  - `## Types` with one `###` subsection per type: keyword, kind, display name, category,
+    description, traits, widening targets, implied modifiers, implied qualifiers, qualifier shape,
+    accessors, choice literal tokens, authoring metadata (`HoverDescription`, `UsageExample`),
+    `NotemptyApplicable`, content-validation details when present
+  - `## Modifiers` split into fixed subsections:
+    - `### Value Modifiers`
+    - `### State Modifiers`
+    - `### Event Modifiers`
+    - `### Access Modifiers`
+    - `### Anchor Modifiers`
+    Each entry should include keyword, kind, description, category, applicability, mutually
+    exclusive set, desugaring/proof metadata, and authoring metadata where present.
+  - `## Built-in Functions` with one `###` subsection per function: name, category, description,
+    overload list, qualifier match, proof requirements, CI variant info, usage/snippet/hover,
+    message-position flag
+- **DTO deletions:** `TypesDto` from `NewToolDtos.cs`; `TypeCatalogEntryDto`, `QualifierShapeDto`,
+  `QualifierSlotDto`, `TypeAccessorDto`, `ContentValidationDto`, `ModifierCatalogDto`,
+  `ModifierTargetDto`, `ValueModifierCatalogEntryDto`, `StateModifierCatalogEntryDto`,
+  `EventModifierCatalogEntryDto`, `AccessModifierCatalogEntryDto`, `AnchorModifierCatalogEntryDto`,
+  `FunctionCatalogEntryDto`, `FunctionOverloadDto`, `FunctionParameterDto`
+  from `LanguageToolDtos.cs`
+
+#### `precept_operations`
+
+- **Current -> new:** `OperationsResultDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/OperationsTool.cs`
+- **Read from:** `Operations.All`
+- **Formatter output:**
+  - `# Precept Operations`
+  - If a filter was supplied, print `Filtered by: \`Money\`` (or whatever was passed)
+  - `## Available Categories` listing distinct LHS type names in the current order used by the tool
+  - `## Matching Operations` with one `###` subsection per operation: kind, rendered signature
+    (`lhs operator rhs -> result`), description, qualifier match, proof requirements,
+    CI-variant diagnostic if present, bidirectional lookup flag
+  - `## Count` as a final single-line section so tests can assert the filtered total cleanly
+- **DTO deletions:** `OperationsResultDto` from `NewToolDtos.cs`; `OperationDto`
+  from `LanguageToolDtos.cs`
+
+#### `precept_proofs`
+
+- **Current -> new:** `ProofsDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/ProofsTool.cs`
+- **Read from:** `ProofRequirements.All`, `Faults.All`
+- **Formatter output:**
+  - `# Precept Proofs and Runtime Faults`
+  - `## Proof Requirements` with one `###` subsection per requirement: kind, description,
+    whether it is dual-subject, and any short explanatory line needed for authoring
+  - `## Runtime Faults` with one `###` subsection per fault: code, severity, message template,
+    recovery hint
+- **DTO deletions:** `ProofsDto`, `ProofRequirementMetaDto`, `FaultMetaDto`
+  from `NewToolDtos.cs`
+
+#### `precept_patterns`
+
+- **Current -> new:** `PatternsDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/PatternsTool.cs`
+- **Read from:** `SyntaxReference.CommonPatterns`, `SyntaxReference.AntiPatterns`
+- **Formatter output:**
+  - `# Precept Patterns`
+  - `## Common Patterns` with one `###` subsection per pattern: name, description,
+    fenced `precept` snippet
+  - `## Anti-Patterns` with one `###` subsection per anti-pattern: name, description,
+    `Bad` snippet, `Good` snippet, `Why it fails`
+- **DTO deletions:** `PatternsDto` from `NewToolDtos.cs`; `CommonPatternDto`, `AntiPatternDto`
+  from `LanguageToolDtos.cs`
+
+#### `precept_diagnostic`
+
+- **Current -> new:** `DiagnosticLookupResultDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/DiagnosticTool.cs`
+- **Read from:** `Diagnostics.All`; `Diagnostics.GetMeta((DiagnosticCode)numericValue)` for PRE lookups
+- **Tool logic to keep:** name lookup, PRE#### lookup, and not-found branching stay in
+  `DiagnosticTool.cs`; only rendering moves into `CatalogFormatters`
+- **Formatter output when found:**
+  - `# Diagnostic UndeclaredField (PRE0017)` style heading
+  - `## Summary` with stage, severity, category, message template
+  - `## Trigger`
+  - `## Recovery Steps`
+  - `## Fix Hint`
+  - `## Related Codes`
+  - `## Prevents Fault`
+  - `## Examples` with before/after blocks when present
+- **Formatter output when missing:** a short markdown/plain-text block that echoes the requested code,
+  states the lookup failed, and reminds the caller of the two accepted formats
+- **DTO deletions:** `DiagnosticLookupResultDto` from `NewToolDtos.cs`; `DiagnosticCatalogEntryDto`
+  from `LanguageToolDtos.cs`
+
+#### `precept_domains`
+
+- **Current -> new:** `DomainsDto` -> `string`
+- **Tool file:** `tools/Precept.Mcp/Tools/DomainsTool.cs`
+- **Read from:**
+  - `CurrencyCatalog.All.Values.OrderBy(entry => entry.AlphaCode)`
+  - `UcumAtomCatalog.BrowseTier1()`
+  - `UcumPrefixCatalog.All.Values.OrderBy(p => p.Order)`
+  - `DimensionCatalog.All.Values.OrderBy(entry => entry.Name)`
+  - `TemporalUnits.AllEntries`
+- **Formatter output:**
+  - `# Precept Domain Catalog`
+  - `## Currencies` table or subsections with alpha code, numeric code, name, minor unit, symbol
+  - `## UCUM Tier-1 Units` with code, name, dimension vector, resolved dimension name,
+    exact scale, prefixable flag, annotation class
+  - `## UCUM Prefixes` with code, name, numerator, denominator, base-10 exponent
+  - `## Dimensions` with name, dimension vector, description
+  - `## Temporal Units` with singular, plural, calendar-based flag, period flag, duration flag
+- **DTO deletions:** `DomainsDto`, `UcumPrefixDto` from `NewToolDtos.cs`; `DomainCatalogDto`,
+  `CurrencyDomainEntryDto`, `UcumTier1UnitDto`, `DimensionDomainEntryDto`,
+  `TemporalUnitDomainEntryDto`, `DimensionVectorDto`, `UcumExactFactorDto`
+  from `LanguageToolDtos.cs`
+
+#### Fate of `LanguageTool.cs`
+
+- Do not add new formatter code to `tools/Precept.Mcp/Tools/LanguageTool.cs`.
+- During migration Newman may leave it compiling temporarily while focused tools are rewired.
+- Once the focused tools no longer call `LanguageTool.Language()`, delete the file rather than
+  preserving an internal DTO serializer that nobody should use.
+- Do **not** carry forward `Constraints`, `FirePipeline`, or the giant aggregate `LanguageReferenceDto`
+  surface just to keep old tests alive. That was the old architecture.
+
+### Phase 2 — Compile Tool (`tools/Precept.Mcp/Tools/CompileTool.cs`)
+
+#### Surviving DTO records
+
+Keep only the minimal diagnostic JSON contract. Reduce
+`tools/Precept.Mcp/Dtos/CompileToolDtos.cs` to exactly this shape:
+
+```csharp
+namespace Precept.Mcp.Dtos;
+
+public sealed record CompileResultDto(
+    bool HasErrors,
+    DiagnosticDto[] Diagnostics,
+    string? ProjectDefinition);
+
+public sealed record DiagnosticDto(
+    string Code,
+    string Severity,
+    string Message,
+    DiagnosticLocationDto Location);
+
+public sealed record DiagnosticLocationDto(
+    int Line,
+    int Column,
+    int Length);
+```
+
+With ASP.NET/System.Text.Json web defaults, this serializes as:
+
+```json
+{
+  "hasErrors": false,
+  "diagnostics": [],
+  "projectDefinition": "# Compiled Precept\n..."
+}
+```
+
+#### DTO records to delete from `CompileToolDtos.cs`
+
+Delete the entire definition graph:
+
+- `PreceptDefinitionDto`
+- `PreceptFieldDto`
+- `PreceptStateDto`
+- `PreceptEventDto`
+- `EventArgDto`
+- `TransitionRowDto`
+- `PreceptRuleDto`
+- `EnsureDto`
+- `AccessModeDto`
+- `StateHookDto`
+
+Also remove `using System.Text.Json.Serialization;` because the `JsonPropertyName` attributes go away
+with the definition graph.
+
+#### `ProjectDefinition` structure
+
+Replace `MapDefinition(...)` with a text renderer, not another object model. Add a private helper in
+`CompileTool.cs` (or extract later if it grows too large):
+
+```csharp
+private static string BuildProjectDefinition(string source, Compilation compilation)
+```
+
+Structure the rendered text in a fixed order so agents and tests can rely on it:
+
+1. `# Compiled Precept`
+2. `## Overview`
+   - Name
+   - Stateful/stateless
+   - Field count
+   - State count
+   - Event count
+   - Rule count
+   - State hook count
+3. `## Fields`
+   - one `###` subsection per field with type, optionality, writability, modifiers, default,
+     computed expression, qualifier, choice metadata when present
+4. `## States`
+   - one `###` subsection per state with modifiers, constraints, omitted fields, access modes
+5. `## Events`
+   - one `###` subsection per event with args, rows, ensures
+   - each row should include from-state(s), guard, actions, outcome, target state,
+     reject message when applicable
+6. `## Rules`
+   - one bullet or `###` subsection per rule with expression, because, when
+7. `## State Hooks`
+   - one `###` subsection per hook with state name, kind (`entry`/`exit`), actions
+
+Render empty sections explicitly as `None.` rather than omitting them. The point is stable readable
+output, not compactness.
+
+#### `CompileTool.cs` method-level rewrite
+
+Keep the outer compile flow; remove the DTO projection tree.
+
+- Keep:
+  - `Compile(string text)`
+  - `MapDiagnostic(Diagnostic diagnostic)`
+  - `FormatDiagnosticCode(...)`
+  - `FormatSeverity(...)`
+  - low-level render helpers that still serve text rendering (`RenderTypeName`, `RenderQualifier`,
+    `RenderExpression`, `RenderSpan`, etc.)
+- Delete or replace:
+  - `MapDefinition`
+  - `MapField`
+  - `MapState`
+  - `MapEvent`
+  - `MapArg`
+  - `MapTransitionRow`
+  - `MapEventHandlerRow`
+  - `MapRule`
+  - `MapEnsure`
+  - `MapAccessMode`
+  - `MapStateHook`
+- Add focused summary helpers so the file reads as a formatter, not a DTO mapper:
+
+```csharp
+private static string BuildProjectDefinition(string source, Compilation compilation);
+private static void AppendFields(StringBuilder sb, SemanticIndex semantics, string source);
+private static void AppendStates(
+    StringBuilder sb,
+    SemanticIndex semantics,
+    IReadOnlyDictionary<string, string[]> omittedFieldsByState,
+    string source);
+private static void AppendEvents(StringBuilder sb, SemanticIndex semantics, string source);
+private static void AppendRules(StringBuilder sb, SemanticIndex semantics, string source);
+private static void AppendStateHooks(StringBuilder sb, SemanticIndex semantics, string source);
+```
+
+#### End-to-end `precept_compile` contract
+
+The tool should now return only three top-level fields:
+
+```json
+{
+  "hasErrors": true,
+  "diagnostics": [
+    {
+      "code": "PRE0017",
+      "severity": "Error",
+      "message": "Field 'Amount' is not declared.",
+      "location": {
+        "line": 2,
+        "column": 7,
+        "length": 6
+      }
+    }
+  ],
+  "projectDefinition": null
+}
+```
+
+and on success:
+
+```json
+{
+  "hasErrors": false,
+  "diagnostics": [],
+  "projectDefinition": "# Compiled Precept\n## Overview\n- Name: `LoanApplication`\n..."
+}
+```
+
+### Phase 3 — Cleanup
+
+#### Files to delete
+
+- `tools/Precept.Mcp/Dtos/LanguageToolDtos.cs`
+- `tools/Precept.Mcp/Dtos/NewToolDtos.cs`
+- `tools/Precept.Mcp/Tools/LanguageTool.cs` (after the focused tools stop calling it)
+- `test/Precept.Mcp.Tests/LanguageToolTests.cs` (delete rather than preserving tests for a dead internal aggregate tool)
+
+#### Files to modify
+
+- `tools/Precept.Mcp/Tools/QuickstartTool.cs` — return `string`; call `CatalogFormatters.FormatQuickstart()`
+- `tools/Precept.Mcp/Tools/SyntaxTool.cs` — return `string`; call `CatalogFormatters.FormatSyntax(...)`
+- `tools/Precept.Mcp/Tools/TypesTool.cs` — return `string`; call `CatalogFormatters.FormatTypes(...)`
+- `tools/Precept.Mcp/Tools/OperationsTool.cs` — return `string`; preserve `category` filter, then format text
+- `tools/Precept.Mcp/Tools/ProofsTool.cs` — return `string`; move mapping/rendering to formatter
+- `tools/Precept.Mcp/Tools/PatternsTool.cs` — return `string`; format `SyntaxReference` patterns directly
+- `tools/Precept.Mcp/Tools/DiagnosticTool.cs` — return `string`; keep lookup logic, replace DTO return
+- `tools/Precept.Mcp/Tools/DomainsTool.cs` — return `string`; read catalogs directly, include temporal units
+- `tools/Precept.Mcp/Tools/CompileTool.cs` — keep minimal diagnostic JSON; replace definition DTO graph with `ProjectDefinition` text
+- `tools/Precept.Mcp/Dtos/CompileToolDtos.cs` — reduce to 3 records only
+- `tools/Precept.Mcp/Formatters/CatalogFormatters.cs` — new file containing all catalog markdown rendering
+- `test/Precept.Mcp.Tests/NewToolTests.cs` — rewrite from JSON-shape assertions to markdown content assertions
+- `test/Precept.Mcp.Tests/RecoveryHintTests.cs` — assert proof/diagnostic markdown content instead of DTO property access
+- `test/Precept.Mcp.Tests/CompileToolTests.cs` — assert `ProjectDefinition` presence/absence instead of `Definition`
+- `test/Precept.Mcp.Tests/CompileToolDefinitionProjectionTests.cs` — replace DTO graph assertions with summary-section assertions
+- `test/Precept.Mcp.Tests/DefinitionProjectionTests.cs` — replace DTO field/property assertions with summary text assertions or fold into a new compile-summary test file
+- `test/Precept.Mcp.Tests/OutcomeKindProjectionTests.cs` — keep catalog `SerializedKind` assertions; replace compile DTO assertions with summary text assertions
+
+#### Build verification
+
+Minimum verification after the MCP rewrite:
+
+```bash
+dotnet build tools/Precept.Mcp/Precept.Mcp.csproj
+dotnet test test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj
+```
+
+If Newman touches any shared docs describing the MCP contract, run the same MCP test suite after the
+doc sync so the final commit closes green.
+
+### Tests to write
+
+Add or update MCP tests to prove the new contract, not merely the new signatures.
+
+#### Catalog-tool tests
+
+Rewrite `test/Precept.Mcp.Tests/NewToolTests.cs` around markdown/text behavior:
+
+- `Quickstart_ReturnsMarkdownSections_ForOverviewConceptsToolGuideExamples`
+- `Syntax_ReturnsMarkdown_WithGrammarConstructActionOutcomeOperatorSections`
+- `Types_ReturnsMarkdown_WithTypesModifierBucketsAndFunctions`
+- `Operations_FilteredCall_RendersFilterHeaderAndCorrectCount`
+- `Proofs_ReturnsMarkdown_WithProofRequirementsAndRuntimeFaults`
+- `Patterns_ReturnsMarkdown_WithCommonAndAntiPatternBlocks`
+- `Diagnostic_LookupByName_RendersDiagnosticHeaderTriggerRecoveryAndExamples`
+- `Diagnostic_MissingCode_RendersHelpfulNotFoundMessage`
+- `Domains_ReturnsMarkdown_WithCurrenciesUnitsPrefixesDimensionsTemporalUnits`
+
+Do **not** assert exact whitespace or full-table formatting. Assert stable headings, representative
+lines, and key substrings.
+
+#### Compile-tool tests
+
+Replace DTO-shape tests with compile-contract tests:
+
+- success -> `HasErrors == false`, diagnostics empty or non-error, `ProjectDefinition` non-null
+- failure -> `HasErrors == true`, diagnostics populated, `ProjectDefinition == null`
+- summary contains all fixed major sections: `## Overview`, `## Fields`, `## States`, `## Events`,
+  `## Rules`, `## State Hooks`
+- representative projection coverage still matters; keep the old behavioral scenarios, but assert
+  against summary lines instead of object properties:
+  - choice field metadata
+  - modifier bound values
+  - omitted fields per state
+  - state access modes
+  - event ensures
+  - reject rows / outcome text
+  - entry/exit hooks
+
+#### Regression tests that will break and must be updated
+
+These existing files are DTO-contract tests and will fail immediately once the rewrite lands:
+
+- `test/Precept.Mcp.Tests/NewToolTests.cs`
+- `test/Precept.Mcp.Tests/RecoveryHintTests.cs`
+- `test/Precept.Mcp.Tests/CompileToolTests.cs`
+- `test/Precept.Mcp.Tests/CompileToolDefinitionProjectionTests.cs`
+- `test/Precept.Mcp.Tests/DefinitionProjectionTests.cs`
+- `test/Precept.Mcp.Tests/OutcomeKindProjectionTests.cs`
+- `test/Precept.Mcp.Tests/LanguageToolTests.cs` (delete with the file under test)
+- `test/Precept.Mcp.Tests/ValueModifierDtoTestAccess.cs` (delete once modifier DTO reflection is gone)
+
+### Dependency note
+
+- **Runtime changes:** none. This is strictly `tools/Precept.Mcp/` contract/rendering work.
+  `src/Precept/` stays untouched.
+- **Language server / VS Code extension:** no code changes required. MCP contract reshaping is
+  independent of LSP and the VS Code extension.
+- **Architectural boundary:** keep using catalog metadata as the source of truth. This plan removes
+  DTOs; it does **not** authorize hand-maintained prose or tool-local vocabulary tables.
