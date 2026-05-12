@@ -993,3 +993,148 @@ These existing files are DTO-contract tests and will fail immediately once the r
   independent of LSP and the VS Code extension.
 - **Architectural boundary:** keep using catalog metadata as the source of truth. This plan removes
   DTOs; it does **not** authorize hand-maintained prose or tool-local vocabulary tables.
+
+## Context Window Analysis
+
+The known failure mode is real. Measuring the current tool outputs against the checked-in MCP
+implementation shows that the legacy aggregate vocabulary payload is already far beyond any safe AI
+context budget.
+
+Measurement basis:
+
+- Current sizes were measured from the existing MCP DTO outputs using the built `Precept.Mcp`
+  release-test binaries and compact JSON serialization.
+- Treat the numbers as wire-size approximations. MCP framing will move them slightly, but not enough
+  to change the verdict.
+- New-size estimates are architectural estimates based on the approved formatter plan in this
+  document: markdown for catalog/reference tools, minimal JSON for diagnostics, and text-only
+  `ProjectDefinition` on successful compile.
+
+Conservative agent budgets used here:
+
+- **Claude Sonnet / Opus:** ~150 KB usable tool-result budget per session
+- **GPT-4 / GPT-4o class:** ~90 KB usable tool-result budget per session
+
+| Tool | Current size (est.) | New size (est.) | Status |
+| --- | ---: | ---: | --- |
+| `precept_language` (legacy aggregate) | 401.1 KB | replaced by focused tools | ❌ over budget |
+| `precept_quickstart` | 5.4 KB | 4-5 KB | ✅ under budget |
+| `precept_syntax` | 38.0 KB | 28-32 KB | ✅ under budget |
+| `precept_types` | 72.1 KB | 48-58 KB | ⚠️ marginal |
+| `precept_operations` (unfiltered) | 63.6 KB | 38-45 KB | ⚠️ marginal |
+| `precept_proofs` | 4.2 KB | 3-4 KB | ✅ under budget |
+| `precept_patterns` | 9.7 KB | 9-10 KB | ✅ under budget |
+| `precept_diagnostic` (single code lookup) | 0.9 KB | 0.8-1.0 KB | ✅ under budget |
+| `precept_domains` | 66.1 KB | 42-52 KB | ⚠️ marginal |
+| `precept_compile` | 5.6 KB on a representative successful sample; 29.3 KB on `inventory-item.precept` with 113 diagnostics | ~4-5 KB on comparable success; ~0.8 KB for a 5-diagnostic failure | ✅ under budget |
+
+### What the measurements say
+
+#### 1. The old aggregate call is dead on arrival
+
+`precept_language` at ~401 KB is not merely large; it is architecturally unusable for agent work.
+Even before conversation history, one call exhausts the conservative budget for both major model
+families.
+
+Typical current-session cost:
+
+- `precept_language` + `precept_compile` (clean mid-size definition) -> about **406-407 KB**
+- `precept_language` + `precept_compile` (`inventory-item.precept`, 113 diagnostics) -> about **430 KB**
+
+That is the real source of the context-window complaint. The hybrid split removes this failure mode.
+
+#### 2. The hybrid redesign fixes the catastrophic case
+
+Under the new design, a normal compile plus one focused reference call stays comfortably inside
+budget:
+
+- `precept_compile` (5 diagnostics, minimal JSON) + `precept_syntax` -> about **29-33 KB**
+- `precept_compile` (5 diagnostics, minimal JSON) + `precept_types` -> about **49-59 KB**
+- `precept_compile` (5 diagnostics, minimal JSON) + `precept_domains` -> about **43-53 KB**
+
+Those are acceptable for both model families.
+
+#### 3. The redesign does **not** eliminate size pressure everywhere
+
+The largest focused reference tools remain large enough that two of them in one thread can still
+stress a GPT-class session:
+
+- `precept_types` + `precept_domains` + `precept_compile` (5 diagnostics) lands around **91-111 KB**
+- `precept_types` + `precept_operations` + `precept_compile` (5 diagnostics) lands around **87-104 KB**
+
+So the redesign solves the old catastrophic aggregate payload, but it does **not** justify
+unscoped "dump everything" reference calls for the biggest focused catalogs.
+
+### Tool-by-tool mitigation
+
+- **`precept_language`**
+  - Do not ship it.
+  - Do not preserve it as a hidden compatibility path.
+  - The all-vocabulary-in-one-call approach is unsound.
+
+- **`precept_types`**
+  - Add a `scope` parameter before shipping.
+  - Minimum split: `types`, `modifiers`, `functions`.
+  - Prefer also allowing modifier sub-scopes (`value`, `state`, `event`, `access`, `anchor`) so the
+    caller does not pay for all modifier domains at once.
+
+- **`precept_domains`**
+  - Add a `scope` parameter before shipping.
+  - Minimum split: `currencies`, `units`, `prefixes`, `dimensions`, `temporal`.
+  - This tool is dominated by currencies + UCUM units; forcing the full bundle is unnecessary waste.
+
+- **`precept_operations`**
+  - Keep the existing `category` filter.
+  - Treat filtered usage as the intended path, not an optional nicety.
+  - If unfiltered usage remains common, add a second scoping axis later (`operator` family or
+    result-type filter).
+
+- **`precept_syntax`**
+  - Can ship as designed.
+  - Not currently over budget, but it is the next candidate for a `section` parameter if constructs,
+    actions, or operator metadata grow materially.
+  - Natural future sections: `grammar`, `constructs`, `actions`, `operators`, `outcomes`, `order`.
+
+- **`precept_compile`**
+  - The DTO-free rewrite fixes successful-compile bloat by replacing the object graph with readable
+    text.
+  - Failure payload size is still diagnostic-count-driven. A badly broken file can still be tens of
+    KB, as `inventory-item.precept` already demonstrates.
+  - A `maxDiagnostics` cap is a reasonable follow-up guardrail, but it is **not** a pre-ship blocker
+    at current observed sizes.
+
+- **`precept_quickstart`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`**
+  - No pagination or scoping required.
+  - They are comfortably below budget.
+
+### Markdown-vs-JSON verdict
+
+The markdown path is directionally correct, but only if the format stays compact.
+
+- For metadata-heavy tools (`types`, `operations`, `domains`, `syntax`), markdown should be
+  materially smaller because it removes repeated JSON keys and nested transport scaffolding.
+- For prose/snippet-heavy tools (`quickstart`, `patterns`, `diagnostic`), markdown is only roughly
+  size-neutral. It may even be slightly larger if Newman adds ornamental blank lines and repeated
+  labels everywhere.
+- Therefore the formatter rule is simple: **tight headings, tight bullets, no decorative whitespace,
+  no repeated boilerplate per entry.**
+
+### Shipping recommendation
+
+Recommended size thresholds:
+
+- **Target:** keep routine tool calls at or below **25 KB**
+- **Soft ceiling:** **40 KB**; anything above this should have a scope/filter parameter
+- **Hard no for unscoped reference tools:** **60 KB+**
+
+Against that standard:
+
+- Current violators: `precept_language`, `precept_types`, `precept_operations`, `precept_domains`
+- New-design tools that still need scope before shipping: **`precept_types` and `precept_domains`**
+- New-design tool that must keep and emphasize its existing scope mechanism: **`precept_operations`**
+- New-design tool that can ship unscoped for now: **`precept_syntax`**, with a reserved future
+  `section` escape hatch
+
+Final ruling: the hybrid DTO-free design **does** solve Shane's original context-window problem, but
+only if Newman also adds scoping to the two heaviest focused catalog tools and treats unfiltered
+operations output as exceptional rather than normal.
