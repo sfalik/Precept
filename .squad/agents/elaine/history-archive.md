@@ -147,3 +147,191 @@ Full read of all `design/system/` artifacts (HTML canonical output, manifest, no
 - **Construct colors and verdict colors have non-overlapping domains.** `--rule` is for displaying Rule constructs in code. `--warn`/`--violated`/`--valid` are for runtime verdict output. Mixing these is a visible error — a gold reject reason text looks like a code annotation, not a verdict. Hold the domain boundaries firmly.
 - **Disabled token sets are the canonical disabling treatment.** Using `opacity: 0.5` on a construct color is not equivalent to the `support-disabled` token set. The disabled tokens produce a neutral muted gray-blue, not a faded version of the construct color. The distinction matters: a faded cyan event name still reads as an "event" at low contrast; the disabled token reads as "system-disabled."
 - **"Fire button" was a design fiction.** The canonical model has no separate fire button anywhere in the card or the inline expansion — because there is no inline expansion. The button that fires is the event card itself (no-args) or the dialog OK button (with-args). This simplifies the affordance model significantly and removes the question of "what color should the fire button be" — it's always the event color when active.
+
+---
+
+## Archive Batch — 2026-05-12T13:52:04Z
+
+---
+
+## Elaine-33 — API accuracy pass
+
+
+
+[2026-05-06]
+
+
+
+Task: Applied 4 accuracy fixes from Frank/George review: ConstraintResult (inspection path), EventOutcome type name verification, RowEffect DU shape (TransitionInspection), datetime→correct type.
+
+
+
+
+
+
+
+## Elaine-34 — OQ-1 closed
+
+
+
+[2026-05-06]
+
+
+
+Task: Closed OQ-1; visual system spec answer = certain-reject → Blocked.
+
+
+
+
+
+
+
+## Elaine-35 — OQ-3 closed
+
+
+
+[2026-05-06]
+
+
+
+Task: Closed OQ-3; tag input for collection args (`set of T`, `list of T`) is in V1 scope.
+
+
+
+
+
+
+
+## Elaine-36 — OQ-5 closed
+
+
+
+[2026-05-06]
+
+
+
+Task: OQ-5 closed; runtime provides GuardSummary on TransitionInspection.
+
+
+
+
+
+
+
+## Elaine-37 — OQ-6 closed
+
+
+
+[2026-05-06]
+
+
+
+Task: OQ-6 closed; V1 event name only, V2 language annotation deferred.
+
+
+
+
+
+
+
+## Elaine-38 — OQ-8 closed
+
+
+
+[2026-05-06]
+
+
+
+Task: OQ-8 closed; both commit modes supported, mode derived from constraint metadata.
+
+
+
+
+
+
+
+## Elaine-39 — OQ-9 closed
+
+
+
+[2026-05-06]
+
+
+
+Task: OQ-9 closed; Event Timeline stays on committed state while buffered edits disable fire actions. All OQs resolved; event interaction UXR document is complete.
+
+
+
+
+
+
+
+## Elaine-40 — CC#21 UnhandledEvent naming
+
+
+
+[2026-05-06]
+
+
+
+Task: Proposed three candidate names for the new graph-analyzer diagnostic for events with zero handlers in any state. Top recommendation `UnhandledEvent` was adopted; it names the missing-handler cause directly and avoids the misleading parentage implication of `OrphanedEvent`.
+
+
+
+
+
+
+
+### 2026-05-07T08:40:33Z — Computed-field delimiter UX locked to `<-`
+
+
+
+- Elaine's review made the UX case durable: `<-` reads as value flowing into the field, while `->` overloaded two semantics and `=` collided with everyday `set X = expr` syntax.
+
+
+
+- Shane approved `<-`, and the parser/doc/tooling rollout shipped without needing a separate UX follow-up rename or affordance change.
+
+
+
+
+
+
+
+## Elaine-41 — Field and Arg Semantic Color Proposal
+
+
+
+[2026-05-09]
+
+
+
+Task: Proposed field color (`#A5B4FC`, hero identifier reused as `--field`) and arg color (`#9AD8E8`, new lifted cyan as `--arg`) based on Shane's structure/behaviour axis model. Full proposal at `docs/working/elaine-field-arg-colors.md`. Pending Shane sign-off.
+
+
+
+
+
+## Elaine-42 — Color Family Paradigm Recommendation
+
+
+
+[2026-05-09]
+
+
+
+Task: Answered Shane's question on whether the 1–3 shade paradigm needs to change for field/arg companion tokens. Recommendation: no paradigm change — companion tokens are an inter-construct axis relationship, orthogonal to the intra-construct shade model. Formalize a thin axis layer (Structure Axis, Behaviour Axis) naming cross-family groupings. Arg is the only net new tone (8→9). Appended to `docs/working/elaine-field-arg-colors.md`.
+
+
+
+
+
+## Elaine-43 — Paradigm Recommendation Revised (Standalone Companions)
+
+
+
+[2026-05-09]
+
+
+
+Task: Revised the paradigm recommendation after Shane's feedback that the axis layer was circular (states are already structural). Evaluated Shane's alternative (add field/arg to Data family) — rejected because Data is hue-coherent at ~215° slate and absorbing 239° indigo + 195° cyan would break that coherence. Landed on a third option: field and arg as standalone companion tokens, documented alongside families but not inside any family card. Data narrows to 2 tones (type + value), #B0BEC5 drops. Five families stay clean. Colors unchanged. Updated `docs/working/elaine-field-arg-colors.md`.

@@ -6,6 +6,76 @@
 
 ---
 
+### 2026-05-12T13:52:04Z: Proof diagnostic root cause is missing same-qualifier operation metadata, not a new proof strategy gap
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-expression-qualifier-diagnostic.md`.
+
+- Frank isolated the nested `(A - B) - C` PRE0114 failures to a catalog input gap: same-qualifier `+/-` operations lacked `Match: QualifierMatch.Same`, so intermediate `TypedBinaryOp` results did not advertise inherited qualifiers and the existing recursive proof path never activated.
+- The approved fix stays metadata-driven and surgical: add `Match: Same` to the six same-qualifier money/quantity/price arithmetic operations and cover nested regressions; no provenance redesign or new proof algorithm is required.
+- The message UX follow-up remains independently valuable: `ProofEngine` should describe subexpressions recursively and show resolved qualifier values instead of `<expression>` placeholders so legitimate qualifier failures explain the real mismatch.
+
+---
+
+### 2026-05-12T13:52:04Z: Same-qualifier arithmetic metadata and PRE0114 operand labeling are now fixed together
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-proof-diagnostic-fix.md`.
+
+- George added `Match: QualifierMatch.Same` to the six same-qualifier money/quantity/price `+/-` operations so nested arithmetic results now retain the proved qualifier contract the checker and proof engine already know how to recurse through.
+- `ProofEngine.CreateDiagnostic(...)` now describes full expressions recursively and attaches resolved qualifier values to PRE0114 operand labels, replacing placeholder fallbacks on both the computed-expression and collection-access paths.
+- The fix shipped in commit `d187230c` with new proof-engine and operation-catalog regressions, and George reported the full suite green at `5507/5507`.
+
+---
+
+### 2026-05-12T13:52:04Z: Proof-stage diagnostics and hover need operand truth, repair guidance, and dedicated routing
+
+**By:** Scribe
+
+**Status:** Merged from Elaine's inbox note.
+
+**Merged source:** `elaine-proof-ux-audit.md`.
+
+- Elaine's proof UX audit locked the core teachable-moment failures: `<unknown>`-style placeholders are never acceptable, qualifier diagnostics must show the actual conflicting values, and human repair guidance must be paired with structured args rather than baked into sentence fragments.
+- The audit also established that proof hover is a routing problem as much as a content problem: generic operator and transition hover frequently wins before authors ever see proof context.
+- The durable design split is now explicit: declaration-contract hover, expression-proof hover, and diagnostic-squiggle hover are separate UX jobs and should not be collapsed into one generic card.
+
+---
+
+### 2026-05-12T13:52:04Z: Proof diagnostics now use explicit 'Cannot prove…' wording with structured qualifier payloads
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-proof-message-rewrites.md`.
+
+- George implemented Elaine Section A's proof-message rewrites in commit `1d8962f7`, including the six-argument PRE0114 shape that carries operand labels, axis, context clause, and left/right qualifier values separately.
+- PRE0112, PRE0113, PRE0115, PRE0116, PRE0082, PRE0083, and PRE0084 now use clearer author-facing wording while keeping the structured diagnostic contract intact for tooling and AI consumers.
+- The batch updated proof-engine and exact-message regression coverage, synced the proof/diagnostic runtime docs, and stayed green on the targeted core path at `4914/4914`.
+
+---
+
+### 2026-05-12T13:52:04Z: Proof hover working spec is filed for Shane sign-off before implementation
+
+**By:** Scribe
+
+**Status:** Merged from Elaine's inbox note.
+
+**Merged source:** `elaine-hover-design-filed.md`.
+
+- Elaine wrote `docs/working/proof-hover-design.md` as the canonical working spec for proof-hover UX before Kramer starts implementation work.
+- The doc covers precedence failures in the current hover stack, scenario-specific card requirements, routing rules, and the proof-evidence data shape the implementation must have available.
+- Status is now durable: the hover design is ready for Shane review and annotation, not for silent implementation drift.
+
+---
+
 ### 2026-05-12T05:04:03Z: MCP hybrid rollout requires scoped reference tools
 
 **By:** Scribe

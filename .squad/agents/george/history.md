@@ -19,6 +19,14 @@
 
 ## Recent Updates
 
+### 2026-05-12T13:52:04Z — Same-qualifier arithmetic metadata and PRE0114 label routing closed
+- Commit `d187230c` added `Match: QualifierMatch.Same` to the six same-qualifier money/quantity/price `+/-` operations, so nested arithmetic subexpressions now carry inherited qualifier bindings instead of dropping proof context.
+- `ProofEngine` now labels PRE0114 operands with recursive expression descriptions plus resolved qualifier values; George validated the combined fix against the full suite at `5507/5507`.
+
+### 2026-05-12T13:52:04Z — Elaine Section A proof-message rewrites landed
+- Commit `1d8962f7` moved PRE0114 to the six-argument "Cannot prove..." format and refreshed PRE0112/PRE0113/PRE0115/PRE0116/PRE0082/PRE0083/PRE0084 wording without widening the requirement metadata surface.
+- Targeted core validation stayed green at `4914/4914`, and the proof / diagnostic docs were synced in the same pass.
+
 ### 2026-05-12T04:40:27Z — E1 proof-site operand resolution
 - `TryQualifierCompatibilityProof` must read operands from the `TypedBinaryOp` site, not `ParamSubject`, or mismatched qualifiers can bypass PRE0114.
 - PRE0114 operand names should come from that same binary-op site; the slice landed in commit `d549b4a5dc478a571ba639ca67ae483ab0ff9fd3` with five new regression tests and seven targeted proof tests passing.
