@@ -80,6 +80,7 @@ public static class LanguageTool
             ExpandFlags(type.Traits),
             type.WidensTo.Select(kind => kind.ToString()).ToArray(),
             type.ImpliedModifiers.Select(RenderModifier).ToArray(),
+            type.ImpliedQualifiers.Length == 0 ? null : type.ImpliedQualifiers.Select(RenderImpliedQualifier).ToArray(),
             type.QualifierShape is null ? null : MapQualifierShape(type.QualifierShape),
             type.Accessors.Select(MapAccessor).ToArray(),
             (type.ChoiceLiteralTokens ?? []).Select(kind => kind.ToString()).ToArray(),
@@ -612,6 +613,14 @@ public static class LanguageTool
 
     private static string RenderModifier(ModifierKind kind)
         => Modifiers.GetMeta(kind).Token.Text ?? kind.ToString();
+
+    private static string RenderImpliedQualifier(DeclaredQualifierMeta qualifier) => qualifier switch
+    {
+        DeclaredQualifierMeta.TemporalDimension td => $"TemporalDimension:{td.Value}",
+        DeclaredQualifierMeta.TemporalUnit tu      => $"TemporalUnit:{tu.UnitName}",
+        DeclaredQualifierMeta.Dimension d          => $"Dimension:{d.DimensionName}",
+        _                                          => $"{qualifier.Axis}",
+    };
 
     private static string RenderToken(TokenKind kind)
         => Tokens.GetMeta(kind).Text ?? kind.ToString();

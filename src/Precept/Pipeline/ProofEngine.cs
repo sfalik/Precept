@@ -932,6 +932,13 @@ public static class ProofEngine
         DeclaredQualifierMeta.ToCurrency tc    => tc.CurrencyCode,
         DeclaredQualifierMeta.Unit u           => u.UnitCode,
         DeclaredQualifierMeta.Dimension d      => d.DimensionName,
+        DeclaredQualifierMeta.TemporalUnit tu  => tu.UnitName,
+        DeclaredQualifierMeta.TemporalDimension td => td.Value switch
+        {
+            PeriodDimension.Date => "date",
+            PeriodDimension.Time => "time",
+            _                    => null,   // PeriodDimension.Any cannot satisfy chain comparisons
+        },
         _                                      => null,
     };
 
@@ -956,6 +963,25 @@ public static class ProofEngine
                 if (qual.Axis == QualifierAxis.Dimension)
                     return qual;
             }
+        }
+
+        // Axis fallback: Dimension → TemporalDimension (price of 'time'/'date' satisfies Dimension-axis proofs)
+        if (axis == QualifierAxis.Dimension)
+        {
+            foreach (var qual in field.DeclaredQualifiers)
+            {
+                if (qual.Axis == QualifierAxis.TemporalDimension)
+                    return qual;
+            }
+        }
+
+        // Implied qualifiers: check type-level metadata after declared qualifiers are exhausted
+        // (e.g., duration carries implied TemporalDimension(Time, Baseline))
+        var typeMeta = Types.GetMeta(field.ResolvedType);
+        foreach (var qual in typeMeta.ImpliedQualifiers)
+        {
+            if (qual.Axis == axis)
+                return qual;
         }
 
         return null;
@@ -1395,6 +1421,29 @@ public static class ProofEngine
     private static object? MarkUnfoldable(HashSet<string> unfoldable, string fieldName)
     {
         unfoldable.Add(fieldName);
+        return null;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Test entry points (InternalsVisibleTo — Precept.Tests)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Exposes <see cref="ExtractComparableValue"/> for unit testing.</summary>
+    internal static string? ExtractComparableValueForTest(DeclaredQualifierMeta qualifier) =>
+        ExtractComparableValue(qualifier);
+
+    /// <summary>
+    /// Returns the first implied qualifier matching <paramref name="axis"/> for <paramref name="type"/>.
+    /// Tests Slice 11B's Duration implied-qualifier path without requiring proof pipeline setup.
+    /// </summary>
+    internal static DeclaredQualifierMeta? GetImpliedQualifierOnAxis(TypeKind type, QualifierAxis axis)
+    {
+        var typeMeta = Types.GetMeta(type);
+        foreach (var qual in typeMeta.ImpliedQualifiers)
+        {
+            if (qual.Axis == axis)
+                return qual;
+        }
         return null;
     }
 

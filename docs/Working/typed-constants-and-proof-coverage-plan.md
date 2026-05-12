@@ -951,7 +951,7 @@ In contrast, the **quantity unit axis** and **price compound axis** are correctl
 
 ### Slice 7: Money Currency Enforcement (G1 + G2 + G3)
 
-**Status:** Not Started  
+**Status:** ✅ Already Implemented (confirmed by proof audit, 2026-05-11)  
 **Goal:** Add `QualifierCompatibilityProofRequirement` on `QualifierAxis.Currency` to all 8 money arithmetic and comparison operations that currently lack currency enforcement.
 
 **Work items:**
@@ -977,7 +977,7 @@ In contrast, the **quantity unit axis** and **price compound axis** are correctl
 
 ### Slice 8: Qualifier Chain Validation Infrastructure (G4 + G5)
 
-**Status:** Not Started  
+**Status:** ✅ Already Implemented (confirmed by proof audit, 2026-05-11)  
 **Goal:** Introduce `QualifierChainProofRequirement` DU subtype for cross-type, cross-axis qualifier validation. Use it to enforce exchange rate × money currency chains and price × quantity dimension chains.
 
 **Work items:**
@@ -1008,7 +1008,7 @@ In contrast, the **quantity unit axis** and **price compound axis** are correctl
 
 ### Slice 9: Dimension-Only Field False Positive Fix (G6)
 
-**Status:** Not Started  
+**Status:** ✅ Already Implemented (confirmed by proof audit, 2026-05-11)  
 **Goal:** Fix `ResolveQualifierOnAxis` to fall back from `QualifierAxis.Unit` to `QualifierAxis.Dimension` when a field has only a dimension qualifier. Eliminates spurious `UnprovedQualifierCompatibility` diagnostics on `quantity of 'mass' + quantity of 'mass'`.
 
 **Work items:**
@@ -1028,7 +1028,7 @@ In contrast, the **quantity unit axis** and **price compound axis** are correctl
 
 ### Slice 10: Assignment Expression Qualifier Propagation (G7)
 
-**Status:** Not Started  
+**Status:** ✅ Already Implemented (confirmed by proof audit, 2026-05-11)  
 **Goal:** Add proof obligation on `set` actions when the target field has qualifiers and the source is an expression (not a simple field/arg ref). The proof engine becomes the qualifier authority for expression-result assignments.
 
 **Work items:**
@@ -1054,7 +1054,7 @@ In contrast, the **quantity unit axis** and **price compound axis** are correctl
 
 ### Slice 11: Exchange Rate Assignment Qualifier Validation (G9)
 
-**Status:** Not Started  
+**Status:** ✅ Already Implemented (confirmed by proof audit, 2026-05-11)  
 **Goal:** Add `FromCurrency` and `ToCurrency` cases to the `ValidateAssignmentQualifiers` switch statement so that exchange rate field-to-field assignments with mismatched from/to currencies produce diagnostics.
 
 **Work items:**
@@ -1072,25 +1072,390 @@ In contrast, the **quantity unit axis** and **price compound axis** are correctl
 
 ---
 
-### Slice 12: Temporal Chain Validation (G8 + G13)
+### Slice 11B: Temporal Price Denominator Type System Extension (G8 + G13 Prerequisite)
+
+**Status:** ✅ Complete (2026-05-11)  
+**Depends on:** ~~Slice 8~~, ~~Slice 9~~ (both already implemented — unblocked)  
+**Blocks:** Slice 12  
+**Goal:** Extend the type system so that price fields can carry temporal denominator metadata, enabling chain validation between price and period/duration operands.
+
+**Architect:** Frank  
+**Date:** 2026-05-11
+
+---
+
+#### Background: Why Slice 12 Cannot Proceed
+
+George discovered that the original Slice 12 specification was incorrect. The plan assumed `price per 'month'` declares a temporal qualifier axis, but:
+
+1. **No `per` keyword exists.** `TokenKind.Per` is not in the token catalog.
+2. **Price uses `QS_CurrencyAndDimension`** — `in` → `QualifierAxis.Currency`, `of` → `QualifierAxis.Dimension` (physical only). No temporal axis.
+3. **Period uses `QS_TemporalUnitOrDimension`** — entirely separate temporal axes (`TemporalUnit`, `TemporalDimension`).
+4. **Duration has no qualifier shape** — no declared qualifiers at all.
+5. **`ExtractComparableValue` has no temporal arms** — returns null for `TemporalDimension` and `TemporalUnit`.
+
+Adding `QualifierChainProofRequirement` entries to `PriceTimesPeriod`/`PriceTimesDuration` without fixing these gaps would break existing valid operations (null comparisons → spurious diagnostics on all price × period arithmetic).
+
+This slice provides the prerequisite type system work that makes Slice 12's catalog entries correct.
+
+---
+
+#### Language Surface Decision: No New Syntax
+
+**Decision:** No `per` keyword. No `TokenKind.Per`. No new qualifier preposition.
+
+**Rationale:** Price temporal denominators are expressible through the existing `of` qualifier — `price of 'time'` (time-dimension denominator: hours/minutes/seconds) and `price of 'date'` (date-dimension denominator: days/weeks/months/years). This parallels the physical case: `price of 'mass'` already means "denominator is in the mass dimension family." The `of` preposition means "denominator dimension category" on price — extending it to accept temporal dimensions is a natural generalization, not a new concept.
+
+The compound literal form `price in 'USD/hours'` also carries temporal denomination in the literal value. Enabling qualifier-level temporal discrimination through `of` is orthogonal to compound literal parsing (which is a separate content-validation concern and out of scope for this slice).
+
+**Alternatives rejected:**
+
+- **`price per 'month'` (new preposition):** Requires a new `TokenKind.Per`, new token catalog entry, parser changes, completions, grammar updates, semantic tokens — a full language surface addition for something the existing `of` preposition already covers semantically. The `of` qualifier on price means "denominator dimension category" — temporal dimensions are a category, not a different concept. Adding `per` would create two ways to say the same thing and violate the uniform qualifier preposition model. `per` also carries "rate" semantics that overlap with price's inherent "per unit" nature, creating redundancy.
+- **Generalize `Dimension` axis to bridge physical and temporal (Option B from George):** Conflates two distinct registries (UCUM physical dimensions and NodaTime temporal dimensions) under one axis. Physical dimension names (mass, length, count) and temporal dimension names (date, time) happen to be disjoint today but this is a naming coincidence, not a structural guarantee. Merging the axes would require either a polymorphic `DeclaredQualifierMeta.Dimension` that holds either a string or a `PeriodDimension`, or a union axis that must be pattern-matched everywhere. Both approaches violate the DU principle: each qualifier subtype should carry exactly the fields its consumers need.
+
+**Tradeoff accepted:** Authors must write `price of 'time'` or `price of 'date'` to enable temporal chain validation. Unqualified temporal prices (`price in 'USD'` with a temporal literal like `'4.17 USD/hours'`) will trigger chain proof obligations that cannot discharge — the author must add the `of` qualifier. This is consistent with the physical case: `price in 'USD'` × `quantity of 'mass'` also fails without a dimension qualifier on price.
+
+**Precedent:** The `of` preposition on `period` already accepts temporal dimension values (`period of 'date'`, `period of 'time'`). Extending it to `price` uses the same vocabulary and the same mapper logic.
+
+---
+
+#### Type System Design
+
+**A. `MapDimensionQualifier` temporal extension (~10 LOC)**
+
+In `ExtractQualifiers` (TypeChecker.cs L102), when the qualifier axis is `QualifierAxis.Dimension`, check if the containing type is `TypeKind.Price` and the value is a temporal dimension name. If so, route to `MapTemporalDimensionQualifier` instead of `MapDimensionQualifier`.
+
+```
+ExtractQualifiers switch:
+  QualifierAxis.Dimension when (resolvedKind == TypeKind.Price && IsTemporalDimensionName(q.Value))
+    => MapTemporalDimensionQualifier(qualifier, ctx)
+  QualifierAxis.Dimension
+    => MapDimensionQualifier(qualifier, ctx)
+```
+
+The `resolvedKind` is available via `qualified.InnerType.ResolvedKind` (already computed in the method). `IsTemporalDimensionName` checks for "date" or "time" — the same values `MapTemporalDimensionQualifier` already accepts.
+
+This produces `DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Date/Time)` with `QualifierAxis.TemporalDimension` on the stored metadata. The parser-level axis (`Dimension`) and the stored metadata axis (`TemporalDimension`) differ — the axis fallback in `ResolveQualifierOnAxis` (work item C below) bridges this.
+
+**Why type-gated:** Without the `TypeKind.Price` guard, `quantity of 'time'` would silently produce temporal metadata on a physical type. Quantities are physical measurements — temporal dimension values are invalid on quantity's `of` axis. The guard keeps the temporal acceptance scoped to price, where "denominator dimension category" semantically includes temporal.
+
+**B. `ExtractComparableValue` temporal arms (~4 LOC)**
+
+Add two arms to `ExtractComparableValue` in ProofEngine.cs L928:
+
+```csharp
+DeclaredQualifierMeta.TemporalUnit tu       => tu.UnitName,
+DeclaredQualifierMeta.TemporalDimension td  => td.Value switch
+{
+    PeriodDimension.Date => "date",
+    PeriodDimension.Time => "time",
+    _                    => null,
+},
+```
+
+`PeriodDimension.Any` returns null — it cannot satisfy a chain comparison (consistent with the existing locked decision that `PeriodDimension.Any` does not satisfy qualifier compatibility, ProofEngine.cs L888–893).
+
+Physical dimension names (mass, length, count) and temporal dimension names (date, time) are disjoint — no collision is possible in `ChainQualifiersMatch`.
+
+**C. `ResolveQualifierOnAxis` — Dimension→TemporalDimension fallback (~8 LOC)**
+
+Extend the existing axis fallback logic in ProofEngine.cs L951–959. After the existing `Unit → Dimension` fallback, add:
+
+```
+if axis == QualifierAxis.Dimension:
+    fall back to QualifierAxis.TemporalDimension
+```
+
+This parallels the Slice 9 pattern (Unit → Dimension fallback). When a chain requirement asks for price's `Dimension` axis and the price field has `TemporalDimension` metadata (from `price of 'time'`), the fallback finds it.
+
+The full fallback chain becomes: `Unit → Dimension → TemporalDimension`. This means a chain requirement using `QualifierAxis.Dimension` will find either physical or temporal dimensions on the subject field. The `ExtractComparableValue` string comparison ensures cross-domain mismatches (physical vs temporal) always fail — the string values are disjoint.
+
+**D. `ImpliedQualifiers` on `TypeMeta` — Duration implicit temporal metadata (~12 LOC)**
+
+Add an optional `ImpliedQualifiers` property to `TypeMeta` (Type.cs L185), analogous to the existing `ImpliedModifiers`:
+
+```csharp
+DeclaredQualifierMeta[]? ImpliedQualifiers = null
+// with computed property:
+public DeclaredQualifierMeta[] ImpliedQualifiers { get; } = ImpliedQualifiers ?? [];
+```
+
+Set on Duration's `TypeMeta` entry in Types.cs:
+
+```csharp
+ImpliedQualifiers: [new DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Time, QualifierOrigin.Baseline)]
+```
+
+This encodes "duration is intrinsically time-dimension" as catalog metadata — no hardcoded duration logic in the proof engine.
+
+Extend `ResolveQualifierOnAxis` to check implied qualifiers after declared qualifiers:
+
+```
+foreach (var qual in field.DeclaredQualifiers) { ... }
+// After declared qualifier check, check implied:
+var typeMeta = Types.GetMeta(field.ResolvedType);
+foreach (var qual in typeMeta.ImpliedQualifiers) { if (qual.Axis == axis) return qual; }
+```
+
+The `QualifierOrigin.Baseline` origin distinguishes implied qualifiers from explicit/derived ones — consumers that need to differentiate can pattern-match on origin.
+
+**Why this is correct for D15:** Duration cancels only fixed-length denominators (hours, minutes, seconds). The `PeriodDimension.Time` value maps exactly to these fixed-length units (IsCalendarBased = false in `TemporalUnits`). Date-dimension denominators (days, weeks, months, years — `PeriodDimension.Date`) are variable-length and must cancel with `period` only. The chain comparison `price of 'date' * duration` → "date" ≠ "time" → fails. Correct.
+
+---
+
+#### `ExtractComparableValue` Extension Detail
+
+After this slice, `ExtractComparableValue` handles all qualifier subtypes:
+
+| Subtype | Comparable Value | Example |
+|---------|-----------------|---------|
+| `Currency(code)` | `code` | `"USD"` |
+| `FromCurrency(code)` | `code` | `"USD"` |
+| `ToCurrency(code)` | `code` | `"EUR"` |
+| `Unit(code, dim)` | `code` | `"kg"` |
+| `Dimension(name)` | `name` | `"mass"` |
+| `TemporalUnit(name, dim)` | `name` | `"hours"` |
+| `TemporalDimension(value)` | `"date"` or `"time"` | `"time"` |
+| `TemporalDimension(Any)` | `null` | — |
+| `Timezone(id)` | `null` (no chain use) | — |
+
+**Matching/subsumption rules:** Strict equality only. `per 'month'` does NOT match `per 'year'` — they are different temporal units. `of 'date'` does NOT match `of 'time'` — they are different temporal dimensions. `PeriodDimension.Any` matches nothing — it cannot satisfy chain proofs (locked decision).
+
+---
+
+#### Proof Chain Coverage
+
+After this slice completes, Slice 12 adds these exact catalog entries:
+
+**G8 — `PriceTimesPeriod`:**
+
+```csharp
+OperationKind.PriceTimesPeriod => new BinaryOperationMeta(
+    kind, OperatorKind.Times, PPrice, PPeriod, TypeKind.Money,
+    "Price × period → money (time-denominator cancellation)", BidirectionalLookup: true,
+    ProofRequirements:
+    [
+        new QualifierChainProofRequirement(
+            new ParamSubject(PPrice), QualifierAxis.Dimension,
+            new ParamSubject(PPeriod), QualifierAxis.TemporalDimension,
+            "Price denominator dimension must match period temporal dimension"),
+    ]),
+```
+
+Chain logic: `ResolveQualifierOnAxis(Price, Dimension)` → fallback to `TemporalDimension` if price has `of 'time'`/`of 'date'` → `ExtractComparableValue` → "time"/"date". `ResolveQualifierOnAxis(Period, TemporalDimension)` → direct match → `ExtractComparableValue` → "time"/"date". String equality comparison via `ChainQualifiersMatch`.
+
+**G13 — `PriceTimesDuration`:**
+
+```csharp
+OperationKind.PriceTimesDuration => new BinaryOperationMeta(
+    kind, OperatorKind.Times, PPrice, PDuration, TypeKind.Money,
+    "Price × duration → money (hours/min/sec cancellation)", BidirectionalLookup: true,
+    ProofRequirements:
+    [
+        new QualifierChainProofRequirement(
+            new ParamSubject(PPrice), QualifierAxis.Dimension,
+            new ParamSubject(PDuration), QualifierAxis.TemporalDimension,
+            "Price denominator must be time-dimension for duration cancellation"),
+    ]),
+```
+
+Chain logic: `ResolveQualifierOnAxis(Duration, TemporalDimension)` → declared qualifiers empty → implied qualifiers → `TemporalDimension(Time)` → "time". Price side same as above.
+
+**Validation matrix:**
+
+| Price qualifier | Period qualifier | Expected | Why |
+|----------------|-----------------|----------|-----|
+| `of 'time'` | `of 'time'` | ✅ Proved | "time" == "time" |
+| `of 'time'` | `of 'date'` | ❌ Diagnostic | "time" ≠ "date" |
+| `of 'date'` | `of 'date'` | ✅ Proved | "date" == "date" |
+| `of 'date'` | `of 'time'` | ❌ Diagnostic | "date" ≠ "time" |
+| `of 'mass'` | `of 'date'` | ❌ Diagnostic | "mass" ≠ "date" |
+| (no qualifier) | `of 'time'` | ❌ Diagnostic | null left side |
+| `of 'time'` | (no qualifier) | ❌ Diagnostic | null right side |
+| `of 'time'` | duration (implied) | ✅ Proved | "time" == "time" |
+| `of 'date'` | duration (implied) | ❌ Diagnostic | "date" ≠ "time" |
+| `of 'mass'` | duration (implied) | ❌ Diagnostic | "mass" ≠ "time" |
+
+---
+
+#### Full Impact Surface
+
+**Runtime:**
+
+| File | Method/Area | Change | LOC |
+|------|-------------|--------|-----|
+| `src/Precept/Language/Type.cs` | `TypeMeta` record | Add `ImpliedQualifiers` optional parameter + computed property | ~4 |
+| `src/Precept/Language/Types.cs` | Duration entry | Add `ImpliedQualifiers: [TemporalDimension(Time, Baseline)]` | ~2 |
+| `src/Precept/Pipeline/TypeChecker.cs` | `ExtractQualifiers` L121 switch | Add temporal dimension routing for `Price` + `Dimension` axis | ~8 |
+| `src/Precept/Pipeline/ProofEngine.cs` | `ExtractComparableValue` L928 | Add `TemporalUnit` and `TemporalDimension` arms | ~4 |
+| `src/Precept/Pipeline/ProofEngine.cs` | `ResolveQualifierOnAxis` L938 | Add `Dimension → TemporalDimension` fallback + implied qualifier check | ~12 |
+| **Subtotal** | | | **~30** |
+
+No new diagnostic codes needed — chain validation uses existing `UnprovedQualifierCompatibility` diagnostic. The chain requirement descriptions provide the error message context.
+
+**Tooling:**
+
+| Surface | Impact | Action |
+|---------|--------|--------|
+| TextMate grammar | None | No new syntax — `of` is already a keyword, `'time'`/`'date'` are typed constant values |
+| Completions | Minimal | Price `of` completions should include `'time'` and `'date'` alongside physical dimension names. This is a completions data change in the language server, not a structural change. ~2 LOC in dimension completion provider. |
+| Hover | None | Price hover already describes `of` as denominator dimension qualifier |
+| Semantic tokens | None | No new token types |
+
+**MCP:**
+
+| Tool | Impact | Action |
+|------|--------|--------|
+| `precept_types` | Minimal | `ImpliedQualifiers` may appear in type metadata output — verify DTO handles it or add mapping. ~2 LOC if needed. |
+| `precept_compile` | None | Compilation output format unchanged — diagnostics flow through existing paths |
+| `precept_operations` | None | Operation proof requirements already serialize through existing paths |
+
+---
+
+#### Work Items
+
+1. **Add `ImpliedQualifiers` to `TypeMeta`** — `src/Precept/Language/Type.cs` L185: add optional `DeclaredQualifierMeta[]? ImpliedQualifiers = null` parameter and computed property ~4 LOC
+2. **Set Duration's implied temporal dimension** — `src/Precept/Language/Types.cs` Duration entry (~L397): add `ImpliedQualifiers: [new DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Time, QualifierOrigin.Baseline)]` ~2 LOC
+3. **Extend `ExtractQualifiers` for temporal dimension routing on price** — `src/Precept/Pipeline/TypeChecker.cs` L121: modify the `QualifierAxis.Dimension` arm to check `resolvedKind == TypeKind.Price && IsTemporalDimensionName(q.Value)` and route to `MapTemporalDimensionQualifier` ~8 LOC
+4. **Add temporal arms to `ExtractComparableValue`** — `src/Precept/Pipeline/ProofEngine.cs` L928: add `TemporalUnit` and `TemporalDimension` pattern arms ~4 LOC
+5. **Extend `ResolveQualifierOnAxis` with Dimension→TemporalDimension fallback and implied qualifier support** — `src/Precept/Pipeline/ProofEngine.cs` L938: add second fallback after Unit→Dimension, plus implied qualifier loop at end ~12 LOC
+
+**Tests (8 scenarios):**
+
+1. `field Rate as price in 'USD' of 'time'` → compiles clean, stores `TemporalDimension(Time)` in declared qualifiers
+2. `field Rate as price in 'USD' of 'date'` → compiles clean, stores `TemporalDimension(Date)` in declared qualifiers
+3. `field Rate as price in 'USD' of 'mass'` → compiles clean (unchanged physical dimension behavior)
+4. `field Qty as quantity of 'time'` → emits `InvalidDimensionString` (temporal dimensions rejected on quantity — unchanged)
+5. `ExtractComparableValue(TemporalUnit("hours", Time))` → `"hours"` (unit test)
+6. `ExtractComparableValue(TemporalDimension(Time))` → `"time"` (unit test)
+7. `ExtractComparableValue(TemporalDimension(Any))` → `null` (unit test)
+8. `ResolveQualifierOnAxis(durationField, TemporalDimension)` → returns implied `TemporalDimension(Time)` (unit test)
+
+**Regression anchors:**
+- All existing price + price qualifier compatibility tests pass
+- All existing price × quantity dimension chain tests pass (Slice 8, if already in)
+- All existing quantity `of` / `in` qualifier tests pass (temporal routing is price-gated)
+- All existing period `of 'date'` / `of 'time'` qualifier tests pass
+- All existing Unit → Dimension fallback tests pass (Slice 9, if already in)
+
+**LOC estimate:** ~30 (implementation) + ~50 (tests) = ~80 total  
+**Risk:** Medium — touches TypeMeta record (public API), TypeChecker qualifier routing, and ProofEngine resolution. Changes are additive (new property, new arms, new fallbacks) with no modifications to existing code paths.
+
+---
+
+### Slice 12: Temporal Chain Validation (G8 + G13) — REVISED
 
 **Status:** Not Started  
-**Depends on:** Slice 8 (requires `QualifierChainProofRequirement` infrastructure)  
-**Goal:** Add temporal dimension chain validation to `PriceTimesPeriod` and `PriceTimesDuration` using the infrastructure built in Slice 8.
+**Depends on:** ~~Slice 8~~ (already implemented), Slice 11B (requires temporal price denominator support)  
+**Goal:** Add temporal dimension chain validation to `PriceTimesPeriod` and `PriceTimesDuration` using the type system extensions from Slice 11B and the chain infrastructure from Slice 8.
 
 **Work items:**
 
-1. **Catalog entry: `PriceTimesPeriod`** — `Operations.cs` L599: add `QualifierChainProofRequirement` for temporal dimension axis ~4 LOC
-2. **Catalog entry: `PriceTimesDuration`** — `Operations.cs`: add matching requirement ~4 LOC
+1. **Catalog entry: `PriceTimesPeriod`** — `src/Precept/Language/Operations.cs` L615: add `QualifierChainProofRequirement(ParamSubject(PPrice), QualifierAxis.Dimension, ParamSubject(PPeriod), QualifierAxis.TemporalDimension, "Price denominator dimension must match period temporal dimension")` ~4 LOC
+2. **Catalog entry: `PriceTimesDuration`** — `src/Precept/Language/Operations.cs` L619: add `QualifierChainProofRequirement(ParamSubject(PPrice), QualifierAxis.Dimension, ParamSubject(PDuration), QualifierAxis.TemporalDimension, "Price denominator must be time-dimension for duration cancellation")` ~4 LOC
 
 **Tests:**
-- `price in 'USD' per 'month' * period of 'date'` → proved (temporal dimension match)
-- `price in 'USD' per 'month' * period of 'time'` → diagnostic (date ≠ time)
-- `price in 'USD' per 'hour' * duration` → proved (time dimension match)
-- Regression: existing price × period operations still compile when valid
+- `price of 'time' * period of 'time'` → proved (temporal dimension match)
+- `price of 'date' * period of 'date'` → proved (temporal dimension match)
+- `price of 'time' * period of 'date'` → diagnostic (time ≠ date)
+- `price of 'date' * period of 'time'` → diagnostic (date ≠ time)
+- `price of 'mass' * period of 'date'` → diagnostic (physical ≠ temporal)
+- `price of 'time' * duration` → proved (time == time via implied qualifier)
+- `price of 'date' * duration` → diagnostic (date ≠ time — D15 correct: duration only cancels fixed-length)
+- `price of 'mass' * duration` → diagnostic (mass ≠ time)
+- bare `price * period` (no qualifiers) → obligation fires, cannot discharge
+- bare `price * duration` (no qualifiers) → obligation fires (price side null), cannot discharge
+- Regression: existing `price * decimal` scaling unaffected (no chain requirement)
+- Regression: existing `price ± price` qualifier compatibility unaffected
 
 **LOC estimate:** ~8  
-**Risk:** Low — pure catalog additions using Slice 8 infrastructure.
+**Risk:** Low — pure catalog additions using Slice 8 infrastructure and Slice 11B type system support.
+
+---
+
+### Slice 13: Derivation-Direction Chain Proof Analysis (G15)
+
+**Status:** Closed — No Action Required  
+**Depends on:** Slice 11B (temporal infrastructure), Slice 12 (chain proof pattern)  
+**Goal:** Determine whether `MoneyDivideQuantity`, `MoneyDividePeriod`, and `MoneyDivideDuration` need `QualifierChainProofRequirement` entries to enforce qualifier compatibility, mirroring the multiplication-direction chain proofs on `PriceTimesQuantity`, `PriceTimesPeriod`, and `PriceTimesDuration`.
+
+**Architect:** Frank  
+**Date:** 2026-05-11
+
+---
+
+#### Background: Why This Was Flagged
+
+The spec coverage audit (frank-9) identified G15 as a gap: the multiplication-direction operations (`PriceTimesQuantity`, `PriceTimesPeriod`, `PriceTimesDuration`) carry `QualifierChainProofRequirement` entries that validate qualifier compatibility for dimensional cancellation, but the derivation-direction operations (`MoneyDivideQuantity`, `MoneyDividePeriod`, `MoneyDivideDuration`) carry only `NumericProofRequirement` (divisor non-zero). The question: should derivation-direction operations have matching chain proofs?
+
+**Canonical authority:** `business-domain-types.md` L365–367 defines these operations:
+
+| Operation | Result | Semantics |
+|-----------|--------|-----------|
+| `money / quantity` | `price` | Currency / non-currency → price derivation (L365) |
+| `money / period` | `price` | Time-based price derivation (L366, D15) |
+| `money / duration` | `price` | Duration-based price derivation (L367, D15) |
+
+**Current Operations.cs state:**
+
+| Operation | Location | Current ProofRequirements |
+|-----------|----------|--------------------------|
+| `MoneyDivideQuantity` | L473–480 | `NumericProofRequirement` (non-zero) only |
+| `MoneyDividePeriod` | L482–489 | `NumericProofRequirement` (non-zero) only |
+| `MoneyDivideDuration` | L491–498 | `NumericProofRequirement` (non-zero) only |
+
+---
+
+#### Analysis: Chain Proofs Are Structurally Impossible
+
+Multiplication-direction chain proofs validate that two operands' qualifiers are compatible for **dimensional cancellation**. The proof compares qualifier values from shared or fallback-bridged axes:
+
+```
+PriceTimesQuantity:  Price.Dimension ←→ Quantity.Dimension     // both have Dimension axis
+PriceTimesPeriod:    Price.Dimension ←→ Period.TemporalDimension // Dimension→TemporalDimension fallback
+PriceTimesDuration:  Price.Dimension ←→ Duration.TemporalDimension // via ImpliedQualifiers
+```
+
+Derivation-direction operations have a fundamentally different qualifier topology — the operands do **not** share qualifier axes:
+
+| Operation | Left operand axes | Right operand axes | Shared axis? |
+|-----------|------------------|--------------------|-------------|
+| `money ÷ quantity` | `Currency` | `Dimension`, `Unit` | ❌ None |
+| `money ÷ period` | `Currency` | `TemporalDimension`, `TemporalUnit` | ❌ None |
+| `money ÷ duration` | `Currency` | (implied `TemporalDimension` via 11B) | ❌ None |
+
+Adding `QualifierChainProofRequirement` to any of these operations would cause `ResolveQualifierOnAxis` to return `null` for one side (money has no dimension axis; quantity/period/duration have no currency axis). The chain proof would **always fail**, making every derivation operation produce a spurious unresolvable obligation. This is not "needs implementation" — it is **architecturally impossible** under the current chain proof model.
+
+**Why derivation differs from cancellation:** Cancellation validates that a pre-existing denominator dimension matches the cancelling operand's dimension (price `of 'mass'` × quantity `of 'mass'` → ✓). Derivation **creates** the relationship — the result price's denominator IS the divisor's dimension. There is no pre-existing qualifier to validate against, so there is no chain to check.
+
+---
+
+#### Gap Closure: Slice 10 Assignment Validation
+
+The practical concern — "what if `money in 'USD' ÷ quantity of 'length'` is assigned to `price in 'USD' of 'mass'`?" — is already covered by Slice 10 (assignment expression qualifier propagation, **already implemented**).
+
+`ValidateAssignmentQualifiers` (TypeChecker.Expressions.cs L1261–1268) extracts leaf operands from binary expressions and validates each leaf's qualifiers against the target field:
+
+```
+set Rate = Revenue / Qty
+  → leaf Revenue (money in 'USD') checked against Rate (price in 'EUR' of 'mass')
+    → Currency: 'USD' ≠ 'EUR' → QualifierMismatch diagnostic ✓
+  → leaf Qty (quantity of 'length') checked against Rate (price in 'USD' of 'mass')
+    → Dimension: 'length' ≠ 'mass' → DimensionCategoryMismatch diagnostic ✓
+```
+
+Every derivation-direction qualifier mismatch that could produce a semantically incoherent assignment is caught at assignment time. No operation-level chain proof adds defensive value beyond what Slice 10 already provides.
+
+---
+
+#### Conclusion
+
+**G15 is a false gap.** Derivation-direction operations create qualifier relationships; they do not cancel pre-existing ones. The operands share no qualifier axes, making `QualifierChainProofRequirement` structurally impossible without introducing a new proof requirement kind. Assignment validation (Slice 10, already implemented) provides full coverage for the practical scenarios.
+
+**No code changes. No new proof requirements. No new tests.**
+
+**LOC estimate:** 0  
+**Risk:** None — verification-only slice.
 
 ---
 
@@ -1103,19 +1468,22 @@ In contrast, the **quantity unit axis** and **price compound axis** are correctl
 | 9 | G6, G12 | ~15 | ~4 | None |
 | 10 | G7 | ~50 | ~8 | None |
 | 11 | G9 | ~20 | ~4 | None |
-| 12 | G8, G13 | ~8 | ~4 | Slice 8 |
-| **Total** | **10 gaps** | **~167** | **~38** | |
+| 11B | G8, G13 prereq | ~30 | ~8 | Slice 8, Slice 9 |
+| 12 | G8, G13 | ~8 | ~12 | Slice 8, Slice 11B |
+| 13 | G15 | 0 | 0 | Slice 11B, Slice 12 (analysis only) |
+| **Total** | **11 gaps** | **~197** | **~54** | |
 
 **Not sliced (by design or tracked elsewhere):**
 - G10 — tracked in Part A Slice 2 extension (~25 LOC, 9 tests)
 - G11 — by-design limitation, deferred
 - G14 — working correctly, no fix needed
+- G15 — false gap, closed by design + Slice 10 assignment validation (see Slice 13)
 
 ### Test Coverage Assessment
 
 **Existing coverage:** The proof engine has ~173 test cases across 13 slice classes in `ProofEngineTests.cs`. Well covered: numeric obligations (S1–S4), subsumption chains, guard extraction, flow narrowing, error taint suppression, constraint influence, initial state satisfiability, forwarding facts. Partially covered: qualifier compatibility (record equality, axis values — no E2E obligation-through-discharge tests with real money/quantity expressions). Not covered: currency compatibility on arithmetic, dimension-only field compatibility, exchange rate chain validation, assignment qualifier propagation through expressions.
 
-**New tests estimated:** ~38 tests across Slices 7–12, plus ~6 regression tests = **~44 new tests total** (including regression anchors).
+**New tests estimated:** ~54 tests across Slices 7–12 (including 11B), plus ~10 regression tests = **~64 new tests total** (including regression anchors).
 
 ### Proof Engine Architecture Assessment
 
@@ -1127,14 +1495,15 @@ The S1–S5 strategy architecture is **sound and sufficient**:
 | S2: DeclarationAttribute | Numeric: field modifier; Dimension: temporal period; Modifier; Presence | ✅ Correct |
 | S3: GuardInPath | Numeric: guard comparison; Presence: `is set` guard | ✅ Correct |
 | S4: FlowNarrowing | Numeric: field-to-field guard implies result sign | ✅ Correct |
-| S5: QualifierCompatibility | QualifierAxis equality between operands | ⚠️ Needs axis fallback (G6) + chain extension (G4/G5) |
+| S5: QualifierCompatibility | QualifierAxis equality between operands | ⚠️ Needs axis fallback (G6, 11B) + chain extension (G4/G5) + implied qualifiers (11B) |
 
-**Two targeted additions needed** (both within S5's scope):
+**Three targeted additions needed** (all within S5's scope):
 
-1. **Axis fallback** (Slice 9, G6): ~15 LOC in `ResolveQualifierOnAxis` to handle Dimension↔Unit equivalence.
+1. **Axis fallback** (Slice 9, G6): ~15 LOC in `ResolveQualifierOnAxis` to handle Unit→Dimension equivalence.
 2. **Chain validation** (Slice 8, G4/G5): new `QualifierChainProofRequirement` DU subtype + S5 extension for cross-type, cross-axis qualifier matching.
+3. **Temporal price denominator support** (Slice 11B, G8/G13 prereq): `Dimension→TemporalDimension` axis fallback, `ExtractComparableValue` temporal arms, `ImpliedQualifiers` on `TypeMeta` for duration's intrinsic time dimension, and type-gated temporal dimension acceptance on price's `of` qualifier.
 
-**Root cause:** This is not a proof engine bug. The operations were declared with textual descriptions noting "same currency required" but the corresponding `ProofRequirements` entries were never added. The engine faithfully processes whatever obligations the catalog declares — the catalog was simply silent on money operations. The fix belongs in the catalog, not in the engine. The engine does not need money-specific logic — it needs the catalog to declare what it already describes in prose.
+**Root cause:** This is not a proof engine bug. The operations were declared with textual descriptions noting "same currency required" but the corresponding `ProofRequirements` entries were never added. The engine faithfully processes whatever obligations the catalog declares — the catalog was simply silent on money operations. The fix belongs in the catalog, not in the engine. The engine does not need money-specific logic — it needs the catalog to declare what it already describes in prose. The temporal chain gap (G8/G13) is a structural gap — the price type lacked the qualifier axis to carry temporal denominator information. Slice 11B provides the type system foundation; Slice 12 provides the catalog entries.
 
 ### Proof Gap Dependency Order
 
@@ -1144,12 +1513,14 @@ Slice 8 (Chain Infra)        — independent, can start immediately
 Slice 9 (Dimension Fallback) — independent, can start immediately
 Slice 10 (Assignment Quals)  — independent, can start immediately
 Slice 11 (ExRate Assignment)  — independent, can start immediately
-Slice 12 (Temporal Chain)    — DEPENDS ON Slice 8
+Slice 11B (Temporal Price)   — DEPENDS ON Slice 8, Slice 9
+Slice 12 (Temporal Chain)    — DEPENDS ON Slice 8, Slice 11B
+Slice 13 (Derivation Chain)  — DEPENDS ON Slice 11B, Slice 12 (analysis only — no code changes)
 ```
 
-Slices 7–11 can execute in any order. Slice 12 is blocked on Slice 8's `QualifierChainProofRequirement` infrastructure.
+Slices 7–11 can execute in any order. Slice 11B requires Slice 8 (chain infrastructure) and Slice 9 (axis fallback pattern). Slice 12 requires Slice 8 and Slice 11B. Slice 13 is a verification-only slice — concluded G15 is a false gap (see Slice 13 analysis).
 
-All proof gap slices (7–12) are independent of Part A interpolation slices (1–6). The two workstreams can execute in parallel.
+All proof gap slices (7–12, including 11B) are independent of Part A interpolation slices (1–6). The two workstreams can execute in parallel.
 
 ---
 

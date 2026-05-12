@@ -94,6 +94,7 @@ public sealed record TypeCatalogEntryDto(
     string[] Traits,
     string[] WidensTo,
     string[] ImpliedModifiers,
+    string[]? ImpliedQualifiers,
     QualifierShapeDto? QualifierShape,
     TypeAccessorDto[] Accessors,
     string[] ChoiceLiteralTokens,

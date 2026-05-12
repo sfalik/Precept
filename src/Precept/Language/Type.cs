@@ -214,7 +214,14 @@ public record TypeMeta(
     /// Non-null for types whose typed constant literals require content validation
     /// (temporal types via NodaTime, currency/unit via closed set membership).
     /// </summary>
-    ContentValidation?           ContentValidation = null
+    ContentValidation?           ContentValidation = null,
+    /// <summary>
+    /// Qualifier metadata intrinsically carried by this type regardless of explicit field declarations.
+    /// Used by the proof engine's <c>ResolveQualifierOnAxis</c> after declared qualifiers are exhausted.
+    /// Example: <c>duration</c> carries an implied <c>TemporalDimension(Time, Baseline)</c> because
+    /// duration is intrinsically a time-dimension measurement.
+    /// </summary>
+    DeclaredQualifierMeta[]?     ImpliedQualifiers = null
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>
@@ -225,4 +232,7 @@ public record TypeMeta(
 
     /// <summary>Member accessors available on this type.</summary>
     public IReadOnlyList<TypeAccessor> Accessors { get; } = Accessors ?? Array.Empty<TypeAccessor>();
+
+    /// <summary>Qualifiers intrinsically carried by this type (e.g., duration → TemporalDimension(Time)).</summary>
+    public DeclaredQualifierMeta[] ImpliedQualifiers { get; } = ImpliedQualifiers ?? [];
 }

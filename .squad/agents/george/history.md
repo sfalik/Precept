@@ -5,6 +5,16 @@
 - Diagnostic additions should be semantically precise; do not overload unrelated codes when the compiler contract changes shape.
 - Shared-environment build discipline still matters: targeted validation beats noisy full-solution churn when the workspace may be busy.
 
+## Learnings
+
+### 2026-05-11 — Slice 11B: Temporal Price Denominator
+
+- Pre-existing spike branch failures (26 tests in `TypeCheckerAssemblyTests` + `TypeCheckerAssignmentQualifierTests`) produce `ExpectedToken` parser errors unrelated to type checker work. Always baseline before claiming new failures.
+- `TypeMeta` is a positional record — adding a new optional parameter at the end is safe because all call sites use named parameters. The computed-property-shadowing-parameter pattern (`public T[] Foo { get; } = Foo ?? []`) is the established idiom here.
+- `typeRef.ResolvedKind` on a `QualifiedTypeReference` delegates to `InnerType.ResolvedKind` — no need to unbox manually; the property dispatch covers it.
+- Dimension→TemporalDimension fallback is intentionally broad: any field with a `TemporalDimension` declared qualifier satisfies a `Dimension`-axis chain requirement. Cross-domain mismatches (physical vs temporal) are caught by `ExtractComparableValue` string comparison, not axis gating.
+- Adding `internal static` test entry points to private ProofEngine helpers (behind `InternalsVisibleTo`) is the established pattern and keeps tests exercising real code paths without overexposing the API.
+
 ## Live Guidance
 
 - Mutual-exclusion metadata must be symmetric; PRECEPT0011c makes one-way declarations non-buildable.
@@ -17,6 +27,16 @@
 - `.squad/decisions.md` remains the canonical chronology; this file now keeps only current implementation guidance and the newest merged outcomes.
 
 ## Recent Updates
+
+### 2026-05-11 — Slice 11B: Temporal Price Denominator Type System Extension
+- Added `ImpliedQualifiers` to `TypeMeta` record; Duration entry carries `TemporalDimension(Time, Baseline)`.
+- Extended `ExtractQualifiers` in TypeChecker: `price of 'time'`/`'date'` routes to `MapTemporalDimensionQualifier`; `quantity of 'time'` still emits `InvalidDimensionString` (type-gated guard).
+- Added `TemporalUnit` and `TemporalDimension` arms to `ExtractComparableValue`; `PeriodDimension.Any` → null (locked).
+- Extended `ResolveQualifierOnAxis` with `Dimension → TemporalDimension` fallback and implied-qualifier loop.
+- Added `ExtractComparableValueForTest` and `GetImpliedQualifierOnAxis` internal test entry points.
+- MCP DTO: added `string[]? ImpliedQualifiers` to `TypeCatalogEntryDto`; rendered as `"Axis:Value"` strings.
+- 13 new tests, all pass. 26 pre-existing spike branch failures unchanged.
+- Slice 12 (PriceTimesPeriod/PriceTimesDuration chain requirements) is now unblocked.
 
 ### 2026-05-11T22:41:00Z — Slice 1 Parser for InterpolatedTypedConstantExpression complete
 - Rewrote `ParseInterpolatedTypedConstant()` to produce `InterpolatedTypedConstantExpression` with full segment AST (mirrors `InterpolatedStringExpression`).

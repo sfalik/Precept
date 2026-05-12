@@ -122,6 +122,11 @@ internal static partial class TypeChecker
             {
                 QualifierAxis.Currency         => MapCurrencyQualifier(qualifier, ctx),
                 QualifierAxis.Unit             => MapUnitQualifier(qualifier, ctx),
+                // Temporal dimension names ("date", "time") on price's 'of' axis → temporal denomination.
+                // Guard prevents quantity of 'time' silently producing temporal metadata.
+                QualifierAxis.Dimension when typeRef.ResolvedKind == TypeKind.Price
+                                            && qualifier.Value is "date" or "time"
+                                            => MapTemporalDimensionQualifier(qualifier, ctx),
                 QualifierAxis.Dimension        => MapDimensionQualifier(qualifier, ctx),
                 QualifierAxis.FromCurrency     => MapFromCurrencyQualifier(qualifier, ctx),
                 QualifierAxis.ToCurrency       => MapToCurrencyQualifier(qualifier, ctx),

@@ -410,7 +410,8 @@ public static class Types
             DisplayName: "duration",
             HoverDescription: "An exact elapsed time measured in hours, minutes, and seconds. Use when the length of a gap needs to be precise.",
             UsageExample: "field SlaLimit as duration default '72 hours'",
-            ContentValidation: DurationValidation
+            ContentValidation: DurationValidation,
+            ImpliedQualifiers: [new DeclaredQualifierMeta.TemporalDimension(PeriodDimension.Time, QualifierOrigin.Baseline)]
         ),
 
         TypeKind.Period => new(
