@@ -47,6 +47,14 @@ from Cancelled on Activate -> reject "Cancelled subscriptions cannot be reactiva
 ```
 </details>
 
+State-scoped constructs can also target a subset of states with a comma-delimited `StateTarget`:
+
+```precept
+from Screening, InterviewLoop, Decision on RejectCandidate
+  -> set FinalNote = RejectCandidate.Note
+  -> transition Rejected
+```
+
 **The Execution**
 
 ```csharp

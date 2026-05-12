@@ -1,511 +1,386 @@
 # Precept Hover Design
 
-**By:** Elaine · **V5** · **2026-05-12** · VS Code markdown hover
+**By:** Elaine · **V7** · **2026-05-12T18:25:28.876-04:00** · VS Code markdown hover
 
 ---
 
-## Overview
+## 1. Overview
 
-Hover is a fast trust surface. It answers: what this construct means for the business rule, where it applies, and whether Precept **proved** it, **runtime-checks** it, or has an **unresolved gap**.
-
-Lead with governed meaning — `because` rationale as a blockquote where authored, type/kind metadata where not. For proof-bearing constructs, every hover answers: what was proved OR why it couldn't be proved, compactly. Primary reader: technically literate business author comfortable in SQL/Python, already familiar with Precept basics.
+Hover answers one question first: **what guarantee is Precept giving me here?** Every card leads with one of three guarantee states — ✅ Proven, ⚡ Enforced, or ⚠️ Gap — then gives one concrete evidence line when proof is the issue. Compactness is a correctness rule: design for 3 lines, spend lines 4–5 only when proof evidence is the user's actual question.
 
 ---
 
-## Construct Quick Reference
+## 2. Badge vocabulary
 
-| Construct | Leading content | Proof status shown |
-|---|---|---|
-| `field` (stored) | Type · qualifier · access map · governing constraints | ⚡ Runtime checked |
-| `field` (computed) | Type · expression · governing constraints | ⚡ Runtime checked |
-| `rule` | `because` rationale · scope · referenced fields | ⚡ Runtime checked |
-| `state` | Modifiers · reachability · incoming/outgoing · write set | ✅ / ⚠️ |
-| `event` | Arg signature · eligible states | ⚡ Runtime checked |
-| transition row | Guard · actions · graph status · proof block | ✅ / ⚠️ |
-| `ensure` | `because` rationale · anchor type · scope | ⚡ Runtime checked |
-| `access` | Write-set metadata · state coverage | ✅ Proof verified |
-| `omit` | Structural absence · restore states | ✅ Proof verified |
-| `reject` | Reject reason · outcome | ⚡ Runtime checked |
-| qualifier | Resolved value · source · active uses · open issues | Per-use status |
-| qualified field (proof) | Declaration contract · open proof issues | Proof contract status |
-| binary expression (proof) | Operand evidence · result qualifier · verdict | ✅ Proved / ⚠️ Unresolved |
-| diagnostic squiggle | Proof verdict · failure evidence · fix hint | ⚠️ Unresolved / specific |
-
----
-
-## 1. `field` (stored)
-
-```md
-**field** `ListPrice`
-⚡ **Runtime checked** — enforced on every mutation before commit
-Type: `price` · not nullable · `in CatalogCurrency` · `of SaleUnit.dimension`
-Writable: `Listed`, `LowStock` · Read-only: `Unlisted`, `Delisted`
-Governed by: non-negative rule · positive-in-sellable ensures
-```
-
-**Data sources (V1):** type checker (`ResolvedType`, `Presence`, `DeclaredQualifiers`) · graph (`AccessModes` traversal) · proof (`ConstraintInfluenceEntry`)  
-**V2 deferred:** event-driven mutation reach (high cost — requires cross-referencing all transition row actions)
-
----
-
-## 2. `field` (computed)
-
-Computed fields (`<-`) are never directly writable — writable-state map suppressed entirely.
-
-```md
-**computed field** `AverageCost`
-⚡ **Runtime checked** — recomputed on every mutation before commit
-Type: `price` · not nullable · `in CatalogCurrency` · `of SaleUnit.dimension`
-Computed from: `TotalCost / QuantityOnHand`
-Governed by: non-negative rule
-```
-
-**Data sources (V1):** type checker (`ResolvedType`, expression AST) · proof (`ConstraintInfluenceEntry`)
-
----
-
-## 3. `rule`
-
-```md
-**rule** `QuantityOnHand >= '0 {StockingUnit}'`
-> Stock on hand cannot go negative
-⚡ **Runtime checked** — boolean expression on `QuantityOnHand`
-Scope: global — enforced after every mutation
-If false: operation rejected before commit
-Referenced fields: `QuantityOnHand`
-```
-
-Guarded variant:
-
-```md
-**rule** `when InForce: ApprovedAmount <= CoverageLimit`
-> Approved claims cannot exceed coverage while the policy is active
-⚡ **Runtime checked** — boolean expression on `ApprovedAmount`, `CoverageLimit`
-Scope: global when `InForce`
-If false: operation rejected before commit
-Referenced fields: `ApprovedAmount`, `CoverageLimit`
-```
-
-**Data sources (V1):** type checker (expression type, operand compatibility) · proof (`ProofLedger.Obligations` by `ConstraintContext(RuleIdentity)`, `ConstraintInfluence`)  
-**Notes:** Use `ConstraintInfluenceEntry` for referenced fields — NOT `TypedRule.SemanticSubjects` (currently empty, Kramer N10). Rules are global data truth — never frame scope as "all reachable states." Stateless precepts have no states; scope line must work without them.
-
----
-
-## 4. `state`
-
-```md
-**state** `LowStock`
-✅ **Proof verified** — reachable from `Listed`
-Modifiers: *none*
-Incoming: `FulfillOrder`, `RecordShrinkage`
-Outgoing: `ReceiveShipment` → `Listed`, `ReturnOrder` → `Listed`, `AdjustInventory` → `Listed`
-Writable here: `RestockThreshold`, `Supplier`, `SupplierCurrency`, `ListPrice`
-Terminal reachable · active ensures: 3 (1 unverified)
-```
-
-With modifiers:
-
-```md
-**state** `Approved` · `required`
-✅ **Proof verified** — reachable; every initial→terminal path visits here
-Modifiers: `required`
-Incoming: `ReviewComplete`
-Outgoing: `Disburse` → `Funded`, `Withdraw` → `Cancelled`
-Writable here: `DisbursementDate`, `FinalAmount`
-Terminal reachable · active ensures: 2
-```
-
-**Data sources (V1):** graph (`StateGraph.Edges`, `ReachableStates`, `AccessModes`, dead-end analysis) · proof (`EnsuresByState` + obligations) · manifest (modifiers: `terminal`, `required`, `irreversible`, `success`, `warning`, `error`)
-
----
-
-## 5. `event`
-
-```md
-**event** `UpdateListPrice(Price as price)`
-⚡ **Runtime checked** — args validated before transition
-Can fire from: `Listed`, `LowStock`
-Arg: `Price` is `price` · `in CatalogCurrency` · `of SaleUnit.dimension`
-```
-
-Constructor variant:
-
-```md
-**event** `initial CreateItem(Name as text, InitialStock as quantity)`
-⚡ **Runtime checked** — constructor event (invoked via `CreateInstance`, not `Fire`)
-Arg: `Name` is `text` · not nullable
-Arg: `InitialStock` is `quantity` · `of StockingUnit.dimension`
-```
-
-**Data sources (V1):** type checker (`TypedEvent.Args`) · graph (`GraphEvent.HandledInStates`) · proof (event ensure status) · manifest (`initial` modifier)  
-**V2 deferred:** "Typical effects" line — high-cost traversal, no ready projection (Frank N6, Kramer N3)
-
----
-
-## 6. Transition row (`from … on … when … ->`)
-
-```md
-**transition** `from LowStock on ReceiveShipment when ... -> Listed`
-⚠️ **Unverified** — row is reachable, but one proof obligation remains
-Guard: `PostShipmentStock > RestockThreshold`
-Actions: `set TotalCost`, `add QuantityOnHand`, `recompute AverageCost`
-Graph: source reachable · target `Listed` reachable
-Proof: qualifier arithmetic
-  Verdict: Cannot prove — 1 unresolved obligation
-  Evidence: compound-unit quantity operands in shipment cost path
-  Fix: ensure matching qualifier axes on both sides of the arithmetic
-```
-
-**Data sources (V1):** type checker (mutation type-safety, coercions) · graph (row/target reachability) · proof (row-scoped obligations, qualifier constraints) · manifest (guard, action order, outcome)  
-**V1 note:** show obligation count + diagnostic category. Prose gap text is V2 (Kramer N4).
-
----
-
-## 7. `ensure`
-
-Scope line varies by anchor type:
-
-| Anchor | Scope text | Semantics |
-|---|---|---|
-| `in` | `Scope: residency (in Listed)` | Checked while residing in state |
-| `to` | `Scope: entry gate (to Listed)` | Checked on transitions entering state |
-| `from` | `Scope: exit gate (from Listed)` | Checked on transitions leaving state |
-| `on` | `Scope: event args (on Submit)` | Checked when event fires |
-
-*(Table is design reference — not rendered in hover. Hover uses the inline scope text.)*
-
-**Residency (`in`):**
-
-```md
-**ensure** `in Listed ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}'`
-> A listed product must have a positive list price
-⚡ **Runtime checked** — enforced on every mutation before commit
-Scope: residency (`in Listed`)
-Referenced fields: `ListPrice`
-Violation rejects the operation
-```
-
-**Entry gate (`to`):**
-
-```md
-**ensure** `to Approved ensure ApprovedAmount <= CoverageLimit`
-> Cannot enter Approved with amount exceeding coverage
-⚡ **Runtime checked** — enforced on transitions entering `Approved`
-Scope: entry gate (`to Approved`)
-Referenced fields: `ApprovedAmount`, `CoverageLimit`
-Violation rejects the transition
-```
-
-**Event args (`on`):**
-
-```md
-**ensure** `on Submit ensure Amount > '0 USD'`
-> Submitted amount must be positive
-⚡ **Runtime checked** — enforced when `Submit` fires
-Scope: event args (`on Submit`)
-Referenced args: `Amount`
-Violation rejects the event
-```
-
-**Data sources (V1):** type checker (ensure expression type, references) · graph (active states) · proof (`ProofLedger.Obligations` by `EnsureIdentity`, `ConstraintInfluence`)  
-**Note:** Use `ConstraintInfluenceEntry` for referenced fields/args — NOT `TypedEnsure.SemanticSubjects` (currently empty, Kramer N10).
-
----
-
-## 8. `access` and `omit`
-
-**`access` (editable):**
-
-```md
-**access** `in Listed modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable`
-✅ **Proof verified** — write map is structural
-Editable here: `RestockThreshold`, `Supplier`, `SupplierCurrency`, `ListPrice`
-Same write set in `LowStock` · locked in `Unlisted`, `Delisted`
-```
-
-**`omit`:**
-
-```md
-**omit** `in Unlisted omit ListPrice`
-✅ **Proof verified** — field is structurally absent in `Unlisted`
-`ListPrice` does not exist in this state — not readable, not writable
-Restored on transition to: `Listed`, `LowStock`
-```
-
-**Data sources (V1):** type checker (field existence, duplicate safety) · graph (`TypedAccessMode`, same-write-set/locked-state summaries, restore-transition scan) · manifest (omit declaration)  
-**V1 limit:** guarded-access final write map not materialized — V1 shows raw declaration only.
-
----
-
-## 9. `reject`
-
-```md
-**reject** `from Listed on FulfillOrder -> reject`
-> Insufficient stock to fulfill this order
-⚡ **Runtime checked** — deliberate business rejection
-Result: state unchanged · no field mutations commit
-```
-
-**Data sources (V1):** manifest (`RejectReason`) · graph (row reachability)  
-**V2 deferred:** "Selected when: no earlier guard matches" — requires ordered-row analysis (Kramer N6).
-
----
-
-## 10. Qualifier (`of …`, `in …`)
-
-```md
-**qualifier** `in '{CatalogCurrency}'`
-Status: Active in 3 proof-checked uses · 1 unresolved use
-Axis: Currency
-Declared form: `in '{CatalogCurrency}'`
-Resolved value: `'{CatalogCurrency}'`
-Resolved source: field `CatalogCurrency`
-Resolved value shape: symbolic currency qualifier
-Compatibility rule:
-- money operands used together must share the same Currency qualifier
-- qualifier-preserving operations keep this qualifier in the result
-Open proof issues:
-- computed field `GrossProfit` — PRE0114 on `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
-```
-
-**Data sources (V1):** `QualifierHoverInfo` (Axis, Span, Label, OwnerType, ResolvedQualifier) · type checker (declared/resolved qualifier, symbolic source) · proof (active use counts, unresolved uses, qualifier-preserving strategy)  
-**Note:** Show resolved value, source, and open issues as **separate labeled lines** — never collapsed into prose. Do not force a `Proof verified` tone if unresolved uses exist.
-
----
-
-## Proof Hover Scenarios
-
-### Scenario 1: Qualified field
-
-> **Trigger:** cursor on a field identifier with at least one declared qualifier
-
-```md
-**field** `TotalRevenue`
-Type: `money`
-Proof: Currency qualifier contract
-  Verdict: Active — no open issues
-  Declared qualifier: `in '{CatalogCurrency}'`
-  Resolved value: `'{CatalogCurrency}'`
-  Qualifier source: field `CatalogCurrency`
-```
-
-**Variant B — unresolved uses:**
-
-```md
-Proof: Currency qualifier contract
-  Verdict: Active — 2 unresolved uses
-  Declared qualifier: `in '{CatalogCurrency}'`
-  Resolved value: `'{CatalogCurrency}'`
-  Qualifier source: field `CatalogCurrency`
-  Open issues: computed field `GrossProfit` · transition `from Draft on Approve`
-```
-
-**Variant C — proved:**
-
-```md
-Proof: Currency qualifier contract
-  Verdict: Proved via qualifier-preserving operations
-  Declared qualifier: `in '{CatalogCurrency}'`
-  Resolved value: `'{CatalogCurrency}'`
-  Qualifier source: field `CatalogCurrency`
-```
-
-> The field hover tells the user what contract this field carries. The diagnostic hover tells them where that contract failed to prove. Do not show failure tone on the declaration hover unless the declaration itself is the failing span. Do not collapse declared form, resolved value, and source into one sentence.
-
-**Data needed:** `TypedField.Name`, `ResolvedType`, `DeclaredQualifiers`, `Qualifier`, `NameSpan` · resolved qualifier value + symbolic source · proof-usage summary (the missing join from declaration to open obligations).
-
----
-
-### Scenario 2: Binary expression with proof obligations
-
-> **Trigger:** cursor on operator or operand inside a `TypedBinaryOp` with at least one proof obligation. Target the **smallest proof-bearing binary expression** at the cursor — not the generic operator.
-
-**Proved:**
-
-```md
-**expression** `(TotalRevenue - TotalReturns)`
-Proof: Currency qualifier propagation
-  Verdict: Proved — same-qualifier propagation
-  Left: `TotalRevenue` · qualifier `'{CatalogCurrency}'`
-  Right: `TotalReturns` · qualifier `'{CatalogCurrency}'`
-  Result type: `money` · qualifier `'{CatalogCurrency}'`
-```
-
-**Unresolved:**
-
-```md
-**expression** `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
-Proof: Currency qualifier propagation
-  Verdict: Cannot prove — left subexpression qualifier not proved at this site
-  Left: `(TotalRevenue - TotalReturns)` · qualifier: not proved here
-  Right: `TotalCostOfGoods` · qualifier `'{CatalogCurrency}'`
-  Result type: `money` · qualifier: unresolved
-  Fix: align qualifier sources or insert an explicit conversion / intermediate field
-```
-
-> This is the flagship proof card — where the user expects Precept to explain itself. Do not show generic operator help when a proof-bearing `TypedBinaryOp` is present. Do not show only `1 unresolved obligation` — the card must name the requirement and evidence.
-
-**Data needed:** `TypedBinaryOp.Left/Right/ResultType/ResultQualifier/ProofRequirements/Span` · matching `ProofObligation` from `ProofLedger` · proof disposition and strategy · resolved left/right qualifier values at this site · expression context (`FieldExpressionContext(TypedField)`)  
-**Note:** `ResultQualifier` describes the propagation rule, not the humanized resolved value — the hover needs a resolution step, not just the raw DU case.
-
----
-
-### Scenario 3: Diagnostic squiggle
-
-> **Trigger:** cursor within the span of a proof-stage diagnostic. **Diagnostic hover wins over all other hovers at this position.**
-
-Problems panel gives one-line verdicts for scanning. Hover gives a mini proof card for diagnosis and repair. Never compress proof context into inline parentheses in hover.
-
-**PRE0114 — Currency qualifier mismatch:**
-
-```md
-**PRE0114 — Cannot prove Currency qualifier compatibility**
-Proof: Currency qualifier compatibility
-  Verdict: Cannot prove — nested subtraction result not proved qualifier-preserving here
-  Context: computed field `GrossProfit`
-  Expression: `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
-  Left: `(TotalRevenue - TotalReturns)` · qualifier: unresolved
-  Right: `TotalCostOfGoods` · qualifier `'{CatalogCurrency}'` from field `CatalogCurrency`
-  Fix: align qualifier paths or insert an explicit conversion / intermediate field
-```
-
-**PRE0116 — Presence requirement:**
-
-```md
-**PRE0116 — Cannot prove presence**
-Proof: Optional field access guard
-  Verdict: Cannot prove `TrackingNumber` is present before this access
-  Context: computed field `ShipmentSummary`
-  Expression: `TrackingNumber.length`
-  Subject: `TrackingNumber` · declared `optional`
-  Fix: guard with `when TrackingNumber is set`, initialize on all paths, or remove `optional`
-```
-
----
-
-## Status Indicators
-
-| Badge | Meaning |
+| Icon | Meaning |
 |---|---|
-| ✅ **Proof verified** | Statically established for the hovered construct |
-| ⚡ **Runtime checked** | Enforced on every mutation before commit — not pre-proved |
-| ⚠️ **Unverified** | A relevant proof or analysis obligation is still unresolved |
+| ✅ | **Proven** — established statically before runtime |
+| ⚡ | **Enforced** — checked on mutation before commit |
+| ⚠️ | **Gap** — not proven; the next line says why |
+| 🔒 | Not mutable / structurally absent here |
+| ✏️ | Mutable here |
+| 🔁 | Transition / routing / from→to shape |
+| ⚖️ | Currency, unit, or comparison contract |
+| 📍 | Graph position — reachable, dead, terminal, required |
+| 🔬 | Calculation / proof check / expression reasoning |
 
-> "Runtime checked" describes enforcement at mutation time. `Inspect` is a non-mutating preview — it evaluates constraints but does not enforce. Badges describe enforcement semantics, not preview behavior.
-
----
-
-## Routing Rules
-
-| Priority | Target | Card returned |
-|---|---|---|
-| 1 | Proof diagnostic span | Diagnostic proof card |
-| 2 | `TypedBinaryOp` with proof obligation | Expression proof card |
-| 3 | Construct declaration span | Rich construct card |
-| 4 | Field identifier with declared qualifier | Field symbol + proof block (combined) |
-| 5 (fallback) | Any other position | Generic operator / function / type card |
-
-**Routing notes:**
-- Qualifier hover (`TryCreateQualifierHover`) remains the qualifier-syntax entry point, but the card content becomes proof-aware.
-- Qualified-field hover stays **one combined card** — declaration identity and proof contract together.
+> Icons replace words. They are scan primitives, not decoration.
 
 ---
 
-## Constraints
+## 3. Card templates
 
-### Rendering (VS Code)
+Examples below are grounded in `inventory-item.precept`, `loan-application.precept`, `computed-tax-net.precept`, and `sum-on-rhs-rule.precept`.
 
-Bold, blockquotes, code spans, and inline emoji render well. **Do not use tables, HTML, or deep nested lists** — hover width degrades them fast. All templates above use safe markdown patterns only.
+### `field` (stored)
 
-### V1 Boundary (compile-time only)
+```md
+⚡ Enforced · `price` · ⚖️ `CatalogCurrency` / `SaleUnit`
+✏️ `Listed`, `LowStock` (unconditional) · 🔒 `Unlisted`, `Delisted`
+Governed by: 2 rules · 1 ensure
+```
 
-`HoverHandler` receives only the current `Compilation` snapshot. Everything in V1 templates must be derivable from compile-time artifacts.
+**Proof variant:**
+
+```md
+⚠️ Gap · `CatalogCurrency` is on this field, 1 use not proven
+🔬 Use: `GrossProfit` · `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
+Left `(TotalRevenue - TotalReturns)` has no known `CatalogCurrency` · right `TotalCostOfGoods` carries `CatalogCurrency`
+```
+
+**Data sources:** type checker (`ResolvedType`, `Presence`, `DeclaredQualifiers`) · access map (`AccessModes` traversal, unconditional entries only in V1 summaries) · proof (`ConstraintInfluenceEntry`, overlapping diagnostics)
+
+---
+
+### `field` (computed)
+
+```md
+⚡ Enforced · recomputed before commit
+`price` · ⚖️ `CatalogCurrency` / `StockingUnit`
+From: `TotalInventoryCost / QuantityOnHand` · Governed by 1 rule
+```
+
+**Proof variant:**
+
+```md
+✅ Proven · derived calculation stays safe
+🔬 `Total - Tax - Fee` proves `Net` stays positive
+```
+
+**Data sources:** type checker (`ResolvedType`, `ComputedExpression`) · proof (`ProofLedger.Obligations`, `ConstraintInfluenceEntry`)
+
+---
+
+### `state`
+
+```md
+✅ Proven · reachable from `Listed`
+🔁 In: `FulfillOrder`, `RecordShrinkage` · Out: `ReceiveShipment → Listed`
+✏️ 4 fields (unconditional) · 🧭 terminal ✓ · ⚡ 3 ensures (1 ⚠️)
+```
+
+**Proof variant:**
+
+```md
+⚠️ Gap · `Approved` unreachable from `Draft`
+🧭 `Draft` reaches `UnderReview`
+Missing path: `UnderReview --Approve--> Approved` can't be proven
+```
+
+**Data sources:** graph (`ReachableStates`, `Edges`, terminal reachability) · access map (unconditional entries only in V1 summaries) · ensures + proof obligations · modifiers
+
+---
+
+### B4 — state proof narrative (**locked**)
+
+**Status:** Locked · shipped in `29cd9938`
+
+B4 ships as an appended sub-card inside the rich `state` hover. It does **not** replace the standard state card; it adds a graph-position proof narrative at the bottom of that card.
+
+**As built templates:**
+
+```md
+📍 Draft graph position
+
+⚠️ Gap · Draft --Submit--> Approved can't be proven
+```
+
+```md
+📍 Draft graph position
+
+✅ Proven · all connected edges satisfy their proof obligations
+```
+
+```md
+📍 Draft graph position
+
+✅ Proven · no connected edges carry proof obligations
+```
+
+- `📍` is the fixed header line for the graph-position block.
+- If any connected edge is unproven, the block emits one `⚠️ Gap · From --Event--> To can't be proven` line per failing edge.
+- If no connected edge is unproven, the block collapses to one positive `✅ Proven` line.
+- B4 uses the locked proof vocabulary only: `📍`, `✅ Proven`, and `⚠️ Gap`.
+
+**`EdgeProofStatus` architecture:**
+
+- Lives in `src/Precept/Pipeline/StateGraph.cs` as a graph-level projection record on `StateGraph.EdgeProofStatuses`.
+- Each `EdgeProofStatus` carries `FromState`, `EventName`, `ToState`, `IsProven`, and `ImmutableArray<string> UnresolvedObligationSummaries`.
+- `src/Precept/Compiler.cs` populates it in `EnrichGraphWithProofStatus(...)` **after** `GraphAnalyzer.Analyze(...)` and `ProofEngine.Prove(...)`.
+- Population rule: match unresolved `ProofLedger` obligations whose context is `TransitionRowContext` onto concrete `GraphEdge` instances, respect explicit-row-over-wildcard precedence, de-duplicate `Requirement.Description`, then mark the edge proven when no unresolved summaries remain.
+- `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` consumes the projection via `GetEdgeProofStatusesForState(...)`, which filters to incident edges (`from` or `to` the hovered state) and de-duplicates by `(FromState, EventName, ToState)`.
+- Current render behavior uses the edge identity plus `IsProven` for the visible card. `UnresolvedObligationSummaries` are carried in the architecture but are not yet printed in the hover body.
+
+**Routing rule:**
+
+- A state hover reaches B4 only through the normal rich state-hover path: `HoverHandler` resolves a `TypedState` and calls `RichHoverFactory.CreateStateHover(...)`.
+- That happens from both state identifier lookup (`TryFindState(...)`) and symbol-occurrence lookup (`StateOccurrence`).
+- B4 is therefore part of the standard state card, not a separate hover kind.
+- Global proof-first routing still applies above it: proof diagnostics and proof-expression hovers win earlier when the cursor is on those spans instead of the state symbol.
+
+**Representative rendered output (from LS regression coverage):**
+
+```md
+📍 Draft graph position
+
+⚠️ Gap · Draft --Submit--> Approved can't be proven
+```
+
+`HoverHandlerTests` also locks the positive variant:
+
+```md
+📍 Draft graph position
+
+✅ Proven · all connected edges satisfy their proof obligations
+```
+
+---
+
+### `event`
+
+```md
+⚡ Enforced · args checked before route
+🔁 Fires from: `Listed`, `LowStock`
+Args: `Price as price in CatalogCurrency of SaleUnit`
+```
+
+**Initial-event variant:**
+
+```md
+⚡ Enforced · constructor event
+Args: `Applicant`, `Amount`, `Score`, `Income`, `Debt`
+```
+
+**Data sources:** type checker (`TypedEvent.Args`) · graph (`HandledInStates`) · event ensure proof status · modifiers
+
+---
+
+### Transition row (`from … on … when … ->`)
+
+```md
+✅ Proven · currencies match
+🔁 `LowStock` → `Listed` on `ReceiveShipment`
+Guard: `QuantityOnHand + ReceiveShipment.PurchaseQty *`
+`StockingUnitsPerPurchaseUnit > RestockThreshold`
+```
+
+**Proof variant:**
+
+```md
+⚠️ Gap · `LowStock` → `Listed` on `ReceiveShipment`
+Guard: `PostShipmentStock > RestockThreshold`
+🔬 Can't confirm `PostShipmentStock` carries `StockingUnit` from `ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit` · `RestockThreshold` carries `StockingUnit`
+```
+
+Long `Guard:` expressions wrap to the next line in V1; they do not truncate.
+
+**Data sources:** transition row span + manifest (guard, outcome) · graph reachability · proof obligations + overlapping proof diagnostics
+
+---
+
+### `rule`
+
+```md
+⚡ Enforced after every mutation
+> Stock on hand cannot go negative
+Fields: `QuantityOnHand`
+```
+
+**Guarded variant:**
+
+```md
+⚡ Enforced when `DocumentsVerified`
+> Debt cannot exceed 3× income while verified
+Fields: `ExistingDebt`, `AnnualIncome`
+```
+
+**Proof variant:**
+
+```md
+⚠️ `PRE0114` · Gap · `ListPrice / StockingUnitsPerSaleUnit >= AverageCost`
+⚖️ Fields: `ListPrice`, `StockingUnitsPerSaleUnit`, `AverageCost`
+`ListPrice / StockingUnitsPerSaleUnit` has no known `CatalogCurrency/{StockingUnit}` · `AverageCost` carries `CatalogCurrency/{StockingUnit}`
+```
+
+**Data sources:** type checker (guard + condition spans) · proof (`ConstraintInfluenceEntry`, `ProofLedger.Obligations`) · `because` text
+
+---
+
+### `ensure`
+
+```md
+⚡ Entry gate · `Approved`
+> Cannot enter Approved with amount exceeding coverage
+Fields: `ApprovedAmount`, `CoverageLimit`
+```
+
+**Anchor variants:**
+- `in` → `⚡ Residency · <State>`
+- `to` → `⚡ Entry gate · <State>`
+- `from` → `⚡ Exit gate · <State>`
+- `on` → `⚡ Arg gate · <Event>`
+
+**Proof variant:**
+
+```md
+⚠️ `PRE0114` · Gap · `to Approved` checks `ApprovedAmount`, `CoverageLimit`
+⚖️ `ApprovedAmount` carries `CatalogCurrency`
+`CoverageLimit` carries `SupplierCurrency` · different currencies — can't compare
+```
+
+**Data sources:** ensure kind/anchor · `because` text · proof (`ConstraintInfluenceEntry`, `ProofLedger.Obligations`)
+
+---
+
+### `access`
+
+```md
+✅ Proven · write access declared in manifest
+✏️ `RestockThreshold`, `Supplier`, `SupplierCurrency`, `ListPrice`
+Also in: `LowStock` · 🔒 `Unlisted`, `Delisted`
+```
+
+**Data sources:** `AccessModes` + state set
+
+---
+
+### `omit`
+
+```md
+✅ Proven · structurally absent in `Unlisted`
+🔒 `ListPrice` does not exist here
+🔁 Restored on: `Listed`, `LowStock`
+```
+
+**Data sources:** manifest omit declarations · graph edges
+
+---
+
+### `reject`
+
+```md
+⚡ Enforced · event rejected
+> Insufficient stock to fulfill this order
+State unchanged · no changes apply
+```
+
+**Data sources:** transition row outcome + reject reason
+
+---
+
+### Qualifier (`of …`, `in …`, `to …`)
+
+```md
+⚖️ Currency · `CatalogCurrency`
+Mixed currencies or units aren't allowed
+```
+
+**Proof variant:**
+
+```md
+⚠️ Gap · currency is `CatalogCurrency`
+⚖️ Use: `GrossProfit`
+Left side of `(TotalRevenue - TotalReturns) - TotalCostOfGoods` can't be confirmed to carry `CatalogCurrency`
+```
+
+**Data sources:** `QualifierHoverInfo` · resolved qualifier + source · overlapping proof diagnostic can name the failing use in V1; declaration→use counts are deferred to V2 when a declaration→use projection exists
+
+---
+
+### Proof expression (`TypedBinaryOp`)
+
+```md
+✅ Proven · result keeps `CatalogCurrency`
+🔬 `TotalRevenue - TotalReturns`
+Left/Right: `CatalogCurrency` · Result: `CatalogCurrency`
+```
+
+**Proof variant:**
+
+```md
+⚠️ Gap · currency not proven
+🔬 `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
+Left `(TotalRevenue - TotalReturns)` has no known `CatalogCurrency` · right `TotalCostOfGoods` carries `CatalogCurrency`
+```
+
+**Data sources:** `TypedBinaryOp` · `ProofLedger.Obligations` · resolved left/right/result qualifier evidence
+
+---
+
+### Diagnostic squiggle
+
+```md
+⚠️ `PRE0114` · Can't confirm currencies match
+🔬 `GrossProfit` · `(TotalRevenue - TotalReturns) - TotalCostOfGoods`
+Left `(TotalRevenue - TotalReturns)` has no known `CatalogCurrency` · right `TotalCostOfGoods` carries `CatalogCurrency`
+```
+
+**Presence variant:**
+
+```md
+⚠️ `PRE0116` · Can't confirm presence
+🔬 `ShipmentSummary` · `TrackingNumber.length`
+`TrackingNumber` is optional · `.length` accessed without presence guard
+```
+
+**Data sources:** proof-stage diagnostic + matching obligation + proof subject resolution
+
+---
+
+## 4. Routing rules
+
+1. Proof diagnostic span wins.
+2. Smallest proof-bearing `TypedBinaryOp` wins next.
+3. Then construct cards on declaration spans.
+4. Within construct cards: `reject` beats generic transition; qualifier beats symbol hover on the qualifier span.
+5. State symbols route to the rich state card, and B4 renders inside that card rather than as a separate hover kind.
+6. Otherwise fall back to generic operator / function / type help.
+
+---
+
+## 5. V1 boundary
 
 **Available in V1:**
 - `SemanticIndex`: fields, states, events, rules, ensures, access modes, transition rows, qualifier bindings
-- Type-check results: declared type, nullability, coercions, mutation assignment safety
-- `StateGraph`: reachability, dead states, transitions, terminal reachability
-- `ProofLedger` + diagnostics: per-construct status, `ConstraintInfluenceEntry`, unresolved obligations
-- Manifest: modifiers, guard expressions, action sequences, reject reasons, omit declarations
+- type summaries: declared type, presence, qualifiers, computed-expression spans, argument signatures
+- `StateGraph`: reachability, incoming/outgoing edges, handled states, terminal reachability, and `EdgeProofStatuses`
+- `ProofLedger` + diagnostics: unresolved obligations, requirement kind, context, `ConstraintInfluenceEntry`
+- manifest snippets: guard text, action order, reject reasons, omit/access declarations
+- B4 state proof narrative: connected-edge proof verdicts projected from proof into graph data, then rendered on state hover
 
-**Not available in V1:** executable model or runtime descriptors · inspect/fire/update projections · ordered mutation summaries · qualifier-usage index · precomputed prose proof-gap text · guarded-access final write maps
+**Not available in V1:**
+- runtime `Inspect` / `Fire` / `Update` facts
+- ordered mutation summaries beyond the current row
+- declaration → use qualifier index
+- qualifier/use counts on qualifier cards (suppressed until the declaration → use projection exists)
+- authored one-line proof explanations beyond what the proof model already exposes
+- final guarded-access maps (guarded entries are omitted from V1 mutability summaries)
+- per-edge rendering of `UnresolvedObligationSummaries` inside the B4 card (the projection exists; V1 shows verdict lines only)
 
-### V2 Deferred
-
-1. Event "typical effects" summary (Frank N6, Kramer N3)
-2. Prose proof-gap text (Kramer N4)
-3. Qualifier "applied to" line — requires usage index (Kramer N7)
-4. Event-driven mutation reach on field hover (Kramer N1)
-5. Reject row ordering context (Kramer N6)
-6. Guarded-access final write maps (Kramer N5)
-7. Runtime preview integration
-
----
-
-## Implementation Notes (Kramer)
-
-### Derived projections (V1)
-- `ConstructAtPosition` — resolve hover target
-- `FieldWriteMapByState` — via `AccessModes` traversal (medium cost)
-- `ConstraintInfluenceSummary` — from `ConstraintInfluenceEntry` (medium cost)
-- `HoverStatusBadge` — from `ProofLedger.Obligations`
-
-### Helper APIs needed
-
-```csharp
-TryFindProofDiagnosticAtPosition(Compilation, Position, out Diagnostic, out ProofObligation?)
-TryFindProofBearingExpressionAtPosition(Compilation, Position, out TypedExpression, out ImmutableArray<ProofObligation>)
-ResolveQualifierEvidence(TypedExpression, QualifierAxis, Compilation) → (value, source, state)
-GetProofUsesForField(TypedField, Compilation) → open/clean use summary
-HumanizeProofStrategy(ProofStrategy)
-```
-
-> If the ledger cannot provide a truthful `Verdict` or failure explanation, the hover falls back to a precise generic explanation — never invents specificity.
-
-### Data model availability
-
-**From `Compilation`:**
-
-| Need | Status |
-|---|---|
-| Token / position context | **Available** — `Compilation.Tokens` |
-| Semantic declarations and expressions | **Available** — `Compilation.Semantics` |
-| Proof ledger | **Available** — `Compilation.Proof` |
-| Diagnostics at a span | **Available** — `RichHoverFactory.GetDiagnosticsOverlapping(...)` |
-| Proof diagnostic at cursor → matching obligation | **Not exposed as helper** — inferred by overlapping span/code; dedicated helper safer `[George verify]` |
-
-**From `SemanticIndex`:**
-
-| Need | Status |
-|---|---|
-| Field declaration qualifiers | **Available** — `TypedField.DeclaredQualifiers` |
-| Field qualifier behavior | **Available** — `TypedField.Qualifier` |
-| Binary expression proof requirements | **Available** — `TypedBinaryOp.ProofRequirements` |
-| Binary result qualifier propagation rule | **Available** — `TypedBinaryOp.ResultQualifier` (needs humanization) |
-| Smallest expression at cursor | **Available** — `SemanticExpressionLocator.TryFindExpressionAt(...)` |
-| Qualifier value resolution for expression/site | **Not public** — needs extracted resolver `[George verify]` |
-| Qualifier usage index: declaration → use sites | **Not obvious** — may need language-server helper `[George verify]` |
-| Symbolic source extraction for qualifier value | **Partial** — `RichHoverFactory.TryGetQualifierResolvedSource(...)` covers declaration cases; expression-site needs same |
-
-**From `ProofLedger`:**
-
-| Need | Status |
-|---|---|
-| Proof obligations with site + context | **Available** — `ProofLedger.Obligations` (`Requirement`, `Site`, `Context`, `Disposition`, `Strategy`, `EmittedDiagnostic`) |
-| Fault-site links | **Available** — `ProofLedger.FaultSiteLinks` |
-| Proof verdict | **Available** — `ProofDisposition` (`Proved` / `Unresolved`) |
-| Proof strategy | **Available** — `ProofStrategy?` |
-| Explicit unresolved reason text | **Not visible** — current model gives verdict not user-ready explanation `[George verify]` |
-| Stable diagnostic ↔ obligation join | **Partially inferable** — joinable by span + code + site; confirm before implementation `[George verify]` |
+> V7 assumes compact helper projections, not new runtime surfaces.
 
 ---
 
-## Open Questions
+## 6. Status
 
-1. **Inline warnings:** when a construct has a diagnostic squiggle, repeat the proof gap inline in hover? Recommendation: yes — one short sentence.
-2. **Status wording:** keep `Proof verified` / `Runtime checked` / `Unverified`? Recommendation: keep.
-3. **V1 boundary:** markdown only, or reserve hooks for richer hover actions? Recommendation: ship markdown now, shape DTOs for follow-on.
-4. **Demo mix:** show both ✅ and ⚠️ states in hover demos? Recommendation: yes — demonstrates honest status reporting.
-5. **Proof strategy line on proved hovers** — `Proof strategy: same-qualifier propagation` is valuable but implementation-forward. Confirm tone with Shane.
-6. **Qualifier hover shows open proof issues**, not just static semantics — turns a declaration-syntax hover operational. Confirm scope.
-7. **Proof hover wins over generic operator docs** — right for proof as flagship surface, but a real routing tradeoff.
+All design questions resolved — V7 is synced to shipped behavior, and B4 is now locked as-built in `29cd9938`.

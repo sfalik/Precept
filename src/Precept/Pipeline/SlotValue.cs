@@ -62,11 +62,20 @@ public sealed record ActionChainSlot(ImmutableArray<ParsedAction> Actions, Sourc
 public sealed record OutcomeSlot(ParsedOutcome Outcome, SourceSpan Span)
     : SlotValue(ConstructSlotKind.Outcome, Span);
 
-/// <summary>State name or quantifier (any).</summary>
-public sealed record StateTargetSlot(string? StateName, SourceSpan Span)
+/// <summary>State name list or quantifier (any).</summary>
+public sealed record StateTargetSlot(ImmutableArray<string> StateNames, ImmutableArray<SourceSpan> NameSpans, SourceSpan Span)
     : SlotValue(ConstructSlotKind.StateTarget, Span)
 {
-    public SourceSpan NameSpan { get; init; } = Span;
+    public StateTargetSlot(string? stateName, SourceSpan span)
+        : this(
+            stateName is null ? ImmutableArray<string>.Empty : ImmutableArray.Create(stateName),
+            stateName is null ? ImmutableArray<SourceSpan>.Empty : ImmutableArray.Create(span),
+            span)
+    {
+    }
+
+    public string? StateName => StateNames.IsDefaultOrEmpty ? null : StateNames[0];
+    public SourceSpan NameSpan => NameSpans.IsDefaultOrEmpty ? Span : NameSpans[0];
 }
 
 /// <summary>Event name (or "initial" marker).</summary>

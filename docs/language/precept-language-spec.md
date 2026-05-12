@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Incremental — grows as each compiler stage is designed and implemented |
-| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Name Binding and Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4–5 stubs (pre-implementation contracts in §0.5–0.6) |
+| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Name Binding and Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4 Graph Analyzer complete; §5 Proof Engine complete |
 | Grounding | `docs/PreceptLanguageDesign.md` (v1 spec); vision archived at `docs/archive/language-design/precept-language-vision.md` |
 | Clean room rule | References v1 grammar and keyword inventory; does not import v1 implementation details |
 
@@ -115,9 +115,7 @@ These properties are the reason the language can support tractable compile-time 
 
 ### 0.5 Graph Analyzer Design Contract
 
-> **Pre-implementation contract.** This section captures the language's requirements for
-> the graph analyzer. §4 is a stub pending implementation. These requirements define the
-> contract the implementation must satisfy.
+> **Design contract.** This section captures the language's requirements for the graph analyzer. §4 is implemented. These requirements define the contract the implementation satisfies.
 
 The compiler must build and reason over the full state transition graph at compile time. The graph is constructed from declared states, events, and transition rows. This is a first-class language requirement, not an optional optimization.
 
@@ -138,9 +136,7 @@ The graph analysis surface must support at least these reasoning capabilities:
 
 ### 0.6 Proof Engine Design Contract
 
-> **Pre-implementation contract.** This section captures the language's requirements for
-> the proof engine. §5 is a stub pending implementation. These requirements define the
-> contract the implementation must satisfy.
+> **Design contract.** This section captures the language's requirements for the proof engine. §5 is implemented. These requirements define the contract the implementation satisfies.
 
 #### Proof-system responsibilities
 
@@ -818,12 +814,17 @@ These preposition keywords parse a state target, then look ahead to select the p
 | `from` | `ensure` | state ensure (scoped to `from`) |
 | `from` | `->` | state action (exit hook) |
 
-State ensures, state actions, and access modes support an optional pre-verb `when` guard between the state target and the construct verb. Transition rows keep their guard after the event name, and `omit` declarations do not support `when`.
+```
+StateTarget  :=  Identifier ("," Identifier)* | any
+EventTarget  :=  Identifier
+```
+
+`any` remains the state wildcard. A comma-delimited `StateTarget` is pure syntactic sugar: the compiler expands it into one independent state-scoped declaration per named state, preserving source order and leaving the guard, actions, ensure body, access mode, omit target, or outcome unchanged. State ensures, state actions, and access modes support an optional pre-verb `when` guard between the state target and the construct verb. Transition rows keep their guard after the event target, and `omit` declarations do not support `when`.
 
 #### Transition row
 
 ```
-from StateTarget on Identifier ("when" BoolExpr)?
+from StateTarget on EventTarget ("when" BoolExpr)?
 ("->" ActionStatement)*
 "->" Outcome
 
@@ -847,21 +848,21 @@ Outcome  :=  transition Identifier
           |  reject StringExpr
 ```
 
-Each action and the outcome are introduced by `->`. The `->` arrow is deliberately overloaded to create a visual pipeline that reads top-to-bottom: each step in a transition — guard, actions, outcome — flows through the same arrow. The parser loops consuming `->` followed by an action keyword, and breaks out when the token after `->` is an outcome keyword.
+Each action and the outcome are introduced by `->`. The `->` arrow is deliberately overloaded to create a visual pipeline that reads top-to-bottom: each step in a transition — guard, actions, outcome — flows through the same arrow. The parser loops consuming `->` followed by an action keyword, and breaks out when the token after `->` is an outcome keyword. If `StateTarget` is a comma-delimited list, the row desugars to one independent transition row per named state; each expanded row keeps the same event target, guard, action chain, and outcome.
 
 #### State/event ensure
 
 ```
 (in|to|from) StateTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr
-on Identifier ("when" BoolExpr)? ensure BoolExpr because StringExpr
+on EventTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr
 ```
 
-The optional `when` guard is pre-verb: it appears after the state/event target and before `ensure`.
+The optional `when` guard is pre-verb: it appears after the state/event target and before `ensure`. For state-anchored ensures, a comma-delimited `StateTarget` expands to one independent ensure per named state.
 
 #### Stateless event hook
 
 ```
-on Identifier
+on EventTarget
 ("->" ActionStatement)*
 ```
 
@@ -874,7 +875,7 @@ Event handlers are the stateless `on Event -> ...` form. Once `->` appears after
 ("->" ActionStatement)*
 ```
 
-State actions support an optional `when` guard between the state target and the action chain. The guard is passed through to the AST node.
+State actions support an optional `when` guard between the state target and the action chain. The guard is passed through to the AST node. A comma-delimited `StateTarget` expands to one independent hook per named state.
 
 #### Quantifier expression grammar
 
@@ -921,7 +922,7 @@ in StateTarget omit all                                              ← state-s
 
 Root-level access mode declarations are **not valid syntax** — use the `writable` modifier on the field declaration for field-level mutability. All access mode overrides are state-scoped.
 
-State-scoped access modes (`in StateTarget`) use `modify` for constraint declarations and `omit` for structural exclusion. Guarded access modes read `in <State> when <Guard> modify <FieldTarget> readonly|editable`; the field target is either `all` or a comma-separated list of field names.
+State-scoped access modes (`in StateTarget`) use `modify` for constraint declarations and `omit` for structural exclusion. `StateTarget` may be a single state name, a comma-delimited list of state names, or `any`; comma-delimited state targets expand to one independent access-mode or omit declaration per named state. Guarded access modes read `in <StateTarget> when <Guard> modify <FieldTarget> readonly|editable`; the field target is either `all` or a comma-separated list of field names.
 
 **Composition rules:**
 1. **Field baseline** — `writable` modifier on a field declaration sets the field's default to editable across all states.
@@ -1838,13 +1839,13 @@ This is not merely a tooling convenience. It is a language-level guarantee that 
 
 ## 4. Graph Analyzer
 
-> **Status:** Stub — to be written when the graph analyzer is designed and implemented.
+> **Status:** Implemented. See [`docs/compiler/graph-analyzer.md`](../compiler/graph-analyzer.md) for implementation detail.
 
 ---
 
 ## 5. Proof Engine
 
-> **Status:** Stub — to be written when the proof engine is designed and implemented.
+> **Status:** Implemented. See [`docs/compiler/proof-engine.md`](../compiler/proof-engine.md) for implementation detail.
 
 ---
 

@@ -28,7 +28,7 @@ internal static class RichHoverFactory
         return false;
     }
 
-    internal static bool TryCreateConstructHover(Compilation compilation, Position position, out Hover hover)
+    internal static bool TryCreateHover(Compilation compilation, Position position, Token token, out Hover hover)
     {
         if (TryCreateRuleHover(compilation, position, out hover))
         {
@@ -62,12 +62,6 @@ internal static class RichHoverFactory
             return true;
         }
 
-        hover = null!;
-        return false;
-    }
-
-    internal static bool TryCreateSupplementalHover(Compilation compilation, Position position, Token token, out Hover hover)
-    {
         if (TryCreateQualifierHover(compilation, position, out hover))
         {
             return true;
@@ -80,16 +74,6 @@ internal static class RichHoverFactory
 
         hover = null!;
         return false;
-    }
-
-    internal static bool TryCreateHover(Compilation compilation, Position position, Token token, out Hover hover)
-    {
-        if (TryCreateConstructHover(compilation, position, out hover))
-        {
-            return true;
-        }
-
-        return TryCreateSupplementalHover(compilation, position, token, out hover);
     }
 
     private static bool TryCreateRuleHover(Compilation compilation, Position position, out Hover hover)
@@ -224,7 +208,7 @@ internal static class RichHoverFactory
         Hover? symbolHover = occurrence switch
         {
             FieldOccurrence field => MakeHover(CreateFieldMarkdown(compilation, field.Field), token.Span),
-            StateOccurrence state => CreateStateHover(compilation, state.State, token.Span),
+            StateOccurrence state => MakeHover(CreateStateMarkdown(compilation, state.State), token.Span),
             EventOccurrence evt => MakeHover(CreateEventMarkdown(compilation, evt.Event), token.Span),
             ArgOccurrence arg => MakeHover(CreateArgumentMarkdown(arg.Arg), token.Span),
             _ => null,
@@ -233,9 +217,6 @@ internal static class RichHoverFactory
         hover = symbolHover!;
         return symbolHover is not null;
     }
-
-    internal static Hover CreateStateHover(Compilation compilation, TypedState state, SourceSpan span) =>
-        MakeHover(CreateStateMarkdown(compilation, state), span);
 
     private static bool TryCreateProofDiagnosticHover(Compilation compilation, Position position, out Hover hover)
     {
@@ -345,17 +326,24 @@ internal static class RichHoverFactory
         QualifierCompatibilityProofRequirement requirement)
     {
         var expression = obligation.Site as TypedBinaryOp;
+        var axisName = GetQualifierDisplayName(requirement.Axis);
         var lines = new List<string>
         {
-            $"⚠️ `{FormatDiagnosticCode(diagnosticCode)}` · {GetCompactQualifierProofSummary(requirement.Axis)}",
-            FormatCompactProofContextLine(compilation, obligation),
+            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove {axisName} qualifier compatibility**",
+            $"Verdict: Cannot prove both operands resolve to the same {axisName} qualifier",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            $"Requirement: both operands must resolve to the same {axisName} qualifier",
         };
 
         if (expression is not null)
         {
-            lines.Add(FormatCompactEvidenceLine(compilation, expression.Left, expression.Right, requirement.Axis));
+            AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.Axis, obligation, includeResultLines: true);
         }
 
+        lines.Add("Status: unresolved");
+        lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression?.Left, expression?.Right, requirement.Axis)}");
+        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
         return string.Join("\n\n", lines);
     }
 
@@ -368,15 +356,21 @@ internal static class RichHoverFactory
         var expression = obligation.Site as TypedBinaryOp;
         var lines = new List<string>
         {
-            $"⚠️ `{FormatDiagnosticCode(diagnosticCode)}` · Can't confirm qualifier chain",
-            FormatCompactProofContextLine(compilation, obligation),
+            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove qualifier compatibility**",
+            $"Verdict: Cannot prove the required qualifier chain across this expression",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            $"Requirement: {DescribeQualifierChainRequirement(requirement)}",
         };
 
         if (expression is not null)
         {
-            lines.Add(FormatCompactEvidenceLine(compilation, expression.Left, expression.Right, requirement.LeftAxis, requirement.LeftAxis, requirement.RightAxis));
+            AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.LeftAxis, obligation, includeResultLines: false, leftAxis: requirement.LeftAxis, rightAxis: requirement.RightAxis);
         }
 
+        lines.Add("Status: unresolved");
+        lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression?.Left, expression?.Right, requirement.LeftAxis)}");
+        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
         return string.Join("\n\n", lines);
     }
 
@@ -387,12 +381,26 @@ internal static class RichHoverFactory
         PresenceProofRequirement requirement)
     {
         var subjectExpression = ResolveProofSubjectExpression(requirement.Subject, obligation.Site);
-        return string.Join("\n\n", new[]
+        var subject = subjectExpression is null ? DescribeProofSite(compilation, obligation.Site) : DescribeProofSite(compilation, subjectExpression);
+        var lines = new List<string>
         {
-            $"⚠️ `{FormatDiagnosticCode(diagnosticCode)}` · Can't confirm presence",
-            FormatCompactProofContextLine(compilation, obligation),
-            FormatCompactPresenceEvidenceLine(compilation, subjectExpression, obligation.Site),
-        });
+            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove presence**",
+            $"Verdict: Cannot prove `{EscapeInline(subject)}` is present before this access",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            "Requirement: optional fields must be proved present before access",
+            $"Subject: `{EscapeInline(subject)}`",
+        };
+
+        if (TryGetPresenceDescription(subjectExpression, compilation.Semantics, out var presence))
+        {
+            lines.Add($"Declared presence: {presence}");
+        }
+
+        lines.Add("Status: unresolved");
+        lines.Add("Reason: no guard or earlier assignment proves the field is set on this path");
+        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateGenericProofDiagnosticMarkdown(PreceptDiagnostic diagnostic)
@@ -424,29 +432,31 @@ internal static class RichHoverFactory
         ProofObligation obligation,
         QualifierCompatibilityProofRequirement requirement)
     {
-        var leftQualifier = ResolveQualifierFromExpression(expression.Left, requirement.Axis, compilation.Semantics);
-        var rightQualifier = ResolveQualifierFromExpression(expression.Right, requirement.Axis, compilation.Semantics);
-        var resultQualifier = ResolveQualifierFromExpression(expression, requirement.Axis, compilation.Semantics)
-            ?? leftQualifier
-            ?? rightQualifier;
-
-        if (obligation.Disposition == ProofDisposition.Proved)
+        var axisName = GetQualifierDisplayName(requirement.Axis);
+        var lines = new List<string>
         {
-            var operandQualifier = leftQualifier ?? rightQualifier ?? resultQualifier;
-            return string.Join("\n\n", new[]
+            $"**expression** `{EscapeInline(DescribeProofSite(compilation, expression))}`",
+            $"Status: {DescribeProofStatus(obligation)}",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Requirement: both operands must resolve to the same {axisName} qualifier",
+        };
+
+        AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.Axis, obligation, includeResultLines: true);
+
+        if (obligation.Disposition == ProofDisposition.Proved && obligation.Strategy is { } strategy)
+        {
+            lines.Add($"Proof strategy: {HumanizeProofStrategy(strategy)}");
+        }
+        else
+        {
+            lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression.Left, expression.Right, requirement.Axis)}");
+            if (obligation.EmittedDiagnostic is { } diagnosticCode)
             {
-                $"✅ Proven · result keeps {FormatCompactQualifierValue(resultQualifier)}",
-                FormatCompactExpressionLine(compilation, expression),
-                $"Left/Right: {FormatCompactQualifierValue(operandQualifier)} · Result: {FormatCompactQualifierValue(resultQualifier)}",
-            });
+                lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+            }
         }
 
-        return string.Join("\n\n", new[]
-        {
-            $"⚠️ Gap · {GetQualifierAxisName(requirement.Axis)} not proven",
-            FormatCompactExpressionLine(compilation, expression),
-            FormatCompactEvidenceLine(compilation, expression.Left, expression.Right, requirement.Axis),
-        });
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateQualifierChainProofExpressionMarkdown(
@@ -455,25 +465,30 @@ internal static class RichHoverFactory
         ProofObligation obligation,
         QualifierChainProofRequirement requirement)
     {
-        var leftQualifier = ResolveQualifierFromExpression(expression.Left, requirement.LeftAxis, compilation.Semantics);
-        var rightQualifier = ResolveQualifierFromExpression(expression.Right, requirement.RightAxis, compilation.Semantics);
-
-        if (obligation.Disposition == ProofDisposition.Proved)
+        var lines = new List<string>
         {
-            return string.Join("\n\n", new[]
+            $"**expression** `{EscapeInline(DescribeProofSite(compilation, expression))}`",
+            $"Status: {DescribeProofStatus(obligation)}",
+            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
+            $"Requirement: {DescribeQualifierChainRequirement(requirement)}",
+        };
+
+        AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.LeftAxis, obligation, includeResultLines: false, leftAxis: requirement.LeftAxis, rightAxis: requirement.RightAxis);
+
+        if (obligation.Disposition == ProofDisposition.Proved && obligation.Strategy is { } strategy)
+        {
+            lines.Add($"Proof strategy: {HumanizeProofStrategy(strategy)}");
+        }
+        else
+        {
+            lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression.Left, expression.Right, requirement.LeftAxis)}");
+            if (obligation.EmittedDiagnostic is { } diagnosticCode)
             {
-                "✅ Proven · qualifier chain holds",
-                FormatCompactExpressionLine(compilation, expression),
-                FormatCompactChainStatusLine(leftQualifier, rightQualifier, requirement.LeftAxis, requirement.RightAxis),
-            });
+                lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
+            }
         }
 
-        return string.Join("\n\n", new[]
-        {
-            "⚠️ Gap · qualifier chain not proven",
-            FormatCompactExpressionLine(compilation, expression),
-            FormatCompactEvidenceLine(compilation, expression.Left, expression.Right, requirement.LeftAxis, requirement.LeftAxis, requirement.RightAxis),
-        });
+        return string.Join("\n\n", lines);
     }
 
     private static string CreateGenericProofExpressionMarkdown(Compilation compilation, TypedBinaryOp expression, ProofObligation obligation)
@@ -498,138 +513,6 @@ internal static class RichHoverFactory
         return string.Join("\n\n", lines);
     }
 
-    private static string FormatCompactProofContextLine(Compilation compilation, ProofObligation obligation)
-    {
-        var context = DescribeCompactProofContext(compilation, obligation.Context);
-        var site = FormatCompactProofSite(compilation, obligation.Site);
-        return $"🔬 `{EscapeInline(context)}` · `{EscapeInline(site)}`";
-    }
-
-    private static string FormatCompactExpressionLine(Compilation compilation, TypedExpression expression) =>
-        $"🔬 `{EscapeInline(FormatCompactProofSite(compilation, expression))}`";
-
-    private static string FormatCompactEvidenceLine(
-        Compilation compilation,
-        TypedExpression left,
-        TypedExpression right,
-        QualifierAxis defaultAxis,
-        QualifierAxis? leftAxis = null,
-        QualifierAxis? rightAxis = null)
-    {
-        var resolvedLeftAxis = leftAxis ?? defaultAxis;
-        var resolvedRightAxis = rightAxis ?? defaultAxis;
-        var leftQualifier = ResolveQualifierFromExpression(left, resolvedLeftAxis, compilation.Semantics);
-        var rightQualifier = ResolveQualifierFromExpression(right, resolvedRightAxis, compilation.Semantics);
-        var leftSite = FormatCompactProofSite(compilation, left);
-        var rightSite = FormatCompactProofSite(compilation, right);
-        var sameAxis = resolvedLeftAxis == resolvedRightAxis;
-
-        if (leftQualifier is null && rightQualifier is null)
-        {
-            return sameAxis
-                ? $"Neither `{EscapeInline(leftSite)}` nor `{EscapeInline(rightSite)}` can be confirmed to carry a `{EscapeInline(GetQualifierDisplayName(resolvedLeftAxis))}` qualifier"
-                : $"Neither `{EscapeInline(leftSite)}` nor `{EscapeInline(rightSite)}` can be confirmed to carry the required qualifier chain";
-        }
-
-        if (leftQualifier is null)
-        {
-            var expected = sameAxis ? FormatCompactQualifierValue(rightQualifier) : $"`{EscapeInline(GetQualifierDisplayName(resolvedLeftAxis))}`";
-            return $"Left `{EscapeInline(leftSite)}` has no known {expected} · right `{EscapeInline(rightSite)}` carries {FormatCompactQualifierValue(rightQualifier)}";
-        }
-
-        if (rightQualifier is null)
-        {
-            var expected = sameAxis ? FormatCompactQualifierValue(leftQualifier) : $"`{EscapeInline(GetQualifierDisplayName(resolvedRightAxis))}`";
-            return $"Left `{EscapeInline(leftSite)}` carries {FormatCompactQualifierValue(leftQualifier)} · right `{EscapeInline(rightSite)}` has no known {expected}";
-        }
-
-        if (!AreEquivalentQualifiers(leftQualifier, rightQualifier))
-        {
-            var mismatch = sameAxis
-                ? $"different {GetQualifierAxisName(resolvedLeftAxis)} qualifiers"
-                : $"required {GetQualifierAxisName(resolvedLeftAxis)}/{GetQualifierAxisName(resolvedRightAxis)} chain does not match";
-            return $"Left `{EscapeInline(leftSite)}` carries {FormatCompactQualifierValue(leftQualifier)} · right `{EscapeInline(rightSite)}` carries {FormatCompactQualifierValue(rightQualifier)} — {mismatch}";
-        }
-
-        return sameAxis
-            ? $"Left `{EscapeInline(leftSite)}` and right `{EscapeInline(rightSite)}` both carry {FormatCompactQualifierValue(leftQualifier)}"
-            : $"Left `{EscapeInline(leftSite)}` carries {FormatCompactQualifierValue(leftQualifier)} · right `{EscapeInline(rightSite)}` carries {FormatCompactQualifierValue(rightQualifier)}";
-    }
-
-    private static string FormatCompactPresenceEvidenceLine(Compilation compilation, TypedExpression? subjectExpression, TypedExpression site)
-    {
-        var subject = subjectExpression is null ? FormatCompactProofSite(compilation, site) : FormatCompactProofSite(compilation, subjectExpression);
-        var presenceLead = TryGetPresenceDescription(subjectExpression, compilation.Semantics, out var presence)
-            ? $"`{EscapeInline(subject)}` is {presence}"
-            : $"`{EscapeInline(subject)}` may be absent";
-        var siteText = FormatCompactProofSite(compilation, site);
-        var accessText = siteText.StartsWith(subject, StringComparison.Ordinal) && siteText.Length > subject.Length
-            ? siteText[subject.Length..]
-            : siteText;
-
-        return string.IsNullOrWhiteSpace(accessText) || string.Equals(accessText, subject, StringComparison.Ordinal)
-            ? $"{presenceLead} · used without presence guard"
-            : $"{presenceLead} · `{EscapeInline(accessText)}` accessed without presence guard";
-    }
-
-    private static string FormatCompactChainStatusLine(
-        DeclaredQualifierMeta? leftQualifier,
-        DeclaredQualifierMeta? rightQualifier,
-        QualifierAxis leftAxis,
-        QualifierAxis rightAxis)
-    {
-        var leftLabel = leftAxis == rightAxis ? "Left" : $"Left {GetQualifierDisplayName(leftAxis)}";
-        var rightLabel = leftAxis == rightAxis ? "Right" : $"Right {GetQualifierDisplayName(rightAxis)}";
-        return $"{leftLabel}: {FormatCompactQualifierValue(leftQualifier)} · {rightLabel}: {FormatCompactQualifierValue(rightQualifier)}";
-    }
-
-    private static string FormatCompactProofSite(Compilation compilation, TypedExpression expression) =>
-        FormatCompactProofSiteText(DescribeProofSite(compilation, expression));
-
-    private static string FormatCompactProofSiteText(string site) =>
-        site.Replace(" . ", ".", StringComparison.Ordinal);
-
-    private static string FormatCompactQualifierValue(DeclaredQualifierMeta? qualifier)
-    {
-        if (qualifier is null)
-        {
-            return "`<unresolved>`";
-        }
-
-        if (TryDescribeQualifierSource(qualifier, TypeKind.Error, out var source)
-            && source.IsFieldSource
-            && !string.IsNullOrWhiteSpace(source.FieldName))
-        {
-            return $"`{EscapeInline(source.FieldName)}`";
-        }
-
-        return FormatResolvedQualifierValue(qualifier);
-    }
-
-    private static string GetCompactQualifierProofSummary(QualifierAxis axis) => axis switch
-    {
-        QualifierAxis.Currency => "Can't confirm currencies match",
-        QualifierAxis.Unit => "Can't confirm units match",
-        QualifierAxis.Dimension => "Can't confirm dimensions match",
-        QualifierAxis.FromCurrency => "Can't confirm source currencies match",
-        QualifierAxis.ToCurrency => "Can't confirm target currencies match",
-        QualifierAxis.Timezone => "Can't confirm timezones match",
-        QualifierAxis.TemporalDimension => "Can't confirm temporal dimensions match",
-        QualifierAxis.TemporalUnit => "Can't confirm temporal units match",
-        _ => "Can't confirm qualifiers match",
-    };
-
-    private static string DescribeCompactProofContext(Compilation compilation, ObligationContext context) => context switch
-    {
-        FieldExpressionContext fieldContext => fieldContext.Field.Name,
-        TransitionRowContext transitionContext => FormatTransitionHeader(transitionContext.Row),
-        ConstraintContext constraintContext => DescribeConstraint(compilation, constraintContext.Constraint),
-        EventHandlerContext eventHandlerContext => eventHandlerContext.Handler.EventName,
-        StateHookContext stateHookContext => $"{stateHookContext.Hook.Scope.ToString().ToLowerInvariant()} {stateHookContext.Hook.StateName}",
-        _ => DescribeProofContext(compilation, context),
-    };
-
-    // Kept for qualifier/detail surfaces; compact proof cards use FormatCompactEvidenceLine.
     private static void AppendQualifierProofEvidenceLines(
         List<string> lines,
         Compilation compilation,
@@ -1047,12 +930,7 @@ internal static class RichHoverFactory
         else if (!compilation.Semantics.States.IsEmpty)
         {
             var writeMap = GetFieldWriteMapByState(compilation, field);
-            if (!writeMap.WritableStates.IsEmpty)
-            {
-                lines.Add(writeMap.LockedStates.IsEmpty
-                    ? $"Writable: {FormatCodeList(writeMap.WritableStates)}"
-                    : $"Writable: {FormatCodeList(writeMap.WritableStates)} · Read-only: {FormatCodeList(writeMap.LockedStates)}");
-            }
+            lines.Add($"Writable: {FormatCodeList(writeMap.WritableStates)} · Read-only: {FormatCodeList(writeMap.LockedStates)}");
         }
 
         lines.Add($"Governed by: {FormatConstraintGovernance(compilation, field.Name)}");
@@ -1062,7 +940,12 @@ internal static class RichHoverFactory
     private static string CreateStateMarkdown(Compilation compilation, TypedState state)
     {
         var graphState = compilation.Graph.States.FirstOrDefault(candidate => string.Equals(candidate.Name, state.Name, StringComparison.Ordinal));
-        var reachabilityDetail = DescribeStateReachability(compilation, state, graphState);
+        var detail = DescribeStateReachability(compilation, state, graphState);
+        var statusKind = HasConstructDiagnostics(compilation, state.NameSpan) || graphState is null || !graphState.IsReachable
+            ? HoverStatusKind.Unverified
+            : HoverStatusKind.ProofVerified;
+        var status = new HoverStatusBadge(statusKind, detail);
+
         var modifiers = state.Modifiers.IsDefaultOrEmpty ? "*none*" : FormatCodeList(state.Modifiers.Select(FormatModifierName));
         var incoming = compilation.Graph.Edges
             .Where(edge => string.Equals(edge.ToState, state.Name, StringComparison.Ordinal))
@@ -1077,27 +960,10 @@ internal static class RichHoverFactory
         var writable = GetWritableFieldsForState(compilation, state.Name);
         var activeEnsures = GetEnsuresForState(compilation, state.Name);
         var unverifiedEnsures = activeEnsures.Count(entry => HasUnresolvedConstraint(compilation, entry.Identity));
-        var edgeProofStatuses = GetEdgeProofStatusesForState(compilation, state.Name);
-        var unresolvedEdgeCount = edgeProofStatuses.Count(status => !status.IsProven);
         var terminalReachable = IsTerminalReachable(compilation.Graph, state.Name);
         var titleSuffix = state.Modifiers.IsDefaultOrEmpty
             ? string.Empty
             : $" · {FormatCodeList(state.Modifiers.Select(FormatModifierName))}";
-        var statusDetail = graphState is null || !graphState.IsReachable
-            ? reachabilityDetail
-            : unresolvedEdgeCount > 0
-                ? $"{unresolvedEdgeCount} connected edge{Pluralize(unresolvedEdgeCount)} can't be proven"
-                : unverifiedEnsures > 0
-                    ? $"{unverifiedEnsures} ensure{Pluralize(unverifiedEnsures)} unverified"
-                    : reachabilityDetail;
-        var statusKind = HasConstructDiagnostics(compilation, state.NameSpan)
-            || graphState is null
-            || !graphState.IsReachable
-            || unresolvedEdgeCount > 0
-            || unverifiedEnsures > 0
-            ? HoverStatusKind.Unverified
-            : HoverStatusKind.ProofVerified;
-        var status = new HoverStatusBadge(statusKind, statusDetail);
 
         var lines = new List<string>
         {
@@ -1106,15 +972,9 @@ internal static class RichHoverFactory
             $"Modifiers: {modifiers}",
             $"Incoming: {FormatCodeList(incoming)}",
             $"Outgoing: {FormatCodeList(outgoing)}",
-            CreateStateGraphEdgeProofCard(state, edgeProofStatuses),
+            $"Writable here: {FormatCodeList(writable)}",
+            $"{(terminalReachable ? "Terminal reachable" : "No terminal path")} · active ensures: {activeEnsures.Length}{(unverifiedEnsures > 0 ? $" ({unverifiedEnsures} unverified)" : string.Empty)}",
         };
-
-        if (!writable.IsEmpty)
-        {
-            lines.Add($"Writable here: {FormatCodeList(writable)}");
-        }
-
-        lines.Add($"{(terminalReachable ? "Terminal reachable" : "No terminal path")} · active ensures: {activeEnsures.Length}{(unverifiedEnsures > 0 ? $" ({unverifiedEnsures} unverified)" : string.Empty)}");
 
         return string.Join("\n\n", lines);
     }
@@ -1709,38 +1569,6 @@ internal static class RichHoverFactory
                 && context.Row.RowSpan == row.RowSpan)
             .ToImmutableArray();
 
-    private static ImmutableArray<EdgeProofStatus> GetEdgeProofStatusesForState(Compilation compilation, string stateName) =>
-        compilation.Graph.EdgeProofStatuses
-            .Where(status => string.Equals(status.FromState, stateName, StringComparison.Ordinal)
-                || string.Equals(status.ToState, stateName, StringComparison.Ordinal))
-            .GroupBy(status => (status.FromState, status.EventName, status.ToState))
-            .Select(group => group.First())
-            .ToImmutableArray();
-
-    private static string CreateStateGraphEdgeProofCard(TypedState state, ImmutableArray<EdgeProofStatus> edgeProofStatuses)
-    {
-        var lines = new List<string>
-        {
-            $"📍 {EscapePlain(state.Name)} graph position",
-        };
-
-        var gaps = edgeProofStatuses
-            .Where(status => !status.IsProven)
-            .ToImmutableArray();
-
-        if (!gaps.IsEmpty)
-        {
-            lines.AddRange(gaps.Select(status =>
-                $"⚠️ Gap · {EscapePlain(status.FromState)} --{EscapePlain(status.EventName)}--> {EscapePlain(status.ToState)} can't be proven"));
-            return string.Join("\n\n", lines);
-        }
-
-        lines.Add(edgeProofStatuses.IsEmpty
-            ? "✅ Proven · no connected edges carry proof obligations"
-            : "✅ Proven · all connected edges satisfy their proof obligations");
-        return string.Join("\n\n", lines);
-    }
-
     private static ImmutableArray<(TypedEnsure Ensure, EnsureIdentity Identity)> GetEnsuresForState(Compilation compilation, string stateName) =>
         compilation.Semantics.Ensures
             .Select((ensure, index) => (Ensure: ensure, Identity: new EnsureIdentity(ensure.Kind, ensure.AnchorState ?? ensure.AnchorEvent, index)))
@@ -1761,21 +1589,15 @@ internal static class RichHoverFactory
             return new FieldWriteMap(ImmutableArray<string>.Empty, ImmutableArray<string>.Empty);
         }
 
-        var allAccesses = GetAccessDeclarations(compilation);
-        var unconditionalAccesses = allAccesses
-            .Where(access => !access.IsGuarded)
-            .ToImmutableArray();
-
-        var hasGuardedAccess = allAccesses.Any(access => access.IsGuarded && access.FieldNames.Contains(field.Name, StringComparer.Ordinal));
-
+        var accesses = GetAccessDeclarations(compilation);
         ImmutableArray<string> writableStates;
-        if (allAccesses.Length == 0 && field.Modifiers.Contains(ModifierKind.Writable))
+        if (accesses.Length == 0 && field.Modifiers.Contains(ModifierKind.Writable))
         {
             writableStates = states;
         }
         else
         {
-            writableStates = unconditionalAccesses
+            writableStates = accesses
                 .Where(access => access.Mode == ModifierKind.Write
                     && access.FieldNames.Contains(field.Name, StringComparer.Ordinal))
                 .Select(access => access.StateName)
@@ -1783,19 +1605,15 @@ internal static class RichHoverFactory
                 .ToImmutableArray();
         }
 
-        var lockedStates = writableStates.IsEmpty || hasGuardedAccess
-            ? ImmutableArray<string>.Empty
-            : states.Where(state => !writableStates.Contains(state, StringComparer.Ordinal)).ToImmutableArray();
+        var writableSet = writableStates.ToImmutableHashSet(StringComparer.Ordinal);
+        var lockedStates = states.Where(state => !writableSet.Contains(state)).ToImmutableArray();
         return new FieldWriteMap(writableStates, lockedStates);
     }
 
     private static ImmutableArray<string> GetWritableFieldsForState(Compilation compilation, string stateName)
     {
-        var allAccesses = GetAccessDeclarations(compilation);
-        var accesses = allAccesses
-            .Where(access => !access.IsGuarded
-                && access.Mode == ModifierKind.Write
-                && string.Equals(access.StateName, stateName, StringComparison.Ordinal))
+        var accesses = GetAccessDeclarations(compilation)
+            .Where(access => access.Mode == ModifierKind.Write && string.Equals(access.StateName, stateName, StringComparison.Ordinal))
             .SelectMany(access => access.FieldNames)
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
@@ -1803,11 +1621,6 @@ internal static class RichHoverFactory
         if (!accesses.IsEmpty)
         {
             return accesses;
-        }
-
-        if (allAccesses.Length != 0)
-        {
-            return ImmutableArray<string>.Empty;
         }
 
         return compilation.Semantics.Fields
@@ -1832,7 +1645,7 @@ internal static class RichHoverFactory
         }
 
         var label = FormatSnippet(compilation, access.Syntax.Span);
-        return new AccessDeclarationInfo(access.StateName, fieldNames, access.Mode, access.Guard is not null, access.Syntax.Span, label);
+        return new AccessDeclarationInfo(access.StateName, fieldNames, access.Mode, access.Syntax.Span, label);
     }
 
     private static ImmutableArray<OmitDeclarationInfo> GetOmitDeclarations(Compilation compilation) =>
@@ -2396,7 +2209,6 @@ internal static class RichHoverFactory
         string StateName,
         ImmutableArray<string> FieldNames,
         ModifierKind Mode,
-        bool IsGuarded,
         SourceSpan Span,
         string Label);
 

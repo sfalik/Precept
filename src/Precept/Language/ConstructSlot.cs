@@ -15,7 +15,7 @@ public enum ConstructSlotKind
     GuardClause       =  7, // "when expression"
     ActionChain       =  8, // "-> action -> action" chain
     Outcome           =  9, // "-> transition State | -> no transition | -> reject 'reason'"
-    StateTarget       = 10, // state name or quantifier (any)
+    StateTarget       = 10, // state name, "any", or comma-delimited list of state names
     EventTarget       = 11, // event name (or "initial" marker)
     EnsureClause      = 12, // "ensure expression"
     BecauseClause     = 13, // "because message"

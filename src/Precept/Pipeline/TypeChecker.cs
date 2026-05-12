@@ -680,8 +680,8 @@ internal static partial class TypeChecker
     {
         foreach (var construct in manifest.ByKind[ConstructKind.TransitionRow])
         {
-            var row = NormalizeTransitionRow(construct, ctx);
-            ctx.TransitionRows.Add(row);
+            var rows = NormalizeTransitionRow(construct, ctx);
+            ctx.TransitionRows.AddRange(rows);
         }
 
         // D26: if any TypedErrorExpression in transition rows → at least one Error diagnostic must exist
@@ -772,24 +772,7 @@ internal static partial class TypeChecker
             foreach (var construct in manifest.ByKind[ConstructKind.StateEnsure])
             {
                 var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
-                string? anchorState = null;
-                if (stateSlot?.StateName is not null)
-                {
-                    if (HasKeywordTokenMeta(stateSlot.StateName, meta => meta.IsStateWildcard))
-                    {
-                        anchorState = null;
-                    }
-                    else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
-                    {
-                        anchorState = typedState.Name;
-                        ctx.StateReferences.Add(new StateReference(typedState, stateSlot.NameSpan));
-                    }
-                    else
-                    {
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.NameSpan, stateSlot.StateName));
-                    }
-                }
+                var anchorStates = ResolveStateTargets(stateSlot, ctx);
 
                 // Determine constraint kind from leading token (catalog-driven; fallback stays resident)
                 var constraintKind = construct.LeadingTokenKind is { } leadingToken
@@ -808,18 +791,21 @@ internal static partial class TypeChecker
                     ? new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span)
                     : new TypedLiteral(TypeKind.String, "", construct.Span);
 
-                ctx.Ensures.Add(new TypedEnsure(
-                    Kind: constraintKind,
-                    AnchorState: anchorState,
-                    AnchorEvent: null,
-                    Condition: condition,
-                    Guard: null,
-                    Message: message,
-                    Syntax: construct));
-                ctx.ConstraintRefs.Add(new ConstraintFieldRefs(
-                    new EnsureIdentity(constraintKind, anchorState, ctx.Ensures.Count - 1),
-                    CollectFieldRefs(condition).Distinct().ToImmutableArray(),
-                    CollectArgRefs(condition).Distinct().ToImmutableArray()));
+                foreach (var anchorState in anchorStates)
+                {
+                    ctx.Ensures.Add(new TypedEnsure(
+                        Kind: constraintKind,
+                        AnchorState: anchorState.StateName,
+                        AnchorEvent: null,
+                        Condition: condition,
+                        Guard: null,
+                        Message: message,
+                        Syntax: construct));
+                    ctx.ConstraintRefs.Add(new ConstraintFieldRefs(
+                        new EnsureIdentity(constraintKind, anchorState.StateName, ctx.Ensures.Count - 1),
+                        CollectFieldRefs(condition).Distinct().ToImmutableArray(),
+                        CollectArgRefs(condition).Distinct().ToImmutableArray()));
+                }
             }
         }
 
@@ -893,6 +879,62 @@ internal static partial class TypeChecker
     private static bool HasKeywordTokenMeta(string text, Func<TokenMeta, bool> predicate) =>
         Tokens.Keywords.TryGetValue(text, out var kind) && predicate(Tokens.GetMeta(kind));
 
+    private readonly record struct ResolvedStateTarget(string? StateName, SourceSpan Span);
+
+    private static ImmutableArray<ResolvedStateTarget> ResolveStateTargets(StateTargetSlot? stateSlot, CheckContext ctx)
+    {
+        if (stateSlot is null || stateSlot.StateNames.IsDefaultOrEmpty)
+            return [new ResolvedStateTarget(null, stateSlot?.Span ?? SourceSpan.Missing)];
+
+        var wildcardEntries = ImmutableArray.CreateBuilder<ResolvedStateTarget>();
+        for (var i = 0; i < stateSlot.StateNames.Length; i++)
+        {
+            var stateName = stateSlot.StateNames[i];
+            var nameSpan = i < stateSlot.NameSpans.Length ? stateSlot.NameSpans[i] : stateSlot.NameSpan;
+            if (HasKeywordTokenMeta(stateName, meta => meta.IsStateWildcard))
+                wildcardEntries.Add(new ResolvedStateTarget(null, nameSpan));
+        }
+
+        if (wildcardEntries.Count > 0)
+        {
+            if (wildcardEntries.Count != stateSlot.StateNames.Length)
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.StateListContainsWildcard, wildcardEntries[0].Span));
+                return ImmutableArray<ResolvedStateTarget>.Empty;
+            }
+
+            return [wildcardEntries[0]];
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var builder = ImmutableArray.CreateBuilder<ResolvedStateTarget>(stateSlot.StateNames.Length);
+        for (var i = 0; i < stateSlot.StateNames.Length; i++)
+        {
+            var stateName = stateSlot.StateNames[i];
+            var nameSpan = i < stateSlot.NameSpans.Length ? stateSlot.NameSpans[i] : stateSlot.NameSpan;
+            if (!seen.Add(stateName))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.DuplicateStateInList, nameSpan, stateName));
+                continue;
+            }
+
+            if (ctx.StateLookup.TryGetValue(stateName, out var typedState))
+            {
+                builder.Add(new ResolvedStateTarget(typedState.Name, nameSpan));
+                ctx.StateReferences.Add(new StateReference(typedState, nameSpan));
+            }
+            else
+            {
+                builder.Add(new ResolvedStateTarget(stateName, nameSpan));
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.UndeclaredState, nameSpan, stateName));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
     private static void PopulateAccessModes(ConstructManifest manifest, CheckContext ctx)
     {
         if (!manifest.ByKind.Contains(ConstructKind.AccessMode))
@@ -902,25 +944,7 @@ internal static partial class TypeChecker
         {
             // —— State reference ——
             var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
-            string stateName = "";
-            if (stateSlot?.StateName is not null)
-            {
-                if (HasKeywordTokenMeta(stateSlot.StateName, meta => meta.IsStateWildcard))
-                {
-                    stateName = stateSlot.StateName;
-                }
-                else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
-                {
-                    stateName = typedState.Name;
-                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.NameSpan));
-                }
-                else
-                {
-                    stateName = stateSlot.StateName;
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.NameSpan, stateSlot.StateName));
-                }
-            }
+            var resolvedStates = ResolveStateTargets(stateSlot, ctx);
 
             // —— Field reference ——
             var fieldSlot = construct.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
@@ -968,12 +992,15 @@ internal static partial class TypeChecker
                 }
             }
 
-            ctx.AccessModes.Add(new TypedAccessMode(
-                StateName: stateName,
-                FieldName: fieldName,
-                Mode: mode,
-                Guard: guard,
-                Syntax: construct));
+            foreach (var resolvedState in resolvedStates)
+            {
+                ctx.AccessModes.Add(new TypedAccessMode(
+                    StateName: resolvedState.StateName ?? stateSlot?.StateName ?? "",
+                    FieldName: fieldName,
+                    Mode: mode,
+                    Guard: guard,
+                    Syntax: construct));
+            }
         }
     }
 
@@ -990,25 +1017,7 @@ internal static partial class TypeChecker
         {
             // —— State reference ——
             var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
-            string stateName = "";
-            if (stateSlot?.StateName is not null)
-            {
-                if (HasKeywordTokenMeta(stateSlot.StateName, meta => meta.IsStateWildcard))
-                {
-                    stateName = stateSlot.StateName;
-                }
-                else if (ctx.StateLookup.TryGetValue(stateSlot.StateName, out var typedState))
-                {
-                    stateName = typedState.Name;
-                    ctx.StateReferences.Add(new StateReference(typedState, stateSlot.NameSpan));
-                }
-                else
-                {
-                    stateName = stateSlot.StateName;
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.UndeclaredState, stateSlot.NameSpan, stateSlot.StateName));
-                }
-            }
+            var resolvedStates = ResolveStateTargets(stateSlot, ctx);
 
             // —— Hook scope from leading token (catalog-driven; fallback stays OnEntry) ——
             var scope = construct.LeadingTokenKind is { } leadingToken
@@ -1030,12 +1039,15 @@ internal static partial class TypeChecker
                 actions = builder.MoveToImmutable();
             }
 
-            ctx.StateHooks.Add(new TypedStateHook(
-                Scope: scope,
-                StateName: stateName,
-                Guard: guard,
-                Actions: actions,
-                Syntax: construct));
+            foreach (var resolvedState in resolvedStates)
+            {
+                ctx.StateHooks.Add(new TypedStateHook(
+                    Scope: scope,
+                    StateName: resolvedState.StateName ?? stateSlot?.StateName ?? "",
+                    Guard: guard,
+                    Actions: actions,
+                    Syntax: construct));
+            }
         }
     }
 
@@ -1080,30 +1092,15 @@ internal static partial class TypeChecker
         }
     }
 
-    /// <summary>Normalize a transition row construct into a <see cref="TypedTransitionRow"/>.</summary>
-    private static TypedTransitionRow NormalizeTransitionRow(ParsedConstruct construct, CheckContext ctx)
+    /// <summary>Normalize a transition row construct into one or more <see cref="TypedTransitionRow"/> values.</summary>
+    private static ImmutableArray<TypedTransitionRow> NormalizeTransitionRow(ParsedConstruct construct, CheckContext ctx)
     {
         // —— FromState resolution ——
         var stateTargetSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
-        string? fromState = null;
-        if (stateTargetSlot is not null && stateTargetSlot.StateName is not null)
-        {
-            if (HasKeywordTokenMeta(stateTargetSlot.StateName, meta => meta.IsStateWildcard))
-            {
-                fromState = null;
-            }
-            else if (ctx.StateLookup.TryGetValue(stateTargetSlot.StateName, out var fromTypedState))
-            {
-                fromState = fromTypedState.Name;
-                ctx.StateReferences.Add(new StateReference(fromTypedState, stateTargetSlot.NameSpan));
-            }
-            else
-            {
-                ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.UndeclaredState, stateTargetSlot.NameSpan, stateTargetSlot.StateName));
-            }
-        }
-        // StateName == null or wildcard token text → any-state wildcard (D10): FromState stays null, no error
+        var fromStates = ResolveStateTargets(stateTargetSlot, ctx)
+            .Select(state => state.StateName)
+            .ToImmutableArray();
+        // Empty list or wildcard token text → any-state wildcard (D10): FromState stays null, no error
 
         // —— Event resolution ——
         var eventTargetSlot = construct.GetRequiredSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
@@ -1199,17 +1196,23 @@ internal static partial class TypeChecker
                 }
             }
 
-            return new TypedTransitionRow(
-                FromState: fromState,
-                EventName: eventName,
-                TargetState: targetState,
-                Guard: guard,
-                Actions: actions,
-                Outcome: outcome,
-                RejectReason: rejectReason,
-                ResultQualifier: null,
-                RowSpan: construct.Span,
-                Syntax: construct);
+            var rowBuilder = ImmutableArray.CreateBuilder<TypedTransitionRow>(fromStates.Length);
+            foreach (var fromState in fromStates)
+            {
+                rowBuilder.Add(new TypedTransitionRow(
+                    FromState: fromState,
+                    EventName: eventName,
+                    TargetState: targetState,
+                    Guard: guard,
+                    Actions: actions,
+                    Outcome: outcome,
+                    RejectReason: rejectReason,
+                    ResultQualifier: null,
+                    RowSpan: construct.Span,
+                    Syntax: construct));
+            }
+
+            return rowBuilder.MoveToImmutable();
         }
         finally
         {

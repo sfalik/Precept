@@ -8,7 +8,6 @@ public sealed record class StateGraph(
     ImmutableArray<GraphState> States,
     ImmutableArray<GraphEvent> Events,
     ImmutableArray<GraphEdge> Edges,
-    ImmutableArray<EdgeProofStatus> EdgeProofStatuses,
     ImmutableHashSet<string> ReachableStates,
     ImmutableHashSet<string> UnreachableStates,
     ImmutableArray<DominanceFact> Dominance,
@@ -23,7 +22,6 @@ public sealed record class StateGraph(
         States: ImmutableArray<GraphState>.Empty,
         Events: ImmutableArray<GraphEvent>.Empty,
         Edges: ImmutableArray<GraphEdge>.Empty,
-        EdgeProofStatuses: ImmutableArray<EdgeProofStatus>.Empty,
         ReachableStates: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
         UnreachableStates: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
         Dominance: ImmutableArray<DominanceFact>.Empty,
@@ -55,14 +53,6 @@ public sealed record GraphEdge(
     string ToState,
     bool HasGuard,
     TransitionRowOutcome Outcome
-);
-
-public sealed record EdgeProofStatus(
-    string FromState,
-    string EventName,
-    string ToState,
-    bool IsProven,
-    ImmutableArray<string> UnresolvedObligationSummaries
 );
 
 public sealed record DominanceFact(

@@ -48,7 +48,7 @@ There are no per-construct AST node types. The traditional N construct kinds × 
 | `GuardClauseSlot` | `ParsedExpression` (typed DU) |
 | `ActionChainSlot` | `ImmutableArray<ActionKind>` |
 | `OutcomeSlot` | `ParsedOutcome` (typed DU) |
-| `StateTargetSlot` | `string?` — target state name |
+| `StateTargetSlot` | `ImmutableArray<string>` + `ImmutableArray<SourceSpan>` — target state names with per-name spans (`any` remains a single wildcard entry) |
 | `EventTargetSlot` | `string?` — target event name |
 | `EnsureClauseSlot` | `ParsedExpression` (typed DU) |
 | `BecauseClauseSlot` | `string` — diagnostic message |
@@ -170,8 +170,8 @@ The `RoutingFamily` enum classifies how constructs are identified:
 |--------|-------------|---------|
 | `Header` | Unique in preamble position | `precept` |
 | `Direct` | Unique leading token | `field`, `state`, `event`, `rule` |
-| `StateScoped` | Shared leading token, disambiguation by peek | `from`/`in`/`to` constructs |
-| `EventScoped` | Shared leading token, disambiguation by peek | `on` constructs |
+| `StateScoped` | Shared leading token, disambiguation by scanned family verb | `from`/`in`/`to` constructs |
+| `EventScoped` | Shared leading token, disambiguation by scoped family verb | `on` constructs |
 
 For `StateScoped` and `EventScoped`, the parser consults `DisambiguationEntry.DisambiguationTokens` via the construct's `Entries` property to select the correct construct.
 
@@ -181,23 +181,24 @@ When multiple constructs share a leading token:
 
 ```
 candidates := constructs with this leading token
+disambiguationToken := resolveDisambiguationToken(candidates)
 for each candidate:
     disambiguationTokens := candidate.Meta.Entries.DisambiguationTokens
-    if peek(2) in disambiguationTokens:
+    if disambiguationToken.Kind in disambiguationTokens:
         return parseConstruct(candidate)
 report ambiguous construct
 ```
 
-The offset and token set come from catalog metadata — the parser contains no hardcoded disambiguation logic.
+The disambiguation token set comes from catalog metadata. The parser computes where to look based on routing family and slot shape: EventScoped constructs still resolve at fixed offset 2, while StateScoped constructs scan past the full `StateTarget` (`any` or `Identifier ("," Identifier)*`) before considering the family verb.
 
-> **Decision (2026-05-06): Disambiguation offset is structurally invariant at 2.** All `StateScoped` and `EventScoped` constructs follow the grammar pattern `[leading-token @ offset 0] [anchor-name @ offset 1] [disambiguation-token @ offset 2]`. The parser peeks at `peek(2)` to read the disambiguation token and matches it against `DisambiguationEntry.DisambiguationTokens`. No `Offset` field is needed on `DisambiguationEntry` because:
+> **Decision (2026-05-12): StateScoped disambiguation is variable-offset; EventScoped disambiguation remains offset-2.** No `Offset` field is needed on `DisambiguationEntry` because:
 >
-> 1. Every StateScoped construct's first slot is `StateTarget` (a single identifier).
-> 2. Every EventScoped construct's first slot is `EventTarget` (a single identifier).
-> 3. The anchor name is always exactly one token after the leading keyword.
-> 4. Therefore the disambiguation token is always at position 2 in the lookahead window.
+> 1. Every EventScoped construct's first slot is `EventTarget` (a single identifier), so its disambiguation token remains `peek(2)`.
+> 2. Every StateScoped construct's first slot is `StateTarget`, which may be `any`, a single identifier, or a comma-delimited identifier list.
+> 3. The parser can derive the initial disambiguation offset by scanning the authored `StateTarget`, then—when applicable—scan forward past pre-verb `when <expr>` to the first family verb.
+> 4. The token *set* still comes from `DisambiguationEntry.DisambiguationTokens`; only the StateScoped offset is computed rather than fixed.
 >
-> Evidence: `Constructs.cs` construct entries confirm the slot pattern — `TransitionRow`(`from <state> on ...`), `StateEnsure`(`in <state> ensure ...`), `AccessMode`(`in <state> modify ...`), `OmitDeclaration`(`in <state> omit ...`), `StateAction`(`to <state> -> ...`), `EventEnsure`(`on <event> ensure ...`), `EventHandler`(`on <event> -> ...`). All follow offset-2 invariant.
+> Evidence: `Parser.GetDisambiguationTokenOffset(...)` scans comma-delimited state targets, and `Parser.ResolveDisambiguationToken(...)` scans past optional pre-verb guards to the family verb (`on`, `ensure`, `modify`, `omit`, `->`).
 
 ### Slot Walking
 
@@ -226,8 +227,8 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 | `GuardClause` | Parse `when` expression via Pratt parser → `ParsedExpression` |
 | `ActionChain` | Parse action keywords via `Actions` catalog |
 | `Outcome` | Parse `-> transition/no transition/reject` → `ParsedOutcome` |
-| `StateTarget` | Parse optional state name after `to` |
-| `EventTarget` | Parse optional event name after `fire` |
+| `StateTarget` | Parse `any` or one/more comma-delimited state names after a scoped preposition |
+| `EventTarget` | Parse event name after `on` |
 | `EnsureClause` | Parse `ensure` expression via Pratt parser → `ParsedExpression` |
 | `BecauseClause` | Parse `because "message"` |
 | `AccessModeKeyword` | Capture access mode span |

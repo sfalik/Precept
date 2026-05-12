@@ -26,7 +26,7 @@ public static class Constructs
     private static readonly ConstructSlot SlotPreVerbGuardModify   = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Modify]);
     private static readonly ConstructSlot SlotActionChain          = new(ConstructSlotKind.ActionChain,        IsRequired: false);
     private static readonly ConstructSlot SlotOutcome           = new(ConstructSlotKind.Outcome);
-    private static readonly ConstructSlot SlotStateTarget       = new(ConstructSlotKind.StateTarget);
+    private static readonly ConstructSlot SlotStateTarget       = new(ConstructSlotKind.StateTarget,        Description: "single state name, `any` for all states, or comma-delimited list of state names");
     private static readonly ConstructSlot SlotOptStateTarget    = new(ConstructSlotKind.StateTarget,        IsRequired: false);
     private static readonly ConstructSlot SlotEventTarget       = new(ConstructSlotKind.EventTarget);
     private static readonly ConstructSlot SlotEnsureClause      = new(ConstructSlotKind.EnsureClause,       TerminationTokens: [TokenKind.Because]);

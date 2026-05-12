@@ -155,6 +155,18 @@ public class DiagnosticsTests
     }
 
     [Fact]
+    public void StateListContainsWildcard_HasErrorSeverity()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.StateListContainsWildcard).Severity.Should().Be(Severity.Error);
+    }
+
+    [Fact]
+    public void DuplicateStateInList_HasWarningSeverity()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.DuplicateStateInList).Severity.Should().Be(Severity.Warning);
+    }
+
+    [Fact]
     public void UnprovedModifierRequirement_HasProofStage()
     {
         Diagnostics.GetMeta(DiagnosticCode.UnprovedModifierRequirement).Stage.Should().Be(DiagnosticStage.Proof);
@@ -257,6 +269,8 @@ public class DiagnosticsTests
         DiagnosticCode.DuplicateEventName,
         DiagnosticCode.DuplicateArgName,
         DiagnosticCode.UndeclaredState,
+        DiagnosticCode.StateListContainsWildcard,
+        DiagnosticCode.DuplicateStateInList,
         DiagnosticCode.UndeclaredEvent,
         DiagnosticCode.UndeclaredFunction,
         DiagnosticCode.MultipleInitialStates,

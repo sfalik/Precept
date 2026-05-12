@@ -48,6 +48,8 @@ public enum DiagnosticCode
     DuplicateEventName                 =  26,
     DuplicateArgName                   =  27,
     UndeclaredState                    =  28,
+    StateListContainsWildcard          = 128,
+    DuplicateStateInList               = 129,
     UndeclaredEvent                    =  29,
     UndeclaredFunction                 =  30,
     MultipleInitialStates              =  31,

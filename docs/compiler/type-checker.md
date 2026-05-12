@@ -56,7 +56,7 @@ The parser produces these slot value types:
 | `GuardClauseSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
 | `ActionChainSlot` | `ImmutableArray<ActionKind> Actions` | N/A — resolved actions |
 | `OutcomeSlot` | `ParsedOutcome Outcome` | Parser-owned outcome DU |
-| `StateTargetSlot` | `string? StateName` | N/A — resolved name |
+| `StateTargetSlot` | `ImmutableArray<string> StateNames` + `ImmutableArray<SourceSpan> NameSpans` | N/A — one or more authored state names (or wildcard token text) |
 | `EventTargetSlot` | `string? EventName` | N/A — resolved name |
 | `EnsureClauseSlot` | `ParsedExpression Expression` | Parser-owned expression DU |
 | `BecauseClauseSlot` | `string Message` | N/A — extracted literal text |
@@ -194,12 +194,12 @@ Walks each construct kind and resolves contained expressions via 2a, producing t
 
 | ConstructKind | Resolution | Output |
 |---|---|---|
-| `TransitionRow` | Resolve guard + actions + outcome | `TypedTransitionRow` |
+| `TransitionRow` | Resolve state target(s), event, guard + actions + outcome; expand comma-delimited state targets | `TypedTransitionRow` row(s) |
 | `RuleDeclaration` | Resolve condition + guard + message | `TypedRule` |
-| `StateEnsure` | Resolve condition + guard + message | `TypedEnsure` |
+| `StateEnsure` | Resolve anchor state(s), condition + guard + message; expand comma-delimited state targets | `TypedEnsure` entry/entries |
 | `EventEnsure` | Resolve condition + guard + message | `TypedEnsure` |
-| `AccessMode` | Validate field/state names, resolve guard | `TypedAccessMode` |
-| `StateAction` | Resolve guard + actions | `TypedStateHook` |
+| `AccessMode` | Validate field/state names, resolve guard; expand comma-delimited state targets | `TypedAccessMode` entry/entries |
+| `StateAction` | Resolve anchor state(s), guard + actions; expand comma-delimited state targets | `TypedStateHook` entry/entries |
 | `EventHandler` | Resolve actions | `TypedEventHandler` |
 | `FieldDeclaration` (computed) | Resolve computed expression | Populate `TypedField.ComputedExpression` |
 
@@ -371,6 +371,8 @@ public sealed record TypedEditDeclaration(
 ```
 
 **`TypedTransitionRow.FromState` convention:** `null` means "any-state wildcard" — the row fires in any source state. This is a binary discriminator (named state vs wildcard) that will never gain a third case; a full DU would be over-abstraction. GraphAnalyzer filters "any-state rows" with `== null`.
+
+A comma-delimited authored `StateTarget` never survives into `TypedTransitionRow.FromState`. The type checker desugars `from A, B on Event ...` into two independent `TypedTransitionRow` records with identical event, guard, actions, and outcome; only `FromState` differs. The same pure-copy expansion applies to state-anchored ensures, access modes, omit declarations, and state hooks.
 
 #### Typed Actions (3-Shape DU)
 

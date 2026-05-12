@@ -48,7 +48,6 @@ public static class GraphAnalyzer
                     .Select(evt => new GraphEvent(evt.Name, false, ImmutableArray<string>.Empty))
                     .ToImmutableArray(),
                 Edges: ImmutableArray<GraphEdge>.Empty,
-                EdgeProofStatuses: ImmutableArray<EdgeProofStatus>.Empty,
                 ReachableStates: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
                 UnreachableStates: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
                 Dominance: ImmutableArray<DominanceFact>.Empty,
@@ -285,7 +284,6 @@ public static class GraphAnalyzer
             States: graphStates,
             Events: graphEvents,
             Edges: edges,
-            EdgeProofStatuses: ImmutableArray<EdgeProofStatus>.Empty,
             ReachableStates: reachability.Reachable.ToImmutableHashSet(StringComparer.Ordinal),
             UnreachableStates: reachability.UnreachableOrdered.ToImmutableHashSet(StringComparer.Ordinal),
             Dominance: dominanceResult.Facts,

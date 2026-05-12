@@ -31,16 +31,7 @@ event Resolve(Note as string notempty)
 event CloseTicket
 event Reopen(Note as string optional)
 
-from New on RegisterAgent
-    -> enqueue AgentQueue RegisterAgent.AgentName
-    -> no transition
-from Assigned on RegisterAgent
-    -> enqueue AgentQueue RegisterAgent.AgentName
-    -> no transition
-from WaitingOnCustomer on RegisterAgent
-    -> enqueue AgentQueue RegisterAgent.AgentName
-    -> no transition
-from Resolved on RegisterAgent
+from New, Assigned, WaitingOnCustomer, Resolved on RegisterAgent
     -> enqueue AgentQueue RegisterAgent.AgentName
     -> no transition
 
@@ -48,12 +39,12 @@ from New on Triage
     -> set TicketTitle = Triage.Title
     -> set Severity = Triage.Level
     -> no transition
-from New on Assign when AgentQueue.count > 0
+from New, WaitingOnCustomer on Assign when AgentQueue.count > 0
     -> set LastQueuedAgent = AgentQueue.peek
     -> dequeue AgentQueue
     -> set AssignedAgent = LastQueuedAgent
     -> transition Assigned
-from New on Assign
+from New, WaitingOnCustomer on Assign
     -> reject "No support agent is currently available"
 
 from Assigned on CustomerReply
@@ -61,14 +52,6 @@ from Assigned on CustomerReply
 from Assigned on Resolve
     -> set ResolutionNote = Resolve.Note
     -> transition Resolved
-
-from WaitingOnCustomer on Assign when AgentQueue.count > 0
-    -> set LastQueuedAgent = AgentQueue.peek
-    -> dequeue AgentQueue
-    -> set AssignedAgent = LastQueuedAgent
-    -> transition Assigned
-from WaitingOnCustomer on Assign
-    -> reject "No support agent is currently available"
 
 from Resolved on CloseTicket
     -> transition Closed

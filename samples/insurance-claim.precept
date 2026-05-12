@@ -13,8 +13,8 @@ field DecisionNote as string optional maxlength 500
 field PoliceReportRequired as boolean default false
 field FraudFlag as boolean default false
 field MissingDocuments as set of string
-rule ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
-rule ApprovedAmount * 2 <= ClaimAmount when FraudFlag because "Fraud-flagged claims are capped at half the claimed amount"
+rule ApprovedAmount <= ClaimAmount because "Approved amount {ApprovedAmount} cannot exceed the claim of {ClaimAmount}"
+rule ApprovedAmount * 2 <= ClaimAmount when FraudFlag because "Fraud-flagged claims are capped at {ClaimAmount / 2}"
 
 state Draft initial
 state Submitted
@@ -23,6 +23,7 @@ state Approved
 state Denied terminal
 state Paid terminal
 
+in Draft omit ApprovedAmount, AdjusterName,  DecisionNote, MissingDocuments
 in Draft modify ClaimantName, ClaimAmount, PoliceReportRequired editable
 in UnderReview modify FraudFlag editable
 in UnderReview when not FraudFlag modify AdjusterName editable
@@ -34,10 +35,12 @@ event RequestDocument(Name as string notempty)
 event ReceiveDocument(Name as string notempty)
 event AssignAdjuster(Name as string notempty)
 event Approve(Amount as money in 'USD' positive, Note as string optional)
+on Approve ensure Approve.Amount <= ClaimAmount because "Approved amount cannot exceed the claim amount"
 event Deny(Note as string notempty)
 event PayClaim
 
 from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD' and (not PoliceReportRequired or ClaimAmount <= '100000.00 USD')
+    -> set ApprovedAmount = '0.00 USD'
     -> transition Submitted
 from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD'
     -> reject "Police-report claims are capped at $100,000"
@@ -60,7 +63,7 @@ from UnderReview on ReceiveDocument when MissingDocuments contains ReceiveDocume
 from UnderReview on ReceiveDocument
     -> reject "That document is not currently outstanding"
 
-from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.count == 0) and Approve.Amount <= ClaimAmount
+from UnderReview on Approve when not PoliceReportRequired or MissingDocuments.count == 0
     -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
     -> set DecisionNote = if Approve.Note is set then Approve.Note else "Approved"
     -> transition Approved

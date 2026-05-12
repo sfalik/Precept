@@ -58,6 +58,17 @@
 - Token vocabulary (§1.1: 139 tokens), reserved keywords (§1.2: 102 keywords), and Set/SetType handling all verified accurate.
 - Full findings written to `.squad/decisions/inbox/frank-spec-audit.md`.
 
+### 2026-05-12T18:27:28-04:00 — Field-state guarantees v2 design
+
+- **Parser bug confirmed:** `ParseFieldTarget` (Parser.cs:1005–1048) consumes comma-separated field identifiers but stores only `first.Text` in `FieldTargetSlot`. Fields 2–N are lexed, consumed, and discarded. Every multi-field access mode and omit declaration in every sample file is silently partial. `insurance-claim.precept` line 26 (`in Draft omit ApprovedAmount, AdjusterName, DecisionNote, MissingDocuments`) produces ONE `TypedAccessMode` for `ApprovedAmount` only.
+- **Omit/AccessMode split is architecturally wrong:** `PopulateEditDeclarations` pushes to `ctx.EditDeclarations` (a separate accumulator) instead of `ctx.AccessModes`. Omit is `ModifierKind.Omit = 26` — it belongs in the same access mode table as `Read` and `Write`. This split makes it impossible to build a unified field access lookup.
+- **Two-category enforcement model locked:** Structural violations (omit read/write, readonly write) are TypeChecker concerns — no proof needed, just state-aware validation. Conditional violations (`modify when {condition}`) are ProofEngine concerns — the engine's `ExtractGuardConstraints` + conjunct subsumption already provides the machinery.
+- **ProofEngine extension is minimal:** ~75 lines of new code. New `ProofRequirementKind.AccessCondition = 7`, new `AccessConditionProofRequirement` DU subtype, new `TryAccessConditionProof` discharge method reusing existing `ExtractGuardConstraints`. Boolean guard decomposition needs a small extension for bare `not BoolField` patterns.
+- **D42/D43 diagnostic codes exist but are never emitted.** `BuildFieldAccessLookup` is the right place to emit them — it's where conflict and redundancy detection naturally live.
+- **Five new diagnostic codes:** D130 `WriteToOmittedField`, D131 `ReadOfOmittedField`, D132 `WriteToReadOnlyField`, D133 `WriteToTargetOmittedField`, D134 `UnprovedAccessCondition`.
+- **Pipeline ordering fix:** `BuildFieldAccessLookup` must run after `PopulateAccessModes` + `PopulateEditDeclarations` and before `ValidateFieldStateAccess`. The existing pass ordering is almost correct — just insert the lookup build and the new validation pass.
+- **Design written to `docs/working/field-state-guarantees-v2.md`.**
+
 ### 2026-05-12T18:04:32.430-04:00 — Comma-list sample refresh
 
 - The highest-value sample updates were pure-copy state subsets only: `HiringPipeline.RejectCandidate`, `ItHelpdeskTicket.RegisterAgent`, `ItHelpdeskTicket.Assign`, and `UtilityOutageReport.RegisterCrew`.

@@ -16,7 +16,7 @@
 | Doc purpose | Design reference — grammar principles, structure, and invariants |
 | Primary source | `docs/language/catalog-system.md` (constructs, slots, disambiguation) |
 | Related | `docs/compiler/parser.md` · `docs/language/precept-language-spec.md` |
-| Updated | 2026-05-10 |
+| Updated | 2026-05-12 |
 
 ---
 
@@ -260,7 +260,7 @@ in  Approved  [when  IsEligible]  ensure  ApprovedAmount > 0  [because  "…"]
 [1]   [2]       slot      [3]    disambig.      [4]              slot      [5]
               marker                token                         marker
 [1] Leading token: `in`   ← shared with AccessMode, OmitDeclaration
-[2] StateTarget slot — the anchor state name
+[2] StateTarget slot — the anchor state name(s) or `any`
 [3] GuardClause slot (optional) — `when` expression that scopes when this ensure applies
 [4] EnsureClause slot — the expression condition (`ensure <expression>`)
 [5] BecauseClause slot — optional explanatory reason
@@ -284,7 +284,7 @@ from  Draft  on  Submit  when  DocumentsVerified  ->  set ApplicantName = Submit
  [1]   [2]  slot  [3]   slot        [4]          slot       [5]                               slot       [6]
             mark       mark                      mark                                         mark
 [1] Leading token: `from`
-[2] StateTarget slot — the source state (or `any`)
+[2] StateTarget slot — the source state name(s) (or `any`)
 [3] EventTarget slot — the event name
 [4] GuardClause slot — optional `when` expression
 [5] ActionChain slot — zero or more `-> action` pairs
@@ -316,7 +316,7 @@ in  Draft  when  DocumentsVerified  modify  ClaimAmount  editable
 [1]  [2]   slot         [3]      disambig.    [4]         [5]
            marker                    token
 [1] Leading token: `in`   ← shared with StateEnsure, OmitDeclaration
-[2] StateTarget slot — the anchor state name
+[2] StateTarget slot — the anchor state name(s) or `any`
 [3] GuardClause slot — optional `when` expression
 [4] FieldTarget slot — the field affected in that state
 [5] AccessModeKeyword slot — `editable` or `readonly`
@@ -328,7 +328,7 @@ to  Approved  [when  IsEligible]  ->  set ApprovedAmount = ClaimAmount
 [1]   [2]       slot      [3]    disambig.           [4]
               marker                token
 [1] Leading token: `to`   ← shared with StateEnsure
-[2] StateTarget slot — the state whose entry hook is being declared
+[2] StateTarget slot — the state name(s) whose entry hook is being declared (or `any`)
 [3] GuardClause slot (optional) — `when` expression that scopes when the hook fires
 [4] ActionChain slot — one or more `-> action` steps; `from` uses the same shape for exit hooks
 ```
@@ -398,7 +398,7 @@ parse immediately         scan forward → disambiguationToken
                      parse construct A               parse construct B
 ```
 
-Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the construct's catalog entry. For scoped constructs with optional pre-verb guards, the parser skips `when <BoolExpr>` and then consumes the first matching family disambiguation token. The token set comes from metadata; the parser does not switch on construct kind.
+Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the construct's catalog entry. For scoped constructs with optional pre-verb guards, the parser first scans past the full anchor target; for `StateScoped` constructs that target is `StateTarget`, which may be `any` or a comma-delimited state list. If a pre-verb `when <BoolExpr>` follows, the parser then scans forward to the first matching family disambiguation token. The token set comes from metadata; the parser does not switch on construct kind.
 
 **Scoped-family invariant:** The disambiguation keyword must appear before any new construct leader. Optional pre-verb guards may intervene, but they terminate at the construct-family verb (`ensure`, `modify`, `on`, `->`, etc.), keeping routing deterministic.
 
@@ -407,9 +407,9 @@ Disambiguation reads `DisambiguationEntry.DisambiguationTokens` from the constru
 #### The `in` family (StateScoped)
 
 ```
-in  [AnchorState]  [when Guard]  ensure  Expr  [because  "..."]   → StateEnsure
-in  [AnchorState]  [when Guard]  modify  Field  [readonly|editable] → AccessMode
-in  [AnchorState]  omit  Field                                      → OmitDeclaration
+in  [AnchorState[, ...] | any]  [when Guard]  ensure  Expr  [because  "..."]   → StateEnsure
+in  [AnchorState[, ...] | any]  [when Guard]  modify  Field  [readonly|editable] → AccessMode
+in  [AnchorState[, ...] | any]  omit  Field                                      → OmitDeclaration
 ```
 
 The second keyword (`ensure`, `modify`, `omit`) is the disambiguation token. `readonly` and `editable` are access-mode adjectives inside the `AccessModeKeyword` slot, not family-level disambiguation tokens.
@@ -426,9 +426,9 @@ The second keyword (`ensure` vs `->`) is the disambiguation token.
 #### The `from` family (StateScoped)
 
 ```
-from  [AnchorState]  on  EventName  [when Guard]  -> ActionChain -> Outcome  → TransitionRow
-from  [AnchorState]  [when Guard]  ensure  Expr  [because  "..."]             → StateEnsure
-from  [AnchorState]  [when Guard]  ->  actions                                → StateAction
+from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> ActionChain -> Outcome  → TransitionRow
+from  [AnchorState[, ...] | any]  [when Guard]  ensure  Expr  [because  "..."]             → StateEnsure
+from  [AnchorState[, ...] | any]  [when Guard]  ->  actions                                → StateAction
 ```
 
 The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` leads `TransitionRow`; `ensure` leads `StateEnsure` (exit constraint); `->` leads `StateAction` (exit hook).
@@ -436,8 +436,8 @@ The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` l
 #### The `to` family (StateScoped)
 
 ```
-to  [AnchorState]  [when Guard]  ensure  Expr  [because  "..."]  → StateEnsure
-to  [AnchorState]  [when Guard]  ->  actions                     → StateAction
+to  [AnchorState[, ...] | any]  [when Guard]  ensure  Expr  [because  "..."]  → StateEnsure
+to  [AnchorState[, ...] | any]  [when Guard]  ->  actions                     → StateAction
 ```
 
 The second keyword (`ensure` vs `->`) is the disambiguation token. `ensure` leads `StateEnsure` (entry constraint); `->` leads `StateAction` (entry hook).
@@ -481,7 +481,7 @@ The 17 `ConstructSlotKind` values cover every distinct slot type in the language
 | `GuardClause` | Optional `when` condition expression | `when DocumentsVerified and CreditScore >= 680` |
 | `ActionChain` | Sequence of `-> action` steps | `-> set ApprovedAmount = ...` |
 | `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "..."` / `-> no transition` |
-| `StateTarget` | A state name reference | `from Draft`, `to Approved` |
+| `StateTarget` | State name(s) or `any` wildcard | `from Draft`, `from Draft, Pending`, `to Approved` |
 | `EventTarget` | An event name reference | `on Submit` |
 | `EnsureClause` | Constraint expression | `ensure ApprovedAmount > 0` |
 | `BecauseClause` | Reason string literal | `because "Approved amount must be positive"` |
@@ -502,8 +502,8 @@ from   Draft   on   Submit   when   Expr   -> action* -> Outcome
 Slot # │ Kind             │ Required │ Notes
 ───────┼──────────────────┼──────────┼────────────────────────────────────────
   [1]  │ (leading token)  │  yes     │ Structural marker, not a slot
-  [2]  │ StateTarget      │  yes     │ Source state name (or `any`)
-  [3]  │ (disambiguation token) │  yes     │ `on` keyword — family verb / event slot boundary
+  [2]  │ StateTarget      │  yes     │ Source state name(s), comma-delimited list, or `any`
+  [3]  │ (disambiguation token) │  yes     │ `on` keyword — family verb / event slot boundary after the full state target
   [4]  │ EventTarget      │  yes     │ Event name
   [5]  │ (slot marker)    │  no      │ `when` keyword — slot delimiter
   [6]  │ GuardClause      │  no      │ Guard expression
@@ -826,7 +826,7 @@ ModifierList              no  — modifier keywords + values
 StateEntryList            no  — (name modifier*) pairs
 InitialMarker             no  — keyword only
 ArgumentList              no  — name:type pairs
-StateTarget               no  — state name
+StateTarget               no  — state name(s) or wildcard
 EventTarget               no  — event name
 BecauseClause             no  — string literal only
 AccessModeKeyword         no  — keyword only

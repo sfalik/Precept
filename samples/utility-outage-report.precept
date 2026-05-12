@@ -52,16 +52,7 @@ from Reported on VerifyReport when AffectedBlocks.count > 0
 from Reported on VerifyReport
     -> reject "At least one affected block must be recorded before verification"
 
-from Reported on RegisterCrew
-    -> enqueue CrewQueue RegisterCrew.CrewName
-    -> no transition
-from VerifiedState on RegisterCrew
-    -> enqueue CrewQueue RegisterCrew.CrewName
-    -> no transition
-from Dispatched on RegisterCrew
-    -> enqueue CrewQueue RegisterCrew.CrewName
-    -> no transition
-from Restored on RegisterCrew
+from Reported, VerifiedState, Dispatched, Restored on RegisterCrew
     -> enqueue CrewQueue RegisterCrew.CrewName
     -> no transition
 

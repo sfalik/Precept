@@ -223,6 +223,57 @@ public class TypeCheckerAssemblyTests
     }
 
     [Fact]
+    public void StateEnsure_MultiStateList_ExpandsIntoIndependentEnsures()
+    {
+        const string precept = """
+            precept Widget
+            field Amount as number default 0
+            state Draft initial
+            state Pending
+            in Draft, Pending ensure Amount >= 0 because "Amount stays nonnegative"
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.Ensures.Should().HaveCount(2);
+        index.Ensures.Select(e => e.AnchorState).Should().Equal("Draft", "Pending");
+    }
+
+    [Fact]
+    public void AccessMode_MultiStateList_ExpandsIntoIndependentEntries()
+    {
+        const string precept = """
+            precept Widget
+            field Amount as number default 0
+            state Draft initial
+            state Pending
+            in Draft, Pending modify Amount editable
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.AccessModes.Should().HaveCount(2);
+        index.AccessModes.Select(mode => mode.StateName).Should().Equal("Draft", "Pending");
+    }
+
+    [Fact]
+    public void StateAction_MultiStateList_ExpandsIntoIndependentHooks()
+    {
+        const string precept = """
+            precept Widget
+            field Amount as number default 0
+            state Draft initial
+            state Pending
+            to Draft, Pending -> set Amount = Amount + 1
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.StateHooks.Should().HaveCount(2);
+        index.StateHooks.Select(hook => hook.StateName).Should().Equal("Draft", "Pending");
+    }
+
+    [Fact]
     public void CleanPrecept_StateReferencesPopulated()
     {
         var index = TypeCheckerTestHelpers.CheckExpectingClean(FullPrecept);

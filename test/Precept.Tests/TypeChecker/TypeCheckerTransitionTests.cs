@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using FluentAssertions;
@@ -47,6 +48,28 @@ public class TypeCheckerTransitionTests
     }
 
     [Fact]
+    public void TransitionRow_MultiStateFromList_ExpandsIntoIndependentRows()
+    {
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Draft initial
+            state Pending
+            state Active
+            event Submit
+            from Draft, Pending on Submit -> set Count = Count + 1 -> transition Active
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.TransitionRows.Should().HaveCount(2);
+        index.TransitionRows.Select(row => row.FromState).Should().Equal("Draft", "Pending");
+        index.TransitionRows.All(row => row.EventName == "Submit").Should().BeTrue();
+        index.TransitionRows.All(row => row.TargetState == "Active").Should().BeTrue();
+        index.TransitionRows.Should().OnlyContain(row => row.Actions.Length == 1);
+    }
+
+    [Fact]
     public void UnknownFromState_EmitsUndeclaredState()
     {
         var precept = """
@@ -60,7 +83,81 @@ public class TypeCheckerTransitionTests
         var index = TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.UndeclaredState);
 
         var row = index.TransitionRows.Single();
+        row.FromState.Should().Be("Bogus");
         row.EventName.Should().Be("Ping");
+    }
+
+    [Fact]
+    public void TransitionRow_MultiStateFromList_EmitsPerNameDiagnostics()
+    {
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Draft initial
+            state Active
+            event Submit
+            from Draft, Missing on Submit -> set Count = Count + 1 -> transition Active
+            """;
+
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UndeclaredState) && d.Args.Contains("Missing"));
+        index.TransitionRows.Should().HaveCount(2);
+        index.TransitionRows.Select(row => row.FromState).Should().Equal("Draft", "Missing");
+    }
+
+    [Fact]
+    public void TransitionRow_DuplicateStateInList_EmitsWarningPerDuplicateOccurrence()
+    {
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Draft initial
+            state Active
+            event Submit
+            from Draft, Draft, Draft on Submit -> set Count = Count + 1 -> transition Active
+            """;
+
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Where(d => d.Code == nameof(DiagnosticCode.DuplicateStateInList))
+            .Should().HaveCount(2)
+            .And.OnlyContain(d => d.Severity == Severity.Warning && d.Args.Contains("Draft"));
+        index.TransitionRows.Should().ContainSingle();
+        index.TransitionRows.Single().FromState.Should().Be("Draft");
+    }
+
+    [Fact]
+    public void TransitionRow_DuplicateStateInList_DeduplicatesBeforeExpansion()
+    {
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Draft initial
+            state Pending
+            state Active
+            event Submit
+            from Draft, Draft, Pending on Submit -> set Count = Count + 1 -> transition Active
+            """;
+
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.DuplicateStateInList) && d.Args.Contains("Draft"));
+        index.TransitionRows.Should().HaveCount(2);
+        index.TransitionRows.Select(row => row.FromState).Should().Equal("Draft", "Pending");
+    }
+
+    [Fact]
+    public void TransitionRow_StateListContainsWildcard_EmitsDiagnosticAndSkipsExpansion()
+    {
+        var (index, diagnostics) = CheckTransitionRowWithStateTarget(
+            new StateTargetSlot(
+                ImmutableArray.Create("Draft", "any"),
+                ImmutableArray.Create(SourceSpan.Missing, SourceSpan.Missing),
+                SourceSpan.Missing));
+
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.StateListContainsWildcard));
+        index.TransitionRows.Should().BeEmpty();
     }
 
     [Fact]
@@ -582,5 +679,41 @@ public class TypeCheckerTransitionTests
         // Invariant consistency: both set or both null
         input.SecondaryRole.HasValue.Should().Be(input.SecondaryExpression is not null,
             because: "D5: SecondaryRole.HasValue must equal (SecondaryExpression != null)");
+    }
+
+    private static (SemanticIndex Index, IReadOnlyList<Diagnostic> Diagnostics) CheckTransitionRowWithStateTarget(StateTargetSlot stateTarget)
+    {
+        const string declarations = """
+            precept Widget
+            field Count as number default 0
+            state Draft initial
+            state Active
+            event Submit
+            """;
+
+        var tokens = Lexer.Lex(declarations);
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+        var symbols = Precept.Pipeline.NameBinder.Bind(manifest);
+
+        var row = new ParsedConstruct(
+            Constructs.GetMeta(ConstructKind.TransitionRow),
+            ImmutableArray.Create<SlotValue>(
+                stateTarget,
+                new EventTargetSlot("Submit", SourceSpan.Missing),
+                new OutcomeSlot(new TransitionOutcome("Active", SourceSpan.Missing), SourceSpan.Missing)),
+            SourceSpan.Missing,
+            TokenKind.From);
+
+        var augmentedManifest = new ConstructManifest(
+            manifest.Constructs.Add(row),
+            manifest.Diagnostics);
+
+        var index = Precept.Pipeline.TypeChecker.Check(augmentedManifest, symbols);
+        var diagnostics = augmentedManifest.Diagnostics
+            .Concat(symbols.Diagnostics)
+            .Concat(index.Diagnostics)
+            .ToList();
+
+        return (index, diagnostics);
     }
 }

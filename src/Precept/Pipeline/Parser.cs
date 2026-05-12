@@ -164,16 +164,17 @@ public static partial class Parser
                     }
                     else
                     {
-                        // B3 disambiguation: peek(2) is the disambiguation token.
+                        // B3 disambiguation: state-scoped constructs may carry
+                        // comma-delimited state lists before the disambiguation token.
                         // For constructs with optional pre-verb guards, the disambiguation
-                        // token can appear after "when <expr>".
+                        // token can also appear after "when <expr>".
                         var disambToken = ResolveDisambiguationToken(candidates);
                         ConstructKind? resolved = null;
 
                         foreach (var (kind, entry) in candidates)
                         {
                             if (entry.DisambiguationTokens is { } tokens
-                                && tokens.Contains(disambToken))
+                                && tokens.Contains(disambToken.Kind))
                             {
                                 resolved = kind;
                                 break;
@@ -184,8 +185,8 @@ public static partial class Parser
                         {
                             // Disambiguation failure — emit diagnostic, select first candidate
                             _diagnostics.Add(DiagnosticsCatalog.Create(
-                                DiagnosticCode.ExpectedToken, Peek(2).Span,
-                                "disambiguation keyword", Peek(2).Text));
+                                DiagnosticCode.ExpectedToken, disambToken.Span,
+                                "disambiguation keyword", disambToken.Text));
                             resolved = candidates[0].Kind;
                         }
 
@@ -206,11 +207,12 @@ public static partial class Parser
             }
         }
 
-        private TokenKind ResolveDisambiguationToken(
+        private Token ResolveDisambiguationToken(
             ImmutableArray<(ConstructKind Kind, DisambiguationEntry Entry)> candidates)
         {
-            var disambToken = Peek(2).Kind;
-            if (disambToken != TokenKind.When)
+            var offset = GetDisambiguationTokenOffset(candidates);
+            var disambToken = Peek(offset);
+            if (disambToken.Kind != TokenKind.When)
                 return disambToken;
 
             var disambCandidates = candidates
@@ -220,18 +222,53 @@ public static partial class Parser
             if (disambCandidates.Length == 0)
                 return disambToken;
 
-            var offset = 3;
+            offset++;
             while (true)
             {
-                var token = Peek(offset).Kind;
-                if (token == TokenKind.EndOfSource)
+                var token = Peek(offset);
+                if (token.Kind == TokenKind.EndOfSource)
                     return disambToken;
-                if (disambCandidates.Contains(token))
+                if (disambCandidates.Contains(token.Kind))
                     return token;
-                if (ConstructsCatalog.LeadingTokens.Contains(token) && token != TokenKind.When)
+                if (ConstructsCatalog.LeadingTokens.Contains(token.Kind) && token.Kind != TokenKind.When)
                     return disambToken;
                 offset++;
             }
+        }
+
+        private int GetDisambiguationTokenOffset(
+            ImmutableArray<(ConstructKind Kind, DisambiguationEntry Entry)> candidates)
+        {
+            if (candidates.IsDefaultOrEmpty)
+                return 2;
+
+            var routingFamily = ConstructsCatalog.GetMeta(candidates[0].Kind).RoutingFamily;
+            if (routingFamily != RoutingFamily.StateScoped)
+                return 2;
+
+            var disambTokens = candidates
+                .SelectMany(candidate => candidate.Entry.DisambiguationTokens ?? [])
+                .ToFrozenSet();
+            var offset = 1;
+            var token = Peek(offset);
+            var tokenMeta = Tokens.GetMeta(token.Kind);
+
+            if (tokenMeta.IsStateWildcard)
+                return offset + 1;
+
+            if (token.Kind != TokenKind.Identifier)
+                return disambTokens.Contains(token.Kind) ? offset : offset + 1;
+
+            offset++;
+            while (Peek(offset).Kind == TokenKind.Comma)
+            {
+                offset++;
+                if (Peek(offset).Kind != TokenKind.Identifier)
+                    return offset;
+                offset++;
+            }
+
+            return offset;
         }
 
         private void SkipToConstructBoundary()
@@ -343,7 +380,7 @@ public static partial class Parser
             ConstructSlotKind.EnsureClause      => new EnsureClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ActionChain       => new ActionChainSlot(ImmutableArray<ParsedAction>.Empty, SourceSpan.Missing),
             ConstructSlotKind.Outcome           => new OutcomeSlot(new MalformedOutcome(SourceSpan.Missing), SourceSpan.Missing),
-            ConstructSlotKind.StateTarget       => new StateTargetSlot(null, SourceSpan.Missing),
+            ConstructSlotKind.StateTarget       => new StateTargetSlot(ImmutableArray<string>.Empty, ImmutableArray<SourceSpan>.Empty, SourceSpan.Missing),
             ConstructSlotKind.EventTarget       => new EventTargetSlot(null, SourceSpan.Missing),
             ConstructSlotKind.AccessModeKeyword => new AccessModeSlot(TokenKind.Readonly, SourceSpan.Missing),
             ConstructSlotKind.FieldTarget       => new FieldTargetSlot(null, SourceSpan.Missing),
@@ -873,20 +910,54 @@ public static partial class Parser
             return new BecauseClauseSlot("", becauseToken.Span);
         }
 
-        // ── StateTarget: state name identifier ──────────────────────────────────
+        // ── StateTarget: state name list or wildcard ────────────────────────────
 
         private SlotValue ParseStateTarget(ConstructSlot slot)
         {
             var current = Peek();
             var meta = Tokens.GetMeta(current.Kind);
-            if (current.Kind == TokenKind.Identifier || meta.IsStateWildcard)
+            if (meta.IsStateWildcard)
             {
                 var tok = Advance();
-                return new StateTargetSlot(tok.Text, tok.Span)
-                {
-                    NameSpan = tok.Span,
-                };
+                return new StateTargetSlot(
+                    ImmutableArray.Create(tok.Text),
+                    ImmutableArray.Create(tok.Span),
+                    tok.Span);
             }
+
+            if (current.Kind == TokenKind.Identifier)
+            {
+                var names = new List<string>();
+                var nameSpans = new List<SourceSpan>();
+                var first = Advance();
+                var lastSpan = first.Span;
+
+                names.Add(first.Text);
+                nameSpans.Add(first.Span);
+
+                while (Peek().Kind == TokenKind.Comma)
+                {
+                    Advance(); // consume comma
+                    if (Peek().Kind == TokenKind.Identifier)
+                    {
+                        var next = Advance();
+                        names.Add(next.Text);
+                        nameSpans.Add(next.Span);
+                        lastSpan = next.Span;
+                        continue;
+                    }
+
+                    _diagnostics.Add(DiagnosticsCatalog.Create(
+                        DiagnosticCode.ExpectedToken, Peek().Span, "identifier", Peek().Text));
+                    break;
+                }
+
+                return new StateTargetSlot(
+                    names.ToImmutableArray(),
+                    nameSpans.ToImmutableArray(),
+                    SourceSpan.Covering(first.Span, lastSpan));
+            }
+
             if (!slot.IsRequired)
                 return MakeSentinel(slot);
             _diagnostics.Add(DiagnosticsCatalog.Create(

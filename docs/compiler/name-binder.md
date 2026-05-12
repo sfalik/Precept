@@ -137,7 +137,7 @@ Duplicate detection uses working dictionaries (`_fieldsByName`, `_statesByName`,
 **Output:** `ImmutableArray<SymbolReference>` + diagnostics for undeclared references
 
 For each construct, resolves:
-- **State target slots** — resolve state name references (transition targets)
+- **State target slots** — resolve each named state in a state-scoped anchor independently; `any` is a wildcard and does not bind to a declaration
 - **Event target slots** — resolve event name references (rule/transition event anchors)
 - **Field target slots** — resolve field name references (access mode targets)
 - **Expression slots** — recursively walk guard, ensure, compute, rule, and action expressions; resolve identifiers per scoping rules
@@ -186,6 +186,8 @@ public sealed record SymbolReference(
 
 `SymbolCategory` enum: `Field`, `State`, `Event`, `Any`.
 
+A comma-delimited `StateTarget` contributes one `SymbolReference` per named state. The wildcard `any` does not resolve to a `DeclaredState`, so it produces no `StateTarget` reference entry.
+
 ### 7.3 Scoping Rules
 
 Identifier resolution follows a three-level scoping order (spec § 3):
@@ -220,7 +222,7 @@ In computed field expressions, a reference to a field declared *after* the curre
 | `ArgumentListSlot` | Event argument names + types |
 | `InitialMarkerSlot` | Initial event marker |
 | `EventTargetSlot` | Event context for scope resolution |
-| `StateTargetSlot` | State reference to resolve |
+| `StateTargetSlot` | State reference(s) to resolve — one per authored name; wildcard produces none |
 | `FieldTargetSlot` | Field reference to resolve |
 | `GuardClauseSlot` | Guard expression to walk |
 | `EnsureClauseSlot` | Ensure expression to walk |

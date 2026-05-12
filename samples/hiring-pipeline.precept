@@ -45,7 +45,7 @@ from Screening on PassScreen when PendingInterviewers.count > 0
     -> transition InterviewLoop
 from Screening on PassScreen
     -> reject "At least one interviewer must be assigned before the interview loop begins"
-from Screening on RejectCandidate
+from Screening, InterviewLoop, Decision on RejectCandidate
     -> set FinalNote = RejectCandidate.Note
     -> transition Rejected
 
@@ -59,9 +59,6 @@ from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains 
     -> no transition
 from InterviewLoop on RecordInterviewFeedback
     -> reject "Only assigned interviewers can submit feedback"
-from InterviewLoop on RejectCandidate
-    -> set FinalNote = RejectCandidate.Note
-    -> transition Rejected
 
 from Decision on ExtendOffer when FeedbackCount >= 2
     -> set OfferAmount = ExtendOffer.Amount
@@ -69,9 +66,6 @@ from Decision on ExtendOffer when FeedbackCount >= 2
     -> transition OfferExtended
 from Decision on ExtendOffer
     -> reject "At least two completed interview feedback entries are required before extending an offer"
-from Decision on RejectCandidate
-    -> set FinalNote = RejectCandidate.Note
-    -> transition Rejected
 
 from OfferExtended on AcceptOffer
     -> transition Hired
