@@ -40,3 +40,9 @@
 ### 2026-05-12T00:01:51Z — Temporal price denominator design locked
 - Temporal price denomination stays on the existing `of` qualifier surface (`price of 'time'`, `price of 'date'`); `duration` gains implied temporal-dimension metadata through `TypeMeta.ImpliedQualifiers`.
 - Follow-through still needs Dimension→TemporalDimension comparison/proof support and must keep chain validation gated to price fields that explicitly carry the temporal `of` qualifier.
+
+## Learnings
+
+- 2026-05-12 — E2 needed `ResolveQualifierFromExpression()` to synthesize `DeclaredQualifierMeta` directly from `TypedInterpolatedTypedConstant` slots; `DeclaredQualifierMeta.Unit` requires both unit and dimension payloads.
+- 2026-05-12 — E3 needed more than currency passthrough. Compound-cancellation dimension proofs must fall back to unit qualifiers and derive numerator dimensions (`kg` → `mass`, `{StockingUnit}` → `{StockingUnit.dimension}`) or nested `Qty * Conv * Price` chains still emit PRE0114.
+- 2026-05-12 — On the current inventory-item worktree, E2/E3 cut PRE0114 from 66 to 16; the remaining ReceiveShipment/GrossProfit fallout is tied to deferred `ExchangeRateTimesMoney` propagation plus separate sample edits outside the parenthesization fix.
