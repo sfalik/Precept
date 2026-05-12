@@ -310,12 +310,15 @@ state Draft initial
     }
 
     [Fact]
-    public void Hover_OnStoredField_ShowsWriteMapAndGovernance()
+    public void Hover_OnStoredField_ShowsWriteMapGovernanceAndResolvedQualifiers()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Price as money");
 
         markup.Should().Contain("**field `Price`**");
         markup.Should().Contain("Type: `money` · not nullable · `in USD`");
+        markup.Should().Contain("Declared qualifier: `in USD`");
+        markup.Should().Contain("Resolved qualifier: `'USD'`");
+        markup.Should().Contain("Qualifier source: declared explicitly on this type");
         markup.Should().Contain("Writable:");
         markup.Should().Contain("`Draft`");
         markup.Should().Contain("`Listed`");
@@ -543,6 +546,38 @@ state Draft initial
 
         markup.Should().Contain("**qualifier**");
         markup.Should().Contain("Axis: unit of measure");
+    }
+
+    [Fact]
+    public void Hover_OnExchangeRateField_ExplainsMissingQualifierAnnotations()
+    {
+        const string source = """
+            precept ExchangeRateHover
+            field Rate as exchangerate
+            state Draft initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "Rate as exchangerate");
+
+        markup.Should().Contain("Resolved qualifiers: Source currency `<unresolved>` · Target currency `<unresolved>`");
+        markup.Should().Contain("Reason: exchange rate has no `in ... to ...` annotation");
+    }
+
+    [Fact]
+    public void Hover_OnQualifierExpression_ShowsResolvedValueSourceAndShape()
+    {
+        const string source = """
+            precept CurrencyQualifierHover
+            field CatalogCurrency as currency default 'USD'
+            field TotalRevenue as money in '{CatalogCurrency}'
+            state Draft initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "'{CatalogCurrency}'", offset: 2);
+
+        markup.Should().Contain("Resolved value: `'{CatalogCurrency}'`");
+        markup.Should().Contain("Resolved source: field `CatalogCurrency`");
+        markup.Should().Contain("Resolved value shape: symbolic currency qualifier");
     }
 
     private static string GetHoverMarkdown(string source, string needle, int offset = 0, int occurrence = 1)

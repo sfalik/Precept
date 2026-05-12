@@ -223,6 +223,8 @@ internal static class RichHoverFactory
             $"Type: {FormatTypeSummary(field.ResolvedType, field.ElementType, field.KeyType, field.DeclaredQualifiers, field.Presence)}",
         };
 
+        AppendFieldQualifierLines(lines, field);
+
         if (field.IsComputed && field.ComputedExpression is not null)
         {
             lines.Add($"Computed from: `{EscapeInline(FormatSnippet(compilation, field.ComputedExpression.Span))}`");
@@ -479,55 +481,307 @@ internal static class RichHoverFactory
 
     private static string CreateQualifierMarkdown(Compilation compilation, QualifierHoverInfo info)
     {
-        var status = BuildStatus(compilation, info.Span, HoverStatusKind.ProofVerified, GetQualifierStatusDetail(info));
+        var statusKind = info.ResolvedQualifier is null ? HoverStatusKind.Unverified : HoverStatusKind.ProofVerified;
+        var status = BuildStatus(compilation, info.Span, statusKind, GetQualifierStatusDetail(info));
         var lines = new List<string>
         {
             $"**qualifier** `{EscapeInline(info.Label)}`",
             FormatStatus(status),
             $"Axis: {GetQualifierAxisName(info)}",
-            $"Checks: {GetQualifierChecksText(info)}",
-            "Mismatch: incompatible combinations are rejected",
+            $"Declared form: `{EscapeInline(info.Label)}`",
+            $"Resolved value: {FormatResolvedQualifierValue(info.ResolvedQualifier)}",
         };
 
+        if (TryDescribeQualifierSource(info.ResolvedQualifier, info.OwnerType, out var source))
+        {
+            lines.Add($"Resolved source: {source.DisplayText}");
+        }
+        else if (TryGetQualifierUnresolvedReason(info.OwnerType, [info.Axis], out var reason))
+        {
+            lines.Add($"Reason: {reason}");
+        }
+
+        lines.Add($"Resolved value shape: {DescribeQualifierValueShape(info.ResolvedQualifier, info.Axis)}");
+        lines.Add($"Compatibility rule: {GetQualifierChecksText(info)}");
+        lines.Add("Mismatch: incompatible combinations are rejected");
         return string.Join("\n\n", lines);
+    }
+
+    private static void AppendFieldQualifierLines(List<string> lines, TypedField field)
+    {
+        var axes = GetRelevantQualifierAxes(field.ResolvedType, field.DeclaredQualifiers);
+        if (axes.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        if (!field.DeclaredQualifiers.IsDefaultOrEmpty)
+        {
+            var label = field.DeclaredQualifiers.Length == 1 ? "Declared qualifier" : "Declared qualifiers";
+            lines.Add($"{label}: {string.Join(" · ", field.DeclaredQualifiers.Select(FormatDeclaredQualifier))}");
+        }
+
+        var resolved = axes
+            .Select(axis => new QualifierResolutionEntry(axis, ResolveDeclarationQualifier(field.ResolvedType, field.DeclaredQualifiers, axis)))
+            .ToImmutableArray();
+        lines.Add($"{(resolved.Length == 1 ? "Resolved qualifier" : "Resolved qualifiers")}: {FormatResolvedQualifierEntries(resolved)}");
+
+        var sources = resolved
+            .Select(entry => CreateQualifierSourceEntry(field.ResolvedType, entry))
+            .Where(entry => entry is not null)
+            .Cast<string>()
+            .ToImmutableArray();
+        if (!sources.IsEmpty)
+        {
+            lines.Add($"{(sources.Length == 1 ? "Qualifier source" : "Qualifier sources")}: {string.Join(" · ", sources)}");
+        }
+
+        var missingAxes = resolved.Where(entry => entry.Qualifier is null).Select(entry => entry.Axis).ToImmutableArray();
+        if (!missingAxes.IsEmpty && TryGetQualifierUnresolvedReason(field.ResolvedType, missingAxes, out var reason))
+        {
+            lines.Add($"Reason: {reason}");
+        }
     }
 
     private static string GetQualifierStatusDetail(QualifierHoverInfo info)
     {
-        if (TryGetQualifierResolvedSource(info.ResolvedQualifier, info.OwnerType, out var source))
+        if (TryDescribeQualifierSource(info.ResolvedQualifier, info.OwnerType, out var source))
         {
-            return $"qualifier resolves from `{EscapeInline(source)}`";
+            return source.IsFieldSource
+                ? $"qualifier resolves from {source.DisplayText}"
+                : $"qualifier is {source.DisplayText}";
+        }
+
+        if (TryGetQualifierUnresolvedReason(info.OwnerType, [info.Axis], out var reason))
+        {
+            return reason;
         }
 
         return $"qualifier compatibility checked for `{EscapeInline(FormatType(info.OwnerType))}` at compile time";
     }
 
-    private static bool TryGetQualifierResolvedSource(DeclaredQualifierMeta? qualifier, TypeKind ownerType, out string source)
+    private static ImmutableArray<QualifierAxis> GetRelevantQualifierAxes(TypeKind ownerType, ImmutableArray<DeclaredQualifierMeta> declaredQualifiers)
     {
-        var template = qualifier switch
+        if (!declaredQualifiers.IsDefaultOrEmpty)
         {
-            DeclaredQualifierMeta.Currency currency => currency.CurrencyCode,
-            DeclaredQualifierMeta.FromCurrency currency => currency.CurrencyCode,
-            DeclaredQualifierMeta.ToCurrency currency => currency.CurrencyCode,
-            DeclaredQualifierMeta.Unit unit => unit.UnitCode,
-            DeclaredQualifierMeta.Dimension dimension => dimension.DimensionName,
-            DeclaredQualifierMeta.Timezone timezone => timezone.TimezoneId,
-            DeclaredQualifierMeta.TemporalDimension dimension when ownerType == TypeKind.Price => dimension.Value.ToString().ToLowerInvariant(),
-            DeclaredQualifierMeta.TemporalUnit unit when ownerType == TypeKind.Duration
-                || ownerType == TypeKind.Period
-                || ownerType == TypeKind.Price => unit.UnitName,
-            _ => null,
-        };
+            return declaredQualifiers
+                .Select(qualifier => qualifier.Axis)
+                .Distinct()
+                .ToImmutableArray();
+        }
 
-        if (string.IsNullOrWhiteSpace(template))
+        var slots = Types.GetMeta(ownerType).QualifierShape?.Slots;
+        return slots is null
+            ? ImmutableArray<QualifierAxis>.Empty
+            : slots.Select(slot => slot.Axis).Distinct().ToImmutableArray();
+    }
+
+    private static DeclaredQualifierMeta? ResolveDeclarationQualifier(
+        TypeKind ownerType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
+        QualifierAxis axis)
+    {
+        foreach (var qualifier in declaredQualifiers)
         {
-            source = string.Empty;
+            if (qualifier.Axis == axis)
+            {
+                return qualifier;
+            }
+        }
+
+        if (axis == QualifierAxis.Unit)
+        {
+            foreach (var qualifier in declaredQualifiers)
+            {
+                if (qualifier.Axis == QualifierAxis.Dimension)
+                {
+                    return qualifier;
+                }
+            }
+        }
+
+        if (axis == QualifierAxis.Dimension)
+        {
+            foreach (var qualifier in declaredQualifiers)
+            {
+                if (qualifier.Axis == QualifierAxis.TemporalDimension)
+                {
+                    return qualifier;
+                }
+            }
+        }
+
+        foreach (var qualifier in Types.GetMeta(ownerType).ImpliedQualifiers)
+        {
+            if (qualifier.Axis == axis)
+            {
+                return qualifier;
+            }
+        }
+
+        return null;
+    }
+
+    private static string FormatResolvedQualifierEntries(ImmutableArray<QualifierResolutionEntry> resolved)
+    {
+        if (resolved.Length == 1)
+        {
+            return FormatResolvedQualifierValue(resolved[0].Qualifier);
+        }
+
+        return string.Join(" · ", resolved.Select(entry => $"{GetQualifierDisplayName(entry.Axis)} {FormatResolvedQualifierValue(entry.Qualifier)}"));
+    }
+
+    private static string? CreateQualifierSourceEntry(TypeKind ownerType, QualifierResolutionEntry entry)
+    {
+        if (!TryDescribeQualifierSource(entry.Qualifier, ownerType, out var source))
+        {
+            return null;
+        }
+
+        return $"{GetQualifierDisplayName(entry.Axis)} {source.DisplayText}";
+    }
+
+    private static string FormatResolvedQualifierValue(DeclaredQualifierMeta? qualifier)
+    {
+        if (qualifier is null)
+        {
+            return "`<unresolved>`";
+        }
+
+        var rawValue = GetQualifierRawValue(qualifier);
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return "`<unresolved>`";
+        }
+
+        if (TrySplitCompoundQualifier(rawValue, out var numerator, out var denominator))
+        {
+            return $"`'{EscapeInline(rawValue)}'` (numerator: `'{EscapeInline(numerator)}'`, denominator: `'{EscapeInline(denominator)}'`)";
+        }
+
+        return $"`'{EscapeInline(rawValue)}'`";
+    }
+
+    private static bool TryDescribeQualifierSource(DeclaredQualifierMeta? qualifier, TypeKind ownerType, out QualifierSourceInfo source)
+    {
+        if (qualifier is null)
+        {
+            source = null!;
             return false;
         }
 
-        source = SimplifyQualifierResolvedSource(template);
+        if (!string.IsNullOrWhiteSpace(qualifier.SourceFieldName))
+        {
+            source = new QualifierSourceInfo($"field `{EscapeInline(qualifier.SourceFieldName!)}`", qualifier.SourceFieldName, true);
+            return true;
+        }
+
+        var rawValue = GetQualifierRawValue(qualifier);
+        if (!string.IsNullOrWhiteSpace(rawValue)
+            && rawValue.Length > 2
+            && rawValue[0] == '{'
+            && rawValue[^1] == '}'
+            && rawValue.Count(static ch => ch == '{') == 1
+            && rawValue.Count(static ch => ch == '}') == 1)
+        {
+            var fieldName = SimplifyQualifierResolvedSource(rawValue);
+            source = new QualifierSourceInfo($"field `{EscapeInline(fieldName)}`", fieldName, true);
+            return true;
+        }
+
+        source = qualifier.Origin == QualifierOrigin.Derived
+            ? new QualifierSourceInfo("derived from operand qualifiers")
+            : new QualifierSourceInfo("declared explicitly on this type");
         return true;
     }
+
+    private static string GetQualifierRawValue(DeclaredQualifierMeta qualifier) => qualifier switch
+    {
+        DeclaredQualifierMeta.Currency currency => currency.CurrencyCode,
+        DeclaredQualifierMeta.FromCurrency currency => currency.CurrencyCode,
+        DeclaredQualifierMeta.ToCurrency currency => currency.CurrencyCode,
+        DeclaredQualifierMeta.Unit unit => unit.UnitCode,
+        DeclaredQualifierMeta.Dimension dimension => dimension.DimensionName,
+        DeclaredQualifierMeta.Timezone timezone => timezone.TimezoneId,
+        DeclaredQualifierMeta.TemporalDimension dimension => dimension.Value.ToString().ToLowerInvariant(),
+        DeclaredQualifierMeta.TemporalUnit unit => unit.UnitName,
+        _ => string.Empty,
+    };
+
+    private static bool TrySplitCompoundQualifier(string rawValue, out string numerator, out string denominator)
+    {
+        var slashIndex = rawValue.IndexOf('/');
+        if (slashIndex < 0)
+        {
+            numerator = string.Empty;
+            denominator = string.Empty;
+            return false;
+        }
+
+        numerator = rawValue[..slashIndex].Trim();
+        denominator = rawValue[(slashIndex + 1)..].Trim();
+        return !string.IsNullOrWhiteSpace(numerator) && !string.IsNullOrWhiteSpace(denominator);
+    }
+
+    private static string DescribeQualifierValueShape(DeclaredQualifierMeta? qualifier, QualifierAxis axis)
+    {
+        if (qualifier is null)
+        {
+            return "unresolved";
+        }
+
+        var rawValue = GetQualifierRawValue(qualifier);
+        if (TrySplitCompoundQualifier(rawValue, out var numerator, out var denominator))
+        {
+            return $"compound {GetQualifierAxisName(axis)} qualifier — numerator `'{EscapeInline(numerator)}'`, denominator `'{EscapeInline(denominator)}'`";
+        }
+
+        if (!string.IsNullOrWhiteSpace(qualifier.SourceFieldName)
+            || (rawValue.Length > 2 && rawValue[0] == '{' && rawValue[^1] == '}'))
+        {
+            return $"symbolic {GetQualifierAxisName(axis)} qualifier";
+        }
+
+        return $"literal {GetQualifierAxisName(axis)} qualifier";
+    }
+
+    private static bool TryGetQualifierUnresolvedReason(TypeKind ownerType, ImmutableArray<QualifierAxis> missingAxes, out string reason)
+    {
+        if (missingAxes.IsDefaultOrEmpty)
+        {
+            reason = string.Empty;
+            return false;
+        }
+
+        if (ownerType == TypeKind.ExchangeRate)
+        {
+            var hasFrom = missingAxes.Contains(QualifierAxis.FromCurrency);
+            var hasTo = missingAxes.Contains(QualifierAxis.ToCurrency);
+            reason = hasFrom && hasTo
+                ? "exchange rate has no `in ... to ...` annotation"
+                : hasFrom
+                    ? "exchange rate has no `in ...` annotation"
+                    : "exchange rate has no `to ...` annotation";
+            return true;
+        }
+
+        var missing = missingAxes.Select(GetQualifierAnnotationLabel).Distinct().ToArray();
+        reason = missing.Length switch
+        {
+            1 => $"{FormatType(ownerType)} declaration has no {missing[0]} annotation",
+            _ => $"{FormatType(ownerType)} declaration has no {string.Join(" or ", missing)} annotation",
+        };
+        return true;
+    }
+
+    private static string GetQualifierAnnotationLabel(QualifierAxis axis) => axis switch
+    {
+        QualifierAxis.Currency or QualifierAxis.Unit or QualifierAxis.FromCurrency or QualifierAxis.Timezone or QualifierAxis.TemporalUnit => "`in ...`",
+        QualifierAxis.Dimension or QualifierAxis.TemporalDimension => "`of ...`",
+        QualifierAxis.ToCurrency => "`to ...`",
+        _ => "qualifier",
+    };
 
     private static string SimplifyQualifierResolvedSource(string template)
     {
@@ -870,7 +1124,7 @@ internal static class RichHoverFactory
                 {
                     if (SymbolNavigation.Contains(qualifier.ValueSpan, position))
                     {
-                        var resolved = declaredQualifiers.FirstOrDefault(candidate => candidate.Axis == qualifier.Axis);
+                        var resolved = ResolveDeclarationQualifier(ownerType, declaredQualifiers, qualifier.Axis);
                         var label = $"{GetPrepositionText(qualifier.Preposition)} {FormatSnippet(compilation, qualifier.ValueSpan)}";
                         info = new QualifierHoverInfo(qualifier.Axis, qualifier.ValueSpan, label, ownerType, resolved);
                         return true;
@@ -1098,6 +1352,19 @@ internal static class RichHoverFactory
         _ => "qualifier",
     };
 
+    private static string GetQualifierDisplayName(QualifierAxis axis) => axis switch
+    {
+        QualifierAxis.Currency => "Currency",
+        QualifierAxis.Unit => "Unit",
+        QualifierAxis.Dimension => "Dimension",
+        QualifierAxis.FromCurrency => "Source currency",
+        QualifierAxis.ToCurrency => "Target currency",
+        QualifierAxis.Timezone => "Timezone",
+        QualifierAxis.TemporalDimension => "Temporal dimension",
+        QualifierAxis.TemporalUnit => "Temporal unit",
+        _ => "Qualifier",
+    };
+
     private static string GetQualifierChecksText(QualifierAxis axis) => axis switch
     {
         QualifierAxis.Currency => "assignments, comparisons, and arithmetic stay currency-compatible",
@@ -1222,6 +1489,15 @@ internal static class RichHoverFactory
     private sealed record ConstraintInfluenceSummary(
         ImmutableArray<string> ReferencedFields,
         ImmutableArray<EventArgReference> ReferencedArgs);
+
+    private sealed record QualifierResolutionEntry(
+        QualifierAxis Axis,
+        DeclaredQualifierMeta? Qualifier);
+
+    private sealed record QualifierSourceInfo(
+        string DisplayText,
+        string? FieldName = null,
+        bool IsFieldSource = false);
 
     private sealed record FieldWriteMap(
         ImmutableArray<string> WritableStates,
