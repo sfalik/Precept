@@ -168,4 +168,23 @@ public class ProofEngineTemporalChainTests
             .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
         ledger.Obligations.Should().NotContain(o => o.Requirement is QualifierChainProofRequirement);
     }
+
+    [Fact]
+    public void Price_same_qualifiers_proved()
+    {
+        var ledger = Prove("""
+            precept Widget
+            field P1 as price in 'USD' of 'mass' writable
+            field P2 as price in 'USD' of 'mass' writable
+            field Result as price in 'USD' of 'mass' writable
+            state Draft initial
+            event Submit
+            from Draft on Submit -> set Result = P1 + P2 -> no transition
+            """);
+
+        ledger.Obligations
+            .Where(o => o.Requirement is QualifierCompatibilityProofRequirement)
+            .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved));
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+    }
 }

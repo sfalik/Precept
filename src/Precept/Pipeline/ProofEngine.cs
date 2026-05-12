@@ -880,8 +880,11 @@ public static class ProofEngine
     {
         if (obligation.Requirement is QualifierCompatibilityProofRequirement qcReq)
         {
-            var leftQualifier = ResolveQualifierOnAxis(qcReq.LeftSubject, qcReq.Axis, obligation.Site, semantics);
-            var rightQualifier = ResolveQualifierOnAxis(qcReq.RightSubject, qcReq.Axis, obligation.Site, semantics);
+            if (obligation.Site is not TypedBinaryOp binOp)
+                return false;
+
+            var leftQualifier = ResolveQualifierFromExpression(binOp.Left, qcReq.Axis, semantics);
+            var rightQualifier = ResolveQualifierFromExpression(binOp.Right, qcReq.Axis, semantics);
 
             if (leftQualifier is null || rightQualifier is null)
                 return false;
@@ -1287,9 +1290,21 @@ public static class ProofEngine
                     usageSuffix);
 
             case QualifierCompatibilityProofRequirement qcReq:
+                string leftName, rightName;
+                if (obligation.Site is TypedBinaryOp qcBin)
+                {
+                    leftName = GetFieldName(qcBin.Left) ?? "<expression>";
+                    rightName = GetFieldName(qcBin.Right) ?? "<expression>";
+                }
+                else
+                {
+                    leftName = GetFieldName(qcReq.LeftSubject, obligation.Site) ?? "<unknown>";
+                    rightName = GetFieldName(qcReq.RightSubject, obligation.Site) ?? "<unknown>";
+                }
+
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
-                    GetFieldName(qcReq.LeftSubject, obligation.Site) ?? "<unknown>",
-                    GetFieldName(qcReq.RightSubject, obligation.Site) ?? "<unknown>",
+                    leftName,
+                    rightName,
                     qcReq.Axis.ToString(),
                     usageSuffix);
 

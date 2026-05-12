@@ -3740,6 +3740,48 @@ public class ProofEngineTests
         }
 
         [Fact]
+        public void Cross_currency_fields_now_detected()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as money in 'USD' default '0.00 USD' writable
+                field F2 as money in 'EUR' default '0.00 EUR' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = F1 + F2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Currency })
+                .Should().ContainSingle()
+                .Which.Disposition.Should().Be(ProofDisposition.Unresolved);
+            ledger.Diagnostics
+                .Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void Operand_names_in_diagnostics()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field F1 as money in 'USD' default '0.00 USD' writable
+                field F2 as money in 'EUR' default '0.00 EUR' writable
+                field Result as money default '0.00 USD' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = F1 + F2 -> no transition
+                """);
+
+            var diagnostic = ledger.Diagnostics
+                .Single(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+
+            diagnostic.Message.Should().Contain("F1");
+            diagnostic.Message.Should().Contain("F2");
+            diagnostic.Message.Should().NotContain("<unknown>");
+        }
+
+        [Fact]
         public void Money_plus_money_different_currency_diagnostic()
         {
             var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.MoneyPlusMoney);
@@ -4006,6 +4048,48 @@ public class ProofEngineTests
                 .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Unit })
                 .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved,
                     because: "same dimension falls back from Unit to Dimension"));
+        }
+
+        [Fact]
+        public void Quantity_same_dimension_proved()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Q1 as quantity of 'mass' writable
+                field Q2 as quantity of 'mass' writable
+                field Result as quantity default '0 kg' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Q1 + Q2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Unit })
+                .Should().ContainSingle()
+                .Which.Disposition.Should().Be(ProofDisposition.Proved,
+                    because: "same dimension qualifiers should compare successfully");
+            ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void Quantity_different_dimension_detected()
+        {
+            var ledger = Prove("""
+                precept Widget
+                field Q1 as quantity of 'mass' writable
+                field Q2 as quantity of 'length' writable
+                field Result as quantity default '0 kg' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Q1 + Q2 -> no transition
+                """);
+
+            ledger.Obligations
+                .Where(o => o.Requirement is QualifierCompatibilityProofRequirement { Axis: QualifierAxis.Unit })
+                .Should().ContainSingle()
+                .Which.Disposition.Should().Be(ProofDisposition.Unresolved);
+            ledger.Diagnostics
+                .Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         }
 
         [Fact]
