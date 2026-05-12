@@ -83,3 +83,7 @@
 - Removed the stale RC1 / RC2 compiler-blocker comments from `samples/inventory-item.precept`; those blockers are already shipped.
 - BUG-A is now explicitly a sample-side edit: `Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'` still needs Frank's sign-off before George changes the sample.
 - Commit: `b389e74e`.
+
+### 2026-05-12T15:15:10Z — Kramer proof hover implementation shipped
+- Kramer landed Elaine v4 proof hover across three commits: `5ab6030e` (qualifier hover), `516aa6ba` (proof status hover), and `7829e9c6` (proof chain detail).
+- Language-server validation stayed green at `264/264` in `Precept.LanguageServer.Tests`, so George can treat proof-hover routing and cards as shipped editor behavior rather than pending design work.

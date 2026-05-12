@@ -6,6 +6,62 @@
 
 ---
 
+### 2026-05-12T15:15:10Z: Proof hover spec is now consolidated into `docs/Working/hover-design.md`
+
+**By:** Scribe
+
+**Status:** Merged from Elaine's inbox note.
+
+**Merged source:** `elaine-hover-merge.md`.
+
+- Elaine merged the proof-hover design into `docs/Working/hover-design.md`, replacing the old standalone proof-hover draft with the canonical hover spec.
+- Qualifier hover now uses the proof-aware Scenario 4 card, and the working doc carries explicit scenarios for qualified fields, proof-bearing binary expressions, and proof diagnostic squiggles.
+- Hover routing, precedence, proof data-shape requirements, and proof-specific open questions now live in one maintained design surface instead of split working docs.
+
+---
+
+### 2026-05-12T15:15:10Z: Remaining `inventory-item.precept` proof fallout splits into shipped G1, BUG-C event-arg qualifiers, and deferred algebraic G2
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox note.
+
+**Merged source:** `frank-proof-coverage-expansion.md`.
+
+- Frank closed the root-cause triage: RC1 was the compound-unit qualifier bug in `ResolveQualifierFromInterpolatedConstant`, RC2 is blocked on BUG-C because unqualified `exchangerate` event args cannot carry `in ... to ...` metadata yet, and RC3 is a later algebraic proof-composition problem.
+- The decision explicitly reframed F4 as already implemented in runtime semantics; the remaining ReceiveShipment currency fallout is a data-shape gap, not a missing `CurrencyConversion` policy.
+- G1 stayed the immediate slice because it clears four diagnostics surgically; G2 remains deferred until BUG-C exposes qualifier data on event args.
+
+---
+
+### 2026-05-12T15:15:10Z: Compound-unit interpolated constants now resolve full `{A}/{B}` qualifiers before denominator fallback
+
+**By:** Scribe
+
+**Status:** Merged from George's inbox note.
+
+**Merged source:** `george-g1-compound-unit-fix.md`.
+
+- George fixed `ResolveQualifierFromInterpolatedConstant` so typed constants carrying both numerator and denominator unit slots build the full compound qualifier string instead of collapsing to the denominator.
+- The G1 pass shipped in commit `cb4fbf57`, kept `StaticMagnitude` on the typed interpolated constant node, and reused trusted positive-rule proofs so downstream nonzero obligations can discharge from the cleaned qualifier evidence.
+- RC1 fallout is cleared in `samples/inventory-item.precept`: the PRE0114s at plan lines 122/123 and the cascading DivisionByZero diagnostics at lines 137/142 are gone, with docs/history synced in `1ee54bdb`.
+
+---
+
+### 2026-05-12T15:15:10Z: Proof hover ships honest fallback reasons until compile-time proof exposes a stable failure-reason payload
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's inbox note.
+
+**Merged source:** `kramer-hover-gap-proof-reason.md`.
+
+- Kramer recorded that `Compilation.Proof` already gives hover enough truth for verdict, requirement, operands, qualifiers, context, and fix hints, but not a stable unresolved-reason payload for the `Reason:` line.
+- The shipped hover design therefore prefers explicit heuristics over invented precision when proof failure reasons are not surfaced directly from the compile-time ledger.
+- Elaine v4 hover implementation landed in commits `5ab6030e`, `516aa6ba`, and `7829e9c6`, and `264/264` `Precept.LanguageServer.Tests` passed with the current honest-fallback approach.
+
+---
+
 ### 2026-05-12T13:52:04Z: Proof diagnostic root cause is missing same-qualifier operation metadata, not a new proof strategy gap
 
 **By:** Scribe

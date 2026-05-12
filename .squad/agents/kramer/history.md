@@ -31,3 +31,7 @@
 - Real hover gaps are now explicit: qualifier hover still hides the resolved-source meaning line, and field/state/event still use the generic symbol path instead of explicit construct entrypoints.
 - No active Elaine-listed color gap remains in-tree; only Gap 1 field-vs-arg split evidence is partially unverified, and grammar-level regression depth could still improve.
 - Recommended follow-up stays focused on extra hover regression coverage, qualifier resolved-source rendering, optional construct-parity refactors, and explicit field/arg plus grammar-scope tests.
+
+### 2026-05-12T15:15:10Z — George shipped G1 compound-unit qualifier repair
+- George fixed `ResolveQualifierFromInterpolatedConstant` in `ProofEngine.cs` so interpolated compound-unit constants resolve the full `{A}/{B}` qualifier string before the denominator fallback path.
+- Commit `cb4fbf57` plus docs/history follow-up `1ee54bdb` cleared the RC1 PRE0114 and cascading DivisionByZero fallout in `samples/inventory-item.precept`, leaving only BUG-C / later proof work outside Kramers hover scope.
