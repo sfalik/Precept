@@ -126,7 +126,10 @@ public sealed class ParserSlice8Tests
             """);
 
         compilation.HasErrors.Should().BeFalse();
-        compilation.Diagnostics.Should().BeEmpty();
+
+        var diagnostic = compilation.Diagnostics.Should().ContainSingle().Which;
+        diagnostic.Code.Should().Be(nameof(DiagnosticCode.AlwaysRejecting));
+        diagnostic.Severity.Should().Be(Severity.Warning);
     }
 
     [Fact]

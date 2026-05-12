@@ -75,7 +75,13 @@
 - `.squad/decisions.md` remains the canonical chronology; this file now keeps only current implementation guidance and the newest merged outcomes.
 - 2026-05-11 implementation-detail updates for Slice 11B, Slice 1, Slices 6/10/11/12, A2B, and early inventory fallout were compacted into `history-archive.md` during the 2026-05-12T02:12:11Z summarization pass.
 
-## Recent Updates
+## Recent Updates
+
+### 2026-05-12T03:31:55Z — Bug031 warning expectation synced
+
+- `Parser_Bug031_InterpolatedRejectAndBecause_CompilesClean` now expects one `AlwaysRejecting` graph warning instead of an empty diagnostic set; the DSL fixture stays unchanged because the always-reject transition is intentional coverage for interpolated `reject` / `because` parsing.
+- Validation: filtered `Bug031` passes after rebuild (`dotnet test test\Precept.Tests\Precept.Tests.csproj --filter "Bug031" --no-build`), `Precept.Tests` is green in the full run, and repo-wide `dotnet test` still hits 7 unrelated existing failures (2 MCP, 5 language-server semantic-token tests).
+
 
 ### 2026-05-11T23:43:07Z — Slice 12 handoff and sample fallout recorded
 
