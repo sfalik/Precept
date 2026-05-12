@@ -225,20 +225,20 @@ from Unlisted on Publish
 #   quantity + quantity → quantity  (new on-hand)                           BUG-A
 #   money ÷ quantity → price        (new WAC)                               BUG-A
 from Listed on ReceiveShipment
-    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
-    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> no transition
 
 from LowStock on ReceiveShipment when QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit > RestockThreshold
-    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
-    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> transition Listed
 from LowStock on ReceiveShipment
-    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
-    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
+    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> no transition
 
 # FulfillOrder: capture P&L at current prices before decrementing stock.
