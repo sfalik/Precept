@@ -1082,6 +1082,8 @@ public static class ProofEngine
         var raw = qualifier switch
         {
             DeclaredQualifierMeta.Currency { CurrencyCode: var value } => value,
+            DeclaredQualifierMeta.FromCurrency { CurrencyCode: var value } => value,
+            DeclaredQualifierMeta.ToCurrency { CurrencyCode: var value } => value,
             DeclaredQualifierMeta.Unit { UnitCode: var value } => value,
             DeclaredQualifierMeta.Dimension { DimensionName: var value } => value,
             DeclaredQualifierMeta.TemporalUnit { UnitName: var value } => value,
@@ -1327,10 +1329,13 @@ public static class ProofEngine
                             : TryResolveCompoundCancellationUnit(binOp, axis, semantics),
                     CurrencyConversionRequired =>
                         axis == QualifierAxis.Currency
-                            // Result currency = exchangerate operand's ToCurrency
-                            ? ResolveQualifierFromExpression(
-                                binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
-                                QualifierAxis.ToCurrency, semantics)
+                            // Result currency = exchangerate operand's ToCurrency.
+                            // Translate the exchange-rate axis back onto the caller's Currency axis
+                            // so qualifier compatibility compares like-for-like in nested expressions.
+                            ? TranslateCurrencyAxis(
+                                ResolveQualifierFromExpression(
+                                    binOp.Left.ResultType == TypeKind.ExchangeRate ? binOp.Left : binOp.Right,
+                                    QualifierAxis.ToCurrency, semantics))
                             : null,
                     CompoundDimensionElevationRequired =>
                         axis == QualifierAxis.Currency
@@ -1346,6 +1351,20 @@ public static class ProofEngine
             default:
                 return null;
         }
+    }
+
+    private static DeclaredQualifierMeta? TranslateCurrencyAxis(DeclaredQualifierMeta? qualifier)
+    {
+        return qualifier switch
+        {
+            DeclaredQualifierMeta.ToCurrency toCurrency => new DeclaredQualifierMeta.Currency(
+                toCurrency.CurrencyCode,
+                toCurrency.Origin,
+                TokenKind.In,
+                toCurrency.ProofSatisfactions,
+                toCurrency.SourceFieldName),
+            _ => qualifier,
+        };
     }
 
     private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(

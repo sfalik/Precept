@@ -4794,6 +4794,20 @@ public class ProofEngineTests
         }
 
         [Fact]
+        public void SymbolicEquality_CrossSubtype_NullSourceField_FallsBackToStringExtraction()
+        {
+            var toCurrency = new DeclaredQualifierMeta.ToCurrency("{CatalogCurrency}");
+            var currency = new DeclaredQualifierMeta.Currency("{CatalogCurrency}");
+            var fromCurrency = new DeclaredQualifierMeta.FromCurrency("{SupplierCurrency}");
+            var supplierCurrency = new DeclaredQualifierMeta.Currency("{SupplierCurrency}");
+
+            ProofEngine.QualifiersSymbolicallyEqualForTest(toCurrency, currency)
+                .Should().BeTrue(because: "ToCurrency and Currency should share the same literal fallback path");
+            ProofEngine.QualifiersSymbolicallyEqualForTest(fromCurrency, supplierCurrency)
+                .Should().BeTrue(because: "FromCurrency and Currency should share the same literal fallback path");
+        }
+
+        [Fact]
         public void SymbolicEquality_MemberAccess_ExtractsRootField()
         {
             // Member-access forms share SourceFieldName "StockingUnit" — both root and dotted template equal.
@@ -4886,6 +4900,27 @@ public class ProofEngineTests
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Converted = Rate * Amount -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
+
+        [Fact]
+        public void ExchangeRateTimesMoney_InNestedAddition_UsesCurrencyAxisResult()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field CatalogCurrency as currency default 'USD'
+                field SupplierCurrency as currency default 'EUR'
+                field TotalInventoryCost as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' writable
+                state Draft initial
+                event ReceiveShipment(
+                    Amt as money in '{SupplierCurrency}' default '1.00 {SupplierCurrency}',
+                    Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}')
+                from Draft on ReceiveShipment
+                    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * ReceiveShipment.Amt
+                    -> no transition
                 """);
 
             compilation.HasErrors.Should().BeFalse();
