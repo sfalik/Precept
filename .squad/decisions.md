@@ -6,6 +6,35 @@
 
 ---
 
+### 2026-05-12T00:50:06Z: Derivation operations do not infer qualifiers on resulting `price` values
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox notes.
+
+**Merged source:** `frank-q2-derivation-no-inference.md`.
+
+- `money ÷ quantity`, `money ÷ period`, and `money ÷ duration` produce bare `price` results; the compiler does not infer denominator qualifiers from the divisor.
+- Authors who need temporal-denominated derived prices must assign into fields explicitly declared with `of 'time'` or `of 'date'`.
+- The rationale is now locked as D19 in `docs/language/business-domain-types.md`: qualifier inference on derivation would violate Precept's explicit, deterministic, inspectable domain-contract model.
+
+---
+
+### 2026-05-12T00:50:06Z: Temporal proof-plan audit confirms Slice 11B/12 direction and closes G15 as a false gap
+
+**By:** Scribe
+
+**Status:** Merged from Frank's inbox notes.
+
+**Merged sources:** `frank-plan-extension-g15.md`, `frank-spec-coverage-audit.md`, `frank-temporal-canonical-analysis.md`.
+
+- Canonical-doc review confirmed the Slice 11B direction is additive to locked docs: temporal denominators stay on `price of ...`, `price of 'time'` / `price of 'date'` is the right extension, and `quantity of 'time'` remains invalid.
+- `ImpliedQualifiers` on `TypeMeta`, temporal routing in `ExtractQualifiers`, comparable temporal values, and Dimension→TemporalDimension fallback remain the accepted infrastructure for Slice 11B.
+- G15 is closed as a false gap: derivation-direction operations do not need qualifier-chain proofs because the operands share no qualifier axis, and assignment validation already enforces declared-target compatibility in the practical cases.
+- The plan-status correction is durable: Slices 7–11 were confirmed already implemented; only Slice 11B and Slice 12 remain open work.
+
+---
+
 ### 2026-05-12T00:01:51Z: Temporal price denominators stay on `price of ...`; `quantity of 'time'` remains invalid
 
 **By:** Scribe
