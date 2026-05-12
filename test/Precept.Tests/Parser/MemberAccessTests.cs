@@ -53,6 +53,17 @@ public class MemberAccessTests
                      "it must be valid after '.' to allow expressions like 'Scores.max'");
     }
 
+    [Theory]
+    [InlineData(TokenKind.From)]
+    [InlineData(TokenKind.To)]
+    public void TokenMeta_ExchangeRateKeywordAccessor_IsValidAsMemberName(TokenKind kind)
+    {
+        var meta = Tokens.GetMeta(kind);
+
+        meta.IsValidAsMemberName.Should().BeTrue(
+            because: $"'{meta.Text}' is an exchangerate accessor and must remain valid after '.'");
+    }
+
     [Fact]
     public void KeywordsValidAsMemberName_ContainsAt()
     {
@@ -69,11 +80,20 @@ public class MemberAccessTests
                      "because the QueueBy type exposes a 'peekby' accessor");
     }
 
+    [Theory]
+    [InlineData(TokenKind.From)]
+    [InlineData(TokenKind.To)]
+    public void KeywordsValidAsMemberName_ContainsExchangeRateKeywordAccessor(TokenKind kind)
+    {
+        Tokens.KeywordsValidAsMemberName.Should().Contain(kind,
+            because: $"'{Tokens.GetMeta(kind).Text}' is declared as an exchangerate accessor in the type catalog");
+    }
+
     [Fact]
     public void KeywordsValidAsMemberName_IsNonEmpty()
     {
         Tokens.KeywordsValidAsMemberName.Should().NotBeEmpty(
-            because: "at minimum 'at' and 'peekby' are keyword-named accessors and must be included");
+            because: "at minimum 'at', 'peekby', 'from', and 'to' are keyword-named accessors and must be included");
     }
 
     // ── Parser: keyword member names parse as member access ──────────────────────
@@ -182,5 +202,19 @@ public class MemberAccessTests
 
         compilation.HasErrors.Should().BeFalse(
             because: "Scores.max uses the 'max' keyword as a member name — it must compile cleanly");
+    }
+
+    [Fact]
+    public void Compiler_ExchangeRateFromToAccessors_CompileCleanly()
+    {
+        var compilation = Compiler.Compile("""
+            precept ExchangeRateAccessors
+            field FxRate as exchangerate in 'USD' to 'EUR'
+            field SourceCurrency as currency <- FxRate.from
+            field TargetCurrency as currency <- FxRate.to
+            """);
+
+        compilation.HasErrors.Should().BeFalse(
+            because: "FxRate.from and FxRate.to use keyword tokens as exchangerate member names and must compile cleanly");
     }
 }

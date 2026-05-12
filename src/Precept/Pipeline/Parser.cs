@@ -28,10 +28,7 @@ public static partial class Parser
             .ToFrozenSet();
 
     public static FrozenSet<TokenKind> KeywordsValidAsMemberName { get; } =
-        Tokens.All
-            .Where(meta => meta.IsValidAsMemberName)
-            .Select(meta => meta.Kind)
-            .ToFrozenSet();
+        Tokens.KeywordsValidAsMemberName;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     //  Public API

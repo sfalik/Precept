@@ -13,6 +13,11 @@
 
 
 ## Learnings
+### 2026-05-12T00:20:02-04:00 — C2 .from/.to keyword member-name cycle
+
+- The safe derivation path is `Types.All` accessor names → `Tokens.Keywords` → `Tokens.KeywordsValidAsMemberName`; the parser must consume that frozen set directly instead of rebuilding it through `TokenMeta.IsValidAsMemberName` during static initialization.
+- The current workspace compile for `samples/inventory-item.precept` shows no `ExpectedToken` / PRE0009 fallout; remaining inventory diagnostics are now downstream proof/type issues, not the keyword-member-access cycle.
+
 ### 2026-05-11T23:20:02.837-04:00 — D2 exchangerate qualifier fixture sync
 
 - `exchangerate` qualifier declarations now use `in '<from-currency>' to '<to-currency>'`; stale `from` fixtures in type-checker tests drift out of sync with the language surface.
