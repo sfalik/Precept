@@ -612,7 +612,7 @@ The `(` disambiguates: constraint keywords are never followed by `(`, function c
 | After `set of`, `queue of`, `stack of` | Collection inner type | `field Tags as set of string`, `field Labels as set of ~string` |
 | After a domain type in a field declaration | Dimension family qualifier | `field Distance as quantity of 'length'` |
 
-Type qualifiers narrow the value domain of the field — they are part of the type annotation, not a declaration modifier. `in '<unit>'` pins to a specific unit or currency. `of '<family>'` constrains to a dimension or component family. A field may use `in` or `of`, never both — with one exception: `price` allows `in` (currency-only) combined with `of` (denominator dimension), because price has two independent axes. When `in` specifies a compound `'currency/unit'` value, `of` is rejected. The preceding token (always a type keyword or collection keyword) makes the type-qualifier role unambiguous at LL(1).
+Type qualifiers narrow the value domain of the field — they are part of the type annotation, not a declaration modifier. `in '<unit>'` pins to a specific unit or currency. `of '<family>'` constrains to a dimension or component family. A field may use `in` or `of`, never both — with one exception: `price` allows `in` (currency-only) combined with `of` (denominator dimension), because price has two independent axes. For `price`, `of 'time'` and `of 'date'` are valid temporal denominator qualifiers on that same axis; the proof engine uses them to validate `price * period` and `price * duration` cancellation. When `in` specifies a compound `'currency/unit'` value, `of` is rejected. The preceding token (always a type keyword or collection keyword) makes the type-qualifier role unambiguous at LL(1).
 
 The lexer uses a mode stack to handle nested interpolation in string and typed-constant literals. This ensures `{expr}` inside a literal correctly lexes the expression tokens and then returns to the literal context.
 
@@ -1269,7 +1269,7 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `quantity` | `*` `/` | `decimal` | `quantity` | Commutative for `*`. |
 | `quantity` | `/` | `quantity` (same dim.) | `decimal` | |
 | `quantity` | `/` | `quantity` (diff. dim.) | `quantity` (compound) | |
-| `price` | `*` | `quantity` / `period` / `duration` | `money` | Dimensional cancellation. Commutative. |
+| `price` | `*` | `quantity` / `period` / `duration` | `money` | Dimensional cancellation. Commutative. `price * period` requires matching temporal dimension; `price * duration` requires a time-denominated price. |
 | `price` | `*` `/` | `decimal` | `price` | Commutative for `*`. |
 | `price` | `±` | `price` | `price` | Same currency and unit required. |
 | `exchangerate` | `*` | `money` | `money` | Currency conversion. Commutative. |

@@ -28,6 +28,12 @@
 
 ## Recent Updates
 
+### 2026-05-11T21:23:24.768-04:00 — Slice 12 temporal chain validation complete
+- `src/Precept/Language/Operations.cs`: `Operations.Create()` switch arms at lines 615-633 now add `QualifierChainProofRequirement` entries for `PriceTimesPeriod` and `PriceTimesDuration`.
+- Constructor shape confirmed from `src/Precept/Language/ProofRequirement.cs` lines 106-112: `QualifierChainProofRequirement(ProofSubject LeftSubject, QualifierAxis LeftAxis, ProofSubject RightSubject, QualifierAxis RightAxis, string Description)`.
+- Added `test/Precept.Tests/ProofEngineTemporalChainTests.cs`: `Prove()` at lines 12-16, `AssertSingleChainObligation()` at lines 19-25, and 12 scenario tests at lines 30-169 covering proved matches, mismatches, bare-operand obligations, and regression anchors.
+- Validation: targeted class passed all 12 tests; full `dotnet test test/Precept.Tests/` remains at 26 pre-existing spike-branch failures, unchanged.
+
 ### 2026-05-12T01:05:25Z — Inventory coverage audit tightened remaining interpolation follow-up
 - `inventory-item.precept` still exposes a compound-unit interpolation gap, so the checker follow-up needs `unitofmeasure` U2 plus quantity compound patterns for forms like `'{StockingUnit}/{PurchaseUnit}'` and `'0 {StockingUnit}/{PurchaseUnit}'`, with dimensional validation of the resulting compound unit.
 - No new proof-engine bug was confirmed: BUG-B remains covered through interpolation plus Slice 9 fallback, while BUG-A now looks like an explicit regression-gap risk once event args parse cleanly.
