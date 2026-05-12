@@ -11,6 +11,9 @@
 - Hover, definition, highlight, references, and rename all depend on the same precise semantic span contracts; container spans are only acceptable when the consumer explicitly wants them.
 - Keyword semantic tokens should stay out of grammar-owned context-sensitive positions; the extension manifest and grammar must stay aligned on the fallback scopes they actually emit.
 - Qualifier hover V3 should derive its status detail from resolved qualifier metadata: simple interpolated templates like `{StockingUnit.dimension}` should collapse to the owning symbol for `qualifier resolves from ...`, and reject rows must keep precedence over generic transition hover because both come from the same `TransitionRows` projection.
+- Proof hover routing works best as a two-pass check in `HoverHandler.cs`: first ask `RichHoverFactory.TryCreateProofHover(...)` for proof diagnostics and proof-bearing expressions, then fall back to generic operator/type/accessor hover so PRE0114/PRE0116 explanation wins over catalog help.
+- `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` is now the compile-time proof-hover composition point: field proof summaries come from `Compilation.Proof.Obligations`, diagnostic cards join proof diagnostics back to `ProofObligation` via `FaultSiteLinks`, and expression cards resolve qualifier evidence from typed expressions rather than raw token text.
+- For hover evidence, reuse typed spans plus qualifier metadata together: `FormatSnippet(...)` gives the authored expression text, while `ResolveDeclarationQualifier(...)` / `ResolveQualifierFromExpression(...)` recover resolved qualifier values, sources, and proof-chain fields without reaching for parser back-pointers.
 
 ## Historical Summary
 

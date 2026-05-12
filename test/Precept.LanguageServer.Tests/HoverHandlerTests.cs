@@ -558,6 +558,7 @@ state Draft initial
         markup.Should().Contain("**expression** `(TotalRevenue - TotalReturns)`");
         markup.Should().Contain("Status: Proved");
         markup.Should().Contain("Requirement: both operands must resolve to the same Currency qualifier");
+        markup.Should().Contain("Proof chain fields: `CatalogCurrency`");
         markup.Should().Contain("Result qualifier: `'{CatalogCurrency}'`");
         markup.Should().Contain("Proof strategy: same-qualifier propagation");
     }

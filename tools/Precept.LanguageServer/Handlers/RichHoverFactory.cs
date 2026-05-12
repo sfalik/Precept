@@ -536,6 +536,19 @@ internal static class RichHoverFactory
         lines.Add($"Right qualifier{(resolvedRightAxis == defaultAxis ? string.Empty : $" ({GetQualifierDisplayName(resolvedRightAxis)})")}: {FormatProofQualifierValue(rightQualifier, "not proved at this site")}");
         lines.Add($"Right qualifier source: {DescribeProofQualifierSource(rightQualifier)}");
 
+        var proofChainFields = new[]
+        {
+            leftQualifier?.SourceFieldName,
+            rightQualifier?.SourceFieldName,
+        }
+            .Where(fieldName => !string.IsNullOrWhiteSpace(fieldName))
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+        if (!proofChainFields.IsEmpty)
+        {
+            lines.Add($"Proof chain fields: {FormatCodeList(proofChainFields!)}");
+        }
+
         if (includeResultLines)
         {
             var resultQualifier = ResolveQualifierFromExpression(obligation.Site, defaultAxis, compilation.Semantics);
