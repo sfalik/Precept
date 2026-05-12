@@ -1020,12 +1020,7 @@ internal static class RichHoverFactory
     private static string CreateStateMarkdown(Compilation compilation, TypedState state)
     {
         var graphState = compilation.Graph.States.FirstOrDefault(candidate => string.Equals(candidate.Name, state.Name, StringComparison.Ordinal));
-        var detail = DescribeStateReachability(compilation, state, graphState);
-        var statusKind = HasConstructDiagnostics(compilation, state.NameSpan) || graphState is null || !graphState.IsReachable
-            ? HoverStatusKind.Unverified
-            : HoverStatusKind.ProofVerified;
-        var status = new HoverStatusBadge(statusKind, detail);
-
+        var reachabilityDetail = DescribeStateReachability(compilation, state, graphState);
         var modifiers = state.Modifiers.IsDefaultOrEmpty ? "*none*" : FormatCodeList(state.Modifiers.Select(FormatModifierName));
         var incoming = compilation.Graph.Edges
             .Where(edge => string.Equals(edge.ToState, state.Name, StringComparison.Ordinal))
@@ -1040,10 +1035,27 @@ internal static class RichHoverFactory
         var writable = GetWritableFieldsForState(compilation, state.Name);
         var activeEnsures = GetEnsuresForState(compilation, state.Name);
         var unverifiedEnsures = activeEnsures.Count(entry => HasUnresolvedConstraint(compilation, entry.Identity));
+        var edgeProofStatuses = GetEdgeProofStatusesForState(compilation, state.Name);
+        var unresolvedEdgeCount = edgeProofStatuses.Count(status => !status.IsProven);
         var terminalReachable = IsTerminalReachable(compilation.Graph, state.Name);
         var titleSuffix = state.Modifiers.IsDefaultOrEmpty
             ? string.Empty
             : $" · {FormatCodeList(state.Modifiers.Select(FormatModifierName))}";
+        var statusDetail = graphState is null || !graphState.IsReachable
+            ? reachabilityDetail
+            : unresolvedEdgeCount > 0
+                ? $"{unresolvedEdgeCount} connected edge{Pluralize(unresolvedEdgeCount)} can't be proven"
+                : unverifiedEnsures > 0
+                    ? $"{unverifiedEnsures} ensure{Pluralize(unverifiedEnsures)} unverified"
+                    : reachabilityDetail;
+        var statusKind = HasConstructDiagnostics(compilation, state.NameSpan)
+            || graphState is null
+            || !graphState.IsReachable
+            || unresolvedEdgeCount > 0
+            || unverifiedEnsures > 0
+            ? HoverStatusKind.Unverified
+            : HoverStatusKind.ProofVerified;
+        var status = new HoverStatusBadge(statusKind, statusDetail);
 
         var lines = new List<string>
         {
@@ -1054,6 +1066,7 @@ internal static class RichHoverFactory
             $"Outgoing: {FormatCodeList(outgoing)}",
             $"Writable here: {FormatCodeList(writable)}",
             $"{(terminalReachable ? "Terminal reachable" : "No terminal path")} · active ensures: {activeEnsures.Length}{(unverifiedEnsures > 0 ? $" ({unverifiedEnsures} unverified)" : string.Empty)}",
+            CreateStateGraphEdgeProofCard(state, edgeProofStatuses),
         };
 
         return string.Join("\n\n", lines);
@@ -1643,6 +1656,38 @@ internal static class RichHoverFactory
                 && obligation.Context is TransitionRowContext context
                 && context.Row.RowSpan == row.RowSpan)
             .ToImmutableArray();
+
+    private static ImmutableArray<EdgeProofStatus> GetEdgeProofStatusesForState(Compilation compilation, string stateName) =>
+        compilation.Graph.EdgeProofStatuses
+            .Where(status => string.Equals(status.FromState, stateName, StringComparison.Ordinal)
+                || string.Equals(status.ToState, stateName, StringComparison.Ordinal))
+            .GroupBy(status => (status.FromState, status.EventName, status.ToState))
+            .Select(group => group.First())
+            .ToImmutableArray();
+
+    private static string CreateStateGraphEdgeProofCard(TypedState state, ImmutableArray<EdgeProofStatus> edgeProofStatuses)
+    {
+        var lines = new List<string>
+        {
+            $"📍 {EscapePlain(state.Name)} graph position",
+        };
+
+        var gaps = edgeProofStatuses
+            .Where(status => !status.IsProven)
+            .ToImmutableArray();
+
+        if (!gaps.IsEmpty)
+        {
+            lines.AddRange(gaps.Select(status =>
+                $"⚠️ Gap · {EscapePlain(status.FromState)} --{EscapePlain(status.EventName)}--> {EscapePlain(status.ToState)} can't be proven"));
+            return string.Join("\n\n", lines);
+        }
+
+        lines.Add(edgeProofStatuses.IsEmpty
+            ? "✅ Proven · no connected edges carry proof obligations"
+            : "✅ Proven · all connected edges satisfy their proof obligations");
+        return string.Join("\n\n", lines);
+    }
 
     private static ImmutableArray<(TypedEnsure Ensure, EnsureIdentity Identity)> GetEnsuresForState(Compilation compilation, string stateName) =>
         compilation.Semantics.Ensures

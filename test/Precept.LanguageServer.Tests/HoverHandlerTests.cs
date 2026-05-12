@@ -507,6 +507,65 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnState_WithUnprovenEdge_ShowsGraphProofGapCard()
+    {
+        const string source = """
+            precept StateEdgeProofGap
+            field Result as number
+            field Numerator as number
+            field Denominator as number
+            state Draft initial
+            state Approved terminal
+            event Submit
+            from Draft on Submit
+                -> set Result = Numerator / Denominator
+                -> transition Approved
+            """;
+
+        var markup = GetHoverMarkdown(source, "state Draft", offset: 6);
+
+        markup.Should().Contain("📍 Draft graph position");
+        markup.Should().Contain("⚠️ Gap · Draft --Submit--> Approved can't be proven");
+    }
+
+    [Fact]
+    public void Hover_OnState_WithOnlyProvenEdges_ShowsPositiveGraphProofCard()
+    {
+        const string source = """
+            precept StateEdgeProofPositive
+            field Result as number
+            field Numerator as number
+            field Denominator as number
+            state Draft initial
+            state Approved terminal
+            event Submit
+            from Draft on Submit when Denominator != 0
+                -> set Result = Numerator / Denominator
+                -> transition Approved
+            """;
+
+        var markup = GetHoverMarkdown(source, "state Draft", offset: 6);
+
+        markup.Should().Contain("📍 Draft graph position");
+        markup.Should().Contain("✅ Proven · all connected edges satisfy their proof obligations");
+        markup.Should().NotContain("⚠️ Gap ·");
+    }
+
+    [Fact]
+    public void Hover_OnState_WithNoConnectedEdges_ShowsNoObligationsGraphProofCard()
+    {
+        const string source = """
+            precept StateEdgeProofNoObligations
+            state Draft initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "state Draft", offset: 6);
+
+        markup.Should().Contain("📍 Draft graph position");
+        markup.Should().Contain("✅ Proven · no connected edges carry proof obligations");
+    }
+
+    [Fact]
     public void Hover_OnEvent_ShowsSignatureAndEligibleStates()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Publish(NewPrice as money");
