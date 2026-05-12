@@ -1876,6 +1876,7 @@ internal static partial class TypeChecker
         new([MatchEmpty, MatchSpaceUnit], [InterpolationSlotKind.Magnitude]),
         new([MatchNumericSpace, MatchEmpty], [InterpolationSlotKind.Unit]),
         new([MatchEmpty, (string s) => s == " ", MatchEmpty], [InterpolationSlotKind.Magnitude, InterpolationSlotKind.Unit]),
+        new([MatchEmpty, (string s) => s == " ", MatchSlash, MatchEmpty], [InterpolationSlotKind.Magnitude, InterpolationSlotKind.NumeratorUnit, InterpolationSlotKind.DenominatorUnit]),
     ];
 
     private static readonly SegmentForm[] PriceForms =
@@ -1931,6 +1932,12 @@ internal static partial class TypeChecker
         new([MatchEmpty, MatchEmpty], [InterpolationSlotKind.WholeValue]),
     ];
 
+    private static readonly SegmentForm[] UnitOfMeasureForms =
+    [
+        new([MatchEmpty, MatchEmpty], [InterpolationSlotKind.WholeValue]),
+        new([MatchEmpty, MatchSlash, MatchEmpty], [InterpolationSlotKind.NumeratorUnit, InterpolationSlotKind.DenominatorUnit]),
+    ];
+
     private static readonly SegmentForm[] TemporalSingleForms =
     [
         new([MatchEmpty, MatchEmpty], [InterpolationSlotKind.WholeValue]),
@@ -1950,7 +1957,7 @@ internal static partial class TypeChecker
         TypeKind.Price         => PriceForms,
         TypeKind.ExchangeRate  => ExchangeRateForms,
         TypeKind.Currency      => SingleComponentForms,
-        TypeKind.UnitOfMeasure => SingleComponentForms,
+        TypeKind.UnitOfMeasure => UnitOfMeasureForms,
         TypeKind.Dimension     => SingleComponentForms,
         TypeKind.Duration      => TemporalSingleForms,
         TypeKind.Period        => TemporalSingleForms,
@@ -1973,7 +1980,7 @@ internal static partial class TypeChecker
                 => holeType is TypeKind.Integer or TypeKind.Decimal or TypeKind.Number,
             InterpolationSlotKind.Currency or InterpolationSlotKind.FromCurrency or InterpolationSlotKind.ToCurrency
                 => holeType == TypeKind.Currency,
-            InterpolationSlotKind.Unit
+            InterpolationSlotKind.Unit or InterpolationSlotKind.NumeratorUnit or InterpolationSlotKind.DenominatorUnit
                 => holeType == TypeKind.UnitOfMeasure,
             InterpolationSlotKind.WholeValue
                 => holeType == targetType,
@@ -1987,7 +1994,8 @@ internal static partial class TypeChecker
         InterpolationSlotKind.Magnitude                 => "integer, decimal, or number",
         InterpolationSlotKind.Currency or InterpolationSlotKind.FromCurrency or InterpolationSlotKind.ToCurrency
                                                         => "currency",
-        InterpolationSlotKind.Unit                      => "unitofmeasure",
+        InterpolationSlotKind.Unit or InterpolationSlotKind.NumeratorUnit or InterpolationSlotKind.DenominatorUnit
+                                                        => "unitofmeasure",
         InterpolationSlotKind.WholeValue                => "the target type",
         _ => "unknown",
     };
@@ -2196,6 +2204,8 @@ internal static partial class TypeChecker
                 InterpolationSlotKind.FromCurrency              => TypeKind.Currency,
                 InterpolationSlotKind.ToCurrency                => TypeKind.Currency,
                 InterpolationSlotKind.Unit                      => TypeKind.UnitOfMeasure,
+                InterpolationSlotKind.NumeratorUnit             => TypeKind.UnitOfMeasure,
+                InterpolationSlotKind.DenominatorUnit           => TypeKind.UnitOfMeasure,
                 InterpolationSlotKind.WholeValue                => targetType,
                 _ => null,
             };

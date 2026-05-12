@@ -151,7 +151,9 @@ public enum InterpolationSlotKind
     Unit,
     FromCurrency,
     ToCurrency,
-    WholeValue
+    WholeValue,
+    NumeratorUnit,
+    DenominatorUnit
 }
 
 /// <summary>

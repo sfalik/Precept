@@ -687,6 +687,173 @@ public class TypeCheckerTypedConstantTests
             d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
     }
 
+    // ── Compound-unit interpolation ──────────────────────────────────────
+
+    [Fact]
+    public void InterpolatedTypedConstant_CompoundUnit_ValidUnitOfMeasure()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field a as unitofmeasure
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{a}/{b}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.UnitOfMeasure);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_IntegerMagnitudeWithCompoundUnit_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity
+            field n as integer
+            field a as unitofmeasure
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{n} {a}/{b}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_DecimalMagnitudeWithCompoundUnit_ValidQuantity()
+    {
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as quantity
+            field n as decimal
+            field a as unitofmeasure
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{n} {a}/{b}'
+            """);
+
+        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+            .Single(a => a.FieldName == "target");
+        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .Which.ResultType.Should().Be(TypeKind.Quantity);
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_QuantityInCompoundUnitSlot_TypeMismatch()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field q as quantity in 'kg'
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{q}/{b}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_StringInCompoundUnitNumerator_Rejected()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field s as string
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{s}/{b}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_StringInCompoundUnitDenominator_Rejected()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field a as unitofmeasure
+            field s as string
+            event Go initial
+            on Go
+                -> set target = '{a}/{s}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_IntegerInCompoundUnitSlot_Rejected()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field n as integer
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{n}/{b}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_ThreeHoleCompoundUnit_StructuralError()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field a as unitofmeasure
+            field b as unitofmeasure
+            field c as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{a}/{b}/{c}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InvalidInterpolatedTypedConstantForm));
+    }
+
+    [Fact]
+    public void InterpolatedTypedConstant_PipeSeparatedCompoundUnit_StructuralError()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Test
+            field target as unitofmeasure
+            field a as unitofmeasure
+            field b as unitofmeasure
+            event Go initial
+            on Go
+                -> set target = '{a}|{b}'
+            """);
+
+        diagnostics.Should().Contain(d =>
+            d.Code == nameof(DiagnosticCode.InvalidInterpolatedTypedConstantForm));
+    }
+
     // ── Valid combinations (positive tests) ──────────────────────────────
 
     [Fact]

@@ -116,3 +116,9 @@
 - Slice 12 follow-through needs comparison/proof support for Dimension→TemporalDimension fallback and must keep chain validation gated to price fields that explicitly carry the new temporal `of` qualifier.
 - Shane follow-ups remain open on `quantity in 's'` hinting, `money ÷ duration -> price` inference, and `period ×/÷ integer` operator support.
 
+### 2026-05-11T21:26:23.861-04:00 — Slice A2B compound-unit interpolation landed
+- The type-grammar table in `src/Precept/Pipeline/TypeChecker.Expressions.cs` is static-array driven: each target type maps through `GetFormsForType()` to `SegmentForm(TextMatch[] TextChecks, InterpolationSlotKind[] Slots)` entries, and `TryMatchForm()` walks the parser's `2N+1` alternating segment shape to assign slot identities by hole index.
+- Slot identity lives in `src/Precept/Pipeline/SemanticIndex.cs` as `InterpolationSlotKind` (the plan still calls it `SlotIdentity`). Slice A2B added `NumeratorUnit` and `DenominatorUnit` there.
+- Exact text-segment matching is delegate-based, not token-based: separator checks happen through `TextMatch` functions over `TextSegment.Text`, and the slash separator is the literal `MatchSlash(string text) => text == "/"` check. Literal spaces in mixed forms still use exact inline checks like `(string s) => s == " "`.
+- A2B added quantity Q5 (`'{n} {A}/{B}'`) plus a dedicated `UnitOfMeasureForms` compound-unit pattern for `'{A}/{B}'`; quantity Q6 was intentionally not added because the existing quantity whole-value lane is `H[whole-value]`, not a unit-only compound form.
+
