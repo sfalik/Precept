@@ -15,22 +15,6 @@ precept InventoryItem
 # Supplier invoices may be in any currency; an exchange rate converts to the
 # catalog currency at receipt time. The catalog currency itself is configurable
 # per product and locked at listing.
-#
-# THIS FILE DOES NOT COMPILE — it expresses the intended design.
-# Pending compiler issues (spike/Precept-V2-Radical):
-#
-#   ROOT CAUSE 2 (partial): compound-unit typed constant literals of the form
-#          '0 {Unit}/{Unit}' are parsed with only the denominator unit extracted.
-#          Affects rules/ensures that compare compound-unit quantity fields against
-#          typed constant literals (lines 116-117). The division-by-zero errors on
-#          the ListPrice ensures cascade from these failing to establish > 0 proof.
-#
-#   BUG-C: Rate arg declared as bare `exchangerate` — needs
-#          `in '{SupplierCurrency}' to '{CatalogCurrency}'` qualifier once
-#          interpolated arg qualifiers ship. Causes currency mismatch on all
-#          ReceiveShipment transitions (lines 211-224).
-#
-# Analysis: .squad/decisions/inbox/frank-inventory-deep-dive.md (2026-05-11)
 
 # ── Product identity ──────────────────────────────────────────────────────────
 
