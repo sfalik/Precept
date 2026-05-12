@@ -32,6 +32,22 @@ public static class QuantityValidator
             var literalDimension = UnitDimensionHelper.DeriveUnitDimensionName(unitResult.Unit!);
             foreach (var qualifier in qualifiers)
             {
+                if (qualifier is DeclaredQualifierMeta.Dimension { DimensionName: var compoundUnitDimension }
+                    && UnitDimensionHelper.TryGetCanonicalCompoundUnitCode(compoundUnitDimension, out var requiredCompoundUnit))
+                {
+                    if (!UnitDimensionHelper.TryGetCanonicalCompoundUnitCode(match.Groups[2].Value, out var actualCompoundUnit)
+                        || !string.Equals(actualCompoundUnit, requiredCompoundUnit, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        return TypedConstantParseResult.Failed(
+                            validation.FormatDescription,
+                            new TypedConstantDiagnostic(
+                                DiagnosticCode.QualifierMismatch.ToString(),
+                                $"Unit '{match.Groups[2].Value}' does not match compound qualifier '{compoundUnitDimension}'"));
+                    }
+
+                    continue;
+                }
+
                 string? requiredDimension = qualifier switch
                 {
                     DeclaredQualifierMeta.Dimension { DimensionName: var dimensionName } => dimensionName,

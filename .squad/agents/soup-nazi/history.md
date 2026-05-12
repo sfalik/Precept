@@ -59,3 +59,7 @@
 ### 2026-05-12T02:12:11Z — RC-1 / RC-2 scaffold coverage completed
 - Soup Nazi added 11 regression anchors across parser and typed-constant suites: 6 for RC-1 qualifier interpolation and 5 for RC-2 compound-unit quantity forms.
 - The deliberate red/green posture was preserved: one malformed-qualifier guard stayed green before the fixes, the other 10 tests went red as expected, and the full set closed green once george-rc1 and george-rc2 landed.
+
+### 2026-05-12T09:02:45.968-04:00 — B1 static Dimension-form cancellation gap closed
+- Added `CompoundUnit_cancellation_dimension_qualifier_form` in `test/Precept.Tests/ProofEngineTests.cs` to lock the `quantity of 'each/case'` cancellation path beside the existing `in 'X/Y'` regressions.
+- Static `of 'X/Y'` quantity qualifiers need exact compound-unit validation, not plain dimension-name validation; count atoms like `each/case` collapse dimensionally and must preserve numerator/denominator identity.

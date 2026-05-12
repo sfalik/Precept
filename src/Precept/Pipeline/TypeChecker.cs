@@ -272,8 +272,12 @@ internal static partial class TypeChecker
 
     private static DeclaredQualifierMeta.Dimension MapDimensionQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
     {
-        if (!DimensionCatalog.All.ContainsKey(value))
+        if (!DimensionCatalog.All.ContainsKey(value)
+            && !UnitDimensionHelper.TryGetCanonicalCompoundUnitCode(value, out _))
+        {
             ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidDimensionString, valueSpan, value));
+        }
+
         return new DeclaredQualifierMeta.Dimension(value);
     }
 

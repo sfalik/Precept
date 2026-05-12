@@ -4570,6 +4570,23 @@ public class ProofEngineTests
             compilation.HasErrors.Should().BeFalse();
             compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         }
+
+        [Fact]
+        public void CompoundUnit_cancellation_dimension_qualifier_form()
+        {
+            var compilation = Compiler.Compile("""
+                precept Widget
+                field Qty as quantity in 'case' default '2 case' writable
+                field Conv as quantity of 'each/case' default '12 each/case' writable
+                field Result as quantity in 'each' default '0 each' writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set Result = Qty * Conv -> no transition
+                """);
+
+            compilation.HasErrors.Should().BeFalse();
+            compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+        }
     }
 
     public class PartF_F3_StaticTypedConstantQualifierExtraction
