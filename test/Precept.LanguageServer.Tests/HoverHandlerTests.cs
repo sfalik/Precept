@@ -347,6 +347,27 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnGuardedRule_ShowsGuardCondition()
+    {
+        const string source = """
+            precept GuardedRuleHover
+            field ApprovedAmount as money in 'USD'
+            field CoverageLimit as money in 'USD'
+            field InForce as boolean
+            state Draft initial
+            state Done terminal
+            event Submit
+            rule ApprovedAmount <= CoverageLimit when InForce because "guarded cap"
+            from Draft on Submit -> transition Done
+            """;
+
+        var markup = GetHoverMarkdown(source, "rule ApprovedAmount <=");
+
+        markup.Should().Contain("**rule** `when InForce: ApprovedAmount <= CoverageLimit`");
+        markup.Should().Contain("Scope: global when `InForce`");
+    }
+
+    [Fact]
     public void Hover_OnState_ShowsReachabilityModifiersAndEnsures()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Archived terminal");
@@ -369,6 +390,20 @@ state Draft initial
         markup.Should().Contain("`Draft`");
         markup.Should().Contain("`Listed`");
         markup.Should().Contain("Arg: `NewPrice` is `money` · not nullable · `in USD`");
+    }
+
+    [Fact]
+    public void Hover_OnInitialEvent_ShowsConstructorWording()
+    {
+        const string source = """
+            precept InitialEventHover
+            event Create(Name as string) initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "Create(Name as string)");
+
+        markup.Should().Contain("**event `initial Create(Name as string)`**");
+        markup.Should().Contain("constructor event (invoked via `CreateInstance`, not `Fire`)");
     }
 
     [Fact]
@@ -432,6 +467,43 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnRequiredState_ShowsRequiredReachability()
+    {
+        const string source = """
+            precept RequiredStateHover
+            state Draft initial
+            state Approved required
+            state Done terminal
+            event Approve
+            event Finish
+            from Draft on Approve -> transition Approved
+            from Approved on Finish -> transition Done
+            """;
+
+        var markup = GetHoverMarkdown(source, "Approved required");
+
+        markup.Should().Contain("**state `Approved`** · `required`");
+        markup.Should().Contain("reachable; every initial→terminal path visits here");
+    }
+
+    [Fact]
+    public void Hover_OnProofVerifiedTransition_ShowsVerifiedBadge()
+    {
+        const string source = """
+            precept VerifiedTransitionHover
+            state Draft initial
+            state Done terminal
+            event Submit
+            from Draft on Submit -> transition Done
+            """;
+
+        var markup = GetHoverMarkdown(source, "from Draft on Submit");
+
+        markup.Should().Contain("✅ **Proof verified**");
+        markup.Should().NotContain("Proof gap:");
+    }
+
+    [Fact]
     public void Hover_OnQualifierExpression_ShowsAxisAndCompatibilityChecks()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "money in 'USD'", offset: 9);
@@ -439,6 +511,38 @@ state Draft initial
         markup.Should().Contain("**qualifier**");
         markup.Should().Contain("Axis: currency");
         markup.Should().Contain("Checks: assignments, comparisons, and arithmetic stay currency-compatible");
+    }
+
+    [Fact]
+    public void Hover_OnInterpolatedDimensionQualifier_ShowsResolvedSource()
+    {
+        const string source = """
+            precept QualifierHover
+            field StockingUnit as unitofmeasure
+            field QuantityOnHand as quantity of '{StockingUnit.dimension}'
+            state Draft initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "'{StockingUnit.dimension}'", offset: 2);
+
+        markup.Should().Contain("✅ **Proof verified** — qualifier resolves from `StockingUnit`");
+        markup.Should().Contain("Axis: physical dimension");
+    }
+
+    [Fact]
+    public void Hover_OnUnitQualifierExpression_ShowsUnitAxis()
+    {
+        const string source = """
+            precept QualifierHover
+            field StockingUnit as unitofmeasure
+            field QuantityOnHand as quantity in '{StockingUnit}'
+            state Draft initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "'{StockingUnit}'", offset: 2);
+
+        markup.Should().Contain("**qualifier**");
+        markup.Should().Contain("Axis: unit of measure");
     }
 
     private static string GetHoverMarkdown(string source, string needle, int offset = 0, int occurrence = 1)

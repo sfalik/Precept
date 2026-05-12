@@ -10,6 +10,7 @@
 - Semantic-token delta stability depends on exact identifier spans and cache invalidation of both `_documents` and `_latestResults` when token layouts change.
 - Hover, definition, highlight, references, and rename all depend on the same precise semantic span contracts; container spans are only acceptable when the consumer explicitly wants them.
 - Keyword semantic tokens should stay out of grammar-owned context-sensitive positions; the extension manifest and grammar must stay aligned on the fallback scopes they actually emit.
+- Qualifier hover V3 should derive its status detail from resolved qualifier metadata: simple interpolated templates like `{StockingUnit.dimension}` should collapse to the owning symbol for `qualifier resolves from ...`, and reject rows must keep precedence over generic transition hover because both come from the same `TransitionRows` projection.
 
 ## Historical Summary
 

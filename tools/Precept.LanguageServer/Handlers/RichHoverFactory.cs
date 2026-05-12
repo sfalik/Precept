@@ -24,6 +24,8 @@ internal static class RichHoverFactory
             return true;
         }
 
+        // Reject rows are represented inside TransitionRows too, so they must win before
+        // the generic transition template sees the same row span.
         if (TryCreateRejectHover(compilation, position, out hover))
         {
             return true;
@@ -477,19 +479,87 @@ internal static class RichHoverFactory
 
     private static string CreateQualifierMarkdown(Compilation compilation, QualifierHoverInfo info)
     {
-        var status = BuildStatus(compilation, info.Span, HoverStatusKind.ProofVerified, "qualifier compatibility checked at compile time");
-        var axisName = GetQualifierAxisName(info.Axis);
+        var status = BuildStatus(compilation, info.Span, HoverStatusKind.ProofVerified, GetQualifierStatusDetail(info));
         var lines = new List<string>
         {
             $"**qualifier** `{EscapeInline(info.Label)}`",
             FormatStatus(status),
-            $"Axis: {axisName}",
-            $"Checks: {GetQualifierChecksText(info.Axis)}",
+            $"Axis: {GetQualifierAxisName(info)}",
+            $"Checks: {GetQualifierChecksText(info)}",
             "Mismatch: incompatible combinations are rejected",
         };
 
         return string.Join("\n\n", lines);
     }
+
+    private static string GetQualifierStatusDetail(QualifierHoverInfo info)
+    {
+        if (TryGetQualifierResolvedSource(info.ResolvedQualifier, info.OwnerType, out var source))
+        {
+            return $"qualifier resolves from `{EscapeInline(source)}`";
+        }
+
+        return $"qualifier compatibility checked for `{EscapeInline(FormatType(info.OwnerType))}` at compile time";
+    }
+
+    private static bool TryGetQualifierResolvedSource(DeclaredQualifierMeta? qualifier, TypeKind ownerType, out string source)
+    {
+        var template = qualifier switch
+        {
+            DeclaredQualifierMeta.Currency currency => currency.CurrencyCode,
+            DeclaredQualifierMeta.FromCurrency currency => currency.CurrencyCode,
+            DeclaredQualifierMeta.ToCurrency currency => currency.CurrencyCode,
+            DeclaredQualifierMeta.Unit unit => unit.UnitCode,
+            DeclaredQualifierMeta.Dimension dimension => dimension.DimensionName,
+            DeclaredQualifierMeta.Timezone timezone => timezone.TimezoneId,
+            DeclaredQualifierMeta.TemporalDimension dimension when ownerType == TypeKind.Price => dimension.Value.ToString().ToLowerInvariant(),
+            DeclaredQualifierMeta.TemporalUnit unit when ownerType == TypeKind.Duration
+                || ownerType == TypeKind.Period
+                || ownerType == TypeKind.Price => unit.UnitName,
+            _ => null,
+        };
+
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            source = string.Empty;
+            return false;
+        }
+
+        source = SimplifyQualifierResolvedSource(template);
+        return true;
+    }
+
+    private static string SimplifyQualifierResolvedSource(string template)
+    {
+        if (template.Length > 2
+            && template[0] == '{'
+            && template[^1] == '}'
+            && template.Count(static ch => ch == '{') == 1
+            && template.Count(static ch => ch == '}') == 1)
+        {
+            var inner = template[1..^1];
+            if (inner.EndsWith(".dimension", StringComparison.Ordinal))
+            {
+                return inner[..^".dimension".Length];
+            }
+
+            return inner;
+        }
+
+        return template;
+    }
+
+    private static string GetQualifierAxisName(QualifierHoverInfo info) => info.ResolvedQualifier switch
+    {
+        DeclaredQualifierMeta.TemporalDimension or DeclaredQualifierMeta.TemporalUnit => GetQualifierAxisName(info.ResolvedQualifier.Axis),
+        _ => GetQualifierAxisName(info.Axis),
+    };
+
+    private static string GetQualifierChecksText(QualifierHoverInfo info) => info.ResolvedQualifier switch
+    {
+        DeclaredQualifierMeta.TemporalDimension or DeclaredQualifierMeta.TemporalUnit => GetQualifierChecksText(info.ResolvedQualifier.Axis),
+        _ => GetQualifierChecksText(info.Axis),
+    };
 
     private static HoverStatusBadge BuildConstraintStatus(
         Compilation compilation,

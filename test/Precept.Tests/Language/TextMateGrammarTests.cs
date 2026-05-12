@@ -43,6 +43,41 @@ public sealed class TextMateGrammarTests
             .GetValue<string>()
             .Should().Be("keyword.other.constraint.precept");
 
+    [Fact]
+    public void FieldAndEventArgReferences_UseDistinctNonFallbackScopes()
+    {
+        var fieldReferenceScope = GetCapture("collectionMemberAccess", "1")["name"]!.GetValue<string>();
+        var argReferenceScope = GetCapture("eventArgReference", "3")["name"]!.GetValue<string>();
+        var fallbackScope = GetRepositoryPattern("identifierReference")["name"]!.GetValue<string>();
+
+        fieldReferenceScope.Should().Be("variable.other.field.precept");
+        argReferenceScope.Should().Be("variable.parameter.property.precept");
+        fieldReferenceScope.Should().NotBe(argReferenceScope);
+        fieldReferenceScope.Should().NotBe(fallbackScope,
+            because: "field references should stay on the field lane, not the neutral fallback");
+        argReferenceScope.Should().NotBe(fallbackScope,
+            because: "event arg references should stay on the arg lane, not the neutral fallback");
+    }
+
+    [Fact]
+    public void BuiltInFunctionCalls_UseSupportFunctionScope()
+    {
+        GetCapture("functionCalls", "1")["name"]!.GetValue<string>().Should().Be("support.function.precept");
+        GetCapture("functionCallsCI", "1")["name"]!.GetValue<string>().Should().Be("support.function.precept");
+    }
+
+    [Fact]
+    public void DoubleQuotedStringEscapes_UseEscapeScope()
+        => Grammar["repository"]!
+            .AsObject()["strings"]!
+            .AsObject()["patterns"]!
+            .AsArray()[0]!
+            .AsObject()["patterns"]!
+            .AsArray()[0]!
+            .AsObject()["name"]!
+            .GetValue<string>()
+            .Should().Be("constant.character.escape.precept");
+
     private static JsonObject LoadGrammar()
     {
         var path = Path.GetFullPath(Path.Combine(
@@ -53,14 +88,17 @@ public sealed class TextMateGrammarTests
         return JsonNode.Parse(File.ReadAllText(path))!.AsObject();
     }
 
+    private static JsonObject GetRepositoryPattern(string repositoryKey, int patternIndex = 0)
+        => Grammar["repository"]!
+            .AsObject()[repositoryKey]!
+            .AsObject()["patterns"]!
+            .AsArray()[patternIndex]!
+            .AsObject();
+
     private static JsonObject GetCapture(string repositoryKey, string captureKey)
-    {
-        var repository = Grammar["repository"]!.AsObject();
-        var declaration = repository[repositoryKey]!.AsObject();
-        var pattern = declaration["patterns"]!.AsArray()[0]!.AsObject();
-        var captures = pattern["captures"]!.AsObject();
-        return captures[captureKey]!.AsObject();
-    }
+        => GetRepositoryPattern(repositoryKey)["captures"]!
+            .AsObject()[captureKey]!
+            .AsObject();
 
     private static int FindPatternIndex(JsonArray patterns, string name, string match)
     {

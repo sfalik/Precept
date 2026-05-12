@@ -357,7 +357,8 @@ Note: "Runtime checked" means enforcement happens at mutation time. Inspection (
 ## Implementation Notes for Kramer
 
 ### Resolver order
-- Resolve the enclosing construct first: rule, ensure, transition row, access declaration, omit declaration, reject row, qualifier span.
+- Resolve the enclosing construct first: rule, ensure, reject row, transition row, access declaration, omit declaration, qualifier span.
+- Reject must win before the generic transition-row hover because `-> reject` rows live in the same `TransitionRows` projection and would otherwise fall through to the transition template.
 - Fall back to token hover only when no construct-level result exists.
 
 ### Available data (V1 — compile-time only)
