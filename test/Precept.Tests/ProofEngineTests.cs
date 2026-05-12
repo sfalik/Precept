@@ -4426,6 +4426,34 @@ public class ProofEngineTests
             obligation!.Disposition.Should().Be(ProofDisposition.Proved);
             obligation.Strategy.Should().Be(ProofStrategy.CompositionalConstraint);
         }
+
+        [Fact]
+        public void Compositional_TrustedFacts_Prove_PositiveSumDenominator()
+        {
+            var ledger = Prove("""
+                precept InventoryMath
+                field OnHand as number default 0 writable
+                field StockingUnitsPerPurchaseUnit as number default 1 writable
+                field Average as number default 0 writable
+                state Active initial
+                rule OnHand >= 0 because "On hand cannot go negative"
+                rule StockingUnitsPerPurchaseUnit > 0 because "Conversion ratio must be positive"
+                event Receive(PurchaseQty as number)
+                on Receive ensure Receive.PurchaseQty > 0 because "Purchase quantity must be positive"
+                from Active on Receive
+                    -> set Average = 10 / (OnHand + Receive.PurchaseQty * StockingUnitsPerPurchaseUnit)
+                    -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m }
+                && o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved);
+            obligation.Strategy.Should().Be(ProofStrategy.CompositionalConstraint);
+            ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DivisionByZero));
+        }
     }
 
     public class PartE_E2_InterpolatedTypedConstantQualifierExtraction

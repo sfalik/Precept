@@ -172,4 +172,15 @@ public class ProofEngineTypedArgQualifierTests
             .Count(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility))
             .Should().BeLessThan(73, because: "C4 should reduce the inventory-item PRE0114 baseline");
     }
+
+    [Fact]
+    public void InventoryItem_Sample_Clears_G2_DivisionByZero_Diagnostics()
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesRoot, "inventory-item.precept"));
+        var compilation = Compiler.Compile(source);
+
+        compilation.Diagnostics.Should().NotContain(d =>
+            d.Code == nameof(DiagnosticCode.DivisionByZero)
+            && (d.Span.StartLine == 214 || d.Span.StartLine == 220 || d.Span.StartLine == 225));
+    }
 }
