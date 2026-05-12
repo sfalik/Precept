@@ -54,7 +54,15 @@
 
 
 
-## Learnings
+## Learnings
+
+### 2026-05-12T03:45:15Z — D4 scalar-op qualifier propagation
+
+- Six scalar operations (`*Decimal`, `/Decimal` for money, quantity, price) were missing `ResultQualifierPolicy`, causing their `TypedBinaryOp` results to carry `ResultQualifier: null`. When these appeared as operands in qualifier-checked operations (e.g., `MoneySubtractMoney`), the proof engine couldn't resolve their qualifiers → false PRE0114.
+
+- The fix adds `InheritFromQualifiedOperand` policy + `QualifiedOperandInherited` binding + transitive resolution in `ResolveQualifierOnAxis()`. The key insight: `ResolveQualifierFromExpression()` must recurse through nested `TypedBinaryOp` nodes to handle chained scalar ops like `A * B * B`.
+
+- Divide tests need the divisor field to carry `nonzero` modifier, not just `default 2` — the proof engine doesn't infer non-zero from default values alone.
 
 ### 2026-05-12T00:30:00-04:00 — C3 assignment-in-expression diagnostic
 
