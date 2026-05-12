@@ -50,6 +50,8 @@ public class TypeCheckerTransitionTests
     [Fact]
     public void TransitionRow_MultiStateFromList_ExpandsIntoIndependentRows()
     {
+        // Covers: comma-list expansion produces one TypedTransitionRow per source state,
+        // each with the correct FromState, shared event, shared target, and Transition outcome.
         var precept = """
             precept Widget
             field Count as number default 0
@@ -67,6 +69,7 @@ public class TypeCheckerTransitionTests
         index.TransitionRows.All(row => row.EventName == "Submit").Should().BeTrue();
         index.TransitionRows.All(row => row.TargetState == "Active").Should().BeTrue();
         index.TransitionRows.Should().OnlyContain(row => row.Actions.Length == 1);
+        index.TransitionRows.Should().OnlyContain(row => row.Outcome == TransitionRowOutcome.Transition);
     }
 
     [Fact]
@@ -158,6 +161,62 @@ public class TypeCheckerTransitionTests
 
         diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.StateListContainsWildcard));
         index.TransitionRows.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TransitionRow_MultiStateFromList_WithGuard_GuardClonedToAllExpandedRows()
+    {
+        // B3: guard expression (when Count > 0) must be propagated to every expanded row,
+        // not just the first — each TypedTransitionRow owns an independent reference to the
+        // same guard expression.
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Draft initial
+            state Pending
+            state Active
+            event Submit
+            from Draft, Pending on Submit when Count > 0 -> transition Active
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.TransitionRows.Should().HaveCount(2);
+        index.TransitionRows.Select(row => row.FromState).Should().Equal("Draft", "Pending");
+        index.TransitionRows.Should().OnlyContain(row => row.Guard != null,
+            because: "the 'when Count > 0' guard must be propagated to every expanded row");
+        index.TransitionRows.Should().OnlyContain(row => row.Outcome == TransitionRowOutcome.Transition);
+        index.TransitionRows.Should().OnlyContain(row => row.TargetState == "Active");
+    }
+
+    [Fact]
+    public void TransitionRow_MultiStateFromList_MultipleUnknownStates_EmitsPerStateDiagnostic()
+    {
+        // B4: each unknown name in a comma-list must produce its own UndeclaredState diagnostic,
+        // and both expanded rows must still be emitted with the unknown from-state names preserved.
+        // NOTE: NameBinder also resolves the first state name (via the StateName compat getter),
+        // so Missing1 receives two UndeclaredState diagnostics (one from each pipeline stage)
+        // while Missing2 receives one. Total is >= 2; both states must have at least one entry.
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Active initial
+            event Submit
+            from Missing1, Missing2 on Submit -> no transition
+            """;
+
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        var undeclared = diagnostics.Where(d => d.Code == nameof(DiagnosticCode.UndeclaredState)).ToList();
+        undeclared.Should().HaveCountGreaterThanOrEqualTo(2,
+            because: "each unknown state name in the list must produce at least one UndeclaredState diagnostic");
+        undeclared.Should().Contain(d => d.Args.Contains("Missing1"),
+            because: "Missing1 is not a declared state");
+        undeclared.Should().Contain(d => d.Args.Contains("Missing2"),
+            because: "Missing2 is not a declared state");
+
+        index.TransitionRows.Should().HaveCount(2);
+        index.TransitionRows.Select(row => row.FromState).Should().Equal("Missing1", "Missing2");
     }
 
     [Fact]

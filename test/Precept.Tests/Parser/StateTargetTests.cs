@@ -145,6 +145,72 @@ public class StateTargetTests
             because: "the FieldTargetSlot must capture the broadcast token text 'all'");
     }
 
+    // ── Parser: comma-list StateTarget ───────────────────────────────────────────
+
+    [Fact]
+    public void Parser_FromCommaList_TwoNames_StateTargetSlot_CarriesBothNames()
+    {
+        var manifest = Pipeline.Parser.Parse(Lexer.Lex("from Draft, Pending on Submit -> no transition"));
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var slot = row.Slots.OfType<StateTargetSlot>().Single();
+
+        slot.StateNames.Should().HaveCount(2);
+        slot.StateNames.Should().ContainInOrder("Draft", "Pending");
+    }
+
+    [Fact]
+    public void Parser_FromCommaList_ThreeNames_StateTargetSlot_CarriesAllThreeNames()
+    {
+        var manifest = Pipeline.Parser.Parse(Lexer.Lex("from Draft, Pending, Review on Submit -> no transition"));
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var slot = row.Slots.OfType<StateTargetSlot>().Single();
+
+        slot.StateNames.Should().HaveCount(3);
+        slot.StateNames.Should().ContainInOrder("Draft", "Pending", "Review");
+    }
+
+    [Fact]
+    public void Parser_FromCommaList_NoSpaces_ParsesCorrectly()
+    {
+        var manifest = Pipeline.Parser.Parse(Lexer.Lex("from Draft,Pending on Submit -> no transition"));
+
+        manifest.Diagnostics.Should().BeEmpty(
+            because: "no spaces around comma should not affect parsing");
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var slot = row.Slots.OfType<StateTargetSlot>().Single();
+
+        slot.StateNames.Should().HaveCount(2);
+        slot.StateNames.Should().ContainInOrder("Draft", "Pending");
+    }
+
+    [Fact]
+    public void Parser_FromCommaList_ExtraWhitespace_ParsesCorrectly()
+    {
+        var manifest = Pipeline.Parser.Parse(Lexer.Lex("from Draft ,  Pending on Submit -> no transition"));
+
+        manifest.Diagnostics.Should().BeEmpty(
+            because: "extra spaces around comma should not affect parsing");
+
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var slot = row.Slots.OfType<StateTargetSlot>().Single();
+
+        slot.StateNames.Should().HaveCount(2);
+        slot.StateNames.Should().ContainInOrder("Draft", "Pending");
+    }
+
+    [Fact]
+    public void Parser_FromCommaList_TrailingComma_EmitsDiagnostic()
+    {
+        // 'from Draft, on Submit' — the parser sees a comma then a keyword, not an identifier
+        var manifest = Pipeline.Parser.Parse(Lexer.Lex("from Draft, on Submit -> no transition"));
+
+        manifest.Diagnostics.Should().NotBeEmpty(
+            because: "a trailing comma (comma followed by a keyword instead of an identifier) must produce a parse diagnostic");
+    }
+
     // ── Full compilation: wildcards round-trip cleanly ───────────────────────────
 
     [Fact]

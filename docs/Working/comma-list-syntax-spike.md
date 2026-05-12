@@ -432,6 +432,14 @@ Complete list of every file touched in the implementation PR, organized by categ
 | Type checker | Multi-state expansion (verify N rows emitted). Both new diagnostics: `StateListContainsWildcard`, `DuplicateStateInList`. |
 | Samples | All updated samples compile clean with 0 diagnostics. |
 
+**Test count record:**
+
+| Checkpoint | `Precept.Tests` count | Notes |
+|------------|----------------------|-------|
+| Pre-spike baseline | 4938 | Verified by Soup Nazi against `dotnet test` on `spike/Precept-V2-Radical` before S1/S2 landed |
+| Post-spike (commit `a63d88b4`) | 4962 | Verified by Frank during spike review; Soup Nazi also confirmed this count (`dotnet test` output) |
+| After Soup Nazi blocker fixes (B1–B4) | 4969 | 7 new tests added: 5 parser comma-list AST shape tests, guard-cloning test, multi-unknown-state fan-out test |
+
 ---
 
 ## 9. Design Decisions (Locked)

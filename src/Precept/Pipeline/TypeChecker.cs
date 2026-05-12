@@ -995,6 +995,8 @@ internal static partial class TypeChecker
             foreach (var resolvedState in resolvedStates)
             {
                 ctx.AccessModes.Add(new TypedAccessMode(
+                    // StateName: resolvedState carries the expanded single name after normalization;
+                    // fall back to stateSlot.StateName (first-element compat) for wildcard rows where no target was resolved.
                     StateName: resolvedState.StateName ?? stateSlot?.StateName ?? "",
                     FieldName: fieldName,
                     Mode: mode,
@@ -1043,6 +1045,8 @@ internal static partial class TypeChecker
             {
                 ctx.StateHooks.Add(new TypedStateHook(
                     Scope: scope,
+                    // StateName: resolvedState carries the expanded single name after normalization;
+                    // fall back to stateSlot.StateName (first-element compat) for wildcard rows where no target was resolved.
                     StateName: resolvedState.StateName ?? stateSlot?.StateName ?? "",
                     Guard: guard,
                     Actions: actions,
