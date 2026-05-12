@@ -83,8 +83,11 @@ internal static partial class TypeChecker
             if (meta is not ValueModifierMeta valueMeta)
                 continue;
 
-            // Applicability: empty ApplicableTo = any type; otherwise check membership
+            // Applicability: empty ApplicableTo = any type; otherwise check membership.
+            // Skip applicability check if the modifier is already implied by the type —
+            // the redundancy check below will emit RedundantModifier instead.
             if (valueMeta.ApplicableTo.Length > 0 &&
+                !impliedModifiers.Contains(kind) &&
                 !IsTypeApplicable(valueMeta.ApplicableTo, resolvedType, modifiers.Select(m => m.Kind).ToImmutableArray()))
             {
                 var typeName = Types.GetMeta(resolvedType).DisplayName;

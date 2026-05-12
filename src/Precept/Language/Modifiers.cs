@@ -17,16 +17,23 @@ public static class Modifiers
     [
         new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
         new(TypeKind.Money),   new(TypeKind.Quantity),
+        new(TypeKind.Price),   new(TypeKind.ExchangeRate),
     ];
 
     private static readonly TypeTarget[] RangedNumericTypes =
     [
         new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
         new(TypeKind.Money),   new(TypeKind.Quantity),
+        new(TypeKind.Price),
+    ];
+
+    private static readonly TypeTarget[] BusinessMagnitudeTypes =
+    [
+        new(TypeKind.Decimal), new(TypeKind.Money), new(TypeKind.Quantity),
+        new(TypeKind.Price),   new(TypeKind.ExchangeRate),
     ];
 
     private static readonly TypeTarget[] StringOnly = [new(TypeKind.String)];
-    private static readonly TypeTarget[] DecimalOnly = [new(TypeKind.Decimal)];
     private static readonly TypeTarget[] ChoiceOnly = [new(TypeKind.Choice)];
 
     private static readonly TypeTarget[] CollectionTypes =
@@ -229,8 +236,8 @@ public static class Modifiers
         ModifierKind.Maxplaces => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxplaces),
             "Maximum decimal places",
-            ModifierCategory.Structural, DecimalOnly, HasValue: true,
-            HoverDescription: "The decimal field must have at most this many digits after the decimal point.",
+            ModifierCategory.Structural, BusinessMagnitudeTypes, HasValue: true,
+            HoverDescription: "The decimal or business-domain magnitude field (money, quantity, price, exchangerate) must have at most this many digits after the decimal point. For currency amounts, this overrides the currency's default minor-unit precision.",
             DesugarsToRule: true),
 
         ModifierKind.Writable => new ValueModifierMeta(
