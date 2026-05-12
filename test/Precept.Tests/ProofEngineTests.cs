@@ -997,7 +997,7 @@ public class ProofEngineTests
 
             var diagnostic = ledger.Diagnostics.Single(d =>
                 d.Code == nameof(DiagnosticCode.UnprovedPresenceRequirement));
-            diagnostic.Message.Should().Be("'OptionalText' is optional and may be empty here — guard with 'when OptionalText is set' or remove 'optional' (used on event 'Submit' from state 'Draft')");
+            diagnostic.Message.Should().Be("Cannot prove that 'OptionalText' is present (used on event 'Submit' from state 'Draft') — guard with 'when OptionalText is set', initialize it earlier, or make it required");
         }
 
         [Fact]
@@ -1784,7 +1784,7 @@ public class ProofEngineTests
 
             var diagnostic = ledger.Diagnostics.Single(d =>
                 d.Code == nameof(DiagnosticCode.UnprovedModifierRequirement));
-            diagnostic.Message.Should().Be("Field 'Offset' requires 'Nonzero' — add 'Nonzero' to its declaration (used on event 'Advance' from state 'Draft')");
+            diagnostic.Message.Should().Be("Cannot prove that 'Offset' satisfies the required modifier 'Nonzero' (used on event 'Advance' from state 'Draft')");
         }
 
         [Fact]
@@ -1819,7 +1819,7 @@ public class ProofEngineTests
 
             var diagnostic = ledger.Diagnostics.Single(d =>
                 d.Code == nameof(DiagnosticCode.UnprovedDimensionRequirement));
-            diagnostic.Message.Should().Be("Field 'Offset' needs a 'date' dimension qualifier — add 'of date' to the field declaration (used on event 'Advance' from state 'Draft')");
+            diagnostic.Message.Should().Be("'Offset' must declare `of 'date'` before it can be used here (used on event 'Advance' from state 'Draft')");
         }
 
         [Fact]
@@ -4637,7 +4637,7 @@ public class ProofEngineTests
         }
 
         [Fact]
-        public void QualifierCompatibility_diagnostic_describes_subexpressions_and_values()
+        public void QualifierCompatibility_diagnostic_uses_cannot_prove_bracketed_values_and_context()
         {
             var compilation = Compiler.Compile("""
                 precept Widget
@@ -4650,9 +4650,7 @@ public class ProofEngineTests
             var diagnostic = compilation.Diagnostics
                 .Single(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
 
-            diagnostic.Message.Should().Contain("(A - B)");
-            diagnostic.Message.Should().Contain("Currency: 'USD'");
-            diagnostic.Message.Should().Contain("Currency: 'EUR'");
+            diagnostic.Message.Should().Be("Cannot prove Currency qualifier compatibility between '(A - B)' [Currency: 'USD'] and 'C' [Currency: 'EUR'] in the computed expression for field 'Result'");
             diagnostic.Message.Should().NotContain("<expression>");
             diagnostic.Message.Should().NotContain("<unknown>");
         }

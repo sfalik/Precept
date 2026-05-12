@@ -326,18 +326,21 @@ public static class ProofEngine
     private static string DescribeSubject(ProofSubject subject, TypedExpression site)
         => DescribeExpression(ResolveSubject(subject, site));
 
-    private static string DescribeQualifiedSubject(
+    private static (string Label, string QualifierValue) DescribeQualifiedSubject(
         ProofSubject subject,
         TypedExpression site,
         QualifierAxis axis,
         SemanticIndex semantics)
         => DescribeQualifiedExpression(ResolveSubject(subject, site), axis, semantics);
 
-    private static string DescribeQualifiedExpression(TypedExpression? expr, QualifierAxis axis, SemanticIndex semantics)
+    private static (string Label, string QualifierValue) DescribeQualifiedExpression(
+        TypedExpression? expr,
+        QualifierAxis axis,
+        SemanticIndex semantics)
     {
         var label = DescribeExpression(expr);
         var qualifier = expr is null ? null : ResolveQualifierFromExpression(expr, axis, semantics);
-        return $"{label} ({axis}: {DescribeQualifier(qualifier)})";
+        return (label, FormatQualifierValue(qualifier));
     }
 
     private static string DescribeExpression(TypedExpression? expr) => expr switch
@@ -373,10 +376,10 @@ public static class ProofEngine
         };
     }
 
-    private static string DescribeQualifier(DeclaredQualifierMeta? qualifier)
+    private static string FormatQualifierValue(DeclaredQualifierMeta? qualifier)
     {
         if (qualifier is null)
-            return "<unresolved>";
+            return "unresolved";
 
         var value = qualifier switch
         {
@@ -398,7 +401,7 @@ public static class ProofEngine
         };
 
         return string.IsNullOrWhiteSpace(value)
-            ? "<unresolved>"
+            ? "unresolved"
             : $"'{value}'";
     }
 
@@ -1677,7 +1680,7 @@ public static class ProofEngine
 
     private static Diagnostic CreateDiagnostic(ProofObligation obligation, SemanticIndex semantics)
     {
-        var contextDesc = FormatContextDescription(obligation.Context);
+        var contextClause = FormatContextClause(obligation.Context);
         var usageSuffix = FormatUsageContextSuffix(obligation.Context);
 
         switch (obligation.Requirement)
@@ -1688,7 +1691,7 @@ public static class ProofEngine
             case NumericProofRequirement numeric:
                 return Diagnostics.Create(GetNumericRequirementDiagnosticCode(obligation, numeric), obligation.Site.Span,
                     DescribeSubject(numeric.Subject, obligation.Site),
-                    contextDesc);
+                    contextClause);
 
             case ModifierRequirement modReq:
                 return Diagnostics.Create(DiagnosticCode.UnprovedModifierRequirement, obligation.Site.Span,
@@ -1703,30 +1706,37 @@ public static class ProofEngine
                     usageSuffix);
 
             case QualifierCompatibilityProofRequirement qcReq:
-                string leftName, rightName;
+                (string Label, string QualifierValue) leftOperand;
+                (string Label, string QualifierValue) rightOperand;
                 if (obligation.Site is TypedBinaryOp qcBin)
                 {
-                    leftName = DescribeQualifiedExpression(qcBin.Left, qcReq.Axis, semantics);
-                    rightName = DescribeQualifiedExpression(qcBin.Right, qcReq.Axis, semantics);
+                    leftOperand = DescribeQualifiedExpression(qcBin.Left, qcReq.Axis, semantics);
+                    rightOperand = DescribeQualifiedExpression(qcBin.Right, qcReq.Axis, semantics);
                 }
                 else
                 {
-                    leftName = DescribeQualifiedSubject(qcReq.LeftSubject, obligation.Site, qcReq.Axis, semantics);
-                    rightName = DescribeQualifiedSubject(qcReq.RightSubject, obligation.Site, qcReq.Axis, semantics);
+                    leftOperand = DescribeQualifiedSubject(qcReq.LeftSubject, obligation.Site, qcReq.Axis, semantics);
+                    rightOperand = DescribeQualifiedSubject(qcReq.RightSubject, obligation.Site, qcReq.Axis, semantics);
                 }
 
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
-                    leftName,
-                    rightName,
+                    leftOperand.Label,
+                    rightOperand.Label,
                     qcReq.Axis.ToString(),
-                    usageSuffix);
+                    contextClause,
+                    leftOperand.QualifierValue,
+                    rightOperand.QualifierValue);
 
             case QualifierChainProofRequirement chainReq:
+                var leftExpression = ResolveSubject(chainReq.LeftSubject, obligation.Site);
+                var rightExpression = ResolveSubject(chainReq.RightSubject, obligation.Site);
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
-                    DescribeSubject(chainReq.LeftSubject, obligation.Site),
-                    DescribeSubject(chainReq.RightSubject, obligation.Site),
+                    DescribeExpression(leftExpression),
+                    DescribeExpression(rightExpression),
                     $"{chainReq.LeftAxis}↔{chainReq.RightAxis}",
-                    usageSuffix);
+                    contextClause,
+                    FormatQualifierValue(leftExpression is null ? null : ResolveQualifierFromExpression(leftExpression, chainReq.LeftAxis, semantics)),
+                    FormatQualifierValue(rightExpression is null ? null : ResolveQualifierFromExpression(rightExpression, chainReq.RightAxis, semantics)));
 
             case PresenceProofRequirement presence:
                 return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,
@@ -1823,6 +1833,14 @@ public static class ProofEngine
         return usageDescription == "here"
             ? " (used here)"
             : $" (used {usageDescription})";
+    }
+
+    private static string FormatContextClause(ObligationContext context)
+    {
+        var usageDescription = FormatUsageContextDescription(context);
+        return usageDescription == "here"
+            ? string.Empty
+            : $" {usageDescription}";
     }
 
     private static string FormatUsageContextDescription(ObligationContext context) => context switch

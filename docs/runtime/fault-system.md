@@ -218,11 +218,11 @@ If any link is missing, the build fails. The chain is enforced across five layer
        → [StaticallyPreventable(DiagnosticCode.DivisionByZero)]
 
 3. DiagnosticCode.DivisionByZero
-       → Proof stage, Error, "Division by zero: '{0}' can be zero when {1}"
+       → Proof stage, Error, "Division is unsafe: '{0}' can be zero{1}"
 
 4. ProofEngine: analyzes every division expression
        → if divisor interval includes zero:
-           Diagnostics.Create(DiagnosticCode.DivisionByZero, range, "rate", "rate has no lower bound")
+           Diagnostics.Create(DiagnosticCode.DivisionByZero, range, "rate", " in the computed expression for field 'Average'")
 
 5. Compilation.HasErrors == true → no Precept produced → evaluator never runs
 ```

@@ -50,6 +50,7 @@
 - 2026-05-12 — P2: When co-running agents share the filesystem, use `git add <specific-files>` (not `git add -A`) to isolate your commit from other agents' working tree changes.
 - 2026-05-12 — Sample headers can go stale after runtime/parser fixes land; when a blocker moves from compiler support to sample authoring, update the sample comment to name the remaining sample-side edit instead of leaving obsolete root-cause notes.
 - 2026-05-12 — Same-qualifier arithmetic must declare `Match: QualifierMatch.Same`, not just `QualifierCompatibilityProofRequirement`; otherwise intermediate `TypedBinaryOp.ResultQualifier` stays null and nested PRE0114 proofs never recurse through the subexpression.
+- 2026-05-12 — PRE0114's six-argument rewrite is cleaner when qualifier values are resolved at diagnostic emission time; reusing preformatted operand strings hides the structured left/right qualifier payloads and breaks the shared template for chain proofs.
 
 ### 2026-05-12T05:04:03Z — E2 and E3 completed
 - Typed interpolated constant qualifier extraction (E2, `8785d753`) and subexpression / compound-unit qualifier propagation (E3, `d3f5aa98`) landed, with `f4db093e` fixing the ReceiveShipment parenthesization follow-up.
