@@ -668,6 +668,9 @@ internal static partial class TypeChecker
         if (meta.ResultQualifierPolicy == ResultQualifierPolicy.CompoundUnitCancellation)
             return new CompoundUnitCancellationRequired();
 
+        if (meta.ResultQualifierPolicy == ResultQualifierPolicy.InheritFromQualifiedOperand)
+            return new QualifiedOperandInherited();
+
         return meta.Match switch
         {
             QualifierMatch.Same      => new SameQualifierRequired(),

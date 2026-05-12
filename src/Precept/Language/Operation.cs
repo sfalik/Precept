@@ -27,6 +27,11 @@ public enum ResultQualifierPolicy
     [Precept.AllowZeroDefault]
     None,
     CompoundUnitCancellation,
+    /// <summary>
+    /// Result inherits qualifiers from the qualifier-bearing operand in a scalar operation
+    /// (e.g., money × decimal → money with same qualifier).
+    /// </summary>
+    InheritFromQualifiedOperand,
 }
 
 /// <summary>

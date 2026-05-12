@@ -204,6 +204,12 @@ public sealed record SameQualifierRequired : QualifierBinding;
 /// <summary>A quantity product cancels a compound-unit denominator and inherits the numerator unit.</summary>
 public sealed record CompoundUnitCancellationRequired : QualifierBinding;
 
+/// <summary>
+/// Result inherits qualifiers from the qualifier-bearing operand in a scalar operation.
+/// The non-qualifier-bearing operand (e.g., decimal) is transparent to qualifier flow.
+/// </summary>
+public sealed record QualifiedOperandInherited : QualifierBinding;
+
 // ════════════════════════════════════════════════════════════════════════════
 //  ActionSecondaryRole enum (D5)
 // ════════════════════════════════════════════════════════════════════════════

@@ -974,6 +974,26 @@ public static class ProofEngine
             }
         }
 
+        // Transitive qualifier resolution through binary operations:
+        // When the resolved subject is a TypedBinaryOp (a subexpression), its
+        // ResultQualifier tells us how to derive the result's qualifiers.
+        if (resolved is TypedBinaryOp binOp && binOp.ResultQualifier is not null)
+        {
+            switch (binOp.ResultQualifier)
+            {
+                case SameQualifierRequired:
+                    return ResolveQualifierFromExpression(binOp.Left, axis, semantics);
+
+                case QualifiedOperandInherited:
+                    var qualifiedOperand = binOp.Left.ResultType == binOp.ResultType
+                        ? binOp.Left : binOp.Right;
+                    return ResolveQualifierFromExpression(qualifiedOperand, axis, semantics);
+
+                case CompoundUnitCancellationRequired:
+                    return null;
+            }
+        }
+
         var fieldName = GetFieldName(resolved);
         if (fieldName is null) return null;
         if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return null;
@@ -1012,6 +1032,74 @@ public static class ProofEngine
             if (qual.Axis == axis)
                 return qual;
         }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Resolve a qualifier on an axis from an arbitrary typed expression.
+    /// Handles field refs, arg refs, and recursive binary ops.
+    /// </summary>
+    private static DeclaredQualifierMeta? ResolveQualifierFromExpression(
+        TypedExpression expr, QualifierAxis axis, SemanticIndex semantics)
+    {
+        switch (expr)
+        {
+            case TypedArgRef { DeclaredQualifiers: { IsDefaultOrEmpty: false } argQuals }:
+                foreach (var q in argQuals)
+                    if (q.Axis == axis) return q;
+                if (axis == QualifierAxis.Unit)
+                    foreach (var q in argQuals)
+                        if (q.Axis == QualifierAxis.Dimension) return q;
+                if (axis == QualifierAxis.Dimension)
+                    foreach (var q in argQuals)
+                        if (q.Axis == QualifierAxis.TemporalDimension) return q;
+                return null;
+
+            case TypedFieldRef fieldRef:
+                return ResolveFieldQualifier(fieldRef.FieldName, axis, semantics);
+
+            case TypedMemberAccess { Object: TypedFieldRef fieldRef2 }:
+                return ResolveFieldQualifier(fieldRef2.FieldName, axis, semantics);
+
+            case TypedBinaryOp binOp when binOp.ResultQualifier is not null:
+                return binOp.ResultQualifier switch
+                {
+                    SameQualifierRequired =>
+                        ResolveQualifierFromExpression(binOp.Left, axis, semantics),
+                    QualifiedOperandInherited =>
+                        ResolveQualifierFromExpression(
+                            binOp.Left.ResultType == binOp.ResultType ? binOp.Left : binOp.Right,
+                            axis, semantics),
+                    _ => null,
+                };
+
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
+    private static DeclaredQualifierMeta? ResolveFieldQualifier(
+        string fieldName, QualifierAxis axis, SemanticIndex semantics)
+    {
+        if (!semantics.FieldsByName.TryGetValue(fieldName, out var field))
+            return null;
+
+        foreach (var q in field.DeclaredQualifiers)
+            if (q.Axis == axis) return q;
+
+        if (axis == QualifierAxis.Unit)
+            foreach (var q in field.DeclaredQualifiers)
+                if (q.Axis == QualifierAxis.Dimension) return q;
+
+        if (axis == QualifierAxis.Dimension)
+            foreach (var q in field.DeclaredQualifiers)
+                if (q.Axis == QualifierAxis.TemporalDimension) return q;
+
+        var typeMeta = Types.GetMeta(field.ResolvedType);
+        foreach (var q in typeMeta.ImpliedQualifiers)
+            if (q.Axis == axis) return q;
 
         return null;
     }

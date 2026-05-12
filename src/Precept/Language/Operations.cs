@@ -439,11 +439,13 @@ public static class Operations
 
         OperationKind.MoneyTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PMoney, PDecimal, TypeKind.Money,
-            "Money × decimal → money (scaling)", BidirectionalLookup: true),
+            "Money × decimal → money (scaling)", BidirectionalLookup: true,
+            ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand),
 
         OperationKind.MoneyDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PDecimal, TypeKind.Money,
             "Money ÷ decimal → money (scaling)",
+            ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand,
             ProofRequirements:
             [
                 new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
@@ -518,11 +520,13 @@ public static class Operations
 
         OperationKind.QuantityTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PDecimal, TypeKind.Quantity,
-            "Quantity × decimal → quantity (scaling)", BidirectionalLookup: true),
+            "Quantity × decimal → quantity (scaling)", BidirectionalLookup: true,
+            ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand),
 
         OperationKind.QuantityDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PQuantity, PDecimal, TypeKind.Quantity,
             "Quantity ÷ decimal → quantity (scaling)",
+            ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand,
             ProofRequirements:
             [
                 new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
@@ -635,11 +639,13 @@ public static class Operations
 
         OperationKind.PriceTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PDecimal, TypeKind.Price,
-            "Price × decimal → price (scaling)", BidirectionalLookup: true),
+            "Price × decimal → price (scaling)", BidirectionalLookup: true,
+            ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand),
 
         OperationKind.PriceDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PPrice, PDecimal, TypeKind.Price,
             "Price ÷ decimal → price (scaling)",
+            ResultQualifierPolicy: ResultQualifierPolicy.InheritFromQualifiedOperand,
             ProofRequirements:
             [
                 new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
