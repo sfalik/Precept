@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using FluentAssertions;
+using Precept.Language;
 using Xunit;
 
 namespace Precept.LanguageServer.Tests;
@@ -79,6 +80,21 @@ public class ExtensionManifestTests
     }
 
     [Fact]
+    public void PackageManifest_SemanticTokenFallbackScopes_AlignWithGrammarScopes()
+    {
+        SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Name).TextMateScope.Should().Be("entity.name.type.precept.precept");
+        SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.State).TextMateScope.Should().Be("entity.name.type.state.precept");
+        SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Event).TextMateScope.Should().Be("entity.name.function.event.precept");
+        SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).TextMateScope.Should().Be("variable.parameter.precept");
+
+        GetSemanticTokenScopes("preceptName").Should().Equal(SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Name).TextMateScope);
+        GetSemanticTokenScopes("preceptState").Should().Equal(SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.State).TextMateScope);
+        GetSemanticTokenScopes("preceptState.preceptConstrained").Should().Equal("entity.name.type.state.constrained.precept");
+        GetSemanticTokenScopes("preceptEvent").Should().Equal(SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.Event).TextMateScope);
+        GetSemanticTokenScopes("preceptArgName").Should().Equal(SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).TextMateScope);
+    }
+
+    [Fact]
     public void ExtensionSource_Activate_CreatesAndShowsLanguageServerStatusItem()
     {
         var activateBody = GetExtensionFunctionBody("export async function activate");
@@ -145,6 +161,19 @@ public class ExtensionManifestTests
             .GetProperty("settings")
             .Clone();
     }
+
+    private static string[] GetSemanticTokenScopes(string tokenType) =>
+        GetPackageManifest()
+            .GetProperty("contributes")
+            .GetProperty("semanticTokenScopes")
+            .EnumerateArray()
+            .Single()
+            .GetProperty("scopes")
+            .GetProperty(tokenType)
+            .EnumerateArray()
+            .Select(static scope => scope.GetString())
+            .OfType<string>()
+            .ToArray();
 
     private static JsonElement GetPackageManifest()
     {

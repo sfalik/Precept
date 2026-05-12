@@ -899,6 +899,7 @@ static string ScopeToRepositoryKey(string scope) => scope switch
     "entity.name.type.precept"        => "typeKeywords",
     "constant.language.precept"       => "booleanLiterals",
     "entity.name.precept"             => "nameTokens",
+    "entity.name.type.precept.precept" => "nameTokens",
     "comment.line.precept"            => "commentTokens",
     _ => scope.Replace(".precept", "").Replace(".", "_") + "Keywords"
 };

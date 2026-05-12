@@ -37,6 +37,9 @@
 - `EnumerateExpressionTree` must include a `TypedInterpolatedTypedConstant` case that walks `slot.Expression` for every slot — same pattern as `TypedInterpolatedString` over `TypedHoleSegment`. Without it, `TypedFunctionCall` nodes inside typed constant holes are invisible to the `OfType<TypedFunctionCall>()` scan and get no built-in function semantic token. Note: `FieldRef`/`ArgRef` tokens inside holes already surface correctly via `index.FieldReferences`/`index.ArgReferences` (populated by `Resolve()` during type-checking); the expression-tree walker is only needed for function-call tokens.
 - VS Code 1.74+ auto-activates extensions for contributed languages, so extension manifest tests should assert `contributes.languages[].id == "precept"` rather than expecting a redundant `onLanguage:precept` activation event; keep non-redundant triggers like `workspaceContains:**/*.precept` covered separately.
 
+- Keyword semantic tokens should stay out of positions the TextMate grammar already classifies context-sensitively; suppressing catalog `KeywordSemantic`/`KeywordGrammar` lexical tokens keeps LS connect visually stable while preserving identifier-only semantic value-add.
+- Semantic-token fallback scopes must match the concrete grammar scopes exactly (`entity.name.type.state.precept`, `entity.name.function.event.precept`, `variable.parameter.precept`, `entity.name.type.precept.precept`) or the startup race falls through to theme defaults.
+
 ## Historical Summary
 
 - Early May tooling work established the catalog-driven language-server baseline: semantic-context completions, semantic-token publication, shared symbol-navigation helpers, document version ordering, and VS Code activation coverage.

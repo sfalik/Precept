@@ -148,7 +148,7 @@
         "language": "precept",
         "scopes": {
           "preceptName": [
-            "entity.name.precept"
+            "entity.name.type.precept.precept"
           ],
           "preceptKeywordSemantic": [
             "keyword.other.semantic.precept"
@@ -160,13 +160,13 @@
             "keyword.operator.precept"
           ],
           "preceptState": [
-            "entity.name.state.precept"
+            "entity.name.type.state.precept"
           ],
           "preceptState.preceptConstrained": [
-            "entity.name.state.constrained.precept"
+            "entity.name.type.state.constrained.precept"
           ],
           "preceptEvent": [
-            "entity.name.event.precept"
+            "entity.name.function.event.precept"
           ],
           "preceptEvent.preceptConstrained": [
             "entity.name.function.event.constrained.precept"
@@ -178,7 +178,7 @@
             "variable.other.field.constrained.precept"
           ],
           "preceptArgName": [
-            "variable.parameter.arg.precept"
+            "variable.parameter.precept"
           ],
           "preceptArgName.preceptConstrained": [
             "variable.parameter.arg.constrained.precept"

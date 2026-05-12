@@ -33,16 +33,16 @@ public static class SemanticTokenTypes
     private static readonly FrozenDictionary<SemanticTokenTypeKind, SemanticTokenTypeMeta> _byKind =
         new SemanticTokenTypeMeta[]
         {
-            new(SemanticTokenTypeKind.Name, "preceptName", "entity.name.precept", "Precept declaration name", "#A5B4FC"),
+            new(SemanticTokenTypeKind.Name, "preceptName", "entity.name.type.precept.precept", "Precept declaration name", "#A5B4FC"),
             new(SemanticTokenTypeKind.KeywordSemantic, "preceptKeywordSemantic", "keyword.other.semantic.precept", "Precept behavioral structure keyword", "#4338CA", Bold: true),
             new(SemanticTokenTypeKind.KeywordGrammar, "preceptKeywordGrammar", "keyword.other.grammar.precept", "Precept grammar connective keyword", "#6366F1"),
             new(SemanticTokenTypeKind.Operator, "preceptOperator", "keyword.operator.precept", "Precept operator", "#6366F1"),
-            new(SemanticTokenTypeKind.State, "preceptState", "entity.name.state.precept", "Precept state name", "#A898F5", SupportsConstrainedModifier: true),
-            new(SemanticTokenTypeKind.Event, "preceptEvent", "entity.name.event.precept", "Precept event name", "#30B8E8", SupportsConstrainedModifier: true),
+            new(SemanticTokenTypeKind.State, "preceptState", "entity.name.type.state.precept", "Precept state name", "#A898F5", SupportsConstrainedModifier: true),
+            new(SemanticTokenTypeKind.Event, "preceptEvent", "entity.name.function.event.precept", "Precept event name", "#30B8E8", SupportsConstrainedModifier: true),
             new(SemanticTokenTypeKind.Type, "preceptType", "entity.name.type.precept", "Precept type keyword", "#9AA8B5"),
             new(SemanticTokenTypeKind.Value, "preceptValue", "constant.language.precept", "Precept literal value", "#84929F"),
             new(SemanticTokenTypeKind.FieldName, "preceptFieldName", "variable.other.field.precept", "Precept field name", "#A5B4FC", SupportsConstrainedModifier: true),
-            new(SemanticTokenTypeKind.ArgName, "preceptArgName", "variable.parameter.arg.precept", "Precept argument name", "#9AD8E8", SupportsConstrainedModifier: true),
+            new(SemanticTokenTypeKind.ArgName, "preceptArgName", "variable.parameter.precept", "Precept argument name", "#9AD8E8", SupportsConstrainedModifier: true),
             new(SemanticTokenTypeKind.Message, "preceptMessage", "string.other.message.precept", "Precept message string", "#FBBF24"),
             new(SemanticTokenTypeKind.Comment, "preceptComment", "comment.line.precept", "Precept comment", "#9096A6", Italic: true),
         }.ToFrozenDictionary(m => m.Kind);

@@ -187,20 +187,24 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             var meta = TokensCatalog.GetMeta(token.Kind);
             string? effectiveTokenType = null;
 
+            if (IsTypedConstantToken(token.Kind))
+            {
+                effectiveTokenType = BuiltInStringTokenType;
+            }
             // Contextual reclassification: 'set' emits the type custom token in type-expression position.
             // SetType.VisualCategory is intentionally null (parser-synthesized; never in the lexer stream),
             // so we derive the type token from the catalog rather than the synthetic token kind.
-            if (token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token))
+            else if (token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token))
             {
                 effectiveTokenType = SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.Type).CustomType;
+            }
+            else if (meta.VisualCategory is SemanticTokenTypeKind.KeywordSemantic or SemanticTokenTypeKind.KeywordGrammar)
+            {
+                continue;
             }
             else if (meta.VisualCategory.HasValue)
             {
                 effectiveTokenType = SemanticTokenTypesCatalog.GetMeta(meta.VisualCategory.Value).CustomType;
-            }
-            else if (IsTypedConstantToken(token.Kind))
-            {
-                effectiveTokenType = BuiltInStringTokenType;
             }
 
             if (effectiveTokenType is null)
