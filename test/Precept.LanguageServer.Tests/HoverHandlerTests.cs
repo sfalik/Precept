@@ -455,6 +455,47 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnGloballyWritableField_OmitAllStateAppearsAsLocked()
+    {
+        const string source = """
+            precept OmitAllMutabilityHover
+            field Price as money in 'USD' writable
+            state Draft initial
+            state Archived terminal
+            event Archive
+            from Draft on Archive -> transition Archived
+            in Archived omit all
+            """;
+
+        var markup = GetHoverMarkdown(source, "Price as money");
+
+        markup.Should().Contain("✏️ `Draft` (unconditional)");
+        markup.Should().Contain("🔒 `Archived`", because: "omit all makes every field structurally absent in that state");
+    }
+
+    [Fact]
+    public void Hover_OnState_OmitAllExcludesAllFieldsFromWritableSummary()
+    {
+        const string source = """
+            precept OmitAllMutabilityHover
+            field Price as money in 'USD' writable
+            field Qty as integer writable
+            state Draft initial
+            state Archived terminal
+            event Archive
+            from Draft on Archive -> transition Archived
+            in Archived omit all
+            """;
+
+        var markup = GetHoverMarkdown(source, "Archived terminal");
+
+        markup.Should().Contain("**state `Archived`**");
+        markup.Should().Contain("Writable here: *none*");
+        markup.Should().NotContain("`Price`", because: "omit all makes all fields structurally absent");
+        markup.Should().NotContain("`Qty`", because: "omit all makes all fields structurally absent");
+    }
+
+    [Fact]
     public void Hover_OnStateReference_InTransitionRow_RoutesToRichStateCard()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "from Listed on Archive", offset: 5);
