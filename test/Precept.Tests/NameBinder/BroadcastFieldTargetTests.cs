@@ -14,8 +14,8 @@ public sealed class BroadcastFieldTargetTests
     {
         var compilation = Compile("""
             precept BroadcastModify
-            field Name as string writable
-            field Amount as number
+            field Name as string writable default ""
+            field Amount as number default 0
             field Notes as string optional
             state Draft initial
             state Closed terminal

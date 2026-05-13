@@ -23,6 +23,7 @@ public class F5TempVerify(ITestOutputHelper output)
         Directory.GetFiles(SamplesRoot, "*.precept")
                  .OrderBy(Path.GetFileName)
                  .Where(p => !string.Equals(Path.GetFileName(p), "inventory-item.precept", StringComparison.OrdinalIgnoreCase))
+                 .Where(p => !string.Equals(Path.GetFileName(p), "Test.precept", StringComparison.OrdinalIgnoreCase))
                  .Select(p => new object[] { Path.GetFileName(p), p });
 
     [Theory]

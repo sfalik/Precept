@@ -265,7 +265,9 @@ Slice 1 (diagnostic infra) ──→ Slice 3, 4, 5
 Slice 3, 4, 5 ──→ Slice 6 (sample corrections)
 Slice 6 ──→ Slice 7 (spec updates)
 Slice 8 (MCP + LS sync) is independent — can be authored at any point
-Slice 9 (OR / ProofEngine bugfix) is independent of Slices 0–8 — depends only on the existing ProofEngine and ensure-normalization infrastructure
+Slice 9 (OR / ProofEngine bugfix) is independent of Slices 0–8
+Slice 10 (D93 enforcement) is independent of Slices 0–9
+Slice 10 ──→ Slice 11 (D94 enforcement)
 ```
 
 - **Slice 0 must be first.** The parser fix is a prerequisite for all other slices because multi-field omit declarations silently discard fields 2–N. Without this fix, the omit lookup will be incomplete.
@@ -276,6 +278,8 @@ Slice 9 (OR / ProofEngine bugfix) is independent of Slices 0–8 — depends onl
 - **Slice 7 follows Slice 6.** Spec annotations reference the shipped diagnostic behavior.
 - **Slice 8 is a verification slice** confirming automatic propagation.
 - **Slice 9 is a standalone correctness bugfix.** It is appended after the current slices only to avoid renumbering the approved v3 plan; it does **not** depend on D130/D131/D132 enforcement.
+- **Slice 10 is independent** of Slices 0–9 — it adds new construction-time validation that uses only Pass 1 symbols (`ctx.Events`, `ctx.Fields`). D93 diagnostic metadata already exists (declared in Slice 1 era).
+- **Slice 11 depends on Slice 10.** It extends `ValidateConstructionGuarantees` with the D94 initial-event-per-row analysis.
 
 ---
 
@@ -920,6 +924,157 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 
 ---
 
+### Slice 10 — D93: RequiredFieldsNeedInitialEvent Enforcement
+
+**Gap identified by:** v3 gap audit (2026-05-12). D93 was declared in `DiagnosticCode.cs` and `Diagnostics.cs` but never emitted by any pipeline stage. The v3 design's §7 Form 2 analysis assumes D93 is enforced — without it, Form 2 precepts with required fields compile clean when they should fail.
+
+**Spec grounding:** §3A.5: "If the precept does not declare an initial event, `Create()` is parameterless and always succeeds (the compiler guarantees all fields have defaults or are optional — enforced by `RequiredFieldsNeedInitialEvent`)."
+
+**Scope:** Stateful precepts (at least one `state` declaration) that do NOT declare an initial event. If any field is non-optional, non-computed, has no default value, and is not a collection type, the definition must be rejected.
+
+Stateless precepts (no `state` declarations) with no initial event follow the same rule per §3A.5: "All other steps apply unchanged." D93 applies to stateless precepts that have required fields and no initial event.
+
+**Trigger conditions:**
+
+D93 fires when ALL of the following are true:
+1. The precept has no event with `IsInitial == true`.
+2. At least one field exists that is:
+   - NOT `optional`
+   - NOT computed (`ComputedExpression == null`)
+   - Has no `DefaultExpression`
+   - Is NOT a collection type (`set`, `list`, `queue`, `bag`, `log`, `stack`, `lookup`, `queueby`, `logby`)
+
+**Exemptions:**
+- Precepts WITH an initial event — D94 handles those, not D93.
+- Fields with `optional` — unset is a valid state.
+- Fields with `default` — a value is available at construction.
+- Computed fields — value is derived.
+- Collection-typed fields — empty collection is a valid initial value.
+
+**Modify:**
+
+- **`TypeChecker.Validation.cs`** — add `ValidateConstructionGuarantees` method (~35 lines):
+  ```csharp
+  private static void ValidateConstructionGuarantees(CheckContext ctx)
+  ```
+  Algorithm:
+  1. Check if any event in `ctx.Events` has `IsInitial == true`. If yes, defer to D94 logic (Slice 11). If no, continue.
+  2. Collect all required fields: iterate `ctx.Fields`, filter to non-optional, non-computed, no default, non-collection.
+  3. If the collection is non-empty, emit D93 with `{0}` = comma-joined field names.
+  4. Span: use the first field's `Span` (or the precept-level span if available).
+
+- **`TypeChecker.cs`** (line ~63) — wire `ValidateConstructionGuarantees` after `ValidateFieldStateGuarantees`:
+  ```csharp
+  ValidateFieldStateGuarantees(ctx);
+
+  // Construction-time field guarantees (D93, D94) — Slice 10-11.
+  ValidateConstructionGuarantees(ctx);
+  ```
+
+**Tests (in `test/Precept.Tests/TypeChecker/`):**
+
+New test class or section: `TypeCheckerConstructionTests.cs`
+
+- `D93_StatefulPrecept_NoInitialEvent_RequiredField_Fires` — `[Fact]`: precept with states, no initial event, and `field Name as string` (required, no default) → D93 fires listing "Name".
+- `D93_StatefulPrecept_NoInitialEvent_AllFieldsHaveDefaults_NoDiagnostic` — `[Fact]`: all fields have defaults → no D93.
+- `D93_StatefulPrecept_NoInitialEvent_AllFieldsOptional_NoDiagnostic` — `[Fact]`: all fields optional → no D93.
+- `D93_StatefulPrecept_NoInitialEvent_ComputedField_NoDiagnostic` — `[Fact]`: only computed fields → no D93.
+- `D93_StatefulPrecept_NoInitialEvent_CollectionField_NoDiagnostic` — `[Fact]`: `field Items as set of string` (collection) → no D93.
+- `D93_StatefulPrecept_WithInitialEvent_RequiredField_NoDiagnostic` — `[Fact]`: initial event declared → no D93 (D94's domain).
+- `D93_StatefulPrecept_NoInitialEvent_MultipleRequiredFields_ListsAll` — `[Fact]`: two required fields → D93 message lists both.
+- `D93_StatelessPrecept_NoInitialEvent_RequiredField_Fires` — `[Fact]`: stateless precept (no states) with required field and no initial event → D93 fires.
+- `D93_StatelessPrecept_NoInitialEvent_AllDefaults_NoDiagnostic` — `[Fact]`: stateless precept, all fields defaulted → no D93.
+- `D93_MixedFields_OnlyRequiredFieldsListed` — `[Fact]`: mix of optional, defaulted, computed, collection, and required fields → D93 lists only the required ones.
+
+**Regression anchors:**
+
+- All Slices 0–9 tests — D93 enforcement is additive, touches no existing validation logic.
+- `TypeCheckerFieldStateTests` — D130/D131/D132 must pass unchanged.
+- `DiagnosticsTests.DiagnosticMeta_AllCodesHaveEntries` — D93 already has metadata, so no change needed.
+
+**Files:** `src/Precept/Pipeline/TypeChecker.cs`, `src/Precept/Pipeline/TypeChecker.Validation.cs`
+
+- [ ] Create `ValidateConstructionGuarantees` method
+- [ ] Wire into `TypeChecker.Check` pipeline
+- [ ] D93 tests (10 tests)
+- [ ] Verify regression anchors
+
+---
+
+### Slice 11 — D94: InitialEventMissingAssignments Enforcement
+
+**Gap identified by:** v3 gap audit (2026-05-12). D94 was declared in `DiagnosticCode.cs` and `Diagnostics.cs` but never emitted by any pipeline stage. A Form 1 precept where the initial event doesn't assign all required fields compiles clean.
+
+**Spec grounding:** §3A.5: "InitialEventMissingAssignments: Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints."
+
+**Scope:** Precepts that declare an initial event (Form 1). The initial event must, across its transition rows, assign all required fields. This is the construction-time counterpart of D132 (which handles mid-lifecycle omit→non-omit crossings).
+
+**Trigger conditions:**
+
+D94 fires when ALL of the following are true:
+1. The precept declares an initial event (`IsInitial == true`).
+2. A required field exists (non-optional, non-computed, no default, non-collection).
+3. The initial event has at least one transition row, and at least one such row does NOT include a `set` action for the required field.
+
+**Semantic complexity — per-row vs. per-event analysis:**
+
+The initial event may have multiple transition rows (guarded). D94 must fire per-row, not per-event. If row A sets the required field but row B doesn't, D94 fires for row B. The entity could be constructed through any matching row — each row must independently guarantee all required fields are populated.
+
+If the initial event has NO transition rows (unlikely but possible if the event is defined but has no `from` rows), D94 fires for the event as a whole — there is no path through which required fields could be set.
+
+**Initial event action chain analysis:**
+
+For each transition row associated with the initial event:
+1. Identify rows by matching `row.EventName` to the initial event's name.
+2. For each required field, check whether `row.Actions` contains a `set` action targeting that field (using the same `IsSetAction` helper from D132).
+3. If not → emit D94 with `{0}` = event name, `{1}` = comma-joined missing field names.
+
+**What about initial event args vs. set actions?**
+
+The initial event may declare args that are intended to populate fields (e.g., `event Create(Name as string) initial`). However, having an arg is not the same as having a `set Name = Name` action. The transition row must explicitly set the field — the compiler does not infer field assignment from arg names. This matches D132's semantics: only explicit `set` actions count.
+
+**Modify:**
+
+- **`ValidateConstructionGuarantees`** (TypeChecker.Validation.cs) — extend the method from Slice 10:
+  After the D93 check (no initial event), add the D94 check (initial event exists):
+  1. Find the initial event: `ctx.Events.FirstOrDefault(e => e.IsInitial)`.
+  2. If no initial event → D93 path (Slice 10). If initial event exists → D94 path.
+  3. Collect required fields (same filter as D93).
+  4. If no required fields → return (no D94 needed).
+  5. Find all transition rows for the initial event: `ctx.TransitionRows.Where(r => string.Equals(r.EventName, initialEvent.Name, StringComparison.Ordinal))`.
+  6. For each transition row, for each required field:
+     - Check `row.Actions.Any(a => IsSetAction(a.Kind) && string.Equals(a.FieldName, field.Name, StringComparison.Ordinal))`.
+     - If not → emit D94 with event name and missing field name(s).
+
+**Tests (in `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs`):**
+
+- `D94_InitialEvent_AssignsAllRequiredFields_NoDiagnostic` — `[Fact]`: initial event with `set` for every required field → no D94.
+- `D94_InitialEvent_MissesRequiredField_Fires` — `[Fact]`: initial event doesn't set a required field → D94 fires.
+- `D94_InitialEvent_MissesMultipleFields_ListsAll` — `[Fact]`: two required fields unset → D94 message lists both.
+- `D94_InitialEvent_OptionalField_NoDiagnostic` — `[Fact]`: optional field not set → no D94.
+- `D94_InitialEvent_DefaultField_NoDiagnostic` — `[Fact]`: field with default not set → no D94.
+- `D94_InitialEvent_ComputedField_NoDiagnostic` — `[Fact]`: computed field not set → no D94.
+- `D94_InitialEvent_CollectionField_NoDiagnostic` — `[Fact]`: collection field not set → no D94.
+- `D94_InitialEvent_MultipleRows_OneRowMissesField_Fires` — `[Fact]`: row A sets the field, row B doesn't → D94 fires for row B.
+- `D94_InitialEvent_AllRowsSetField_NoDiagnostic` — `[Fact]`: all rows set the field → no D94.
+- `D94_NoTransitionRows_InitialEvent_RequiredField_Fires` — `[Fact]`: initial event defined but no transition rows reference it → D94 fires.
+
+**Regression anchors:**
+
+- All Slice 10 tests — D93 must still pass.
+- All Slices 0–9 tests — D94 enforcement is additive.
+- `TypeCheckerFieldStateTests` — D130/D131/D132 must pass unchanged.
+
+**Dependencies:** Slice 10 (D93) must be implemented first — Slice 11 extends `ValidateConstructionGuarantees`.
+
+**Files:** `src/Precept/Pipeline/TypeChecker.Validation.cs`
+
+- [ ] Extend `ValidateConstructionGuarantees` with D94 logic
+- [ ] D94 tests (10 tests)
+- [ ] Verify regression anchors
+
+---
+
 ### File Inventory
 
 | File | Change | Slices | Description |
@@ -944,21 +1099,24 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 | `test/Precept.Tests/Parser/` (existing files) | Modify | 0 | Multi-field parser tests |
 | `test/Precept.Tests/TypeChecker/` (existing files) | Modify | 0, 2 | Omit lookup and multi-field consumer tests |
 | `test/Precept.Tests/DiagnosticsTests.cs` | Modify | 1 | D130/D131/D132 metadata tests |
+| `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs` | New | 10, 11 | D93/D94 construction enforcement tests |
 
-**Total estimated tests:** ~73 new tests across all slices.
-**Regression anchors:** ~19 named existing test families.
+**Total estimated tests:** ~93 new tests across all slices (73 original + 20 from Slices 10–11).
+**Regression anchors:** ~21 named existing test families.
 
 ---
 
 ## 11. Status
 
-**Design Approved — Implementation Plan Authored**
+**Design Approved — Implementation In Progress (gap audit remediation pending)**
+
+Gap audit (2026-05-12) identified two BLOCKING gaps: D93 and D94 are declared but never enforced. Slices 10–11 added as remediation. Slices 0–10 are complete.
 
 ---
 
 ## 12. Implementation Tracker
 
-**Progress:** 9 / 10 slices complete
+**Progress:** 11 / 12 slices complete
 
 | Slice | Name | Status | Depends On | Commit |
 |---|---|---|---|---|
@@ -972,3 +1130,5 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 | Slice 7 | Spec and Documentation Updates | ✅ Done | Slice 6 | `40bcd746` |
 | Slice 8 | MCP + Language Server Sync Assessment | ✅ Done | Independent | `12449503` |
 | Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ✅ Done | Standalone | `c2d5b8fb` |
+| Slice 10 | D93: `RequiredFieldsNeedInitialEvent` enforcement | ✅ Done | Independent (additive) | `HEAD` |
+| Slice 11 | D94: `InitialEventMissingAssignments` enforcement | ⏳ Pending | Slice 10 | — |

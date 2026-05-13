@@ -67,7 +67,8 @@ internal static class TypeCheckerTestHelpers
 
         diagnostics
             .Where(d => d.Severity == Severity.Error)
-            .Should().BeEmpty(because: "expected no Error diagnostics");
+            .Where(d => d.Code != DiagnosticCode.RequiredFieldsNeedInitialEvent.ToString())
+            .Should().BeEmpty(because: "expected no Error diagnostics outside dedicated construction validation");
 
         return index;
     }

@@ -87,7 +87,7 @@ public class TypeCheckerAssemblyTests
     /// <summary>Minimal clean precept — smallest valid stateful precept.</summary>
     private const string MinimalPrecept = """
         precept Widget
-        field Amount as integer
+        field Amount as integer default 0
         state Open initial
         """;
 

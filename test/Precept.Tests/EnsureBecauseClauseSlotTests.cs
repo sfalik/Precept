@@ -511,7 +511,7 @@ public class EnsureBecauseClauseSlotTests
         // RED-R: Compiler.Compile → Precept.From → Version.Fire all throw NotImplementedException.
         var src =
             "precept OrderFulfillment\n" +
-            "field amount as number\n" +
+            "field amount as number default 0\n" +
             "state Approved terminal success, Draft initial\n" +
             "event Approve(amount as number)\n" +
             "from Draft on Approve -> set amount = Approve.amount -> transition Approved\n" +
@@ -532,7 +532,7 @@ public class EnsureBecauseClauseSlotTests
         // RED-R: Runtime not yet implemented.
         var src =
             "precept OrderFulfillment\n" +
-            "field reviewer as string\n" +
+            "field reviewer as string default \"\"\n" +
             "state Active initial, Done terminal success\n" +
             "event Submit(reviewer as string)\n" +
             "from Active on Submit -> set reviewer = Submit.reviewer -> transition Done\n" +
@@ -555,7 +555,7 @@ public class EnsureBecauseClauseSlotTests
         // or other fault when the constraint fires.
         var src =
             "precept OrderFulfillment\n" +
-            "field amount as number\n" +
+            "field amount as number default 0\n" +
             "state Approved terminal success, Draft initial\n" +
             "event Approve(amount as number)\n" +
             "from Draft on Approve -> set amount = Approve.amount -> transition Approved\n" +
@@ -576,7 +576,7 @@ public class EnsureBecauseClauseSlotTests
         // RED-R: Runtime not yet implemented.
         var src =
             "precept OrderFulfillment\n" +
-            "field reviewer as string\n" +
+            "field reviewer as string default \"\"\n" +
             "state Active initial, Done terminal success\n" +
             "event Submit(reviewer as string)\n" +
             "from Active on Submit -> set reviewer = Submit.reviewer -> transition Done\n" +

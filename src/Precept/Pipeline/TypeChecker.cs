@@ -62,6 +62,9 @@ internal static partial class TypeChecker
         // Field-state guarantees (D130, D131, D132) — Slice 3-5.
         ValidateFieldStateGuarantees(ctx);
 
+        // Construction-time field guarantees (D93, D94) — Slice 10-11.
+        ValidateConstructionGuarantees(ctx);
+
         // CI enforcement (Slice 8) — runs after all expression resolution;
         // walks resolved expression trees for ~string consistency violations.
         ValidateCIEnforcement(ctx);

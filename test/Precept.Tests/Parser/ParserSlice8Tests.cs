@@ -32,8 +32,8 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug005
-            field FirstName as string writable
-            field LastName as string writable
+            field FirstName as string writable default ""
+            field LastName as string writable default ""
             state Draft initial
             state Done terminal
             in Draft modify FirstName, LastName editable

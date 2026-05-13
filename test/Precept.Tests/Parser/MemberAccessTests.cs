@@ -212,6 +212,8 @@ public class MemberAccessTests
             field FxRate as exchangerate in 'USD' to 'EUR'
             field SourceCurrency as currency <- FxRate.from
             field TargetCurrency as currency <- FxRate.to
+            event Seed(Rate as exchangerate in 'USD' to 'EUR') initial
+            on Seed -> set FxRate = Seed.Rate
             """);
 
         compilation.HasErrors.Should().BeFalse(

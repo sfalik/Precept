@@ -474,7 +474,7 @@ public class TypeCheckerFieldStateTests
     {
         var precept = """
             precept Widget
-            field F as integer
+            field F as integer default 0
             state Draft initial
             state Review
             event E

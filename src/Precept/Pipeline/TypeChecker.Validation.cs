@@ -281,13 +281,8 @@ internal static partial class TypeChecker
             {
                 foreach (var field in ctx.Fields)
                 {
-                    if (field.IsOptional ||
-                        field.DefaultExpression is not null ||
-                        field.IsComputed ||
-                        field.ResolvedType is TypeKind.Set or TypeKind.Queue or TypeKind.Stack or TypeKind.Log or TypeKind.LogBy or TypeKind.Bag or TypeKind.List or TypeKind.QueueBy or TypeKind.Lookup)
-                    {
+                    if (!IsRequiredFieldWithoutImplicitValue(field))
                         continue;
-                    }
 
                     var omitInFrom = ctx.OmitLookup.Contains((fromState, field.Name));
                     var omitInTarget = ctx.OmitLookup.Contains((row.TargetState, field.Name));
@@ -313,7 +308,59 @@ internal static partial class TypeChecker
         }
     }
 
+    private static void ValidateConstructionGuarantees(CheckContext ctx)
+    {
+        if (ctx.Events.Any(evt => evt.IsInitial))
+            return;
+
+        var requiredFields = ctx.Fields
+            .Where(field => NeedsInitialEvent(field, ctx))
+            .ToImmutableArray();
+
+        if (requiredFields.IsDefaultOrEmpty)
+            return;
+
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(
+                DiagnosticCode.RequiredFieldsNeedInitialEvent,
+                requiredFields[0].NameSpan,
+                string.Join(", ", requiredFields.Select(field => field.Name))));
+    }
+
     private static bool IsSetAction(ActionKind kind) => kind == ActionKind.Set;
+
+    private static bool IsRequiredFieldWithoutImplicitValue(TypedField field) =>
+        !field.IsOptional &&
+        field.DefaultExpression is null &&
+        !field.IsComputed &&
+        !IsCollectionField(field);
+
+    private static bool NeedsInitialEvent(TypedField field, CheckContext ctx)
+    {
+        if (!IsRequiredFieldWithoutImplicitValue(field))
+            return false;
+
+        var initialStates = ctx.States
+            .Where(state => state.Modifiers.Contains(ModifierKind.InitialState))
+            .Select(state => state.Name)
+            .ToImmutableArray();
+
+        if (initialStates.IsDefaultOrEmpty)
+            return true;
+
+        return initialStates.Any(stateName => !ctx.OmitLookup.Contains((stateName, field.Name)));
+    }
+
+    private static bool IsCollectionField(TypedField field) => field.ResolvedType is
+        TypeKind.Set or
+        TypeKind.Queue or
+        TypeKind.Stack or
+        TypeKind.Log or
+        TypeKind.LogBy or
+        TypeKind.Bag or
+        TypeKind.List or
+        TypeKind.QueueBy or
+        TypeKind.Lookup;
 
     /// <summary>Validate modifier applicability, conflicts, and subsumption for all fields and states.</summary>
     private static void ValidateModifiers(CheckContext ctx)

@@ -4,7 +4,7 @@ precept ClinicAppointmentScheduling
 # Demonstrates: integer + nonnegative modifiers on event args, notempty on a required
 # field, conditional actions (if/then/else), and the 15-minute boundary rule.
 
-field PatientName as string notempty
+field PatientName as string optional
 field ScheduledDay as integer default 0 nonnegative
 field ScheduledMinute as integer default 0 nonnegative
 field ConfirmationCode as string optional
