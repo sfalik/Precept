@@ -69,6 +69,166 @@ internal static partial class TypeChecker
         }
     }
 
+    private static void CollectFieldRefsFromExpression(
+        TypedExpression? expr, List<TypedFieldRef> refs)
+    {
+        if (expr is null)
+            return;
+
+        switch (expr)
+        {
+            case TypedBinaryOp bin:
+                CollectFieldRefsFromExpression(bin.Left, refs);
+                CollectFieldRefsFromExpression(bin.Right, refs);
+                break;
+
+            case TypedFunctionCall func:
+                foreach (var arg in func.Arguments)
+                    CollectFieldRefsFromExpression(arg, refs);
+                break;
+
+            case TypedUnaryOp un:
+                CollectFieldRefsFromExpression(un.Operand, refs);
+                break;
+
+            case TypedConditional cond:
+                CollectFieldRefsFromExpression(cond.Condition, refs);
+                CollectFieldRefsFromExpression(cond.ThenBranch, refs);
+                CollectFieldRefsFromExpression(cond.ElseBranch, refs);
+                break;
+
+            case TypedQuantifier quant:
+                CollectFieldRefsFromExpression(quant.Collection, refs);
+                CollectFieldRefsFromExpression(quant.Predicate, refs);
+                break;
+
+            case TypedMemberAccess mem:
+                CollectFieldRefsFromExpression(mem.Object, refs);
+                break;
+
+            case TypedInterpolatedString interp:
+                foreach (var seg in interp.Segments)
+                {
+                    if (seg is TypedHoleSegment hole)
+                        CollectFieldRefsFromExpression(hole.Expression, refs);
+                }
+                break;
+
+            case TypedListLiteral list:
+                foreach (var elem in list.Elements)
+                    CollectFieldRefsFromExpression(elem, refs);
+                break;
+
+            case TypedFieldRef fieldRef:
+                refs.Add(fieldRef);
+                break;
+
+            case TypedPostfixOp:
+            case TypedArgRef:
+            case TypedLiteral:
+            case TypedErrorExpression:
+                break;
+        }
+    }
+
+    private static void EmitD130ForWildcard(
+        string fieldName, SourceSpan span, CheckContext ctx)
+    {
+        var omittedStates = ctx.States
+            .Where(state => ctx.OmitLookup.Contains((state.Name, fieldName)))
+            .Select(state => state.Name)
+            .ToImmutableArray();
+
+        if (omittedStates.IsDefaultOrEmpty)
+            return;
+
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(
+                DiagnosticCode.OmittedFieldReadInState,
+                span,
+                fieldName,
+                string.Join(", ", omittedStates)));
+    }
+
+    private static void ValidateFieldStateGuarantees(CheckContext ctx)
+    {
+        var fieldRefs = new List<TypedFieldRef>();
+
+        void EmitDiagnosticsForFieldRefs(string? stateName)
+        {
+            foreach (var fieldRef in fieldRefs)
+            {
+                if (stateName is not null)
+                {
+                    if (ctx.OmitLookup.Contains((stateName, fieldRef.FieldName)))
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.OmittedFieldReadInState,
+                                fieldRef.Span,
+                                fieldRef.FieldName,
+                                stateName));
+                    }
+                }
+                else
+                {
+                    EmitD130ForWildcard(fieldRef.FieldName, fieldRef.Span, ctx);
+                }
+            }
+
+            fieldRefs.Clear();
+        }
+
+        foreach (var row in ctx.TransitionRows)
+        {
+            fieldRefs.Clear();
+            CollectFieldRefsFromExpression(row.Guard, fieldRefs);
+            EmitDiagnosticsForFieldRefs(row.FromState);
+
+            foreach (var action in row.Actions)
+            {
+                if (action is not TypedInputAction inputAction)
+                    continue;
+
+                fieldRefs.Clear();
+                CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
+                CollectFieldRefsFromExpression(inputAction.SecondaryExpression, fieldRefs);
+                EmitDiagnosticsForFieldRefs(row.FromState);
+            }
+        }
+
+        foreach (var ensure in ctx.Ensures)
+        {
+            if (ensure.Kind is not (ConstraintKind.StateResident or ConstraintKind.StateExit) ||
+                ensure.AnchorState is null)
+            {
+                continue;
+            }
+
+            fieldRefs.Clear();
+            CollectFieldRefsFromExpression(ensure.Condition, fieldRefs);
+            EmitDiagnosticsForFieldRefs(ensure.AnchorState);
+        }
+
+        foreach (var hook in ctx.StateHooks)
+        {
+            fieldRefs.Clear();
+            CollectFieldRefsFromExpression(hook.Guard, fieldRefs);
+            EmitDiagnosticsForFieldRefs(hook.StateName);
+
+            foreach (var action in hook.Actions)
+            {
+                if (action is not TypedInputAction inputAction)
+                    continue;
+
+                fieldRefs.Clear();
+                CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
+                CollectFieldRefsFromExpression(inputAction.SecondaryExpression, fieldRefs);
+                EmitDiagnosticsForFieldRefs(hook.StateName);
+            }
+        }
+    }
+
     /// <summary>Validate modifier applicability, conflicts, and subsumption for all fields and states.</summary>
     private static void ValidateModifiers(CheckContext ctx)
     {

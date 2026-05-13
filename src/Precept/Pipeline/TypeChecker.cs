@@ -17,8 +17,8 @@ namespace Precept.Pipeline;
 /// ResolveFieldExpressions → PopulateTransitionRows → PopulateEventHandlers →
 /// PopulateRules → PopulateEnsures → PopulateAccessModes → PopulateStateHooks →
 /// PopulateEditDeclarations → BuildOmitLookup → ValidateModifiers →
-/// ValidateStructural → ValidateCIEnforcement → BuildSemanticIndex
-/// (final assembly with D26 global invariant check).
+/// ValidateStructural → ValidateFieldStateGuarantees → ValidateCIEnforcement →
+/// BuildSemanticIndex (final assembly with D26 global invariant check).
 /// </remarks>
 internal static partial class TypeChecker
 {
@@ -58,6 +58,9 @@ internal static partial class TypeChecker
         // Structural validation (Slice 6) — runs after Pass 2; reads ComputedDeps
         // (populated during expression resolution) for cycle detection.
         ValidateStructural(ctx);
+
+        // Field-state guarantees (D130, D131, D132) — Slice 3-5.
+        ValidateFieldStateGuarantees(ctx);
 
         // CI enforcement (Slice 8) — runs after all expression resolution;
         // walks resolved expression trees for ~string consistency violations.
@@ -1086,8 +1089,22 @@ internal static partial class TypeChecker
                 ? anchorMeta.Scope
                 : AnchorScope.OnEntry;
 
-            // —— Guard (state hooks may support guards in future; currently none in slot list) ——
+            // —— Optional guard ——
             TypedExpression? guard = null;
+            var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+            if (guardSlot is not null)
+            {
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                guard = Resolve(guardSlot.Expression, ctx);
+                if (guard is not TypedErrorExpression && guard.ResultType != TypeKind.Boolean)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.TypeMismatch, guardSlot.Expression.Span,
+                            Types.GetMeta(TypeKind.Boolean).DisplayName,
+                            Types.GetMeta(guard.ResultType).DisplayName));
+                    guard = new TypedErrorExpression(guardSlot.Expression.Span);
+                }
+            }
 
             // —— Action chain ——
             var actionChainSlot = construct.GetSlot<ActionChainSlot>(ConstructSlotKind.ActionChain);
