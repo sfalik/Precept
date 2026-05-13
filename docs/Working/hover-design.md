@@ -11,11 +11,11 @@
 | 3 | `event` | ✅ Done | `92ac40f8` |
 | 4 | `rule` | ✅ Done | `eb581e86` |
 | 5 | `ensure` | ✅ Done | `eb581e86` |
-| 6 | Transition row | 🟡 In progress | — |
-| 7 | `reject` | 🟡 In progress | — |
-| 8 | Qualifier (base + proof) | 🔴 Not started | — |
-| 9 | Proof expression (non-qualifier) | 🔴 Not started | — |
-| 10 | Diagnostic squiggle (non-qualifier) | 🔴 Not started | — |
+| 6 | Transition row | ✅ Done | `82da479c` |
+| 7 | `reject` | ✅ Done | `82da479c` |
+| 8 | Qualifier (base + proof) | 🟡 In progress | — |
+| 9 | Proof expression (non-qualifier) | 🟡 In progress | — |
+| 10 | Diagnostic squiggle (non-qualifier) | 🟡 In progress | — |
 | 11 | State proof variant | 🔴 Not started | — |
 | 12 | `access` | 🔴 Not started | — |
 | 13 | `omit` | 🔴 Not started | — |

@@ -707,6 +707,24 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnQualifierDeclaration_WithProofGap_ShowsCompactProofCard()
+    {
+        const string source = """
+            precept QualifierProofHover
+            field A as money in 'USD'
+            field B as money in 'USD'
+            field C as money in 'EUR'
+            field Result as money <- (A - B) + C
+            """;
+
+        var markup = GetHoverMarkdown(source, "'USD'", offset: 1);
+
+        markup.Should().Contain("⚠️ Gap · currency is `'USD'`");
+        markup.Should().Contain("⚖️ Use: `Result`");
+        markup.Should().Contain("Left `A - B` carries `'USD'` · right `C` carries `'EUR'`");
+    }
+
+    [Fact]
     public void Hover_OnProofDiagnosticSpan_WinsOverOperatorHover()
     {
         const string source = """
@@ -722,6 +740,23 @@ state Draft initial
         markup.Should().Contain("⚠️ `PRE0114` · Can't confirm currencies match");
         markup.Should().Contain("🔬 `Result` · `(A - B) + C`");
         markup.Should().Contain("Left `A - B` carries `'USD'` · right `C` carries `'EUR'`");
+    }
+
+    [Fact]
+    public void Hover_OnGenericProofDiagnostic_ShowsCompactThreeLineCard()
+    {
+        const string source = """
+            precept GenericProofDiagnosticHover
+            field A as number
+            field B as number
+            field Result as number <- A / B
+            """;
+
+        var markup = GetHoverMarkdown(source, "/");
+
+        markup.Should().Contain("⚠️ `PRE");
+        markup.Should().Contain("· Gap");
+        markup.Should().Contain("Evidence:");
     }
 
     [Fact]
@@ -745,13 +780,29 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnGenericProofExpression_ShowsCompactThreeLineCard()
+    {
+        const string source = """
+            precept GenericProofExpressionHover
+            field A as number
+            field Result as number <- A / 1
+            """;
+
+        var markup = GetHoverMarkdown(source, "A / 1", offset: 2);
+
+        markup.Should().Contain("✅ Proven · `A / 1`");
+        markup.Should().Contain("Requirement:");
+        markup.Should().Contain("🔬 Proven via");
+    }
+
+    [Fact]
     public void Hover_OnQualifierExpression_ShowsCompactQualifierCard()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "money in 'USD'", offset: 9);
 
         markup.Should().Contain("⚖️ Currency · `'USD'`");
-        markup.Should().Contain("Declared explicitly on this type");
         markup.Should().Contain("Mixed currencies aren't allowed");
+        markup.Should().NotContain("Declared explicitly on this type");
         markup.Should().NotContain("**field `Price`**");
     }
 
@@ -768,8 +819,8 @@ state Draft initial
         var markup = GetHoverMarkdown(source, "'{StockingUnit.dimension}'", offset: 2);
 
         markup.Should().Contain("⚖️ Physical dimension · `'{StockingUnit.dimension}'`");
-        markup.Should().Contain("Resolves from field `StockingUnit`");
         markup.Should().Contain("Mixed physical dimensions aren't allowed");
+        markup.Should().NotContain("Resolves from");
     }
 
     [Fact]
@@ -785,7 +836,7 @@ state Draft initial
         var markup = GetHoverMarkdown(source, "'{StockingUnit}'", offset: 2);
 
         markup.Should().Contain("⚖️ Unit of measure · `'{StockingUnit}'`");
-        markup.Should().Contain("Resolves from field `StockingUnit`");
+        markup.Should().NotContain("Resolves from");
     }
 
     [Fact]
@@ -816,8 +867,8 @@ state Draft initial
         var markup = GetHoverMarkdown(source, "'{CatalogCurrency}'", offset: 2);
 
         markup.Should().Contain("⚖️ Currency · `'{CatalogCurrency}'`");
-        markup.Should().Contain("Resolves from field `CatalogCurrency`");
         markup.Should().Contain("Mixed currencies aren't allowed");
+        markup.Should().NotContain("Resolves from");
     }
 
     private static string GetHoverMarkdown(string source, string needle, int offset = 0, int occurrence = 1)

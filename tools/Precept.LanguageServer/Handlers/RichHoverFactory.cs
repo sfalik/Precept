@@ -357,24 +357,15 @@ internal static class RichHoverFactory
         QualifierChainProofRequirement requirement)
     {
         var expression = obligation.Site as TypedBinaryOp;
-        var lines = new List<string>
+        var evidence = expression is null
+            ? EscapePlain(obligation.Requirement.Description)
+            : DescribeQualifierGapEvidenceLine(compilation, expression.Left, expression.Right, requirement.LeftAxis);
+        return string.Join("\n", new[]
         {
-            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove qualifier compatibility**",
-            $"Verdict: Cannot prove the required qualifier chain across this expression",
-            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
-            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
-            $"Requirement: {DescribeQualifierChainRequirement(requirement)}",
-        };
-
-        if (expression is not null)
-        {
-            AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.LeftAxis, obligation, includeResultLines: false, leftAxis: requirement.LeftAxis, rightAxis: requirement.RightAxis);
-        }
-
-        lines.Add("Status: unresolved");
-        lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression?.Left, expression?.Right, requirement.LeftAxis)}");
-        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
-        return string.Join("\n\n", lines);
+            $"⚠️ `{FormatDiagnosticCode(diagnosticCode)}` · Gap",
+            $"🔬 qualifier chain unresolved — {DescribeQualifierChainRequirement(requirement)}",
+            $"Evidence: {evidence}",
+        });
     }
 
     private static string CreatePresenceProofDiagnosticMarkdown(
@@ -385,47 +376,35 @@ internal static class RichHoverFactory
     {
         var subjectExpression = ResolveProofSubjectExpression(requirement.Subject, obligation.Site);
         var subject = subjectExpression is null ? DescribeProofSite(compilation, obligation.Site) : DescribeProofSite(compilation, subjectExpression);
-        var lines = new List<string>
+        var evidence = TryGetPresenceDescription(subjectExpression, compilation.Semantics, out var presence)
+            ? $"{EscapeInline(subject)} is {presence}"
+            : $"{EscapeInline(subject)} is accessed without a proven presence guard";
+        return string.Join("\n", new[]
         {
-            $"**{FormatDiagnosticCode(diagnosticCode)} — Cannot prove presence**",
-            $"Verdict: Cannot prove `{EscapeInline(subject)}` is present before this access",
-            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
-            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
-            "Requirement: optional fields must be proven present before access",
-            $"Subject: `{EscapeInline(subject)}`",
-        };
-
-        if (TryGetPresenceDescription(subjectExpression, compilation.Semantics, out var presence))
-        {
-            lines.Add($"Declared presence: {presence}");
-        }
-
-        lines.Add("Status: unresolved");
-        lines.Add("Reason: no guard or earlier assignment proves the field is set on this path");
-        lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
-        return string.Join("\n\n", lines);
+            $"⚠️ `{FormatDiagnosticCode(diagnosticCode)}` · Gap",
+            $"🔬 {evidence}",
+            "Evidence: no guard or earlier assignment proves the field is set on this path",
+        });
     }
 
     private static string CreateGenericProofDiagnosticMarkdown(PreceptDiagnostic diagnostic)
     {
         var title = diagnostic.Message.Replace("'", "`").Replace("\r", string.Empty).Replace("\n", " ");
-        return string.Join("\n\n", new[]
+        return string.Join("\n", new[]
         {
-            $"**proof diagnostic** `{EscapeInline(diagnostic.Code)}`",
-            $"Verdict: {title}",
-            "Status: unresolved",
+            $"⚠️ `{EscapeInline(diagnostic.Code)}` · Gap",
+            $"🔬 {title}",
+            "Evidence: see diagnostic details",
         });
     }
 
     private static string CreateGenericProofDiagnosticMarkdown(Compilation compilation, PreceptDiagnosticCode diagnosticCode, PreceptDiagnostic diagnostic, ProofObligation obligation)
     {
-        return string.Join("\n\n", new[]
+        return string.Join("\n", new[]
         {
-            $"**{FormatDiagnosticCode(diagnosticCode)} — {EscapeInline(diagnostic.Message)}**",
-            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
-            $"Expression: `{EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
-            "Status: unresolved",
-            $"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}",
+            $"⚠️ `{FormatDiagnosticCode(diagnosticCode)}` · Gap",
+            $"🔬 {EscapeInline(diagnostic.Message)}",
+            $"Evidence: {EscapePlain(obligation.Requirement.Description)}",
         });
     }
 
@@ -459,52 +438,30 @@ internal static class RichHoverFactory
         ProofObligation obligation,
         QualifierChainProofRequirement requirement)
     {
-        var lines = new List<string>
-        {
-            $"**expression** `{EscapeInline(DescribeProofSite(compilation, expression))}`",
-            $"Status: {DescribeProofStatus(obligation)}",
-            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
-            $"Requirement: {DescribeQualifierChainRequirement(requirement)}",
-        };
-
-        AppendQualifierProofEvidenceLines(lines, compilation, expression.Left, expression.Right, requirement.LeftAxis, obligation, includeResultLines: false, leftAxis: requirement.LeftAxis, rightAxis: requirement.RightAxis);
-
-        if (obligation.Disposition == ProofDisposition.Proved && obligation.Strategy is { } strategy)
-        {
-            lines.Add($"Proof strategy: {HumanizeProofStrategy(strategy)}");
-        }
-        else
-        {
-            lines.Add($"Reason: {ExplainUnresolvedQualifierReason(compilation, expression.Left, expression.Right, requirement.LeftAxis)}");
-            if (obligation.EmittedDiagnostic is { } diagnosticCode)
-            {
-                lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
-            }
-        }
-
-        return string.Join("\n\n", lines);
+        var header = obligation.Disposition == ProofDisposition.Proved
+            ? $"✅ Proven · `{EscapeInline(DescribeProofSite(compilation, expression))}`"
+            : $"⚠️ Gap · `{EscapeInline(DescribeProofSite(compilation, expression))}`";
+        var middle = obligation.Disposition == ProofDisposition.Proved
+            ? "⚖️ Qualifier chain verified"
+            : $"⚖️ Qualifier: {DescribeQualifierChainRequirement(requirement)}";
+        var tail = obligation.Disposition == ProofDisposition.Proved
+            ? $"🔬 Proven via {HumanizeProofStrategy(obligation.Strategy ?? ProofStrategy.CompositionalConstraint)}"
+            : $"🔬 {DescribeQualifierGapEvidenceLine(compilation, expression.Left, expression.Right, requirement.LeftAxis)}";
+        return string.Join("\n", new[] { header, middle, tail });
     }
 
     private static string CreateGenericProofExpressionMarkdown(Compilation compilation, TypedBinaryOp expression, ProofObligation obligation)
     {
-        var lines = new List<string>
-        {
-            $"**expression** `{EscapeInline(DescribeProofSite(compilation, expression))}`",
-            $"Status: {DescribeProofStatus(obligation)}",
-            $"Context: {DescribeProofContext(compilation, obligation.Context)}",
-            $"Requirement: {obligation.Requirement.Description}",
-        };
-
-        if (obligation.Disposition == ProofDisposition.Proved && obligation.Strategy is { } strategy)
-        {
-            lines.Add($"Proof strategy: {HumanizeProofStrategy(strategy)}");
-        }
-        else if (obligation.EmittedDiagnostic is { } diagnosticCode)
-        {
-            lines.Add($"Fix: {Diagnostics.GetMeta(diagnosticCode).FixHint}");
-        }
-
-        return string.Join("\n\n", lines);
+        var header = obligation.Disposition == ProofDisposition.Proved
+            ? $"✅ Proven · `{EscapeInline(DescribeProofSite(compilation, expression))}`"
+            : $"⚠️ Gap · `{EscapeInline(DescribeProofSite(compilation, expression))}`";
+        var middle = $"Requirement: {EscapePlain(obligation.Requirement.Description)}";
+        var tail = obligation.Disposition == ProofDisposition.Proved
+            ? $"🔬 Proven via {HumanizeProofStrategy(obligation.Strategy ?? ProofStrategy.CompositionalConstraint)}"
+            : obligation.EmittedDiagnostic is { } diagnosticCode
+                ? $"🔬 {Diagnostics.GetMeta(diagnosticCode).FixHint}"
+                : $"🔬 {EscapePlain(obligation.Requirement.Description)}";
+        return string.Join("\n", new[] { header, middle, tail });
     }
 
     private static string GetQualifierDiagnosticSummary(QualifierAxis axis) => axis switch
@@ -1480,25 +1437,43 @@ internal static class RichHoverFactory
 
     private static string CreateQualifierMarkdown(Compilation compilation, QualifierHoverInfo info)
     {
+        if (TryCreateQualifierProofCard(compilation, info, out var proofCard))
+        {
+            return proofCard;
+        }
+
         var effectiveAxis = info.ResolvedQualifier?.Axis ?? info.Axis;
-        var lines = new List<string>
+        return string.Join("\n", new[]
         {
-            $"⚖️ {CapitalizeFirst(GetQualifierAxisName(effectiveAxis))} · {FormatResolvedQualifierValue(info.ResolvedQualifier)}",
-        };
+            $"⚖️ {CapitalizeFirst(GetQualifierAxisName(effectiveAxis))} · {(info.ResolvedQualifier is null ? "`<unresolved>`" : FormatCompactQualifierValue(info.ResolvedQualifier))}",
+            GetQualifierMismatchText(effectiveAxis),
+        });
+    }
 
-        if (TryDescribeQualifierSource(info.ResolvedQualifier, info.OwnerType, out var source))
+    private static bool TryCreateQualifierProofCard(Compilation compilation, QualifierHoverInfo info, out string markdown)
+    {
+        markdown = string.Empty;
+        if (!info.IsFieldOwner || string.IsNullOrWhiteSpace(info.OwnerName) || !compilation.Semantics.FieldsByName.TryGetValue(info.OwnerName, out var field))
         {
-            lines.Add(source.IsFieldSource
-                ? $"Resolves from {source.DisplayText}"
-                : CapitalizeFirst(source.DisplayText));
-        }
-        else if (TryGetQualifierUnresolvedReason(info.OwnerType, [info.Axis], out var reason))
-        {
-            lines.Add(CapitalizeFirst(reason));
+            return false;
         }
 
-        lines.Add(GetQualifierMismatchText(effectiveAxis));
-        return string.Join("\n", lines);
+        var obligations = field.IsComputed
+            ? GetComputedFieldProofObligations(compilation, field)
+            : GetStoredFieldProofUses(compilation, field);
+        if (!TryGetFieldProofGap(compilation, obligations, out var gap))
+        {
+            return false;
+        }
+
+        var axis = info.ResolvedQualifier?.Axis ?? info.Axis;
+        markdown = string.Join("\n", new[]
+        {
+            $"⚠️ Gap · {GetQualifierAxisName(axis)} is {(info.ResolvedQualifier is null ? "`<unresolved>`" : FormatCompactQualifierValue(info.ResolvedQualifier))}",
+            $"⚖️ Use: {gap.Use}",
+            gap.Evidence,
+        });
+        return true;
     }
 
     private static void AppendFieldQualifierLines(List<string> lines, TypedField field)
@@ -2132,7 +2107,7 @@ internal static class RichHoverFactory
     {
         foreach (var field in compilation.Semantics.Fields)
         {
-            if (TryFindQualifierAt(field.Syntax.GetSlot<TypeExpressionSlot>(ConstructSlotKind.TypeExpression)?.TypeRef, field.ResolvedType, field.DeclaredQualifiers, compilation, position, out info))
+            if (TryFindQualifierAt(field.Syntax.GetSlot<TypeExpressionSlot>(ConstructSlotKind.TypeExpression)?.TypeRef, field.ResolvedType, field.DeclaredQualifiers, field.Name, true, compilation, position, out info))
             {
                 return true;
             }
@@ -2143,7 +2118,7 @@ internal static class RichHoverFactory
             var args = evt.Syntax.GetSlot<ArgumentListSlot>(ConstructSlotKind.ArgumentList)?.Args ?? ImmutableArray<ArgumentSyntax>.Empty;
             for (var index = 0; index < args.Length && index < evt.Args.Length; index++)
             {
-                if (TryFindQualifierAt(args[index].Type, evt.Args[index].ResolvedType, evt.Args[index].DeclaredQualifiers, compilation, position, out info))
+                if (TryFindQualifierAt(args[index].Type, evt.Args[index].ResolvedType, evt.Args[index].DeclaredQualifiers, evt.Args[index].Name, false, compilation, position, out info))
                 {
                     return true;
                 }
@@ -2158,6 +2133,8 @@ internal static class RichHoverFactory
         ParsedTypeReference? typeRef,
         TypeKind ownerType,
         ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
+        string ownerName,
+        bool isFieldOwner,
         Compilation compilation,
         Position position,
         out QualifierHoverInfo info)
@@ -2177,16 +2154,16 @@ internal static class RichHoverFactory
                     {
                         var resolved = ResolveDeclarationQualifier(ownerType, declaredQualifiers, qualifier.Axis);
                         var label = $"{GetPrepositionText(qualifier.Preposition)} {FormatSnippet(compilation, qualifier.ValueSpan)}";
-                        info = new QualifierHoverInfo(qualifier.Axis, qualifier.ValueSpan, label, ownerType, resolved);
+                        info = new QualifierHoverInfo(qualifier.Axis, qualifier.ValueSpan, label, ownerType, resolved, ownerName, isFieldOwner);
                         return true;
                     }
                 }
 
-                return TryFindQualifierAt(qualified.InnerType, ownerType, declaredQualifiers, compilation, position, out info);
+                return TryFindQualifierAt(qualified.InnerType, ownerType, declaredQualifiers, ownerName, isFieldOwner, compilation, position, out info);
 
             case CollectionTypeReference collection:
-                return TryFindQualifierAt(collection.ElementType, ownerType, declaredQualifiers, compilation, position, out info)
-                    || TryFindQualifierAt(collection.KeyType, ownerType, declaredQualifiers, compilation, position, out info);
+                return TryFindQualifierAt(collection.ElementType, ownerType, declaredQualifiers, ownerName, isFieldOwner, compilation, position, out info)
+                    || TryFindQualifierAt(collection.KeyType, ownerType, declaredQualifiers, ownerName, isFieldOwner, compilation, position, out info);
 
             default:
                 return false;
@@ -2605,5 +2582,7 @@ internal static class RichHoverFactory
         SourceSpan Span,
         string Label,
         TypeKind OwnerType,
-        DeclaredQualifierMeta? ResolvedQualifier);
+        DeclaredQualifierMeta? ResolvedQualifier,
+        string? OwnerName,
+        bool IsFieldOwner);
 }
