@@ -6,8 +6,8 @@
 
 | # | Card | Status | Commit |
 |---|------|--------|--------|
-| 1 | `field` (stored) | 🔴 Not started | — |
-| 2 | `field` (computed) | 🔴 Not started | — |
+| 1 | `field` (stored) | 🟡 In progress | — |
+| 2 | `field` (computed) | 🟡 In progress | — |
 | 3 | `event` | 🔴 Not started | — |
 | 4 | `rule` | 🔴 Not started | — |
 | 5 | `ensure` | 🔴 Not started | — |

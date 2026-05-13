@@ -899,48 +899,45 @@ internal static class RichHoverFactory
         };
     }
 
-    private static void AppendFieldProofLines(List<string> lines, Compilation compilation, TypedField field)
-    {
-        if (GetRelevantQualifierAxes(field.ResolvedType, field.DeclaredQualifiers).IsDefaultOrEmpty)
-        {
-            return;
-        }
-
-        var summary = GetFieldProofSummary(compilation, field);
-        lines.Add($"Status: {summary.StatusDetail}");
-        lines.Add(summary.OpenIssueContexts.IsEmpty
-            ? "Open proof issues: none"
-            : $"Open proof issues: {string.Join(" · ", summary.OpenIssueContexts)}");
-    }
-
-    private static FieldProofSummary GetFieldProofSummary(Compilation compilation, TypedField field)
-    {
-        var qualifierUses = compilation.Proof.Obligations
+    private static ImmutableArray<ProofObligation> GetStoredFieldProofUses(Compilation compilation, TypedField field) =>
+        compilation.Proof.Obligations
             .Where(obligation => obligation.Requirement is QualifierCompatibilityProofRequirement or QualifierChainProofRequirement)
             .Where(obligation => ContainsFieldReference(obligation.Site, field.Name))
             .ToImmutableArray();
-        if (qualifierUses.IsEmpty)
-        {
-            return new FieldProofSummary("Proof contract active · No active proof issues", ImmutableArray<string>.Empty);
-        }
 
-        var unresolvedContexts = qualifierUses
-            .Where(obligation => obligation.Disposition == ProofDisposition.Unresolved)
-            .Select(obligation => DescribeProofContext(compilation, obligation.Context))
-            .Distinct(StringComparer.Ordinal)
+    private static ImmutableArray<ProofObligation> GetComputedFieldProofObligations(Compilation compilation, TypedField field) =>
+        compilation.Proof.Obligations
+            .Where(obligation => obligation.Requirement is QualifierCompatibilityProofRequirement or QualifierChainProofRequirement)
+            .Where(obligation => obligation.Context is FieldExpressionContext context
+                && string.Equals(context.Field.Name, field.Name, StringComparison.Ordinal))
             .ToImmutableArray();
-        if (!unresolvedContexts.IsEmpty)
+
+    private static bool TryGetFieldProofGap(Compilation compilation, ImmutableArray<ProofObligation> obligations, out FieldProofGap gap)
+    {
+        var obligation = obligations
+            .Where(candidate => candidate.Disposition == ProofDisposition.Unresolved)
+            .OrderBy(candidate => GetSpanWidth(candidate.Site.Span))
+            .FirstOrDefault();
+        if (obligation is null)
         {
-            return new FieldProofSummary($"Proof contract active · {unresolvedContexts.Length} unresolved use{Pluralize(unresolvedContexts.Length)}", unresolvedContexts);
+            gap = null!;
+            return false;
         }
 
-        var strategy = qualifierUses
-            .Select(obligation => obligation.Strategy)
-            .FirstOrDefault(candidate => candidate is not null);
-        return strategy is ProofStrategy resolvedStrategy
-            ? new FieldProofSummary($"Proof contract active · Proven via {HumanizeProofStrategy(resolvedStrategy)}", ImmutableArray<string>.Empty)
-            : new FieldProofSummary("Proof contract active · No active proof issues", ImmutableArray<string>.Empty);
+        gap = new FieldProofGap(
+            FormatProofUse(compilation, obligation.Context),
+            CreateFieldProofEvidence(compilation, obligation));
+        return true;
     }
+
+    private static string CreateFieldProofEvidence(Compilation compilation, ProofObligation obligation) => obligation switch
+    {
+        { Requirement: QualifierCompatibilityProofRequirement requirement, Site: TypedBinaryOp expression } =>
+            DescribeQualifierGapEvidenceLine(compilation, expression.Left, expression.Right, requirement.Axis),
+        { Requirement: QualifierChainProofRequirement requirement, Site: TypedBinaryOp expression } =>
+            DescribeQualifierGapEvidenceLine(compilation, expression.Left, expression.Right, requirement.LeftAxis),
+        _ => EscapePlain(obligation.Requirement.Description),
+    };
 
     private static bool ContainsFieldReference(TypedExpression expression, string fieldName) => expression switch
     {
@@ -959,35 +956,181 @@ internal static class RichHoverFactory
         _ => false,
     };
 
+    private static string FormatFieldIdentityLine(TypedField field)
+    {
+        if (TryFormatCompactQualifierSummary(field.ResolvedType, field.DeclaredQualifiers, out var qualifierSummary))
+        {
+            return $"`{EscapeInline(field.Name)}` · ⚖️ {qualifierSummary}";
+        }
+
+        return $"`{EscapeInline(field.Name)}` · `{EscapeInline(FormatType(field.ResolvedType, field.ElementType, field.KeyType))}`";
+    }
+
+    private static bool TryFormatCompactQualifierSummary(TypeKind ownerType, ImmutableArray<DeclaredQualifierMeta> qualifiers, out string summary)
+    {
+        var resolved = GetRelevantQualifierAxes(ownerType, qualifiers)
+            .Select(axis => ResolveDeclarationQualifier(ownerType, qualifiers, axis))
+            .Where(qualifier => qualifier is not null)
+            .Cast<DeclaredQualifierMeta>()
+            .ToImmutableArray();
+        if (resolved.IsEmpty)
+        {
+            summary = string.Empty;
+            return false;
+        }
+
+        summary = string.Join(" / ", resolved.Select(FormatCompactQualifierValue));
+        return true;
+    }
+
+    private static string FormatCompactQualifierValue(DeclaredQualifierMeta qualifier)
+    {
+        var rawValue = GetQualifierRawValue(qualifier);
+        return string.IsNullOrWhiteSpace(rawValue)
+            ? "`<unresolved>`"
+            : $"`'{EscapeInline(rawValue)}'`";
+    }
+
+    private static string FormatConstraintGovernanceSummary(Compilation compilation, string fieldName)
+    {
+        var influences = compilation.Proof.ConstraintInfluence
+            .Where(entry => entry.ReferencedFields.Contains(fieldName, StringComparer.Ordinal))
+            .Select(entry => entry.Constraint)
+            .Distinct()
+            .ToImmutableArray();
+        var ruleCount = influences.Count(identity => identity is RuleIdentity);
+        var ensureCount = influences.Count(identity => identity is EnsureIdentity);
+        var parts = new List<string>();
+        if (ruleCount > 0)
+        {
+            parts.Add(FormatGovernanceCount(ruleCount, "rule"));
+        }
+
+        if (ensureCount > 0)
+        {
+            parts.Add(FormatGovernanceCount(ensureCount, "ensure"));
+        }
+
+        return parts.Count == 0 ? "none" : string.Join(" · ", parts);
+    }
+
+    private static string FormatGovernanceCount(int count, string noun) => $"{count} {noun}{Pluralize(count)}";
+
+    private static string FormatComputedFieldSourceSummary(Compilation compilation, TypedField field)
+    {
+        if (field.ComputedExpression is null)
+        {
+            return "*none*";
+        }
+
+        var inputs = new HashSet<string>(StringComparer.Ordinal);
+        CollectFieldInputs(field.ComputedExpression, inputs);
+        if (inputs.Count == 0)
+        {
+            return $"`{EscapeInline(FormatSnippet(compilation, field.ComputedExpression.Span))}`";
+        }
+
+        return string.Join(" · ", inputs.Select(name => $"`{EscapeInline(name)}`"));
+    }
+
+    private static void CollectFieldInputs(TypedExpression expression, HashSet<string> inputs)
+    {
+        switch (expression)
+        {
+            case TypedFieldRef fieldRef:
+                inputs.Add(fieldRef.FieldName);
+                break;
+            case TypedMemberAccess memberAccess:
+                CollectFieldInputs(memberAccess.Object, inputs);
+                break;
+            case TypedBinaryOp binary:
+                CollectFieldInputs(binary.Left, inputs);
+                CollectFieldInputs(binary.Right, inputs);
+                break;
+            case TypedUnaryOp unary:
+                CollectFieldInputs(unary.Operand, inputs);
+                break;
+            case TypedFunctionCall functionCall:
+                foreach (var argument in functionCall.Arguments)
+                {
+                    CollectFieldInputs(argument, inputs);
+                }
+                break;
+            case TypedConditional conditional:
+                CollectFieldInputs(conditional.Condition, inputs);
+                CollectFieldInputs(conditional.ThenBranch, inputs);
+                CollectFieldInputs(conditional.ElseBranch, inputs);
+                break;
+            case TypedInterpolatedString interpolatedString:
+                foreach (var hole in interpolatedString.Segments.OfType<TypedHoleSegment>())
+                {
+                    CollectFieldInputs(hole.Expression, inputs);
+                }
+                break;
+            case TypedInterpolatedTypedConstant interpolatedConstant:
+                foreach (var slot in interpolatedConstant.Slots)
+                {
+                    CollectFieldInputs(slot.Expression, inputs);
+                }
+                break;
+            case TypedListLiteral listLiteral:
+                foreach (var element in listLiteral.Elements)
+                {
+                    CollectFieldInputs(element, inputs);
+                }
+                break;
+            case TypedPostfixOp postfix:
+                CollectFieldInputs(postfix.Operand, inputs);
+                break;
+        }
+    }
+
     private static string CreateFieldMarkdown(Compilation compilation, TypedField field)
     {
-        var status = field.IsComputed
-            ? BuildStatus(
-                compilation,
-                field.ComputedExpression?.Span ?? field.NameSpan,
-                HoverStatusKind.RuntimeChecked,
-                "recomputed on every mutation before commit")
-            : BuildStatus(
-                compilation,
-                field.NameSpan,
-                HoverStatusKind.RuntimeChecked,
-                "enforced on every mutation before commit");
+        var identity = FormatFieldIdentityLine(field);
+        var governance = FormatConstraintGovernanceSummary(compilation, field.Name);
+
+        if (!field.IsComputed && TryGetFieldProofGap(compilation, GetStoredFieldProofUses(compilation, field), out var storedGap))
+        {
+            return string.Join("\n", new[]
+            {
+                $"⚠️ Gap · {identity}",
+                $"🔬 Use: {storedGap.Use}",
+                $"Evidence: {storedGap.Evidence}",
+            });
+        }
+
+        if (field.IsComputed)
+        {
+            var obligations = GetComputedFieldProofObligations(compilation, field);
+            if (TryGetFieldProofGap(compilation, obligations, out var computedGap))
+            {
+                return string.Join("\n", new[]
+                {
+                    "⚠️ Gap · recomputed before commit",
+                    identity,
+                    $"🔬 Use: {computedGap.Use}",
+                    $"Evidence: {computedGap.Evidence}",
+                });
+            }
+
+            var header = obligations.Length > 0
+                ? "✅ Proven · recomputed before commit"
+                : "⚡ Enforced · recomputed before commit";
+            return string.Join("\n", new[]
+            {
+                header,
+                identity,
+                $"From: {FormatComputedFieldSourceSummary(compilation, field)} · Governed by: {governance}",
+            });
+        }
 
         var lines = new List<string>
         {
-            field.IsComputed ? $"**computed field `{EscapeInline(field.Name)}`**" : $"**field `{EscapeInline(field.Name)}`**",
-            FormatStatus(status),
-            $"Type: {FormatTypeSummary(field.ResolvedType, field.ElementType, field.KeyType, field.DeclaredQualifiers, field.Presence)}",
+            $"⚡ Enforced · {identity}",
         };
 
-        AppendFieldQualifierLines(lines, field);
-        AppendFieldProofLines(lines, compilation, field);
-
-        if (field.IsComputed && field.ComputedExpression is not null)
-        {
-            lines.Add($"Computed from: `{EscapeInline(FormatSnippet(compilation, field.ComputedExpression.Span))}`");
-        }
-        else if (!compilation.Semantics.States.IsEmpty)
+        if (!compilation.Semantics.States.IsEmpty)
         {
             var writeMap = GetFieldWriteMapByState(compilation, field);
             if (TryFormatFieldMutabilitySummary(writeMap, out var mutabilitySummary))
@@ -996,8 +1139,8 @@ internal static class RichHoverFactory
             }
         }
 
-        lines.Add($"Governed by: {FormatConstraintGovernance(compilation, field.Name)}");
-        return string.Join("\n\n", lines);
+        lines.Add($"Governed by: {governance}");
+        return string.Join("\n", lines);
     }
 
     private static bool TryFormatFieldMutabilitySummary(FieldWriteMap writeMap, out string summary)
@@ -2351,9 +2494,9 @@ internal static class RichHoverFactory
         string? FieldName = null,
         bool IsFieldSource = false);
 
-    private sealed record FieldProofSummary(
-        string StatusDetail,
-        ImmutableArray<string> OpenIssueContexts);
+    private sealed record FieldProofGap(
+        string Use,
+        string Evidence);
 
     private sealed record FieldWriteMap(
         ImmutableArray<string> WritableStates,

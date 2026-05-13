@@ -108,8 +108,7 @@ state Draft initial
 
         var markup = hover.Contents.MarkupContent;
         markup.Should().NotBeNull();
-        markup!.Value.Should().Contain("field `Amount`");
-        markup.Value.Should().Contain("number");
+        markup!.Value.Should().Contain("⚡ Enforced · `Amount` · `number`");
     }
 
     [Fact]
@@ -204,8 +203,7 @@ state Draft initial
         hover.Should().NotBeNull();
         hover!.Contents.HasMarkupContent.Should().BeTrue();
         var markup = hover.Contents.MarkupContent!;
-        markup.Value.Should().Contain("**field `Tags`**");
-        markup.Value.Should().Contain("Type: `set of string`");
+        markup.Value.Should().Contain("⚡ Enforced · `Tags` · `set of string`");
         markup.Value.Should().NotStartWith("**set**");
     }
 
@@ -274,8 +272,7 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "money", occurrence: 1);
 
-        markup.Should().Contain("**field `Price`**");
-        markup.Should().Contain("Type: `money` · not nullable · `in USD`");
+        markup.Should().Contain("⚡ Enforced · `Price` · ⚖️ `'USD'`");
         markup.Should().NotStartWith("**money**");
     }
 
@@ -317,20 +314,10 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Price as money");
 
-        markup.Should().Contain("**field `Price`**");
-        markup.Should().Contain("Type: `money` · not nullable · `in USD`");
-        markup.Should().Contain("Declared qualifier: `in USD`");
-        markup.Should().Contain("Resolved qualifier: `'USD'`");
-        markup.Should().Contain("Qualifier source: Currency declared explicitly on this type");
-        markup.Should().Contain("✏️");
-        markup.Should().Contain("`Draft`");
-        markup.Should().Contain("`Listed`");
-        markup.Should().Contain("🔒");
-        markup.Should().Contain("`Hidden`");
-        markup.Should().Contain("`Archived`");
-        markup.Should().Contain("Governed by:");
-        markup.Should().Contain("rule");
-        markup.Should().Contain("ensure");
+        markup.Should().Contain("⚡ Enforced · `Price` · ⚖️ `'USD'`");
+        markup.Should().Contain("✏️ `Draft`, `Listed` (unconditional)");
+        markup.Should().Contain("🔒 `Hidden`, `Archived`");
+        markup.Should().Contain("Governed by: 1 rule · 1 ensure");
     }
 
     [Fact]
@@ -383,9 +370,9 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "AverageQuantity as number");
 
-        markup.Should().Contain("**computed field `AverageQuantity`**");
-        markup.Should().Contain("Computed from:");
-        markup.Should().Contain("Quantity / 2");
+        markup.Should().Contain("⚡ Enforced · recomputed before commit");
+        markup.Should().Contain("`AverageQuantity` · `number`");
+        markup.Should().Contain("From: `Quantity` · Governed by: none");
         markup.Should().NotContain("Writable:");
     }
 
@@ -718,8 +705,9 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "A as money");
 
-        markup.Should().Contain("Status: Proof contract active · 1 unresolved use");
-        markup.Should().Contain("Open proof issues: computed field `Result`");
+        markup.Should().Contain("⚠️ Gap · `A` · ⚖️ `'USD'`");
+        markup.Should().Contain("🔬 Use: `Result`");
+        markup.Should().Contain("Evidence: Left `A - B` carries `'USD'` · right `C` carries `'EUR'`");
     }
 
     [Fact]
@@ -815,8 +803,8 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "Rate as exchangerate");
 
-        markup.Should().Contain("Resolved qualifiers: Source currency `<unresolved>` · Target currency `<unresolved>`");
-        markup.Should().Contain("Reason: exchange rate has no `in ... to ...` annotation");
+        markup.Should().Contain("⚡ Enforced · `Rate` · `exchange rate`");
+        markup.Should().Contain("Governed by: none");
     }
 
     [Fact]
