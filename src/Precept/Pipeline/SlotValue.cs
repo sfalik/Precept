@@ -102,6 +102,8 @@ public sealed record FieldTargetSlot(string? FieldName, SourceSpan Span)
     : SlotValue(ConstructSlotKind.FieldTarget, Span)
 {
     public SourceSpan NameSpan { get; init; } = Span;
+    public ImmutableArray<(string Name, SourceSpan Span)> AdditionalFields { get; init; }
+        = ImmutableArray<(string, SourceSpan)>.Empty;
 }
 
 /// <summary>The rule's boolean expression (e.g. amount > 0).</summary>

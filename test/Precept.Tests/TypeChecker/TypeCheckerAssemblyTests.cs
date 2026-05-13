@@ -257,6 +257,62 @@ public class TypeCheckerAssemblyTests
     }
 
     [Fact]
+    public void PopulateAccessModes_MultiFieldOmit_AllFieldsRecorded()
+    {
+        const string precept = """
+            precept Widget
+            field A as number default 0
+            field B as number default 0
+            state Draft initial
+            in Draft omit A, B
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.AccessModes
+            .Where(mode => mode.StateName == "Draft" && mode.Mode == ModifierKind.Omit)
+            .Select(mode => mode.FieldName)
+            .Should().Equal("A", "B");
+    }
+
+    [Fact]
+    public void ParseFieldTarget_MultiFieldAccessMode_AllFieldsRecorded()
+    {
+        const string precept = """
+            precept Widget
+            field A as number default 0
+            field B as number default 0
+            state Draft initial
+            in Draft modify A, B readonly
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+
+        index.AccessModes
+            .Where(mode => mode.StateName == "Draft" && mode.Mode == ModifierKind.Read)
+            .Select(mode => mode.FieldName)
+            .Should().Equal("A", "B");
+    }
+
+    [Fact]
+    public void PopulateEditDeclarations_MultiFieldOmit_AllFieldsRecorded()
+    {
+        const string precept = """
+            precept Widget
+            field A as number default 0
+            field B as number default 0
+            state Draft initial
+            in Draft omit A, B
+            """;
+
+        var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
+        var editDeclaration = index.EditDeclarations.Single();
+
+        editDeclaration.IsEditAll.Should().BeFalse();
+        editDeclaration.EditableFields.Should().Equal("A", "B");
+    }
+
+    [Fact]
     public void StateAction_MultiStateList_ExpandsIntoIndependentHooks()
     {
         const string precept = """

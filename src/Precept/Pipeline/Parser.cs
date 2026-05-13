@@ -1019,13 +1019,16 @@ public static partial class Parser
             {
                 var first = Advance();
                 var lastSpan = first.Span;
+                var additionalBuilder = ImmutableArray.CreateBuilder<(string Name, SourceSpan Span)>();
 
                 while (Peek().Kind == TokenKind.Comma)
                 {
                     Advance(); // consume comma
                     if (Peek().Kind == TokenKind.Identifier)
                     {
-                        lastSpan = Advance().Span;
+                        var next = Advance();
+                        additionalBuilder.Add((next.Text, next.Span));
+                        lastSpan = next.Span;
                         continue;
                     }
 
@@ -1037,6 +1040,7 @@ public static partial class Parser
                 return new FieldTargetSlot(first.Text, SourceSpan.Covering(first.Span, lastSpan))
                 {
                     NameSpan = first.Span,
+                    AdditionalFields = additionalBuilder.ToImmutable(),
                 };
             }
 

@@ -423,6 +423,10 @@ public static class NameBinder
             if (fieldTargetSlot?.FieldName is { } fieldName)
             {
                 ResolveFieldReference(fieldName, fieldTargetSlot.NameSpan, null);
+                foreach (var (additionalFieldName, additionalFieldSpan) in fieldTargetSlot.AdditionalFields)
+                {
+                    ResolveFieldReference(additionalFieldName, additionalFieldSpan, null);
+                }
             }
 
             // Resolve expressions in various slots

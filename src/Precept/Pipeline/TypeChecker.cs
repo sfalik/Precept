@@ -937,46 +937,67 @@ internal static partial class TypeChecker
 
     private static void PopulateAccessModes(ConstructManifest manifest, CheckContext ctx)
     {
-        if (!manifest.ByKind.Contains(ConstructKind.AccessMode))
-            return;
-
-        foreach (var construct in manifest.ByKind[ConstructKind.AccessMode])
+        if (manifest.ByKind.Contains(ConstructKind.AccessMode))
         {
-            // —— State reference ——
-            var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
-            var resolvedStates = ResolveStateTargets(stateSlot, ctx);
+            foreach (var construct in manifest.ByKind[ConstructKind.AccessMode])
+                PopulateAccessModesForConstruct(construct, ctx, forcedMode: null, emitUndeclaredDiagnostics: true);
+        }
 
-            // —— Field reference ——
-            var fieldSlot = construct.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
-            string fieldName = "";
-            if (fieldSlot?.FieldName is not null)
+        if (manifest.ByKind.Contains(ConstructKind.OmitDeclaration))
+        {
+            foreach (var construct in manifest.ByKind[ConstructKind.OmitDeclaration])
+                PopulateAccessModesForConstruct(construct, ctx, ModifierKind.Omit, emitUndeclaredDiagnostics: false);
+        }
+    }
+
+    private static void PopulateAccessModesForConstruct(
+        ParsedConstruct construct,
+        CheckContext ctx,
+        ModifierKind? forcedMode,
+        bool emitUndeclaredDiagnostics)
+    {
+        // —— State reference ——
+        var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
+        var resolvedStates = ResolveStateTargets(stateSlot, ctx);
+
+        // —— Field reference ——
+        var fieldSlot = construct.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
+        string fieldName = "";
+        var additionalFieldNames = ImmutableArray<(string FieldName, SourceSpan Span)>.Empty;
+        if (fieldSlot?.FieldName is not null)
+        {
+            fieldName = ResolveAccessModeFieldName(fieldSlot.FieldName, fieldSlot.NameSpan, ctx, emitUndeclaredDiagnostics);
+
+            if (!fieldSlot.AdditionalFields.IsDefaultOrEmpty)
             {
-                if (HasKeywordTokenMeta(fieldSlot.FieldName, meta => meta.IsFieldBroadcast))
+                var additionalBuilder = ImmutableArray.CreateBuilder<(string FieldName, SourceSpan Span)>(fieldSlot.AdditionalFields.Length);
+                foreach (var (additionalFieldName, additionalFieldSpan) in fieldSlot.AdditionalFields)
                 {
-                    fieldName = fieldSlot.FieldName;
+                    additionalBuilder.Add((
+                        ResolveAccessModeFieldName(additionalFieldName, additionalFieldSpan, ctx, emitUndeclaredDiagnostics),
+                        additionalFieldSpan));
                 }
-                else if (ctx.FieldLookup.TryGetValue(fieldSlot.FieldName, out var typedField))
-                {
-                    fieldName = typedField.Name;
-                    ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.NameSpan));
-                }
-                else
-                {
-                    fieldName = fieldSlot.FieldName;
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.UndeclaredField, fieldSlot.NameSpan, fieldSlot.FieldName));
-                }
-            }
 
-            // —— Mode (readonly / editable / omit → modifier kind) ——
+                additionalFieldNames = additionalBuilder.ToImmutable();
+            }
+        }
+
+        // —— Mode (readonly / editable / omit → modifier kind) ——
+        ModifierKind mode;
+        TypedExpression? guard = null;
+        if (forcedMode is { } explicitMode)
+        {
+            mode = explicitMode;
+        }
+        else
+        {
             var modeSlot = construct.GetSlot<AccessModeSlot>(ConstructSlotKind.AccessModeKeyword);
-            ModifierKind mode = modeSlot?.AccessMode is { } accessToken
-                                && Modifiers.ByAccessToken.TryGetValue(accessToken, out var accessMeta)
+            mode = modeSlot?.AccessMode is { } accessToken
+                   && Modifiers.ByAccessToken.TryGetValue(accessToken, out var accessMeta)
                 ? accessMeta.Kind
                 : ModifierKind.Read;
 
             // —— Optional guard ——
-            TypedExpression? guard = null;
             var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
             if (guardSlot is not null)
             {
@@ -991,17 +1012,53 @@ internal static partial class TypeChecker
                     guard = new TypedErrorExpression(guardSlot.Expression.Span);
                 }
             }
+        }
 
-            foreach (var resolvedState in resolvedStates)
+        foreach (var resolvedState in resolvedStates)
+        {
+            ctx.AccessModes.Add(new TypedAccessMode(
+                StateName: resolvedState.StateName,
+                FieldName: fieldName,
+                Mode: mode,
+                Guard: guard,
+                Syntax: construct));
+
+            foreach (var (additionalFieldName, _) in additionalFieldNames)
             {
                 ctx.AccessModes.Add(new TypedAccessMode(
                     StateName: resolvedState.StateName,
-                    FieldName: fieldName,
+                    FieldName: additionalFieldName,
                     Mode: mode,
                     Guard: guard,
                     Syntax: construct));
             }
         }
+    }
+
+    private static string ResolveAccessModeFieldName(
+        string fieldName,
+        SourceSpan fieldSpan,
+        CheckContext ctx,
+        bool emitUndeclaredDiagnostics)
+    {
+        if (HasKeywordTokenMeta(fieldName, meta => meta.IsFieldBroadcast))
+        {
+            return fieldName;
+        }
+
+        if (ctx.FieldLookup.TryGetValue(fieldName, out var typedField))
+        {
+            ctx.FieldReferences.Add(new FieldReference(typedField, fieldSpan));
+            return typedField.Name;
+        }
+
+        if (emitUndeclaredDiagnostics)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.UndeclaredField, fieldSpan, fieldName));
+        }
+
+        return fieldName;
     }
 
     /// <summary>
@@ -1079,9 +1136,19 @@ internal static partial class TypeChecker
                 }
                 else
                 {
-                    fields = [fieldName];
+                    var fieldBuilder = ImmutableArray.CreateBuilder<string>(1 + fieldSlot.AdditionalFields.Length);
+                    fieldBuilder.Add(fieldName);
                     if (ctx.FieldLookup.TryGetValue(fieldName, out var typedField))
                         ctx.FieldReferences.Add(new FieldReference(typedField, fieldSlot.NameSpan));
+
+                    foreach (var (additionalFieldName, additionalFieldSpan) in fieldSlot.AdditionalFields)
+                    {
+                        fieldBuilder.Add(additionalFieldName);
+                        if (ctx.FieldLookup.TryGetValue(additionalFieldName, out var additionalTypedField))
+                            ctx.FieldReferences.Add(new FieldReference(additionalTypedField, additionalFieldSpan));
+                    }
+
+                    fields = fieldBuilder.ToImmutable();
                 }
             }
 

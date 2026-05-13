@@ -867,6 +867,67 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
+    public void ParseFieldTarget_MultiField_AllFieldsCaptured()
+    {
+        const string source = "in Draft omit A, B, C";
+        var tokens = Lexer.Lex(source);
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var omit = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.OmitDeclaration);
+        var fieldSlot = omit.Slots.OfType<FieldTargetSlot>().Single();
+
+        fieldSlot.FieldName.Should().Be("A");
+        fieldSlot.AdditionalFields.Select(field => field.Name).Should().Equal("B", "C");
+
+        var bToken = tokens.Tokens.Single(token => token.Text == "B");
+        var cToken = tokens.Tokens.Single(token => token.Text == "C");
+        fieldSlot.AdditionalFields[0].Span.Should().Be(bToken.Span);
+        fieldSlot.AdditionalFields[1].Span.Should().Be(cToken.Span);
+    }
+
+    [Fact]
+    public void ParseFieldTarget_SingleField_AdditionalFieldsEmpty()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("in Draft omit A"));
+
+        var omit = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.OmitDeclaration);
+        var fieldSlot = omit.Slots.OfType<FieldTargetSlot>().Single();
+
+        fieldSlot.AdditionalFields.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ParseFieldTarget_MultiField_SpanCoversAll()
+    {
+        const string source = "in Draft omit A, B, C";
+        var tokens = Lexer.Lex(source);
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        var omit = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.OmitDeclaration);
+        var fieldSlot = omit.Slots.OfType<FieldTargetSlot>().Single();
+        var firstToken = tokens.Tokens.Single(token => token.Text == "A");
+        var lastToken = tokens.Tokens.Single(token => token.Text == "C");
+
+        fieldSlot.Span.Should().Be(SourceSpan.Covering(firstToken.Span, lastToken.Span));
+    }
+
+    [Fact]
+    public void ParseFieldTarget_MultiField_TrailingComma_Diagnostic()
+    {
+        var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex("in Draft omit A, B,"));
+
+        var omit = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.OmitDeclaration);
+        var fieldSlot = omit.Slots.OfType<FieldTargetSlot>().Single();
+
+        fieldSlot.FieldName.Should().Be("A");
+        fieldSlot.AdditionalFields.Should().ContainSingle();
+        fieldSlot.AdditionalFields[0].Name.Should().Be("B");
+        manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    [Fact]
     public void OmitDeclaration_OmitAll_UsesFieldWildcard()
     {
         var tokens = Lexer.Lex("in Draft omit all");
