@@ -1,4 +1,91 @@
-# Diagnostic Coverage Enforcement
+# Frank — Hover Gap Audit — V7 vs. Implementation
+
+**Date:** 2026-05-13
+**Status:** Audit complete
+**Scope:** Render-format audit only. Compared `docs/Working/hover-design.md` against `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs`; deeper data-truth questions were intentionally out of scope.
+
+## Fixed by Kramer (`dcaf506d`)
+
+- `state` card — `CreateStateMarkdown` no longer leads with the non-spec `**state ...**` title + `Modifiers:` block. It now uses the V7 three-line summary shape (`status`, `🔁 In/Out`, `✏️/🧭/⚡`) and keeps the locked B4 sub-card appended underneath.
+
+## Confirmed gaps remaining
+
+**field (stored)** (`CreateFieldMarkdown`)
+- Gap: Still title-first (`**field ...**`), still emits `Type:` / qualifier-source / proof-summary lines, and still pushes mutability + governance below that verbose block.
+- V7 spec says: status-first compact card — `⚡ Enforced · <field> · ⚖️ ...`, then mutability, then `Governed by: ...`. Proof variant should be `⚠️ Gap` + `🔬 Use:` + one evidence line.
+
+**field (computed)** (`CreateFieldMarkdown`)
+- Gap: Same old title-line pattern, plus separate `Type:` / qualifier / `Computed from:` / `Governed by:` sections instead of the compact V7 layout. The proof/proven variant is not rendered in the V7 form.
+- V7 spec says: `⚡ Enforced · recomputed before commit`, then ``<field> · ⚖️ ...``, then `From: ... · Governed by ...`; proof variant collapses to the 2-line proven card.
+
+**state** (`CreateStateMarkdown`)
+- Gap: The standard summary shape is fixed, but the V7 state proof variant is still missing. Gap states still show the generic summary body plus B4 rather than the dedicated `🧭 ... reaches ...` / `Missing path: ...` proof body.
+- V7 spec says: proof-variant state cards should render `⚠️ Gap · <state> unreachable from <state>`, then a `🧭` evidence line, then a `Missing path:` line.
+
+**event** (`CreateEventMarkdown`)
+- Gap: Still title-first (`**event ...**`), uses `Can fire from:` instead of the V7 `🔁 Fires from:` line, and renders one `Arg:` line per argument instead of one compact `Args:` line. Initial-event wording also carries extra runtime-detail copy.
+- V7 spec says: status-first card — `⚡ Enforced · args checked before route`, then `🔁 Fires from: ...`, then `Args: ...`; initial events collapse to `⚡ Enforced · constructor event` + `Args:`.
+
+**transition row** (`CreateTransitionMarkdown`)
+- Gap: Still renders the old `**transition**` title, `Actions:` line, `Graph:` line, and proof-gap counts/categories. It never emits the V7 `🔁 from → to on event` summary line or the compact `🔬 Can't confirm ...` proof-evidence line.
+- V7 spec says: status line, then `🔁 <from> → <to> on <event>`, then wrapped `Guard:` text; proof variant replaces the status with a `⚠️ Gap` row header and adds one `🔬` evidence line.
+
+**rule** (`CreateRuleMarkdown`)
+- Gap: Still title-first, keeps `Scope:` / `If false:` prose, and only appends referenced fields/args opportunistically. It does not render the V7 `Fields:` line or the compact proof-variant card.
+- V7 spec says: `⚡ Enforced ...`, blockquote message, `Fields: ...`; proof variant should be `⚠️ PRE.... · Gap · <expr>`, then `⚖️ Fields: ...`, then one evidence line.
+
+**ensure** (`CreateEnsureMarkdown`)
+- Gap: Still title-first, uses `Scope:` and `Violation rejects ...` prose, and does not render the anchored V7 header format (`Residency`, `Entry gate`, `Exit gate`, `Arg gate`) as the leading line. Proof variant is also missing.
+- V7 spec says: anchor-specific status-first card, then blockquote message, then `Fields: ...`; proof variant should collapse to the compact `⚠️ PRE... · Gap` form with qualifier evidence.
+
+**access** (`CreateAccessMarkdown`)
+- Gap: Still title-first, status detail is `write map is structural`, second line is `Editable here: ...`, and third line is `Same write set in ... · locked in ...` rather than the V7 icon-led summary.
+- V7 spec says: `✅ Proven · write access declared in manifest`, then `✏️ ...`, then `Also in: ... · 🔒 ...`.
+
+**omit** (`CreateOmitMarkdown`)
+- Gap: Still title-first, uses prose (`... does not exist in this state — not readable, not writable`) and `Restored on transition to:` instead of the compact V7 lock/restore lines.
+- V7 spec says: `✅ Proven · structurally absent in <state>`, then `🔒 <field> does not exist here`, then `🔁 Restored on: ...`.
+
+**reject** (`CreateRejectMarkdown`)
+- Gap: Still title-first, status detail is `deliberate business rejection`, and the result line is old prose (`Result: state unchanged · no field mutations commit`).
+- V7 spec says: `⚡ Enforced · event rejected`, then the reject reason blockquote, then `State unchanged · no changes apply`.
+
+**qualifier** (`CreateQualifierMarkdown`)
+- Gap: Base card adds an extra source/resolution line and renders the value as `'<value>'` rather than the simpler V7 display. More importantly, there is no V7 proof-aware qualifier declaration card; `CreateQualifierMarkdown` never emits the `⚠️ Gap · currency is ...` / `⚖️ Use:` variant.
+- V7 spec says: 2-line base card (`⚖️ Axis · value` + mismatch rule) and a 3-line proof variant when overlapping proof data exists.
+
+**proof expression** (`CreateQualifierChainProofExpressionMarkdown`, `CreateGenericProofExpressionMarkdown`)
+- Gap: Only the qualifier-compatibility path uses the compact V7 card. Qualifier-chain and generic proof-expression fallbacks still render the old forensic `**expression**` / `Status:` / `Context:` / `Requirement:` sections.
+- V7 spec says: proof-expression hover is a compact 3-line card shape, not a verbose diagnostic dossier.
+
+**diagnostic squiggle** (`CreatePresenceProofDiagnosticMarkdown`, `CreateGenericProofDiagnosticMarkdown`)
+- Gap: Only qualifier-compatibility diagnostics use the V7 compact card. Presence and generic proof diagnostics still render verbose `**PRE...**`, `Verdict:`, `Context:`, `Expression:`, `Requirement:` sections.
+- V7 spec says: diagnostic squiggles — including the presence variant — should stay in the compact 3-line `⚠️ / 🔬 / evidence` format.
+
+## Confirmed correct
+
+- `state` standard summary (`CreateStateMarkdown`) now matches the V7 top-level 3-line shape.
+- `B4` state proof narrative (`CreateStateGraphEdgeProofCard`) still matches the locked V7/B4 contract.
+- `CreateQualifierProofExpressionMarkdown` matches the V7 compact proof-expression card.
+- `CreateQualifierProofDiagnosticMarkdown` matches the V7 compact proof-diagnostic card.
+
+## Summary
+
+- By card family: 1 card type is fully correct end-to-end (`B4`).
+- 13 card types still have at least one V7 format gap.
+- 0 card types are completely unimplemented.
+
+## Recommended remediation order
+
+1. Field + event cards.
+2. Rule + ensure + transition + reject cards.
+3. Qualifier + proof-expression + diagnostic-squiggle consistency pass.
+4. State proof-variant completion.
+5. Access + omit polish.
+
+---
+
+# Diagnostic Coverage Enforcement
 
 **By:** Frank  
 **Date:** 2026-05-13T00:32:04-04:00  
