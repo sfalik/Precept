@@ -1,0 +1,14 @@
+precept Test
+
+
+field f1 as quantity of 'mass' default '1 kg'
+field f2 as quantity of 'mass' default '1 {f1.unit}'
+
+
+field Balance as money in 'USD' default '0.00 USD' nonnegative     # OK — resolves
+field Limit   as money in 'USD' default '5000.00 USD' # OK — resolves
+
+rule Balance >= '0.00 USD' because "balance must be nonnegative"      # PRE0052 — should resolve
+rule Balance <= '5000.00 USD' because "balance must not exceed limit" # PRE0052 — should resolve
+
+state Active initial terminal
