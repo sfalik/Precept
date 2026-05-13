@@ -50,6 +50,23 @@ public enum DiagnosticCode
     UndeclaredState                    =  28,
     StateListContainsWildcard          = 128,
     DuplicateStateInList               = 129,
+    /// <summary>
+    /// Reading a field that is <c>omit</c> in the state-anchored expression context
+    /// (transition row guard, in-state ensure, from-state ensure, state action guard/RHS).
+    /// </summary>
+    OmittedFieldReadInState            = 130,
+    /// <summary>
+    /// A <c>set</c> action in a transition or state hook targets a field that is
+    /// <c>omit</c> in the target state.
+    /// Grounded in §2.2 rule #6.
+    /// </summary>
+    OmittedFieldSetInTargetState       = 131,
+    /// <summary>
+    /// A transition moves a required field from <c>omit</c> (from-state) to non-omit
+    /// (to-state) without a <c>set</c> action assigning it.
+    /// Structural dual of <see cref="InitialEventMissingAssignments"/> (D94).
+    /// </summary>
+    RequiredFieldUnassignedOnEntry     = 132,
     UndeclaredEvent                    =  29,
     UndeclaredFunction                 =  30,
     MultipleInitialStates              =  31,

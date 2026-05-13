@@ -167,6 +167,31 @@ public class DiagnosticsTests
     }
 
     [Fact]
+    public void DiagnosticMeta_D130_HasRequiredFields()
+    {
+        var meta = Diagnostics.GetMeta(DiagnosticCode.OmittedFieldReadInState);
+
+        AssertRequiredDiagnosticMetadata(meta);
+    }
+
+    [Fact]
+    public void DiagnosticMeta_D131_HasRequiredFields()
+    {
+        var meta = Diagnostics.GetMeta(DiagnosticCode.OmittedFieldSetInTargetState);
+
+        AssertRequiredDiagnosticMetadata(meta);
+    }
+
+    [Fact]
+    public void DiagnosticMeta_D132_HasRequiredFields()
+    {
+        var meta = Diagnostics.GetMeta(DiagnosticCode.RequiredFieldUnassignedOnEntry);
+
+        AssertRequiredDiagnosticMetadata(meta);
+        meta.RelatedCodes.Should().Contain(DiagnosticCode.InitialEventMissingAssignments);
+    }
+
+    [Fact]
     public void UnprovedModifierRequirement_HasProofStage()
     {
         Diagnostics.GetMeta(DiagnosticCode.UnprovedModifierRequirement).Stage.Should().Be(DiagnosticStage.Proof);
@@ -211,6 +236,16 @@ public class DiagnosticsTests
         foreach (var code in Enum.GetValues<DiagnosticCode>())
             data.Add(code);
         return data;
+    }
+
+    private static void AssertRequiredDiagnosticMetadata(DiagnosticMeta meta)
+    {
+        meta.FixHint.Should().NotBeNull();
+        meta.TriggerCondition.Should().NotBeNull();
+        meta.RecoverySteps.Should().NotBeNullOrEmpty();
+        meta.Stage.Should().Be(DiagnosticStage.Type);
+        meta.Severity.Should().Be(Severity.Error);
+        meta.Category.Should().Be(DiagnosticCategory.Structure);
     }
 
     public static TheoryData<DiagnosticCode, string> UpdatedMessageTemplates => new()
@@ -271,6 +306,9 @@ public class DiagnosticsTests
         DiagnosticCode.UndeclaredState,
         DiagnosticCode.StateListContainsWildcard,
         DiagnosticCode.DuplicateStateInList,
+        DiagnosticCode.OmittedFieldReadInState,
+        DiagnosticCode.OmittedFieldSetInTargetState,
+        DiagnosticCode.RequiredFieldUnassignedOnEntry,
         DiagnosticCode.UndeclaredEvent,
         DiagnosticCode.UndeclaredFunction,
         DiagnosticCode.MultipleInitialStates,
