@@ -108,6 +108,7 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 - Lifecycle optional — stateless precepts enforce field declarations, rules, and constraints without a state machine
 - Full inspectability — preview any action's outcome without executing it
 - Compile-time proof engine — a unified interval + relational inference engine that proves numeric properties at compile time, before any instance exists. Catches divisor safety (C92/C93), sqrt safety (C76), assignment constraint violations (C94), contradictory rules (C95), vacuous rules (C96), dead guards (C97), and tautological guards (C98). Proof covers compound operands, sum-on-RHS rules, computed-field intermediaries, transitive ordering chains, and 10 built-in numeric functions. All diagnostics include source attribution so authors see what was proved and why.
+- Compile-time field-state guarantees — omitted fields cannot be read in state-anchored expressions (D130) or written into target states where they are structurally absent (D131), and omit→present transitions must assign newly required fields before entry (D132).
 - **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
 - **Conditional declarations** — `when` guards on rules, ensures, and edit blocks make rules apply only when a precondition is met
 - **Conditional expressions** — `if...then...else` selects between values inline, replacing row duplication for data-dependent field assignments

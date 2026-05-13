@@ -932,7 +932,13 @@ State-scoped access modes (`in StateTarget`) use `modify` for constraint declara
 4b. **Guarded `readonly` requires a `writable` baseline** — a guarded `readonly` on a field without `writable` is a compile error (`RedundantAccessMode`); both branches would otherwise resolve to read-only, making the guard vacuous.
 4c. **Unguarded declarations must change the effective mode** — `in <State> modify F editable` where `F` carries `writable` (editable is already the baseline) and `in <State> modify F readonly` where `F` lacks `writable` (read-only is the D3 default) are both compile errors (`RedundantAccessMode`). A declaration that resolves to the same mode the field already falls back to changes nothing — it is dead code. This mirrors the `RedundantModifier` pattern: declarations that have no effect are refused, not merely warned about. **`omit` is exempt** — it operates on structural presence rather than mutability and always changes the effective shape of the state, so it can never be redundant on the mutability axis. **`all` forms (`in <State> modify all readonly`) are also exempt** — a broadcast declaration's effective change depends on the current field population; applying redundancy checks to bulk forms would make valid declarations brittle as fields are added or removed.
 5. **`omit` clears on state entry** — field value resets to default on any transition into an `omit` state (including self-transitions); does NOT apply to `no transition`.
+
+   **D132 — RequiredFieldUnassignedOnEntry:** When a transition moves a required field (non-optional, no default value, not computed) from `omit` in the source state to non-omit in the target state, the transition action chain must include a `set` for that field. This is the structural dual of `InitialEventMissingAssignments` (D94) applied to state-crossing transitions.
 6. **`set` targeting an `omit` field in the target state** is a compile error; `readonly`/`editable` do not restrict `set`.
+
+   **D130 — OmittedFieldReadInState:** Reading a field in a state-anchored expression context (transition guard, `in`-state ensure, `from`-state ensure, state hook guard, or action RHS) when that field is `omit` in the anchoring state is a compile error.
+
+   **D131 — OmittedFieldSetInTargetState:** A `set` (or any write) action that targets a field `omit` in the transition's target state is a compile error.
 7. **Conflicting modes** on the same (field, state) pair is a compile error.
 8. **`writable` on a computed field** is a compile error (`ComputedFieldNotWritable`).
 9. **`writable` on an event argument** is a compile error (`WritableOnEventArg`).
@@ -1189,6 +1195,8 @@ Fields, states, and events are all declared at the top level. They are visible e
 | Default value expression | Field names declared **before** this field (no self-reference, no forward reference) |
 | Computed expression (`field X as T <- Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
 | Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
+
+Field names that resolve to fields declared `omit` in the anchoring state are syntactically in scope but produce `OmittedFieldReadInState` (D130) — reading a structurally absent field is a compile error.
 
 #### Quantifier binding variable scope
 
