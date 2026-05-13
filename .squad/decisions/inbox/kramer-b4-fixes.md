@@ -1,7 +1,0 @@
-# Kramer B4 fixes
-
-- B1 fixed by extending `src/Precept/Pipeline/StateGraph.cs` `EdgeProofStatus` with `HasObligations`, populating it from matched transition-row proof obligations in `src/Precept/Compiler.cs`, and switching `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` to render the no-obligations variant when every connected edge has `HasObligations == false`.
-- B1 regression coverage now includes the connected-edge/no-proof-obligation path in `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs`, so a plain `from Draft on Submit -> transition Approved` row locks `✅ Proven · no connected edges carry proof obligations` instead of the all-proven wording.
-- B2 fixed with a new regression in `test/Precept.Tests/CompilerEdgeProofStatusTests.cs` that creates two unresolved dequeue obligations with the same `Requirement.Description`, proves the proof ledger carries both obligations, and asserts `UnresolvedObligationSummaries` collapses them to one summary.
-- `docs/Working/hover-design.md` now reflects the shipped `HasObligations` projection and the updated enrichment/rendering rule.
-- Verification: `dotnet test test\Precept.LanguageServer.Tests\ --nologo`, `dotnet test test\Precept.Tests\Precept.Tests.csproj --filter FullyQualifiedName~CompilerEdgeProofStatusTests --nologo`, and `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp\dev-language-server --nologo` all passed.

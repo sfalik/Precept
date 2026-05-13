@@ -9052,3 +9052,157 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - Frank confirmed the good news first: state identifier routing is fixed, `reject` and qualifier precedence are correct, and `271/271` language-server tests passed.
 - Blocker B1 remains: `TryCreateTypeHover(...)` and `TryCreateActionHover(...)` still return before rich construct routing, so declaration-span `money` and action keywords can bypass the construct card.
 - Blockers B2 and B3 remain: the field and state mutability summaries still ignore state-local `omit` declarations in the global/unconditional writable fallbacks, so omitted surfaces can still be reported as `✏️` instead of `🔒`.
+
+### 2026-05-12T04:00:00Z: Modifier applicability drift was confirmed as catalog gaps for `price`, `maxplaces`, and identity-type redundancy handling
+
+**By:** Scribe
+
+**Status:** Merged from Frank's modifier applicability audit.
+
+**Merged source:** `frank-modifier-price-analysis.md`.
+
+- Frank grounded the issue in catalog metadata, not checker logic: `price` bound modifiers and business-magnitude `maxplaces` were missing from `Modifiers.cs`, while the checker was faithfully enforcing incomplete metadata.
+- The audit locked the design line that `price` magnitude modifiers are semantically valid, `exchangerate min/max` remain deliberately invalid, and `notempty` must stay off scalar business magnitudes.
+- It also recorded the validator-shape bug on identity types: explicit `currency`/`unitofmeasure`/`dimension notempty` should degrade to redundancy-only handling.
+
+---
+
+### 2026-05-12T23:36:02Z: Field-state guarantees v2 doc was finalized pending owner sign-off after resolving its tracked open questions
+
+**By:** Scribe
+
+**Status:** Merged from Frank's v2 doc update.
+
+**Merged source:** `frank-v2-doc-update.md`.
+
+- Frank advanced `docs/Working/field-state-guarantees-v2.md` to "Design Finalized — Pending Implementation" after documenting resolutions for Q1-Q5, B1-B3, and the W5 false-positive limitation.
+- The finalized draft records `IsBroadcast`, spec-truth baselines, DNF handling for OR conditions, wildcard multiplicity, and the self-loop dual-diagnostic decision as the working implementation contract.
+- This record stays explicitly pending Shane's sign-off rather than claiming the design was owner-approved.
+
+---
+
+### 2026-05-12T23:38:00Z: Field-state guarantees v2 consistency review blocked readonly/access-condition enforcement on event-driven `set`
+
+**By:** Scribe
+
+**Status:** Merged from Frank's v2 consistency review.
+
+**Merged source:** `frank-v2-consistency-review.md`.
+
+- Frank confirmed D133, the multi-field parser fix, omit/access-mode unification, and D42/D43 emission are architecturally sound and grounded in the spec.
+- He blocked the wider design where it crossed the spec boundary: `readonly` and guarded `editable` restrict Update-path patches, not event-driven `set` actions, so D132, D134, and the proposed Phase 2 proof surface were not approved.
+- The review also recorded that general from-state D130 and guard-read D131 need either narrower justification or explicit spec extension rather than being presented as already-shipped language law.
+
+---
+
+### 2026-05-12T23:42:25Z: Hover B2/B3 re-review stayed blocked until `omit all` gained explicit regression coverage
+
+**By:** Scribe
+
+**Status:** Merged from Frank's B2/B3 re-review.
+
+**Merged source:** `frank-b2-b3-review-v2.md`.
+
+- Frank confirmed the routing-order fix and omit-driven mutability summaries were structurally correct and that targeted language-server tests were green.
+- The remaining blocker was narrow and explicit: no hover regression yet locked the `omit all` path on field and state cards.
+- Durable review guidance is that B2/B3 were functionally close, but not mergeable until the `omit all` surface was test-covered.
+
+---
+
+### 2026-05-12T23:45:45Z: Required-field constructor enforcement is specified but entirely unimplemented
+
+**By:** Scribe
+
+**Status:** Merged from Frank's required-field initialization gap analysis.
+
+**Merged source:** `frank-required-fields-analysis.md`.
+
+- Frank confirmed PRE0093 and PRE0094 already exist in the diagnostic catalog and message templates, but no pipeline stage emits them and no tests or samples exercise the constructor contract.
+- The gap is broader than one check: `Precept.Create()` is still a stub, samples currently rely on editable Draft-state initialization, and even event-argument syntax appears incomplete for the spec's constructor examples.
+- The durable owner-direction question is whether to implement the spec as written now, refine the spec around the shipped Draft-edit path, or split compile-time advisory from runtime enforcement.
+
+---
+
+### 2026-05-12T23:48:11Z: Hover B2/B3 final re-review approved after `omit all` hover coverage landed
+
+**By:** Scribe
+
+**Status:** Merged from Frank's final B2/B3 re-review.
+
+**Merged source:** `frank-b2-b3-review-v3.md`.
+
+- Frank approved the final B2/B3 pass once construct-card routing, omit-aware mutability summaries, and `omit all` behavior all matched `docs/Working/hover-design.md`.
+- The missing regression coverage was closed with two new hover tests that lock the `omit all` path on both affected surfaces.
+- Targeted validation closed green at `275/275` language-server tests.
+
+---
+
+### 2026-05-12T23:50:08Z: Modifier catalog gaps were closed for `price`, `exchangerate`, business-magnitude `maxplaces`, and identity-type redundancy handling
+
+**By:** Scribe
+
+**Status:** Merged from George's modifier-gap implementation note.
+
+**Merged source:** `george-modifier-catalog-gaps-fixed.md`.
+
+- Commit `a727dddb` widened `ZeroBoundNumericTypes` to include `Price` and `ExchangeRate`, widened ranged modifiers to include `Price`, and introduced `BusinessMagnitudeTypes` so `maxplaces` now applies across decimal, money, quantity, price, and exchangerate.
+- The TypeChecker applicability guard now skips implied modifiers, collapsing identity-type `notempty` handling to `RedundantModifier` instead of the previous double-diagnostic shape.
+- George validated the implementation at `4969/4969` core tests green and handed Soup Nazi the missing regression scenarios to lock.
+
+---
+
+### 2026-05-12T23:50:08Z: Modifier-gap regression coverage landed across price, exchangerate, business magnitudes, and identity types
+
+**By:** Scribe
+
+**Status:** Merged from Soup Nazi's modifier-gap regression suite note.
+
+**Merged source:** `soup-nazi-modifier-gap-tests.md`.
+
+- Soup Nazi added 22 tests across three files: a 17-test `PriceExchangeRateModifierTests.cs` suite, a 3-test `IdentityTypeModifierTests.cs` suite, and two `maxplaces` additions in `MoneyQuantityModifierRegressionTests.cs`.
+- The suite locked the expected split between newly-fixed price paths, already-green exchangerate and identity-type behavior, and the deliberate negative coverage that `exchangerate min/max` must stay invalid.
+- The tester note also preserved two useful cautions: the price regression guards were not asserting the actual pre-fix diagnostic code, and five `ModifiersTests` theory failures were pre-existing drift rather than fallout from this batch.
+
+---
+
+### 2026-05-12T23:56:04Z: B4 edge-proof status projection landed across the compiler, graph model, and rich state hover
+
+**By:** Scribe
+
+**Status:** Merged from George's B4 completion note.
+
+**Merged source:** `george-b4-complete.md`.
+
+- George added `StateGraph.EdgeProofStatuses` plus the `EdgeProofStatus` record so graph-level proof projections survive into tooling without rejoining proof data inside the language server.
+- Compiler enrichment now maps unresolved transition-row obligations onto concrete graph edges, de-duplicates repeated descriptions, and marks edges proven when no unresolved summaries remain.
+- The rich state card now renders per-edge proof gaps or the matching proven/no-obligations copy, and targeted test counts rose to `278` language-server tests and `4973` core tests.
+
+---
+
+### 2026-05-13T00:00:38Z: Hover B4 review approved the edge-proof projection shape but blocked a no-obligation copy bug and missing de-dup coverage
+
+**By:** Scribe
+
+**Status:** Merged from Frank's B4 review.
+
+**Merged source:** `frank-b4-review.md`.
+
+- Frank approved the overall B4 architecture: `StateGraph.EdgeProofStatus`, compiler enrichment, incident-edge filtering, and rich state-card rendering were all wired in the expected places.
+- Two blockers remained before closeout: the no-obligations branch used the wrong emptiness check and the projection suite did not yet lock `Requirement.Description` de-duplication.
+- Targeted B4 tests passed even though an unrelated pre-existing modifier-catalog failure still kept the broader core suite red.
+
+---
+
+### 2026-05-13T00:00:39Z: Kramer's B4 fix pass closed the no-obligations copy bug and proof-summary de-dup coverage
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's B4 fix note.
+
+**Merged source:** `kramer-b4-fixes.md`.
+
+- Kramer extended `StateGraph.EdgeProofStatus` with `HasObligations`, populated it during compiler enrichment, and switched rich state hover to render the locked no-obligations wording when connected edges exist but none carry proof obligations.
+- The fix pass also added the missing regression anchors: language-server coverage for the connected-edge/no-proof-obligation path and core projection coverage that duplicate `Requirement.Description` values collapse to one unresolved summary.
+- `docs/Working/hover-design.md` was updated to match the shipped projection/rendering rule, and targeted language-server tests, compiler-edge-proof tests, and the language-server build all passed.
+
+---

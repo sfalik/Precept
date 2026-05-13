@@ -161,7 +161,22 @@
 - Identified 5 open design questions that block test writing: broadcast identity contract, field baseline for D132, OR-disjunct access condition diagnostic, wildcard-row diagnostic multiplicity, and self-loop dual-diagnostic behavior.
 - Filed findings to `.squad/decisions/inbox/soup-nazi-v2-test-review.md`.
 
+### 2026-05-12T19:50:08-04:00 — Modifier catalog gap tests added for price/exchangerate/identity types
+
+- Added `test/Precept.Tests/TypeChecker/PriceExchangeRateModifierTests.cs` — 17 tests covering: 7 price clean tests (nonnegative, positive, nonzero, min, max, minmax, maxplaces), 4 exchangerate clean tests (nonnegative, positive, nonzero, maxplaces), 2 exchangerate negative tests (min/max still `InvalidModifierForType` by design), 4 regression guards.
+- Added `test/Precept.Tests/TypeChecker/IdentityTypeModifierTests.cs` — 3 tests covering the double-error fix: `currency`, `unitofmeasure`, and `dimension` + `notempty` must emit ONLY `RedundantModifier`, with explicit `NotContain(InvalidModifierForType)` assertion.
+- Extended `test/Precept.Tests/TypeChecker/MoneyQuantityModifierRegressionTests.cs` — added `Maxplaces_OnMoneyField_NoDiagnostic` and `Maxplaces_OnQuantityField_NoDiagnostic`.
+- Red/green posture at write time: 7 price tests RED (George's implementation pending), all exchangerate and identity-type tests GREEN (those gaps already fixed or never broken), 2 new MoneyQuantity tests GREEN.
+- Confirmed exchangerate field qualifier syntax as `in 'USD' to 'EUR'` (not `in 'USD/EUR'`); price field qualifier as compound `in 'USD/each'`.
+- Confirmed min/max on exchangerate CORRECTLY remain `InvalidModifierForType` — ordering is undefined for currency-pair rates per spec § "Business-domain comparison".
+- The 5 pre-existing `ModifiersTests.NumericModifiers_ApplyToIntegerDecimalNumberMoneyQuantity` theory failures (Min, Max, Nonnegative, Positive, Nonzero) matched the filter string but are pre-existing, not caused by this batch.
+
 ### 2026-05-12T18:01:17.648-04:00 — Hover baseline verified clean after B1
 
 - Verified `HoverHandlerTests` at 44/44 passing with `Precept.LanguageServer.Tests` 272/272 and core `Precept.Tests` 4938/4938. No test edits, disables, or skips were needed in this pass.
 - Recorded the five earlier hover failures as already-fixed implementation bugs: markdown paragraph joining, qualifier source plumbing, qualifier axis/checks output, transition proof-gap routing, and proof-chain details.
+
+### 2026-05-12T23:50:08Z — Modifier-gap regression suite closed green after coordinator follow-up
+
+- Soup Nazi landed 22 regression tests across `PriceExchangeRateModifierTests.cs`, `IdentityTypeModifierTests.cs`, and `MoneyQuantityModifierRegressionTests.cs`, covering price/exchangerate legality, business-magnitude `maxplaces`, and identity-type redundancy behavior.
+- Coordinator corrected the price qualifier fixture and updated `ModifiersTests` drift theories for the split `ZeroBound` vs `Ranged` catalog groups, bringing the final repo-wide validation result to `4995/4995`.

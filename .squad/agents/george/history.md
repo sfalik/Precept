@@ -45,3 +45,8 @@
 - Pure-copy state-list expansion should resolve shared payload once, then fan out per source-state name while preserving per-name spans and undeclared-state diagnostics.
 - `TypedInterpolatedTypedConstant` qualifier work must treat compound-unit literals as numerator/denominator slot pairs; denominator-only fallbacks silently lose information.
 - 2026-05-12 modifier applicability catalog gaps closed: `ZeroBoundNumericTypes` now includes `Price` and `ExchangeRate`; `RangedNumericTypes` adds `Price` only (ExchangeRate excluded — ordering undefined); new `BusinessMagnitudeTypes` array (`Decimal`, `Money`, `Quantity`, `Price`, `ExchangeRate`) replaces `DecimalOnly` for `Maxplaces`; `DecimalOnly` removed. TypeChecker.Validation applicability guard now skips when modifier is already in `impliedModifiers`, so identity types (`currency`, `unitofmeasure`, `dimension`) + `notempty` emit only `RedundantModifier`. All 4969 tests green, zero test flips.
+
+### 2026-05-12T23:50:08Z — Modifier applicability gaps closed with final suite health
+
+- Commit `a727dddb` widened modifier applicability for `price`, `exchangerate`, and business-magnitude `maxplaces`, and collapsed identity-type `notempty` handling to redundancy-only by skipping implied modifiers during applicability validation.
+- Coordinator follow-up repaired the remaining price qualifier fixture and `ModifiersTests` catalog-drift expectations, so the final repository result closed at `4995/4995` tests passing.

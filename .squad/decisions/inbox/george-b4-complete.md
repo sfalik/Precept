@@ -1,6 +1,0 @@
-# George B4 complete
-
-- `src/Precept/Pipeline/StateGraph.cs` now carries graph-level edge proof projection data: the new `EdgeProofStatus` record plus `StateGraph.EdgeProofStatuses`, with empty initialization in both `StateGraph.Empty` and `GraphAnalyzer` construction paths.
-- `src/Precept/Compiler.cs` now calls `EnrichGraphWithProofStatus(...)` after graph analysis and proof. The projection matches unresolved `ProofLedger` obligations whose context is `TransitionRowContext` onto concrete `GraphEdge` instances, prefers explicit `(from state, event)` rows over wildcard rows, de-duplicates `Requirement.Description`, and marks an edge proven when no unresolved summaries remain.
-- `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` now appends the B4 `📍 graph position` block inside the rich state card. It renders one `⚠️ Gap · From --Event--> To can't be proven` line per failing connected edge, otherwise `✅ Proven · all connected edges satisfy their proof obligations`, or `✅ Proven · no connected edges carry proof obligations` when the state has no connected projected edges.
-- Test count before/after: `test/Precept.LanguageServer.Tests` 275 → 278, `test/Precept.Tests` 4969 → 4973.
