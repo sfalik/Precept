@@ -155,6 +155,7 @@
 
 
 - D94 construction analysis must only inspect initial-event rows whose `FromState` is an initial state; rows on the same initial event that originate from non-initial states are lifecycle paths and must not participate in construction guarantees.
+- D94 and D132 partition construction vs. lifecycle guarantees cleanly only when `NeedsInitialEvent` excludes fields omitted in every initial state; stateful coverage should lock that boundary in tests, while stateless precepts with initial events still escape both D93 and D94 as a documented pre-existing gap.
 
 ### 2026-05-12T23:50:08Z — Modifier applicability gaps closed with final suite health
 

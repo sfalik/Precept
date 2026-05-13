@@ -1102,9 +1102,9 @@ The initial event may declare args that are intended to populate fields (e.g., `
 | `test/Precept.Tests/Parser/` (existing files) | Modify | 0 | Multi-field parser tests |
 | `test/Precept.Tests/TypeChecker/` (existing files) | Modify | 0, 2 | Omit lookup and multi-field consumer tests |
 | `test/Precept.Tests/DiagnosticsTests.cs` | Modify | 1 | D130/D131/D132 metadata tests |
-| `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs` | New | 10, 11 | D93/D94 construction enforcement tests |
+| `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs` | New | 10, 11, 13 | D93/D94 construction enforcement + D94 boundary follow-up tests |
 
-**Total estimated tests:** ~93 new tests across all slices (73 original + 20 from Slices 10–11).
+**Total estimated tests:** ~96 new tests across all slices (73 original + 20 from Slices 10–11 + 3 from Slice 13).
 **Regression anchors:** ~21 named existing test families.
 
 ---
@@ -1113,13 +1113,13 @@ The initial event may declare args that are intended to populate fields (e.g., `
 
 **Design Approved — Implementation Complete**
 
-Gap audit (2026-05-12) identified two blocking gaps: D93 and D94 were declared but never enforced. Slices 10–11 closed that remediation work. Slices 0–11 are complete.
+Gap audit (2026-05-12) identified two blocking gaps: D93 and D94 were declared but never enforced. Slices 10–11 closed that remediation work, and Slice 13 captured Frank's post-fix D94 boundary follow-up. Slices 0–11 plus Slice 13 are complete.
 
 ---
 
 ## 12. Implementation Tracker
 
-**Progress:** 12 / 12 slices complete
+**Progress:** 13 / 13 slices complete
 
 | Slice | Name | Status | Depends On | Commit |
 |---|---|---|---|---|
@@ -1135,16 +1135,18 @@ Gap audit (2026-05-12) identified two blocking gaps: D93 and D94 were declared b
 | Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ✅ Done | Standalone | `c2d5b8fb` |
 | Slice 10 | D93: `RequiredFieldsNeedInitialEvent` enforcement | ✅ Done | Independent (additive) | `597a0479` |
 | Slice 11 | D94: `InitialEventMissingAssignments` enforcement | ✅ Done | Slice 10 | `0b42fd1a` |
+| Slice 13 | D94 Boundary Tests + Catalog Fix (Frank follow-up) | ✅ Done | Slice 11 | `d9edee97` |
 
 ### Slice 13 — D94 Boundary Tests + Catalog Fix (Frank follow-up)
 
-**Status:** 🔲 Pending
+**Status:** ✅ Done
+**Commit:** `d9edee97`
 
 **Goal:** Add targeted boundary tests documenting the D94/D132 partition and multi-initial-state behavior; update D94's `TriggerCondition` text; note the stateless-precept gap.
 
 **Files:**
 - `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs` — 3 new tests
-- `src/Precept/Language/DiagnosticCatalog.cs` — D94 TriggerCondition text
+- `src/Precept/Language/Diagnostics.cs` — D94 TriggerCondition text
 
 **Tests:**
 - `D94_FieldOmittedInInitialState_NotRequired`
