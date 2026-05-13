@@ -6,6 +6,34 @@
 
 ---
 
+### 2026-05-13T00:32:50Z: Elaine's naming-normalization proposal pushes the field-state diagnostic family toward subject-first catalog names
+
+**By:** Scribe
+
+**Status:** Merged from Elaine's diagnostic naming normalization proposal.
+
+**Merged source:** `elaine-diagnostic-naming-normalization.md`.
+
+- Elaine judged the catalog house style to be subject-first, plain-English condition naming, which makes `MustSetOmitToNonOmit` the clearest outlier and leaves `ReadOfOmittedField` / `WriteToTargetOmittedField` sounding more robotic than the rest of `DiagnosticCode`.
+- Her proposed normalized family is `FieldOmittedInStateCannotBeRead`, `FieldOmittedInTargetStateCannotBeSet`, and `RequiredFieldNeedsAssignmentWhenBecomingPresent`, plus a tightened `InitialEventMissingRequiredFieldAssignments`, while `RequiredFieldsNeedInitialEvent`, `ConflictingAccessModes`, and `RedundantAccessMode` stay as-is.
+- Even with better identifiers, the Problems panel still needs field-first, state-aware, repair-oriented message text; the stable diagnostic name alone should not carry that UX burden.
+
+---
+
+### 2026-05-13T00:32:50Z: Elaine's UX review freezes the canonical v3 field-state codes at D130, D131, and D132 and flags D132 naming as unshipped
+
+**By:** Scribe
+
+**Status:** Merged from Elaine's diagnostic UX review.
+
+**Merged source:** `elaine-diagnostics-ux-review.md`.
+
+- The v3 field-state design now has one canonical numbering surface: `ReadOfOmittedField` = D130, `WriteToTargetOmittedField` = D131, and `MustSetOmitToNonOmit` = D132. Earlier ledger references to provisional D131/D133/D135 should be read as D130/D131/D132.
+- Elaine judged D130 and D131 conceptually sound, but flagged D132's current name as compiler shorthand that should be rewritten into author language before ship.
+- Her proposed Problems-panel copy is now durable team memory: `Field '{0}' is omitted in state '{1}' and cannot be read in this expression.`, `Field '{0}' is omitted in target state '{1}'; this transition cannot set it.`, and `Required field '{0}' is omitted in '{1}' but present in '{2}'; add \`set {0} = ...\` to this transition.`
+
+---
+
 ### 2026-05-13T00:26:25Z: Circular static-init crash in Tokens/Types is closed with lazy keyword-set initialization
 
 **By:** Scribe
@@ -20,7 +48,7 @@
 
 ---
 
-### 2026-05-13T00:26:25Z: Field-state guarantees v3 resets the implementation boundary to D131, D133, and D135 only
+### 2026-05-13T00:26:25Z: Field-state guarantees v3 resets the implementation boundary to D130, D131, and D132 only
 
 **By:** Scribe
 
@@ -28,8 +56,9 @@
 
 **Merged source:** `frank-v3-design-complete.md`.
 
-- Frank replaced the blocked v2 plan with a spec-grounded v3 design: keep `ReadOfOmittedField` (D131), keep `WriteToTargetOmittedField` (D133), and add `MustSetOmitToNonOmit` (D135).
-- The redesign explicitly removes D130, D132, D134, and the ProofEngine extension because the shipped spec separates Update access modes from Fire/`set` semantics.
+- Frank replaced the blocked v2 plan with a spec-grounded v3 design: keep `ReadOfOmittedField` (D130), keep `WriteToTargetOmittedField` (D131), and add `MustSetOmitToNonOmit` (D132).
+- This record was canonicalized after the v3 renumber pass; older references to provisional D131/D133/D135 now map to D130/D131/D132.
+- The redesign explicitly drops the old v2-only from-state target-write, readonly/access-condition, and ProofEngine enforcement surfaces because the shipped spec separates Update access modes from Fire/`set` semantics.
 - The design note also records the remaining spec edits needed when this ships: annotate the §3.5 scope gap, define omit→non-omit required-field reentry, and state state-hook access-mode direction explicitly.
 
 ---
@@ -57,6 +86,7 @@
 - For a self-loop transition `S -> S`, omitting a field in `S` triggers both D130 and D133 because `ValidateFieldStateAccess` checks the omitted field against both the from-state and the to-state, and both roles resolve to the same state.
 - Self-loops remain a general-case path, not a special case: the engine should keep the uniform from-state D130 check and to-state D133 check rather than suppressing one side when the state identities match.
 - Diagnostic expectations and future regression tests should treat dual reporting on self-loops as intentional behavior, not as a deduplication bug.
+- Numbering note: this record uses the pre-canonical field-state numbering; the target-state write diagnostic `D133` was later renumbered to canonical v3 `D131`.
 
 ---
 
@@ -85,6 +115,7 @@
 - Implementation cannot start until omit declarations resolve `StateTarget` before unifying into `AccessModes`, `NameBinder` iterates every field in a multi-field target, and broadcast compatibility keeps a stable `all` identity instead of collapsing `.FieldName` to null.
 - The structural/conditional split, pipeline ordering, and D130-D134 envelope remain approved, but the plan's real test surface is much larger than advertised: event handlers, wildcard/self-loop multiplicity, diagnostics stage lists, and broadcast regressions all need explicit anchors.
 - Open questions that still block exact tests are now durable team memory: D132 baseline semantics for unmentioned fields, OR-disjunct handling in access conditions, wildcard diagnostic multiplicity, and self-loop D130/D133 double-report behavior.
+- Numbering note: this v2 record preserves the provisional field-state numbering; when the surviving v3 diagnostics were canonicalized, old D131/D133/D135 became D130/D131/D132.
 
 ---
 
@@ -155,6 +186,7 @@
 - Enforcement is now explicitly split by certainty: omit/unconditional-readonly violations stay in a new TypeChecker validation pass, while guarded-editability checks become a new `ProofRequirementKind.AccessCondition` path in the ProofEngine.
 - `FieldTargetSlot` must become multi-name so access-mode and omit declarations stop dropping fields 2..N from comma-separated targets, and omit declarations should feed `ctx.AccessModes` as `ModifierKind.Omit` rather than living on a disconnected enforcement surface.
 - The design also locks the diagnostic envelope for this work: activate existing D42/D43 declaration checks and add D130-D134 for structural write/read failures plus unproved access conditions.
+- Numbering note: later v3 canonicalization renamed the surviving field-state diagnostics from provisional D131/D133/D135 to D130/D131/D132.
 
 ---
 
@@ -7430,6 +7462,7 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - Frank confirmed D133, the multi-field parser fix, omit/access-mode unification, and D42/D43 emission are architecturally sound and grounded in the spec.
 - He blocked the wider design where it crossed the spec boundary: `readonly` and guarded `editable` restrict Update-path patches, not event-driven `set` actions, so D132, D134, and the proposed Phase 2 proof surface were not approved.
 - The review also recorded that general from-state D130 and guard-read D131 need either narrower justification or explicit spec extension rather than being presented as already-shipped language law.
+- Numbering note: this review uses the provisional field-state numbering; canonical v3 renumbering later mapped old D131 -> D130 and old D133 -> D131, with D135 becoming D132.
 
 ---
 

@@ -12,6 +12,8 @@
 - Meaning-first hover copy works best when the authored `because` text leads and proof detail stays compact.
 - Field/arg coloring is a semantic split: fields read as structure identity, args as event-scoped behaviour; docs must not drift back to the retired unified data-name lane.
 - Construct colors, verdict colors, and disabled-surface colors are separate systems and should never be blended.
+- Field-state diagnostics need Problems-panel copy that names the field, the relevant state or state change, and the repair action in plain DSL terms; compiler shorthand like `omit→non-omit` is not shippable user text.
+- Diagnostic IDs should use subject-first, plain-English condition names; `MustSetOmitToNonOmit` is a naming smell because it encodes compiler shorthand instead of the user-visible failure.
 
 ## Historical Summary
 
@@ -19,6 +21,12 @@
 - The older unified `--data` anchor is retired history; current design truth lives in the field/arg split and in visual-system HTML when prose lags.
 
 ## Recent Updates
+
+### 2026-05-13T00:32:50Z — Field-state diagnostic UX review locked the user-facing naming bar
+
+- Elaine reviewed the canonicalized `docs/Working/field-state-guarantees-v3.md` surface and flagged code drift: earlier team notes used provisional D131/D133/D135, but the v3 doc now canonically uses D130/D131/D132.
+- She judged D130 and D131 shippable in concept, rejected `MustSetOmitToNonOmit` as compiler shorthand, and proposed direct Problems-panel copy that names the field first, the state(s) second, and the repair action explicitly.
+- In a follow-up naming-normalization proposal, she argued the catalog family should move toward subject-first names like `FieldOmittedInStateCannotBeRead`, `FieldOmittedInTargetStateCannotBeSet`, and `RequiredFieldNeedsAssignmentWhenBecomingPresent`, while leaving D42/D43 alone.
 
 ### 2026-05-12T22:25:28Z — B4 as-built hover doc sync recorded
 

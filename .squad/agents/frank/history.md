@@ -17,10 +17,13 @@
 
 ## Recent Updates
 
-### 2026-05-13T00:26:25Z — Field-state v3 resets the design surface to spec-grounded structural guarantees
+### 2026-05-13T00:32:50Z — Field-state v3 is now canonically D130/D131/D132
 
-- Frank's v3 design keeps D131 and D133, adds D135 for required omit→non-omit reentry, and removes the blocked D130/D132/D134 + ProofEngine path because Update access modes do not govern Fire/`set`.
-- The companion initialization analysis locks the three construction scenarios: initial events must assign required fields, no-initial-event precepts cannot contain required no-default fields, and stateless precepts inherit the same constructor guarantees minus state-entry behavior.
+- Frank's v3 design now records the canonical numbering after the doc renumber pass: `ReadOfOmittedField` = D130, `WriteToTargetOmittedField` = D131, and `MustSetOmitToNonOmit` = D132; older notes that said D131/D133/D135 should be read through that mapping.
+- The design boundary remains unchanged: the blocked from-state target-write, readonly/access-condition, and ProofEngine surfaces stay out because Update access modes do not govern Fire/`set`.
+- The companion initialization analysis still locks the three construction scenarios: initial events must assign required fields, no-initial-event precepts cannot contain required no-default fields, and stateless precepts inherit the same constructor guarantees minus state-entry behavior.
+- Elaine's UX pass says D130 and D131 are conceptually sound, but D132's canonical name still needs an author-language rewrite before ship; her proposed Problems-panel copy is now part of durable team memory.
+- Elaine also proposed a subject-first naming cleanup if the family is normalized in code: `FieldOmittedInStateCannotBeRead`, `FieldOmittedInTargetStateCannotBeSet`, `RequiredFieldNeedsAssignmentWhenBecomingPresent`, and a tighter `InitialEventMissingRequiredFieldAssignments`.
 
 ### 2026-05-12T23:50:08Z — Modifier applicability and constructor gaps are durable team memory
 
@@ -48,7 +51,7 @@
 - Catalog/spec drift around business-domain types should be recorded as metadata gaps, not framed as deep semantic exclusions, when the checker is merely enforcing incomplete applicability tables.
 - If a spec guarantee depends on runtime surfaces that do not yet exist (for example constructor enforcement around `Create()`), record the gap and owner decision boundary before pushing implementation work.
 - §2.2 rule #6 is the single most important sentence for field-state enforcement: "`set` targeting an `omit` field in the target state is a compile error; `readonly`/`editable` do not restrict `set`." This one rule invalidated three v2 diagnostics (D130, D132, D134) and the entire ProofEngine conditional enforcement phase.
-- D131 scope must extend beyond transition row guards to all state-anchored expression contexts (`in`-state ensures, `from`-state ensures, state action guards). The evaluator confirms guard timing at line ~499: guard evaluates against from-state slots before working copy creation.
-- D135 (MustSetOmitToNonOmit) is the structural dual of `InitialEventMissingAssignments` — both prevent required fields from existing without valid values. D135 fills a spec gap where rule #5 covers entering-omit but is silent on leaving-omit.
-- The three precept forms (with initial event, without initial event, stateless) have different D135 applicability profiles. Form 2 (no initial event) makes D135 structurally unsatisfiable because `RequiredFieldsNeedInitialEvent` forces all fields to have defaults or be optional.
-- §3.5 "All field names" describes name resolution scope, not semantic validity. D131 operates in the gap between "the name resolves" and "reading it is meaningful." This distinction must be annotated in the spec when D131 ships.
+- Canonical v3 D130 scope must extend beyond transition row guards to all state-anchored expression contexts (`in`-state ensures, `from`-state ensures, state action guards). The evaluator confirms guard timing at line ~499: guard evaluates against from-state slots before working copy creation.
+- Canonical v3 D132 (`MustSetOmitToNonOmit`) is the structural dual of `InitialEventMissingAssignments` — both prevent required fields from existing without valid values. D132 fills a spec gap where rule #5 covers entering-omit but is silent on leaving-omit.
+- The three precept forms (with initial event, without initial event, stateless) have different D132 applicability profiles. Form 2 (no initial event) makes D132 structurally unsatisfiable because `RequiredFieldsNeedInitialEvent` forces all fields to have defaults or be optional.
+- §3.5 "All field names" describes name resolution scope, not semantic validity. Canonical v3 D130 operates in the gap between "the name resolves" and "reading it is meaningful." This distinction must be annotated in the spec when D130 ships.
