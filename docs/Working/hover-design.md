@@ -2,6 +2,28 @@
 
 **By:** Elaine · **V7** · **2026-05-12T18:25:28.876-04:00** · VS Code markdown hover
 
+## 📊 V7 Alignment Tracker
+
+| # | Card | Status | Commit |
+|---|------|--------|--------|
+| 1 | `field` (stored) | 🔴 Not started | — |
+| 2 | `field` (computed) | 🔴 Not started | — |
+| 3 | `event` | 🔴 Not started | — |
+| 4 | `rule` | 🔴 Not started | — |
+| 5 | `ensure` | 🔴 Not started | — |
+| 6 | Transition row | 🔴 Not started | — |
+| 7 | `reject` | 🔴 Not started | — |
+| 8 | Qualifier (base + proof) | 🔴 Not started | — |
+| 9 | Proof expression (non-qualifier) | 🔴 Not started | — |
+| 10 | Diagnostic squiggle (non-qualifier) | 🔴 Not started | — |
+| 11 | State proof variant | 🔴 Not started | — |
+| 12 | `access` | 🔴 Not started | — |
+| 13 | `omit` | 🔴 Not started | — |
+| ✅ | State (standard) | ✅ `dcaf506d` | `dcaf506d` |
+| ✅ | B4 proof narrative | ✅ `29cd9938` | `29cd9938` |
+| ✅ | Qualifier-compat proof expression | ✅ pre-existing | — |
+| ✅ | Qualifier-compat diagnostic squiggle | ✅ pre-existing | — |
+
 ---
 
 ## 1. Overview
