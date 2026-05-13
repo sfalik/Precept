@@ -1,3 +1,138 @@
+# Decision: Diagnostic Gap Analysis Complete
+
+**Author:** Frank
+**Date:** 2026-05-13
+**Status:** Analysis complete — pending Shane review
+
+## What
+
+Comprehensive gap analysis of all 132 diagnostics in `DiagnosticCode.cs`. Found 50 diagnostics with no pipeline emission site (corrected from the input's 54 — the 4 CI enforcement diagnostics are working correctly via catalog-driven dispatch).
+
+## Root Cause Breakdown
+
+- **Root Cause A (Parser gates, 3 codes):** PRE0013–0015. Parser grew construct dispatch but never wired the rejection paths for invalid guard positions. All specced in §2.7.
+- **Root Cause B (TypeChecker domain logic, 21 codes):** Five domain clusters — temporal (8), currency/unit (5), choice (5 type-stage), collection safety (4) — have full catalog metadata and tests but zero emission logic.
+- **Root Cause C (Category 1 stragglers, 6 codes):** PRE0043/0079/0092/0094 are specced but unenforced. PRE0091 is latent (unreachable due to single-candidate resolution). PRE0092 is trivial to wire.
+- **Root Cause D (Scattered, 17 codes):** Individual type-checker emission sites missing. Most are precision upgrades (specific diagnostic instead of generic `TypeMismatch`).
+- **CI Enforcement (4 codes):** Incorrectly reported as gaps. They ARE emitted via catalog-driven dispatch through `CIDiagnosticCode` properties.
+
+## Priority 1 Recommendation
+
+**Wire currency/unit arithmetic first (PRE0070–0074).** Cross-currency arithmetic compiling clean is a direct violation of Precept's core philosophy. The spec says the compiler catches it; it doesn't. This is the highest integrity risk.
+
+Second: choice validation (PRE0086–0089). Non-existent choice values passing type checking undermines closed-set governance.
+
+Third: PRE0094 `InitialEventMissingAssignments` — already identified as blocking for v3 field-state-guarantees.
+
+## Working Document
+
+Full analysis at `docs/working/diagnostic-gap-analysis.md`.
+
+---
+
+# Slice 10 — D93 RequiredFieldsNeedInitialEvent: Done
+
+**Branch:** `spike/Precept-V2-Radical`
+**Commit:** `HEAD`
+
+## Outcome
+
+- Added `ValidateConstructionGuarantees` to emit D93 when a precept has no initial event and still exposes required non-collection, non-computed fields at construction time.
+- Reused the required-field filter used by D132, but excluded fields omitted in every initial state so omit-driven draft workflows still compile until a field becomes present.
+- Wired construction validation into `TypeChecker.Check` immediately after field-state validation.
+- Added `TypeCheckerConstructionTests` with the requested D93 coverage and updated coupled fixtures/samples so unrelated tests remain focused on their intended behavior.
+
+## Validation
+
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj` passed (`5127` tests).
+- `samples\Test.precept` now produces D93 instead of compiling clean.
+
+---
+
+# Decision: AfterKeyword added to completion context switch with definitive empty list
+
+**Date:** 2026-05-13
+**Author:** Kramer
+**Status:** Implemented
+
+## Context
+
+Fixing the bug where `-> set FieldName ` (field name typed, space pressed, no `=` yet) showed top-level keyword completions instead of nothing.
+
+## Root Cause
+
+`TryGetActionChainContext` in `SlotContext.cs` handled `Arrow`, action verb tokens, `Into`, and `Assign/By/At` — but not the `Identifier` (field name) token that follows an action verb expecting a field target. When the cursor landed after the field name, `TryGetActionChainContext` returned `false` and the outer `GetCursorContext` fell through to `return SlotContext.TopLevel`.
+
+## Decision 1: Identifier-after-action-verb branch in `TryGetActionChainContext`
+
+When `TryGetActionChainContext` detects it is inside an action chain and the current token is an `Identifier`, it now walks back one token to check if the preceding token is an action verb that expects a field target (via `ExpectsFieldTargetAfterActionVerb`) or the `into` keyword for a field-target action (via `ExpectsFieldTargetAfterInto`). If so, it returns `SlotContext.AfterKeyword` and exits cleanly, preventing fallthrough to `TopLevel`.
+
+**Rationale:** The Identifier at this position is the field name — it is already typed. The only valid next input is an operator (`=`, `by`, `at`, `into`). No vocabulary completions exist. The fix is minimal and precisely scoped: it adds a branch inside the existing action-chain gate rather than changing outer routing logic.
+
+## Decision 2: `AfterKeyword` added explicitly to the completion context switch
+
+`SlotContext.AfterKeyword` previously fell to the `_ => new CompletionList([], true)` arm (incomplete = true). Adding it as `AfterKeyword => CreateCompletionList(Enumerable.Empty<CompletionItem>())` makes the response a definitive empty list (incomplete = false), which is semantically correct: we know there is nothing to offer here, so VS Code should not re-query.
+
+**Rationale:** `isIncomplete: true` signals "the server may have more items if you retry." For a position where no completions exist by design, a definitive `isIncomplete: false, items: []` is the correct contract. This is consistent with how other known-empty positions (e.g., text typed constants) are handled in the codebase.
+
+## Files Changed
+
+- `tools/Precept.LanguageServer/SlotContext.cs` — `TryGetActionChainContext`: new Identifier branch before `context = default; return false`
+- `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs` — `GetCompletions` context switch: explicit `AfterKeyword` arm
+- `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs` — new `Completions_SetActionAfterFieldName_NoTopLevelKeywords` regression test
+
+---
+
+# Kramer hover fix outcome
+
+## Summary
+- Updated `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` so rich state hover cards render in the V7 compact format.
+- Removed the extra state title/modifiers lines.
+- Merged incoming/outgoing into `🔁 In: ... · Out: ...`.
+- Replaced the standalone writable/terminal/ensures lines with `✏️ ... · 🧭 terminal ✓/✗ · ⚡ ... (⚠️)`.
+- Preserved the existing B4 graph-position block unchanged.
+
+## Test updates
+- Updated state-hover assertions in `test/Precept.LanguageServer.Tests/HoverHandlerTests.cs` to match the compact card output.
+
+## Validation
+- `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp\dev-language-server --nologo` ✅
+- Focused state-hover regression slice (`Hover_OnState*`, state-reference routing, required-state hover) ✅
+- `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --nologo` ❌ still fails with the same 10 pre-existing branch failures outside this rendering change (existing hover omit/access routing issue plus semantic-token/diagnostic failures on current branch state).
+
+---
+
+# Decision: `InSetAssignment` is the canonical SlotContext for `-> set FieldName ` position
+
+**By:** Kramer
+**Date:** 2026-05-13
+**Status:** Shipped
+
+## Decision
+
+`SlotContext.AfterKeyword` (empty completion list) is too broad to serve as the context for the cursor position after `-> set FieldName `. A dedicated `SlotContext.InSetAssignment` value is the correct representation for this slot.
+
+## Rationale
+
+`AfterKeyword` is a general-purpose context used after declaration keywords (`from`, `on`, `in`, etc.) to suppress completions in positions where no further vocabulary applies. Reusing it for the `set FieldName ` position was correct for suppression but prohibited offering `=`, which is the only valid continuation at that position in the grammar.
+
+A narrower context value allows the completion handler to dispatch exactly the right vocabulary (a single `= ` operator item) without polluting `AfterKeyword` semantics.
+
+## Structural changes
+
+- `SlotContext` enum (`tools/Precept.LanguageServer/SlotContext.cs`): new `InSetAssignment` member.
+- `TryGetActionChainContext` — Identifier branch returns `InSetAssignment` (not `AfterKeyword`) for both the action-verb-identifier and `into`-identifier cases.
+- `CompletionHandler.GetCompletions` context switch: `InSetAssignment => CreateCompletionList(GetSetAssignmentItem())`.
+- `GetSetAssignmentItem()` returns one `CompletionItemKind.Operator` item: label `"= "`, insertText `"= "`.
+
+## Test coverage
+
+`Completions_SetActionAfterFieldName_NoTopLevelKeywords` (`CompletionHandlerTests.cs`) now asserts both:
+- top-level construct keywords are absent
+- `"= "` is present in the completion list
+
+---
+
 # Frank — Revised Pattern Proposals
 **Date:** 2026-05-12
 **Status:** APPROVED — ready for Newman to implement
@@ -21505,4 +21640,3 @@ Added 6 new `CommonPattern` entries to `SyntaxReference.CommonPatterns`. Updated
 ## Test Result
 
 5595/5595 passing after all changes.
-
