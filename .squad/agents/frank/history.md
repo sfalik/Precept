@@ -52,6 +52,12 @@
 - The approved end state is commit-backed by `c2a38a56`, `47f3068c`, and `9617f39b`, with `279/279` language-server tests and `4973` core tests green.
 ## Learnings
 
+### 2026-05-12 — v3 gap audit: declared ≠ enforced
+
+- D93 and D94 were declared in `DiagnosticCode.cs` with full `DiagnosticMeta` entries but zero emission sites in the pipeline. The v3 design built its Form 2/Form 1 reasoning on the assumption these diagnostics were enforced. They weren't. Known gaps documented in agent history must always be promoted to tracked implementation slices — prose observations evaporate.
+- Every design that depends on existing diagnostics must include a prerequisite audit: grep the pipeline for `DiagnosticCode.X` emission, not just declaration. Declaration with metadata creates false confidence.
+- Two remediation slices (10, 11) added to `docs/Working/field-state-guarantees-v3.md`. Decision filed at `.squad/decisions/inbox/frank-v3-gap-audit.md`.
+
 ### 2026-05-12 — Modifier applicability by type: catalog-verified
 
 - `nonnegative`, `positive`, and `nonzero` apply to all seven numeric/magnitude types: `integer`, `decimal`, `number`, `money`, `quantity`, `price`, `exchangerate`. Both `nonnegative` and `positive` desugar to rules and carry proof satisfactions.
@@ -89,3 +95,9 @@
 - Expanded `docs\compiler\proof-engine.md` Strategy 5 coverage with a new `Qualifier Resolution Reference` section documenting `ResolveQualifierFromExpression`, the shared `Unit → Dimension → TemporalDimension` fallback chain, `TranslateCurrencyAxis`, the real `NumericConstraintSubsumes` vs `SatisfactionCovers` tables, and the constant-folder zero-denominator guard.
 - Replaced the §5 stub in `docs\language\precept-language-spec.md` with a standalone proof-system overview that states the two-pass model, the meaning of proved qualifier constraints, the range/currency/unit-dimension enforcement surface, and the compile-time rejection rule for unresolved obligations.
 - Corrected local proof-engine doc drift that had implied Strategy 2 and Strategy 3 shared one subsumption table and that qualifier compatibility was still pending future type-checker work.
+
+### 2026-05-13T03:56:26Z — Slice 9 review and constructor-gap reanalysis recorded
+
+- `frank-9` deferred the first Slice 9 review because George had not committed yet; the pre-review concerns were later closed by George's final commits `c2d5b8fb` and `32da6a3e`.
+- `frank-10` corrected the initial-state/no-default analysis: `RequiredFieldsNeedInitialEvent` (D93) must fire, D94 is also unenforced, and `ProofEngine.Analysis.GetTypeDefault()` is the implementation bug if the sample compiles clean.
+- `frank-11` completed the broader v3 gap audit: D93 and D94 are blocking gaps, D132's Form 2 reasoning depends on D93, and the fix belongs in `TypeChecker.Validation.cs` slices 10 and 11.

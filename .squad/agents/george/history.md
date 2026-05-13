@@ -69,3 +69,9 @@
 
 - Updated `docs/language/catalog-system.md` to harden Frank's required static-initialization constraint paragraph after the catalog initialization guidance.
 - The documentation now records that reverse `Tokens` → downstream catalog static references must use `Lazy<T>`; `Tokens.KeywordsValidAsMemberName` remains the current concrete example.
+
+### 2026-05-13T03:56:26Z — Slice 9 OR/disjunction support landed cleanly
+
+- Commits `c2d5b8fb` and `32da6a3e` closed the proof-engine disjunction slice: branch-aware OR splitting now drives Strategy 3 / Strategy 4, ensure guards survive normalization, and guarded ensures no longer leak as unconditional facts.
+- Validation closed green at `5118/5118` tests passing.
+- Frank's initial pre-commit concerns were all satisfied by the committed final state, so Slice 9 is the current baseline for disjunctive guard reasoning.

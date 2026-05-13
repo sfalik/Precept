@@ -21010,3 +21010,499 @@ The "null-guard baseline" additional finding (guards dropped entirely, `Guard: n
 George — 2025-07-20
 
 *Reviewed: TypeChecker.cs (PopulateEditDeclarations, PopulateEnsures, TypeChecker.Check pipeline), TypeChecker.Validation.cs (ValidateCIEnforcement reference pattern), CheckContext.cs (available ctx fields), SlotValue.cs (FieldTargetSlot, TypedEditDeclaration), Parser.cs lines 1005–1048 (ParseFieldTarget), ProofEngine.Strategies.cs lines 271–538 (TryGuardInPathProof, ExtractGuardConstraints, TryFlowNarrowingProof), ProofEngine.Composition.cs lines 155–203 (TryGetNumericEnsureFact), SemanticIndex.cs (TypedEditDeclaration, TypedEnsure records), samples/insurance-claim.precept.*
+
+### 2026-05-12T23:47: User directive
+**By:** Shane (via Copilot)
+**What:** We are on a spike branch. No new branches. No PRs. All work stays on the current branch.
+**Why:** User request — captured for team memory
+
+# Frank → George: Slice 9 Review — OR / ProofEngine Disjunction Support
+
+**Date:** 2026-05-12  
+**Branch:** `spike/Precept-V2-Radical`  
+**Verdict:** ⏳ **IN PROGRESS — Review Deferred (Slice 9 not committed)**
+
+---
+
+## Status Assessment
+
+George has **not committed Slice 9** yet. The HEAD is `016c7736` — two housekeeping commits after Slice 8 (`12449503`). No Slice 9 commit exists on the branch.
+
+However, there **are uncommitted changes** to `src/Precept/Pipeline/TypeChecker.cs` (36 insertions, 2 deletions) that represent the first deliverable of Slice 9: **`PopulateEnsures` guard preservation.**
+
+### What's Done (Uncommitted)
+
+**TypeChecker.cs — `PopulateEnsures` guard preservation:** ✅ Looks correct.
+
+**G1:** Both `StateEnsure` and `EventEnsure` paths now extract the `GuardClauseSlot`, resolve via `Resolve()`, validate `TypeKind.Boolean`, emit `TypeMismatch` on failure, and replace with `TypedErrorExpression` — exactly following the `PopulateAccessModes` pattern. The `Guard: null` hardcoding is replaced with `Guard: ensureGuard` / `Guard: eventEnsureGuard`. This is the spec-prescribed fix for the guard-dropping bug.
+
+**G2:** `ctx.CurrentScope = FieldScopeMode.AllFields` is set before guard resolution in both paths. Correct — guards can reference any field.
+
+**G3:** The existing test suite (309 tests in ProofEngine + TypeCheckerAssembly) passes clean with these changes. No regressions introduced.
+
+### What's NOT Done Yet
+
+The following Slice 9 deliverables have **zero progress**:
+
+| Deliverable | File | Status |
+|---|---|---|
+| OR-splitting in `TryGuardInPathProof` / `ExtractGuardConstraints` | `ProofEngine.Strategies.cs` | ❌ Not started — line 317-319 still drops OR nodes |
+| OR-splitting in `TryFlowNarrowingProof` / `ExtractFieldToFieldConstraints` | `ProofEngine.Strategies.cs` | ❌ Not started |
+| Guarded ensures → unconditional fact prevention | `ProofEngine.Composition.cs` | ❌ Not started — `TryGetNumericEnsureFact` ignores `ensure.Guard` |
+| ProofEngine OR tests (6 tests) | `ProofEngineTests.cs` | ❌ Not written |
+| Null-guard baseline tests (3 tests) | `ProofEngineTests.cs` | ❌ Not written |
+| TypeCheckerAssembly guard tests (3 tests) | `TypeCheckerAssemblyTests.cs` | ❌ Not written |
+| Regression anchor rewrite (`Strategy3_OrGuard_DoesNotDischarge`) | `ProofEngineTests.cs` | ❌ Still documents the live bug |
+
+### Current Risk: Guard Preservation Without Downstream Guard-Awareness
+
+The TypeChecker now preserves `TypedEnsure.Guard`, but `ProofEngine.Composition.cs:TryGetNumericEnsureFact` (lines 163-173) does **not** check `ensure.Guard`. This means:
+
+> **A guarded ensure (`when D > 0 ensure result >= 0`) will now flow through as an unconditional numeric fact.**
+
+This is the exact soundness hole the spec warns about at line 864. The TypeChecker change is correct in isolation, but it must be paired with the `TryGetNumericEnsureFact` guard check **in the same commit** to avoid a window where guarded ensures masquerade as unconditional facts.
+
+### Existing OR Behavior (Still Broken)
+
+`ProofEngine.Strategies.cs:317-319`:
+```csharp
+case TypedBinaryOp bin when Operations.GetMeta(bin.ResolvedOp).Op == OperatorKind.Or:
+    // OR: do NOT decompose — neither disjunct is guaranteed
+    break;
+```
+
+This silently drops OR nodes. The spec requires branch-aware extraction where ALL branches must independently prove the obligation. This is the core Slice 9 work that hasn't started.
+
+---
+
+## Criteria Checklist (Against Spec)
+
+| # | Criterion | Status |
+|---|---|---|
+| 1 | OR-splitting soundness in `ExtractGuardConstraints` | ❌ Not started |
+| 2 | N-way disjunction (`A or B or C`) | ❌ Not started |
+| 3 | Null-guard safety | ⚠️ Untested — no new null-guard paths yet, but existing paths not verified for the new guard flow |
+| 4 | `PopulateEnsures` guard preservation | ✅ Correct (uncommitted) |
+| 5 | Guarded ensures ≠ unconditional facts | ❌ Not started — `TryGetNumericEnsureFact` ignores guard |
+| 6 | Regression anchor rewrite | ❌ Not started |
+| 7 | Test count (12 minimum) | ❌ 0/12 written |
+| 8 | No `Skip =` | ✅ No skips found |
+| 9 | Catalog-driven | ✅ No hardcoded token sets introduced |
+| 10 | MCP/LS sync | ✅ No changes needed (confirmed) |
+
+---
+
+## Verdict
+
+**Cannot issue APPROVED or BLOCKED — Slice 9 is not committed.** 1 of 7 deliverables is in progress (uncommitted). The TypeChecker guard preservation looks correct and follows the prescribed pattern.
+
+**When George commits, re-review must cover:**
+
+1. The guard-preservation + unconditional-fact-prevention must land together — no window where guarded ensures are silently treated as unconditional.
+2. OR-splitting must be recursive (N-way), not just 2-way.
+3. All 12 tests must be present, no `Skip =`.
+4. `Strategy3_OrGuard_DoesNotDischarge` must be rewritten to expect `Proved` (not `Unresolved`) for the all-branches-covered case.
+5. `Strategy3_AndGuard_DecomposesConjuncts` must remain unchanged.
+
+— Frank
+
+# Revised Analysis: Initial-State Field Assignment Diagnostic
+
+> **Author:** Frank (Lead/Architect)  
+> **Date:** 2026-05-12  
+> **Subject:** Re-assessment of `precept Test / field test as integer / state Active initial terminal`
+
+---
+
+## Prior Assessment (Wrong)
+
+I previously claimed this precept compiles correctly with no diagnostics, on two grounds:
+
+1. D132 only fires on transition-based materialization — not on instantiation into the initial state.
+2. `integer` has an implicit type-zero default (0), so the field is never "unassigned."
+
+**Both assessments were incorrect.** Here is why, grounded in the spec.
+
+---
+
+## Corrected Assessment
+
+### Reason 1 is wrong: The spec defines "required field" without reference to type-zero defaults
+
+The spec defines a **required field** as: **non-optional, no default value, not computed** (§2.2 rule #5, D132 definition; §3A.5 compiler enforcement).
+
+The critical language appears in three independent locations:
+
+- **§3A.5 line 1796:** "entities with required fields (non-optional, no default) cannot be constructed parameterlessly"
+- **§3A.5 line 1808:** "the compiler guarantees all fields have defaults or are optional — enforced by `RequiredFieldsNeedInitialEvent` / `InitialEventMissingAssignments`"
+- **§3A.5 line 1821:** "`RequiredFieldsNeedInitialEvent`: Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version."
+
+The spec uses "no default" to mean **no declared `default` clause in the field declaration**. There is no mention of implicit type-zero defaults anywhere in the language specification. The `default` modifier is listed in §2.4 as an explicit value modifier (`default Expr`). A field without this modifier has no default — full stop.
+
+The `GetTypeDefault` function in `ProofEngine.Analysis.cs` (line 103–117) does synthesize type-zero values (`0m` for integer, `""` for string, `false` for boolean). But this function serves a narrow purpose: **constant folding for initial-state satisfiability checking** (proving whether default values violate declared rules/ensures at compile time — §0.4 responsibility #10). It is an internal proof-engine implementation detail for evaluating constraint satisfiability, not a language-level semantic that makes fields "assigned."
+
+**The spec is unambiguous:** `field test as integer` (no `default` clause, not `optional`, not computed) is a required field.
+
+### Reason 2 is wrong: The initial state IS in scope for `RequiredFieldsNeedInitialEvent`
+
+I claimed D132 only fires on transition-based entry. That was a red herring — D132 specifically covers omit→non-omit transitions and is indeed transition-scoped. But **the correct diagnostic for this precept is not D132 at all.**
+
+The test precept is:
+```precept
+precept Test
+field test as integer
+state Active initial terminal
+```
+
+This is a **Form 2 precept** per my own v3 design doc §7: a stateful precept without an initial event. The spec (§3A.5 line 1808) says:
+
+> "If the precept does not declare an initial event, `Create()` is parameterless and always succeeds (the compiler guarantees all fields have defaults or are optional — enforced by `RequiredFieldsNeedInitialEvent` / `InitialEventMissingAssignments`)."
+
+And (§3A.5 line 1821):
+
+> "`RequiredFieldsNeedInitialEvent`: Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version."
+
+`field test as integer` is a required field (non-optional, no default). The precept declares no initial event. Therefore **`RequiredFieldsNeedInitialEvent` must fire.**
+
+My own v3 design doc (§7, Form 2) confirms this:
+
+> "`RequiredFieldsNeedInitialEvent` rejects the definition if any field is non-optional and has no default. Construction is parameterless — there is no way to provide initial values."
+
+---
+
+## Correct Diagnostic
+
+The precept `precept Test / field test as integer / state Active initial terminal` should emit:
+
+**`RequiredFieldsNeedInitialEvent`** — The precept has a required field (`test`: non-optional, no declared default, not computed) but does not declare an initial event. Parameterless construction cannot produce a valid initial version because there is no way to provide the required field's value.
+
+This diagnostic fires in the **graph analyzer or proof engine** (construction-time validation), not in the type checker's field-state guarantee pass.
+
+---
+
+## Where the Implementation Bug Is
+
+If this precept currently compiles clean, the implementation is wrong — not the spec. The likely root cause is that `GetTypeDefault` in `ProofEngine.Analysis.cs` synthesizes a type-zero value (0 for integer), and whatever validation checks for `RequiredFieldsNeedInitialEvent` treats a field with a synthesized type-zero as "having a default." But the spec draws the line at the **declared `default` clause**, not at type-zero synthesis.
+
+The fix should ensure that `RequiredFieldsNeedInitialEvent` checks for `field.DefaultExpression is not null || field.IsOptional || field.IsComputed` — not whether the proof engine can synthesize a fallback value.
+
+---
+
+## Summary
+
+| Prior Claim | Verdict | Correction |
+|---|---|---|
+| D132 only fires on transitions, not initial state | **Irrelevant** — D132 is the wrong diagnostic entirely. The correct diagnostic is `RequiredFieldsNeedInitialEvent`. | `RequiredFieldsNeedInitialEvent` fires because the precept has a required field and no initial event. |
+| `integer` has an implicit zero default | **Wrong per spec** — the spec defines "has a default" as having a declared `default` clause. `GetTypeDefault` is a proof-engine internal for satisfiability checking, not a language-level field default. | `field test as integer` with no `default` clause is a required field. |
+
+**The precept should not compile clean. It should emit `RequiredFieldsNeedInitialEvent`.**
+
+# Frank — v3 Field-State Guarantees Gap Audit
+
+> **Date:** 2026-05-12T23:54:48-04:00
+> **Author:** Frank (Lead/Architect)
+> **Trigger:** Shane identified D93 (RequiredFieldsNeedInitialEvent) is declared but never enforced. A precept with required fields and no initial event compiles clean when it should fail.
+
+---
+
+## Executive Summary
+
+The v3 plan (Slices 0–9) focused exclusively on omit-related field-state guarantees (D130/D131/D132) and a standalone ProofEngine disjunction fix (Slice 9). It **assumed** that the prerequisite construction-time enforcement — D93 (`RequiredFieldsNeedInitialEvent`) and D94 (`InitialEventMissingAssignments`) — was already implemented. That assumption was wrong. Both diagnostics are declared in the `DiagnosticCode` enum and have full `DiagnosticMeta` entries, but **no pipeline stage emits them**. Zero enforcement code exists.
+
+This means:
+- A Form 2 precept (stateful, no initial event) with required fields compiles clean. It should fail with D93.
+- A Form 1 precept (stateful, with initial event) where the initial event doesn't assign all required fields compiles clean. It should fail with D94.
+- The v3 design's §7 reasoning about D132 inapplicability in Form 2 is structurally correct but **relies on D93 being enforced**. Without D93, Form 2 precepts can have required fields with no defaults, and D132 won't catch the construction-time gap because D132 only fires on omit→non-omit crossings — not on initial-state entry.
+
+Two new slices (10 and 11) are added to the v3 plan.
+
+---
+
+## Root Cause of the Planning Gap
+
+**The v3 plan assumed existing infrastructure without verifying it.**
+
+D93 and D94 were declared in the enum (lines 219–221 of `DiagnosticCode.cs`) and had full `DiagnosticMeta` entries (lines 814–824 of `Diagnostics.cs`). The v3 design's §7 explicitly references both by name and builds its D132 analysis on the assumption they're enforced. But declaration ≠ enforcement. Nobody ran the obvious cross-check: "for each diagnostic code that the v3 design depends on, verify that `Diagnostics.Create(DiagnosticCode.X, ...)` appears somewhere in the pipeline."
+
+The process failure has two parts:
+
+1. **No prerequisite verification step.** The v3 plan should have included a "verify existing dependencies" checklist — for every diagnostic or invariant that the new design assumes is already working, grep the pipeline for emission and add a remediation slice if missing.
+
+2. **Appearance of completeness.** D93 and D94 look implemented — they have enum values, DiagnosticMeta entries with message text, fix hints, recovery steps, and category/stage/severity. The only thing missing is the enforcement code. This is a particularly insidious gap because code review of the enum or metadata would show fully-formed entries, creating false confidence.
+
+Frank's history entry from `2026-05-12T23:50:08Z` explicitly noted "PRE0093/PRE0094 are specified but unimplemented, with no emitting pipeline stage" — so the gap was **known** during the v3 planning session. It was documented as a known gap but never promoted into the implementation plan. This is the real failure: known gaps that don't become tracked slices evaporate.
+
+---
+
+## Identified Gaps
+
+### Gap 1 — D93 `RequiredFieldsNeedInitialEvent` (Severity: **BLOCKING**)
+
+| Aspect | Detail |
+|---|---|
+| **What the spec says** | §3A.5: "If the precept does not declare an initial event, `Create()` is parameterless and always succeeds (the compiler guarantees all fields have defaults or are optional — enforced by `RequiredFieldsNeedInitialEvent`)" |
+| **What the implementation does** | Nothing. `DiagnosticCode.RequiredFieldsNeedInitialEvent` (D93) is declared at line 219 and has metadata at Diagnostics.cs:814. Zero emission sites exist in any pipeline file. |
+| **Why this is a gap** | A Form 2 precept with a required field (non-optional, no default) compiles clean. The runtime's `Create()` path would construct the entity with type-zero defaults for required fields — violating Prevention (§0.1.1) and Totality (§0.1.10). |
+| **Diagnostic** | D93 already declared. Needs enforcement code. |
+| **Fix location** | `TypeChecker.Validation.cs` — new method `ValidateConstructionGuarantees` or added to `ValidateFieldStateGuarantees`. Runs after Pass 1 symbol population. Checks: if the precept is stateful (has states) AND has no initial event AND has any field that is non-optional, non-computed, has no default, and is not a collection type → emit D93 listing the offending field names. |
+| **Remediation** | Slice 10 |
+
+### Gap 2 — D94 `InitialEventMissingAssignments` (Severity: **BLOCKING**)
+
+| Aspect | Detail |
+|---|---|
+| **What the spec says** | §3A.5: "InitialEventMissingAssignments: Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints." |
+| **What the implementation does** | Nothing. `DiagnosticCode.InitialEventMissingAssignments` (D94) is declared at line 221 and has metadata at Diagnostics.cs:820. Zero emission sites exist in any pipeline file. |
+| **Why this is a gap** | A Form 1 precept where the initial event's transition rows don't `set` all required fields compiles clean. The entity would be constructed with unsatisfied required fields. |
+| **Diagnostic** | D94 already declared. Needs enforcement code. |
+| **Fix location** | `TypeChecker.Validation.cs` — same method as D93. Checks: for each initial event, find all transition rows triggered by that event. For each required field (non-optional, non-computed, no default, non-collection), verify that every transition row from the initial event includes a `set` action for that field. If any row lacks a `set` for a required field → emit D94 with the event name and missing field list. |
+| **Remediation** | Slice 11 |
+
+### Gap 3 — `GetTypeDefault` Satisfiability Masking (Severity: **Minor**)
+
+| Aspect | Detail |
+|---|---|
+| **What the concern is** | `ProofEngine.Analysis.cs:68` synthesizes type-zero defaults (0, "", false) for required fields with no default when checking initial-state satisfiability. This means the satisfiability check acts as if every required field has a zero default, masking the fact that D93 should have rejected the definition. |
+| **Impact** | Not a standalone gap — it's a consequence of Gap 1. Once D93 is enforced, definitions that reach the ProofEngine's satisfiability check will always have either a real default, an initial event, or `optional`. The synthetic defaults become correct (they represent the actual runtime default for fields that have one). |
+| **Fix** | No standalone fix needed. D93 enforcement (Slice 10) closes this gap transitively. |
+
+### Gap 4 — D42/D43 `ConflictingAccessModes`/`RedundantAccessMode` (Severity: **Acknowledged, Out of Scope**)
+
+Already explicitly acknowledged as out-of-scope in the v3 design (Slice 1 scoping note). These are access-mode declaration validation, not field-state enforcement. Not a planning gap — a deliberate deferral.
+
+### Gap 5 — D92 `EventHandlerInStatefulPrecept` (Severity: **Minor, Out of Scope**)
+
+Declared but never emitted. Not field-state related. Flagged for future tracking but not remediated in this plan.
+
+---
+
+## Remediation Slices
+
+| Slice | Title | Severity |
+|---|---|---|
+| Slice 10 | D93: RequiredFieldsNeedInitialEvent enforcement | BLOCKING |
+| Slice 11 | D94: InitialEventMissingAssignments enforcement | BLOCKING |
+
+Both slices are added to `docs/Working/field-state-guarantees-v3.md` with full specification following the existing slice format.
+
+---
+
+## Process Improvement
+
+To prevent this class of gap from recurring:
+
+1. **Every design that depends on existing diagnostics must include a "prerequisite audit" section** that verifies each dependency is actually enforced (grep for `DiagnosticCode.X` in pipeline files).
+2. **Known gaps documented in agent history must be promoted to tracked slices** in the relevant implementation plan, not left as prose observations.
+3. **The diagnostic catalog should have a CI check** that flags any `DiagnosticCode` member not emitted from any pipeline file. Declaration without enforcement is a spec-implementation drift signal.
+
+# Slice 9 — OR / ProofEngine Disjunction Support: Done
+
+**Commit:** `c2d5b8fb`  
+**Branch:** `spike/Precept-V2-Radical`  
+**Date:** 2025
+
+## What Was Done
+
+### 1. Branch-aware OR splitting (ProofEngine.Strategies.cs)
+
+Replaced flat guard-constraint extraction with a disjunction-aware algorithm in both Strategy 3 (GuardInPath) and Strategy 4 (FlowNarrowing):
+
+- **`ExtractGuardBranches`** — returns the disjunctive normal form of a guard as `ImmutableArray<ImmutableArray<GuardConstraint>>`. OR nodes union their children's branch sets. AND nodes cross-product their children's branch sets (so conjunct facts propagate into each OR branch).
+- **`ExtractFieldToFieldBranches`** — same algorithm for field-to-field constraints used by Strategy 4.
+- **`TryGuardInPathProof`** (Strategy 3) — now requires ALL branches to independently prove the obligation. `D > 0 or D < 0` discharges a `D != 0` obligation; `D > 0 or E > 0` does not.
+- **`TryFlowNarrowingProof`** (Strategy 4) — same soundness semantics: all branches must independently produce a field-to-field constraint that implies the obligation.
+- Kept `ExtractGuardConstraintsCore` and `ExtractFieldToFieldCore` as internal helpers (flat extraction still used elsewhere); added `ExtractGuardLeafConstraints` / `ExtractFieldToFieldLeaf` for atomic-node extraction shared by both paths.
+
+### 2. Ensure guard preservation (TypeChecker.cs)
+
+`PopulateEnsures` now:
+- Extracts the `GuardClauseSlot` from both `StateEnsure` and `EventEnsure` constructs.
+- Resolves the guard expression with `FieldScopeMode.AllFields`.
+- Type-validates that the result is `TypeKind.Boolean`; emits `TypeMismatch` + replaces with `TypedErrorExpression` on failure (pattern from `PopulateAccessModes`).
+- Passes the resolved guard to `TypedEnsure.Guard` — no longer silently null'd out.
+
+### 3. Guarded-ensure fact suppression (ProofEngine.Composition.cs)
+
+`TryGetNumericEnsureFact` now returns `false` when `ensure.Guard` is non-null. A `when D > 0 ensure result >= 0` cannot be treated as an unconditional numeric fact — doing so would be unsound.
+
+### 4. Regression anchor rewrite
+
+`Strategy3_OrGuard_DoesNotDischarge` documented the old (wrong) behavior: OR guards failing TC and producing no constraints. Rewrote it to `Strategy3_OrGuard_DischargesWhenBothBranchesCover`, testing that `D > 0 or D < 0` now correctly discharges the D != 0 obligation.
+
+### 5. New tests (15 total)
+
+**ProofEngineTests.cs (Slice9_OrDisjunctionSupport):**
+- `ProofEngine_DischargesObligation_WhenDisjunctiveGuardCoversAllCases`
+- `ProofEngine_DoesNotDischarge_WhenDisjunctiveGuardIsPartial`
+- `ProofEngine_DischargesObligation_WhenThreeWayDisjunction`
+- `ProofEngine_FlowNarrowing_Discharges_WhenDisjunctiveGuardCoversAllBranches`
+- `ProofEngine_FlowNarrowing_DoesNotDischarge_WhenDisjunctiveGuardIsPartial`
+- `ProofEngine_GuardedEnsure_DoesNotBecomeUnconditionalFact`
+- `EnsureNormalizer_NoGuard_ProducesUnconditionalFact`
+- `ProofEngine_DoesNotCrash_WhenEnsureHasNullGuard`
+- `ProofEngine_DoesNotCrash_WhenTransitionGuardAbsent`
+
+**TypeCheckerAssemblyTests.cs:**
+- `EnsureNormalizer_PreservesOrGuard_WhenUsedWithEnsure`
+- `EnsureNormalizer_PreservesGuard_ForEventEnsure`
+- `EnsureNormalizer_NonBooleanGuard_EmitsTypeMismatch`
+
+## Result
+
+- All 5118 tests pass.
+- Regression anchors (Slice5, Slice6, StateEnsure_MultiStateList) stayed green throughout.
+- MCP + Language Server: no DTO or LSP changes needed (proof discharge is internal, no surface change).
+- Tracker updated: 9 / 10 slices complete.
+
+# Kramer Hover Assessment — State Card V7 Spec Gap
+
+**Date:** 2026-05-12T23:42:56-04:00  
+**Author:** Kramer  
+**Status:** Assessment only — no fix implemented yet
+
+---
+
+## What Was Checked
+
+Compared the V7 state card spec in `docs/Working/hover-design.md §3` against the implementation in `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs`, method `CreateStateMarkdown` (line 1020).
+
+---
+
+## ✅ What's Correct
+
+**B4 block** (line 1069): `CreateStateGraphEdgeProofCard(...)` — the graph-position proof narrative renders correctly per spec:
+```
+📍 Active graph position
+✅ Proven · no connected edges carry proof obligations
+```
+
+**Status badge line** (line 1063): `FormatStatus(status)` — the badge/status line exists and uses the correct icon vocabulary (`✅`/`⚠️`). The badge content for `reachable from \`X\`` is correct (line 2032 in `DescribeStateReachability`).
+
+**Data assembly**: All required data is being fetched — incoming events, outgoing edges, writable fields, ensures count, terminal reachability, edge proof statuses. This is a pure formatting problem.
+
+---
+
+## ❌ What's Wrong
+
+**V7 spec says (3 lines):**
+```
+✅/⚠️ [badge] · reachable from `X`
+🔁 In: `Event` · Out: `Event → State`
+✏️ N fields (unconditional) · 🧭 terminal ✓/✗ · ⚡ N ensures
+```
+
+**Current implementation outputs (7 lines):**
+```
+**state `Active`** · initialstate       ← EXTRA: title line (line 1062)
+⚠️ Gap · initial state                  ← OK: badge line (line 1063)
+Modifiers: initialstate                  ← EXTRA: modifiers line (line 1064)
+Incoming: none                           ← WRONG FORMAT (line 1065)
+Outgoing: none                           ← WRONG FORMAT (line 1066)
+Writable here: none                      ← WRONG FORMAT (line 1067)
+No terminal path · active ensures: 0    ← WRONG FORMAT (line 1068)
+```
+
+### Divergence 1 — Extra title line (line 1062)
+```csharp
+$"**state `{EscapeInline(state.Name)}`**{titleSuffix}"
+```
+Not in the V7 spec. The spec's state card starts with the badge line, not a bold-title header. Note: the field card (`CreateFieldMarkdown`, line 978) has the same title-line pattern — the issue exists across constructs, not just state.
+
+### Divergence 2 — Extra "Modifiers:" line (line 1064)
+```csharp
+$"Modifiers: {modifiers}"
+```
+Not in the V7 spec. The spec has no separate modifiers row; modifier info is embedded in the badge status line (e.g., "initial state", "reachable; every initial→terminal path visits here").
+
+### Divergence 3 — Incoming/Outgoing on separate verbose lines (lines 1065–1066)
+```csharp
+$"Incoming: {FormatCodeList(incoming)}",
+$"Outgoing: {FormatCodeList(outgoing)}",
+```
+Spec says: single combined line with `🔁` icon:
+```
+🔁 In: `FulfillOrder`, `RecordShrinkage` · Out: `ReceiveShipment → Listed`
+```
+
+### Divergence 4 — "Writable here:" as a field list (line 1067)
+```csharp
+$"Writable here: {FormatCodeList(writable)}"
+```
+Spec says: count-format icon prefix, not a label + field list:
+```
+✏️ 4 fields (unconditional)
+```
+And this count belongs on the same summary line as terminal + ensures (Divergence 5 below), not as a standalone line.
+
+### Divergence 5 — Summary line missing icons and writable count (line 1068)
+```csharp
+$"{(terminalReachable ? "Terminal reachable" : "No terminal path")} · active ensures: {activeEnsures.Length}..."
+```
+Spec says: all three (writable, terminal, ensures) on one summary line with icon vocabulary:
+```
+✏️ 4 fields (unconditional) · 🧭 terminal ✓ · ⚡ 3 ensures (1 ⚠️)
+```
+Missing: `✏️` writable-count prefix on this line, `🧭` terminal icon, `⚡` ensures icon.
+
+---
+
+## 🔧 What Needs to Change
+
+All changes are in `CreateStateMarkdown` (lines 1060–1073). Data helpers stay as-is.
+
+1. **Remove** the title line (line 1062).  
+2. **Remove** the separate `Modifiers:` line (line 1064).  
+3. **Replace** the two `Incoming:` / `Outgoing:` lines with one line:  
+   `🔁 In: {in-list} · Out: {out-list}` (handle "none" gracefully).  
+4. **Replace** the `Writable here:` line + terminal/ensures line with one compact summary line:  
+   `✏️ {N} field{s} (unconditional) · 🧭 terminal {✓/✗} · ⚡ {N} ensures{gap-suffix}`.  
+5. **Update tests** in `HoverHandlerTests.cs`: 6+ assertions reference old format strings (`"**state \`...\`**"`, `"Modifiers:"`, `"Incoming:"`, `"Outgoing:"`, `"Writable here:"`) at lines 173, 429–431, 433, 452–453, 492–493, 503–505, 691–692.
+
+---
+
+## 📏 Fix Scope Estimate
+
+**Medium.** All data is already assembled correctly. The change is contained to:  
+- `CreateStateMarkdown` lines 1060–1073 (~7 code lines → 3 output lines)  
+- `HoverHandlerTests.cs` — 6+ assertion strings need updating  
+- No new data projections, no new helpers, no pipeline changes  
+
+No risk to B4 (which is in a separate method called on line 1069 and is correct).
+
+The same title-line pattern also exists in `CreateFieldMarkdown` (line 978) and `CreateEventMarkdown` (line 1093) — those are out of scope here but should be noted as potential follow-on spec-parity work.
+
+# Decision: 6 New Common Patterns Added to precept_patterns (2026-05-12)
+
+**By:** Newman  
+**Date:** 2026-05-12  
+**Status:** Inbox — pending Scribe merge
+
+## Summary
+
+Added 6 new `CommonPattern` entries to `SyntaxReference.CommonPatterns`. Updated `Quickstart.cs` tool-guide count (8 → 14). Fixed a stale `NewToolTests` assertion (`MustSetOmitToNonOmit`) that conflicted with the v3 diagnostic rename.
+
+## Patterns Added
+
+1. **Entry action hook** — `to State -> actions` fires on every inbound edge; shows reset-on-re-entry variant. Source: VehicleServiceAppointment, BuildingAccessBadgeRequest.
+2. **Cross-cutting event (from any)** — `from any on Event` for system signals that apply regardless of current state. Source: CrosswalkSignal, RestaurantWaitlist.
+3. **Stack and queue operations** — push/pop-into/.count (LIFO) and enqueue/dequeue-into/.peek/.count (FIFO). Source: WarrantyRepairRequest, RestaurantWaitlist.
+4. **Optional-with-fallback assignment** — `if Param is set then Param else fallback` inline in a `set` action. Source: LoanApplication.
+5. **Conditional rule (rule when)** — `rule Expression when Condition` for invariants that only apply after a guard. Source: LoanApplication.
+6. **State-scoped editing window** — `in State modify Fields editable` and the `when Condition` variant. Source: ApartmentRentalApplication, LoanApplication.
+
+## Files Changed
+
+- `src/Precept/Language/SyntaxReference.cs` — 6 new `CommonPattern` entries appended to `CommonPatterns`
+- `src/Precept/Language/Quickstart.cs` — tool guide count updated: "8 verified examples" → "14 verified examples"
+- `test/Precept.Mcp.Tests/NewToolTests.cs` — stale `MustSetOmitToNonOmit` assertion replaced with 6 new pattern heading assertions and `"omit ApprovedAmount"` (text that is actually in the current sentinel-defaults good snippet)
+
+## Structural Decisions
+
+- **Patterns live in source, not a resource file.** `SyntaxReference.CommonPatterns` is a C# raw-string collection in `src/Precept/Language/SyntaxReference.cs`. This is the correct insertion point — no separate JSON/text resource file exists or is needed.
+- **Count in Quickstart.cs is the only derived count to keep in sync.** The `precept_patterns` tool guide entry in `Quickstart.cs` hard-codes the count; update it whenever entries are added or removed.
+- **Stale MustSetOmitToNonOmit assertion corrected.** The diagnostic code was renamed as part of v3 field-state work. The MCP test was not updated at that time. It is now aligned: checks for actual content in the good snippet and the 6 new pattern headings.
+
+## Test Result
+
+5595/5595 passing after all changes.
+
