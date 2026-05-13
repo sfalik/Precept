@@ -1,0 +1,317 @@
+using System.Collections.Immutable;
+using Precept.Language;
+
+namespace Precept.Pipeline;
+
+/// <summary>
+/// A closed numeric interval [Min, Max] used for compile-time overflow proofs.
+/// </summary>
+public readonly struct NumericInterval
+{
+    public decimal Min { get; }
+    public decimal Max { get; }
+    public bool IsUnbounded { get; }
+    public bool IsEmpty => Max < Min;
+
+    public NumericInterval(decimal min, decimal max, bool isUnbounded = false)
+    {
+        Min = min;
+        Max = max;
+        IsUnbounded = isUnbounded;
+    }
+
+    public static NumericInterval Unbounded { get; } =
+        new(decimal.MinValue, decimal.MaxValue, isUnbounded: true);
+
+    public static NumericInterval Point(decimal v) => new(v, v);
+
+    public NumericInterval Add(NumericInterval other)
+    {
+        if (IsUnbounded || other.IsUnbounded) return Unbounded;
+        return new(Min + other.Min, Max + other.Max);
+    }
+
+    public NumericInterval Subtract(NumericInterval other)
+    {
+        if (IsUnbounded || other.IsUnbounded) return Unbounded;
+        return new(Min - other.Max, Max - other.Min); // note: swapped
+    }
+
+    public NumericInterval Multiply(NumericInterval other)
+    {
+        if (IsUnbounded || other.IsUnbounded) return Unbounded;
+        var corners = new[] { Min * other.Min, Min * other.Max, Max * other.Min, Max * other.Max };
+        return new(corners.Min(), corners.Max());
+    }
+
+    public NumericInterval Divide(NumericInterval other)
+    {
+        if (IsUnbounded || other.IsUnbounded) return Unbounded;
+        if (other.Min <= 0m && other.Max >= 0m) return Unbounded;
+        var corners = new[] { Min / other.Min, Min / other.Max, Max / other.Min, Max / other.Max };
+        return new(corners.Min(), corners.Max());
+    }
+
+    public NumericInterval Negate()
+    {
+        if (IsUnbounded) return Unbounded;
+        return new(-Max, -Min);
+    }
+
+    public bool Contains(NumericInterval other)
+    {
+        if (other.IsEmpty) return true;
+        return other.Min >= Min && other.Max <= Max;
+    }
+
+    public NumericInterval Union(NumericInterval other)
+    {
+        if (IsUnbounded || other.IsUnbounded) return Unbounded;
+        return new(Math.Min(Min, other.Min), Math.Max(Max, other.Max));
+    }
+
+    public override string ToString() =>
+        IsUnbounded ? "[−∞ .. +∞]" :
+        IsEmpty ? "[empty]" :
+        $"[{Min} .. {Max}]";
+}
+
+public static partial class ProofEngine
+{
+    // Interval proof methods are in this file
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 2: Interval Computation and Obligation Collection
+    // ════════════════════════════════════════════════════════════════════════
+
+    private static NumericInterval IntervalOf(TypedExpression expr, SemanticIndex semantics)
+        => IntervalOfNarrowed(expr, semantics, null);
+
+    private static NumericInterval IntervalOfNarrowed(
+        TypedExpression expr,
+        SemanticIndex semantics,
+        ImmutableDictionary<string, NumericInterval>? narrowed)
+    {
+        switch (expr)
+        {
+            case TypedLiteral { Value: decimal d }:
+                return NumericInterval.Point(d);
+            case TypedLiteral { Value: int i }:
+                return NumericInterval.Point((decimal)i);
+            case TypedLiteral { Value: long l }:
+                return NumericInterval.Point((decimal)l);
+
+            case TypedFieldRef fieldRef:
+                if (narrowed is not null && narrowed.TryGetValue(fieldRef.FieldName, out var narrowedInterval))
+                    return narrowedInterval;
+                return ExtractFieldInterval(fieldRef.FieldName, semantics);
+
+            case TypedArgRef argRef:
+                return ExtractArgInterval(argRef.ArgName, argRef.EventName, semantics);
+
+            case TypedBinaryOp bin:
+            {
+                var opMeta = Operations.GetMeta(bin.ResolvedOp);
+                if (opMeta is BinaryOperationMeta bom && bom.IntervalTransfer is { } transfer)
+                {
+                    var leftInterval = IntervalOfNarrowed(bin.Left, semantics, narrowed);
+                    var rightInterval = IntervalOfNarrowed(bin.Right, semantics, narrowed);
+                    return transfer(leftInterval, rightInterval);
+                }
+                return NumericInterval.Unbounded;
+            }
+
+            case TypedUnaryOp un:
+            {
+                var opMeta = Operations.GetMeta(un.ResolvedOp);
+                if (opMeta is UnaryOperationMeta uom && uom.IntervalTransfer is { } transfer)
+                    return transfer(IntervalOfNarrowed(un.Operand, semantics, narrowed));
+                return NumericInterval.Unbounded;
+            }
+
+            case TypedFunctionCall call:
+            {
+                var overload = ResolveFunctionOverload(call);
+                if (overload?.IntervalTransfer is { } transfer)
+                {
+                    var argIntervals = call.Arguments
+                        .Select(a => IntervalOfNarrowed(a, semantics, narrowed))
+                        .ToArray();
+                    return transfer(argIntervals);
+                }
+                return NumericInterval.Unbounded;
+            }
+
+            case TypedConditional cond:
+            {
+                var thenInterval = IntervalOfNarrowed(cond.ThenBranch, semantics, narrowed);
+                var elseInterval = IntervalOfNarrowed(cond.ElseBranch, semantics, narrowed);
+                return thenInterval.Union(elseInterval);
+            }
+
+            default:
+                return NumericInterval.Unbounded;
+        }
+    }
+
+    private static NumericInterval ExtractFieldInterval(string fieldName, SemanticIndex semantics)
+    {
+        if (!semantics.FieldsByName.TryGetValue(fieldName, out var field))
+            return NumericInterval.Unbounded;
+        var (min, max) = ExtractBoundsFromField(field);
+        if (!min.HasValue && !max.HasValue) return NumericInterval.Unbounded;
+        return new NumericInterval(min ?? decimal.MinValue, max ?? decimal.MaxValue);
+    }
+
+    private static NumericInterval ExtractArgInterval(string argName, string eventName, SemanticIndex semantics)
+    {
+        if (!semantics.EventsByName.TryGetValue(eventName, out var evt))
+            return NumericInterval.Unbounded;
+
+        foreach (var arg in evt.Args)
+        {
+            if (!string.Equals(arg.Name, argName, StringComparison.Ordinal))
+                continue;
+
+            decimal? min = null, max = null;
+            foreach (var modifier in arg.Modifiers)
+            {
+                var meta = Modifiers.GetMeta(modifier);
+                if (meta is not ValueModifierMeta vmm) continue;
+                foreach (var sat in vmm.ProofSatisfactions)
+                {
+                    if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.GreaterThanOrEqual } ns
+                        && ns.Bound is NumericBoundSource.Constant c)
+                        min = c.Value;
+                    if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.LessThanOrEqual } ns2
+                        && ns2.Bound is NumericBoundSource.Constant c2)
+                        max = c2.Value;
+                }
+            }
+            if (!min.HasValue && !max.HasValue) return NumericInterval.Unbounded;
+            return new NumericInterval(min ?? decimal.MinValue, max ?? decimal.MaxValue);
+        }
+        return NumericInterval.Unbounded;
+    }
+
+    internal static (decimal? min, decimal? max) ExtractBoundsFromField(TypedField field)
+    {
+        decimal? min = null, max = null;
+        foreach (var modifier in field.Modifiers.Concat(field.ImpliedModifiers))
+        {
+            var meta = Modifiers.GetMeta(modifier);
+            if (meta is not ValueModifierMeta vmm) continue;
+            foreach (var sat in vmm.ProofSatisfactions)
+            {
+                if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.GreaterThanOrEqual } ns
+                    && ns.Bound is NumericBoundSource.Constant c)
+                    min = c.Value;
+                if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.LessThanOrEqual } ns2
+                    && ns2.Bound is NumericBoundSource.Constant c2)
+                    max = c2.Value;
+            }
+        }
+        return (min, max);
+    }
+
+    private static bool TryIntervalContainmentProof(
+        ProofObligation obligation,
+        SemanticIndex semantics,
+        out NumericInterval? computedInterval)
+    {
+        computedInterval = null;
+        if (obligation.Requirement is not IntervalContainmentProofRequirement intervalReq)
+            return false;
+
+        var resultInterval = IntervalOf(obligation.Site, semantics);
+        computedInterval = resultInterval;
+
+        if (resultInterval.IsUnbounded) return false;
+
+        if (intervalReq.DeclaredMin.HasValue && resultInterval.Min < intervalReq.DeclaredMin.Value)
+            return false;
+        if (intervalReq.DeclaredMax.HasValue && resultInterval.Max > intervalReq.DeclaredMax.Value)
+            return false;
+
+        return true;
+    }
+
+    private static bool TryIntervalContainmentProofNarrowed(
+        ProofObligation obligation,
+        SemanticIndex semantics,
+        out NumericInterval? computedInterval)
+    {
+        computedInterval = null;
+        if (obligation.Requirement is not IntervalContainmentProofRequirement intervalReq)
+            return false;
+
+        var narrowed = BuildNarrowedIntervals(obligation, semantics);
+        var resultInterval = IntervalOfNarrowed(obligation.Site, semantics, narrowed);
+        computedInterval = resultInterval;
+
+        if (resultInterval.IsUnbounded) return false;
+
+        if (intervalReq.DeclaredMin.HasValue && resultInterval.Min < intervalReq.DeclaredMin.Value)
+            return false;
+        if (intervalReq.DeclaredMax.HasValue && resultInterval.Max > intervalReq.DeclaredMax.Value)
+            return false;
+
+        return true;
+    }
+
+    private static ImmutableDictionary<string, NumericInterval>? BuildNarrowedIntervals(
+        ProofObligation obligation,
+        SemanticIndex semantics)
+    {
+        var guard = obligation.Context switch
+        {
+            TransitionRowContext t => t.Row.Guard,
+            StateHookContext s => s.Hook.Guard,
+            _ => null
+        };
+        if (guard is null) return null;
+
+        var branches = ExtractGuardBranches(guard);
+        if (branches.IsEmpty) return null;
+
+        // Use the first branch for now (Slice 3 handles single-branch guards)
+        var builder = ImmutableDictionary.CreateBuilder<string, NumericInterval>(StringComparer.Ordinal);
+
+        foreach (var branch in branches)
+        {
+            var branchNarrowings = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+
+            foreach (var gc in branch)
+            {
+                if (gc.IsPresenceCheck || gc.Value is null) continue;
+
+                var baseInterval = ExtractFieldInterval(gc.Field, semantics);
+                if (!branchNarrowings.TryGetValue(gc.Field, out var current))
+                    current = baseInterval.IsUnbounded
+                        ? new NumericInterval(decimal.MinValue, decimal.MaxValue)
+                        : baseInterval;
+
+                var value = gc.Value.Value;
+                current = gc.Comparison switch
+                {
+                    OperatorKind.GreaterThanOrEqual => new NumericInterval(Math.Max(current.Min, value), current.Max),
+                    OperatorKind.GreaterThan => new NumericInterval(Math.Max(current.Min, value), current.Max),
+                    OperatorKind.LessThanOrEqual => new NumericInterval(current.Min, Math.Min(current.Max, value)),
+                    OperatorKind.LessThan => new NumericInterval(current.Min, Math.Min(current.Max, value)),
+                    _ => current
+                };
+                branchNarrowings[gc.Field] = current;
+            }
+
+            foreach (var (field, interval) in branchNarrowings)
+            {
+                if (builder.TryGetValue(field, out var existing))
+                    builder[field] = existing.Union(interval);
+                else
+                    builder[field] = interval;
+            }
+        }
+
+        return builder.Count > 0 ? builder.ToImmutable() : null;
+    }
+}

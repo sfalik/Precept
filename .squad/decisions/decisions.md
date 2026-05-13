@@ -21589,3 +21589,139 @@ Added 6 new `CommonPattern` entries to `SyntaxReference.CommonPatterns`. Updated
 ## Test Result
 
 5595/5595 passing after all changes.
+
+---
+
+# Decision: Catalog-Mediated Emission Expansion Scope
+
+**Author:** Frank
+**Date:** 2026-05-13T13:38:04Z
+**Status:** Documented — no implementation gating
+
+## Decision
+
+The catalog-mediated diagnostic emission pattern (CIDiagnosticCode on catalog metadata, consumed by a generic validation loop) is selective, not universal. Direct emission remains the default. The pattern expands only where three criteria are met simultaneously:
+
+1. Stable 1:1 mapping from catalog member to diagnostic code.
+2. Uniform emission logic across all members (no per-member branching).
+3. Validation is a membership/property check on resolved artifacts, not a structural judgment.
+
+## Expansion Candidates (Prioritized)
+
+1. **Modifier constraint violations** — ModifierMeta.ConstraintDiagnosticCode property. Audit ValidateModifiers first.
+2. **Typed-constant family validation** — family metadata declares format/semantic error codes. Requires promoting family dispatch to a catalog surface.
+3. **Proof obligation emission** — verify all ProofEngine paths read from ProofRequirements.GetMeta().DiagnosticCode instead of hardcoding.
+
+## Exclusion List
+
+Parser rejection paths, structural one-off checks, expression-level precision diagnostics, cross-entity qualifier comparison, and meta-enforcement analyzers remain direct emission permanently.
+
+## Rationale
+
+The CI enforcement cluster proved the pattern is sound for its shape — but extending it to areas that don't meet the criteria would introduce pretend-genericity, obscure intent, and make the Gate 1 analyzer's job harder (more indirect references to trace). The three-criteria test keeps the boundary clean.
+
+## Impact
+
+Doc-only. No code changes. Informs future implementation decisions for Slices 1–8 and the IsImplemented flag long-term path.
+
+---
+
+# Kramer hover V7 closeout
+
+**Date:** 2026-05-13
+**Status:** Complete
+
+## Outcome
+
+- Added the V7 alignment tracker to docs/Working/hover-design.md and closed all 13 remaining rows with commit references.
+- Reworked 	ools/Precept.LanguageServer/Handlers/RichHoverFactory.cs so field, event, rule, ensure, transition, reject, qualifier, proof, state-gap, access, and omit hovers all render in the compact badge-first V7 format.
+- Expanded 	est/Precept.LanguageServer.Tests/HoverHandlerTests.cs with compact-card regressions for the new layouts, including qualifier-proof and generic proof fallbacks.
+
+## Validation
+
+- Targeted hover regression slices for each card family passed locally.
+- Clean-worktree full LS validation still reports the branch's pre-existing non-hover failures in semantic-token and diagnostic-publish tests outside this slice.
+
+---
+
+# Kramer cleanup done
+
+## What was committed
+
+- eat(completions): fix slot detection regressions and duplicate modifier suppression
+- 	est(hover): update hover tests to match V7 card format
+- chore(samples): update Test.precept and inventory-item.precept
+- docs(working): consolidate diagnostic coverage docs into enforcement-v3
+
+## Pre-existing failures left for the team
+
+The remaining language-server failures are not from the hover V7 or completion cleanup. After fixing the hover assertion, dotnet test test\\Precept.LanguageServer.Tests\\ --nologo dropped from 7 failures to 6, and the survivors all sit in older semantic-token / diagnostic areas whose file history predates the current work:
+
+- DiagnosticProjectorTests.Project_EmptyDiagnostics_ReturnsEmptyList
+- DiagnosticPublishIntegrationTests.DidChange_OutOfOrderVersions_PublishesNewestDiagnosticsOnly
+- SemanticTokensHandlerTests.IdentifierTokens_FieldDeclaration_EmitsPropertyToken
+- SemanticTokensHandlerTests.Pass2_EventName_EmitsPreceptEvent
+- SemanticTokensHandlerTests.Pass2_FieldName_EmitsPreceptFieldName
+- SemanticTokensHandlerTests.Pass2_StateName_EmitsPreceptState
+
+Evidence checked during cleanup:
+- semantic-token files were last touched by older commits such as d7556365 and 3c3681ea
+- diagnostic projector/publish paths were last touched by older commits such as 568ab5cc and 10de4133
+- none of the uncommitted completion or hover cleanup files overlap those semantic-token / diagnostic implementations
+
+## Final test counts
+
+- dotnet test test\\Precept.LanguageServer.Tests\\ --nologo: **284 passed / 290 total, 6 failing (pre-existing list above)**
+- dotnet test test\\Precept.Tests\\ --nologo: **5141 passed / 5141 total**
+---
+
+# User Directive — 2026-05-13T09:48:49.825-04:00
+
+**By:** shane (via Copilot)
+**What:** Add planned slices specifically in `docs/Working/diagnostic-enforcement.md` for the expansion scope; treat the expansion as in-scope implementation planning.
+**Why:** User request — captured for team memory
+
+---
+
+# Decision: Catalog-Mediated Emission Expansion as Implementation Slices
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-13
+**Status:** Proposed
+
+## Context
+
+The diagnostic enforcement plan (`docs/Working/diagnostic-enforcement.md`) documented three expansion candidates for catalog-mediated diagnostic emission in § 9 as long-term evolution notes. Shane requested these be promoted to concrete, named implementation slices with the same quality bar as the gap-closure slices.
+
+## Decision
+
+Three new slices (9A, 9B, 9C) are added under a new "Priority 4 — Catalog-Mediated Emission Expansion" tier in the plan:
+
+- **Slice 9A:** Modifier constraint violations → `ModifierMeta.ConstraintDiagnosticCode`
+- **Slice 9B:** Typed-constant family diagnostics → `TypedConstantFamilyMeta` with per-family codes
+- **Slice 9C:** Proof obligation emission consistency → complete catalog dispatch in ProofEngine
+
+Each slice requires a prerequisite audit pass and can close as "not viable" if the audit shows insufficient branch count or the three-criteria test fails in practice.
+
+## Key Policy Retained
+
+- **Direct emission remains the default.** Catalog mediation is selective.
+- These are **mechanism-migration slices**, not gap-closure slices. Their gate is behavioral equivalence (same diagnostics fire on same inputs) plus Gate 1 analyzer recognition of indirect catalog paths.
+- The do-not-apply list (parser paths, structural checks, expression-level precision, qualifier comparison, gate analyzers) remains explicit and unchanged.
+
+## Numbering Rationale
+
+The "9" prefix ties these slices to § 9 (Long-Term Evolution) where the expansion scope originated. The letter suffix (A/B/C) avoids disrupting the existing 0–8 numeric sequence for gap-closure work.
+
+## Sequencing
+
+- 9A: after Slice 8 (needs PRE0035/PRE0042 wired first)
+- 9B: after Slice 5 OR independent (can subsume Slice 5 if ordered first)
+- 9C: independent of gap-closure slices (pure mechanism audit)
+
+---
+
+### 2026-05-13T09:55:48.630-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Treat the expansion work as current in-scope execution now, not long-term evolution.
+**Why:** User request — captured for team memory

@@ -1,5 +1,7 @@
 namespace Precept.Language;
 
+public delegate NumericInterval FunctionIntervalTransferFn(NumericInterval[] args);
+
 /// <summary>
 /// Grouping of functions by semantic domain. Used by completions and MCP vocabulary
 /// to present functions in contextually organized groups.
@@ -24,6 +26,9 @@ public sealed record FunctionOverload(
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
+
+    /// <summary>Interval transfer function for compile-time overflow analysis.</summary>
+    public FunctionIntervalTransferFn? IntervalTransfer { get; init; }
 }
 
 /// <summary>

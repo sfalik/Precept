@@ -14,7 +14,7 @@
 
 ## 2. Overview
 
-The proof engine is the fifth and final analysis stage before the Precept Builder — the compile-time half of Precept's structural safety guarantee. Its role: discharge statically preventable runtime hazards using a bounded, five-strategy set. If an operation is proven safe, no runtime check is needed. If proof fails, the compiler emits a diagnostic and the author must fix the source before an executable model is produced.
+The proof engine is the fifth and final analysis stage before the Precept Builder — the compile-time half of Precept's structural safety guarantee. Its role: discharge statically preventable runtime hazards using a bounded, six-strategy set. If an operation is proven safe, no runtime check is needed. If proof fails, the compiler emits a diagnostic and the author must fix the source before an executable model is produced.
 
 **Pipeline Position:**
 
@@ -28,7 +28,7 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 
 **Key design choices:**
 
-1. **Proof is bounded** — five strategies only, no general SMT solver. Predictable, auditable, zero external dependencies.
+1. **Proof is bounded** — six strategies only, no general SMT solver. Predictable, auditable, zero external dependencies.
 2. **Proof ledger does NOT cross the compile-runtime boundary** — only `FaultSiteDescriptor` residue (defense-in-depth backstops) crosses into runtime. The proof engine is purely a compile-time analysis stage.
 3. **Catalog-driven obligations** — the proof engine reads `ProofRequirement` records stamped by the type checker from catalog metadata. It does NOT maintain its own list of what needs to be proved.
 
@@ -41,7 +41,7 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 | Responsibility | Description |
 |---|---|
 | **Obligation instantiation** | Create `ProofObligation` records from `ProofRequirement` attachments on typed expressions and actions |
-| **Obligation discharge** | Apply five proof strategies in order to resolve each obligation |
+| **Obligation discharge** | Apply six proof strategies in order to resolve each obligation |
 | **Diagnostic emission** | Emit diagnostics for unresolved obligations with semantic site attribution |
 | **FaultSiteLink production** | Link unresolved obligations to their corresponding `FaultCode` for Precept Builder backstops |
 | **Constraint influence analysis** | Traverse constraint expressions to record field/arg dependencies for causal reasoning |
@@ -62,20 +62,20 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 
 ## 4. Right-Sizing
 
-The proof engine is **intentionally bounded** — five strategies only, no external solver. This is a deliberate scope limit, not a capability gap.
+The proof engine is **intentionally bounded** — six strategies only, no external solver. This is a deliberate scope limit, not a capability gap.
 
 | Metric | Value | Rationale |
 |---|---|---|
 | Estimated LOC | 400–600 | ~150 obligation instantiation + ~200 strategy dispatch + ~100 influence analysis + ~50 satisfiability |
-| Strategy count | 5 | Bounded set covers the DSL's constrained expression language |
+| Strategy count | 6 | Bounded set covers the DSL's constrained expression language |
 | External dependencies | 0 | No SMT solver, no SAT solver, no external libraries |
 | Determinism | 100% | Same input always produces same output — no solver timeouts or resource limits |
 
-**Why five strategies, not a general solver:**
+**Why six strategies, not a general solver:**
 
-General SMT solving (Z3, CVC4/5) would add non-deterministic verification times, external dependencies, and implementation complexity. The surveyed verification systems (SPARK Ada/GNATprove, Dafny, Liquid Haskell, CBMC) all depend on external solvers for general proof discharge. Precept's DSL is intentionally constrained — the expression language is finite, the obligation space is bounded, and the five-strategy set covers realistic programs.
+General SMT solving (Z3, CVC4/5) would add non-deterministic verification times, external dependencies, and implementation complexity. The surveyed verification systems (SPARK Ada/GNATprove, Dafny, Liquid Haskell, CBMC) all depend on external solvers for general proof discharge. Precept's DSL is intentionally constrained — the expression language is finite, the obligation space is bounded, and the six-strategy set covers realistic programs.
 
-**Boundary condition:** If the five strategies prove insufficient for real programs, a sixth bounded strategy would be added — not a general solver. The strategy set is bounded, not extensible by users.
+**Boundary condition:** If the six strategies prove insufficient for real programs, a seventh bounded strategy would be added — not a general solver. The strategy set is bounded, not extensible by users.
 
 ---
 
@@ -223,7 +223,8 @@ public enum ProofStrategy
     DeclarationAttribute = 2,    // declaration-site attributes establish the proof
     GuardInPath = 3,             // enclosing guard establishes the constraint
     FlowNarrowing = 4,           // same-row guard narrows the type state
-    QualifierCompatibility = 5   // qualifier values are provably compatible
+    QualifierCompatibility = 5,  // qualifier values are provably compatible
+    CompositionalConstraint = 6  // field assignments satisfy modifiers via compositional sign inference
 }
 ```
 
@@ -353,6 +354,7 @@ The proof engine operates in two sequential passes:
 │    - Try Strategy 3 (GuardInPath) → if success, mark Proved          │
 │    - Try Strategy 4 (FlowNarrowing) → if success, mark Proved        │
 │    - Try Strategy 5 (QualifierCompatibility) → if success, mark Proved │
+│    - Try Strategy 6 (CompositionalConstraint) → if success, mark Proved │
 │    - If all fail → mark Unresolved, emit diagnostic                  │
 │  • Build FaultSiteLinks for unresolved obligations                   │
 │  • Run constraint influence analysis                                 │
@@ -454,9 +456,9 @@ public sealed record SelfSubject(TypeAccessor? Accessor = null) : ProofSubject;
 
 ## 7. Component Mechanics
 
-### Five Proof Strategies
+### Six Proof Strategies
 
-Each strategy is a simple predicate function — not a solver. The first strategy that succeeds marks the obligation as `Proved`. Strategies are tried in order (1 → 2 → 3 → 4 → 5).
+Each strategy is a simple predicate function — not a solver. The first strategy that succeeds marks the obligation as `Proved`. Strategies are tried in order (1 → 2 → 3 → 4 → 5 → 6).
 
 ### Subject Resolution Utilities
 
@@ -1226,6 +1228,222 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 **Reference:** The exact dispatch, fallback chains, currency-axis translation, and comparison tables are documented in **Qualifier Resolution Reference** below.
 
+#### Strategy 6: Compositional Constraint Proof
+
+**When it applies:** An obligation on a field's numeric range can be proven by compositional sign inference across all assignments to that field combined with the modifiers on the assigned values.
+
+**How it works:** For each field referenced in a proof obligation, Strategy 6 collects all assignments to that field across transition rows and event handlers. If ALL assignments are interpolated typed constants (string interpolations with typed values embedded), it extracts the magnitude or whole-value slot source from each interpolation. It then resolves the modifiers on those slot sources and checks whether the modifiers collectively satisfy the numeric requirement. Additionally, Strategy 6 reasons about sign propagation through arithmetic expressions — combining sign knowledge from modifiers and trusted constraint facts to infer whether a computed result satisfies a numeric bound.
+
+**Examples:**
+
+```precept
+field Price as money of 'USD' positive
+field UnitPrice as money of 'USD' nonnegative
+
+on SetUnitPrice when Count > 0
+    set UnitPrice = "$(Price.Magnitude / Count)"    // ← magnitude slot source is Price (positive modifier)
+    // ✅ Division result inferred nonnegative from positive numerator and Count > 0 guard
+```
+
+```precept
+field Quantity as positive integer
+field Discount as nonnegative integer
+
+on AdjustPrice when Quantity > 0
+    set FinalPrice = BasePrice - Discount
+    // ✅ If BasePrice is nonnegative and Discount is nonnegative,
+    //    subtraction sign inference proves FinalPrice can be negative (fails proof)
+```
+
+**Sign inference rules:** Strategy 6 maintains a `NumericSignSet` (a bitmask of possible signs: Negative, Zero, Positive). It infers sign sets for:
+- **Literals:** exact sign (positive, zero, or negative)
+- **Field refs:** from declared modifiers (positive → Positive, nonnegative → Nonnegative, nonzero → Nonzero)
+- **Arithmetic:** combines operand signs via algebra rules:
+  - Addition: positive + positive = positive; positive + nonnegative = positive; zero + zero = zero; etc.
+  - Subtraction: positive - nonnegative = Unknown (result could be positive, zero, or negative); positive - zero = positive; etc.
+  - Multiplication: positive × positive = positive; positive × negative = negative; zero × anything = zero; etc.
+  - Division: positive ÷ positive = positive; cannot divide by zero (blocks proof)
+- **Unary operators:** negation flips signs (negative ↔ positive, zero stays zero)
+- **Functions:** reads `FunctionOverload.ReturnNonnegative` flag (e.g., `abs()` always returns nonnegative)
+- **Accessors:** reads `FixedReturnAccessor.ReturnNonnegative` flag (e.g., collection count is always nonnegative)
+- **Trusted rule facts:** incorporates numeric constraints from rule and ensure conditions scoped to the current context (state or event). For example, if a rule states `Quantity > 0` and applies to the current event, that fact refines the Quantity field's sign set to Positive during proof.
+
+**Constraint fact scoping:** Strategy 6 collects numeric facts from unresolved rules and ensures. A fact `X > 0` extracted from a rule condition is trusted (included in proof reasoning) only if:
+1. The rule condition itself is unresolved (it has failed proof) — "if I'm uncertain about this rule, I can't use it as a trusted fact"
+2. The fact's scope (state or event anchor) matches the obligation's context (state-anchor facts apply to state hooks and transition rows from that state; event-anchor facts apply to transition rows and event handlers for that event)
+
+This conservative gating prevents circular reasoning: a rule's condition can only propagate as a trusted proof fact if the rule itself is not being proved.
+
+**Discharge predicate pseudocode:**
+
+```csharp
+// Strategy 6: Compositional Constraint Proof — Discharge Predicate
+// Input: ProofObligation (from Pass 1)
+// Reads: SemanticIndex.TransitionRows[] + .EventHandlers[] (to find all assignments),
+//        Modifiers catalog (ProofSatisfactions on declared modifiers),
+//        Rules and Ensures conditions (to extract trusted numeric facts)
+// Scope: Numeric proof requirements where the subject's value can be proven through
+//        compositional sign inference across field assignments and constraint facts
+
+bool TryCompositionalConstraintProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    if (obligation.Requirement is not NumericProofRequirement numericReq)
+        return false;
+
+    var subject = ResolveSubject(numericReq.Subject, obligation.Site);
+    if (subject is not null
+        && SignSetSatisfiesRequirement(
+            ResolveNumericSignSet(subject, obligation.Context, ImmutableArray<ScopedNumericFact>.Empty, semantics),
+            numericReq))
+    {
+        return true;
+    }
+
+    // Resolve the target field from the obligation subject
+    var fieldName = GetFieldName(numericReq.Subject, obligation.Site);
+    if (fieldName is null) return false;
+
+    // Find ALL assignments to this field across transition rows and event handlers
+    var interpolatedAssignments = FindInterpolatedAssignments(fieldName, semantics);
+
+    // No interpolated assignments → decline
+    if (interpolatedAssignments.Length == 0) return false;
+
+    // For each interpolated assignment, extract the relevant slot source and
+    // verify its modifiers satisfy the numeric obligation
+    foreach (var assignment in interpolatedAssignments)
+    {
+        var slotSource = GetMagnitudeSlotSource(assignment);
+        if (slotSource is null) return false;
+
+        // Resolve the source's modifiers (field or arg)
+        var modifiers = ResolveSourceModifiers(slotSource, semantics);
+        if (modifiers.IsDefault || modifiers.IsEmpty) return false;
+
+        bool covered = false;
+        foreach (var modifier in modifiers)
+        {
+            var meta = Modifiers.GetMeta(modifier);
+            if (meta is not ValueModifierMeta vmm) continue;
+
+            foreach (var satisfaction in vmm.ProofSatisfactions)
+            {
+                if (SatisfactionCovers(satisfaction, numericReq))
+                {
+                    covered = true;
+                    break;
+                }
+            }
+            if (covered) break;
+        }
+
+        if (!covered) return false;
+    }
+
+    return true;
+}
+
+// Helper: resolve the sign set for an expression via modifier facts + trusted constraints
+NumericSignSet ResolveNumericSignSet(
+    TypedExpression expression,
+    ObligationContext context,
+    ImmutableArray<ScopedNumericFact> trustedFacts,
+    SemanticIndex semantics)
+{
+    // 1. Literals and typed constants: exact sign
+    if (TryGetStaticNumericValue(expression, out var value))
+        return GetExactSignSet(value);
+
+    // 2. Field/arg refs: sign from modifiers + trusted facts
+    if (TryGetNumericSubjectRef(expression, out var subject))
+        return ResolveNumericSubjectSignSet(subject, context, trustedFacts, semantics);
+
+    // 3. Composite expressions: recursive sign inference
+    return expression switch
+    {
+        TypedUnaryOp unaryOp => ResolveUnarySignSet(unaryOp, context, trustedFacts, semantics),
+        TypedBinaryOp binaryOp => ResolveBinarySignSet(binaryOp, context, trustedFacts, semantics),
+        TypedFunctionCall functionCall when ResolveFunctionOverload(functionCall)?.ReturnNonnegative == true => NumericSignSet.Nonnegative,
+        TypedMemberAccess { ResolvedAccessor: FixedReturnAccessor { ReturnNonnegative: true } } => NumericSignSet.Nonnegative,
+        TypedConditional conditional => ResolveNumericSignSet(conditional.ThenBranch, context, trustedFacts, semantics)
+                                     | ResolveNumericSignSet(conditional.ElseBranch, context, trustedFacts, semantics),
+        _ => NumericSignSet.Unknown,
+    };
+}
+
+// Helper: combine two sign sets via addition
+NumericSignSet AddSignSets(NumericSignSet left, NumericSignSet right)
+{
+    var result = NumericSignSet.None;
+    foreach (var leftSign in EnumerateSigns(left))
+    {
+        foreach (var rightSign in EnumerateSigns(right))
+        {
+            result |= (leftSign, rightSign) switch
+            {
+                (Positive, Positive) => Positive,
+                (Positive, Zero) => Positive,
+                (Zero, Positive) => Positive,
+                (Zero, Zero) => Zero,
+                (Negative, Negative) => Negative,
+                (Negative, Zero) => Negative,
+                (Zero, Negative) => Negative,
+                _ => Unknown,
+            };
+        }
+    }
+    return result == NumericSignSet.None ? NumericSignSet.Unknown : result;
+}
+
+// Helper: combine two sign sets via multiplication
+NumericSignSet MultiplySignSets(NumericSignSet left, NumericSignSet right)
+{
+    var result = NumericSignSet.None;
+    foreach (var leftSign in EnumerateSigns(left))
+    {
+        foreach (var rightSign in EnumerateSigns(right))
+        {
+            result |= (leftSign, rightSign) switch
+            {
+                (Zero, _) or (_, Zero) => Zero,
+                (Positive, Positive) => Positive,
+                (Negative, Negative) => Positive,
+                (Positive, Negative) => Negative,
+                (Negative, Positive) => Negative,
+                _ => Unknown,
+            };
+        }
+    }
+    return result == NumericSignSet.None ? NumericSignSet.Unknown : result;
+}
+
+// Helper: check if a sign set satisfies a numeric requirement
+bool SignSetSatisfiesRequirement(NumericSignSet signSet, NumericProofRequirement requirement)
+{
+    if (requirement.Threshold != 0m)
+        return false;
+
+    return requirement.Comparison switch
+    {
+        OperatorKind.NotEquals => !signSet.HasFlag(NumericSignSet.Zero),
+        OperatorKind.GreaterThan => signSet == NumericSignSet.Positive,
+        OperatorKind.GreaterThanOrEqual => !signSet.HasFlag(NumericSignSet.Negative),
+        OperatorKind.LessThan => signSet == NumericSignSet.Negative,
+        OperatorKind.LessThanOrEqual => !signSet.HasFlag(NumericSignSet.Positive),
+        _ => false,
+    };
+}
+```
+
+> **Intentional scope:** Strategy 6 combines three proof techniques:
+>
+> 1. **Interpolated assignment analysis** — if a field is ALWAYS assigned from interpolated typed constants with modifiers on the slot sources, those modifiers can discharge numeric obligations on the field.
+> 2. **Compositional sign inference** — arithmetic operations propagate sign information through operands, allowing proof by combining modifier facts and literal signs.
+> 3. **Trusted constraint facts** — numeric comparisons in unresolved rules and ensures provide context-scoped facts that refine sign sets during inference.
+>
+> Strategy 6 is the LAST strategy tried — after Strategies 1–5 have all failed. It is more expensive than per-site strategies (searches across all assignments) and more speculative (relies on patterns of modifiers and assignments). This ordering ensures that simpler, more direct proofs (literals, declarations, guards) are preferred over compositional reasoning.
+
+
 ### Qualifier Resolution Reference
 
 This section documents the implementation in `src/Precept/Pipeline/ProofEngine.Qualifiers.cs`, `ProofEngine.Strategies.cs`, and the constant-folder guard in `ProofEngine.Analysis.cs`. See **Carrier Types** above for the `DeclaredQualifierMeta` and `ProofSatisfaction` DU shapes that this logic consumes.
@@ -1826,9 +2044,9 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 ### Disposition Exhaustiveness
 
-**Contract:** Every `ProofObligation` has a disposition: `Proved` (one of five strategies succeeded) or `Unresolved`.
+**Contract:** Every `ProofObligation` has a disposition: `Proved` (one of six strategies succeeded) or `Unresolved`.
 
-**Enforcement:** The strategy dispatch loop is exhaustive — after trying all five strategies, the obligation is marked `Unresolved`; non-error-tainted obligations emit diagnostics, while error-tainted obligations are suppressed per PE-G13.
+**Enforcement:** The strategy dispatch loop is exhaustive — after trying all six strategies, the obligation is marked `Unresolved`; non-error-tainted obligations emit diagnostics, while error-tainted obligations are suppressed per PE-G13.
 
 ### Fault Chain Integrity
 
@@ -1843,7 +2061,7 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 **Contract:** Same input (`SemanticIndex` + `StateGraph`) always produces same output (`ProofLedger`).
 
-**Enforcement:** No external solver, no non-deterministic algorithms, no timeouts. The five strategies are pure predicate functions.
+**Enforcement:** No external solver, no non-deterministic algorithms, no timeouts. The six strategies are pure predicate functions.
 
 ### Catalog Correspondence
 
@@ -1863,7 +2081,7 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 - **Predictability:** Every proof attempt completes in bounded, deterministic time. No solver timeouts, no "unknown" results, no resource exhaustion.
 - **Auditability:** Each strategy is a simple predicate function (~10–30 lines). Authors can understand exactly why an obligation was proved or not.
 - **Zero external dependencies:** No Z3, no CVC5, no SAT solver. The proof engine is self-contained within the Precept runtime.
-- **Coverage sufficiency:** The DSL expression language is intentionally constrained. Precept does not support arbitrary arithmetic, unbounded loops, or recursive definitions. The five strategies cover the realistic obligation space, including qualifier compatibility as a dedicated bounded case.
+- **Coverage sufficiency:** The DSL expression language is intentionally constrained. Precept does not support arbitrary arithmetic, unbounded loops, or recursive definitions. The six strategies cover the realistic obligation space, including qualifier compatibility as a dedicated bounded case.
 
 **Trade-off accepted:** The proof engine cannot discharge complex cross-field value relationships or inductive properties. This is acceptable because:
 1. Such relationships are rare in business state machines
@@ -2022,7 +2240,7 @@ The proof engine produces a `ConstraintInfluenceMap` that enables AI agents to r
 
 ### Implementation Status
 
-Items 1 and 2 are resolved — the full ProofEngine body is implemented with all five strategies, obligation collection, diagnostic emission, constraint influence analysis, initial-state satisfiability, and ProofForwardingFact consumption.
+Items 1 and 2 are resolved — the full ProofEngine body is implemented with all six strategies, obligation collection, diagnostic emission, constraint influence analysis, initial-state satisfiability, and ProofForwardingFact consumption.
 
 ### Validation Required
 
@@ -2062,7 +2280,7 @@ The bounded strategy set is intentional. General proof is not a goal. Adding an 
 - Complicate the build and deployment story
 - Provide marginal benefit for the constrained DSL expression language
 
-If an obligation cannot be discharged by the five strategies, the author adds a guard or modifier to make it statically provable, or accepts the defense-in-depth backstop.
+If an obligation cannot be discharged by the six strategies, the author adds a guard or modifier to make it statically provable, or accepts the defense-in-depth backstop.
 
 ### No Runtime Obligation Checking
 
@@ -2081,7 +2299,7 @@ Constraint evaluation is the evaluator's domain. The proof engine checks satisfi
 
 ### No General Dataflow Analysis
 
-The five strategies are local and shallow:
+The six strategies are local and shallow:
 - Literal proof: single expression
 - Declaration attribute proof: single subject's declaration metadata
 - Guard-in-path: enclosing guard in same transition row

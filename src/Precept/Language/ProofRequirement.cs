@@ -126,6 +126,20 @@ public sealed record ModifierRequirement(
     string       Description
 ) : ProofRequirement(ProofRequirementKind.Modifier, Description);
 
+/// <summary>
+/// Interval containment proof: the computed value interval of an expression
+/// assigned to a decimal/number field must fit within the field's declared
+/// bounds (if any). Used to prevent compile-time-provable numeric overflow
+/// on field assignment operations (set, add, etc.).
+/// </summary>
+public sealed record IntervalContainmentProofRequirement(
+    ProofSubject Subject,
+    string TargetField,
+    decimal? DeclaredMin,
+    decimal? DeclaredMax,
+    string Description
+) : ProofRequirement(ProofRequirementKind.IntervalContainment, Description);
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  ProofRequirementMeta — catalog meta (DU as identity)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -172,6 +186,11 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
     public sealed record QualifierChain()
         : ProofRequirementMeta(ProofRequirementKind.QualifierChain,
             "Qualifier chain — cross-type, cross-axis qualifier validation");
+
+    /// <summary>Interval containment — result interval must fit within target field's declared bounds.</summary>
+    public sealed record IntervalContainment()
+        : ProofRequirementMeta(ProofRequirementKind.IntervalContainment,
+            "Interval containment — result interval must fit within target field's declared bounds");
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement
@@ -194,6 +213,9 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
     public sealed record QualifierCompatibility(QualifierAxis Axis)
         : ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
+
+    public sealed record IntervalContainment()
+        : ProofSatisfaction(ProofRequirementKind.IntervalContainment);
 }
 
 public abstract record SatisfactionProjection

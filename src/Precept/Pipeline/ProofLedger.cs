@@ -17,7 +17,8 @@ public sealed record ProofObligation(
     ObligationContext Context,
     ProofDisposition Disposition,
     ProofStrategy? Strategy,
-    DiagnosticCode? EmittedDiagnostic
+    DiagnosticCode? EmittedDiagnostic,
+    NumericInterval? ComputedInterval = null
 );
 
 public abstract record ObligationContext;
@@ -40,7 +41,8 @@ public enum ProofStrategy
     GuardInPath = 3,
     FlowNarrowing = 4,
     QualifierCompatibility = 5,
-    CompositionalConstraint = 6
+    CompositionalConstraint = 6,
+    IntervalContainment = 7
 }
 
 public sealed record FaultSiteLink(

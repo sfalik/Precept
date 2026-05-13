@@ -72,6 +72,16 @@ public static partial class ProofEngine
                 return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,
                     DescribeSubject(presence.Subject, obligation.Site),
                     usageSuffix);
+
+            case IntervalContainmentProofRequirement intervalReq:
+            {
+                var computedStr = obligation.ComputedInterval.HasValue
+                    ? $" (computed: {obligation.ComputedInterval.Value})"
+                    : string.Empty;
+                return Diagnostics.Create(DiagnosticCode.NumericOverflow, obligation.Site.Span,
+                    intervalReq.TargetField,
+                    $"[{intervalReq.DeclaredMin?.ToString() ?? "−∞"} .. {intervalReq.DeclaredMax?.ToString() ?? "+∞"}]{computedStr}");
+            }
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
@@ -212,6 +222,8 @@ public static partial class ProofEngine
                 return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedQualifierCompatibility);
             case PresenceProofRequirement:
                 return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedPresenceRequirement);
+            case IntervalContainmentProofRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.NumericOverflow);
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
@@ -225,6 +237,7 @@ public static partial class ProofEngine
             DiagnosticCode.SqrtOfNegative => FaultCode.SqrtOfNegative,
             DiagnosticCode.UnguardedCollectionAccess => FaultCode.CollectionEmptyOnAccess,
             DiagnosticCode.UnguardedCollectionMutation => FaultCode.CollectionEmptyOnMutation,
+            DiagnosticCode.NumericOverflow => FaultCode.NumericOverflow,
             _ => FaultCode.DivisionByZero // Proof-only obligation families still share the existing conservative runtime backstop.
         };
 

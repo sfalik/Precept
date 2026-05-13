@@ -79,3 +79,7 @@
 
 - Kramer-1 is still running on `RichHoverFactory.cs` `CreateStateMarkdown` to match the V7 compact state card: drop the title and modifiers lines, then merge transition and summary data onto the compact lines.
 - Current scope is formatting-only plus matching `HoverHandlerTests.cs` assertion updates; no commit or validation result is recorded yet.
+
+### 2026-05-13T13:38:04Z — Hover/completion cleanup closeout recorded
+
+- The cleanup batch is now durably captured in .squad/decisions.md; the remaining language-server failures stayed confined to the pre-existing semantic-token / diagnostic debt outside the hover and completion slices.

@@ -23,4 +23,7 @@ public enum ProofRequirementKind
     QualifierCompatibility =  5,
 
     QualifierChain         =  6,
+
+    /// <summary>Interval containment check — result interval must fit within target field's declared bounds.</summary>
+    IntervalContainment    =  7,
 }

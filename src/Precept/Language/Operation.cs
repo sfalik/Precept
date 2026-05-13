@@ -1,5 +1,8 @@
 namespace Precept.Language;
 
+public delegate NumericInterval IntervalTransferFn(NumericInterval left, NumericInterval right);
+public delegate NumericInterval UnaryIntervalTransferFn(NumericInterval operand);
+
 /// <summary>Describes a single operand slot in an operation.</summary>
 public record ParameterMeta(TypeKind Kind, string? Name = null);
 
@@ -63,7 +66,11 @@ public sealed record UnaryOperationMeta(
     ParameterMeta Operand,
     TypeKind Result,
     string Description)
-    : OperationMeta(Kind, Op, Result, Description);
+    : OperationMeta(Kind, Op, Result, Description)
+{
+    /// <summary>Interval transfer function for compile-time overflow analysis.</summary>
+    public UnaryIntervalTransferFn? IntervalTransfer { get; init; }
+}
 
 /// <summary>Binary operation metadata (e.g., money * decimal → money).</summary>
 public sealed record BinaryOperationMeta(
@@ -83,4 +90,7 @@ public sealed record BinaryOperationMeta(
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
+
+    /// <summary>Interval transfer function for compile-time overflow analysis.</summary>
+    public IntervalTransferFn? IntervalTransfer { get; init; }
 }

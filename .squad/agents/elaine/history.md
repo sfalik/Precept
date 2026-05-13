@@ -8,6 +8,11 @@
 
 ## Learnings
 
+- Interval display needs a notation that's compact AND unambiguous in markdown: `[lo .. hi]` with two dots avoids confusion with Precept's range syntax and renders cleanly in VS Code hover.
+- When extending the hover badge vocabulary, check existing badges before proposing new ones — `⚖️` (comparison contract) already covers declared bounds, and `🔬` already covers arithmetic reasoning. No new icon was needed for intervals.
+- The proof status and the runtime fallback are different things. Unbounded fields must show `⚠️ Gap` even when a runtime check exists — hover cards communicate static guarantees, not safety nets.
+- Repair hints belong on line 3 of the compact card, not gated behind expansion. The most common hover use case is "what do I do?" — that answer must be visible without extra interaction.
+
 - Hover docs need a quick-reference table first so implementers can find the construct they care about before reading prose.
 - Meaning-first hover copy works best when the authored `because` text leads and proof detail stays compact.
 - Field/arg coloring is a semantic split: fields read as structure identity, args as event-scoped behaviour; docs must not drift back to the retired unified data-name lane.
@@ -21,6 +26,16 @@
 - The older unified `--data` anchor is retired history; current design truth lives in the field/arg split and in visual-system HTML when prose lags.
 
 ## Recent Updates
+
+### 2026-05-13T18:17:15Z — Interval hover display design authored
+
+- Designed `docs/working/interval-hover-design.md`: 6 template variations (proven field, gap field, proven expression, overflow-risk expression, unbounded field, optional field), interval notation (`[lo .. hi]`), propagation chain display, compactness rules, and gap handling.
+- Confirmed no new badge icons are needed: `🔬` covers interval arithmetic, `⚖️` extends naturally to declared bounds as a comparison contract.
+- Key design ruling: unbounded fields show `⚠️ Gap` not `⚡ Enforced`, even when a runtime fallback exists — hover communicates proof status, not safety nets.
+- Expanded propagation chain view deferred to V2 (requires solver to expose intermediate intervals).
+- Filed decisions to `.squad/decisions/inbox/elaine-interval-hover.md`.
+
+
 
 ### 2026-05-13T00:46:00Z — Omit anti-pattern prose sharpened for SyntaxReference
 

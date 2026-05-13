@@ -16,9 +16,9 @@ Of the 132 diagnostics defined in `DiagnosticCode.cs`, **50 have no emission sit
 
 2. **AI legibility failure.** The MCP `precept_diagnostic` tool returns full trigger/recovery metadata for these codes. AI consumers (including this agent) present them to users as working enforcement. They aren't.
 
-This design does two things: it closes the most critical gaps and it installs a two-gate convention test that prevents future regressions. The convention test is the enforcement mechanism; the gap closure work is the remediation. Together they form a complete answer to the question "how do we know the catalog's promises are kept?"
+This design does two things: it closes the most critical gaps and it installs two Roslyn analyzer gates that prevent future regressions. The analyzers are the enforcement mechanism; the gap closure work is the remediation. Together they form a complete answer to the question "how do we know the catalog's promises are kept?"
 
-**Important correction from the initial gap analysis:** Four diagnostics (PRE0066, PRE0095, PRE0097, PRE0098) were initially reported as "never emitted." These ARE emitted — by `ValidateCIEnforcement` in `TypeChecker.Validation.cs` via catalog-driven dispatch through `Operations.GetMeta().CIDiagnosticCode` and `Functions.GetMeta().CIDiagnosticCode`. The original grep missed them because indirect catalog references don't produce a literal `DiagnosticCode.X` token at the emission call site. **The true gap count is 50, not 54.** This catalog-driven emission pattern is the reason the convention test's emission-site scan must check for indirect dispatch, not just literal references.
+**Important correction from the initial gap analysis:** Four diagnostics (PRE0066, PRE0095, PRE0097, PRE0098) were initially reported as "never emitted." These ARE emitted — by `ValidateCIEnforcement` in `TypeChecker.Validation.cs` via catalog-driven dispatch through `Operations.GetMeta().CIDiagnosticCode` and `Functions.GetMeta().CIDiagnosticCode`. The original grep missed them because indirect catalog references don't produce a literal `DiagnosticCode.X` token at the emission call site. **The true gap count is 50, not 54.** This catalog-driven emission pattern is the reason the analyzer emission-site pass must check for indirect dispatch, not just literal references.
 
 ---
 
@@ -49,11 +49,12 @@ The pipeline produces diagnostics through three patterns:
 - No diagnostic fires when a field declared `omit` in a state is used in an expression anchored to that state (covered separately in field-state-guarantees-v3.md).
 - No diagnostic fires when an initial event fails to assign all required fields (PRE0094 — this design closes that gap).
 - Temporal constant errors surface as generic `InvalidTypedConstantContent` (PRE0053) rather than domain-specific diagnostics.
+- No diagnostic fires when a typed constant would validate against multiple candidate typed-constant families after inference is introduced; the current resolver has no ambiguity state and therefore cannot emit PRE0091.
 - No mechanism exists to detect when a new diagnostic code is added without an emission site, so gaps silently accumulate.
 
 ### No enforcement mechanism exists
 
-There is currently no gate — automated or manual — that catches a new diagnostic code added to `DiagnosticCode.cs` without a corresponding emission site in the pipeline. This means the gap can and will grow over time through normal development. The convention test (Slice 0) closes this structural hole.
+There is currently no gate — automated or manual — that catches a new diagnostic code added to `DiagnosticCode.cs` without a corresponding emission site in the pipeline. This means the gap can and will grow over time through normal development. The Roslyn analyzer pair in Slice 0 closes this structural hole.
 
 ---
 
@@ -91,6 +92,20 @@ The typed constant validation pipeline reaches `TypedConstantValidation` but use
 The error IS caught (PRE0052/0053 fires), but the user sees "invalid typed constant content" instead of "February 30 doesn't exist." B1 is a precision gap, not a silent-failure gap. NodaTime already returns the specific failure reason — the TypeChecker just doesn't select the right code.
 
 PRE0060–0062 (period arithmetic rules) are more substantive: they require qualifier-aware type checking in the temporal binary operation path, parallel to B2.
+
+#### Scoped companion — PRE0091 `AmbiguousTypedConstant`
+
+PRE0091 is not a temporal-precision variant of PRE0055–0059. It is a typed-constant resolution-path diagnostic that only becomes reachable once the TypeChecker can evaluate **multiple viable target types** for the same single-quoted literal.
+
+**Why missing today:** `ResolveTypedConstant(...)` is currently single-candidate. It is driven by a concrete `expectedType`, delegates to `TypedConstantValidation.Validate(...)`, and either accepts that one target type or emits PRE0052/PRE0053. There is no candidate set, no survivor filtering, and therefore no ambiguity state to report.
+
+**Scoped enforcement target for this plan:** when the typed-constant resolution path is broadened to try multiple candidate target types, retain every candidate whose content validation succeeds. If the survivor count is:
+
+- **0** → preserve the current PRE0052 `UnresolvedTypedConstant` / PRE0053 `InvalidTypedConstantContent` behavior
+- **1** → resolve normally to that typed constant
+- **>1** → emit PRE0091 `AmbiguousTypedConstant` naming the conflicting candidate types and return an error expression
+
+**First-tranche boundary:** this plan scopes PRE0091 to the **TypeChecker typed-constant resolution path only** (`ResolveTypedConstant` + validation helpers). It does **not** broaden parser syntax, evaluator/runtime behavior, or proof-engine responsibilities.
 
 ### 3.3 Root Cause B2 — Currency/Unit Arithmetic Safety (PRE0070–0074) ⚠️ HIGHEST SEVERITY
 
@@ -170,7 +185,7 @@ These 7 codes have no emission site AND no test file reference anywhere in the t
 
 | Code | Notes |
 |------|-------|
-| `AmbiguousTypedConstant` (PRE0091) | Unreachable — current resolution is single-candidate. Latent; wire when multi-candidate resolution ships. |
+| `AmbiguousTypedConstant` (PRE0091) | Scoped in Slice 5A. Blocked on multi-candidate typed-constant resolution landing in the TypeChecker path; not a parser/runtime change. |
 | `EventHandlerDoesNotSupportGuard` (PRE0014) | Root Cause A — parser gate never wired |
 | `EventHandlerInStatefulPrecept` (PRE0092) | Root Cause C — trivial structural check not wired |
 | `OmitDoesNotSupportGuard` (PRE0013) | Root Cause A — parser gate never wired |
@@ -202,22 +217,26 @@ These 7 codes have no emission site AND no test file reference anywhere in the t
 
 ## 5. Design
 
-### 5.1 Enforcement mechanism: convention test over Roslyn analyzer
+### 5.1 Enforcement mechanism: Roslyn analyzers for Gate 1 + Gate 2
 
-**Decision: xUnit convention test** (`DiagnosticEmissionCoverageTests.cs`) rather than a Roslyn analyzer (`PRECEPT0027`).
+**Decision: Roslyn analyzers** in `src/Precept.Analyzers` are the enforcement path for both gates. The prior convention-test approach is retired.
 
-**Rationale:** The emission-site distinction problem makes a Roslyn analyzer heavier than it looks. A `CompilationEndAction` analyzer would need to distinguish:
+**Planned analyzer IDs:**
+- `PRECEPT0027` — Gate 1: every `DiagnosticCode` must have an emission site or be allow-listed
+- `PRECEPT0028` — Gate 2: every emitted `DiagnosticCode` must be referenced by at least one test or be allow-listed
+
+**Rationale:** We want enforcement at authoring and build time (IDE + CI), not only test-run time. The emission-site distinction still requires semantic analysis; analyzers make that cost worthwhile by turning it into always-on governance.
+
+A `CompilationEndAction` implementation must still distinguish:
 - `Diagnostics.GetMeta(DiagnosticCode.X)` references in `Diagnostics.cs` — catalog reads, NOT emissions
 - `Diagnostics.Create(DiagnosticCode.X, ...)` in pipeline stages — real emissions
 - `CIDiagnosticCode: DiagnosticCode.X` in `Operations.cs`/`Functions.cs` — catalog-mediated emissions
 
-That distinction requires semantic analysis of the `IFieldReferenceOperation`'s containing invocation, which is tractable but adds complexity disproportionate to the value — since the convention test catches the same class of regressions at PR time. The convention test is the pragmatic gate. If the allow-list grows unwieldy or the team wants build-time IDE feedback, promote the logic to a Roslyn analyzer in `Precept.Analyzers` later.
-
-**A Roslyn analyzer is the right next evolution,** not the right first step. The catalog-declared `IsImplemented` flag (see § 5.3) is the architecturally correct long-term answer, but it requires touching all 132 catalog entries.
+**Accepted tradeoff:** Higher implementation complexity than simple convention scans, in exchange for immediate feedback and stronger drift resistance. The catalog-declared `IsImplemented` flag (see § 5.3) remains the architecturally correct truth source for a future simplification pass.
 
 ### 5.2 Two-gate design
 
-The convention test enforces two distinct properties:
+The analyzer pair enforces two distinct properties:
 
 **Gate 1 — Emission site existence:** Every `DiagnosticCode` member must have at least one reference (direct or catalog-mediated) in a pipeline emission-site source file, OR be on the allow-list with a tracking comment.
 
@@ -235,13 +254,15 @@ The convention test enforces two distinct properties:
 
 **Choice literal comparison for B3.** When a `TypedLiteral` is compared to or assigned to a choice field, check whether the literal's value exists in the field's declared choice set. The choice value set is already parsed and available in the field's type reference.
 
+**Typed-constant candidate arbitration for PRE0091.** Keep typed-constant parsing in the TypeChecker. Once candidate enumeration exists, `ResolveTypedConstant` should validate the raw literal against each eligible candidate type, keep the successful survivors, resolve on a single survivor, emit PRE0091 for multiple survivors, and preserve PRE0052/PRE0053 for zero survivors. This keeps ambiguity handling in the same stage that owns typed-constant context propagation.
+
 ### 5.4 Alternatives considered and rejected
 
 **Option: Wire currency/unit checks in the ProofEngine rather than TypeChecker.** The ProofEngine already handles qualifier compatibility for proof obligations (`PRE0114 UnprovedQualifierCompatibility`). Extending it would work but places a type-level check in the proof stage, blurring the stage boundary. The Operations catalog declares `DiagnosticStage.Type` for these codes — they belong in the TypeChecker. Proof obligations are about provability ("can we prove this division won't be zero?"), not type-level domain rules ("these currencies must match"). The boundary must stay clean.
 
 **Option: Accept generic temporal diagnostics, deprecate PRE0055–0062.** `InvalidTypedConstantContent` is sufficient in that it catches the error. But domain-specific diagnostics exist precisely to give precision. "February 30 doesn't exist" is better than "invalid typed constant content." The NodaTime exception already contains the specific failure reason; we're just not selecting the right code.
 
-**Option: Roslyn analyzer as Gate 1.** See § 5.1. Deferred, not rejected.
+**Option: xUnit convention tests as enforcement gates.** Rejected. They run at test time only, duplicate analyzer semantics, and weaken IDE/build-time drift resistance.
 
 ---
 
@@ -249,7 +270,7 @@ The convention test enforces two distinct properties:
 
 ### Gap 1: Catalog-driven emission not documented as a pattern
 
-The spec and contributing guide describe direct emission (`Diagnostics.Create(...)`) but not catalog-mediated emission via `CIDiagnosticCode`. This caused the initial audit to miscount the gap (54 instead of 50). Any gap audit tool — including the convention test — must search for both patterns.
+The spec and contributing guide describe direct emission (`Diagnostics.Create(...)`) but not catalog-mediated emission via `CIDiagnosticCode`. This caused the initial audit to miscount the gap (54 instead of 50). Any gap audit tool — including the Gate 1 analyzer — must search for both patterns.
 
 **Annotation needed:** `DiagnosticMeta` documentation should note that `CIDiagnosticCode` on operation/function metadata constitutes an emission site equivalent to `Diagnostics.Create(...)`.
 
@@ -265,18 +286,18 @@ The spec says "Same currency required" for money±money but doesn't specify whet
 
 ## 7. Implementation Plan
 
-> **Quality bar:** Method-level specificity for Slices 0–4. Cluster-level specificity for Slices 5–8. Every slice has file paths, test method names, regression anchors, and a checklist.
+> **Quality bar:** Method-level specificity for Slices 0–4 and 5A. Cluster-level specificity for Slices 5–8. Every slice has file paths, test method names, regression anchors, and a checklist.
 
 ### Architectural Approach
 
-**Convention test first.** Slice 0 installs the enforcement mechanism before any gap is closed. Once the convention test exists with all 50 unemitted codes in the allow-list, every subsequent gap-closure slice automatically validates its own work: the act of removing a code from the allow-list is the slice's completion gate.
+**Analyzer enforcement first.** Slice 0 installs the enforcement mechanism before any gap is closed. Once the analyzer pair exists with all 50 unemitted codes in the Gate 1 allow-list, every subsequent gap-closure slice automatically validates its own work: the act of removing a code from the allow-list is the slice's completion gate.
 
 **Gap closure follows priority, not technical dependency.** The ordering within each priority tier is largely independent.
 
 ### Ordering Constraints
 
 ```
-Slice 0 (convention test) ─────────────────────────────────→ scaffolding for all slices
+Slice 0 (Roslyn analyzers) ───────────────────────────────→ scaffolding for all slices
 
 Slice 1 (B2 currency/unit) ──→ independent of all others
 Slice 2 (B3 choice)        ──→ independent of all others
@@ -284,225 +305,82 @@ Slice 3 (PRE0094)          ──→ independent; Slice 10-11 in field-state-v3 
 Slice 4 (PRE0092)          ──→ independent (trivial)
 
 Slice 5 (B1 temporal)      ──→ independent
+Slice 5A (PRE0091)         ──→ after typed-constant resolution extraction in the parser/typechecker split; no parser gate dependency
 Slice 6 (B4 collection)    ──→ independent
 Slice 7 (A parser gates)   ──→ independent
 
 Slice 8 (scattered D)      ──→ independent (individual wires)
+
+Slice 9A (modifier catalog)──→ after Slice 8 wires PRE0035/PRE0042 (mechanism migration, not gap closure)
+Slice 9B (typed-const cat.) ──→ after Slice 5 OR independent (subsumes Slice 5 if ordered first)
+Slice 9C (proof catalog)   ──→ independent of gap-closure slices (mechanism audit)
 ```
 
-All gap-closure slices (1–8) depend on Slice 0 only in the soft sense: Slice 0 is the mechanism that validates completion. The code changes in Slices 1–8 do not have a code dependency on Slice 0.
+All gap-closure slices (1–8, plus 5A) depend on Slice 0 only in the soft sense: Slice 0 is the mechanism that validates completion. The code changes in Slices 1–8 and 5A do not have a code dependency on Slice 0.
+
+Slices 9A–9C are **mechanism-migration slices**, not gap-closure slices. They do not add new diagnostic coverage — they refactor how existing emission is dispatched. Their completion gate is behavioral equivalence (same diagnostics fire on same inputs) plus analyzer recognition of the new indirect emission paths. They are lower priority than gap closure and should be sequenced after their respective prerequisite gap-closure slices ship.
+
+PRE0091 is the one deliberate exception to the otherwise-independent ordering rule: it should follow the **type-checker side** of the ongoing parser/typechecker split if that split is actively moving `ResolveTypedConstant` and typed-constant helpers into their own file. It does **not** depend on the parser guard-gate work in Slice 7 and should not be blocked on unrelated parser cleanup.
 
 ---
 
-### Slice 0 — Convention Test: Gate 1 + Gate 2
+### Slice 0 — Roslyn Analyzer Foundation: Gate 1 + Gate 2
 
-**Purpose:** Install the two-gate enforcement mechanism. Once this slice ships, all future gap-closure work is automatically validated by the test suite. The allow-list starts with all 50 currently-unemitted codes; each subsequent slice removes entries as gaps are closed.
+**Purpose:** Install the two-gate enforcement mechanism in `Precept.Analyzers`. Once this slice ships, all future gap-closure work is automatically validated at build/IDE time. The Gate 1 allow-list starts with all 50 currently-unemitted codes; each subsequent slice removes entries as gaps are closed.
 
-**Create:** `test/Precept.Tests/CatalogTests/DiagnosticEmissionCoverageTests.cs`
+**Analyzer architecture (authoritative for Gate 1 + Gate 2):**
+- `PRECEPT0027` and `PRECEPT0028` are separate analyzers that share one semantic scanner and one allow-list source.
+- A shared scanner computes three sets from the compilation: all catalog codes, emitted codes, and test-referenced codes.
+- Gate 1 reports against `all - emitted - Gate1AllowList`; Gate 2 reports against `emitted - tested - Gate2AllowList`.
+- Stale-entry checks run in both gates so allow-lists only represent active exceptions.
 
-```csharp
-public sealed class DiagnosticEmissionCoverageTests
-{
-    // Gate 1 allow-list: known-unemitted codes — shrinks as gaps close.
-    // Each entry must cite the tracking issue or reason.
-    private static readonly HashSet<DiagnosticCode> Gate1AllowList = new()
-    {
-        // Root Cause A — parser gates never wired
-        DiagnosticCode.OmitDoesNotSupportGuard,           // PRE0013
-        DiagnosticCode.EventHandlerDoesNotSupportGuard,   // PRE0014
-        DiagnosticCode.PreEventGuardNotAllowed,           // PRE0015
-        // Root Cause B1 — temporal constant precision
-        DiagnosticCode.InvalidDateValue,                  // PRE0055
-        DiagnosticCode.InvalidDateFormat,                 // PRE0056
-        DiagnosticCode.InvalidTimeValue,                  // PRE0057
-        DiagnosticCode.InvalidInstantFormat,              // PRE0058
-        DiagnosticCode.InvalidTimezoneId,                 // PRE0059
-        DiagnosticCode.UnqualifiedPeriodArithmetic,       // PRE0060
-        DiagnosticCode.MissingTemporalUnit,               // PRE0061
-        DiagnosticCode.FractionalUnitValue,               // PRE0062
-        // Root Cause B2 — currency/unit arithmetic (highest severity)
-        DiagnosticCode.CrossCurrencyArithmetic,           // PRE0070
-        DiagnosticCode.CrossDimensionArithmetic,          // PRE0071
-        DiagnosticCode.DenominatorUnitMismatch,           // PRE0072
-        DiagnosticCode.DurationDenominatorMismatch,       // PRE0073
-        DiagnosticCode.CompoundPeriodDenominator,         // PRE0074
-        // Root Cause B3 — choice type validation
-        DiagnosticCode.ChoiceLiteralNotInSet,             // PRE0086
-        DiagnosticCode.ChoiceArgOutsideFieldSet,          // PRE0087
-        DiagnosticCode.ChoiceRankConflict,                // PRE0089
-        // Root Cause B4 — collection safety extensions
-        DiagnosticCode.KeyPresenceSafety,                 // PRE0099
-        DiagnosticCode.IndexBoundsGuard,                  // PRE0100
-        DiagnosticCode.KeyUniquenessGuard,                // PRE0101
-        DiagnosticCode.MissingOrderingKey,                // PRE0104
-        // Root Cause C — structural single-check gaps
-        DiagnosticCode.EventHandlerInStatefulPrecept,     // PRE0092
-        DiagnosticCode.InitialEventMissingAssignments,    // PRE0094
-        // Root Cause D — scattered TypeChecker gaps
-        DiagnosticCode.NonAssociativeComparison,          // PRE0010
-        DiagnosticCode.UnexpectedKeyword,                 // PRE0011
-        DiagnosticCode.InvalidCallTarget,                 // PRE0012
-        DiagnosticCode.NullInNonNullableContext,          // PRE0019
-        DiagnosticCode.FunctionArgConstraintViolation,    // PRE0022
-        DiagnosticCode.DuplicateArgName,                  // PRE0027
-        DiagnosticCode.InvalidModifierValue,              // PRE0035
-        DiagnosticCode.ComputedFieldWithDefault,          // PRE0039
-        DiagnosticCode.ConflictingAccessModes,            // PRE0042
-        DiagnosticCode.RedundantAccessMode,               // PRE0043
-        DiagnosticCode.ListLiteralOutsideDefault,         // PRE0044
-        DiagnosticCode.EventArgOutOfScope,                // PRE0050
-        DiagnosticCode.InvalidInterpolationCoercion,      // PRE0051
-        DiagnosticCode.MaxPlacesExceeded,                 // PRE0067
-        DiagnosticCode.NumericOverflow,                   // PRE0078
-        DiagnosticCode.OutOfRange,                        // PRE0079
-        DiagnosticCode.NonChoiceAssignedToChoice,         // PRE0085
-        DiagnosticCode.AmbiguousTypedConstant,            // PRE0091 — latent; single-candidate resolution
-        DiagnosticCode.CollectionInnerTypeError,          // PRE0105
-        // ... remaining codes to full count of 50 ...
-    };
+**Expected files (Slice 0 deliverables):**
+- `src/Precept.Analyzers/Precept0027DiagnosticEmissionCoverage.cs` (Gate 1 analyzer)
+- `src/Precept.Analyzers/Precept0028DiagnosticTestCoverage.cs` (Gate 2 analyzer)
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` (shared Gate 1 / Gate 2 allow-lists)
+- `src/Precept.Analyzers/DiagnosticCoverageScanner.cs` (shared emission/test coverage discovery)
+- `test/Precept.Analyzers.Tests/Precept0027Tests.cs`
+- `test/Precept.Analyzers.Tests/Precept0028Tests.cs`
 
-    // Gate 2 allow-list: emitted codes without tests. Currently empty — all 83 emitted
-    // codes already have test references. Non-empty entries require a tracking reason.
-    private static readonly HashSet<DiagnosticCode> Gate2AllowList = new()
-    {
-    };
+**Gate 1 (`PRECEPT0027`) behavior:**
+- Build the emitted-code set from pipeline emission contexts:
+  - `Diagnostics.Create(DiagnosticCode.X, ...)`
+  - `CIDiagnosticCode: DiagnosticCode.X` assignments in operations/functions metadata
+  - ProofEngine dispatch branches that emit `DiagnosticCode.X`
+- Exclude catalog reads (`Diagnostics.GetMeta(DiagnosticCode.X)`) and enum-definition references.
+- Report diagnostics for any `DiagnosticCode` member not emitted and not in `Gate1AllowList`.
+- Report stale allow-list entries when a Gate 1 allow-listed code is now emitted.
 
-    [Fact]
-    public void Every_DiagnosticCode_Has_An_Emission_Site_Or_Is_AllowListed()
-    {
-        var repoRoot = GetRepoRoot();
-        var emittedCodes = GetEmittedCodes(repoRoot);
-        var allCodes = Enum.GetValues<DiagnosticCode>();
+**Gate 2 (`PRECEPT0028`) behavior:**
+- Use Gate 1 emitted set as the source of truth for "must be tested."
+- Scan test projects for `DiagnosticCode.{MemberName}` references.
+- Report diagnostics for emitted codes missing test references and not in `Gate2AllowList`.
+- Report stale Gate 2 allow-list entries when test coverage now exists.
 
-        var violations = allCodes
-            .Where(code => !emittedCodes.Contains(code) && !Gate1AllowList.Contains(code))
-            .ToList();
+**Scope of "covered":**
+- **Emission coverage:** semantic detection of real emission contexts (not raw string grep).
+- **Test coverage:** reference presence in test source (`DiagnosticCode.{MemberName}`), with allow-list exceptions.
 
-        violations.Should().BeEmpty(
-            $"The following DiagnosticCode members have no emission site and are not allow-listed:\n" +
-            string.Join("\n", violations.Select(c => $"  - {c}")) +
-            "\nAdd an emission site in a pipeline stage, or add to Gate1AllowList with a tracking comment.");
-    }
+**What it does NOT catch:** Dead code paths that are syntactically present but unreachable at runtime, behavioral correctness of test assertions, or spec documentation completeness.
 
-    [Fact]
-    public void Gate1_AllowList_Contains_Only_Actually_Unemitted_Codes()
-    {
-        var repoRoot = GetRepoRoot();
-        var emittedCodes = GetEmittedCodes(repoRoot);
-
-        var staleEntries = Gate1AllowList.Where(code => emittedCodes.Contains(code)).ToList();
-
-        staleEntries.Should().BeEmpty(
-            $"The following Gate1AllowList entries are now emitted and should be removed:\n" +
-            string.Join("\n", staleEntries.Select(c => $"  - {c}")));
-    }
-
-    [Fact]
-    public void Every_Emitted_DiagnosticCode_Has_A_Test()
-    {
-        var repoRoot = GetRepoRoot();
-        var emittedCodes = GetEmittedCodes(repoRoot);
-
-        var testText = GetTestFileText(repoRoot);
-        var violations = emittedCodes
-            .Where(code => !Gate2AllowList.Contains(code))
-            .Where(code => !testText.Contains($"DiagnosticCode.{code}"))
-            .ToList();
-
-        violations.Should().BeEmpty(
-            $"The following emitted DiagnosticCode members have no test reference:\n" +
-            string.Join("\n", violations.Select(c => $"  - {c}")) +
-            "\nWrite a test asserting this diagnostic fires, or add to Gate2AllowList with a reason.");
-    }
-
-    [Fact]
-    public void Gate2_AllowList_Contains_Only_Actually_Untested_Codes()
-    {
-        var repoRoot = GetRepoRoot();
-        var testText = GetTestFileText(repoRoot);
-
-        var staleEntries = Gate2AllowList
-            .Where(code => testText.Contains($"DiagnosticCode.{code}"))
-            .ToList();
-
-        staleEntries.Should().BeEmpty(
-            $"The following Gate2AllowList entries now have test coverage and should be removed:\n" +
-            string.Join("\n", staleEntries.Select(c => $"  - {c}")));
-    }
-
-    private static HashSet<DiagnosticCode> GetEmittedCodes(string repoRoot)
-    {
-        // Emission-site source files:
-        //   - All .cs files under src/Precept/Pipeline/
-        //   - src/Precept/Language/Operations.cs
-        //   - src/Precept/Language/Functions.cs
-        // Excluded (non-emission references):
-        //   - src/Precept/Language/DiagnosticCode.cs (enum definition)
-        //   - src/Precept/Language/Diagnostics.cs (GetMeta catalog — not emission)
-        var pipelineFiles = Directory
-            .GetFiles(Path.Combine(repoRoot, "src", "Precept", "Pipeline"), "*.cs");
-        var catalogEmissionFiles = new[]
-        {
-            Path.Combine(repoRoot, "src", "Precept", "Language", "Operations.cs"),
-            Path.Combine(repoRoot, "src", "Precept", "Language", "Functions.cs"),
-        };
-
-        var allText = string.Join("\n",
-            pipelineFiles.Concat(catalogEmissionFiles).Select(File.ReadAllText));
-
-        return Enum.GetValues<DiagnosticCode>()
-            .Where(code => allText.Contains($"DiagnosticCode.{code}"))
-            .ToHashSet();
-    }
-
-    private static string GetTestFileText(string repoRoot)
-    {
-        var testDirs = new[]
-        {
-            Path.Combine(repoRoot, "test", "Precept.Tests"),
-            Path.Combine(repoRoot, "test", "Precept.LanguageServer.Tests"),
-            Path.Combine(repoRoot, "test", "Precept.Mcp.Tests"),
-        };
-        return string.Join("\n",
-            testDirs.SelectMany(d => Directory.GetFiles(d, "*.cs", SearchOption.AllDirectories))
-                    .Select(File.ReadAllText));
-    }
-
-    private static string GetRepoRoot()
-    {
-        var dir = new DirectoryInfo(
-            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!);
-        while (dir != null && !dir.GetFiles("*.slnx").Any())
-            dir = dir.Parent;
-        return dir?.FullName
-            ?? throw new InvalidOperationException("Could not find repo root (no .slnx found).");
-    }
-}
-```
-
-**Scope of "covered":** The literal token `DiagnosticCode.{MemberName}` appears in at least one `.cs` file in the emission-site source set (Pipeline files + `Operations.cs` + `Functions.cs`), excluding the enum definition and metadata catalog. This catches all three emission patterns: direct `Diagnostics.Create(...)`, catalog-mediated `CIDiagnosticCode:` assignments, and ProofEngine dispatch branches.
-
-**What it does NOT catch:** Dead code paths (code referenced inside an unreachable branch still passes), incorrect emission context (stray references in comments or `FaultSiteLink` constructors count as "present"), and spec documentation completeness.
-
-**Test method names:**
-- `Every_DiagnosticCode_Has_An_Emission_Site_Or_Is_AllowListed` — `[Fact]`
-- `Gate1_AllowList_Contains_Only_Actually_Unemitted_Codes` — `[Fact]`
-- `Every_Emitted_DiagnosticCode_Has_A_Test` — `[Fact]`
-- `Gate2_AllowList_Contains_Only_Actually_Untested_Codes` — `[Fact]`
+**Allow-list ownership and location:**
+- **Location:** `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs`
+- **Ownership:** Runtime/diagnostics maintainers who touch `src/Precept/Language/DiagnosticCode.cs` or diagnostic emission wiring must update this file in the same PR.
+- **Policy:** Gate 1 allow-list entries require root-cause comments; Gate 2 allow-list is exception-only and should remain empty unless explicitly justified.
 
 **Regression anchors:**
-- `DiagnosticsTests.AllDiagnosticCodes` — existing exhaustiveness check pattern used as structural precedent
-- `CatalogTestReflection.AllDiagnostics()` — reflection pattern reused
+- Existing analyzer patterns in `src/Precept.Analyzers` (`PRECEPT0001`–`PRECEPT0023`)
+- Existing analyzer test harness in `test/Precept.Analyzers.Tests/AnalyzerTestHelper.cs`
 
-**Files:** `test/Precept.Tests/CatalogTests/DiagnosticEmissionCoverageTests.cs` (create)
+**Files:** `src/Precept.Analyzers/*.cs`, `test/Precept.Analyzers.Tests/*.cs` (create)
 
-- [ ] Create `DiagnosticEmissionCoverageTests.cs` with `GetRepoRoot()` and `GetEmittedCodes()` helpers
+- [ ] Create shared coverage scanner + allow-list infrastructure in `src/Precept.Analyzers`
 - [ ] Populate `Gate1AllowList` with all 50 unemitted codes (with cluster comments)
-- [ ] Implement `Every_DiagnosticCode_Has_An_Emission_Site_Or_Is_AllowListed` (Gate 1)
-- [ ] Implement `Gate1_AllowList_Contains_Only_Actually_Unemitted_Codes` (Gate 1 inverse)
-- [ ] Implement `Every_Emitted_DiagnosticCode_Has_A_Test` (Gate 2) with empty `Gate2AllowList`
-- [ ] Implement `Gate2_AllowList_Contains_Only_Actually_Untested_Codes` (Gate 2 inverse)
-- [ ] Verify test passes with all 50 entries in Gate 1 allow-list and Gate 2 allow-list empty
+- [ ] Keep `Gate2AllowList` empty at initialization (all currently emitted diagnostics are test-referenced)
+- [ ] Implement `PRECEPT0027` Gate 1 emission-coverage analyzer + stale-entry check
+- [ ] Implement `PRECEPT0028` Gate 2 test-coverage analyzer + stale-entry check
+- [ ] Add analyzer tests for positive, negative, and stale allow-list cases
+- [ ] Verify analyzers fire in analyzer test harness and in solution build
 
 ---
 
@@ -584,7 +462,7 @@ Test method names:
 - [ ] Add `TryGetStaticQualifier` helper to extract qualifier from resolved types
 - [ ] Wire into binary operation resolution path
 - [ ] Tests: 8 tests (positive + negative for each diagnostic code)
-- [ ] Remove 5 codes from Gate 1 allow-list in `DiagnosticEmissionCoverageTests.cs`
+- [ ] Remove 5 codes from Gate 1 allow-list in `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs`
 - [ ] Verify Gate 1 staleness check now flags removed entries (proves the round-trip works)
 
 ---
@@ -762,6 +640,61 @@ Test method names (representative):
 
 ---
 
+### Slice 5A — PRE0091: Ambiguous Typed Constant Resolution
+
+**Purpose:** Activate PRE0091 in a narrowly-scoped way once the TypeChecker supports **multi-candidate typed-constant resolution**. This slice adds an ambiguity outcome to the typed-constant resolver; it does not redesign typed constants as a whole.
+
+**Behavior added in this tranche:**
+- `ResolveTypedConstant` may evaluate more than one candidate target type for the same raw literal when context is inference-based rather than a single fixed `expectedType`
+- If exactly one candidate validates, resolution succeeds unchanged
+- If multiple candidates validate, emit PRE0091 `AmbiguousTypedConstant` and surface the competing type names in the diagnostic payload
+- If no candidates validate, preserve current PRE0052/PRE0053 behavior
+
+**Pipeline landing zone:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` in the typed-constant resolution path (`ResolveTypedConstant`), with validation continuing to flow through `src/Precept/Language/TypedConstantValidation.cs`
+
+**Explicitly out of scope for this tranche:**
+- Parser grammar or tokenization changes
+- Runtime evaluator behavior changes
+- ProofEngine ambiguity handling
+- Broad temporal-precision work already tracked in Slice 5
+- Heuristic inference beyond the candidate set already available to the TypeChecker
+- Reclassifying PRE0091 in the catalog or removing the diagnostic
+
+**Design notes:**
+- Keep the current expected-type fast path. PRE0091 should only appear when the resolver is genuinely operating over a candidate set.
+- The first concrete ambiguity case should come from existing temporal families that already share a literal surface (for example, `'30 days'` validating as both `duration` and `period`).
+- Prefer a small helper (`ResolveTypedConstantCandidates` or equivalent) that returns 0/1/many survivors without moving validation logic out of `TypedConstantValidation`.
+- If richer survivor metadata is needed for the diagnostic message, extend `TypedConstantParseResult` surgically rather than forking validator-specific result shapes.
+
+**Code surfaces/files likely impacted:**
+- `src/Precept/Pipeline/TypeChecker.Expressions.cs` — `ResolveTypedConstant` control flow and ambiguity emission
+- `src/Precept/Language/TypedConstantValidation.cs` — candidate-by-candidate validation entry point reuse
+- `src/Precept/Language/TypedConstantParseResult.cs` — only if survivor metadata is needed for PRE0091 payload shaping
+- `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` — new ambiguity coverage
+
+**Tests to add:**
+- `TypedConstant_MultipleTemporalCandidates_EmitsAmbiguousTypedConstant` — `[Fact]`
+- `TypedConstant_SingleCandidate_ResolvesWithoutDiagnostic` — `[Fact]`
+- `TypedConstant_WithExplicitExpectedType_SkipsAmbiguityPath` — `[Fact]`
+- `TypedConstant_NoCandidateMatch_PreservesUnresolvedOrInvalidBehavior` — `[Fact]`
+- `TypedConstant_QualifierFilteredToSingleCandidate_NoAmbiguityDiagnostic` — `[Fact]` (only if qualifier filtering participates in the first tranche)
+
+**Acceptance criteria:**
+- PRE0091 is emitted only from the TypeChecker typed-constant resolution path, never from the parser
+- Existing single-expected-type typed-constant tests continue to pass unchanged
+- At least one real multi-candidate literal (expected first: temporal quantity form) now produces PRE0091
+- Zero-candidate paths still emit PRE0052/PRE0053 rather than PRE0091
+- `AmbiguousTypedConstant` is removed from the Gate 1 allow-list once emission + tests exist
+
+- [ ] Confirm the parser/typechecker split has stabilized the owning typed-constant file boundary (`TypeChecker.Expressions.cs` vs. `TypeChecker.Expressions.TypedConstants.cs`)
+- [ ] Add a candidate-enumeration helper in the TypeChecker typed-constant path
+- [ ] Preserve the single-expected-type fast path
+- [ ] Emit PRE0091 when multiple validated survivors remain
+- [ ] Tests: ambiguity + unique-candidate + zero-candidate + explicit-context cases
+- [ ] Remove `AmbiguousTypedConstant` from Gate 1 allow-list
+
+---
+
 ### Slice 6 — B4: Collection Safety Extensions (PRE0099–0101, PRE0104)
 
 **Purpose:** Extend collection safety enforcement to the newer collection types (list, lookup, queue-by-priority). Existing enforcement covers `UnguardedCollectionAccess` (PRE0063) and `UnguardedCollectionMutation` (PRE0064) for `.peek`/`.min`/`.max`/`pop`/`dequeue`.
@@ -935,6 +868,110 @@ Test method names:
 
 ---
 
+### Slice 9A — Catalog-Mediated Emission: Modifier Constraint Violations
+
+> **Numbering note:** Slices 9A–9C use the "9" prefix to indicate they are catalog-mediation expansion work (§ 9 architectural evolution). The letter suffix distinguishes them from the gap-closure slices (0–8) without disrupting existing numbering. They are active implementation slices in the current execution plan with the same quality bar and enforcement posture as Slices 0–8.
+
+**Objective:** Migrate modifier constraint violations from per-identity switches to a single generic validation loop driven by `ModifierMeta.ConstraintDiagnosticCode`. If `ValidateModifiers` has ≥3 branches with the "check constraint → emit code" shape, add the metadata property and replace those branches with catalog dispatch.
+
+**Governing policy:** Direct emission remains the default. This slice applies catalog mediation only because modifier constraints satisfy all three criteria: (1) stable 1:1 mapping between modifier identity and its constraint diagnostic, (2) the emission logic is uniform (check applicability, emit), and (3) validation is a membership/property check on a resolved modifier, not a structural judgment.
+
+**Target files:**
+- `src/Precept/Language/Catalogs/Modifiers.cs` — add `ConstraintDiagnosticCode` property to `ModifierMeta`
+- `src/Precept/Pipeline/TypeChecker.Validation.cs` — refactor `ValidateModifiers` to dispatch through catalog
+- `test/Precept.Tests/TypeChecker/TypeCheckerModifierTests.cs` — regression + new positive/negative cases
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` — no allow-list change expected (PRE0035, PRE0042 are already emitted via direct paths; this migrates emission mechanism, not net-new coverage)
+
+**Prerequisite:** Audit pass. Before implementation, confirm that `ValidateModifiers` has ≥3 branches with identical shape. If <3, this slice is deferred as unnecessary — annotate tracker as "audit: not viable."
+
+**Completion gate:**
+- `ValidateModifiers` no longer contains per-modifier-identity switch branches for constraint diagnostics — all such emission reads from `ModifierMeta.ConstraintDiagnosticCode`.
+- Gate 1 (`PRECEPT0027`) continues to detect PRE0035 and PRE0042 as emitted (the emission site moves from a literal to a catalog property dereference — the analyzer must handle indirect catalog paths, per Slice 0 design).
+- No behavioral change: the same diagnostics fire on the same inputs as before.
+
+**Test/regression anchors:**
+- All existing tests in `TypeCheckerModifierTests.cs` must pass unchanged (behavioral equivalence).
+- Add ≥1 new positive/negative pair per migrated diagnostic code to prove catalog dispatch works end-to-end.
+- `TypeCheckerCITests.cs` — unrelated, must pass (proves no interference with existing catalog-mediated emission).
+
+- [ ] Audit `ValidateModifiers` branch count and shape — document findings in PR
+- [ ] Add `ConstraintDiagnosticCode` to `ModifierMeta` (nullable; `null` = "no catalog-driven constraint check")
+- [ ] Populate metadata for each modifier whose constraint violation has a dedicated `DiagnosticCode`
+- [ ] Refactor `ValidateModifiers` to generic loop reading catalog property
+- [ ] Verify existing modifier tests pass unchanged (behavioral equivalence)
+- [ ] Add new positive + negative tests for catalog-dispatch path
+- [ ] Verify Gate 1 still recognizes the emission site (indirect catalog reference)
+
+---
+
+### Slice 9B — Catalog-Mediated Emission: Typed-Constant Family Diagnostics
+
+**Objective:** Promote the typed-constant family registry from in-method dispatch to a catalog surface with per-family `FormatErrorCode` and `SemanticErrorCode` properties. Replace the generic PRE0052/PRE0053 fall-through with catalog-declared domain-specific diagnostics (PRE0055–0058 for temporal; others as families stabilize).
+
+**Governing policy:** Catalog mediation applies because typed-constant families satisfy all three criteria: (1) stable 1:1 mapping from family to its diagnostic pair, (2) the validation logic is uniform ("parse against format → format error; validate against domain rules → semantic error"), (3) the check is on already-resolved typed-constant content, not syntactic structure.
+
+**Target files:**
+- `src/Precept/Language/Catalogs/TypedConstants.cs` (new or extended) — typed-constant family metadata with `FormatErrorCode` + `SemanticErrorCode`
+- `src/Precept/Pipeline/TypedConstantValidation.cs` — refactor `Validate()` to read family metadata for diagnostic selection
+- `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` — positive/negative cases for domain-specific codes
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` — remove PRE0055–0058 from Gate 1 allow-list as they become emitted
+
+**Dependency:** Sequenced after Slice 5 (B1 temporal precision) if Slice 5 ships first with direct emission. If Slice 9B ships first, it subsumes Slice 5's coverage for temporal diagnostics. Either ordering is valid — the dependency is on typed-constant resolution being stable, not on Slice 5 specifically.
+
+**Completion gate:**
+- `TypedConstantValidation.Validate()` selects diagnostic codes from family metadata, not from per-family `if`/`switch` branches.
+- Every typed-constant family with a declared diagnostic pair emits its domain-specific code instead of generic PRE0052/PRE0053.
+- Gate 1 recognizes the new emission paths (indirect catalog property dereference).
+- PRE0055–0058 (at minimum) are removed from Gate 1 allow-list.
+
+**Test/regression anchors:**
+- Existing typed-constant tests in `TypeCheckerTypedConstantTests.cs` must pass unchanged.
+- Add ≥1 positive + negative pair per newly-emitted domain-specific diagnostic code.
+- `TypeCheckerCITests.cs` — existing CI enforcement tests unaffected.
+
+- [ ] Confirm typed-constant family registry is promotable to catalog surface (audit current dispatch structure)
+- [ ] Design `TypedConstantFamilyMeta` record with `FormatErrorCode` + `SemanticErrorCode` (nullable for families without domain-specific codes)
+- [ ] Populate metadata for temporal families (date, time, instant, duration) — PRE0055–0058
+- [ ] Refactor `TypedConstantValidation.Validate()` to read catalog for diagnostic selection
+- [ ] Add positive + negative tests for domain-specific temporal codes
+- [ ] Remove PRE0055–0058 from Gate 1 allow-list
+- [ ] Verify Gate 1 recognizes indirect catalog emission
+
+---
+
+### Slice 9C — Catalog-Mediated Emission: Proof Obligation Consistency
+
+**Objective:** Verify and complete catalog-mediated emission for proof obligations. `ProofRequirements.GetMeta(kind).DiagnosticCode` is partially used today. This slice audits all ProofEngine emission paths and migrates any remaining hardcoded `DiagnosticCode.X` literals to consistent catalog dispatch.
+
+**Governing policy:** Proof obligations satisfy all three criteria: (1) stable 1:1 mapping from proof obligation kind to its diagnostic, (2) the emission logic is uniform ("obligation not met → emit diagnostic"), (3) the check is on resolved proof results, not structural parsing. Where a ProofEngine branch applies per-obligation branching logic beyond simple "met/not-met" (e.g., conditional message formatting), direct emission remains correct for that specific branch.
+
+**Target files:**
+- `src/Precept/Pipeline/ProofEngine.cs` — migrate hardcoded emission to `ProofRequirements.GetMeta(kind).DiagnosticCode`
+- `src/Precept/Language/Catalogs/ProofRequirements.cs` — verify all obligation kinds have `DiagnosticCode` populated
+- `test/Precept.Tests/ProofEngine/ProofEngineTests.cs` — regression coverage for migrated paths
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` — no allow-list change expected (proof codes are already emitted; this is mechanism migration)
+
+**Prerequisite:** Audit pass. Grep ProofEngine for literal `DiagnosticCode.X` emission sites. Count catalog-dispatched vs. hardcoded. If all emission is already catalog-mediated, this slice closes as "audit: already complete."
+
+**Completion gate:**
+- All ProofEngine emission paths use `ProofRequirements.GetMeta(kind).DiagnosticCode` unless the branch has legitimate per-obligation formatting logic that requires direct emission (documented exception per the do-not-apply criteria).
+- Gate 1 continues to recognize all proof-obligation diagnostics as emitted.
+- No behavioral change: same diagnostics fire on same inputs.
+
+**Test/regression anchors:**
+- All existing ProofEngine tests must pass unchanged (behavioral equivalence).
+- Add ≥1 positive + negative pair per migrated emission path where existing test coverage is thin.
+- `TypeCheckerCITests.cs` — unaffected, must pass.
+
+- [ ] Audit ProofEngine: count `ProofRequirements.GetMeta(...).DiagnosticCode` vs. hardcoded `DiagnosticCode.X`
+- [ ] Document any branches that legitimately require direct emission (per-obligation formatting)
+- [ ] Migrate remaining hardcoded paths to catalog dispatch
+- [ ] Verify existing ProofEngine tests pass unchanged
+- [ ] Add positive + negative tests for migrated paths with thin coverage
+- [ ] Verify Gate 1 recognition of migrated emission sites
+
+---
+
 ### Test Requirements for All Gap Closure
 
 **Required for every diagnostic code:**
@@ -977,7 +1014,8 @@ public void DescriptiveCondition_ValidForm_NoDiagnostic()
 ## 8. Tracker
 
 ### Priority 0 — Enforcement Foundation
-- [ ] **Slice 0:** Convention test (Gate 1 + Gate 2) — `DiagnosticEmissionCoverageTests.cs`
+Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `PRECEPT0027` and `PRECEPT0028` are active in build + IDE.
+- [ ] **Slice 0:** Roslyn analyzers (Gate 1 + Gate 2) — `PRECEPT0027` + `PRECEPT0028`
 
 ### Priority 1 — Integrity Violations (Silent Wrong Behavior)
 - [ ] **Slice 1:** Currency/unit arithmetic safety (PRE0070–0074) — `TypeChecker.Expressions.cs` qualifier comparison
@@ -987,32 +1025,71 @@ public void DescriptiveCondition_ValidForm_NoDiagnostic()
 
 ### Priority 2 — User Experience Gaps
 - [ ] **Slice 5:** Temporal constant precision (PRE0055–0058) — specialize `TypedConstantValidation`
+- [ ] **Slice 5A:** Ambiguous typed constant resolution (PRE0091) — TypeChecker typed-constant candidate arbitration, sequenced after typed-constant split stabilization
 - [ ] **Slice 6:** Collection safety extensions (PRE0099–0101, PRE0104) — ProofEngine + TypeChecker
 - [ ] **Slice 7:** Parser guard gates (PRE0013–0015) — explicit rejection paths in `Parser.cs`
 
 ### Priority 3 — Scattered TypeChecker Gaps
 - [ ] **Slice 8:** Scattered emission sites (PRE0027, PRE0035, PRE0039, PRE0042, PRE0043, PRE0044, PRE0050, PRE0067, PRE0085, PRE0105) — individual TypeChecker wires
 
+### Priority 4 — Catalog-Mediated Emission Expansion (Mechanism Migration) ★ Active
+These slices are in-scope for the current execution plan. They refactor emission dispatch from per-identity switches to catalog-mediated loops. They do not add net-new diagnostic coverage — their gate is behavioral equivalence plus analyzer recognition. Each requires a prerequisite audit pass; if the audit shows insufficient branch count, the slice closes as "not viable."
+
+- [ ] **Slice 9A:** Modifier constraint violations → `ModifierMeta.ConstraintDiagnosticCode` — generic loop in `ValidateModifiers` (after Slice 8 wires PRE0035/PRE0042)
+- [ ] **Slice 9B:** Typed-constant family diagnostics → `TypedConstantFamilyMeta.FormatErrorCode`/`SemanticErrorCode` — catalog dispatch in `TypedConstantValidation` (after Slice 5 or subsumes it)
+- [ ] **Slice 9C:** Proof obligation consistency → `ProofRequirements.GetMeta(kind).DiagnosticCode` everywhere — audit and migrate remaining hardcoded ProofEngine emission
+
 ### Deferred
 - [ ] **Period arithmetic safety** (PRE0060–0062) — qualifier-aware temporal type checking, parallel to B2; deferred pending B2 pattern establishment
 - [ ] **Precision upgrades** (PRE0019, PRE0022, PRE0051, PRE0078) — deeper analysis needed; may already be covered by `TypeMismatch` or proof obligations under different codes
-- [ ] **AmbiguousTypedConstant** (PRE0091) — latent; wire when multi-candidate typed constant resolution ships
 - [ ] **OutOfRange** (PRE0079) — reclassify; constant-assignment bounds checking only; runtime value bounds checking is proof-level
 - [ ] **Parser expression precision** (PRE0010–0012) — chained comparisons, keywords-as-values, invalid call targets; lower priority than guard gates
 
 ---
 
-## 9. Long-Term Evolution
+## 9. Architectural Evolution
+
+Roslyn analyzers are the standing enforcement baseline for this plan. The items below are post-baseline refinements that complement the active implementation slices — they are not alternatives to analyzer gates.
 
 ### Catalog-declared `IsImplemented` flag
 
-`DiagnosticMeta` already declares `DiagnosticStage` (Lex/Parse/Type/Graph/Proof). Adding an `IsImplemented` (or `EmissionSite`) property would let the catalog itself declare whether a diagnostic is live or aspirational. A catalog validation test could then verify that every `IsImplemented = true` entry has an actual emission site, and every `IsImplemented = false` entry is tracked in an issue.
+`DiagnosticMeta` already declares `DiagnosticStage` (Lex/Parse/Type/Graph/Proof). Adding an `IsImplemented` (or `EmissionSite`) property would let the catalog itself declare whether a diagnostic is live or aspirational. A catalog-backed analyzer check could then verify that every `IsImplemented = true` entry has an actual emission site, and every `IsImplemented = false` entry is tracked in an issue.
 
-This is the architecturally correct long-term answer — it follows the metadata-driven principle: the catalog declares truth, enforcement derives from it. But it requires touching all 132 catalog entries and doesn't prevent the gap from growing if developers forget to set the flag. The convention test is the right first step; the catalog approach is the right second step if the allow-list grows unwieldy.
+This is the architecturally correct evolution — it follows the metadata-driven principle: the catalog declares truth, enforcement derives from it. It still requires touching all 132 catalog entries and migration discipline across the catalog. `PRECEPT0027`/`PRECEPT0028` remain mandatory baseline enforcement; the `IsImplemented` path is a later simplification of analyzer inputs, not a replacement of analyzer gates.
 
-### Roslyn analyzer as next evolution
+### Analyzer hardening after initial rollout
 
-If the convention test proves its value and the team wants build-time (IDE) enforcement rather than CI enforcement, promote the logic to a `CompilationEndAction` analyzer in `Precept.Analyzers` as `PRECEPT0027`. The emission-site detection pattern — distinguish `IFieldReferenceOperation` on `DiagnosticCode` members inside `Diagnostics.Create()` invocations or `CIDiagnosticCode` assignments from references in `Diagnostics.GetMeta()` — is well-understood from this analysis.
+After `PRECEPT0027`/`PRECEPT0028` land, hardening work should focus on:
+- comment/string-literal stripping where needed to avoid false positives
+- tighter semantic discrimination of emission vs. metadata references
+- optional fixers or quick actions for allow-list hygiene
+
+### Catalog-mediated emission: expansion scope
+
+The `CIDiagnosticCode` pattern on `Operations.GetMeta()` and `Functions.GetMeta()` is the only shipped instance of catalog-mediated diagnostic emission. `ValidateCIEnforcement` is its sole consumer — a generic loop that walks resolved expressions and emits the diagnostic declared by catalog metadata without naming any specific `DiagnosticCode` member at the call site.
+
+This pattern is powerful and correct for its use case, but **it is selective, not universal.** The governing policy is:
+
+> **Direct emission remains the default pattern.** Catalog-mediated emission is appropriate only where:
+> 1. There is a stable 1:1 mapping from a catalog member to a diagnostic code.
+> 2. The emission logic is uniform across all members of that catalog (no per-member branching at the call site).
+> 3. The validation is a membership/property check on already-resolved artifacts, not a context-sensitive structural judgment.
+>
+> Where any of these criteria is absent, direct emission with explicit `DiagnosticCode.X` at the call site is correct, readable, and audit-friendly.
+
+The three expansion candidates are active implementation slices (Slice 9A–9C in § 7/§ 8), sequenced within the current execution plan. The remainder of this subsection retains the do-not-apply list as standing policy.
+
+#### Do-not-apply list (direct emission must remain)
+
+The following areas must retain direct `Diagnostics.Create(DiagnosticCode.X, ...)` emission. Catalog mediation would obscure intent, introduce false genericity, or violate the three criteria above:
+
+| Area | Reason |
+|------|--------|
+| **Parser rejection paths** (PRE0013–0015, PRE0010–0012) | Context-sensitive structural judgments during parsing. No catalog member maps 1:1 to these — they fire on syntactic position, not catalog-member identity. |
+| **Structural checks** (PRE0092 `EventHandlerInStatefulPrecept`, PRE0094 `InitialEventMissingAssignments`) | One-off structural invariants. No catalog axis exists to generalize across. |
+| **TypeChecker expression-level precision** (PRE0019, PRE0051, PRE0078) | Condition-specific checks that depend on expression subtree shape, not catalog-member classification. Adding a catalog property would be pretend-genericity for a single consumer. |
+| **Cross-entity qualifier comparison** (PRE0070–0074 currency/unit arithmetic) | The emission logic is uniform for B2, but the qualifier-matching rules are structurally diverse across arithmetic vs. denomination vs. compound-period cases — per-member branching is inherent to the domain. |
+| **Gate analyzers themselves** (`PRECEPT0027`/`PRECEPT0028`) | Meta-enforcement. These analyze emission patterns; they are not themselves governed by catalog dispatch. |
 
 ---
 
@@ -1024,12 +1101,12 @@ If the convention test proves its value and the team wants build-time (IDE) enfo
 
 3. **PRE0094 priority sequencing.** The field-state-guarantees-v3 work (Slices 10–11 in that doc) depends on PRE0094. Should PRE0094 be fast-tracked ahead of the B2 currency/unit cluster, even though B2 is a higher integrity risk by the philosophy test? Or is the B2 dependency more urgent to address first?
 
-4. **PRE0091 `AmbiguousTypedConstant` — keep or remove?** It's the only truly speculative diagnostic with no emission path and no anticipated feature that would create it. Keeping it on the allow-list is harmless (it blocks Gate 1 without causing failures). Removing it from `DiagnosticCode.cs` is clean but irreversible if multi-candidate resolution ships later. Options: (a) keep on allow-list with a "reserved" comment, (b) remove from the enum and re-add when needed, (c) add an `IsReserved` flag to `DiagnosticMeta`. Recommendation is (a) — confirm.
+4. **PRE0091 `AmbiguousTypedConstant` — first-tranche candidate breadth.** The scoped plan assumes the first emitting implementation is limited to candidate sets already available inside the TypeChecker typed-constant path (expected first: temporal quantity ambiguity such as `duration` vs. `period`). Should the first tranche stay that narrow, or should it immediately enumerate every content-validated typed-constant family? Recommendation is the narrow tranche — it is enough to activate PRE0091 without entangling broader inference work.
 
 5. **Scattered Priority 3 precision upgrades.** PRE0019 `NullInNonNullableContext`, PRE0022 `FunctionArgConstraintViolation`, PRE0051 `InvalidInterpolationCoercion`, PRE0078 `NumericOverflow` may already be covered by `TypeMismatch` or other codes. Should we invest in precision upgrades for these (more specific diagnostic on the same condition), or accept the current generic handling and let the allow-list entries remain indefinitely?
 
 6. **Gate 1 allow-list granularity.** The initial allow-list has all 50 unemitted codes. Should each entry cite a specific tracking issue (e.g., `// tracked in #245`), or is a cluster comment (`// Root Cause B2 — not yet implemented`) sufficient? The issue-level citation is richer but requires creating 50 tracking issues. Direction on granularity before Slice 0 implementation.
 
-7. **Convention test scan scope: Pipeline-only vs. all source.** The recommended scan covers `src/Precept/Pipeline/*.cs` + `Operations.cs` + `Functions.cs`. If future emission patterns emerge outside these files (e.g., a new `RuntimeValidator` in `src/Precept/Runtime/`), the scan set needs manual updating. Should the test scan all of `src/Precept/**/*.cs` minus known non-emission files instead, making it automatically inclusive? Broader scope means fewer false negatives but potentially more false positives from non-emission references. Direction before Slice 0 is finalized.
+7. **Analyzer scan scope: Pipeline-only vs. all source.** The recommended initial scope covers `src/Precept/Pipeline/*.cs` + `Operations.cs` + `Functions.cs` (+ ProofEngine emission paths). If future emission patterns emerge outside these files (e.g., a new `RuntimeValidator` in `src/Precept/Runtime/`), the scan set needs manual updating. Should the analyzer scan all of `src/Precept/**/*.cs` minus known non-emission files instead, making it automatically inclusive? Broader scope means fewer false negatives but potentially more false positives from non-emission references. Direction before Slice 0 is finalized.
 
 8. **Doc-comment false positives.** The emission-site scan picks up `DiagnosticCode.X` in XML doc comments (`/// <see cref="DiagnosticCode.X"/>`). Currently rare — only one instance exists and `X` is not a real member name. If it becomes a pattern, the scan should strip `// ...` and `/** */` comments before matching. For now, does Shane want comment stripping from the start, or accept the current minimal risk?

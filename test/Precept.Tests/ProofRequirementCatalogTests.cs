@@ -41,7 +41,9 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        ProofRequirements.All.Should().HaveCount(6);
+        // ⚠️  Regression anchor § 9.4 #11: must be 7 after George's Slice 1 adds
+        // ProofRequirementKind.IntervalContainment = 7. RED until that ships.
+        ProofRequirements.All.Should().HaveCount(7);
     }
 
     // ── DU subtype correctness ──────────────────────────────────────────────────
@@ -169,5 +171,48 @@ public class ProofRequirementCatalogTests
 
         req.LeftSubject.Should().BeSameAs(leftSubject);
         req.RightSubject.Should().BeSameAs(rightSubject);
+    }
+
+    // ── Slice 1 regression anchors — IntervalContainment catalog entry ──────────
+    // ⚠️  Tests below are RED until George's Slice 1 adds IntervalContainment = 7
+    // to ProofRequirementKind and updates ProofRequirements.GetMeta.
+
+    [Fact]
+    public void IntervalContainment_KindExistsInEnum()
+    {
+        // Regression anchor § 9.4 #11: enum value must be 7
+        var kind = ProofRequirementKind.IntervalContainment;
+        ((int)kind).Should().Be(7);
+    }
+
+    [Fact]
+    public void IntervalContainment_IsIntervalContainmentSubtype()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.IntervalContainment)
+            .Should().BeOfType<ProofRequirementMeta.IntervalContainment>();
+    }
+
+    [Fact]
+    public void IntervalContainmentProofRequirement_KindIsIntervalContainment()
+    {
+        var req = new IntervalContainmentProofRequirement(
+            Subject:     new SelfSubject(),
+            TargetField: "balance",
+            DeclaredMin: 0m,
+            DeclaredMax: 999_999m,
+            Description: "balance must stay within [0 .. 999 999]");
+        req.Kind.Should().Be(ProofRequirementKind.IntervalContainment);
+    }
+
+    [Fact]
+    public void SingleSubjectKinds_NowIncludesIntervalContainment()
+    {
+        // With IntervalContainment added, single-subject kinds count increases
+        var singleSubject = ProofRequirements.All
+            .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
+                        and not ProofRequirementMeta.QualifierChain)
+            .ToList();
+        singleSubject.Should().HaveCount(5,
+            "IntervalContainment joins Numeric, Presence, Dimension, Modifier as single-subject");
     }
 }
