@@ -18,7 +18,7 @@ precept InventoryItem
 
 # ── Product identity ──────────────────────────────────────────────────────────
 
-field Sku as string notempty maxlength 50
+field Sku as string optional maxlength 50
 field Description as string optional maxlength 200
 field Supplier as string optional maxlength 100
 
@@ -105,6 +105,7 @@ state Delisted
 in Unlisted modify Sku, CatalogCurrency, SupplierCurrency, ValuationMethod, StockingUnit, PurchaseUnit, SaleUnit, StockingUnitsPerPurchaseUnit, StockingUnitsPerSaleUnit editable
 
 in Listed, LowStock modify RestockThreshold, Supplier, SupplierCurrency, ListPrice editable
+in Listed, LowStock ensure Sku is set because "A listed product must have a SKU"
 in Listed, LowStock ensure ListPrice > '0 {CatalogCurrency}/{SaleUnit}' because "A listed product must have a positive list price"
 in Listed, LowStock ensure ListPrice / StockingUnitsPerSaleUnit >= AverageCost because "List price per stocking unit is below average cost"
 in Listed, LowStock ensure QuantityOnHand > '0 {StockingUnit}' and AverageCost > '0 {CatalogCurrency}/{StockingUnit}' or QuantityOnHand == '0 {StockingUnit}' because "Stocked items must have a positive average cost"
@@ -116,8 +117,8 @@ event Publish(Sku as string notempty, Desc as string optional)
 # ReceiveShipment: purchase qty in PurchaseUnit; supplier cost in SupplierCurrency
 # converted to CatalogCurrency via Rate (exchangerate, 'from' must match SupplierCurrency).
 event ReceiveShipment(
-    PurchaseQty as quantity of '{PurchaseUnit.dimension}' default '0 {PurchaseUnit}',
-    SupplierUnitCost as price in '{SupplierCurrency}' of '{StockingUnit.dimension}' default '0.00 {SupplierCurrency}/{StockingUnit}',
+    PurchaseQty as quantity of '{PurchaseUnit.dimension}',
+    SupplierUnitCost as price in '{SupplierCurrency}' of '{StockingUnit.dimension}',
     Rate as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}')
 on ReceiveShipment ensure ReceiveShipment.PurchaseQty > '0 {PurchaseUnit}' because "Purchase quantity must be positive"
 on ReceiveShipment ensure ReceiveShipment.SupplierUnitCost > '0.00 {SupplierCurrency}/{StockingUnit}' because "Supplier unit cost must be positive"
@@ -125,13 +126,13 @@ on ReceiveShipment ensure ReceiveShipment.SupplierUnitCost > '0.00 {SupplierCurr
 # FulfillOrder: sale qty in SaleUnit, converted to StockingUnit on fulfillment.
 # Captured at current ListPrice and AverageCost for P&L accuracy.
 # Transitions to LowStock when stock falls to or below RestockThreshold.
-event FulfillOrder(Qty as quantity of '{SaleUnit.dimension}' default '0 {SaleUnit}')
+event FulfillOrder(Qty as quantity of '{SaleUnit.dimension}')
 on FulfillOrder ensure FulfillOrder.Qty > '0 {SaleUnit}' because "Order quantity must be positive"
 
 # ReturnOrder: reverses a prior sale. Stock re-incremented; revenue reversed at
 # original sale price; COGS reversed at current AverageCost.
 event ReturnOrder(
-    Qty as quantity of '{SaleUnit.dimension}' default '0 {SaleUnit}',
+    Qty as quantity of '{SaleUnit.dimension}',
     OriginalSalePrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}')
 on ReturnOrder ensure ReturnOrder.Qty > '0 {SaleUnit}' because "Return quantity must be positive"
 on ReturnOrder ensure ReturnOrder.OriginalSalePrice > '0 {CatalogCurrency}/{SaleUnit}' because "Original sale price must be positive"
@@ -146,7 +147,7 @@ on AdjustInventory ensure AdjustInventory.Qty >= '0 {StockingUnit}' because "Adj
 # RecordShrinkage: books a write-off for damage, expiry, or theft.
 # Decrements stock and accumulates TotalShrinkage — distinct from cycle count.
 event RecordShrinkage(
-    Qty as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}',
+    Qty as quantity of '{StockingUnit.dimension}',
     Reason as string notempty)
 on RecordShrinkage ensure RecordShrinkage.Qty > '0 {StockingUnit}' because "Shrinkage quantity must be positive"
 on RecordShrinkage ensure RecordShrinkage.Qty <= QuantityOnHand because "Cannot write off more than is on hand"

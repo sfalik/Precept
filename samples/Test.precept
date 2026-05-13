@@ -1,14 +1,17 @@
 precept Test
 
+field test as integer
 
-field f1 as quantity of 'mass' default '1 kg'
-field f2 as quantity of 'mass' default '1 {f1.unit}'
+state offState initial
+state onState 
 
+event toggle initial
 
-field Balance as money in 'USD' default '0.00 USD' nonnegative     # OK — resolves
-field Limit   as money in 'USD' default '5000.00 USD' # OK — resolves
+#in offState omit test
 
-rule Balance >= '0.00 USD' because "balance must be nonnegative"      # PRE0052 — should resolve
-rule Balance <= '5000.00 USD' because "balance must not exceed limit" # PRE0052 — should resolve
+from offState on toggle 
+    -> set test 
+    -> transition onState
 
-state Active initial terminal
+from onState on toggle
+    -> transition offState
