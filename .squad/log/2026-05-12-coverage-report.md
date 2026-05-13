@@ -1,0 +1,1 @@
+Coverage session recorded 2026-05-12: Soup Nazi measured compiler-pipeline coverage for `src/Precept/` at 90.4% line and 79.4% branch across 4,997 passing tests, with the main gaps concentrated in ProofEngine, TypeChecker, NameBinder, and Parser; the resulting gap decisions were merged from `.squad/decisions/inbox/` into `.squad/decisions/decisions.md` and the inbox was cleared.

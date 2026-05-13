@@ -19645,3 +19645,720 @@ However, the architecture doc needs a small addition:
 **By:** Shane (via Copilot)
 **What:** Bump Frank to claude-opus-4.6 for implementation planning work. Implementation plans feed all downstream agents and warrant premium reasoning.
 **Why:** User request — captured for team memory
+
+# Verdict: D130/D131/D132 and ProofStrategy
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-12T21:21:03Z
+**Question:** Does field editability enforcement (D130/D131/D132) require a 7th ProofStrategy value?
+
+---
+
+## Verdict: No. D130/D131/D132 belong in the TypeChecker, not the ProofEngine.
+
+**ProofStrategy is exclusively a discharge mechanism for ProofObligations.** `TryDischarge()` in `ProofEngine.cs` is called once per `ProofObligation` — obligations that are collected from expression nodes (`TypedBinaryOp.ProofRequirements`, `TypedFunctionCall.ProofRequirements`, `TypedMemberAccess.ProofRequirements`, `TypedAction.ProofRequirements`) via catalog metadata. These obligations represent expression-level runtime safety requirements — division-by-zero safety, collection bounds, qualifier compatibility — and a strategy records *which proof technique discharged them*. The strategy enum is a ledger annotation on Proved obligations, not a dispatch axis for a new category of check.
+
+D130/D131/D132 are **not proof obligations**. They do not attach to expression nodes via catalog metadata. They are structural invariant checks across the state/field/action relationship:
+
+- **D130** fires when a state-anchored expression context reads a field that is `omit` in that state — a name-resolves-but-is-absent semantic gap.
+- **D131** fires when a `set` action targets a field that is `omit` in the to-state — a catalog-grounded structural restriction (§2.2 rule #6).
+- **D132** fires when an omit→non-omit transition for a required field omits a required `set` — a structural completeness invariant dual to `InitialEventMissingAssignments`.
+
+None of these are about proving a runtime expression is safe. They are about rejecting definitions that violate state-machine structural invariants. The v3 design doc's implementation plan (§10, Architectural Approach) is explicit: the enforcement uses a **post-resolution validation pass** (`ValidateFieldStateGuarantees`) that walks already-resolved `TypedExpression` trees and `TypedAction` chains with knowledge of the state anchor, following the established `ValidateCIEnforcement` pattern in `TypeChecker.Validation.cs:350`.
+
+---
+
+## Correct Pipeline Owner: TypeChecker (post-resolution validation pass)
+
+| Diagnostic | Check Type | Stage | Pattern |
+|---|---|---|---|
+| D130 | State-anchored expression reads omit field | TypeChecker validation pass | Post-resolution expression walker, `ValidateCIEnforcement` pattern |
+| D131 | `set` action targets omit-in-to-state field | TypeChecker validation pass | Post-resolution action chain walker |
+| D132 | Omit→non-omit transition missing required `set` | TypeChecker validation pass | Post-resolution transition row analysis |
+
+The ProofEngine never sees these checks. Its ProofStrategy enum stays at 6 values.
+
+---
+
+## Why the Confusion Is Natural
+
+The ProofEngine does run post-resolution analysis over expressions and actions. But its analysis is driven entirely by `*.ProofRequirements` lists attached to typed nodes via catalog metadata — not by structural state-machine topology. D130/D131/D132 require the state anchor (`TypedTransitionRow.FromState`, hook state) to be meaningful, which is a topology concern, not an expression requirement concern. Those are fundamentally different analytical primitives. Adding them to the ProofEngine would either require threading state context into the obligation collector (high coupling) or conflating two unrelated proof models.
+
+The TypeChecker's post-resolution pattern (`ValidateCIEnforcement` in `TypeChecker.Validation.cs:350`) is the precise fit: it runs after all resolution, has access to the full semantic index including state topology, and is the established home for structural invariant checks that aren't expression-safety obligations.
+
+# Decision Note: OR Support Audit in Existing Compiler Behavior
+
+**Author:** Frank  
+**Date:** 2026-05-13T01:33:10-04:00  
+**Status:** Audit (requested by Shane)
+
+---
+
+## Question
+
+Does the absence of special OR-proof handling create bugs in the compiler **as it exists today**, independent of D134 or any future work?
+
+## Verdict
+
+**Yes.**
+
+The parser and type checker already support keyword-form `or` as a normal boolean operator. The current bug is downstream: the proof engine only handles disjunction partially, so logically sufficient OR conditions can still produce false-positive proof diagnostics. In addition, state/event ensure pre-guards are parsed but then silently dropped before proof analysis.
+
+---
+
+## Stage-by-Stage Findings
+
+### Parser
+
+- `TokenKind.Or` exists and `Tokens.GetMeta(TokenKind.Or)` maps it to the keyword text `"or"`.
+- `Parser.Expressions` treats `TokenKind.Or` as a normal binary operator via `Operators.ByToken` and emits `BinaryOperationExpression`.
+- `ParserExpressionTests` has positive coverage for `rule a or b` and precedence with `and`.
+- Symbolic `||` is **not** a token. The lexer only scans operator punctuation from the token maps; `|` falls through to `InvalidCharacter`.
+
+**Verdict:** `or` is parseable; `||` is a lex error.
+
+### TypeChecker
+
+- `OperatorKind.Or` and `OperationKind.BooleanOrBoolean` are present in the catalogs.
+- `ResolveBinaryOp` resolves OR through the normal operation lookup path.
+- Direct compile checks show OR is accepted in:
+  - computed fields,
+  - transition guards,
+  - ensure conditions,
+  - access-mode `modify when` guards.
+- `OperatorTypingTests.Or_InComputedField_CompilesCleanly` already asserts the computed-field case.
+
+**Verdict:** OR is accepted and typed correctly as boolean; it is not rejected.
+
+### ProofEngine
+
+The proof engine is split in behavior:
+
+- `ProofEngine.Analysis.EvaluateBinaryOp` **does** evaluate boolean OR for constant folding.
+- `GuardInPath` (`ExtractGuardConstraintsCore`) decomposes `and` but explicitly skips `or`.
+- `FlowNarrowing` (`ExtractFieldToFieldCore`) also decomposes `and` but skips `or`.
+- Compositional constraint proof (`TryGetNumericConstraintFact`) only recognizes a single comparison node, so OR constraints contribute no facts.
+
+This means OR is **not unsafely proved**; the engine is conservative. But the conservatism is externally visible and wrong for some real inputs.
+
+### Reachable current bug
+
+These programs compile, but the proof engine still reports unresolved safety obligations:
+
+- Transition guard: `when D > 0 or D < 0 -> set X = Y / D`
+- Rule: `rule D > 0 or D < 0 because ...` with `X <- 10 / D`
+- State ensure: `in Draft ensure D > 0 or D < 0 because ...` with `X <- 10 / D`
+
+Those disjunctions imply `D != 0`, but the proof engine cannot use them, so it emits false-positive `DivisionByZero` diagnostics. The same shape applies to `sqrt(D)` with `D >= 0 or D == 0`-style disjunctions and other proof obligations.
+
+**Verdict:** OR is only partially handled. It is silently skipped by proof-discharge strategies and can cause wrong compiler output (false-positive proof diagnostics).
+
+### Evaluator
+
+- `src\Precept\Runtime\Evaluator.cs` is still a stub: `Fire`, `Update`, `InspectFire`, `InspectUpdate`, and `Restore` all throw `NotImplementedException`.
+- The executable-model entry points in `src\Precept\Runtime\Precept.cs` are also not implemented.
+
+So there is no shipped runtime path today that evaluates OR in transition guards, ensures, or access-mode guards.
+
+**Verdict:** not reached; runtime evaluation is unimplemented.
+
+---
+
+## Additional Finding: Ensure `when` Guards Are Dropped Entirely
+
+This is not an OR-specific parser bug, but it matters to the audit because OR can appear there.
+
+- `Constructs.cs` gives both `StateEnsure` and `EventEnsure` an optional pre-verb guard slot (`when ... ensure ...`).
+- `TypeChecker.PopulateEnsures` never resolves or stores that guard.
+- `TypedEnsure` has a `Guard` property, but both construction sites hardcode `Guard: null`.
+
+Result: a program like `on Submit when Flag or Approved ensure Approved == true because ...` compiles, but the `when` guard is silently erased from the normalized model.
+
+**Severity:** silent semantic loss.
+
+---
+
+## Scope Affected Today
+
+### Affected
+
+- transition-row guards (`from ... on ... when ...`)
+- rule conditions (`rule ... because ...`)
+- ensure conditions (`in/on ... ensure ...`)
+- guarded access modes (`in State when ... modify Field editable|readonly`)
+- state/event ensure pre-guards (`in/on ... when ... ensure ...`) — worse: the guard is dropped entirely
+
+### Not currently affected at runtime
+
+- runtime commit/inspect evaluation, because that surface is not implemented yet
+
+---
+
+## Test Coverage Reality
+
+What exists:
+
+- parser positive tests for `or`
+- computed-field typing test for OR
+- one proof-engine test asserting an OR guard does not discharge
+
+What is missing:
+
+- a lexer/parser regression test that `||` is rejected cleanly
+- guard/ensure/access-mode typing tests for OR
+- proof tests for logically sufficient disjunctions (the current false-positive bug)
+- tests for state/event ensure pre-guard preservation
+
+One existing proof test comment is stale: it claims `BooleanOrBoolean` is absent from the operations catalog. That is no longer true.
+
+---
+
+## Bottom Line
+
+**Shane's answer is yes:** there are existing bugs today.
+
+But they are **not** "the parser does not support OR." The current system already parses and type-checks OR. The bugs are:
+
+1. **False-positive proof diagnostics** because proof discharge silently skips disjunctions it could, in some cases, reason about.
+2. **Silent guard loss** on state/event ensure pre-guards, which erases OR there along with the rest of the guard.
+
+That is current, reachable, shipped behavior — independent of D134.
+
+# Frank — OR / ProofEngine Slice Added to v3 Plan
+
+- **Date:** 2026-05-13T01:43:21-04:00
+- **Requested by:** Shane
+- **Decision:** `docs\Working\field-state-guarantees-v3.md` now includes **Slice 9 — OR / ProofEngine Disjunction Support**.
+- **Positioning:** Appended after existing Slices 0–8 to preserve the approved numbering; explicitly marked as a standalone correctness bugfix independent of D130/D131/D132 enforcement.
+- **Targeted files:** `src\Precept\Pipeline\ProofEngine.Strategies.cs`, `src\Precept\Pipeline\ProofEngine.Composition.cs`, `src\Precept\Pipeline\TypeChecker.cs`, `test\Precept.Tests\ProofEngineTests.cs`, `test\Precept.Tests\TypeChecker\TypeCheckerAssemblyTests.cs`.
+- **Why:** Parser and TypeChecker already accept `or`; the live correctness bug is in ProofEngine branch-fact extraction and in ensure normalization silently dropping `when ... ensure ...` guards.
+- **MCP / LS impact:** None. Proof changes do not alter DTOs, and diagnostic surfacing remains automatic.
+
+# Decision Note: ProofEngine 6-File Split — AI Agent Editing Ergonomics Assessment
+
+**Author:** Frank  
+**Date:** 2026-05-12T21:13:29.109-04:00  
+**Status:** Assessment (requested by Shane)  
+**Related:** `.squad/decisions/inbox/frank-proof-engine-split.md`
+
+---
+
+## Verdict
+
+**The 6-file split is well-suited for AI agent editing. It needs no structural adjustments.**
+
+One optional refinement is worth considering (see § Optional Refinement below), but the proposed split already maximizes single-file edits for the most common modification scenarios.
+
+---
+
+## Dimension-by-Dimension Assessment
+
+### 1. Context Window Fit — ✅ All files fit cleanly
+
+The current monolith is ~2,890 lines / ~125KB — well over the 50KB view truncation limit. An agent must use `view_range` and can never see the whole file. This is the core problem the split solves.
+
+Post-split, using the actual byte density (~50 bytes/line from the current file):
+
+| Proposed File | Est. Lines | Est. Size | Fits 50KB? |
+|---------------|-----------|-----------|------------|
+| `ProofEngine.cs` | ~500 | ~25KB | ✅ |
+| `ProofEngine.Strategies.cs` | ~550 | ~28KB | ✅ |
+| `ProofEngine.Qualifiers.cs` | ~620 | ~31KB | ✅ |
+| `ProofEngine.Composition.cs` | ~650 | ~33KB | ✅ |
+| `ProofEngine.Diagnostics.cs` | ~250 | ~13KB | ✅ |
+| `ProofEngine.Analysis.cs` | ~400 | ~20KB | ✅ |
+
+Every file can be read in a single `view` call without truncation. The largest file (Composition, ~33KB) has ~17KB of headroom.
+
+**Does an agent need multiple files to understand a single concern?** No. Each proposed file covers one complete logical concern. The qualifier resolution subsystem (S7) is a recursive call graph (`ResolveQualifierFromExpression` ↔ `ResolveQualifierOnAxis` ↔ `ResolveFieldQualifier` ↔ compound cancellation/elevation) — it's kept together in one file. The sign-set abstract interpretation (S8) is similarly self-contained. The strategies S3–S6 share the guard-extraction and flow-narrowing helpers and stay together.
+
+### 2. Cohesion — ✅ Each file tells a complete story
+
+Real editing scenarios mapped to files touched:
+
+| Task | Files Touched | Assessment |
+|------|--------------|------------|
+| Add a 7th discharge strategy | `Strategies.cs` only (add method + add call in `TryDischarge`) | **1 file** ✅ |
+| Fix a diagnostic message | `Diagnostics.cs` only | **1 file** ✅ |
+| Fix sign-set abstract interpretation bug | `Composition.cs` only | **1 file** ✅ |
+| Fix qualifier compatibility for a new axis | `Qualifiers.cs` only | **1 file** ✅ |
+| Fix constant-folding in satisfiability check | `Analysis.cs` only | **1 file** ✅ |
+| Add a new obligation collection source | `ProofEngine.cs` only (modify `CollectObligations`) | **1 file** ✅ |
+
+The most common modification scenarios — adding a strategy, fixing a diagnostic, fixing a qualifier resolver — are all single-file edits. This is the critical metric for AI agent ergonomics.
+
+### 3. Coupling at Boundaries — ✅ Partial class eliminates the problem
+
+Cross-file method usage (methods used by multiple proposed files):
+
+| Shared Method | Ref Count | Current Location | Called From |
+|---------------|-----------|-----------------|-------------|
+| `ResolveSubject` | 12 | Main (S2) | Strategies, Qualifiers, Composition, Diagnostics |
+| `GetFieldName` | 11 | Main (S2) | Strategies, Composition |
+| `DescribeExpression` | 12 | Main (S2) | Diagnostics |
+| `ResolveQualifierFromExpression` | 27 | Qualifiers (S7) | Diagnostics (for error formatting) |
+| `SatisfactionCovers` | 3 | Strategies (S4) | Composition (S8) |
+| `InvertOp` / `ToDecimal` | 5 / 7 | Strategies (S5-S6) | Composition (S8) |
+| `ContainsErrorExpression` | 13 | Main (entry) | Main only (self-recursive) |
+| `TryGetStaticNumericValue` | 4 | Composition (S8) | Composition only |
+
+Because ProofEngine is a `partial class`, all `private static` methods are visible across all files. There are zero interface seams, zero new types, and zero API surface changes. The coupling is purely logical — an agent using go-to-definition or grep will find any method regardless of which partial file it lives in.
+
+**No shared helper file is needed.** The main `ProofEngine.cs` already serves as the shared infrastructure file (records, entry point, subject resolution). The widely-called methods (`ResolveSubject`, `GetFieldName`, `DescribeExpression`) are already proposed to live there.
+
+### 4. Discoverability — ✅ File names are unambiguous
+
+| Agent Task | Natural First File | Correct? |
+|------------|-------------------|----------|
+| "Add a discharge strategy for Quantity units" | `ProofEngine.Strategies.cs` | ✅ |
+| "Fix the diagnostic for proof obligation X" | `ProofEngine.Diagnostics.cs` | ✅ |
+| "Fix qualifier compatibility for currency conversion" | `ProofEngine.Qualifiers.cs` | ✅ |
+| "Fix sign-set for negative divisor" | `ProofEngine.Composition.cs` | ⚠️ Might try Strategies first |
+| "Fix initial-state satisfiability" | `ProofEngine.Analysis.cs` | ✅ |
+| "Add new obligation collection for computed fields" | `ProofEngine.cs` | ✅ |
+
+The one ambiguity: "Composition" as a name for the sign-set abstract interpretation subsystem. An agent unfamiliar with the codebase might look in `Strategies.cs` first. However, the file-level doc comment (or section banner) saying "S8 — Compositional Constraint strategy / sign-set abstract interpretation" resolves this after one glance. And any agent running `grep -r "SignSet" ProofEngine*.cs` finds it instantly.
+
+### 5. Cross-Cutting Changes — Acceptable multi-file counts
+
+| Change | Files Touched | Why |
+|--------|--------------|-----|
+| D130/D131/D132 field-state enforcement in proof engine | 2-3: Main (new obligation context), Strategies or new strategy file, Diagnostics (new diagnostic emission) | Standard for a new feature that spans collection → discharge → reporting |
+| New qualifier axis (e.g., new SI dimension) | 1-2: Qualifiers (resolver), potentially Diagnostics (error formatting) | Qualifier axis changes are contained |
+| Sign-set abstract interpretation bug | 1: Composition | Fully contained |
+| New proof requirement DU variant | 2-3: Main (collection), Strategies (discharge), Diagnostics (emission) | Inherent to the obligation lifecycle — same as today, but each file is now readable |
+
+For cross-cutting changes, the 6-file split doesn't create _more_ files to touch than the logical concerns already require. It makes each file small enough that the agent can read and edit it without context window pressure.
+
+### 6. Alternative Structures Considered
+
+**4-file split (merge Diagnostics into main, merge Analysis into main):** Makes the main file ~1,150 lines / ~58KB — over the 50KB truncation limit. Defeats the purpose. Rejected.
+
+**4-file split (merge Strategies + Diagnostics):** ~800 lines. Violates single-responsibility — strategies prove obligations, diagnostics report failures. An agent fixing a diagnostic message must scroll past 550 lines of strategy code. Rejected.
+
+**7-file split (split Qualifiers into QualifierMatching + QualifierResolution):** The qualifier resolution methods form a recursive call graph. `ResolveQualifierFromExpression` calls `ResolveQualifierOnAxis`, which calls `ResolveFieldQualifier`, which recurses back through `ResolveQualifierFromExpression` for binary ops. Splitting this recursive unit forces an agent to read two files to trace one recursive flow. Rejected.
+
+**7-file split (split Composition into SignSet + TrustedFacts):** `ApplyTrustedRuleFacts` calls `ResolveNumericSignSet` and `SignSetSatisfiesRequirement`. They're tightly coupled. Splitting creates an artificial seam between the fact collector and the fact consumer. Rejected.
+
+**Merge Diagnostics into another file (it's "only" 250 lines):** 250 lines is a healthy, focused file. It contains `CreateDiagnostic` (the per-requirement-type diagnostic switch), `CreateFaultSiteLink`, `TryCreateCollectionSafetyDiagnostic`, and 5 context-formatting methods. This is a complete, self-contained concern. An agent tasked with "fix the diagnostic message for X" opens this one file, makes the edit, done. Keeping it small is a feature, not a deficiency.
+
+---
+
+## Optional Refinement
+
+The small cross-cutting utility methods (`InvertOp`, `NegateOp`, `ToDecimal`, `SatisfactionCovers`) currently sit between S5 and S6 in the proposed `Strategies.cs` file, but are called from `Composition.cs` as well. Consider moving them to `ProofEngine.cs` alongside the other shared infrastructure (`ResolveSubject`, `GetFieldName`). This makes the main file the canonical home for "methods used across multiple concern files."
+
+Impact: adds ~40 lines to the main file (→ ~540 lines, ~27KB). Low risk, marginal discoverability improvement. Not a blocker — the partial class pattern means they work fine anywhere.
+
+---
+
+## Conclusion
+
+The 6-file split is optimal for AI agent editing because:
+
+1. **Every file fits in a single view call** — no truncation, no multi-call assembly
+2. **The 6 most common editing scenarios are each single-file edits** — the split was designed around modification patterns, not just logical grouping
+3. **File names map directly to task descriptions** — an agent can pick the right file from the name alone in 5 of 6 cases
+4. **Cross-cutting changes touch 2-3 files at most** — the same number of logical concerns that would need modification in the monolith, but now each file is readable
+5. **The partial class pattern eliminates coupling friction** — no interfaces, no new types, no forwarding methods
+
+The TypeChecker precedent (4 files, same pattern) has been in production since at least 2026-05-12 with no reported issues. The ProofEngine split follows the identical pattern at a slightly finer granularity justified by the engine's larger size and more distinct internal concerns.
+
+**Proceed as proposed.**
+
+# Decision Note: ProofEngine 6-File Split Executed
+
+**Author:** Frank  
+**Date:** 2026-05-12T21:18:42.028-04:00  
+**Status:** Executed (requested by Shane)
+
+---
+
+- Split `src\Precept\Pipeline\ProofEngine.cs` into six `public static partial class ProofEngine` files following the established TypeChecker partial-file pattern.
+- Kept the public API and project wiring unchanged: shared records/types, entry-point flow, obligation collection/subject resolution, and forwarding-fact consumption remain in `ProofEngine.cs`; strategies, qualifiers, composition, diagnostics, and analysis moved to dedicated partials.
+- Validation completed cleanly after the split: `dotnet build src\Precept\Precept.csproj` succeeded, and `dotnet test test\Precept.Tests\ --no-build` passed.
+
+# Decision Note: ProofEngine Logical Split
+
+**Author:** Frank  
+**Date:** 2026-05-12T21:09:24.330-04:00  
+**Status:** Recommendation (awaiting owner decision)
+
+---
+
+## Current State
+
+The proof engine is a single static class across these files:
+
+| File | Lines | Responsibility |
+|------|-------|----------------|
+| `src/Precept/Pipeline/ProofEngine.cs` | 2,891 | All proof logic — collection, discharge, diagnostics, analysis |
+| `src/Precept/Pipeline/ProofLedger.cs` | 77 | Output records (ProofObligation, FaultSiteLink, etc.) |
+| `src/Precept/Language/ProofRequirement.cs` | 216 | Proof obligation DU types + ProofSatisfaction DU |
+| `src/Precept/Language/ProofRequirementKind.cs` | 27 | ProofRequirementKind enum |
+| `src/Precept/Language/ProofRequirements.cs` | 32 | Catalog GetMeta + All accessor |
+
+The problem is entirely in `ProofEngine.cs` at 2,891 lines. The other files are properly sized. For comparison, `TypeChecker.cs` (1,378 lines) is already split into 4 partial class files totaling ~3,453 lines.
+
+### What ProofEngine Does
+
+The engine runs after type checking and graph analysis. It:
+
+1. **Collects obligations** (S1, lines 150–275) — walks all transition rows, event handlers, state hooks, rules, ensures, and computed fields to discover proof obligations declared in catalog metadata.
+2. **Resolves subjects** (S2, lines 277–449) — maps ProofSubject (ParamSubject, SelfSubject) to concrete TypedExpression nodes, with helpers for describing expressions in diagnostics.
+3. **Discharges obligations via 6 strategies** (S3–S7, lines 451–1622):
+   - **S3 Literal** (lines 473–502) — constant value satisfies numeric bound
+   - **S4 Declaration Attribute** (lines 504–732) — field modifiers/presence carry proof satisfactions
+   - **S5 Guard-in-Path** (lines 734–903) — guard expression subsumes the obligation
+   - **S6 Flow Narrowing** (lines 905–1001) — field-to-field guard implies obligation on subtraction
+   - **S7 Qualifier Compatibility** (lines 1003–1622) — qualifier axis matching across operands, including compound unit cancellation, currency conversion, dimension elevation, interpolated typed constants
+   - **S8 Compositional Constraint** (lines 1624–2256) — sign-set abstract interpretation + trusted rule/ensure facts + interpolated assignment tracking
+4. **Emits diagnostics and fault site links** (S9, lines 2258–2501) — creates Diagnostic and FaultSiteLink for unresolved obligations.
+5. **Constraint influence analysis** (S10, lines 2503–2537) — projects which fields/args each constraint references.
+6. **Initial-state satisfiability** (S11, lines 2539–2826) — constant-folds ensure conditions against default values to detect unsatisfiable initial states. Includes a full mini constant-folder (FoldValue, EvaluateBinaryOp).
+7. **Forwarding fact incorporation** (S12, lines 2828–2890) — suppresses obligations on unreachable/dead-end state transitions.
+
+### Logical Concerns Identified
+
+| Concern | Lines | % of File |
+|---------|-------|-----------|
+| Obligation collection + subject resolution | 150–449 | ~12% |
+| Discharge strategies (S3–S8) | 451–2256 | ~72% |
+| — of which Qualifier Compatibility (S7) alone | 1003–1622 | ~25% |
+| — of which Compositional/SignSet (S8) alone | 1624–2256 | ~25% |
+| Diagnostic emission (S9) | 2258–2501 | ~10% |
+| Analysis passes (S10–S12) | 2503–2890 | ~16% |
+
+---
+
+## Proposed Split Options
+
+### Option A: Split by Pipeline Sub-Stage (Recommended)
+
+Follow the TypeChecker pattern — `partial class` files named `ProofEngine.{Concern}.cs`.
+
+| New File | Contents | Lines (est.) |
+|----------|----------|-------------|
+| `ProofEngine.cs` | Entry point `Prove()`, internal records, S1 obligation collection, S2 subject resolution, S12 forwarding facts, error-expression suppression | ~500 |
+| `ProofEngine.Strategies.cs` | `TryDischarge()` dispatcher + strategies S3–S6 (Literal, Declaration, Guard, Flow Narrowing) | ~550 |
+| `ProofEngine.Qualifiers.cs` | S7 — qualifier compatibility, qualifier chain, qualifier resolution from expressions/fields/args/interpolated constants, compound cancellation, currency conversion, dimension elevation | ~620 |
+| `ProofEngine.Composition.cs` | S8 — compositional constraint, sign-set abstract interpretation, trusted rule facts, `ApplyTrustedRuleFacts`, interpolated assignment scanning | ~650 |
+| `ProofEngine.Diagnostics.cs` | S9 — `CreateDiagnostic`, `CreateFaultSiteLink`, context formatting, collection safety diagnostics | ~250 |
+| `ProofEngine.Analysis.cs` | S10 constraint influence + S11 initial-state satisfiability (constant folder, `FoldValue`, `EvaluateBinaryOp`) + test entry points | ~400 |
+
+**Seam types:** None needed. All methods are `private static` on the same class — `partial class` keeps them in scope. The internal records (`GuardConstraint`, `FieldToFieldConstraint`, `NumericSignSet`, etc.) stay in the main file and are visible to all partials.
+
+**Tradeoff:**
+- ✅ Each file has a single, nameable responsibility
+- ✅ Zero interface changes, zero new types, zero API surface change
+- ✅ Follows the established TypeChecker pattern exactly
+- ✅ Git blame stays clean — move-only, no semantic changes
+- ❌ Private helper sharing across files (e.g., `SatisfactionCovers` used by both S4 and S8) — fine because partial class shares all members, but some helpers conceptually belong to one concern and are used by another
+
+### Option B: Split by Obligation Category
+
+One file per `ProofRequirementKind`:
+
+| File | Contents |
+|------|----------|
+| `ProofEngine.Numeric.cs` | Numeric obligation discharge (literal, guard, sign-set, compositional) |
+| `ProofEngine.Presence.cs` | Presence obligation discharge |
+| `ProofEngine.Qualifier.cs` | QualifierCompatibility + QualifierChain discharge |
+| `ProofEngine.Dimension.cs` | Dimension obligation discharge |
+| `ProofEngine.Modifier.cs` | Modifier obligation discharge |
+
+**Tradeoff:**
+- ✅ Clear mental model: "everything about numeric proofs is here"
+- ❌ Strategies are cross-cutting — `TryDeclarationAttributeProof` handles Numeric, Presence, Dimension, AND Modifier in the same method. This would force splitting individual methods across files or duplicating shared logic.
+- ❌ Requires refactoring the existing strategy methods to separate per-kind dispatch, which changes semantics
+- ❌ No precedent in the codebase
+
+### Option C: Extract Analysis Passes Only
+
+Minimal split — just pull S10, S11, S12 into a separate file:
+
+| File | Contents |
+|------|----------|
+| `ProofEngine.cs` | Everything in S1–S9 (~2,500 lines) |
+| `ProofEngine.Analysis.cs` | S10 + S11 + S12 (~400 lines) |
+
+**Tradeoff:**
+- ✅ Extremely low risk — the analysis passes are cleanly isolated
+- ❌ Doesn't address the real problem: the 2,500-line core is still monolithic
+- ❌ Band-aid, not a solution
+
+---
+
+## Recommendation: Option A — Split by Pipeline Sub-Stage
+
+**Why:** It follows the TypeChecker precedent exactly. The codebase already uses `partial class` with `{Class}.{Concern}.cs` naming for pipeline stages that grow large (TypeChecker has 4 files, Parser has 2). The ProofEngine's internal section markers (S1–S12) already delineate the split points — this is a formalization of structure that's already implicit in the code.
+
+The 6-file decomposition gives each file a clear single responsibility at 250–650 lines — well within the comfort zone. The qualifier resolution subsystem (S7) is the strongest candidate for extraction: it's 620 lines of self-contained qualifier axis matching that has no shared state with the other strategies and only calls back into `ResolveSubject` and `GetFieldName` (which stay in the main file).
+
+**Complexity estimate: Small.** This is almost entirely file splitting with `partial class`. No new interfaces, no extracted types, no API surface change. The internal records are already in the main file and visible to all partials. The only editorial decision is where `SatisfactionCovers` lives (it's used by S4 and S8 — I'd keep it in `ProofEngine.Strategies.cs` since S4 is its primary home and S8 calls it transitively).
+
+---
+
+## Next Steps
+
+1. Owner decision on whether to proceed
+2. If approved, this is a single-PR mechanical move — no design review needed
+3. Test suite should pass unchanged (no semantic changes)
+
+# Decision: v3 Field-State Guarantees Implementation Plan
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-12
+
+---
+
+## Slice Ordering Rationale
+
+The plan uses 9 slices (0–8) with a dependency DAG, not a linear chain:
+
+- **Slice 0 (parser fix) is prerequisite to everything.** The multi-field `FieldTargetSlot` bug silently drops fields 2–N from `in Draft omit A, B, C`. Without fixing this, the omit lookup will be incomplete and all enforcement rules will miss fields. This was confirmed by reading `ParseFieldTarget` (Parser.cs:1005–1048) — the while loop consumes identifiers but only stores `first.Text`.
+- **Slice 1 (diagnostic infrastructure) and Slice 2 (omit lookup) are independent of each other** and can be implemented in parallel, but both must precede Slices 3–5.
+- **Slices 3, 4, 5 are enforcement slices** for D130, D131, D132 respectively. They are independent of each other but share infrastructure created in Slice 3 (`CollectFieldRefsFromExpression`, `ValidateFieldStateGuarantees` scaffold). D130 is recommended first because it establishes the expression-walking pattern.
+- **Slices 6–7 are post-enforcement** (sample corrections, spec updates). Slice 8 is verification-only.
+
+---
+
+## ConflictingAccessModes (D42) / RedundantAccessMode (D43) — Out of Scope
+
+D42 and D43 are access-mode *declaration* validation rules (§2.2 rules #4c and #7). They validate whether `modify` declarations conflict with each other or restate the field's baseline — this is the *declaration surface*. D130/D131/D132 validate the *enforcement surface* (field reads/writes in state-anchored contexts). These are different validation concerns:
+
+- D42/D43 validate omit/access-mode declarations against each other.
+- D130/D131/D132 validate expressions and actions against the omit lookup.
+
+Activating D42/D43 requires its own validation pass (iterating `ctx.AccessModes` and checking for per-field-per-state conflicts), its own test coverage (~10+ tests for conflicting/redundant/guarded combinations), and its own regression analysis. Bundling it into this issue would bloat scope without advancing the field-state guarantee. Tracked separately.
+
+---
+
+## Wildcard Handling Approach
+
+Three wildcard scenarios exist:
+
+1. **Wildcard state target in omit declaration** (`in any omit F`): During `BuildOmitLookup`, expand `any` to all declared states from `ctx.States`. Add `(state.Name, fieldName)` for every state. This is consistent with how `ResolveStateTargets` handles wildcards throughout the TypeChecker — the wildcard is expanded at resolution time, not deferred.
+
+2. **Wildcard from-state in transition rows** (`from any on E`): The `TypedTransitionRow.FromState` is `null` for wildcards. During `ValidateFieldStateGuarantees`:
+   - For D130: collect all states where the field is omit and emit one D130 listing all affected states.
+   - For D131: the target state is explicit (not wildcarded), so D131 checks normally.
+   - For D132: iterate all declared states as potential from-states, checking the omit→non-omit crossing for each.
+
+3. **Broadcast field target** (`in Draft omit all`): During `BuildOmitLookup`, expand `all` to every declared field from `ctx.Fields`. This parallels how `PopulateAccessModes` already handles `IsFieldBroadcast` for `modify all`.
+
+---
+
+## CheckContext Threading Approach
+
+**Decision: Post-resolution validation, not resolution-time threading.**
+
+The plan does NOT add `CurrentFromState` or `CurrentTargetState` to `CheckContext`. Instead, all field-state validation happens in a post-resolution pass (`ValidateFieldStateGuarantees`) that walks already-resolved `TypedExpression` trees with knowledge of the state anchor from the enclosing construct.
+
+**Rationale:**
+- Follows the established `ValidateCIEnforcement` pattern (TypeChecker.Validation.cs:350) — recursive expression walker that runs after all Pass 2 resolution.
+- Avoids modifying `ResolveIdentifier` (TypeChecker.Expressions.cs:522), which would mix name resolution and semantic validation concerns.
+- Avoids careful state management across every resolution call site (`NormalizeTransitionRow`, `PopulateStateHooks`, `PopulateEnsures`).
+- Lower risk of regression in existing resolution behavior.
+
+The only new `CheckContext` property is `OmitLookup: HashSet<(string State, string Field)>` — a lookup table, not a mutable state context.
+
+---
+
+## MCP and Language Server Sync Findings
+
+**Both are automatic — no code changes needed.**
+
+- **MCP:** `CompileTool.FormatDiagnosticCode` (CompileTool.cs:59–64) uses `Enum.TryParse<DiagnosticCode>` to format any enum value as `PRE{code:D4}`. New codes surface as `PRE0130`, `PRE0131`, `PRE0132` without registration. `LanguageTool.cs` reads diagnostic vocabulary from the catalog dynamically.
+
+- **Language Server:** `DiagnosticProjector.cs` (line 17–24) maps ALL `compilation.Diagnostics` to LSP diagnostics without filtering. `DiagnosticEnricher.cs` uses `Enum.TryParse` + `Diagnostics.GetMeta` for enrichment — new codes are automatically parsed and enriched with FixHint/RecoverySteps from the `DiagnosticMeta` entries.
+
+This confirms the metadata-driven architecture principle: the `DiagnosticCode` enum and `Diagnostics.GetMeta` switch expression are the single source of truth. All downstream consumers derive from them.
+
+---
+
+## Key Codebase Finding
+
+`TypedEditDeclaration` (SemanticIndex.cs:429–433) has no `StateName` property — it is a placeholder for future stateless-precept edit declarations (D24), not for omit enforcement. The omit lookup must be built directly from `OmitDeclaration` constructs via state target resolution, not from `TypedEditDeclaration` records.
+
+# Coverage Gap Report — Compiler Pipeline
+**Date:** 2026-05-12  
+**Author:** Soup Nazi  
+**Method:** `dotnet test test/Precept.Tests/ --collect:"XPlat Code Coverage"` with Coverlet (already configured in .csproj). 4,997 tests passed.
+
+---
+
+## Summary
+
+| Component | Line Coverage | Lines Covered / Total | Status |
+|-----------|-------------|----------------------|--------|
+| Lexer | **99.5%** | 397 / 399 | ✅ Excellent |
+| GraphAnalyzer | **97.0%** | 426 / 439 | ✅ Excellent |
+| Language-Catalog | **95.7%** | 6,622 / 6,920 | ✅ Excellent |
+| Root (Compiler.cs) | **92.9%** | 78 / 84 | ✅ Very good |
+| Pipeline-Other | **90.6%** | 638 / 704 | ✅ Good |
+| TypeChecker | **85.8%** | 2,081 / 2,425 | ⚠️ Gaps |
+| NameBinder | **87.8%** | 351 / 400 | ⚠️ Gaps |
+| Parser | **88.2%** | 939 / 1,065 | ⚠️ Gaps |
+| ProofEngine | **77.8%** | 1,211 / 1,556 | 🔴 Real gap |
+| Runtime | **31.1%** | 50 / 161 | ⬛ Phase 3 stubs — expected |
+
+**Overall `src/Precept/`:** 90.4% line / 79.4% branch (12,793 / 14,153 lines)
+
+---
+
+## Runtime — Not a Gap (Phase 3 D8/R4)
+
+`Runtime\Evaluator.cs`, `Runtime\Version.cs`, `Runtime\UpdateOutcome.cs`, `Runtime\RestoreOutcome.cs`, `Runtime\FiredArgs.cs`, `Runtime\EventOutcome.cs`, `Runtime\Measures\*`, `Runtime\BusinessValues\*` — all public methods are `throw new NotImplementedException()`. The `internal static` API surface is gated behind Phase 3 (D8/R4 executable model design). No tests are expected until that gate clears.
+
+`Runtime\Inspection.cs` (19%) and `Runtime\Precept.cs` (25%) have thin coverage only because the non-NotImplementedException helpers are tested indirectly.
+
+---
+
+## Gap 1 — ProofEngine.Analysis.cs (64.1%, 60 uncovered lines)
+
+**What's dark:** The constant-folding engine (`FoldValue`) has tests for its happy-path numeric-rule proof outcomes, but the folding machinery itself is untested:
+- `TypedUnaryOp` — `OperatorKind.Not` (boolean negate) and `OperatorKind.Negate` (arithmetic negate)
+- `TypedConditional` — conditional branch folding
+- `EvaluateBinaryOp` — ALL arithmetic ops (`+`, `-`, `*`, `/`, `%`), ALL numeric comparisons, string equality, boolean AND/OR
+
+**Risk:** Constant-folding bugs in numeric rule proofs would silently produce wrong proof outcomes without any test catching them. The proof engine relies on this for determining whether guards statically satisfy numeric constraints.
+
+**Suggested test targets:**
+- `ProofEngineTests.cs` — add cases where guard expressions use negation or conditional shapes
+- Direct unit tests on `FoldValue` via a synthetic proof obligation with `TypedUnaryOp`/`TypedConditional` expressions
+- `EvaluateBinaryOp` via guards that compare field < 0 (requires negation) or use boolean `and`/`or` in guard conditions
+
+---
+
+## Gap 2 — ProofEngine.Qualifiers.cs (73.5%, 95 uncovered lines)
+
+**What's dark:**
+- `TypedArgRef` qualifier resolution with axis fallback: Unit→Dimension and Dimension→TemporalDimension chains
+- `TypedTypedConstant` qualifier resolution with identical fallback chains
+- `TranslateCurrencyAxis`: `ToCurrency` → `Currency` translation (needed for exchange-rate `in 'USD' to 'EUR'` qualifiers in event args)
+- `ResolveQualifierFromInterpolatedConstant`: axis resolution for interpolated typed constants with `Currency`, `Unit`, `Dimension`, `FromCurrency`, `ToCurrency` slots
+- Compound qualifier elevation paths (lines 380–388)
+
+**Risk:** Qualifier resolution failures would silently return `null` instead of the correct qualifier, causing proof obligations involving event-arg or typed-constant qualifiers to fail spuriously or pass without enforcement.
+
+**Suggested test targets:**
+- Proof tests with event args that carry quantity/price qualifiers and participate in proof obligations
+- Interpolated-constant qualifier proof tests (RC-1/RC-2 style but with proof obligation outcomes rather than just parse/type-check)
+- Exchange-rate event-arg qualifier proof (ToCurrency axis translation path)
+
+---
+
+## Gap 3 — TypeChecker.Expressions.Callables.cs (77.9%, 98 uncovered lines)
+
+**What's dark:**
+- `TryContextRetryOverload` (lines 40–92): multi-arg overload resolution that re-resolves literal args with parameter type context. This is "Slice 4" of overload resolution — the context-retry path.
+- `PutKeyValueAction` type-checking (lines 252–273): key-value map operations
+- `CollectionIntoByAction` binding (lines 275–286): collection-by binding in action targets
+- Member access on non-field receivers (lines 663–698): `UndeclaredField` for invalid event.arg names, accessor resolution for typed field refs, `InvalidMemberAccess` error path, `ResolveAccessorReturnType` error return
+- `UndeclaredFunction` diagnostic (lines 526–531)
+
+**Risk:** Overload resolution with coercible literal arguments may silently pick wrong overloads. Map `put` and collection `into` actions have no type-checker exercise. `UndeclaredFunction` is a diagnostic path that could regress silently.
+
+**Suggested test targets:**
+- `TypeCheckerCallablesTests` — add multi-arg function call where a literal arg coerces to match an overload (e.g., `round(field, 2)` where `2` is an int literal needing decimal parameter context)
+- `put key: expr into: field` action type-checking (key-value map fields)
+- `into` action on collection fields
+- Rule expression calling an undeclared function
+- Member access on a typed field (e.g., `moneyField.currency`)
+
+---
+
+## Gap 4 — TypeChecker.Validation.cs (85.6%, 37 uncovered lines)
+
+**What's dark:**
+- `EnforceCIInExpression` for `TypedInterpolatedString` (lines 462–468) and `TypedListLiteral` (lines 470–473)
+- `TryEmitContainsCIDiagnostic` (lines 488–520): all collection type variants in the CI-mismatch suggestion — queue, stack, log, log-by, bag, list, queue-by
+
+**Risk:** Case-insensitive enforcement inside interpolated strings and list literals silently skips. The CI collection type suggestion in diagnostics emits wrong type names for non-set collections.
+
+**Suggested test targets:**
+- CI field reference inside an interpolated string template
+- CI list literal (a list expression containing CI field references)
+- `contains` on a queue/log/bag/list of string with a CI field value — verify the diagnostic suggestion says `queue of ~string` (not `set of ~string`)
+
+---
+
+## Gap 5 — NameBinder (87.8%, 49 uncovered lines)
+
+**What's dark:**
+- `CollectFieldDependencies` switch cases: `UnaryOperationExpression`, `ConditionalExpression` (ternary), `PostfixOperationExpression` (`is set`/`is not set`), `QuantifierExpression` (any/all/none), `CIFunctionCallExpression`, `InterpolatedTypedConstantExpression`
+- `PutKeyValueAction` walk (lines 522–526) and `CollectionIntoByAction` walk (lines 527–530)
+- `UndeclaredField` diagnostic path in `WalkFieldReference` (lines 774–779)
+
+**Risk:** Dependency graph for cyclic-dependency detection (graph analysis) silently ignores fields referenced inside unary expressions, conditionals, postfix ops, quantifiers, CI functions, and interpolated typed constants. If such a field reference creates a cycle, the graph analyzer won't see it.
+
+**Suggested test targets:**
+- Field whose default rule contains `fieldA is set` (postfix) where `fieldA` depends on the field being defined — should trigger cyclic dependency
+- Field default with `any x in collectionField where x > 0` (quantifier)
+- `put key: k into: field` action in a rule (key-value collection)
+- Rule guard that references an undeclared field (to hit the `UndeclaredField` path in WalkFieldReference)
+
+---
+
+## Gap 6 — ProofEngine.Strategies.cs (79.4%, 63 uncovered lines)
+
+**What's dark:**
+- `FunctionReturnSatisfies` (lines 118–131): `round()`/similar function return proves nonnegative — gated behind `ReturnNonnegative == true`
+- `NumericConstraintSubsumes` operator-pair combinations: `(GT, NotEquals) when value==0`, `(GT, GTE)`, `(GT, GT)`, `(GTE, GTE)`, `(LT, NotEquals) when value==0` — guard subsumption paths that prove proofs from guard constraints
+- `InvertOp` (lines 411–418) and `NegateOp` (lines 421–429): operator inversion utilities used for double-negated guard extraction
+- Guard extraction from negated binary expressions with literal on left side (lines 370–374)
+- `ToDecimal` for `int` and `long` literals (lines 434–435)
+
+**Risk:** Guard subsumption tests are the heart of the proof engine's ability to prove that a guarded transition satisfies nonnegative/positive/nonzero requirements. The uncovered `NumericConstraintSubsumes` arms mean specific operator-pair combinations don't have test coverage — a bug in these arms would silently fail to prove obligations that should pass.
+
+**Suggested test targets:**
+- Transition guarded by `field > 0` that must satisfy a `nonzero` requirement (GT/NotEquals arm)
+- Transition guarded by `field > 0` satisfying `nonnegative` (GT/GTE arm)
+- Transition guarded by `field < 0` satisfying `negative` (LT/NotEquals arm at value==0)
+- `round(field)` action value for a `nonnegative` proof (function return proof)
+- Guard `0 > field` (literal on left) — tests `InvertOp` path
+
+---
+
+## Gap 7 — ProofEngine.Composition.cs (84.1%, 51 uncovered lines)
+
+**What's dark:**
+- `TryGetSignFromComparison` for negative thresholds and edge cases: `GT when value < 0 → Unknown`, `GTE when value > 0 → Positive`, `GTE → Unknown`, `LT when value <= 0 → Negative`, `LT when value > 0 → Unknown`, `LTE when value < 0 → Negative`, `LTE when value == 0 → Nonpositive`, `LTE → Unknown`, `NotEquals when value == 0 → Nonzero`
+- `DivideSignSets` (lines 627–633): division sign tracking
+- `ContainsErrorExpression` for: `TypedUnaryOp`, `TypedFunctionCall`, `TypedMemberAccess`, `TypedConditional`, `TypedQuantifier`, `TypedPostfixOp`
+
+**Risk:** Sign composition for `LessThan`/`LessThanOrEqual` comparisons and division is dark. Proofs on fields with negative-threshold guards or division expressions might give wrong sign sets.
+
+---
+
+## Gap 8 — Parser.cs (86.1%, 97 uncovered lines)
+
+**What's dark:** Mostly error-recovery and optional-sentinel paths:
+- `Match()` → `true` branch (lines 95–98): this helper's positive path may be untested
+- `ParseStateTarget` optional slot sentinel (line 962)
+- `ParseEventTarget` optional slot sentinel (lines 980–984)
+- `ParseAccessMode` optional sentinel + required-but-missing error (lines 996–999)
+- `CollectionIntoByAction` parsing (lines 1328–1341): the `into` slot and `CollectionIntoByAction` construction
+- ~50 additional scattered error-recovery lines across various construct parsers
+
+**Risk:** Optional-slot parse recovery and `CollectionIntoByAction` parsing are exercised only on the happy path. Malformed constructs in these positions would not be caught by existing error-recovery tests.
+
+---
+
+## Recommendations (Priority Order)
+
+1. **ProofEngine.Analysis.cs** — highest risk/reward. Add 6–8 targeted tests for `FoldValue` constant folding: unary negation, boolean not, conditional expression folding, and arithmetic binary ops. These underpin proof correctness.
+
+2. **ProofEngine.Strategies.cs + Composition.cs** — add `NumericConstraintSubsumes` operator-pair cases and sign-composition edge cases. ~10–12 tests.
+
+3. **TypeChecker.Expressions.Callables.cs** — `PutKeyValueAction` and `CollectionIntoByAction` are action types that exist in the catalog but have zero type-checker test coverage. These are semantic correctness gaps, not edge cases. ~6–8 tests.
+
+4. **TypeChecker.Validation.cs** — CI enforcement in interpolated strings and non-set CI collection type suggestions. ~4–6 tests.
+
+5. **ProofEngine.Qualifiers.cs** — `TypedArgRef`/`TypedTypedConstant` axis fallback chains and `TranslateCurrencyAxis`. These are exercised by exchange-rate and compound-quantity proof scenarios. ~8–10 tests.
+
+6. **NameBinder** — `CollectFieldDependencies` for quantifier/postfix/conditional shapes is the most impactful gap (cyclic dependency detection). ~4–5 tests.
+
+7. **Parser.cs** — `CollectionIntoByAction` parsing and optional sentinel paths. ~4 tests.
+
