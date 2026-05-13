@@ -958,17 +958,17 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 
 ## 12. Implementation Tracker
 
-**Progress:** 0 / 10 slices complete
+**Progress:** 3 / 10 slices complete
 
-| Slice | Name | Status | Depends On |
-|---|---|---|---|
-| Slice 0 | Parser Fix: `FieldTargetSlot` Multi-Field Broadcast | ⬜ Pending | — |
-| Slice 1 | Diagnostic Infrastructure: D130, D131, D132 | ⬜ Pending | — |
-| Slice 2 | Omit Lookup Construction | ⬜ Pending | Slice 0 |
-| Slice 3 | D130: `OmittedFieldReadInState` | ⬜ Pending | Slices 1, 2 |
-| Slice 4 | D131: `OmittedFieldSetInTargetState` | ⬜ Pending | Slices 1, 2 |
-| Slice 5 | D132: `RequiredFieldUnassignedOnEntry` | ⬜ Pending | Slices 1, 2 |
-| Slice 6 | Sample Corrections | ⬜ Pending | Slices 3, 4, 5 |
-| Slice 7 | Spec and Documentation Updates | ⬜ Pending | Slice 6 |
-| Slice 8 | MCP + Language Server Sync Assessment | ⬜ Pending | Independent |
-| Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ⬜ Pending | Standalone |
+| Slice | Name | Status | Depends On | Commit |
+|---|---|---|---|---|
+| Slice 0 | Parser Fix: `FieldTargetSlot` Multi-Field Broadcast | ✅ Done | — | `b7020917` |
+| Slice 1 | Diagnostic Infrastructure: D130, D131, D132 | ✅ Done | — | `99f7a693` |
+| Slice 2 | Omit Lookup Construction | ✅ Done | Slice 0 | `bedb9dd6` |
+| Slice 3 | D130: `OmittedFieldReadInState` | ⬜ Pending | Slices 1, 2 | — |
+| Slice 4 | D131: `OmittedFieldSetInTargetState` | ⬜ Pending | Slices 1, 2 | — |
+| Slice 5 | D132: `RequiredFieldUnassignedOnEntry` | ⬜ Pending | Slices 1, 2 | — |
+| Slice 6 | Sample Corrections | ⬜ Pending | Slices 3, 4, 5 | — |
+| Slice 7 | Spec and Documentation Updates | ⬜ Pending | Slice 6 | — |
+| Slice 8 | MCP + Language Server Sync Assessment | ⬜ Pending | Independent | — |
+| Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ⬜ Pending | Standalone | — |
