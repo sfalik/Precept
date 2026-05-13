@@ -57,8 +57,8 @@ public sealed class Track2PhaseAToolchainRegressionTests
     {
         var compilation = Compile("""
             precept Bug037Regression
-            field Name as string writable
-            field Amount as number
+            field Name as string default "" writable
+            field Amount as number default 0
             field Notes as string optional
             state Draft initial
             state Closed terminal

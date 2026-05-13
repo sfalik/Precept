@@ -371,6 +371,250 @@ public class TypeCheckerFieldStateTests
         diagnostic.Message.Should().Be("Field 'F' is omitted in target state 'Review'; this transition cannot set it");
     }
 
+    [Fact]
+    public void D132_OmitToNonOmit_RequiredField_NoSet_Fires()
+    {
+        var diagnostic = AssertSingleD132("""
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> transition Review
+            """);
+
+        diagnostic.Message.Should().Be("Required field 'F' is omitted in 'Draft' but present in 'Review'; add `set F = ...` to this transition");
+    }
+
+    [Fact]
+    public void D132_OmitToNonOmit_RequiredField_WithSet_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> set F = 1 -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_OmitToNonOmit_OptionalField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer optional
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_OmitToNonOmit_DefaultField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer default 0
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_OmitToNonOmit_ComputedField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field G as integer default 0
+            field F as integer <- G + 1
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_BothStatesOmit_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            in Review omit F
+            from Draft on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_NeitherStateOmit_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            from Draft on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_WildcardFromState_OmitInOneState_Fires()
+    {
+        var diagnostic = AssertSingleD132("""
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from any on E -> transition Review
+            """);
+
+        diagnostic.Message.Should().Be("Required field 'F' is omitted in 'Draft' but present in 'Review'; add `set F = ...` to this transition");
+    }
+
+    [Fact]
+    public void D132_WildcardFromState_OmitInAllStates_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in any omit F
+            from any on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_SelfLoop_OmitInState_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer
+            state S initial
+            event E
+            in S omit F
+            from S on E -> transition S
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_AddActionOnCollection_Exempt_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Tags as set of string
+            state Draft initial
+            state Review
+            event E
+            in Draft omit Tags
+            from Draft on E -> add Tags "x" -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_StatelessPrecept_Inapplicable_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as integer
+            event Start initial
+            on Start -> set F = 1
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_CollectionField_OmitToNonOmit_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Items as set of string
+            state Draft initial
+            state Review
+            event E
+            in Draft omit Items
+            from Draft on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_ListField_OmitToNonOmit_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Entries as list of string
+            state Draft initial
+            state Review
+            event E
+            in Draft omit Entries
+            from Draft on E -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D132_DoesNotSuppressD130()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E when F > 0 -> transition Review
+            """);
+
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().BeEquivalentTo(
+            [
+                nameof(DiagnosticCode.OmittedFieldReadInState),
+                nameof(DiagnosticCode.RequiredFieldUnassignedOnEntry)
+            ]);
+    }
+
     private static Diagnostic AssertSingleD130(string preceptText)
     {
         var (_, diagnostics) = TypeCheckerTestHelpers.Check(preceptText);
@@ -401,5 +645,21 @@ public class TypeCheckerFieldStateTests
 
         d131.Should().ContainSingle();
         return d131[0];
+    }
+
+    private static Diagnostic AssertSingleD132(string preceptText)
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(preceptText);
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().OnlyContain(code => code == nameof(DiagnosticCode.RequiredFieldUnassignedOnEntry));
+
+        var d132 = diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.RequiredFieldUnassignedOnEntry))
+            .ToArray();
+
+        d132.Should().ContainSingle();
+        return d132[0];
     }
 }

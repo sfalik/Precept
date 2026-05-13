@@ -266,7 +266,54 @@ internal static partial class TypeChecker
                 }
             }
         }
+
+        // D132: transitions that materialize a required field on entry must assign it.
+        foreach (var row in ctx.TransitionRows)
+        {
+            if (row.Outcome != TransitionRowOutcome.Transition || row.TargetState is null)
+                continue;
+
+            var effectiveFromStates = row.FromState is not null
+                ? [row.FromState]
+                : ctx.States.Select(state => state.Name);
+
+            foreach (var fromState in effectiveFromStates)
+            {
+                foreach (var field in ctx.Fields)
+                {
+                    if (field.IsOptional ||
+                        field.DefaultExpression is not null ||
+                        field.IsComputed ||
+                        field.ResolvedType is TypeKind.Set or TypeKind.Queue or TypeKind.Stack or TypeKind.Log or TypeKind.LogBy or TypeKind.Bag or TypeKind.List or TypeKind.QueueBy or TypeKind.Lookup)
+                    {
+                        continue;
+                    }
+
+                    var omitInFrom = ctx.OmitLookup.Contains((fromState, field.Name));
+                    var omitInTarget = ctx.OmitLookup.Contains((row.TargetState, field.Name));
+                    if (!omitInFrom || omitInTarget)
+                        continue;
+
+                    var hasSet = row.Actions.Any(action =>
+                        IsSetAction(action.Kind) &&
+                        string.Equals(action.FieldName, field.Name, StringComparison.Ordinal));
+
+                    if (!hasSet)
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.RequiredFieldUnassignedOnEntry,
+                                row.RowSpan,
+                                field.Name,
+                                fromState,
+                                row.TargetState));
+                    }
+                }
+            }
+        }
     }
+
+    private static bool IsSetAction(ActionKind kind) => kind == ActionKind.Set;
 
     /// <summary>Validate modifier applicability, conflicts, and subsumption for all fields and states.</summary>
     private static void ValidateModifiers(CheckContext ctx)
