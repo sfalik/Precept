@@ -76,3 +76,9 @@
 
 - Architecture review accepted George's `Lazy<T>` fix for `Tokens.KeywordsValidAsMemberName` as the correct way to break the narrow `Tokens` ↔ `Types` cctor cycle.
 - The required follow-up doc hardening is complete: `docs/language/catalog-system.md` now explicitly states that reverse `Tokens` → downstream catalog static references must defer materialization with `Lazy<T>`.
+
+### 2026-05-12T22:25:49.004-04:00 — Proof engine doc updates written
+
+- Expanded `docs\compiler\proof-engine.md` Strategy 5 coverage with a new `Qualifier Resolution Reference` section documenting `ResolveQualifierFromExpression`, the shared `Unit → Dimension → TemporalDimension` fallback chain, `TranslateCurrencyAxis`, the real `NumericConstraintSubsumes` vs `SatisfactionCovers` tables, and the constant-folder zero-denominator guard.
+- Replaced the §5 stub in `docs\language\precept-language-spec.md` with a standalone proof-system overview that states the two-pass model, the meaning of proved qualifier constraints, the range/currency/unit-dimension enforcement surface, and the compile-time rejection rule for unresolved obligations.
+- Corrected local proof-engine doc drift that had implied Strategy 2 and Strategy 3 shared one subsumption table and that qualifier compatibility was still pending future type-checker work.

@@ -29744,3 +29744,20 @@ enforcement takes effect immediately.
 **What:** Implement the type checker on the current spike branch. No GitHub issue — skip the formal issue/PR workflow. This is a spike implementation.
 
 **Why:** User request — captured for team memory
+
+# George — v3 Field-State Guarantees Design Decisions
+
+**Date:** 2025-07-20
+**Context:** Review of `docs/Working/field-state-guarantees-v3.md`
+
+---
+
+- **`TypedEditDeclaration` must carry resolved state names.** The current record (SemanticIndex.cs) has no `StateName`/`StateNames` field; `PopulateEditDeclarations` never calls `ResolveStateTargets`. Slice 2's `BuildOmitLookup` can only work correctly if `TypedEditDeclaration` is extended with `ImmutableArray<string> StateNames` (via Path A) — reading from `Syntax` directly is fragile and causes diagnostic-emission ordering problems. Slice 2 scope must include this record extension and the `PopulateEditDeclarations` update.
+
+- **D132 exemptions must include collection fields.** `MissingDocuments as set of string` in `insurance-claim.precept` is non-optional, has no default, and is not computed. D132 as currently specified would fire on the Draft→Submitted transition, breaking Slice 6's "clean compile" claim. Resolution: add an explicit exemption for collection-typed fields (set, list, queue, bag, log) on the grounds that their natural empty state is a valid initialized value. This must be reflected in §6, §10 Slice 5 logic, and Slice 5 tests.
+
+- **`PopulateEnsures` guard fix (Slice 9) must include full expression resolution, not just slot extraction.** The fix must call `Resolve(guardSlot.Expression, ctx)` and validate the boolean result type, matching the pattern in `PopulateAccessModes` (TypeChecker.cs lines 979–992). The plan's "stop discarding GuardClauseSlot" description understates the required change.
+
+- **Slice 9 `TryGetNumericEnsureFact` fix must land atomically with the `PopulateEnsures` guard fix.** If `Guard` is populated in `TypedEnsure` but `TryGetNumericEnsureFact` still ignores it, a guarded ensure's condition becomes an unconditional numeric fact — a soundness regression worse than the current bug. The two changes must be committed together.
+
+- **`FieldTargetSlot.AdditionalFields` should be an `init`-only property with default `ImmutableArray<string>.Empty`, not a constructor parameter.** `FieldTargetSlot` is a `public sealed record`. Adding it as a required constructor parameter would break all external consumers that construct slots directly (including tests using positional constructors). The `init`-only property preserves existing construction sites.

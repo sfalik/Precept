@@ -1,3 +1,148 @@
+# Frank's Response — George's v3 Field-State Conditions
+
+## Verdicts
+
+### Condition 1: `TypedEditDeclaration` Has No State Information — REJECTED
+
+George is right that `TypedEditDeclaration` has no state info. He's wrong that this is a problem.
+
+The plan was designed around this fact. Line 253 explicitly states: "The existing `TypedEditDeclaration` record is NOT modified — it is a placeholder for future stateless-precept edit declarations (D24) and has no `StateName` property." `BuildOmitLookup` (Slice 2, lines 462–471) resolves state targets directly from `OmitDeclaration` constructs via `ResolveStateTargets(stateSlot, ctx)`. It never reads from `TypedEditDeclaration` or `ctx.EditDeclarations`. There is no "Path B fragility" because `PopulateEditDeclarations` never resolves state targets in the first place — `BuildOmitLookup` is the ONLY resolution point for omit declaration state names, and `ResolveStateTargets` emits `UndeclaredState` diagnostics correctly at that point.
+
+George's Path A (extend `TypedEditDeclaration`) is a reasonable future improvement for D24 stateless-precept support, but it is not required for this design. No plan change.
+
+### Condition 2: D132 Collection-Field Exemption — ACCEPTED
+
+George is correct. `MissingDocuments as set of string` is non-optional, no default, not computed. D132 would fire falsely on the Draft→Submitted transition. Collection types (`set`, `list`, `queue`, `bag`, `log`) have an intrinsic empty value — an empty set is a semantically meaningful valid state, unlike an unset scalar. This is not a sentinel; it's the natural initial value for a collection.
+
+**Changes made:**
+- §6 Trigger Conditions: added collection-typed fields as a fourth exemption category with rationale.
+- Slice 5 algorithm: added `field.IsCollection` to the skip-if-exempt check.
+- Slice 5 tests: added `D132_CollectionField_OmitToNonOmit_NoDiagnostic` and `D132_ListField_OmitToNonOmit_NoDiagnostic`.
+- Slice 6 insurance-claim analysis: refined exemption annotation for `MissingDocuments` to reference the formal collection exemption.
+
+### Condition 3: `PopulateEnsures` Guard Fix Must Include Full Expression Resolution — ACCEPTED
+
+George is correct. The plan said "Resolve the pre-guard" but did not explicitly specify the boolean type-validation step that `PopulateAccessModes` performs (lines 979–992): set `CurrentScope`, call `Resolve()`, check `ResultType != TypeKind.Boolean`, emit `TypeMismatch`, replace with `TypedErrorExpression` on failure. An implementer reading only the plan text could skip the type-check.
+
+**Changes made:**
+- Slice 9 `PopulateEnsures` description: expanded to explicitly specify the full resolution + type-validation pattern, citing `PopulateAccessModes` as the template.
+- Slice 9 tests: added `EnsureNormalizer_NonBooleanGuard_EmitsTypeMismatch` test.
+- Slice 9 checklist: updated to include "full expression resolution + boolean type validation."
+
+### Condition 4: `PopulateEditDeclarations` Must Validate `AdditionalFields` Names — ACCEPTED WITH MODIFICATION
+
+George is right that `UndeclaredField` validation for additional field names must exist. He's wrong about where it belongs. `PopulateEditDeclarations` does NOT emit `UndeclaredField` for the primary field either — it uses `FieldLookup.TryGetValue` for reference registration with silent skip on miss. The `UndeclaredField` diagnostic comes from `NameBinder.ResolveFieldReference`, which the plan already extends in Slice 0 (line 321) to iterate `AdditionalFields`.
+
+The coverage is already complete. The plan just needed a clarifying note so implementers don't second-guess the validation path.
+
+**Changes made:**
+- Slice 0 NameBinder description: expanded to explicitly note that this is the path that emits `UndeclaredField` for additional fields, and that `PopulateAccessModes` / `PopulateEditDeclarations` intentionally use the silent-skip pattern consistent with primary field handling.
+
+### Condition 5: `FieldTargetSlot` `AdditionalFields` Must Be `init`-Only — REJECTED
+
+George missed that the plan already specifies exactly this. Lines 288–291:
+
+```csharp
+public ImmutableArray<(string Name, SourceSpan Span)> AdditionalFields { get; init; }
+    = ImmutableArray<(string, SourceSpan)>.Empty;
+```
+
+That is `init`-only with a default of `ImmutableArray<(string, SourceSpan)>.Empty`. The no-arg constructor form works without `AdditionalFields`. No plan change needed.
+
+### Condition 6: OR-Splitting Semantics Must Be Made Explicit — ACCEPTED
+
+George is correct that "branch-aware" is ambiguous and could be misread as "prove under ANY branch" (unsound) instead of "prove under ALL branches" (sound). The soundness requirement is: if a guard is `A or B`, obligation X is discharged only if X holds under A's constraints AND under B's constraints independently, because at runtime either branch could be the one that holds.
+
+**Changes made:**
+- Slice 9: added a formal "OR-Splitting Soundness Semantics" statement before the Modify section, specifying the ALL-branches-must-independently-prove algorithm, the soundness justification, the unsound alternative that must be avoided, and recursive application to three-way+ disjunctions.
+- Updated the `TryGuardInPathProof` and `TryFlowNarrowingProof` descriptions to reference the formal semantics.
+
+---
+
+## Summary
+
+| Condition | Verdict | Plan Changed? |
+|---|---|---|
+| 1. `TypedEditDeclaration` state info | **Rejected** | No |
+| 2. Collection-field D132 exemption | **Accepted** | Yes — §6, Slice 5 algorithm + 2 tests, Slice 6 analysis |
+| 3. `PopulateEnsures` full resolution | **Accepted** | Yes — Slice 9 description + 1 test |
+| 4. `AdditionalFields` UndeclaredField | **Accepted with modification** | Yes — Slice 0 clarifying note (coverage was already present) |
+| 5. `FieldTargetSlot` init-only | **Rejected** | No |
+| 6. OR-splitting formal semantics | **Accepted** | Yes — Slice 9 formal statement + description updates |
+
+4 of 6 conditions accepted (2 in full, 1 with modification, 1 where the coverage was present but needed clarity). 2 rejected — the plan already addressed both correctly.
+
+## Plan Status
+
+The v3 plan is now ready for Shane's review and implementation sign-off. All accepted conditions have been incorporated as surgical edits. The plan's test count is updated to ~73 (up from ~70). No architectural changes were required — the accepted conditions were specificity improvements and a correctness exemption, not structural redesigns.
+
+---
+
+Frank — 2026-05-12
+
+# Frank's Pattern Additions Review — 2026-05-12
+
+**Reviewer:** Frank (Lead/Architect)
+**Date:** 2026-05-12
+**Verdict:** APPROVED for 6 of 9 proposed items; 3 items blocked pending rework
+
+---
+
+## Approved Additions (ready to implement)
+
+### P1: Entry action hook (`to State -> actions`)
+Confirmed in 5 samples (VehicleServiceAppointment, WarrantyRepairRequest, BuildingAccessBadgeRequest, EventRegistration, ParcelLockerPickup). Proposal undercounts at "three." Absent from current tool. The reset-on-re-entry framing is valid as a structural guarantee, not just a description of observed re-entry.
+
+### P2: `from any on Event` for cross-cutting signals
+Confirmed in CrosswalkSignal (no-transition broadcast) and RestaurantWaitlist (unconditional transition broadcast). Two sub-patterns worth distinct example coverage. Absent from current tool.
+
+### P3: Stack/queue with ordered operations
+Stack confirmed in WarrantyRepairRequest (`push`/`pop into`/`count` guard). Queue confirmed in RestaurantWaitlist (`enqueue`/`dequeue into`/`.peek`/`.count`). `.peek`-before-`.dequeue` sub-pattern confirmed. **Correction required:** Remove ParcelLockerPickup from the stack examples — it uses only `push`/`clear`, no `pop into` or count guard. Absent from current tool.
+
+### P5: Optional-with-fallback assignment (`if Param is set then Param else "default"`)
+Confirmed in BuildingAccessBadgeRequest, LoanApplication, EventRegistration. **Correction required:** Remove ApartmentRentalApplication — its Approve transition uses direct assignment with no fallback. Distinct from existing "Conditional action" pattern (field value comparison, not `is set` presence check).
+
+### P6: Conditional rule (`rule X when Y`)
+Confirmed in LoanApplication (`rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified`). Only one sample but structurally unique. Absent from current tool.
+
+### P7: `in State modify Field1, Field2 editable` editing window
+Confirmed across the corpus. The guarded form (`in UnderReview when DocumentsVerified modify DecisionNote editable`) is a notable sub-pattern. Completely absent from current tool (tool only covers `writable` for stateless).
+
+---
+
+## Blocked Items (must be reworked before merge)
+
+### BLOCK — P4: `on Event ensure` for argument validation
+**Reason:** False premise. The tool's "Ensures invariant" pattern already includes `on MakePayment ensure MakePayment.PaymentAmount > 0 because "Payment must be positive"`. The claim that "the tool documents `in State ensure` but doesn't mention the pre-fire argument guard" is factually incorrect.
+
+**Required rework:** Reframe as an extension note to the existing "Ensures invariant" pattern — not a new missing pattern. The pedagogical point that `on Event ensure` serves input validation while `in State ensure` serves structural invariants is worth surfacing, but only as added prose to the existing pattern, not as a "missing" entry.
+
+### BLOCK — AP1: `rule Field >= 0` when modifier suffices
+**Reason:** The cited example (`rule QuantityOnHand >= 0 because "..."`) does not exist in the samples. InventoryItem uses the `nonnegative` modifier on `QuantityOnHand` — the correct approach. The actual `rule >= 0` cases in InventoryItem are for `price`-typed fields with qualified dimensional zero literals (`rule AverageCost >= '0 {CatalogCurrency}/{StockingUnit}'`), where modifier applicability may be legitimately different from plain `number` fields. This needs modifier catalog verification before being labeled an anti-pattern.
+
+**Required rework:** Either (a) find a sample where `rule X >= 0` is used for a plain `number`/`integer` field that demonstrably accepts `nonnegative`, or (b) investigate whether `nonnegative` applies to `price`-typed fields with dynamic qualifiers. Do not fabricate an example — ground it in a real sample.
+
+### BLOCK — AP2: Identical rows for multiple states instead of multi-state target
+**Reason:** The Coordinator's factual claim is wrong. InventoryItem does NOT contain `from Listed on Delist -> ...` and `from LowStock on Delist -> ...` as separate rows. The actual file has `from Listed, LowStock on Delist -> set Description = ... -> transition Delisted` — the multi-state form, which is the correct approach.
+
+**Required rework:** The anti-pattern is architecturally valid and worth documenting. But the "Bad" example must be clearly labeled as a hypothetical illustration (what an author might write without knowing multi-state syntax), and the "Good" example should cite the actual InventoryItem `from Listed, LowStock on Delist` row.
+
+---
+
+## Priority Order for Approved Items
+
+1. P7 — `in State modify ... editable` — highest corpus prevalence, completely absent
+2. P1 — Entry action hook — 5 samples, zero coverage
+3. P3 — Stack/queue ordered operations — highest mechanical complexity, no coverage
+4. P2 — `from any` broadcast — important for system-signal design
+5. P5 — Optional-with-fallback — ubiquitous optional-param idiom
+6. P6 — Conditional rule — low frequency but structurally unique
+
+### 2026-05-12: Proof engine doc updates written
+**By:** Frank (shane)
+**What:** Added proof-engine.md §7 (Qualifier Resolution Reference) covering TranslateCurrencyAxis, TypedArgRef/TypedTypedConstant axis chains, ResolveQualifierFromExpression dispatch, corrected subsumption tables, and zero-denominator guard. Expanded spec §5 stub to full proof system overview.
+**Files:** docs/compiler/proof-engine.md, docs/language/precept-language-spec.md
+
 # George H1/H2 Done
 
 Date: 2026-05-12
@@ -20362,8 +20507,6 @@ This confirms the metadata-driven architecture principle: the `DiagnosticCode` e
 
 7. **Parser.cs** — `CollectionIntoByAction` parsing and optional sentinel paths. ~4 tests.
 
-
-
 # Proof Engine Documentation Gap — Decision Inbox
 
 **Author:** Frank  
@@ -20529,25 +20672,6 @@ The function is also where `TranslateCurrencyAxis` is called, where all five Qua
 ---
 
 *Decision required: None — this is a documentation gap record for tracking. Implementation of the doc additions should be scheduled against available bandwidth, prioritized after D130/D131/D132 and the OR proof-engine bug fix (Slice 9 of the field-state v3 plan).*
-
-
-# George — v3 Field-State Guarantees Design Decisions
-
-**Date:** 2025-07-20
-**Context:** Review of `docs/Working/field-state-guarantees-v3.md`
-
----
-
-- **`TypedEditDeclaration` must carry resolved state names.** The current record (SemanticIndex.cs) has no `StateName`/`StateNames` field; `PopulateEditDeclarations` never calls `ResolveStateTargets`. Slice 2's `BuildOmitLookup` can only work correctly if `TypedEditDeclaration` is extended with `ImmutableArray<string> StateNames` (via Path A) — reading from `Syntax` directly is fragile and causes diagnostic-emission ordering problems. Slice 2 scope must include this record extension and the `PopulateEditDeclarations` update.
-
-- **D132 exemptions must include collection fields.** `MissingDocuments as set of string` in `insurance-claim.precept` is non-optional, has no default, and is not computed. D132 as currently specified would fire on the Draft→Submitted transition, breaking Slice 6's "clean compile" claim. Resolution: add an explicit exemption for collection-typed fields (set, list, queue, bag, log) on the grounds that their natural empty state is a valid initialized value. This must be reflected in §6, §10 Slice 5 logic, and Slice 5 tests.
-
-- **`PopulateEnsures` guard fix (Slice 9) must include full expression resolution, not just slot extraction.** The fix must call `Resolve(guardSlot.Expression, ctx)` and validate the boolean result type, matching the pattern in `PopulateAccessModes` (TypeChecker.cs lines 979–992). The plan's "stop discarding GuardClauseSlot" description understates the required change.
-
-- **Slice 9 `TryGetNumericEnsureFact` fix must land atomically with the `PopulateEnsures` guard fix.** If `Guard` is populated in `TypedEnsure` but `TryGetNumericEnsureFact` still ignores it, a guarded ensure's condition becomes an unconditional numeric fact — a soundness regression worse than the current bug. The two changes must be committed together.
-
-- **`FieldTargetSlot.AdditionalFields` should be an `init`-only property with default `ImmutableArray<string>.Empty`, not a constructor parameter.** `FieldTargetSlot` is a `public sealed record`. Adding it as a required constructor parameter would break all external consumers that construct slots directly (including tests using positional constructors). The `init`-only property preserves existing construction sites.
-
 
 # George's Review — v3 Field-State Guarantees
 
