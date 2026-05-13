@@ -9,10 +9,10 @@
 | 1 | `field` (stored) | ✅ Done | `c178198e` |
 | 2 | `field` (computed) | ✅ Done | `c178198e` |
 | 3 | `event` | ✅ Done | `92ac40f8` |
-| 4 | `rule` | 🔴 Not started | — |
-| 5 | `ensure` | 🔴 Not started | — |
-| 6 | Transition row | 🔴 Not started | — |
-| 7 | `reject` | 🔴 Not started | — |
+| 4 | `rule` | ✅ Done | `eb581e86` |
+| 5 | `ensure` | ✅ Done | `eb581e86` |
+| 6 | Transition row | 🟡 In progress | — |
+| 7 | `reject` | 🟡 In progress | — |
 | 8 | Qualifier (base + proof) | 🔴 Not started | — |
 | 9 | Proof expression (non-qualifier) | 🔴 Not started | — |
 | 10 | Diagnostic squiggle (non-qualifier) | 🔴 Not started | — |

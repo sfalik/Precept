@@ -285,8 +285,8 @@ state Draft initial
         var hover = HoverHandler.CreateHover(compilation, new Position(addToken.Span.StartLine - 1, addToken.Span.StartColumn - 1));
 
         hover.Should().NotBeNull();
-        hover!.Contents.MarkupContent!.Value.Should().Contain("**transition**");
-        hover.Contents.MarkupContent.Value.Should().Contain("Actions:");
+        hover!.Contents.MarkupContent!.Value.Should().Contain("⚡ Enforced · route fires if guard passes");
+        hover.Contents.MarkupContent.Value.Should().Contain("🔁 `Draft` → `Done` on `AddTag`");
         hover.Contents.MarkupContent.Value.Should().NotStartWith("**add**");
     }
 
@@ -593,12 +593,11 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "from Listed on Publish");
 
-        markup.Should().Contain("**transition**");
-        markup.Should().Contain("⚠️ Gap · 1 unresolved proof obligation");
-        markup.Should().Contain("set ReorderRatio");
-        markup.Should().Contain("Graph:");
-        markup.Should().Contain("Gap: 1 unresolved obligation");
-        markup.Should().NotContain("Proof gap:");
+        markup.Should().Contain("⚠️ Gap · route proof incomplete");
+        markup.Should().Contain("🔁 `Listed` → `Listed` on `Publish`");
+        markup.Should().Contain("🔬 Can't confirm:");
+        markup.Should().NotContain("Actions:");
+        markup.Should().NotContain("Graph:");
     }
 
     [Theory]
@@ -644,9 +643,9 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "from Draft on Cancel");
 
-        markup.Should().Contain("**reject**");
+        markup.Should().Contain("⚡ Enforced · event rejected");
         markup.Should().Contain("> draft items cannot be cancelled");
-        markup.Should().Contain("Result: state unchanged · no field mutations commit");
+        markup.Should().Contain("State unchanged · no changes apply");
         markup.Should().NotContain("**transition**");
     }
 
@@ -684,7 +683,8 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "from Draft on Submit");
 
-        markup.Should().Contain("✅ Proven · source reachable · target `Done` reachable");
+        markup.Should().Contain("⚡ Enforced · route fires if guard passes");
+        markup.Should().Contain("🔁 `Draft` → `Done` on `Submit`");
         markup.Should().NotContain("Proof gap:");
     }
 

@@ -1387,36 +1387,37 @@ internal static class RichHoverFactory
     {
         var unresolved = GetTransitionObligations(compilation, row);
         var proofDiagnostics = GetDiagnosticsOverlapping(compilation, row.RowSpan, DiagnosticStage.Proof);
-        var reachability = DescribeTransitionReachability(compilation.Graph, row);
-        var proofGapCount = Math.Max(unresolved.Length, proofDiagnostics.Length);
-        var status = proofGapCount > 0 || HasConstructDiagnostics(compilation, row.RowSpan)
-            ? new HoverStatusBadge(HoverStatusKind.Unverified, $"{proofGapCount} unresolved proof obligation{Pluralize(proofGapCount)}")
-            : new HoverStatusBadge(HoverStatusKind.ProofVerified, reachability);
+        if (!unresolved.IsEmpty || !proofDiagnostics.IsEmpty)
+        {
+            var primaryObligation = SelectPrimaryProofObligation(unresolved);
+            var evidence = primaryObligation is null
+                ? EscapePlain(proofDiagnostics[0].Message)
+                : CreateFieldProofEvidence(compilation, primaryObligation);
+            return string.Join("\n", new[]
+            {
+                "⚠️ Gap · route proof incomplete",
+                FormatTransitionRouteLine(row),
+                $"🔬 Can't confirm: {evidence}",
+            });
+        }
 
         var lines = new List<string>
         {
-            $"**transition** `{EscapeInline(FormatTransitionHeader(row))}`",
-            FormatStatus(status),
-            $"Guard: {(row.Guard is null ? "*none*" : $"`{EscapeInline(FormatSnippet(compilation, row.Guard.Span))}`")}",
-            $"Actions: {FormatCodeList(row.Actions.Select(FormatActionSummary))}",
-            $"Graph: {reachability}",
+            "⚡ Enforced · route fires if guard passes",
+            FormatTransitionRouteLine(row),
+            row.Guard is null
+                ? "Guard: *none*"
+                : $"Guard: {EscapeInline(FormatSnippet(compilation, row.Guard.Span))}",
         };
 
-        if (proofGapCount > 0)
-        {
-            var categories = GetProofGapCategories(proofDiagnostics);
-            lines.Add($"Gap: {proofGapCount} unresolved obligation{Pluralize(proofGapCount)} ({string.Join(", ", categories)})");
-        }
-
-        return string.Join("\n\n", lines);
+        return string.Join("\n", lines);
     }
 
     private static string CreateRejectMarkdown(Compilation compilation, TypedTransitionRow row)
     {
-        var status = BuildStatus(compilation, row.RowSpan, HoverStatusKind.RuntimeChecked, "deliberate business rejection");
         var lines = new List<string>
         {
-            $"**reject** `{EscapeInline(FormatRejectHeader(row))}`",
+            "⚡ Enforced · event rejected",
         };
 
         if (!string.IsNullOrWhiteSpace(row.RejectReason))
@@ -1424,9 +1425,8 @@ internal static class RichHoverFactory
             lines.Add($"> {EscapeBlockquote(row.RejectReason!)}");
         }
 
-        lines.Add(FormatStatus(status));
-        lines.Add("Result: state unchanged · no field mutations commit");
-        return string.Join("\n\n", lines);
+        lines.Add("State unchanged · no changes apply");
+        return string.Join("\n", lines);
     }
 
     private static string CreateAccessMarkdown(Compilation compilation, AccessDeclarationInfo access)
@@ -2282,6 +2282,18 @@ internal static class RichHoverFactory
         };
 
         return $"{source} · {target}";
+    }
+
+    private static string FormatTransitionRouteLine(TypedTransitionRow row)
+    {
+        var from = row.FromState ?? "*";
+        var target = row.Outcome switch
+        {
+            TransitionRowOutcome.Transition => row.TargetState ?? "*",
+            _ => row.FromState ?? "*",
+        };
+
+        return $"🔁 `{EscapeInline(from)}` → `{EscapeInline(target)}` on `{EscapeInline(row.EventName)}`";
     }
 
     private static string FormatTransitionHeader(TypedTransitionRow row)
