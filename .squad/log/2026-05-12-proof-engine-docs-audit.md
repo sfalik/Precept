@@ -1,0 +1,1 @@
+Proof-engine docs audit recorded. Merged Frank's documentation-gap record and George's v3 field-state review/decision notes into `.squad/decisions/decisions.md`, skipped re-adding the already-captured `George H1/H2 Done` inbox item as a duplicate, and cleared the inbox files.

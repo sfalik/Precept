@@ -20362,3 +20362,365 @@ This confirms the metadata-driven architecture principle: the `DiagnosticCode` e
 
 7. **Parser.cs** — `CollectionIntoByAction` parsing and optional sentinel paths. ~4 tests.
 
+
+
+# Proof Engine Documentation Gap — Decision Inbox
+
+**Author:** Frank  
+**Date:** 2026-05-12T22:07:41-04:00  
+**Context:** Documentation quality audit requested by Shane. Assessed `docs/compiler/proof-engine.md`, `docs/language/precept-language-spec.md`, `docs/language/catalog-system.md`, and `src/Precept/Pipeline/ProofEngine.*.cs`.
+
+---
+
+## Verdict: Acceptable — Core documented, qualifier internals are the gap
+
+The proof engine has a dedicated 1,568-line design doc that covers the architecture thoroughly. The gaps are real but bounded to one subsystem: the qualifier resolution machinery in `ProofEngine.Qualifiers.cs`.
+
+---
+
+## What Is Well-Documented
+
+All of the following are described with sufficient detail that an implementer could reproduce them from the doc alone:
+
+- **Pipeline position and stage contract** — §2 of proof-engine.md, including the full pipeline ASCII diagram
+- **Two-pass architecture** — Pass 1 (obligation instantiation) and Pass 2 (discharge), with walk targets and strategy sequence
+- **Five proof strategies** — each has pseudocode, examples, edge cases, and a clear scope boundary
+  - Strategy 1 (Literal): discharge predicate pseudocode
+  - Strategy 2 (Declaration Attribute): carrier dispatch table, ProofSatisfactions modifier table, FunctionReturnSatisfies, FixedReturnAccessor.ReturnNonnegative paths
+  - Strategy 3 (Guard-in-Path): ExtractGuardConstraints specification (PE-G10), GuardSubsumes pseudocode, operator subsumption rules, full decomposition table for all guard patterns including OR suppression, negation inversion
+  - Strategy 4 (Flow Narrowing): GuardRelationImpliesObligation triple table (PE-G14), FieldToFieldConstraint type, distinction from Strategy 3
+  - Strategy 5 (Qualifier Compatibility): discharge predicate, DeclaredQualifierMeta subtypes, QualifierOrigin, normalization rules, TemporalDimension(Any) boundary
+- **All obligation and ledger types** — ProofRequirement DU (5 subtypes), ProofSubject DU, ProofDisposition, ProofStrategy, ObligationContext DU, ProofObligation, FaultSiteLink, ConstraintInfluenceEntry, InitialStateSatisfiabilityResult
+- **Carrier types** — DeclaredPresenceMeta, DeclaredQualifierMeta (8 subtypes), ValueModifierMeta.ProofSatisfactions table (10 modifiers)
+- **Initial-state satisfiability algorithm** — Steps 1–7 with the constant-fold table for all TypedExpression variants
+- **ProofForwardingFact consumption contract** — all 5 fact subtypes documented with consumption behavior
+- **Stateless precept handling** (PE-G15) — strategy applicability table
+- **Builder consumption contract** (PE-G11) — FaultSiteDescriptor backstops, ConstraintInfluenceMap shape, initial-state gate
+- **Language spec §0.6** — 12 proof-system responsibilities plus 7 proof philosophy principles. This is the authoritative language-level contract.
+- **Catalog-system.md** — ProofRequirements is Catalog 11, correctly described as a DU identity catalog with 5 subtypes
+
+---
+
+## What Is Missing or Underdocumented
+
+### Gap 1 (Critical): `TranslateCurrencyAxis` — completely absent
+
+**Source:** `ProofEngine.Qualifiers.cs:392–403`
+
+```csharp
+private static DeclaredQualifierMeta? TranslateCurrencyAxis(DeclaredQualifierMeta? qualifier)
+{
+    return qualifier switch
+    {
+        DeclaredQualifierMeta.ToCurrency toCurrency => new DeclaredQualifierMeta.Currency(
+            toCurrency.CurrencyCode, toCurrency.Origin, ...),
+        _ => qualifier,
+    };
+}
+```
+
+**What it does:** When a `CurrencyConversionRequired` QualifierBinding is on a binary op (e.g., `money * exchangerate`), the result's currency comes from the exchange rate's `ToCurrency` axis. But the outer compatibility check is on the `Currency` axis. `TranslateCurrencyAxis` bridges the axis mismatch by promoting `ToCurrency → Currency` so downstream comparisons see like-for-like qualifiers.
+
+**Why it matters:** This is the only path that makes `money * exchangerate` yield a correctly typed, provably-compatible currency qualifier. Without this function working correctly, currency conversion expressions are incorrectly unresolved. The function is entirely absent from the doc — not described by name, not described by behavior, not described as part of the `CurrencyConversionRequired` binding handling.
+
+**Coverage context:** `TranslateCurrencyAxis` is in the 73.5%-covered `Qualifiers.cs`. The test paths that cover it are exercised, but the behavior is undocumented implementation knowledge.
+
+---
+
+### Gap 2 (Critical): `TypedArgRef` and `TypedTypedConstant` resolution paths
+
+**Source:** `ProofEngine.Qualifiers.cs:161–217` (in `ResolveQualifierOnAxis`), `ProofEngine.Qualifiers.cs:319–339` (in `ResolveQualifierFromExpression`)
+
+**What it does:** When resolving a qualifier for Strategy 5, the subject may resolve to a `TypedArgRef` (an event argument, e.g., `on Submit(amount as money in 'USD'`) or a `TypedTypedConstant` (a typed literal). Both have their own `DeclaredQualifiers` properties and their own Unit→Dimension→TemporalDimension axis fallback chains.
+
+**Why it matters:** The doc says "Strategy 5 reads `TypedField.DeclaredQualifiers`" — which is true for field references. But operations on event args (extremely common in Precept — `set Amount = arg.amount * rate`) resolve through `TypedArgRef`. If `TypedArgRef` resolution is broken or changes, Strategy 5 silently produces `Unresolved` for all event-arg operands. The doc gives no hint this code path exists.
+
+---
+
+### Gap 3 (Critical): Transitive qualifier resolution through `TypedBinaryOp.ResultQualifier`
+
+**Source:** `ProofEngine.Qualifiers.cs:222–265` (in `ResolveQualifierOnAxis`), `ProofEngine.Qualifiers.cs:350–385` (in `ResolveQualifierFromExpression`)
+
+**What it does:** When a proof subject resolves to a `TypedBinaryOp` (e.g., the subject of a further arithmetic operation is itself an arithmetic expression), the engine reads `binOp.ResultQualifier` to determine how to derive the result qualifier. Five binding variants drive the recursion:
+- `SameQualifierRequired` — inherit from left operand
+- `QualifiedOperandInherited` — inherit from whichever operand has the result type
+- `CompoundUnitCancellationRequired` — for currency axes, inherit from either; for unit axes, call `TryResolveCompoundCancellationUnit`
+- `CurrencyConversionRequired` — result currency = exchange rate's `ToCurrency`, then translate axis via `TranslateCurrencyAxis`
+- `CompoundDimensionElevationRequired` — for currency axes, inherit from price (left); for unit axes, call `TryResolveCompoundElevationDimension`
+
+**Why it matters:** Complex price/quantity expressions (e.g., `(price * quantity) + tax`) require transitive resolution to verify qualifier compatibility. If the recursion logic is wrong, proof diagnostics fire for valid programs. None of this traversal is documented.
+
+---
+
+### Gap 4 (Moderate): `NumericConstraintSubsumes` vs. `SatisfactionCovers` subsumption divergence
+
+**Source:** `ProofEngine.Strategies.cs:388–408` vs `ProofEngine.Strategies.cs:199–267`
+
+**The doc's claim (line 785–786):**
+> "The subsumption logic mirrors GuardSubsumes (Strategy 3) but reads from catalog metadata rather than from a guard expression."
+
+**This is incorrect.** `SatisfactionCovers` has MORE operator-pair cases than `NumericConstraintSubsumes` (Strategy 3's function):
+
+| Case | NumericConstraintSubsumes | SatisfactionCovers |
+|---|---|---|
+| `(GreaterThan, GreaterThan)` | ✅ | ✅ |
+| `(LessThan, LessThan)` | ❌ (falls to exact match) | ✅ explicit |
+| `(LessThanOrEqual, LessThanOrEqual)` | ❌ (falls to exact match) | ✅ explicit |
+| `(NotEquals, NotEquals)` | ❌ (falls to exact match) | ✅ explicit |
+
+The exact-match fallback in `NumericConstraintSubsumes` covers most cases, but the **explicit ordering** creates different behavior when threshold values differ. This divergence is undocumented and could mislead anyone extending either function.
+
+**Note:** The doc's `GuardSubsumes` pseudocode table is itself incomplete — it shows only 5 rows but `NumericConstraintSubsumes` in source has the same 5 rows plus `(GreaterThan, GreaterThan)`. The pseudocode is one case short.
+
+---
+
+### Gap 5 (Minor): `EvaluateBinaryOp` divide-by-zero conservative guard
+
+**Source:** `ProofEngine.Analysis.cs:255–256`
+
+```csharp
+OperatorKind.Divide when dr.Value != 0 => dl.Value / dr.Value,
+OperatorKind.Modulo when dr.Value != 0 => dl.Value % dr.Value,
+```
+
+**What's missing:** The constant-fold table in the doc says `TypedBinaryOp` "evaluates the operation" if both operands fold to known values. It does NOT mention that divide and modulo return `Unknown` when the denominator folds to zero — rather than the literal fold result `False`. This conservative guard prevents the fold from reporting a deterministic result even when the operation is statically provable to fault. The behavior is correct but undocumented.
+
+---
+
+### Gap 6 (Minor): Language spec §5 is a stub
+
+**Source:** `docs/language/precept-language-spec.md:1846–1850`
+
+```markdown
+## 5. Proof Engine
+> **Status:** Implemented. See [`docs/compiler/proof-engine.md`](../compiler/proof-engine.md) for implementation detail.
+```
+
+Two lines. The spec has a rich §0.6 (proof design contract) but §5 itself carries no standalone content. A reader going through the spec linearly hits §5 and finds nothing. Ideally §5 should have a 1-page summary of proof obligations by construct (mirroring the operator/function tables in §3A), cross-referenced to the compiler doc for implementation.
+
+---
+
+## Most Critical Missing Doc
+
+**`ResolveQualifierFromExpression` — the qualifier resolution reference.**
+
+This function in `ProofEngine.Qualifiers.cs` is the implementation core of Strategy 5 for everything beyond simple `TypedField` subjects. It handles `TypedArgRef`, `TypedTypedConstant`, `TypedBinaryOp.ResultQualifier` recursion, `TypedInterpolatedTypedConstant`, and `TypedMemberAccess` subjects. None of this is described in the doc.
+
+The function is also where `TranslateCurrencyAxis` is called, where all five QualifierBinding variants are dispatched, and where the axis fallback chain logic lives. One section in proof-engine.md — perhaps 40–60 lines — covering `ResolveQualifierFromExpression`'s resolution contract would close Gaps 1, 2, 3, and much of Gap 4 simultaneously.
+
+---
+
+## Recommendation
+
+**Yes, the proof engine doc needs targeted additions — not a new doc.** `docs/compiler/proof-engine.md` is the right home. Add the following sections:
+
+1. **`§7 — Qualifier Resolution Reference`** (new subsection under §7 Component Mechanics):
+   - `ResolveQualifierOnAxis` contract: subject types handled, axis fallback chain (Unit→Dimension, Dimension→TemporalDimension)
+   - `ResolveQualifierFromExpression`: all expression node types, `TypedBinaryOp.ResultQualifier` dispatch for each of the 5 QualifierBinding variants
+   - `TranslateCurrencyAxis`: what it does, when it's called, why the axis mismatch exists
+   - `TypedArgRef` and `TypedTypedConstant` resolution arms
+
+2. **`§7 — Subsumption tables (corrected)`**: Document `NumericConstraintSubsumes` and `SatisfactionCovers` as separate functions with their own complete tables. Retract the "mirrors GuardSubsumes" claim.
+
+3. **`§5` in the language spec**: Add a 1-page proof-obligation summary by construct (÷0, sqrt, pow, collection access, qualifier compatibility). Currently scattered across §3A function/operator tables — consolidate the proof surface in §5.
+
+**Effort:** Medium — 3 targeted sections. The existing doc structure accommodates these naturally. No new top-level document is needed.
+
+---
+
+*Decision required: None — this is a documentation gap record for tracking. Implementation of the doc additions should be scheduled against available bandwidth, prioritized after D130/D131/D132 and the OR proof-engine bug fix (Slice 9 of the field-state v3 plan).*
+
+
+# George — v3 Field-State Guarantees Design Decisions
+
+**Date:** 2025-07-20
+**Context:** Review of `docs/Working/field-state-guarantees-v3.md`
+
+---
+
+- **`TypedEditDeclaration` must carry resolved state names.** The current record (SemanticIndex.cs) has no `StateName`/`StateNames` field; `PopulateEditDeclarations` never calls `ResolveStateTargets`. Slice 2's `BuildOmitLookup` can only work correctly if `TypedEditDeclaration` is extended with `ImmutableArray<string> StateNames` (via Path A) — reading from `Syntax` directly is fragile and causes diagnostic-emission ordering problems. Slice 2 scope must include this record extension and the `PopulateEditDeclarations` update.
+
+- **D132 exemptions must include collection fields.** `MissingDocuments as set of string` in `insurance-claim.precept` is non-optional, has no default, and is not computed. D132 as currently specified would fire on the Draft→Submitted transition, breaking Slice 6's "clean compile" claim. Resolution: add an explicit exemption for collection-typed fields (set, list, queue, bag, log) on the grounds that their natural empty state is a valid initialized value. This must be reflected in §6, §10 Slice 5 logic, and Slice 5 tests.
+
+- **`PopulateEnsures` guard fix (Slice 9) must include full expression resolution, not just slot extraction.** The fix must call `Resolve(guardSlot.Expression, ctx)` and validate the boolean result type, matching the pattern in `PopulateAccessModes` (TypeChecker.cs lines 979–992). The plan's "stop discarding GuardClauseSlot" description understates the required change.
+
+- **Slice 9 `TryGetNumericEnsureFact` fix must land atomically with the `PopulateEnsures` guard fix.** If `Guard` is populated in `TypedEnsure` but `TryGetNumericEnsureFact` still ignores it, a guarded ensure's condition becomes an unconditional numeric fact — a soundness regression worse than the current bug. The two changes must be committed together.
+
+- **`FieldTargetSlot.AdditionalFields` should be an `init`-only property with default `ImmutableArray<string>.Empty`, not a constructor parameter.** `FieldTargetSlot` is a `public sealed record`. Adding it as a required constructor parameter would break all external consumers that construct slots directly (including tests using positional constructors). The `init`-only property preserves existing construction sites.
+
+
+# George's Review — v3 Field-State Guarantees
+
+## Verdict
+
+**APPROVED WITH CONDITIONS**
+
+## Summary
+
+The architectural approach is sound: post-resolution validation in `ValidateFieldStateGuarantees` mirrors the established `ValidateCIEnforcement` pattern, `OmitLookup: HashSet<(string State, string Field)>` is the correct data structure, and the Slice 9 ProofEngine bugs are correctly identified. However, the plan has two correctness gaps that must be resolved before implementation starts: `TypedEditDeclaration` carries no resolved state names, leaving `BuildOmitLookup`'s state resolution path unspecified; and D132's exemption criteria don't address collection fields, which would cause a false positive on `MissingDocuments` in the insurance-claim sample and break Slice 6's "clean compile" claim.
+
+---
+
+## Findings
+
+### CONDITION 1: `TypedEditDeclaration` Has No State Information — `BuildOmitLookup` Path Unspecified
+
+`TypedEditDeclaration` (SemanticIndex.cs line 429–433) only carries `EditableFields`, `IsEditAll`, and `Syntax`. It has **no resolved state name**.
+
+`PopulateEditDeclarations` (TypeChecker.cs lines 1059–1093) reads the `FieldTargetSlot` and validates field names, but it **never calls `ResolveStateTargets`** on the `StateTargetSlot`. State names in omit declarations are not validated and not stored in the typed record.
+
+The plan's Slice 2 says `BuildOmitLookup` "Resolves state targets (single, comma-list, wildcard/any)" but doesn't specify the implementation path. Two paths exist:
+
+- **Path A (preferred):** Extend `TypedEditDeclaration` to add `ImmutableArray<string> StateNames`. Update `PopulateEditDeclarations` to call `ResolveStateTargets` and store the results. `BuildOmitLookup` reads `editDecl.StateNames` directly. This is consistent with how every other declaration type works (`TypedAccessMode.StateName`, `TypedStateHook.StateName`, etc.).
+
+- **Path B (fragile):** `BuildOmitLookup` calls `editDecl.Syntax.GetSlot<StateTargetSlot>(...)` and re-resolves state names itself. Problem: `ResolveStateTargets` emits `UndeclaredState` diagnostics. These would fire during `BuildOmitLookup`, not during `PopulateEditDeclarations`, which is architecturally wrong (state-name diagnostics belong with the declaration phase). An implementer would need to either emit diagnostics twice or write a read-only variant with no diagnostic side effects.
+
+**Required before Slice 2 starts:** The plan must specify Path A, which means Slice 2 must also include extending `TypedEditDeclaration` and updating `PopulateEditDeclarations`. This is a ~20-line addition but changes the public record shape.
+
+---
+
+### CONDITION 2: D132 Collection-Field Exemption Missing — Slice 6 "Clean Compile" Claim Broken
+
+D132 fires when a field is: non-optional, no `default` declaration, not computed, and crosses omit→non-omit without a `set` action.
+
+`insurance-claim.precept` declares:
+```
+field MissingDocuments as set of string
+in Draft omit ApprovedAmount, AdjusterName, DecisionNote, MissingDocuments
+```
+
+`MissingDocuments` is not `optional`, has no `default`, and is not computed. The Draft→Submitted transition (lines 42–44) does NOT `set MissingDocuments`. Under the plan's D132 exemption criteria, D132 **would fire** for `MissingDocuments` on this transition.
+
+`ApprovedAmount` is fine: it has `default '0.00 USD'` (line 10). Removing line 43 (`-> set ApprovedAmount = '0.00 USD'`) is correct; the default exempts it. `AdjusterName` and `DecisionNote` are `optional`, also exempt.
+
+But `MissingDocuments` is not exempt under any stated criterion. Slice 6's "2 tests (clean compile + sample regression theory)" cannot pass unless either:
+
+1. **Collection types get an implicit empty-initialization exemption**: If `set`, `list`, `queue`, `bag`, `log` fields are treated as always having an implicit "empty" value when they exit the omit state (no explicit set required), they should be listed as an exemption in §6 and §10 Slice 5 logic.
+2. **MissingDocuments is made optional in the sample**: Add `optional` to the field declaration.
+3. **A `set` action is added to the Draft→Submitted transition**: But this contradicts the purpose of `omit` (collections should start empty, not be set explicitly).
+
+Option 1 is semantically correct (empty is the natural initial state for a collection) and should be in the D132 exemption table. The plan must resolve this explicitly before implementation.
+
+---
+
+### CONDITION 3: `PopulateEnsures` Guard Fix (Slice 9) Must Include Full Expression Resolution
+
+`PopulateEnsures` (TypeChecker.cs lines 767–873) currently hardcodes `Guard: null` at lines 801 and 858 for both `StateEnsure` and `EventEnsure`. The `TypedEnsure` record does carry `TypedExpression? Guard` (SemanticIndex.cs line 394), so the field exists.
+
+The Slice 9 fix must not just extract the `GuardClauseSlot` — it must also **resolve** the expression and validate its type, exactly as `PopulateAccessModes` does (TypeChecker.cs lines 979–992):
+
+```csharp
+var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+if (guardSlot is not null)
+{
+    ctx.CurrentScope = FieldScopeMode.AllFields;
+    guard = Resolve(guardSlot.Expression, ctx);
+    if (guard is not TypedErrorExpression && guard.ResultType != TypeKind.Boolean)
+    {
+        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, ...));
+        guard = new TypedErrorExpression(guardSlot.Expression.Span);
+    }
+}
+```
+
+The plan says "stop discarding GuardClauseSlot" but doesn't mention this resolution step explicitly. Slice 9's test plan should include a case where the guard resolves to a non-boolean expression to confirm the type error is properly emitted.
+
+---
+
+### CONDITION 4: `PopulateEditDeclarations` Must Validate `AdditionalFields` After Slice 0
+
+After Slice 0 adds `AdditionalFields` to `FieldTargetSlot`, `PopulateEditDeclarations` (TypeChecker.cs line 1083) currently only validates `fieldSlot.FieldName` against `ctx.FieldLookup`. It must be extended to validate each additional field name and emit `UndeclaredField` for any that doesn't exist. This applies equally to `PopulateAccessModes` (line 958).
+
+The plan mentions "Update PopulateAccessModes, PopulateEditDeclarations, NameBinder" in Slice 0's scope, but doesn't call out the UndeclaredField validation path for additional fields explicitly.
+
+---
+
+### CONDITION 5: `FieldTargetSlot` Is a `public sealed record` — API Surface Change
+
+`FieldTargetSlot` (SlotValue.cs lines 101–105) is `public sealed record`. Adding `AdditionalFields` changes the public constructor signature and equality semantics. Any consumer deserializing or constructing `FieldTargetSlot` externally would break. The plan should acknowledge this and ensure the property has a `default` value (`ImmutableArray<string>.Empty`) so the no-arg form works without AdditionalFields.
+
+---
+
+### CONDITION 6: Slice 9 OR Splitting Semantics Must Be Made Explicit
+
+`ExtractGuardConstraintsCore` (ProofEngine.Strategies.cs lines 317–319) already correctly drops OR branches with the comment "OR: do NOT decompose — neither disjunct is guaranteed." This is **intentional and correct** for AND-based constraint extraction.
+
+`ExtractFieldToFieldCore` (ProofEngine.Strategies.cs line 493–494) does the same.
+
+The Slice 9 plan says "replace flat extraction with branch-aware OR splitting" — but this phrase is ambiguous. Clarification needed: for `TryGuardInPathProof`, if the guard is `A OR B`, a proof of obligation X succeeds only if X holds under branch A **and** under branch B independently. This is "per-branch validation" not "decompose OR into facts". The plan should state this explicitly, because a naive "split OR into two constraint sets and try each" approach would be unsound (it would prove X if X holds under A, ignoring B).
+
+The fix is: attempt proof of obligation against branch A's extracted constraints; if that succeeds, attempt proof against branch B's extracted constraints. Only if **both** succeed is the obligation proved. The plan description "branch-aware" should be formalized to this.
+
+---
+
+### GOOD: ParseFieldTarget Multi-Field Bug Confirmed
+
+Parser.cs lines 1019–1040: the while loop advances past commas and identifier tokens (consuming `AdjusterName`, `DecisionNote`, `MissingDocuments` from `insurance-claim.precept` line 26) but only stores `first.Text`. The `Advance()` return at line 1028 is discarded. The `FieldTargetSlot` constructor (line 1037) receives only `first.Text`. Confirmed real bug, confirmed data loss in practice.
+
+---
+
+### GOOD: PopulateEnsures Guard Drop Confirmed
+
+TypeChecker.cs lines 796–803 and 854–861: both `StateEnsure` and `EventEnsure` branches hardcode `Guard: null`. The `GuardClauseSlot` is never read. The existing `PopulateRules` method (lines 733–746) correctly handles the guard, so the pattern to follow is clear. Slice 9 fix is correct.
+
+---
+
+### GOOD: TryGetNumericEnsureFact Soundness Hole Confirmed
+
+ProofEngine.Composition.cs lines 155–157: `TryGetNumericEnsureFact` is called with no guard check. Since `PopulateEnsures` always sets `Guard: null`, this is currently a latent hole that becomes exploitable once Slice 9 fixes the guard propagation. The Slice 9 fix (check `ensure.Guard` before treating condition as unconditional fact) is correct and must land atomically with the `PopulateEnsures` fix.
+
+---
+
+### GOOD: OmitLookup Data Structure and Pipeline Position Are Sound
+
+`HashSet<(string State, string Field)>` uses default tuple equality (ordinal string comparison for both components). This is correct. All state and field names in the pipeline are ordinal-case-normalized by Pass 1. Placing `BuildOmitLookup` after `PopulateEditDeclarations` and before `ValidateModifiers` is the right position: all typed symbols are available, access-mode records are populated, state names are resolved.
+
+---
+
+### GOOD: D130 Scope Decisions Are Defensible
+
+Excluding to-State ensures from D130 scope is correct. A to-State ensure is a postcondition on the incoming transition — the omitted field is not being READ, the constraint is checked after the field might have been set. Including to-State ensures would produce false positives on exactly the transitions D132 is designed to enforce.
+
+Excluding on-exit hooks from D131 is correct. At semantic check time, the target state is not known for on-exit hooks (they fire when leaving a state, before the transition resolves the target). Checking on-exit hook `set` actions against the current state's omit lookup would be wrong.
+
+---
+
+### GOOD: Slice 9 Null-Guard Baseline Test Acknowledgment
+
+The "null-guard baseline" additional finding (guards dropped entirely, `Guard: null` in pipeline) is correctly scoped as a Slice 9 prerequisite test. Without confirming this baseline, the guard-drop fix can't be verified in isolation.
+
+---
+
+### GOOD: ValidateCIEnforcement Is the Right Reference Pattern
+
+`ValidateCIEnforcement` (TypeChecker.Validation.cs lines 350–390) iterates `ctx.TransitionRows`, `ctx.EventHandlers`, `ctx.Rules`, `ctx.Ensures`, and walks expression trees. `ValidateFieldStateGuarantees` needs the same iteration shape plus `ctx.StateHooks`. The pattern is directly applicable. The `EnforceCIInExpression` walker is also the correct model for `CollectFieldRefsFromExpression`.
+
+---
+
+## Edge Cases Not Covered
+
+1. **Collection fields and D132** (covered above as Condition 2 — the primary instance). No general resolution for "collection type has implicit empty initial value."
+2. **Wildcard from-state in D132**: When a transition has `FromState == null` (any-state wildcard), D132 must check every concrete state, not just states where the field is omitted. The plan mentions wildcard expansion but doesn't address the case where the wildcard spans BOTH omit and non-omit states for the same field. For a field omitted in some states and not others, only the omit-covered states in the wildcard are relevant — the expansion must filter to (omit, non-omit target) pairs, not fire unconditionally for all wildcard source states.
+3. **Self-loop transitions and D131**: A self-loop transition (`from State on Event -> no transition`) stays in the same state. D131 checks if a `set` action targets an omitted field in the target state. For a self-loop where the field is omitted in that state, D131 correctly fires. But D132 does not fire (the field doesn't cross omit→non-omit; it stays omitted). This case should be in the test suite.
+4. **Omit with unresolved state name**: If an omit declaration references an undeclared state (currently produces no diagnostic because `PopulateEditDeclarations` doesn't call `ResolveStateTargets`), the `OmitLookup` should either omit the entry (silent ignore — unresolved state already has an error diagnostic once Condition 1's fix is applied) or assert. After Condition 1 is resolved, this is handled naturally.
+5. **Multiple omit declarations for the same (State, Field) pair**: `HashSet<(string, string)>` silently deduplicates. This is correct behavior, but the plan doesn't explicitly confirm this is intended over flagging as a duplicate.
+
+---
+
+## Implementation Risk Notes
+
+**Slice 0 (ParseFieldTarget fix) is a correctness prerequisite for D130/D131/D132 enforcement on the insurance-claim sample.** Without it, `in Draft omit ApprovedAmount, AdjusterName, DecisionNote, MissingDocuments` produces a `FieldTargetSlot` with only `ApprovedAmount`. D131 and D132 checks for `AdjusterName`, `DecisionNote`, and `MissingDocuments` would be silently skipped. This is correctly called out in the ordering constraints.
+
+**Slice 9 must land as an atomic unit.** The `PopulateEnsures` guard fix and the `TryGetNumericEnsureFact` guard check must be deployed together. If the guard is stored in `TypedEnsure` but `TryGetNumericEnsureFact` still ignores it, the guard creates a soundness regression (a fact that only holds conditionally is treated as unconditional). The null-guard baseline tests should be the first tests written.
+
+**The `AdditionalFields` addition to `FieldTargetSlot` is a public API change.** If any external consumer constructs `FieldTargetSlot` directly (e.g., tests that use `new FieldTargetSlot(...)` with positional arguments), the constructor change will break them. Recommend: add `AdditionalFields` as an optional `init`-only property with default `ImmutableArray<string>.Empty`, not a constructor parameter.
+
+**`OmitLookup` is built from unvalidated state names until Condition 1 is resolved.** If `BuildOmitLookup` reads `Syntax` directly without emitting state-name diagnostics, `in FakeState omit field` would silently produce no lookup entry and no diagnostic. This gives a false negative: omit is declared but not enforced. Must be addressed.
+
+---
+
+## Sign-Off
+
+George — 2025-07-20
+
+*Reviewed: TypeChecker.cs (PopulateEditDeclarations, PopulateEnsures, TypeChecker.Check pipeline), TypeChecker.Validation.cs (ValidateCIEnforcement reference pattern), CheckContext.cs (available ctx fields), SlotValue.cs (FieldTargetSlot, TypedEditDeclaration), Parser.cs lines 1005–1048 (ParseFieldTarget), ProofEngine.Strategies.cs lines 271–538 (TryGuardInPathProof, ExtractGuardConstraints, TryFlowNarrowingProof), ProofEngine.Composition.cs lines 155–203 (TryGetNumericEnsureFact), SemanticIndex.cs (TypedEditDeclaration, TypedEnsure records), samples/insurance-claim.precept.*
