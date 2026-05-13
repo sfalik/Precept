@@ -500,15 +500,19 @@ public static class Tokens
 
     /// <summary>
     /// Keywords that are valid as member/method names after '.'.
-    /// Derived from type accessor metadata.
+    /// Derived from type accessor metadata. Initialized lazily to avoid
+    /// a circular static-constructor dependency between <see cref="Tokens"/>
+    /// and <see cref="Types"/>.
     /// </summary>
-    public static FrozenSet<TokenKind> KeywordsValidAsMemberName { get; } =
-        Types.All
+    private static readonly Lazy<FrozenSet<TokenKind>> _keywordsValidAsMemberName =
+        new(() => Types.All
             .SelectMany(meta => meta.Accessors)
             .Select(accessor => accessor.Name)
             .Distinct(StringComparer.Ordinal)
             .Select(name => Keywords.TryGetValue(name, out var kind) ? kind : (TokenKind?)null)
             .Where(kind => kind is not null)
             .Select(kind => kind!.Value)
-            .ToFrozenSet();
+            .ToFrozenSet());
+
+    public static FrozenSet<TokenKind> KeywordsValidAsMemberName => _keywordsValidAsMemberName.Value;
 }

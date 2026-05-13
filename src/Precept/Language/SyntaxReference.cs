@@ -255,6 +255,106 @@ public static class SyntaxReference
 
             rule DiscountPercent <= 100 because "Discount percent cannot exceed 100%"
             """),
+
+        new(
+            "Entry action hook",
+            "Declare a single action that fires automatically whenever the entity transitions into a state, instead of repeating the same assignment in every inbound transition. The 'to State -> actions' clause runs on every inbound edge including back-edges that re-enter the state. Use this to initialize or reset a field on state entry.",
+            """
+            # Fires on every inbound edge to ReadyForPickup, regardless of source state.
+            to ReadyForPickup -> set PickupContacted = true
+
+            # Reset-on-re-entry: fires even when a re-approval transitions back into Approved.
+            to Approved -> set BadgePrinted = false
+            """),
+
+        new(
+            "Cross-cutting event (from any)",
+            "An event that must fire regardless of current state — a system-level signal that cuts across all lifecycle stages. Declare it once with 'from any on Event' instead of repeating the row for every individual state. The usual outcome is 'no transition' to stay in place, or 'transition Target' to jump unconditionally.",
+            """
+            from any on PedestrianRequest
+                -> set RequestPending = true
+                -> no transition
+
+            from any on CloseService
+                -> set WalkInOpen = false
+                -> transition Closed
+            """),
+
+        new(
+            "Stack and queue operations",
+            "Collection fields that maintain insertion order. A stack supports push, pop-into, and .count (LIFO). A queue supports enqueue, dequeue-into, .peek, and .count (FIFO). The .peek accessor reads the front element without consuming it — useful to capture it into a field before the dequeue action removes it.",
+            """
+            # Stack: push adds to top; pop into captures and removes the top element.
+            field RepairSteps as stack of string
+
+            from InRepair on LogRepairStep
+                -> push RepairSteps LogRepairStep.StepName
+                -> no transition
+            from InRepair on UndoLastStep when RepairSteps.count > 0
+                -> pop RepairSteps into LastReversedStep
+                -> no transition
+
+            # Queue: enqueue adds to back; peek reads front without removing; dequeue into removes.
+            field PartyQueue as queue of string
+
+            from Accepting on JoinWaitlist
+                -> enqueue PartyQueue JoinWaitlist.PartyName
+                -> no transition
+            from Accepting on SeatNextParty when PartyQueue.count > 0
+                -> set LastCalledParty = PartyQueue.peek
+                -> dequeue PartyQueue into CurrentParty
+                -> transition Seating
+            """),
+
+        new(
+            "Optional-with-fallback assignment",
+            "When an event parameter is 'optional', use 'if Param is set then Param else fallback' in a 'set' action to provide a safe default without a separate guard row. The entire expression stays inline — no extra transition row is needed. Multiple fallback tiers can be chained with additional 'else if' clauses.",
+            """
+            event Approve(Amount as money in 'USD', Note as string optional)
+
+            from UnderReview on Approve when DocumentsVerified and CreditScore >= 680
+                -> set ApprovedAmount = Approve.Amount
+                -> set DecisionNote = if Approve.Note is set then Approve.Note else if CreditScore >= 750 then "Prime tier — auto-approved" else "Standard tier — approved"
+                -> transition Approved
+            """),
+
+        new(
+            "Conditional rule (rule when)",
+            "A global invariant that only applies when a guard condition is true. Use 'rule Expression when Condition because ...' when a constraint is only meaningful once the entity reaches a certain state. The runtime skips the rule entirely while the guard is false, preventing spurious violations during early lifecycle stages.",
+            """
+            # Skipped until DocumentsVerified = true; enforced on every operation thereafter.
+            rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Debt {ExistingDebt} exceeds the 3x income ceiling — maximum is {AnnualIncome * 3.0}"
+            """),
+
+        new(
+            "State-scoped editing window",
+            "Declare a window of mutability for specific fields only while the entity is in a given state. 'in State modify Fields editable' is lifecycle-aware: the editing window closes the moment the state changes. An optional 'when Condition' narrows the window further to a runtime guard within the state. Distinct from 'writable', which is a stateless per-field flag with no lifecycle awareness.",
+            """
+            # All five fields are editable while in Draft; window closes on Submit.
+            in Draft modify ApplicantName, MonthlyIncome, RequestedRent, CreditScore, HouseholdSize editable
+
+            # Conditional editing window — only open once DocumentsVerified is true.
+            in UnderReview when DocumentsVerified modify DecisionNote editable
+            """),
+
+        new(
+            "Interpolation in diagnostic strings",
+            "Embed field values and computed expressions directly into 'because' and 'reject' strings using {expr} interpolation. Any expression valid in a 'when' guard is also valid inside braces. Use this to make rejection messages self-explanatory — the actual values that caused the failure appear inline rather than requiring a separate lookup.",
+            """
+            # Field value inline in a rule violation message.
+            rule ApprovedAmount <= RequestedAmount because "Approved amount {ApprovedAmount} exceeds the submitted request of {RequestedAmount}"
+
+            # Computed expression inline — same arithmetic the guard uses, surfaced in the message.
+            in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Monthly income {MonthlyIncome} does not meet the 3x rent requirement — {RequestedRent * 3} needed"
+
+            # Event argument and field value together in a reject string.
+            from Submitted on Approve
+                -> reject "Cannot approve {Approve.Amount} — the submitted request is only {RequestedAmount}"
+
+            # Division in a reject message — the same computed value the guard checked.
+            from Draft on Submit
+                -> reject "Average lodging of {Submit.Lodging / Submit.Days} per day exceeds the $350 policy cap"
+            """),
     ];
 
     public static IReadOnlyList<string> ConventionalOrder { get; } =
@@ -331,6 +431,59 @@ public static class SyntaxReference
             from Draft on Complete -> transition Done
             """,
             "Computed fields (declared with '<-') are read-only by definition. Their value is recalculated from the formula whenever A changes. Attempting to 'set' a computed field produces a ComputedFieldNotWritable error."),
+
+        new(
+            "Sentinel defaults for not-yet-meaningful fields",
+            "Using `default 0`, `default false`, or `default \"\"` for a field that should be absent in earlier states. A sentinel default turns 'not meaningful yet' into a real value and hides the transition where the field must first be set.",
+            """
+            precept RefundReview
+
+            field RequestedAmount as money in 'USD' optional
+            field ApprovedAmount as money in 'USD' default '0.00 USD'
+
+            state Draft initial
+            state Reviewed
+            state Approved terminal
+
+            in Approved ensure ApprovedAmount > '0.00 USD' because "Approved refunds must have a positive approved amount"
+
+            event Submit(Amount as money in 'USD')
+            event Approve(Amount as money in 'USD')
+            on Approve ensure Approve.Amount > '0.00 USD' because "Approved refunds must be positive"
+
+            from Draft on Submit
+                -> set RequestedAmount = Submit.Amount
+                -> transition Reviewed
+            from Reviewed on Approve
+                -> set ApprovedAmount = Approve.Amount
+                -> transition Approved
+            """,
+            """
+            precept RefundReview
+
+            field RequestedAmount as money in 'USD' optional
+            field ApprovedAmount as money in 'USD'
+
+            state Draft initial
+            state Reviewed
+            state Approved terminal
+
+            in Draft omit ApprovedAmount
+            in Reviewed omit ApprovedAmount
+            in Approved ensure ApprovedAmount > '0.00 USD' because "Approved refunds must have a positive approved amount"
+
+            event Submit(Amount as money in 'USD')
+            event Approve(Amount as money in 'USD')
+            on Approve ensure Approve.Amount > '0.00 USD' because "Approved refunds must be positive"
+
+            from Draft on Submit
+                -> set RequestedAmount = Submit.Amount
+                -> transition Reviewed
+            from Reviewed on Approve
+                -> set ApprovedAmount = Approve.Amount
+                -> transition Approved
+            """,
+            "Declare the field with `omit` in every state where it has no business meaning. Then, on the transition into a non-omitted state, include `set Field = ...` to initialize it; the compiler requires that assignment before the field can become present. Keep `default` only for real business defaults."),
 
         new(
             "Exhaustive rejection rows",

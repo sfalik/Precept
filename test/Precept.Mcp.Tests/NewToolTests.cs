@@ -109,7 +109,16 @@ public class NewToolTests
         result.Should().StartWith("# Precept Patterns");
         result.Should().Contain("## Common Patterns");
         result.Should().Contain("### Guarded transition");
+        result.Should().Contain("### Entry action hook");
+        result.Should().Contain("### Cross-cutting event (from any)");
+        result.Should().Contain("### Stack and queue operations");
+        result.Should().Contain("### Optional-with-fallback assignment");
+        result.Should().Contain("### Conditional rule (rule when)");
+        result.Should().Contain("### State-scoped editing window");
+        result.Should().Contain("### Interpolation in diagnostic strings");
         result.Should().Contain("## Anti-Patterns");
+        result.Should().Contain("### Sentinel defaults for not-yet-meaningful fields");
+        result.Should().Contain("omit ApprovedAmount");
         result.Should().Contain("### Exhaustive rejection rows");
     }
 

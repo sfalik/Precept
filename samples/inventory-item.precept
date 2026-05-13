@@ -50,16 +50,16 @@ field StockingUnit as unitofmeasure default 'each'
 field PurchaseUnit as unitofmeasure default 'each'
 field SaleUnit as unitofmeasure default 'each'
 
-field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}' default '1 {StockingUnit}/{PurchaseUnit}'
-field StockingUnitsPerSaleUnit as quantity in '{StockingUnit}/{SaleUnit}' default '1 {StockingUnit}/{SaleUnit}'
+field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}' default '1 {StockingUnit}/{PurchaseUnit}' positive
+field StockingUnitsPerSaleUnit as quantity in '{StockingUnit}/{SaleUnit}' default '1 {StockingUnit}/{SaleUnit}' positive
 
 # ── Stock levels ──────────────────────────────────────────────────────────────
 # `of '{StockingUnit.dimension}'` constrains the dimension to match StockingUnit at runtime.
-field QuantityOnHand as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}'
-field RestockThreshold as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}'
+field QuantityOnHand as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}' nonnegative
+field RestockThreshold as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}' nonnegative
 
 # ── Pricing and cost ──────────────────────────────────────────────────────────
-field TotalInventoryCost as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+field TotalInventoryCost as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' nonnegative
 
 # Weighted average cost per stocking unit — purchase side, derived from shipment receipts.
 # Type derivation: TotalInventoryCost / QuantityOnHand → money ÷ quantity → price.
@@ -73,10 +73,10 @@ field ListPrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}' defaul
 # TotalCostOfGoods — Qty × StockingUnitsPerSaleUnit × AverageCost per FulfillOrder
 # TotalReturns     — reversed revenue from ReturnOrder events
 # TotalShrinkage   — write-off cost from RecordShrinkage events
-field TotalRevenue as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
-field TotalCostOfGoods as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
-field TotalReturns as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
-field TotalShrinkage as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}'
+field TotalRevenue as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' nonnegative
+field TotalCostOfGoods as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' nonnegative
+field TotalReturns as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' nonnegative
+field TotalShrinkage as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' nonnegative
 
 # GrossProfit is derived — the engine keeps it atomically consistent with the accumulators.
 field GrossProfit as money in '{CatalogCurrency}' <- TotalRevenue - TotalReturns - TotalCostOfGoods - TotalShrinkage
@@ -91,17 +91,8 @@ field ShrinkageLog as log of string
 field AdjustmentLog as log of string
 
 # ── Invariants ────────────────────────────────────────────────────────────────
-rule QuantityOnHand >= '0 {StockingUnit}' because "Stock on hand cannot go negative"
-rule RestockThreshold >= '0 {StockingUnit}' because "Restock threshold cannot be negative"
-rule TotalInventoryCost >= '0.00 {CatalogCurrency}' because "Total inventory cost must be nonnegative"
-rule TotalRevenue >= '0.00 {CatalogCurrency}' because "Total revenue cannot be negative"
-rule TotalCostOfGoods >= '0.00 {CatalogCurrency}' because "Total cost of goods cannot be negative"
-rule TotalReturns >= '0.00 {CatalogCurrency}' because "Total returns cannot be negative"
-rule TotalShrinkage >= '0.00 {CatalogCurrency}' because "Total shrinkage cannot be negative"
 rule AverageCost >= '0 {CatalogCurrency}/{StockingUnit}' because "Average cost cannot be negative"
 rule ListPrice >= '0 {CatalogCurrency}/{SaleUnit}' because "List price cannot be negative"
-rule StockingUnitsPerPurchaseUnit > '0 {StockingUnit}/{PurchaseUnit}' because "Purchase conversion ratio must be positive"
-rule StockingUnitsPerSaleUnit > '0 {StockingUnit}/{SaleUnit}' because "Sale conversion ratio must be positive"
 
 # ── States ────────────────────────────────────────────────────────────────────
 
@@ -182,18 +173,12 @@ from Unlisted on Publish
 #   quantity × quantity → quantity  (purchase → stocking qty)
 #   quantity + quantity → quantity  (new on-hand)
 #   money ÷ quantity → price        (new WAC)
-from Listed on ReceiveShipment
-    -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))
-    -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
-    -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
-    -> no transition
-
 from LowStock on ReceiveShipment when QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit > RestockThreshold
     -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
     -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
     -> transition Listed
-from LowStock on ReceiveShipment
+from Listed, LowStock on ReceiveShipment
     -> set TotalInventoryCost = TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))
     -> set QuantityOnHand = QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit
     -> set AverageCost = (TotalInventoryCost + ReceiveShipment.Rate * (ReceiveShipment.SupplierUnitCost * (ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit))) / (QuantityOnHand + ReceiveShipment.PurchaseQty * StockingUnitsPerPurchaseUnit)
@@ -207,40 +192,24 @@ from Listed on FulfillOrder when QuantityOnHand >= FulfillOrder.Qty * StockingUn
     -> set QuantityOnHand = QuantityOnHand - FulfillOrder.Qty * StockingUnitsPerSaleUnit
     -> set TotalInventoryCost = QuantityOnHand * AverageCost
     -> transition LowStock
-from Listed on FulfillOrder when QuantityOnHand >= FulfillOrder.Qty * StockingUnitsPerSaleUnit
+from Listed, LowStock on FulfillOrder when QuantityOnHand >= FulfillOrder.Qty * StockingUnitsPerSaleUnit
     -> set TotalRevenue = TotalRevenue + FulfillOrder.Qty * ListPrice
     -> set TotalCostOfGoods = TotalCostOfGoods + FulfillOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
     -> set QuantityOnHand = QuantityOnHand - FulfillOrder.Qty * StockingUnitsPerSaleUnit
     -> set TotalInventoryCost = QuantityOnHand * AverageCost
     -> no transition
-from Listed on FulfillOrder
-    -> reject "Insufficient stock to fulfill this order"
-
-from LowStock on FulfillOrder when QuantityOnHand >= FulfillOrder.Qty * StockingUnitsPerSaleUnit
-    -> set TotalRevenue = TotalRevenue + FulfillOrder.Qty * ListPrice
-    -> set TotalCostOfGoods = TotalCostOfGoods + FulfillOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
-    -> set QuantityOnHand = QuantityOnHand - FulfillOrder.Qty * StockingUnitsPerSaleUnit
-    -> set TotalInventoryCost = QuantityOnHand * AverageCost
-    -> no transition
-from LowStock on FulfillOrder
+from Listed, LowStock on FulfillOrder
     -> reject "Insufficient stock to fulfill this order"
 
 # ReturnOrder: reverse revenue at original price; reverse COGS at current WAC.
 # Stock re-incremented and revalued.
-from Listed on ReturnOrder
-    -> set TotalReturns = TotalReturns + ReturnOrder.Qty * ReturnOrder.OriginalSalePrice
-    -> set TotalCostOfGoods = TotalCostOfGoods - ReturnOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
-    -> set QuantityOnHand = QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit
-    -> set TotalInventoryCost = QuantityOnHand * AverageCost
-    -> no transition
-
 from LowStock on ReturnOrder when QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit > RestockThreshold
     -> set TotalReturns = TotalReturns + ReturnOrder.Qty * ReturnOrder.OriginalSalePrice
     -> set TotalCostOfGoods = TotalCostOfGoods - ReturnOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
     -> set QuantityOnHand = QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit
     -> set TotalInventoryCost = QuantityOnHand * AverageCost
     -> transition Listed
-from LowStock on ReturnOrder
+from Listed, LowStock on ReturnOrder
     -> set TotalReturns = TotalReturns + ReturnOrder.Qty * ReturnOrder.OriginalSalePrice
     -> set TotalCostOfGoods = TotalCostOfGoods - ReturnOrder.Qty * StockingUnitsPerSaleUnit * AverageCost
     -> set QuantityOnHand = QuantityOnHand + ReturnOrder.Qty * StockingUnitsPerSaleUnit

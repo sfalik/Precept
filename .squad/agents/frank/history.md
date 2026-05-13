@@ -52,6 +52,13 @@
 - The approved end state is commit-backed by `c2a38a56`, `47f3068c`, and `9617f39b`, with `279/279` language-server tests and `4973` core tests green.
 ## Learnings
 
+### 2026-05-12 — Modifier applicability by type: catalog-verified
+
+- `nonnegative`, `positive`, and `nonzero` apply to all seven numeric/magnitude types: `integer`, `decimal`, `number`, `money`, `quantity`, `price`, `exchangerate`. Both `nonnegative` and `positive` desugar to rules and carry proof satisfactions.
+- The claim "NOT price or exchangerate" is wrong. Both types are in the catalog applicability sets and have been since at least the current MCP snapshot.
+- However, `price` and `exchangerate` fields with dynamic qualifiers (e.g., `price in '{CatalogCurrency}' of '{StockingUnit.dimension}'`) legitimately use explicit zero comparisons with dimensionally-qualified literals rather than the modifier. The modifier desugars to `self >= 0` (dimensionless zero); the explicit rule makes both currency and dimension expectations visible. This is intentional, not an anti-pattern.
+- InventoryItem's `AverageCost` and `ListPrice` rules (`rule AverageCost >= '0 {CatalogCurrency}/{StockingUnit}'`) are correctly authored — the qualified literal form is the right choice for dynamically-qualified price fields.
+
 - When a design spans Update and Fire behavior, verify the split against the spec and evaluator before planning diagnostics; a single explicit rule can invalidate an otherwise plausible implementation plan.
 - Catalog/spec drift around business-domain types should be recorded as metadata gaps, not framed as deep semantic exclusions, when the checker is merely enforcing incomplete applicability tables.
 - If a spec guarantee depends on runtime surfaces that do not yet exist (for example constructor enforcement around `Create()`), record the gap and owner decision boundary before pushing implementation work.

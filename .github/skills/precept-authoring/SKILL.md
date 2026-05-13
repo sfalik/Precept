@@ -23,7 +23,7 @@ Read one or more existing `.precept` files from the workspace to understand loca
 
 ## Step 3: Get Patterns Before Drafting
 
-Call `precept_patterns` before writing the first draft. The 8 verified common patterns and 3 anti-patterns are the most efficient way to avoid mistakes that would require backtracking later.
+Call `precept_patterns` before writing the first draft. The 8 verified common patterns and 5 anti-patterns are the most efficient way to avoid mistakes that would require backtracking later.
 
 ## Step 4: Design the Model
 

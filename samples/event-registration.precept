@@ -56,10 +56,7 @@ from PendingPayment on RecordPayment when SeatsReserved > 0
 from PendingPayment on RecordPayment
     -> reject "A payment cannot be recorded before seats are reserved"
 
-from Draft on Cancel
-    -> set CancellationReason = if Cancel.Reason is set then Cancel.Reason else "Cancelled"
-    -> transition Cancelled
-from PendingPayment on Cancel
+from Draft, PendingPayment on Cancel
     -> set CancellationReason = if Cancel.Reason is set then Cancel.Reason else "Cancelled"
     -> transition Cancelled
 

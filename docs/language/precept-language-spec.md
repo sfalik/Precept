@@ -1845,7 +1845,19 @@ This is not merely a tooling convenience. It is a language-level guarantee that 
 
 ## 5. Proof Engine
 
-> **Status:** Implemented. See [`docs/compiler/proof-engine.md`](../compiler/proof-engine.md) for implementation detail.
+> **Status:** Implemented.
+
+Precept's proof system is the compile-time layer that prevents invalid qualifier and safety configurations from entering an accepted definition. Conceptually it runs in two passes: it first instantiates proof obligations from typed expressions and actions, then discharges those obligations from literals, declaration metadata, guards, simple flow facts, and qualifier compatibility. It also checks initial-state satisfiability against default values. See [`docs/compiler/proof-engine.md`](../compiler/proof-engine.md) for implementation detail and §7 there for qualifier-resolution mechanics.
+
+For authors, a **proved** qualifier constraint means the compiler established the required fact for every accepted execution reaching the proof site: the expression can rely on that qualifier relation at runtime without an additional author-supplied guard. The proof system is intentionally conservative. If the compiler cannot prove the required fact, the program is rejected with a diagnostic rather than accepted on a guess.
+
+The implemented qualifier-oriented checks include:
+- numeric/range obligations such as nonzero and nonnegative requirements on operations
+- currency-axis compatibility and conversion-result currency resolution
+- unit, dimension, and temporal-dimension compatibility
+- declaration-based facts carried by qualifiers, modifiers, and presence metadata
+
+An unprovable obligation is not treated as "probably fine." It remains unresolved, surfaces a compile-time diagnostic, and requires the author to add the missing qualifier, modifier, default, guard, or other proof-bearing fact.
 
 ---
 

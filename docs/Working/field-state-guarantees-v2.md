@@ -1,8 +1,9 @@
 # Field-State Guarantees — v2 Design
 
-> **Status:** Proposal  
+> **Status:** Design Finalized — Pending Implementation  
 > **Author:** Frank (Lead/Architect)  
 > **Date:** 2026-05-12  
+> **Finalized:** 2026-05-12
 
 ---
 
@@ -119,17 +120,18 @@ The ProofEngine already has the machinery to check this: `ExtractGuardConstraint
 
 **File:** `src/Precept/Pipeline/SlotValue.cs`
 
-Change `FieldTargetSlot` to carry all field names:
+Change `FieldTargetSlot` to carry all field names and an explicit broadcast flag:
 
 ```csharp
-/// <summary>Field name(s) or "all".</summary>
+/// <summary>Field name(s) or broadcast ("all").</summary>
 public sealed record FieldTargetSlot(
     ImmutableArray<string> FieldNames,
+    bool IsBroadcast,
     SourceSpan Span
 ) : SlotValue(ConstructSlotKind.FieldTarget, Span)
 {
-    /// <summary>Backward-compat: first field name, or null if empty/broadcast.</summary>
-    public string? FieldName => FieldNames.IsDefaultOrEmpty ? null
+    /// <summary>Backward-compat: first field name, or null if broadcast/empty.</summary>
+    public string? FieldName => IsBroadcast || FieldNames.IsDefaultOrEmpty ? null
         : FieldNames[0];
 
     /// <summary>Per-field name spans for diagnostics and LS references.</summary>
@@ -137,6 +139,8 @@ public sealed record FieldTargetSlot(
         ImmutableArray<SourceSpan>.Empty;
 }
 ```
+
+**Design decision (Q1/B3):** The `IsBroadcast` property replaces the original null-`FieldName` sentinel for broadcast detection. Current code uses `HasKeywordTokenMeta(fieldSlot.FieldName, ...)` for broadcast detection — a null `FieldName` would break this. The explicit boolean makes broadcast intent unambiguous and avoids conflating "no fields parsed" with "all fields."
 
 **File:** `src/Precept/Pipeline/Parser.cs`, method `ParseFieldTarget` (line 1005)
 
@@ -152,6 +156,7 @@ private SlotValue ParseFieldTarget(ConstructSlot slot)
         var tok = Advance();
         return new FieldTargetSlot(
             ImmutableArray<string>.Empty,
+            IsBroadcast: true,
             tok.Span)
         {
             NameSpans = ImmutableArray<SourceSpan>.Empty,
@@ -185,6 +190,7 @@ private SlotValue ParseFieldTarget(ConstructSlot slot)
 
         return new FieldTargetSlot(
             names.ToImmutable(),
+            IsBroadcast: false,
             SourceSpan.Covering(first.Span, lastSpan))
         {
             NameSpans = spans.ToImmutable(),
@@ -195,19 +201,30 @@ private SlotValue ParseFieldTarget(ConstructSlot slot)
         return MakeSentinel(slot);
     _diagnostics.Add(DiagnosticsCatalog.Create(
         DiagnosticCode.ExpectedToken, Peek().Span, "field name", Peek().Text));
-    return new FieldTargetSlot(ImmutableArray<string>.Empty, Peek().Span);
+    return new FieldTargetSlot(ImmutableArray<string>.Empty, IsBroadcast: false, Peek().Span);
 }
 ```
 
-**Downstream changes:** Every consumer of `FieldTargetSlot.FieldName` must iterate `FieldNames` instead. Two call sites:
-- `PopulateAccessModes` (TypeChecker.cs:950–969) — loop over `FieldNames` and `NameSpans`, emitting one `TypedAccessMode` per field per resolved state.
-- `PopulateEditDeclarations` (TypeChecker.cs:1069–1086) — loop over `FieldNames`, emitting one `TypedAccessMode` with `Mode = ModifierKind.Omit` per field per resolved state.
+**Downstream changes:** Every consumer of `FieldTargetSlot.FieldName` must iterate `FieldNames` instead (or check `IsBroadcast` for the all-fields case). Four call sites:
+
+| # | Consumer | File:Line | Change Required |
+|---|----------|-----------|-----------------|
+| 1 | `PopulateAccessModes` | TypeChecker.cs:950–969 | Loop over `FieldNames` and `NameSpans`, emitting one `TypedAccessMode` per field per resolved state. Check `IsBroadcast` for the all-fields expansion. |
+| 2 | `PopulateEditDeclarations` | TypeChecker.cs:1069–1086 | Loop over `FieldNames`, emitting one `TypedAccessMode` with `Mode = ModifierKind.Omit` per field per resolved state. |
+| 3 | `NameBinder.cs:422` | NameBinder.cs:422 | Reference-tracking consumer. Must iterate `FieldNames` instead of reading single `FieldName`. |
+| 4 | `RichHoverFactory.cs:1659` | RichHoverFactory.cs:1659 | Language server hover. Backward-compat `FieldName` property covers it (shows first-field info only). No change required — but only shows first-field for multi-field targets. |
+
+**Broadcast detection:** All consumers that previously used `HasKeywordTokenMeta(fieldSlot.FieldName, ...)` or `fieldSlot.FieldName == null` for broadcast detection now use `fieldSlot.IsBroadcast`.
 
 ### 1.2 Unify Omit Into AccessModes
 
 `PopulateEditDeclarations` currently produces `TypedEditDeclaration` — a separate accumulator from `AccessModes`. This is architecturally wrong. Omit is an access mode (`ModifierKind.Omit = 26`). It belongs in `ctx.AccessModes`.
 
-**Change:** In `PopulateEditDeclarations`, instead of pushing to `ctx.EditDeclarations`, push `TypedAccessMode` records with `Mode = ModifierKind.Omit` into `ctx.AccessModes`:
+**Blocker fix (B1):** `PopulateEditDeclarations` currently never calls `ResolveStateTargets` — state context is silently discarded. The implementation must call `ResolveStateTargets` in `PopulateEditDeclarations` exactly as `PopulateAccessModes` does, so omit declarations correctly resolve state scope before emitting `TypedAccessMode` records with `Mode = ModifierKind.Omit`.
+
+**Change:** In `PopulateEditDeclarations`:
+1. Call `ResolveStateTargets` to resolve the state target (matching `PopulateAccessModes` behavior).
+2. Instead of pushing to `ctx.EditDeclarations`, push `TypedAccessMode` records with `Mode = ModifierKind.Omit` into `ctx.AccessModes` for each resolved state:
 
 ```csharp
 // For each field in the omit declaration, for each resolved state:
@@ -281,7 +298,8 @@ For each `TypedTransitionRow` in `ctx.TransitionRows`:
    - If any `TypedFieldRef` references a field that is `Omit` in `fromState` → emit `ReadOfOmittedField`
 4. Walk each action's RHS expression tree:
    - If any `TypedFieldRef` references a field that is `Omit` in `fromState` → emit `ReadOfOmittedField`
-5. **Wildcard rows** (`FromState == null`): validate against ALL states. If the access mode lookup shows the field is omitted in ANY reachable state where the wildcard applies, emit the diagnostic. Conservative but correct.
+5. **Wildcard rows** (`FromState == null`): validate against ALL states. If the access mode lookup shows the field is omitted in ANY reachable state where the wildcard applies, emit the diagnostic. **Design decision (Q4):** When a wildcard row violates omit in multiple states, emit a **single diagnostic** listing ALL affected state names in the message (not N separate diagnostics per state). Detection happens after `BuildFieldAccessLookup` expands wildcards. Message format: `"Field '{0}' is omitted in states {1} — wildcard row cannot write to it"` where `{1}` is a comma-separated list of state names.
+6. **Self-loop transitions** (`fromState == targetState`): **Design decision (Q5):** Both D130 and D133 fire. When a self-loop transition writes to a field that is omitted in the loop state, the general validation logic runs uniformly — `fromState` produces D130, `targetState` produces D133. Self-loops are NOT special-cased in `ValidateFieldStateAccess`. The diagnostics are correct: the field cannot be written (D130) AND setting it has no effect in the target state (D133).
 
 #### 1.4b — State Hook Structural Violations
 
@@ -591,6 +609,51 @@ private static bool TryAccessConditionProof(ProofObligation obligation, Semantic
 
 This reuses the existing `ExtractGuardConstraints` infrastructure. The check is: every conjunct in the access condition is subsumed by some conjunct in the transition guard. This is sound (no false negatives for the `and`-conjunct decomposition) and conservative (may reject valid programs where the implication holds but requires reasoning beyond conjunct matching).
 
+#### 2.4a — Disjunctive Proof Support (DNF Conversion)
+
+**Design decision (Q3):** Access conditions may contain OR disjuncts (e.g., `when Status == "Active" or Priority > 5`). The existing `ExtractGuardConstraintsCore` silently drops OR at lines 782–784 (and `ExtractFieldToFieldCore` at lines 958–959). This produces false negatives — valid programs rejected because the engine ignores disjuncts.
+
+**Fix:** Convert the access condition to Disjunctive Normal Form (DNF) before running `TryAccessConditionProof`. DNF transforms `A or (B and C)` into a list of conjunctions: `[A], [B, C]`. The discharge rule becomes: the guard must imply **at least one** disjunct of the access condition.
+
+```csharp
+/// <summary>
+/// Convert an expression to DNF — a list of conjunctions (each conjunction
+/// is a list of atomic conditions). The guard must imply at least one disjunct.
+/// </summary>
+private static List<List<GuardConstraint>> ToDnf(TypedExpression condition)
+{
+    // Recursively decompose:
+    // - AND(A, B) → cross-product merge (each disjunct of A combined with each of B)
+    // - OR(A, B) → union of disjuncts
+    // - Atomic → single disjunct with one constraint
+    // Bounded: no SAT solver needed — algebraic subsumption per-disjunct.
+}
+
+private static bool TryAccessConditionProof(ProofObligation obligation, SemanticIndex semantics)
+{
+    // ... (existing guard extraction) ...
+
+    // Convert access condition to DNF
+    var disjuncts = ToDnf(access.AccessCondition);
+
+    // The guard must imply at least ONE disjunct
+    foreach (var disjunct in disjuncts)
+    {
+        bool disjunctSatisfied = true;
+        foreach (var ac in disjunct)
+        {
+            bool subsumed = guardConstraints.Any(gc =>
+                gc.Field == ac.Field && ConstraintSubsumes(gc, ac));
+            if (!subsumed) { disjunctSatisfied = false; break; }
+        }
+        if (disjunctSatisfied) return true;
+    }
+    return false;
+}
+```
+
+**Scope:** ~100–150 lines total for DNF conversion + per-disjunct subsumption. No SAT solver, no exponential blowup for realistic access conditions (which are typically 2–3 disjuncts of 1–2 conjuncts each).
+
 **Special case: boolean field guards.** The access condition `when not FraudFlag` decomposes to a guard constraint on `FraudFlag`. The transition guard must contain `not FraudFlag` (or `FraudFlag == false`) to subsume it. The existing `ExtractGuardConstraintsCore` handles `not X` as a negated comparison (line 821), and boolean field checks as `field == true/false` via the postfix `is set` path. We may need to extend constraint extraction to recognize `not {boolField}` as `{boolField} == false`:
 
 ```csharp
@@ -670,14 +733,18 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
 
 1. **`src/Precept/Pipeline/SlotValue.cs`** — Change `FieldTargetSlot`:
    - Replace `string? FieldName` with `ImmutableArray<string> FieldNames`
+   - Add `bool IsBroadcast` constructor parameter (B3 fix)
    - Add `ImmutableArray<SourceSpan> NameSpans`
-   - Add backward-compat `FieldName` property (returns first or null)
+   - Add backward-compat `FieldName` property (returns first, or null if broadcast/empty)
 
 2. **`src/Precept/Pipeline/Parser.cs`** — Rewrite `ParseFieldTarget` (line 1005):
    - Accumulate all identifiers and spans into builders
+   - Set `IsBroadcast: true` for the broadcast ("all") case
+   - Set `IsBroadcast: false` for identifier-list case
    - Return multi-field slot
 
 3. **`src/Precept/Pipeline/TypeChecker.cs`** — Update `PopulateAccessModes` (line 938):
+   - Check `fieldSlot.IsBroadcast` for all-fields expansion (replaces `HasKeywordTokenMeta` pattern)
    - Loop over `fieldSlot.FieldNames` with matching `fieldSlot.NameSpans`
    - Emit one `TypedAccessMode` per field per resolved state
 
@@ -685,11 +752,16 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
    - Loop over `fieldSlot.FieldNames`
    - Emit `TypedAccessMode` with `Mode = ModifierKind.Omit` (unification, see Slice 2)
 
-5. **Tests:**
+5. **`src/Precept/Pipeline/NameBinder.cs`** (line 422) — Update reference-tracking consumer (B2 fix):
+   - Iterate `fieldSlot.FieldNames` instead of reading single `FieldName`
+   - Register reference for each field name in the list
+
+6. **Tests:**
    - Parser test: `in Draft omit A, B, C` → three `TypedAccessMode` records
    - Parser test: `in Draft modify X, Y editable` → two `TypedAccessMode` records
    - Parser test: single field still works
-   - Parser test: `all` keyword still works
+   - Parser test: `all` keyword → `IsBroadcast == true`, empty `FieldNames`
+   - Parser test: broadcast detection uses `IsBroadcast` (not null FieldName)
    - Regression: all existing parser tests pass
 
 ### Slice 2: Omit Unification + Field Access Lookup
@@ -697,7 +769,8 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
 **Goal:** Omit declarations produce `TypedAccessMode` records; build the lookup table; emit D42/D43.
 
 1. **`src/Precept/Pipeline/TypeChecker.cs`** — In `PopulateEditDeclarations`:
-   - Replace `ctx.EditDeclarations.Add(...)` with `ctx.AccessModes.Add(new TypedAccessMode(Mode: ModifierKind.Omit, ...))` for each field
+   - **Add `ResolveStateTargets` call** (B1 fix) — exactly as `PopulateAccessModes` does, so omit declarations resolve state scope before emitting records
+   - Replace `ctx.EditDeclarations.Add(...)` with `ctx.AccessModes.Add(new TypedAccessMode(Mode: ModifierKind.Omit, ...))` for each field × each resolved state
 
 2. **`src/Precept/Pipeline/CheckContext.cs`** — Add:
    - `public FrozenDictionary<(string State, string Field), FieldAccess>? FieldAccessLookup { get; set; }`
@@ -769,7 +842,7 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
 
 ### Slice 4: Conditional Enforcement (ProofEngine)
 
-**Goal:** Emit D134 for unproved access condition implications.
+**Goal:** Emit D134 for unproved access condition implications. Handle disjunctive access conditions via DNF.
 
 1. **`src/Precept/Language/ProofRequirementKind.cs`** — Add `AccessCondition = 7`
 
@@ -784,18 +857,27 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
    - Emit `AccessConditionProofRequirement` obligations for writes to conditionally-editable fields
 
 5. **`src/Precept/Pipeline/ProofEngine.cs`** — New method `TryAccessConditionProof`:
-   - Extract constraints from transition guard and access condition
-   - Check conjunct-wise subsumption
+   - Convert access condition to DNF via `ToDnf` helper
+   - For each disjunct, check if the guard's constraints subsume all conjuncts in that disjunct
+   - Proof succeeds if ANY disjunct is fully subsumed
 
-6. **`src/Precept/Pipeline/ProofEngine.cs`** — Extend `ExtractGuardConstraintsCore`:
+6. **`src/Precept/Pipeline/ProofEngine.cs`** — New helper `ToDnf`:
+   - Convert expression to list of conjunctions (Disjunctive Normal Form)
+   - ~100–150 lines; algebraic decomposition, no SAT solver
+   - AND → cross-product merge of disjunct lists
+   - OR → union of disjunct lists
+   - Atomic → singleton disjunct
+
+7. **`src/Precept/Pipeline/ProofEngine.cs`** — Extend `ExtractGuardConstraintsCore`:
    - Handle bare boolean field refs (`FraudFlag` → `FraudFlag == true`)
    - Handle `not BoolField` → `BoolField == false`
+   - **NOT handled in v2: string equality** (see Known Limitations / W5)
 
-7. **`src/Precept/Pipeline/ProofEngine.cs`** — Add to `TryDischarge` cascade
+8. **`src/Precept/Pipeline/ProofEngine.cs`** — Add to `TryDischarge` cascade
 
-8. **`src/Precept/Pipeline/ProofEngine.cs`** — Add to `CreateDiagnostic` for D134
+9. **`src/Precept/Pipeline/ProofEngine.cs`** — Add to `CreateDiagnostic` for D134
 
-9. **Tests:**
+10. **Tests:**
    - `in S when Cond modify F editable` + transition `from S -> set F = ...` with no guard → D134
    - Same + transition with `when Cond` guard → clean (proved by AccessConditionImplication)
    - `when X > 5` condition + `when X > 10` guard → clean (guard is stronger)
@@ -804,6 +886,9 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
    - `when not FraudFlag` condition + no guard → D134
    - `when A and B` condition + `when A` guard → D134 (missing B)
    - `when A and B` condition + `when A and B and C` guard → clean
+   - `when A or B` condition + `when A` guard → clean (one disjunct satisfied)
+   - `when A or B` condition + `when C` guard → D134 (neither disjunct satisfied)
+   - `when Status == "Active"` condition + matching guard → D134 (W5: string equality not handled)
 
 ---
 
@@ -815,7 +900,7 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
 | `ExtractGuardConstraints` — AND-conjunct decomposition | Shipped | **Directly reusable** for access condition comparison |
 | `GuardSubsumes` — numeric constraint implication | Shipped | **Directly reusable** for numeric access conditions |
 | Presence check matching | Shipped | Reusable for `field is set` access conditions |
-| OR rejection | Shipped | Correct — OR disjuncts cannot guarantee access conditions |
+| OR handling via DNF | v2 addition | Access condition disjuncts handled via DNF conversion — guard must imply at least one disjunct |
 | `not (X op Y)` negation | Shipped | Partially reusable — extend for bare boolean negation |
 | `TransitionRowContext` — links obligation to transition | Shipped | **Directly reusable** for access condition obligations |
 | `StateHookContext` — links obligation to state hook | Shipped | Reusable for hook access conditions |
@@ -830,10 +915,11 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
 3. `ProofStrategy.AccessConditionImplication` — new strategy enum member
 4. `TryAccessConditionProof` — new discharge method (~40 lines)
 5. Boolean guard constraint extraction — extend `ExtractGuardConstraintsCore` (~10 lines)
-6. Obligation collection for guarded access modes — ~20 lines in `CollectObligations`
-7. Diagnostic creation for D134 — ~5 lines in `CreateDiagnostic`
+6. DNF conversion for disjunctive access conditions — `ToDnf` helper (~100–150 lines)
+7. Obligation collection for guarded access modes — ~20 lines in `CollectObligations`
+8. Diagnostic creation for D134 — ~5 lines in `CreateDiagnostic`
 
-**Total ProofEngine delta: ~75 lines of new code.** The infrastructure does the heavy lifting.
+**Total ProofEngine delta: ~225 lines of new code.** The infrastructure does the heavy lifting; the DNF conversion is the only non-trivial addition.
 
 ---
 
@@ -841,26 +927,82 @@ private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation o
 
 | Category | Test Count | Key Scenarios |
 |----------|-----------|---------------|
-| Parser multi-field | 5 | Single field, two fields, three fields, all keyword, trailing comma error |
+| Parser multi-field | 6 | Single field, two fields, three fields, all keyword (IsBroadcast), broadcast detection, trailing comma error |
 | Omit unification | 3 | Omit → AccessMode, omit + modify same field = conflict, omit all |
 | D42 ConflictingAccessModes | 3 | Same field, two modes; different fields clean; guarded + unguarded |
 | D43 RedundantAccessMode | 3 | Writable field + editable mode; readonly field + readonly mode; guarded mode (no redundancy) |
-| D130 WriteToOmittedField | 5 | Transition action, state hook, wildcard row, target-state action (→ D133), clean case |
+| D130 WriteToOmittedField | 6 | Transition action, state hook, wildcard row (single diag all states), self-loop (both D130+D133), target-state action (→ D133), clean case |
 | D131 ReadOfOmittedField | 4 | Guard read, action RHS read, conditional expression read, clean case |
 | D132 WriteToReadOnlyField | 4 | Explicit readonly, default readonly (no writable), state hook, clean case |
-| D133 WriteToTargetOmittedField | 3 | Set + transition to omit state, set + no transition (clean), set + transition to non-omit (clean) |
-| D134 UnprovedAccessCondition | 8 | No guard, matching guard, stronger guard, weaker guard, boolean guard, negated boolean, compound condition, clean case |
+| D133 WriteToTargetOmittedField | 4 | Set + transition to omit state, self-loop (dual with D130), set + no transition (clean), set + transition to non-omit (clean) |
+| D134 UnprovedAccessCondition | 11 | No guard, matching guard, stronger guard, weaker guard, boolean guard, negated boolean, compound condition, OR disjunct (one satisfied), OR disjunct (none satisfied), string equality (W5 false positive), clean case |
 | Regression | 5 | insurance-claim.precept compiles clean (after parser fix captures all fields), existing samples maintain diagnostic count |
-| **Total** | **~43** | |
+| **Total** | **~49** | |
 
 ---
 
-## Open Design Questions
+## Resolved Design Questions
 
-1. **Wildcard row handling for conditional access modes.** A `from * on X -> set F = ...` row touches all states. If `F` is conditionally editable in one state, the obligation would need to consider all states' access conditions. The conservative answer: emit one obligation per state that has a guarded access mode for the field. This is correct but may produce many diagnostics.
+All questions from the original proposal are now resolved. Decisions are final.
 
-2. **`if` expressions inside actions.** `set F = if Cond then Expr1 else Expr2` — if `Expr1` reads an omitted field but `Cond` guarantees we only reach `Expr1` when the field exists, should we allow it? For v2, the conservative answer is NO — the structural check walks the full expression tree. Conditional field reads under `if` guards require Phase 2 proof integration.
+### Q1 — Multi-field FieldTargetSlot (Resolved)
+**Decision:** Add `IsBroadcast: bool` property to `FieldTargetSlot` instead of using null `FieldName` for broadcast. `FieldNames: ImmutableArray<string>` for the field list, `IsBroadcast: bool` for the all-fields case. Resolves B3 (the backward-compat null `FieldName` issue that broke broadcast detection in `TypeChecker.cs:954`).
 
-3. **Event handlers.** `TypedEventHandler` has actions but no `fromState`. Event handlers are stateless — they fire in any state. For field-state validation, they must be clean in ALL states. If any state omits a field that the handler writes, that's an error.
+### Q2 — Field baseline (No change needed)
+**Decision:** The spec is already clear at §2.2 lines 919–929: `writable` modifier = editable baseline; no `writable` = read-only baseline (D3 default). Undeclared (field, state) pairs use Layer 1 baseline. No design change — the spec is the source of truth.
 
-4. **On-entry hooks and target state.** An on-entry hook (`to State`) fires when entering the state. The access modes of the target state apply. An on-exit hook (`from State`) fires when leaving — the access modes of the source state apply. The hook's `Scope` field (`AnchorScope.To` vs `AnchorScope.From`) determines which direction.
+### Q3 — OR disjuncts in access conditions (Resolved)
+**Decision:** Implement disjunctive proof support via DNF conversion. The access condition is converted to Disjunctive Normal Form before `TryAccessConditionProof`. The guard must imply at least ONE disjunct. Bounded at ~100–150 lines; algebraic subsumption per-disjunct, no SAT solver. OR is currently silently dropped at `ExtractGuardConstraintsCore` line 782–784. The fix removes this false-negative path.
+
+### Q4 — Wildcard row multiplicity (Resolved)
+**Decision:** One diagnostic listing ALL affected state names. When a wildcard row violates omit in multiple states, emit a single diagnostic with all affected state names in the message (not N separate diagnostics). Detection happens after `BuildFieldAccessLookup` expands wildcards.
+
+### Q5 — Self-loop dual-diagnostic (Resolved)
+**Decision:** Both D130 and D133 fire for self-loop transitions. When `fromState == targetState` and the action writes to a field omitted in that state, BOTH `WriteToOmittedField` (D130) and `WriteToTargetOmittedField` (D133) apply. Self-loops are not a special case — the general validation logic runs uniformly. No special-casing in `ValidateFieldStateAccess`.
+
+### Q-original-1 — Wildcard row handling for conditional access modes (Resolved)
+**Decision:** Emit one obligation per state that has a guarded access mode for the field. The wildcard expands to all states; each state with a conditional access mode gets its own `AccessConditionProofRequirement`. Combined with Q4, structural violations use a single diagnostic listing all affected states.
+
+### Q-original-2 — `if` expressions inside actions (Resolved)
+**Decision:** For v2, the conservative answer is NO — the structural check walks the full expression tree. `set F = if Cond then Expr1 else Expr2` reports D131 if `Expr1` reads an omitted field, regardless of `Cond`. Conditional field reads under `if` guards are deferred beyond v2.
+
+### Q-original-3 — Event handlers (Resolved)
+**Decision:** `TypedEventHandler` has no `fromState`. Event handlers are stateless — they fire in any state. For field-state validation, they must be clean in ALL states. If any state omits a field that the handler writes, that's an error.
+
+### Q-original-4 — On-entry hooks and target state (Resolved)
+**Decision:** An on-entry hook (`to State`) fires when entering the state — the target state's access modes apply. An on-exit hook (`from State`) fires when leaving — the source state's access modes apply. The hook's `Scope` field (`AnchorScope.To` vs `AnchorScope.From`) determines which direction.
+
+---
+
+## Resolved Blockers
+
+### B1 — `PopulateEditDeclarations` state context
+**Fix:** Call `ResolveStateTargets` in `PopulateEditDeclarations` exactly as `PopulateAccessModes` does, so omit declarations correctly resolve state scope before emitting `TypedAccessMode` records with `Mode = ModifierKind.Omit`.
+
+### B2 — `NameBinder.cs:422` consumer
+**Fix:** A third `FieldTargetSlot.FieldName` consumer at `NameBinder.cs:422` (reference tracking) was not listed in the original consumer table. Added to Slice 1. Must iterate `FieldNames` instead of reading single `FieldName`.
+
+### B3 — Broadcast null semantics
+**Fix:** Resolved by Q1. The `IsBroadcast` property replaces null `FieldName` for broadcast detection. Current code uses `HasKeywordTokenMeta(fieldSlot.FieldName, ...)` which would break on null. Explicit boolean makes intent unambiguous.
+
+---
+
+## Known Limitations / Out of Scope (v2)
+
+### W5 — String equality guards produce false-positive D134
+
+**Scope limitation:** String equality guards in access conditions (e.g., `in S when Status == "Active" modify F editable`) will produce false-positive D134 in v2 because `ExtractGuardConstraints` only handles numeric `TypedLiteral` values. Boolean field references (`when not FraudFlag`) ARE handled. String comparisons are NOT.
+
+**Impact:** A transition with guard `when Status == "Active"` writing to a field that is conditionally editable `when Status == "Active"` will still emit D134 even though the guard trivially implies the condition. The user must suppress or accept the false positive.
+
+**Why acceptable:** String equality in access conditions is rare in the corpus. The overwhelming majority of conditional access modes use boolean flags or numeric comparisons. The false positive is conservative (it rejects a valid program, never accepts an invalid one) and does not block compilation — D134 is an error but the user's transition intent is still semantically clear.
+
+**Future fix:** Extend `ExtractGuardConstraints` to extract string equality as a `GuardConstraint` variant (e.g., `StringEqualityConstraint(field, value)`). This is a straightforward extension once v2 ships and the constraint infrastructure is proven.
+
+### `if`-guarded field reads (deferred)
+
+Conditional field reads under `if` expressions within actions (e.g., `set F = if Cond then OmittedField else 0`) are conservatively flagged as D131 even if `Cond` guarantees the branch is unreachable when the field is omitted. This requires proof integration between the structural check and expression-level guard analysis — deferred beyond v2.
+
+### Wildcard + conditional: obligation explosion
+
+A wildcard row writing to a field that is conditionally editable in N states produces N separate `AccessConditionProofRequirement` obligations. For precepts with many states and many conditional access modes, this could produce many proof obligations. No deduplication or batching is applied in v2. Acceptable because real-world conditional access modes are sparse.

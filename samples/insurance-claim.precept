@@ -47,16 +47,13 @@ from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD'
 from Draft on Submit
     -> reject "A claim needs a claimant name and a positive claim amount"
 
-from Submitted on RequestDocument
+from Submitted, UnderReview on RequestDocument
     -> add MissingDocuments RequestDocument.Name
     -> no transition
 from Submitted on AssignAdjuster
     -> set AdjusterName = trim(AssignAdjuster.Name)
     -> transition UnderReview
 
-from UnderReview on RequestDocument
-    -> add MissingDocuments RequestDocument.Name
-    -> no transition
 from UnderReview on ReceiveDocument when MissingDocuments contains ReceiveDocument.Name
     -> remove MissingDocuments ReceiveDocument.Name
     -> no transition

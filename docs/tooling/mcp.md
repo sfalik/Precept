@@ -25,7 +25,7 @@ The MCP server exposes 12 tools that project Precept's compiler, runtime, and la
 | `precept_types` | Types, value modifiers, functions | `Types`, `Modifiers`, `Functions` |
 | `precept_operations(category?)` | All 198 typed operator combinations, optional LHS-type filter | `Operations.All` |
 | `precept_proofs` | Proof obligation catalog + runtime fault catalog | `ProofRequirements.All`, `Faults.All` |
-| `precept_patterns` | 8 common patterns + 3 anti-patterns, all verified to compile | `SyntaxReference.CommonPatterns`, `.AntiPatterns` |
+| `precept_patterns` | 8 common patterns + 5 anti-patterns, all verified to compile | `SyntaxReference.CommonPatterns`, `.AntiPatterns` |
 | `precept_diagnostic(code)` | Single diagnostic lookup by name or PRE-number | `Diagnostics.All` / `Diagnostics.GetMeta` |
 | `precept_domains` | Currencies, UCUM tier-1 units, SI prefixes, dimensions | `CurrencyCatalog`, `UcumAtomCatalog.BrowseTier1()`, `UcumPrefixCatalog`, `DimensionCatalog` |
 

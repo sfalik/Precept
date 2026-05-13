@@ -780,15 +780,16 @@ bool TryDeclarationAttributeProof(ProofObligation obligation, SemanticIndex sema
 // a true flag discharges NumericProofRequirement(>=, 0) before modifier lookup.
 // SatisfactionCovers: checks whether a ProofSatisfaction entry covers a requirement.
 // For NumericProofRequirement: satisfaction.RequirementKind == Numeric
-//   AND satisfaction.Comparison subsumes requirement.Comparison at satisfaction.Bound.
+//   AND the satisfaction's comparison/bound pair covers the requested requirement.
 // For PresenceProofRequirement: satisfaction.RequirementKind == Presence.
-// Subsumption: positive (>, 0) covers both (!=, 0) and (>=, 0).
-// The subsumption logic mirrors GuardSubsumes (Strategy 3) but reads from catalog
-// metadata rather than from a guard expression.
+// Positive (>, 0) still covers both (!=, 0) and (>=, 0), but the table is NOT
+// identical to Strategy 3's NumericConstraintSubsumes table: SatisfactionCovers also
+// has dedicated (!= -> !=), (<= -> <=), and (< -> <) rows. See “Qualifier Resolution
+// Reference” below for the corrected side-by-side tables.
 ```
 
 > **✅ Resolved (CC#5 → PE-G2) — ValueModifierMeta.ProofSatisfactions is now canonical**
-> `ProofDischarge` has been renamed to `ProofSatisfaction` — a full DU with 5 subtypes (Numeric, Presence, Dimension, Modifier, QualifierCompatibility) plus 3 supporting DUs (SatisfactionProjection, NumericBoundSource, DimensionSource). `ProofSatisfaction[]` is carried on `ValueModifierMeta` for numeric modifiers. Presence proof reads `TypedField.Presence` (new `DeclaredPresenceMeta` carrier). Dimension and qualifier-compatibility proof read `TypedField.DeclaredQualifiers` (new `DeclaredQualifierMeta` carrier). Strategy 2 consumes all three carrier surfaces.
+> `ProofDischarge` has been renamed to `ProofSatisfaction` — a full DU with 5 subtypes (Numeric, Presence, Dimension, Modifier, QualifierCompatibility) plus 3 supporting DUs (SatisfactionProjection, NumericBoundSource, DimensionSource). `ProofSatisfaction[]` is carried on `ValueModifierMeta` for numeric modifiers. Presence proof reads `TypedField.Presence` (new `DeclaredPresenceMeta` carrier). Dimension proof and qualifier compatibility both read `DeclaredQualifierMeta` carriers, with Strategy 5 additionally resolving those carriers through fields, args, typed constants, and propagated expression results. Strategy 2 consumes all three carrier surfaces.
 > *Resolved: 2026-05-06 (CC#5), redesigned 2026-05-08 (PE-G2 locked)*
 
 ### Carrier Types
@@ -830,7 +831,7 @@ A DU with 8 subtypes representing all qualifier axes:
 
 **Strategy integration:**
 - Strategy 2 reads `field.DeclaredQualifiers` for `DimensionProofRequirement` — finds a `TemporalDimension` entry and checks dimension compatibility.
-- Strategy 5 reads `field.DeclaredQualifiers` for `QualifierCompatibilityProofRequirement` — compares two fields' qualifier entries on the requested axis.
+- Strategy 5 resolves `DeclaredQualifierMeta` carriers from both operands — fields, event args, typed constants, interpolated typed constants, or recursive `TypedBinaryOp.ResultQualifier` propagation — then compares the resolved entries on the requested axis.
 
 #### ValueModifierMeta.ProofSatisfactions
 
@@ -872,7 +873,7 @@ Strategy 5 reads `DeclaredQualifierMeta` entries from both subjects:
 
 | Requirement Kind | Carrier | Read Path |
 |---|---|---|
-| `QualifierCompatibilityProofRequirement` | `DeclaredQualifierMeta` | Read both subjects' `DeclaredQualifiers`, find entries on requested axis, compare values |
+| `QualifierCompatibilityProofRequirement` | `DeclaredQualifierMeta` | Resolve qualifier carriers from both operands (field qualifiers, event args, typed constants, interpolated typed constants, or binary-op result propagation), then compare the resolved entries on the requested axis |
 
 #### Strategy 3: Guard-in-Path Proof
 
@@ -1192,7 +1193,7 @@ static bool GuardRelationImpliesObligation(
 
 **When it applies:** The obligation is a `QualifierCompatibilityProofRequirement` — the only dual-subject requirement kind.
 
-**How it works:** Resolve both subjects to their `DeclaredQualifierMeta` entries on the specified `QualifierAxis`. If both resolve to the same qualifier value, discharge. If either is unqualified or the values differ, the obligation remains `Unresolved`.
+**How it works:** Strategy 5 resolves qualifiers from the binary operation's left and right operands on the requested `QualifierAxis`, then delegates comparison to `QualifiersAreCompatible`. Resolution is recursive for qualifying binary-expression results and interpolated typed constants; if either side resolves to no carrier, the obligation remains `Unresolved`.
 
 **Examples:**
 - `quantity of 'kg' + quantity of 'kg'` → both Unit qualifiers match → discharged
@@ -1200,35 +1201,135 @@ static bool GuardRelationImpliesObligation(
 - `quantity + quantity` (unqualified) → cannot prove → `Unresolved` → diagnostic
 - `TemporalDimension(Any)` satisfies Dimension proof but does NOT satisfy QualifierCompatibility — two `Any` fields are not provably compatible
 
-**Declaration carrier dependency:** Strategy 5 reads `TypedField.DeclaredQualifiers` (new `DeclaredQualifierMeta` carrier entries populated by the type checker). Each `DeclaredQualifierMeta` subtype carries its axis and concrete value. The proof engine compares two fields' qualifier entries on the requested axis — it never inspects raw type annotations or parser output.
+**Declaration carrier dependency:** Strategy 5 compares resolved `DeclaredQualifierMeta` carriers, not raw syntax. Those carriers may come from field declarations, event args, typed constants, interpolated typed constants, or `TypedBinaryOp.ResultQualifier` propagation through nested binary expressions.
 
 **Discharge predicate pseudocode:**
 
 ```csharp
 // Strategy 5: Qualifier Compatibility Proof — Discharge Predicate
 // Input: ProofObligation with QualifierCompatibilityProofRequirement
-// Reads: Both subjects' resolved qualifier bindings from SemanticIndex
+// Reads: The binary operation operands' resolved qualifier bindings from SemanticIndex
 // Scope: Dual-subject obligations where two operands must share a qualifier value
 
 bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex semantics)
 {
     if (obligation.Requirement is not QualifierCompatibilityProofRequirement qcReq)
         return false;
-
-    // 1. Resolve both subjects to their qualifier bindings
-    var leftQualifier = ResolveQualifierOnAxis(qcReq.LeftSubject, qcReq.Axis, obligation.Site, semantics);
-    var rightQualifier = ResolveQualifierOnAxis(qcReq.RightSubject, qcReq.Axis, obligation.Site, semantics);
-
-    // 2. If either qualifier is unresolved (unqualified field), cannot prove — Unresolved
-    if (leftQualifier is null || rightQualifier is null)
+    if (obligation.Site is not TypedBinaryOp binOp)
         return false;
 
-    // 3. Compare: both must have the same qualifier value on the specified axis
-    return leftQualifier == rightQualifier;
+    var leftQualifier = ResolveQualifierFromExpression(binOp.Left, qcReq.Axis, semantics);
+    var rightQualifier = ResolveQualifierFromExpression(binOp.Right, qcReq.Axis, semantics);
+    return QualifiersAreCompatible(leftQualifier, rightQualifier, qcReq.Axis);
 }
 ```
 
-**Dependency:** Requires qualifier resolution in the TypeChecker (currently Slice 2+ future work). Until qualifier resolution ships, all `QualifierCompatibilityProofRequirement` obligations produce `Unresolved` — the correct conservative behavior.
+**Reference:** The exact dispatch, fallback chains, currency-axis translation, and comparison tables are documented in **Qualifier Resolution Reference** below.
+
+### Qualifier Resolution Reference
+
+This section documents the implementation in `src/Precept/Pipeline/ProofEngine.Qualifiers.cs`, `ProofEngine.Strategies.cs`, and the constant-folder guard in `ProofEngine.Analysis.cs`. See **Carrier Types** above for the `DeclaredQualifierMeta` and `ProofSatisfaction` DU shapes that this logic consumes.
+
+#### 7.1 — `ResolveQualifierFromExpression` Dispatch
+
+`ResolveQualifierFromExpression(TypedExpression expr, QualifierAxis axis, SemanticIndex semantics)` is Strategy 5's expression-level resolver. It does not inspect parser syntax directly; it switches on the typed-expression shape and returns a single `DeclaredQualifierMeta?` on the requested axis.
+
+| Expression arm | Resolution behavior |
+|---|---|
+| `TypedArgRef` with non-empty `DeclaredQualifiers` | Scan for an exact-axis match, then apply the standard fallback chain described in §7.2. |
+| `TypedTypedConstant` with non-empty `DeclaredQualifiers` | Same as `TypedArgRef`: exact-axis lookup, then the standard fallback chain. |
+| `TypedFieldRef` | Call `ResolveFieldQualifier(fieldName, axis, semantics)`. |
+| `TypedMemberAccess { Object: TypedFieldRef }` | Resolve against the backing field via `ResolveFieldQualifier`. |
+| `TypedInterpolatedTypedConstant` | Call `ResolveQualifierFromInterpolatedConstant`; currency/unit/dimension/from-currency/to-currency carriers are synthesized from interpolation slots. |
+| `TypedBinaryOp` with non-null `ResultQualifier` | Dispatch to the binding-specific propagation rules below. |
+| Any other typed expression | Return `null`. There is no dedicated unary, function-call, conditional, or quantifier arm here. |
+
+`TypedBinaryOp.ResultQualifier` currently has five consumed binding shapes:
+
+| Binding shape | Resolution rule |
+|---|---|
+| `SameQualifierRequired` | Recurse into `binOp.Left`; the result qualifier is defined by the left operand. |
+| `QualifiedOperandInherited` | Choose the operand whose `ResultType` matches the binary result type, then recurse into that operand. |
+| `CompoundUnitCancellationRequired` | For currency axes, return the first non-null currency/from-currency/to-currency qualifier from `Left` then `Right`. For unit/dimension axes, call `TryResolveCompoundCancellationUnit`. |
+| `CurrencyConversionRequired` | Only for `QualifierAxis.Currency`: resolve the exchange-rate operand on `QualifierAxis.ToCurrency`, then normalize it with `TranslateCurrencyAxis` (§7.3). |
+| `CompoundDimensionElevationRequired` | For currency axes, inherit from the left operand (the price side). For unit/dimension axes, call `TryResolveCompoundElevationDimension`. |
+
+Recursion is therefore explicit for qualifying binary expressions and interpolated typed constants only. If qualifier information sits behind a `TypedUnaryOp`, `TypedFunctionCall`, `TypedConditional`, or another unhandled expression shape, this helper stops and returns `null`; Strategy 5 then stays conservative and leaves the obligation unresolved.
+
+#### 7.2 — Axis-Fallback Chains: Field Refs, Event Args, Typed Constants
+
+Three resolution paths share the same axis fallback order: exact axis first, then `Unit → Dimension`, then `Dimension → TemporalDimension`.
+
+**Field refs.** `ResolveFieldQualifier` scans `field.DeclaredQualifiers` for the requested axis. If no exact match exists, `QualifierAxis.Unit` falls back to a declared `Dimension`, and `QualifierAxis.Dimension` falls back to a declared `TemporalDimension`. Only after declared qualifiers are exhausted does the helper consult `Types.GetMeta(field.ResolvedType).ImpliedQualifiers`, and that implied-qualifier lookup is exact-axis only.
+
+**Event args (`TypedArgRef`).** Both `ResolveQualifierOnAxis` and `ResolveQualifierFromExpression` scan `arg.DeclaredQualifiers` in the same order: exact axis, then `Unit → Dimension`, then `Dimension → TemporalDimension`. There is no type-level implied-qualifier pass for args.
+
+**Typed constants (`TypedTypedConstant`).** Both helpers apply the same sequence to `TypedTypedConstant.DeclaredQualifiers`: exact axis, then `Unit → Dimension`, then `Dimension → TemporalDimension`. Again, there is no follow-up implied-qualifier lookup.
+
+If the chain exhausts without a carrier, the helper returns `null`. At Strategy 5 call sites that means "cannot prove" rather than "proved incompatible": the obligation remains `Unresolved`.
+
+#### 7.3 — Currency Axis Translation (`TranslateCurrencyAxis`)
+
+`TranslateCurrencyAxis` is a one-step normalizer:
+
+- `DeclaredQualifierMeta.ToCurrency(code, origin, ..., sourceField)` becomes `DeclaredQualifierMeta.Currency(code, origin, TokenKind.In, ..., sourceField)`
+- Any other qualifier is returned unchanged.
+
+This fires only in the `CurrencyConversionRequired` arm of `ResolveQualifierFromExpression`, and only when the caller requested `QualifierAxis.Currency`. The multiplication result of a money × exchange-rate expression is checked on the **Currency** axis, but the exchange-rate carrier exposes its destination as **ToCurrency**. The proof engine therefore has to translate "pending destination currency" into "resolved result currency" before `QualifiersAreCompatible` can compare like-for-like.
+
+Without this normalization the resolver would surface `ToCurrency` on one side and `Currency` on the other, causing Strategy 5 to return `false` and leave a correct conversion obligation unresolved.
+
+#### 7.4 — Corrected Subsumption and Satisfaction Coverage Tables
+
+The implementation does **not** use one shared table for guard subsumption and declaration-satisfaction coverage.
+
+`NumericConstraintSubsumes` (Strategy 3 / guard facts) is:
+
+| Guard comparison | Requirement comparison | Condition |
+|---|---|---|
+| `GreaterThan` | `NotEquals` | guard value = `0` and requirement threshold = `0` |
+| `GreaterThan` | `GreaterThanOrEqual` | guard value `>=` requirement threshold |
+| `GreaterThan` | `GreaterThan` | guard value `>=` requirement threshold |
+| `GreaterThanOrEqual` | `GreaterThanOrEqual` | guard value `>=` requirement threshold |
+| `LessThan` | `NotEquals` | guard value = `0` and requirement threshold = `0` |
+| exact same operator | exact same threshold | fallback exact-match row (`comparison == requirement.Comparison && value == requirement.Threshold`) |
+
+That fallback exact-match row covers same-threshold cases such as `LessThan → LessThan`, `LessThanOrEqual → LessThanOrEqual`, `Equals → Equals`, and `NotEquals → NotEquals`. It also covers the missing `GreaterThan → GreaterThan` same-threshold case, although `GreaterThan` already has the broader `value >= threshold` row above.
+
+`SatisfactionCovers` (Strategy 2 / declaration metadata) is:
+
+| Satisfaction comparison | Requirement comparison | Condition |
+|---|---|---|
+| `GreaterThan` | `NotEquals` | bound = `0` and requirement threshold = `0` |
+| `GreaterThan` | `GreaterThanOrEqual` | bound `>=` requirement threshold |
+| `GreaterThan` | `GreaterThan` | bound `>=` requirement threshold |
+| `GreaterThanOrEqual` | `GreaterThanOrEqual` | bound `>=` requirement threshold |
+| `NotEquals` | `NotEquals` | bound = requirement threshold |
+| `LessThanOrEqual` | `LessThanOrEqual` | bound `<=` requirement threshold |
+| `LessThan` | `NotEquals` | bound = `0` and requirement threshold = `0` |
+| `LessThan` | `LessThan` | bound `<=` requirement threshold |
+
+Before that table is consulted, `SatisfactionCovers` also requires:
+
+- `ProofSatisfaction.RequirementKind == Numeric`
+- accessor projections to match the `SelfSubject` accessor exactly when the satisfaction projects through `Accessor(name)`
+- the numeric bound to resolve to a constant; `DeclarationValue` currently returns `false` conservatively
+
+The key difference is upper-bound coverage. `SatisfactionCovers` has dedicated generalized `LessThan → LessThan` and `LessThanOrEqual → LessThanOrEqual` rows, while `NumericConstraintSubsumes` only accepts those operator pairs through its exact-match fallback. The source therefore documents a deliberate conservative asymmetry: declaration metadata can cover some upper-bound obligations more broadly than guard extraction currently does, but the code does not claim full symmetry.
+
+#### 7.5 — Constant Folder: Zero-Denominator Conservative Guard
+
+`ConstantFold` delegates arithmetic folding to `FoldValue`, which delegates binary arithmetic to `EvaluateBinaryOp`. Inside `EvaluateBinaryOp`, numeric operands (`decimal`, `int`, `long`) are normalized to decimals and then evaluated.
+
+For division and modulo, the folder only evaluates when the right-hand value is non-zero:
+
+```csharp
+OperatorKind.Divide when dr.Value != 0 => dl.Value / dr.Value,
+OperatorKind.Modulo when dr.Value != 0 => dl.Value % dr.Value,
+_ => UnknownSentinel
+```
+
+A constant zero denominator therefore does **not** produce a proved `true`/`false` result. The fold returns `UnknownSentinel`, which `ConstantFold` maps to `null` (unknown). This is a conservative guard: the proof engine refuses to "evaluate through" divide-by-zero or modulo-by-zero during initial-state satisfiability analysis. Because `int`, `long`, and `decimal` all feed the same numeric path, the guard applies equally to integer and decimal division.
 
 ### Proof/Fault Chain
 

@@ -64,7 +64,7 @@ from Open on Assign
     -> set ScheduledDate = Assign.DueDate
     -> set EstimatedDuration = Assign.Estimate
     -> transition Scheduled
-from Open on Cancel
+from Open, Scheduled on Cancel
     -> set CancellationReason = Cancel.Reason
     -> transition Cancelled
 
@@ -75,10 +75,6 @@ from Scheduled on StartWork when not Urgent or PartsApproved
     -> transition InProgress
 from Scheduled on StartWork
     -> reject "Urgent work must have parts approved before it starts"
-from Scheduled on Cancel
-    -> set CancellationReason = Cancel.Reason
-    -> transition Cancelled
-
 from InProgress on RecordProgress
     -> set ActualDuration = ActualDuration + RecordProgress.Elapsed
     -> no transition

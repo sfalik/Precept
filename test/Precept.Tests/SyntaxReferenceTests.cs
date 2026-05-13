@@ -1,5 +1,6 @@
 using System.Linq;
 using FluentAssertions;
+using Precept;
 using Precept.Language;
 using Xunit;
 
@@ -150,5 +151,25 @@ public class SyntaxReferenceTests
 
         computedField.DslSnippet.Should().Contain("<-");
         computedField.DslSnippet.Should().NotContain("->");
+    }
+
+    [Fact]
+    public void AntiPatterns_SentinelDefaults_RecommendOmitAndTransitionSet()
+    {
+        var sentinelDefaults = SyntaxReference.AntiPatterns.Single(pattern => pattern.Name == "Sentinel defaults for not-yet-meaningful fields");
+        var badCompilation = Compiler.Compile(sentinelDefaults.BadSnippet);
+        var goodCompilation = Compiler.Compile(sentinelDefaults.GoodSnippet);
+
+        sentinelDefaults.Description.Should().Contain("absent in earlier states");
+        sentinelDefaults.GoodSnippet.Should().Contain("omit ApprovedAmount");
+        sentinelDefaults.GoodSnippet.Should().Contain("set ApprovedAmount = Approve.Amount");
+        sentinelDefaults.WhyItFails.Should().Contain("transition into a non-omitted state");
+        sentinelDefaults.WhyItFails.Should().Contain("`set Field = ...`");
+        sentinelDefaults.WhyItFails.Should().NotContain("MustSetOmitToNonOmit");
+        sentinelDefaults.WhyItFails.Should().NotContain("D132");
+        badCompilation.HasErrors.Should().BeFalse();
+        badCompilation.Diagnostics.Should().BeEmpty();
+        goodCompilation.HasErrors.Should().BeFalse();
+        goodCompilation.Diagnostics.Should().BeEmpty();
     }
 }

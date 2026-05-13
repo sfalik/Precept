@@ -1,3 +1,165 @@
+# Frank — Revised Pattern Proposals
+**Date:** 2026-05-12
+**Status:** APPROVED — ready for Newman to implement
+
+---
+
+## Revised B1: `on Event ensure` as extension note to "Ensures invariant"
+
+**Type:** Common Pattern — extension note (appended to existing "Ensures invariant" entry)
+**Original problem:** Coordinator proposed a new top-level pattern entry for `on Event ensure`, but the form is already illustrated inside the "Ensures invariant" pattern and the distinction is pedagogical, not structural.
+**Fix:** Add an extension note after the existing "Ensures invariant" code block that names and distinguishes the two ensure sites.
+
+**Entry text (append to the "Ensures invariant" pattern after its existing code block):**
+
+---
+
+**Extension note — Two ensure sites, two distinct roles**
+
+Precept has two `ensure` attachment points and they enforce different things:
+
+| Form | When evaluated | What it constrains |
+|------|---------------|-------------------|
+| `in State ensure <condition>` | Post-transition and after every operation while in `State` | Structural state invariant — the entity's own field values |
+| `on Event ensure <condition>` | Pre-fire, before the transition body runs | Input validation guard — the incoming event arguments |
+
+An `in State ensure` rejection means the entity reached a structurally inconsistent configuration. An `on Event ensure` rejection means the caller supplied invalid input; no state mutation has occurred.
+
+```precept
+precept LoanBalance
+
+field Principal as number default 0 nonnegative
+field OutstandingBalance as number default 0 nonnegative
+
+state Active initial
+state PaidOff terminal
+
+# Structural invariant: the entity's own field relationship while Active.
+# Checked after every transition and operation that lands in Active.
+in Active ensure OutstandingBalance <= Principal because "Outstanding balance cannot exceed principal"
+
+event MakePayment(PaymentAmount as number)
+# Input validation guard: rejects the event before any mutation if input is invalid.
+on MakePayment ensure MakePayment.PaymentAmount > 0 because "Payment amount must be positive"
+
+from Active on MakePayment when MakePayment.PaymentAmount < OutstandingBalance
+    -> set OutstandingBalance = OutstandingBalance - MakePayment.PaymentAmount
+    -> no transition
+from Active on MakePayment
+    -> set OutstandingBalance = 0
+    -> transition PaidOff
+```
+
+A single precept often needs both: `on Event ensure` validates inputs at the boundary; `in State ensure` enforces structural commitments after the dust settles.
+
+---
+
+**APPROVED.** Wire the extension note text into the "Ensures invariant" entry in the patterns source. No new pattern entry needed.
+
+---
+
+## Revised B2: `rule Field >= 0` anti-pattern
+
+**Type:** Anti-Pattern
+**Original problem:** The proposed example incorrectly cited `rule QuantityOnHand >= 0` on InventoryItem's `QuantityOnHand` field — that field already uses `nonnegative`. The actual rule-based zero comparisons in that file are on `price`-typed fields with dynamic qualifiers, where explicit qualified zeros carry dimension context the modifier's desugar target does not.
+**Fix:** Use a straightforward `integer`-typed field example where no qualifier ambiguity exists, and add a note on when qualified types legitimately use explicit rules.
+
+**Entry text:**
+
+---
+
+### Redundant zero rule when a modifier applies
+
+Using `rule Field >= 0 because "..."` or `rule Field > 0 because "..."` on a field whose type supports `nonnegative` or `positive` directly.
+
+The `nonnegative` and `positive` modifiers apply to all numeric and magnitude types: `integer`, `decimal`, `number`, `money`, `quantity`, `price`, `exchangerate`. Both desugar to an equivalent `rule` automatically — writing the rule by hand is redundant and adds noise.
+
+Bad:
+```precept
+precept TicketAllocation
+
+field TotalSeats as integer default 0
+field SeatsRemaining as integer default 0
+rule TotalSeats >= 0 because "Total seats cannot be negative"
+rule SeatsRemaining >= 0 because "Seats remaining cannot be negative"
+```
+
+Good:
+```precept
+precept TicketAllocation
+
+field TotalSeats as integer nonnegative default 0
+field SeatsRemaining as integer nonnegative default 0
+```
+
+Why it's redundant: `nonnegative` on an `integer` field desugars to exactly `rule Field >= 0` at type-check time. Keeping both is valid Precept but violates the principle of declaring constraints once. The modifier form is shorter, communicates intent at the declaration site, and is visible to proof-engine satisfaction analysis without requiring rule lookup.
+
+**When explicit rules are appropriate:** `price` and `exchangerate` fields with dynamic dimension or currency qualifiers (e.g., `price in '{CatalogCurrency}' of '{StockingUnit.dimension}'`) conventionally use explicit zero comparisons with dimensionally-qualified literals (e.g., `rule AverageCost >= '0 {CatalogCurrency}/{StockingUnit}'`). This is intentional: the desugar target for `nonnegative` is `self >= 0` with a dimensionless zero, while the explicit form makes both the currency and dimension expectations visible at the constraint site. This is not an anti-pattern; it is the correct authoring style for dynamically-qualified magnitude fields.
+
+---
+
+**APPROVED.** Use the `TicketAllocation` example as the canonical bad/good pair. The note on qualified types must ship with the entry — it prevents the anti-pattern from being misread as applying to the InventoryItem price fields.
+
+---
+
+## Revised B3: Identical rows across multiple from-states
+
+**Type:** Anti-Pattern
+**Original problem:** The Coordinator cited `from Listed, LowStock on Delist -> ...` in InventoryItem as an example of the bad pattern. That is the *corrected* multi-state target form — it is already the good example. The anti-pattern itself is real but needs a hypothetical illustration, not a citation of a sample file.
+**Fix:** Replace the sample-file citation with a clearly constructed hypothetical. Add the desugar clarification.
+
+**Entry text:**
+
+---
+
+### Identical transition rows copied across from-states
+
+Writing two or more identical transition rows — same event, same actions, same outcome — with different `from` states, instead of using a multi-state source target.
+
+Bad:
+```precept
+precept MemberAccount
+
+state Active
+state Suspended
+state Probation
+
+event Archive
+
+from Active on Archive
+    -> set ClosedReason = "archived"
+    -> transition Closed
+from Suspended on Archive
+    -> set ClosedReason = "archived"
+    -> transition Closed
+from Probation on Archive
+    -> set ClosedReason = "archived"
+    -> transition Closed
+```
+
+Good:
+```precept
+precept MemberAccount
+
+state Active
+state Suspended
+state Probation
+
+event Archive
+
+from Active, Suspended, Probation on Archive
+    -> set ClosedReason = "archived"
+    -> transition Closed
+```
+
+Why it matters: Identical copied rows create a maintenance hazard — updating the action body requires touching every copy, and a missed copy produces silent behavioral divergence. The multi-state source target is the canonical form.
+
+The runtime desugars `from A, B, C on Event ...` into N independent typed transition rows (one per from-state) at type-check time, so the behavioral semantics are identical. There is no runtime difference. The multi-state form is strictly a declaration-site improvement.
+
+---
+
+**APPROVED.** Use the hypothetical `MemberAccount` example. Do not reference any specific sample file. Include the desugar clarification sentence — it closes the common "does this change behavior?" question before it gets asked.
+
 # Frank's Response — George's v3 Field-State Conditions
 
 ## Verdicts
