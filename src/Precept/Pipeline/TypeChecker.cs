@@ -16,8 +16,9 @@ namespace Precept.Pipeline;
 /// Pipeline stages: PopulateFields → PopulateStates → PopulateEvents →
 /// ResolveFieldExpressions → PopulateTransitionRows → PopulateEventHandlers →
 /// PopulateRules → PopulateEnsures → PopulateAccessModes → PopulateStateHooks →
-/// PopulateEditDeclarations → ValidateModifiers → ValidateStructural →
-/// ValidateCIEnforcement → BuildSemanticIndex (final assembly with D26 global invariant check).
+/// PopulateEditDeclarations → BuildOmitLookup → ValidateModifiers →
+/// ValidateStructural → ValidateCIEnforcement → BuildSemanticIndex
+/// (final assembly with D26 global invariant check).
 /// </remarks>
 internal static partial class TypeChecker
 {
@@ -42,11 +43,14 @@ internal static partial class TypeChecker
         PopulateEventHandlers(manifest, ctx);
         PopulateRules(manifest, ctx);
 
-        // Pass 2b: normalize ensures, access modes, state hooks, edit declarations (B2)
+        // Pass 2b: normalize ensures, access modes, state hooks, and edit declarations (B2)
         PopulateEnsures(manifest, ctx);
         PopulateAccessModes(manifest, ctx);
         PopulateStateHooks(manifest, ctx);
         PopulateEditDeclarations(manifest, ctx);
+
+        // Field-state omit lookup (prerequisite for ValidateFieldStateGuarantees)
+        BuildOmitLookup(manifest, ctx);
 
         // Modifier validation (Slice 7) — depends only on Pass 1 symbols
         ValidateModifiers(ctx);

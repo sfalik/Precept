@@ -12,6 +12,63 @@ internal static partial class TypeChecker
     //  Modifier and structural validation
     // ════════════════════════════════════════════════════════════════════════
 
+    private static void BuildOmitLookup(ConstructManifest manifest, CheckContext ctx)
+    {
+        if (!manifest.ByKind.Contains(ConstructKind.OmitDeclaration))
+            return;
+
+        foreach (var construct in manifest.ByKind[ConstructKind.OmitDeclaration])
+        {
+            var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
+            var resolvedStates = ResolveStateTargets(stateSlot, ctx);
+            if (resolvedStates.IsDefaultOrEmpty)
+                continue;
+
+            var fieldSlot = construct.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
+            if (fieldSlot?.FieldName is not { } fieldName)
+                continue;
+
+            var fieldNames = ImmutableArray.CreateBuilder<string>(1 + fieldSlot.AdditionalFields.Length);
+            if (HasKeywordTokenMeta(fieldName, meta => meta.IsFieldBroadcast))
+            {
+                foreach (var field in ctx.Fields)
+                    fieldNames.Add(field.Name);
+            }
+            else
+            {
+                AddDeclaredField(fieldName);
+                foreach (var (additionalFieldName, _) in fieldSlot.AdditionalFields)
+                    AddDeclaredField(additionalFieldName);
+            }
+
+            if (fieldNames.Count == 0)
+                continue;
+
+            if (resolvedStates.Any(state => state.IsWildcard))
+            {
+                foreach (var state in ctx.States)
+                {
+                    foreach (var resolvedFieldName in fieldNames)
+                        ctx.OmitLookup.Add((state.Name, resolvedFieldName));
+                }
+
+                continue;
+            }
+
+            foreach (var resolvedState in resolvedStates)
+            {
+                foreach (var resolvedFieldName in fieldNames)
+                    ctx.OmitLookup.Add((resolvedState.StateName, resolvedFieldName));
+            }
+
+            void AddDeclaredField(string candidateFieldName)
+            {
+                if (ctx.FieldLookup.TryGetValue(candidateFieldName, out var typedField))
+                    fieldNames.Add(typedField.Name);
+            }
+        }
+    }
+
     /// <summary>Validate modifier applicability, conflicts, and subsumption for all fields and states.</summary>
     private static void ValidateModifiers(CheckContext ctx)
     {

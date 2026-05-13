@@ -101,6 +101,13 @@ internal sealed class CheckContext
     /// <summary>Normalized edit declarations accumulated during Pass 2.</summary>
     public List<TypedEditDeclaration> EditDeclarations { get; } = [];
 
+    /// <summary>
+    /// Omit lookup: (state, field) pairs where the field is declared <c>omit</c>.
+    /// Built by <see cref="TypeChecker.BuildOmitLookup"/> from OmitDeclaration constructs.
+    /// Consumed by <see cref="TypeChecker.ValidateFieldStateGuarantees"/>.
+    /// </summary>
+    public HashSet<(string State, string Field)> OmitLookup { get; } = new();
+
     // ── Dependency facts ──────────────────────────────────────────────────
 
     /// <summary>Computed field dependency records accumulated during Pass 2.</summary>
