@@ -39,6 +39,11 @@
 - Commit `d187230c` added `QualifierMatch.Same` to the six same-qualifier arithmetic operations and taught PRE0114 diagnostics to show recursive expression labels plus resolved qualifier values.
 - Companion message work in `1d8962f7` locked the clearer proof wording without widening the proof metadata surface; George validated the combined path against the full suite at `5507/5507`.
 
+### 2026-05-13T00:08:20Z — George's B2/B3 and B4 hover work is now the approved baseline
+
+- Commit `47f3068c` fixed Frank's B2/B3 blockers by reordering construct routing ahead of generic hover help and making mutability summaries explicitly omit-aware.
+- Commit `a6bf789f` introduced `EdgeProofStatus`, `EnrichGraphWithProofStatus`, and the 📍 state-hover proof narrative so graph-edge proof posture is visible on the rich state card.
+- Frank's final approval sweep closed the hover program with `279/279` language-server tests and `4973` core tests green.
 ## Learnings
 
 - Proof diagnostics are most robust when qualifier facts are resolved at emission time rather than baked into preformatted operand strings.
@@ -50,3 +55,4 @@
 
 - Commit `a727dddb` widened modifier applicability for `price`, `exchangerate`, and business-magnitude `maxplaces`, and collapsed identity-type `notempty` handling to redundancy-only by skipping implied modifiers during applicability validation.
 - Coordinator follow-up repaired the remaining price qualifier fixture and `ModifiersTests` catalog-drift expectations, so the final repository result closed at `4995/4995` tests passing.
+

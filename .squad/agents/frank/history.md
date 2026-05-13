@@ -32,8 +32,14 @@
 - Frank confirmed D133, the parser field-target fix, omit/access-mode unification, and D42/D43 emission are grounded in the canonical spec.
 - He blocked D132, D134, and the broader proof-enforcement surface because the spec explicitly says `readonly` / `editable` do not restrict event-driven `set`, and he flagged from-state D130 / guard-read D131 as needing narrower justification or explicit spec extension.
 
+### 2026-05-13T00:08:20Z — Frank's hover B1-B4 review cycle finished fully approved
+
+- Across B2/B3 and B4, Frank's blockers locked the final quality bar: correct rich-construct routing order, omit-aware mutability honesty, explicit `omit all` regression coverage, honest no-obligation proof narration, and duplicate-proof suppression tests.
+- Final re-reviews `frank-7` and `frank-9` approved the repaired implementations, closing the full B1-B4 hover program without remaining review debt.
+- The approved end state is commit-backed by `c2a38a56`, `47f3068c`, and `9617f39b`, with `279/279` language-server tests and `4973` core tests green.
 ## Learnings
 
 - When a design spans Update and Fire behavior, verify the split against the spec and evaluator before planning diagnostics; a single explicit rule can invalidate an otherwise plausible implementation plan.
 - Catalog/spec drift around business-domain types should be recorded as metadata gaps, not framed as deep semantic exclusions, when the checker is merely enforcing incomplete applicability tables.
 - If a spec guarantee depends on runtime surfaces that do not yet exist (for example constructor enforcement around `Create()`), record the gap and owner decision boundary before pushing implementation work.
+

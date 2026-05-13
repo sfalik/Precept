@@ -58,3 +58,9 @@
 - `HoverHandler.cs` now routes state symbols to the rich state card before generic construct rows can steal them, and it evaluates rich construct hovers before generic operator/function/accessor fallbacks so rule/ensure/transition/reject/access/omit cards win where the spec requires.
 - `RichHoverFactory.cs` now exposes shared rich symbol-card builders for field/state/event/arg paths and filters guarded access declarations out of V1 writable summaries, producing honest field mutability lines with `✏️` unconditional states and `🔒` locked-or-omitted states.
 - `HoverHandlerTests.cs` now covers state-reference routing, reject-over-transition precedence, qualifier-over-symbol routing, guarded-access omission from mutability summaries, and the updated routing expectations; validation passed with `dotnet test test\Precept.LanguageServer.Tests\ --nologo` (271/271) and `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --nologo`.
+
+### 2026-05-13T00:08:20Z — Hover B2/B3/B4 closeout is fully approved
+
+- Commit `4a3abe77` shipped Kramer's initial B2/B3 pass, establishing rich-construct-first routing and honest `✏️` / `🔒` mutability summaries for hover cards.
+- Commit `9617f39b` closed B4's remaining blockers by adding `HasObligations` for no-proof edges and the missing duplicate-proof regression coverage.
+- Frank's final re-reviews approved the repaired B2/B3 and B4 work, leaving the hover program green at `279/279` language-server tests and `4973` core tests.
