@@ -169,7 +169,8 @@ state Draft initial
         var hover = HoverHandler.CreateHover(compilation, new Position(2, 6));
 
         hover.Should().NotBeNull();
-        hover!.Contents.MarkupContent!.Value.Should().Contain("state `Draft`");
+        hover!.Contents.MarkupContent!.Value.Should().Contain("⚠️ Gap · initial state");
+        hover.Contents.MarkupContent.Value.Should().Contain("📍 Draft graph position");
     }
 
     [Fact]
