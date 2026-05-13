@@ -276,6 +276,22 @@ public class TypeCheckerConstructionTests
     }
 
     [Fact]
+    public void D94_NonInitialStateRow_NotChecked()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            state Draft initial
+            state Active terminal
+            event Start(InputName as string) initial
+            from Draft on Start -> set Name = InputName -> transition Active
+            from Active on Start -> no transition
+            """;
+
+        AssertNoD94(precept);
+    }
+
+    [Fact]
     public void D94_NoTransitionRows_InitialEvent_RequiredField_Fires()
     {
         var diagnostic = AssertSingleD94("""

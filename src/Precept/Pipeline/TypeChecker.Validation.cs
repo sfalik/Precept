@@ -331,8 +331,16 @@ internal static partial class TypeChecker
         if (ctx.States.Count == 0)
             return;
 
+        var initialStateNames = ctx.States
+            .Where(state => state.Modifiers.Contains(ModifierKind.InitialState))
+            .Select(state => state.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
         var initialRows = ctx.TransitionRows
-            .Where(row => string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal))
+            .Where(row =>
+                string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
+                row.FromState is { } fromState &&
+                initialStateNames.Contains(fromState))
             .ToImmutableArray();
 
         if (initialRows.IsDefaultOrEmpty)
