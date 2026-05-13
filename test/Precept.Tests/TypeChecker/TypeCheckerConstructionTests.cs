@@ -292,6 +292,52 @@ public class TypeCheckerConstructionTests
     }
 
     [Fact]
+    public void D94_FieldOmittedInInitialState_NotRequired()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            state Draft initial
+            state Active terminal
+            in Draft omit Name
+            event Start initial
+            from Draft on Start -> transition Active
+            """;
+
+        AssertNoD94(precept);
+    }
+
+    [Fact]
+    public void D94_MultipleInitialStates_AllRowsChecked()
+    {
+        var diagnostic = AssertSingleD94("""
+            precept Widget
+            field Name as string
+            state A initial
+            state B initial
+            state Done terminal
+            event Start(InputName as string) initial
+            from A on Start -> set Name = InputName -> transition Done
+            from B on Start -> transition Done
+            """);
+
+        diagnostic.Message.Should().Be("Initial event 'Start' does not assign required field(s): Name");
+    }
+
+    [Fact]
+    public void D94_StatelessPrecept_WithInitialEvent_SkipsCheck()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            event Start(InputName as string) initial
+            """;
+
+        // Pre-existing gap: stateless precepts with initial events escape both D93 and D94.
+        AssertNoD94(precept);
+    }
+
+    [Fact]
     public void D94_NoTransitionRows_InitialEvent_RequiredField_Fires()
     {
         var diagnostic = AssertSingleD94("""

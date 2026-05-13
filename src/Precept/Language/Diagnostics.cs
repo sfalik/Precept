@@ -819,7 +819,7 @@ public static class Diagnostics
             ExampleAfter: "precept Example\nfield Name as string optional\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete -> transition Done"),
         DiagnosticCode.InitialEventMissingAssignments => new(nameof(DiagnosticCode.InitialEventMissingAssignments), DiagnosticStage.Type,  Severity.Error,   "Initial event '{0}' does not assign required field(s): {1}",                                                                           DiagnosticCategory.Structure,
             FixHint: "Add 'set <field>' actions to the initial event body for each required field",
-            TriggerCondition: "An initial event does not assign all required fields in its transition body.",
+            TriggerCondition: "An initial event's construction paths (transition rows from initial states) do not assign all required fields that are present in the initial state.",
             RecoverySteps: ["Add 'set FieldName = ...' actions to the initial event for each required field it does not assign"],
             ExampleBefore: "precept Example\nfield Name as string\nfield Email as string\nstate Draft initial\nstate Done terminal\nevent Init(N as string, E as string)\nevent Complete\nfrom Draft on Init -> set Name = Init.N -> no transition\nfrom Draft on Complete -> transition Done",
             ExampleAfter: "precept Example\nfield Name as string\nfield Email as string\nstate Draft initial\nstate Done terminal\nevent Init(N as string, E as string)\nevent Complete\nfrom Draft on Init -> set Name = Init.N -> set Email = Init.E -> no transition\nfrom Draft on Complete -> transition Done"),

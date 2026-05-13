@@ -1135,3 +1135,20 @@ Gap audit (2026-05-12) identified two blocking gaps: D93 and D94 were declared b
 | Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ✅ Done | Standalone | `c2d5b8fb` |
 | Slice 10 | D93: `RequiredFieldsNeedInitialEvent` enforcement | ✅ Done | Independent (additive) | `597a0479` |
 | Slice 11 | D94: `InitialEventMissingAssignments` enforcement | ✅ Done | Slice 10 | `0b42fd1a` |
+
+### Slice 13 — D94 Boundary Tests + Catalog Fix (Frank follow-up)
+
+**Status:** 🔲 Pending
+
+**Goal:** Add targeted boundary tests documenting the D94/D132 partition and multi-initial-state behavior; update D94's `TriggerCondition` text; note the stateless-precept gap.
+
+**Files:**
+- `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs` — 3 new tests
+- `src/Precept/Language/DiagnosticCatalog.cs` — D94 TriggerCondition text
+
+**Tests:**
+- `D94_FieldOmittedInInitialState_NotRequired`
+- `D94_MultipleInitialStates_AllRowsChecked`
+- `D94_StatelessPrecept_WithInitialEvent_SkipsCheck`
+
+**Rationale:** Frank's post-fix analysis (`frank-d94-analysis.md`) identified these as undocumented boundary behaviors. The D94/D132 partition is correct but untested; multi-initial-state scoping is correct but not exercised; stateless precept bailout documents a known pre-existing gap.
