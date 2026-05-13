@@ -17,6 +17,11 @@
 
 ## Recent Updates
 
+### 2026-05-13T00:26:25Z — Field-state v3 resets the design surface to spec-grounded structural guarantees
+
+- Frank's v3 design keeps D131 and D133, adds D135 for required omit→non-omit reentry, and removes the blocked D130/D132/D134 + ProofEngine path because Update access modes do not govern Fire/`set`.
+- The companion initialization analysis locks the three construction scenarios: initial events must assign required fields, no-initial-event precepts cannot contain required no-default fields, and stateless precepts inherit the same constructor guarantees minus state-entry behavior.
+
 ### 2026-05-12T23:50:08Z — Modifier applicability and constructor gaps are durable team memory
 
 - Frank's modifier audit locked the core judgment: `price` bound modifiers and business-magnitude `maxplaces` were missing catalog metadata, while `notempty` on scalar business magnitudes should remain invalid and identity-type `notempty` should be redundancy-only.
@@ -42,4 +47,8 @@
 - When a design spans Update and Fire behavior, verify the split against the spec and evaluator before planning diagnostics; a single explicit rule can invalidate an otherwise plausible implementation plan.
 - Catalog/spec drift around business-domain types should be recorded as metadata gaps, not framed as deep semantic exclusions, when the checker is merely enforcing incomplete applicability tables.
 - If a spec guarantee depends on runtime surfaces that do not yet exist (for example constructor enforcement around `Create()`), record the gap and owner decision boundary before pushing implementation work.
-
+- §2.2 rule #6 is the single most important sentence for field-state enforcement: "`set` targeting an `omit` field in the target state is a compile error; `readonly`/`editable` do not restrict `set`." This one rule invalidated three v2 diagnostics (D130, D132, D134) and the entire ProofEngine conditional enforcement phase.
+- D131 scope must extend beyond transition row guards to all state-anchored expression contexts (`in`-state ensures, `from`-state ensures, state action guards). The evaluator confirms guard timing at line ~499: guard evaluates against from-state slots before working copy creation.
+- D135 (MustSetOmitToNonOmit) is the structural dual of `InitialEventMissingAssignments` — both prevent required fields from existing without valid values. D135 fills a spec gap where rule #5 covers entering-omit but is silent on leaving-omit.
+- The three precept forms (with initial event, without initial event, stateless) have different D135 applicability profiles. Form 2 (no initial event) makes D135 structurally unsatisfiable because `RequiredFieldsNeedInitialEvent` forces all fields to have defaults or be optional.
+- §3.5 "All field names" describes name resolution scope, not semantic validity. D131 operates in the gap between "the name resolves" and "reading it is meaningful." This distinction must be annotated in the spec when D131 ships.

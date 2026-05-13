@@ -19,6 +19,11 @@
 
 ## Recent Updates
 
+### 2026-05-13T00:26:25Z — Circular Tokens/Types static-init crash is closed
+
+- `Tokens.KeywordsValidAsMemberName` now defers its `Types.All` read through `Lazy<FrozenSet<TokenKind>>`, eliminating the `Tokens..cctor()` ↔ `Types..cctor()` re-entry crash.
+- George confirmed the public API surface stayed unchanged and the repository test pass closed green at `4996/4996`.
+
 ### 2026-05-12T23:20:42Z — Soup Nazi re-review approved the comma-list closeout
 
 - Commit `53d68d51` closed B1-B5 plus N1 with parser AST coverage, stronger expansion and guard-clone assertions, multi-unknown-state fan-out coverage, and the corrected `4969` core-test count in the spike doc.
@@ -46,6 +51,10 @@
 - Frank's final approval sweep closed the hover program with `279/279` language-server tests and `4973` core tests green.
 ## Learnings
 
+- **Tokens ↔ Types circular static init:** `Tokens.GetMeta(TokenKind.StringType)` (called during `Types..cctor()`) triggers `Tokens..cctor()`, which then reads `Types.All` (null — not yet assigned) via `KeywordsValidAsMemberName`. Fix: `Lazy<FrozenSet<TokenKind>>` on `KeywordsValidAsMemberName` defers the `Types.All` access until after both static constructors complete.
+
+
+
 - Proof diagnostics are most robust when qualifier facts are resolved at emission time rather than baked into preformatted operand strings.
 - Pure-copy state-list expansion should resolve shared payload once, then fan out per source-state name while preserving per-name spans and undeclared-state diagnostics.
 - `TypedInterpolatedTypedConstant` qualifier work must treat compound-unit literals as numerator/denominator slot pairs; denominator-only fallbacks silently lose information.
@@ -55,4 +64,3 @@
 
 - Commit `a727dddb` widened modifier applicability for `price`, `exchangerate`, and business-magnitude `maxplaces`, and collapsed identity-type `notempty` handling to redundancy-only by skipping implied modifiers during applicability validation.
 - Coordinator follow-up repaired the remaining price qualifier fixture and `ModifiersTests` catalog-drift expectations, so the final repository result closed at `4995/4995` tests passing.
-

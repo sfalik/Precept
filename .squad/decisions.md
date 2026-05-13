@@ -6,6 +6,48 @@
 
 ---
 
+### 2026-05-13T00:26:25Z: Circular static-init crash in Tokens/Types is closed with lazy keyword-set initialization
+
+**By:** Scribe
+
+**Status:** Merged from George's runtime fix note.
+
+**Merged source:** `george-circular-static-init-fix.md`.
+
+- `Tokens.KeywordsValidAsMemberName` now uses a `Lazy<FrozenSet<TokenKind>>` backing field, so `Types.All` is not touched during `Tokens..cctor()`.
+- The crash path was a CLR static-constructor cycle: `Types.GetMeta()` re-entered `Tokens..cctor()`, which previously read `Types.All` before assignment and faulted in `SelectMany`.
+- George reported the public API shape unchanged and the repository suite green at `4996/4996` tests passing.
+
+---
+
+### 2026-05-13T00:26:25Z: Field-state guarantees v3 resets the implementation boundary to D131, D133, and D135 only
+
+**By:** Scribe
+
+**Status:** Merged from Frank's v3 design closeout.
+
+**Merged source:** `frank-v3-design-complete.md`.
+
+- Frank replaced the blocked v2 plan with a spec-grounded v3 design: keep `ReadOfOmittedField` (D131), keep `WriteToTargetOmittedField` (D133), and add `MustSetOmitToNonOmit` (D135).
+- The redesign explicitly removes D130, D132, D134, and the ProofEngine extension because the shipped spec separates Update access modes from Fire/`set` semantics.
+- The design note also records the remaining spec edits needed when this ships: annotate the §3.5 scope gap, define omit→non-omit required-field reentry, and state state-hook access-mode direction explicitly.
+
+---
+
+### 2026-05-13T00:26:25Z: Required-field initialization semantics stay compile-time complete across all three precept forms
+
+**By:** Scribe
+
+**Status:** Merged from Frank's field-initialization analysis.
+
+**Merged source:** `frank-field-init-semantics.md`.
+
+- Stateful precepts with an initial event remain compile-time safe because `InitialEventMissingAssignments` must force every required no-default field to be assigned during construction.
+- Stateful precepts without an initial event cannot carry required no-default fields at all because `RequiredFieldsNeedInitialEvent` rejects that shape, while stateless precepts follow the same constructor guarantees without state-entry semantics.
+- The open spec gap remains omit→non-omit reentry: non-optional, no-default fields need a must-set rule on the transition, while defaulted and optional fields can re-materialize from their valid baseline values.
+
+---
+
 ### 2026-05-12T23:33:48Z: Self-loop omit validation intentionally fires both D130 and D133 when `from` and `to` are the same state
 
 **By:** Scribe
@@ -46,8 +88,6 @@
 
 ---
 
----
-
 ### 2026-05-12T23:02:04Z: Comma-list `StateTarget` spike is architecturally approved, but parser/test closure and count reconciliation remain open
 
 **By:** Scribe
@@ -59,8 +99,6 @@
 - Frank approved commit `a63d88b4` on architecture: parser disambiguation stays catalog-derived, `ResolveStateTargets` remains the single normalization path, expansion is pure-copy, and the grammar already accepts comma lists.
 - The follow-up gate is test completeness, not design shape: parser AST coverage still needs 2-name, 3+-name, whitespace, and trailing-comma anchors, and expansion coverage must assert cloned guard/action/outcome semantics plus multi-unknown-state diagnostic fan-out.
 - Published validation counts must match real output; the durable tester note is that current `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build --nologo` reports `4962`, so any `4966` claim needs reconciliation before handoff.
-
----
 
 ---
 
@@ -78,8 +116,6 @@
 
 ---
 
----
-
 ### 2026-05-12T23:02:04Z: Hover B1 review locked the compact-card proof-hover contract before the fix pass
 
 **By:** Scribe
@@ -91,8 +127,6 @@
 - Frank's blocker list made the contract explicit: qualifier proof diagnostics, qualifier proof expressions, and qualifier declarations all had to use the compact 3-line card shapes from `docs/Working/hover-design.md` instead of the older forensic sections.
 - The review also locked the exact wording surface: `✅ Proven`, `⚡ Enforced`, `⚠️ Gap`, plus `proven` instead of `proved`, with transition hover using `Gap:` rather than `Proof gap:`.
 - Routing itself was not the problem: proof-first dispatch in `HoverHandler` and the rich proof/qualifier precedence inside `RichHoverFactory` were already judged structurally correct; the rendered copy and stale red tests were the blocked surface.
-
----
 
 ---
 
@@ -110,8 +144,6 @@
 
 ---
 
----
-
 ### 2026-05-12T22:39:45Z: Field-state guarantees v2 will enforce structural access violations in the TypeChecker and conditional access through proof obligations
 
 **By:** Scribe
@@ -123,8 +155,6 @@
 - Enforcement is now explicitly split by certainty: omit/unconditional-readonly violations stay in a new TypeChecker validation pass, while guarded-editability checks become a new `ProofRequirementKind.AccessCondition` path in the ProofEngine.
 - `FieldTargetSlot` must become multi-name so access-mode and omit declarations stop dropping fields 2..N from comma-separated targets, and omit declarations should feed `ctx.AccessModes` as `ModifierKind.Omit` rather than living on a disconnected enforcement surface.
 - The design also locks the diagnostic envelope for this work: activate existing D42/D43 declaration checks and add D130-D134 for structural write/read failures plus unproved access conditions.
-
----
 
 ---
 
@@ -142,8 +172,6 @@
 
 ---
 
----
-
 ### 2026-05-12T22:18:18Z: Construct metadata now describes `StateTarget` as a single state, `any`, or a comma-delimited state list
 
 **By:** Scribe
@@ -153,8 +181,6 @@
 - `src/Precept/Language/ConstructSlot.cs:18` now documents `ConstructSlotKind.StateTarget` as accepting a state name, `any`, or a comma-delimited list of state names.
 - `src/Precept/Language/Constructs.cs:29` now gives the shared `SlotStateTarget` description the same list-capable wording, keeping catalog-facing construct metadata aligned with the shipped parser and type-checker behavior.
 - George reported the S5 catalog wording pass complete and confirmed the validation build passed.
-
----
 
 ---
 
@@ -169,8 +195,6 @@
 - The hard rule is now durable team memory: no one uses `claude-opus-4.7` unless Shane explicitly authorizes it for the session or task.
 - The clarification also locks the non-ban boundary: `claude-opus-4.6` remains available for complex work under the existing model-selection policy and is not part of the prohibition.
 - Model-selection guidance should therefore treat the directive as a surgical ban on `claude-opus-4.7`, not a general no-opus policy.
-
----
 
 ---
 
@@ -189,8 +213,6 @@
 
 ---
 
----
-
 ### 2026-05-12T22:18:18Z: Canonical samples now demonstrate comma-list state syntax only where semantics stay identical
 
 **By:** Scribe
@@ -202,8 +224,6 @@
 - `samples/hiring-pipeline.precept`, `samples/it-helpdesk-ticket.precept`, and `samples/utility-outage-report.precept` now use comma-list source states for the pure-copy transitions George's runtime/parser work actually supports.
 - Frank deliberately left rows expanded anywhere guards, actions, or outcomes diverged, preserving the spike ruling that comma lists are syntactic sugar for identical rows rather than a semantic broadening of transition behavior.
 - Validation for the three edited samples stayed clean through VS Code diagnostics even though MCP `precept_compile` was unavailable during the pass.
-
----
 
 ---
 
@@ -223,8 +243,6 @@
 
 ---
 
----
-
 ### 2026-05-12T15:15:10Z: Proof hover spec is now consolidated into `docs/Working/hover-design.md`
 
 **By:** Scribe
@@ -236,8 +254,6 @@
 - Elaine merged the proof-hover design into `docs/Working/hover-design.md`, replacing the old standalone proof-hover draft with the canonical hover spec.
 - Qualifier hover now uses the proof-aware Scenario 4 card, and the working doc carries explicit scenarios for qualified fields, proof-bearing binary expressions, and proof diagnostic squiggles.
 - Hover routing, precedence, proof data-shape requirements, and proof-specific open questions now live in one maintained design surface instead of split working docs.
-
----
 
 ---
 
@@ -255,8 +271,6 @@
 
 ---
 
----
-
 ### 2026-05-12T15:15:10Z: Compound-unit interpolated constants now resolve full `{A}/{B}` qualifiers before denominator fallback
 
 **By:** Scribe
@@ -268,8 +282,6 @@
 - George fixed `ResolveQualifierFromInterpolatedConstant` so typed constants carrying both numerator and denominator unit slots build the full compound qualifier string instead of collapsing to the denominator.
 - The G1 pass shipped in commit `cb4fbf57`, kept `StaticMagnitude` on the typed interpolated constant node, and reused trusted positive-rule proofs so downstream nonzero obligations can discharge from the cleaned qualifier evidence.
 - RC1 fallout is cleared in `samples/inventory-item.precept`: the PRE0114s at plan lines 122/123 and the cascading DivisionByZero diagnostics at lines 137/142 are gone, with docs/history synced in `1ee54bdb`.
-
----
 
 ---
 
@@ -287,8 +299,6 @@
 
 ---
 
----
-
 ### 2026-05-12T13:52:04Z: Proof diagnostic root cause is missing same-qualifier operation metadata, not a new proof strategy gap
 
 **By:** Scribe
@@ -300,8 +310,6 @@
 - Frank isolated the nested `(A - B) - C` PRE0114 failures to a catalog input gap: same-qualifier `+/-` operations lacked `Match: QualifierMatch.Same`, so intermediate `TypedBinaryOp` results did not advertise inherited qualifiers and the existing recursive proof path never activated.
 - The approved fix stays metadata-driven and surgical: add `Match: Same` to the six same-qualifier money/quantity/price arithmetic operations and cover nested regressions; no provenance redesign or new proof algorithm is required.
 - The message UX follow-up remains independently valuable: `ProofEngine` should describe subexpressions recursively and show resolved qualifier values instead of `<expression>` placeholders so legitimate qualifier failures explain the real mismatch.
-
----
 
 ---
 
@@ -319,8 +327,6 @@
 
 ---
 
----
-
 ### 2026-05-12T13:52:04Z: Proof-stage diagnostics and hover need operand truth, repair guidance, and dedicated routing
 
 **By:** Scribe
@@ -332,8 +338,6 @@
 - Elaine's proof UX audit locked the core teachable-moment failures: `<unknown>`-style placeholders are never acceptable, qualifier diagnostics must show the actual conflicting values, and human repair guidance must be paired with structured args rather than baked into sentence fragments.
 - The audit also established that proof hover is a routing problem as much as a content problem: generic operator and transition hover frequently wins before authors ever see proof context.
 - The durable design split is now explicit: declaration-contract hover, expression-proof hover, and diagnostic-squiggle hover are separate UX jobs and should not be collapsed into one generic card.
-
----
 
 ---
 
@@ -351,8 +355,6 @@
 
 ---
 
----
-
 ### 2026-05-12T13:52:04Z: Proof hover working spec is filed for Shane sign-off before implementation
 
 **By:** Scribe
@@ -364,8 +366,6 @@
 - Elaine wrote `docs/working/proof-hover-design.md` as the canonical working spec for proof-hover UX before Kramer starts implementation work.
 - The doc covers precedence failures in the current hover stack, scenario-specific card requirements, routing rules, and the proof-evidence data shape the implementation must have available.
 - Status is now durable: the hover design is ready for Shane review and annotation, not for silent implementation drift.
-
----
 
 ---
 
@@ -383,8 +383,6 @@
 
 ---
 
----
-
 ### 2026-05-12T05:04:03Z: DTO-free MCP architecture analysis confirms hybrid curated projection
 
 **By:** Scribe
@@ -396,8 +394,6 @@
 - Frank evaluated multiple DTO-free MCP approaches under the no-codegen constraint and rejected raw core serialization plus attribute-driven converter sprawl.
 - The accepted direction keeps the contract curated while removing DTO type maintenance: catalog/reference tools move toward compact rendered output and only genuinely programmatic surfaces keep minimal structured JSON.
 - The core ruling remains that transport shape is a deliberate MCP contract concern, not something to leak back into `src/Precept` domain types.
-
----
 
 ---
 
@@ -415,8 +411,6 @@
 
 ---
 
----
-
 ### 2026-05-12T05:04:03Z: DTO-free MCP working doc is the canonical design surface
 
 **By:** Scribe
@@ -431,8 +425,6 @@
 
 ---
 
----
-
 ### 2026-05-12T05:04:03Z: E2 and E3 qualifier fixes cut inventory-item PRE0114 to 16
 
 **By:** Scribe
@@ -444,8 +436,6 @@
 - George landed E2 in `8785d753` and E3 in `d3f5aa98`, then followed with `f4db093e` for the ReceiveShipment parenthesization fix.
 - `samples/inventory-item.precept` PRE0114 count dropped from `66` to `16` after typed interpolated constant qualifier extraction, subexpression qualifier propagation, and compound-unit cancellation improvements.
 - The remaining 16 PRE0114 diagnostics are deferred exchange-rate / GrossProfit fallout; two separate `TypeMismatch` sample edits remain outside the committed parenthesization fix.
-
----
 
 ---
 
@@ -475,8 +465,6 @@
 
 ---
 
----
-
 ### 2026-05-12T04:29:05Z: Inventory-Item PRE0114 Root Cause Analysis and Resolution Plan
 
 
@@ -498,8 +486,6 @@
 - The plan adds Part E to `docs/Working/typed-constants-and-proof-coverage-plan.md` with slices E1–E4; the recommended execution order is E1 → E4 → E2 → E3.
 
 - One sample bug is separate from the compiler work: `ReceiveShipment` needs inner parenthesization so the intended scalar-chain grouping survives parsing.
-
----
 
 ---
 
@@ -527,8 +513,6 @@
 
 ---
 
----
-
 ### 2026-05-12T04:29:05Z: Diagnostic Message Location Tag Revision
 
 
@@ -550,8 +534,6 @@
 - The recommended tag format preserves the DSL preposition and scope name (`[on ... ensure]` / `[in ... ensure]`) so event-vs-state ensures stay distinguishable.
 
 - Structured `Args` remain part of the contract so AI agents can reconstruct the location tag without regex-parsing the rendered message.
-
----
 
 ---
 
@@ -579,8 +561,6 @@
 
 ---
 
----
-
 ### 2026-05-12T00:50:06Z: Temporal proof-plan audit confirms Slice 11B/12 direction and closes G15 as a false gap
 
 
@@ -604,8 +584,6 @@
 - G15 is closed as a false gap: derivation-direction operations do not need qualifier-chain proofs because the operands share no qualifier axis, and assignment validation already enforces declared-target compatibility in the practical cases.
 
 - The plan-status correction is durable: Slices 7–11 were confirmed already implemented; only Slice 11B and Slice 12 remain open work.
-
----
 
 ---
 
@@ -637,8 +615,6 @@
 
 ---
 
----
-
 ### 2026-05-11T20:25:57Z: DTO-free MCP catalog exposure stays off the public contract path
 
 
@@ -665,8 +641,6 @@
 
 ---
 
----
-
 ### 2026-05-11T20:25:57Z: Semantic-token invalidation now clears `_latestResults` so delta requests reseed from a full baseline
 
 
@@ -690,8 +664,6 @@
 - Regression coverage now proves invalidation clears both caches and forces the next delta response down the safe full-response path.
 
 - Kramer reported the fix closed with a successful build and green language-server tests.
-
----
 
 ---
 
@@ -725,8 +697,6 @@
 
 ---
 
----
-
 ### 2026-05-11T20:03:33Z: `optional` + `notempty` is now a first-class conflicting-modifier error across code, docs, and tests
 
 
@@ -755,8 +725,6 @@
 
 ---
 
----
-
 ### 2026-05-11T00:00:00Z: Precept skills and Precept Author agent now match the actual 10-tool MCP surface
 
 
@@ -780,12 +748,6 @@
 - Frank established the durable architectural decisions: keep two separate skills (authoring = generative cognitive mode, debugging = diagnostic cognitive mode); authoring tool order is `precept_quickstart` (new session only) → `precept_patterns` (before writing) → conditional domain tools → compile loop; `precept_syntax`/`precept_types` are on-demand reference, not workflow steps; debugging is fully static (compile → `precept_diagnostic` per code → transition-table reasoning); `precept_diagnostic` is reactive in both skills; keep `precept/*` wildcard in the agent definition so new tools are picked up automatically without agent-file edits.
 
 - The debugging workflow now explicitly acknowledges that runtime tracing via MCP does not exist; all diagnosis is static. The debugging skill includes explicit reasoning guidance on guard ordering, unreachable/dead-end states, constraint satisfaction on entry, event ensures, and conditional rules to compensate for the absent runtime tools.
-
-
-
----
-
----
 
 ---
 
@@ -813,12 +775,6 @@
 
 - Three diagnostic codes allocated: 120 (`InvalidInterpolatedTypedConstantForm`), 121 (`InterpolationUnsupportedForType`), 122 (`InterpolatedTypedConstantHoleTypeMismatch`). Slice 1 (Parser) unchanged from frank-16; Slice 2 (TypeChecker) fully redesigned to match-then-check. Plan written to `docs/Working/interpolation-plan.md`. Three open questions filed for Shane review before Slice 1 begins.
 
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T00:00:00Z: B9–B12 slices 2/3/4 shipped — post-resolution type and qualifier checking now enforced
@@ -845,12 +801,6 @@
 
 - All three slices closed green. Slice 5 remains.
 
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T00:00:00Z: Release-only build policy is now the repo default; all Debug.Assert sites converted
@@ -874,12 +824,6 @@
 - `Directory.Build.props` sets `Release` as the default configuration with `DebugSymbols=true` and `DebugType=portable`.
 
 - All 7 `Debug.Assert` sites in `src/Precept/Pipeline/` and `src/Precept/Language/` converted to unconditional `throw new InvalidOperationException(...)`. No `#if DEBUG` blocks remain.
-
-
-
----
-
----
 
 ---
 
@@ -905,12 +849,6 @@
 
 - Fix 7 stands as-is. Revisit if `GraphAnalysisKind` grows to 4+ members across multiple dispatch sites — at that scale, PRECEPT019-style annotation becomes the better tool. Defense-in-depth also applies: the runtime throw catches cases where the analyzer is bypassed.
 
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T00:00:00Z: B6 fixed — DeclaredQualifiers threaded through binary peer context in CompletionHandler
@@ -932,12 +870,6 @@
 - `TypedConstantContext` now carries `DeclaredQualifiers` for money/quantity fields, threaded through binary peer context in `CompletionHandler`.
 
 - Commit: `65badacb`. Tests green.
-
-
-
----
-
----
 
 ---
 
@@ -963,12 +895,6 @@
 
 - `ResolveAction()` remains private; new defensive tests invoke it via reflection instead of widening production visibility for test access.
 
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T05:34:40Z: B4/B5 retriage reopens qualifier-site routing for declaration-side typed literals
@@ -992,12 +918,6 @@
 - Frank's retriage shows that the same coercion is wrong for declaration-side qualifier slots. At `field q as quantity in '` and `field q as quantity of '`, completion now falls through `TryGetEnclosingField(...)`, recovers the outer `Quantity` type, and routes into quantity-literal items instead of the active qualifier slot (`UnitOfMeasure` or `Dimension`).
 
 - Durable fix direction for Kramer's next pass: resolve declaration-side qualifier literal sites before expression fallback using parsed qualifier metadata and qualifier-shape slots, return the active qualifier-slot type rather than the outer field type, avoid routing B4/B5 through `GetQuantityLiteralItems(...)`, and replace weak non-empty assertions with concrete unit/dimension label checks.
-
-
-
----
-
----
 
 ---
 
@@ -1025,12 +945,6 @@
 
 - Follow-on fixes replaced the quantity-unit example stub with `UcumCatalog.BrowseTier1()` plus dimension-vector filtering, and closed the OmniSharp semantic-token delta crash by invalidating cached documents when typed-constant token spans change instead of swallowing exceptions or forcing full refresh globally.
 
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T05:34:40Z: Money and quantity modifiers now ship with implementation, regression coverage, and synced docs
@@ -1054,12 +968,6 @@
 - Soup Nazi confirmed the shipped implementation was complete, added 14 regression anchors in `MoneyQuantityModifierRegressionTests.cs`, and kept the core suite green while explicitly preserving the two known follow-up gaps: qualifier alignment and plain-number acceptance still behave the same as `default`.
 
 - Frank synced the spec and business-domain docs to the real implementation: modifier applicability tables now list `money` and `quantity`, typed-constant bounds are documented as required for domain fields, and the quantity example now uses `min '0 kg' max '1000 kg'` instead of invalid plain integers.
-
-
-
----
-
----
 
 ---
 
@@ -1085,16 +993,6 @@
 
 - George shipped the approved design as `StructuralSinkState` (C119) plus gated `DeadEndState` (C108), preserved `DeadEndStateFact` suppression semantics, and recorded implementation commit `482f4b1b`.
 
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T01:38:51Z: Parser precedence and typed-constant binary context fixes are durable
@@ -1118,16 +1016,6 @@
 - `TypeChecker.Expressions.ResolveBinaryOp(...)` now propagates peer operand type context into typed constants before the D13 error short-circuit, closing PRE0052 failures in ensure, rule, and other binary-expression sites.
 
 - The rental sample shed its comparison-workaround parentheses, and Frank recorded the batch as green at 5,073 tests.
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1153,16 +1041,6 @@
 
 - State-declaration graph warnings now stop at the name token boundary; Kramer validated the span fix against both core and language-server test projects.
 
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T01:38:51Z: Semantic-token arg spans now use bare identifiers and exact-range dedup
@@ -1186,16 +1064,6 @@
 - Language-server overlay token dedup now collapses only exact duplicate ranges instead of every token sharing a start column, preventing malformed delta streams.
 
 - Kramer closed the OmniSharp delta crash with `test/Precept.LanguageServer.Tests` green at 160/160 and a successful language-server build.
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1221,16 +1089,6 @@
 
 - The graph-warning projector fixture now asserts `StructuralSinkState` for no-terminal flows, and Soup Nazi finished with `dotnet test` green at 5,085 passing / 0 failing.
 
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T20:56:45Z: Track 2 Slice 11 makes proof obligations derive from catalog proof-site metadata
@@ -1254,20 +1112,6 @@
 - Unguarded mutation diagnostics now bind the real collection field name, and regression coverage now locks guarded plus `notempty` collection mutations alongside the catalog-driven `sqrt(abs(x))` proof path with 5 new proof tests.
 
 - Implementation commits `004e68be`, `e48c0071`, and `599206b6` closed BUG-008, BUG-013, and BUG-050. The two transient shared-tree NameBinder failures during George-9's concurrent full-run attempt are superseded by George-7's clean 3,925-test run.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1293,20 +1137,6 @@
 
 - Implementation commits `def91dbb` and `b08b1fc4` closed BUG-001, BUG-026, BUG-030, and BUG-037 with 3,911 / 3,911 tests passing.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T20:56:43Z: Track 2 Slice 9 makes operator typing fully catalog-derived in TypeChecker
@@ -1331,20 +1161,6 @@
 
 - Implementation commits `b7868d60` and `2f75c829` closed BUG-002, BUG-003, BUG-007, BUG-009, BUG-010, BUG-028, BUG-029, BUG-038, BUG-040, BUG-046, BUG-052, and BUG-053; validation finished clean at 3,925 / 3,925 tests.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T20:56:42Z: Track 2 Slice 4 locks operator result typing to catalog metadata
@@ -1368,20 +1184,6 @@
 - Catalog assignments are explicit: comparisons/presence/contains stay `Fixed` boolean, `and` / `or` use `BothOperands` with boolean agreement, unary negate uses `LhsType`, lookup `for` uses `ElementType`, and arithmetic operators point at `OperationResult`.
 
 - Durable rule for t2-9: arithmetic result typing must read `OperationMeta.Result` instead of reviving a per-operator promotion switch. George shipped the catalog-only foundation in commit `df874e15` with 3,899 passing tests.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1409,20 +1211,6 @@
 
 - AccessMode should move to pre-verb syntax (`in Draft when IsOwner modify Amount editable`), and the follow-through must update spec grammar, catalog/docs/tests, and MCP projections. `SupportsPostActionEnsure` was flagged as the parallel architectural smell, but kept out of this fix's scope.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T16:15:12Z: When-guard audit locks pre-verb state/event ensures and exposes the remaining spec-sample drift
@@ -1446,20 +1234,6 @@
 - Parser, catalog, spec prose, spec examples, toolchain-plan notes, and tests all agree on the pre-verb form; the broken sample lines now stand as durable evidence that `ParserIntegrationTests` must start asserting zero diagnostics, not just "no crash."
 
 - Other guard positions remain structurally consistent: rule stays the deliberate post-expression exception, transition rows keep post-event guards, state actions stay pre-verb, access mode remains post-adjective today, and omit/event-handler constructs still reject `when`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1485,20 +1259,6 @@
 
 - Durable follow-up: BUG-019 is only partially fixed because typed constants in binary comparison context still hit PRE0052 until `ResolveBinaryOp` retries context before the D13 bailout; stale MCP triage and `FieldTargetSlot`'s single-name data-model limitation remain explicitly tracked as non-blocking follow-ups.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T15:52:58Z: Track 2 Phase A source audit and D1-D8 doc-sync closeout are now one canonical record
@@ -1522,20 +1282,6 @@
 - The follow-up doc-sync batch closed all D1–D8 gaps, added the named modifier capability tests, and re-aligned `catalog-system.md` with the live catalog field names, counts, and metadata shapes.
 
 - Durable process rule: when catalog work ships, the owning commit must also close or remove any lingering open-question checklist items so documentation does not trail the metadata-driven source of truth.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1561,20 +1307,6 @@
 
 - The approved implementation boundary is three vertical slices: catalog enrichment (`ActionSyntaxSlot` / `ActionShapeMeta`), `ParseActionTarget` rewire to shape-specific separator sets, then shape-method rewires that read separator tokens and optional suffix rules from metadata.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T13:46:52Z: BUG-006 / BUG-051 PRE0009 on `min(A,B)` is a stale extension build, not a live source defect
@@ -1598,20 +1330,6 @@
 - The live editor symptom came from a stale language-server binary: the running `Precept.dll` predates George's fix commit `6d360231`, so the editor was still executing the old parse path that emitted PRE0009.
 
 - No code change is required for BUG-006 / BUG-051. Shane only needs to rebuild the extension/language-server output (VS Code Build task / `Ctrl+Shift+B`) so the editor picks up the already-correct source fix.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1639,20 +1357,6 @@
 
 - Regression coverage locks BUG-001, BUG-006, BUG-025, BUG-026, BUG-037, BUG-039, and BUG-051 through `Track2PhaseAToolchainRegressionTests` plus exact token-catalog shape/token assertions, and the slice closed green at 3824/3824 `Precept.Tests` after George's commit `6d360231`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T12:34:54Z: Track 2 is the active execution lane again
@@ -1674,20 +1378,6 @@
 - Shane switched active execution focus from Track 1 back to Track 2 immediately.
 
 - This is an execution-priority change only; durable Track 1 decisions remain recorded, but new active batch work should route to Track 2 until another directive supersedes it.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1715,20 +1405,6 @@
 
 - The durable regression anchor stays in `test\Precept.LanguageServer.Tests\ExtensionManifestTests.cs` until the repo grows a dedicated `test\Precept.VsCode.Tests` harness; spike mode should not invent a new test project just for this guard.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T12:25:21Z: Status-log triage isolates protocol bugs from the missing status-bar surface
@@ -1752,20 +1428,6 @@
 - Those bugs are real and worth landing, but Kramer did not find a code path where either one removes the VS Code status-bar item; the strongest direct clue for that missing surface remained extension activation and client lifecycle.
 
 - Durable conclusion: keep the protocol fixes and treat the missing status-bar surface as a separate activation/lifecycle issue unless later logs show the extension deactivating or the status item never being created.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1791,20 +1453,6 @@
 
 - Shared-infrastructure work (`20`, `23`, `26`) is the correct Wave A priority because those slices unblock later protocol work without reopening design questions.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T12:15:36Z: Incomplete typed declarations must offer `as` immediately after the value name
@@ -1828,20 +1476,6 @@
 - The durable slot-context surface is `AfterValueName`: after `field Name ` or `event Foo(Arg )`, completion should offer the required `as` keyword instead of broad top-level constructs.
 
 - The regression anchor uses the real space trigger and an exact `["as"]` expectation so the test fails on the actual bad surface, not just on an internal context guess.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1867,20 +1501,6 @@
 
 - Regression coverage should stay catalog-anchored while still asserting the exact user-visible boolean surface so future metadata drift fails honestly.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T12:15:36Z: Grammar-keyword gold drift was a VS Code fallback-color ordering bug, not a catalog classification bug
@@ -1904,20 +1524,6 @@
 - `as` must remain on `keyword.declaration.precept`, and field-declaration `default` needs an explicit declaration-site override before the generic `#grammarKeywords` fallback.
 
 - The honest regression layer is grammar/package coverage: verify the generated TextMate ordering and fallback colors instead of changing catalog truth that was already correct.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -1943,20 +1549,6 @@
 
 - Multi-position acceptance tests must submit positions in a deliberately non-source order and assert the returned chains preserve that request order, making output alignment an explicit contract.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T05:25:00Z: Slice 20 symbol-navigation coverage must lock full semantic reference sites and capability registration
@@ -1980,20 +1572,6 @@
 - Event-argument navigation must honor `ArgReference.Site` exactly; qualified references like `JoinWaitlist.PartyName` should use the full qualified span instead of trimming to the trailing identifier.
 
 - Capability coverage is part of the slice contract: once the handlers land, the language server must advertise references and document-highlight providers or the protocol surface is still incomplete.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2019,20 +1597,6 @@
 
 - If the team later narrows state `NameSpan` to the bare identifier token, that is a separate pipeline contract change and should not be smuggled through the language-server slice.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T05:16:00Z: Slice 26 version-ordering tests must fail as runtime contract checks, not compile breaks
@@ -2056,20 +1620,6 @@
 - That keeps the suite compiling while still failing with an exact runtime contract message when the versioned API is absent or has the wrong signature.
 
 - Once the production API lands, the same tests can pivot immediately from API-presence checks to older/newer version behavior without test rewrites.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2095,20 +1645,6 @@
 
 - Current event scope should come from semantic construct matches (`TypedEvent`, `TypedTransitionRow`, `TypedEventHandler`, event-anchored `TypedEnsure`) rather than LS-local keyword and verb lists so arg completions stay catalog-driven across declaration, transition, and handler contexts.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T05:00:00Z: Track 1 should run autonomously to completion under the approved dependency wave plan
@@ -2132,20 +1668,6 @@
 - The approved remaining-wave plan launches 15, 18, 19, 20, 22, 23, 25, 26, and 27 immediately; 17 waits on 14, 21 waits on 20, 24 waits on 23, and terminal slices 28 then 29 stay strictly serial after the behavioral surface closes.
 
 - Shared-infrastructure slices 20, 23, and 26 should be prioritized ahead of lower-risk handlers and editor polish because they lock the helper contracts that unblock downstream slices.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2171,20 +1693,6 @@
 
 - `test/Precept.LanguageServer.Tests/SlotContextResolverTests.cs` locks the full approved Slice 13 matrix, and `test/Precept.LanguageServer.Tests` validated green at 88/88.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T04:33:18Z: Track 1 is the only active execution lane until Shane explicitly reopens Track 2
@@ -2208,20 +1716,6 @@
 - The coordinator applied the directive immediately: `.squad/identity/now.md` now marks Track 1 as exclusive, and the SQL tracker reset all Track 2 `in_progress` slices back to `pending` so the live tracker shows no active Track 2 execution.
 
 - Track 2 plans, findings, and reopened bug slices remain part of the durable record; this changes execution priority, not historical memory.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2247,20 +1741,6 @@
 
 - `ServerCapabilityTests` now lock the live Phase 1 capability contract, and Slice 29 is narrowed back to future protocol-surface growth rather than Phase 1 mirroring cleanup.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T04:33:18Z: Semantic-token colors are injected from SemanticTokenTypes.All via `precept/semanticTokenColors`
@@ -2285,20 +1765,6 @@
 
 - Constraint-pressure styling stays generic rather than per-token duplicated: the extension keeps one wildcard rule, `*.preceptConstrained => italic`, while token colors remain generated from catalog metadata.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T04:33:18Z: Implementation plans and plan-cleanup prompts must encode the no-deferral rule explicitly
@@ -2322,20 +1788,6 @@
 - This applies to both active implementation plans and to any spawned cleanup/rewrite prompt; when agents are asked to clean plans up, the prompt must state the no-deferral rule directly.
 
 - Required work belongs in its owning slice. For Track 2, that means metadata-only slices close with catalog tests, consumer integrations land in the later slices that actually change parser/checker/binder/proof/MCP behavior, and Slice 2 is an audit checkpoint rather than a soft maybe.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2363,20 +1815,6 @@
 
 - Phase A proof closes first at the catalog layer: `test/Precept.Tests` should lock the new metadata fields, while behavior/integration coverage becomes mandatory in the later consumer slices, with outcome serialization closing end to end when the MCP slice wires it.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T04:33:18Z: Pipeline audit pins the remaining Track 2 debt on parser, type-checker, and proof metadata drift
@@ -2400,20 +1838,6 @@
 - Wildcard and broadcast targets remain cross-stage drift because `any` and `all` still survive as raw names/null sentinels instead of first-class metadata, affecting parser, binder, and graph behavior together.
 
 - Type-checker and proof debt are the same class of problem in later stages: qualifier/unit meaning still leaks through local tables or modifier-kind checks, and proof discharge still embeds operator implication/diagnostic tables instead of reading metadata-owned semantics.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2463,20 +1887,6 @@
 
 - The slice also locked its follow-through boundaries: the Track 2 rename surfaced a required `CompletionHandler` update to `ValueModifierMeta`, `LspTestHost` intentionally stays partial until Slice 29 expands protocol-surface coverage, and `dotnet test test/Precept.LanguageServer.Tests/` closed green at 74/74.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T04:20:44Z: Tracker status must change at the same boundary as execution state
@@ -2524,20 +1934,6 @@
 
 
 - The reconciliation batch applied that rule to the live trackers: Track 1 already matched evidence (`Slice 10-color` done, `Slice 11` active), Track 2 `Slice 2` is satisfied from audit, `Slices 1/4/5/6/7` are worktree-landed, and `Slice 3` remains the only active Track 2 item; at close, only Track 1 Slice 11 and the modifier-model rename remained active across the batch.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2587,20 +1983,6 @@
 
 - The batch closes the surrounding sync work too: Frank's architectural rulings are now implemented rather than deferred, Newman and J. Peterman's contract/doc updates align to the landed core names, and Soup Nazi's earlier red rename/applicability coverage is satisfied by George's validated Precept build plus green `Precept.Tests` and `Precept.Mcp.Tests`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T03:13:51Z: Toolchain bug audit locks parser/MCP root causes and a real-catalog test strategy
@@ -2648,20 +2030,6 @@
 
 
 - Priority regression layers are now locked: add an MCP definition-surface matrix, parser routing/disambiguation tests derived from `Constructs.Entries`, keyword-collision/accessor tests from real catalog names, TypeChecker catalog-consumer tests for operations/accessors/modifiers, hook-specific pipeline tests, and catalog-reflection fixture tests that compile at least one minimal case per relevant catalog member.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2711,20 +2079,6 @@
 
 - The visual taxonomy also stays explicit at the token level: args remain their own `ArgName` category, message strings remain the only gold token lane, comments keep base italic outside the five construct colors, and generated `package.json` semantic-token sections are the deployment projection of the catalog metadata rather than an independent source of truth.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T02:50:04Z: Language-server Phase 2 is now the production gap-closure plan
@@ -2773,20 +2127,6 @@
 
 - Non-gaps are locked too: keep push diagnostics on OmniSharp 0.19.9, keep full-sync/no-save hooks, do not add workspace diagnostics for closed files, do not add inlay hints or code lens, and do not encode routing-policy heuristics in completion filtering.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T02:50:04Z: Outline metadata and LS Slice 0 foundation are durably recorded as the protocol baseline
@@ -2830,20 +2170,6 @@
 
 
 - The temporary `LegacyHandlerCompat` bridge is explicitly part of this baseline record so later slices can treat Slice 0b removal as the planned cleanup, not an accidental regression.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -2889,20 +2215,6 @@
 
 - Secondary action variants (`AppendBy`, `EnqueueBy`, `DequeueBy`, `RemoveAt`) stay out of snippet metadata because they are checker-resolved secondary forms, not independent primary author-facing completion items.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T00:47:45Z: Slice 3 core landed ArgReference recording as the semantic-index arg provenance surface
@@ -2946,20 +2258,6 @@
 
 
 - This closes the thin core prerequisite for projection-only arg tooling, and `test/Precept.Tests/ArgReferenceTests.cs` added three regression facts before George validated the slice at 3740/3740 passing tests.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3009,20 +2307,6 @@
 
 - Validation closed most of the batch cleanly: Slice 1 and the Slice 2/4 work passed LS build/test runs at 20/20, Slice 5 passed isolated-worktree LS build/tests at 7/7 plus 3737 core tests, and Slice 9 confirmed clean IDE diagnostics plus 3737 core tests. The only remaining repo-baseline blocker called out by Kramer is the pre-existing `SemanticTokensHandler.CreateRegistrationOptions` access-modifier mismatch that can stop shared-tree LS build/test execution before the new folding tests run.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-10T00:23:31Z: Slice 0b removed the legacy language-server stub layer and zeroed the LS test project
@@ -3066,20 +2350,6 @@
 
 
 - Validation closed the cleanup gate: `dotnet build` succeeds for the language-server and LS test projects, and `dotnet test test/Precept.Tests/` stays green at 3737/3737.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3129,20 +2399,6 @@
 
 - Durable caveat: `DocumentState` uses a volatile `Compilation` field plus `Interlocked.Exchange`, `DocumentStore` is keyed by `ConcurrentDictionary<DocumentUri, DocumentState>`, the language server builds, and the remaining legacy stub test failures stay expected until Slice 0b deletes the old stub layer.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T23:46:43Z: Language-server review batch reconciled docs, landed `TypedField.NameSpan`, and left only the preview restore-failure contract open
@@ -3186,20 +2442,6 @@
 
 
 - One design decision remains open from the batch: `precept/inspect` preview restore failures (`RestoreInvalidInput` / `RestoreConstraintsFailed`) still need an explicit language-server contract, either as a structured failure payload or as a defined JSON-RPC error shape.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3245,20 +2487,6 @@
 
 - `precept/inspect` now ships as a real handler shell, `PreceptPreviewProtocol.cs` is slated for deletion, and Slice 11 is reduced to final `Program.cs` wiring plus capability declaration.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T18:53:05-04:00: Language server implementation is locked to the stub contract with no remaining plan deferrals
@@ -3302,20 +2530,6 @@
 
 
 - The temporary `ConstructKind` outline switch is superseded by concrete Slice 0a: `ConstructMeta` gains `IsOutlineNode` plus string `OutlineSymbolTag`, and the LS projects that tag to `SymbolKind` without introducing LSP types into `src/Precept/`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3365,20 +2579,6 @@
 
 - The focused tool implementations stay thin by projecting from `LanguageTool.Language()` internally; `precept_language` remains an internal fallback with its discoverable attribute removed, `precept_operations(category?)` filters on case-insensitive `LhsType`, and `precept_domains` layers in `UcumPrefixCatalog`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T16:06:55-04:00: UCUM and domain registries stay curated registry surfaces with XML-anchored drift tests
@@ -3422,20 +2622,6 @@
 
 
 - Drift tests anchor against the embedded XML universe plus the approved Tier 1 curation rules, including the exclusion of time atoms (`s`, `min`, `h`, `d`) and `mol`, instead of relying on aspirational atom-count floors.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3481,18 +2667,6 @@
 
 - Counting-unit safety did not require a proof-engine redesign: quantity arithmetic already compares unit-code-bearing qualifier records. The real gap was reverse-aliasing every `DimensionVector.None` unit to `count`, which is now fixed in unit-aware qualifier derivation so angles and solid angles no longer masquerade as counts.
 
-
-
----
-
-
-
----
-
-
-
----
-
 ---
 
 ### 2026-05-09T17:47: AI authoring content belongs in catalogs, and proof guidance owns runtime fault consequences
@@ -3537,18 +2711,6 @@
 
 - Runtime `Faults.All` belongs under `precept_proofs()` as `runtimeFaults`, because proofs and guards are the authoring lane that explains how those runtime consequences are avoided.
 
-
-
----
-
-
-
----
-
-
-
----
-
 ---
 
 ### 2026-05-09T17:43: User directive — the spike branch allows no deferrals, phased punts, or open-question handoffs
@@ -3588,20 +2750,6 @@
 
 
 - This directive applies immediately to MCP tool design, catalog authoring, and language-server planning; durable records should capture the final decision, not a deferred question list.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3647,20 +2795,6 @@
 
 - The recommended future language surface is a string constraint modifier such as `matches /pattern/ because ...`, implemented through the existing modifier/constraint pipeline rather than the typed-literal framework.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T15:33:49Z: Runtime typed-literal arg parsing stays on `TypeRuntimeMeta`, not compile-time literal validation
@@ -3704,20 +2838,6 @@
 
 
 - Each typed-literal type therefore keeps three distinct catalog registrations on `TypeMeta`: `TypeRuntime<T>`, `TypeRuntimeMeta`, and `ContentValidation`, while sharing the same domain parsers underneath.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3763,20 +2883,6 @@
 
 - Commit `9de87699` closes the parse-warning defect now; the missing tool surfaces remain a deferred runtime-build scope tracked in `docs/working/newman-mcp-tool-discovery-diagnosis.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T15:20:45Z: Event-arg member references now use a dedicated parameter-property TextMate scope
@@ -3820,20 +2926,6 @@
 
 
 - The implementation shipped in `tools/Precept.GrammarGen/Program.cs`, regenerated `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`, simplified `tools/Precept.VsCode/package.json` to a direct `variable.parameter.property.precept -> #9AD8E8` rule, and left collection-member property scoping unchanged on the field axis.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3879,20 +2971,6 @@
 
 - New work implied by the decision is explicit: add `UcumValidation` and `QuantityValidation`, give `NodaTimeValidation` a `TemporalLiteralKind`, add missing temporal `ContentValidation` entries (instant, timezone, zoneddatetime, duration quantity), and build the shared temporal parser under `src/Precept/Language/Time/`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T15:07:24Z: CurrencyCatalog stays transactional while sync tests record intentional ISO-only exclusions
@@ -3936,20 +3014,6 @@
 
 
 - The durable exclusion policy now explicitly includes fund/accounting-unit codes `BOV`, `CHE`, `CHW`, `CLF`, `COU`, `MXV`, `USN`, `UYI`, `UYW`, `VED`, `XAD`, `XCG`, and `ZWG` alongside `XAU`, `XAG`, `XPT`, `XPD`, `XTS`, and `XXX`; withdrawn catalog entries `ANG`, `BGN`, and `ZWL` stay real failures if reintroduced.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -3995,20 +3059,6 @@
 
 - The Data family is now the four-token semantic grouping `--data-t`, `--data-v`, `--field`, and `--arg`; the family definition no longer depends on an anchor swatch or hue-only coherence.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T14:56:10Z: UCUM parsing must ship as a real shared language subsystem, not a closed-set placeholder
@@ -4052,20 +3102,6 @@
 
 
 - The domain rules are explicit: `time` is not in the UCUM dimension partition, `quantity of 'time'` is invalid in favor of `duration` / `period`, `count` remains a Precept business alias over dimensionless UCUM forms, and `speed` plus `force` become curated `DimensionCatalog` aliases.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -4111,20 +3147,6 @@
 
 - The older 11-catalog draft is superseded by the implemented/docs-synced surface; future evaluator metadata stays additive unless it changes the agent-facing vocabulary itself.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-09T00:00:00Z: Runtime business-domain CLR shapes are pure data records, not executor logic containers
@@ -4168,20 +3190,6 @@
 
 
 - Parsing, formatting, interning, arithmetic helpers, and `PreceptValue` wrappers are explicitly separate follow-on runtime concerns rather than responsibilities of these CLR shape types.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -4227,20 +3235,6 @@
 
 - Catalog gap locked: add `TokenMeta.IsMessagePosition` on `Because` and `Reject` so the generator can derive the gold message-string rule catalog-first before inserting `#messageStrings` ahead of `#strings`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08T05:27:37Z: Grammar generator implementation closes the spec must-fix inventory while leaving the catalog-blocked message-position gap explicit
@@ -4284,20 +3278,6 @@
 
 
 - Validation at handoff stayed clean: the generator build passed, the emitted grammar JSON was valid, and promotion to the canonical grammar remains gated on full parity plus the message-position catalog gap.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -4343,20 +3323,6 @@
 
 - Durable implementation gate: close the discharge-model, catalog-shape, and output-type mismatches before any ProofEngine slice starts; source-alignment gaps like `SemanticIndex.AllTypedExpressions` and the `ConstraintIdentity` shapes remain follow-up work.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08T04:55:17Z: TextMate grammar replacement must be catalog-complete and parity-or-better before the generator becomes canonical
@@ -4401,20 +3367,6 @@
 
 - Resolution baseline: catalog `TextMateScope` assignments win over conflicting brand-doc keyword lists, and the generator must reach hand-authored parity-or-better before it can replace the shipped grammar.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08T04:26:28Z: Exhaustive GraphAnalyzer review approves the current implementation and narrows the remaining follow-up to future event-modifier work
@@ -4458,20 +3410,6 @@
 
 
 - Durable future-touch follow-up: when richer event modifiers land, GraphAnalyzer must consume `EventModifierMeta.RequiredAnalysis`; the next touch is also the right time to consider an event-per-state index for the O(events × edges) scans and `RelatedSpans` on structural-violation diagnostics.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -4529,20 +3467,6 @@
 
 - The locked 2026-05-08 directive is therefore preserved together with the evidence that its remaining conditional GraphAnalyzer test items have now landed in the ledger.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08T00:49:00Z: GraphAnalyzer advisory fix batch closed on-branch except the deferred event-modifier gap
@@ -4586,20 +3510,6 @@
 
 
 - Validation at handoff closed green at 3385/3385 `Precept.Tests` passing.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -4645,20 +3555,6 @@
 
 - Gap1 remains the deliberate future-touch item: GraphAnalyzer still must consume `EventModifierMeta.RequiredAnalysis` when richer event modifiers ship.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08T00:22:50Z: R4 hard gate expanded to every remaining conditional GraphAnalyzer item
@@ -4698,20 +3594,6 @@
 
 
 - Scribe merged the directive immediately without waiting for the still-running `soup-nazi-8` batch so the team ledger reflects the hard gate now, not after the remaining follow-up lands.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -4764,8 +3646,6 @@
 
 
 - **Q8 — NameBinder diagnostic code range:** Implementation detail; the implementer assigns the next available codes from `DiagnosticCatalog.cs` at implementation time. Reserve codes for: `DuplicateFieldName`, `DuplicateStateName`, `DuplicateEventName`, `UndeclaredField`, `UndeclaredState`, `UndeclaredEvent`, `UndeclaredArg`, `BindingShadowsField`.
-
----
 
 ---
 
@@ -4981,8 +3861,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-08: george-ci-fix-done
 
 
@@ -5008,20 +3886,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-ci-fix-done.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5053,8 +3917,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-08: george-slice-1-done
 
 
@@ -5083,8 +3945,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-08: george-slice-10-done
 
 
@@ -5110,20 +3970,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-10-done.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5155,8 +4001,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-08: george-slice-3-done
 
 
@@ -5182,8 +4026,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-3-done.md`.
-
----
 
 ---
 
@@ -5215,8 +4057,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-08: george-slice-5-done
 
 
@@ -5242,8 +4082,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-5-done.md`.
-
----
 
 ---
 
@@ -5275,8 +4113,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-08: george-slice-7-done
 
 
@@ -5302,8 +4138,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-7-done.md`.
-
----
 
 ---
 
@@ -5333,20 +4167,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `george-slice-8-done.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08: george-slice-9-done
@@ -5374,20 +4194,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `george-slice-9-done.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5417,20 +4223,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `george-slice5-restored.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08: soup-nazi-slice-1-triage
@@ -5458,20 +4250,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `soup-nazi-slice-1-triage.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5501,20 +4279,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `soup-nazi-slice-10-done.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08: soup-nazi-slice-2-done
@@ -5542,20 +4306,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `soup-nazi-slice-2-done.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5585,20 +4335,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `soup-nazi-slice-3-done.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08: soup-nazi-slice-4-done
@@ -5626,20 +4362,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `soup-nazi-slice-4-done.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5669,20 +4391,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `soup-nazi-slice-5-done.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08: soup-nazi-slice-6-done
@@ -5710,20 +4418,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `soup-nazi-slice-6-done.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5753,20 +4447,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `soup-nazi-slice-7-done.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08: soup-nazi-slice-8-done
@@ -5795,20 +4475,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 **Merged source:** `soup-nazi-slice-8-done.md`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-08: soup-nazi-slice-9-done
@@ -5836,20 +4502,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Merged source:** `soup-nazi-slice-9-done.md`.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -5895,20 +4547,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - Durable gate: treat the test matrix as ready for R1 once George's Slice 1 commit arrives; `LogBy` / `QueueBy` key-type coverage remains explicitly deferred beyond this batch.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T23:22:15Z: TypeChecker Slice 0 R0 closed after `TransitionRowOutcome` rename
@@ -5953,20 +4591,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - George resolved B1 in `350f386` by renaming `TypedOutcomeKind` to `TransitionRowOutcome` in `SemanticIndex.cs`; all other D# decisions remained compliant and the 2974-test branch baseline stayed intact.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T22:51:59Z: H1 housekeeping closeout recorded; Frank C2 catalog doc sync deduplicated into the same batch
@@ -6010,20 +4634,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - Validation at handoff: 2974 tests passing; no history files crossed the 15 KB summarization gate in this pass.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -6093,20 +4703,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - PRECEPT0019 scope is now explicitly narrow: `ExpressionFormKind` exhaustiveness belongs on `ParserState` and the expression-form handlers it owns, not as a wider parser-wide promotion.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T08:05:00Z: ParsedOutcome / ParsedExpression parser refactor recorded as the durable parse-time payload baseline
@@ -6167,20 +4763,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - George's GAP-062 investigation remains preserved as the catalog-pressure signal that outcome syntax needed a first-class lane instead of ad hoc per-member parser branching.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T08:05:00Z: Catalog-driven parser slices 1-4 recorded with review corrections and status-quo rulings
@@ -6240,20 +4822,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - Carry-forward constraint: parser helpers may dispatch on metadata shape, but they should not reintroduce duplicated per-member language knowledge outside the catalogs.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -6330,20 +4898,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - George is unblocked to implement `ParsedExpression.cs` (B1) and the paired `AccessModeSlot` fix against the approved slot-value contracts and invariant disambiguation rule.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -6429,20 +4983,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T02:24:36Z: Wave 5 archive and cleanup recorded
@@ -6519,20 +5059,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - Frank's cleanup landed in commit `421605a`.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T02:20:00Z: Wave 3 Round 1 canonical doc sweep recorded
@@ -6592,20 +5118,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -6691,20 +5203,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - Validation reported: `dotnet build src/Precept/Precept.csproj` still shows only the 3 pre-existing `SemanticIndex.cs` errors (`TypedState`, `TypedField`, `TypedEvent` not found); no new errors were introduced.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T01:26:52Z: Wave 2 cross-cutting decisions all closed; Wave 1 checkbox drift corrected
@@ -6765,20 +5263,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 - Durable architecture takeaways: `GraphState` stays a derived-facts output record, `SlotContext` and `ConstructSlotKind` stay distinct, catalog metadata owns per-member language knowledge, and default-valued `readonly record struct` additions remain backward-compatible.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-07T01:26:35Z: Implementation-note discipline locked for active parser work
@@ -6822,8 +5306,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - Treat George, Frank, and Soup-Nazi note-taking as an execution requirement, not optional cleanup, so end-of-batch review can inspect the real reasoning trail.
-
----
 
 ---
 
@@ -6871,8 +5353,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-07: OQ1 anti-mirroring enforcement locks to a Roslyn analyzer
 
 
@@ -6914,8 +5394,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - Tradeoff accepted: analyzer maintenance is heavier than a reflection/xUnit guard, but the guarantee is automatic and structurally stronger.
-
----
 
 ---
 
@@ -6963,8 +5441,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-07: OQ3 CI enforcement remains TypeChecker logic until the rule surface grows
 
 
@@ -7006,8 +5482,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - Revisit cataloging only if the rule surface expands again (explicitly, if a sixth CI rule appears).
-
----
 
 ---
 
@@ -7059,8 +5533,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-07: Parser metadata promotion lands `ExpressionFormMeta.BindingPower` and `ConstructSlot.TerminationTokens`
 
 
@@ -7106,8 +5578,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 - Regression coverage plus `docs/language/catalog-system.md` now document both metadata additions; validation closed green at 2949 tests.
-
----
 
 ---
 
@@ -7159,8 +5629,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 ---
 
----
-
 ### 2026-05-07: Parser gap fixes complete
 
 
@@ -7182,8 +5650,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **Any issues:** Two existing parser tests (`TypeExpression_QueueOfNumber_ProducesCollectionTypeReference`, `QueueOfNumber_TypeExpressionSlot_PreservesCollectionAndElementTypes`) were asserting the buggy `QueueBy` behavior — updated them to assert `Queue`. No other regressions.
-
----
 
 ---
 
@@ -7268,8 +5734,6 @@ The Slices 5–7 implementation is **sound, catalog-compliant, and correctly sco
 
 
 **SemanticIndex fields populated by Slice 1:** Fields ✓, States ✓, Events ✓, FieldsByName ✓, StatesByName ✓, EventsByName ✓, Diagnostics ✓ (type-checker diagnostics only; does not include parser/binder diagnostics). All other arrays are ImmutableArray.Empty / FrozenDictionary.Empty.
-
----
 
 ---
 
@@ -7402,8 +5866,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 
 
 **Test results:** 3021 passed, 8 failed (same 8 pre-existing DeclaredArg/qualified-type parser gaps from Slice 1). All 2974 baseline tests pass.
-
----
 
 ---
 
@@ -7635,8 +6097,6 @@ First match wins. WidensTo array order is the tiebreaker (narrowest-first per ca
 
 ---
 
----
-
 ### 2026-05-07: Slice 4 Complete
 
 
@@ -7813,8 +6273,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 ---
 
----
-
 ### 2026-05-07: Slice 5 Complete
 
 
@@ -7983,8 +6441,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 ---
 
----
-
 ### 2026-05-07: Slice 6 Complete
 
 
@@ -8033,8 +6489,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 ---
 
----
-
 ### 2026-05-07: Slice 7 Complete
 
 
@@ -8072,8 +6526,6 @@ For Soup Nazi test setup: call `TypeChecker.ResolveExpression(expr, ctx, expecte
 
 
 **Notes for Soup Nazi:** `IsTypeApplicable` handles both simple `TypeTarget` (kind match) and `ModifiedTypeTarget` (kind + required modifiers). Empty `ApplicableTo` array means "any type" — no validation needed. Writable checks are the only non-catalog-driven dispatch (`kind == ModifierKind.Writable`) — these are structural constraints on the modifier's semantics, not type applicability. 7 pre-existing test failures from Slice 5 transition row processing (UndeclaredField on event arg member access); no new failures from Slice 7.
-
----
 
 ---
 
@@ -8209,8 +6661,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
-
 ### 2026-05-07: GraphAnalyzer OQ1 — DeadEndStateFact is a separate fact from TerminalCompletenessFact
 
 
@@ -8227,8 +6677,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
-
 ### 2026-05-07: GraphAnalyzer OQ2 — EventHandlers structurally excluded from EventCoverage
 
 
@@ -8242,20 +6690,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 
 **Why:** This was a doc error, not a policy question. The language semantics make it impossible.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -8324,20 +6758,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 
 - With OQ-6 already closed in the prior merged entry, all event-interaction UXR open questions are now resolved and `docs/working/elaine-ux-requirements-event-interaction.md` is complete.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -8415,20 +6835,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 - Elaine-33's API accuracy pass is folded forward: `InspectUpdate` references `ConstraintResult`, fire-outcome prose uses `EventOutcome.ConstraintsFailed`, `TransitionInspection` references align to the `RowEffect` DU, and `datetime` remains a valid Precept type.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-06T19:11:15Z: CC#8 EventInspection shape resolved; `ArgErrorKind` rejected and `RowEffect` DU adopted
@@ -8496,20 +6902,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 
 - `event-inspection-proposal.md` was updated, CC#8 is resolved in the cross-cutting register, and CC#12 is now unblocked.
-
-
-
----
-
-
-
----
-
-
-
----
-
----
 
 ---
 
@@ -8587,20 +6979,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 - Frank and George's review pass is preserved as a durable warning that proposal-only inspection fields and names must be called out as CC#8 dependencies until the implementation ships.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-06T18:25:02Z: Event-interaction personas, surface model, and create/edit/fire mental model corrected
@@ -8677,20 +7055,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 - `InspectUpdate` must return the hypothetical post-patch access modes on its existing response so conditional field unlock UX stays on one runtime surface.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-06T10:41:33Z: Event-interaction UX baseline established under current-architecture rules
@@ -8753,8 +7117,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
-
 ### 2026-05-06: Wave 1 cross-cutting facilitation started with CC#7 first
 
 
@@ -8805,20 +7167,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 - Once Shane rules on CC#7, the CC#9 follow-through and the catalog-system example cleanup are mechanically unblocked.
 
-
-
----
-
-
-
----
-
-
-
----
-
----
-
 ---
 
 ### 2026-05-11T22:41:49Z: Proof Engine Qualifier Coverage — Part B (Slices 7+8+9)
@@ -8844,8 +7192,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - Added Unit→Dimension fallback in `ResolveQualifierOnAxis()` so dimension-only fields can satisfy unit-axis proof obligations.
 
 - Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
-
----
 
 ---
 
@@ -8875,8 +7221,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
-
 ### 2026-05-11T22:41:49Z: Slice 2 Complete: Full Type-Grammar Matching for Interpolated Typed Constants
 
 
@@ -8900,8 +7244,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - Introduced diagnostics for invalid forms, unsupported types, hole-type mismatches, and dimension/unit mismatches.
 
 - Closed with 39 new tests and 129 typed-constant tests passing.
-
----
 
 ---
 
@@ -8931,8 +7273,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
----
-
 ### 2026-05-11T22:41:49Z: string Excluded from Typed Constant Interpolation Holes
 
 
@@ -8954,8 +7294,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - The decision restores the prior compile-time guarantee and rejects runtime-deferral as a structural escape hatch.
 
 - No new diagnostic code is needed because `InterpolatedTypedConstantHoleTypeMismatch` already covers the failure.
-
----
 
 ---
 
@@ -8982,8 +7320,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - BUG-A still looks like an interpolation-driven cascade rather than a separate proof defect, but explicit regressions for event-arg qualifier use in `ensure` comparisons and arithmetic expressions should ship before calling that path closed.
 
 - Remaining sample fallout after the plan lands is design-level, not compiler-level: `SupplierUnitCost` is modeled as `money` where `price` semantics are needed, `Sku is set` still targets a non-optional field, and the average-cost calculation still needs a division-by-zero guard.
-
----
 
 ---
 
@@ -9052,6 +7388,8 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - Frank confirmed the good news first: state identifier routing is fixed, `reject` and qualifier precedence are correct, and `271/271` language-server tests passed.
 - Blocker B1 remains: `TryCreateTypeHover(...)` and `TryCreateActionHover(...)` still return before rich construct routing, so declaration-span `money` and action keywords can bypass the construct card.
 - Blockers B2 and B3 remain: the field and state mutability summaries still ignore state-local `omit` declarations in the global/unconditional writable fallbacks, so omitted surfaces can still be reported as `✏️` instead of `🔒`.
+
+---
 
 ### 2026-05-12T04:00:00Z: Modifier applicability drift was confirmed as catalog gaps for `price`, `maxplaces`, and identity-type redundancy handling
 
