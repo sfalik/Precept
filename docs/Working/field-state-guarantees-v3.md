@@ -958,7 +958,7 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 
 ## 12. Implementation Tracker
 
-**Progress:** 4 / 10 slices complete
+**Progress:** 5 / 10 slices complete
 
 | Slice | Name | Status | Depends On | Commit |
 |---|---|---|---|---|
@@ -966,8 +966,8 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 | Slice 1 | Diagnostic Infrastructure: D130, D131, D132 | ✅ Done | — | `99f7a693` |
 | Slice 2 | Omit Lookup Construction | ✅ Done | Slice 0 | `bedb9dd6` |
 | Slice 3 | D130: `OmittedFieldReadInState` | ✅ Done | Slices 1, 2 | `18415226` |
-| Slice 4 | D131: `OmittedFieldSetInTargetState` | 🔄 In Progress | Slices 1, 2 | — |
-| Slice 5 | D132: `RequiredFieldUnassignedOnEntry` | ⬜ Pending | Slices 1, 2 | — |
+| Slice 4 | D131: `OmittedFieldSetInTargetState` | ✅ Done | Slices 1, 2 | `eaa3b45e` |
+| Slice 5 | D132: `RequiredFieldUnassignedOnEntry` | 🔄 In Progress | Slices 1, 2 | — |
 | Slice 6 | Sample Corrections | ⬜ Pending | Slices 3, 4, 5 | — |
 | Slice 7 | Spec and Documentation Updates | ⬜ Pending | Slice 6 | — |
 | Slice 8 | MCP + Language Server Sync Assessment | ⬜ Pending | Independent | — |
