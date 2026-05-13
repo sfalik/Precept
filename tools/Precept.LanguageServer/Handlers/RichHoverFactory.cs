@@ -1021,7 +1021,6 @@ internal static class RichHoverFactory
     {
         var graphState = compilation.Graph.States.FirstOrDefault(candidate => string.Equals(candidate.Name, state.Name, StringComparison.Ordinal));
         var reachabilityDetail = DescribeStateReachability(compilation, state, graphState);
-        var modifiers = state.Modifiers.IsDefaultOrEmpty ? "*none*" : FormatCodeList(state.Modifiers.Select(FormatModifierName));
         var incoming = compilation.Graph.Edges
             .Where(edge => string.Equals(edge.ToState, state.Name, StringComparison.Ordinal))
             .Select(edge => edge.EventName)
@@ -1038,9 +1037,6 @@ internal static class RichHoverFactory
         var edgeProofStatuses = GetEdgeProofStatusesForState(compilation, state.Name);
         var unresolvedEdgeCount = edgeProofStatuses.Count(status => !status.IsProven);
         var terminalReachable = IsTerminalReachable(compilation.Graph, state.Name);
-        var titleSuffix = state.Modifiers.IsDefaultOrEmpty
-            ? string.Empty
-            : $" · {FormatCodeList(state.Modifiers.Select(FormatModifierName))}";
         var statusDetail = graphState is null || !graphState.IsReachable
             ? reachabilityDetail
             : unresolvedEdgeCount > 0
@@ -1056,16 +1052,14 @@ internal static class RichHoverFactory
             ? HoverStatusKind.Unverified
             : HoverStatusKind.ProofVerified;
         var status = new HoverStatusBadge(statusKind, statusDetail);
+        var incomingSummary = incoming.IsEmpty ? "none" : FormatCodeList(incoming);
+        var outgoingSummary = outgoing.IsEmpty ? "none" : FormatCodeList(outgoing);
 
         var lines = new List<string>
         {
-            $"**state `{EscapeInline(state.Name)}`**{titleSuffix}",
             FormatStatus(status),
-            $"Modifiers: {modifiers}",
-            $"Incoming: {FormatCodeList(incoming)}",
-            $"Outgoing: {FormatCodeList(outgoing)}",
-            $"Writable here: {FormatCodeList(writable)}",
-            $"{(terminalReachable ? "Terminal reachable" : "No terminal path")} · active ensures: {activeEnsures.Length}{(unverifiedEnsures > 0 ? $" ({unverifiedEnsures} unverified)" : string.Empty)}",
+            $"🔁 In: {incomingSummary} · Out: {outgoingSummary}",
+            $"✏️ {writable.Length} field{Pluralize(writable.Length)} (unconditional) · 🧭 terminal {(terminalReachable ? "✓" : "✗")} · ⚡ {activeEnsures.Length} ensure{Pluralize(activeEnsures.Length)} ({unverifiedEnsures} ⚠️)",
             CreateStateGraphEdgeProofCard(state, edgeProofStatuses),
         };
 

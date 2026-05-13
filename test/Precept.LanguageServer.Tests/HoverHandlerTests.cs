@@ -426,12 +426,8 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Archived terminal");
 
-        markup.Should().Contain("**state `Archived`**");
-        markup.Should().Contain("Modifiers: `terminal`");
-        markup.Should().Contain("Incoming:");
-        markup.Should().Contain("`Archive`");
-        markup.Should().Contain("Writable here:");
-        markup.Should().Contain("active ensures: 1");
+        markup.Should().Contain("🔁 In: `Archive` · Out: none");
+        markup.Should().Contain("✏️ 0 fields (unconditional) · 🧭 terminal ✓ · ⚡ 1 ensure (0 ⚠️)");
     }
 
     [Fact]
@@ -449,8 +445,8 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "Hidden terminal");
 
-        markup.Should().Contain("**state `Hidden`**");
-        markup.Should().Contain("Writable here: *none*");
+        markup.Should().Contain("🔁 In: `Hide` · Out: none");
+        markup.Should().Contain("✏️ 0 fields (unconditional) · 🧭 terminal ✓ · ⚡ 0 ensures (0 ⚠️)");
         markup.Should().NotContain("`Price`", because: "omitted fields are structurally absent, not writable");
     }
 
@@ -489,8 +485,8 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "Archived terminal");
 
-        markup.Should().Contain("**state `Archived`**");
-        markup.Should().Contain("Writable here: *none*");
+        markup.Should().Contain("🔁 In: `Archive` · Out: none");
+        markup.Should().Contain("✏️ 0 fields (unconditional) · 🧭 terminal ✓ · ⚡ 0 ensures (0 ⚠️)");
         markup.Should().NotContain("`Price`", because: "omit all makes all fields structurally absent");
         markup.Should().NotContain("`Qty`", because: "omit all makes all fields structurally absent");
     }
@@ -500,9 +496,8 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "from Listed on Archive", offset: 5);
 
-        markup.Should().Contain("**state `Listed`**");
-        markup.Should().Contain("Incoming:");
-        markup.Should().Contain("Outgoing:");
+        markup.Should().Contain("🔁 In: `Publish` · Out: `Publish → Listed`, `Hide → Hidden`, `Archive → Archived`");
+        markup.Should().Contain("✏️ 3 fields (unconditional) · 🧭 terminal ✓ · ⚡ 2 ensures (0 ⚠️)");
         markup.Should().NotContain("**transition**");
     }
 
@@ -688,8 +683,9 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "Approved required");
 
-        markup.Should().Contain("**state `Approved`** · `required`");
         markup.Should().Contain("reachable; every initial→terminal path visits here");
+        markup.Should().Contain("🔁 In: `Approve` · Out: `Finish → Done`");
+        markup.Should().Contain("✏️ 0 fields (unconditional) · 🧭 terminal ✓ · ⚡ 0 ensures (0 ⚠️)");
     }
 
     [Fact]

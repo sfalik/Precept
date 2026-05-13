@@ -15,6 +15,8 @@
 - `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` is now the compile-time proof-hover composition point: field proof summaries come from `Compilation.Proof.Obligations`, diagnostic cards join proof diagnostics back to `ProofObligation` via `FaultSiteLinks`, and expression cards resolve qualifier evidence from typed expressions rather than raw token text.
 - For hover evidence, reuse typed spans plus qualifier metadata together: `FormatSnippet(...)` gives the authored expression text, while `ResolveDeclarationQualifier(...)` / `ResolveQualifierFromExpression(...)` recover resolved qualifier values, sources, and proof-chain fields without reaching for parser back-pointers.
 
+- **State card V7 fix shipped (2026-05-13):** `CreateStateMarkdown` now matches the V7 compact card: status line first, a single `🔁 In ... · Out ...` edge summary, and a single `✏️ ... · 🧭 terminal ✓/✗ · ⚡ ... (⚠️)` summary line before the preserved B4 graph block. The change was rendering-only in `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs`; targeted state-hover regressions in `HoverHandlerTests.cs` were updated and the focused state-hover test slice passed, while the full LS suite still had the same 10 unrelated pre-existing failures already present on `spike/Precept-V2-Radical`.
+
 ## Historical Summary
 
 - Early May through 2026-05-11 established the current tooling baseline: typed-constant completion and semantic-token fixes, delta-baseline guards, UCUM tier-1 completion curation, modifier-span precision, and catalog-driven hover/completion behavior.
