@@ -994,10 +994,10 @@ New test class or section: `TypeCheckerConstructionTests.cs`
 
 **Files:** `src/Precept/Pipeline/TypeChecker.cs`, `src/Precept/Pipeline/TypeChecker.Validation.cs`
 
-- [ ] Create `ValidateConstructionGuarantees` method
-- [ ] Wire into `TypeChecker.Check` pipeline
-- [ ] D93 tests (10 tests)
-- [ ] Verify regression anchors
+- [x] Create `ValidateConstructionGuarantees` method
+- [x] Wire into `TypeChecker.Check` pipeline
+- [x] D93 tests (10 tests)
+- [x] Verify regression anchors
 
 ---
 
@@ -1069,9 +1069,9 @@ The initial event may declare args that are intended to populate fields (e.g., `
 
 **Files:** `src/Precept/Pipeline/TypeChecker.Validation.cs`
 
-- [ ] Extend `ValidateConstructionGuarantees` with D94 logic
-- [ ] D94 tests (10 tests)
-- [ ] Verify regression anchors
+- [x] Extend `ValidateConstructionGuarantees` with D94 logic
+- [x] D94 tests (10 tests)
+- [x] Verify regression anchors
 
 ---
 
@@ -1108,15 +1108,15 @@ The initial event may declare args that are intended to populate fields (e.g., `
 
 ## 11. Status
 
-**Design Approved — Implementation In Progress (gap audit remediation pending)**
+**Design Approved — Implementation Complete**
 
-Gap audit (2026-05-12) identified two BLOCKING gaps: D93 and D94 are declared but never enforced. Slices 10–11 added as remediation. Slices 0–10 are complete.
+Gap audit (2026-05-12) identified two blocking gaps: D93 and D94 were declared but never enforced. Slices 10–11 closed that remediation work. Slices 0–11 are complete.
 
 ---
 
 ## 12. Implementation Tracker
 
-**Progress:** 11 / 12 slices complete
+**Progress:** 12 / 12 slices complete
 
 | Slice | Name | Status | Depends On | Commit |
 |---|---|---|---|---|
@@ -1130,5 +1130,5 @@ Gap audit (2026-05-12) identified two BLOCKING gaps: D93 and D94 are declared bu
 | Slice 7 | Spec and Documentation Updates | ✅ Done | Slice 6 | `40bcd746` |
 | Slice 8 | MCP + Language Server Sync Assessment | ✅ Done | Independent | `12449503` |
 | Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ✅ Done | Standalone | `c2d5b8fb` |
-| Slice 10 | D93: `RequiredFieldsNeedInitialEvent` enforcement | ✅ Done | Independent (additive) | `HEAD` |
-| Slice 11 | D94: `InitialEventMissingAssignments` enforcement | ⏳ Pending | Slice 10 | — |
+| Slice 10 | D93: `RequiredFieldsNeedInitialEvent` enforcement | ✅ Done | Independent (additive) | `597a0479` |
+| Slice 11 | D94: `InitialEventMissingAssignments` enforcement | ✅ Done | Slice 10 | `0b42fd1a` |
