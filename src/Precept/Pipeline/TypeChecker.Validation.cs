@@ -227,6 +227,45 @@ internal static partial class TypeChecker
                 EmitDiagnosticsForFieldRefs(hook.StateName);
             }
         }
+
+        // D131: write actions cannot target fields omitted in the target or entered state.
+        foreach (var row in ctx.TransitionRows)
+        {
+            if (row.Outcome != TransitionRowOutcome.Transition || row.TargetState is null)
+                continue;
+
+            foreach (var action in row.Actions)
+            {
+                if (ctx.OmitLookup.Contains((row.TargetState, action.FieldName)))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(
+                            DiagnosticCode.OmittedFieldSetInTargetState,
+                            action.Span,
+                            action.FieldName,
+                            row.TargetState));
+                }
+            }
+        }
+
+        foreach (var hook in ctx.StateHooks)
+        {
+            if (hook.Scope != AnchorScope.OnEntry)
+                continue;
+
+            foreach (var action in hook.Actions)
+            {
+                if (ctx.OmitLookup.Contains((hook.StateName, action.FieldName)))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(
+                            DiagnosticCode.OmittedFieldSetInTargetState,
+                            action.Span,
+                            action.FieldName,
+                            hook.StateName));
+                }
+            }
+        }
     }
 
     /// <summary>Validate modifier applicability, conflicts, and subsumption for all fields and states.</summary>

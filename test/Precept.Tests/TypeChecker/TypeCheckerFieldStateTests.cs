@@ -233,6 +233,144 @@ public class TypeCheckerFieldStateTests
         diagnostic.Message.Should().Be("Field 'F' is omitted in state 'S' and cannot be read in this expression");
     }
 
+    [Fact]
+    public void D131_SetAction_TargetFieldOmitInTargetState_Fires()
+    {
+        var diagnostic = AssertSingleD131("""
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            state Review
+            event E
+            in Review omit F
+            from Draft on E -> set F = 1 -> transition Review
+            """);
+
+        diagnostic.Message.Should().Be("Field 'F' is omitted in target state 'Review'; this transition cannot set it");
+    }
+
+    [Fact]
+    public void D131_SetAction_TargetFieldNotOmitInTargetState_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            state Review
+            event E
+            from Draft on E -> set F = 1 -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D131_SetAction_NoTransitionOutcome_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            state Review
+            event E
+            in Review omit F
+            from Draft on E -> set F = 1 -> no transition
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D131_SetAction_RejectOutcome_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            state Review
+            event E
+            in Review omit F
+            from Draft on E -> set F = 1 -> reject "reason"
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D131_SetAction_OmitInFromStateNotTargetState_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> set F = 1 -> transition Review
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D131_OnEntryHook_SetOmitField_Fires()
+    {
+        var diagnostic = AssertSingleD131("""
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            in Draft omit F
+            to Draft -> set F = 1
+            """);
+
+        diagnostic.Message.Should().Be("Field 'F' is omitted in target state 'Draft'; this transition cannot set it");
+    }
+
+    [Fact]
+    public void D131_OnExitHook_SetOmitField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            in Draft omit F
+            from Draft -> set F = 1
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void D131_SelfLoop_SetOmitField_Fires()
+    {
+        var diagnostic = AssertSingleD131("""
+            precept Widget
+            field F as number default 0
+            state S initial
+            event E
+            in S omit F
+            from S on E -> set F = 1 -> transition S
+            """);
+
+        diagnostic.Message.Should().Be("Field 'F' is omitted in target state 'S'; this transition cannot set it");
+    }
+
+    [Fact]
+    public void D131_WildcardFromState_SetOmitInTarget_Fires()
+    {
+        var diagnostic = AssertSingleD131("""
+            precept Widget
+            field F as number default 0
+            state Draft initial
+            state Review
+            event E
+            in Review omit F
+            from any on E -> set F = 1 -> transition Review
+            """);
+
+        diagnostic.Message.Should().Be("Field 'F' is omitted in target state 'Review'; this transition cannot set it");
+    }
+
     private static Diagnostic AssertSingleD130(string preceptText)
     {
         var (_, diagnostics) = TypeCheckerTestHelpers.Check(preceptText);
@@ -247,5 +385,21 @@ public class TypeCheckerFieldStateTests
 
         d130.Should().ContainSingle();
         return d130[0];
+    }
+
+    private static Diagnostic AssertSingleD131(string preceptText)
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(preceptText);
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().OnlyContain(code => code == nameof(DiagnosticCode.OmittedFieldSetInTargetState));
+
+        var d131 = diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.OmittedFieldSetInTargetState))
+            .ToArray();
+
+        d131.Should().ContainSingle();
+        return d131[0];
     }
 }
