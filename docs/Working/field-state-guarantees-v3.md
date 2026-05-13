@@ -958,7 +958,7 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 
 ## 12. Implementation Tracker
 
-**Progress:** 8 / 10 slices complete
+**Progress:** 9 / 10 slices complete
 
 | Slice | Name | Status | Depends On | Commit |
 |---|---|---|---|---|
@@ -971,4 +971,4 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 | Slice 6 | Sample Corrections | ✅ Done | Slices 3, 4, 5 | `6d5d464b` |
 | Slice 7 | Spec and Documentation Updates | ✅ Done | Slice 6 | `40bcd746` |
 | Slice 8 | MCP + Language Server Sync Assessment | ✅ Done | Independent | `12449503` |
-| Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ⬜ Pending | Standalone | — |
+| Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ✅ Done | Standalone | `c2d5b8fb` |
