@@ -60,3 +60,19 @@
 - Canonical v3 D132 (`MustSetOmitToNonOmit`) is the structural dual of `InitialEventMissingAssignments` — both prevent required fields from existing without valid values. D132 fills a spec gap where rule #5 covers entering-omit but is silent on leaving-omit.
 - The three precept forms (with initial event, without initial event, stateless) have different D132 applicability profiles. Form 2 (no initial event) makes D132 structurally unsatisfiable because `RequiredFieldsNeedInitialEvent` forces all fields to have defaults or be optional.
 - §3.5 "All field names" describes name resolution scope, not semantic validity. Canonical v3 D130 operates in the gap between "the name resolves" and "reading it is meaningful." This distinction must be annotated in the spec when D130 ships.
+
+### 2026-07-02T00:00:00Z — Circular static-init review: Tokens ↔ Types
+
+- Reviewed and accepted George's `Lazy<T>` fix for `Tokens.KeywordsValidAsMemberName` (Tokens.cs line 507). The CLR cctor re-entrancy caused `Types.All` to return `null` when `Tokens..cctor()` ran mid-`Types..cctor()`, crashing the MCP server.
+- Confirmed the architectural invariant: Tokens is Layer ① (lexical foundation); all other catalogs depend downward on it. The reverse reference (`Tokens → Types.All`) was the only violation and is now deferred via `Lazy<T>`.
+- Key constraint to document: no catalog may reference a downstream catalog's static members in its own cctor. Reverse references must use `Lazy<T>`. Currently `KeywordsValidAsMemberName` is the only such case.
+- The `Types ↔ Modifiers` bidirectional edge is safe because both sides reference enum values and call `GetMeta()` lazily — no cctor depends on the other catalog's cctor completion.
+- `Actions.CollectionCountAccessor` references are safe: they're inside `GetMeta()` arms (not static field initializers), and `CollectionCountAccessor` itself is a simple field initializer that doesn't depend on `Types.All`.
+- Required follow-up: add static initialization constraint paragraph to `docs/language/catalog-system.md` after line 896.
+- Sentinel defaults (`default 0`, `default false`, `default ""`) are a modeling anti-pattern when the field has no business meaning in the current state; `omit` should carry that meaning structurally instead.
+- `omit` is now the preferred guidance for not-yet-meaningful fields because D132 `MustSetOmitToNonOmit` turns the re-entry path into a compile-time assignment guarantee rather than a runtime null/sentinel convention.
+
+### 2026-05-13T01:03:07Z — Circular static-init review closed
+
+- Architecture review accepted George's `Lazy<T>` fix for `Tokens.KeywordsValidAsMemberName` as the correct way to break the narrow `Tokens` ↔ `Types` cctor cycle.
+- The required follow-up doc hardening is complete: `docs/language/catalog-system.md` now explicitly states that reverse `Tokens` → downstream catalog static references must defer materialization with `Lazy<T>`.

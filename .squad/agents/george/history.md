@@ -64,3 +64,8 @@
 
 - Commit `a727dddb` widened modifier applicability for `price`, `exchangerate`, and business-magnitude `maxplaces`, and collapsed identity-type `notempty` handling to redundancy-only by skipping implied modifiers during applicability validation.
 - Coordinator follow-up repaired the remaining price qualifier fixture and `ModifiersTests` catalog-drift expectations, so the final repository result closed at `4995/4995` tests passing.
+
+### 2026-05-13T01:03:07Z — Catalog static-init constraint documented
+
+- Updated `docs/language/catalog-system.md` to harden Frank's required static-initialization constraint paragraph after the catalog initialization guidance.
+- The documentation now records that reverse `Tokens` → downstream catalog static references must use `Lazy<T>`; `Tokens.KeywordsValidAsMemberName` remains the current concrete example.

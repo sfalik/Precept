@@ -895,6 +895,8 @@ public record TypeMeta(
 
 The `Token` fieldholds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
 
+> **Static initialization constraint:** No catalog in Layers ②–④ may reference `Tokens` static members in its own static field initializers or cctor — this is the normal downward direction and is safe. The reverse — `Tokens` referencing a downstream catalog's static members — must use `Lazy<T>` to defer materialization past cctor completion. Currently, `Tokens.KeywordsValidAsMemberName` is the only such reverse reference (deferred via `Lazy<FrozenSet<TokenKind>>`). This constraint exists because .NET's cctor re-entrancy returns `null` for a static field that hasn't been assigned yet on the same thread — a reverse reference in a field initializer will silently receive `null` rather than a valid value.
+
 `DisplayName` is required — every type must have a human-readable name. Single-word types use their keyword (e.g., `"money"`); multi-word types use the human form (e.g., `"zoned date-time"`, `"unit of measure"`). Omitting it is a compile error.
 
 ##### ContentValidation — typed-literal registration hook

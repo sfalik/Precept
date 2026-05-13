@@ -19540,3 +19540,108 @@ All tests pass. No test was updated, disabled, or skipped. Soup Nazi's role here
   - Baseline: `dotnet build src\Precept\Precept.csproj` succeeded; `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` = 4938 passed, 0 failed.
   - After S2: `dotnet build src\Precept\Precept.csproj` succeeded; `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` = 4940 passed, 0 failed.
 
+### 2026-07-02T00:00:00Z: Circular static-init review — Tokens ↔ Types
+**By:** Frank (Lead/Architect)
+**Requested by:** shane
+
+---
+
+## Root Cause Verdict
+
+The diagnosis is **correct and complete.** I verified every claim against the source.
+
+The dependency cycle is real and narrow:
+
+1. `Types.GetMeta()` (line 288+) calls `Tokens.GetMeta(TokenKind.*)` for every `TypeKind` member — this is the documented `Types → Tokens` direction (catalog-system.md line 188, topology diagram).
+2. `Tokens.KeywordsValidAsMemberName` (was line 506, now line 507) called `Types.All` — this is a **reverse** `Tokens → Types` reference that the architecture doc never sanctioned.
+
+The CLR cctor re-entrancy semantics are correctly described: when `Types..cctor()` is already running on thread T and `Tokens..cctor()` tries to access `Types.All`, the CLR returns `null` (the field default) rather than blocking or restarting the cctor. This is specified behavior per ECMA-335 §II.10.5.3.3.
+
+**One nuance missing from the write-up:** the `Actions.GetMeta()` references to `Types.CollectionCountAccessor` (Actions.cs lines 99, 119, 158, 172, 204) are safe **not** because of initialization order, but because they are inside `GetMeta()` switch arms — they are invoked lazily by callers, never during `Actions..cctor()`. The audit correctly identified these as safe but attributed safety to "initialized early in `Types..cctor()`." The real reason they're safe is that `GetMeta()` is a method call, not a static field initializer. Even if `Types..cctor()` hadn't completed, `CollectionCountAccessor` (line 140) is indeed a `static readonly` field declared before the `GetMeta` switch, so it initializes before any `GetMeta` call during `Types..cctor()` — but the important point is that `Actions.GetMeta()` is never called during any cctor at all.
+
+## Fix Verdict
+
+**ACCEPTED.**
+
+The `Lazy<T>` is the correct tool here. It is not a band-aid — it is a precise, targeted break of a narrow dependency cycle. Here's why:
+
+1. **The cycle is one edge.** `Tokens` has exactly ONE reference to `Types`: `KeywordsValidAsMemberName`. All other dependencies flow downward (Types → Tokens, Actions → Tokens, Modifiers → Tokens, etc.). `Lazy<T>` severs this single reverse edge at the right granularity.
+
+2. **The alternative (moving to `Types`) is worse.** See Design Question below.
+
+3. **The public API surface is unchanged.** `KeywordsValidAsMemberName` remains a `FrozenSet<TokenKind>` property on `Tokens`. The `Lazy<T>` is an implementation detail hidden behind the property accessor.
+
+4. **The computation is idempotent and pure.** The lambda captures no mutable state. Once materialized, the `FrozenSet` is immutable and immortal. `Lazy<T>` is the textbook tool for this.
+
+## Design Question: Where does KeywordsValidAsMemberName belong?
+
+**Ruling: Option (a) — keep in `Tokens`, lazy-initialized. This is the architecturally correct location.**
+
+Reasoning:
+
+**(b) is wrong.** Moving `KeywordsValidAsMemberName` to `Types` would break the architectural invariant that `Types` describes type semantics while `Tokens` describes lexical classification. `KeywordsValidAsMemberName` is a **lexer/parser concern** — "which keywords can appear as member names after `.`" is a question about token reclassification during scanning/parsing, not about type semantics. The fact that the *data source* is `Types.Accessors` doesn't change *who needs the answer*. The parser and lexer consume `Tokens`, not `Types`. Putting this on `Types` would force the lexer to depend on a Layer 3 catalog — a layer violation.
+
+**(c) is unnecessary.** The catalog architecture (catalog-system.md line 896) explicitly states: "The Tokens catalog initializes first; all other catalogs reference its instances." The reverse direction (Tokens referencing Types) was an oversight, not a design pattern. The `Lazy<T>` fix correctly defers the reverse reference past both cctors, preserving the documented one-way dependency at the object-reference level while allowing the derived-data relationship at runtime.
+
+The catalog-system.md topology diagram (lines 160-210) shows `Types → Tokens` but no `Tokens → Types` edge. The `Lazy<T>` fix preserves this topology: `Tokens..cctor()` completes without touching `Types`. The reverse reference only materializes on first access of `KeywordsValidAsMemberName`, which happens long after both catalogs are fully initialized.
+
+This is a derived property in the same sense as `Tokens.Keywords` or `Tokens.TwoCharOperators` — it aggregates data from the catalog's own `All` collection into a lookup structure. The only difference is that its *input* crosses a catalog boundary, which the `Lazy<T>` correctly handles.
+
+## Thread Safety
+
+**`LazyThreadSafetyMode.ExecutionAndPublication` (the default) is correct.**
+
+The MCP server and language server are both multi-threaded hosts. Multiple requests can race to first-access `KeywordsValidAsMemberName`. `ExecutionAndPublication` guarantees:
+- Exactly one thread executes the factory delegate.
+- All other threads block until the value is available.
+- No double-materialization of the `FrozenSet`.
+
+`PublicationOnly` would allow multiple threads to compute the same `FrozenSet` concurrently and race to publish — wasteful but functionally correct. Not worth the waste.
+
+`None` would be unsafe in this context — concurrent first-access could produce a torn read or double-initialization race.
+
+The default is the right choice. No change needed.
+
+## Documentation Requirements
+
+The inline `<summary>` comment on lines 501-506 of `Tokens.cs` is **necessary and sufficient for the code**. It explains why the `Lazy<T>` exists and names both catalogs involved. Good.
+
+However, the architecture doc needs a small addition:
+
+1. **`docs/language/catalog-system.md`** — line 896 states "The Tokens catalog initializes first; all other catalogs reference its instances." This is a durable architectural invariant that was violated and should be hardened:
+
+   After the existing sentence, add a paragraph:
+
+   > **Static initialization constraint:** No catalog in Layers ②–④ may reference `Tokens` static members in its own static field initializers or cctor — this is the normal downward direction and is safe. The reverse — `Tokens` referencing a downstream catalog's static members — must use `Lazy<T>` to defer materialization past cctor completion. Currently, `Tokens.KeywordsValidAsMemberName` is the only such reverse reference (deferred via `Lazy<FrozenSet<TokenKind>>`).
+
+   This makes the constraint explicit and discoverable for anyone adding future cross-catalog derived properties.
+
+2. **The topology diagram** (lines 160-210) does not need a change. The `Lazy<T>` reference is a derived-data relationship, not an object-reference dependency. The diagram correctly shows only object-reference edges.
+
+## Required follow-up actions
+
+1. **Update `docs/language/catalog-system.md`** — add the static initialization constraint paragraph after line 896 as described above. This makes the invariant explicit.
+2. **No code changes required.** The fix is correct as-is. All 4,996 tests pass.
+3. **No additional `Lazy<T>` conversions needed.** The audit confirms no other circular static initialization paths exist.
+
+## Additional Findings
+
+1. **`Actions.cs` references to `Types.CollectionCountAccessor`** (lines 99, 119, 158, 172, 204) — verified safe. These are inside `GetMeta()` switch arms, not static field initializers. `Actions.All` (line 299) calls `GetMeta` during `Actions..cctor()`, which triggers `Types.CollectionCountAccessor` access, but `CollectionCountAccessor` is a `private static readonly` field (Types.cs line 140) that initializes before `Types.GetMeta()` or `Types.All` in `Types..cctor()`. Both orderings (`Actions` before `Types`, `Types` before `Actions`) are safe because `CollectionCountAccessor` doesn't depend on `Types.All` — it's a simple `new FixedReturnAccessor(...)`.
+
+   Wait — I need to correct that. `Actions.All` (line 299) calls `Enum.GetValues<ActionKind>().Select(GetMeta).ToArray()`. Inside `Actions.GetMeta()`, each arm calls `Tokens.GetMeta(TokenKind.*)` (lines 66, 74, etc.) AND references `Types.CollectionCountAccessor` (lines 99, 119, etc.). So if `Actions..cctor()` runs, it triggers BOTH `Tokens..cctor()` AND reads `Types.CollectionCountAccessor`. If `Types..cctor()` hasn't started yet, the first access to `Types.CollectionCountAccessor` triggers `Types..cctor()`, which calls `Tokens.GetMeta()` in its own `GetMeta` — but if `Tokens..cctor()` is already complete by then (triggered by `Actions` calling `Tokens.GetMeta` first), this is fine. And `CollectionCountAccessor` is declared at line 140, which is a field initializer that runs before the `All` property initializer. So regardless of ordering, `CollectionCountAccessor` is always available by the time anyone reads it. **Confirmed safe.**
+
+2. **The `Modifiers.cs` references** (lines 64, 71, 77, etc.) — all inside `GetMeta()` switch arms calling `Tokens.GetMeta()`. Standard downward dependency, no cycle. **Confirmed safe.**
+
+3. **The `Types ↔ Modifiers` bidirectional edge** in the topology diagram (line 201: `Types <-->|"implied ↔ applicable"| Modifiers`) is an interesting parallel case. `Types.GetMeta()` references `ModifierKind` enum values (e.g., `ImpliedModifiers: [ModifierKind.Notempty]`), and `Modifiers.GetMeta()` references `TypeKind` values and `Tokens.GetMeta()`. Neither references the other catalog's `All` or static fields in a cctor — they reference enum values (constants) and call `GetMeta()` lazily. So this bidirectional edge is safe because no cctor depends on the other catalog's cctor completion. The `Tokens ↔ Types` case was different because `Tokens.KeywordsValidAsMemberName` was a static field initializer that referenced `Types.All` — a property that requires `Types..cctor()` to have completed.
+
+# Frank — Omit vs Default Pattern
+
+- **Antipattern:** Using `default 0`, `default ""`, `default false`, or similar sentinel defaults for fields that are not yet meaningful in a state. The field is structurally present, but the value is only a placeholder, so readers and tools must guess whether `0`/`false`/`""` is real or merely conventional absence.
+- **Sample survey evidence:** This shows up in current samples such as `samples\apartment-rental-application.precept` (`CreditScore`, `DepositPaid`, `LeaseSigned`), `samples\clinic-appointment-scheduling.precept` (`ScheduledDay`, `ScheduledMinute`, `ReminderSent`, `VisitCompleted`), `samples\building-access-badge-request.precept` (`LowestRequestedFloor`, `HighestRequestedFloor`, `BadgePrinted`), `samples\loan-application.precept` (`ApprovedAmount`, `CreditScore`, `DocumentsVerified`), and `samples\vehicle-service-appointment.precept` (`ApprovedWorkCount`, `InvoiceTotal`, `PickupContacted`).
+- **Placement decision:** Added the guidance as a durable MCP/catalog anti-pattern in `src\Precept\Language\SyntaxReference.cs` under `SyntaxReference.AntiPatterns` with the title `Sentinel defaults for not-yet-meaningful fields`. `tools\Precept.Mcp\Tools\PatternsTool.cs` already projects this catalog through `precept_patterns`, so this is the correct authoritative home. Added regression coverage in `test\Precept.Tests\SyntaxReferenceTests.cs` and `test\Precept.Mcp.Tests\NewToolTests.cs`, and synced count references in `src\Precept\Language\Quickstart.cs`, `docs\tooling\mcp.md`, and `.github\skills\precept-authoring\SKILL.md`.
+- **v3 doc update:** Added `## 9. Design Motivation — Omit vs Sentinel Defaults` to `docs\Working\field-state-guarantees-v3.md`, directly before the implementation-plan placeholder, and renumbered the trailing sections. The new section states that `omit` is the correct representation when a field has no business meaning in a state, distinguishes genuine business defaults from placeholder sentinels, and ties the safety story to D132 `MustSetOmitToNonOmit`.
+
+### 2026-05-12T21:06:52Z: Session directive — Use claude-opus-4.6 for Frank on implementation planning tasks
+**By:** Shane (via Copilot)
+**What:** Bump Frank to claude-opus-4.6 for implementation planning work. Implementation plans feed all downstream agents and warrant premium reasoning.
+**Why:** User request — captured for team memory
