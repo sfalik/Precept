@@ -799,34 +799,30 @@ public class ProofEngineTests
         }
 
         [Fact]
-        public void Strategy3_OrGuard_DoesNotDischarge()
+        public void Strategy3_OrGuard_DischargesWhenBothBranchesCover()
         {
-            // NOTE: `or` in guards currently produces a TypeMismatch diagnostic — BooleanOrBoolean
-            // is not in the Operations catalog. The guard expression fails type-checking and
-            // produces no guard constraints, so the obligation is unresolved.
-            // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
+            // `D > 0 or D < 0` means D is nonzero in every branch, so the divisor obligation discharges.
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
                 field X as number default 0 writable
                 field Y as integer default 1 writable
                 field D as number default 1 writable
-                field Z as number nonzero default 1 writable
                 state Draft initial
                 event Submit
-                from Draft on Submit when D != 0 or Z != 0 -> set X = Y / D -> no transition
+                from Draft on Submit when D > 0 or D < 0 -> set X = Y / D -> no transition
                 """);
 
             var obligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m } &&
                 o.Context is TransitionRowContext);
 
-            // `or` guard fails TC; no strategy can prove the obligation
+            // Both branches (D > 0) and (D < 0) independently prove D != 0 → obligation discharges
             if (obligation is not null)
             {
-                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
-                    because: "or guard fails type-checking; guard constraints cannot be extracted");
-                obligation.Strategy.Should().NotBe(ProofStrategy.GuardInPath,
-                    because: "OR-connected guards are not decomposed by strategy 3");
+                obligation.Disposition.Should().Be(ProofDisposition.Proved,
+                    because: "D > 0 and D < 0 both independently imply D != 0");
+                obligation.Strategy.Should().Be(ProofStrategy.GuardInPath,
+                    because: "OR-connected guards are now branch-aware; all branches prove D != 0");
             }
         }
 
@@ -4990,6 +4986,265 @@ public class ProofEngineTests
 
             compilation.HasErrors.Should().BeFalse();
             compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.QualifierMismatch));
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 9 — OR / ProofEngine Disjunction Support
+    // ════════════════════════════════════════════════════════════════════════
+
+    public class Slice9_OrDisjunctionSupport
+    {
+        // ── Strategy 3: Guard-in-Path OR splitting ───────────────────────────
+
+        [Fact]
+        public void ProofEngine_DischargesObligation_WhenDisjunctiveGuardCoversAllCases()
+        {
+            // D > 0 or D < 0 → both branches independently prove D != 0
+            var (_, ledger) = ProveAllowingDiagnostics("""
+                precept Widget
+                field X as number default 0 writable
+                field Y as integer default 1 writable
+                field D as number default 1 writable
+                state Draft initial
+                event Submit
+                from Draft on Submit when D > 0 or D < 0 -> set X = Y / D -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m } &&
+                o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull("division by D must generate a proof obligation");
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "both OR branches (D > 0, D < 0) independently prove D != 0");
+            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath);
+        }
+
+        [Fact]
+        public void ProofEngine_DoesNotDischarge_WhenDisjunctiveGuardIsPartial()
+        {
+            // D > 0 or E > 0 — branch 2 (E > 0) does NOT prove D != 0; obligation stays unresolved
+            var (_, ledger) = ProveAllowingDiagnostics("""
+                precept Widget
+                field X as number default 0 writable
+                field Y as integer default 1 writable
+                field D as number default 1 writable
+                field E as number default 1 writable
+                state Draft initial
+                event Submit
+                from Draft on Submit when D > 0 or E > 0 -> set X = Y / D -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m } &&
+                o.Context is TransitionRowContext);
+
+            if (obligation is not null)
+            {
+                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
+                    because: "branch 'E > 0' does not independently prove D != 0");
+                obligation.Strategy.Should().NotBe(ProofStrategy.GuardInPath);
+            }
+        }
+
+        [Fact]
+        public void ProofEngine_DischargesObligation_WhenThreeWayDisjunction()
+        {
+            // D > 0 or D < 0 or D != 0 — all three branches prove D != 0
+            var (_, ledger) = ProveAllowingDiagnostics("""
+                precept Widget
+                field X as number default 0 writable
+                field Y as integer default 1 writable
+                field D as number default 1 writable
+                state Draft initial
+                event Submit
+                from Draft on Submit when D > 0 or D < 0 or D != 0 -> set X = Y / D -> no transition
+                """);
+
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m } &&
+                o.Context is TransitionRowContext);
+
+            obligation.Should().NotBeNull("division by D must generate a proof obligation");
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "all three OR branches independently prove D != 0");
+            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath);
+        }
+
+        // ── Strategy 4: Flow-narrowing OR splitting ──────────────────────────
+
+        [Fact]
+        public void ProofEngine_FlowNarrowing_Discharges_WhenDisjunctiveGuardCoversAllBranches()
+        {
+            // A > B or A > B (redundant but both branches prove A - B > 0 via flow narrowing)
+            var subtractionMeta = GetBinaryMeta(OperationKind.NumberMinusNumber);
+            var subtraction = MakeBinary(
+                TypeKind.Number,
+                OperationKind.NumberMinusNumber,
+                MakeFieldRef("A", TypeKind.Number),
+                MakeFieldRef("B", TypeKind.Number),
+                new NumericProofRequirement(
+                    new ParamSubject(subtractionMeta.Rhs),
+                    OperatorKind.GreaterThan,
+                    0m,
+                    "Difference must be positive"));
+
+            // Build OR guard: A > B or A > B
+            var guardLeft = MakeBinary(TypeKind.Boolean, OperationKind.NumberGreaterThanNumber,
+                MakeFieldRef("A", TypeKind.Number), MakeFieldRef("B", TypeKind.Number));
+            var guardRight = MakeBinary(TypeKind.Boolean, OperationKind.NumberGreaterThanNumber,
+                MakeFieldRef("A", TypeKind.Number), MakeFieldRef("B", TypeKind.Number));
+            var orGuard = MakeBinary(TypeKind.Boolean, OperationKind.BooleanOrBoolean, guardLeft, guardRight);
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("A"),
+                        MakeField("B"),
+                        MakeField("X")),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            orGuard,
+                            MakeSetAction("X", TypeKind.Number, subtraction)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single();
+
+            obligation.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "both OR branches contain 'A > B' which proves A - B > 0 via flow narrowing");
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
+        }
+
+        [Fact]
+        public void ProofEngine_FlowNarrowing_DoesNotDischarge_WhenDisjunctiveGuardIsPartial()
+        {
+            // A > B or C > D — branch 2 (C > D) is irrelevant to A - B; should not discharge
+            var subtractionMeta = GetBinaryMeta(OperationKind.NumberMinusNumber);
+            var subtraction = MakeBinary(
+                TypeKind.Number,
+                OperationKind.NumberMinusNumber,
+                MakeFieldRef("A", TypeKind.Number),
+                MakeFieldRef("B", TypeKind.Number),
+                new NumericProofRequirement(
+                    new ParamSubject(subtractionMeta.Rhs),
+                    OperatorKind.GreaterThan,
+                    0m,
+                    "Difference must be positive"));
+
+            var guardLeft = MakeBinary(TypeKind.Boolean, OperationKind.NumberGreaterThanNumber,
+                MakeFieldRef("A", TypeKind.Number), MakeFieldRef("B", TypeKind.Number));
+            var guardRight = MakeBinary(TypeKind.Boolean, OperationKind.NumberGreaterThanNumber,
+                MakeFieldRef("C", TypeKind.Number), MakeFieldRef("D", TypeKind.Number));
+            var orGuard = MakeBinary(TypeKind.Boolean, OperationKind.BooleanOrBoolean, guardLeft, guardRight);
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("A"),
+                        MakeField("B"),
+                        MakeField("C"),
+                        MakeField("D"),
+                        MakeField("X")),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            orGuard,
+                            MakeSetAction("X", TypeKind.Number, subtraction)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single();
+
+            obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
+                because: "branch 'C > D' is irrelevant to A - B; partial disjunction must not discharge");
+            obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing);
+        }
+
+        // ── Ensure guard preservation ────────────────────────────────────────
+
+        [Fact]
+        public void ProofEngine_GuardedEnsure_DoesNotBecomeUnconditionalFact()
+        {
+            // `when D > 0 ensure result >= 0` — the ensure has a guard, so it must NOT
+            // be treated as an unconditional numeric fact by TryGetNumericEnsureFact.
+            var (index, _) = TypeCheckerTestHelpers.Check("""
+                precept Widget
+                field D as number default 1 writable
+                field result as number default 0 writable
+                state Draft initial
+                in Draft when D > 0 ensure result >= 0 because "result is nonneg when D is positive"
+                """);
+
+            // The guarded ensure must have a non-null Guard
+            var ensure = index.Ensures.Should().ContainSingle().Subject;
+            ensure.Guard.Should().NotBeNull(
+                because: "PopulateEnsures must preserve the GuardClauseSlot as TypedEnsure.Guard");
+
+            // The fact must NOT appear as an unconditional trusted fact
+            // (verified indirectly: if Guard is non-null, TryGetNumericEnsureFact returns false)
+            ensure.Guard.Should().NotBeOfType<TypedErrorExpression>(
+                because: "D > 0 is a valid boolean guard");
+        }
+
+        // ── Null-guard baseline ──────────────────────────────────────────────
+
+        [Fact]
+        public void EnsureNormalizer_NoGuard_ProducesUnconditionalFact()
+        {
+            // `ensure D >= 0` with no `when` clause → Guard must be null → unconditional fact
+            var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+                precept Widget
+                field D as number default 0 writable
+                state Draft initial
+                in Draft ensure D >= 0 because "D stays nonnegative"
+                """);
+
+            var ensure = index.Ensures.Should().ContainSingle().Subject;
+            ensure.Guard.Should().BeNull(because: "no 'when' clause means Guard must be null");
+        }
+
+        [Fact]
+        public void ProofEngine_DoesNotCrash_WhenEnsureHasNullGuard()
+        {
+            // Unconditional ensure through full pipeline must not throw
+            var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+                precept Widget
+                field D as number nonzero default 1 writable
+                field X as number default 0 writable
+                state Draft initial
+                event Submit
+                in Draft ensure D != 0 because "D is always nonzero"
+                from Draft on Submit -> set X = 1 / D -> no transition
+                """);
+            var graph = GraphAnalyzer.Analyze(index);
+            var ledger = ProofEngine.Prove(index, graph);
+
+            ledger.Should().NotBeNull();
+        }
+
+        [Fact]
+        public void ProofEngine_DoesNotCrash_WhenTransitionGuardAbsent()
+        {
+            // Transition row with no guard → TryGuardInPathProof exits early, no null dereference
+            var ledger = Prove("""
+                precept Widget
+                field X as number default 0 writable
+                field Y as number nonzero default 1 writable
+                state Draft initial
+                event Submit
+                from Draft on Submit -> set X = 1 / Y -> no transition
+                """);
+
+            ledger.Should().NotBeNull();
+            // Y has nonzero modifier; obligation is proved by strategy 2, not strategy 3
+            var obligation = ledger.Obligations.FirstOrDefault(o =>
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+            if (obligation is not null)
+                obligation.Strategy.Should().NotBe(ProofStrategy.GuardInPath,
+                    because: "no guard means strategy 3 cannot fire");
         }
     }
 }

@@ -278,24 +278,75 @@ public static partial class ProofEngine
         };
         if (guard is null) return false;
 
-        var guardConstraints = ExtractGuardConstraints(guard);
+        var branches = ExtractGuardBranches(guard);
 
-        foreach (var gc in guardConstraints)
+        // Every OR branch must independently prove the obligation for it to discharge.
+        foreach (var branchConstraints in branches)
         {
-            if (obligation.Requirement is NumericProofRequirement numeric)
+            var thisBranchProved = false;
+            foreach (var gc in branchConstraints)
             {
-                if (GuardSubsumes(gc, numeric, obligation.Site))
-                    return true;
+                if (obligation.Requirement is NumericProofRequirement numeric)
+                {
+                    if (GuardSubsumes(gc, numeric, obligation.Site)) { thisBranchProved = true; break; }
+                }
+                else if (obligation.Requirement is PresenceProofRequirement presence)
+                {
+                    if (gc.Field == GetFieldName(presence.Subject, obligation.Site) && gc.IsPresenceCheck)
+                    { thisBranchProved = true; break; }
+                }
             }
-            else if (obligation.Requirement is PresenceProofRequirement presence)
+            if (!thisBranchProved) return false;
+        }
+
+        return branches.Length > 0;
+    }
+
+    /// <summary>
+    /// Returns the disjunctive branches of a guard expression as sets of <see cref="GuardConstraint"/>.
+    /// AND nodes cross-product their children's branch sets; OR nodes union them.
+    /// Each branch set contains all constraints that hold simultaneously in that branch.
+    /// </summary>
+    private static ImmutableArray<ImmutableArray<GuardConstraint>> ExtractGuardBranches(TypedExpression guard)
+    {
+        var branches = ExtractGuardBranchesCore(guard);
+        return branches.IsEmpty
+            ? ImmutableArray.Create(ImmutableArray<GuardConstraint>.Empty)
+            : branches;
+    }
+
+    private static ImmutableArray<ImmutableArray<GuardConstraint>> ExtractGuardBranchesCore(TypedExpression expr)
+    {
+        if (expr is TypedBinaryOp bin)
+        {
+            var op = Operations.GetMeta(bin.ResolvedOp).Op;
+
+            if (op == OperatorKind.Or)
             {
-                if (gc.Field == GetFieldName(presence.Subject, obligation.Site)
-                    && gc.IsPresenceCheck)
-                    return true;
+                var leftBranches = ExtractGuardBranchesCore(bin.Left);
+                var rightBranches = ExtractGuardBranchesCore(bin.Right);
+                return leftBranches.AddRange(rightBranches);
+            }
+
+            if (op == OperatorKind.And)
+            {
+                var leftBranches = ExtractGuardBranchesCore(bin.Left);
+                var rightBranches = ExtractGuardBranchesCore(bin.Right);
+                if (leftBranches.IsEmpty) return rightBranches;
+                if (rightBranches.IsEmpty) return leftBranches;
+                // Cross-product: each left-branch paired with each right-branch
+                var cross = ImmutableArray.CreateBuilder<ImmutableArray<GuardConstraint>>(leftBranches.Length * rightBranches.Length);
+                foreach (var lb in leftBranches)
+                    foreach (var rb in rightBranches)
+                        cross.Add(lb.AddRange(rb));
+                return cross.ToImmutable();
             }
         }
 
-        return false;
+        // Atomic node: extract leaf constraints via the existing non-AND/OR handler
+        var leafBuilder = ImmutableArray.CreateBuilder<GuardConstraint>();
+        ExtractGuardLeafConstraints(expr, leafBuilder);
+        return ImmutableArray.Create(leafBuilder.ToImmutable());
     }
 
     private static ImmutableArray<GuardConstraint> ExtractGuardConstraints(TypedExpression guard)
@@ -318,6 +369,19 @@ public static partial class ProofEngine
                 // OR: do NOT decompose — neither disjunct is guaranteed
                 break;
 
+            default:
+                ExtractGuardLeafConstraints(expr, builder);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Extracts a single guard constraint from an atomic (non-AND, non-OR) expression.
+    /// </summary>
+    private static void ExtractGuardLeafConstraints(TypedExpression expr, ImmutableArray<GuardConstraint>.Builder builder)
+    {
+        switch (expr)
+        {
             case TypedBinaryOp bin:
             {
                 var compOp = Operations.GetMeta(bin.ResolvedOp).Op;
@@ -449,9 +513,6 @@ public static partial class ProofEngine
         };
         if (guard is null) return false;
 
-        var relationalGuards = ExtractFieldToFieldConstraints(guard);
-        if (relationalGuards.IsEmpty) return false;
-
         if (obligation.Site is not TypedBinaryOp binaryOp) return false;
         if (obligation.Requirement is not NumericProofRequirement numeric) return false;
 
@@ -461,17 +522,71 @@ public static partial class ProofEngine
         var rightField = GetFieldName(binaryOp.Right);
         if (leftField is null || rightField is null) return false;
 
-        foreach (var rg in relationalGuards)
-        {
-            if (!((rg.LeftField == leftField && rg.RightField == rightField) ||
-                  (rg.LeftField == rightField && rg.RightField == leftField)))
-                continue;
+        var branches = ExtractFieldToFieldBranches(guard);
+        if (branches.IsEmpty) return false;
 
-            if (GuardRelationImpliesObligation(rg, binaryOp, leftField, rightField, numeric))
-                return true;
+        // Every OR branch must independently prove the flow-narrowing obligation.
+        foreach (var branchConstraints in branches)
+        {
+            var thisBranchProved = false;
+            foreach (var rg in branchConstraints)
+            {
+                if (!((rg.LeftField == leftField && rg.RightField == rightField) ||
+                      (rg.LeftField == rightField && rg.RightField == leftField)))
+                    continue;
+
+                if (GuardRelationImpliesObligation(rg, binaryOp, leftField, rightField, numeric))
+                { thisBranchProved = true; break; }
+            }
+            if (!thisBranchProved) return false;
         }
 
-        return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Returns the disjunctive branches of a guard expression as sets of <see cref="FieldToFieldConstraint"/>.
+    /// AND nodes cross-product their children's branch sets; OR nodes union them.
+    /// </summary>
+    private static ImmutableArray<ImmutableArray<FieldToFieldConstraint>> ExtractFieldToFieldBranches(TypedExpression guard)
+    {
+        var branches = ExtractFieldToFieldBranchesCore(guard);
+        return branches.IsEmpty
+            ? ImmutableArray.Create(ImmutableArray<FieldToFieldConstraint>.Empty)
+            : branches;
+    }
+
+    private static ImmutableArray<ImmutableArray<FieldToFieldConstraint>> ExtractFieldToFieldBranchesCore(TypedExpression expr)
+    {
+        if (expr is TypedBinaryOp bin)
+        {
+            var op = Operations.GetMeta(bin.ResolvedOp).Op;
+
+            if (op == OperatorKind.Or)
+            {
+                var leftBranches = ExtractFieldToFieldBranchesCore(bin.Left);
+                var rightBranches = ExtractFieldToFieldBranchesCore(bin.Right);
+                return leftBranches.AddRange(rightBranches);
+            }
+
+            if (op == OperatorKind.And)
+            {
+                var leftBranches = ExtractFieldToFieldBranchesCore(bin.Left);
+                var rightBranches = ExtractFieldToFieldBranchesCore(bin.Right);
+                if (leftBranches.IsEmpty) return rightBranches;
+                if (rightBranches.IsEmpty) return leftBranches;
+                var cross = ImmutableArray.CreateBuilder<ImmutableArray<FieldToFieldConstraint>>(leftBranches.Length * rightBranches.Length);
+                foreach (var lb in leftBranches)
+                    foreach (var rb in rightBranches)
+                        cross.Add(lb.AddRange(rb));
+                return cross.ToImmutable();
+            }
+        }
+
+        // Atomic: extract field-to-field leaf constraint
+        var leafBuilder = ImmutableArray.CreateBuilder<FieldToFieldConstraint>();
+        ExtractFieldToFieldLeaf(expr, leafBuilder);
+        return ImmutableArray.Create(leafBuilder.ToImmutable());
     }
 
     private static ImmutableArray<FieldToFieldConstraint> ExtractFieldToFieldConstraints(TypedExpression guard)
@@ -493,13 +608,19 @@ public static partial class ProofEngine
             case TypedBinaryOp bin when Operations.GetMeta(bin.ResolvedOp).Op == OperatorKind.Or:
                 break;
 
-            case TypedBinaryOp bin:
-            {
-                var compOp = Operations.GetMeta(bin.ResolvedOp).Op;
-                if (bin.Left is TypedFieldRef leftF && bin.Right is TypedFieldRef rightF)
-                    builder.Add(new FieldToFieldConstraint(leftF.FieldName, compOp, rightF.FieldName));
+            default:
+                ExtractFieldToFieldLeaf(expr, builder);
                 break;
-            }
+        }
+    }
+
+    private static void ExtractFieldToFieldLeaf(TypedExpression expr, ImmutableArray<FieldToFieldConstraint>.Builder builder)
+    {
+        if (expr is TypedBinaryOp bin)
+        {
+            var compOp = Operations.GetMeta(bin.ResolvedOp).Op;
+            if (bin.Left is TypedFieldRef leftF && bin.Right is TypedFieldRef rightF)
+                builder.Add(new FieldToFieldConstraint(leftF.FieldName, compOp, rightF.FieldName));
         }
     }
 

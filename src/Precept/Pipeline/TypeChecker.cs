@@ -793,6 +793,22 @@ internal static partial class TypeChecker
                 ctx.CurrentScope = FieldScopeMode.AllFields;
                 var condition = Resolve(ensureSlot.Expression, ctx);
 
+                TypedExpression? ensureGuard = null;
+                var ensureGuardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+                if (ensureGuardSlot is not null)
+                {
+                    ctx.CurrentScope = FieldScopeMode.AllFields;
+                    ensureGuard = Resolve(ensureGuardSlot.Expression, ctx);
+                    if (ensureGuard is not TypedErrorExpression && ensureGuard.ResultType != TypeKind.Boolean)
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.TypeMismatch, ensureGuardSlot.Expression.Span,
+                                Types.GetMeta(TypeKind.Boolean).DisplayName,
+                                Types.GetMeta(ensureGuard.ResultType).DisplayName));
+                        ensureGuard = new TypedErrorExpression(ensureGuardSlot.Expression.Span);
+                    }
+                }
+
                 var becauseSlot = construct.GetSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause);
                 var message = becauseSlot is not null
                     ? new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span)
@@ -805,7 +821,7 @@ internal static partial class TypeChecker
                         AnchorState: anchorState.StateName,
                         AnchorEvent: null,
                         Condition: condition,
-                        Guard: null,
+                        Guard: ensureGuard,
                         Message: message,
                         Syntax: construct));
                     ctx.ConstraintRefs.Add(new ConstraintFieldRefs(
@@ -853,6 +869,22 @@ internal static partial class TypeChecker
                     ctx.CurrentScope = FieldScopeMode.AllFields;
                     var condition = Resolve(ensureSlot.Expression, ctx);
 
+                    TypedExpression? eventEnsureGuard = null;
+                    var eventEnsureGuardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+                    if (eventEnsureGuardSlot is not null)
+                    {
+                        ctx.CurrentScope = FieldScopeMode.AllFields;
+                        eventEnsureGuard = Resolve(eventEnsureGuardSlot.Expression, ctx);
+                        if (eventEnsureGuard is not TypedErrorExpression && eventEnsureGuard.ResultType != TypeKind.Boolean)
+                        {
+                            ctx.Diagnostics.Add(
+                                Diagnostics.Create(DiagnosticCode.TypeMismatch, eventEnsureGuardSlot.Expression.Span,
+                                    Types.GetMeta(TypeKind.Boolean).DisplayName,
+                                    Types.GetMeta(eventEnsureGuard.ResultType).DisplayName));
+                            eventEnsureGuard = new TypedErrorExpression(eventEnsureGuardSlot.Expression.Span);
+                        }
+                    }
+
                     var becauseSlot = construct.GetSlot<BecauseClauseSlot>(ConstructSlotKind.BecauseClause);
                     var message = becauseSlot is not null
                         ? new TypedLiteral(TypeKind.String, becauseSlot.Message, becauseSlot.Span)
@@ -863,7 +895,7 @@ internal static partial class TypeChecker
                         AnchorState: null,
                         AnchorEvent: anchorEvent,
                         Condition: condition,
-                        Guard: null,
+                        Guard: eventEnsureGuard,
                         Message: message,
                         Syntax: construct));
                     ctx.ConstraintRefs.Add(new ConstraintFieldRefs(

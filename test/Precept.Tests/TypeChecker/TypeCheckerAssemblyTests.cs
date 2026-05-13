@@ -754,4 +754,64 @@ public class TypeCheckerAssemblyTests
                 because: "binary operation resolution in guards must be deterministic (§10 G5)");
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 9 — Ensure guard preservation
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void EnsureNormalizer_PreservesOrGuard_WhenUsedWithEnsure()
+    {
+        // `when D > 0 or D < 0 ensure result >= 0` — TypedEnsure.Guard must be non-null
+        var (index, _) = TypeCheckerTestHelpers.Check("""
+            precept Widget
+            field D as number default 1 writable
+            field result as number default 0 writable
+            state Draft initial
+            in Draft when D > 0 or D < 0 ensure result >= 0 because "result is nonneg when D is nonzero"
+            """);
+
+        var ensure = index.Ensures.Should().ContainSingle().Subject;
+        ensure.Guard.Should().NotBeNull(
+            because: "PopulateEnsures must preserve the GuardClauseSlot on StateEnsure");
+    }
+
+    [Fact]
+    public void EnsureNormalizer_PreservesGuard_ForEventEnsure()
+    {
+        // `when D > 0 ensure result >= 0` on event ensure → Guard preserved
+        var (index, _) = TypeCheckerTestHelpers.Check("""
+            precept Widget
+            field D as number default 1 writable
+            field result as number default 0 writable
+            state Draft initial
+            event Submit
+            on Submit when D > 0 ensure result >= 0 because "result nonneg when D positive"
+            """);
+
+        var ensure = index.Ensures.Should().ContainSingle().Subject;
+        ensure.Guard.Should().NotBeNull(
+            because: "PopulateEnsures must preserve the GuardClauseSlot on EventEnsure");
+    }
+
+    [Fact]
+    public void EnsureNormalizer_NonBooleanGuard_EmitsTypeMismatch()
+    {
+        // `when D ensure result >= 0` — D is number (not boolean) → TypeMismatch diagnostic
+        // Guard must become TypedErrorExpression
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Widget
+            field D as number default 1 writable
+            field result as number default 0 writable
+            state Draft initial
+            in Draft when D ensure result >= 0 because "invalid guard"
+            """);
+
+        diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.TypeMismatch),
+            because: "a non-boolean guard expression must produce a TypeMismatch diagnostic");
+
+        var ensure = index.Ensures.Should().ContainSingle().Subject;
+        ensure.Guard.Should().BeOfType<TypedErrorExpression>(
+            because: "the invalid guard must be replaced with TypedErrorExpression");
+    }
 }

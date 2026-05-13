@@ -164,6 +164,10 @@ public static partial class ProofEngine
     {
         fact = default;
 
+        // Guarded ensures are conditional — they must NOT become unconditional numeric facts.
+        if (ensure.Guard is not null)
+            return false;
+
         return ensure.Kind switch
         {
             ConstraintKind.EventPrecondition => TryGetNumericConstraintFact(ensure.Condition, null, ensure.AnchorEvent, out fact),
