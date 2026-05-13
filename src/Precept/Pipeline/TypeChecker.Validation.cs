@@ -310,9 +310,6 @@ internal static partial class TypeChecker
 
     private static void ValidateConstructionGuarantees(CheckContext ctx)
     {
-        if (ctx.Events.Any(evt => evt.IsInitial))
-            return;
-
         var requiredFields = ctx.Fields
             .Where(field => NeedsInitialEvent(field, ctx))
             .ToImmutableArray();
@@ -320,11 +317,54 @@ internal static partial class TypeChecker
         if (requiredFields.IsDefaultOrEmpty)
             return;
 
-        ctx.Diagnostics.Add(
-            Diagnostics.Create(
-                DiagnosticCode.RequiredFieldsNeedInitialEvent,
-                requiredFields[0].NameSpan,
-                string.Join(", ", requiredFields.Select(field => field.Name))));
+        var initialEvent = ctx.Events.FirstOrDefault(evt => evt.IsInitial);
+        if (initialEvent is null)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(
+                    DiagnosticCode.RequiredFieldsNeedInitialEvent,
+                    requiredFields[0].NameSpan,
+                    string.Join(", ", requiredFields.Select(field => field.Name))));
+            return;
+        }
+
+        if (ctx.States.Count == 0)
+            return;
+
+        var initialRows = ctx.TransitionRows
+            .Where(row => string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal))
+            .ToImmutableArray();
+
+        if (initialRows.IsDefaultOrEmpty)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(
+                    DiagnosticCode.InitialEventMissingAssignments,
+                    initialEvent.NameSpan,
+                    initialEvent.Name,
+                    string.Join(", ", requiredFields.Select(field => field.Name))));
+            return;
+        }
+
+        foreach (var row in initialRows)
+        {
+            var missingFields = requiredFields
+                .Where(field => !row.Actions.Any(action =>
+                    IsSetAction(action.Kind) &&
+                    string.Equals(action.FieldName, field.Name, StringComparison.Ordinal)))
+                .Select(field => field.Name)
+                .ToImmutableArray();
+
+            if (missingFields.IsDefaultOrEmpty)
+                continue;
+
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(
+                    DiagnosticCode.InitialEventMissingAssignments,
+                    row.RowSpan,
+                    initialEvent.Name,
+                    string.Join(", ", missingFields)));
+        }
     }
 
     private static bool IsSetAction(ActionKind kind) => kind == ActionKind.Set;
