@@ -570,11 +570,9 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Publish(NewPrice as money");
 
-        markup.Should().Contain("**event `Publish(NewPrice as money in USD)`**");
-        markup.Should().Contain("Can fire from:");
-        markup.Should().Contain("`Draft`");
-        markup.Should().Contain("`Listed`");
-        markup.Should().Contain("Arg: `NewPrice` is `money` · not nullable · `in USD`");
+        markup.Should().Contain("⚡ Enforced · args checked before route");
+        markup.Should().Contain("🔁 Fires from: `Draft`, `Listed`");
+        markup.Should().Contain("Args: `NewPrice as money in USD`");
     }
 
     [Fact]
@@ -587,8 +585,8 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "Create(Name as string)");
 
-        markup.Should().Contain("**event `initial Create(Name as string)`**");
-        markup.Should().Contain("constructor event (invoked via `CreateInstance`, not `Fire`)");
+        markup.Should().Contain("⚡ Enforced · constructor event");
+        markup.Should().Contain("Args: `Name as string`");
     }
 
     [Fact]

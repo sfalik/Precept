@@ -6,9 +6,9 @@
 
 | # | Card | Status | Commit |
 |---|------|--------|--------|
-| 1 | `field` (stored) | 🟡 In progress | — |
-| 2 | `field` (computed) | 🟡 In progress | — |
-| 3 | `event` | 🔴 Not started | — |
+| 1 | `field` (stored) | ✅ Done | `c178198e` |
+| 2 | `field` (computed) | ✅ Done | `c178198e` |
+| 3 | `event` | 🟡 In progress | — |
 | 4 | `rule` | 🔴 Not started | — |
 | 5 | `ensure` | 🔴 Not started | — |
 | 6 | Transition row | 🔴 Not started | — |

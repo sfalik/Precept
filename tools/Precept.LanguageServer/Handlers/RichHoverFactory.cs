@@ -1211,24 +1211,18 @@ internal static class RichHoverFactory
 
     private static string CreateEventMarkdown(Compilation compilation, TypedEvent evt)
     {
-        var signature = evt.Args.IsDefaultOrEmpty
-            ? EscapeInline(evt.Name)
-            : $"{EscapeInline(evt.Name)}({string.Join(", ", evt.Args.Select(FormatArgumentSignaturePart))})";
-        if (evt.IsInitial)
-        {
-            signature = $"initial {signature}";
-        }
-
         var hasEventEnsureGap = GetEnsuresForEvent(compilation, evt.Name)
             .Any(entry => HasUnresolvedConstraint(compilation, entry.Identity));
-        var status = evt.IsInitial
-            ? BuildStatus(compilation, evt.NameSpan, hasEventEnsureGap ? HoverStatusKind.Unverified : HoverStatusKind.RuntimeChecked, "constructor event (invoked via `CreateInstance`, not `Fire`)")
-            : BuildStatus(compilation, evt.NameSpan, hasEventEnsureGap ? HoverStatusKind.Unverified : HoverStatusKind.RuntimeChecked, "args validated before transition");
-
+        var header = evt.IsInitial
+            ? hasEventEnsureGap
+                ? "⚠️ Gap · constructor event"
+                : "⚡ Enforced · constructor event"
+            : hasEventEnsureGap
+                ? "⚠️ Gap · args checked before route"
+                : "⚡ Enforced · args checked before route";
         var lines = new List<string>
         {
-            $"**event `{signature}`**",
-            FormatStatus(status),
+            header,
         };
 
         if (!evt.IsInitial)
@@ -1237,15 +1231,11 @@ internal static class RichHoverFactory
                 .FirstOrDefault(candidate => string.Equals(candidate.Name, evt.Name, StringComparison.Ordinal))?
                 .HandledInStates
                 ?? ImmutableArray<string>.Empty;
-            lines.Add($"Can fire from: {FormatCodeList(handledInStates)}");
+            lines.Add($"🔁 Fires from: {FormatCodeList(handledInStates)}");
         }
 
-        foreach (var arg in evt.Args)
-        {
-            lines.Add($"Arg: `{EscapeInline(arg.Name)}` is {FormatTypeSummary(arg.ResolvedType, arg.ElementType, null, arg.DeclaredQualifiers, arg.Presence)}");
-        }
-
-        return string.Join("\n\n", lines);
+        lines.Add($"Args: {(evt.Args.IsDefaultOrEmpty ? "*none*" : string.Join(" · ", evt.Args.Select(arg => $"`{EscapeInline(FormatArgumentSignaturePart(arg))}`")))}");
+        return string.Join("\n", lines);
     }
 
     private static string CreateArgumentMarkdown(TypedArg arg) => string.Join("\n\n", new[]
@@ -2277,8 +2267,16 @@ internal static class RichHoverFactory
         _ => $"{edge.EventName} → no transition",
     };
 
-    private static string FormatArgumentSignaturePart(TypedArg arg) =>
-        $"{EscapeInline(arg.Name)} as {FormatType(arg.ResolvedType, arg.ElementType)}{FormatQualifierSuffix(arg.DeclaredQualifiers)}";
+    private static string FormatArgumentSignaturePart(TypedArg arg)
+    {
+        var type = $"{FormatType(arg.ResolvedType, arg.ElementType)}{FormatQualifierSuffix(arg.DeclaredQualifiers)}";
+        if (arg.Presence is DeclaredPresenceMeta.Optional)
+        {
+            type += "?";
+        }
+
+        return $"{EscapeInline(arg.Name)} as {type}";
+    }
 
     private static string FormatTypeSummary(
         TypeKind kind,
