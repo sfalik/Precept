@@ -13,10 +13,10 @@
 | 5 | `ensure` | ✅ Done | `eb581e86` |
 | 6 | Transition row | ✅ Done | `82da479c` |
 | 7 | `reject` | ✅ Done | `82da479c` |
-| 8 | Qualifier (base + proof) | 🟡 In progress | — |
-| 9 | Proof expression (non-qualifier) | 🟡 In progress | — |
-| 10 | Diagnostic squiggle (non-qualifier) | 🟡 In progress | — |
-| 11 | State proof variant | 🔴 Not started | — |
+| 8 | Qualifier (base + proof) | ✅ Done | `cea204cf` |
+| 9 | Proof expression (non-qualifier) | ✅ Done | `cea204cf` |
+| 10 | Diagnostic squiggle (non-qualifier) | ✅ Done | `cea204cf` |
+| 11 | State proof variant | 🟡 In progress | — |
 | 12 | `access` | 🔴 Not started | — |
 | 13 | `omit` | 🔴 Not started | — |
 | ✅ | State (standard) | ✅ `dcaf506d` | `dcaf506d` |

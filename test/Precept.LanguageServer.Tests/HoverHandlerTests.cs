@@ -488,6 +488,28 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnUnreachableState_ShowsProofVariantCard()
+    {
+        const string source = """
+            precept StateGapHover
+            state Draft initial
+            state Review
+            state Pending
+            state Done terminal
+            event Approve
+            event Finish
+            from Review on Approve -> transition Pending
+            from Draft on Finish -> transition Done
+            """;
+
+        var markup = GetHoverMarkdown(source, "state Pending", offset: 6);
+
+        markup.Should().Contain("⚠️ Gap · `Pending` unreachable from `Draft`");
+        markup.Should().Contain("🧭 No path found via Approve");
+        markup.Should().Contain("Missing path: confirm reachability or add transition");
+    }
+
+    [Fact]
     public void Hover_OnState_WithUnprovenEdge_ShowsGraphProofGapCard()
     {
         const string source = """

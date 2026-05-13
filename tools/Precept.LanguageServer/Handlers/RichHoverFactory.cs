@@ -1135,18 +1135,19 @@ internal static class RichHoverFactory
         var activeEnsures = GetEnsuresForState(compilation, state.Name);
         var unverifiedEnsures = activeEnsures.Count(entry => HasUnresolvedConstraint(compilation, entry.Identity));
         var edgeProofStatuses = GetEdgeProofStatusesForState(compilation, state.Name);
+        if (TryCreateStateProofVariant(compilation, state, graphState, incoming, edgeProofStatuses, out var proofVariant))
+        {
+            return proofVariant;
+        }
+
         var unresolvedEdgeCount = edgeProofStatuses.Count(status => !status.IsProven);
         var terminalReachable = IsTerminalReachable(compilation.Graph, state.Name);
-        var statusDetail = graphState is null || !graphState.IsReachable
-            ? reachabilityDetail
-            : unresolvedEdgeCount > 0
-                ? $"{unresolvedEdgeCount} connected edge{Pluralize(unresolvedEdgeCount)} can't be proven"
-                : unverifiedEnsures > 0
-                    ? $"{unverifiedEnsures} ensure{Pluralize(unverifiedEnsures)} unverified"
-                    : reachabilityDetail;
+        var statusDetail = unresolvedEdgeCount > 0
+            ? $"{unresolvedEdgeCount} connected edge{Pluralize(unresolvedEdgeCount)} can't be proven"
+            : unverifiedEnsures > 0
+                ? $"{unverifiedEnsures} ensure{Pluralize(unverifiedEnsures)} unverified"
+                : reachabilityDetail;
         var statusKind = HasConstructDiagnostics(compilation, state.NameSpan)
-            || graphState is null
-            || !graphState.IsReachable
             || unresolvedEdgeCount > 0
             || unverifiedEnsures > 0
             ? HoverStatusKind.Unverified
@@ -1870,6 +1871,49 @@ internal static class RichHoverFactory
             ? "✅ Proven · no connected edges carry proof obligations"
             : "✅ Proven · all connected edges satisfy their proof obligations");
         return string.Join("\n\n", lines);
+    }
+
+    private static bool TryCreateStateProofVariant(
+        Compilation compilation,
+        TypedState state,
+        GraphState? graphState,
+        ImmutableArray<string> incomingEvents,
+        ImmutableArray<EdgeProofStatus> edgeProofStatuses,
+        out string markdown)
+    {
+        if (graphState is null || !graphState.IsReachable)
+        {
+            var initialState = compilation.Semantics.States.FirstOrDefault(candidate => candidate.Modifiers.Contains(ModifierKind.InitialState))?.Name ?? "initial state";
+            var via = incomingEvents.IsEmpty ? "no incoming routes" : string.Join(", ", incomingEvents);
+            markdown = string.Join("\n", new[]
+            {
+                $"⚠️ Gap · `{EscapeInline(state.Name)}` unreachable from `{EscapeInline(initialState)}`",
+                $"🧭 No path found via {via}",
+                "Missing path: confirm reachability or add transition",
+            });
+            return true;
+        }
+
+        if (state.Modifiers.Contains(ModifierKind.Required)
+            && compilation.Diagnostics.Any(diagnostic => diagnostic.Code == nameof(PreceptDiagnosticCode.RequiredStateDoesNotDominateTerminal) && Overlaps(diagnostic.Span, state.NameSpan)))
+        {
+            var terminals = compilation.Graph.ProofFacts.OfType<DominancePathFact>()
+                .FirstOrDefault(fact => string.Equals(fact.RequiredState, state.Name, StringComparison.Ordinal))
+                ?.DominatedTerminals ?? ImmutableArray<string>.Empty;
+            var terminalSummary = terminals.IsDefaultOrEmpty
+                ? "some terminal paths bypass this state"
+                : $"No guaranteed path to {FormatCodeList(terminals)}";
+            markdown = string.Join("\n", new[]
+            {
+                $"⚠️ Gap · `{EscapeInline(state.Name)}` is missing on some terminal paths",
+                $"🧭 {terminalSummary}",
+                "Missing path: confirm reachability or add transition",
+            });
+            return true;
+        }
+
+        markdown = string.Empty;
+        return false;
     }
 
     private static ImmutableArray<(TypedEnsure Ensure, EnsureIdentity Identity)> GetEnsuresForState(Compilation compilation, string stateName) =>
