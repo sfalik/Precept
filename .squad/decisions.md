@@ -6,6 +6,32 @@
 
 ---
 
+### 2026-05-13T04:32:04Z: D94 construction analysis now ignores non-initial-state rows on the initial event
+
+**By:** Scribe
+
+**Status:** Merged from George's D94 bugfix note.
+
+**Merged source:** `george-d94-bugfix.md`.
+
+- `ValidateConstructionGuarantees` now analyzes only initial-event rows whose `FromState` is an initial state, so lifecycle transitions on the same initial event no longer participate in construction guarantees.
+- `samples\Test.precept` compiles clean again, `D94_NonInitialStateRow_NotChecked` covers the regression, and `dotnet test test\Precept.Tests\Precept.Tests.csproj` closed green at `5138/5138` with commit `4c567cdc`.
+
+---
+
+### 2026-05-13T04:32:04Z: User directive keeps all work on `spike/Precept-V2-Radical` with no new branches
+
+**By:** Scribe
+
+**Status:** Merged from user directive inbox note.
+
+**Merged source:** `copilot-directive-no-new-branches.md`.
+
+- Shane directed that no new branches be created; all work stays on `spike/Precept-V2-Radical` while the team remains in spike mode.
+- This is durable team-memory guidance and should be treated as a branch-discipline constraint for follow-on work in the current spike.
+
+---
+
 ### 2026-05-13T04:28:00Z: D94 now requires every Form 1 initial-event construction row to assign newly present required fields
 
 **By:** Scribe
@@ -1735,30 +1761,6 @@
 
 ---
 
-### 2026-05-10T05:00:00Z: Track 1 should run autonomously to completion under the approved dependency wave plan
-
-
-
-**By:** Scribe
-
-
-
-**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
-
-
-
-**Merged sources:** `copilot-directive-20260510T005009-track1-autonomous-run.md`, `frank-track1-autonomous-run.md`.
-
-
-
-- Shane's directive is explicit: Track 1 should continue without per-slice approval pauses until the lane reaches completion or a real blocker appears.
-
-- The approved remaining-wave plan launches 15, 18, 19, 20, 22, 23, 25, 26, and 27 immediately; 17 waits on 14, 21 waits on 20, 24 waits on 23, and terminal slices 28 then 29 stay strictly serial after the behavioral surface closes.
-
-- Shared-infrastructure slices 20, 23, and 26 should be prioritized ahead of lower-risk handlers and editor polish because they lock the helper contracts that unblock downstream slices.
-
----
-
 ### 2026-05-10T04:36:29Z: Slice 13 slot-context routing treats post-span `by`/`at` separators as expression positions
 
 
@@ -2394,50 +2396,6 @@
 
 
 - Validation closed most of the batch cleanly: Slice 1 and the Slice 2/4 work passed LS build/test runs at 20/20, Slice 5 passed isolated-worktree LS build/tests at 7/7 plus 3737 core tests, and Slice 9 confirmed clean IDE diagnostics plus 3737 core tests. The only remaining repo-baseline blocker called out by Kramer is the pre-existing `SemanticTokensHandler.CreateRegistrationOptions` access-modifier mismatch that can stop shared-tree LS build/test execution before the new folding tests run.
-
----
-
-### 2026-05-10T00:23:31Z: Slice 0b removed the legacy language-server stub layer and zeroed the LS test project
-
-
-
-
-
-
-
-**By:** Scribe
-
-
-
-
-
-
-
-**Status:** Merged, inbox cleared (1 file -> 1 canonical entry).
-
-
-
-
-
-
-
-**Merged source:** `.squad/agents/kramer/inbox.md`.
-
-
-
-
-
-
-
-- Kramer commit `51d93dc2` deleted `tools/Precept.LanguageServer/LanguageServerStubs.cs`, `PreceptPreviewProtocol.cs`, and `LegacyHandlerCompat.cs`; the compat file also had to go because it still referenced the removed stub types and otherwise kept the language-server build red.
-
-
-
-- Slice 0b also deleted 13 legacy shim-facing files under `test/Precept.LanguageServer.Tests/`, removing 173 compiler-redundant tests; the project now retains only `LspTestHost.cs` and `GlobalUsings.cs`, discovers 0 tests, and still builds cleanly.
-
-
-
-- Validation closed the cleanup gate: `dotnet build` succeeds for the language-server and LS test projects, and `dotnet test test/Precept.Tests/` stays green at 3737/3737.
 
 ---
 
