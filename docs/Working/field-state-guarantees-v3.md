@@ -958,7 +958,7 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 
 ## 12. Implementation Tracker
 
-**Progress:** 5 / 10 slices complete
+**Progress:** 6 / 10 slices complete
 
 | Slice | Name | Status | Depends On | Commit |
 |---|---|---|---|---|
@@ -967,8 +967,8 @@ These tests must remain green throughout Slice 9 implementation. Any null-guard 
 | Slice 2 | Omit Lookup Construction | ✅ Done | Slice 0 | `bedb9dd6` |
 | Slice 3 | D130: `OmittedFieldReadInState` | ✅ Done | Slices 1, 2 | `18415226` |
 | Slice 4 | D131: `OmittedFieldSetInTargetState` | ✅ Done | Slices 1, 2 | `eaa3b45e` |
-| Slice 5 | D132: `RequiredFieldUnassignedOnEntry` | 🔄 In Progress | Slices 1, 2 | — |
-| Slice 6 | Sample Corrections | ⬜ Pending | Slices 3, 4, 5 | — |
+| Slice 5 | D132: `RequiredFieldUnassignedOnEntry` | ✅ Done | Slices 1, 2 | `dea339d8` |
+| Slice 6 | Sample Corrections | 🔄 In Progress | Slices 3, 4, 5 | — |
 | Slice 7 | Spec and Documentation Updates | ⬜ Pending | Slice 6 | — |
 | Slice 8 | MCP + Language Server Sync Assessment | ⬜ Pending | Independent | — |
 | Slice 9 | OR / ProofEngine Disjunction Support + guards-dropped-entirely | ⬜ Pending | Standalone | — |
