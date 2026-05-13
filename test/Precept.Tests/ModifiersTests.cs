@@ -94,13 +94,29 @@ public class ModifiersTests
     [InlineData(ModifierKind.Nonnegative)]
     [InlineData(ModifierKind.Positive)]
     [InlineData(ModifierKind.Nonzero)]
-    [InlineData(ModifierKind.Min)]
-    [InlineData(ModifierKind.Max)]
-    public void NumericModifiers_ApplyToIntegerDecimalNumberMoneyQuantity(ModifierKind kind)
+    public void ZeroBoundNumericModifiers_ApplyToIntegerDecimalNumberMoneyQuantityPriceExchangeRate(ModifierKind kind)
     {
         var meta = ValueModifierTestAccess.GetMeta(kind);
         meta.ApplicableTo.Select(t => t.Kind).Should()
-            .BeEquivalentTo([TypeKind.Integer, TypeKind.Decimal, TypeKind.Number, TypeKind.Money, TypeKind.Quantity]);
+            .BeEquivalentTo([
+                TypeKind.Integer, TypeKind.Decimal, TypeKind.Number,
+                TypeKind.Money, TypeKind.Quantity,
+                TypeKind.Price, TypeKind.ExchangeRate,
+            ]);
+    }
+
+    [Theory]
+    [InlineData(ModifierKind.Min)]
+    [InlineData(ModifierKind.Max)]
+    public void RangedNumericModifiers_ApplyToIntegerDecimalNumberMoneyQuantityPrice(ModifierKind kind)
+    {
+        var meta = ValueModifierTestAccess.GetMeta(kind);
+        meta.ApplicableTo.Select(t => t.Kind).Should()
+            .BeEquivalentTo([
+                TypeKind.Integer, TypeKind.Decimal, TypeKind.Number,
+                TypeKind.Money, TypeKind.Quantity,
+                TypeKind.Price,
+            ], "min/max are valid on price but not exchangerate — ordering is undefined for currency-pair rates");
     }
 
     [Theory]
@@ -143,11 +159,14 @@ public class ModifiersTests
     }
 
     [Fact]
-    public void Maxplaces_ApplyToDecimalOnly()
+    public void Maxplaces_AppliesToBusinessMagnitudeTypes()
     {
         var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Maxplaces);
-        meta.ApplicableTo.Should().HaveCount(1);
-        meta.ApplicableTo[0].Kind.Should().Be(TypeKind.Decimal);
+        meta.ApplicableTo.Select(t => t.Kind).Should().BeEquivalentTo(
+        [
+            TypeKind.Decimal, TypeKind.Money, TypeKind.Quantity,
+            TypeKind.Price, TypeKind.ExchangeRate,
+        ], "maxplaces applies to all business-domain magnitude types, not just decimal");
     }
 
     [Fact]

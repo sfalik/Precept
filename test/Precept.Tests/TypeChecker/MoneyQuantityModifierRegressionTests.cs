@@ -205,4 +205,32 @@ public class MoneyQuantityModifierRegressionTests
             d => d.Code == nameof(DiagnosticCode.InvalidModifierForType),
             because: "positive must be valid on quantity fields after catalog extension");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  maxplaces on money and quantity — must produce 0 errors (gaps now fixed)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Maxplaces_OnMoneyField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field X as money in 'USD' maxplaces 2
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void Maxplaces_OnQuantityField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field X as quantity in 'kg' maxplaces 3
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
 }
