@@ -40,7 +40,6 @@ event Deny(Note as string notempty)
 event PayClaim
 
 from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD' and (not PoliceReportRequired or ClaimAmount <= '100000.00 USD')
-    -> set ApprovedAmount = '0.00 USD'
     -> transition Submitted
 from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD'
     -> reject "Police-report claims are capped at $100,000"
