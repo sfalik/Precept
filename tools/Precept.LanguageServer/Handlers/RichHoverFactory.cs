@@ -1248,14 +1248,22 @@ internal static class RichHoverFactory
     private static string CreateRuleMarkdown(Compilation compilation, TypedRule rule, RuleIdentity identity)
     {
         var influence = GetConstraintInfluence(compilation, identity);
-        var status = BuildConstraintStatus(compilation, rule.Syntax.Span, identity, HoverStatusKind.RuntimeChecked, "enforced after every mutation before commit");
-        var title = rule.Guard is null
-            ? FormatSnippet(compilation, rule.Condition.Span)
-            : $"when {FormatSnippet(compilation, rule.Guard.Span)}: {FormatSnippet(compilation, rule.Condition.Span)}";
+        if (TryCreateConstraintProofCard(
+            compilation,
+            rule.Syntax.Span,
+            identity,
+            FormatSnippet(compilation, rule.Condition.Span),
+            influence,
+            out var proofCard))
+        {
+            return proofCard;
+        }
 
         var lines = new List<string>
         {
-            $"**rule** `{EscapeInline(title)}`",
+            rule.Guard is null
+                ? "⚡ Enforced · after every mutation"
+                : $"⚡ Enforced · when `{EscapeInline(FormatSnippet(compilation, rule.Guard.Span))}`",
         };
 
         if (TryGetMessageText(rule.Message, out var message))
@@ -1263,31 +1271,31 @@ internal static class RichHoverFactory
             lines.Add($"> {EscapeBlockquote(message)}");
         }
 
-        lines.Add(FormatStatus(status));
-        lines.Add(rule.Guard is null
-            ? "Scope: global — enforced after every mutation"
-            : $"Scope: global when `{EscapeInline(FormatSnippet(compilation, rule.Guard.Span))}`");
-        lines.Add("If false: the operation is rejected before commit");
-        AppendConstraintInfluenceLines(lines, influence);
-        return string.Join("\n\n", lines);
+        if (TryFormatConstraintReferenceLine(influence, false, out var referenceLine))
+        {
+            lines.Add(referenceLine);
+        }
+
+        return string.Join("\n", lines);
     }
 
     private static string CreateEnsureMarkdown(Compilation compilation, TypedEnsure ensure, EnsureIdentity identity)
     {
         var influence = GetConstraintInfluence(compilation, identity);
-        var status = BuildConstraintStatus(compilation, ensure.Syntax.Span, identity, HoverStatusKind.RuntimeChecked, GetEnsureStatusDetail(ensure));
-        var title = ensure.Kind switch
+        if (TryCreateConstraintProofCard(
+            compilation,
+            ensure.Syntax.Span,
+            identity,
+            GetEnsureProofLabel(ensure),
+            influence,
+            out var proofCard))
         {
-            ConstraintKind.StateResident => $"in {ensure.AnchorState} ensure {FormatSnippet(compilation, ensure.Condition.Span)}",
-            ConstraintKind.StateEntry => $"to {ensure.AnchorState} ensure {FormatSnippet(compilation, ensure.Condition.Span)}",
-            ConstraintKind.StateExit => $"from {ensure.AnchorState} ensure {FormatSnippet(compilation, ensure.Condition.Span)}",
-            ConstraintKind.EventPrecondition => $"on {ensure.AnchorEvent} ensure {FormatSnippet(compilation, ensure.Condition.Span)}",
-            _ => $"ensure {FormatSnippet(compilation, ensure.Condition.Span)}",
-        };
+            return proofCard;
+        }
 
         var lines = new List<string>
         {
-            $"**ensure** `{EscapeInline(title)}`",
+            $"⚡ Enforced · {GetEnsureCardDetail(ensure)}",
         };
 
         if (TryGetMessageText(ensure.Message, out var message))
@@ -1295,11 +1303,84 @@ internal static class RichHoverFactory
             lines.Add($"> {EscapeBlockquote(message)}");
         }
 
-        lines.Add(FormatStatus(status));
-        lines.Add($"Scope: {GetEnsureScopeLine(ensure)}");
-        AppendConstraintInfluenceLines(lines, influence);
-        lines.Add($"Violation rejects {GetEnsureViolationTarget(ensure)}");
-        return string.Join("\n\n", lines);
+        if (TryFormatConstraintReferenceLine(influence, false, out var referenceLine))
+        {
+            lines.Add(referenceLine);
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    private static bool TryCreateConstraintProofCard(
+        Compilation compilation,
+        SourceSpan span,
+        ConstraintIdentity identity,
+        string label,
+        ConstraintInfluenceSummary influence,
+        out string markdown)
+    {
+        var obligations = GetConstraintObligations(compilation, identity);
+        var diagnostics = GetDiagnosticsOverlapping(compilation, span, DiagnosticStage.Proof);
+        if (obligations.IsEmpty && diagnostics.IsEmpty)
+        {
+            markdown = string.Empty;
+            return false;
+        }
+
+        var diagnosticCode = obligations
+            .Select(obligation => obligation.EmittedDiagnostic)
+            .FirstOrDefault(code => code is not null)
+            ?? diagnostics
+                .Select(diagnostic => Enum.TryParse<PreceptDiagnosticCode>(diagnostic.Code, out var code) ? code : (PreceptDiagnosticCode?)null)
+                .FirstOrDefault(code => code is not null);
+        var header = diagnosticCode is { } resolvedCode
+            ? $"⚠️ `{FormatDiagnosticCode(resolvedCode)}` · Gap · {EscapeInline(label)}"
+            : $"⚠️ Gap · {EscapeInline(label)}";
+        var primaryObligation = SelectPrimaryProofObligation(obligations);
+        var evidence = primaryObligation is null
+            ? EscapePlain(diagnostics[0].Message)
+            : CreateFieldProofEvidence(compilation, primaryObligation);
+        var lines = new List<string>
+        {
+            header,
+        };
+
+        if (TryFormatConstraintReferenceLine(influence, true, out var referenceLine))
+        {
+            lines.Add(referenceLine);
+        }
+
+        lines.Add($"🔬 {evidence}");
+        markdown = string.Join("\n", lines);
+        return true;
+    }
+
+    private static bool TryFormatConstraintReferenceLine(ConstraintInfluenceSummary influence, bool proofVariant, out string line)
+    {
+        var parts = new List<string>();
+        if (!influence.ReferencedFields.IsDefaultOrEmpty)
+        {
+            parts.Add($"Fields: {FormatCodeList(influence.ReferencedFields)}");
+        }
+
+        if (!influence.ReferencedArgs.IsDefaultOrEmpty)
+        {
+            parts.Add($"Args: {FormatCodeList(influence.ReferencedArgs.Select(arg => arg.ArgName))}");
+        }
+
+        if (parts.Count == 0)
+        {
+            line = string.Empty;
+            return false;
+        }
+
+        line = string.Join(" · ", parts);
+        if (proofVariant)
+        {
+            line = $"⚖️ {line}";
+        }
+
+        return true;
     }
 
     private static string CreateTransitionMarkdown(Compilation compilation, TypedTransitionRow row)
@@ -2114,29 +2195,22 @@ internal static class RichHoverFactory
 
     private static string GetPrepositionText(TokenKind tokenKind) => Tokens.GetMeta(tokenKind).Text ?? tokenKind.ToString().ToLowerInvariant();
 
-    private static string GetEnsureStatusDetail(TypedEnsure ensure) => ensure.Kind switch
+    private static string GetEnsureCardDetail(TypedEnsure ensure) => ensure.Kind switch
     {
-        ConstraintKind.StateResident => "enforced on every mutation before commit",
-        ConstraintKind.StateEntry => $"enforced on transitions entering `{EscapeInline(ensure.AnchorState ?? "<state>")}`",
-        ConstraintKind.StateExit => $"enforced on transitions leaving `{EscapeInline(ensure.AnchorState ?? "<state>")}`",
-        ConstraintKind.EventPrecondition => $"enforced when `{EscapeInline(ensure.AnchorEvent ?? "<event>")}` fires",
-        _ => "enforced before commit",
-    };
-
-    private static string GetEnsureScopeLine(TypedEnsure ensure) => ensure.Kind switch
-    {
-        ConstraintKind.StateResident => $"residency (`in {EscapeInline(ensure.AnchorState ?? "<state>")}`)",
-        ConstraintKind.StateEntry => $"entry gate (`to {EscapeInline(ensure.AnchorState ?? "<state>")}`)",
-        ConstraintKind.StateExit => $"exit gate (`from {EscapeInline(ensure.AnchorState ?? "<state>")}`)",
-        ConstraintKind.EventPrecondition => $"event args (`on {EscapeInline(ensure.AnchorEvent ?? "<event>")}`)",
+        ConstraintKind.StateResident => "residency (always applies)",
+        ConstraintKind.StateEntry => $"entry gate · `{EscapeInline(ensure.AnchorState ?? "<state>")}`",
+        ConstraintKind.StateExit => $"exit gate · `{EscapeInline(ensure.AnchorState ?? "<state>")}`",
+        ConstraintKind.EventPrecondition => $"arg gate · `{EscapeInline(ensure.AnchorEvent ?? "<event>")}`",
         _ => "ensure",
     };
 
-    private static string GetEnsureViolationTarget(TypedEnsure ensure) => ensure.Kind switch
+    private static string GetEnsureProofLabel(TypedEnsure ensure) => ensure.Kind switch
     {
-        ConstraintKind.EventPrecondition => "the event",
-        ConstraintKind.StateEntry or ConstraintKind.StateExit => "the transition",
-        _ => "the operation",
+        ConstraintKind.StateResident => $"in {EscapeInline(ensure.AnchorState ?? "<state>")}",
+        ConstraintKind.StateEntry => $"to {EscapeInline(ensure.AnchorState ?? "<state>")}",
+        ConstraintKind.StateExit => $"from {EscapeInline(ensure.AnchorState ?? "<state>")}",
+        ConstraintKind.EventPrecondition => $"on {EscapeInline(ensure.AnchorEvent ?? "<event>")}",
+        _ => "ensure",
     };
 
     private static string DescribeStateReachability(Compilation compilation, TypedState state, GraphState? graphState)

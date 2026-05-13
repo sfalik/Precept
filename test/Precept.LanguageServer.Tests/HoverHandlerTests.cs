@@ -243,9 +243,9 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(RichHoverSource, "max(0, 0)");
 
-        markup.Should().Contain("**rule**");
+        markup.Should().Contain("⚡ Enforced · after every mutation");
         markup.Should().Contain("> valid");
-        markup.Should().Contain("Scope: global — enforced after every mutation");
+        markup.Should().Contain("Fields: `Notes`");
         markup.Should().NotContain("function `max`");
     }
 
@@ -381,10 +381,9 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "rule Price >=");
 
-        markup.Should().Contain("**rule**");
+        markup.Should().Contain("⚡ Enforced · after every mutation");
         markup.Should().Contain("> price stays non-negative");
-        markup.Should().Contain("Scope: global — enforced after every mutation");
-        markup.Should().Contain("Referenced fields: `Price`");
+        markup.Should().Contain("Fields: `Price`");
     }
 
     [Fact]
@@ -404,8 +403,8 @@ state Draft initial
 
         var markup = GetHoverMarkdown(source, "rule ApprovedAmount <=");
 
-        markup.Should().Contain("**rule** `when InForce: ApprovedAmount <= CoverageLimit`");
-        markup.Should().Contain("Scope: global when `InForce`");
+        markup.Should().Contain("⚡ Enforced · when `InForce`");
+        markup.Should().Contain("Fields: `ApprovedAmount`, `CoverageLimit`");
     }
 
     [Fact]
@@ -603,17 +602,16 @@ state Draft initial
     }
 
     [Theory]
-    [InlineData("in Listed ensure", "Scope: residency (`in Listed`)", "Referenced fields: `Price`")]
-    [InlineData("to Archived ensure", "Scope: entry gate (`to Archived`)", "Referenced fields: `CatalogCode`")]
-    [InlineData("from Listed ensure", "Scope: exit gate (`from Listed`)", "Referenced fields: `Quantity`")]
-    [InlineData("on Publish ensure", "Scope: event args (`on Publish`)", "Referenced args: `NewPrice`")]
+    [InlineData("in Listed ensure", "⚡ Enforced · residency (always applies)", "Fields: `Price`")]
+    [InlineData("to Archived ensure", "⚡ Enforced · entry gate · `Archived`", "Fields: `CatalogCode`")]
+    [InlineData("from Listed ensure", "⚡ Enforced · exit gate · `Listed`", "Fields: `Quantity`")]
+    [InlineData("on Publish ensure", "⚡ Enforced · arg gate · `Publish`", "Args: `NewPrice`")]
     public void Hover_OnEnsure_ShowsAnchorSpecificScope(string needle, string expectedScope, string expectedReference)
     {
         var markup = GetHoverMarkdown(HoverV3Source, needle);
 
-        markup.Should().Contain("**ensure**");
-        markup.Should().Contain("> ");
         markup.Should().Contain(expectedScope);
+        markup.Should().Contain("> ");
         markup.Should().Contain(expectedReference);
     }
 

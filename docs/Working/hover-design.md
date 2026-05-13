@@ -8,7 +8,7 @@
 |---|------|--------|--------|
 | 1 | `field` (stored) | ✅ Done | `c178198e` |
 | 2 | `field` (computed) | ✅ Done | `c178198e` |
-| 3 | `event` | 🟡 In progress | — |
+| 3 | `event` | ✅ Done | `92ac40f8` |
 | 4 | `rule` | 🔴 Not started | — |
 | 5 | `ensure` | 🔴 Not started | — |
 | 6 | Transition row | 🔴 Not started | — |
