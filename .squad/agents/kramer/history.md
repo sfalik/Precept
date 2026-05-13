@@ -21,6 +21,8 @@
 
 - **State card V7 fix shipped (2026-05-13):** `CreateStateMarkdown` now matches the V7 compact card: status line first, a single `🔁 In ... · Out ...` edge summary, and a single `✏️ ... · 🧭 terminal ✓/✗ · ⚡ ... (⚠️)` summary line before the preserved B4 graph block. The change was rendering-only in `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs`; targeted state-hover regressions in `HoverHandlerTests.cs` were updated and the focused state-hover test slice passed, while the full LS suite still had the same 10 unrelated pre-existing failures already present on `spike/Precept-V2-Radical`.
 
+- **Hover V7 closeout tracker + compact-card patterns (2026-05-13):** The final hover pass landed as a sequence of card-family rewrites in `RichHoverFactory.cs`, and the durable rule is now clear: V7 cards should prefer one badge-first line plus 1-2 evidence lines, not title blocks or prose sections. In practice that meant (1) field/event/rule/ensure/transition/reject/access/omit cards all needed bespoke compact line builders instead of the old generic `FormatStatus + details` stack, (2) proof fallbacks need their own 3-line summaries even when they are not qualifier-compatibility cases, and (3) omit declarations must route before access declarations because both spans can overlap on `in State omit Field`. The live tracker in `docs/Working/hover-design.md` is now the canonical progress ledger for future hover card alignment work.
+
 ## Historical Summary
 
 - Early May through 2026-05-11 established the current tooling baseline: typed-constant completion and semantic-token fixes, delta-baseline guards, UCUM tier-1 completion curation, modifier-span precision, and catalog-driven hover/completion behavior.
