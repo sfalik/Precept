@@ -6,6 +6,10 @@
 
 ## Learnings
 
+- **`set FieldName ` completion: `InSetAssignment` context and `= ` completion (2026-05-13):** The previous fix used `SlotContext.AfterKeyword` (empty completion list) for the cursor position after `-> set FieldName `. That suppressed bogus top-level keywords correctly, but also suppressed the valid `=` operator completion. Refinement: renamed the returned context from `AfterKeyword` to the new narrower `SlotContext.InSetAssignment` (in `TryGetActionChainContext`, `SlotContext.cs`) — both the action-verb-identifier and `into`-identifier branches were updated. Added `InSetAssignment => CreateCompletionList(GetSetAssignmentItem())` to the context switch in `CompletionHandler.cs`. `GetSetAssignmentItem()` yields a single `CompletionItemKind.Operator` item with label and insertText `"= "` (trailing space lands the cursor ready to type the expression). Regression test `Completions_SetActionAfterFieldName_NoTopLevelKeywords` updated to also assert `labels.Should().Contain("= ")`. Build passed; targeted test passed; 10 pre-existing LS failures unchanged.
+
+- **State card V7 spec gap (2026-05-12):** `CreateStateMarkdown` (line 1020 in `RichHoverFactory.cs`) produces 7 lines instead of the V7 spec's 3-line compact format. All data is assembled correctly — the problem is formatting only. Key divergences: (1) extra bold title line (line 1062), (2) extra `Modifiers:` line (line 1064), (3) `Incoming:` / `Outgoing:` on separate verbose lines instead of one `🔁 In: ... · Out: ...` line (lines 1065–1066), (4) `Writable here:` field list instead of `✏️ N fields (unconditional)` count on the summary line (line 1067), (5) terminal/ensures line missing `🧭`/`⚡` icons and `✏️` writable-count prefix (line 1068). B4 (`CreateStateGraphEdgeProofCard`) is correct. Fix is medium-scope: rewrite the `lines` builder in `CreateStateMarkdown` plus update 6+ assertions in `HoverHandlerTests.cs`. Same title-line pattern also exists in `CreateFieldMarkdown` (line 978) and `CreateEventMarkdown` (line 1093).
+
 - `TypedConstantContext` remains the durable carrier for expected typed-constant slot context; declaration-site qualifier recovery must consult parsed qualifier metadata before enclosing-expression fallback.
 - Semantic-token delta stability depends on exact identifier spans and cache invalidation of both `_documents` and `_latestResults` when token layouts change.
 - Hover, definition, highlight, references, and rename all depend on the same precise semantic span contracts; container spans are only acceptable when the consumer explicitly wants them.
@@ -66,3 +70,8 @@
 - Commit `4a3abe77` shipped Kramer's initial B2/B3 pass, establishing rich-construct-first routing and honest `✏️` / `🔒` mutability summaries for hover cards.
 - Commit `9617f39b` closed B4's remaining blockers by adding `HasObligations` for no-proof edges and the missing duplicate-proof regression coverage.
 - Frank's final re-reviews approved the repaired B2/B3 and B4 work, leaving the hover program green at `279/279` language-server tests and `4973` core tests.
+
+### 2026-05-13T04:22:01Z — State card V7 formatting pass is active
+
+- Kramer-1 is still running on `RichHoverFactory.cs` `CreateStateMarkdown` to match the V7 compact state card: drop the title and modifiers lines, then merge transition and summary data onto the compact lines.
+- Current scope is formatting-only plus matching `HoverHandlerTests.cs` assertion updates; no commit or validation result is recorded yet.

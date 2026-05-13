@@ -19,6 +19,13 @@
 
 ## Recent Updates
 
+### 2026-05-13T04:18:23Z — Slice 10 D93 construction guarantee shipped
+
+- Added `ValidateConstructionGuarantees` so D93 now fires when a precept has no initial event and still exposes required non-collection, non-computed fields at construction time.
+- The implementation reuses the D132 required-field filter but excludes fields omitted in every initial state, preserving omit-driven draft workflows until the field becomes present.
+- Validation closed green at `5127/5127` `Precept.Tests`, and `samples\Test.precept` now raises D93 instead of compiling clean.
+
+
 ### 2026-05-13T00:26:25Z — Circular Tokens/Types static-init crash is closed
 
 - `Tokens.KeywordsValidAsMemberName` now defers its `Types.All` read through `Lazy<FrozenSet<TokenKind>>`, eliminating the `Tokens..cctor()` ↔ `Types..cctor()` re-entry crash.
@@ -75,3 +82,14 @@
 - Commits `c2d5b8fb` and `32da6a3e` closed the proof-engine disjunction slice: branch-aware OR splitting now drives Strategy 3 / Strategy 4, ensure guards survive normalization, and guarded ensures no longer leak as unconditional facts.
 - Validation closed green at `5118/5118` tests passing.
 - Frank's initial pre-commit concerns were all satisfied by the committed final state, so Slice 9 is the current baseline for disjunctive guard reasoning.
+
+### 2026-05-13T04:28:00Z — Slice 11 D94 construction enforcement closed
+
+- `src/Precept/Pipeline/TypeChecker.Validation.cs`: `ValidateConstructionGuarantees` now keeps the D93 no-initial-event path, then emits D94 per initial-event transition row (plus the no-row event-level case) when required no-default fields are left unset.
+- Decision: keep D94 scoped to Form 1/stateful precepts (`ctx.States.Count > 0`) so stateless initial-event handler coverage stays on the existing construction semantics and the `D132_StatelessPrecept_Inapplicable_NoDiagnostic` anchor does not regress.
+- `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs` now carries the 10 Slice 11 regressions; `dotnet build src/Precept/Precept.csproj` + `dotnet test test/Precept.Tests/Precept.Tests.csproj` closed green at `5137/5137`.
+
+### 2026-05-13T04:22:01Z — Slice 10 D93 construction enforcement landed
+
+- Commit `597a0479` on `spike/Precept-V2-Radical` added `ValidateConstructionGuarantees` in `TypeChecker.Validation.cs` so precepts without an initial event now emit D93 when required present fields would otherwise remain constructible.
+- The slice reused the D132 required-field filter, excluded fields omitted in every initial state, and closed green at `5127/5127` tests; `samples\Test.precept` now fails with D93.

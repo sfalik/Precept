@@ -28092,3 +28092,59 @@ All 19 test the Slice 5 contract (transition row resolution, guard scope, action
 - All remaining sections were verified as consistent; the only follow-up tensions left for Shane are the DX-layer well-known-constants surface and the authoritative `currency` accessor doc lag.
 
 ---
+
+---
+
+## Archive Batch — 2026-05-13T04:22:01Z
+
+---
+
+### 2026-05-06: Wave 1 cross-cutting facilitation started with CC#7 first
+
+
+
+
+
+
+
+**By:** Frank
+
+
+
+
+
+
+
+**Status:** Recommendation recorded from inbox; Shane decision still needed on CC#7.
+
+
+
+
+
+
+
+**Merged source:** `frank-wave1-start.md`.
+
+
+
+
+
+
+
+- Wave 0 is treated as complete (CC#1, CC#2, CC#25), and Wave 1 sequencing starts with CC#7, then CC#9, CC#8, CC#12, CC#3/CC#4/CC#6/CC#23/CC#24, then CC#11.
+
+
+
+
+
+
+
+- Frank recommends keeping the hierarchical `ConstraintMeta.StateAnchored` intermediate: builder routing still matches all five concrete leaves, while other consumers retain a structural "is state-scoped" grouping node.
+
+
+
+
+
+
+
+- Once Shane rules on CC#7, the CC#9 follow-through and the catalog-system example cleanup are mechanically unblocked.

@@ -6,6 +6,34 @@
 
 ---
 
+### 2026-05-13T04:28:00Z: D94 now requires every Form 1 initial-event construction row to assign newly present required fields
+
+**By:** Scribe
+
+**Status:** Merged from George's Slice 11 closeout note.
+
+**Merged source:** `george-slice11-done.md`.
+
+- `ValidateConstructionGuarantees` now keeps the D93 no-initial-event path and adds D94 per initial-event transition row, plus the no-row event-level diagnostic, when required no-default fields remain unset.
+- The new enforcement stays scoped to Form 1/stateful precepts so stateless initial-event handler baselines continue using the existing construction semantics.
+- `TypeCheckerConstructionTests` gained 10 Slice 11 regressions, and `dotnet build src/Precept/Precept.csproj --nologo` plus `dotnet test test/Precept.Tests/Precept.Tests.csproj --nologo` closed green at `5137/5137` with commit `0b42fd1a`.
+
+---
+
+### 2026-05-13T04:22:01Z: D93 RequiredFieldsNeedInitialEvent now blocks construction when required present fields lack any initial event
+
+**By:** Scribe
+
+**Status:** Merged from George's Slice 10 closeout note.
+
+**Merged source:** `george-slice10-done.md`.
+
+- `ValidateConstructionGuarantees` now emits D93 when a precept has no initial event and still exposes required non-collection, non-computed fields at construction time.
+- The construction check reuses the D132 required-field filter, but excludes fields omitted in every initial state so omit-driven draft workflows stay valid until a field becomes present.
+- `TypeChecker.Check` now runs the construction validation immediately after field-state validation; `TypeCheckerConstructionTests` plus coupled fixtures and `samples\Test.precept` closed green at `5127/5127` tests, and the sample now fails with D93.
+
+---
+
 ### 2026-05-13T00:46:00Z: Sentinel defaults are now a recorded omit anti-pattern in SyntaxReference guidance
 
 **By:** Scribe
@@ -3751,174 +3779,6 @@
 
 **Test baseline:** 3242/3242 passing
 
-
-
-
-
-
-
----
-
-
-
-
-
-
-
-## Verdict: APPROVED
-
-
-
-
-
-
-
-Slices 8–9 may proceed.
-
-
-
-
-
-
-
----
-
-
-
-
-
-
-
-## Summary
-
-
-
-
-
-
-
-The Slices 5–7 implementation is **sound, catalog-compliant, and correctly scoped.** All three slices follow the design authority faithfully. The pipeline call order is correct and matches the intended dependency chain. Key locked decisions are enforced:
-
-
-
-
-
-
-
-- **D5 (ActionSecondaryRole invariant):** `ResolveAction` correctly pairs `SecondaryRole` with `SecondaryExpression` — `null/null` for no-secondary cases, `HasValue/non-null` for `CollectionValueByAction`, `InsertAtAction`, and `PutKeyValueAction`, with `Debug.Assert` enforcing the non-null side. The tests validate the null/null case; the positive case is enforced by assert and will get end-to-end coverage when collection action tests expand.
-
-
-
-
-
-
-
-- **D9 (QualifierBinding DU):** `QualifierBinding` is used on `TypedBinaryOp.ResultQualifier` and `TypedTransitionRow.ResultQualifier` — no raw qualifier strings anywhere.
-
-
-
-
-
-
-
-- **D10 (FromState == null for wildcard):** `TypedTransitionRow.FromState` is `string?` with comprehensive XML doc explaining null = any-state wildcard. The null case is handled correctly in the implementation (line 938–952). No test asserts `FromState == null` because the parser's wildcard syntax isn't exercised yet — this is a parser-surface gap, not a type-checker gap.
-
-
-
-
-
-
-
-- **D26 (ErrorExpression → ≥1 Error diagnostic):** `Debug.Assert` in both `PopulateTransitionRows` and `PopulateEventHandlers` via `ContainsErrorExpression` / `ContainsErrorExpressionInAction` helpers. Tests at lines 225–241 and 445–462 exercise both the guard and action-value error paths.
-
-
-
-
-
-
-
-- **D3/Modifier catalog compliance:** `ValidateFieldModifiers` reads `FieldModifierMeta.ApplicableTo`, `MutuallyExclusiveWith`, `Subsumes` entirely from the Modifiers catalog. Zero per-modifier switches. `IsTypeApplicable` handles both `TypeTarget` and `ModifiedTypeTarget` correctly.
-
-
-
-
-
-
-
-- **§13/§14 boundary:** `ValidateStructural` contains only computed-field cycle detection (DFS), forward-reference belt-and-suspenders, and is set/choice validation. No reachability, dead-end, or unreachable-state logic — those are correctly left to GraphAnalyzer.
-
-
-
-
-
-
-
-- **Restoration integrity:** Slice 5 methods are complete. Pipeline call order confirmed: PopulateFields → PopulateStates → PopulateEvents → PopulateTransitionRows → PopulateEventHandlers → ValidateModifiers → ValidateStructural.
-
-
-
-
-
-
-
-- **EventName.ArgName fix:** `ResolveMemberAccess` (line 1487–1498) correctly produces `TypedArgRef` when LHS is a known event name and RHS is a declared arg. Does NOT fall through to `TypedMemberAccess`. End-to-end validated by `TypeCheckerModifierTests.EventArg_WithValidModifier_NoDiagnostic` (`Submit.Label` resolves cleanly).
-
-
-
-
-
-
-
-## Test Quality Notes
-
-
-
-
-
-
-
-- **Transition tests (26):** Good breadth — FromState/ToState resolution, undeclared state/event, guard resolution with field refs, D26 guard/action error paths, multi-action chains, clear action shape, event handler resolution and reference recording.
-
-
-
-- **Structural tests (17):** IsSet/IsNotSet on optional and non-optional fields well covered. Cycle detection infrastructure is correct; positive cycle tests are structurally blocked until computed expression resolution populates `ComputedDeps` (documented in test comments — acceptable).
-
-
-
-- **Modifier tests (29):** Strong catalog-driven coverage. Applicability uses real `ApplicableTo` from catalog. Subsumption uses real catalog relationships (positive→nonnegative, positive→nonzero). Implied modifier redundancy uses real type metadata (timezone→notempty, currency→notempty). Writable-on-event-arg and writable-on-computed both validated.
-
-
-
-
-
-
-
-## Observations (non-blocking)
-
-
-
-
-
-
-
-1. **Stale regression note in TransitionTests header:** The `<remarks>` block references the `EventName.ArgName` regression as "TYPE B (known red)" — but the fix is already shipped and `Submit.Label` resolves cleanly. The note should be removed in a future cleanup pass.
-
-
-
-
-
-
-
-2. **D10 wildcard test gap:** No test asserts `FromState == null` for an any-state wildcard. Low risk — the implementation is trivially correct (if `StateName == null`, `fromState` stays `null`). Coverage should be added when parser wildcard syntax is available.
-
-
-
-
-
-
-
-3. **D5 positive-case test gap:** No end-to-end test exercises `SecondaryRole.HasValue == true` with `SecondaryExpression != null` (insert-at, append-by, put). The Debug.Assert covers correctness; expand test coverage when collection actions get dedicated integration tests.
-
 ---
 
 ### 2026-05-08: george-ci-fix-done
@@ -7177,58 +7037,6 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 ---
 
-### 2026-05-06: Wave 1 cross-cutting facilitation started with CC#7 first
-
-
-
-
-
-
-
-**By:** Frank
-
-
-
-
-
-
-
-**Status:** Recommendation recorded from inbox; Shane decision still needed on CC#7.
-
-
-
-
-
-
-
-**Merged source:** `frank-wave1-start.md`.
-
-
-
-
-
-
-
-- Wave 0 is treated as complete (CC#1, CC#2, CC#25), and Wave 1 sequencing starts with CC#7, then CC#9, CC#8, CC#12, CC#3/CC#4/CC#6/CC#23/CC#24, then CC#11.
-
-
-
-
-
-
-
-- Frank recommends keeping the hierarchical `ConstraintMeta.StateAnchored` intermediate: builder routing still matches all five concrete leaves, while other consumers retain a structural "is state-scoped" grouping node.
-
-
-
-
-
-
-
-- Once Shane rules on CC#7, the CC#9 follow-through and the catalog-system example cleanup are mechanically unblocked.
-
----
-
 ### 2026-05-11T22:41:49Z: Proof Engine Qualifier Coverage — Part B (Slices 7+8+9)
 
 
@@ -7603,5 +7411,3 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 - Kramer extended `StateGraph.EdgeProofStatus` with `HasObligations`, populated it during compiler enrichment, and switched rich state hover to render the locked no-obligations wording when connected edges exist but none carry proof obligations.
 - The fix pass also added the missing regression anchors: language-server coverage for the connected-edge/no-proof-obligation path and core projection coverage that duplicate `Requirement.Description` values collapse to one unresolved summary.
 - `docs/Working/hover-design.md` was updated to match the shipped projection/rendering rule, and targeted language-server tests, compiler-edge-proof tests, and the language-server build all passed.
-
----
