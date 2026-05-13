@@ -125,11 +125,11 @@ B4 ships as an appended sub-card inside the rich `state` hover. It does **not** 
 **`EdgeProofStatus` architecture:**
 
 - Lives in `src/Precept/Pipeline/StateGraph.cs` as a graph-level projection record on `StateGraph.EdgeProofStatuses`.
-- Each `EdgeProofStatus` carries `FromState`, `EventName`, `ToState`, `IsProven`, and `ImmutableArray<string> UnresolvedObligationSummaries`.
+- Each `EdgeProofStatus` carries `FromState`, `EventName`, `ToState`, `HasObligations`, `IsProven`, and `ImmutableArray<string> UnresolvedObligationSummaries`.
 - `src/Precept/Compiler.cs` populates it in `EnrichGraphWithProofStatus(...)` **after** `GraphAnalyzer.Analyze(...)` and `ProofEngine.Prove(...)`.
-- Population rule: match unresolved `ProofLedger` obligations whose context is `TransitionRowContext` onto concrete `GraphEdge` instances, respect explicit-row-over-wildcard precedence, de-duplicate `Requirement.Description`, then mark the edge proven when no unresolved summaries remain.
+- Population rule: match `ProofLedger` obligations whose context is `TransitionRowContext` onto concrete `GraphEdge` instances, respect explicit-row-over-wildcard precedence, set `HasObligations` when any obligation matched the edge, de-duplicate unresolved `Requirement.Description`, then mark the edge proven when no unresolved summaries remain.
 - `tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs` consumes the projection via `GetEdgeProofStatusesForState(...)`, which filters to incident edges (`from` or `to` the hovered state) and de-duplicates by `(FromState, EventName, ToState)`.
-- Current render behavior uses the edge identity plus `IsProven` for the visible card. `UnresolvedObligationSummaries` are carried in the architecture but are not yet printed in the hover body.
+- Current render behavior uses the edge identity plus `HasObligations`/`IsProven` for the visible card. `UnresolvedObligationSummaries` are carried in the architecture but are not yet printed in the hover body.
 
 **Routing rule:**
 

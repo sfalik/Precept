@@ -24,6 +24,7 @@ public class CompilerEdgeProofStatusTests
             FromState: "Draft",
             EventName: "Submit",
             ToState: "Done",
+            HasObligations: false,
             IsProven: true,
             UnresolvedObligationSummaries: []));
     }
@@ -44,6 +45,7 @@ public class CompilerEdgeProofStatusTests
                 -> transition Approved
             """);
 
+        status.HasObligations.Should().BeTrue();
         status.IsProven.Should().BeTrue();
         status.UnresolvedObligationSummaries.Should().BeEmpty();
     }
@@ -64,9 +66,38 @@ public class CompilerEdgeProofStatusTests
                 -> transition Approved
             """);
 
+        status.HasObligations.Should().BeTrue();
         status.IsProven.Should().BeFalse();
         status.UnresolvedObligationSummaries.Should().NotBeEmpty();
         status.UnresolvedObligationSummaries.Should().OnlyContain(summary => !string.IsNullOrWhiteSpace(summary));
+    }
+
+    [Fact]
+    public void Compile_DeduplicatesDuplicateRequirementDescriptions_PerEdge()
+    {
+        var compilation = Compiler.Compile("""
+            precept EdgeProofStatusDedup
+            field PrimaryQueue as queue of string
+            field SecondaryQueue as queue of string
+            state Draft initial
+            state Approved terminal
+            event Submit
+            from Draft on Submit
+                -> dequeue PrimaryQueue
+                -> dequeue SecondaryQueue
+                -> transition Approved
+            """);
+
+        compilation.Proof.Obligations.Count(obligation =>
+            obligation.Disposition == ProofDisposition.Unresolved
+            && obligation.Context is TransitionRowContext
+            && obligation.Requirement.Description == "Queue must be non-empty")
+            .Should().Be(2);
+
+        var status = compilation.Graph.EdgeProofStatuses.Should().ContainSingle().Subject;
+        status.HasObligations.Should().BeTrue();
+        status.IsProven.Should().BeFalse();
+        status.UnresolvedObligationSummaries.Should().Equal("Queue must be non-empty");
     }
 
     [Fact]

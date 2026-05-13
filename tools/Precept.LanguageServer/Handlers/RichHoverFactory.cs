@@ -1683,7 +1683,7 @@ internal static class RichHoverFactory
             return string.Join("\n\n", lines);
         }
 
-        lines.Add(edgeProofStatuses.IsEmpty
+        lines.Add(edgeProofStatuses.All(status => !status.HasObligations)
             ? "✅ Proven · no connected edges carry proof obligations"
             : "✅ Proven · all connected edges satisfy their proof obligations");
         return string.Join("\n\n", lines);

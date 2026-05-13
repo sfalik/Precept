@@ -61,6 +61,7 @@ public sealed record EdgeProofStatus(
     string FromState,
     string EventName,
     string ToState,
+    bool HasObligations,
     bool IsProven,
     ImmutableArray<string> UnresolvedObligationSummaries
 );

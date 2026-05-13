@@ -566,6 +566,24 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnState_WithConnectedEdgesButNoProofObligations_ShowsNoObligationsGraphProofCard()
+    {
+        const string source = """
+            precept StateEdgeProofConnectedNoObligations
+            state Draft initial
+            state Approved terminal
+            event Submit
+            from Draft on Submit -> transition Approved
+            """;
+
+        var markup = GetHoverMarkdown(source, "state Draft", offset: 6);
+
+        markup.Should().Contain("📍 Draft graph position");
+        markup.Should().Contain("✅ Proven · no connected edges carry proof obligations");
+        markup.Should().NotContain("✅ Proven · all connected edges satisfy their proof obligations");
+    }
+
+    [Fact]
     public void Hover_OnEvent_ShowsSignatureAndEligibleStates()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Publish(NewPrice as money");

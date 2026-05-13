@@ -73,10 +73,13 @@ public static class Compiler
             .Select(row => row.RowSpan)
             .ToImmutableHashSet();
 
-        ImmutableArray<string> unresolvedObligationSummaries = proof.Obligations
-            .Where(obligation => obligation.Disposition == ProofDisposition.Unresolved
-                && obligation.Context is TransitionRowContext context
+        ImmutableArray<ProofObligation> matchedObligations = proof.Obligations
+            .Where(obligation => obligation.Context is TransitionRowContext context
                 && matchingRowSpans.Contains(context.Row.RowSpan))
+            .ToImmutableArray();
+
+        ImmutableArray<string> unresolvedObligationSummaries = matchedObligations
+            .Where(obligation => obligation.Disposition == ProofDisposition.Unresolved)
             .Select(obligation => obligation.Requirement.Description)
             .Where(summary => !string.IsNullOrWhiteSpace(summary))
             .Distinct(StringComparer.Ordinal)
@@ -86,6 +89,7 @@ public static class Compiler
             FromState: edge.FromState,
             EventName: edge.EventName,
             ToState: edge.ToState,
+            HasObligations: !matchedObligations.IsEmpty,
             IsProven: unresolvedObligationSummaries.IsEmpty,
             UnresolvedObligationSummaries: unresolvedObligationSummaries);
     }
