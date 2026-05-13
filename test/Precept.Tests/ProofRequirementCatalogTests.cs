@@ -101,13 +101,13 @@ public class ProofRequirementCatalogTests
     }
 
     [Fact]
-    public void FourKinds_AreSingleSubject()
+    public void FiveKinds_AreSingleSubject()
     {
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
             .ToList();
-        singleSubject.Should().HaveCount(4);
+        singleSubject.Should().HaveCount(5);
     }
 
     // ── Instance Kind property matches catalog ──────────────────────────────────

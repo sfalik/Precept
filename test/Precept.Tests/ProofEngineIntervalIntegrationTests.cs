@@ -560,23 +560,24 @@ precept NoBounded {
     [Fact]
     public void Regression_ExistingQualifierCompatibilityObligation_Unaffected()
     {
-        // §9.4 #3: QualifierCompatibility proof still fires on currency mismatch
-        // Strategy 7 does not interfere with Strategies 1–6
-        var source = @"
-precept QualCheck {
-    field balanceUSD: decimal as USD
-    field balanceEUR: decimal as EUR
-    event Cross()
-    Active -> Active on Cross:
-        set balanceUSD to balanceUSD + balanceEUR
-}";
+        // §9.4 #3: QualifierCompatibility proof still fires on qualifier mismatch
+        // Strategy 7 does not interfere with Strategies 1–6.
+        // Uses old-style syntax (without braces) with a known-good qualifier mismatch:
+        // price of 'mass' × quantity of 'length' → dimension mismatch → S5 fires.
+        var source = """
+            precept QualCheck
+            field Total as money in 'USD' default '0.00 USD' writable
+            state Draft initial
+            event Receive(UnitCost as price in 'USD' of 'mass', Qty as quantity of 'length')
+            from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
+            """;
         var result = Compiler.Compile(source);
 
-        // QualifierMismatch should still fire independently of NumericOverflow
-        result.Proof.Obligations
+        // S5 qualifier compatibility diagnostic must still fire
+        result.Diagnostics
             .Should().Contain(
-                o => o.Requirement.Kind == ProofRequirementKind.QualifierCompatibility,
-                "S5 qualifier compatibility obligations still collected alongside S7");
+                d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility),
+                "S5 qualifier compatibility diagnostics still emitted alongside any S7 work");
     }
 
     // ════════════════════════════════════════════════════════════════════════

@@ -263,13 +263,13 @@ public class ProofEngineIntervalTests
     [Fact]
     public void NumericInterval_Multiply_BothNegative_ReturnsPositiveBounds()
     {
-        // [-3, -1] × [-4, -2] → corners: 6,4,12,8 → [4, 12]
+        // [-3, -1] × [-4, -2] → corners: {(-3)×(-4)=12, (-3)×(-2)=6, (-1)×(-4)=4, (-1)×(-2)=2}
         var a = new NumericInterval(-3m, -1m);
         var b = new NumericInterval(-4m, -2m);
 
         var result = a.Multiply(b);
 
-        result.Min.Should().Be(4m);
+        result.Min.Should().Be(2m);
         result.Max.Should().Be(12m);
     }
 
