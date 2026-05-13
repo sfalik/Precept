@@ -20,6 +20,7 @@ internal enum SlotContext
     InActionVerb,
     InExpression,
     InArgDefault,
+    InSetAssignment,
 }
 
 internal static class SlotContextResolver
@@ -369,7 +370,8 @@ internal static class SlotContextResolver
             return true;
         }
 
-        if (IsStateDeclarationNameToken(tokens, tokenIndex, token, construct))
+        if (IsStateDeclarationNameToken(tokens, tokenIndex, token, construct)
+            || IsEventDeclarationNameToken(tokens, tokenIndex, token, construct))
         {
             context = SlotContext.InModifierPosition;
             return true;
@@ -448,6 +450,25 @@ internal static class SlotContextResolver
         return previousTokenIndex >= 0
             && (tokens[previousTokenIndex].Kind == Precept.Language.TokenKind.Comma
                 || tokens[previousTokenIndex].Kind == construct.Meta.PrimaryLeadingToken);
+    }
+
+    private static bool IsEventDeclarationNameToken(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Precept.Pipeline.ParsedConstruct? construct)
+    {
+        if (token.Kind != Precept.Language.TokenKind.Identifier
+            || construct?.Meta.ModifierDomain != Precept.Language.ModifierDomain.Event)
+        {
+            return false;
+        }
+
+        // Must be the event name itself — not an argument name inside parens.
+        // Event names are preceded by the 'event' keyword (the primary leading token).
+        var previousTokenIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        return previousTokenIndex >= 0
+            && tokens[previousTokenIndex].Kind == construct.Meta.PrimaryLeadingToken;
     }
 
     private static bool IsFieldDeclarationNameToken(
@@ -530,6 +551,32 @@ internal static class SlotContextResolver
         {
             context = SlotContext.InExpression;
             return true;
+        }
+
+        // Identifier following an action verb that expects a field target (e.g. 'set FieldName ')
+        // or following 'into' in an action that expects a target after 'into' (e.g. 'dequeue Queue into FieldName ').
+        // The cursor is after the field name but before the value operator — no completions apply here.
+        // Without this branch the outer GetCursorContext falls through to TopLevel, showing bogus top-level keywords.
+        if (token.Kind == Precept.Language.TokenKind.Identifier)
+        {
+            var prevIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+            if (prevIndex >= 0)
+            {
+                if (IsActionVerbToken(tokens[prevIndex].Kind, out var prevAction)
+                    && ExpectsFieldTargetAfterActionVerb(prevAction.SyntaxShape))
+                {
+                    context = SlotContext.InSetAssignment;
+                    return true;
+                }
+
+                if (tokens[prevIndex].Kind == Precept.Language.TokenKind.Into
+                    && TryGetCurrentActionMeta(tokens, prevIndex, out var prevIntoAction)
+                    && ExpectsFieldTargetAfterInto(prevIntoAction.SyntaxShape))
+                {
+                    context = SlotContext.InSetAssignment;
+                    return true;
+                }
+            }
         }
 
         context = default;

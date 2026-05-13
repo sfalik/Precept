@@ -218,6 +218,150 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_SetActionAfterFieldName_NoTopLevelKeywords()
+    {
+        // Regression: cursor after '-> set FieldName ' (field name typed, space pressed, no '=' yet)
+        // was falling through to SlotContext.TopLevel in TryGetActionChainContext because the
+        // Identifier token (field name) was not handled, causing top-level keyword completions to appear.
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field test as integer
+            state offState initial
+            state onState
+            event toggle
+            from onState on toggle
+                -> set test ¦
+                -> transition offState
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"],
+            "top-level construct keywords must not appear after the field name in a set action");
+        labels.Should().Contain("= ",
+            "the '= ' assignment operator must be offered as the only completion after '-> set FieldName '");
+    }
+
+    [Fact]
+    public async Task Completions_SetAction_NonBooleanField_ExcludesBooleanLiterals()
+    {
+        // Regression: 'true' and 'false' appeared in the expression completions when the cursor
+        // was after '-> set IntegerField = ' even though boolean literals are never valid for integer fields.
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field test as integer
+            state offState initial
+            state onState
+            event toggle
+            from offState on toggle
+                -> set test = ¦
+                -> transition onState
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().NotContain("true",
+            "boolean literal 'true' must not appear in expression completions for an integer field");
+        labels.Should().NotContain("false",
+            "boolean literal 'false' must not appear in expression completions for an integer field");
+    }
+
+    [Fact]
+    public async Task Completions_SetAction_BooleanField_IncludesBooleanLiterals()
+    {
+        // Counter-test: boolean literals must still appear when the target field IS boolean.
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field Flag as boolean default false
+            state Idle initial
+            event Flip
+            from Idle on Flip
+                -> set Flag = ¦
+                -> no transition
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain("true",
+            "boolean literal 'true' must appear in expression completions for a boolean field");
+        labels.Should().Contain("false",
+            "boolean literal 'false' must appear in expression completions for a boolean field");
+    }
+
+    [Fact]
+    public async Task Completions_EventDeclarationName_OffersEventModifiers()
+    {
+        // Regression: cursor after 'event EventName ' (space after event name) was falling through
+        // to SlotContext.TopLevel because no specialized check handled the event name Identifier,
+        // causing top-level keyword completions (precept, field, state, etc.) to appear.
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field test as integer
+            state offState initial
+            state onState
+            event toggle ¦
+            from offState on toggle
+                -> transition onState
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"],
+            "top-level construct keywords must not appear after an event name");
+        labels.Should().Contain("initial",
+            "'initial' modifier must be offered after an event name");
+    }
+
+    [Fact]
+    public async Task Completions_StateDeclarationName_SuppressesAlreadyAppliedModifiers()
+    {
+        // 'initial' is already on the state declaration — it must not reappear in the completion list.
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            state offState initial ¦
+            state onState
+            event toggle
+            from offState on toggle -> transition onState
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().NotContain("initial",
+            "'initial' must not be offered again when it is already present on the state declaration");
+    }
+
+    [Fact]
+    public async Task Completions_EventDeclarationName_SuppressesAlreadyAppliedModifiers()
+    {
+        // 'initial' is already on the event declaration — it must not reappear in the completion list.
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field test as integer
+            state offState initial
+            state onState
+            event toggle initial ¦
+            from offState on toggle -> transition onState
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().NotContain("initial",
+            "'initial' must not be offered again when it is already present on the event declaration");
+    }
+
+    [Fact]
+    public async Task Completions_FieldDeclaration_SuppressesAlreadyAppliedModifiers()
+    {
+        // 'nonnegative' is already on the field — it must not reappear in the completion list.
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field Count as integer default 0 nonnegative ¦
+            state Idle initial
+            event Tick
+            from Idle on Tick -> no transition
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().NotContain("nonnegative",
+            "'nonnegative' must not be offered again when it is already present on the field declaration");
+    }
+
+    [Fact]
     public async Task Completions_Expression_IncludeFieldsArgsAndFunctions()
     {
         var completions = await GetCompletionsAsync("""

@@ -146,6 +146,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         return context switch
         {
             SlotContext.TopLevel => CreateCompletionList(GetTopLevelItems()),
+            SlotContext.AfterKeyword => CreateCompletionList(Enumerable.Empty<CompletionItem>()),
             SlotContext.AfterValueName => CreateCompletionList(GetTypeAnnotationItems()),
             SlotContext.InTypePosition => CreateCompletionList(GetTypeItems()),
             SlotContext.InModifierPosition => CreateModifierList(compilation, position),
@@ -155,6 +156,7 @@ internal sealed class CompletionHandler : ICompletionHandler
             SlotContext.InActionVerb => CreateCompletionList(GetActionItems(compilation, position)),
             SlotContext.InExpression => CreateCompletionList(GetExpressionItems(compilation, position)),
             SlotContext.InArgDefault => CreateCompletionList(GetExpressionItems(compilation, position)),
+            SlotContext.InSetAssignment => CreateCompletionList(GetSetAssignmentItem()),
             _ => new CompletionList([], true),
         };
     }
@@ -194,6 +196,16 @@ internal sealed class CompletionHandler : ICompletionHandler
                 sortGroup: CompletionSortGroup.Keyword,
                 documentation: meta.Description),
         ];
+    }
+
+    private static IEnumerable<CompletionItem> GetSetAssignmentItem()
+    {
+        yield return CreateItem(
+            label: "= ",
+            detail: "Assign a value to the field",
+            kind: CompletionItemKind.Operator,
+            sortGroup: CompletionSortGroup.Keyword,
+            insertText: "= ");
     }
 
     private static IEnumerable<CompletionItem> GetTypeItems() =>
@@ -280,14 +292,20 @@ internal sealed class CompletionHandler : ICompletionHandler
             documentation: meta.HoverDescription ?? meta.Description,
             usageExample: meta.UsageExample,
             snippetTemplate: meta.SnippetTemplate)));
-        var booleanLiteralItems = new[] { TokenKind.True, TokenKind.False }
-            .Select(Tokens.GetMeta)
-            .Select(meta => CreateItem(
-                label: meta.Text ?? meta.Kind.ToString().ToLowerInvariant(),
-                detail: meta.Description,
-                kind: CompletionItemKind.Constant,
-                sortGroup: CompletionSortGroup.Keyword,
-                documentation: meta.Description));
+        // Boolean literals are only valid in boolean-typed positions.
+        // Suppress them when the set-action target field has a known non-boolean type.
+        var actionTarget = SlotContextResolver.GetCurrentActionTargetField(compilation, position);
+        var includeBooleanLiterals = actionTarget is null || actionTarget.ResolvedType == TypeKind.Boolean;
+        var booleanLiteralItems = includeBooleanLiterals
+            ? new[] { TokenKind.True, TokenKind.False }
+                .Select(Tokens.GetMeta)
+                .Select(meta => CreateItem(
+                    label: meta.Text ?? meta.Kind.ToString().ToLowerInvariant(),
+                    detail: meta.Description,
+                    kind: CompletionItemKind.Constant,
+                    sortGroup: CompletionSortGroup.Keyword,
+                    documentation: meta.Description))
+            : Enumerable.Empty<CompletionItem>();
 
         return eventArgItems
             .Concat(fieldItems)
@@ -715,16 +733,68 @@ internal sealed class CompletionHandler : ICompletionHandler
     private static IEnumerable<ModifierMeta> GetModifiers(Compilation compilation, Position position, ModifierDomain domain)
     {
         var modifiers = GetModifiers(domain);
+
+        // Collect modifier token kinds that are already present on the current declaration line
+        // so we can suppress already-applied modifiers from the completion list.
+        var alreadyApplied = GetAlreadyAppliedModifierKinds(compilation.Tokens.Tokens, position, domain);
+
         if (domain != ModifierDomain.Field
             || !TryGetCurrentValueModifierContext(compilation, position, out var resolvedType, out var appliedModifiers, out var declarationSite))
         {
-            return modifiers;
+            return modifiers
+                .Where(meta => !alreadyApplied.Contains(meta.Token.Kind));
         }
 
         return modifiers
             .OfType<ValueModifierMeta>()
             .Where(meta => meta.ApplicableDeclarationSites.HasFlag(declarationSite))
-            .Where(meta => meta.ApplicableTo.Length == 0 || IsTypeApplicable(meta.ApplicableTo, resolvedType, appliedModifiers));
+            .Where(meta => meta.ApplicableTo.Length == 0 || IsTypeApplicable(meta.ApplicableTo, resolvedType, appliedModifiers))
+            .Where(meta => !alreadyApplied.Contains(meta.Token.Kind));
+    }
+
+    /// <summary>
+    /// Scans backward from the cursor through tokens on the same declaration line to find
+    /// which modifier token kinds are already present. Stops when it hits the construct's
+    /// primary leading token (e.g. 'state', 'event', 'field') or a different line.
+    /// </summary>
+    private static ImmutableHashSet<TokenKind> GetAlreadyAppliedModifierKinds(
+        ImmutableArray<Token> tokens,
+        Position position,
+        ModifierDomain domain)
+    {
+        // Collect the token kinds for all modifiers in this domain so we can recognise them.
+        var domainModifierTokenKinds = GetModifiers(domain)
+            .Select(meta => meta.Token.Kind)
+            .ToImmutableHashSet();
+
+        var result = ImmutableHashSet.CreateBuilder<TokenKind>();
+
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return result.ToImmutable();
+        }
+
+        var cursorLine = position.Line;
+
+        // Walk backward, collecting modifier tokens on the same line.
+        // Stop when we reach a token on a different line (newline boundary) or a non-modifier
+        // leading keyword that started this declaration.
+        for (var i = tokenIndex; i >= 0; i--)
+        {
+            var tok = tokens[i];
+            if (tok.Span.StartLine < cursorLine)
+            {
+                break;
+            }
+
+            if (domainModifierTokenKinds.Contains(tok.Kind))
+            {
+                result.Add(tok.Kind);
+            }
+        }
+
+        return result.ToImmutable();
     }
 
     private static bool IsTypeApplicable(TypeTarget[] applicableTo, TypeKind resolvedType, ImmutableArray<ModifierKind> modifiers)
