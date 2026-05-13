@@ -64,12 +64,12 @@ internal static class RichHoverFactory
             return true;
         }
 
-        if (TryCreateAccessHover(compilation, position, out hover))
+        if (TryCreateOmitHover(compilation, position, out hover))
         {
             return true;
         }
 
-        if (TryCreateOmitHover(compilation, position, out hover))
+        if (TryCreateAccessHover(compilation, position, out hover))
         {
             return true;
         }
@@ -1389,7 +1389,6 @@ internal static class RichHoverFactory
 
     private static string CreateAccessMarkdown(Compilation compilation, AccessDeclarationInfo access)
     {
-        var status = BuildStatus(compilation, access.Span, HoverStatusKind.ProofVerified, "write map is structural");
         var sameWriteSetStates = GetAccessDeclarations(compilation)
             .Where(candidate => !string.Equals(candidate.StateName, access.StateName, StringComparison.Ordinal)
                 && candidate.Mode == access.Mode
@@ -1403,20 +1402,16 @@ internal static class RichHoverFactory
             .Where(name => !string.Equals(name, access.StateName, StringComparison.Ordinal) && !sameSet.Contains(name))
             .ToImmutableArray();
 
-        var lines = new List<string>
+        return string.Join("\n", new[]
         {
-            $"**access** `{EscapeInline(access.Label)}`",
-            FormatStatus(status),
-            $"Editable here: {FormatCodeList(access.FieldNames)}",
-            $"Same write set in {FormatCodeList(sameWriteSetStates)} · locked in {FormatCodeList(lockedStates)}",
-        };
-
-        return string.Join("\n\n", lines);
+            "✅ Proven · write access declared in manifest",
+            $"✏️ {FormatCodeList(access.FieldNames)} (mutable here)",
+            $"Also in: {FormatCodeList(sameWriteSetStates)} · 🔒 {FormatCodeList(lockedStates)}",
+        });
     }
 
     private static string CreateOmitMarkdown(Compilation compilation, OmitDeclarationInfo omit)
     {
-        var status = BuildStatus(compilation, omit.Span, HoverStatusKind.ProofVerified, $"field is structurally absent in `{EscapeInline(omit.StateName)}`");
         var restoredStates = compilation.Graph.Edges
             .Where(edge => string.Equals(edge.FromState, omit.StateName, StringComparison.Ordinal)
                 && edge.ToState is not null
@@ -1425,15 +1420,12 @@ internal static class RichHoverFactory
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
 
-        var lines = new List<string>
+        return string.Join("\n", new[]
         {
-            $"**omit** `{EscapeInline(omit.Label)}`",
-            FormatStatus(status),
-            $"`{EscapeInline(omit.FieldName)}` does not exist in this state — not readable, not writable",
-            $"Restored on transition to: {FormatCodeList(restoredStates)}",
-        };
-
-        return string.Join("\n\n", lines);
+            $"✅ Proven · structurally absent in `{EscapeInline(omit.StateName)}`",
+            $"🔒 `{EscapeInline(omit.FieldName)}` does not exist here",
+            $"🔁 Restored on: {FormatCodeList(restoredStates)}",
+        });
     }
 
     private static string CreateQualifierMarkdown(Compilation compilation, QualifierHoverInfo info)

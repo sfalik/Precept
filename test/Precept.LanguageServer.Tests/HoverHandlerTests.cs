@@ -641,13 +641,9 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "in Draft modify");
 
-        markup.Should().Contain("**access**");
-        markup.Should().Contain("Editable here:");
-        markup.Should().Contain("`CatalogCode`");
-        markup.Should().Contain("`Quantity`");
-        markup.Should().Contain("`Price`");
-        markup.Should().Contain("Same write set in `Listed`");
-        markup.Should().Contain("locked in");
+        markup.Should().Contain("✅ Proven · write access declared in manifest");
+        markup.Should().Contain("✏️ `CatalogCode`, `Quantity`, `Price` (mutable here)");
+        markup.Should().Contain("Also in: `Listed` · 🔒 `Hidden`, `Archived`");
     }
 
     [Fact]
@@ -655,9 +651,9 @@ state Draft initial
     {
         var markup = GetHoverMarkdown(HoverV3Source, "in Hidden omit");
 
-        markup.Should().Contain("**omit**");
-        markup.Should().Contain("`CatalogCode` does not exist in this state");
-        markup.Should().Contain("Restored on transition to: `Draft`");
+        markup.Should().Contain("✅ Proven · structurally absent in `Hidden`");
+        markup.Should().Contain("🔒 `CatalogCode` does not exist here");
+        markup.Should().Contain("🔁 Restored on: `Draft`");
     }
 
     [Fact]

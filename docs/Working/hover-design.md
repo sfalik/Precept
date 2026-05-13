@@ -16,9 +16,9 @@
 | 8 | Qualifier (base + proof) | ✅ Done | `cea204cf` |
 | 9 | Proof expression (non-qualifier) | ✅ Done | `cea204cf` |
 | 10 | Diagnostic squiggle (non-qualifier) | ✅ Done | `cea204cf` |
-| 11 | State proof variant | 🟡 In progress | — |
-| 12 | `access` | 🔴 Not started | — |
-| 13 | `omit` | 🔴 Not started | — |
+| 11 | State proof variant | ✅ Done | `c33808f7` |
+| 12 | `access` | 🟡 In progress | — |
+| 13 | `omit` | 🟡 In progress | — |
 | ✅ | State (standard) | ✅ `dcaf506d` | `dcaf506d` |
 | ✅ | B4 proof narrative | ✅ `29cd9938` | `29cd9938` |
 | ✅ | Qualifier-compat proof expression | ✅ pre-existing | — |
