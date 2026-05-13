@@ -1932,8 +1932,11 @@ internal static class RichHoverFactory
             .Where(state => IsFieldOmittedInState(compilation, field.Name, state))
             .ToImmutableHashSet(StringComparer.Ordinal);
         var accesses = GetAccessDeclarations(compilation);
+        var writeAccesses = accesses
+            .Where(access => access.Mode == ModifierKind.Write)
+            .ToImmutableArray();
         ImmutableArray<string> writableStates;
-        if (accesses.Length == 0 && field.Modifiers.Contains(ModifierKind.Writable))
+        if (writeAccesses.IsEmpty && field.Modifiers.Contains(ModifierKind.Writable))
         {
             writableStates = states
                 .Where(state => !omittedStates.Contains(state))
@@ -1941,9 +1944,8 @@ internal static class RichHoverFactory
         }
         else
         {
-            writableStates = accesses
+            writableStates = writeAccesses
                 .Where(access => !access.IsGuarded
-                    && access.Mode == ModifierKind.Write
                     && access.FieldNames.Contains(field.Name, StringComparer.Ordinal))
                 .Select(access => access.StateName)
                 .Where(state => !omittedStates.Contains(state))
