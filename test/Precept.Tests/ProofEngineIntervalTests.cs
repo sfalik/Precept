@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Precept.Language;
 using Precept.Pipeline;
 using Xunit;
 
