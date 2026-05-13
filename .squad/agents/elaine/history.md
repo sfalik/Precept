@@ -22,6 +22,16 @@
 
 ## Recent Updates
 
+### 2026-05-13T00:46:00Z — Omit anti-pattern prose sharpened for SyntaxReference
+
+- Elaine rewrote the omit anti-pattern guidance to reject sentinel defaults like `default 0`, `default false`, and `default ""` when a field is not meaningful yet.
+- The durable guidance is to use `omit` in every state without business meaning, then add `set Field = ...` on the transition where the field becomes present; `default` stays reserved for real business defaults.
+
+### 2026-05-13T00:45:00Z — Field-state diagnostic naming v2 was adopted
+
+- Elaine tightened the field-state family to the adopted compact names `OmittedFieldReadInState`, `OmittedFieldSetInTargetState`, and `RequiredFieldUnassignedOnEntry`.
+- The approved set preserves the existing catalog house style while removing the sentence-like feel of the earlier normalization pass.
+
 ### 2026-05-13T00:32:50Z — Field-state diagnostic UX review locked the user-facing naming bar
 
 - Elaine reviewed the canonicalized `docs/Working/field-state-guarantees-v3.md` surface and flagged code drift: earlier team notes used provisional D131/D133/D135, but the v3 doc now canonically uses D130/D131/D132.

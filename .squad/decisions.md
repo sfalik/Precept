@@ -6,6 +6,34 @@
 
 ---
 
+### 2026-05-13T00:46:00Z: Sentinel defaults are now a recorded omit anti-pattern in SyntaxReference guidance
+
+**By:** Scribe
+
+**Status:** Merged from Elaine's prose refinement.
+
+**Merged source:** `elaine-omit-antipattern-text.md`.
+
+- Using `default 0`, `default false`, or `default ""` to stand in for "not meaningful yet" is now durable anti-pattern guidance: sentinel defaults hide the transition where the field must first become meaningful.
+- The preferred authoring guidance is to declare the field `omit` in every state where it has no business meaning, then initialize it on the transition into a non-omitted state with `set Field = ...`.
+- `default` remains reserved for real business defaults rather than lifecycle placeholders.
+
+---
+
+### 2026-05-13T00:45:00Z: Elaine's adopted diagnostic naming v2 is now the canonical field-state family, and Frank applied it to the v3 doc
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `elaine-naming-v2.md`, `frank-adopted-names.md`.
+
+- Elaine's adopted compact v2 naming replaces the earlier sentence-like normalization pass: D130 = `OmittedFieldReadInState`, D131 = `OmittedFieldSetInTargetState`, and D132 = `RequiredFieldUnassignedOnEntry`.
+- The adopted set keeps the catalog house style aligned with compact condition phrases like `InitialEventMissingAssignments` and `RequiredFieldsNeedInitialEvent` while keeping state or entry context explicit instead of compiler shorthand.
+- Frank applied those names throughout `docs\Working\field-state-guarantees-v3.md`, including the summary, tables, section headers, inline prose, and design-motivation references, and intentionally left `src\Precept\Language\SyntaxReference.cs` untouched because Elaine had concurrent prose work there.
+
+---
+
 ### 2026-05-13T00:32:50Z: Elaine's naming-normalization proposal pushes the field-state diagnostic family toward subject-first catalog names
 
 **By:** Scribe

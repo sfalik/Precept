@@ -17,6 +17,11 @@
 
 ## Recent Updates
 
+### 2026-05-13T00:45:00Z — Adopted field-state names were applied to the v3 doc
+
+- Frank updated `docs\Working\field-state-guarantees-v3.md` everywhere the old field-state diagnostic names appeared so the v3 design now uses `OmittedFieldReadInState`, `OmittedFieldSetInTargetState`, and `RequiredFieldUnassignedOnEntry` throughout.
+- He checked `src\Precept\Language\SyntaxReference.cs` for overlap with Elaine's prose work and intentionally made no edit there to avoid trampling concurrent changes.
+
 ### 2026-05-13T00:32:50Z — Field-state v3 is now canonically D130/D131/D132
 
 - Frank's v3 design now records the canonical numbering after the doc renumber pass: `ReadOfOmittedField` = D130, `WriteToTargetOmittedField` = D131, and `MustSetOmitToNonOmit` = D132; older notes that said D131/D133/D135 should be read through that mapping.
