@@ -209,4 +209,7 @@
 
 - The slice reused the D132 required-field filter, excluded fields omitted in every initial state, and closed green at `5127/5127` tests; `samples\Test.precept` now fails with D93.
 
+### 2026-05-13T04:52:18Z — Slice 13 locked D94 follow-up regression coverage
 
+- Commit `d9edee97` added the three D94 follow-up tests covering omitted-initial-state fields, multiple initial states, and the documented stateless-initial-event bailout.
+- `Diagnostics.cs` now states D94 in terms of construction paths from initial-state rows, and both targeted plus full `test\Precept.Tests\Precept.Tests.csproj` runs closed green.

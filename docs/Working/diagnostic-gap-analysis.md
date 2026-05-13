@@ -341,3 +341,230 @@ The original analysis listed 4 CI diagnostics (PRE0066, PRE0095, PRE0097, PRE009
 The original grep searched for literal `DiagnosticCode.CaseInsensitive*` in the pipeline. The emission uses indirect catalog references (`binaryDiagCode` and `functionDiagCode` variables), which the grep missed. `TypeCheckerCITests.cs` contains 15+ tests that assert correct emission — these tests pass.
 
 **Lesson:** Catalog-driven emission means the diagnostic code name won't appear literally at the emission site. Gap analysis must search for both direct references and catalog-mediated dispatch patterns.
+
+---
+
+## Test Strategy for Gap Remediation
+
+Every gap closure must ship with tests that prove the diagnostic fires on invalid input and does not fire on valid input. The existing test infrastructure provides everything needed — no new framework or base class required.
+
+### Test Pattern: `CheckExpectingError`
+
+The dominant integration test pattern runs the full pipeline (Lexer → Parser → NameBinder → TypeChecker) and asserts a specific `DiagnosticCode` appears at Error severity. This is the pattern to use for all gap tests.
+
+**Template:**
+
+```csharp
+[Fact]
+public void DescriptiveCondition_EmitsExpectedDiagnostic()
+{
+    var precept = """
+        precept Widget
+        // ... minimal DSL that triggers the diagnostic ...
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ExpectedCode);
+}
+```
+
+**How it works:** `TypeCheckerTestHelpers.Check(preceptText)` runs the full pipeline and collects diagnostics from all stages (manifest, symbols, index). `CheckExpectingError` filters to Error severity and asserts the code is present. `CheckExpectingClean` asserts no Error-severity diagnostics exist (excluding D93 `RequiredFieldsNeedInitialEvent` construction noise).
+
+### Concrete Examples per Gap Cluster
+
+#### B1: Temporal Constant Validation (PRE0055–PRE0062)
+
+```csharp
+// PRE0055 — InvalidDateValue: calendar date doesn't exist
+[Fact]
+public void DateField_February30_EmitsInvalidDateValue()
+{
+    var precept = """
+        precept Widget
+        field D as date default '2024-02-30'
+        state Open initial
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidDateValue);
+}
+
+// PRE0056 — InvalidDateFormat: wrong date format
+[Fact]
+public void DateField_WrongFormat_EmitsInvalidDateFormat()
+{
+    var precept = """
+        precept Widget
+        field D as date default '30-02-2024'
+        state Open initial
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidDateFormat);
+}
+
+// PRE0061 — MissingTemporalUnit: bare number in temporal arithmetic
+[Fact]
+public void DateField_AddBareNumber_EmitsMissingTemporalUnit()
+{
+    var precept = """
+        precept Widget
+        field D as date default '2024-01-01'
+        field Result as date <- D + 5
+        state Open initial
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.MissingTemporalUnit);
+}
+```
+
+#### B2: Currency/Unit Arithmetic Safety (PRE0070–PRE0074)
+
+```csharp
+// PRE0070 — CrossCurrencyArithmetic: adding USD to EUR
+[Fact]
+public void MoneyFields_DifferentCurrencies_EmitsCrossCurrencyArithmetic()
+{
+    var precept = """
+        precept Widget
+        field CostUSD as money in 'USD' default '0.00 USD'
+        field CostEUR as money in 'EUR' default '0.00 EUR'
+        field Total as money in 'USD' <- CostUSD + CostEUR
+        state Open initial
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossCurrencyArithmetic);
+}
+
+// PRE0071 — CrossDimensionArithmetic: adding mass to length
+[Fact]
+public void QuantityFields_DifferentDimensions_EmitsCrossDimensionArithmetic()
+{
+    var precept = """
+        precept Widget
+        field Weight as quantity in 'kg' default '0 kg'
+        field Length as quantity in 'm' default '0 m'
+        field Bad as quantity in 'kg' <- Weight + Length
+        state Open initial
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossDimensionArithmetic);
+}
+
+// Negative case — same currency is valid
+[Fact]
+public void MoneyFields_SameCurrency_NoDiagnostic()
+{
+    var precept = """
+        precept Widget
+        field Cost1 as money in 'USD' default '0.00 USD'
+        field Cost2 as money in 'USD' default '0.00 USD'
+        field Total as money in 'USD' <- Cost1 + Cost2
+        state Open initial
+        """;
+    TypeCheckerTestHelpers.CheckExpectingClean(precept);
+}
+```
+
+#### B3: Choice Type Validation (PRE0086–PRE0089)
+
+```csharp
+// PRE0086 — ChoiceLiteralNotInSet: literal not in declared choice set
+[Fact]
+public void ChoiceField_LiteralNotInSet_EmitsChoiceLiteralNotInSet()
+{
+    var precept = """
+        precept Widget
+        field Status as choice of string("Active", "Done")
+        state Open initial
+        state Closed
+        event Close
+        from Open on Close when Status == "Pending" -> transition Closed
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ChoiceLiteralNotInSet);
+}
+
+// Negative case — valid choice value
+[Fact]
+public void ChoiceField_ValidLiteral_NoDiagnostic()
+{
+    var precept = """
+        precept Widget
+        field Status as choice of string("Active", "Done")
+        state Open initial
+        state Closed
+        event Close
+        from Open on Close when Status == "Active" -> transition Closed
+        """;
+    TypeCheckerTestHelpers.CheckExpectingClean(precept);
+}
+```
+
+#### B4: Collection Safety Guards (PRE0099–PRE0101, PRE0104)
+
+```csharp
+// PRE0099 — KeyPresenceSafety: key access without contains guard
+[Fact]
+public void LookupField_KeyAccess_WithoutContainsGuard_EmitsKeyPresenceSafety()
+{
+    var precept = """
+        precept Widget
+        field Items as lookup of string to number
+        field Result as number <- Items for "key1"
+        state Open initial
+        """;
+    TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.KeyPresenceSafety);
+}
+```
+
+#### Parser Gates (PRE0013–PRE0015)
+
+Parser-level tests use the parser directly, not `TypeCheckerTestHelpers`:
+
+```csharp
+// PRE0015 — PreEventGuardNotAllowed: guard before on-event
+[Fact]
+public void GuardBeforeOnEvent_EmitsPreEventGuardNotAllowed()
+{
+    var manifest = Precept.Pipeline.Parser.Parse(
+        Lexer.Lex("precept W\nstate S initial\nevent E\nfrom S when true on E -> no transition"));
+    manifest.Diagnostics.Should().Contain(
+        d => d.Code == nameof(DiagnosticCode.PreEventGuardNotAllowed));
+}
+```
+
+### Positive vs. Negative Test Requirements
+
+**Current practice:** Existing tests overwhelmingly check positive cases only — "this bad input fires the diagnostic." `TypeCheckerCITests.cs` is the notable exception: every violation test has a companion `*_NoDiagnostic()` test with the corrected form.
+
+**Requirement for gap tests:**
+
+| Assertion Type | Requirement | Rationale |
+|----------------|-------------|-----------|
+| Positive case (fires) | **Required — at least 1 per code.** Use `CheckExpectingError`. | Without this, Gate 2 is meaningless — the code is "referenced" but never proved to fire. |
+| Negative case (doesn't fire) | **Required — at least 1 per code.** Use `CheckExpectingClean`. | A diagnostic that fires on valid input is a false positive — the worst kind of bug in a domain-integrity product. The B2 cluster (currency arithmetic) is especially critical: `Cost1 + Cost2` with same currency must NOT fire. |
+| Message text | **Not required.** | Current tests don't verify message text. The `DiagnosticsTests` catalog tests already verify `MessageTemplate` correctness via `Create_ProducesCorrectCodeString_ForEveryDiagnosticCode`. Adding message assertions to integration tests adds brittleness without proportionate value. |
+| Source span accuracy | **Not required for gap closure, recommended for new parser diagnostics.** | Span accuracy is important for IDE tooling (language server underlines, code actions), but the TypeChecker helper doesn't expose span assertions. Parser diagnostics (PRE0013–0015) should spot-check span correctness since they're the primary consumer of parser span precision. |
+
+### Test Placement Guidance
+
+| Gap Cluster | File | Rationale |
+|-------------|------|-----------|
+| B1: Temporal (PRE0055–0062) | `TypeCheckerTypedConstantTests.cs` | Temporal constants are typed constant resolution — the existing typed constant test file already covers `UnresolvedTypedConstant` and `InvalidTypedConstantContent`. Add a section for the temporal-specific codes. |
+| B2: Currency/Unit (PRE0070–0074) | **New file: `TypeCheckerCurrencyUnitTests.cs`** | No existing file covers cross-qualifier arithmetic validation. The CI tests (`TypeCheckerCITests.cs`) are the closest structural parallel — domain-specific expression validation. A dedicated file keeps the cluster cohesive. |
+| B3: Choice (PRE0086–0089) | `TypeCheckerStructuralTests.cs` | Structural tests already contain `EmptyChoice` and `DuplicateChoiceValue`. Choice literal/arg validation is the same domain. Add a section after the existing choice category. |
+| B4: Collection Safety (PRE0099–0101, PRE0104) | **New file: `TypeCheckerCollectionSafetyTests.cs`** | Collection safety is a distinct domain from existing collection tests. The existing `TypeCheckerQuantifierTests.cs` covers quantifier predicates; key/index/bounds safety is a separate concern. |
+| A: Parser Gates (PRE0013–0015) | `ParserExpressionTests.cs` or **new file: `ParserGuardValidationTests.cs`** | These are parser-level construct validation, not expression parsing. A new file is cleaner, but the existing parser test file is also acceptable since it already covers `AssignmentInExpressionContext`. |
+| D: Scattered (PRE0035, PRE0039, etc.) | Existing slice files per-category | Each scattered diagnostic belongs in whichever existing file covers its domain. `InvalidModifierValue` → `TypeCheckerModifierTests.cs`. `ComputedFieldWithDefault` → `TypeCheckerStructuralTests.cs`. Match the existing test organization. |
+
+### Test Naming Convention
+
+Observed pattern from existing tests (consistent across all TypeChecker test files):
+
+```
+{Condition}_{InputDescription}_{ExpectedOutcome}
+```
+
+Examples from the codebase:
+- `TildeEquals_OnCIField_NoDiagnostic`
+- `Equals_OnCIField_EmitsTildeEqualsRequired`
+- `OptionalField_IsSet_InGuard_ResolvesToBoolean_NoDiagnostic`
+- `NonOptionalField_IsSet_InGuard_EmitsIsSetOnNonOptional`
+
+**Rules:**
+- PascalCase throughout
+- Condition first (what's being tested), input variation second, expected outcome last
+- Positive results end with `_NoDiagnostic` or `_ResolvesCleanly`
+- Negative results end with `_Emits{DiagnosticName}` or describe the outcome
+- No `Test_` prefix, no `Should_` prefix — the method name IS the assertion description

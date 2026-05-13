@@ -6,6 +6,48 @@
 
 ---
 
+### 2026-05-13T04:52:18Z: D94 follow-up coverage now locks omit-boundary, multi-initial-state, and stateless-bailout regressions
+
+**By:** Scribe
+
+**Status:** Merged from George's Slice 13 closeout note.
+
+**Merged source:** `george-d94-slice13-done.md`.
+
+- George added `D94_FieldOmittedInInitialState_NotRequired` to document the D94/D132 boundary where fields omitted in every initial state stay outside D94's construction set.
+- `D94_MultipleInitialStates_AllRowsChecked` now proves every initial-state construction row is checked, and `D94_StatelessPrecept_WithInitialEvent_SkipsCheck` durably documents the pre-existing stateless bailout gap.
+- `Diagnostics.cs` now describes D94's trigger in terms of construction paths from initial-state rows, and commit `d9edee97` closed both targeted and full `Precept.Tests` validation green.
+
+---
+
+### 2026-05-13T04:52:18Z: D94 false-positive review confirms initial-state row scoping and flags a stateless follow-up gap
+
+**By:** Scribe
+
+**Status:** Merged from Frank's D94 analysis.
+
+**Merged source:** `frank-d94-analysis.md`.
+
+- Frank confirmed commit `4c567cdc` fixed the real D94 bug: construction analysis must inspect only initial-event rows whose `FromState` is an initial state, while non-initial-state rows remain lifecycle paths.
+- The D94/D132 boundary is now durable team guidance: `NeedsInitialEvent` excludes fields omitted in every initial state from D94, and D132 owns omit→non-omit lifecycle crossings.
+- Follow-up guidance is recorded for targeted tests around omitted initial-state fields and multi-initial-state coverage, plus a low-priority stateless-initial-event gap where D93 and D94 currently both skip enforcement.
+
+---
+
+### 2026-05-13T04:52:18Z: Diagnostic gap closures now require paired positive and negative integration tests
+
+**By:** Scribe
+
+**Status:** Merged from Frank's test-quality standards note.
+
+**Merged source:** `frank-test-recommendations.md`.
+
+- Every diagnostic gap closure must ship both a positive `CheckExpectingError` case and a negative `CheckExpectingClean` case; positive-only coverage is below the team quality bar.
+- Gate 2 remains a tripwire rather than proof of behavioral coverage because literal `DiagnosticCode.X` references can come from metadata or catalog tests without exercising emission behavior.
+- Message-text checks stay optional, TypeChecker span checks stay recommended-not-required, and domain-specific test files remain the preferred placement for new gap tests.
+
+---
+
 ### 2026-05-13T04:32:04Z: D94 construction analysis now ignores non-initial-state rows on the initial event
 
 **By:** Scribe

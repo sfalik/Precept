@@ -295,3 +295,159 @@ public sealed class DiagnosticEmissionCoverageTests
 2. **Pipeline-only vs. all-source scanning.** The recommended emission-site scan set covers `Pipeline/*.cs` + `Operations.cs` + `Functions.cs`. If future emission patterns emerge outside these files (e.g., a new `RuntimeValidator`), the scan set needs updating. Should the test scan all of `src/Precept/**/*.cs` minus the known non-emission files instead? Broader scan = fewer false negatives but more false positives from non-emission references.
 
 3. **Doc-comment false positives.** The emission-site scan picks up `DiagnosticCode.X` references in XML doc comments (e.g., `/// <see cref="DiagnosticCode.X"/>`). These are not real emissions. Should the scan strip comments before matching, or is this edge case rare enough to ignore? Currently only one instance exists (`DiagnosticCode.X` as a generic placeholder in `GraphAnalyzer.cs` doc comments) and `X` is not a real enum member.
+
+---
+
+## Test Quality Standards
+
+Gate 2 proves a `DiagnosticCode.X` literal exists in a test file. That is a necessary but not sufficient condition for meaningful test coverage. This section defines the minimum bar for what counts as a "real" test, the known limitations of Gate 2, and the failure messages George/Kramer should implement.
+
+### What Gate 2 Actually Verifies — and What It Doesn't
+
+**What Gate 2 catches:**
+- A new emission site was added without any test referencing the code → test fails.
+- An existing test was deleted without removing the emission site → test fails.
+
+**What Gate 2 does NOT catch:**
+- **Import-only references.** A test file could contain `DiagnosticCode.X` in a `using` declaration, enum iteration, or helper registration without ever asserting the diagnostic fires. Gate 2 would count this as "covered."
+- **Dead test code.** A test method that references `DiagnosticCode.X` but is `[Skip]`-ed, commented out, or inside a never-executed branch still passes Gate 2.
+- **Catalog-only tests.** `DiagnosticsTests.cs` references every `DiagnosticCode` member for metadata assertions (`Create_ProducesCorrectCodeString`, stage grouping, etc.). These tests verify catalog shape — they do NOT verify the diagnostic fires on invalid input. Gate 2 currently counts these as coverage. This is acceptable because all 83 emitted codes also have independent behavioral tests, but the limitation must be understood: Gate 2 alone does not guarantee behavioral coverage.
+- **Proactive/anticipatory tests.** 42 of the 49 unemitted codes are referenced in test files — tests written in anticipation of future implementation. These tests call `CheckExpectingError` with a code that never fires, which means the assertion is vacuously satisfied (the test passes because it checks `Should().Contain()` against a list that doesn't include the code — wait: `CheckExpectingError` uses `.Should().Contain()`, which FAILS if the code is absent). **Correction: any test that calls `CheckExpectingError(precept, DiagnosticCode.X)` for an unemitted code X would FAIL**, because the pipeline never produces that diagnostic. These 42 codes must either (a) have their test references in non-behavioral contexts (catalog tests, enum iterations, commented examples) or (b) not exist as `CheckExpectingError` calls. The Gate 2 scan cannot distinguish between these reference types — it only checks for the literal string.
+
+**Practical consequence:** Gate 2 is a tripwire, not a proof of correctness. It catches the obvious gap (emitted code with zero test presence) but does not certify the test is meaningful. The minimum bar below addresses this.
+
+### Minimum Bar for a New Test
+
+Any test written to close a gap or cover a new emission site must meet these requirements to count as real coverage:
+
+| # | Requirement | How to verify |
+|---|-------------|---------------|
+| 1 | **At least one positive-case test.** A `[Fact]` or `[Theory]` that supplies invalid input and asserts the diagnostic fires using `CheckExpectingError(precept, DiagnosticCode.X)` (for TypeChecker codes) or `manifest.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.X))` (for Parser codes). | Test must call `CheckExpectingError` or equivalent assertion with the specific `DiagnosticCode` enum member. |
+| 2 | **At least one negative-case test.** A `[Fact]` that supplies valid input — the corrected form of the positive case — and asserts no error fires, using `CheckExpectingClean(precept)` or asserting the diagnostic is absent. | Test must call `CheckExpectingClean` or `diagnostics.Should().NotContain(...)`. |
+| 3 | **Minimal precept scaffold.** The test DSL snippet must be the minimum valid precept that triggers (or avoids) the diagnostic. Do not copy entire sample files. Include only the fields, states, events, and transitions necessary for the test condition. | Review: is every line in the snippet necessary for the test? |
+| 4 | **No shared state.** Tests must be independent. Each `[Fact]` builds its own precept string. The `TypeCheckerTestHelpers.Check` and `CheckExpectingError` methods are stateless — they create a fresh pipeline per call. | No `static` mutable fields, no test ordering dependencies. |
+
+**Recommended (not required):**
+- **Edge case variants.** For cluster tests (e.g., B2 currency), add at least one `[Theory]` with `[InlineData]` that covers multiple operator variants (addition, subtraction, multiplication) against the same diagnostic.
+- **Message text spot-check.** Not required (see gap analysis § Test Strategy), but for new diagnostics where the message template contains interpolated values, one test per cluster that verifies the formatted message contains expected field/type names is a good defense against broken `string.Format` templates. The catalog metadata tests in `DiagnosticsTests.cs` only test with placeholder `"x"` args.
+
+### Convention Test Failure Messages
+
+When George or Kramer implement the Gate 1 and Gate 2 convention tests, the failure messages must be specific, actionable, and self-documenting. Here are the exact messages to use:
+
+**Gate 1 failure — emission site missing:**
+
+```
+DiagnosticEmissionCoverageTests.Every_DiagnosticCode_Has_An_Emission_Site_Or_Is_AllowListed
+
+The following DiagnosticCode members have no emission site in any pipeline
+or catalog-emission file and are not in the allow-list:
+
+  - DiagnosticCode.NewFeatureGap
+  - DiagnosticCode.AnotherNewCode
+
+Each diagnostic must either:
+  (a) Have a DiagnosticCode.{Name} reference in src/Precept/Pipeline/*.cs,
+      src/Precept/Language/Operations.cs, or src/Precept/Language/Functions.cs
+  (b) Be added to Gate1AllowList with a comment citing why it's unemitted
+      (e.g., "// Temporal domain — not yet implemented, tracked in #NNN")
+```
+
+**Gate 1 inverse failure — allow-list stale:**
+
+```
+DiagnosticEmissionCoverageTests.AllowList_Contains_Only_Actually_Unemitted_Codes
+
+The following DiagnosticCode members are in the Gate 1 allow-list but DO have
+emission sites — remove them from the allow-list:
+
+  - DiagnosticCode.CrossCurrencyArithmetic (found in TypeChecker.Expressions.cs)
+
+The allow-list must shrink as gaps are closed. A code with an emission site
+does not belong on the "unemitted" allow-list.
+```
+
+**Gate 2 failure — test missing for emitted code:**
+
+```
+DiagnosticEmissionCoverageTests.Every_Emitted_DiagnosticCode_Has_A_Test
+
+The following DiagnosticCode members are emitted in the pipeline but have no
+reference in any test file:
+
+  - DiagnosticCode.NewFeatureGap (emitted in TypeChecker.Expressions.cs)
+
+Each emitted diagnostic must have at least one test that references
+DiagnosticCode.{Name} in test/Precept.Tests/, test/Precept.LanguageServer.Tests/,
+or test/Precept.Mcp.Tests/. Write a test that asserts the diagnostic fires,
+or add to Gate2AllowList with a tracking comment.
+```
+
+**Gate 2 inverse failure — allow-list stale:**
+
+```
+DiagnosticEmissionCoverageTests.Gate2_AllowList_Contains_Only_Actually_Untested_Codes
+
+The following DiagnosticCode members are in the Gate 2 allow-list but DO have
+test references — remove them from the allow-list:
+
+  - DiagnosticCode.SomeCode (found in TypeCheckerCurrencyUnitTests.cs)
+
+The allow-list must shrink as tests are added. A code with a test reference
+does not belong on the "untested" allow-list.
+```
+
+**Implementation note:** Use FluentAssertions' `because` parameter for the assertion message, and build the violation list as a formatted string joined with newlines. The pattern:
+
+```csharp
+var violationReport = string.Join("\n  - ",
+    violations.Select(v => $"DiagnosticCode.{v}"));
+
+violations.Should().BeEmpty(
+    because: $"the following DiagnosticCode members have no emission site " +
+             $"and are not in the allow-list:\n  - {violationReport}\n\n" +
+             "Each diagnostic must either:\n" +
+             "  (a) Have a DiagnosticCode.{{Name}} reference in the pipeline\n" +
+             "  (b) Be added to Gate1AllowList with a tracking comment");
+```
+
+### Coverage Debt Tracking
+
+The 49 codes on the Gate 1 allow-list are known emission debt. The 0 codes on the Gate 2 allow-list are known test debt. Both must be tracked and reduced over time.
+
+**Recommended mechanism: allow-list comment annotations with cluster tags.**
+
+Each allow-list entry must have a comment with:
+1. **Cluster tag** — which gap group it belongs to (e.g., `B1-temporal`, `B2-currency`, `B3-choice`, `B4-collection`, `A-parser`, `C-stale`, `D-scattered`)
+2. **Tracking reference** — either a GitHub issue number or a brief explanation
+
+```csharp
+private static readonly HashSet<DiagnosticCode> Gate1AllowList = new()
+{
+    // B1-temporal — temporal constant validation not yet implemented
+    DiagnosticCode.InvalidDateValue,          // PRE0055
+    DiagnosticCode.InvalidDateFormat,         // PRE0056
+    DiagnosticCode.InvalidTimeValue,          // PRE0057
+    DiagnosticCode.InvalidInstantFormat,      // PRE0058
+    DiagnosticCode.InvalidTimezoneId,         // PRE0059
+    DiagnosticCode.UnqualifiedPeriodArithmetic, // PRE0060
+    DiagnosticCode.MissingTemporalUnit,       // PRE0061
+    DiagnosticCode.FractionalUnitValue,       // PRE0062
+
+    // B2-currency — qualifier comparison not yet wired in TypeChecker
+    DiagnosticCode.CrossCurrencyArithmetic,   // PRE0070
+    DiagnosticCode.CrossDimensionArithmetic,  // PRE0071
+    // ... etc.
+};
+```
+
+**Debt reduction tracking:** When a gap cluster is implemented, the implementer removes the cluster's entries from the allow-list in the same PR. The inverse staleness test (`AllowList_Contains_Only_Actually_Unemitted_Codes`) enforces this — if entries remain on the allow-list after emission sites are added, the test fails.
+
+**No separate tracking issue needed.** The allow-list IS the tracking artifact. It lives in the test suite, is version-controlled, is enforced by CI, and its size is trivially measurable. If the team wants a dashboard metric, `Gate1AllowList.Count` in the test output provides it. A separate GitHub issue would duplicate the allow-list without adding enforcement value.
+
+**Quarterly review cadence (recommended):** Add a comment at the top of the allow-list noting the date and count at last review:
+
+```csharp
+// Allow-list review: 2026-05-13 — 49 codes (initial baseline)
+// Next review: reduce by at least one cluster per quarter
+```
