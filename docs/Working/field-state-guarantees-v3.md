@@ -1007,25 +1007,25 @@ New test class or section: `TypeCheckerConstructionTests.cs`
 
 **Spec grounding:** §3A.5: "InitialEventMissingAssignments: Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints."
 
-**Scope:** Precepts that declare an initial event (Form 1). The initial event must, across its transition rows, assign all required fields. This is the construction-time counterpart of D132 (which handles mid-lifecycle omit→non-omit crossings).
+**Scope:** Precepts that declare an initial event (Form 1). The initial event must, across the transition rows whose `from` state is initial, assign all required fields. This is the construction-time counterpart of D132 (which handles mid-lifecycle omit→non-omit crossings).
 
 **Trigger conditions:**
 
 D94 fires when ALL of the following are true:
 1. The precept declares an initial event (`IsInitial == true`).
 2. A required field exists (non-optional, non-computed, no default, non-collection).
-3. The initial event has at least one transition row, and at least one such row does NOT include a `set` action for the required field.
+3. Either (a) the initial event has no transition rows whose `from` state is initial, or (b) at least one such initial-state row does NOT include a `set` action for the required field.
 
 **Semantic complexity — per-row vs. per-event analysis:**
 
-The initial event may have multiple transition rows (guarded). D94 must fire per-row, not per-event. If row A sets the required field but row B doesn't, D94 fires for row B. The entity could be constructed through any matching row — each row must independently guarantee all required fields are populated.
+The initial event may have multiple transition rows (guarded). D94 must fire per-row, not per-event, but only for rows that can participate in construction. If row A starts from an initial state and sets the required field but row B starts from a non-initial state and does not, D94 does not fire for row B — that row is a lifecycle path, not a construction path.
 
-If the initial event has NO transition rows (unlikely but possible if the event is defined but has no `from` rows), D94 fires for the event as a whole — there is no path through which required fields could be set.
+If the initial event has NO transition rows whose `from` state is initial, D94 fires for the event as a whole — there is no construction path through which required fields could be set.
 
 **Initial event action chain analysis:**
 
-For each transition row associated with the initial event:
-1. Identify rows by matching `row.EventName` to the initial event's name.
+For each transition row associated with the initial event whose `from` state is initial:
+1. Identify rows by matching `row.EventName` to the initial event's name and requiring `row.FromState` to be one of the initial state names.
 2. For each required field, check whether `row.Actions` contains a `set` action targeting that field (using the same `IsSetAction` helper from D132).
 3. If not → emit D94 with `{0}` = event name, `{1}` = comma-joined missing field names.
 
@@ -1041,8 +1041,9 @@ The initial event may declare args that are intended to populate fields (e.g., `
   2. If no initial event → D93 path (Slice 10). If initial event exists → D94 path.
   3. Collect required fields (same filter as D93).
   4. If no required fields → return (no D94 needed).
-  5. Find all transition rows for the initial event: `ctx.TransitionRows.Where(r => string.Equals(r.EventName, initialEvent.Name, StringComparison.Ordinal))`.
-  6. For each transition row, for each required field:
+  5. Find all initial-state transition rows for the initial event: `ctx.TransitionRows.Where(r => string.Equals(r.EventName, initialEvent.Name, StringComparison.Ordinal) && r.FromState is { } fromState && initialStateNames.Contains(fromState))`.
+  6. If no initial-state rows exist → emit D94 for the event as a whole.
+  7. For each initial-state transition row, for each required field:
      - Check `row.Actions.Any(a => IsSetAction(a.Kind) && string.Equals(a.FieldName, field.Name, StringComparison.Ordinal))`.
      - If not → emit D94 with event name and missing field name(s).
 
@@ -1056,8 +1057,9 @@ The initial event may declare args that are intended to populate fields (e.g., `
 - `D94_InitialEvent_ComputedField_NoDiagnostic` — `[Fact]`: computed field not set → no D94.
 - `D94_InitialEvent_CollectionField_NoDiagnostic` — `[Fact]`: collection field not set → no D94.
 - `D94_InitialEvent_MultipleRows_OneRowMissesField_Fires` — `[Fact]`: row A sets the field, row B doesn't → D94 fires for row B.
-- `D94_InitialEvent_AllRowsSetField_NoDiagnostic` — `[Fact]`: all rows set the field → no D94.
-- `D94_NoTransitionRows_InitialEvent_RequiredField_Fires` — `[Fact]`: initial event defined but no transition rows reference it → D94 fires.
+- `D94_InitialEvent_AllRowsSetField_NoDiagnostic` — `[Fact]`: all initial-state rows set the field → no D94.
+- `D94_NonInitialStateRow_NotChecked` — `[Fact]`: a non-initial-state row for the initial event misses the field, but the initial-state construction row sets it → no D94.
+- `D94_NoTransitionRows_InitialEvent_RequiredField_Fires` — `[Fact]`: initial event defined but no initial-state transition rows reference it → D94 fires.
 
 **Regression anchors:**
 
@@ -1070,8 +1072,9 @@ The initial event may declare args that are intended to populate fields (e.g., `
 **Files:** `src/Precept/Pipeline/TypeChecker.Validation.cs`
 
 - [x] Extend `ValidateConstructionGuarantees` with D94 logic
-- [x] D94 tests (10 tests)
+- [x] D94 tests (11 tests)
 - [x] Verify regression anchors
+- Bug fix: commit `4c567cdc` scoped D94 row analysis to initial-state `from` rows only, fixing the false positive on `samples/Test.precept`.
 
 ---
 

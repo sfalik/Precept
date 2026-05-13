@@ -73,6 +73,8 @@
 - `TypedInterpolatedTypedConstant` qualifier work must treat compound-unit literals as numerator/denominator slot pairs; denominator-only fallbacks silently lose information.
 - 2026-05-12 modifier applicability catalog gaps closed: `ZeroBoundNumericTypes` now includes `Price` and `ExchangeRate`; `RangedNumericTypes` adds `Price` only (ExchangeRate excluded — ordering undefined); new `BusinessMagnitudeTypes` array (`Decimal`, `Money`, `Quantity`, `Price`, `ExchangeRate`) replaces `DecimalOnly` for `Maxplaces`; `DecimalOnly` removed. TypeChecker.Validation applicability guard now skips when modifier is already in `impliedModifiers`, so identity types (`currency`, `unitofmeasure`, `dimension`) + `notempty` emit only `RedundantModifier`. All 4969 tests green, zero test flips.
 
+- D94 construction analysis must only inspect initial-event rows whose `FromState` is an initial state; rows on the same initial event that originate from non-initial states are lifecycle paths and must not participate in construction guarantees.
+
 ### 2026-05-12T23:50:08Z — Modifier applicability gaps closed with final suite health
 
 - Commit `a727dddb` widened modifier applicability for `price`, `exchangerate`, and business-magnitude `maxplaces`, and collapsed identity-type `notempty` handling to redundancy-only by skipping implied modifiers during applicability validation.
@@ -99,3 +101,4 @@
 
 - Commit `597a0479` on `spike/Precept-V2-Radical` added `ValidateConstructionGuarantees` in `TypeChecker.Validation.cs` so precepts without an initial event now emit D93 when required present fields would otherwise remain constructible.
 - The slice reused the D132 required-field filter, excluded fields omitted in every initial state, and closed green at `5127/5127` tests; `samples\Test.precept` now fails with D93.
+
