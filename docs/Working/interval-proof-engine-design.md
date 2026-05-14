@@ -16,7 +16,7 @@
 | **2** | Obligation Collection + Strategy 7 Wiring (decimal) | George | ✅ Done | — | Depends on Slice 1 |
 | **3** | Guard-Narrowing Integration | George | ✅ Done | — | Depends on Slice 2 |
 | **4** | Function Overload Intervals | George | ✅ Done | — | Independent after Slice 2 |
-| **5** | Hover Expression Display + Diagnostic Squiggle | Kramer | ⏳ Pending | — | Depends on Slice 2 |
+| **5** | Hover Expression Display + Diagnostic Squiggle | Kramer | ✅ Done | `dotnet test test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj --filter "FullyQualifiedName~HoverHandlerIntervalTests\|FullyQualifiedName~HoverHandlerTests"` (70/70) | Interval field/expression + NumericOverflow squiggle hover shipped |
 | **6** | Regression + Symbol Export | Soup Nazi | ⏳ Pending | — | Final validation |
 | **7** | Catalog-Driven Obligation Generator Refactor | George | ✅ Done | ProofEngineIntervalIntegrationTests; ProofEngineTests.Slice1_ObligationCollection; Precept.Tests | Catalog-driven bounds extraction from modifier metadata (ApplicableTo + ProofSatisfactions) wired for obligation generation; Slice 2 anchors remain green. |
 | **8** | Qualified-Type Bound Semantics | George | ⏳ Pending | — | Depends on Slice 7 |

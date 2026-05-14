@@ -103,11 +103,14 @@ public static partial class ProofEngine
             var (disposition, strategy) = TryDischarge(obligation, semantics);
             var enriched = obligation with { Disposition = disposition, Strategy = strategy };
 
-            // Enrich ComputedInterval for interval containment obligations (proved or unresolved)
-            if (enriched.Requirement is IntervalContainmentProofRequirement
-                && TryIntervalContainmentProofNarrowed(obligation, semantics, out var computed))
+            // Enrich ComputedInterval for interval containment obligations (proved or unresolved).
+            if (enriched.Requirement is IntervalContainmentProofRequirement)
             {
-                enriched = enriched with { ComputedInterval = computed };
+                _ = TryIntervalContainmentProofNarrowed(obligation, semantics, out var computed);
+                if (computed.HasValue)
+                {
+                    enriched = enriched with { ComputedInterval = computed };
+                }
             }
 
             obligations[i] = enriched;

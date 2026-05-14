@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Precept.Language;
 using Precept.Pipeline;
@@ -233,10 +235,15 @@ internal static class RichHoverFactory
     private static bool TryCreateProofDiagnosticHover(Compilation compilation, Position position, out Hover hover)
     {
         var diagnostics = compilation.Diagnostics
-            .Where(diagnostic => diagnostic.Stage == DiagnosticStage.Proof
-                && diagnostic.Severity is Severity.Warning or Severity.Error
+            .Where(diagnostic => diagnostic.Severity is Severity.Warning or Severity.Error
                 && SymbolNavigation.Contains(diagnostic.Span, position))
-            .OrderBy(diagnostic => GetSpanWidth(diagnostic.Span))
+            .Select(diagnostic => new
+            {
+                Diagnostic = diagnostic,
+                Obligation = FindProofObligationForDiagnostic(compilation, diagnostic, position),
+            })
+            .Where(entry => entry.Diagnostic.Stage == DiagnosticStage.Proof || entry.Obligation is not null)
+            .OrderBy(entry => GetSpanWidth(entry.Diagnostic.Span))
             .ToImmutableArray();
         if (diagnostics.IsEmpty)
         {
@@ -244,10 +251,9 @@ internal static class RichHoverFactory
             return false;
         }
 
-        var diagnostic = diagnostics[0];
-        var obligation = FindProofObligationForDiagnostic(compilation, diagnostic, position);
-        var span = obligation?.Site.Span ?? diagnostic.Span;
-        hover = MakeHover(CreateProofDiagnosticMarkdown(compilation, diagnostic, obligation), span);
+        var selected = diagnostics[0];
+        var span = selected.Obligation?.Site.Span ?? selected.Diagnostic.Span;
+        hover = MakeHover(CreateProofDiagnosticMarkdown(compilation, selected.Diagnostic, selected.Obligation), span);
         return true;
     }
 
@@ -320,6 +326,7 @@ internal static class RichHoverFactory
             QualifierCompatibilityProofRequirement qualifierCompatibility => CreateQualifierProofDiagnosticMarkdown(compilation, diagnosticCode, obligation, qualifierCompatibility),
             QualifierChainProofRequirement qualifierChain => CreateQualifierChainProofDiagnosticMarkdown(compilation, diagnosticCode, obligation, qualifierChain),
             PresenceProofRequirement presence => CreatePresenceProofDiagnosticMarkdown(compilation, diagnosticCode, obligation, presence),
+            IntervalContainmentProofRequirement intervalRequirement => CreateIntervalProofDiagnosticMarkdown(compilation, diagnosticCode, diagnostic, obligation, intervalRequirement),
             _ => CreateGenericProofDiagnosticMarkdown(compilation, diagnosticCode, diagnostic, obligation),
         };
     }
@@ -328,6 +335,7 @@ internal static class RichHoverFactory
     {
         QualifierCompatibilityProofRequirement qualifierCompatibility => CreateQualifierProofExpressionMarkdown(compilation, expression, obligation, qualifierCompatibility),
         QualifierChainProofRequirement qualifierChain => CreateQualifierChainProofExpressionMarkdown(compilation, expression, obligation, qualifierChain),
+        IntervalContainmentProofRequirement intervalRequirement => CreateIntervalProofExpressionMarkdown(compilation, expression, obligation, intervalRequirement),
         _ => CreateGenericProofExpressionMarkdown(compilation, expression, obligation),
     };
 
@@ -462,6 +470,68 @@ internal static class RichHoverFactory
                 ? $"🔬 {Diagnostics.GetMeta(diagnosticCode).FixHint}"
                 : $"🔬 {EscapePlain(obligation.Requirement.Description)}";
         return string.Join("\n", new[] { header, middle, tail });
+    }
+
+    private static string CreateIntervalProofExpressionMarkdown(
+        Compilation compilation,
+        TypedBinaryOp expression,
+        ProofObligation obligation,
+        IntervalContainmentProofRequirement requirement)
+    {
+        if (!obligation.ComputedInterval.HasValue)
+        {
+            return CreateGenericProofExpressionMarkdown(compilation, expression, obligation);
+        }
+
+        var expressionText = EscapeInline(DescribeProofSite(compilation, expression));
+        var computedInterval = FormatInterval(obligation.ComputedInterval.Value);
+        var declaredInterval = FormatDeclaredInterval(requirement.DeclaredMin, requirement.DeclaredMax);
+
+        if (obligation.Disposition == ProofDisposition.Proved)
+        {
+            return string.Join("\n", new[]
+            {
+                $"✅ Proven · `{expressionText}` result {computedInterval} fits `{EscapeInline(requirement.TargetField)}`",
+                $"🔬 Result interval: {computedInterval}",
+                $"⚖️ Declared: {declaredInterval} · proven safe",
+            });
+        }
+
+        var violation = DescribeIntervalViolation(requirement.DeclaredMin, requirement.DeclaredMax, obligation.ComputedInterval.Value);
+        var guidance = obligation.EmittedDiagnostic is { } code && !string.IsNullOrWhiteSpace(Diagnostics.GetMeta(code).FixHint)
+            ? Diagnostics.GetMeta(code).FixHint!
+            : $"Target `{EscapeInline(requirement.TargetField)}` requires {declaredInterval}";
+
+        return string.Join("\n", new[]
+        {
+            $"⚠️ Gap · `{expressionText}` may leave {declaredInterval}",
+            $"🔬 Result interval: {computedInterval} · {violation}",
+            guidance,
+        });
+    }
+
+    private static string CreateIntervalProofDiagnosticMarkdown(
+        Compilation compilation,
+        PreceptDiagnosticCode diagnosticCode,
+        PreceptDiagnostic diagnostic,
+        ProofObligation obligation,
+        IntervalContainmentProofRequirement requirement)
+    {
+        if (!obligation.ComputedInterval.HasValue)
+        {
+            return CreateGenericProofDiagnosticMarkdown(compilation, diagnosticCode, diagnostic, obligation);
+        }
+
+        var computedInterval = obligation.ComputedInterval.Value;
+        var lines = new List<string>
+        {
+            $"⚠️ `{FormatDiagnosticCode(diagnosticCode)}` · Arithmetic result may overflow declared bounds",
+            $"🔬 `{EscapeInline(requirement.TargetField)} = {EscapeInline(DescribeProofSite(compilation, obligation.Site))}`",
+            $"Result interval {FormatInterval(computedInterval)} · declared {FormatDeclaredInterval(requirement.DeclaredMin, requirement.DeclaredMax)}",
+        };
+
+        lines.AddRange(CreateIntervalViolationDetails(requirement.DeclaredMin, requirement.DeclaredMax, computedInterval));
+        return string.Join("\n", lines);
     }
 
     private static string GetQualifierDiagnosticSummary(QualifierAxis axis) => axis switch
@@ -670,6 +740,148 @@ internal static class RichHoverFactory
 
     private static string FormatDiagnosticCode(PreceptDiagnosticCode code) => $"PRE{(int)code:0000}";
 
+    private static string FormatDeclaredInterval(decimal? min, decimal? max) =>
+        $"[{FormatBoundValue(min, upperBound: false)} .. {FormatBoundValue(max, upperBound: true)}]";
+
+    private static string FormatDeclaredBoundsSummary(decimal? min, decimal? max)
+    {
+        var parts = new List<string>();
+        if (min.HasValue)
+        {
+            parts.Add($"min {FormatNumericValue(min.Value)}");
+        }
+
+        if (max.HasValue)
+        {
+            parts.Add($"max {FormatNumericValue(max.Value)}");
+        }
+
+        return parts.Count == 0
+            ? "no declared bounds"
+            : string.Join(" ", parts);
+    }
+
+    private static string FormatInterval(NumericInterval interval)
+    {
+        if (interval.IsUnbounded)
+        {
+            return "[−∞ .. +∞]";
+        }
+
+        if (interval.IsEmpty)
+        {
+            return "[empty]";
+        }
+
+        var min = interval.Min == decimal.MinValue ? (decimal?)null : interval.Min;
+        var max = interval.Max == decimal.MaxValue ? (decimal?)null : interval.Max;
+        return FormatDeclaredInterval(min, max);
+    }
+
+    private static string DescribeIntervalViolation(decimal? declaredMin, decimal? declaredMax, NumericInterval computedInterval)
+    {
+        if (computedInterval.IsUnbounded)
+        {
+            return "bound safety not proven";
+        }
+
+        var lowerViolated = declaredMin.HasValue && computedInterval.Min < declaredMin.Value;
+        var upperViolated = declaredMax.HasValue && computedInterval.Max > declaredMax.Value;
+
+        if (lowerViolated && upperViolated)
+        {
+            return "lower and upper bounds unsafe";
+        }
+
+        if (lowerViolated)
+        {
+            return "lower bound unsafe";
+        }
+
+        if (upperViolated)
+        {
+            return "upper bound unsafe";
+        }
+
+        return "bounds satisfied";
+    }
+
+    private static ImmutableArray<string> CreateIntervalViolationDetails(decimal? declaredMin, decimal? declaredMax, NumericInterval computedInterval)
+    {
+        var lines = ImmutableArray.CreateBuilder<string>();
+
+        if (computedInterval.IsUnbounded)
+        {
+            lines.Add("Bound safety not proven: computed interval is unbounded");
+            return lines.ToImmutable();
+        }
+
+        if (declaredMin.HasValue && computedInterval.Min < declaredMin.Value)
+        {
+            lines.Add($"Lower bound violated: result.Min = {FormatNumericValue(computedInterval.Min)}");
+        }
+
+        if (declaredMax.HasValue && computedInterval.Max > declaredMax.Value)
+        {
+            lines.Add($"Upper bound violated: result.Max = {FormatNumericValue(computedInterval.Max)}");
+        }
+
+        if (lines.Count == 0)
+        {
+            lines.Add("Bound safety not proven");
+        }
+
+        return lines.ToImmutable();
+    }
+
+    private static string FormatBoundValue(decimal? value, bool upperBound) =>
+        value.HasValue
+            ? FormatNumericValue(value.Value)
+            : upperBound
+                ? "+∞"
+                : "−∞";
+
+    private static string FormatNumericValue(decimal value)
+    {
+        var text = value.ToString("0.############################", CultureInfo.InvariantCulture);
+        var isNegative = text.StartsWith("-", StringComparison.Ordinal);
+        if (isNegative)
+        {
+            text = text[1..];
+        }
+
+        var decimalIndex = text.IndexOf('.', StringComparison.Ordinal);
+        var integerPart = decimalIndex >= 0 ? text[..decimalIndex] : text;
+        var fractionalPart = decimalIndex >= 0 ? text[decimalIndex..] : string.Empty;
+
+        return $"{(isNegative ? "-" : string.Empty)}{ApplyThinSpaceThousands(integerPart)}{fractionalPart}";
+    }
+
+    private static string ApplyThinSpaceThousands(string digits)
+    {
+        if (digits.Length <= 3)
+        {
+            return digits;
+        }
+
+        var firstGroupLength = digits.Length % 3;
+        if (firstGroupLength == 0)
+        {
+            firstGroupLength = 3;
+        }
+
+        var builder = new StringBuilder(digits.Length + ((digits.Length - 1) / 3));
+        builder.Append(digits.AsSpan(0, firstGroupLength));
+
+        for (var index = firstGroupLength; index < digits.Length; index += 3)
+        {
+            builder.Append('\u2009');
+            builder.Append(digits.AsSpan(index, 3));
+        }
+
+        return builder.ToString();
+    }
+
     private static int GetSpanWidth(SourceSpan span) => span.End - span.Offset;
 
     private static string FormatProofQualifierValue(DeclaredQualifierMeta? qualifier, string unresolvedText) => qualifier is null
@@ -694,6 +906,7 @@ internal static class RichHoverFactory
         ProofStrategy.GuardInPath => "guard in path",
         ProofStrategy.FlowNarrowing => "flow narrowing",
         ProofStrategy.CompositionalConstraint => "compositional constraint",
+        ProofStrategy.IntervalContainment => "interval containment",
         _ => strategy.ToString(),
     };
 
@@ -860,6 +1073,12 @@ internal static class RichHoverFactory
         compilation.Proof.Obligations
             .Where(obligation => obligation.Requirement is QualifierCompatibilityProofRequirement or QualifierChainProofRequirement)
             .Where(obligation => ContainsFieldReference(obligation.Site, field.Name))
+            .ToImmutableArray();
+
+    private static ImmutableArray<ProofObligation> GetIntervalFieldProofObligations(Compilation compilation, TypedField field) =>
+        compilation.Proof.Obligations
+            .Where(obligation => obligation.Requirement is IntervalContainmentProofRequirement intervalRequirement
+                && string.Equals(intervalRequirement.TargetField, field.Name, StringComparison.Ordinal))
             .ToImmutableArray();
 
     private static ImmutableArray<ProofObligation> GetComputedFieldProofObligations(Compilation compilation, TypedField field) =>
@@ -1047,6 +1266,11 @@ internal static class RichHoverFactory
         var identity = FormatFieldIdentityLine(field);
         var governance = FormatConstraintGovernanceSummary(compilation, field.Name);
 
+        if (TryCreateIntervalFieldMarkdown(compilation, field, governance, out var intervalMarkdown))
+        {
+            return intervalMarkdown;
+        }
+
         if (!field.IsComputed && TryGetFieldProofGap(compilation, GetStoredFieldProofUses(compilation, field), out var storedGap))
         {
             return string.Join("\n", new[]
@@ -1098,6 +1322,64 @@ internal static class RichHoverFactory
 
         lines.Add($"Governed by: {governance}");
         return string.Join("\n", lines);
+    }
+
+    private static bool TryCreateIntervalFieldMarkdown(Compilation compilation, TypedField field, string governance, out string markdown)
+    {
+        var obligations = GetIntervalFieldProofObligations(compilation, field);
+        if (obligations.IsEmpty)
+        {
+            markdown = string.Empty;
+            return false;
+        }
+
+        var primary = obligations
+            .OrderByDescending(obligation => obligation.Disposition == ProofDisposition.Unresolved)
+            .ThenBy(obligation => GetSpanWidth(obligation.Site.Span))
+            .First();
+        var requirement = (IntervalContainmentProofRequirement)primary.Requirement;
+        var declaredInterval = FormatDeclaredInterval(requirement.DeclaredMin, requirement.DeclaredMax);
+
+        if (primary.Disposition == ProofDisposition.Proved)
+        {
+            markdown = string.Join("\n", new[]
+            {
+                $"✅ Proven · `{EscapeInline(field.Name)}` stays within {declaredInterval}",
+                $"⚖️ Declared: {FormatDeclaredBoundsSummary(requirement.DeclaredMin, requirement.DeclaredMax)}",
+                $"Governed by: {governance}",
+            });
+            return true;
+        }
+
+        var expression = EscapeInline(DescribeProofSite(compilation, primary.Site));
+        var computedInterval = primary.ComputedInterval.HasValue
+            ? FormatInterval(primary.ComputedInterval.Value)
+            : "[−∞ .. +∞]";
+        var violation = primary.ComputedInterval.HasValue
+            ? DescribeIntervalViolation(requirement.DeclaredMin, requirement.DeclaredMax, primary.ComputedInterval.Value)
+            : "bound safety not proven";
+
+        if (field.Presence is DeclaredPresenceMeta.Optional)
+        {
+            markdown = string.Join("\n", new[]
+            {
+                $"⚠️ Gap · `{EscapeInline(field.Name)}` is optional · interval applies only when present",
+                $"🔬 `{expression}` → {computedInterval} · {violation}",
+                $"Guard presence before arithmetic on `{EscapeInline(field.Name)}`",
+            });
+            return true;
+        }
+
+        var fixHint = Diagnostics.GetMeta(PreceptDiagnosticCode.NumericOverflow).FixHint
+            ?? $"Target `{EscapeInline(field.Name)}` requires {declaredInterval}";
+
+        markdown = string.Join("\n", new[]
+        {
+            $"⚠️ Gap · `{EscapeInline(field.Name)}` assignment may leave {declaredInterval}",
+            $"🔬 `{expression}` → {computedInterval} · {violation}",
+            fixHint,
+        });
+        return true;
     }
 
     private static bool TryFormatFieldMutabilitySummary(FieldWriteMap writeMap, out string summary)
