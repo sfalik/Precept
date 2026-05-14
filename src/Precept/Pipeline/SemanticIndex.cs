@@ -312,7 +312,11 @@ public sealed record TypedField(
     decimal? DeclaredMin = null,
     decimal? DeclaredMax = null,
     ImmutableArray<DeclaredQualifierMeta> DeclaredMinBoundQualifiers = default,
-    ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default
+    ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default,
+    int? DeclaredMinLength = null,
+    int? DeclaredMaxLength = null,
+    int? DeclaredMinCount = null,
+    int? DeclaredMaxCount = null
 );
 
 /// <summary>Typed state declaration.</summary>

@@ -514,6 +514,23 @@ public static partial class ProofEngine
         if (TryIntervalContainmentProofNarrowed(obligation, semantics, out _))
             return (ProofDisposition.Proved, ProofStrategy.IntervalContainment);
 
+        // Length containment: string literal assigned to a bounded string field
+        if (obligation.Requirement is LengthContainmentProofRequirement lengthReq)
+        {
+            var result = TryLengthContainmentProof(lengthReq, obligation.Site);
+            if (result == true)
+                return (ProofDisposition.Proved, ProofStrategy.LengthContainment);
+            // result == false means violation; leave Unresolved so Diagnostics emits the error
+        }
+
+        // Count containment: V1 always unresolved (set on collections rejected by type checker)
+        if (obligation.Requirement is CountContainmentProofRequirement countReq)
+        {
+            var result = TryCountContainmentProof(countReq, obligation.Site);
+            if (result == true)
+                return (ProofDisposition.Proved, ProofStrategy.CountContainment);
+        }
+
         return (ProofDisposition.Unresolved, null);
     }
 

@@ -1034,6 +1034,29 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield f1 as quantity of 'length'\nfield f2 as quantity of 'mass'\nstate S initial\nevent E initial\non E\n-> set f1 = '1 kg'\n-> set f2 = '1 {f1.unit}'",
             ExampleAfter: "precept Example\nfield f1 as quantity of 'mass'\nfield f2 as quantity of 'mass'\nstate S initial\nevent E initial\non E\n-> set f1 = '1 kg'\n-> set f2 = '1 {f1.unit}'"),
 
+        // ── Proof (string/collection bounds) ─────────────────────────────────────
+        DiagnosticCode.LengthBoundViolation => new(
+            nameof(DiagnosticCode.LengthBoundViolation),
+            DiagnosticStage.Proof, Severity.Error,
+            "String value has {0} character(s) but field '{1}' requires length in [{2}..{3}]",
+            DiagnosticCategory.Proof,
+            FixHint: "Use a string whose length satisfies the field's minlength/maxlength constraints, or adjust the bounds on the field declaration",
+            PreventsFault: FaultCode.LengthBoundViolation,
+            TriggerCondition: "A string literal assigned to a bounded string field has a character count outside the declared minlength/maxlength range.",
+            RecoverySteps: ["Use a string whose length is within the declared bounds", "Or adjust the minlength/maxlength modifiers on the field declaration"],
+            ExampleBefore: "precept Example\nfield Note as string optional maxlength 5\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete -> set Note = \"This is way too long\" -> transition Done",
+            ExampleAfter: "precept Example\nfield Note as string optional maxlength 5\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete -> set Note = \"Short\" -> transition Done"),
+
+        DiagnosticCode.CountBoundViolation => new(
+            nameof(DiagnosticCode.CountBoundViolation),
+            DiagnosticStage.Proof, Severity.Error,
+            "Collection count {0} is outside the declared bounds [{1}..{2}] on field '{3}'",
+            DiagnosticCategory.Proof,
+            FixHint: "Ensure the collection element count satisfies the field's mincount/maxcount constraints, or adjust the bounds on the field declaration",
+            PreventsFault: FaultCode.CountBoundViolation,
+            TriggerCondition: "A collection field assignment or mutation results in an element count outside the declared mincount/maxcount range.",
+            RecoverySteps: ["Ensure the collection count is within the declared bounds", "Or adjust the mincount/maxcount modifiers on the field declaration"]),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

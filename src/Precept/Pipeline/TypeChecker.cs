@@ -360,6 +360,19 @@ internal static partial class TypeChecker
                 ? TryGetComparableModifierValue(maxExpr, resolvedType, declaredQualifiers)
                 : null;
 
+            var declaredMinLengthBound = declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Minlength) is { Value: { } minLenExpr }
+                ? TryGetComparableModifierValue(minLenExpr, TypeKind.Integer, ImmutableArray<DeclaredQualifierMeta>.Empty)
+                : null;
+            var declaredMaxLengthBound = declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Maxlength) is { Value: { } maxLenExpr }
+                ? TryGetComparableModifierValue(maxLenExpr, TypeKind.Integer, ImmutableArray<DeclaredQualifierMeta>.Empty)
+                : null;
+            var declaredMinCountBound = declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Mincount) is { Value: { } minCntExpr }
+                ? TryGetComparableModifierValue(minCntExpr, TypeKind.Integer, ImmutableArray<DeclaredQualifierMeta>.Empty)
+                : null;
+            var declaredMaxCountBound = declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Maxcount) is { Value: { } maxCntExpr }
+                ? TryGetComparableModifierValue(maxCntExpr, TypeKind.Integer, ImmutableArray<DeclaredQualifierMeta>.Empty)
+                : null;
+
             bool isOptional = modifiers.Contains(ModifierKind.Optional);
             bool isWritable = modifiers.Contains(ModifierKind.Writable);
 
@@ -385,7 +398,11 @@ internal static partial class TypeChecker
                 DeclaredMin: declaredMinBound?.Magnitude,
                 DeclaredMax: declaredMaxBound?.Magnitude,
                 DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
-                DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty);
+                DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
+                DeclaredMinLength: declaredMinLengthBound?.Magnitude is { } mnL ? (int)mnL : null,
+                DeclaredMaxLength: declaredMaxLengthBound?.Magnitude is { } mxL ? (int)mxL : null,
+                DeclaredMinCount: declaredMinCountBound?.Magnitude is { } mnC ? (int)mnC : null,
+                DeclaredMaxCount: declaredMaxCountBound?.Magnitude is { } mxC ? (int)mxC : null);
 
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;

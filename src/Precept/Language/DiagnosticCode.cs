@@ -155,6 +155,11 @@ public enum DiagnosticCode
     NumericOverflow                    =  78,
     OutOfRange                         =  79,
 
+    /// <summary>A string field assignment cannot be proven to satisfy the declared minlength/maxlength bounds.</summary>
+    LengthBoundViolation               = 135,
+    /// <summary>A collection field assignment cannot be proven to satisfy the declared mincount/maxcount bounds.</summary>
+    CountBoundViolation                = 136,
+
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,
     UnhandledEvent                     =  81,

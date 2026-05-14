@@ -82,6 +82,29 @@ public static partial class ProofEngine
                     intervalReq.TargetField,
                     $"[{intervalReq.DeclaredMin?.ToString() ?? "−∞"} .. {intervalReq.DeclaredMax?.ToString() ?? "+∞"}]{computedStr}");
             }
+
+            case LengthContainmentProofRequirement lengthReq:
+            {
+                var literalLength = obligation.Site is TypedLiteral { Value: string s } ? s.Length.ToString() : "?";
+                var minStr = lengthReq.DeclaredMinLength?.ToString() ?? "0";
+                var maxStr = lengthReq.DeclaredMaxLength?.ToString() ?? "∞";
+                return Diagnostics.Create(DiagnosticCode.LengthBoundViolation, obligation.Site.Span,
+                    literalLength,
+                    lengthReq.TargetField,
+                    minStr,
+                    maxStr);
+            }
+
+            case CountContainmentProofRequirement countReq:
+            {
+                var minStr = countReq.DeclaredMinCount?.ToString() ?? "0";
+                var maxStr = countReq.DeclaredMaxCount?.ToString() ?? "∞";
+                return Diagnostics.Create(DiagnosticCode.CountBoundViolation, obligation.Site.Span,
+                    "?",
+                    minStr,
+                    maxStr,
+                    countReq.TargetField);
+            }
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
@@ -224,6 +247,10 @@ public static partial class ProofEngine
                 return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedPresenceRequirement);
             case IntervalContainmentProofRequirement:
                 return CreateFaultSiteLink(obligation, DiagnosticCode.NumericOverflow);
+            case LengthContainmentProofRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.LengthBoundViolation);
+            case CountContainmentProofRequirement:
+                return CreateFaultSiteLink(obligation, DiagnosticCode.CountBoundViolation);
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
@@ -238,6 +265,8 @@ public static partial class ProofEngine
             DiagnosticCode.UnguardedCollectionAccess => FaultCode.CollectionEmptyOnAccess,
             DiagnosticCode.UnguardedCollectionMutation => FaultCode.CollectionEmptyOnMutation,
             DiagnosticCode.NumericOverflow => FaultCode.NumericOverflow,
+            DiagnosticCode.LengthBoundViolation => FaultCode.LengthBoundViolation,
+            DiagnosticCode.CountBoundViolation => FaultCode.CountBoundViolation,
             _ => FaultCode.DivisionByZero // Proof-only obligation families still share the existing conservative runtime backstop.
         };
 

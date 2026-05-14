@@ -37,6 +37,10 @@ public static class Faults
             RecoveryHint: "Reduce the magnitude of operands, or widen the field type to number for larger range"),
         FaultCode.OutOfRange                     => new(nameof(FaultCode.OutOfRange),                     "Value {0} is outside the declared bounds [{1}, {2}]",
             RecoveryHint: "Ensure assigned values satisfy the field's min/max constraints, or widen the bounds in the field declaration"),
+        FaultCode.LengthBoundViolation           => new(nameof(FaultCode.LengthBoundViolation),           "String value has {0} characters but field '{1}' requires [{2}..{3}]",
+            RecoveryHint: "Ensure the assigned string satisfies the field's minlength/maxlength constraints, or remove the length bound if runtime validation is sufficient"),
+        FaultCode.CountBoundViolation            => new(nameof(FaultCode.CountBoundViolation),            "Collection count {0} is outside the declared bounds [{1}..{2}] on field '{3}'",
+            RecoveryHint: "Ensure the collection satisfies the field's mincount/maxcount constraints, or remove the count bound if runtime validation is sufficient"),
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

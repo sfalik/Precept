@@ -46,4 +46,10 @@ public enum FaultCode
 
     [StaticallyPreventable(DiagnosticCode.OutOfRange)]
     OutOfRange                 = 13,
+
+    [StaticallyPreventable(DiagnosticCode.LengthBoundViolation)]
+    LengthBoundViolation       = 14,
+
+    [StaticallyPreventable(DiagnosticCode.CountBoundViolation)]
+    CountBoundViolation        = 15,
 }

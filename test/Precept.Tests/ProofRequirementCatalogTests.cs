@@ -41,9 +41,8 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        // ⚠️  Regression anchor § 9.4 #11: must be 7 after George's Slice 1 adds
-        // ProofRequirementKind.IntervalContainment = 7. RED until that ships.
-        ProofRequirements.All.Should().HaveCount(7);
+        // Updated for Slice 11: +2 kinds (LengthContainment = 8, CountContainment = 9)
+        ProofRequirements.All.Should().HaveCount(9);
     }
 
     // ── DU subtype correctness ──────────────────────────────────────────────────
@@ -103,11 +102,12 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void FiveKinds_AreSingleSubject()
     {
+        // Updated for Slice 11: +2 single-subject kinds (LengthContainment, CountContainment)
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
             .ToList();
-        singleSubject.Should().HaveCount(5);
+        singleSubject.Should().HaveCount(7);
     }
 
     // ── Instance Kind property matches catalog ──────────────────────────────────
@@ -207,12 +207,13 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void SingleSubjectKinds_NowIncludesIntervalContainment()
     {
-        // With IntervalContainment added, single-subject kinds count increases
+        // Updated for Slice 11: single-subject kinds are now 7
+        // (Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment, CountContainment)
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
             .ToList();
-        singleSubject.Should().HaveCount(5,
-            "IntervalContainment joins Numeric, Presence, Dimension, Modifier as single-subject");
+        singleSubject.Should().HaveCount(7,
+            "IntervalContainment, LengthContainment, and CountContainment join Numeric, Presence, Dimension, Modifier as single-subject");
     }
 }

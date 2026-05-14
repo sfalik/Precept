@@ -26,4 +26,10 @@ public enum ProofRequirementKind
 
     /// <summary>Interval containment check — result interval must fit within target field's declared bounds.</summary>
     IntervalContainment    =  7,
+
+    /// <summary>Length containment check — assigned string's length must fit within the field's declared minlength/maxlength.</summary>
+    LengthContainment      =  8,
+
+    /// <summary>Count containment check — collection element count must fit within the field's declared mincount/maxcount.</summary>
+    CountContainment       =  9,
 }

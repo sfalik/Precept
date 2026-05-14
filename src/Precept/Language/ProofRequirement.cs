@@ -140,6 +140,33 @@ public sealed record IntervalContainmentProofRequirement(
     string Description
 ) : ProofRequirement(ProofRequirementKind.IntervalContainment, Description);
 
+/// <summary>
+/// Length containment proof: a string value being assigned to a bounded string
+/// field must have its character length within the declared minlength/maxlength.
+/// Conservative strategy: literal string assignments are checked statically;
+/// non-literal assignments remain unresolved.
+/// </summary>
+public sealed record LengthContainmentProofRequirement(
+    ProofSubject Subject,
+    string TargetField,
+    int? DeclaredMinLength,
+    int? DeclaredMaxLength,
+    string Description
+) : ProofRequirement(ProofRequirementKind.LengthContainment, Description);
+
+/// <summary>
+/// Count containment proof: a collection's element count must stay within
+/// the field's declared mincount/maxcount bounds. Static proof is limited
+/// to cases where the element count is statically knowable (e.g., literal lists).
+/// </summary>
+public sealed record CountContainmentProofRequirement(
+    ProofSubject Subject,
+    string TargetField,
+    int? DeclaredMinCount,
+    int? DeclaredMaxCount,
+    string Description
+) : ProofRequirement(ProofRequirementKind.CountContainment, Description);
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  ProofRequirementMeta — catalog meta (DU as identity)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -191,6 +218,16 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
     public sealed record IntervalContainment()
         : ProofRequirementMeta(ProofRequirementKind.IntervalContainment,
             "Interval containment — result interval must fit within target field's declared bounds");
+
+    /// <summary>Length containment — assigned string's character length must fit within declared minlength/maxlength.</summary>
+    public sealed record LengthContainment()
+        : ProofRequirementMeta(ProofRequirementKind.LengthContainment,
+            "Length containment — assigned string's character length must fit within declared minlength/maxlength");
+
+    /// <summary>Count containment — collection element count must fit within declared mincount/maxcount.</summary>
+    public sealed record CountContainment()
+        : ProofRequirementMeta(ProofRequirementKind.CountContainment,
+            "Count containment — collection element count must fit within declared mincount/maxcount");
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement
@@ -216,6 +253,12 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
     public sealed record IntervalContainment()
         : ProofSatisfaction(ProofRequirementKind.IntervalContainment);
+
+    public sealed record LengthContainment()
+        : ProofSatisfaction(ProofRequirementKind.LengthContainment);
+
+    public sealed record CountContainment()
+        : ProofSatisfaction(ProofRequirementKind.CountContainment);
 }
 
 public abstract record SatisfactionProjection

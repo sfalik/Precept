@@ -42,7 +42,9 @@ public enum ProofStrategy
     FlowNarrowing = 4,
     QualifierCompatibility = 5,
     CompositionalConstraint = 6,
-    IntervalContainment = 7
+    IntervalContainment = 7,
+    LengthContainment   = 8,
+    CountContainment    = 9,
 }
 
 public sealed record FaultSiteLink(

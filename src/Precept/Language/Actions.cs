@@ -222,6 +222,7 @@ public static class Actions
     /// <summary>
     /// Generates interval containment proof obligations for Set actions on constrained fields.
     /// Returns an empty array if the action's target has no catalog-declared interval bounds.
+    /// Also generates length containment obligations for string literal assignments to bounded string fields.
     /// </summary>
     private static ImmutableArray<ProofObligation> GenerateIntervalContainmentObligations(
         TypedAction action,
@@ -232,27 +233,52 @@ public static class Actions
         
         if (!semantics.FieldsByName.TryGetValue(inputAction.FieldName, out var targetField))
             return [];
-        
+
+        var obligations = ImmutableArray.CreateBuilder<ProofObligation>();
+
+        // Numeric interval containment
         var (min, max) = ProofEngine.GetFieldBounds(targetField);
-        if (!min.HasValue && !max.HasValue)
-            return [];
-        
-        var intervalReq = new IntervalContainmentProofRequirement(
-            new SelfSubject(),
-            inputAction.FieldName,
-            min, max,
-            $"Interval containment: {inputAction.FieldName} must stay within declared bounds [{min?.ToString() ?? "−∞"} .. {max?.ToString() ?? "+∞"}]");
-        
-        // ProofObligation will be updated with proper context in ProofEngine.WalkActions()
-        var obligation = new ProofObligation(
-            intervalReq,
-            inputAction.InputExpression,
-            null!, // Will be replaced with proper context
-            ProofDisposition.Unresolved,
-            null,
-            null);
-        
-        return [obligation];
+        if (min.HasValue || max.HasValue)
+        {
+            var intervalReq = new IntervalContainmentProofRequirement(
+                new SelfSubject(),
+                inputAction.FieldName,
+                min, max,
+                $"Interval containment: {inputAction.FieldName} must stay within declared bounds [{min?.ToString() ?? "−∞"} .. {max?.ToString() ?? "+∞"}]");
+
+            obligations.Add(new ProofObligation(
+                intervalReq,
+                inputAction.InputExpression,
+                null!, // Will be replaced with proper context in ProofEngine.WalkActions()
+                ProofDisposition.Unresolved,
+                null,
+                null));
+        }
+
+        // String length containment (string fields with minlength/maxlength)
+        // Only generate for literal string assignments — non-literal assignments leave the
+        // runtime to enforce bounds. This avoids false positives for dynamically-provided values.
+        if (targetField.ResolvedType == TypeKind.String
+            && (targetField.DeclaredMinLength.HasValue || targetField.DeclaredMaxLength.HasValue)
+            && inputAction.InputExpression is TypedLiteral { ResultType: TypeKind.String })
+        {
+            var lengthReq = new LengthContainmentProofRequirement(
+                new SelfSubject(),
+                inputAction.FieldName,
+                targetField.DeclaredMinLength,
+                targetField.DeclaredMaxLength,
+                $"Length containment: {inputAction.FieldName} must have length in [{targetField.DeclaredMinLength?.ToString() ?? "0"} .. {targetField.DeclaredMaxLength?.ToString() ?? "∞"}]");
+
+            obligations.Add(new ProofObligation(
+                lengthReq,
+                inputAction.InputExpression,
+                null!, // Will be replaced with proper context in ProofEngine.WalkActions()
+                ProofDisposition.Unresolved,
+                null,
+                null));
+        }
+
+        return obligations.ToImmutable();
     }
 
     // ════════════════════════════════════════════════════════════════════════════
