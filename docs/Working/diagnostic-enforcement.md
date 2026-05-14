@@ -385,13 +385,13 @@ PRE0091 is the one deliberate exception to the otherwise-independent ordering ru
 
 **Files:** `src/Precept.Analyzers/*.cs`, `test/Precept.Analyzers.Tests/*.cs` (create)
 
-- [ ] Create shared coverage scanner + allow-list infrastructure in `src/Precept.Analyzers`
-- [ ] Populate `Gate1AllowList` with all 49 unemitted codes (with cluster comments)
-- [ ] Keep `Gate2AllowList` empty at initialization (all currently emitted diagnostics are test-referenced)
-- [ ] Implement `PRECEPT0027` Gate 1 emission-coverage analyzer + stale-entry check
-- [ ] Implement `PRECEPT0028` Gate 2 test-coverage analyzer + stale-entry check
-- [ ] Add analyzer tests for positive, negative, and stale allow-list cases
-- [ ] Verify analyzers fire in analyzer test harness and in solution build
+- [x] Create shared coverage scanner + allow-list infrastructure in `src/Precept.Analyzers`
+- [x] Populate `Gate1AllowList` with all unemitted codes (30 entries, with cluster comments)
+- [x] Keep `Gate2AllowList` empty at initialization (all currently emitted diagnostics are test-referenced)
+- [x] Implement `PRECEPT0027` Gate 1 emission-coverage analyzer + stale-entry check (`PRECEPT0029`)
+- [x] Implement `PRECEPT0028` Gate 2 test-coverage analyzer + stale-entry check (`PRECEPT0030`)
+- [x] Add analyzer tests for positive, negative, and stale allow-list cases
+- [x] Verify analyzers fire in analyzer test harness and in solution build
 
 ---
 
