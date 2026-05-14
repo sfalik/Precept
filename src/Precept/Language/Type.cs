@@ -119,8 +119,17 @@ public sealed record ElementParameterAccessor(
 /// <summary>
 /// Describes how a typed constant's string content is validated for a given <see cref="TypeKind"/>.
 /// Subtypes carry the validation strategy: regex pattern, NodaTime temporal parsing, or closed set membership.
+/// <para>
+/// <see cref="FormatErrorCode"/> and <see cref="SemanticErrorCode"/> enable catalog-mediated diagnostic
+/// emission: when validation fails, the type checker selects the domain-specific code declared here
+/// instead of the generic <c>InvalidTypedConstantContent</c> (PRE0053). Null means "fall back to generic."
+/// </para>
 /// </summary>
-public abstract record ContentValidation(string FormatDescription, string[] Examples);
+public abstract record ContentValidation(
+    string FormatDescription,
+    string[] Examples,
+    DiagnosticCode? FormatErrorCode = null,
+    DiagnosticCode? SemanticErrorCode = null);
 
 /// <summary>
 /// Validates typed constant content against a regular expression pattern.
@@ -138,8 +147,10 @@ public sealed record NodaTimeValidation(
     TemporalLiteralKind LiteralKind,
     string NodaTimePattern,
     string FormatDescription,
-    string[] Examples
-) : ContentValidation(FormatDescription, Examples);
+    string[] Examples,
+    DiagnosticCode? FormatErrorCode = null,
+    DiagnosticCode? SemanticErrorCode = null
+) : ContentValidation(FormatDescription, Examples, FormatErrorCode, SemanticErrorCode);
 
 public sealed record UcumValidation(
     string FormatDescription,

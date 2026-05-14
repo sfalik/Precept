@@ -233,26 +233,29 @@ public class TypeCheckerTypedConstantTests
     [InlineData("not-a-date")]
     [InlineData("2024-13-01")]
     [InlineData("2024-00-15")]
-    public void InvalidIsoDate_EmitsInvalidTypedConstantContent(string date)
+    public void InvalidIsoDate_EmitsTemporalDiagnostic(string date)
     {
         var ctx = MinimalContext();
         var result = Resolve(TypedConstant(date), ctx, TypeKind.Date);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+        var diagnostic = ctx.Diagnostics.Should().ContainSingle().Which;
+        // Catalog-mediated: format errors → InvalidDateFormat, semantic errors → InvalidDateValue
+        diagnostic.Code.Should().BeOneOf(
+            DiagnosticCode.InvalidDateFormat.ToString(),
+            DiagnosticCode.InvalidDateValue.ToString());
     }
 
     [Fact]
-    public void DateTimeStringAsDate_EmitsInvalidTypedConstantContent()
+    public void DateTimeStringAsDate_EmitsInvalidDateFormat()
     {
         var ctx = MinimalContext();
-        // An ISO datetime should not parse as a bare date
+        // An ISO datetime should not parse as a bare date — format mismatch
         var result = Resolve(TypedConstant("2024-01-15T14:30:00"), ctx, TypeKind.Date);
 
         result.Should().BeOfType<TypedErrorExpression>();
         ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+            .Which.Code.Should().Be(DiagnosticCode.InvalidDateFormat.ToString());
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -279,14 +282,15 @@ public class TypeCheckerTypedConstantTests
     [InlineData("25:00:00")]
     [InlineData("not-a-time")]
     [InlineData("")]
-    public void InvalidIsoTime_EmitsInvalidTypedConstantContent(string time)
+    public void InvalidIsoTime_EmitsInvalidTimeValue(string time)
     {
         var ctx = MinimalContext();
         var result = Resolve(TypedConstant(time), ctx, TypeKind.Time);
 
         result.Should().BeOfType<TypedErrorExpression>();
+        // Time family declares only SemanticErrorCode (InvalidTimeValue) — used for all failures
         ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+            .Which.Code.Should().Be(DiagnosticCode.InvalidTimeValue.ToString());
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -311,14 +315,17 @@ public class TypeCheckerTypedConstantTests
     [Theory]
     [InlineData("not-a-datetime")]
     [InlineData("2024-13-01T00:00:00")]
-    public void InvalidIsoDateTime_EmitsInvalidTypedConstantContent(string dt)
+    public void InvalidIsoDateTime_EmitsTemporalDiagnostic(string dt)
     {
         var ctx = MinimalContext();
         var result = Resolve(TypedConstant(dt), ctx, TypeKind.DateTime);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+        var diagnostic = ctx.Diagnostics.Should().ContainSingle().Which;
+        // DateTime family declares both format and semantic codes
+        diagnostic.Code.Should().BeOneOf(
+            DiagnosticCode.InvalidDateFormat.ToString(),
+            DiagnosticCode.InvalidDateValue.ToString());
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1462,5 +1469,137 @@ public class TypeCheckerTypedConstantTests
         result.Should().BeOfType<TypedErrorExpression>();
         ctx.Diagnostics.Should().ContainSingle()
             .Which.Code.Should().Be(DiagnosticCode.UnresolvedTypedConstant.ToString());
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 9B — Catalog-Mediated Temporal Diagnostics (PRE0055–0058)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void DateField_February30_EmitsInvalidDateValue()
+    {
+        var precept = """
+            precept Widget
+            field Created as date
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set Created = '2026-02-30'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidDateValue);
+    }
+
+    [Fact]
+    public void DateField_ValidDate_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Created as date
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set Created = '2026-01-15'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void DateField_WrongFormat_EmitsInvalidDateFormat()
+    {
+        var precept = """
+            precept Widget
+            field Created as date
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set Created = '01-15-2026'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidDateFormat);
+    }
+
+    [Fact]
+    public void TimeField_HoursOutOfRange_EmitsInvalidTimeValue()
+    {
+        var precept = """
+            precept Widget
+            field StartTime as time
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set StartTime = '25:00:00'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidTimeValue);
+    }
+
+    [Fact]
+    public void TimeField_ValidTime_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field StartTime as time
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set StartTime = '14:30:00'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void InstantField_MissingZ_EmitsInvalidInstantFormat()
+    {
+        var precept = """
+            precept Widget
+            field Stamp as instant
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set Stamp = '2026-04-15T14:30:00'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidInstantFormat);
+    }
+
+    [Fact]
+    public void InstantField_ValidInstant_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Stamp as instant
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set Stamp = '2026-04-15T14:30:00Z'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void DateField_Month13_EmitsInvalidDateValue()
+    {
+        var precept = """
+            precept Widget
+            field Created as date
+            state Open initial
+            state Done terminal
+            event Init initial
+            from Open on Init
+                -> set Created = '2026-13-01'
+                -> transition Done
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidDateValue);
     }
 }

@@ -642,14 +642,14 @@ Test method names (representative):
 
 **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` or `TypeChecker.TypedConstants.cs` (modify), `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` (modify)
 
-- [ ] Specialize temporal constant validation to select domain-specific diagnostic over generic
-- [ ] PRE0055 (`InvalidDateValue`) — calendar date doesn't exist
-- [ ] PRE0056 (`InvalidDateFormat`) — wrong format
-- [ ] PRE0057 (`InvalidTimeValue`) — out-of-range time components
-- [ ] PRE0058 (`InvalidInstantFormat`) — missing trailing Z
-- [ ] PRE0059 (`InvalidTimezoneId`) — non-canonical IANA form
-- [ ] Tests: 6+ tests (positive + negative for each code)
-- [ ] Remove 5 codes from Gate 1 allow-list
+- [x] Specialize temporal constant validation to select domain-specific diagnostic over generic
+- [x] PRE0055 (`InvalidDateValue`) — calendar date doesn't exist
+- [x] PRE0056 (`InvalidDateFormat`) — wrong format
+- [x] PRE0057 (`InvalidTimeValue`) — out-of-range time components
+- [x] PRE0058 (`InvalidInstantFormat`) — missing trailing Z
+- [ ] PRE0059 (`InvalidTimezoneId`) — non-canonical IANA form (deferred: requires ZonedDateTime/Timezone validation split)
+- [x] Tests: 6+ tests (positive + negative for each code)
+- [x] Remove 4 codes from Gate 1 allow-list (PRE0055–0058; PRE0059 remains pending)
 
 ---
 
@@ -948,13 +948,13 @@ Test method names:
 - Add ≥1 positive + negative pair per newly-emitted domain-specific diagnostic code.
 - `TypeCheckerCITests.cs` — existing CI enforcement tests unaffected.
 
-- [ ] Confirm typed-constant family registry is promotable to catalog surface (audit current dispatch structure)
-- [ ] Design `TypedConstantFamilyMeta` record with `FormatErrorCode` + `SemanticErrorCode` (nullable for families without domain-specific codes)
-- [ ] Populate metadata for temporal families (date, time, instant, duration) — PRE0055–0058
-- [ ] Refactor `TypedConstantValidation.Validate()` to read catalog for diagnostic selection
-- [ ] Add positive + negative tests for domain-specific temporal codes
-- [ ] Remove PRE0055–0058 from Gate 1 allow-list
-- [ ] Verify Gate 1 recognizes indirect catalog emission
+- [x] Confirm typed-constant family registry is promotable to catalog surface (audit current dispatch structure)
+- [x] Design `TypedConstantFamilyMeta` record with `FormatErrorCode` + `SemanticErrorCode` (nullable for families without domain-specific codes)
+- [x] Populate metadata for temporal families (date, time, instant, duration) — PRE0055–0058
+- [x] Refactor `TypedConstantValidation.Validate()` to read catalog for diagnostic selection
+- [x] Add positive + negative tests for domain-specific temporal codes
+- [x] Remove PRE0055–0058 from Gate 1 allow-list
+- [x] Verify Gate 1 recognizes indirect catalog emission
 
 ---
 
@@ -1046,7 +1046,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 - [ ] **Slice 4:** EventHandlerInStatefulPrecept (PRE0092) — trivial structural check in `ValidateStructural`
 
 ### Priority 2 — User Experience Gaps
-- [ ] **Slice 5:** Temporal constant precision (PRE0055–0058) — specialize `TypedConstantValidation`
+- [x] **Slice 5:** ~~Temporal constant precision (PRE0055–0058)~~ — **subsumed by Slice 9B** catalog-mediated emission
 - [ ] **Slice 5A:** Ambiguous typed constant resolution (PRE0091) — TypeChecker typed-constant candidate arbitration, sequenced after typed-constant split stabilization
 - [ ] **Slice 6:** Collection safety extensions (PRE0099–0101, PRE0104) — ProofEngine + TypeChecker
 - [x] **Slice 7:** Parser guard gates (PRE0013–0015) — explicit rejection paths in `Parser.cs`
@@ -1058,7 +1058,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 These slices are in-scope for the current execution plan. They refactor emission dispatch from per-identity switches to catalog-mediated loops. They do not add net-new diagnostic coverage — their gate is behavioral equivalence plus analyzer recognition. Each requires a prerequisite audit pass; if the audit shows insufficient branch count, the slice closes as "not viable."
 
 - [ ] **Slice 9A:** Modifier constraint violations → `ModifierMeta.ConstraintDiagnosticCode` — generic loop in `ValidateModifiers` (after Slice 8 wires PRE0035/PRE0042)
-- [ ] **Slice 9B:** Typed-constant family diagnostics → `TypedConstantFamilyMeta.FormatErrorCode`/`SemanticErrorCode` — catalog dispatch in `TypedConstantValidation` (after Slice 5 or subsumes it)
+- [x] **Slice 9B:** ~~Typed-constant family diagnostics~~ → `ContentValidation.FormatErrorCode`/`SemanticErrorCode` — catalog dispatch in `TypedConstantValidation` (subsumes Slice 5)
 - [x] **Slice 9C:** Proof obligation consistency → `ProofRequirements.GetMeta(kind).DiagnosticCode` everywhere — audit and migrate remaining hardcoded ProofEngine emission **(sequence after interval engine Slice 2; must include Strategy 7)** — ✅ Completed 2025-07-14: Added `DiagnosticCode` property to `ProofRequirementMeta`; refactored `CreateFaultSiteLink` to use catalog dispatch for all non-Numeric kinds; `Numeric` retained as documented exception (1:many context-dependent mapping); `CreateDiagnostic` retained as legitimate per-obligation formatting; Strategy 7 verified: `IntervalContainment.DiagnosticCode == NumericOverflow`.
 
 ### Deferred

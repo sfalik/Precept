@@ -59,25 +59,31 @@ public static class Types
         TemporalLiteralKind.Date,
         "uuuu'-'MM'-'dd",
         "ISO 8601 date (YYYY-MM-DD)",
-        ["2026-01-15", "2024-12-31"]);
+        ["2026-01-15", "2024-12-31"],
+        FormatErrorCode: DiagnosticCode.InvalidDateFormat,
+        SemanticErrorCode: DiagnosticCode.InvalidDateValue);
 
     private static readonly NodaTimeValidation TimeValidation = new(
         TemporalLiteralKind.Time,
         "HH':'mm':'ss",
         "ISO 8601 extended time (HH:mm:ss)",
-        ["09:00:00", "14:30:00"]);
+        ["09:00:00", "14:30:00"],
+        SemanticErrorCode: DiagnosticCode.InvalidTimeValue);
 
     private static readonly NodaTimeValidation DateTimeValidation = new(
         TemporalLiteralKind.DateTime,
         "uuuu'-'MM'-'dd'T'HH':'mm':'ss",
         "ISO 8601 date-time (YYYY-MM-DDThh:mm:ss)",
-        ["2026-04-13T09:00:00", "2024-12-31T23:59:59"]);
+        ["2026-04-13T09:00:00", "2024-12-31T23:59:59"],
+        FormatErrorCode: DiagnosticCode.InvalidDateFormat,
+        SemanticErrorCode: DiagnosticCode.InvalidDateValue);
 
     private static readonly NodaTimeValidation InstantValidation = new(
         TemporalLiteralKind.Instant,
         "uuuu'-'MM'-'dd'T'HH':'mm':'ss'Z'",
         "ISO 8601 instant (YYYY-MM-DDThh:mm:ssZ)",
-        ["2026-04-15T14:30:00Z"]);
+        ["2026-04-15T14:30:00Z"],
+        FormatErrorCode: DiagnosticCode.InvalidInstantFormat);
 
     private static readonly NodaTimeValidation TimezoneValidation = new(
         TemporalLiteralKind.Timezone,

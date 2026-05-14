@@ -16,7 +16,24 @@ public readonly record struct TypedConstantParseResult(
         new(false, null, null, formatDescription, diagnostics);
 }
 
-public sealed record TypedConstantDiagnostic(string Code, string Message, string? Suggestion = null);
+/// <summary>
+/// Classifies a typed-constant validation failure as either a format mismatch
+/// (input doesn't match the expected structural pattern) or a semantic violation
+/// (input matches the pattern but contains invalid domain values).
+/// </summary>
+public enum TypedConstantErrorKind
+{
+    /// <summary>The input does not match the expected structural format.</summary>
+    Format = 1,
+    /// <summary>The input matches the format but contains invalid domain values (e.g., Feb 30).</summary>
+    Semantic = 2,
+}
+
+public sealed record TypedConstantDiagnostic(
+    string Code,
+    string Message,
+    string? Suggestion = null,
+    TypedConstantErrorKind ErrorKind = TypedConstantErrorKind.Format);
 
 public sealed record TypedConstantContext(
     TypeKind? PeerType = null,

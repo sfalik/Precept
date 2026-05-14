@@ -255,14 +255,31 @@ internal static partial class TypeChecker
             return new TypedTypedConstant(targetType, rawText, result.Value, declaredQualifiers, lit.Span);
         }
 
-        foreach (var _ in result.Diagnostics)
+        foreach (var diag in result.Diagnostics)
         {
+            var code = SelectDiagnosticCode(cv, diag.ErrorKind);
             ctx.Diagnostics.Add(
-                Diagnostics.Create(DiagnosticCode.InvalidTypedConstantContent, lit.Span,
-                    rawText, meta.DisplayName));
+                Diagnostics.Create(code, lit.Span, rawText, meta.DisplayName));
         }
 
         return new TypedErrorExpression(lit.Span);
+    }
+
+    /// <summary>
+    /// Selects the diagnostic code for a typed-constant validation failure using catalog-mediated
+    /// emission. If the family's <see cref="ContentValidation"/> declares a domain-specific code
+    /// for the error kind, that code is used; otherwise falls back to generic PRE0053.
+    /// </summary>
+    private static DiagnosticCode SelectDiagnosticCode(ContentValidation validation, TypedConstantErrorKind errorKind)
+    {
+        var catalogCode = errorKind switch
+        {
+            TypedConstantErrorKind.Semantic => validation.SemanticErrorCode ?? validation.FormatErrorCode,
+            TypedConstantErrorKind.Format => validation.FormatErrorCode ?? validation.SemanticErrorCode,
+            _ => validation.FormatErrorCode ?? validation.SemanticErrorCode,
+        };
+
+        return catalogCode ?? DiagnosticCode.InvalidTypedConstantContent;
     }
 
     /// <summary>
@@ -360,8 +377,9 @@ internal static partial class TypeChecker
         BinaryOperationMeta resolvedOperation,
         TypedExpression left,
         TypedExpression right,
-        CheckContext ctx) =>
-        new(
+        CheckContext ctx)
+    {
+        var resolved = new TypedBinaryOp(
             ResolveBinaryResultType(opMeta, resolvedOperation, left, ctx),
             resolvedOperation.Kind,
             left,
@@ -369,6 +387,12 @@ internal static partial class TypeChecker
             ResultQualifier: MapQualifierBinding(resolvedOperation),
             ProofRequirements: resolvedOperation.ProofRequirements.ToImmutableArray(),
             Span: span);
+
+        // B2 enforcement: qualifier compatibility check (PRE0070–0074)
+        ValidateQualifierCompatibility(resolved, opMeta, span, ctx);
+
+        return resolved;
+    }
 
     private static TypedBinaryOp CreateSyntheticBinaryOp(
         SourceSpan span,
@@ -804,6 +828,192 @@ internal static partial class TypeChecker
         ctx.Diagnostics.Add(
             Diagnostics.Create(DiagnosticCode.IsSetOnNonOptional, postfix.Span, "expression"));
         return new TypedErrorExpression(postfix.Span);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  B2 Enforcement: Qualifier Compatibility (PRE0070–0074)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Extract static qualifiers from a <see cref="TypedExpression"/>.
+    /// Returns null if the expression has no declared qualifiers, or if any qualifier
+    /// is dynamic (has a <see cref="DeclaredQualifierMeta.SourceFieldName"/> — meaning
+    /// the qualifier is interpolated from another field at runtime).
+    /// </summary>
+    private static ImmutableArray<DeclaredQualifierMeta>? TryGetStaticQualifiers(TypedExpression expr)
+    {
+        var qualifiers = expr switch
+        {
+            TypedFieldRef fr => fr.DeclaredQualifiers,
+            TypedArgRef ar => ar.DeclaredQualifiers,
+            TypedLiteral lit => lit.DeclaredQualifiers,
+            TypedTypedConstant tc => tc.DeclaredQualifiers,
+            _ => null,
+        };
+
+        if (qualifiers is not { } qs || qs.IsDefaultOrEmpty)
+            return null;
+
+        // If any qualifier is dynamic (sourced from a field), skip static checking.
+        foreach (var q in qs)
+        {
+            if (q.SourceFieldName is not null)
+                return null;
+        }
+
+        return qs;
+    }
+
+    /// <summary>
+    /// Get a display name for a <see cref="TypedExpression"/> operand, used in diagnostic messages.
+    /// </summary>
+    private static string GetOperandName(TypedExpression expr) => expr switch
+    {
+        TypedFieldRef fr => fr.FieldName,
+        TypedArgRef ar => ar.ArgName,
+        _ => Types.GetMeta(expr.ResultType).DisplayName,
+    };
+
+    /// <summary>
+    /// Validate qualifier compatibility for a resolved binary operation.
+    /// Emits PRE0070–0074 when static qualifiers on operands are incompatible.
+    /// Skipped when either operand has a dynamic qualifier (deferred to ProofEngine).
+    /// </summary>
+    private static void ValidateQualifierCompatibility(
+        TypedBinaryOp op, OperatorMeta opMeta, SourceSpan span, CheckContext ctx)
+    {
+        var leftQualifiers = TryGetStaticQualifiers(op.Left);
+        var rightQualifiers = TryGetStaticQualifiers(op.Right);
+        if (leftQualifiers is null || rightQualifiers is null)
+            return;
+
+        // PRE0070: Cross-currency arithmetic — Money + Money with different currencies
+        if (op.Left.ResultType == TypeKind.Money && op.Right.ResultType == TypeKind.Money
+            && opMeta.Family == OperatorFamily.Arithmetic)
+        {
+            var leftCurrency = leftQualifiers.Value.FirstOrDefault(q => q.Axis == QualifierAxis.Currency);
+            var rightCurrency = rightQualifiers.Value.FirstOrDefault(q => q.Axis == QualifierAxis.Currency);
+            if (leftCurrency is DeclaredQualifierMeta.Currency lc
+                && rightCurrency is DeclaredQualifierMeta.Currency rc
+                && !StringComparer.OrdinalIgnoreCase.Equals(lc.CurrencyCode, rc.CurrencyCode))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.CrossCurrencyArithmetic, span,
+                        GetOperandName(op.Left), lc.CurrencyCode,
+                        GetOperandName(op.Right), rc.CurrencyCode));
+                return;
+            }
+        }
+
+        // PRE0071: Cross-dimension arithmetic — Quantity + Quantity with different dimensions
+        if (op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity
+            && opMeta.Family == OperatorFamily.Arithmetic)
+        {
+            var leftDim = GetDimensionFromQualifiers(leftQualifiers.Value);
+            var rightDim = GetDimensionFromQualifiers(rightQualifiers.Value);
+            if (leftDim is not null && rightDim is not null
+                && !StringComparer.Ordinal.Equals(leftDim, rightDim))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.CrossDimensionArithmetic, span,
+                        GetOperandName(op.Left), leftDim,
+                        GetOperandName(op.Right), rightDim));
+                return;
+            }
+        }
+
+        // PRE0072: Denominator unit mismatch — division where denominator dimension differs
+        // PRE0073: Duration denominator mismatch — variable-length temporal unit as denominator
+        // PRE0074: Compound period denominator — compound period can't cancel single-unit denominator
+        if (opMeta.Kind == OperatorKind.Divide)
+            ValidateDenominatorCompatibility(op, span, ctx, leftQualifiers.Value, rightQualifiers.Value);
+    }
+
+    /// <summary>
+    /// Validate denominator compatibility for division operations (PRE0072–0074).
+    /// Checks whether the right operand's qualifier is compatible as a denominator
+    /// for the left operand in unit cancellation.
+    /// </summary>
+    private static void ValidateDenominatorCompatibility(
+        TypedBinaryOp op, SourceSpan span, CheckContext ctx,
+        ImmutableArray<DeclaredQualifierMeta> leftQualifiers,
+        ImmutableArray<DeclaredQualifierMeta> rightQualifiers)
+    {
+        // PRE0072: Physical unit/dimension mismatch in division
+        // When both operands are quantity with different dimensions, the denominator can't cancel.
+        if (op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity)
+        {
+            var leftDim = GetDimensionFromQualifiers(leftQualifiers);
+            var rightDim = GetDimensionFromQualifiers(rightQualifiers);
+            if (leftDim is not null && rightDim is not null
+                && !StringComparer.Ordinal.Equals(leftDim, rightDim))
+            {
+                // Already handled by PRE0071 for arithmetic — but division is also arithmetic,
+                // so this case is covered above. Emit PRE0072 only for cross-type division
+                // (e.g., price / quantity where dimensions don't match).
+                return;
+            }
+        }
+
+        // PRE0072: Price divided by quantity with dimension that doesn't match price's denominator dimension
+        if (op.Left.ResultType == TypeKind.Price && op.Right.ResultType == TypeKind.Quantity)
+        {
+            var priceDim = GetDimensionFromQualifiers(leftQualifiers);
+            var quantityDim = GetDimensionFromQualifiers(rightQualifiers);
+            if (priceDim is not null && quantityDim is not null
+                && !StringComparer.Ordinal.Equals(priceDim, quantityDim))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.DenominatorUnitMismatch, span,
+                        quantityDim, priceDim));
+                return;
+            }
+        }
+
+        // PRE0073: Duration denominator with variable-length temporal unit
+        var rightTemporalUnit = rightQualifiers.FirstOrDefault(q => q.Axis == QualifierAxis.TemporalUnit)
+            as DeclaredQualifierMeta.TemporalUnit;
+        if (rightTemporalUnit is not null
+            && op.Left.ResultType is TypeKind.Duration or TypeKind.Period
+            && rightTemporalUnit.DerivedDimension == PeriodDimension.Date)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.DurationDenominatorMismatch, span,
+                    rightTemporalUnit.UnitName));
+            return;
+        }
+
+        // PRE0074: Compound period as denominator against a single-unit denominator
+        // A period with multiple temporal qualifiers can't cleanly cancel a single-unit denominator.
+        var leftTemporalUnit = leftQualifiers.FirstOrDefault(q => q.Axis == QualifierAxis.TemporalUnit)
+            as DeclaredQualifierMeta.TemporalUnit;
+        var rightTemporalDims = rightQualifiers.Where(q =>
+            q.Axis == QualifierAxis.TemporalUnit || q.Axis == QualifierAxis.TemporalDimension).ToList();
+        if (leftTemporalUnit is not null && rightTemporalDims.Count > 1)
+        {
+            var compoundDesc = string.Join(" + ", rightTemporalDims.Select(q => q switch
+            {
+                DeclaredQualifierMeta.TemporalUnit tu => tu.UnitName,
+                DeclaredQualifierMeta.TemporalDimension td => td.Value.ToString().ToLowerInvariant(),
+                _ => "unknown",
+            }));
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.CompoundPeriodDenominator, span,
+                    compoundDesc, leftTemporalUnit.UnitName));
+        }
+    }
+
+    /// <summary>
+    /// Extract the dimension name from a qualifier array (checking Unit, then Dimension axis).
+    /// </summary>
+    private static string? GetDimensionFromQualifiers(ImmutableArray<DeclaredQualifierMeta> qualifiers)
+    {
+        foreach (var q in qualifiers)
+        {
+            if (q is DeclaredQualifierMeta.Unit u) return u.DimensionName;
+            if (q is DeclaredQualifierMeta.Dimension d) return d.DimensionName;
+        }
+        return null;
     }
 
     /// <summary>
