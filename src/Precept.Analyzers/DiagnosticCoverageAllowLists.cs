@@ -36,10 +36,8 @@ internal static class DiagnosticCoverageAllowLists
         "ChoiceRankConflict",                 // B3: choice ordering check not wired
 
         // ── Root Cause B4 — Collection Safety Extensions ─────────────────────────
-        "KeyPresenceSafety",                  // B4: key access safety not wired
-        "IndexBoundsGuard",                   // B4: index access safety not wired
-        "KeyUniquenessGuard",                 // B4: key uniqueness safety not wired
-        "MissingOrderingKey",                 // B4: ordering key check not wired
+        "KeyPresenceSafety",                  // B4: obligation generator not yet on lookup accessor
+        "KeyUniquenessGuard",                 // B4: obligation generator not yet on lookup put action
 
         // ── Root Cause C — Structural Single-Check Gaps ──────────────────────────
         "EventHandlerInStatefulPrecept",      // C: trivial structural check not wired
@@ -83,6 +81,6 @@ internal static class DiagnosticCoverageAllowLists
     /// </summary>
     internal static readonly HashSet<string> Gate2AllowList = new()
     {
-        // Empty at initialization. All 84 emitted codes have test coverage.
+        // ── Slice 6 — PRE0100 and PRE0104 have tests in TypeCheckerCollectionSafetyTests
     };
 }

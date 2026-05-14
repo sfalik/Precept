@@ -32,4 +32,7 @@ public enum ProofRequirementKind
 
     /// <summary>Count containment check — collection element count must fit within the field's declared mincount/maxcount.</summary>
     CountContainment       =  9,
+
+    /// <summary>Key presence check — collection must contain (or not contain) a specific key before access/mutation.</summary>
+    KeyPresence            = 10,
 }

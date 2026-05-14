@@ -260,6 +260,12 @@ public abstract record ProofRequirementMeta(
         : ProofRequirementMeta(ProofRequirementKind.CountContainment,
             "Count containment — collection element count must fit within declared mincount/maxcount",
             Language.DiagnosticCode.CountBoundViolation);
+
+    /// <summary>Key presence — collection must contain (or not contain) a specific element before access/mutation.</summary>
+    public sealed record KeyPresence()
+        : ProofRequirementMeta(ProofRequirementKind.KeyPresence,
+            "Key presence — collection must contain or not contain a specific element",
+            null);  // Routes to PRE0099 or PRE0101 depending on RequireAbsence
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement
@@ -291,6 +297,9 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
     public sealed record CountContainment()
         : ProofSatisfaction(ProofRequirementKind.CountContainment);
+
+    public sealed record KeyPresence(bool Negated)
+        : ProofSatisfaction(ProofRequirementKind.KeyPresence);
 }
 
 public abstract record SatisfactionProjection

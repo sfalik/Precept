@@ -21,6 +21,7 @@ public static class ProofRequirements
         ProofRequirementKind.IntervalContainment   => new ProofRequirementMeta.IntervalContainment(),
         ProofRequirementKind.LengthContainment     => new ProofRequirementMeta.LengthContainment(),
         ProofRequirementKind.CountContainment      => new ProofRequirementMeta.CountContainment(),
+        ProofRequirementKind.KeyPresence           => new ProofRequirementMeta.KeyPresence(),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ProofRequirementKind: {kind}"),
     };

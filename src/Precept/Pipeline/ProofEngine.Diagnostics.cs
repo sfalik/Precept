@@ -105,6 +105,17 @@ public static partial class ProofEngine
                     maxStr,
                     countReq.TargetField);
             }
+
+            case KeyPresenceProofRequirement keyReq:
+            {
+                var fieldName = obligation.Site is TypedFieldRef fr ? fr.FieldName : "?";
+                var code = keyReq.RequireAbsence
+                    ? DiagnosticCode.KeyUniquenessGuard
+                    : DiagnosticCode.KeyPresenceSafety;
+                return Diagnostics.Create(code, obligation.Site.Span,
+                    fieldName,
+                    "element");
+            }
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
@@ -120,6 +131,17 @@ public static partial class ProofEngine
         switch (obligation.Site)
         {
             case TypedMemberAccess access:
+                // .at() index access → PRE0100 (IndexBoundsGuard) for more specific diagnostics
+                if (access.ResolvedAccessor.Name == "at" && access.ResolvedAccessor.ParameterType is not null)
+                {
+                    diagnostic = Diagnostics.Create(
+                        DiagnosticCode.IndexBoundsGuard,
+                        obligation.Site.Span,
+                        DescribeExpression(access.Object),
+                        "index");
+                    return true;
+                }
+
                 diagnostic = Diagnostics.Create(
                     DiagnosticCode.UnguardedCollectionAccess,
                     obligation.Site.Span,
@@ -163,6 +185,7 @@ public static partial class ProofEngine
         {
             return obligation.Site switch
             {
+                TypedMemberAccess { ResolvedAccessor: { Name: "at", ParameterType: not null } } => DiagnosticCode.IndexBoundsGuard,
                 TypedMemberAccess => DiagnosticCode.UnguardedCollectionAccess,
                 TypedFieldRef => DiagnosticCode.UnguardedCollectionMutation,
                 _ => DiagnosticCode.DivisionByZero,
@@ -236,6 +259,15 @@ public static partial class ProofEngine
         if (obligation.Requirement is NumericProofRequirement numeric)
             return CreateFaultSiteLink(obligation, GetNumericRequirementDiagnosticCode(obligation, numeric));
 
+        // KeyPresence has a 1:2 mapping (PRE0099 or PRE0101 depending on RequireAbsence)
+        if (obligation.Requirement is KeyPresenceProofRequirement keyReq)
+        {
+            var code = keyReq.RequireAbsence
+                ? DiagnosticCode.KeyUniquenessGuard
+                : DiagnosticCode.KeyPresenceSafety;
+            return CreateFaultSiteLink(obligation, code);
+        }
+
         // All other obligation kinds have a stable 1:1 kind→diagnostic mapping in catalog metadata.
         var meta = ProofRequirements.GetMeta(obligation.Requirement.Kind);
         return CreateFaultSiteLink(obligation, meta.DiagnosticCode!.Value);
@@ -249,6 +281,9 @@ public static partial class ProofEngine
             DiagnosticCode.SqrtOfNegative => FaultCode.SqrtOfNegative,
             DiagnosticCode.UnguardedCollectionAccess => FaultCode.CollectionEmptyOnAccess,
             DiagnosticCode.UnguardedCollectionMutation => FaultCode.CollectionEmptyOnMutation,
+            DiagnosticCode.KeyPresenceSafety => FaultCode.CollectionEmptyOnAccess,
+            DiagnosticCode.KeyUniquenessGuard => FaultCode.CollectionEmptyOnMutation,
+            DiagnosticCode.IndexBoundsGuard => FaultCode.CollectionEmptyOnAccess,
             DiagnosticCode.NumericOverflow => FaultCode.NumericOverflow,
             DiagnosticCode.LengthBoundViolation => FaultCode.LengthBoundViolation,
             DiagnosticCode.CountBoundViolation => FaultCode.CountBoundViolation,

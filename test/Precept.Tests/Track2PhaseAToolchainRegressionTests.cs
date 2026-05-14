@@ -75,7 +75,7 @@ public sealed class Track2PhaseAToolchainRegressionTests
     }
 
     [Fact]
-    public void ListAt_WithoutNotempty_EmitsUnguardedCollectionAccess_NotDivisionByZero()
+    public void ListAt_WithoutNotempty_EmitsIndexBoundsGuard_NotDivisionByZero()
     {
         var compilation = Compile("""
             precept Bug039Regression
@@ -83,8 +83,8 @@ public sealed class Track2PhaseAToolchainRegressionTests
             field ThirdStep as string optional <- Steps.at(2)
             """);
 
-        compilation.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnguardedCollectionAccess),
-            because: "collection access without a non-empty proof should use the collection-safety diagnostic");
+        compilation.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
+            because: "index access without a bounds proof should use the index-bounds diagnostic (PRE0100)");
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DivisionByZero),
             because: "Steps.at(2) is collection access, not arithmetic division (PRE0083)");
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.ExpectedToken),

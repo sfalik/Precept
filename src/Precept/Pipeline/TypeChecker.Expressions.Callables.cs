@@ -690,6 +690,23 @@ internal static partial class TypeChecker
             return new TypedErrorExpression(expr.Span);
         }
 
+        // PRE0104: Check RequiredTraits — e.g., .min/.max require Orderable element type
+        if (accessor.RequiredTraits != TypeTrait.None)
+        {
+            var elementType = GetElementType(receiver, ctx);
+            if (elementType is not null)
+            {
+                var elementMeta = Types.GetMeta(elementType.Value);
+                if ((elementMeta.Traits & accessor.RequiredTraits) != accessor.RequiredTraits)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.MissingOrderingKey, expr.Span,
+                            expr.MemberName));
+                    return new TypedErrorExpression(expr.Span);
+                }
+            }
+        }
+
         return new TypedMemberAccess(
             returnType,
             receiver,
@@ -760,6 +777,23 @@ internal static partial class TypeChecker
                 Diagnostics.Create(DiagnosticCode.InvalidMemberAccess, expr.Span,
                     expr.MethodName, typeMeta.DisplayName));
             return new TypedErrorExpression(expr.Span);
+        }
+
+        // PRE0104: Check RequiredTraits — e.g., .min/.max require Orderable element type
+        if (accessor.RequiredTraits != TypeTrait.None)
+        {
+            var elementType = GetElementType(receiver, ctx);
+            if (elementType is not null)
+            {
+                var elementMeta = Types.GetMeta(elementType.Value);
+                if ((elementMeta.Traits & accessor.RequiredTraits) != accessor.RequiredTraits)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.MissingOrderingKey, expr.Span,
+                            expr.MethodName));
+                    return new TypedErrorExpression(expr.Span);
+                }
+            }
         }
 
         return new TypedMemberAccess(

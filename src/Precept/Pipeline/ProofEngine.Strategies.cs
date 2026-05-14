@@ -656,4 +656,56 @@ public static partial class ProofEngine
         return Operations.GetMeta(op).Op == OperatorKind.Minus;
     }
 
+    // ── Contains Guard Matching (PRE0099, PRE0101) ────────────────────────────
+
+    /// <summary>
+    /// Checks whether the guard expression contains a 'Field contains X' check
+    /// (or 'not (Field contains X)' if <paramref name="requireNegated"/> is true).
+    /// Used to satisfy <see cref="KeyPresenceProofRequirement"/> obligations.
+    /// </summary>
+    private static bool GuardHasContainsCheck(TypedExpression guard, string? fieldName, bool requireNegated)
+    {
+        if (fieldName is null) return false;
+        return WalkForContains(guard, fieldName, requireNegated);
+    }
+
+    private static bool WalkForContains(TypedExpression expr, string fieldName, bool requireNegated)
+    {
+        switch (expr)
+        {
+            case TypedBinaryOp bin:
+            {
+                var op = Operations.GetMeta(bin.ResolvedOp).Op;
+
+                if (op == OperatorKind.And)
+                    return WalkForContains(bin.Left, fieldName, requireNegated)
+                        || WalkForContains(bin.Right, fieldName, requireNegated);
+
+                if (op == OperatorKind.Contains && !requireNegated)
+                {
+                    // Field contains X — positive contains guard
+                    if (bin.Left is TypedFieldRef fr && fr.FieldName == fieldName)
+                        return true;
+                }
+                break;
+            }
+
+            case TypedUnaryOp { ResolvedOp: var uop } un when Operations.GetMeta(uop).Op == OperatorKind.Not:
+            {
+                // not (Field contains X) — negative contains guard
+                if (requireNegated && un.Operand is TypedBinaryOp innerBin)
+                {
+                    var innerOp = Operations.GetMeta(innerBin.ResolvedOp).Op;
+                    if (innerOp == OperatorKind.Contains
+                        && innerBin.Left is TypedFieldRef fr
+                        && fr.FieldName == fieldName)
+                        return true;
+                }
+                break;
+            }
+        }
+
+        return false;
+    }
+
 }

@@ -32,6 +32,10 @@ public static partial class ProofEngine
         decimal? Value,
         bool IsPresenceCheck);
 
+    private record ContainsGuardConstraint(
+        string Field,
+        bool Negated);
+
     private record FieldToFieldConstraint(
         string LeftField,
         OperatorKind Comparison,

@@ -41,8 +41,8 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        // Updated for Slice 11: +2 kinds (LengthContainment = 8, CountContainment = 9)
-        ProofRequirements.All.Should().HaveCount(9);
+        // Updated for Slice 6: +1 kind (KeyPresence = 10)
+        ProofRequirements.All.Should().HaveCount(10);
     }
 
     // ── DU subtype correctness ──────────────────────────────────────────────────
@@ -102,12 +102,12 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void FiveKinds_AreSingleSubject()
     {
-        // Updated for Slice 11: +2 single-subject kinds (LengthContainment, CountContainment)
+        // Updated for Slice 6: +1 single-subject kind (KeyPresence)
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
             .ToList();
-        singleSubject.Should().HaveCount(7);
+        singleSubject.Should().HaveCount(8);
     }
 
     // ── Instance Kind property matches catalog ──────────────────────────────────
@@ -207,14 +207,14 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void SingleSubjectKinds_NowIncludesIntervalContainment()
     {
-        // Updated for Slice 11: single-subject kinds are now 7
-        // (Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment, CountContainment)
+        // Updated for Slice 6: single-subject kinds are now 8
+        // (Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment, CountContainment, KeyPresence)
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
             .ToList();
-        singleSubject.Should().HaveCount(7,
-            "IntervalContainment, LengthContainment, and CountContainment join Numeric, Presence, Dimension, Modifier as single-subject");
+        singleSubject.Should().HaveCount(8,
+            "KeyPresence joins IntervalContainment, LengthContainment, CountContainment, Numeric, Presence, Dimension, Modifier as single-subject");
     }
 
     // ── Slice 9C — Catalog-mediated DiagnosticCode ──────────────────────────────
@@ -284,12 +284,22 @@ public class ProofRequirementCatalogTests
     }
 
     [Fact]
-    public void AllNonNumericKinds_HaveNonNullDiagnosticCode()
+    public void AllNonNumericNonKeyPresenceKinds_HaveNonNullDiagnosticCode()
     {
-        var nonNumeric = ProofRequirements.All
-            .Where(m => m.Kind != ProofRequirementKind.Numeric)
+        // Numeric and KeyPresence use context-dependent routing (1:many mapping)
+        var nonContextual = ProofRequirements.All
+            .Where(m => m.Kind != ProofRequirementKind.Numeric
+                     && m.Kind != ProofRequirementKind.KeyPresence)
             .ToList();
-        nonNumeric.Should().AllSatisfy(m =>
+        nonContextual.Should().AllSatisfy(m =>
             m.DiagnosticCode.Should().NotBeNull($"{m.Kind} should have a catalog-mediated DiagnosticCode"));
+    }
+
+    [Fact]
+    public void KeyPresence_DiagnosticCode_IsNull_BecauseContextDependent()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.KeyPresence)
+            .DiagnosticCode.Should().BeNull(
+                "KeyPresence obligations route to PRE0099 or PRE0101 depending on RequireAbsence flag");
     }
 }

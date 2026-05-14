@@ -745,13 +745,13 @@ Test method names (representative):
 
 **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.Callables.cs` (modify), `src/Precept/Pipeline/ProofEngine.Diagnostics.cs` (modify), test files (create/modify)
 
-- [ ] Audit: verify whether existing PRE0063/0064 already catches some B4 cases
-- [ ] PRE0104 `MissingOrderingKey` — TypeChecker structural check on `.min`/`.max` calls
-- [ ] PRE0099 `KeyAccessWithoutWhen` — ProofEngine proof obligation for lookup key access
-- [ ] PRE0100 `IndexAccessWithoutWhen` — ProofEngine proof obligation for list index access
-- [ ] PRE0101 `DuplicateKeyAddWithoutWhen` — ProofEngine proof obligation for `put` without uniqueness guard
-- [ ] Tests: 6+ tests
-- [ ] Remove 4 codes from Gate 1 allow-list
+- [x] Audit: verify whether existing PRE0063/0064 already catches some B4 cases
+- [x] PRE0104 `MissingOrderingKey` — TypeChecker structural check on `.min`/`.max` calls
+- [ ] PRE0099 `KeyAccessWithoutWhen` — ProofEngine proof obligation for lookup key access (blocked: lookup accessor not yet in catalog)
+- [x] PRE0100 `IndexAccessWithoutWhen` — ProofEngine proof obligation for list index access
+- [ ] PRE0101 `DuplicateKeyAddWithoutWhen` — ProofEngine proof obligation for `put` without uniqueness guard (blocked: lookup put action not yet in catalog)
+- [x] Tests: 10 tests in TypeCheckerCollectionSafetyTests
+- [x] Remove 2 codes from Gate 1 allow-list (IndexBoundsGuard, MissingOrderingKey)
 
 ---
 
