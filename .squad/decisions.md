@@ -26,11 +26,11 @@
 
 **Status:** Merged from Frank's overflow-prevention revision.
 
-**Merged source:** rank-overflow-prevention-revision.md.
+**Merged source:** `frank-overflow-prevention-revision.md`.
 
-- Frank revised overflow-prevention-design-analysis.md in place so obsolete @bounds, bounded-integer, validator-phase, runtime-fallback, extra-diagnostic, and three-wave rollout claims are clearly superseded by the interval proof engine design.
-- Strategy 7 (IntervalContainment) now owns bounded arithmetic range checking, NumericOverflow emission, modifier-derived bound extraction, guard narrowing, catalog-driven interval transfer, and hover interval display.
-- The overflow-prevention analysis keeps only durable value: problem framing, strategy comparison, and historical context, with explicit cross-references to interval-proof-engine-design.md.
+- Frank revised `overflow-prevention-design-analysis.md` in place so obsolete `@bounds`, bounded-integer, validator-phase, runtime-fallback, extra-diagnostic, and three-wave rollout claims are clearly superseded by the interval proof engine design.
+- Strategy 7 (`IntervalContainment`) now owns bounded arithmetic range checking, `NumericOverflow` emission, modifier-derived bound extraction, guard narrowing, catalog-driven interval transfer, and hover interval display.
+- The overflow-prevention analysis keeps only durable value: problem framing, strategy comparison, and historical context, with explicit cross-references to `interval-proof-engine-design.md`.
 
 ---
 
