@@ -21760,3 +21760,106 @@ Designed the architecture for fixing false-positive `NumericOverflow` diagnostic
 
 Slices 14–18 continuing from the interval-proof-engine-design tracker.
 
+# Decision Record: Interpolated Quantity Expressions and Normalization Design
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14T01:23:00-04:00
+**Status:** Analysis complete — pending Shane review
+**Scope:** Impact of interpolated quantity expressions on quantity-normalization-design.md
+
+---
+
+## Context
+
+The quantity-normalization-design.md was built around the **static typed-constant literal** case: set test = '6 [lb_av]' where the magnitude is a compile-time decimal. The actual samples/Test.precept file contains set test = '{test2} [lb_av]' — an **interpolated** expression where the magnitude is a field reference resolved at runtime.
+
+## Key Findings
+
+### 1. The IDE diagnostic fires on the interpolated expression
+
+The language server emits NumericOverflow (PRE0078) on line 14 ('{test2} [lb_av]'), character range 18–35. The MCP precept_compile tool reports 0 diagnostics because it does not run the ProofEngine — only parse, type-check, and graph-analyze.
+
+### 2. AST node type: TypedInterpolatedTypedConstant
+
+The expression '{test2} [lb_av]' is parsed as InterpolatedTypedConstantExpression and resolved to TypedInterpolatedTypedConstant with:
+- **Slots:** One TypedInterpolationSlot(Expression: TypedFieldRef("test2"), SlotKind: Magnitude)
+- **ResultType:** Quantity
+- **StaticMagnitude:** 
+ull (magnitude is not statically known)
+
+This is NOT a TypedTypedConstant — the static-literal extraction paths (TryGetTypedConstantMagnitude, TryExtractTypedConstantMagnitude) do not apply.
+
+### 3. Both ProofEngine strategies fail
+
+**Strategy 7 (Interval Containment):** IntervalOfNarrowed in ProofEngine.Intervals.cs has no case for TypedInterpolatedTypedConstant. Falls to default → NumericInterval.Unbounded → interval proof fails.
+
+**Strategy 6 (Compositional Constraint Propagation):** Finds the interpolated assignment, extracts 	est2 as the magnitude slot source, resolves 	est2's Max modifier. But SatisfactionCovers (line 199 of ProofEngine.Strategies.cs) cannot resolve NumericBoundSource.DeclarationValue to a concrete number (line 225: DeclarationValue => null). Satisfaction check fails → proof not discharged.
+
+### 4. The static-literal fix (Slices 14–18) does NOT fix this
+
+The normalization slices modify TryExtractTypedConstantMagnitude and TryGetTypedConstantMagnitude — paths that handle TypedTypedConstant nodes. The interpolated case hits entirely different code paths. These are **independent problems**.
+
+## Decision
+
+### D1: The interpolated case is a separate implementation track
+
+Slices 14–18 fix the static-literal normalization. A new track (Slices 19–21) is needed for interpolated quantity interval analysis. These tracks are independent and can be parallelized.
+
+### D2: The correct fix requires two extensions
+
+1. **IntervalOfNarrowed must handle TypedInterpolatedTypedConstant:** When the expression has a single Magnitude slot, recurse into the slot's expression to compute the magnitude interval. For TypedFieldRef("test2"), this produces ExtractFieldInterval("test2") → (-∞, 2].
+
+2. **Unit-aware interval scaling:** The static unit suffix [lb_av] must be extracted from the text segments and its UCUM factor used to scale the magnitude interval: (-∞, 2] × 453.59237 = (-∞, 907.18] grams. Compare against 5 kg → 5000 grams → 907.18 ≤ 5000 → proof discharged.
+
+### D3: TypedInterpolatedTypedConstant needs a UcumParsedUnit? field
+
+Currently the resolved typed constant discards the static text segments after form-matching. To enable unit-aware interval scaling, the TypedInterpolatedTypedConstant should carry the parsed UcumParsedUnit? for the static unit portion (when the unit is not itself an interpolated hole).
+
+### D4: Null/optional semantics for interpolated magnitude is a separate question
+
+	est2 is optional and unguarded in the transition. The question of what happens when '{null} [lb_av]' executes at runtime is a presence-proof question, not a normalization question. It's documented as open question Q6 but does not block the normalization design.
+
+## Files Updated
+
+- docs/Working/quantity-normalization-design.md — added §1.5, §5.3 (Slices 19–21), §7 Q5 and Q6
+- .squad/agents/frank/history.md — appended session summary
+
+## Cross-References
+
+| File | Relevance |
+|------|-----------|
+| src/Precept/Pipeline/ParsedExpression.cs:92-98 | InterpolatedTypedConstantExpression definition |
+| src/Precept/Pipeline/SemanticIndex.cs:136-141 | TypedInterpolatedTypedConstant definition |
+| src/Precept/Pipeline/ProofEngine.Intervals.cs:15-82 | IntervalOfNarrowed — missing case for interpolated |
+| src/Precept/Pipeline/ProofEngine.Composition.cs:12-68 | S6 compositional strategy — DeclarationValue limitation |
+| src/Precept/Pipeline/ProofEngine.Strategies.cs:199-228 | SatisfactionCovers — conservative null for DeclarationValue |
+| src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs:765-892 | ResolveInterpolatedTypedConstant |
+
+# Decision: Corrected incorrect claim about precept_compile pipeline scope
+
+**By:** Frank
+**Date:** 2026-05-14T01:31:00-04:00
+**Status:** Pending merge
+
+## Context
+
+docs/Working/quantity-normalization-design.md (line 97) stated that the MCP precept_compile tool "does not run the ProofEngine, only parse + type-check + graph-analyze" and that ProofEngine diagnostics fire "only in the language server's full pipeline."
+
+## Finding
+
+This is incorrect. Verified from source:
+
+- Compiler.Compile() (src/Precept/Compiler.cs, line 19) calls ProofEngine.Prove(semantics, graph).
+- proof.Diagnostics is included in the returned Compilation.Diagnostics array.
+- CompileTool.Compile() (	ools/Precept.Mcp/Tools/CompileTool.cs) calls Compiler.Compile(text) and returns ALL diagnostics including proof diagnostics.
+
+The MCP tool runs the **full pipeline**: lex → parse → type-check → graph-analyze → proof-engine.
+
+## Correction
+
+Replaced the incorrect statement with an accurate description: precept_compile runs the full pipeline including the ProofEngine. The 0-diagnostic result for the specific test input is explained by the interpolated expression hitting the Unbounded path in Strategy 7, not by the ProofEngine being absent.
+
+## Affected Files
+
+- docs/Working/quantity-normalization-design.md — corrected line 97
+- .squad/agents/frank/history.md — added learning
