@@ -19,7 +19,7 @@
 | **5** | Hover Expression Display + Diagnostic Squiggle | Kramer | ✅ Done | `dotnet test test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj --filter "FullyQualifiedName~HoverHandlerIntervalTests\|FullyQualifiedName~HoverHandlerTests"` (70/70) | Interval field/expression + NumericOverflow squiggle hover shipped |
 | **6** | Regression + Symbol Export | Soup Nazi | ⏳ Pending | — | Final validation |
 | **7** | Catalog-Driven Obligation Generator Refactor | George | ✅ Done | ProofEngineIntervalIntegrationTests; ProofEngineTests.Slice1_ObligationCollection; Precept.Tests | Catalog-driven bounds extraction from modifier metadata (ApplicableTo + ProofSatisfactions) wired for obligation generation; Slice 2 anchors remain green. |
-| **8** | Qualified-Type Bound Semantics | George | ⏳ Pending | — | Depends on Slice 7 |
+| **8** | Qualified-Type Bound Semantics | George | ✅ Done | dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeCheckerModifierTests\|FullyQualifiedName~PriceExchangeRateModifierTests" (69/69); dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeChecker" (662/662) | Added metadata-driven bound qualifier requirements (money/quantity/price) and BoundsRequireQualifier type-checker enforcement with regression coverage. |
 | **9** | Typed-Constant Bound Extraction | George | ⏳ Pending | — | Depends on Slice 8 |
 | **10** | Qualifier Compatibility Checks | George | ⏳ Pending | — | Depends on Slice 8 |
 | **11** | String/Collection Constraint Obligations | George | ⏳ Pending | — | Depends on Slice 7 |

@@ -553,6 +553,78 @@ public class TypeCheckerModifierTests
     }
 
     [Fact]
+    public void BoundsRequireQualifier_MoneyWithoutIn_EmitsDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money max '500.00 USD'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.BoundsRequireQualifier);
+    }
+
+    [Fact]
+    public void BoundsRequireQualifier_MoneyWithIn_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' max '500.00 USD'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void BoundsRequireQualifier_QuantityWithoutInOrOf_EmitsDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity max '5 kg'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.BoundsRequireQualifier);
+    }
+
+    [Fact]
+    public void BoundsRequireQualifier_QuantityWithIn_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity in 'kg' max '5 kg'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void BoundsRequireQualifier_QuantityWithOf_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Weight as quantity of 'mass' max '5 kg'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void BoundsRequireQualifier_DecimalWithBoundsNoQualifier_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as decimal min 0 max 1000
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
     public void MinModifier_OnMoneyField_InvalidCurrency_EmitsInvalidTypedConstantContent()
     {
         var precept = """

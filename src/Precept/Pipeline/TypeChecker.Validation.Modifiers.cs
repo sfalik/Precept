@@ -14,6 +14,7 @@ internal static partial class TypeChecker
                 field.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)?.Modifiers ?? ImmutableArray<ParsedModifier>.Empty,
                 field.ResolvedType,
                 field.ImpliedModifiers,
+                field.DeclaredQualifiers,
                 field.IsComputed,
                 field.Syntax.Span,
                 field.Name,
@@ -30,6 +31,7 @@ internal static partial class TypeChecker
                     arg.Modifiers.Select(kind => new ParsedModifier(kind, null, arg.Span)).ToImmutableArray(),
                     arg.ResolvedType,
                     ImmutableArray<ModifierKind>.Empty,
+                    arg.DeclaredQualifiers,
                     isComputed: false,
                     arg.Span,
                     arg.Name,
@@ -48,6 +50,7 @@ internal static partial class TypeChecker
         ImmutableArray<ParsedModifier> modifiers,
         TypeKind resolvedType,
         ImmutableArray<ModifierKind> impliedModifiers,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
         bool isComputed,
         SourceSpan span,
         string declarationName,
@@ -161,7 +164,90 @@ internal static partial class TypeChecker
             }
         }
 
+        ValidateBoundQualifierRequirements(modifiers, resolvedType, declaredQualifiers, ctx);
         ValidateModifierBounds(modifiers, span, ctx);
+    }
+
+    private static void ValidateBoundQualifierRequirements(
+        ImmutableArray<ParsedModifier> modifiers,
+        TypeKind resolvedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
+        CheckContext ctx)
+    {
+        if (modifiers.IsDefaultOrEmpty || resolvedType == TypeKind.Error)
+            return;
+
+        bool hasMin = false;
+        bool hasMax = false;
+        bool hasBoundModifier = false;
+        var boundSpan = default(SourceSpan);
+
+        foreach (var modifier in modifiers)
+        {
+            switch (modifier.Kind)
+            {
+                case ModifierKind.Min:
+                    hasMin = true;
+                    if (!hasBoundModifier)
+                    {
+                        hasBoundModifier = true;
+                        boundSpan = modifier.Span;
+                    }
+                    break;
+                case ModifierKind.Max:
+                    hasMax = true;
+                    if (!hasBoundModifier)
+                    {
+                        hasBoundModifier = true;
+                        boundSpan = modifier.Span;
+                    }
+                    break;
+            }
+        }
+
+        if (!hasBoundModifier)
+            return;
+
+        var typeMeta = Types.GetMeta(resolvedType);
+        if (typeMeta.RequiredBoundQualifierAxes.Count == 0)
+            return;
+
+        if (declaredQualifiers.Any(q => typeMeta.RequiredBoundQualifierAxes.Contains(q.Axis)))
+            return;
+
+        var requiredPrepositions = typeMeta.QualifierShape?.Slots
+            .Where(slot => typeMeta.RequiredBoundQualifierAxes.Contains(slot.Axis))
+            .Select(slot => Tokens.GetMeta(slot.Preposition).Text ?? slot.Preposition.ToString().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray() ?? [];
+
+        var boundLabel = hasMin && hasMax
+            ? "min/max"
+            : hasMin
+                ? "min"
+                : "max";
+
+        ctx.Diagnostics.Add(Diagnostics.Create(
+            DiagnosticCode.BoundsRequireQualifier,
+            boundSpan,
+            boundLabel,
+            typeMeta.DisplayName,
+            FormatRequiredQualifierLabel(requiredPrepositions)));
+    }
+
+    private static string FormatRequiredQualifierLabel(IReadOnlyList<string> qualifiers)
+    {
+        if (qualifiers.Count == 0)
+            return "the required qualifier";
+
+        if (qualifiers.Count == 1)
+            return $"'{qualifiers[0]}'";
+
+        if (qualifiers.Count == 2)
+            return $"'{qualifiers[0]}' or '{qualifiers[1]}'";
+
+        var head = string.Join(", ", qualifiers.Take(qualifiers.Count - 1).Select(q => $"'{q}'"));
+        return $"{head}, or '{qualifiers[^1]}'";
     }
 
     private static void ValidateModifierBounds(

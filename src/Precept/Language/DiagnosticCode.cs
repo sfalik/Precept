@@ -74,6 +74,8 @@ public enum DiagnosticCode
     InvalidModifierForType             =  33,
     InvalidModifierBounds              =  34,
     InvalidModifierValue               =  35,
+    /// <summary><c>min</c>/<c>max</c> bounds on qualified types require explicit qualifier context.</summary>
+    BoundsRequireQualifier             = 133,
     DuplicateModifier                  =  36,
     RedundantModifier                  =  37,
     ComputedFieldNotWritable           =  38,

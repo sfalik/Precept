@@ -221,7 +221,12 @@ public record TypeMeta(
     /// Example: <c>duration</c> carries an implied <c>TemporalDimension(Time, Baseline)</c> because
     /// duration is intrinsically a time-dimension measurement.
     /// </summary>
-    DeclaredQualifierMeta[]?     ImpliedQualifiers = null
+    DeclaredQualifierMeta[]?     ImpliedQualifiers = null,
+    /// <summary>
+    /// Qualifier axes required when <c>min</c>/<c>max</c> bounds are declared on this type.
+    /// Empty means bounds do not require qualifier context.
+    /// </summary>
+    IReadOnlyList<QualifierAxis>? RequiredBoundQualifierAxes = null
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>
@@ -235,4 +240,7 @@ public record TypeMeta(
 
     /// <summary>Qualifiers intrinsically carried by this type (e.g., duration → TemporalDimension(Time)).</summary>
     public DeclaredQualifierMeta[] ImpliedQualifiers { get; } = ImpliedQualifiers ?? [];
+
+    /// <summary>Qualifier axes that must be present when min/max bounds are declared on this type.</summary>
+    public IReadOnlyList<QualifierAxis> RequiredBoundQualifierAxes { get; } = RequiredBoundQualifierAxes ?? Array.Empty<QualifierAxis>();
 }

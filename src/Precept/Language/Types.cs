@@ -498,6 +498,7 @@ public static class Types
             "Monetary amount with currency",
             TypeCategory.BusinessDomain,
             QualifierShape: QS_Currency,
+            RequiredBoundQualifierAxes: [QualifierAxis.Currency],
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors:
             [
@@ -527,6 +528,7 @@ public static class Types
             "Measured amount with unit",
             TypeCategory.BusinessDomain,
             QualifierShape: QS_UnitOrDimension,
+            RequiredBoundQualifierAxes: [QualifierAxis.Unit, QualifierAxis.Dimension],
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors:
             [
@@ -573,6 +575,7 @@ public static class Types
             "Price: monetary amount per unit",
             TypeCategory.BusinessDomain,
             QualifierShape: QS_CurrencyAndDimension,
+            RequiredBoundQualifierAxes: [QualifierAxis.Currency],
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors:
             [

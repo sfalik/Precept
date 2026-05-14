@@ -97,6 +97,30 @@ public class PriceExchangeRateModifierTests
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
 
+    [Fact]
+    public void BoundsRequireQualifier_PriceWithoutIn_EmitsDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field X as price of 'mass' min '1 USD/kg'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.BoundsRequireQualifier);
+    }
+
+    [Fact]
+    public void BoundsRequireQualifier_PriceWithIn_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field X as price in 'USD' of 'mass' min '1 USD/kg'
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  maxplaces on price — must produce 0 errors (gap now fixed)
     // ════════════════════════════════════════════════════════════════════════
@@ -196,6 +220,18 @@ public class PriceExchangeRateModifierTests
             """;
 
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierForType);
+    }
+
+    [Fact]
+    public void BoundsRequireQualifier_ExchangeRateWithBounds_NoDiagnostic()
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+            precept Widget
+            field X as exchangerate min '0.9 USD/EUR'
+            state Open initial
+            """);
+
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.BoundsRequireQualifier));
     }
 
     // ════════════════════════════════════════════════════════════════════════
