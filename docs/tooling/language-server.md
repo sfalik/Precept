@@ -12,6 +12,47 @@
 
 ---
 
+## Contents
+
+- [2. Overview](#2-overview)
+- [3. Responsibilities and Boundaries](#3-responsibilities-and-boundaries)
+- [4. Right-Sizing](#4-right-sizing)
+- [5. Inputs and Outputs](#5-inputs-and-outputs)
+- [6. Architecture](#6-architecture)
+  - [In-Process Compilation Model](#in-process-compilation-model)
+  - [Document State Lifecycle](#document-state-lifecycle)
+  - [LSP Feature Routing and Artifact Consumption](#lsp-feature-routing-and-artifact-consumption)
+  - [Atomic Swap Concurrency](#atomic-swap-concurrency)
+- [7. Component Mechanics](#7-component-mechanics)
+  - [7.1 Diagnostics Push](#71-diagnostics-push)
+  - [7.2 Semantic Tokens (Two-Pass Design)](#72-semantic-tokens-two-pass-design)
+  - [7.3 Catalog-Driven Completions](#73-catalog-driven-completions)
+  - [7.4 Hover](#74-hover)
+  - [7.5 Go-to-Definition](#75-go-to-definition)
+  - [7.6 Preview/Inspect (Custom LSP Extension)](#76-previewinspect-custom-lsp-extension)
+  - [7.7 Document Outline](#77-document-outline)
+  - [7.8 Folding Ranges](#78-folding-ranges)
+  - [7.9 Diagnostic Enrichment ("Did You Mean?")](#79-diagnostic-enrichment-did-you-mean)
+  - [7.10 Code Actions](#710-code-actions)
+- [8. Dependencies and Integration Points](#8-dependencies-and-integration-points)
+- [9. Failure Modes and Recovery](#9-failure-modes-and-recovery)
+- [10. Contracts and Guarantees](#10-contracts-and-guarantees)
+- [11. Design Rationale and Decisions](#11-design-rationale-and-decisions)
+  - [Decision 1: In-Process Compilation](#decision-1-in-process-compilation)
+  - [Decision 2: Full-Pipeline Recompile on Change](#decision-2-full-pipeline-recompile-on-change)
+  - [Decision 3: Atomic Swap Concurrency](#decision-3-atomic-swap-concurrency)
+  - [Decision 4: Catalog-Driven Completions](#decision-4-catalog-driven-completions)
+  - [Decision 5: Two-Pass Semantic Tokens](#decision-5-two-pass-semantic-tokens)
+  - [Decision 6: Feature-to-Artifact Hard Rules](#decision-6-feature-to-artifact-hard-rules)
+- [12. Innovation](#12-innovation)
+- [13. Open Questions / Implementation Notes](#13-open-questions-implementation-notes)
+  - [Implementation Status](#implementation-status)
+  - [Open Questions](#open-questions)
+  - [Implementation Notes](#implementation-notes)
+- [14. Deliberate Exclusions](#14-deliberate-exclusions)
+- [15. Cross-References](#15-cross-references)
+- [16. Source Files](#16-source-files)
+
 ## 2. Overview
 
 The language server implements the LSP protocol for Precept `.precept` files. The shipped surface includes diagnostics, semantic tokens, completions, hover, go-to-definition, references, document highlights, rename, signature help, document outline, workspace symbols across open documents, folding, selection ranges, and code actions. It consumes pipeline artifacts by responsibility — each feature reads from exactly the artifact that owns the information it needs.

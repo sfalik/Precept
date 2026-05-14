@@ -12,6 +12,27 @@
 
 ---
 
+## Contents
+
+- [Overview](#overview)
+- [Responsibilities and Boundaries](#responsibilities-and-boundaries)
+- [Right-Sizing](#right-sizing)
+- [Inputs and Outputs](#inputs-and-outputs)
+- [Production Lifecycle](#production-lifecycle)
+- [Descriptor Shapes and Runtime API Integration](#descriptor-shapes-and-runtime-api-integration)
+  - [Descriptor Shapes](#descriptor-shapes)
+  - [API Surfaces Using Descriptors](#api-surfaces-using-descriptors)
+  - [MCP DTO Updates](#mcp-dto-updates)
+- [Dependencies and Integration Points](#dependencies-and-integration-points)
+- [Failure Modes and Recovery](#failure-modes-and-recovery)
+- [Contracts and Guarantees](#contracts-and-guarantees)
+- [Design Rationale and Decisions](#design-rationale-and-decisions)
+- [Innovation](#innovation)
+- [Notes](#notes)
+- [Deliberate Exclusions](#deliberate-exclusions)
+- [Cross-References](#cross-references)
+- [Source Files](#source-files)
+
 ## Overview
 
 Descriptor types are the runtime face of declarations. They represent declared program elements (fields, states, events, args, constraints, fault sites) as first-class sealed types — not string aliases. Every runtime API surface routes through descriptor identity. Descriptors are produced by the Precept Builder from `SemanticIndex` declarations and survive in the `Precept` executable model.

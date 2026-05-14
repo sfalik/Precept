@@ -10,6 +10,36 @@
 | Upstream | `compiler-and-runtime-design.md`; `executable-model.md` (D8/R4) |
 | Downstream | `fault-system.md`; `runtime-api.md` |
 
+## Contents
+
+- [Overview](#overview)
+- [Responsibilities and Boundaries](#responsibilities-and-boundaries)
+- [Right-Sizing](#right-sizing)
+- [Inputs and Outputs](#inputs-and-outputs)
+- [EventOutcome](#eventoutcome)
+- [UpdateOutcome](#updateoutcome)
+- [Inspection Types](#inspection-types)
+  - [Progressive Evaluation Model](#progressive-evaluation-model)
+  - [Enums](#enums)
+  - [EventInspection](#eventinspection)
+  - [UpdateInspection](#updateinspection)
+  - [TransitionInspection](#transitioninspection)
+  - [RowEffect](#roweffect)
+  - [ArgError](#argerror)
+  - [Shared Primitives](#shared-primitives)
+- [Version API Surface](#version-api-surface)
+- [Design Rationale and Decisions](#design-rationale-and-decisions)
+  - [Survey Grounding](#survey-grounding)
+  - [Review Feedback Incorporated](#review-feedback-incorporated)
+- [Innovation](#innovation)
+- [Open Questions / Implementation Notes](#open-questions-implementation-notes)
+  - [Arg-dependency sets (D8/R4)](#arg-dependency-sets-d8r4)
+  - [Transitive unresolvability propagation](#transitive-unresolvability-propagation)
+  - [Kleene three-value guard evaluation](#kleene-three-value-guard-evaluation)
+- [Deliberate Exclusions](#deliberate-exclusions)
+- [Cross-References](#cross-references)
+- [Source Files](#source-files)
+
 ## Overview
 
 The runtime uses three type families to represent operation results:

@@ -10,6 +10,33 @@
 | Upstream | `docs/compiler/diagnostic-system.md` — every `FaultCode` member references a `DiagnosticCode` via `[StaticallyPreventable]` |
 | Downstream | `docs/runtime/result-types.md` — `FaultException` exits the outcome hierarchy; `docs/runtime/evaluator.md` — the evaluator produces `Fault` values |
 
+## Contents
+
+- [Overview](#overview)
+- [Responsibilities and Boundaries](#responsibilities-and-boundaries)
+  - [OWNS](#owns)
+  - [Does NOT OWN](#does-not-own)
+- [Right-Sizing](#right-sizing)
+- [Inputs and Outputs](#inputs-and-outputs)
+- [FaultCode — The Registry](#faultcode-the-registry)
+- [FaultMeta and FaultSeverity](#faultmeta-and-faultseverity)
+- [Faults — The Exhaustive Switch](#faults-the-exhaustive-switch)
+- [Fault — The Output Type](#fault-the-output-type)
+- [The StaticallyPreventable Chain](#the-staticallypreventable-chain)
+  - [The divide-by-zero example, end to end](#the-divide-by-zero-example-end-to-end)
+- [Design Rationale and Decisions](#design-rationale-and-decisions)
+  - [Exhaustive switch, not attributes + reflection](#exhaustive-switch-not-attributes-reflection)
+  - [Recovery hints are on FaultMeta, not Fault](#recovery-hints-are-on-faultmeta-not-fault)
+  - [Defense-in-depth, not a primary error path](#defense-in-depth-not-a-primary-error-path)
+  - [Relationship to prototype](#relationship-to-prototype)
+- [Open Questions / Implementation Notes](#open-questions-implementation-notes)
+  - [Q1 — Evaluator result type](#q1-evaluator-result-type)
+  - [Q2 — Fault context](#q2-fault-context)
+  - [Q3 — Fault vs. structural impossibility](#q3-fault-vs-structural-impossibility)
+- [Deliberate Exclusions](#deliberate-exclusions)
+- [Cross-References](#cross-references)
+- [Source Files](#source-files)
+
 ## Overview
 
 The runtime fault system classifies and communicates evaluator failure modes. It is the runtime mirror of the compiler's diagnostic system.

@@ -12,6 +12,44 @@
 
 ---
 
+## Contents
+
+- [Overview](#overview)
+  - [Two-Lane Ingress Principle](#two-lane-ingress-principle)
+- [Responsibilities and Boundaries](#responsibilities-and-boundaries)
+- [Right-Sizing](#right-sizing)
+- [Inputs and Outputs](#inputs-and-outputs)
+- [Construction](#construction)
+  - [Compilation → Executable Model](#compilation-executable-model)
+  - [Executable Model → Initial Entity](#executable-model-initial-entity)
+  - [Precept — Definition-Level Queries](#precept-definition-level-queries)
+- [Restoration](#restoration)
+- [Operations](#operations)
+  - [Version — Entity Snapshot](#version-entity-snapshot)
+  - [Fire](#fire)
+  - [Update](#update)
+  - [Constraint Exposure Model](#constraint-exposure-model)
+  - [Shared Types](#shared-types)
+  - [Ingress Types](#ingress-types)
+  - [Value Types](#value-types)
+  - [Correctness Invariant](#correctness-invariant)
+  - [Thread Safety](#thread-safety)
+- [Inspection](#inspection)
+  - [InspectFire](#inspectfire)
+  - [InspectUpdate](#inspectupdate)
+- [Typed Lane](#typed-lane)
+  - [Get\<T\>() Mechanics](#gett-mechanics)
+  - [Valid CLR Types](#valid-clr-types)
+- [CLR Type Discovery](#clr-type-discovery)
+- [Design Rationale and Decisions](#design-rationale-and-decisions)
+- [Open Questions / Implementation Notes](#open-questions-implementation-notes)
+  - [R3 — Entity Representation Internals](#r3-entity-representation-internals)
+  - [D8/R4 — Executable Model Contract](#d8r4-executable-model-contract)
+  - [Stateless Precepts — CreateInitialVersion](#stateless-precepts-createinitialversion)
+- [Deliberate Exclusions](#deliberate-exclusions)
+- [Cross-References](#cross-references)
+- [Source Files](#source-files)
+
 ## Overview
 
 The runtime API is the boundary between Precept and host applications. It has four concerns:

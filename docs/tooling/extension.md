@@ -12,6 +12,30 @@
 
 ---
 
+## Contents
+
+- [Overview](#overview)
+- [Responsibilities and Boundaries](#responsibilities-and-boundaries)
+- [Right-Sizing](#right-sizing)
+- [Inputs and Outputs](#inputs-and-outputs)
+- [Orchestration Architecture](#orchestration-architecture)
+- [VS Code Integration Points](#vs-code-integration-points)
+  - [Grammar Registration](#grammar-registration)
+  - [LS Client Lifecycle](#ls-client-lifecycle)
+  - [Language Server Status Bar](#language-server-status-bar)
+  - [MCP Server Launch](#mcp-server-launch)
+  - [Commands](#commands)
+  - [Preview Webview](#preview-webview)
+- [Dependencies and Integration Points](#dependencies-and-integration-points)
+- [Failure Modes and Recovery](#failure-modes-and-recovery)
+- [Contracts and Guarantees](#contracts-and-guarantees)
+- [Design Rationale and Decisions](#design-rationale-and-decisions)
+- [Innovation](#innovation)
+- [Open Questions / Implementation Notes](#open-questions-implementation-notes)
+- [Deliberate Exclusions](#deliberate-exclusions)
+- [Cross-References](#cross-references)
+- [Source Files](#source-files)
+
 ## Overview
 
 The VS Code extension hosts the language server, launches the MCP server, provides the TextMate grammar for syntax highlighting, and surfaces Precept-specific commands and the preview webview panel. It is the thin host shell — all intelligence comes from the language server and compiler.
