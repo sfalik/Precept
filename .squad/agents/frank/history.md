@@ -79,3 +79,4 @@
 - Before using a diagnostic as an ordering dependency, verify whether the checker wiring already shipped; stale sequencing premises should not override integrity-first prioritization.
 - Gate 1 allow-list entries only need root-cause cluster comments; per-issue citations duplicate slice-level tracking when codes cannot slip independently from their cluster.
 - Gate 2's emission-site analyzer should stay on an explicit pipeline-centered scan set; broad all-source scans create more false-positive risk than value while the known emission paths remain stable and well-defined.
+- Strip `// ...`, `/** */`, and `/// ...` comment content before Gate 2 matches `DiagnosticCode.*`; the implementation cost is small and removes the doc-comment false-positive class up front.
