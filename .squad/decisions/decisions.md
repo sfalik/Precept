@@ -1,3 +1,66 @@
+# Decision Record: Quantity Normalization Architectural Reassessment
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14T01:46:51-04:00
+**Scope:** Compile-time quantity normalization pipeline architecture
+
+---
+
+## Decisions
+
+### D1: No shared opcode representation between ProofEngine and Evaluator
+
+The proof engine uses `NumericInterval` (abstract interpretation). The evaluator uses flat opcode arrays (concrete execution). These share source data (`TypedField.NormalizedDeclaredMin/Max`) but NOT an intermediate representation. A shared plan would add coupling without reducing code in either consumer.
+
+### D2: No Builder stage in the compile pipeline
+
+The Builder runs once per deployment, not per keystroke. Adding it to `Compiler.Compile()` would conflate analysis (per-keystroke diagnostics) with runtime compilation (per-deploy optimization). The Builder reads the same `TypedField` normalized bounds the ProofEngine reads — the shared seam is the semantic model.
+
+### D3: Universal interval scaling via `IntervalOf` post-step
+
+Instead of normalizing inside `TryGetTypedConstantMagnitude` (per-expression, scattered), factor normalization as a universal post-step in `IntervalOf`: compute raw interval → if expression has a static unit, scale the interval. This handles both `TypedTypedConstant` and `TypedInterpolatedTypedConstant` uniformly via a single `TryGetStaticUnit(TypedExpression)` helper.
+
+### D4: TypedField stores both original and normalized bounds
+
+`TypedField` gains `NormalizedDeclaredMin` and `NormalizedDeclaredMax` (decimal?) alongside existing `DeclaredMin`/`DeclaredMax`. TypeChecker computes both in one pass. Original values serve diagnostics; normalized values serve proof comparison. Eliminates the Q2 tension entirely.
+
+### D5: No QuantityValue wrapper type
+
+`decimal` is sufficient for all compile-time and build-time comparison needs. A `QuantityValue` wrapper adds an indirection step without improving any callsite. Runtime quantity storage remains a pending D8/R4 decision.
+
+### D6: Normalizer stays in `src/Precept/Language/Numeric/`
+
+The normalizer is a numeric utility that consumes UCUM parse results — it belongs with numeric comparison concerns, not with UCUM parsing infrastructure or runtime execution.
+
+### D7: `NormalizedNumericValue` record struct is unnecessary — simplify to bare `decimal` return
+
+The `OriginalMagnitude` and `ConversionFactor` fields on `NormalizedNumericValue` serve no consumer. The normalizer returns `decimal`. Original values live on `TypedField.DeclaredMin/Max`.
+
+---
+
+## Open Questions (for Shane)
+
+- **Q7:** Should `IntervalContainmentProofRequirement` carry original bounds for display, or should diagnostic renderers look them up from `SemanticIndex`?
+- **Q8:** Should `NumericInterval.Scale` accept `UcumExactFactor` (exact) or `decimal` (simpler)?
+- **Q9:** Confirm "store both" approach on `TypedField` (2 extra `decimal?` fields).
+
+---
+
+## Impact on Slices 14–21
+
+- Slice 14: Simpler (bare `decimal` normalizer + `NumericInterval.Scale`).
+- Slice 15: TypeChecker stores both original + normalized bounds.
+- Slice 16: `TryGetTypedConstantMagnitude` UNCHANGED; new `TryGetStaticUnit` + `IntervalOf` post-step.
+- Slices 19–20: Unified via same `TryGetStaticUnit` path; no special-case interval scaling.
+- Overall: fewer code changes, clearer single-responsibility, one normalization per value.
+
+# Doc navigation improvements
+
+**Date:** 2026-05-14
+**By:** Frank (Shane's request)
+**What:** Added TOC + non-negotiable callout boxes to 5 critical architectural docs to improve AI agent navigation
+**Why:** Agents were missing critical architectural invariants because rules were buried in large docs with no navigation
+
 # Frank — Hover Gap Audit — V7 vs. Implementation
 
 **Date:** 2026-05-13
