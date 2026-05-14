@@ -6,6 +6,20 @@
 
 ---
 
+### 2026-05-14T05:34:18Z: PreceptValue quantity storage uses the union reference lane, so unit identity is not ruled out by the 32-byte layout
+
+**By:** Scribe
+
+**Status:** Merged from Frank's correction note.
+
+**Merged source:** `frank-preceptvalue-quantity-storage.md`.
+
+- Frank corrected `docs/Working/quantity-normalization-design.md` §2.1: `PreceptValue` bytes 8–23 are a three-way union (`decimal`, `long`, or reference region), not a decimal-only payload.
+- The existing 32-byte `PreceptValue` budget therefore does not rule out quantity unit storage through the reference lane; collection backing arrays already prove that lane is viable for composite storage.
+- George should treat quantity runtime storage as an open implementation choice between reference-lane composite storage and descriptor metadata, not as a settled "unit must live outside `PreceptValue`" constraint.
+
+---
+
 ### 2026-05-14T05:30:09Z: Interpolated quantity normalization splits static-literal and interpolated paths, and `precept_compile` still runs proof diagnostics
 
 **By:** Scribe

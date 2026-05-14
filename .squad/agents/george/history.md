@@ -140,6 +140,12 @@
 
 
 
+### 2026-05-14T05:34:18Z — PreceptValue quantity-storage constraint was corrected before runtime implementation
+
+- Frank verified that `PreceptValue` bytes 8–23 are a union lane (`decimal`, `long`, or reference region), so the quantity design note's old "no room for unit reference" finding was incorrect.
+- Runtime guardrail: do not treat `PreceptValue` as decimal-only during quantity implementation; unit identity can still live in the reference lane, with descriptor metadata remaining the other viable option.
+- Source of truth updated in `docs/Working/quantity-normalization-design.md` §2.1 and recorded in `.squad/decisions.md`.
+
 ## Learnings
 
 
