@@ -1,16 +1,16 @@
 precept Test
 
-field test as integer
+field test as integer max 5
 
 state offState initial
 state onState 
 
 event toggle initial
 
-#in offState omit test
+in offState omit test
 
 from offState on toggle 
-    -> set test 
+    -> set test = 6
     -> transition onState
 
 from onState on toggle

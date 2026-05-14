@@ -19,6 +19,18 @@
 
 ## Recent Updates
 
+### 2026-05-14T00:56:58Z — Q2 resolved for dynamic qualifier enforcement
+
+- `docs/Working/diagnostic-enforcement.md` now marks Q2 as decided.
+- The TypeChecker silently skips PRE0070–0074 cross-currency diagnostics when the qualifier is dynamic.
+- Strategy 5 in the ProofEngine remains the enforcement point for dynamic qualifier validation.
+
+### 2026-05-14T00:52:34Z — Q1/Q10 resolved for diagnostic enforcement
+
+- `docs/Working/diagnostic-enforcement.md` now marks Q1 and Q10 as decided.
+- PRE0079 is finalized as a TypeChecker-only literal-bounds diagnostic; PRE0078 remains the ProofEngine / Strategy 7 interval diagnostic.
+- The plan now records the PRE0078/PRE0079 message text updates and the Q10 obligation-generation gate as separate from the Gate 1 allow-list timing.
+
 ### 2026-05-14T00:05:43Z — Diagnostic enforcement revised for interval-proof dependency
 
 - `docs/Working/diagnostic-enforcement.md` now treats PRE0078 `NumericOverflow` as a Strategy 7 / ProofEngine obligation failure instead of a Slice 8 TypeChecker wire.
@@ -58,8 +70,10 @@
 
 ## Learnings
 
+- Q4 PRE0091 AmbiguousTypedConstant decision recorded: narrow first tranche (temporal quantity ambiguity only) validated by architecture — `ResolveTypedConstant` receives `expectedType`, making multi-candidate enumeration speculative infrastructure for error-recovery paths only.
 - If a design depends on an existing diagnostic, confirm the emitting pipeline stage instead of trusting `DiagnosticMeta` declarations or spec prose.
 - Gate 2 is a tripwire, not proof of behavioral correctness; every gap closure still needs both positive and negative tests.
 - Stale exploratory docs must be revised promptly once an implementation-spec path is approved, or they become misleading guidance for downstream agents.
 - `set` into an `omit` target-state field is the decisive field-state rule; Update access modes do not constrain Fire semantics.
 - Catalog static initialization may not reach downstream catalog statics during cctor execution; reverse references should defer through `Lazy<T>`.
+- Before using a diagnostic as an ordering dependency, verify whether the checker wiring already shipped; stale sequencing premises should not override integrity-first prioritization.

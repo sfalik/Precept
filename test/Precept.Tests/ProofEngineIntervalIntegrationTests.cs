@@ -30,6 +30,32 @@ public class ProofEngineIntervalIntegrationTests
         ProofRequirementKind.IntervalContainment;
 
     // ════════════════════════════════════════════════════════════════════════
+    //  TypeChecker bounds extraction validation (Phase 1 - B1 diagnostic)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TypeChecker_FieldWithBounds_PopulatesDeclaredMinMax()
+    {
+        // Phase 1 B1: Verify TypeChecker correctly extracts min/max modifiers
+        // If this test fails, bounds extraction is broken at TypeChecker.cs:378-383
+        const string precept = @"
+precept BoundsTest
+field qty as decimal min 1 max 1000
+state Active initial";
+
+        var result = Compiler.Compile(precept);
+        
+        // Find the qty field in the compiled semantics
+        result.Semantics.FieldsByName.Should().ContainKey("qty", "qty field should exist");
+        
+        var qtyField = result.Semantics.FieldsByName["qty"];
+        
+        // Verify bounds were extracted
+        qtyField.DeclaredMin.Should().Be(1m, "min 1 modifier should be extracted");
+        qtyField.DeclaredMax.Should().Be(1000m, "max 1000 modifier should be extracted");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  Inline precept constants — §9.2 fixture strategy
     //  "Do not reference .precept sample files" — defined inline only.
     // ════════════════════════════════════════════════════════════════════════
