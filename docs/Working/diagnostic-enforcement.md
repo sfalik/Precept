@@ -1037,22 +1037,22 @@ public void DescriptiveCondition_ValidForm_NoDiagnostic()
 
 ### Priority 0 — Enforcement Foundation
 Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `PRECEPT0027` and `PRECEPT0028` are active in build + IDE.
-- [ ] **Slice 0:** Roslyn analyzers (Gate 1 + Gate 2) — `PRECEPT0027` + `PRECEPT0028`
+- [x] **Slice 0:** Roslyn analyzers (Gate 1 + Gate 2) — `PRECEPT0027`–`PRECEPT0030` shipped (`DiagnosticCoverageAllowLists.cs`, `DiagnosticCoverageScanner.cs`, Gate 1 + Gate 2 analyzers + tests)
 
 ### Priority 1 — Integrity Violations (Silent Wrong Behavior)
 - [x] **Slice 1:** Currency/unit arithmetic safety (PRE0070–0074) — `TypeChecker.Expressions.cs` qualifier comparison
 - [x] **Slice 2:** Choice value validation (PRE0086–0089) — `TypeChecker.Expressions.cs` choice literal check
 - [x] **Slice 3:** ~~InitialEventMissingAssignments (PRE0094)~~ — **already wired** in `TypeChecker.Validation.FieldState.cs`; no gap-closure work needed
-- [ ] **Slice 4:** EventHandlerInStatefulPrecept (PRE0092) — trivial structural check in `ValidateStructural`
+- [x] **Slice 4:** EventHandlerInStatefulPrecept (PRE0092) — trivial structural check in `ValidateStructural`
 
 ### Priority 2 — User Experience Gaps
 - [x] **Slice 5:** ~~Temporal constant precision (PRE0055–0058)~~ — **subsumed by Slice 9B** catalog-mediated emission
 - [x] **Slice 5A:** Ambiguous typed constant resolution (PRE0091) — TypeChecker typed-constant candidate arbitration, sequenced after typed-constant split stabilization
-- [ ] **Slice 6:** Collection safety extensions (PRE0099–0101, PRE0104) — ProofEngine + TypeChecker
+- [x] **Slice 6:** Collection safety extensions (PRE0100, PRE0104 wired; PRE0099/PRE0101 staged — await Lookup type expansion) — ProofEngine + TypeChecker
 - [x] **Slice 7:** Parser guard gates (PRE0013–0015) — explicit rejection paths in `Parser.cs`
 
 ### Priority 3 — Scattered TypeChecker Gaps
-- [ ] **Slice 8:** Scattered emission sites (PRE0027, PRE0035, PRE0039, PRE0042, PRE0043, PRE0044, PRE0050, PRE0067, PRE0085, PRE0105) — individual TypeChecker wires
+- [x] **Slice 8:** Scattered emission sites (PRE0027, PRE0035, PRE0039, PRE0042, PRE0043, PRE0044, PRE0050, PRE0067, PRE0085, PRE0105) — individual TypeChecker wires
 
 ### Priority 4 — Catalog-Mediated Emission Expansion (Mechanism Migration) ★ Active
 These slices are in-scope for the current execution plan. They refactor emission dispatch from per-identity switches to catalog-mediated loops. They do not add net-new diagnostic coverage — their gate is behavioral equivalence plus analyzer recognition. Each requires a prerequisite audit pass; if the audit shows insufficient branch count, the slice closes as "not viable."
