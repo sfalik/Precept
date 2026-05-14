@@ -913,13 +913,13 @@ Test method names:
 - Add ≥1 new positive/negative pair per migrated diagnostic code to prove catalog dispatch works end-to-end.
 - `TypeCheckerCITests.cs` — unrelated, must pass (proves no interference with existing catalog-mediated emission).
 
-- [ ] Audit `ValidateModifiers` branch count and shape — document findings in PR
-- [ ] Add `ConstraintDiagnosticCode` to `ModifierMeta` (nullable; `null` = "no catalog-driven constraint check")
-- [ ] Populate metadata for each modifier whose constraint violation has a dedicated `DiagnosticCode`
-- [ ] Refactor `ValidateModifiers` to generic loop reading catalog property
-- [ ] Verify existing modifier tests pass unchanged (behavioral equivalence)
-- [ ] Add new positive + negative tests for catalog-dispatch path
-- [ ] Verify Gate 1 still recognizes the emission site (indirect catalog reference)
+- [x] Audit `ValidateModifiers` branch count and shape — **audit: not viable (2 identity-specific branches, threshold is ≥3)**
+- [ ] ~~Add `ConstraintDiagnosticCode` to `ModifierMeta`~~ — N/A (audit: not viable)
+- [ ] ~~Populate metadata for each modifier whose constraint violation has a dedicated `DiagnosticCode`~~ — N/A (audit: not viable)
+- [ ] ~~Refactor `ValidateModifiers` to generic loop reading catalog property~~ — N/A (audit: not viable)
+- [ ] ~~Verify existing modifier tests pass unchanged (behavioral equivalence)~~ — N/A (audit: not viable)
+- [ ] ~~Add new positive + negative tests for catalog-dispatch path~~ — N/A (audit: not viable)
+- [ ] ~~Verify Gate 1 still recognizes the emission site (indirect catalog reference)~~ — N/A (audit: not viable)
 
 ---
 
@@ -1057,7 +1057,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 ### Priority 4 — Catalog-Mediated Emission Expansion (Mechanism Migration) ★ Active
 These slices are in-scope for the current execution plan. They refactor emission dispatch from per-identity switches to catalog-mediated loops. They do not add net-new diagnostic coverage — their gate is behavioral equivalence plus analyzer recognition. Each requires a prerequisite audit pass; if the audit shows insufficient branch count, the slice closes as "not viable."
 
-- [ ] **Slice 9A:** Modifier constraint violations → `ModifierMeta.ConstraintDiagnosticCode` — generic loop in `ValidateModifiers` (after Slice 8 wires PRE0035/PRE0042)
+- [x] **Slice 9A:** ~~Modifier constraint violations~~ → audit: not viable — closed 2025-07-14. Only 2 identity-specific branches found (WritableOnEventArg, ComputedFieldNotWritable); both are context-dependent checks on the same modifier (Writable), not a pure 1:1 identity→code mapping. `ValidateModifierValues` branches all emit the same code (InvalidModifierValue). Threshold ≥3 not met.
 - [x] **Slice 9B:** ~~Typed-constant family diagnostics~~ → `ContentValidation.FormatErrorCode`/`SemanticErrorCode` — catalog dispatch in `TypedConstantValidation` (subsumes Slice 5)
 - [x] **Slice 9C:** Proof obligation consistency → `ProofRequirements.GetMeta(kind).DiagnosticCode` everywhere — audit and migrate remaining hardcoded ProofEngine emission **(sequence after interval engine Slice 2; must include Strategy 7)** — ✅ Completed 2025-07-14: Added `DiagnosticCode` property to `ProofRequirementMeta`; refactored `CreateFaultSiteLink` to use catalog dispatch for all non-Numeric kinds; `Numeric` retained as documented exception (1:many context-dependent mapping); `CreateDiagnostic` retained as legitimate per-obligation formatting; Strategy 7 verified: `IntervalContainment.DiagnosticCode == NumericOverflow`.
 
