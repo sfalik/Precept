@@ -6,6 +6,34 @@
 
 ---
 
+### 2026-05-14T00:05:43Z: Diagnostic enforcement revision now treats PRE0078 as an interval-proof obligation and narrows PRE0079
+
+**By:** Scribe
+
+**Status:** Merged from Frank's diagnostic-enforcement revision.
+
+**Merged source:** `frank-diagnostic-enforcement-revision.md`.
+
+- Frank corrected the enforcement plan's ownership model: PRE0078 `NumericOverflow` is a ProofEngine obligation failure emitted by Strategy 7 (`IntervalContainment`), not a Slice 8 TypeChecker gap.
+- Slice 9C now depends on interval-engine Slice 2 so the proof-obligation consistency audit covers `IntervalContainment`, while Gate 1 allow-list removal for PRE0078 waits on that external emission path.
+- PRE0079 `OutOfRange` is now narrowed to constant-literal assignments that trivially exceed declared bounds; general expression-level bounds checking belongs to the interval proof engine.
+
+---
+
+### 2026-05-13T23:55:10Z: Overflow-prevention analysis now defers arithmetic bounds enforcement to Strategy 7
+
+**By:** Scribe
+
+**Status:** Merged from Frank's overflow-prevention revision.
+
+**Merged source:** rank-overflow-prevention-revision.md.
+
+- Frank revised overflow-prevention-design-analysis.md in place so obsolete @bounds, bounded-integer, validator-phase, runtime-fallback, extra-diagnostic, and three-wave rollout claims are clearly superseded by the interval proof engine design.
+- Strategy 7 (IntervalContainment) now owns bounded arithmetic range checking, NumericOverflow emission, modifier-derived bound extraction, guard narrowing, catalog-driven interval transfer, and hover interval display.
+- The overflow-prevention analysis keeps only durable value: problem framing, strategy comparison, and historical context, with explicit cross-references to interval-proof-engine-design.md.
+
+---
+
 ### 2026-05-13T04:52:18Z: D94 follow-up coverage now locks omit-boundary, multi-initial-state, and stateless-bailout regressions
 
 **By:** Scribe
