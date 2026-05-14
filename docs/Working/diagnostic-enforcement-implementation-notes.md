@@ -300,3 +300,33 @@ The interval proof engine plan (`docs/Working/interval-proof-engine-design.md`) 
 2. **PRE0079 `OutOfRange`** boundary — interval engine owns expression-level bounds (computed intervals), enforcement plan owns literal-assignment bounds (TypeChecker). These are complementary: PRE0079 fires on `set field to 42` where `42 > max 10`; PRE0078 fires on `set field to X + Y` where the computed interval exceeds bounds. No overlap because TypeChecker runs before ProofEngine and the Q10 literal dedup gate prevents double collection.
 
 3. **Slice 9C verification** — confirmed Strategy 7 uses catalog-mediated dispatch (`ProofRequirementMeta.IntervalContainment.DiagnosticCode`), not a hardcoded literal. The interval engine is aligned with catalog-driven architecture.
+
+---
+
+## 10. Implementer Notes (George)
+
+These notes were recorded by George during and after the enforcement mission and capture the implementation-floor perspective not visible from architecture review alone.
+
+### File Conflict Groups — Wave Serialization Rationale
+
+Three files had multi-slice ownership, forcing wave serialization within each group:
+
+| File | Slices | Resolution |
+|------|--------|-----------|
+| `TypeChecker.Expressions.cs` | 1, 2, 8 | Serialized: Wave 1 (Slice 1) → Wave 2 (Slice 2) → Wave 3 (Slice 8) |
+| `TypeChecker.Validation.cs` | 4, 8, 9A | Wave 1 (Slice 4) → Wave 3 (Slice 8) → Wave 4 (Slice 9A audit) |
+| `Parser.cs` | 7 only | No conflict — Wave 1 parallel |
+
+All other slices were independent and ran in Wave 1 in parallel. File conflict analysis — not domain dependency — was the primary wave-ordering constraint.
+
+### Slice 9B Subsuming Slice 5
+
+Slice 9B (catalog-mediated dispatch in ProofEngine) was scoped to subsume Slice 5 (temporal constant ambiguity / PRE0055–0058) via a catalog-mediated approach. The `TypedConstantFamilyMeta.FormatErrorCode` / `SemanticErrorCode` pattern is architecturally superior to direct temporal emission because it keeps the dispatch table in metadata rather than control flow. Slice 5 as originally spec'd would have been an independent TypeChecker wire; the merged approach is cleaner.
+
+### Staged Infrastructure (PRE0099/0101) — Implementation Posture
+
+The PRE0099/0101 staged work (`KeyPresenceProofRequirement`, `GuardHasContainsCheck`, `ContainsGuardConstraint`) is fully functional code — not a scaffold or placeholder. The strategy was written against the Lookup type as it will exist after catalog expansion. When the key-access accessor and `put` action land in the catalog, the proof engine strategy requires no changes; only the TypeChecker obligation collection site and the allow-list entry need updating.
+
+### Distilled Lesson
+
+> Keep enforcement work catalog-driven; preserve explicit carve-outs for legitimate direct emissions (1:many mappings, context-dependent dispatch); treat stage boundaries and durable logs as the primary review surface — not inline code comments.
